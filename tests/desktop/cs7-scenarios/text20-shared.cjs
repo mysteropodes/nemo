@@ -35,6 +35,7 @@ function targetWorkflow(original) {
   return { async run({ session, row }) {
     check(row.issue === 2264 && same(row.checks.map(c => c.id), Object.keys(GROUPS)), 'original Text target clauses changed');
     const result = await original.run({ session, row: structuredClone(ORIGINAL) });
+    check(typeof result.finalize === 'function', 'original Text20 cleanup finalizer required');
     const phases = result.phaseResults;
     check(Array.isArray(phases) && same(phases.map(p => p.phase), PHASES) &&
       phases.every(p => ['pass', 'fail', 'unrun'].includes(p.status)), 'original Text20 phase evidence missing');
@@ -46,14 +47,13 @@ function targetWorkflow(original) {
     });
     return { checks: mapped.map(c => ({ ...c, status: c.status === 'pass' ? 'unrun' : c.status })),
       safeToContinue: result.safeToContinue,
+      sharedResults: [{ rowId: ORIGINAL.id, result }],
       finalize: async () => {
-        if (result.finalize) {
-          const terminal = await result.finalize();
-          check(terminal.length === 1 && terminal[0].id === 'original-text20' && terminal[0].status === 'pass',
-            'original Text20 terminal evidence refused');
-        }
+        const terminal = await result.finalize();
+        check(terminal.length === 1 && terminal[0].id === 'original-text20' &&
+          terminal[0].status === (result.safeToContinue ? 'pass' : 'fail'), 'original Text20 terminal evidence refused');
         return mapped;
       } };
   } };
 }
-module.exports = { sharedWorkflow, targetWorkflow };
+module.exports = { sharedWorkflow, targetWorkflow, GROUPS };

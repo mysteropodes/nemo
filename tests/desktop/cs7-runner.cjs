@@ -100,11 +100,26 @@ function rowResult(row, observations, status) {
 async function runInstalledRows({ rows, scenarios, session, now = () => new Date().toISOString(), save = async () => {} }) {
   check(rows.length > 0, 'empty installed batch refused');
   const results = rows.map(row => rowResult(row, [], 'unrun'));
-  const finalizers = [];
+  const finalizers = [], recorded = new Set();
   let identity, operatorInputFailures = 0, evidenceFailures = 0, cleanup = 'unrun', terminalCode = null, activeRow = null, failure = null;
+  function record(i, observed) {
+    check(!recorded.has(i), 'installed row already recorded');
+    check(observed && Array.isArray(observed.checks) && typeof observed.safeToContinue === 'boolean', 'installed scenario returned no disposition');
+    const result = rowResult(rows[i], observed.checks, 'unrun');
+    check(observed.checks.length === rows[i].checks.length, 'installed scenario omitted assertions');
+    result.status = result.checks.every(c => c.status === 'pass') ? 'pass' :
+      result.checks.some(c => c.status === 'fail') ? 'fail' : 'incomplete';
+    if (observed.finalize !== undefined) {
+      check(typeof observed.finalize === 'function' && result.status !== 'pass', 'deferred evidence cannot claim an early pass');
+      finalizers.push({ index: i, run: observed.finalize });
+      if (result.status !== 'fail') result.status = 'pending-verification';
+    }
+    results[i] = result; recorded.add(i);
+  }
   try {
     identity = verifiedIdentity(await session.start());
     for (let i = 0; i < rows.length; i++) {
+      if (recorded.has(i)) continue;
       const row = rows[i];
       activeRow = row.id;
       if (row.dependsOn.some(id => results.find(r => r.id === id)?.status !== 'pass')) {
@@ -112,20 +127,22 @@ async function runInstalledRows({ rows, scenarios, session, now = () => new Date
       }
       check(isDeepStrictEqual(verifiedIdentity(await session.identity()), identity), 'installed candidate changed');
       const observed = await scenarios[row.scenario].run({ session, row: structuredClone(row) });
-      check(observed && Array.isArray(observed.checks) && typeof observed.safeToContinue === 'boolean', 'installed scenario returned no disposition');
-      const result = rowResult(row, observed.checks, 'unrun');
-      check(observed.checks.length === row.checks.length, 'installed scenario omitted assertions');
-      result.status = result.checks.every(c => c.status === 'pass') ? 'pass' :
-        result.checks.some(c => c.status === 'fail') ? 'fail' : 'incomplete';
-      if (observed.finalize !== undefined) {
-        check(typeof observed.finalize === 'function' && result.status !== 'pass', 'deferred evidence cannot claim an early pass');
-        finalizers.push({ index: i, run: observed.finalize });
-        if (result.status !== 'fail') result.status = 'pending-verification';
+      record(i, observed);
+      // A reviewed scenario may already have executed an entire later workflow.
+      // Record that evidence before honoring its stop; never call another actor
+      // merely to retrieve the failure, or replay the shared work on success.
+      const shared = observed.sharedResults || [];
+      check(Array.isArray(shared) && shared.length < rows.length, 'invalid shared installed results');
+      let safeToContinue = observed.safeToContinue;
+      for (const item of shared) {
+        const index = rows.findIndex(r => r.id === item.rowId);
+        check(index > i && !item.result?.sharedResults, 'shared installed result must name a later declared row');
+        record(index, item.result);
+        safeToContinue = safeToContinue && item.result.safeToContinue;
       }
-      results[i] = result;
       check(isDeepStrictEqual(verifiedIdentity(await session.identity()), identity), 'installed candidate changed');
       await save({ identity, rows: results, cleanup, complete: false });
-      if (!observed.safeToContinue) { terminalCode = 'scenario-stopped'; break; }
+      if (!safeToContinue) { terminalCode = 'scenario-stopped'; break; }
     }
   } catch (error) {
     // Error messages can contain private paths/tokens. Publish only the fixed classification.

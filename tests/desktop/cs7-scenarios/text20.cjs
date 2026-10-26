@@ -87,7 +87,13 @@ function createWorkflow({ packet, original, c, modules, inputs }) {
           report.phases.find(p => p.phase === phase.name).status = 'fail';
           report.failure = { phase: phase.name, classification: 'original-phase-oracle-refused' }; save();
           return { checks: [{ id: 'original-text20', status: 'fail' }], safeToContinue: false,
-            phaseResults: structuredClone(report.phases) };
+            phaseResults: structuredClone(report.phases),
+            finalize: async () => {
+              // Preserve the original failure and unrun tail while recording
+              // the same verified cleanup required by earned provider clauses.
+              report.cleanup = 'complete'; save();
+              return [{ id: 'original-text20', status: 'fail' }];
+            } };
         }
         report.phases.find(p => p.phase === phase.name).status = 'pass'; delete report.inFlight; save();
       }

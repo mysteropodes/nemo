@@ -1,6 +1,6 @@
 'use strict';
 const test = require('node:test'), assert = require('node:assert/strict');
-const { sharedWorkflow, targetWorkflow } = require('../cs7-scenarios/text20-shared.cjs');
+const { sharedWorkflow, targetWorkflow, GROUPS } = require('../cs7-scenarios/text20-shared.cjs');
 const phases = require('../cs7-scenarios/text20-phases.json');
 const textRow = { issue: 2267, checks: [{ id: 'original-text20' }] };
 const targetRow = { issue: 2264, checks: ['text-edit', 'font-bind', 'reopen'].map(id => ({ id })) };
@@ -15,9 +15,9 @@ function fixture(failed) {
       return { phase: p.name, status };
     });
     return { checks: [{ id: 'original-text20', status: failed ? 'fail' : 'unrun' }],
-      safeToContinue: !failed, phaseResults, ...(!failed ? { finalize: async () => {
-        finalized++; return [{ id: 'original-text20', status: 'pass' }];
-      } } : {}) };
+      safeToContinue: !failed, phaseResults, finalize: async () => {
+        finalized++; return [{ id: 'original-text20', status: failed ? 'fail' : 'pass' }];
+      } };
   } };
   const qualification = { source: 'a'.repeat(40), inputs: 'b'.repeat(64), runtime: { task: 'one-batch' } };
   return { workflow, qualification, counts: () => ({ runs, finalized }) };
@@ -64,10 +64,10 @@ test('later tool failure cannot erase earned provider phases or the original twe
   assert.deepEqual((await result.finalize()).map(c => c.status), ['pass', 'pass', 'pass']);
   const original = await shared.run({ session, row: textRow });
   assert.equal(original.checks[0].status, 'fail');
-  assert.deepEqual(f.counts(), { runs: 1, finalized: 0 });
+  assert.deepEqual(f.counts(), { runs: 1, finalized: 1 });
 });
 test('missing original phases and reordered provider clauses fail closed', async () => {
-  const original = { run: async () => ({ phaseResults: [], safeToContinue: true }) };
+  const original = { run: async () => ({ phaseResults: [], safeToContinue: true, finalize: async () => [] }) };
   await assert.rejects(targetWorkflow(original).run({ session: {}, row: targetRow }), /phase evidence missing/);
   await assert.rejects(targetWorkflow(original).run({ session: {}, row: { ...targetRow, checks: [...targetRow.checks].reverse() } }), /clauses changed/);
 });
@@ -87,7 +87,7 @@ test('actual batch runner withholds both shared receipts when owner cleanup fail
   const f = fixture(), shared = sharedWorkflow(f.workflow, f.qualification);
   const identity = { sourceSha: 'a'.repeat(40), tree: 'b'.repeat(40), driverSha: 'c'.repeat(40),
     executableSha256: 'd'.repeat(64), sessionId: 'batch', pid: 123, dirty: false };
-  const rows = [targetRow, textRow].map((row, n) => ({ ...row, id: 'row-' + n, scenario: 'case-' + n,
+  const rows = [targetRow, textRow].map((row, n) => ({ ...row, id: n ? 'text20' : 'text-targets', scenario: 'case-' + n,
     tasks: [], surfaces: [], dependsOn: [], checks: row.checks.map(c => ({ ...c, clause: c.id, covers: ['positive'] })) }));
   const result = await runInstalledRows({ rows,
     scenarios: { 'case-0': targetWorkflow(shared), 'case-1': shared },
@@ -97,4 +97,48 @@ test('actual batch runner withholds both shared receipts when owner cleanup fail
   assert.equal(result.installed.cleanup, 'incomplete');
   assert.ok(result.installed.rows.every(r => r.checks.every(c => c.status === 'unrun')));
   assert.deepEqual(f.counts(), { runs: 1, finalized: 0 });
+});
+test('actual runner records the original late failure before stopping, without executing its later row', async () => {
+  const { runInstalledRows } = require('../cs7-runner.cjs');
+  const f = fixture('locked-placement'), shared = sharedWorkflow(f.workflow, f.qualification);
+  const identity = { sourceSha: 'a'.repeat(40), tree: 'b'.repeat(40), driverSha: 'c'.repeat(40),
+    executableSha256: 'd'.repeat(64), sessionId: 'batch', pid: 123, dirty: false };
+  const rows = [targetRow, textRow].map((row, n) => ({ ...row, id: n ? 'text20' : 'text-targets', scenario: 'case-' + n,
+    tasks: [], surfaces: [], dependsOn: [], checks: row.checks.map(c => ({ ...c, clause: c.id, covers: ['positive'] })) }));
+  let laterCalls = 0;
+  const result = await runInstalledRows({ rows,
+    scenarios: { 'case-0': targetWorkflow(shared), 'case-1': { run: async () => { laterCalls++; throw Error('later input forbidden'); } } },
+    session: { start: async () => identity, identity: async () => identity, cleanup: async () => {} } });
+  assert.deepEqual(result.installed.rows.map(r => r.status), ['pass', 'fail']);
+  assert.equal(result.installed.rows[1].checks[0].status, 'fail');
+  assert.equal(result.verdict, 'fail');
+  assert.equal(result.installed.operatorInputFailures, 0);
+  assert.equal(result.installed.terminalCode, 'scenario-stopped');
+  assert.equal(laterCalls, 0);
+  assert.deepEqual(f.counts(), { runs: 1, finalized: 1 });
+});
+test('successful shared workflow credits both rows without scheduling later Text20 input', async () => {
+  const { runInstalledRows } = require('../cs7-runner.cjs');
+  const f = fixture(), shared = sharedWorkflow(f.workflow, f.qualification);
+  const identity = { sourceSha: 'a'.repeat(40), tree: 'b'.repeat(40), driverSha: 'c'.repeat(40),
+    executableSha256: 'd'.repeat(64), sessionId: 'batch', pid: 123, dirty: false };
+  const rows = [targetRow, textRow].map((row, n) => ({ ...row, id: n ? 'text20' : 'text-targets', scenario: 'case-' + n,
+    tasks: [], surfaces: [], dependsOn: [], checks: row.checks.map(c => ({ ...c, clause: c.id, covers: ['positive'] })) }));
+  let laterCalls = 0;
+  const result = await runInstalledRows({ rows,
+    scenarios: { 'case-0': targetWorkflow(shared), 'case-1': { run: async () => { laterCalls++; throw Error('shared workflow replayed'); } } },
+    session: { start: async () => identity, identity: async () => identity, cleanup: async () => {} } });
+  assert.equal(result.verdict, 'installed-pass');
+  assert.deepEqual(result.installed.rows.map(r => r.status), ['pass', 'pass']);
+  assert.equal(laterCalls, 0);
+  assert.deepEqual(f.counts(), { runs: 1, finalized: 1 });
+});
+test('declaration phase evidence exactly matches the executed provider mapping', () => {
+  const declaration = require('../../../engineering/inventory/parity/installed/package-b.json');
+  assert.deepEqual(declaration.rows.find(r => r.id === 'text-targets').phaseEvidence, GROUPS);
+});
+test('provider credit requires an original cleanup finalizer even after product failure', async () => {
+  const f = fixture('locked-placement'), run = f.workflow.run;
+  f.workflow.run = async () => { const result = await run(); delete result.finalize; return result; };
+  await assert.rejects(targetWorkflow(sharedWorkflow(f.workflow, {})).run({ session: {}, row: targetRow }), /cleanup finalizer required/);
 });

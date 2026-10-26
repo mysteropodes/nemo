@@ -31,11 +31,18 @@ test('Text20 uses all original phases in one existing lifetime and awaits batch 
 test('first original phase failure stops the workflow and preserves the entire unrun tail', async t => {
   const f = fixture(t, 'point-edit'); const result = await f.workflow.run(f);
   assert.equal(result.safeToContinue, false); assert.equal(result.checks[0].status, 'fail');
-  assert.equal(result.finalize, undefined);
+  assert.equal(typeof result.finalize, 'function');
   assert.deepEqual(f.calls, ['open', 'blank-cancel', 'point-create', 'point-edit']);
   const report = JSON.parse(fs.readFileSync(path.join(f.c.reportRoot, 'receipt.json')));
   assert.equal(report.actions.length, 3);
   assert.deepEqual(report.phases.map(p => p.status), ['pass', 'pass', 'pass', 'fail', ...Array(16).fill('unrun')]);
+  assert.equal(report.cleanup, undefined);
+  assert.deepEqual(await result.finalize(), [{ id: 'original-text20', status: 'fail' }]);
+  const terminal = JSON.parse(fs.readFileSync(path.join(f.c.reportRoot, 'receipt.json')));
+  assert.equal(terminal.cleanup, 'complete');
+  assert.equal(terminal.status, 'partial');
+  assert.deepEqual(terminal.phases, report.phases);
+  assert.deepEqual(terminal.failure, report.failure);
 });
 test('foreign lifetime refuses before any Text20 operator request', async t => {
   const f = fixture(t); f.session.runtimeContext = async () => ({ identity: { sourceSha: 'b'.repeat(40), sessionId: 'one-batch' } });

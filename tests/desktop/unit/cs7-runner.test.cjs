@@ -138,6 +138,29 @@ test('failed cleanup prevents final verification and a broken finalizer is not a
     assert.ok(!JSON.stringify(result).includes('private artifact path'));
   }
 });
+test('shared evidence cannot overwrite earlier rows, name undeclared rows or repeat a row', async () => {
+  for (const ids of [['row-0'], ['missing'], ['row-1', 'row-1']]) {
+    const state = setup(3);
+    const observed = { checks: [{ id: 'workflow', status: 'fail' }], safeToContinue: false };
+    state.scenarios['case-0'].run = async () => ({ ...observed,
+      sharedResults: ids.map(rowId => ({ rowId, result: observed })) });
+    const result = await runInstalledRows(state);
+    assert.equal(result.installed.terminalCode, 'installed-precondition-failed');
+    assert.equal(result.verdict, 'fail');
+    assert.deepEqual(state.calls, ['start', 'cleanup']);
+  }
+});
+test('an unsafe shared result stops subsequent input even if its consumer permits continuation', async () => {
+  const state = setup(3);
+  state.scenarios['case-0'].run = async () => ({ checks: [{ id: 'workflow', status: 'unrun' }], safeToContinue: true,
+    sharedResults: [{ rowId: 'row-1', result: { checks: [{ id: 'workflow', status: 'fail' }], safeToContinue: false } }] });
+  const result = await runInstalledRows(state);
+  assert.equal(result.installed.rows[1].status, 'fail');
+  assert.equal(result.installed.rows[2].status, 'unrun');
+  assert.deepEqual(state.calls, ['start', 'cleanup']);
+  assert.equal(result.installed.operatorInputFailures, 0);
+  assert.equal(result.installed.terminalCode, 'scenario-stopped');
+});
 test('finalization cannot erase an observed failure or omit a declared clause', async () => {
   for (const finalChecks of [[], [{ id: 'workflow', status: 'pass' }]]) {
     const state = setup(1);
