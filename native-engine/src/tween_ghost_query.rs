@@ -4,9 +4,11 @@ use crate::object_document::{object_deserialize, ObjectRecord, Presence};
 use crate::object_frame_packet::{
     prepare_object_exposure_frame, ObjectFramePacket, ObjectFrameSelector,
 };
+#[cfg(feature = "project_media_codec")]
+use crate::object_render_scene::ObjectBrushAdmission;
 use crate::object_render_scene::{
     prepare_object_composition, prepare_object_paint_plan, prepare_object_render_scene,
-    ObjectBrushAdmission, ObjectCompositionWitness,
+    ObjectCompositionWitness,
 };
 use crate::request_receipts::DispatchErrorCode as Error;
 use crate::revision::ObjectSnapshot;
@@ -179,6 +181,7 @@ impl TweenGhostRead {
         prepare_object_exposure_frame(&self.snapshot, &self.selector(frame.frame))
             .map_err(|_| Error::Unavailable)
     }
+    #[cfg(feature = "project_media_codec")]
     pub fn prepare_brush_admission(&self, index: usize) -> Result<ObjectBrushAdmission, Error> {
         let packet = self.prepare_packet(index)?;
         ObjectBrushAdmission::prepare(&packet, &self.selector(packet.frame()))

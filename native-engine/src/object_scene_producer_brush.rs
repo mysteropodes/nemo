@@ -49,7 +49,7 @@ use crate::evaluation::object_scene_style_kernels::bitmap_brush_resources_store:
     BrushBitmap, BrushBitmapStore, BrushStoreError, RetirePort,
 };
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_brush_anchor::{
-    anchor_draw, AnchorDraw, AnchorError, AnchorRestore,
+    anchor_draw, tween_anchor_draw, AnchorDraw, AnchorError, AnchorRestore,
 };
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_brush_slot::{
     anchor_key, BakeRefused, BakedInk, Resolution, SlotError, SlotRequest, TrimAnchor,
@@ -418,11 +418,7 @@ fn build(
         .and_then(|v| v.bitmap_brush.value())
         .is_some_and(|f| f.tween_generated.value() == Some(&true));
     let anchor = if generated {
-        super::object_scene_producer_brush_anchor::tween_anchor_draw(
-            stored.solid_fill(),
-            vector.solid_stroke(),
-            &vector.opacity,
-        )
+        tween_anchor_draw(stored.solid_fill(), vector.solid_stroke(), &vector.opacity)
     } else {
         anchor_draw(
             stored.solid_fill(),
