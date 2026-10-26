@@ -117,9 +117,10 @@
       if(dict.dashArray)path.setAttribute('stroke-dasharray',dict.dashArray.join(' '));path.setAttribute('stroke-dashoffset',dict.dashOffset);path.setAttribute('stroke-miterlimit',dict.miterLimit);
       path.setAttribute('paint-order',dict.paintOrder==='strokeFirst'?'stroke fill':'fill stroke');
     }
-    // G23 (symmetry-bridge.js @1065e9d8): the stroke and its mirrored or rotated copies. Mirrors clip a
-    // Pen/freehand stroke at the axis unless Extend is on (shapes are never clipped), reflect points and
-    // handles, and re-orient closed copies; radial adds n-1 rotations about the centre (2..24 sectors).
+    // G23 (symmetry-bridge.js @1065e9d8, onStrokeCommitted): the stroke and its mirrored or rotated copies.
+    // Mirrors clip the committed stroke at the axis unless Extend is on, reflect points and handles and
+    // re-orient closed copies; radial adds n-1 rotations about the centre (2..24 sectors), stacked as the
+    // baseline's insertAbove leaves them (original, then copy n-1 down to copy 1).
     function symmetric(dict,pin){
       var s=root.state;if(!s.symmetryEnabled)return [dict];
       if(dict.centerSegments||dict.isVectorBrush)fail('Symmetry with pressure brushes is unavailable in native Drawing.');
@@ -128,7 +129,7 @@
       var w=pin.canvasW,h=pin.canvasH;
       if(s.symmetryMode==='radial'){
         var c=s.symmetryRadialCenter||{x:w/2,y:h/2},n=Math.max(2,Math.min(24,s.symmetryRadialSectors|0||6)),out=[dict];
-        for(var k=1;k<n;k++)(function(a){var cs=Math.cos(a),sn=Math.sin(a);
+        for(var k=n-1;k>=1;k--)(function(a){var cs=Math.cos(a),sn=Math.sin(a);
           out.push(map(dict,function(x,y){var dx=x-c.x,dy=y-c.y;return [c.x+dx*cs-dy*sn,c.y+dx*sn+dy*cs];},function(x,y){return [x*cs-y*sn,x*sn+y*cs];}));})(k*2*Math.PI/n);
         return out;
       }
@@ -139,9 +140,11 @@
       function vector(x,y){var t=x*ux+y*uy;return [2*t*ux-x,2*t*uy-y];}
       function point(x,y){var t=(x-axis.x1)*ux+(y-axis.y1)*uy;return [2*(axis.x1+t*ux)-x,2*(axis.y1+t*uy)-y];}
       var base=dict;
-      if((ports.pen||ports.freehand)&&!s.symmetryExtend&&dict.segments.length){
+      if(!s.symmetryExtend&&dict.segments.length){
         var first=side(dict.segments[0].point),cut=dict.segments.length;
         for(var i=1;i<dict.segments.length;i++)if(side(dict.segments[i].point)!==first){cut=i;break;}
+        // The baseline keeps a one-anchor remnant; a native path needs two, so refuse rather than drop it silently.
+        if(cut<2)fail('This stroke starts at the symmetry axis; nothing remains to mirror.');
         base=Object.assign({},dict,{segments:dict.segments.slice(0,cut)});
       }
       var mirrored=map(base,point,vector);
@@ -167,12 +170,12 @@
     // pending, without classifying a pre-dispatch refusal as owner uncertainty.
     function commitAttempt(t,end){
       try{return Promise.resolve(commit(t,end));}
-      catch(_){return Promise.resolve({status:'unavailable',reason:'pre_dispatch_failed'});}
+      catch(error){t.refusal=error&&error.message;return Promise.resolve({status:'unavailable',reason:'pre_dispatch_failed'});}
     }
     function submit(t,end){
       pending=t;settled=commitAttempt(t,end).catch(function(){return {status:'unconfirmed'};}).then(function(result){
         if(result.status==='indeterminate'||result.status==='unconfirmed')uncertain=t;
-        if(!retired&&result.status!=='applied'&&result.status!=='noop'&&result.status!=='cancelled')notice('Native shape drawing was not confirmed.');return result;
+        if(!retired&&result.status!=='applied'&&result.status!=='noop'&&result.status!=='cancelled')notice(t.refusal||'Native shape drawing was not confirmed.');return result;
       }).finally(function(){if(pending===t)pending=null;});
     }
     function grab(e){var el=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(el.setPointerCapture)el.setPointerCapture(e.pointerId);}

@@ -79,6 +79,8 @@
       const maps = dicts.map((dict) => Stroke.toRecord(dict, { layerUid, frame, strokeId: '' }, { opacity: options && options.opacity }));
       const refused = maps.find((map) => !map.ok);
       if (refused) return Promise.resolve(mapped(refused));
+      // The vector edit envelope is bounded at 64 KiB: refuse up front, typed, instead of a transport refusal.
+      if (JSON.stringify(maps.map((map) => map.record)).length > 60000) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'symmetry_too_large' }));
       return send(Contract.VECTOR, { command: 'object.vector.createMany', records: maps.map((map) => map.record) }, options,
         (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds, unmapped: maps.map((map) => map.unmapped) }));
     }

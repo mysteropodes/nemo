@@ -208,7 +208,8 @@ pub(crate) fn result(operation: &str, payload: &Value, value: &Value) -> bool {
                     && ids.first().and_then(Value::as_str) == Some(stroke)
                     && ids
                         .iter()
-                        .all(|id| id.as_str().is_some_and(|id| id.starts_with("native-stroke:")));
+                        .all(|id| id.as_str().is_some_and(|id| id.starts_with("native-stroke:")))
+                    && ids.iter().collect::<std::collections::HashSet<_>>().len() == ids.len();
             }
             let stroke_matches = match ran {
                 "create" => value["applied"] == true && stroke.starts_with("native-stroke:"),

@@ -315,5 +315,12 @@ test('symmetry: a mirrored Pen path and a radial rectangle each commit as one na
  r=await f.gesture();assert.equal(r.status,'applied');q=f.calls[0].payload;assert.equal(q.records.length,4);
  assert.deepEqual(pts(q.records[0]),[[20,20],[100,20],[100,80],[20,80]]);
  assert.deepEqual(pts(q.records[2]),[[300,160],[220,160],[220,100],[300,100]],'180 degrees about (160,90)');
+ assert.deepEqual(pts(q.records[1])[0],[90,230],'copies stack as insertAbove leaves them: 270 degrees right above the original');
  assert.equal(f.session.info().contentRevision,1,'four strokes, one revision');
+});
+
+test('symmetry: a stroke the axis clip leaves with one anchor refuses with its reason instead of dropping silently',async()=>{
+ let f=await fixture('pen');Object.assign(f.root.state,{symmetryEnabled:true,symmetryMode:'y',symmetryExtend:false});
+ await pen(f,[['pointerdown',400,90],['pointerup',400,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
+ assert.equal(f.calls.length,0);assert.ok(f.log.some(m=>/starts at the symmetry axis/.test(m)));
 });

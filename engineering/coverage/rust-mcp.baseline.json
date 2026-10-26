@@ -349,7 +349,7 @@
     "nemo-mcp/src/native_vector_create_many_tests.rs": {
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
-      "note": "#2361 (G23): test-only child of native_vector_contract.rs holding the object.vector.createMany admission and receipt tests; the pinned cargo-llvm-cov report of coverage-rust --check at b4bc3f6a lists no executable regions for it, as for its sibling test children."
+      "note": "#2361 (G23): hand-added entry for a test-only child of native_vector_contract.rs (createMany admission and receipt tests). Not re-recorded with --update (a full re-record rewrote unrelated entries); `coverage-rust --check` passes with it and reports no unlisted source. Re-record at the next reviewed baseline update."
     },
     "nemo-mcp/src/native_image_import_contract_tests.rs": {
       "noRegions": true,

@@ -38,6 +38,7 @@ fn create_many_is_bounded_to_one_layer_and_frame_and_its_receipt_lists_every_own
     for (key, bad) in [
         ("strokeIds", json!(["native-stroke:8:0"])),
         ("strokeIds", json!(["native-stroke:8:1", "native-stroke:8:0"])),
+        ("strokeIds", json!(["native-stroke:8:0", "native-stroke:8:0"])),
         ("strokeId", json!("native-stroke:8:1")),
         ("operation", json!("create")),
         ("applied", json!(false)),

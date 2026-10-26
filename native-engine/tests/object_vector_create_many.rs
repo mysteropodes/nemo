@@ -47,6 +47,8 @@ fn a_bad_record_count_mixed_targets_or_a_preset_id_refuse_the_whole_request() {
         ("unknown-layer", many(vec![record_at("A", "L9", 0, ""), record_at("B", "L9", 0, "")])),
         ("both-members", json!({"command":"object.vector.createMany","records":[record_at("A","L1",0,""),record_at("B","L1",0,"")],"record":record_at("A","L1",0,"")})),
         ("records-on-create", json!({"command":"object.vector.create","records":[record_at("A","L1",0,""),record_at("B","L1",0,"")]})),
+        ("records-on-replace", json!({"command":"object.vector.replace","record":record_at("A","L1",0,"s-a"),"records":[record_at("A","L1",0,""),record_at("B","L1",0,"")]})),
+        ("records-on-delete", json!({"command":"object.vector.delete","stableTarget":target("L1",0,"s-a"),"records":[record_at("A","L1",0,""),record_at("B","L1",0,"")]})),
     ];
     for (name, payload) in cases {
         let mut owner = owner_of(&base);
