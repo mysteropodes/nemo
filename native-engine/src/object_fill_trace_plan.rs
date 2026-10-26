@@ -83,6 +83,7 @@ pub(crate) fn fill_record(
             box_angle: Presence::Missing,
             fill_gradient: Presence::Missing,
             bitmap_brush: Presence::Missing,
+            brush_texture: Presence::Missing,
             linked_fill_id: Presence::Missing,
             is_linked_fill_companion: Presence::Missing,
             is_mask: Presence::Missing,
@@ -190,7 +191,11 @@ pub(crate) fn plan_trace(
         .zip(&rings)
         .map(|(r, ring)| ChildFacts {
             filled_shape: r.solid_fill().is_some(),
-            excluded: false,
+            // fillFindExistingMatch skips `isLinkedFillCompanion || isBrushTextureCopy` children.
+            excluded: r.vector_ext.value().is_some_and(|e| {
+                e.is_linked_fill_companion.value() == Some(&true)
+                    || e.brush_texture.value().is_some_and(|t| t.is_brush_texture_copy.value() == Some(&true))
+            }),
             bounds: native::bounds(ring),
             area: native::area(ring),
             covers_click: native::contains(ring, click),
