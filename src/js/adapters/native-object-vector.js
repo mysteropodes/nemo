@@ -73,6 +73,15 @@
       return send(Contract.VECTOR, { command: 'object.vector.create', record: map.record }, options,
         (receipt) => ({ strokeId: receipt.strokeId, authoredStrokeId: map.authoredStrokeId, unmapped: map.unmapped }));
     }
+    // G23: several strokes (symmetry copies) on one layer and frame as one native revision and one undo entry.
+    function createStrokes(layerUid, frame, dicts, options) {
+      if (!Array.isArray(dicts) || dicts.length < 2) return Promise.resolve(Object.freeze({ status: 'invalid', reason: 'createStrokes needs at least two strokes' }));
+      const maps = dicts.map((dict) => Stroke.toRecord(dict, { layerUid, frame, strokeId: '' }, { opacity: options && options.opacity }));
+      const refused = maps.find((map) => !map.ok);
+      if (refused) return Promise.resolve(mapped(refused));
+      return send(Contract.VECTOR, { command: 'object.vector.createMany', records: maps.map((map) => map.record) }, options,
+        (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds, unmapped: maps.map((map) => map.unmapped) }));
+    }
     function replaceStroke(target, dict, options) {
       if (!target || typeof target.strokeId !== 'string' || !target.strokeId) return Promise.resolve(Object.freeze({ status: 'invalid', reason: 'a replace names the stroke it replaces' }));
       const map = Stroke.toRecord(dict, { layerUid: target.layerUid, frame: target.frame, strokeId: target.strokeId }, { opacity: options && options.opacity });
@@ -103,7 +112,7 @@
       if (!map.ok) return Promise.resolve(mapped(map));
       return send(Contract.EFFECTS, { command: 'object.path.effects.set', layerUid, stack: map.stack }, options);
     }
-    return Object.freeze({ createStroke, replaceStroke, deleteStroke, editMask, setParametric, translateParametric, scaleParametric, setPathEffects, defaultEffect: Stroke.defaultsFor });
+    return Object.freeze({ createStroke, createStrokes, replaceStroke, deleteStroke, editMask, setParametric, translateParametric, scaleParametric, setPathEffects, defaultEffect: Stroke.defaultsFor });
   }
 
   // Read-back validator: the record the owner returns for a target equals what was sent (numbers by value, the allocated

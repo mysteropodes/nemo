@@ -118,6 +118,19 @@ pub(crate) fn request(operation: &str, payload: &Value) -> bool {
         (VECTOR, "object.vector.create") => {
             named(&["record"]) && record_shape(&payload["record"], true)
         }
+        // G23: 2..=32 creates sharing one layer and frame, as one revision and one undo entry.
+        (VECTOR, "object.vector.createMany") => {
+            named(&["records"])
+                && payload["records"].as_array().is_some_and(|records| {
+                    (2..=32).contains(&records.len())
+                        && records.iter().all(|r| record_shape(r, true))
+                        && records.iter().all(|r| {
+                            r["target"]["layerUid"] == records[0]["target"]["layerUid"]
+                                && r["target"]["contextId"] == records[0]["target"]["contextId"]
+                                && r["target"]["frameScope"] == records[0]["target"]["frameScope"]
+                        })
+                })
+        }
         (VECTOR, "object.vector.replace") => {
             named(&["record"])
                 && record_shape(&payload["record"], false)
@@ -177,6 +190,26 @@ pub(crate) fn result(operation: &str, payload: &Value, value: &Value) -> bool {
             let Some(stroke) = value["strokeId"].as_str() else {
                 return false;
             };
+            if ran == "createMany" {
+                let Some(ids) = value["strokeIds"].as_array() else {
+                    return false;
+                };
+                let count = payload["records"].as_array().map_or(0, Vec::len);
+                return exact(
+                    value,
+                    &["applied", "historyEntriesAdded", "operation", "strokeId", "strokeIds"],
+                    &[],
+                )
+                .is_some()
+                    && command_receipt(value)
+                    && value["applied"] == true
+                    && value["operation"] == "createMany"
+                    && ids.len() == count
+                    && ids.first().and_then(Value::as_str) == Some(stroke)
+                    && ids
+                        .iter()
+                        .all(|id| id.as_str().is_some_and(|id| id.starts_with("native-stroke:")));
+            }
             let stroke_matches = match ran {
                 "create" => value["applied"] == true && stroke.starts_with("native-stroke:"),
                 "replace" => payload["record"]["target"]["strokeId"].as_str() == Some(stroke),

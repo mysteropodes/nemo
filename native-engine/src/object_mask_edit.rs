@@ -91,6 +91,7 @@ pub(super) fn apply(
     Ok(Edit {
         document,
         kind: VectorEditKind::Mask,
+        stroke_ids: vec![target.stroke_id.clone()],
         stroke_id: target.stroke_id,
         changed,
     })
