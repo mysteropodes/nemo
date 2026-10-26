@@ -133,7 +133,12 @@
     flag: 'nemo-labs-grid',
     describe: 'labsDescribeCanvasGrid',
     onEnable: function () { lastKey = ''; schedule(); },
-    onDisable: function () { if (overlay) { overlay.remove(); overlay = null; } },
+    // Disable also drops the pending frame, so nothing of the grid stays scheduled (U31, #2374).
+    onDisable: function () {
+      if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+      if (overlay) { overlay.remove(); overlay = null; }
+      lastKey = '';
+    },
   });
   // Resume after reload if the flag was already on.
   if (window.SMLabs.isOn('canvas-grid')) schedule();
