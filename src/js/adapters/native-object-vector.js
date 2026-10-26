@@ -90,6 +90,23 @@
       return send(Contract.VECTOR, placed({ command: 'object.vector.createMany', records: maps.map((map) => map.record) }, options), options,
         (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds, unmapped: maps.map((map) => map.unmapped) }));
     }
+    // #2361/#2362: ordered create/replace/delete steps on one layer as one native revision and one undo entry. Each step
+    // is {create: dict} | {replace: {strokeId, dict}} | {delete: strokeId} at `frame` (or the step's own `frame`).
+    function batchStrokes(layerUid, frame, steps, options) {
+      if (!Array.isArray(steps) || !steps.length) return Promise.resolve(Object.freeze({ status: 'invalid', reason: 'a batch needs at least one step' }));
+      const ops = [];
+      for (const step of steps) {
+        const at = step.frame === undefined ? frame : step.frame;
+        if (step.delete !== undefined) { ops.push({ op: 'delete', stableTarget: stableTarget(layerUid, at, step.delete) }); continue; }
+        const replacing = step.replace !== undefined;
+        const map = Stroke.toRecord(replacing ? step.replace.dict : step.create, { layerUid, frame: at, strokeId: replacing ? step.replace.strokeId : '' },
+          { opacity: step.opacity !== undefined ? step.opacity : options && options.opacity });
+        if (!map.ok) return Promise.resolve(mapped(map));
+        ops.push(replacing ? { op: 'replace', record: map.record } : Object.assign({ op: 'create', record: map.record }, step.placement ? { placement: step.placement } : {}));
+      }
+      const body = Object.assign({ command: 'object.vector.batch', ops }, options && options.keyframe === 'copy' ? { keyframe: 'copy' } : {});
+      return send(Contract.VECTOR, body, options, (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds }));
+    }
     function replaceStroke(target, dict, options) {
       if (!target || typeof target.strokeId !== 'string' || !target.strokeId) return Promise.resolve(Object.freeze({ status: 'invalid', reason: 'a replace names the stroke it replaces' }));
       const map = Stroke.toRecord(dict, { layerUid: target.layerUid, frame: target.frame, strokeId: target.strokeId }, { opacity: options && options.opacity });
@@ -120,7 +137,7 @@
       if (!map.ok) return Promise.resolve(mapped(map));
       return send(Contract.EFFECTS, { command: 'object.path.effects.set', layerUid, stack: map.stack }, options);
     }
-    return Object.freeze({ createStroke, createStrokes, replaceStroke, deleteStroke, editMask, setParametric, translateParametric, scaleParametric, setPathEffects, defaultEffect: Stroke.defaultsFor });
+    return Object.freeze({ createStroke, createStrokes, batchStrokes, replaceStroke, deleteStroke, editMask, setParametric, translateParametric, scaleParametric, setPathEffects, defaultEffect: Stroke.defaultsFor });
   }
 
   // Read-back validator: the record the owner returns for a target equals what was sent (numbers by value, the allocated

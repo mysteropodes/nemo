@@ -1068,6 +1068,86 @@
       },
       "description": "Original Path mask metadata: selected mode/unset or same-frame layer-shared feather; authored geometry and paint remain unchanged."
     },
+    "ObjectVectorBatchPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "ops"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.vector.batch"
+        },
+        "ops": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "op",
+                  "record"
+                ],
+                "properties": {
+                  "op": {
+                    "const": "create"
+                  },
+                  "record": {
+                    "$ref": "#/$defs/ObjectVectorCreateRecord"
+                  },
+                  "placement": {
+                    "enum": [
+                      "front",
+                      "behind"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "op",
+                  "record"
+                ],
+                "properties": {
+                  "op": {
+                    "const": "replace"
+                  },
+                  "record": {
+                    "$ref": "#/$defs/ObjectVectorRecord"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "op",
+                  "stableTarget"
+                ],
+                "properties": {
+                  "op": {
+                    "const": "delete"
+                  },
+                  "stableTarget": {
+                    "$ref": "#/$defs/ObjectTarget"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "keyframe": {
+          "const": "copy"
+        }
+      },
+      "description": "#2361/#2362: 1..64 ordered create/replace/delete steps on one scene-root layer as one revision and one undo entry; the native owner refuses the whole batch when any step is refused."
+    },
     "ObjectVectorEditPayload": {
       "oneOf": [
         {
@@ -1084,6 +1164,9 @@
         },
         {
           "$ref": "#/$defs/ObjectVectorMaskPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectVectorBatchPayload"
         }
       ],
       "description": "Vector create, replace, delete or original Path mask metadata edit. The complete original UTF-8 request envelope is bounded at 65536 bytes, never split or truncated. Other operations and all replies retain their 4096-byte bounds."
@@ -1261,11 +1344,20 @@
             "create",
             "replace",
             "delete",
-            "mask.edit"
+            "mask.edit",
+            "createMany",
+            "batch"
           ]
         },
         "strokeId": {
           "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "strokeIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          }
         }
       },
       "description": "Compact vector edit receipt: the stroke an owner allocated (create) or the stable target named (replace, delete, mask.edit). Parameter and path-effect edits answer with the compact CommandResult."

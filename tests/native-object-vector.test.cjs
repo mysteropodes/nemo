@@ -150,7 +150,7 @@ test('desktop() binds one client per host window', () => {
   assert.ok(client && typeof client.createStroke === 'function');
   assert.equal(Vector.desktop(host), client);
   assert.notEqual(Vector.desktop({ NemoNativeObjectProject: { desktop: () => session } }), client);
-  assert.deepEqual(Object.keys(client).sort(), ['createStroke', 'createStrokes', 'defaultEffect', 'deleteStroke', 'editMask', 'replaceStroke', 'scaleParametric', 'setParametric', 'setPathEffects', 'translateParametric']);
+  assert.deepEqual(Object.keys(client).sort(), ['batchStrokes', 'createStroke', 'createStrokes', 'defaultEffect', 'deleteStroke', 'editMask', 'replaceStroke', 'scaleParametric', 'setParametric', 'setPathEffects', 'translateParametric']);
 });
 
 test('a stroke the record cannot carry, or the owner could not store, is named and never sent', async () => {
@@ -337,4 +337,20 @@ test('createStrokes sends one createMany for every symmetry copy and reports the
   assert.throws(() => Contract.payload(Contract.VECTOR, { command: 'object.vector.createMany', records: [LINE_RECORD('')] }), /2 to 32/);
   const other = LINE_RECORD(''); other.target.layerUid = 'L2';
   assert.throws(() => Contract.payload(Contract.VECTOR, { command: 'object.vector.createMany', records: [LINE_RECORD(''), other] }), /one layer and frame/);
+});
+
+test('batchStrokes sends ordered steps on one layer as one command and correlates one id per step (#2361, #2362)', async () => {
+  const f = adapter();
+  const first = await f.vector.createStroke('L1', 3, { segments: [{ point: [0, 0], handleIn: [0, 0], handleOut: [0, 0] }, { point: [9, 9], handleIn: [0, 0], handleOut: [0, 0] }], strokeColor: '#000000', strokeWidth: 2 });
+  assert.equal(first.status, 'applied');
+  const dict = (x) => ({ segments: [{ point: [x, 0], handleIn: [0, 0], handleOut: [0, 0] }, { point: [x, 9], handleIn: [0, 0], handleOut: [0, 0] }], strokeColor: '#000000', strokeWidth: 2 });
+  const result = await f.vector.batchStrokes('L1', 3, [{ delete: first.strokeId }, { create: dict(1) }, { create: dict(2), frame: 5 }], { keyframe: 'copy' });
+  assert.equal(result.status, 'applied', JSON.stringify(result));
+  assert.equal(result.strokeIds.length, 3);
+  assert.equal(result.strokeIds[0], first.strokeId);
+  const sent = f.owner.log.received.at(-1).payload;
+  assert.deepEqual([sent.command, sent.keyframe, sent.ops.map((op) => op.op), sent.ops[2].record.target.frameScope.frame], ['object.vector.batch', 'copy', ['delete', 'create', 'create'], 5]);
+  const missing = await f.vector.batchStrokes('L1', 3, [{ create: dict(3) }, { delete: 'gone' }]);
+  assert.equal(missing.status, 'refused');
+  assert.equal((await f.vector.batchStrokes('L1', 3, [])).status, 'invalid');
 });
