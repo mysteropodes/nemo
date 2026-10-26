@@ -130,7 +130,7 @@ pub(crate) mod object_rig_record;
 #[path = "object_vector_pressure.rs"]
 #[allow(dead_code)]
 mod vector_pressure;
-pub(crate) use vector_pressure::{PressureFields, STROKE_PROFILE_KINDS};
+pub(crate) use vector_pressure::{CenterSegment, PressureFields, STROKE_PROFILE_KINDS};
 #[path = "object_parametric_record.rs"]
 #[allow(dead_code)]
 mod parametric_record;

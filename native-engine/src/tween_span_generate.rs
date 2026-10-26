@@ -11,6 +11,9 @@ struct PreparedPair {
     id: String,
     controls: ([f64; 2], [f64; 2]),
     texture: Option<PairTexture>,
+    widths: Option<(Vec<f64>, Vec<f64>)>,
+    backdrop: PairBackdrop,
+    bitmap: Option<PairBitmap>,
 }
 pub(super) fn generate_span(
     doc: &mut ObjectDocument,
@@ -20,26 +23,22 @@ pub(super) fn generate_span(
     options: &TweenOptions,
     settings: Option<&TweenSpan>,
     custom: Option<&crate::object_document::ProjectPresetCatalog>,
+    bakes: &mut Vec<BitmapTweenBake>,
 ) -> R<()> {
     let original_a = frame_records(doc, layer, from);
     let original_b = frame_records(doc, layer, to);
-    let mut a: Vec<_> = original_a.iter().filter(|r| !is_dab(r)).cloned().collect();
-    let mut b: Vec<_> = original_b.iter().filter(|r| !is_dab(r)).cloned().collect();
-    // These branches are explicitly unavailable until their native emitters are joined below.
-    if a.iter().chain(&b).any(|r| {
-        r.is_pressure_ribbon()
-            || r.vector_ext
-                .value()
-                .is_some_and(|v| !v.bitmap_brush.missing() || !v.is_linked_fill_companion.missing())
-    }) {
-        return Err(DispatchErrorCode::Unavailable);
-    }
-    let manual = settings.and_then(|s| s.manual_strokes.value());
-    let held: Vec<_> = a
+    let mut a: Vec<_> = original_a
         .iter()
-        .filter(|r| manual.is_some_and(|ids| !ids.contains(&r.target.stroke_id)))
+        .filter(|r| !is_dab(r) && !is_backdrop(r))
         .cloned()
         .collect();
+    let mut b: Vec<_> = original_b
+        .iter()
+        .filter(|r| !is_dab(r) && !is_backdrop(r))
+        .cloned()
+        .collect();
+    let manual = settings.and_then(|s| s.manual_strokes.value());
+    let held = held_entries(doc, layer, from, manual);
     a.retain(|r| manual.is_none_or(|ids| ids.contains(&r.target.stroke_id)));
     if a.len() > 256 || b.len() > 256 {
         return Err(DispatchErrorCode::InvalidRequest);
@@ -65,7 +64,10 @@ pub(super) fn generate_span(
     let persist_a: Vec<_> = specs
         .iter()
         .map(|p| p.a_data.clone())
-        .chain(held.iter().cloned())
+        .chain(held.iter().filter_map(|r| match r {
+            Held::Object(r) => Some(r.clone()),
+            _ => None,
+        }))
         .collect();
     let persist_b: Vec<_> = specs.iter().map(|p| p.b_data.clone()).collect();
     let plans_a: Vec<_> = un_a
@@ -84,7 +86,8 @@ pub(super) fn generate_span(
             .round()
             .min(150.)
             .max(options.resample_points as f64) as usize;
-        let (ra, rb) = resample_pair(&sa, &sb, n, false);
+        let vb = sa.is_vector_brush && sb.is_vector_brush;
+        let (ra, rb) = resample_pair(&sa, &sb, n, vb);
         let rb = align_pair(&ra, &rb);
         let centroid = |s: &[SegOut]| {
             let p = s.iter().fold([0., 0.], |mut p, s| {
@@ -107,17 +110,28 @@ pub(super) fn generate_span(
         let geometry = PreparedInterpolation::new(
             ra.segments,
             rb.segments,
-            sa.closed,
-            sb.closed,
-            Some((sa.segments.len(), sb.segments.len())),
+            !vb && sa.closed,
+            !vb && sb.closed,
+            (!vb).then_some((sa.segments.len(), sb.segments.len())),
         )
         .ok_or(DispatchErrorCode::InvalidRequest)?;
-        let id = spec.a_data.target.stroke_id.clone();
-        a[spec.a].target.stroke_id = id.clone();
-        b[spec.b].target.stroke_id = id.clone();
+        let id = if spec.a_piece {
+            spec.b_data.target.stroke_id.clone()
+        } else {
+            spec.a_data.target.stroke_id.clone()
+        };
+        if !spec.a_piece {
+            a[spec.a].target.stroke_id = id.clone();
+        }
+        if !spec.b_piece {
+            b[spec.b].target.stroke_id = id.clone();
+        }
         let texture = PairTexture::new(&spec.a_data, &spec.b_data, from, spec.mi, custom);
         pairs.push(PreparedPair {
+            bitmap: PairBitmap::new(&spec.a_data, &spec.b_data, from, spec.mi),
+            backdrop: PairBackdrop::new(&spec.a_data, &spec.b_data, &original_a, &original_b),
             texture,
+            widths: ra.widths.zip(rb.widths),
             spec,
             geometry,
             id,
@@ -131,6 +145,7 @@ pub(super) fn generate_span(
             .iter()
             .filter(|r| {
                 !is_dab(r)
+                    && !is_backdrop(r)
                     && (frame == to || manual.is_none_or(|ids| ids.contains(&r.target.stroke_id)))
             })
             .collect();
@@ -170,6 +185,7 @@ pub(super) fn generate_span(
         let t = (frame - from) as f64 / (to - from) as f64;
         let et = tween_easing(easing, t);
         let mut out: Vec<(f64, ObjectRecord)> = vec![];
+        let mut bitmap_items = vec![];
         for p in &pairs {
             let segs = p
                 .geometry
@@ -177,9 +193,15 @@ pub(super) fn generate_span(
                 .ok_or(DispatchErrorCode::InvalidRequest)?;
             let mut record =
                 interpolate_record(&p.spec.a_data, &p.spec.b_data, &segs, et, &p.id, frame)?;
+            if let Some((a, b)) = &p.widths {
+                interpolate_pressure(&mut record, &segs, a, b, et)?;
+            }
             let ar = p.spec.a as f64 / a.len().saturating_sub(1).max(1) as f64;
             let br = p.spec.b as f64 / b.len().saturating_sub(1).max(1) as f64;
             let rank = ar + (br - ar) * et;
+            if let Some(backdrop) = p.backdrop.emit(&record, et)? {
+                out.push((rank - 1e-4, backdrop));
+            }
             if let Some(texture) = &p.texture {
                 out.extend(
                     texture
@@ -187,6 +209,12 @@ pub(super) fn generate_span(
                         .into_iter()
                         .map(|r| (rank + 1e-4, r)),
                 );
+            }
+            if let Some(bitmap) = &p.bitmap {
+                if let Some((raster, bake)) = bitmap.emit(&mut record, et)? {
+                    bitmap_items.push((rank + 1e-4, Held::Raster(raster)));
+                    bakes.push(bake);
+                }
             }
             out.push((rank, record));
         }
@@ -208,6 +236,17 @@ pub(super) fn generate_span(
                     );
                 }
                 if let Some(record) = vanish(&source[i], plan, keep, frame)? {
+                    let mul = if matches!(plan, VanishPlan::Fade) {
+                        keep
+                    } else {
+                        1.
+                    };
+                    if let Some(backdrop) = vanish_backdrop(&source[i], &record, original, mul)? {
+                        out.push((
+                            i as f64 / source.len().saturating_sub(1).max(1) as f64 - 1e-4,
+                            backdrop,
+                        ));
+                    }
                     out.push((
                         i as f64 / source.len().saturating_sub(1).max(1) as f64,
                         record,
@@ -215,13 +254,19 @@ pub(super) fn generate_span(
                 }
             }
         }
+        let mut out: Vec<(f64, Held)> = out
+            .into_iter()
+            .map(|(rank, r)| (rank, Held::Object(r)))
+            .collect();
+        out.extend(bitmap_items);
         for (i, r) in held.iter().enumerate() {
-            let mut r = r.clone();
-            r.target.frame_scope.frame = frame;
-            out.push((i as f64 / held.len().saturating_sub(1).max(1) as f64, r));
+            out.push((
+                i as f64 / held.len().saturating_sub(1).max(1) as f64,
+                r.at(frame),
+            ));
         }
         out.sort_by(|a, b| a.0.total_cmp(&b.0));
-        replace_frame(doc, layer, frame, out.into_iter().map(|(_, r)| r).collect())?;
+        replace_mixed(doc, layer, frame, out.into_iter().map(|(_, r)| r).collect())?;
         frames.push(frame);
     }
     doc.layers[index].timing = Presence::Present(

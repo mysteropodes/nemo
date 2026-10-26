@@ -20,14 +20,7 @@ pub(super) fn native_point(p: [f64; 2]) -> R<ObjectPoint> {
     })
 }
 fn color(c: Option<&SolidFill>) -> Option<String> {
-    c.map(|c| {
-        format!(
-            "#{:02x}{:02x}{:02x}",
-            (c.r.as_f64().unwrap() * 255.).round() as u8,
-            (c.g.as_f64().unwrap() * 255.).round() as u8,
-            (c.b.as_f64().unwrap() * 255.).round() as u8
-        )
-    })
+    c.map(crate::object_document::object_group_kernels::object_boolean_ops::stack::hex8)
 }
 pub(super) fn stroke(r: &ObjectRecord) -> StrokeIn {
     let pressure = r.vector_ext.value().and_then(|v| v.pressure.value());
@@ -192,18 +185,23 @@ pub(super) fn interpolate_record(
     Ok(out)
 }
 fn blend_hex(a: &str, b: &str, t: f64) -> String {
-    let (Some(a), Some(b)) = (
-        parse_hex_color(&Some(a.into())),
-        parse_hex_color(&Some(b.into())),
+    let (Some(aa), Some(bb)) = (
+        crate::object_document::bitmap_brush::rgba(a),
+        crate::object_document::bitmap_brush::rgba(b),
     ) else {
         return if t < 0.5 { a.into() } else { b.into() };
     };
-    format!(
-        "#{:02x}{:02x}{:02x}",
-        (a.0 + (b.0 - a.0) * t).round().clamp(0., 255.) as u8,
-        (a.1 + (b.1 - a.1) * t).round().clamp(0., 255.) as u8,
-        (a.2 + (b.2 - a.2) * t).round().clamp(0., 255.) as u8
-    )
+    let mut channels = [0u8; 4];
+    for i in 0..4 {
+        channels[i] = (aa[i] as f64 + (bb[i] as f64 - aa[i] as f64) * t)
+            .round()
+            .clamp(0., 255.) as u8;
+    }
+    let mut result = format!("#{:02x}{:02x}{:02x}", channels[0], channels[1], channels[2]);
+    if channels[3] < 255 {
+        result.push_str(&format!("{:02x}", channels[3]));
+    }
+    result
 }
 
 pub(super) fn solid_hex(s: &str) -> R<SolidFill> {

@@ -44,25 +44,12 @@ pub(super) fn replace_frame(
     frame: u32,
     records: Vec<ObjectRecord>,
 ) -> R<()> {
-    let old: Vec<_> = doc
-        .objects
-        .iter()
-        .filter(|r| in_cell(r, layer, frame))
-        .map(|r| r.target.clone())
-        .collect();
-    if let Presence::Present(plan) = &mut doc.composition_order {
-        for target in &old {
-            crate::commands::remove_order_element(plan, target)
-                .map_err(|_| DispatchErrorCode::Unavailable)?;
-        }
-        for record in &records {
-            crate::commands::insert_order_element(plan, &record.target)
-                .map_err(|_| DispatchErrorCode::Unavailable)?;
-        }
-    }
-    doc.objects.retain(|r| !in_cell(r, layer, frame));
-    doc.objects.extend(records);
-    Ok(())
+    replace_mixed(
+        doc,
+        layer,
+        frame,
+        records.into_iter().map(Held::Object).collect(),
+    )
 }
 /// Id stamping updates scoped order identities atomically with records, keeping authored order bytes.
 pub(super) fn stamp_frame(

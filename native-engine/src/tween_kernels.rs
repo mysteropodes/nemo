@@ -83,3 +83,37 @@ use dabs::*;
 #[path = "tween_texture_emit.rs"]
 mod texture_emit;
 use texture_emit::*;
+
+#[path = "tween_pressure_outline.rs"]
+mod pressure_outline;
+use pressure_outline::*;
+
+#[path = "tween_outline_cleanup.rs"]
+mod outline_cleanup;
+use outline_cleanup::*;
+
+#[path = "tween_split_plan.rs"]
+mod split_plan;
+use split_plan::*;
+
+#[path = "tween_pressure_record.rs"]
+mod pressure_record;
+use pressure_record::*;
+
+#[path = "tween_backdrop.rs"]
+mod backdrop;
+use backdrop::*;
+
+#[path = "tween_held_items.rs"]
+mod held_items;
+use held_items::*;
+
+#[path = "tween_ghost_query.rs"]
+pub(crate) mod ghost_query;
+
+#[path = "tween_bitmap_plan.rs"]
+mod bitmap_plan;
+use bitmap_plan::*;
+#[path = "tween_bitmap_resources.rs"]
+mod bitmap_resources;
+pub(crate) use bitmap_resources::{prepare_tween_resources, PreparedTweenResources};

@@ -23,6 +23,15 @@ fn paint(v: &Value) -> Value {
 }
 fn record(s: &Value, frame: usize) -> Value {
     let fallback = |key: &str, default: Value| s.get(key).cloned().unwrap_or(default);
+    if s["isRaster"] == true {
+        let mut item = s.clone();
+        let map = item.as_object_mut().unwrap();
+        for key in ["isRaster", "src", "strokeId"] {
+            map.remove(key);
+        }
+        item["assetId"] = s["src"].clone();
+        return json!({"target":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":frame},"layerUid":"L0","strokeId":fallback("strokeId",json!("native-generated-id"))},"item":item});
+    }
     let segments: Vec<_> = s["segments"]
         .as_array()
         .unwrap()
@@ -49,6 +58,9 @@ fn record(s: &Value, frame: usize) -> Value {
         ("preTextureStroke", "preStroke"),
         ("preTextureOpacity", "preOpacity"),
     ] {
+        if s.get("bitmapBrushSpec").is_some() && old != "isBrushTextureCopy" {
+            continue;
+        }
         if let Some(value) = s.get(old) {
             texture[new] = value.clone();
         }
@@ -56,12 +68,58 @@ fn record(s: &Value, frame: usize) -> Value {
     if !texture.as_object().unwrap().is_empty() {
         record["vectorExt"] = json!({"texture":texture});
     }
+    if let Some(spec) = s.get("bitmapBrushSpec") {
+        if record.get("vectorExt").is_none() {
+            record["vectorExt"] = json!({});
+        }
+        let mut bitmap = json!({"bitmapBrushSpec":spec,"brushGroupId":s["brushGroupId"]});
+        if s.get("preTextureStroke").is_none() && s.get("preTextureOpacity").is_none() {
+            bitmap["tweenGenerated"] = json!(true);
+        }
+        for key in [
+            "preTextureStroke",
+            "preTextureOpacity",
+            "bitmapPressureProfile",
+        ] {
+            if let Some(v) = s.get(key) {
+                bitmap[key] = v.clone();
+            }
+        }
+        record["vectorExt"]["bitmapBrush"] = bitmap;
+    }
+    for key in ["linkedFillId", "isLinkedFillCompanion", "fillGradient"] {
+        if let Some(value) = s.get(key) {
+            if record.get("vectorExt").is_none() {
+                record["vectorExt"] = json!({});
+            }
+            record["vectorExt"][key] = value.clone();
+        }
+    }
+    if s["isVectorBrush"] == true {
+        let mut pressure = json!({});
+        if let Some(cs) = s.get("centerSegments") {
+            pressure["centerSegments"] = Value::Array(cs.as_array().unwrap().iter().map(|s| {
+                let p = |key: &str| json!({"x":s[key][0],"y":s[key][1]});
+                json!({"point":p("point"),"handleIn":p("handleIn"),"handleOut":p("handleOut"),"width":s["width"]})
+            }).collect());
+        }
+        for key in ["widthProfile", "strokeProfile", "profileBase"] {
+            if let Some(value) = s.get(key) {
+                pressure[key] = value.clone();
+            }
+        }
+        if record.get("vectorExt").is_none() {
+            record["vectorExt"] = json!({});
+        }
+        record["vectorExt"]["pressure"] = pressure;
+    }
     record
 }
 fn document(frames: &Value, v2: bool) -> ObjectDocument {
     let frames = frames.as_array().unwrap();
     let mut objects = vec![];
     let mut scopes = vec![];
+    let mut rasters = vec![];
     let mut keys = vec![];
     let mut samples = vec![];
     for (i, f) in frames.iter().enumerate() {
@@ -75,7 +133,18 @@ fn document(frames: &Value, v2: bool) -> ObjectDocument {
             samples.push(s);
         }
         let strokes = f["strokes"].as_array().unwrap();
-        objects.extend(strokes.iter().map(|s| record(s, i)));
+        objects.extend(
+            strokes
+                .iter()
+                .filter(|s| s["isRaster"] != true)
+                .map(|s| record(s, i)),
+        );
+        rasters.extend(
+            strokes
+                .iter()
+                .filter(|s| s["isRaster"] == true)
+                .map(|s| record(s, i)),
+        );
         if !strokes.is_empty() {
             scopes.push(json!({"frameScope":{"kind":"authored","frame":i},"elements":strokes.iter().enumerate().map(|(j,s)|json!({"layerUid":"L0","strokeId":s["strokeId"],"naturalPosition":j,"order":{}})).collect::<Vec<_>>()}));
         }
@@ -83,6 +152,9 @@ fn document(frames: &Value, v2: bool) -> ObjectDocument {
     let mut value = json!({"format":"nemo.native-object-document","formatVersion":if v2{2}else{1},"totalFrames":frames.len(),"layers":[{"layerUid":"L0","timing":{"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root","keys":keys,"samples":samples}}],"objects":objects});
     if v2 {
         value["compositionOrder"] = json!({"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,"migration":"explicit-plan-required","referencePolicy":"unresolved","contexts":[{"contextId":"scene-root","layers":[{"layerUid":"L0","naturalPosition":0,"order":{}}],"scopes":scopes}]});
+    }
+    if !rasters.is_empty() {
+        value["items"] = json!({"raster":rasters});
     }
     serde_json::from_value(value).unwrap()
 }
@@ -124,10 +196,19 @@ fn numeric(actual: &Value, expected: &Value, path: &str) {
 }
 fn assert_frames(doc: &ObjectDocument, expected: &Value, name: &str) {
     for (frame, f) in expected.as_array().unwrap().iter().enumerate() {
-        let mut records: Vec<_> = doc
+        let mut records: Vec<Value> = doc
             .objects
             .iter()
             .filter(|r| r.target.frame_scope.frame == frame as u32)
+            .map(|r| serde_json::to_value(r).unwrap())
+            .chain(
+                doc.items
+                    .value()
+                    .into_iter()
+                    .flat_map(|i| i.raster_entries())
+                    .filter(|r| r.target.frame_scope.frame == frame as u32)
+                    .map(|r| serde_json::to_value(r).unwrap()),
+            )
             .collect();
         if let Some(order) = doc.composition_order.value() {
             if let Some(scope) = order.contexts[0]
@@ -139,7 +220,7 @@ fn assert_frames(doc: &ObjectDocument, expected: &Value, name: &str) {
                     scope
                         .elements
                         .iter()
-                        .find(|e| e.stroke_id == r.target.stroke_id)
+                        .find(|e| e.stroke_id == r["target"]["strokeId"].as_str().unwrap())
                         .unwrap()
                         .natural_position
                 });
@@ -149,8 +230,14 @@ fn assert_frames(doc: &ObjectDocument, expected: &Value, name: &str) {
         assert_eq!(records.len(), wanted.len(), "{name} frame {frame}");
         for (r, s) in records.into_iter().zip(wanted) {
             let wanted = record(s, frame);
-            let mut actual = serde_json::to_value(r).unwrap();
-            // Baseline generated dabs have no id; the native record requires a stable scoped id.
+            let mut actual = r;
+            if s["src"]
+                .as_str()
+                .is_some_and(|s| s.starts_with("baseline-bitmap:"))
+            {
+                actual["item"]["assetId"] = wanted["item"]["assetId"].clone();
+            }
+            // Baseline generated brush companions have no id; native records require one.
             if s.get("strokeId").is_none() {
                 actual["target"]["strokeId"] = wanted["target"]["strokeId"].clone();
             }
@@ -177,17 +264,56 @@ fn native_tween_generation_matches_baseline_with_one_undo_redo_and_reopen() {
         for v2 in [false, true] {
             let input = &c["input"];
             let name = input["name"].as_str().unwrap();
-            let mut o = NativeObjectHistory::new("tween", document(&input["frames"], v2)).unwrap();
+            // Format 1 has separate family arrays and no mixed composition order.
+            // The interleaved fixture requires the explicit format-2 order plan.
+            if !v2 && input["requiresCompositionOrder"] == true {
+                continue;
+            }
+            let mut doc = document(&input["frames"], v2);
+            if let Some(settings) = input.get("tweens") {
+                doc.tweens = crate::object_document::Presence::Present(
+                    serde_json::from_value(settings.clone()).unwrap(),
+                );
+            }
+            if let Some(arcs) = input.get("motionArcs") {
+                doc.motion_arcs = crate::object_document::Presence::Present(
+                    serde_json::from_value(arcs.clone()).unwrap(),
+                );
+            }
+            let mut o = if doc.items.value().is_some() || input.get("customBrushPresets").is_some()
+            {
+                let project = crate::object_document::ProjectEnvelope::no_media(
+                    crate::object_document::ProjectMetadata::new(320, 180, 24.)
+                        .unwrap()
+                        .with_custom_brush_presets(
+                            input
+                                .get("customBrushPresets")
+                                .map(|v| serde_json::from_value(v.clone()).unwrap()),
+                        )
+                        .unwrap(),
+                    doc,
+                )
+                .with_asset_inventory(Some(assets::images_only()));
+                NativeObjectHistory::from_admitted_project("tween", project).unwrap()
+            } else {
+                NativeObjectHistory::new("tween", doc).unwrap()
+            };
             let before = bytes(&o);
             let retained = o.acquire_snapshot(0).unwrap();
-            let op = if name == "force" {
-                "tween.reassign"
-            } else {
-                "tween.generate"
+            let op = match input["command"].as_str() {
+                Some("split") => "tween.split",
+                Some("regenerate") => "tween.regenerate",
+                _ if name.starts_with("force") => "tween.reassign",
+                _ => "tween.generate",
             };
             let mut payload = json!({"command":format!("object.{op}"),"layerUid":"L0","options":input["options"]});
-            if name == "force" {
+            if name.starts_with("force") {
                 payload["span"] = input["span"].clone();
+            }
+            for key in ["frame", "selection"] {
+                if let Some(value) = input.get(key) {
+                    payload[key] = value.clone();
+                }
             }
             let q = request(&o, "generate", op, payload);
             let reply = dispatch(&mut o, &q);
@@ -195,6 +321,7 @@ fn native_tween_generation_matches_baseline_with_one_undo_redo_and_reopen() {
             assert_eq!(o.history_depths(), (1, 0));
             assert_eq!(o.content_revision(), 1);
             assert_frames(&head(&o), &c["expected"], name);
+            bitmap::assert_native_bitmap_resources(&o, &c["expected"]);
             let after = bytes(&o);
             assert_eq!(dispatch(&mut o, &q), reply);
             assert_eq!(bytes(&o), after);
@@ -205,10 +332,39 @@ fn native_tween_generation_matches_baseline_with_one_undo_redo_and_reopen() {
                 assert_eq!(&bytes(&o), want);
             }
             assert_eq!(encode_storage_project(retained.document()).unwrap(), before);
-            let reopened =
-                NativeObjectHistory::new("reopened", decode_storage_project(&after).unwrap())
+            let reopened = if o.is_project_file() {
+                let saved = o
+                    .acquire_snapshot(o.content_revision())
+                    .unwrap()
+                    .serialize_project_file()
                     .unwrap();
+                let reopened = NativeObjectHistory::from_project_file("reopened", &saved).unwrap();
+                assert_eq!(
+                    reopened
+                        .acquire_snapshot(0)
+                        .unwrap()
+                        .serialize_project_file()
+                        .unwrap(),
+                    saved
+                );
+                reopened
+            } else {
+                NativeObjectHistory::new("reopened", decode_storage_project(&after).unwrap())
+                    .unwrap()
+            };
             assert_eq!(bytes(&reopened), after);
         }
     }
 }
+
+#[path = "object_tween_refusals.rs"]
+mod refusals;
+
+#[path = "object_raster_asset_commands_support.rs"]
+mod assets;
+
+#[path = "object_tween_ghosts.rs"]
+mod ghosts;
+
+#[path = "object_tween_bitmap.rs"]
+mod bitmap;

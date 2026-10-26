@@ -20,11 +20,15 @@ pub(crate) struct TweenRequest {
 object_deserialize!(TweenRequest{command:String,layer_uid:String,#[serde(default)] options:Presence<TweenOptions>,
     #[serde(default)] starts:Presence<Vec<u32>>,#[serde(default)] selection:Presence<Vec<u32>>,
     #[serde(default)] span:Presence<TweenSpan>,#[serde(default)] frame:Presence<u32>});
+pub(crate) struct TweenPlan {
+    pub(crate) document: ObjectDocument,
+    pub(crate) bakes: Vec<BitmapTweenBake>,
+}
 pub(crate) fn plan_tween(
     document: &ObjectDocument,
     request: &TweenRequest,
     custom: Option<&crate::object_document::ProjectPresetCatalog>,
-) -> R<Option<ObjectDocument>> {
+) -> R<Option<TweenPlan>> {
     let invalid = DispatchErrorCode::InvalidRequest;
     let operation = request.command.as_str();
     if ![
@@ -64,7 +68,7 @@ pub(crate) fn plan_tween(
             .value()
             .unwrap()
             .key_frames()
-            .filter(|&f| !frame_records(doc, &request.layer_uid, f).is_empty())
+            .filter(|&f| has_frame_content(doc, &request.layer_uid, f))
             .collect()
     };
     if drawn_keys(document).len() < 2 {
@@ -134,6 +138,7 @@ pub(crate) fn plan_tween(
     let keys = drawn_keys(&next);
     let options = settings.options.clone();
     let spans = settings.spans.clone();
+    let mut bakes = vec![];
     for endpoints in keys.windows(2) {
         let (from, to) = (endpoints[0], endpoints[1]);
         if starts.as_ref().is_some_and(|s| !s.contains(&from)) {
@@ -147,9 +152,13 @@ pub(crate) fn plan_tween(
             &options,
             spans.iter().find(|s| s.from == from && s.to == to),
             custom,
+            &mut bakes,
         )?;
     }
     next.tweens = Presence::Present(store);
     crate::revision::ObjectSnapshot::validate_drawing(&next).map_err(|_| invalid)?;
-    Ok(Some(next))
+    Ok(Some(TweenPlan {
+        document: next,
+        bakes,
+    }))
 }

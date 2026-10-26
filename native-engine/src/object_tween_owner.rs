@@ -3,12 +3,15 @@ use super::ObjectFillOwner;
 use crate::object_document::ObjectDocument;
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
-use crate::tween_kernels::{plan_tween, TweenRequest};
+use crate::tween_kernels::{
+    plan_tween, prepare_tween_resources, PreparedTweenResources, TweenRequest,
+};
 #[derive(Debug)]
 pub(crate) struct PreparedTween {
     origin: ObjectSnapshot,
     document: Option<ObjectDocument>,
     command: String,
+    resources: Option<PreparedTweenResources>,
 }
 impl PreparedTween {
     pub(crate) fn command(&self) -> &str {
@@ -26,15 +29,36 @@ impl ObjectFillOwner {
         let request: TweenRequest =
             serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
         let origin = self.current_snapshot();
-        let document = plan_tween(
+        let planned = plan_tween(
             origin.document(),
             &request,
             origin
                 .project()
                 .and_then(|p| p.project().custom_brush_presets()),
         )?;
+        let (document, resources) = match planned {
+            None => (None, None),
+            Some(plan) => {
+                let bitmap = |d: &ObjectDocument| {
+                    d.objects.iter().any(|r| {
+                        r.vector_ext
+                            .value()
+                            .is_some_and(|v| !v.bitmap_brush.missing())
+                    })
+                };
+                if bitmap(origin.document()) || bitmap(&plan.document) || !plan.bakes.is_empty() {
+                    (
+                        None,
+                        Some(prepare_tween_resources(&origin, plan.document, plan.bakes)?),
+                    )
+                } else {
+                    (Some(plan.document), None)
+                }
+            }
+        };
         Ok(PreparedTween {
             origin,
+            resources,
             document,
             command: request.command,
         })
@@ -54,6 +78,12 @@ impl ObjectFillOwner {
             || candidate.origin.content_revision() != current.content_revision()
         {
             return Err(DispatchErrorCode::StaleRevision);
+        }
+        if let Some(resources) = candidate.resources {
+            return self
+                .revisions
+                .publish_tween_resources(resources)
+                .map_err(|_| DispatchErrorCode::Unavailable);
         }
         match candidate.document {
             None => Ok(self.content_revision()),

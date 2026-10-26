@@ -11,6 +11,8 @@ pub(super) struct PairSpec {
     pub score: f64,
     pub forced: bool,
     pub piece: bool,
+    pub a_piece: bool,
+    pub b_piece: bool,
 }
 fn spec(
     a: &[ObjectRecord],
@@ -30,6 +32,8 @@ fn spec(
         score,
         forced,
         piece: false,
+        a_piece: false,
+        b_piece: false,
     }
 }
 pub(super) fn pair_plan(
@@ -55,7 +59,17 @@ pub(super) fn pair_plan(
                 continue;
             }
             if indices.len() > 1 {
-                return Err(crate::request_receipts::DispatchErrorCode::Unavailable);
+                used_b[bi] = true;
+                for (ai, mut piece) in ordered_pieces(&b[bi], a, &indices)? {
+                    used_a[ai] = true;
+                    piece.target.stroke_id.clear();
+                    let mut p = spec(a, b, ai, bi, -1 - pairs.len() as i32, 0., true);
+                    p.b_data = piece;
+                    p.piece = true;
+                    p.b_piece = true;
+                    pairs.push(p);
+                }
+                continue;
             }
             let ai = indices[0];
             used_a[ai] = true;
@@ -168,8 +182,9 @@ pub(super) fn pair_plan(
         used_b[m.b] = true;
         pairs.push(spec(a, b, m.a, m.b, *i as i32, m.score, false));
     }
-    let un_a = (0..a.len()).filter(|&i| !used_a[i]).collect();
-    let un_b = (0..b.len()).filter(|&i| !used_b[i]).collect();
+    let mut un_a: Vec<_> = (0..a.len()).filter(|&i| !used_a[i]).collect();
+    let mut un_b: Vec<_> = (0..b.len()).filter(|&i| !used_b[i]).collect();
+    split_matches(a, b, &mut pairs, &mut un_a, &mut un_b)?;
     cohere(&mut pairs);
     Ok((pairs, un_a, un_b))
 }

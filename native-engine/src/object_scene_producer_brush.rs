@@ -412,12 +412,25 @@ fn build(
             .ok_or(BrushUnavailable::Anchor(AnchorError::CamouflageDisagrees(
                 "record-has-no-vector-body",
             )))?;
-    let anchor = anchor_draw(
-        stored.solid_fill(),
-        vector.solid_stroke(),
-        &vector.opacity,
-        &source.restore,
-    )
+    let generated = stored
+        .vector_ext
+        .value()
+        .and_then(|v| v.bitmap_brush.value())
+        .is_some_and(|f| f.tween_generated.value() == Some(&true));
+    let anchor = if generated {
+        super::object_scene_producer_brush_anchor::tween_anchor_draw(
+            stored.solid_fill(),
+            vector.solid_stroke(),
+            &vector.opacity,
+        )
+    } else {
+        anchor_draw(
+            stored.solid_fill(),
+            vector.solid_stroke(),
+            &vector.opacity,
+            &source.restore,
+        )
+    }
     .map_err(BrushUnavailable::Anchor)?;
     if !source.ink_opacity.is_finite() {
         return Err(BrushUnavailable::InkOpacityNotFinite);

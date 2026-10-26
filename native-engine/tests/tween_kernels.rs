@@ -254,3 +254,39 @@ fn tween_vector_dabs_match_every_original_preset_and_seeded_pressure_custom_stam
         }
     }
 }
+
+#[test]
+fn tween_pressure_outline_matches_original_caps_and_rings() {
+    for c in cases().into_iter().filter(|c| c["operation"] == "outline") {
+        let centers: Vec<CenterSegIn> =
+            serde_json::from_value(c["input"]["center"].clone()).unwrap();
+        let segments: Vec<_> = centers
+            .iter()
+            .map(|s| SegOut {
+                point: s.point,
+                handle_in: s.handle_in,
+                handle_out: s.handle_out,
+            })
+            .collect();
+        let widths: Vec<_> = centers.iter().map(|s| s.width).collect();
+        let actual = pressure_outline(&segments, &widths)
+            .unwrap_or_else(|e| panic!("{}: {e:?}", c["input"]["name"]));
+        let expected: Vec<SegOut> = serde_json::from_value(c["expected"].clone()).unwrap();
+        assert_eq!(actual.len(), expected.len(), "{}", c["input"]["name"]);
+        for (i, (a, b)) in actual.iter().zip(expected).enumerate() {
+            for (a, b) in a
+                .point
+                .iter()
+                .chain(&a.handle_in)
+                .chain(&a.handle_out)
+                .zip(b.point.iter().chain(&b.handle_in).chain(&b.handle_out))
+            {
+                assert!(
+                    (a - b).abs() < 1e-8,
+                    "{} vertex {i}: {a} != {b}",
+                    c["input"]["name"]
+                );
+            }
+        }
+    }
+}
