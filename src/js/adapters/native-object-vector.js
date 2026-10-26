@@ -69,7 +69,9 @@
     // G15: `options.placement === 'behind'` enters under the layer's existing artwork; front is the absent default.
     // `options.trimEnds` asks native to trim the new open stroke's dangling ends (baseline Trim Stroke Ends).
     const placed = (body, options) => Object.assign(body, options && options.placement === 'behind' ? { placement: 'behind' } : {},
-      options && options.trimEnds !== undefined ? { trimEnds: options.trimEnds } : {});
+      options && options.trimEnds !== undefined ? { trimEnds: options.trimEnds } : {},
+      // `options.keyframe: 'copy'` keys a held cell with what it showed instead of Draw's empty key.
+      options && options.keyframe === 'copy' ? { keyframe: 'copy' } : {});
 
     function createStroke(layerUid, frame, dict, options) {
       const map = Stroke.toRecord(dict, { layerUid, frame, strokeId: '' }, { opacity: options && options.opacity });

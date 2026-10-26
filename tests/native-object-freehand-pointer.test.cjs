@@ -307,3 +307,25 @@ test('Trim Stroke Ends asks native to trim the Draw commit with the original lim
  await settled(sym);assert.equal(sym.calls.length,1);assert.equal(sym.calls[0].payload.command,'object.vector.createMany');
  assert.equal(sym.calls[0].payload.trimEnds,24,'the copies share the original stroke\'s cuts natively');
 });
+// U33 (#2362): Labs predictive stroke reshapes the native freehand stroke before its single commit (the baseline runs
+// onStroke on the committed path before the frame is saved), through the same recognizer as the legacy hook.
+function predictive(f,on){
+ const protos={};f.root.SMLabs={isOn:name=>on&&name==='predictive-stroke',register(n,d){protos[n]=d;},
+  unmigratedDrawHooks:()=>Object.keys(protos).filter(n=>(protos[n].onStroke||protos[n].onPreview)&&!protos[n].nativeDraw&&f.root.SMLabs.isOn(n))};
+ f.root.Path.Ellipse=function(options){assert.equal(options.insert,false);return new f.paper.Path.Ellipse(options);};
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/labs/predictive-stroke.js'),'utf8'),f.context,{filename:'predictive-stroke.js'});
+}
+test('Labs predictive stroke snaps a near-line and a near-circle in the one native commit, and is inert when off',async()=>{
+ const line=await fixture();predictive(line,true);
+ send(line,'pointerdown',10,40);for(const [x,y] of [[40,41],[70,40],[100,39],[130,40]])send(line,'pointermove',x,y);send(line,'pointerup',160,40);
+ assert.equal((await settled(line)).status,'applied');assert.equal(line.calls.length,1);
+ assert.deepEqual(line.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]),[[10,40],[160,40]]);
+ const circle=await fixture();predictive(circle,true);
+ const ring=Array.from({length:25},(_,i)=>[100+60*Math.cos(i/24*2*Math.PI),90+60*Math.sin(i/24*2*Math.PI)]);
+ send(circle,'pointerdown',...ring[0]);ring.slice(1,-1).forEach(p=>send(circle,'pointermove',...p));send(circle,'pointerup',...ring.at(-1));
+ assert.equal((await settled(circle)).status,'applied');const g=circle.calls[0].payload.record.geometry;
+ assert.equal(g.closed,true);assert.equal(g.segments.length,4,'the baseline Path.Ellipse over the stroke bounds');
+ const off=await fixture();predictive(off,false);
+ send(off,'pointerdown',10,40);for(const [x,y] of [[40,41],[70,40],[100,39],[130,40]])send(off,'pointermove',x,y);send(off,'pointerup',160,40);
+ assert.equal((await settled(off)).status,'applied');assert.equal(off.calls[0].payload.record.geometry.segments.length,6);
+});

@@ -83,6 +83,22 @@ fn trim_ends_is_an_optional_positive_limit_on_the_two_creates_only() {
 }
 
 #[test]
+fn keyframe_copy_is_an_optional_member_of_the_two_creates_only() {
+    let records = json!([record(), record()]);
+    for command in ["object.vector.create", "object.vector.createMany"] {
+        let body = if command == "object.vector.create" { json!({"record":record()}) } else { json!({"records":records}) };
+        for (keyframe, ok) in [(json!("copy"), true), (json!("blank"), false), (json!(true), false), (json!(null), false)] {
+            let mut payload = body.clone();
+            payload["command"] = json!(command);
+            payload["keyframe"] = keyframe.clone();
+            assert_eq!(request(VECTOR, &payload), ok, "{command} {keyframe}");
+        }
+    }
+    let delete = json!({"command":"object.vector.delete","stableTarget":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":3},"layerUid":"L1","strokeId":"s"},"keyframe":"copy"});
+    assert!(!request(VECTOR, &delete));
+}
+
+#[test]
 fn brush_texture_members_are_admitted_as_serp_writes_them_and_nothing_else() {
     for (tags, ok) in [
         (json!({"brushGroupId":"bg1","brushTexturePreset":"charcoal","preTextureOpacity":1}), true),
