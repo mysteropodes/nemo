@@ -104,9 +104,10 @@ fn hidden_layers_and_hidden_folders_are_not_walls_and_a_miss_changes_nothing() {
         (|d: &mut Value| d["layers"][1]["visible"] = json!(false)) as fn(&mut Value),
         |d: &mut Value| {
             d["layers"][1]["parentLayerUid"] = json!("F");
-            d["layers"].as_array_mut().unwrap().push(
-                json!({"layerUid":"F","name":"Folder","visible":false,"isFolderLayer":true}),
-            );
+            d["layers"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"layerUid":"F","name":"Folder","visible":false,"isFolderLayer":true}));
             d["compositionOrder"]["contexts"][0]["layers"]
                 .as_array_mut()
                 .unwrap()

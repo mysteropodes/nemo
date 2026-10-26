@@ -13,11 +13,14 @@ pub(super) const OPERATIONS: [&str; 6] = [
     "rig.pose",
 ];
 /// U36 (#2362): the Labs generators share the table; the agreement corpus stays the original six.
-pub(super) const LABS: [&str; 4] = [
+pub(super) const LABS: [&str; 7] = [
     "labs.speedLines",
     "labs.boil",
     "labs.followPath",
     "labs.referenceFill",
+    "labs.pingpong",
+    "labs.retime",
+    "labs.interval",
 ];
 
 pub(super) fn corpus() -> Value {
@@ -32,8 +35,8 @@ pub(super) fn envelope(operation: &str, payload: Value) -> NativeApplicationRequ
 }
 
 #[test]
-fn the_table_declares_exactly_the_ten_operations_and_nothing_else() {
-    assert_eq!(table().len(), 10, "an unparsable table admits nothing");
+fn the_table_declares_exactly_the_thirteen_operations_and_nothing_else() {
+    assert_eq!(table().len(), 13, "an unparsable table admits nothing");
     for &suffix in OPERATIONS.iter().chain(&LABS) {
         assert!(admitted(&format!("{P}{suffix}")), "{suffix}");
     }

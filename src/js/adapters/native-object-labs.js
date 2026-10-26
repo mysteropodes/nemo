@@ -1,4 +1,4 @@
-/* U36 (#2362): the Labs speed lines, boil, follow-path and reference fill through their native operations. The engine reads the
+/* U35/U36 (#2362): the Labs generators, reference fill and timing actions through their native operations. The engine reads the
  * shown cell itself and runs the baseline algorithms, so a request carries parameters only. Holds no document state and
  * has no fallback writer: an absent project or route is a typed unavailability. */
 (function (root, factory) {
@@ -27,6 +27,11 @@
       boil: (body) => run(Contract.LABS_BOIL, body),
       followPath: (body) => run(Contract.LABS_FOLLOW_PATH, body),
       referenceFill: (body) => run(Contract.LABS_REFERENCE_FILL, body),
+      pingpong: (body) => run(Contract.LABS_PINGPONG, body),
+      retime: (body) => run(Contract.LABS_RETIME, body),
+      interval: (body) => run(Contract.LABS_INTERVAL, body),
+      // The row's authored/held/blank runs through the native timing query (null when refused).
+      cells: (layerUid) => (typeof session.readLayerCells === 'function' ? session.readLayerCells(layerUid, session.info()) : Promise.resolve(null)),
     });
   }
   const bindings = new WeakMap();

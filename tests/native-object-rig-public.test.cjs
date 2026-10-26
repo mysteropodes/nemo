@@ -1,5 +1,5 @@
 'use strict';
-// L03-T public declaration of the six lane-3 object operations and the four U36 Labs operations: the contract, the Rust validator data, the common SDK, the
+// L03-T public declaration of the six lane-3 object operations and the seven U35/U36 Labs operations: the contract, the Rust validator data, the common SDK, the
 // capability descriptors and the closed transport schema agree on one table and on one corpus. Run on the COMPOSED candidate
 // (SDK seam patch + schema patch applied).
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
@@ -13,8 +13,8 @@ const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const corpus = JSON.parse(read('tests/native-object-rig-fixtures/public-corpus.json'));
 const schema = JSON.parse(read('engineering/application/native-transport-v2.schema.json'));
 const P = 'command.document.object.';
-const SUFFIXES = ['image.mesh.edit', 'widget.create', 'widget.write', 'widget.settings', 'rig.edit', 'rig.pose', 'labs.speedLines', 'labs.boil', 'labs.followPath', 'labs.referenceFill'];
-const COMMANDS = { 'image.mesh.edit': 'object.image.mesh.edit', 'widget.create': 'object.widget.create', 'widget.write': 'object.widget.write', 'widget.settings': 'object.widget.settings', 'rig.edit': 'object.rig.edit', 'rig.pose': 'object.rig.pose' , 'labs.speedLines': 'object.labs.speedLines', 'labs.boil': 'object.labs.boil', 'labs.followPath': 'object.labs.followPath', 'labs.referenceFill': 'object.labs.referenceFill' };
+const SUFFIXES = ['image.mesh.edit', 'widget.create', 'widget.write', 'widget.settings', 'rig.edit', 'rig.pose', 'labs.speedLines', 'labs.boil', 'labs.followPath', 'labs.referenceFill', 'labs.pingpong', 'labs.retime', 'labs.interval'];
+const COMMANDS = { 'image.mesh.edit': 'object.image.mesh.edit', 'widget.create': 'object.widget.create', 'widget.write': 'object.widget.write', 'widget.settings': 'object.widget.settings', 'rig.edit': 'object.rig.edit', 'rig.pose': 'object.rig.pose' , 'labs.speedLines': 'object.labs.speedLines', 'labs.boil': 'object.labs.boil', 'labs.followPath': 'object.labs.followPath', 'labs.referenceFill': 'object.labs.referenceFill', 'labs.pingpong': 'object.labs.pingpong', 'labs.retime': 'object.labs.retime', 'labs.interval': 'object.labs.interval' };
 // The original agreement corpus covers the six lane-3 operations; the U36 Labs rows are tests/native-object-labs-public.test.cjs.
 const ORIGINAL = SUFFIXES.slice(0, 6).map((s) => P + s);
 const envelope = (operation, payload, extra) => Object.assign({ apiVersion: 2, requestId: 'edit-1', instanceId: 'instance-A', documentId: 'document-A', expectedRevision: 7, operation, payload }, extra);
@@ -25,7 +25,7 @@ const defOf = (operation) => {
   return branches[0].allOf[1].properties.payload.$ref.replace('#/$defs/', '');
 };
 
-test('the contract admits exactly the ten declared operations, all revisioned commands, and nothing else', () => {
+test('the contract admits exactly the thirteen declared operations, all revisioned commands, and nothing else', () => {
   assert.deepEqual(contract.OPERATIONS, SUFFIXES.map((s) => P + s));
   for (const op of contract.OPERATIONS) {
     assert.equal(contract.admitted(op), true); assert.equal(contract.requiresRevision(op), true); assert.equal(seam.admitted(op), true);
