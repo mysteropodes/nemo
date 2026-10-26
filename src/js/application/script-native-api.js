@@ -158,5 +158,34 @@
     }
     return { nemo: nemo, commit: commit, discard: function () { queue = []; }, log: function () { return log.slice(); } };
   }
-  return Object.freeze({ ROUTES: ROUTES, createRun: createRun });
+  var REFUSED = 'Scripts run on an open native document only.';
+  function compile(source) { return new Function('nemo', '__src', '"use strict";\nreturn eval(__src);'); }
+  // The desktop SMScript.run: one run over the active native object session, or a refusal.
+  function runOnDesktop(root, source) {
+    var project = root.NemoNativeObjectProject, session = project && typeof project.desktop === 'function' && project.desktop(root);
+    if (!session || !session.blocksLegacy() || !session.isActive()) return { ok: false, error: REFUSED, log: [] };
+    var sm = root.SM || {}, entry = function (name) { return function (index) { return typeof sm[name] === 'function' ? sm[name](index) : false; }; };
+    var toast = function (m) { if (typeof root.showToast === 'function') root.showToast(m); }, run;
+    try {
+      run = createRun({ info: function () { return session.isActive() ? session.info() : null; },
+        write: { visible: entry('toggleLayerVis'), locked: entry('toggleLayerLock'), shy: entry('toggleLayerShy') },
+        goToFrame: function (f) { if (typeof root.goToFrame === 'function') root.goToFrame(f); },
+        selection: function () { return (root._layerSel || []).slice(); }, toast: toast });
+    } catch (e) { return { ok: false, error: e.message, log: [] }; }
+    var value;
+    try { value = compile()(run.nemo, source); }
+    catch (e) {
+      // A script that says `return` at top level runs as a function body (baseline idiom).
+      var retry = e instanceof SyntaxError && /return/i.test(e.message || '');
+      try { if (!retry) throw e; value = new Function('nemo', '"use strict";\n' + source)(run.nemo); }
+      catch (e2) {
+        run.discard();
+        return { ok: false, error: (e2 instanceof SyntaxError ? 'Erreur de syntaxe : ' : '') + e2.message, code: e2.code, log: run.log() };
+      }
+    }
+    // A failing script sends nothing; a successful one commits its queued writes in order.
+    var committed = run.commit().then(function (c) { if (!c.ok) toast('Script writes stopped: ' + c.error); return c; });
+    return { ok: true, value: value, log: run.log(), committed: committed };
+  }
+  return Object.freeze({ ROUTES: ROUTES, createRun: createRun, runOnDesktop: runOnDesktop });
 }));

@@ -623,51 +623,11 @@
   }
 
   // ---- runner ----
-  // CS8-SDK (#2354): on the desktop host a script never touches state.layers. With a
-  // native document open it runs against NemoScriptNativeApi (pinned reads, queued writes
-  // drained through the ordinary UI entries); without one it refuses.
-  function nativeSession() {
-    var p = window.NemoNativeObjectProject, s = p && typeof p.desktop === 'function' && p.desktop(window);
-    return s && s.blocksLegacy() && s.isActive() ? s : null;
-  }
-  function desktopHost() { return !!(window.__TAURI__ && window.__TAURI__.core); }
-  function compile() { return new Function('nemo', '__src', '"use strict";\nreturn eval(__src);'); }
-  function runNative(source, session) {
-    var Native = window.NemoScriptNativeApi;
-    if (!session || !Native) return { ok: false, error: 'Scripts run on an open native document only.', log: [] };
-    var sm = window.SM || {}, entry = function (name) {
-      return function (index) { return typeof sm[name] === 'function' ? sm[name](index) : false; };
-    };
-    var run;
-    try {
-      run = Native.createRun({ info: function () { return session.isActive() ? session.info() : null; },
-        write: { visible: entry('toggleLayerVis'), locked: entry('toggleLayerLock'), shy: entry('toggleLayerShy') },
-        goToFrame: function (f) { if (window.goToFrame) goToFrame(f); },
-        selection: function () { return (window._layerSel || []).slice(); },
-        toast: function (m) { if (window.showToast) showToast(m); } });
-    } catch (e) { return { ok: false, error: e.message, log: [] }; }
-    var value;
-    try { value = compile()(run.nemo, source); }
-    catch (e) {
-      if (e instanceof SyntaxError && /return/i.test(e.message || '')) {
-        try { value = new Function('nemo', '"use strict";\n' + source)(run.nemo); }
-        catch (e2) { run.discard(); return { ok: false, error: e2.message, code: e2.code, log: run.log() }; }
-      } else {
-        run.discard();
-        return { ok: false, error: (e instanceof SyntaxError ? 'Erreur de syntaxe : ' : '') + e.message, code: e.code, log: run.log() };
-      }
-    }
-    // A failing script sends nothing; a successful one commits its queued writes in order.
-    return { ok: true, value: value, log: run.log(), committed: run.commit() };
-  }
-
   function run(source, opts) {
-    opts = opts || {};
-    _log = [];
-    var session = nativeSession();
-    if (session || desktopHost()) return runNative(source, session);
-    var api = buildApi();
-    var fn;
+    opts = opts || {}; _log = [];
+    // CS8-SDK (#2354): the desktop host never runs a script against state.layers.
+    if (window.__TAURI__) return window.NemoScriptNativeApi ? NemoScriptNativeApi.runOnDesktop(window, source) : { ok: false, error: 'Scripts run on an open native document only.', log: [] };
+    var api = buildApi(), fn;
     try {
       // The last expression is the script's result, which is what a console-
       // style tool wants; eval's completion value gives that, and "use strict"
@@ -722,7 +682,6 @@
       var rd = new FileReader();
       rd.onload = function () {
         var r = run(String(rd.result), { name: f.name });
-        if (r.committed) r.committed.then(function (c) { if (!c.ok && window.showToast) showToast('« ' + f.name + ' » : ' + c.error); });
         if (window.showToast) showToast(r.ok ? ('Script « ' + f.name + SM.t('toastExecutedSuffix')) : ('« ' + f.name + ' » : ' + r.error));
         window.__nemoScriptLast = r;
         inp.remove();
