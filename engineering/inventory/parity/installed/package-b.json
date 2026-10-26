@@ -42,7 +42,7 @@
       "id": "play-resume",
       "issue": 1573,
       "status": "Blocked",
-      "reason": "Original task citation is resolved. Scenario implementation/review and installed operator/package qualification remain outstanding.",
+      "reason": "Original task citation is resolved. Play scenario review and current observer-package/operator qualification remain outstanding.",
       "tasks": [
         "X12"
       ],
@@ -73,7 +73,8 @@
           ]
         }
       ],
-      "taskEvidence": "https://github.com/mysteropodes/nemo/pull/2403#issuecomment-6416918418 \u2014 reviewer disposition from matrix task owners."
+      "taskEvidence": "https://github.com/mysteropodes/nemo/pull/2403#issuecomment-6416918418 \u2014 reviewer disposition from matrix task owners.",
+      "runtimePrerequisites": "One unsigned test-play-publication-observer package at the batch source; original keyed fixture de1c3782038c51ea04f59978808be895479986d95d9655d9b79e6556f324cf32; actual owned window, native exposure trace and terminal collector copy."
     },
     {
       "id": "play-publication",
@@ -88,12 +89,13 @@
       "checks": [
         {
           "id": "bounded-trace",
-          "clause": "Installed opt-in bounded trace collection in the same installed lifetime; complete retained output survives official owner stop. O1/#1708 collectibility smoke remains required.",
+          "clause": "Installed opt-in bounded trace collection in the same installed lifetime; complete retained output survives official owner stop. Verify current-package collection; the historical O1/#1708 readiness smoke was accepted separately.",
           "covers": [
             "oracle"
           ]
         }
-      ]
+      ],
+      "collectorPrerequisiteEvidence": "O1/#1708 CLOSED; bounded installed collector acceptance https://github.com/mysteropodes/nemo/issues/1708#issuecomment-6129395003. This does not establish current-package collection or Play publication."
     },
     {
       "id": "opacity-consumption",

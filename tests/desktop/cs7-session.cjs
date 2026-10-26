@@ -107,9 +107,16 @@ function createInstalledSession(config) {
     directory: operatorDirectory,
     announce: request => process.stdout.write(JSON.stringify({ operatorRequest: request }) + '\n'),
   });
-  const controller = harness.createController({ root: ROOT, app: app.bundle });
+  const unsigned = config.playObserver === true ? require('./cs7-play-evidence.cjs').qualifyUnsigned(app.bundle) : false;
+  const appEnvironment = { ...process.env };
+  delete appEnvironment.NEMO_TEST_PLAY_OBSERVER;
+  delete appEnvironment.NEMO_NATIVE_OCCLUSION_DIAGNOSTICS;
+  if (config.playObserver === true) Object.assign(appEnvironment, {
+    NEMO_TEST_PLAY_OBSERVER: '1', NEMO_NATIVE_OCCLUSION_DIAGNOSTICS: '1',
+  });
+  const controller = harness.createController({ root: ROOT, app: app.bundle, env: appEnvironment });
   const tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd: ROOT, encoding: 'utf8' }).trim();
-  let instance, started = false, pinned, latestSnapshot;
+  let instance, started = false, pinned, latestSnapshot, cleaned = false, lastIdentity;
   async function currentIdentity() {
     check(instance, 'installed session not started');
     const current = identity.sourceIdentity();
@@ -121,7 +128,7 @@ function createInstalledSession(config) {
     latestSnapshot = status.value;
     const pid = status.value.app.pid;
     if (pinned) check(pid === pinned.pid, 'installed PID changed');
-    return { sourceSha: source.head, tree, driverSha: source.head, executableSha256: app.executableSha256,
+    return lastIdentity = { sourceSha: source.head, tree, driverSha: source.head, executableSha256: app.executableSha256,
       sessionId: config.taskId, pid, dirty: false };
   }
   return {
@@ -139,6 +146,18 @@ function createInstalledSession(config) {
       const current = await currentIdentity();
       return { identity: current, snapshot: structuredClone(latestSnapshot), window: { ...pinned } };
     },
+    async playContext() {
+      const current = await currentIdentity(), observer = latestSnapshot.app.playObserver;
+      check(config.playObserver === true && observer?.schema === 'nemo.play-observer/1' &&
+        /^[a-f0-9-]{36}$/.test(observer.runId), 'owned opt-in Play observer unavailable');
+      return { identity: current, runId: observer.runId, windowId: pinned.windowId };
+    },
+    retainedPlayEvidence() {
+      check(config.playObserver === true, 'Play observer was not admitted');
+      return require('./cs7-play-evidence.cjs').retained({ instance, identity: lastIdentity,
+        windowId: pinned.windowId, cleaned, unsigned,
+        directory: path.join(ROOT, 'reports', 'play-observer-' + config.taskId) });
+    },
     async requestEvidence(request) {
       const current = await currentIdentity();
       const evidence = await operator.request({ ...request, identity: current });
@@ -151,6 +170,7 @@ function createInstalledSession(config) {
       try { await input.close(); } catch { failed = true; }
       try { await controller.cleanup(); } catch { failed = true; }
       check(!failed, 'installed session cleanup incomplete');
+      cleaned = true;
     },
   };
 }
