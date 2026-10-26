@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "f74b5d4cc4acc53efa9aa009f4dfe8d0f19d619d",
-  "describe": "v0.7.0-alpha.4-3194-gf74b5d4c"
+  "head": "32592ce66b437af2544014d61887788c2445afb4",
+  "describe": "v0.7.0-alpha.4-3196-g32592ce6"
  },
- "inputsDigest": "fdba7f50ef38b12d6dff659b85eab5e4514b0fd5c858e365b6ab528805d9559c",
+ "inputsDigest": "73a191104949e603f831b418e4dce816386e4f1425b2f5fefab36d78a99e2355",
  "states": [
   "inventoried",
   "characterized",
@@ -21832,7 +21832,7 @@
    "capability": "Rotating 3D reference: CC0 anime avatar, CC0 rigged arms/hands, fallback mannequins, or OBJ — drag to orbit, wheel to zoom, never exported/baked",
    "area": "labs",
    "handler": [
-    "src/js/labs/reference-3d.js:392"
+    "src/js/labs/reference-3d.js:409"
    ],
    "events": [],
    "exposure": [
@@ -21845,7 +21845,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/reference-3d.js:392",
+   "source": "src/js/labs/reference-3d.js:409",
    "meta": {
     "functionsVisited": 1
    },
