@@ -91,3 +91,30 @@ fn any_refused_step_refuses_the_whole_batch() {
         assert_eq!((state(&owner), owner.history_depths()), (before, (0, 0)));
     }
 }
+
+#[test]
+fn a_copy_keyed_cut_on_a_held_cell_keys_that_cell_and_leaves_the_key() {
+    let mut doc = document(2, vec![record_at("A", "L1", 0, "s-a"), record_at("C", "L1", 0, "s-c")], None);
+    doc["layers"][0]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+        "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+    let mut owner = owner_of(&doc);
+    let before = state(&owner);
+    let mut head = record_at("A", "L1", 3, "s-a");
+    head["geometry"]["segments"][0]["point"]["x"] = json!(-7);
+    let ops = vec![json!({"op":"replace","record":head}), json!({"op":"delete","stableTarget":target("L1", 3, "s-c")}),
+        op_create(record_at("B", "L1", 3, ""))];
+    let held = send(&mut owner, "held", batch(ops.clone()));
+    assert_eq!(held["ok"], false, "without the copy key a held cell has no record to edit: {held}");
+    let mut payload = batch(ops);
+    payload["keyframe"] = json!("copy");
+    let response = send(&mut owner, "knife", payload);
+    assert_eq!(response["ok"], true, "{response}");
+    assert_eq!(ids_at(&owner, "L1", 0), ["s-a", "s-c"].map(String::from).to_vec(), "the held key is untouched");
+    assert_eq!(ids_at(&owner, "L1", 3), ["s-a", "native-stroke:1:0"].map(String::from).to_vec());
+    let snapshot = state(&owner);
+    let cut = objects(&snapshot);
+    let at = |frame: u64| cut.iter().find(|r| r["target"]["strokeId"] == "s-a" && r["target"]["frameScope"]["frame"].as_u64() == Some(frame)).unwrap()["geometry"]["segments"][0]["point"]["x"].clone();
+    assert_eq!((at(0) != json!(-7), at(3)), (true, json!(-7)));
+    owner.undo(1).unwrap();
+    assert_eq!(state(&owner), before, "one undo removes the key and the cut");
+}

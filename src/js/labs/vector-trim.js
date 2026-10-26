@@ -132,6 +132,58 @@
     });
   }
 
+  // Native authority (U33, #2362): the cut is planned on the PRESENTED strokes with Paper geometry, as the selection
+  // hit-test is, and committed as ONE native vector batch with the copy key (a held cell is keyed with what it showed
+  // first). A whole-removed stroke is deleted, a cut stroke's surviving head replaces it under its own id and every other
+  // surviving piece is created with a fresh id, as applyPlan's splitAt/remove do. The presented items are never mutated:
+  // the pieces are cut from a detached copy of each target's geometry, and the native revision re-presents the layer.
+  var MAX_NATIVE_STEPS = 64;
+  function piecesOf(p) {
+    var t = new Path({ insert: false, closed: p.closed, segments: p.target.segments.map(function (s) { return s.clone(); }) });
+    if (p.closed) {
+      var first = p.spans[0];
+      var opened = t.splitAt(t.getLocationAt(first.start)) || t;
+      var tail = opened.splitAt(opened.getLocationAt((first.end - first.start + p.L) % p.L));
+      return { head: null, tails: tail ? [tail] : [] };
+    }
+    var head = t, tails = [];
+    p.spans.slice().sort(function (a, b) { return b.start - a.start; }).forEach(function (span) {
+      if (!head) return;
+      if (span.end < p.L - 1e-6) { var piece = head.splitAt(head.getLocationAt(span.end)); if (piece) tails.push(piece); }
+      if (span.start > 1e-6) head.splitAt(head.getLocationAt(span.start));
+      else head = null;
+    });
+    return { head: head, tails: tails };
+  }
+  function nativeCut(native, plan) {
+    var toast = function (text) { if (typeof showToast === 'function') showToast(text); };
+    var layerUid = native.layerUid(state.activeLayerIdx), steps = [], unnamed = false;
+    plan.forEach(function (p) {
+      var id = p.target.data && p.target.data.strokeId;
+      if (!id) { unnamed = true; return; }
+      if (p.removeWhole) { steps.push({ delete: id }); return; }
+      var cut = piecesOf(p), base = serP(p.target);
+      var dictOf = function (piece) {
+        var dict = JSON.parse(JSON.stringify(base));
+        delete dict.centerSegments;
+        dict.segments = pathOverlaySegments(piece);
+        dict.closed = false;
+        return dict;
+      };
+      steps.push(cut.head ? { replace: { strokeId: id, dict: dictOf(cut.head) } } : { delete: id });
+      cut.tails.forEach(function (piece) { var dict = dictOf(piece); delete dict.strokeId; steps.push({ create: dict }); });
+    });
+    if (!layerUid || unnamed || steps.length > MAX_NATIVE_STEPS) {
+      toast(SM.t('labsToastLayerInvalidLocked'));
+      return Promise.resolve(0);
+    }
+    return native.batchStrokes(layerUid, state.currentFrame, steps).then(function (result) {
+      if (!result || result.status !== 'applied') { toast(SM.t('labsToastLayerInvalidLocked')); return 0; }
+      toast(plan.length === 1 ? SM.t('labsToastStrokeCutSingular') : plan.length + SM.t('labsToastStrokesCutSuffix'));
+      return plan.length;
+    });
+  }
+
   function commitCut() {
     var layer = userLayers[state.activeLayerIdx];
     if (!layer || pts.length < 2) return false;
@@ -147,6 +199,8 @@
       if (typeof showToast === 'function') showToast(SM.t('labsToastNoStrokeUnderKnife'));
       return false;
     }
+    var native = window.NemoNativeObjectLabs && NemoNativeObjectLabs.desktop(window);
+    if (native) { nativeCut(native, plan); return true; }
     pushUndo();
     plan.forEach(applyPlan);
     saveActiveLayerFrame(); updateUI();
