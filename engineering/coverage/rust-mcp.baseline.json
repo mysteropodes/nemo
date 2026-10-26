@@ -634,6 +634,17 @@
       "functions": 100,
       "note": "T08 Shadow: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean c8a7ec57f9ed03a488572a8bc8be38dd9c0ae36e. Report SHA256 423e64ec73254cfc06ff635d42234ca79784550c63c20160b7d94c873da2e803. All existing entries, aggregate floors, exclusions and recorded provenance are preserved."
     },
+    "nemo-mcp/src/native_symmetry_contract.rs": {
+      "lines": 100,
+      "regions": 100,
+      "functions": 100,
+      "note": "#2361 (G23) Draw symmetry contract: observed floors from the coverage-rust --check measurement of the candidate tree (coverage.json SHA256 5fca18245eca0eb6f3c26ce0648f879d14d5bdb154547ace1bc15bbad81e61f4). Hand-added for the two new files only; unrelated entries are not re-recorded."
+    },
+    "nemo-mcp/src/native_symmetry_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "#2361 (G23): cfg(test) child of native_symmetry_contract.rs; hand-added with its parent, no other entry changed."
+    },
     "nemo-mcp/src/native_shadow_contract_tests.rs": {
       "noRegions": true,
       "reason": "no executable regions in the coverage report",

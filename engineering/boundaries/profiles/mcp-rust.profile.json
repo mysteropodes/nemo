@@ -123,6 +123,8 @@
         "src/native_guide_contract_tests.rs",
         "src/native_shadow_contract.rs",
         "src/native_shadow_contract_tests.rs",
+        "src/native_symmetry_contract.rs",
+        "src/native_symmetry_contract_tests.rs",
         "src/native_perspective_contract.rs",
         "src/native_perspective_contract_tests.rs",
         "src/native_workspace_contract.rs",

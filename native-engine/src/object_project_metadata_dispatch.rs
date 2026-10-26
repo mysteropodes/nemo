@@ -59,6 +59,16 @@ impl ObjectSnapshot {
             )
             .map(Some);
         }
+        if request.operation == "query.document.object.project.symmetry.read" {
+            #[cfg(all(feature = "history", feature = "project_media_codec"))]
+            return self.dispatch_symmetry_read(request).map(Some);
+            #[cfg(not(all(feature = "history", feature = "project_media_codec")))]
+            return failure(
+                DispatchErrorCode::Unavailable,
+                "Native symmetry metadata is unavailable.",
+            )
+            .map(Some);
+        }
         if request.operation == "query.document.object.project.workspace.read" {
             #[cfg(all(feature = "history", feature = "project_media_codec"))]
             return self.dispatch_workspace_read(request).map(Some);

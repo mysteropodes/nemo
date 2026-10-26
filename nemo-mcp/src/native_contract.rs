@@ -41,6 +41,8 @@ pub(crate) mod placement;
 pub(crate) mod settings;
 #[path = "native_shadow_contract.rs"]
 pub(crate) mod shadow;
+#[path = "native_symmetry_contract.rs"]
+pub(crate) mod symmetry;
 #[path = "native_workspace_contract.rs"]
 pub(crate) mod workspace;
 
@@ -130,6 +132,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
             | guide::READ
             | shadow::READ
             | perspective::READ
+            | symmetry::READ
             | workspace::READ
             | custom_brush::READ
             | comments::READ
@@ -205,6 +208,7 @@ fn request_check(operation: &str, payload: &Value) -> Option<bool> {
         guide::READ | guide::EDIT => guide::request(operation, payload),
         shadow::READ | shadow::EDIT => shadow::request(operation, payload),
         perspective::READ | perspective::EDIT => perspective::request(operation, payload),
+        symmetry::READ | symmetry::EDIT => symmetry::request(operation, payload),
         workspace::READ | workspace::EDIT => workspace::request(operation, payload),
         comments::READ | comments::EDIT => comments::request(operation, payload),
         custom_brush::READ | custom_brush::EDIT => custom_brush::request(operation, payload),
@@ -419,6 +423,7 @@ fn result_validator(operation: &str) -> Option<ResultValidator> {
         custom_brush::READ | custom_brush::EDIT => |o, d, p, r| custom_brush::result(o, d, p, r),
         workspace::READ | workspace::EDIT => |o, d, p, r| workspace::result(o, d, p, r),
         perspective::READ | perspective::EDIT => |o, d, p, r| perspective::result(o, d, p, r),
+        symmetry::READ | symmetry::EDIT => |o, d, p, r| symmetry::result(o, d, p, r),
         shadow::READ | shadow::EDIT => |o, d, p, r| shadow::result(o, d, p, r),
         guide::READ | guide::EDIT => |o, d, p, r| guide::result(o, d, p, r),
         op if brush::owns(op) => |o, _, p, r| brush::result(o, p, r),

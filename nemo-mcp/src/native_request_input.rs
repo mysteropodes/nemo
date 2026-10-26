@@ -101,6 +101,7 @@ impl NativeApplicationRequest {
                 | crate::native_contract::guide::EDIT
                 | crate::native_contract::shadow::EDIT
                 | crate::native_contract::perspective::EDIT
+                | crate::native_contract::symmetry::EDIT
                 | crate::native_contract::workspace::EDIT
                 | crate::native_contract::custom_brush::EDIT
                 | crate::native_contract::comments::EDIT
@@ -150,6 +151,8 @@ impl NativeApplicationRequest {
                 "workspace metadata"
             } else if self.operation == crate::native_contract::perspective::EDIT {
                 "perspective metadata"
+            } else if self.operation == crate::native_contract::symmetry::EDIT {
+                "symmetry metadata"
             } else if self.operation == crate::native_contract::shadow::EDIT {
                 "shadow metadata"
             } else if self.operation == crate::native_contract::guide::EDIT {
