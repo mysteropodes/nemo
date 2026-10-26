@@ -964,7 +964,7 @@
     },
     {
       "id": "nemo.cli.familyAcceptance",
-      "layer": "tooling-bootstrap",
+      "layer": "tooling-application",
       "dir": "scripts/nemo",
       "files": [
         "family-acceptance.cjs"
@@ -972,7 +972,7 @@
       "publicApi": [
         "family-acceptance.cjs"
       ],
-      "sizeProfile": "Handwritten config/bootstrap"
+      "sizeProfile": "Domain/application JS or TS"
     },
     {
       "id": "nemo.test.familyAcceptance",
