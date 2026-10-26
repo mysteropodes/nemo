@@ -26,7 +26,15 @@
 //! - `removeIk`, `removeBone`, `removeBind`: there is no removal in the baseline UI. They are the
 //!   reference-checked deletions the CRUD acceptance asks for: a bone still named by an IK chain or a
 //!   weight entry is refused, never cascaded;
-//! - `bindMesh`: a typed `unavailable` (the raster that carries a mesh is not a native record yet).
+//! - `bindMesh` (`rigBindMesh`) and the mesh passes of `autoAssign`: the REST vertices of the retained
+//!   image mesh (L03-J store) mapped through the display rect of the raster record that carries it
+//!   (L06-C) into world space, weighed like a stroke's control points; a re-bind of the same `meshId`
+//!   REPLACES the previous one; the weight actions address a mesh bind through `target.meshId`. The mesh
+//!   half is in `object_rig_edit_plan_mesh.rs` / `object_rig_edit_rules_mesh.rs`; the mesh store and the
+//!   raster records are only read, never written. `bindMesh` takes the stroke bind's optional
+//!   `boneIds`/`radius`/`rotate`/`softness` and an optional `frame` (see the plan module for the
+//!   placement rule); a mesh the document does not hold is `not_found`, a mesh placed differently on the
+//!   frames it is carried by (and no `frame`) is `invalid_request`;
 //!
 //! Deliberate differences from the baseline, each pinned by a test: every number is finite and at most
 //! 1e9 in magnitude; ids and counts are bounded; a bone needs two vertices (the baseline silently
@@ -37,7 +45,7 @@
 //! the auto-assign button) and `autoAssign` also refuses an active path effect (`canEditActiveLayer`); a
 //! pressure ribbon cannot be bound (`Unavailable`: the pose commit would leave its centreline at rest).
 //!
-//! Not provided: pose evaluation, IK dragging, reset/commit pose, mesh binds, selection, the locked-layer
+//! Not provided: pose evaluation, IK dragging, reset/commit pose, selection, the locked-layer
 //! gesture escape (F06), the scene/export join and the JS adapter.
 use crate::commands::object_fill_owner::path_effects_edit::layer_has_active_path_fx;
 use crate::commands::ObjectFillOwner;
@@ -51,8 +59,12 @@ use crate::request_receipts::DispatchErrorCode;
 mod parse;
 #[path = "object_rig_edit_plan.rs"]
 mod plan;
+#[path = "object_rig_edit_plan_mesh.rs"]
+mod plan_mesh;
 #[path = "object_rig_edit_rules.rs"]
 mod rules;
+#[path = "object_rig_edit_rules_mesh.rs"]
+mod rules_mesh;
 use plan::PlanRefusal;
 
 /// Which part of a bone vertex a `moveSegment` writes.
@@ -122,7 +134,14 @@ pub(crate) enum RigAction {
         rotate: bool,
         softness: Option<f64>,
     },
-    BindMesh,
+    BindMesh {
+        mesh_id: String,
+        frame: Option<u32>,
+        bone_ids: Option<Vec<String>>,
+        radius: Option<f64>,
+        rotate: bool,
+        softness: Option<f64>,
+    },
     AutoAssign {
         frame: u32,
         default_radius: Option<f64>,
@@ -173,12 +192,10 @@ pub(crate) enum RigAction {
 /// What an edit reports besides the document: the binds a pass made and what it left out.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct RigEditSummary {
-    /// Binds made by `bindStroke` / `autoAssign` (the baseline's `n`).
+    /// Binds made by `bindStroke` / `bindMesh` / `autoAssign` (the baseline's `n`), meshes included.
     pub(crate) bound: u32,
     /// Records of an unsupported family `autoAssign` skipped (the baseline's `skippedUnsupported`).
     pub(crate) skipped_unsupported: u32,
-    /// `autoAssign` was asked for meshes (the default) but no native raster record exists to bind.
-    pub(crate) mesh_binds_unavailable: bool,
 }
 
 /// The origin and proposed document cannot be forged by callers.
@@ -266,7 +283,27 @@ fn apply(
             summary.bound = 1;
             rules::apply_binds(need()?, &[planned], *rotate)?
         }
-        RigAction::BindMesh => return Err(DispatchErrorCode::Unavailable),
+        RigAction::BindMesh {
+            mesh_id,
+            frame,
+            bone_ids,
+            radius,
+            rotate,
+            softness,
+        } => {
+            let planned = plan_mesh::plan_mesh_bind(
+                document,
+                uid,
+                mesh_id,
+                *frame,
+                bone_ids.as_deref(),
+                *radius,
+                *softness,
+            )
+            .map_err(refused)?;
+            summary.bound = 1;
+            rules_mesh::apply_mesh_binds(need()?, &[planned], *rotate)?
+        }
         RigAction::AutoAssign {
             frame,
             default_radius,
@@ -275,13 +312,20 @@ fn apply(
             paths,
             meshes,
         } => {
-            let planned =
-                plan::plan_auto_assign(document, uid, *frame, *default_radius, *softness, *paths)
-                    .map_err(refused)?;
-            summary.bound = planned.binds.len() as u32;
+            let planned = plan::plan_auto_assign(
+                document,
+                uid,
+                *frame,
+                *default_radius,
+                *softness,
+                *paths,
+                *meshes,
+            )
+            .map_err(refused)?;
+            summary.bound = (planned.mesh_binds.len() + planned.binds.len()) as u32;
             summary.skipped_unsupported = planned.skipped_unsupported;
-            summary.mesh_binds_unavailable = *meshes && planned.radius.is_some();
-            rules::apply_binds(need()?, &planned.binds, *rotate)?
+            let with_meshes = rules_mesh::apply_mesh_binds(need()?, &planned.mesh_binds, *rotate)?;
+            rules::apply_binds(&with_meshes, &planned.binds, *rotate)?
         }
         RigAction::SetWeight {
             target,

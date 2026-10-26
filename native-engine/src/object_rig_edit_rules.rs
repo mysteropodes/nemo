@@ -211,7 +211,7 @@ pub(super) fn set_radius(rig: &RigRecord, bone_id: &str, radius: f64) -> Rule<Ri
     Ok(next)
 }
 
-fn control_weight(entry: &ControlEntry) -> Rule<RigWeight> {
+pub(super) fn control_weight(entry: &ControlEntry) -> Rule<RigWeight> {
     Ok(RigWeight {
         bone_id: entry.bone_id.clone(),
         pt_index: Presence::Present(entry.pt_index as u32),
