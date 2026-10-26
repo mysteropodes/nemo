@@ -21,9 +21,50 @@
     return ['', ''];
   }
 
+  // Native authority: each column is the session's whole-row cells read, the same native timing query the
+  // inspector uses, so held and blank cells come from the engine and never from the legacy frames (U31, #2374).
+  // A refused read leaves its column unavailable instead of inventing blank cells.
+  var nativeRows = null, nativeKey = '', reading = 0;
+  function nativeSession() {
+    var P = window.NemoNativeObjectProject, s = P && typeof P.desktop === 'function' && P.desktop(window);
+    return s && typeof s.blocksLegacy === 'function' && s.blocksLegacy() && typeof s.readLayerCells === 'function' ? s : null;
+  }
+  function nativeGlyph(run) {
+    if (!run) return ['', ''];
+    if (run[2] === 'key') return ['●', '#9FB4FA'];
+    if (run[2] === 'interpolated') return ['◆', '#7bd88f'];
+    if (run[2] === 'held' && run[4]) return ['│', '#888'];
+    return ['', ''];
+  }
+  function nativeColumns(session, pin) {
+    var key = pin.documentId + '|' + pin.documentSnapshotId;
+    if (key === nativeKey) return nativeRows;
+    var ticket = ++reading;
+    Promise.all(pin.layers.map(function (layer) {
+      return Promise.resolve(session.readLayerCells(layer.layerUid, pin)).catch(function () { return null; });
+    })).then(function (rows) {
+      if (ticket !== reading || session.info() !== pin) return;
+      nativeKey = key;
+      nativeRows = rows.map(function (runs) {
+        if (!runs) return null;
+        var cells = [];
+        runs.forEach(function (run) { for (var f = run[0]; f < run[0] + run[1]; f++) cells[f] = run; });
+        return cells;
+      });
+      build();
+    });
+    return null;
+  }
+
   function build() {
     if (!window.SMLabs.isOn('xsheet')) return;
-    if (!window.state || !state.layers || !state.layers.length) return;
+    var session = nativeSession(), pin = session && session.info(), columns = null;
+    if (session) {
+      if (!pin || !pin.layers || !pin.layers.length) return;
+      columns = nativeColumns(session, pin);
+      if (!columns) return;
+    } else if (!window.state || !state.layers || !state.layers.length) return;
+    var layers = session ? pin.layers : state.layers, total = session ? pin.totalFrames : state.totalFrames, fps = session ? pin.fps : state.fps;
     if (!panel) {
       panel = document.createElement('div');
       panel.id = 'labs-xsheet';
@@ -35,14 +76,17 @@
     }
     var rows = [];
     var head = '<tr><th style="padding:2px 8px;color:#888;">#</th>';
-    state.layers.forEach(function (ld) { head += '<th style="padding:2px 8px;color:#888;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (ld.name || '') + '</th>'; });
+    layers.forEach(function (ld, l) {
+      var off = columns && !columns[l];
+      head += '<th' + (off ? ' title="Native timing is unavailable."' : '') + ' style="padding:2px 8px;color:' + (off ? '#555' : '#888') + ';max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (ld.name || '') + (off ? ' —' : '') + '</th>';
+    });
     head += '</tr>';
-    for (var f = 0; f < state.totalFrames; f++) {
+    for (var f = 0; f < total; f++) {
       var cur = f === state.currentFrame;
-      var tr = '<tr data-frame="' + f + '" style="cursor:pointer;' + (cur ? 'background:rgba(78,111,242,.25);' : (f % state.fps === 0 ? 'background:rgba(255,255,255,.04);' : '')) + '">';
+      var tr = '<tr data-frame="' + f + '" style="cursor:pointer;' + (cur ? 'background:rgba(78,111,242,.25);' : (f % fps === 0 ? 'background:rgba(255,255,255,.04);' : '')) + '">';
       tr += '<td style="padding:1px 8px;color:' + (cur ? '#9FB4FA' : '#666') + ';text-align:right;">' + (f + 1) + '</td>';
-      for (var l = 0; l < state.layers.length; l++) {
-        var g = glyphFor(state.layers[l].frames[f]);
+      for (var l = 0; l < layers.length; l++) {
+        var g = columns ? nativeGlyph(columns[l] && columns[l][f]) : glyphFor(state.layers[l].frames[f]);
         tr += '<td style="padding:1px 8px;text-align:center;color:' + (g[1] || '#444') + ';">' + g[0] + '</td>';
       }
       rows.push(tr + '</tr>');
@@ -75,7 +119,12 @@
     flag: 'nemo-labs-xsheet',
     describe: 'labsDescribeXsheet',
     onEnable: function () { observe(); build(); },
-    onDisable: function () { if (panel) { panel.remove(); panel = null; } },
+    // Disable removes the panel AND the grid observer, and drops any pending native read.
+    onDisable: function () {
+      if (panel) { panel.remove(); panel = null; }
+      if (mo) { mo.disconnect(); mo = null; }
+      reading++; nativeRows = null; nativeKey = '';
+    },
   });
   if (window.SMLabs.isOn('xsheet')) { observe(); build(); }
 })();

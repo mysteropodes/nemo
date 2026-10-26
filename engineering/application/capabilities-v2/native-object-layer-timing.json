@@ -191,7 +191,64 @@
           }
         }
       }
+    },
+    {
+      "label": "U31 whole-row cells view for the xsheet and Roll readers",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-cells-read-0",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "operation": "query.document.object.layer.timing",
+        "payload": {
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:document-A:0",
+          "contextId": "scene-root",
+          "layerUid": "layer-1",
+          "frame": 0,
+          "view": "cells"
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-cells-read-0",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "kind": "layerCells",
+          "instanceId": "instance-A",
+          "documentId": "document-A",
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:document-A:0",
+          "contextId": "scene-root",
+          "layerUid": "layer-1",
+          "frame": 0,
+          "cells": {
+            "runs": [
+              [
+                0,
+                1,
+                "key",
+                0,
+                true,
+                false
+              ],
+              [
+                1,
+                11,
+                "held",
+                0,
+                true,
+                false
+              ]
+            ],
+            "nextFrame": null
+          }
+        }
+      }
     }
   ],
-  "semantics": " Optional strict view:range reads the same immutable D27 raw/clamped layer ranges and custom/link booleans, including layers without drawing timing. Original five-field cell selector and eleven-field timing result remain exact separate branches. Range projection is read-only; unsupported contexts/providers and complete4096 limits remain explicit refusal; source examples are not desktop acceptance. T12 view \"placement\" returns the layer's video drawing placement (id, asset, offset, remap key count, key-at-frame, eased source frame at the frame and key list, interpMode, frameBlend, and sourceFrameCount, the source frame count the desktop host fills from its decode session bound to the same placement and snapshot, or null) or null; the key list is null when it would not fit the 4096-byte read, the count always fits; any other view is refused."
+  "semantics": " Optional strict view:range reads the same immutable D27 raw/clamped layer ranges and custom/link booleans, including layers without drawing timing. Original five-field cell selector and eleven-field timing result remain exact separate branches. Range projection is read-only; unsupported contexts/providers and complete4096 limits remain explicit refusal; source examples are not desktop acceptance. T12 view \"placement\" returns the layer's video drawing placement (id, asset, offset, remap key count, key-at-frame, eased source frame at the frame and key list, interpMode, frameBlend, and sourceFrameCount, the source frame count the desktop host fills from its decode session bound to the same placement and snapshot, or null) or null; the key list is null when it would not fit the 4096-byte read, the count always fits. U31 view \"cells\" (#2374) returns the whole row from frame onward as run-encoded single-cell answers [startFrame, frameCount, cellKind, sourceFrame, hasContent, manualEdit] with nextFrame paging; every frame of a run equals the single-cell read, and a layer without timing is Unavailable, never blank. Any other view is refused."
 }

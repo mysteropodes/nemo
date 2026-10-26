@@ -1283,6 +1283,9 @@
         },
         {
           "$ref": "#/$defs/ObjectLayerPlacementPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectLayerRowCellsPayload"
         }
       ]
     },
@@ -1296,6 +1299,9 @@
         },
         {
           "$ref": "#/$defs/ObjectLayerPlacementResult"
+        },
+        {
+          "$ref": "#/$defs/ObjectLayerRowCellsResult"
         }
       ]
     },
@@ -11062,6 +11068,44 @@
       },
       "description": "Original selector is bounded to4096bytes; exact actual immutable revision and snapshot token must match. Unsupported contexts return Unavailable. No caller-supplied lifecycle echo."
     },
+    "ObjectLayerRowCellsPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame",
+        "view"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        },
+        "view": {
+          "const": "cells"
+        }
+      },
+      "description": "Whole-row cells view of the same query (U31, #2374): frame is the first frame of the page. Bounded to 4096 bytes; exact actual immutable revision and snapshot token must match. Unsupported contexts return Unavailable; a layer without timing is Unavailable, not blank."
+    },
     "ObjectLayerTimingCellPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -11360,6 +11404,116 @@
             }
           ],
           "description": "T12: the layer's video drawing placement, or null. Remap keys are listed while the read stays within 4096 bytes and counted always."
+        }
+      }
+    },
+    "ObjectLayerRowCellsResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame",
+        "cells"
+      ],
+      "properties": {
+        "kind": {
+          "const": "layerCells"
+        },
+        "instanceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "documentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        },
+        "cells": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runs",
+            "nextFrame"
+          ],
+          "properties": {
+            "runs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "array",
+                "minItems": 6,
+                "maxItems": 6,
+                "prefixItems": [
+                  {
+                    "$ref": "#/$defs/ObjectLayerTimingFrame"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  {
+                    "enum": [
+                      "key",
+                      "held",
+                      "interpolated",
+                      "unexposed"
+                    ]
+                  },
+                  {
+                    "oneOf": [
+                      {
+                        "$ref": "#/$defs/ObjectLayerTimingFrame"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "boolean"
+                  }
+                ]
+              }
+            },
+            "nextFrame": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/ObjectLayerTimingFrame"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "description": "Runs [startFrame, frameCount, cellKind, sourceFrame, hasContent, manualEdit] tile the page in order; each frame of a run answers the single-cell read identically, an interpolated frame being its own source (sourceFrame is the run start). nextFrame starts the next page, or null when the row is complete."
         }
       }
     },

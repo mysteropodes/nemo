@@ -104,6 +104,8 @@
         "src/native_layer_range_contract_tests.rs",
         "src/native_layer_placement_contract.rs",
         "src/native_layer_placement_contract_tests.rs",
+        "src/native_layer_cells_contract.rs",
+        "src/native_layer_cells_contract_tests.rs",
         "src/native_layer_shift_contract.rs",
         "src/native_layer_shift_contract_tests.rs",
         "src/native_layer_shift_wire_tests.rs",
