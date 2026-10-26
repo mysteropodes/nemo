@@ -278,6 +278,30 @@
       "sizeProfile": "Platform/engine adapter"
     },
     {
+      "id": "nemo.lib.boundariesFreeze",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "boundaries-freeze.cjs"
+      ],
+      "publicApi": [
+        "boundaries-freeze.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.boundariesSuggest",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "boundaries-suggest.cjs"
+      ],
+      "publicApi": [
+        "boundaries-suggest.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
       "id": "nemo.lib.receipt",
       "layer": "tooling-application",
       "dir": "scripts/nemo/lib",
@@ -803,6 +827,42 @@
       ],
       "publicApi": [
         "boundaries-discovery.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.boundariesFreeze",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "boundaries-freeze.test.cjs"
+      ],
+      "publicApi": [
+        "boundaries-freeze.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.boundariesSuggest",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "boundaries-suggest.test.cjs"
+      ],
+      "publicApi": [
+        "boundaries-suggest.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.legacySurfaceIds",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "legacy-surface-ids.test.cjs"
+      ],
+      "publicApi": [
+        "legacy-surface-ids.test.cjs"
       ],
       "sizeProfile": "Test file"
     },
