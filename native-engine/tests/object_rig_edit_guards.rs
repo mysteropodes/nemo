@@ -303,13 +303,11 @@ fn a_locked_layer_refuses_every_kind_of_rig_edit_and_publishes_nothing() {
             json!({"kind":"removeBind","target":{"strokeId":"s1"}}),
         ),
     ] {
-        if name != "bindMesh" {
-            // Control: unlocked, none of them is `unavailable` (a missing chain or a still-weighted bone is a
-            // different refusal; removing the bind succeeds).
-            let mut open = owner_for(&row);
-            let reply = run(&mut open, name, payload(action.clone()));
-            assert_ne!(outcome(&reply), "unavailable", "control {name}: {reply}");
-        }
+        // Control: unlocked, none of them is `unavailable` (a missing mesh, chain or a still-weighted bone is
+        // a different refusal; removing the bind succeeds).
+        let mut open = owner_for(&row);
+        let reply = run(&mut open, name, payload(action.clone()));
+        assert_ne!(outcome(&reply), "unavailable", "control {name}: {reply}");
         let mut locked = owner_with_layer_members(&row, "\"locked\":true");
         let before = state(&locked);
         let reply = run(&mut locked, name, payload(action));

@@ -2192,6 +2192,28 @@
             },
             "meshId": {
               "$ref": "#/$defs/ObjectRigId"
+            },
+            "frame": {
+              "$ref": "#/$defs/ObjectFrame"
+            },
+            "boneIds": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ObjectRigId"
+              }
+            },
+            "radius": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000000
+            },
+            "rotate": {
+              "type": "boolean"
+            },
+            "softness": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
             }
           }
         },

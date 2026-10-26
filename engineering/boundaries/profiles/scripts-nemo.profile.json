@@ -665,6 +665,18 @@
       "sizeProfile": "Test file"
     },
     {
+      "id": "nemo.test.inventoryCheck",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "inventory-check.test.cjs"
+      ],
+      "publicApi": [
+        "inventory-check.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
       "id": "nemo.test.inventory",
       "layer": "tooling-test",
       "dir": "scripts/nemo",
