@@ -329,3 +329,25 @@ test('Labs predictive stroke snaps a near-line and a near-circle in the one nati
  send(off,'pointerdown',10,40);for(const [x,y] of [[40,41],[70,40],[100,39],[130,40]])send(off,'pointermove',x,y);send(off,'pointerup',160,40);
  assert.equal((await settled(off)).status,'applied');assert.equal(off.calls[0].payload.record.geometry.segments.length,6);
 });
+// U34 (#2362): Labs multi-frame draw stamps the native freehand stroke on the other selected frames in the same single
+// commit: the drawn frame takes Draw's key, each stamped frame its own copy key; the prototype names the frames only.
+function multiframe(f,on){
+ const protos={},toasts=[];f.root.SMLabs={isOn:name=>on&&name==='multiframe-draw',register(n,d){protos[n]=d;},
+  unmigratedDrawHooks:()=>Object.keys(protos).filter(n=>(protos[n].onStroke||protos[n].onPreview)&&!protos[n].nativeDraw&&f.root.SMLabs.isOn(n))};
+ f.root._sel={frames:[{layer:0,frame:3},{layer:2,frame:5},{layer:0,frame:0},{layer:0,frame:3},{layer:0,frame:99}]};
+ f.root.SM=f.root.SM||{t:k=>k};f.root.showToast=t=>toasts.push(t);
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/labs/multiframe-draw.js'),'utf8'),f.context,{filename:'multiframe-draw.js'});
+ return toasts;
+}
+test('Labs multi-frame draw stamps the native stroke on the other selected frames in one copy-keyed batch, and is inert when off',async()=>{
+ const f=await fixture();multiframe(f,true);
+ send(f,'pointerdown',10,40);for(const [x,y] of [[40,41],[70,40]])send(f,'pointermove',x,y);send(f,'pointerup',100,40);
+ await settled(f);assert.equal(f.calls.length,1,'the native Drawing guard leaves a migrated hook available');
+ const payload=plain(f.calls[0].payload);
+ assert.equal(payload.command,'object.vector.batch');assert.equal(payload.keyframe,undefined,'the drawn frame keeps Draw\'s key');
+ assert.deepEqual(payload.ops.map(op=>[op.op,op.record.target.frameScope.frame,op.keyframe||null]),[['create',0,null],['create',3,'copy'],['create',5,'copy']]);
+ assert.deepEqual(payload.ops[1].record.geometry,payload.ops[0].record.geometry,'every stamp is the drawn stroke');
+ const off=await fixture();multiframe(off,false);
+ send(off,'pointerdown',10,40);send(off,'pointermove',40,41);send(off,'pointerup',100,40);
+ await settled(off);assert.equal(off.calls[0].payload.command,'object.vector.create');
+});

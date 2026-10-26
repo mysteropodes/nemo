@@ -1104,6 +1104,9 @@
                       "front",
                       "behind"
                     ]
+                  },
+                  "keyframe": {
+                    "const": "copy"
                   }
                 }
               },

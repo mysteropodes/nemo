@@ -11,9 +11,10 @@ const MAX_OPS: usize = 64;
 /// One step's addressed target, when the step is one of the three admitted shapes.
 fn step(op: &Value) -> Option<&Value> {
     match op["op"].as_str()? {
-        "create" => (exact(op, &["op", "record"], &["placement"]).is_some()
+        "create" => (exact(op, &["op", "record"], &["placement", "keyframe"]).is_some()
             && record_shape(&op["record"], true)
-            && op.get("placement").is_none_or(|p| p == "front" || p == "behind"))
+            && op.get("placement").is_none_or(|p| p == "front" || p == "behind")
+            && op.get("keyframe").is_none_or(|k| k == "copy"))
         .then(|| &op["record"]["target"]),
         "replace" => (exact(op, &["op", "record"], &[]).is_some()
             && record_shape(&op["record"], false)
