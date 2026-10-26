@@ -647,7 +647,8 @@
         "scene_effect_scene_join_inputs.rs",
         "object_brush_scene_join.rs",
         "object_brush_admission.rs",
-        "object_brush_paint_join.rs"
+        "object_brush_paint_join.rs",
+        "object_rig_packet_pose.rs"
       ],
       "publicApi": [
         "render_scene.rs",
@@ -1763,7 +1764,9 @@
         "object_selection_compound.rs",
         "object_selection_clipboard_groups.rs",
         "object_revision_owner.rs",
-        "object_command_ownership.rs"
+        "object_command_ownership.rs",
+        "object_rig_packet_pose.rs",
+        "object_rig_packet_pose_gpu.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
