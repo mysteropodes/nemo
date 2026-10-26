@@ -12,6 +12,8 @@ pub(super) const OPERATIONS: [&str; 6] = [
     "rig.edit",
     "rig.pose",
 ];
+/// U36 (#2362): the Labs generators share the table; the agreement corpus stays the original six.
+pub(super) const LABS: [&str; 3] = ["labs.speedLines", "labs.boil", "labs.followPath"];
 
 pub(super) fn corpus() -> Value {
     serde_json::from_str(CORPUS).expect("the agreement corpus parses")
@@ -25,9 +27,9 @@ pub(super) fn envelope(operation: &str, payload: Value) -> NativeApplicationRequ
 }
 
 #[test]
-fn the_table_declares_exactly_the_six_operations_and_nothing_else() {
-    assert_eq!(table().len(), 6, "an unparsable table admits nothing");
-    for suffix in OPERATIONS {
+fn the_table_declares_exactly_the_nine_operations_and_nothing_else() {
+    assert_eq!(table().len(), 9, "an unparsable table admits nothing");
+    for &suffix in OPERATIONS.iter().chain(&LABS) {
         assert!(admitted(&format!("{P}{suffix}")), "{suffix}");
     }
     for other in [

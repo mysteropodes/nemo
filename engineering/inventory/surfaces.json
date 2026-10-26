@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "1d419028d5b1b6b1da1cefff71b0fa2c2debe46f",
-  "describe": "v0.7.0-alpha.4-3200-g1d419028"
+  "head": "0da944212ea03e690d076928ed948075f4746f6b",
+  "describe": "v0.7.0-alpha.4-3202-g0da94421"
  },
- "inputsDigest": "e3eac040d7ba9f338b7fc7de97f155bc5578e6d34565251e059c5a0f5f80eeff",
+ "inputsDigest": "eb6cfadeb7a5237fa364dd36d06331d2cd6b74abf4e3904c7cdabb4125b4a6b8",
  "states": [
   "inventoried",
   "characterized",
@@ -1852,7 +1852,7 @@
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 194,
+    "functionsVisited": 198,
     "via": "chain",
     "references": []
    },
@@ -20898,7 +20898,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 235,
+    "functionsVisited": 238,
     "via": "callback btn",
     "references": []
    },
@@ -20944,7 +20944,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 235,
+    "functionsVisited": 238,
     "via": "callback btn",
     "references": []
    },
@@ -20990,7 +20990,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 235,
+    "functionsVisited": 238,
     "via": "callback btn",
     "references": []
    },
@@ -21036,7 +21036,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 235,
+    "functionsVisited": 238,
     "via": "callback btn",
     "references": []
    },
@@ -21082,7 +21082,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 235,
+    "functionsVisited": 238,
     "via": "callback btn",
     "references": []
    },
@@ -21128,7 +21128,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 235,
+    "functionsVisited": 238,
     "via": "callback btn",
     "references": []
    },
@@ -21174,7 +21174,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 235,
+    "functionsVisited": 238,
     "via": "callback btn",
     "references": []
    },
@@ -21220,7 +21220,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 235,
+    "functionsVisited": 238,
     "via": "callback btn",
     "references": []
    },
@@ -21266,7 +21266,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 235,
+    "functionsVisited": 238,
     "via": "callback btn",
     "references": []
    },
@@ -21309,7 +21309,7 @@
    "capability": "Boiling line: SMLabs.boil({frames,amplitude}) places N shaky keyframe-variants of the current drawing on the following frames",
    "area": "labs",
    "handler": [
-    "src/js/labs/boil-effect.js:66"
+    "src/js/labs/boil-effect.js:83"
    ],
    "events": [],
    "exposure": [
@@ -21322,7 +21322,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/boil-effect.js:66",
+   "source": "src/js/labs/boil-effect.js:83",
    "meta": {
     "functionsVisited": 0
    },
@@ -21465,7 +21465,7 @@
    "capability": "Bake along a trajectory: SMLabs.followPath({pathId,frames,ease}) bakes the selection along a trajectory stroke into successive keyframes",
    "area": "labs",
    "handler": [
-    "src/js/labs/follow-path.js:110"
+    "src/js/labs/follow-path.js:142"
    ],
    "events": [],
    "exposure": [
@@ -21478,7 +21478,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/follow-path.js:110",
+   "source": "src/js/labs/follow-path.js:142",
    "meta": {
     "functionsVisited": 0
    },
@@ -31377,7 +31377,7 @@
    "source": "src/js/timeline.js:5346",
    "meta": {
     "i18n": "ctxEditTweenCurve",
-    "functionsVisited": 52
+    "functionsVisited": 56
    },
    "fixtures": [
     "keyed-props",
