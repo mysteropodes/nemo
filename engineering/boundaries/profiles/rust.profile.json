@@ -650,7 +650,8 @@
         "scene_effect_scene_join_inputs.rs",
         "object_brush_scene_join.rs",
         "object_brush_admission.rs",
-        "object_brush_paint_join.rs"
+        "object_brush_paint_join.rs",
+        "object_rig_packet_pose.rs"
       ],
       "publicApi": [
         "render_scene.rs",
@@ -1535,6 +1536,7 @@
         "object_scene_style_emit_controls.rs",
         "object_scene_style_emit_rows.rs",
         "object_scene_style_emit_gpu.rs",
+        "object_scene_style_emit_refusal.rs",
         "scene_effect_layer_record.rs",
         "scene_effect_layer_record_rows.rs",
         "scene_effect_layer_record_refs.rs",
@@ -1766,7 +1768,9 @@
         "object_selection_compound.rs",
         "object_selection_clipboard_groups.rs",
         "object_revision_owner.rs",
-        "object_command_ownership.rs"
+        "object_command_ownership.rs",
+        "object_rig_packet_pose.rs",
+        "object_rig_packet_pose_gpu.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

@@ -512,5 +512,9 @@ mod object_scene_producer_brush_ink_tests;
 mod object_scene_style_emit_gpu;
 
 #[cfg(all(test, feature = "history"))]
+#[path = "../tests/object_scene_style_emit_refusal.rs"]
+mod object_scene_style_emit_refusal;
+
+#[cfg(all(test, feature = "history"))]
 #[path = "../tests/object_compositor_masks.rs"]
 mod mask_tests;

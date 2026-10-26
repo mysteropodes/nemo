@@ -11,7 +11,15 @@ pub(crate) struct RasterSource {
     pub(crate) source_index: usize,
     pub(crate) layer_index: usize,
     mesh_id: Option<String>,
+    /// Rig-posed offsets of the mesh (one per stored vertex), from the one pose evaluation of the scene join.
+    rig_offsets: Option<Vec<[f64; 2]>>,
     pub(crate) source: RasterSceneSource,
+}
+impl RasterSource {
+    /// The rig-posed offsets of this mesh-bound raster, or `None` when no linked bind poses it.
+    pub(crate) fn rig_offsets(&self) -> Option<&[[f64; 2]]> {
+        self.rig_offsets.as_deref()
+    }
 }
 pub(super) fn unavailable(index: usize, reason: &'static str) -> ObjectSceneError {
     ObjectSceneError::UnsupportedGeometry {
@@ -26,6 +34,8 @@ pub(super) fn sources_excluding(
     packet: &ObjectFramePacket,
     claimed: &std::collections::BTreeSet<usize>,
 ) -> Result<Vec<RasterSource>, ObjectSceneError> {
+    // One evaluation per rigged layer that carries a meshed raster, through the scene join's single call site.
+    let mut poses = std::collections::BTreeMap::new();
     packet
         .raster_records()
         .filter(|record| !claimed.contains(&record.source_index()))
@@ -42,12 +52,19 @@ pub(super) fn sources_excluding(
                 ));
             }
             let layer = &packet.source_layers()[record.layer_index()];
-            if item.mesh_id().is_some() && layer.rig().is_some() {
-                return Err(unavailable(
-                    record.source_index(),
-                    "native mesh rig pose is unavailable",
-                ));
-            }
+            let rig_offsets = match (item.mesh_id(), layer.rig()) {
+                (Some(mesh_id), Some(_)) => {
+                    let index = record.layer_index();
+                    let evaluation = poses
+                        .entry(index)
+                        .or_insert_with(|| crate::object_render_scene::rig_packet_pose::layer_pose(packet, index));
+                    crate::object_render_scene::rig_packet_pose::mesh_offsets(
+                        packet, index, mesh_id, evaluation,
+                    )
+                    .map_err(|reason| unavailable(record.source_index(), reason))?
+                }
+                _ => None,
+            };
             if layer.path_fx().is_some_and(|effects| !effects.is_empty()) {
                 return Err(unavailable(
                     record.source_index(),
@@ -69,6 +86,7 @@ pub(super) fn sources_excluding(
                 source_index: record.source_index(),
                 layer_index: record.layer_index(),
                 mesh_id: item.mesh_id().map(str::to_owned),
+                rig_offsets,
                 source: RasterSceneSource {
                     asset_id: item.asset_id().as_str().to_owned(),
                     rect: crate::evaluation::motion_parent_chain::ImageRect {
@@ -244,7 +262,7 @@ mod retained {
                             &MeshSceneSource {
                                 mesh_id,
                                 view: Affine::IDENTITY.as_coeffs(),
-                                offsets: None,
+                                offsets: source.rig_offsets.as_deref(),
                                 pose: None,
                             },
                             plan.packet().snapshot().document().image_meshes(),
