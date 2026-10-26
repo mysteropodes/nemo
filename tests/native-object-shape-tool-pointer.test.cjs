@@ -128,11 +128,21 @@ test('stale frame, selection, tool, style, owner or viewport cancels without tra
  }
 });
 test('native unavailable modes and unconfirmed presentation are consumed before any legacy writer',async()=>{
- for(const change of [f=>f.root.state.tool='star',f=>f.root.state.symmetryEnabled=true,f=>f.root.state.shadowMode=true,f=>f.root.state.maskMode=true,
+ for(const change of [f=>f.root.state.tool='star',f=>f.root.state.symmetryEnabled=true,f=>f.root.state.shadowMode=true,
   f=>f.perspectiveMode('enabled'),f=>f.root.state.strokeStyle='dashed',f=>f.root.state.layers[0].locked=true,
   f=>f.root.state.strokeEnabled=f.root.state.fillEnabled=false,f=>f.root.document.documentElement.classList.remove('nemo-native-underlay')]){
   const f=await fixture();change(f);assert.equal(f.area.fire('pointerdown').stopped,true);f.area.fire('pointerup',{clientX:240,clientY:210});assert.equal(f.calls.length,0);assert.equal(f.body.children.length,0);
  }
+});
+// #2361 G15 Mask mode (tools.js tagOwner @1065e9d8): a shape drawn while Mask is on commits once as a mask of the layer.
+test('Mask mode commits the shape as a mask with the chosen combine mode, add by default',async()=>{
+ for(const [type,mode] of [[undefined,'add'],['intersect','intersect']]){
+  const f=await fixture();f.root.state.maskMode=true;if(type)f.root.state.maskModeType=type;
+  assert.equal((await f.gesture()).status,'applied');assert.equal(f.calls.length,1);
+  const ext=f.calls[0].payload.record.vectorExt||{};assert.deepEqual([ext.isMask,ext.maskMode],[true,mode]);
+ }
+ const plainShape=await fixture();assert.equal((await plainShape.gesture()).status,'applied');
+ assert.equal((plainShape.calls[0].payload.record.vectorExt||{}).isMask,undefined,'without Mask mode nothing is tagged');
 });
 test('pending native receipt blocks new gestures; typed refusal and false ACK never invoke a Paper writer',async()=>{
  const f=await fixture(),wait=gate();f.hold(wait);f.area.fire('pointerdown');f.area.fire('pointerup',{clientX:240,clientY:210});await turn();assert.equal(f.calls.length,1);

@@ -143,3 +143,20 @@ fn keyframe_copy_keys_the_held_cell_with_what_it_showed_and_is_admitted_on_creat
         assert_eq!(state(&owner), before);
     }
 }
+
+// #2361 G15 Mask mode (tools.js tagOwner @1065e9d8): a Draw/Pen/shape commit drawn while Mask is on carries
+// `isMask` and the chosen combine mode; the native create stores them as authored and undo removes the mask.
+#[test]
+fn a_mask_mode_create_stores_its_mask_members() {
+    let mut owner = owner_of(&document(2, seeds(), None));
+    let before = state(&owner);
+    let mut mask = record_at("B", "L1", 0, "");
+    mask["vectorExt"] = json!({"isMask":true,"maskMode":"subtract"});
+    let response = send(&mut owner, "mask", json!({"command":"object.vector.create","record":mask}));
+    assert_eq!(response["ok"], true, "{response}");
+    let after = state(&owner);
+    let stored = objects(&after).iter().find(|r| r["target"]["strokeId"] == "native-stroke:1:0").cloned().unwrap();
+    assert_eq!(stored["vectorExt"], json!({"isMask":true,"maskMode":"subtract"}));
+    owner.undo(1).unwrap();
+    assert_eq!(state(&owner), before);
+}
