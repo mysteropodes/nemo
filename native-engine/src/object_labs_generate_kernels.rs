@@ -222,7 +222,8 @@ pub(super) fn generate(
         LabsRequest::ReferenceFill { .. }
         | LabsRequest::Pingpong { .. }
         | LabsRequest::Retime { .. }
-        | LabsRequest::Interval { .. } => Err(DispatchErrorCode::Internal),
+        | LabsRequest::Interval { .. }
+        | LabsRequest::MoveToLayer { .. } => Err(DispatchErrorCode::Internal),
     }
 }
 

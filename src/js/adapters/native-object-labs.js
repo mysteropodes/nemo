@@ -22,6 +22,7 @@
     const commands = Command.create(session, 'labs');
     const run = (operation, body) => commands.execute(operation, () => Object.assign({ command: Contract.commandOf(operation) }, body));
     return Object.freeze({
+      layerInfo: (index) => { const info = session.info(); return info && info.layers ? info.layers[index] || null : null; },
       layerUid: (index) => { const info = session.info(), layer = info && info.layers && info.layers[index]; return layer ? layer.layerUid : null; },
       speedLines: (body) => run(Contract.LABS_SPEED_LINES, body),
       boil: (body) => run(Contract.LABS_BOIL, body),
@@ -30,6 +31,7 @@
       pingpong: (body) => run(Contract.LABS_PINGPONG, body),
       retime: (body) => run(Contract.LABS_RETIME, body),
       interval: (body) => run(Contract.LABS_INTERVAL, body),
+      moveToLayer: (body) => run(Contract.LABS_MOVE_TO_LAYER, body),
       // The row's authored/held/blank runs through the native timing query (null when refused).
       cells: (layerUid) => (typeof session.readLayerCells === 'function' ? session.readLayerCells(layerUid, session.info()) : Promise.resolve(null)),
     });

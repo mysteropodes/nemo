@@ -5,7 +5,7 @@ use crate::request_receipts::DispatchErrorCode;
 use serde_json::{Map, Value};
 
 /// One public operation per generator; the payload `command` repeats the operation suffix.
-pub(crate) const OPS: [&str; 7] = [
+pub(crate) const OPS: [&str; 8] = [
     "command.document.object.labs.speedLines",
     "command.document.object.labs.boil",
     "command.document.object.labs.followPath",
@@ -13,6 +13,7 @@ pub(crate) const OPS: [&str; 7] = [
     "command.document.object.labs.pingpong",
     "command.document.object.labs.retime",
     "command.document.object.labs.interval",
+    "command.document.object.labs.moveToLayer",
 ];
 
 /// One typed generator request; every command admits exactly its own fields.
@@ -74,6 +75,12 @@ pub(crate) enum LabsRequest {
         last: u32,
         count: u32,
         ease: Ease,
+    },
+    MoveToLayer {
+        from_layer: String,
+        to_layer: String,
+        frame: u32,
+        stroke_ids: Vec<String>,
     },
 }
 
@@ -323,6 +330,33 @@ pub(crate) fn parse_labs_request(
                 last: integer(m, "toFrame", 0, u64::from(u32::MAX))?,
                 count: integer(m, "count", 1, 999)?,
                 ease: Ease::parse(m["ease"].as_str().ok_or(InvalidRequest)?)?,
+            })
+        }
+        "object.labs.moveToLayer" => {
+            let m = fields(
+                payload,
+                &["command", "fromLayer", "toLayer", "frame", "strokeIds"],
+            )?;
+            let ids = m["strokeIds"]
+                .as_array()
+                .filter(|ids| (1..=256).contains(&ids.len()))
+                .ok_or(InvalidRequest)?;
+            let mut stroke_ids: Vec<String> = Vec::with_capacity(ids.len());
+            for id in ids {
+                let id = id
+                    .as_str()
+                    .filter(|s| !s.is_empty() && s.len() <= 256)
+                    .ok_or(InvalidRequest)?;
+                if stroke_ids.iter().any(|seen| seen == id) {
+                    return Err(InvalidRequest);
+                }
+                stroke_ids.push(id.to_owned());
+            }
+            Ok(LabsRequest::MoveToLayer {
+                from_layer: text(m, "fromLayer")?,
+                to_layer: text(m, "toLayer")?,
+                frame: integer(m, "frame", 0, u64::from(u32::MAX))?,
+                stroke_ids,
             })
         }
         _ => Err(InvalidRequest),

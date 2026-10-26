@@ -1,5 +1,5 @@
 /* Public v2 contract of the lane-3 object operations: image mesh edit, widget create / write / settings, rig edit and
- * rig pose, and the U36 Labs operations (speed lines, boil, follow-path, reference fill, ping-pong, retime, interval). Pure validation with the interface of the font contract (admitted, requiresRevision, payload, result,
+ * rig pose, and the U36 Labs operations (speed lines, boil, follow-path, reference fill, ping-pong, retime, interval, move to layer). Pure validation with the interface of the font contract (admitted, requiresRevision, payload, result,
  * correlate, paths); `compose(base)` joins another contract of that interface. The legacy shapes came from the
  * historical tools/spec.js table. Binding shapes are source-derived additions shared with Rust and the schema;
  * that generator is absent. The original corpus stays unchanged, with separate binding agreement controls.
@@ -25,7 +25,8 @@
     "labs.referenceFill": {"command":"object.labs.referenceFill","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":256},"frame":{"t":"int","min":0,"max":4294967295},"point":{"t":"pair","abs":1000000000000},"color":{"t":"str","min":9,"max":9},"opacity":{"t":"num","min":0,"max":1}}}},
     "labs.pingpong": {"command":"object.labs.pingpong","result":"command","node":{"t":"obj","req":{"fromLayer":{"t":"str","min":1,"max":256},"toLayer":{"t":"str","min":1,"max":256},"fromFrame":{"t":"int","min":0,"max":4294967295},"toFrame":{"t":"int","min":0,"max":4294967295},"times":{"t":"int","min":1,"max":50}}}},
     "labs.retime": {"command":"object.labs.retime","result":"command","node":{"t":"obj","req":{"fromLayer":{"t":"str","min":1,"max":256},"toLayer":{"t":"str","min":1,"max":256},"fromFrame":{"t":"int","min":0,"max":4294967295},"toFrame":{"t":"int","min":0,"max":4294967295},"spacing":{"t":"int","min":1,"max":12}}}},
-    "labs.interval": {"command":"object.labs.interval","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":256},"fromFrame":{"t":"int","min":0,"max":4294967295},"toFrame":{"t":"int","min":0,"max":4294967295},"count":{"t":"int","min":1,"max":999},"ease":{"t":"enum","v":["linear","in","out","inout"]}}}}
+    "labs.interval": {"command":"object.labs.interval","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":256},"fromFrame":{"t":"int","min":0,"max":4294967295},"toFrame":{"t":"int","min":0,"max":4294967295},"count":{"t":"int","min":1,"max":999},"ease":{"t":"enum","v":["linear","in","out","inout"]}}}},
+    "labs.moveToLayer": {"command":"object.labs.moveToLayer","result":"command","node":{"t":"obj","req":{"fromLayer":{"t":"str","min":1,"max":256},"toLayer":{"t":"str","min":1,"max":256},"frame":{"t":"int","min":0,"max":4294967295},"strokeIds":{"t":"arr","min":1,"max":256,"of":{"t":"str","min":1,"max":256}}}}}
   };
   const has = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
   const fail = (message) => { throw new TypeError(message); };
@@ -152,5 +153,6 @@
     WIDGET_SETTINGS: PREFIX + 'widget.settings', RIG_EDIT: PREFIX + 'rig.edit', RIG_POSE: PREFIX + 'rig.pose',
     LABS_SPEED_LINES: PREFIX + 'labs.speedLines', LABS_BOIL: PREFIX + 'labs.boil', LABS_FOLLOW_PATH: PREFIX + 'labs.followPath',
     LABS_REFERENCE_FILL: PREFIX + 'labs.referenceFill',
-    LABS_PINGPONG: PREFIX + 'labs.pingpong', LABS_RETIME: PREFIX + 'labs.retime', LABS_INTERVAL: PREFIX + 'labs.interval' });
+    LABS_PINGPONG: PREFIX + 'labs.pingpong', LABS_RETIME: PREFIX + 'labs.retime', LABS_INTERVAL: PREFIX + 'labs.interval',
+    LABS_MOVE_TO_LAYER: PREFIX + 'labs.moveToLayer' });
 }));
