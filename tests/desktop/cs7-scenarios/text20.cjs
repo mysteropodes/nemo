@@ -42,7 +42,11 @@ function prepare({ config, root }) {
   // All original source/tree, clean-package, sidecar, grant, fixture and duration
   // checks run before the batch starts. Never call the original separate launcher.
   const modules = original.preflight(c);
-  return createWorkflow({ packet, original, c, modules, inputs });
+  const workflow = createWorkflow({ packet, original, c, modules, inputs });
+  return require('./text20-shared.cjs').sharedWorkflow(workflow, {
+    config: c,
+    inputsSha256: packet.inputsSha256, directory: packet.directory, hexRoute: packet.hexRoute,
+  });
 }
 function createWorkflow({ packet, original, c, modules, inputs }) {
   let used = false;
@@ -82,12 +86,14 @@ function createWorkflow({ packet, original, c, modules, inputs }) {
         catch {
           report.phases.find(p => p.phase === phase.name).status = 'fail';
           report.failure = { phase: phase.name, classification: 'original-phase-oracle-refused' }; save();
-          return { checks: [{ id: 'original-text20', status: 'fail' }], safeToContinue: false };
+          return { checks: [{ id: 'original-text20', status: 'fail' }], safeToContinue: false,
+            phaseResults: structuredClone(report.phases) };
         }
         report.phases.find(p => p.phase === phase.name).status = 'pass'; delete report.inFlight; save();
       }
       report.saved = ctx.saved; report.status = 'operator-complete'; report.ownerReview = 'required'; save();
       return { checks: [{ id: 'original-text20', status: 'unrun' }], safeToContinue: true,
+        phaseResults: structuredClone(report.phases),
         finalize: async () => {
           // The batch invokes this only after verified normal owner cleanup.
           report.cleanup = 'complete'; save();

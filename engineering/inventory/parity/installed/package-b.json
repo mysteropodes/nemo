@@ -6,7 +6,7 @@
       "id": "f03-clients",
       "issue": 1049,
       "status": "Blocked",
-      "reason": "Original task citation is resolved. Scenario implementation/review and installed operator/package qualification remain outstanding. Both actual Codex and Claude client routes must be available in the same batch lifetime.",
+      "reason": "Client MCP route not configured in the actual Codex and Claude clients; human setup escalated by the orchestrator. No generic SDK substitute. Scenario review and current package/operator qualification remain outstanding.",
       "tasks": [
         "X15"
       ],
@@ -36,13 +36,13 @@
           ]
         }
       ],
-      "taskEvidence": "https://github.com/mysteropodes/nemo/pull/2403#issuecomment-6416918418 \u2014 reviewer disposition from matrix task owners; original issue F03 tag is not the older-format import task."
+      "taskEvidence": "https://github.com/mysteropodes/nemo/pull/2403#issuecomment-6416918418 \u2014 reviewer disposition from matrix task owners; original issue F03 tag is not the older-format import task.",
+      "runtimeDisposition": "https://github.com/mysteropodes/nemo/issues/2348#issuecomment-6418087338"
     },
     {
       "id": "play-resume",
       "issue": 1573,
-      "status": "Blocked",
-      "reason": "Original task citation is resolved. Play scenario review and current observer-package/operator qualification remain outstanding.",
+      "status": "Ready",
       "tasks": [
         "X12"
       ],
@@ -74,7 +74,8 @@
         }
       ],
       "taskEvidence": "https://github.com/mysteropodes/nemo/pull/2403#issuecomment-6416918418 \u2014 reviewer disposition from matrix task owners.",
-      "runtimePrerequisites": "One unsigned test-play-publication-observer package at the batch source; original keyed fixture de1c3782038c51ea04f59978808be895479986d95d9655d9b79e6556f324cf32; actual owned window, native exposure trace and terminal collector copy."
+      "runtimePrerequisites": "One unsigned test-play-publication-observer package at the batch source; original keyed fixture de1c3782038c51ea04f59978808be895479986d95d9655d9b79e6556f324cf32; actual owned window, native exposure trace and terminal collector copy.",
+      "evidence": "N20R source: https://github.com/mysteropodes/nemo/pull/1583 merged at c9a53b8b520a4d7d0d31a394929debcc89833f53; source-complete reconciliation https://github.com/mysteropodes/nemo/issues/1573#issuecomment-6403867878. Original Play scenario approved at 4216183f08670b6e4f781e15230bdab75451626d by https://github.com/mysteropodes/nemo/pull/2403#issuecomment-6417925639."
     },
     {
       "id": "play-publication",
@@ -131,7 +132,8 @@
             "oracle"
           ]
         }
-      ]
+      ],
+      "runtimeDisposition": "https://github.com/mysteropodes/nemo/issues/2348#issuecomment-6418087338 approves the unchanged original three cold app lifetimes, each with a separate receipt and evidenced cleanup, at identical source/tree/package/executable. Issue-level continuation outside this Ready census; any identity drift voids the continuation without replay."
     },
     {
       "id": "text-scene",
@@ -187,7 +189,7 @@
       "id": "text-targets",
       "issue": 2264,
       "status": "Blocked",
-      "reason": "Original task citation is resolved. Scenario implementation/review and installed operator/package qualification remain outstanding.",
+      "reason": "Original task citation is resolved. Shared Text20 target-clause mapping awaits independent review; current private packet, package and operator qualification remain outstanding.",
       "tasks": [
         "G38a",
         "G41"
@@ -221,7 +223,31 @@
           ]
         }
       ],
-      "taskEvidence": "https://github.com/mysteropodes/nemo/issues/2264 \u2014 body: existing agreed baseline G38a/G41."
+      "taskEvidence": "https://github.com/mysteropodes/nemo/issues/2264 \u2014 body: existing agreed baseline G38a/G41.",
+      "phaseEvidence": {
+        "text-edit": [
+          "point-create",
+          "point-edit",
+          "undo-edit",
+          "redo-edit",
+          "edit-reopened",
+          "undo-reopened",
+          "redo-reopened"
+        ],
+        "font-bind": [
+          "font-import",
+          "font-bind",
+          "undo-font",
+          "redo-font"
+        ],
+        "reopen": [
+          "save-as",
+          "replace-initial",
+          "reopen-saved",
+          "save-after",
+          "stale-read"
+        ]
+      }
     },
     {
       "id": "text20",
