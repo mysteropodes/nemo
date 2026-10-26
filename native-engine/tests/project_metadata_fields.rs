@@ -109,6 +109,36 @@ fn unrelated_marker_allocation_survives_visual_edits_and_invalid_values_refuse()
     );
 }
 
+#[test]
+fn symmetry_settings_store_supplied_values_and_refuse_non_finite_or_invalid_text() {
+    let before = metadata();
+    assert_eq!(before.symmetry_metadata(), &SymmetrySettings::default());
+    let settings = SymmetrySettings {
+        enabled: Some(true),
+        mode: Some("radial".into()),
+        axis: Some(None),
+        radial_center: Some(Some((-0.5, 400.25))),
+        radial_sectors: Some(30.5),
+        extend: Some(false),
+    };
+    let edited = before.clone().with_symmetry_metadata(settings.clone()).unwrap();
+    assert_eq!(edited.symmetry_metadata(), &settings);
+    assert_eq!(edited.palette_metadata(), before.palette_metadata());
+    for value in [f64::INFINITY, f64::NEG_INFINITY, f64::NAN] {
+        for bad in [
+            SymmetrySettings { radial_sectors: Some(value), ..settings.clone() },
+            SymmetrySettings { axis: Some(Some((0.0, 0.0, value, 1.0))), ..settings.clone() },
+            SymmetrySettings { radial_center: Some(Some((value, 0.0))), ..settings.clone() },
+        ] {
+            assert_eq!(before.clone().with_symmetry_metadata(bad), Err(invalid()));
+        }
+    }
+    for mode in ["bad\0mode".to_owned(), "é".repeat(513)] {
+        let bad = SymmetrySettings { mode: Some(mode), ..settings.clone() };
+        assert_eq!(before.clone().with_symmetry_metadata(bad), Err(invalid()));
+    }
+}
+
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 mod wire {
     use crate::history::NativeObjectHistory;
@@ -136,7 +166,7 @@ mod wire {
     fn project(owner: &NativeObjectHistory) -> Value {
         serde_json::from_slice::<Value>(&save(owner)).unwrap()["project"].clone()
     }
-    const FIELDS: [&str; 9] = [
+    const FIELDS: [&str; 15] = [
         "palettes",
         "activePaletteIdx",
         "shadowPalette",
@@ -146,6 +176,12 @@ mod wire {
         "perspectiveMode",
         "perspectiveDensity",
         "perspectiveVPs",
+        "symmetryEnabled",
+        "symmetryMode",
+        "symmetryAxis",
+        "symmetryRadialCenter",
+        "symmetryRadialSectors",
+        "symmetryExtend",
     ];
 
     #[test]
@@ -153,7 +189,9 @@ mod wire {
         let fields = json!({"palettes":[{"id":"p","name":"","colors":["#AbC",""]},{"id":"p","name":"X","colors":[]}],
             "activePaletteIdx":-0.5,"shadowPalette":[{"id":"s","color":"#AA00cc"}],"shadowActiveId":"missing-id",
             "guides":{"v":[-0.5,4.25,-0.5]},"perspectiveEnabled":false,"perspectiveMode":"fisheye",
-            "perspectiveDensity":-3.5,"perspectiveVPs":null});
+            "perspectiveDensity":-3.5,"perspectiveVPs":null,"symmetryEnabled":true,"symmetryMode":"radial",
+            "symmetryAxis":{"x1":-0.5,"y1":0.0,"x2":320.25,"y2":180.0},"symmetryRadialCenter":null,
+            "symmetryRadialSectors":7.5,"symmetryExtend":false});
         for version in [1, 2] {
             let mut owner = NativeObjectHistory::from_project_file(
                 "visual-fields",
@@ -332,6 +370,8 @@ mod wire {
             "shadowPalette":[{"id":tag,"color":"#AA00cc"}],"shadowActiveId":tag,
             "guides":{"h":[-0.25],"v":[4.5]},"perspectiveEnabled":true,"perspectiveMode":"custom",
             "perspectiveDensity":-3.5,"perspectiveVPs":[{"x":1.0,"y":2.0,"locked":true}],
+            "symmetryEnabled":true,"symmetryMode":tag,"symmetryAxis":null,
+            "symmetryRadialCenter":{"x":1.5,"y":-2.5},"symmetryRadialSectors":6.0,"symmetryExtend":true,
             "workspace":{"panelOrder":null,"motionColumns":tag},
             "comments":[{"id":tag,"authorName":"Writer","text":tag,"createdAt":1.5,"resolved":false}]})
     }
@@ -441,5 +481,53 @@ mod wire {
                 .is_err());
             }
         }
+    }
+
+    #[test]
+    fn symmetry_members_keep_null_and_missing_distinct_and_refuse_malformed_records() {
+        for fields in [
+            json!({}),
+            json!({"symmetryAxis":null,"symmetryMode":""}),
+            json!({"symmetryRadialCenter":null,"symmetryAxis":{"x1":1.0,"y1":2.0,"x2":3.0,"y2":4.0}}),
+        ] {
+            for version in [1, 2] {
+                let owner =
+                    NativeObjectHistory::from_project_file("symmetry", &input(version, fields.clone()))
+                        .unwrap();
+                let raw = project(&owner);
+                for field in &FIELDS[9..] {
+                    assert_eq!(raw.get(*field), fields.get(*field), "{version}:{field}:{fields}");
+                }
+            }
+        }
+        for invalid in [
+            json!({"symmetryEnabled":"true"}),
+            json!({"symmetryEnabled":null}),
+            json!({"symmetryMode":7}),
+            json!({"symmetryMode":null}),
+            json!({"symmetryAxis":[0.0,0.0,1.0,1.0]}),
+            json!({"symmetryAxis":{"x1":0.0,"y1":0.0,"x2":1.0}}),
+            json!({"symmetryAxis":{"x1":0.0,"y1":0.0,"x2":1.0,"y2":1.0,"z":0.0}}),
+            json!({"symmetryAxis":{"x1":"0","y1":0.0,"x2":1.0,"y2":1.0}}),
+            json!({"symmetryRadialCenter":[1.0,2.0]}),
+            json!({"symmetryRadialCenter":{"x":1.0}}),
+            json!({"symmetryRadialSectors":"6"}),
+            json!({"symmetryRadialSectors":null}),
+            json!({"symmetryExtend":1}),
+            json!({"symmetryRadialCentre":{"x":1.0,"y":2.0}}),
+        ] {
+            for version in [1, 2] {
+                assert!(
+                    NativeObjectHistory::from_project_file("symmetry-bad", &input(version, invalid.clone()))
+                        .is_err(),
+                    "{version}:{invalid}"
+                );
+            }
+        }
+        let raw = String::from_utf8(input(1, json!({"symmetryExtend":true}))).unwrap();
+        let duplicated =
+            raw.replace("\"symmetryExtend\":true", "\"symmetryExtend\":true,\"symmetryExtend\":false");
+        assert_ne!(raw, duplicated);
+        assert!(NativeObjectHistory::from_project_file("symmetry-dup", duplicated.as_bytes()).is_err());
     }
 }

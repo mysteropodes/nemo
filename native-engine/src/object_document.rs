@@ -39,6 +39,7 @@ mod project;
 pub(crate) use project::{
     BrushPresetRecord, ProjectCommentRecord, ProjectEnvelope, ProjectMetadata,
     ProjectMetadataError, ProjectPresetCatalog, ProjectReferenceState, ProjectWorkspaceRecord,
+    SymmetrySettings,
 };
 #[path = "project_camera_state.rs"]
 mod camera;
