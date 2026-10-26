@@ -21,11 +21,11 @@
   function pinSettings(pin,info){settingsKeys.forEach(function(k){if(has(info,k))pin[k]=info[k];else delete pin[k];});return pin;}
   function projectSettings(root,info,previous){
     var s=root.state,defaults={canvasBg:'#ffffff',waIn:0,waOut:info.totalFrames-1};
-    s.canvasW=info.canvasW;s.canvasH=info.canvasH;s.fps=info.fps;
+    s.canvasW=info.canvasW;s.canvasH=info.canvasH;s.fps=info.fps;s.totalFrames=info.totalFrames;
     ['canvasBg','waIn','waOut'].forEach(function(k){
       if(has(info,k))s[k]=info[k];else if(!previous||has(previous,k))s[k]=defaults[k];
     });
-    root._waIn=s.waIn;root._waOut=s.waOut;
+    root._totalF=s.totalFrames;root._waIn=s.waIn;root._waOut=s.waOut;
   }
   function projectionMatches(root,info){
     var pin=projections.get(root),rows=root.state&&root.state.layers;
@@ -79,7 +79,8 @@
   }
   function refreshLayerTable(root,info){
     var pin=projections.get(root),s=root.state,rows=s&&s.layers;
-    if(!pin||!info||!['instanceId','documentId','lifecycleGeneration','totalFrames'].every(function(k){return pin[k]===info[k];})||
+    if(!pin||!info||!['instanceId','documentId','lifecycleGeneration'].every(function(k){return pin[k]===info[k];})||
+      !s||s.totalFrames!==pin.totalFrames||
       !Array.isArray(rows)||rows.length!==pin.layerUids.length||!pin.layerUids.every(function(uid,i){return rows[i]&&rows[i].layerUid===uid&&
         parentValue(rows[i])===pin.layerParents[i];}))return false;
     validateSettings(info);
@@ -93,23 +94,28 @@
     var splice=Splice.plan(pin.layerUids,rows,next,s.activeLayerIdx,root._layerSel,root._layerSelAnchor);
     if(!splice)return false;
     // Prepare the detached UID plan before changing this read-side table.
-    if(delta>0)rows.splice(splice.at,0,splice.added);
-    else if(delta<0)rows.splice(splice.at,1);
+    if(delta>0)rows.splice.apply(rows,[splice.at,0].concat(splice.addedRows));
+    else if(delta<0)rows.splice(splice.at,-delta);
     next.forEach(function(layer,i){if(layer.name!==undefined)rows[i].name=layer.name;rows[i].visible=layer.visible;projectFields(rows[i],layer);});
     if(delta!==0){s.activeLayerIdx=splice.active;root._layerSel=splice.selection;root._layerSelAnchor=splice.anchor;}
     projectSettings(root,info,pin);
+    // Duration edits and their Undo can shorten the timeline. Keep the UI playhead valid
+    // before the native session requests the next presentation; drawing bytes stay native.
+    if(info.totalFrames!==pin.totalFrames){
+      s.currentFrame=Math.max(0,Math.min(info.totalFrames-1,s.currentFrame));root._curFrame=s.currentFrame;
+    }
     projections.set(root,pinSettings(Object.assign({},pin,{layerUids:next.map(function(layer){return layer.layerUid;}),
       contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId,layerParents:next.map(parentValue)}),info));
     return true;
   }
   function create(session,ports,workflow,acknowledgement){
-    var baseline=null,saving=false,opening=false;
+    var baseline=null,saving=false,opening=false,baselines=new Map();
     var saved=acknowledgement.create({
       readUISession:ports.readUI,readPresentedObjectSession:session.readPresentedObjectSession,
       commitSavedMetadata:function(plan){
         if(!plan.documentDigest||!session.info()||session.info().documentDigest!==plan.documentDigest)return false;
         if(ports.commit(plan.destinationPath,session.info())!==true)return false;
-        baseline=plan.documentDigest;ports.repaint();return true;
+        baseline=plan.documentDigest;baselines.set(session.info().documentId,baseline);ports.repaint();return true;
       },
       markSavedIndeterminate:function(){baseline=null;ports.repaint();}
     });
@@ -139,7 +145,7 @@
           commit:function(current){
             if((creating?ports.created(config.name||'Untitled',current):ports.opened(path,current))!==true)
               throw new Error('Native project UI publication failed');
-            baseline=creating?null:current.documentDigest;ports.repaint();
+            baseline=creating?null:current.documentDigest;baselines=new Map([[current.documentId,baseline]]);ports.repaint();
           }
         });
         if(creating&&info&&ports.createdNotice)ports.createdNotice();
@@ -150,6 +156,29 @@
         if(error&&error.details&&error.details.disposition==='notDispatched')ports.refused(error);
         else{baseline=null;ports.failed(error);ports.repaint();if(onCreationFailure)onCreationFailure(error);}
         return false;
+      }finally{opening=false;}
+    }
+    async function activateProject(target,transition){
+      if(saving||opening||!session.isActive()||typeof session.activateProject!=='function')return {notDispatched:true};
+      opening=true;
+      var previous=session.info(),previousBaseline=baseline;
+      baselines.set(previous.documentId,baseline);
+      try{
+        var current=await session.activateProject(target,{
+          isCurrent:transition.isCurrent,confirm:async function(){return true;},
+          occlude:ports.occlude,restore:ports.restore,
+          reveal:function(info,view){if(transition.projecting)transition.projecting();return ports.reveal(info,view);},
+          commit:async function(info,receipt){
+            baseline=baselines.has(info.documentId)?baselines.get(info.documentId):target.digest;
+            baselines=new Map([[previous.documentId,previousBaseline],[info.documentId,baseline]]);
+            if(await transition.commit(info,receipt)!==true)throw new Error('Native tab publication failed');
+            ports.repaint();
+          }
+        });
+        return !!current;
+      }catch(error){
+        if(error&&error.details&&error.details.disposition==='notDispatched'){ports.refused(error);return {notDispatched:true};}
+        baseline=null;ports.failed(error);ports.repaint();return false;
       }finally{opening=false;}
     }
     async function saveAs(){
@@ -167,23 +196,30 @@
       }catch(error){ports.notice({status:'refused'},null,error);return {status:'refused'};}
       finally{saving=false;}
     }
-    return Object.freeze({openPath:openPath,newProject:newProject,saveAs:saveAs,
+    return Object.freeze({openPath:openPath,newProject:newProject,activateProject:activateProject,saveAs:saveAs,
       canOpen:function(){return !saving&&!opening&&(!session.blocksLegacy()||session.isActive());},
       isDirty:function(){var info=session.info();return !session.isActive()&&session.blocksLegacy()||!baseline||!info||info.documentDigest!==baseline;}});
   }
-  function projectView(root,info){
+  function projectView(root,info,view){
     // These rows are read-side UI projections. The native edit guard denies
     // all legacy writes, and no Paper object or serializable document is built.
     var layers=layerTable(info.layers);validateSettings(info);
+    var frame=view?view.frame:0,selected=view?view.layerUids:layers.length?[layers[0].layerUid]:[];
+    if(!Number.isSafeInteger(frame)||frame<0||frame>=info.totalFrames||!Array.isArray(selected)||
+        new Set(selected).size!==selected.length||selected.some(function(uid){return !layers.some(function(l){return l.layerUid===uid;});})||
+        view&&[view.activeLayerUid,view.anchorLayerUid].some(function(uid){return uid!==null&&!layers.some(function(l){return l.layerUid===uid;});}))
+      throw new Error('Native retained view context is unavailable');
+    var indices=selected.map(function(uid){return layers.findIndex(function(l){return l.layerUid===uid;});});
     var s=root.state;
     s.canvasW=info.canvasW;s.canvasH=info.canvasH;s.fps=info.fps;s.totalFrames=info.totalFrames;
-    projectSettings(root,info,null);s.currentFrame=0;s.activeLayerIdx=0;
+    projectSettings(root,info,null);s.currentFrame=frame;s.activeLayerIdx=view&&view.activeLayerUid!==null?layers.findIndex(function(l){return l.layerUid===view.activeLayerUid;}):indices.length?indices[0]:0;
+    if(view)root._layerSelAnchor=view.anchorLayerUid===null?-1:layers.findIndex(function(l){return l.layerUid===view.anchorLayerUid;});
     s.layers=layers.map(function(l,i){var row={layerUid:l.layerUid,
       name:l.name===undefined?'Layer '+(i+1):l.name,visible:l.visible,locked:false,color:'#5FA875',parentLayerUid:null,frames:[],motion:{}};
       projectFields(row,l);return row;});
     s.symbols={};s.cameraKeys=[];s.activeSymbolId=null;s.refMedia=null;
-    root._curFrame=0;root._totalF=info.totalFrames;root._waIn=s.waIn;root._waOut=s.waOut;
-    root._layerSel=info.layers.length?[0]:[];root.selectedPaths=[];
+    root._curFrame=frame;root._totalF=info.totalFrames;root._waIn=s.waIn;root._waOut=s.waOut;
+    root._layerSel=indices;root.selectedPaths=[];
     if(root.userLayers)root.userLayers.forEach(function(layer){layer.visible=false;});
     if(root.SMReference)root.SMReference.refreshNative();
     var pin={layerUids:info.layers.map(function(layer){return layer.layerUid;}),layerParents:layers.map(parentValue),
@@ -208,8 +244,8 @@
         {title:'Unsaved changes',kind:'warning',okLabel:creating?'Discard and create':'Discard and open',cancelLabel:'Cancel'});},
       occlude:function(){startWasHidden=root.document.getElementById('start-screen').classList.contains('hid');ports.show();},
       restore:function(previous){if(previous&&startWasHidden)ports.hide();},
-      reveal:async function(info){
-        diagnostic('file-stage','projection');projectView(root,info);
+      reveal:async function(info,view){
+        diagnostic('file-stage','projection');projectView(root,info,view);
         diagnostic('file-stage','ui-refresh');if(root.updateUI)root.updateUI();
         diagnostic('file-stage','hide-start');ports.hide();
         diagnostic('file-stage','layout-wait');
@@ -232,7 +268,7 @@
       refused:function(error){ports.notice('Could not open native project: '+(error.message||error));},
       failed:function(error){ports.show();ports.notice('Could not open native project: '+(error.message||error));}
     },root.NemoNativeObjectSaveAsWorkflow,root.NemoNativeObjectSavedAcknowledgement);
-    return Object.freeze({isActive:session.blocksLegacy,canOpen:ui.canOpen,isDirty:ui.isDirty,saveAs:ui.saveAs,openPath:ui.openPath,newProject:ui.newProject});
+    return Object.freeze({isActive:session.blocksLegacy,canOpen:ui.canOpen,isDirty:ui.isDirty,saveAs:ui.saveAs,openPath:ui.openPath,newProject:ui.newProject,activateProject:ui.activateProject});
   }
   return Object.freeze({create:create,projectView:projectView,bind:bind,
     projectionReadyForUI:projectionReadyForUI,

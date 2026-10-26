@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-commands => commands_tests
 use nemo_native_engine::codec::decode_project;
 use nemo_native_engine::commands::{
     DispatchErrorCode, NativeOpacityApplication, OpacityRequest, ResponseEnvelope,

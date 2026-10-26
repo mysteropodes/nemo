@@ -13,7 +13,9 @@
     "command.document.object.selection.delete",
     "command.document.object.selection.duplicate",
     "command.document.object.layer.split",
-    "command.document.object.clipboard.paste"
+    "command.document.object.clipboard.paste",
+    "command.document.object.clipboard.copy",
+    "command.document.object.clipboard.cut"
   ],
   "input": {
     "oneOf": [
@@ -28,6 +30,12 @@
       },
       {
         "$ref": "../native-transport-v2.schema.json#/$defs/ObjectClipboardPastePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectClipboardCopyPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectClipboardCutPayload"
       }
     ]
   },
@@ -39,9 +47,9 @@
   "resourceBoundary": {
     "maxRequestBytes": 4096,
     "maxReadResponseBytes": 4096,
-    "policy": "Complete correlated retained receipt or typed refusal; no document or resource payload. Requests above 4096 encoded bytes are refused, never split."
+    "policy": "Complete correlated retained receipt or typed refusal. Full original request and full response are limited to 4096 encoded bytes; never split or truncate. Bitmap packets carry existing raster records and retained-origin identity, never encoded media."
   },
-  "semantics": "Delete or duplicate selected shapes, split a layer into one layer per element, or paste an inline clip into a layer cell, by stable identity, atomically with element Motion, groups and references. One revision and one undo entry per applied edit; an empty selection or empty clip is a no-op. Copy and cut have no wire operation: the compact receipt cannot carry a clip. Animation 2D hold promotion is unavailable until its provider is joined. No JS/Paper writer or optimistic mutation.",
+  "semantics": "Delete or duplicate selected elements, split a layer into one layer per independent element, or copy/cut/paste a bounded inline clip, atomically with groups and references. A pressure linked-fill path and a bitmap-brush raster companion travel with their primary; each retains its actual geometry and paint-order entry. Copies receive fresh stroke, linked-fill, brush-group and combine-group identities. Asset-bearing paste reconstructs the complete packet from its same-owner retained source revision and requires the same current encoded asset allocation. Copy changes no revision, history or redo. Cut preflights the complete correlated response before one deletion revision/undo entry; empty selection returns null without editing. Replay returns the original retained clipboard and disposition. Animation2D promotes the complete held cell once; Motion edits its inherited key. Unsupported family references refuse atomically. No JS/Paper writer or optimistic mutation.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",
@@ -195,6 +203,70 @@
         "result": {
           "applied": false,
           "historyEntriesAdded": 0
+        }
+      }
+    },
+    {
+      "label": "Empty-selection clipboard.copy; retained null clipboard with unchanged revision/history",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "selection-edit-clipboard-copy-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.clipboard.copy",
+        "payload": {
+          "command": "object.clipboard.copy",
+          "contextId": "scene-root",
+          "layerUid": "layer-a",
+          "frame": 0,
+          "mode": "animation2d",
+          "strokeIds": []
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "selection-edit-clipboard-copy-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "applied": false,
+          "historyEntriesAdded": 0,
+          "clipboard": null
+        }
+      }
+    },
+    {
+      "label": "Empty-selection clipboard.cut; retained null clipboard with unchanged revision/history",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "selection-edit-clipboard-cut-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.clipboard.cut",
+        "payload": {
+          "command": "object.clipboard.cut",
+          "contextId": "scene-root",
+          "layerUid": "layer-a",
+          "frame": 0,
+          "mode": "animation2d",
+          "strokeIds": []
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "selection-edit-clipboard-cut-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "applied": false,
+          "historyEntriesAdded": 0,
+          "clipboard": null
         }
       }
     }

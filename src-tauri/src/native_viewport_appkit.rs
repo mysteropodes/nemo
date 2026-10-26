@@ -4,7 +4,7 @@ use crate::native_viewport::{NativeViewportError, ViewportGpuBinding};
 use native_engine::compositor::Compositor;
 use native_engine::desktop_viewport::{
     AcquiredSurfaceFrame, DesktopViewportHost, SettledSurfaceFrame, SurfaceAttempt, SurfacePort,
-    SurfacePresentation, SurfaceRecoveryError, ViewportMapping,
+    SurfacePresentation, SurfaceRecoveryError, ViewportDisplayFilter, ViewportMapping,
 };
 use objc::declare::ClassDecl;
 use objc::runtime::{Class, Object, Sel};
@@ -16,6 +16,10 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Once,
 };
+
+#[path = "native_viewport_display_filter.rs"]
+mod display_filter;
+use display_filter::DisplayFilterBlitter;
 
 #[path = "native_viewport_appkit_occlusion.rs"]
 pub(super) mod occlusion;
@@ -211,7 +215,7 @@ fn surface_contract(
 }
 
 #[rustfmt::skip]
-    struct MacOsSurfacePort { surface: Option<wgpu::Surface<'static>>, view: OwnedView, instance: wgpu::Instance, adapter: wgpu::Adapter, device: wgpu::Device, queue: wgpu::Queue, format: wgpu::TextureFormat, alpha_mode: wgpu::CompositeAlphaMode, blitter: wgpu::util::TextureBlitter, mapping: ViewportMapping, device_lost: Arc<AtomicBool> }
+    struct MacOsSurfacePort { surface: Option<wgpu::Surface<'static>>, view: OwnedView, instance: wgpu::Instance, adapter: wgpu::Adapter, device: wgpu::Device, queue: wgpu::Queue, format: wgpu::TextureFormat, alpha_mode: wgpu::CompositeAlphaMode, blitter: DisplayFilterBlitter, mapping: ViewportMapping, device_lost: Arc<AtomicBool> }
 
 impl MacOsSurfacePort {
     fn new(
@@ -229,7 +233,7 @@ impl MacOsSurfacePort {
                 return Err(error);
             }
         };
-        let blitter = wgpu::util::TextureBlitter::new(compositor.device(), format);
+        let blitter = DisplayFilterBlitter::new(compositor.device(), format);
         let device_lost = Arc::new(AtomicBool::new(false));
         let lost_callback = Arc::clone(&device_lost);
         compositor
@@ -293,7 +297,7 @@ impl MacOsSurfacePort {
         let surface = create_surface(&self.instance, &self.view)?;
         let (format, alpha_mode) = surface_contract(&surface, &self.adapter)?;
         if format != self.format {
-            self.blitter = wgpu::util::TextureBlitter::new(&self.device, format);
+            self.blitter = DisplayFilterBlitter::new(&self.device, format);
         }
         self.surface = Some(surface);
         self.format = format;
@@ -306,7 +310,8 @@ impl MacOsSurfacePort {
 enum MacOsFrame<'port, 'source> {
     Acquired {
         texture: wgpu::SurfaceTexture,
-        blitter: &'port wgpu::util::TextureBlitter,
+        blitter: &'port DisplayFilterBlitter,
+        display_filter: ViewportDisplayFilter,
         device: &'source wgpu::Device,
         queue: &'source wgpu::Queue,
         source: &'source wgpu::TextureView,
@@ -321,6 +326,7 @@ impl AcquiredSurfaceFrame for MacOsFrame<'_, '_> {
             Self::Acquired {
                 texture,
                 blitter,
+                display_filter,
                 device,
                 queue,
                 source,
@@ -333,7 +339,7 @@ impl AcquiredSurfaceFrame for MacOsFrame<'_, '_> {
                 let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("n16-native-viewport-blit"),
                 });
-                blitter.copy(device, &mut encoder, source, &target);
+                blitter.copy(device, &mut encoder, source, &target, display_filter);
                 queue.submit(Some(encoder.finish()));
                 texture.present();
                 let _ = device.poll(wgpu::PollType::Poll);
@@ -379,6 +385,7 @@ impl SurfacePort for MacOsSurfacePort {
                 SurfaceAttempt::Acquired(MacOsFrame::Acquired {
                     texture,
                     blitter: &self.blitter,
+                    display_filter: source.display_filter,
                     device: source.device,
                     queue: source.queue,
                     source: source.texture_view,

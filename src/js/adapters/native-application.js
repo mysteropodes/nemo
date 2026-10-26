@@ -73,7 +73,7 @@
     if (fontContract && fontContract.admitted(operation)) return fontContract.paths(operation);
     if(operation==='query.document.object.property.metadata') return {has:p=>p==='payload.view.property'||/^(?:payload\.view\.target|result\.target|result\.items\.\d+\.target)\.(?:contextId|layerUid|strokeId)$/.test(p)||/^result\.items\.\d+\.(?:contextId|controlName|property)$/.test(p)};
     if (operation === 'query.document.object.layer.timing') return new Set(['payload.layerUid', 'result.layerUid']);
-    if (operation === 'query.document.object') return queryContract.paths;
+    if (operation === 'query.document.object') return {has: (p) => queryContract.paths.has(p) || !!(vectorContract && vectorContract.readPaths.has(p))};
     if (operation === 'command.document.object.layer.create') return new Set(['payload.name', 'result.layerUid']);
     return ['command.document.object.layer.visibility.set', 'command.document.object.layer.policy.edit'].includes(operation) ? new Set(['payload.layerUid']) : null;
   }
@@ -124,7 +124,7 @@
     frame(value.frameScope.frame);
   }
   function objectRecord(value) {
-    if (vectorContract && plain(value) && value.family === vectorContract.FAMILY) return vectorContract.record(value, false);
+    if (vectorContract && plain(value) && value.family === vectorContract.FAMILY) return vectorContract.readRecord(value);
     exact(value, ['schemaVersion', 'family', 'target', 'geometry', 'fill'], [], 'object record');
     if (value.schemaVersion !== 1 || value.family !== 'closed-solid-fill-cubic-path') throw new TypeError('unsupported object family');
     objectTarget(value.target);

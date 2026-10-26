@@ -737,6 +737,12 @@
               "type": "null"
             }
           ]
+        },
+        "linkedFillId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "isLinkedFillCompanion": {
+          "type": "boolean"
         }
       },
       "minProperties": 1,
@@ -2336,6 +2342,28 @@
             },
             "meshId": {
               "$ref": "#/$defs/ObjectRigId"
+            },
+            "frame": {
+              "$ref": "#/$defs/ObjectFrame"
+            },
+            "boneIds": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ObjectRigId"
+              }
+            },
+            "radius": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000000
+            },
+            "rotate": {
+              "type": "boolean"
+            },
+            "softness": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
             }
           }
         },
@@ -3293,14 +3321,33 @@
           "type": "array",
           "maxItems": 1024,
           "items": {
-            "type": "object"
+            "$ref": "#/$defs/ObjectClipboardRecord"
           }
         },
         "groups": {
           "type": "object"
+        },
+        "rasters": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/ObjectClipboardRaster"
+          }
+        },
+        "source": {
+          "$ref": "#/$defs/ObjectClipboardSource"
         }
       },
-      "description": "Detached copied selection carried inline. Bounded structural declaration only: the native owner validates every record and remaps every reference atomically. The 4096-byte request envelope bounds the clip."
+      "description": "Detached copied selection carried inline. Bounded structural declaration only: the native owner validates every record and remaps every reference atomically. The 4096-byte request envelope bounds the clip.",
+      "dependentRequired": {
+        "rasters": [
+          "source"
+        ],
+        "source": [
+          "rasters"
+        ]
+      }
     },
     "ObjectLayerDeletePayload": {
       "type": "object",
@@ -4751,7 +4798,7 @@
               "$ref": "#/$defs/ObjectRecord"
             },
             {
-              "$ref": "#/$defs/ObjectVectorRecord"
+              "$ref": "#/$defs/ObjectVectorReadRecord"
             }
           ]
         }
@@ -7695,6 +7742,57 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.object.history"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectHistoryReadPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.clipboard.copy"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectClipboardCopyPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.clipboard.cut"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectClipboardCutPayload"
+                }
+              }
+            }
+          ]
         }
       ],
       "examples": [
@@ -8560,6 +8658,9 @@
             },
             {
               "$ref": "#/$defs/ObjectQueryResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectHistoryReadResult"
             }
           ]
         },
@@ -15671,6 +15772,844 @@
           }
         }
       ]
+    },
+    "ObjectHistoryReadPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        }
+      }
+    },
+    "ObjectHistoryReadResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "undoDepth",
+        "redoDepth"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "undoDepth": {
+          "$ref": "#/$defs/Revision"
+        },
+        "redoDepth": {
+          "$ref": "#/$defs/Revision"
+        }
+      },
+      "description": "Live current-owner depths only; atRevision and documentSnapshotId must equal the request and current owner. No retained-snapshot stack semantics."
+    },
+    "ObjectClipboardCopyPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUid",
+        "frame",
+        "mode",
+        "strokeIds"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.clipboard.copy"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "mode": {
+          "enum": [
+            "animation2d",
+            "motion"
+          ]
+        },
+        "strokeIds": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/ObjectEditId"
+          }
+        }
+      }
+    },
+    "ObjectClipboardCopyResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded",
+        "clipboard"
+      ],
+      "properties": {
+        "applied": {
+          "const": false
+        },
+        "historyEntriesAdded": {
+          "const": 0
+        },
+        "clipboard": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/ObjectClipPayload"
+            }
+          ]
+        }
+      },
+      "description": "Retained shape clipboard from the pinned native snapshot; clipboard contextId, layerUid and requested frame match the request. Complete encoded correlated response is limited to4096 bytes; overflow refuses before cut publication.",
+      "x-maxEncodedResponseBytes": 4096
+    },
+    "ObjectClipboardCutPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUid",
+        "frame",
+        "mode",
+        "strokeIds"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.clipboard.cut"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "mode": {
+          "enum": [
+            "animation2d",
+            "motion"
+          ]
+        },
+        "strokeIds": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/ObjectEditId"
+          }
+        }
+      }
+    },
+    "ObjectClipboardCutResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded",
+        "clipboard"
+      ],
+      "properties": {
+        "applied": {
+          "type": "boolean"
+        },
+        "historyEntriesAdded": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "clipboard": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/ObjectClipPayload"
+            }
+          ]
+        }
+      },
+      "description": "Retained shape clipboard from the pinned native snapshot; clipboard contextId, layerUid and requested frame match the request. Complete encoded correlated response is limited to4096 bytes; overflow refuses before cut publication.",
+      "x-maxEncodedResponseBytes": 4096,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "clipboard": {
+                "type": "null"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "applied": {
+                "const": false
+              },
+              "historyEntriesAdded": {
+                "const": 0
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "applied": {
+                "const": true
+              },
+              "historyEntriesAdded": {
+                "const": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ObjectClipboardRecord": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schemaVersion",
+            "family",
+            "target",
+            "geometry",
+            "fill"
+          ],
+          "properties": {
+            "schemaVersion": {
+              "const": 1
+            },
+            "family": {
+              "const": "closed-solid-fill-cubic-path"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectTarget"
+            },
+            "geometry": {
+              "$ref": "#/$defs/ObjectGeometry"
+            },
+            "fill": {
+              "$ref": "#/$defs/ObjectSolidFill"
+            },
+            "effects": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "type",
+                      "enabled"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "p1": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "$ref": "#/$defs/ObjectFiniteNumber"
+                          }
+                        ]
+                      },
+                      "p2": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "$ref": "#/$defs/ObjectFiniteNumber"
+                          }
+                        ]
+                      },
+                      "p3": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "$ref": "#/$defs/ObjectFiniteNumber"
+                          }
+                        ]
+                      },
+                      "p4": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "$ref": "#/$defs/ObjectFiniteNumber"
+                          }
+                        ]
+                      },
+                      "p5": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "$ref": "#/$defs/ObjectFiniteNumber"
+                          }
+                        ]
+                      },
+                      "p6": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "$ref": "#/$defs/ObjectFiniteNumber"
+                          }
+                        ]
+                      },
+                      "p7": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "$ref": "#/$defs/ObjectFiniteNumber"
+                          }
+                        ]
+                      },
+                      "p8": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "$ref": "#/$defs/ObjectFiniteNumber"
+                          }
+                        ]
+                      },
+                      "keys": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "type": "object"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schemaVersion",
+            "family",
+            "target",
+            "geometry",
+            "fill",
+            "vector"
+          ],
+          "properties": {
+            "schemaVersion": {
+              "const": 1
+            },
+            "family": {
+              "const": "editable-vector-path"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectTarget"
+            },
+            "geometry": {
+              "$ref": "#/$defs/ObjectVectorGeometry"
+            },
+            "fill": {
+              "$ref": "#/$defs/ObjectVectorFill"
+            },
+            "vector": {
+              "$ref": "#/$defs/ObjectVectorBody"
+            },
+            "vectorExt": {
+              "$ref": "#/$defs/ObjectClipboardVectorExt"
+            },
+            "effects": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "type",
+                      "enabled"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "p1": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "$ref": "#/$defs/ObjectFiniteNumber"
+                          }
+                        ]
+                      },
+                      "p2": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "$ref": "#/$defs/ObjectFiniteNumber"
+                          }
+                        ]
+                      },
+                      "p3": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "$ref": "#/$defs/ObjectFiniteNumber"
+                          }
+                        ]
+                      },
+                      "p4": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "$ref": "#/$defs/ObjectFiniteNumber"
+                          }
+                        ]
+                      },
+                      "p5": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "$ref": "#/$defs/ObjectFiniteNumber"
+                          }
+                        ]
+                      },
+                      "p6": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "$ref": "#/$defs/ObjectFiniteNumber"
+                          }
+                        ]
+                      },
+                      "p7": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "$ref": "#/$defs/ObjectFiniteNumber"
+                          }
+                        ]
+                      },
+                      "p8": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "$ref": "#/$defs/ObjectFiniteNumber"
+                          }
+                        ]
+                      },
+                      "keys": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "type": "object"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "description": "An editable open or closed vector path as the object read returns it."
+        }
+      ],
+      "description": "Clipboard preserves the native authored record including optional effects; execution validates stored effect parameters and keys in the sole native owner."
+    },
+    "ObjectClipboardBitmapBrushSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tip",
+        "size",
+        "spacing",
+        "scatter",
+        "opacity",
+        "color",
+        "pressure",
+        "seed"
+      ],
+      "properties": {
+        "tip": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "At most 255 UTF-8 bytes, no NUL; native storage validates exact authored spelling."
+        },
+        "size": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "spacing": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "scatter": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "opacity": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "seed": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "color": {
+          "type": "string"
+        },
+        "pressure": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ObjectClipboardBitmapBrush": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bitmapBrushSpec",
+        "brushGroupId"
+      ],
+      "properties": {
+        "bitmapBrushSpec": {
+          "$ref": "#/$defs/ObjectClipboardBitmapBrushSpec"
+        },
+        "brushGroupId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "At most 255 UTF-8 bytes, no NUL; native storage validates exact authored spelling."
+        },
+        "preTextureStroke": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "preTextureOpacity": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "bitmapPressureProfile": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            }
+          }
+        }
+      }
+    },
+    "ObjectClipboardVectorExt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "pressure": {
+          "$ref": "#/$defs/ObjectVectorPressure"
+        },
+        "paramShape": {
+          "$ref": "#/$defs/ObjectParamShape"
+        },
+        "boxAngle": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "fillGradient": {
+          "$ref": "#/$defs/ObjectVectorFillGradient"
+        },
+        "fillTrace": {
+          "$ref": "#/$defs/ObjectFillTrace"
+        },
+        "isMask": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "maskMode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maskFeather": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "linkedFillId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "isLinkedFillCompanion": {
+          "type": "boolean"
+        },
+        "bitmapBrush": {
+          "$ref": "#/$defs/ObjectClipboardBitmapBrush"
+        }
+      },
+      "minProperties": 1,
+      "description": "Omitted when empty.",
+      "not": {
+        "required": [
+          "pressure",
+          "fillGradient"
+        ]
+      }
+    },
+    "ObjectClipboardRaster": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "item"
+      ],
+      "properties": {
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contextId",
+            "frameScope",
+            "layerUid",
+            "strokeId"
+          ],
+          "properties": {
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "frameScope": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "frame"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "authored"
+                },
+                "frame": {
+                  "$ref": "#/$defs/ObjectFrame"
+                }
+              }
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The source id of a layer in this batch, or the uid of an existing layer."
+            },
+            "strokeId": {
+              "$ref": "#/$defs/ObjectEditId"
+            }
+          }
+        },
+        "item": {
+          "$ref": "#/$defs/ObjectImportRasterItem"
+        }
+      }
+    },
+    "ObjectClipboardSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "documentId",
+        "contentRevision",
+        "strokeIds"
+      ],
+      "properties": {
+        "instanceId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "documentId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "contentRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "strokeIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/ObjectEditId"
+          }
+        }
+      }
+    },
+    "ObjectVectorReadExt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "pressure": {
+          "$ref": "#/$defs/ObjectVectorPressure"
+        },
+        "paramShape": {
+          "$ref": "#/$defs/ObjectParamShape"
+        },
+        "boxAngle": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "fillGradient": {
+          "$ref": "#/$defs/ObjectVectorFillGradient"
+        },
+        "fillTrace": {
+          "$ref": "#/$defs/ObjectFillTrace"
+        },
+        "isMask": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "maskMode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maskFeather": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "linkedFillId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "isLinkedFillCompanion": {
+          "type": "boolean"
+        },
+        "bitmapBrush": {
+          "$ref": "#/$defs/ObjectClipboardBitmapBrush"
+        }
+      },
+      "minProperties": 1,
+      "description": "Immutable stored vector extensions, including bitmap-anchor metadata. The native owner validates camouflage and linked-fill exclusion; no raster or resource bytes are returned here.",
+      "not": {
+        "required": [
+          "pressure",
+          "fillGradient"
+        ]
+      }
+    },
+    "ObjectVectorReadRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "family",
+        "target",
+        "geometry",
+        "fill",
+        "vector"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "family": {
+          "const": "editable-vector-path"
+        },
+        "target": {
+          "$ref": "#/$defs/ObjectTarget"
+        },
+        "geometry": {
+          "$ref": "#/$defs/ObjectVectorGeometry"
+        },
+        "fill": {
+          "$ref": "#/$defs/ObjectVectorFill"
+        },
+        "vector": {
+          "$ref": "#/$defs/ObjectVectorBody"
+        },
+        "vectorExt": {
+          "$ref": "#/$defs/ObjectVectorReadExt"
+        }
+      },
+      "description": "Immutable stored vector record returned by an object query. Generic vector create/replace retain ObjectVectorRecord and cannot write bitmap anchors."
     }
   }
 }

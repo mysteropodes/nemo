@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-codec => codec_tests
 use nemo_native_engine::codec::{decode_project, encode_project, CodecError, CodecErrorKind};
 use serde::Deserialize;
 use serde_json::{json, Value};

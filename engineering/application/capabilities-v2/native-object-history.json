@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object-history",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "query.document.object.history"
+  ],
+  "input": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectHistoryReadPayload"
+  },
+  "output": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectHistoryReadResult"
+  },
+  "authority": {
+    "document": "native-engine::history::NativeObjectHistory",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "readPolicy": "Read actual undo/redo stack depths under the existing current-owner dispatch lock. Exact current revision and snapshot pins required; retained older snapshots refuse stale_revision. No mutation, revision publication, notification, read receipt, mirror or history copy.",
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Bounded original request bytes and complete correlated response; unsigned safe integer depths."
+  },
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Current native owner history; replace example pins with actual discovery snapshot",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "history-read",
+        "instanceId": "history-fixture",
+        "documentId": "native-object-document-1",
+        "operation": "query.document.object.history",
+        "payload": {
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:native-object-document-1:0"
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "history-read",
+        "instanceId": "history-fixture",
+        "documentId": "native-object-document-1",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:native-object-document-1:0",
+          "undoDepth": 0,
+          "redoDepth": 0
+        }
+      }
+    }
+  ]
+}

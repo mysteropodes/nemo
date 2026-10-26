@@ -16,9 +16,11 @@ const timerTurn=()=>new Promise(resolve=>setTimeout(resolve,0));
 function gate(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
 async function bounded(promise,label,ending='settle'){let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{
   timer=setTimeout(()=>reject(Error(label+' did not '+ending)),1000);})]);}finally{clearTimeout(timer);}}
-function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
+function fixture(initialLayers=[{layerUid:'drawing',visible:true}],realSubscription=false){
   let installed=false,revision=0,generation=0,documentId=null,held=null,foreign=false,projectionRefused=false,rawAck=null,previewHold=null,replyMutation=null;
   let paletteReplyHold=null,commentsReplyHold=null;
+  let syncFault=null,ackCheck=null;
+  const listeners=new Map();
   const log=[],calls=[],classes=new Set(),styles=new Map(),transports=[],notifications=[];
   let layerRows=initialLayers.map(row=>({...row}));
   let rect={left:20.5,top:30.25,width:320.5,height:180.25};
@@ -41,11 +43,16 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
     updateUI:()=>log.push('update'),showToast:text=>log.push('toast:'+text)};
   async function invoke(command,args){
     const r=args&&(args.request||JSON.parse(args.requestJson));calls.push({command,r});
+    if(syncFault&&syncFault.command===command)throw syncFault.error;
     if(command==='nemo_native_object_client_status')return foreign?{...info(),available:true,instanceId:'foreign'}:{...info(),available:installed,instanceId:'instance'};
     if(command==='nemo_native_object_bootstrap'){installed=true;generation++;documentId='document-'+generation;revision=0;return {...info(),requestId:r.requestId,resourceCount:0,viewportAvailable:false};}
     if(command==='nemo_native_object_reference'){assert.equal(r.action.kind,'inspect');return {...info(),requestId:r.requestId};}
-    if(command==='nemo_native_object_preview'){if(previewHold)await previewHold.promise;return {status:'presented',workId:'work-'+calls.length,viewGeneration:1};}
-    if(command==='nemo_native_revision_sync'){assert.equal(r.action,'acknowledge');log.push('native-ack');if(rawAck)await rawAck.promise;return null;}
+    if(command==='nemo_native_object_preview'){if(previewHold)await previewHold.promise;return {status:syncFault&&syncFault.status||'presented',workId:'work-'+calls.length,viewGeneration:1};}
+    if(realSubscription&&command==='nemo_native_status')return {...info(),available:true};
+    if(command==='nemo_native_revision_sync'){
+      if(realSubscription&&r.action!=='acknowledge')return r.action==='binding'?{...info(),subscriptionId:'subscription-'+generation}:r.action==='subscribe'?r.binding:null;
+      assert.equal(r.action,'acknowledge');if(ackCheck)ackCheck(r);log.push('native-ack');if(rawAck)await rawAck.promise;return null;
+    }
     if(command==='nemo_native_dispatch'){
       log.push(r.operation);const p=r.payload;
       let result;
@@ -102,7 +109,7 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
     }
     throw Error('Unexpected native fake command '+command);
   }
-  root.__TAURI__={core:{invoke},event:{listen:async()=>()=>{}}};
+  root.__TAURI__={core:{invoke},event:{listen:async(name,callback)=>{listeners.set(name,callback);return ()=>listeners.delete(name);}}};
   // This is only a transport boundary. Protocol/SDK/session implementations remain production modules.
   root.NemoApplicationMcpTransport={createNativeTauriTransport:call=>{
     const transport={call,connected:false,binding:null,synchronize:null,disconnected:null,
@@ -113,14 +120,21 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
       dispatch:r=>call('nemo_native_dispatch',{request:r}),dispatchObject:(c,r)=>call(c,{requestJson:JSON.stringify(r)})};
     transports.push(transport);return transport;
   }};
+  if(realSubscription)root.NemoApplicationMcpTransport={createNativeTauriTransport:call=>{
+    const value=require('../src/js/adapters/application-mcp.js').createNativeTauriTransport(call);transports.push(value);return value;
+  }};
   const session=Project.desktop(root);
   const open=async()=>{const value=await session.openPath('/fake.json',{reveal:async i=>{Files.projectView(root,i);root.updateUI();}});
     await timerTurn();return value;};
   return {root,session,open,log,calls,classes,styles,transports,notifications,info,
     layers:value=>{layerRows=value.map(row=>({...row}));},paletteReplyGate:value=>{paletteReplyHold=value;},
     commentsReplyGate:value=>{commentsReplyHold=value;},
+    syncFault:value=>{syncFault=value;},ackCheck:value=>{ackCheck=value;},
     hold:v=>held=v,foreign:v=>foreign=v,rect:v=>rect=v,refuseProjection:v=>projectionRefused=v,ackGate:v=>rawAck=v,previewGate:v=>previewHold=v,mutateReply:v=>replyMutation=v,
-    async emit(){const t=transports.at(-1),from=revision;revision++;const event={...info(),requestId:'event-'+revision,fromRevision:from,toRevision:revision};return t.synchronize(event,t.binding);}};
+    async emit(){const t=transports.at(-1),from=revision;revision++;
+      if(realSubscription)return listeners.get('nemo-native-revision')({payload:{instanceId:'instance',documentId,lifecycleGeneration:generation,
+        requestId:'event-'+revision,fromRevision:from,toRevision:revision}});
+      const event={...info(),requestId:'event-'+revision,fromRevision:from,toRevision:revision};return t.synchronize(event,t.binding);}};
 }
 test('actual Project desktop owns one cached session; builder creates ports without session/cache/initial I/O',()=>{
   const f=fixture();assert.equal(Project.desktop(f.root),f.session);assert.equal(f.calls.length,0);assert.equal(f.transports.length,0);
@@ -162,6 +176,42 @@ test('projection refusal fences before UI publication and clears Main underlay',
   await assert.rejects(f.emit(),/projection is uncorrelated/);assert.equal(f.session.isIndeterminate(),true);assert.equal(f.classes.has('nemo-native-underlay'),false);
   assert.deepEqual(f.log.slice(start).filter(x=>['willProject','project','update','reference','dirty'].includes(x)),['willProject','project']);
 });
+test('revision diagnostics witness synchronization order without claiming native ACK',async()=>{
+  const f=fixture(),events=[];f.root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__=(event,code)=>events.push([event,code]);
+  await f.open();events.length=0;await f.emit();
+  assert.deepEqual(events.filter(e=>e[0].startsWith('revision-')),[
+    ['revision-stage','queued'],['revision-stage','inspect'],['revision-stage','publication'],
+    ['revision-stage','present'],['revision-stage','final-projection'],['revision-stage','synchronized']]);
+  assert.equal(f.session.info().contentRevision,1);assert.equal(f.session.isIndeterminate(),false);
+  assert.equal(f.log.includes('native-ack'),false); // This fixture calls the session callback, not the transport ACK.
+});
+for(const [mode,expected]of [
+  ['inspect','inspect:invoke-rejected:unavailable:none'],
+  ['publication','publication:local-refusal:unavailable:none'],
+  ['present','present:invoke-rejected:unavailable:none'],
+  ['preview-status','present:local-refusal:unknown:status-deferred-occluded'],
+  ['final-projection','final-projection:local-refusal:unknown:none']]){
+  test('revision '+mode+' diagnostic preserves original failure and fencing',async()=>{
+    const f=fixture(),events=[],original={code:'unavailable',message:'PRIVATE /Users/secret/document.json',stack:'PRIVATE STACK'};
+    f.root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__=(event,code)=>events.push([event,code]);
+    await f.open();events.length=0;const before=f.calls.length;
+    if(mode==='inspect')f.syncFault({command:'nemo_native_object_reference',error:original});
+    if(mode==='publication')f.root.updateUI=()=>{throw original;};
+    if(mode==='present')f.syncFault({command:'nemo_native_object_preview',error:original});
+    if(mode==='preview-status')f.syncFault({status:'deferred-occluded'});
+    if(mode==='final-projection')f.root.NemoNativeObjectProjectFile.projectionMatches=()=>false;
+    let caught;try{await f.emit();assert.fail('synchronization must refuse');}catch(error){caught=error;}
+    if(['inspect','publication','present'].includes(mode))assert.strictEqual(caught,original);
+    const failures=events.filter(e=>e[0]==='revision-failed');assert.equal(failures.length,1);
+    assert.equal(failures[0][1],expected);
+    assert.equal(events.some(e=>e[1]==='synchronized'),false);
+    assert.equal(f.session.isIndeterminate(),true);assert.equal(f.classes.has('nemo-native-underlay'),false);
+    assert.equal(f.transports[0].connected,false);assert.equal(f.log.includes('native-ack'),false);
+    const calls=f.calls.slice(before);assert.equal(calls.filter(c=>c.command==='nemo_native_object_reference').length,1);
+    assert.equal(calls.filter(c=>c.command==='nemo_native_object_preview').length,['inspect','publication'].includes(mode)?0:1);
+    assert.doesNotMatch(JSON.stringify(events),/PRIVATE|Users|secret|STACK/);
+  });
+}
 
 function selector(f,view={kind:'targets',offset:0,limit:8}){
   const p=f.session.info();return {instanceId:p.instanceId,documentId:p.documentId,atRevision:p.contentRevision,
@@ -469,6 +519,22 @@ test('completion notification drops stale revision, owner, subscription and same
   }
 });
 
+test('Motion completion repaint requires the captured owner, document, frame and active mode',async()=>{
+  for(const mode of ['current','frame','mode','owner','document','unconfirmed']){
+    const f=fixture();await f.open();const ports=Ports.createPorts(f.root),paints=[];
+    f.root.state.appMode='motion';
+    f.root.NemoNativeObjectUI.paintMotionInspector=root=>paints.push(root);
+    ports.presented(f.session.info());
+    if(mode==='frame')f.root.state.currentFrame=1;
+    if(mode==='mode')f.root.state.appMode='animation';
+    if(mode==='owner')delete f.root.NemoNativeObjectProject;
+    if(mode==='document')f.root.document={...f.root.document};
+    if(mode==='unconfirmed')f.transports[0].disconnected(new Error('controlled subscription loss'));
+    await timerTurn();
+    assert.deepEqual(paints,mode==='current'?[f.root]:[],mode);
+  }
+});
+
 test('newest same-port completion is coalesced and callback exceptions cannot reject settled native work',async()=>{
   const f=fixture();await f.open();const ports=Ports.createPorts(f.root),pin=retained(f);
   const before=f.notifications.length,start=f.log.length;
@@ -612,4 +678,87 @@ test('desktop reads only existing session Camera View choice and keeps the nativ
  Ports.didPaintUI(root,{bindPolicyEntries(){seen.push('policy');}});assert.deepEqual(seen,['policy','lock']);
  Object.defineProperties(root.state,{cameraLayerOn:{get(){throw Error('legacy camera layer read');}},cameraKeys:{get(){throw Error('legacy camera keys read');}}});
  assert.equal(ports.viewMode(),'stored-camera');
+});
+
+test('confirmed final presentation is observed before its notification resumes playback',async()=>{
+  const f=fixture();await f.open();const files=new Map();
+  f.root.state.playing=false;f.root.__TAURI__.path={appDataDir:async()=>'/isolated'};
+  f.root.__TAURI__.fs={mkdir:async()=>{},writeTextFile:async(path,bytes)=>files.set(path,bytes),
+    rename:async(from,to)=>files.set(to,files.get(from))};
+  f.root.NemoNativeProjectSettingsController.presented=()=>{
+    Ports.settingsDiagnostic(f.root,'resume',{kind:'setFps'});f.root.state.playing=true;
+  };
+  Ports.createPorts(f.root).presented(f.session.info());await timerTurn();await turn();
+  const events=JSON.parse(files.get('/isolated/diagnostics/native-settings.json')).events.slice(-2);
+  assert.deepEqual(events.map(row=>row.event),['preview-presented','resume']);
+  assert.equal(events[0].contentRevision,0);assert.equal(events[0].frame,0);
+  assert.equal(f.root.state.playing,true);
+});
+
+test('actual desktop split publication handles three to five to three to five rows through one subscription',async()=>{
+  const base=[{layerUid:'A',name:'Hero',visible:true},{layerUid:'B',name:'Destination',visible:true},
+    {layerUid:'C',name:'Locked',visible:false,locked:true}];
+  const pieces=[{layerUid:'native-layer:1:0',name:'Forme 1',visible:true,locked:false,shy:true,color:'#123456',parentLayerUid:'B'},
+    {layerUid:'native-layer:1:1',name:'Forme 2',visible:false,color:'#abcdef',parentLayerUid:null}];
+  const split=[...pieces,{...base[0],name:'Forme 3'},...base.slice(1)];
+  const f=fixture(base,true);await f.open();const table=f.root.state.layers,original=table.slice(),ports=Ports.createPorts(f.root);
+  f.root.state.activeLayerIdx=0;f.root._layerSel=[0,2];f.root._layerSelAnchor=2;
+  for(const [index,next] of [split,base,split].entries()){
+    const begin=f.calls.length;let acknowledgments=0;
+    f.ackCheck(request=>{
+      acknowledgments++;assert.equal(request.event.toRevision,index+1);
+      assert.deepEqual(table.map(row=>row.layerUid),next.map(row=>row.layerUid));
+      assert.equal(ports.projectionReady(f.session.info()),true);
+      assert.ok(f.calls.slice(begin).some(call=>call.command==='nemo_native_object_preview'));
+      assert.equal(f.root.state.activeLayerIdx,index===1?0:2);
+      assert.deepEqual(f.root._layerSel,index===1?[0,2]:[2,4]);assert.equal(f.root._layerSelAnchor,index===1?2:4);
+      for(const [i,meta] of next.entries())for(const key of Object.keys(meta))assert.equal(table[i][key],meta[key]);
+    });
+    f.layers(next);await f.emit();assert.equal(acknowledgments,1);
+    assert.equal(f.session.isIndeterminate(),false);assert.equal(f.session.info().contentRevision,index+1);
+    assert.strictEqual(f.root.state.layers,table);assert.deepEqual(table.map(r=>r.layerUid),next.map(r=>r.layerUid));
+    original.forEach(row=>assert.strictEqual(table.find(r=>r.layerUid===row.layerUid),row));
+    const offset=index===1?0:2;
+    assert.equal(f.root.state.activeLayerIdx,offset);assert.deepEqual(f.root._layerSel,[offset,offset+2]);assert.equal(f.root._layerSelAnchor,offset+2);
+    assert.equal(ports.projectionReady(f.session.info()),true);assert.ok(f.session.readPresentedObjectSession());
+    for(const row of table){assert.ok(Array.isArray(row.frames)||pieces.some(p=>p.layerUid===row.layerUid));}
+    for(const [i,meta] of next.entries())for(const key of ['name','visible','locked','shy','color','parentLayerUid']){
+      if(Object.hasOwn(meta,key))assert.equal(table[i][key],meta[key]);
+    }
+    assert.ok(f.calls.slice(begin).some(c=>c.command==='nemo_native_object_preview'));
+    assert.equal(f.calls.slice(begin).filter(c=>c.command==='nemo_native_revision_sync').length,1);
+  }
+  assert.equal(f.transports.length,1);
+});
+test('actual desktop refuses noncontiguous reorder replacement and duplicate splices without partial publication',async()=>{
+  const base=[{layerUid:'A'},{layerUid:'B'},{layerUid:'C'}];
+  for(const next of [[{layerUid:'x'},base[0],{layerUid:'y'},...base.slice(1)],
+    [{layerUid:'x'},{layerUid:'y'},base[1],base[0],base[2]],
+    [{layerUid:'x'},{layerUid:'y'},base[0],base[1],{layerUid:'replacement'}],
+    [{layerUid:'x'},{layerUid:'x'},...base]]){
+    const f=fixture(base,true);await f.open();
+    const table=f.root.state.layers,before=JSON.stringify(f.root.state),calls=f.calls.length,pin=f.session.info();
+    f.layers(next);await f.emit();assert.strictEqual(f.root.state.layers,table);assert.equal(JSON.stringify(f.root.state),before);
+    assert.equal(Files.projectionReadyForUI(f.root,pin),true,'last published projection pin remains intact');
+    assert.equal(f.session.isIndeterminate(),true);assert.equal(f.session.readPresentedObjectSession(),null);
+    assert.equal(f.calls.slice(calls).some(c=>c.command==='nemo_native_revision_sync'&&c.r.action==='acknowledge'),false);
+  }
+});
+test('multirow file projection preserves full prior state and pin on stale foreign and malformed metadata',async()=>{
+  const f=fixture([{layerUid:'A'},{layerUid:'B'},{layerUid:'C'}]);await f.open();
+  const pin=f.session.info(),table=f.root.state.layers,before=JSON.stringify(f.root.state),ports=Ports.createPorts(f.root);
+  const next={...pin,contentRevision:1,documentSnapshotId:'next',layers:[{layerUid:'x'},{layerUid:'y'},...pin.layers]};
+  const bad=[{...next,instanceId:'foreign'},{...next,documentId:'foreign'},
+    {...next,lifecycleGeneration:pin.lifecycleGeneration+1},{...next,contentRevision:0},
+    {...next,contentRevision:-1},{...next,documentSnapshotId:''}];
+  for(const value of bad){
+    assert.equal(Files.refreshLayerTable(f.root,value),false);assert.equal(JSON.stringify(f.root.state),before);
+    assert.strictEqual(f.root.state.layers,table);assert.equal(ports.projectionReady(pin),true);
+  }
+  for(const changed of [{name:42},{parentLayerUid:''},{visible:'yes'},{locked:null},{color:'#oops'},{extra:true}]){
+    const layers=next.layers.map((row,i)=>i===4?{...row,...changed}:row);
+    assert.throws(()=>Files.refreshLayerTable(f.root,{...next,layers}));
+    assert.equal(JSON.stringify(f.root.state),before);assert.strictEqual(f.root.state.layers,table);
+    assert.equal(ports.projectionReady(pin),true);
+  }
 });

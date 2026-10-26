@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-evaluation => property_expression_runtime_controls_tests
 //! Mutation controls for the property expression result kernel (D15/#2074):
 //! each deliberately broken rule must disagree with the shared oracle rows
 //! (see `property_expression_runtime.rs` for their provenance and row format).

@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-viewport => viewport_tests
 use crate::codec::decode_project;
 use crate::commands::NativeOpacityApplication;
 use crate::compositor::Compositor;
@@ -201,6 +202,45 @@ fn identity(
 }
 fn queue(host: &mut DesktopViewportHost<FakePort>, steps: &[Step]) {
     host.test_port_mut().queue(steps);
+}
+
+#[test]
+fn display_filter_registration_is_immutable_across_deferred_and_cached_receipts() {
+    let app = app();
+    let mut scheduler = FrameScheduler::new();
+    let id = identity(&app, &mut scheduler, 1);
+    let mut host = DesktopViewportHost::new(FakePort::default(), standard());
+    host.register_with_display_filter(id.clone(), ViewportDisplayFilter::Values)
+        .unwrap();
+    queue(&mut host, &[Step::Occluded, Step::Presented]);
+    assert_eq!(
+        host.simulate_port_completion(id.clone()).unwrap().status(),
+        &ViewportStatus::Deferred(DeferredAction::Occluded)
+    );
+    assert_eq!(
+        host.register_with_display_filter(id.clone(), ViewportDisplayFilter::Dim),
+        Err(ViewportError::IdentityMismatch(id.work_id()))
+    );
+    host.register_with_display_filter(id.clone(), ViewportDisplayFilter::Values)
+        .unwrap();
+    let receipt = host.simulate_port_completion(id.clone()).unwrap();
+    assert_eq!(receipt.status(), &ViewportStatus::Presented);
+    assert_eq!(
+        host.register(id.clone()),
+        Err(ViewportError::IdentityMismatch(id.work_id()))
+    );
+    assert_eq!(host.simulate_port_completion(id.clone()).unwrap(), receipt);
+    assert_eq!(
+        host.display_filter(id.work_id()),
+        ViewportDisplayFilter::Values
+    );
+    assert_eq!(host.test_port().settles, 1);
+    scheduler.succeed(id.work_id()).unwrap();
+    host.dispose();
+    assert_eq!(
+        host.register_with_display_filter(id, ViewportDisplayFilter::Values),
+        Err(ViewportError::Disposed)
+    );
 }
 fn fail(scheduler: &mut FrameScheduler, id: &ScheduledFrameIdentity) {
     assert_eq!(

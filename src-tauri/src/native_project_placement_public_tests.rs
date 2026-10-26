@@ -402,28 +402,41 @@ fn public_audio_bad_target_scalar_cancel_stale_and_foreign_identity_leave_saved_
     let state = ApplicationMcp::default();
     let receipt = bootstrap_audio_wire(&state, &audio_wire(true), "audio-refusal-install");
     let before = saved(&state, &receipt);
-    for (index, payload, code) in [
-        (
-            0,
-            json!({"kind":"place","placement":{"id":"missing-track","assetId":"wave-a",
-            "target":{"kind":"audioTrack","trackUid":"absent"},"offsetFrames":0.5}}),
-            "not_found",
-        ),
+    // A well-formed place against an absent track reaches the owner join: typed `not_found`.
+    let req = request(
+        &receipt,
+        "audio-refused-0",
+        0,
+        json!({"kind":"place","placement":{"id":"missing-track","assetId":"wave-a",
+        "target":{"kind":"audioTrack","trackUid":"absent"},"offsetFrames":0.5}}),
+    );
+    let first = dispatch(&state, req.clone());
+    assert_eq!(first["error"]["code"], "not_found");
+    assert_eq!(dispatch(&state, req), first);
+    assert_eq!(saved(&state, &receipt), before);
+    // Malformed scalars never reach the owner: the declared placement contract refuses them
+    // before dispatch (the same transport-level refusal as a duplicate request), every time,
+    // and nothing is published.
+    for (index, payload) in [
         (
             1,
             json!({"kind":"setOffset","placementId":"audio-p","offsetFrames":null}),
-            "invalid_request",
         ),
         (
             2,
             json!({"kind":"shiftOffset","placementId":"audio-p","deltaFrames":9007199254740992_u64}),
-            "invalid_request",
         ),
     ] {
         let req = request(&receipt, &format!("audio-refused-{index}"), 0, payload);
-        let first = dispatch(&state, req.clone());
-        assert_eq!(first["error"]["code"], code);
-        assert_eq!(dispatch(&state, req), first);
+        for _ in 0..2 {
+            let refused = state
+                .dispatch_native(serde_json::from_value(req.clone()).unwrap())
+                .unwrap_err();
+            assert!(
+                refused.contains("does not match its declared contract"),
+                "{refused}"
+            );
+        }
         assert_eq!(saved(&state, &receipt), before);
     }
     for (field, value, code) in [

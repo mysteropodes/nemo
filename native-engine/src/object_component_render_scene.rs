@@ -2,10 +2,9 @@
 //! Geometry is already camera -> symMatrix evaluated. Source style remains the
 //! post-override record: gradients and stroke widths are not transformed again.
 use crate::evaluation::object_component_kernels::object_component_evaluate::evaluate_packet;
-use crate::evaluation::object_component_kernels::object_component_exposed::{
-    ExposedEntry, ExposedValue,
+use crate::evaluation::object_component_kernels::object_component_override_port::{
+    absent_source_allowed, PacketOverrides,
 };
-use crate::evaluation::object_component_kernels::object_component_exposed_apply::OverridePort;
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_component_join::NoPorts;
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_component_scene::{
     ComponentOutcome, ComponentScene,
@@ -50,17 +49,6 @@ pub(crate) struct ComponentPaint {
     pub(crate) prepared: PreparedItem,
     /// SVG's currently admitted legacy closed-solid subset, straight and unquantized.
     pub(crate) svg_rgba: Option<[f64; 4]>,
-}
-
-struct UnavailableOverrides;
-impl OverridePort for UnavailableOverrides {
-    fn available(&mut self) -> bool {
-        false
-    }
-    fn register(&mut self, _property: &ExposedEntry) {}
-    fn read(&mut self, _layer: &str, _key: &str, _frame: u32) -> Result<Vec<ExposedValue>, String> {
-        Err("component exposed-property runtime is not wired".to_owned())
-    }
 }
 
 fn unavailable(index: usize, reason: &'static str) -> ObjectSceneError {
@@ -322,9 +310,15 @@ pub(crate) fn prepare(
         scope_kind: expected.scope_kind.clone(),
         frame: expected.frame,
     };
-    let scene = evaluate_packet(packet, &pin, None, &mut NoPorts, &mut UnavailableOverrides)
-        .map_err(|_| unavailable(first_host, "component production or pin join refused"))?
-        .ok_or_else(|| unavailable(first_host, "component producer omitted its instance table"))?;
+    let scene = evaluate_packet(
+        packet,
+        &pin,
+        None,
+        &mut NoPorts,
+        &mut PacketOverrides::new(packet),
+    )
+    .map_err(|_| unavailable(first_host, "component production or pin join refused"))?
+    .ok_or_else(|| unavailable(first_host, "component producer omitted its instance table"))?;
     let mut paints = Vec::new();
     for slot in scene.slots() {
         let entry = slot.entry();
@@ -467,12 +461,18 @@ pub(crate) fn prepare(
                                 "component order names an unselected source",
                             )
                         })?;
-                        let shape = *shapes.get(&key(source.1.target())).ok_or_else(|| {
-                            unavailable(
-                                entry.source_layer_index,
-                                "component order and evaluated shapes disagree",
-                            )
-                        })?;
+                        let Some(&shape) = shapes.get(&key(source.1.target())) else {
+                            // Only a source the override evaluator reported hidden may be absent.
+                            absent_source_allowed(&placed.hidden, source.1.target())
+                                .map_err(|reason| unavailable(entry.source_layer_index, reason))?;
+                            if !seen_sources.insert(index) {
+                                return Err(unavailable(
+                                    entry.source_layer_index,
+                                    "component order/source correlation is not unique",
+                                ));
+                            }
+                            continue;
+                        };
                         if source.0 != layer.source_layer_index()
                             || !seen_sources.insert(index)
                             || !seen_shapes.insert(shape)

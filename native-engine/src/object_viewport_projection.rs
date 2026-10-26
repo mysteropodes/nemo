@@ -1,6 +1,70 @@
 //! Closed session-only viewport choices and proof of the actual painted affine.
-use crate::desktop_viewport::PresentationReceipt;
+use crate::desktop_viewport::{DesktopViewportHost, PresentationReceipt, SurfacePort, ViewportError};
 use serde::{Deserialize, Serialize};
+
+/// Session-only color check applied to the final surface, never to export pixels.
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ViewportDisplayFilter {
+    #[default]
+    None,
+    Values,
+    Contrast,
+    Dim,
+}
+
+impl<P: SurfacePort> DesktopViewportHost<P> {
+    pub fn register(
+        &mut self,
+        identity: crate::render_scene::ScheduledFrameIdentity,
+    ) -> Result<(), ViewportError> {
+        self.register_with_display_filter(identity, ViewportDisplayFilter::None)
+    }
+
+    /// Retire exactly the scheduler work terminalized by document replacement;
+    /// retained terminal receipts keep their immutable filter binding.
+    pub fn reconcile_replaced(
+        &mut self,
+        work_ids: &[crate::scheduler::WorkId],
+    ) -> Vec<crate::scheduler::WorkId> {
+        work_ids
+            .iter()
+            .copied()
+            .filter(|id| {
+                if self.pending.remove(id).is_none() {
+                    return false;
+                }
+                self.display_filters.remove(id);
+                true
+            })
+            .collect()
+    }
+
+    /// An admitted work identity has one immutable display filter, including
+    /// deferred retries and cached terminal receipts. A change needs fresh work.
+    pub fn register_with_display_filter(
+        &mut self,
+        identity: crate::render_scene::ScheduledFrameIdentity,
+        filter: ViewportDisplayFilter,
+    ) -> Result<(), ViewportError> {
+        self.ensure_active()?;
+        let id = identity.work_id();
+        if self
+            .display_filters
+            .get(&id)
+            .is_some_and(|old| *old != filter)
+        {
+            return Err(ViewportError::IdentityMismatch(id));
+        }
+        self.register_as(id, identity)?;
+        self.display_filters.insert(id, filter);
+        Ok(())
+    }
+
+    pub fn display_filter(&self, work: crate::scheduler::WorkId) -> ViewportDisplayFilter {
+        self.display_filters.get(&work).copied().unwrap_or_default()
+    }
+}
 
 #[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]

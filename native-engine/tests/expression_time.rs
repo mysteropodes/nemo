@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-evaluation => expression_time_tests
 use crate::evaluation::expression_time::{
     loop_plan, loop_value, step_time, to_frames, to_seconds, LoopMode, LoopPlan, LoopSide,
 };

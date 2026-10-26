@@ -5,7 +5,39 @@
   else root.NemoNativeObjectProjectDesktop=api;
 }(typeof globalThis==='object'?globalThis:this,function(){
   'use strict';
-  var openLogs=new WeakMap(),uiCompositions=new WeakMap();
+  var openLogs=new WeakMap(),settingsLogs=new WeakMap(),uiCompositions=new WeakMap();
+  // Read-only chronology for ordinary settings and their native pins. Storage is
+  // bounded and fire-and-forget; a missing, failed or hung sink cannot gate work.
+  function settingsDiagnostic(root,event,value){
+    if(!['input','change','focus','blur','pointerdown','stale-rejected','owner','intent','dispatch','metadata','acknowledged','outcome','stop','resume',
+      'preview-presented','export-request','export-result'].includes(event))return;
+    try{
+      function own(key){var d=value&&Object.getOwnPropertyDescriptor(value,key);return d&&Object.prototype.hasOwnProperty.call(d,'value')?d.value:undefined;}
+      var row={event:event};
+      [['instanceId',/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/],
+        ['documentId',/^native-object-document-[0-9]+$/],
+        ['gestureDocumentId',/^native-object-document-[0-9]+$/],
+        ['documentSnapshotId',/^native-object:native-object-document-[0-9]+:[0-9]+$/],
+        ['requestId',/^project-[a-z-]+-[0-9]+$/]].forEach(function(pair){var v=own(pair[0]);if(typeof v==='string'&&v.length<=128&&pair[1].test(v))row[pair[0]]=v;});
+      ['contentRevision','expectedRevision','atRevision','fromRevision','toRevision','lifecycleGeneration','gestureLifecycleGeneration','frame','viewGeneration'].forEach(function(key){var v=own(key);if(Number.isSafeInteger(v)&&v>=0)row[key]=v;});
+      if(['p-cw','p-ch','proj-fps','p-cbg','btn-dims-lock'].includes(own('field')))row.field=own('field');
+      if(['input','change'].includes(own('sourceEvent')))row.sourceEvent=own('sourceEvent');
+      var kind=own('kind'),status=own('status');
+      if(['setCanvasSize','setFps','setCanvasBackground','setWorkArea','user','native-settings-intent','native-settings-publication'].includes(kind))row.kind=kind;
+      if(['applied-presented','unchanged','superseded','unavailable','unconfirmed','applied-unconfirmed','succeeded','failed','cancelled'].includes(status))row.status=status;
+      var log=settingsLogs.get(root);if(!log){log={startedAt:Date.now(),serial:0,events:[],writing:false,pending:null};settingsLogs.set(root,log);}
+      row.sequence=++log.serial;row.at=Date.now();log.events.push(row);log.events=log.events.slice(-128);
+      log.pending=JSON.stringify({schemaVersion:1,kind:'native-settings-diagnostic',startedAt:log.startedAt,events:log.events});
+      if(log.writing)return;log.writing=true;
+      (async function(){try{
+        var api=root.__TAURI__,base=await api.path.appDataDir(),dir=base.replace(/[\\/]+$/,'')+'/diagnostics';
+        await api.fs.mkdir(dir,{recursive:true});
+        while(log.pending!==null){var bytes=log.pending;log.pending=null;
+          await api.fs.writeTextFile(dir+'/native-settings.pending.json',bytes);
+          await api.fs.rename(dir+'/native-settings.pending.json',dir+'/native-settings.json');}
+      }catch(_){log.pending=null;}finally{log.writing=false;}})();
+    }catch(_){}
+  }
   function bindUIComposition(root,compose){
     if(!root||!root.document||typeof compose!=='function')throw new TypeError('Native UI composition is unavailable');
     var bound=uiCompositions.get(root);
@@ -21,10 +53,61 @@
     return bound.compose(base,policy);
   }
   var stages=['receipt','installed-status','metadata','first-preview','first-owner','reveal','second-preview','second-owner','ui-commit','publication','subscriber'];
-  var previewDetails=['frame-range','mapping','viewport','receipt-access','owner','receipt','status','work-id','view-generation','view',
+  var previewDetails=['frame-range','mapping','viewport','receipt-access','owner','receipt','status','work-id','view-generation','view','display-filter',
     'status-stale-discarded','status-deferred-timeout','status-deferred-occluded','status-failed-validation','status-failed-device-lost',
     'status-failed-retry-lost','status-failed-retry-outdated','status-failed-recreate','status-failed-reconfigure'];
+  var revisionStages=['admission','queued','inspect','publication','present','final-projection','synchronized'];
+  // Observation only: the project owner supplies current attempts and decides all
+  // stages, fencing and retirement. Preserve invoke values and rejection identity.
+  function attemptObserver(invoke,emit,readOpen,readRevision,previewFailures){
+    function errorCode(error){
+      var code='unknown';
+      try{var value=error&&error.code;if(['invalid_request','unavailable','unsupported_format','replacement_refused',
+        'stale_revision','stale_owner','cancelled','wrong_instance','wrong_document','cancelled_before_dispatch'].includes(value))code=value;}catch(_){}
+      return code;
+    }
+    function stage(attempt,value,event){
+      if(!attempt)return;
+      attempt.stage=value;attempt.invokeErrors=new Set();
+      if(event)emit(event,value);
+    }
+    function tracked(command,args){
+      var open=readOpen(),openStage=open&&open.stage,revision=readRevision(),revisionStage=revision&&revision.stage;
+      function rejected(error){
+        if(open&&readOpen()===open&&open.stage===openStage)open.invokeErrors.add(error);
+        if(revision&&readRevision()===revision&&revision.stage===revisionStage)revision.invokeErrors.add(error);
+        throw error;
+      }
+      var result;
+      try{result=arguments.length>1?invoke(command,args):invoke(command);}catch(error){return rejected(error);}
+      return (open||revision)&&result&&typeof result.then==='function'?result.then(function(value){return value;},rejected):result;
+    }
+    function origin(attempt,error){return attempt.invokeErrors.has(error)?'invoke-rejected':'local-refusal';}
+    function openFailure(attempt,error){
+      if(!attempt)return;
+      var code=errorCode(error),disposition='other';
+      try{if(error&&error.details&&error.details.disposition==='notDispatched')disposition='notDispatched';}catch(_){}
+      emit('post-bootstrap-failed','post-bootstrap-'+attempt.stage+':'+origin(attempt,error)+':'+code+':'+disposition);
+    }
+    function revisionFailure(attempt,error){
+      var detail=error&&typeof error==='object'?previewFailures.get(error)||'none':'none';
+      emit('revision-failed',attempt.stage+':'+origin(attempt,error)+':'+errorCode(error)+':'+detail);
+      return error;
+    }
+    return Object.freeze({invoke:tracked,stage:stage,openFailure:openFailure,revisionFailure:revisionFailure});
+  }
   function safeCode(event,code){
+    if(event==='revision-stage')return revisionStages.includes(code)?code:'unknown';
+    if(event==='revision-failed'){
+      if(typeof code!=='string')return 'unknown';
+      var revision=code.split(':');
+      return revision.length===4&&revisionStages.includes(revision[0])&&['invoke-rejected','local-refusal'].includes(revision[1])&&
+        ['unknown','invalid_request','unavailable','unsupported_format','replacement_refused','stale_revision','stale_owner','cancelled',
+          'wrong_instance','wrong_document','cancelled_before_dispatch'].includes(revision[2])&&
+        (revision[3]==='none'||previewDetails.includes(revision[3]))?code:'unknown';
+    }
+    if(event==='tab-capture-refused')return ['inactive','synchronizing','subscription-inactive','presentation-missing',
+      'view-mismatch','owner-mismatch','queue-pending','capture-superseded','tab-unavailable','capture-unavailable','ui-changed'].includes(code)?code:'unknown';
     if(event==='camera-control')return ['native-refused','selected-canvas','selected-stored-camera'].includes(code)?code:'unknown';
     if(event==='camera-presented')return ['canvas','stored-camera'].includes(code)?code:'unknown';
     if(event==='bpm-settings-refused')return ['controller-missing','cache-empty','retired','generation-stale',
@@ -62,8 +145,8 @@
   // A single coalesced writer keeps the last 32 events; storage can fail or hang without delaying Open.
   function openDiagnostic(root,event,code){
     if(!['file-open-started','file-new-started','file-completed','file-cancelled','file-failed','file-stage',
-      'bootstrap-dispatched','bootstrap-resolved','bootstrap-rejected','post-bootstrap-failed','bpm-settings-refused',
-      'guide-entry-refused','guide-release-refused','guide-edit-refused','navigation-begin','navigation-update','camera-control','camera-presented'].includes(event))return;
+      'bootstrap-dispatched','bootstrap-resolved','bootstrap-rejected','post-bootstrap-failed','revision-stage','revision-failed','bpm-settings-refused',
+      'guide-entry-refused','guide-release-refused','guide-edit-refused','navigation-begin','navigation-update','camera-control','camera-presented','tab-capture-refused'].includes(event))return;
     try{
       var log=openLogs.get(root);if(!log){log={startedAt:Date.now(),events:[],serial:0,attempt:0,writing:false,pending:null};openLogs.set(root,log);}
       if(event==='file-open-started'||event==='file-new-started')log.attempt++;
@@ -86,7 +169,7 @@
     }catch(_){}
     // Preserve the existing optional fixture observer; it is never required to collect production evidence.
     try{if(typeof root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__==='function')root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,
-      ['bpm-settings-refused','guide-entry-refused','guide-release-refused','guide-edit-refused','navigation-begin','navigation-update','camera-control','camera-presented'].includes(event)?safeCode(event,code):code);}catch(_){}
+      ['revision-stage','revision-failed','bpm-settings-refused','guide-entry-refused','guide-release-refused','guide-edit-refused','navigation-begin','navigation-update','camera-control','camera-presented','tab-capture-refused'].includes(event)?safeCode(event,code):code);}catch(_){}
   }
   // The captured read proof exists only during this action's synchronous guard.
   function withActionPresentation(origin,current,action){
@@ -166,7 +249,14 @@
     if(root.SMCamera&&typeof root.SMCamera.renderNativeViewLock==='function')root.SMCamera.renderNativeViewLock();
   }
   function createPorts(root){
-    var invoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null,presentationVersion=0;
+    var nativeInvoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null,presentationVersion=0;
+    function invokeProjectObserved(command,args){
+      var pin;
+      if(command==='nemo_native_object_export')try{pin=JSON.parse(args.requestJson);settingsDiagnostic(root,'export-request',pin);}catch(_){}
+      var response=nativeInvoke(command,args);
+      if(pin)Promise.resolve(response).then(function(receipt){settingsDiagnostic(root,'export-result',receipt);},function(){});
+      return response;
+    }
     function settingsNotice(kind,info){[root.NemoNativeProjectSettingsController,root.NemoNativeCompositionController,root.NemoNativePaletteController,root.NemoNativeGuideController,root.NemoNativeShadowController,root.NemoNativePerspectiveController,root.NemoNativeWorkspaceController,root.NemoNativeCustomBrushController,root.NemoNativeCommentsController].forEach(function(c){if(c&&typeof c[kind]==='function')c[kind](info);});}
     function presentationStamp(info){
       var project=root.NemoNativeObjectProject;
@@ -179,6 +269,7 @@
       return {session:session,info:info,ticket:session.readSubscriptionGeneration(),document:root.document,presentation:presentation};
     }
     function publishRevision(info){
+      settingsDiagnostic(root,'metadata',info);
       settingsNotice('willProject',info);
       if(!root.NemoNativeObjectProjectFile||!root.NemoNativeObjectProjectFile.refreshLayerTable(root,info))
         throw new Error('Native object row projection is uncorrelated');
@@ -188,8 +279,9 @@
       if(root.SMProject)root.SMProject.refreshActiveTabDirtyDot();
       return true;
     }
-    return Object.assign({},root.NemoNativeViewportUnderlay.desktop(root),{invoke:invoke,publishRevision:publishRevision,
+    return Object.assign({},root.NemoNativeViewportUnderlay.desktop(root),{invoke:invokeProjectObserved,publishRevision:publishRevision,
       viewMode:function(){return root.state&&root.state.cameraView===true?'stored-camera':'canvas';},
+      displayFilter:function(){return root.SMLabs&&typeof root.SMLabs.getViewFilter==='function'?root.SMLabs.getViewFilter():'none';},
       subscribeWindowOcclusion:root.__TAURI__.event&&typeof root.__TAURI__.event.listen==='function'?async function(hint,cancel){
         var closing=function(){cancel(new Error('Native project window closed'));},remove,detached=false;
         var observesClose=typeof root.addEventListener==='function'&&typeof root.removeEventListener==='function';
@@ -204,11 +296,12 @@
       subscribeRevisions:async function(synchronize,disconnected,trackedInvoke,isCurrent){
         if(!root.NemoApplicationMcpTransport||!root.__TAURI__.event||typeof root.__TAURI__.event.listen!=='function')
           return null; // Private file Open remains usable; no toggle/subscriber is advertised.
-        var call=trackedInvoke||invoke;
+        var call=trackedInvoke||invokeProjectObserved;
         var ownTransport=transport=root.NemoApplicationMcpTransport.createNativeTauriTransport(function(command,args){
           var response=call(command,args);
           if(command==='nemo_native_revision_sync'&&args&&args.request.action==='acknowledge')
             return Promise.resolve(response).then(function(value){
+              settingsDiagnostic(root,'acknowledged',args.request.event);
               // Observe the completed ACK after transport clears its in-flight flag.
               setTimeout(function(){try{if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshTiming)
                 root.NemoNativeObjectUI.refreshTiming(root);if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshPolicy)root.NemoNativeObjectUI.refreshPolicy(root);settingsNotice('presented');}catch(_){}},0);
@@ -230,8 +323,12 @@
         if(!transport||!root.NemoNativeApplicationAdapter||typeof root.NemoNativeApplicationAdapter.createNativeApplicationAdapter!=='function')
           throw new Error('Native public application client is unavailable');
         var client=root.NemoNativeApplicationAdapter.createNativeApplicationAdapter('ui',transport);
+        if(request.operation==='command.document.object.project.settings.edit')
+          settingsDiagnostic(root,'dispatch',Object.assign({},request,{kind:request.payload.action.kind}));
         if(request.operation==='command.document.object.layer.policy.edit'){if(typeof client.editLayerPolicy!=='function')throw new Error('Native public layer policy SDK is unavailable');return client.editLayerPolicy(request);}
-        return client.dispatch(request);
+        var response=client.dispatch(request),gate=root.NemoNativeSettingsValidationGate;
+        return gate&&request.operation==='command.document.object.project.settings.edit'?
+          gate.hold(root,'settings-response',request,response):response;
       },
       openDiagnostic:function(event,code){openDiagnostic(root,event,code);},
       presented:function(info){
@@ -247,10 +344,16 @@
             current.document!==stamp.document||current.presentation!==stamp.presentation)return;
           var shown=current.presentation,canvas=root.document.getElementById('drawing-canvas'),pill=root.document.getElementById('zoom-scrub'),rect=canvas&&canvas.getBoundingClientRect();
           if(shown&&shown.view&&rect&&pill&&root.document.activeElement!==pill){var m=shown.view.documentToComposition,z=Math.hypot(m[0]*rect.width/info.canvasW,m[1]*rect.height/info.canvasH);if(Number.isFinite(z))pill.value=Math.round(z*100);}
+          if(shown&&root.state&&root.state.playing!==true)settingsDiagnostic(root,'preview-presented',shown);
           settingsNotice('presented',info);
           renderCameraViewLock(root);
           if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshPolicy)root.NemoNativeObjectUI.refreshPolicy(root);
           if(root.SMImageMeshUI&&typeof root.SMImageMeshUI.refresh==='function')root.SMImageMeshUI.refresh();
+          // A frame paint can precede native completion and leave Motion unavailable.
+          // Refresh its existing inspector only after the current frame is presented.
+          if(shown&&root.state&&root.state.appMode==='motion'&&shown.frame===root.state.currentFrame&&
+            root.NemoNativeObjectUI&&typeof root.NemoNativeObjectUI.paintMotionInspector==='function')
+            root.NemoNativeObjectUI.paintMotionInspector(root);
           if(shown)openDiagnostic(root,'camera-presented',cameraPresentedCode(shown));
         }catch(_){}},0);
       },
@@ -259,5 +362,5 @@
       notice:function(message){if(root.showToast)root.showToast(message);},
       failed:function(){if(root.showToast)root.showToast('Native project state is unconfirmed. Reopen Nemo before continuing.');}});
   }
-  return Object.freeze({createPorts:createPorts,didPaintUI:didPaintUI,openDiagnostic:openDiagnostic,bindUIComposition:bindUIComposition,composeUI:composeUI,withActionPresentation:withActionPresentation,bindCameraUI:bindCameraUI,renderCameraViewLock:renderCameraViewLock});
+  return Object.freeze({createPorts:createPorts,attemptObserver:attemptObserver,didPaintUI:didPaintUI,openDiagnostic:openDiagnostic,settingsDiagnostic:settingsDiagnostic,bindUIComposition:bindUIComposition,composeUI:composeUI,withActionPresentation:withActionPresentation,bindCameraUI:bindCameraUI,renderCameraViewLock:renderCameraViewLock});
 }));

@@ -1,4 +1,10 @@
 //! Staged object edits/history authority; no transport, retries or replacement port.
+#[path = "object_history_read.rs"]
+mod history_read;
+#[cfg(test)]
+#[path = "../tests/object_history_read.rs"]
+mod history_read_tests;
+
 use crate::commands::{
     ObjectFillOwner, PreparedLayerCreate, PreparedLayerVisibility, PreparedObjectFill,
     PreparedPropertyEdit, PreparedReferenceEdit, PreparedVectorEdit, PreparedWidgetEdit,
@@ -163,6 +169,18 @@ mod object_layer_lifecycle_tests;
 #[cfg(test)]
 #[path = "../tests/object_layer_lifecycle_topology.rs"]
 mod object_layer_lifecycle_topology;
+#[cfg(test)]
+#[path = "../tests/object_linked_fill_codec.rs"]
+mod object_linked_fill_codec;
+#[cfg(test)]
+#[path = "../tests/object_selection_clipboard_dispatch.rs"]
+mod object_selection_clipboard_dispatch;
+#[cfg(test)]
+#[path = "../tests/object_selection_clipboard_groups.rs"]
+mod object_selection_clipboard_groups;
+#[cfg(test)]
+#[path = "../tests/object_selection_compound.rs"]
+mod object_selection_compound;
 #[cfg(test)]
 #[path = "../tests/object_selection_edit_atomic.rs"]
 mod object_selection_edit_atomic;

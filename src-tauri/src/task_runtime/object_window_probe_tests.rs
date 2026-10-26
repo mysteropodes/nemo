@@ -1,7 +1,7 @@
 use crate::task_runtime::object_window_probe::control::{complete, read_ack};
 use crate::task_runtime::object_window_probe::{
-    bind_export_scope, gate, origin, scoped_export_destination, scoped_export_root, sink, Packet,
-    Session, PHASES,
+    bind_export_scope, failure_stage_allowed, gate, origin, scoped_export_destination,
+    scoped_export_root, sink, Packet, Session, PHASES,
 };
 use serde_json::json;
 use std::{cell::RefCell, collections::HashSet, fs, path::PathBuf};
@@ -160,6 +160,13 @@ fn failure_is_bounded_terminal_and_cleanup_can_be_recorded_after_native_timeout(
     let fixture = Fixture::new();
     let mut session = fixture.session();
     let run = session.run.clone();
+    let stage = "preview-invoke:invalid_request";
+    let mut extra = packet(&run, "ready", "ready", None, None);
+    extra.failure_stage = Some(stage.into());
+    assert!(session.admit(&extra).is_err());
+    assert!(!failure_stage_allowed("arbitrary"));
+    assert!(!failure_stage_allowed("preview-invoke:arbitrary"));
+    assert!(!failure_stage_allowed("preview-receipt:invalid_request"));
     session
         .admit(&packet(&run, "ready", "ready", None, None))
         .unwrap();
@@ -168,6 +175,8 @@ fn failure_is_bounded_terminal_and_cleanup_can_be_recorded_after_native_timeout(
     assert!(!session.waiting);
     let mut fail = packet(&run, "failed", "operation_failed", None, None);
     fail.cleanup_succeeded = Some(true);
+    assert!(session.admit(&fail).is_err());
+    fail.failure_stage = Some(stage.into());
     assert_eq!(session.admit(&fail), Ok(false));
     assert!(session.failed);
     assert!(session.admit(&fail).is_err());
@@ -178,6 +187,7 @@ fn failure_is_bounded_terminal_and_cleanup_can_be_recorded_after_native_timeout(
         serde_json::from_slice(&fs::read(fixture.root.join("object-window-probe.json")).unwrap())
             .unwrap();
     assert_eq!(receipt["records"][1]["cleanupSucceeded"], true);
+    assert_eq!(receipt["records"][1]["failureStage"], stage);
     assert_eq!(receipt["complete"], false);
     assert!(serde_json::from_str::<Packet>(
         "{\"runId\":\"x\",\"runId\":\"y\",\"phase\":\"ready\",\"status\":\"ready\"}"

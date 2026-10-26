@@ -2348,11 +2348,13 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-inactive-project-tabs.js"
+        "native-object-inactive-project-tabs.js",
+        "native-object-project-tabs-ui.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
-        "native-object-inactive-project-tabs.js"
+        "native-object-inactive-project-tabs.js",
+        "native-object-project-tabs-ui.js"
       ]
     },
     {
@@ -2641,11 +2643,13 @@
         "native-object-project-reads.js",
         "native-object-project-properties.js",
         "native-object-open-exposure.js",
-        "native-object-project-export.js"
+        "native-object-project-export.js",
+        "native-object-project-entry-contract.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
-        "native-object-project.js"
+        "native-object-project.js",
+        "native-object-project-entry-contract.js"
       ]
     },
     {
@@ -2665,6 +2669,7 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
+        "native-frame-cell-selection.js",
         "native-object-ui.js",
         "native-layer-range-desktop.js",
         "native-layer-playhead-cut-ui.js"
@@ -3700,6 +3705,18 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "project-comments-presentation.js"
+      ]
+    },
+    {
+      "id": "app.native.settings-validation.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-settings-validation-gate.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-settings-validation-gate.js"
       ]
     }
   ],

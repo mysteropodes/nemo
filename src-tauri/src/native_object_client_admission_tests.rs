@@ -156,14 +156,30 @@ fn closed_query_and_command_shapes_keep_private_operations_off_the_public_route(
         .unwrap();
     assert!(public_query.ok);
     assert_eq!(public_query.content_revision, 0);
+    assert!(state
+        .dispatch_native(serde_json::from_value(fill(&receipt, "private-fill", 0)).unwrap())
+        .is_err());
+    // Public history was activated after the original raw-client admission.
+    // Empty history reaches the owner and returns its typed refusal.
     for r in [
-        fill(&receipt, "private-fill", 0),
         history(&receipt, "public-undo", 0, "undo"),
         history(&receipt, "public-redo", 0, "redo"),
     ] {
-        assert!(state
-            .dispatch_native(serde_json::from_value(r).unwrap())
-            .is_err());
+        let response = state
+            .dispatch_native(serde_json::from_value(r.clone()).unwrap())
+            .unwrap();
+        assert!(!response.ok);
+        assert_eq!(response.request_id, r["requestId"].as_str().unwrap());
+        assert_eq!(
+            response.instance_id,
+            receipt["instanceId"].as_str().unwrap()
+        );
+        assert_eq!(
+            response.document_id,
+            receipt["documentId"].as_str().unwrap()
+        );
+        assert_eq!(response.content_revision, 0);
+        assert_eq!(response.error.unwrap().code, "unavailable");
     }
     assert_eq!(client_status(&state).unwrap()["contentRevision"], 0);
 }
@@ -208,7 +224,10 @@ fn actual_release_reinstall_changes_incarnation_and_never_replays_into_new_owner
         "query.document.object.serialize",
         "command.document.object.layer.visibility.set",
         "command.document.object.project.settings.edit",
-        "command.document.object.layer.policy.edit"
+        "command.document.object.layer.policy.edit",
+        "command.document.object.project.placement.edit",
+        "command.document.object.audio.track.edit",
+        "command.document.object.layer.cut"
     ]);
     assert_eq!(status["operations"], operations);
     for flag in ["publicCapabilityAvailable", "mcpAvailable"] {

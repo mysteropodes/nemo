@@ -19,6 +19,11 @@ pub struct VectorExt {
     /// Present exactly for a vector-brush stroke (the baseline `isVectorBrush`).
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) pressure: Presence<PressureFields>,
+    /// Shared original link; the companion is a separate painted record.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) linked_fill_id: Presence<String>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) is_linked_fill_companion: Presence<bool>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) param_shape: Presence<ParamShape>,
     /// Absent differs from an explicit 0 (the baseline serializer drops a falsy angle).
@@ -41,6 +46,8 @@ pub struct VectorExt {
 }
 object_deserialize!(VectorExt {
     #[serde(default)] pressure: Presence<PressureFields>,
+    #[serde(default)] linked_fill_id: Presence<String>,
+    #[serde(default)] is_linked_fill_companion: Presence<bool>,
     #[serde(default)] param_shape: Presence<ParamShape>,
     #[serde(default)] box_angle: Presence<Number>,
     #[serde(default)] fill_gradient: Presence<StoredGradient>,
@@ -53,7 +60,9 @@ object_deserialize!(VectorExt {
 
 impl VectorExt {
     pub(crate) fn is_empty(&self) -> bool {
-        self.pressure.missing()
+        self.linked_fill_id.missing()
+            && self.is_linked_fill_companion.missing()
+            && self.pressure.missing()
             && self.param_shape.missing()
             && self.box_angle.missing()
             && self.fill_gradient.missing()

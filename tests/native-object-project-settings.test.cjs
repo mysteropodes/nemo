@@ -99,12 +99,40 @@ test('settings revision refresh preserves rows, frame, selection and duration; u
  assert.equal(Files.refreshLayerTable(root,info({},2)),true);assert.equal(root.state.canvasBg,'#ffffff');assert.equal(root.state.waIn,0);assert.equal(root.state.waOut,20);
  assert.equal(Files.projectionReadyForUI(root,info({},2)),true);
 });
-test('same-revision settings changes, foreign epochs, stale snapshots and duration changes refuse without mutation',()=>{
+test('same-revision settings or duration changes, foreign epochs and stale snapshots refuse without mutation',()=>{
  for(const change of [{fps:12},{canvasW:100},{canvasBg:'#fff'},{waIn:0},{waOut:0},{documentId:'other'},
-   {lifecycleGeneration:2},{documentSnapshotId:'other'},{totalFrames:22,contentRevision:1,documentSnapshotId:'snapshot-1'}]){
+   {lifecycleGeneration:2},{documentSnapshotId:'other'},{totalFrames:22}]){
   const root=rootView(),before=JSON.stringify(root.state),rows=root.state.layers;
   assert.equal(Files.refreshLayerTable(root,info(change)),false);assert.equal(JSON.stringify(root.state),before);assert.equal(root.state.layers,rows);
  }
+});
+test('correlated duration growth and Undo project native work-area settings while retaining UI row identity',()=>{
+ const root=rootView(),rows=root.state.layers,row=rows[0],selected=root._layerSel;
+ const grown=info({totalFrames:30,waOut:29},1);
+ assert.equal(Files.refreshLayerTable(root,grown),true);assert.equal(Files.projectionReadyForUI(root,grown),true);
+ assert.deepEqual([root.state.totalFrames,root._totalF,root.state.waOut,root._waOut],[30,30,29,29]);
+ assert.equal(root.state.layers,rows);assert.equal(rows[0],row);assert.equal(root._layerSel,selected);
+ assert.equal(root.state.currentFrame,7);assert.equal(root._curFrame,7);
+ root.state.currentFrame=29;root._curFrame=29;
+ const undone=info({},2);assert.equal(Files.refreshLayerTable(root,undone),true);
+ assert.deepEqual([root.state.totalFrames,root._totalF,root.state.waOut,root._waOut,root.state.currentFrame,root._curFrame],[21,21,20,20,20,20]);
+ assert.equal(Files.projectionReadyForUI(root,undone),true);
+ assert.equal(root.state.layers,rows);assert.equal(rows[0],row);assert.equal(root._layerSel,selected);
+ const redone=info({totalFrames:30,waOut:29},3);assert.equal(Files.refreshLayerTable(root,redone),true);
+ assert.equal(Files.projectionReadyForUI(root,redone),true);assert.equal(root.state.currentFrame,20);
+});
+test('duration publication rejects stale/foreign/malformed metadata and prior UI-duration drift without mutation',()=>{
+ for(const values of [{totalFrames:30,contentRevision:-1},{totalFrames:30,documentId:'other'},
+   {totalFrames:30,lifecycleGeneration:2}]){
+  const root=rootView(),before=JSON.stringify(root.state);
+  assert.equal(Files.refreshLayerTable(root,info(values,1)),false);assert.equal(JSON.stringify(root.state),before);
+ }
+ for(const totalFrames of [0,-1,1.5,Infinity]){
+  const root=rootView(),before=JSON.stringify(root.state);
+  assert.throws(()=>Files.refreshLayerTable(root,info({totalFrames},1)),/settings/);assert.equal(JSON.stringify(root.state),before);
+ }
+ const root=rootView();root.state.totalFrames=22;const before=JSON.stringify(root.state);
+ assert.equal(Files.refreshLayerTable(root,info({totalFrames:30},1)),false);assert.equal(JSON.stringify(root.state),before);
 });
 test('malformed/nonfinite optional settings or FPS refuse before session and projectView publication',async()=>{
  const invalid=[{fps:0},{fps:-1},{fps:Infinity},{fps:NaN},{fps:'24'},{fps:null},{canvasBg:null},{canvasBg:'#abcd'},

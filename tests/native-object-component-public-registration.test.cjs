@@ -32,11 +32,8 @@ function assertBootstrap(html) {
 }
 
 test('the two capability descriptors are embedded exactly once and declare six unique operations', () => {
-  const rust = read('nemo-mcp/src/capabilities.rs');
-  const start = rust.indexOf('pub const NATIVE_CAPABILITY_SOURCES:');
-  assert.ok(start >= 0);
-  const block = rust.slice(start, rust.indexOf('];', start));
-  const sources = [...block.matchAll(/include_str!\s*\(\s*"([^"]+)"\s*\)/g)].map((match) => match[1]);
+  // CS1/#2341: nemo-mcp/build.rs discovers capabilities-v2/*.json; read the same set.
+  const sources = require('../scripts/nemo/lib/capability-drift.cjs').nativeDescriptorFiles().map((file) => '../../engineering/application/capabilities-v2/' + path.basename(file));
   for (const family of FAMILIES) {
     const relative = '../../engineering/application/capabilities-v2/native-object-' + family + '.json';
     assert.equal(sources.filter((source) => source === relative).length, 1, family);
@@ -75,7 +72,7 @@ test('the Rust contract and its two test children are members of the MCP transpo
   const contract = read('nemo-mcp/src/native_contract.rs');
   assert.equal(contract.split('pub(crate) mod object_component;').length - 1, 1);
   assert.match(contract, /op if object_component::admitted\(op\) => object_component::request\(op, payload\)/);
-  assert.match(contract, /if object_component::admitted\(operation\) \{\s+return object_component::result\(operation, result\);/);
+  assert.match(contract, /op if object_component::admitted\(op\) => \|o, _, _, r\| object_component::result\(o, r\),/);
   assert.match(read('nemo-mcp/src/wire.rs'), /object_component::response_matches\(request, response\)/);
   assert.match(read('nemo-mcp/src/native_request_input.rs'), /native component command requires expectedRevision/);
 });

@@ -94,6 +94,7 @@
     unavailableInspector(root,ports,info);return true;
   }
   function restoreInspector(root){
+    if(root.NemoNativeFrameCellSelection)root.NemoNativeFrameCellSelection.retire(root);
     if(root.NemoNativeLayerRangeDesktop)root.NemoNativeLayerRangeDesktop.retire(root);
     retireMotion(root);
     retirePolicy(root);
@@ -119,6 +120,14 @@
     if(prior.section.parentNode===prior.panel)prior.panel.removeChild(prior.section);
     inspectors.delete(root);
   }
+  function isFrameSelectionPending(root){var helper=root.NemoNativeFrameCellSelection;return !!(helper&&helper.isPending(root));}
+  function showRepeatDialog(root){
+    try{var helper=root.NemoNativeFrameCellSelection,controller=root.NemoNativeFrameEditController;
+    if(!helper||typeof helper.openRepeatDialog!=='function'||!controller||typeof controller.routeWriter!=='function'||!root.SM||typeof root.SM.repeatSelection!=='function')return false;
+    var sm=root.SM,writer=sm.repeatSelection;return helper.openRepeatDialog(root,function(value){return writer.call(sm,value);},
+      function(){return root.NemoNativeFrameEditController===controller&&root.SM===sm&&sm.repeatSelection===writer;});
+    }catch(_){return false;}
+  }
   function settingsInspector(root,prior,ports,info){
     var controller=ports&&typeof ports.projectSettings==='function'&&ports.projectSettings();
     if(!controller||typeof controller.edit!=='function')return;
@@ -132,12 +141,21 @@
         var label=createNativeObjectUiText(root,'span',entry[1]);label.className='pl';row.appendChild(label);
         var saved={node:node,parent:parent,marker:marker,hidden:node.hidden,display:node.style.display,pointer:node.style.pointerEvents,events:[],gesture:null};
         parent.insertBefore(marker,node);row.appendChild(node);node.hidden=false;node.style.display='';box.appendChild(row);prior.settings.moves.push(saved);
-        function begin(){saved.gesture=Object.assign({},prior.settings.pin);}
-        function guard(event){var dimension=entry[0]==='p-cw'||entry[0]==='p-ch',value=Number(node.value);
+        function observe(event,sourceEvent){
+          try{var diagnostic=root.NemoNativeObjectProjectDesktop;if(diagnostic&&diagnostic.settingsDiagnostic){
+            var session=ports.currentSession();diagnostic.settingsDiagnostic(root,event,Object.assign({},session&&session.info(),{
+              field:entry[0],sourceEvent:sourceEvent,gestureDocumentId:saved.gesture&&saved.gesture.documentId,
+              gestureLifecycleGeneration:saved.gesture&&saved.gesture.lifecycleGeneration,
+              kind:entry[0]==='p-cw'||entry[0]==='p-ch'?'setCanvasSize':entry[0]==='proj-fps'?'setFps':entry[0]==='p-cbg'?'setCanvasBackground':undefined}));}}catch(_){}
+        }
+        function begin(event){saved.gesture=Object.assign({},prior.settings.pin);observe(event&&event.type);}
+        function guard(event){var dimension=entry[0]==='p-cw'||entry[0]==='p-ch',value=Number(node.value);observe(event.type);
           var invalid=dimension&&(!Number.isInteger(value)||value<1||value>4294967295||parseInt(node.value,10)!==value);
-          if(invalid||saved.gesture&&!['instanceId','documentId','lifecycleGeneration'].every(function(k){return saved.gesture[k]===prior.settings.pin[k];})){
+          var stale=saved.gesture&&!['instanceId','documentId','lifecycleGeneration'].every(function(k){return saved.gesture[k]===prior.settings.pin[k];});
+          if(stale)observe('stale-rejected',event.type);
+          if(invalid||stale){
           if(event.preventDefault)event.preventDefault();if(event.stopImmediatePropagation)event.stopImmediatePropagation();}}
-        [['pointerdown',begin,true],['focus',begin,true],['input',guard,true],['change',guard,true]].forEach(function(args){node.addEventListener.apply(node,args);saved.events.push(args);});
+        [['pointerdown',begin,true],['focus',begin,true],['blur',function(){observe('blur');},true],['input',guard,true],['change',guard,true]].forEach(function(args){node.addEventListener.apply(node,args);saved.events.push(args);});
         if(entry[0]==='p-cbg'){
           var wrap=createNativeObjectUiText(root,'div','');wrap.id='native-project-background';wrap.className='color-well';row.insertBefore(wrap,node);wrap.appendChild(node);
           wrap.addEventListener('pointerdown',begin,true);prior.settings.bg=wrap;
@@ -147,6 +165,7 @@
     }
     var before=prior.settings.pin,changed=before&&!['instanceId','documentId','lifecycleGeneration'].every(function(k){return before[k]===info[k];});
     prior.settings.pin={instanceId:info.instanceId,documentId:info.documentId,lifecycleGeneration:info.lifecycleGeneration};
+    if(changed){try{var diagnostic=root.NemoNativeObjectProjectDesktop;if(diagnostic&&diagnostic.settingsDiagnostic)diagnostic.settingsDiagnostic(root,'owner',info);}catch(_){}}
     if(changed){if(root.ColorPicker&&root.ColorPicker.close)root.ColorPicker.close();prior.settings.moves.forEach(function(saved){if(root.document.activeElement===saved.node&&saved.node.blur)saved.node.blur();});}
     prior.settings.ownerChanged=!!changed;
   }
@@ -288,6 +307,8 @@
     if(root.NemoNativeLayerRangeDesktop&&typeof root.NemoNativeLayerRangeDesktop.mount==='function')
       root.NemoNativeLayerRangeDesktop.mount(root,grid,info,Object.assign({},ports,{setKeyTimelineRows:function(layout,expected){return setKeyTimelineRows(root,layout,expected);},readMotionKeyTimelines:function(expected){return readMotionKeyTimelines(root,expected);},readMotionKeyTimeline:function(expected){return readMotionKeyTimeline(root,expected);},readSelectedMotionKeys:function(expected){return readSelectedMotionKeys(root,expected);},readLegacyMotionSelection:function(){var motion=root.SMMotion;return motion&&typeof motion.getKeySelection==='function'?motion.getKeySelection():null;},barUi:root.SMLayerInOut}));
     caption.textContent='Frame '+(root.state.currentFrame+1)+' / '+info.totalFrames;
+    if(root.NemoNativeFrameCellSelection)root.NemoNativeFrameCellSelection.mount(root,caption,info,Object.assign({},ports,{
+      frameEditPending:function(){var controller=root.NemoNativeFrameEditController;return !!(controller&&controller.isPending());}}));
     unavailableInspector(root,ports,info);
     if(!reuse){var pin={};['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].forEach(function(k){pin[k]=info[k];});
       views.set(root,{list:list,header:header,grid:grid,inspector:root.document.getElementById('props-panel'),rows:rows,
@@ -477,5 +498,5 @@
     catch(error){root.state.activeLayerIdx=old.active;root._layerSel=old.selection;root._layerSelAnchor=old.anchor;
       root.selectedPaths=old.paths;root.state.selectedStrokeIndices=old.indices;root._layerActiveExplicit=old.explicit;throw error;}
   }
-  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,readImageMeshSelection:readImageMeshSelection,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,refreshTiming:refreshTiming,setLayerPolicy:setLayerPolicy,retirePolicy:retirePolicy,bindLayerPolicy:bindLayerPolicy,refreshPolicy:refreshPolicy,createPolicyPorts:createPolicyPorts,bindMotion:bindMotion,readSelectedMotionKeys:readSelectedMotionKeys,paintMotionInspector:paintMotionInspector,routeMotionShortcut:routeMotionShortcut});
+  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,readImageMeshSelection:readImageMeshSelection,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,isFrameSelectionPending:isFrameSelectionPending,showRepeatDialog:showRepeatDialog,refreshTiming:refreshTiming,setLayerPolicy:setLayerPolicy,retirePolicy:retirePolicy,bindLayerPolicy:bindLayerPolicy,refreshPolicy:refreshPolicy,createPolicyPorts:createPolicyPorts,bindMotion:bindMotion,readSelectedMotionKeys:readSelectedMotionKeys,paintMotionInspector:paintMotionInspector,routeMotionShortcut:routeMotionShortcut});
 }));

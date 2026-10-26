@@ -47,6 +47,9 @@ pub(crate) mod object_component_exposed_apply;
 #[path = "object_component_exposed_key.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_component_exposed_key;
+#[path = "object_component_override_port.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_component_override_port;
 
 #[path = "object_duplicator_evaluate.rs"]
 #[allow(dead_code)]

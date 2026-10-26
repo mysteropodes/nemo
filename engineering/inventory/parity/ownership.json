@@ -1,0 +1,447 @@
+{
+  "schema": "nemo.parity-ownership/1",
+  "curation": "first-pass agent research 2026-10-25 (CS8 #2349): issues that own a task without declaring its ID; medium/low entries need human confirmation",
+  "tasks": {
+    "D03": [
+      {
+        "issue": 2272,
+        "confidence": "medium",
+        "evidence": "#2272 retained checked activation; close semantics partly #1925/#1645"
+      }
+    ],
+    "D04": [
+      {
+        "issue": 2014,
+        "confidence": "medium",
+        "evidence": "#2014 start-screen bindings, #1970 recents extraction; autosave corruption unverified"
+      }
+    ],
+    "D05": [
+      {
+        "issue": 1647,
+        "confidence": "medium",
+        "evidence": "#1647/#1627 native version History and Restore"
+      }
+    ],
+    "D06": [
+      {
+        "issue": 2355,
+        "confidence": "low",
+        "evidence": "#2355 replaces the shared-merge writer (SM.mergeRemoteSnapshot) with native-snapshot merge; confirm scope covers publish/pull"
+      }
+    ],
+    "D07": [
+      {
+        "issue": 1577,
+        "confidence": "medium",
+        "evidence": "#1577 timed autosave native-owned; #1721 autosave guard"
+      }
+    ],
+    "D08": [
+      {
+        "issue": 2256,
+        "confidence": "low",
+        "evidence": "#2256 context enter/exit adapters; cross-context history routing not explicit"
+      }
+    ],
+    "D09": [
+      {
+        "issue": 1647,
+        "confidence": "medium",
+        "evidence": "#1647 presents native History panel; immutable query seam inferred"
+      }
+    ],
+    "D10": [
+      {
+        "issue": 2068,
+        "confidence": "high",
+        "evidence": "#2068 typed property metadata and stable holders; #2099 metadata query"
+      }
+    ],
+    "D11": [
+      {
+        "issue": 2077,
+        "confidence": "high",
+        "evidence": "#2077 native raw sampling and reversible property edits"
+      }
+    ],
+    "D13": [
+      {
+        "issue": 2202,
+        "confidence": "low",
+        "evidence": "#2202 retime/ripple, #2245 property-track paste; batch collision/stagger not explicit"
+      }
+    ],
+    "D14": [
+      {
+        "issue": 2088,
+        "confidence": "low",
+        "evidence": "#2088 typed guest expression eval runtime; async-job lifecycle not explicit"
+      }
+    ],
+    "D17": [
+      {
+        "issue": 2076,
+        "confidence": "medium",
+        "evidence": "#2076 immutable native expression context provider (comp/self views)"
+      }
+    ],
+    "D27": [
+      {
+        "issue": 2246,
+        "confidence": "medium",
+        "evidence": "#2246 layer range/marker/time-link records, #2133 range shift kernel"
+      }
+    ],
+    "D29": [
+      {
+        "issue": 2256,
+        "confidence": "medium",
+        "evidence": "#2256 native component adapters, #2225/#2243 resolver/evaluation joins"
+      }
+    ],
+    "F14": [
+      {
+        "issue": 2225,
+        "confidence": "high",
+        "evidence": "#2225 stable nested-context resolver and object target resolution (hint)"
+      }
+    ],
+    "F20": [
+      {
+        "issue": 2272,
+        "confidence": "high",
+        "evidence": "#2272 per-project history through retained activation; #1917 inactive snapshot"
+      }
+    ],
+    "G20": [
+      {
+        "issue": 2234,
+        "confidence": "medium",
+        "evidence": "#2234 L02-J adapters selection/clipboard intents (G24,G19); #2222 body mentions G20"
+      }
+    ],
+    "G29": [
+      {
+        "issue": 2240,
+        "confidence": "low",
+        "evidence": "#2240 L06-M media import to native asset attach; legacy media-library.js not reconnected"
+      }
+    ],
+    "G31": [
+      {
+        "issue": 2359,
+        "confidence": "medium",
+        "evidence": "#2359 CS8-MEDIA native video-layer family consumer joins; cites G28,G30,G32"
+      }
+    ],
+    "G34": [
+      {
+        "issue": 1864,
+        "confidence": "medium",
+        "evidence": "#1864 P37C1-DESKTOP still-reference attach/save/reopen/viewport workflow"
+      }
+    ],
+    "G40": [
+      {
+        "issue": 2255,
+        "confidence": "medium",
+        "evidence": "#2255 L03-T mesh, widget and rig command adapters (F17-F19, I11-I13)"
+      }
+    ],
+    "I06": [
+      {
+        "issue": 2153,
+        "confidence": "medium",
+        "evidence": "#2153 dupMatrixFromDescriptor/hexHueRotate/applyMat helpers; #2075 affine provider"
+      }
+    ],
+    "I10": [
+      {
+        "issue": 2244,
+        "confidence": "high",
+        "evidence": "#2244 L04-M setup and convert transactions (hint)"
+      }
+    ],
+    "I26": [
+      {
+        "issue": 2364,
+        "confidence": "medium",
+        "evidence": "#2364 CS4b declaration-driven allowlist/dead facade removal (hint)"
+      }
+    ],
+    "I37": [
+      {
+        "issue": 2219,
+        "confidence": "medium",
+        "evidence": "#2219 atomic import transaction; transplant not named"
+      }
+    ],
+    "I38": [
+      {
+        "issue": 1685,
+        "confidence": "low",
+        "evidence": "#1685/#1680 tutorial targets and first-launch tutorial; lesson drivers not explicit"
+      }
+    ],
+    "I47": [
+      {
+        "issue": 1005,
+        "confidence": "medium",
+        "evidence": "#1005 P03 combined census/scope admission and reconciliation (hint)"
+      }
+    ],
+    "I48": [
+      {
+        "issue": 1005,
+        "confidence": "medium",
+        "evidence": "#1005 P03 combined census/scope admission and reconciliation (hint)"
+      }
+    ],
+    "I49": [
+      {
+        "issue": 1005,
+        "confidence": "medium",
+        "evidence": "#1005 P03 combined census/scope admission and reconciliation (hint)"
+      }
+    ],
+    "I50": [
+      {
+        "issue": 1005,
+        "confidence": "high",
+        "evidence": "#1005 P03 combined census/scope admission and reconciliation (hint)"
+      }
+    ],
+    "I53": [
+      {
+        "issue": 2355,
+        "confidence": "low",
+        "evidence": "#2355 shared-merge writers behind snapshots; revision ghosts not explicit"
+      }
+    ],
+    "U08": [
+      {
+        "issue": 2058,
+        "confidence": "high",
+        "evidence": "#2058 T02-TIMING-UI selected-layer timing presenter"
+      }
+    ],
+    "U09": [
+      {
+        "issue": 2248,
+        "confidence": "medium",
+        "evidence": "#2248 L05-K frame/key/clipboard/repeat consumer exit, F09-F13"
+      }
+    ],
+    "U10": [
+      {
+        "issue": 2234,
+        "confidence": "medium",
+        "evidence": "#2234 L02-J group/lifecycle/selection intents adapters; duplicate/split callers"
+      }
+    ],
+    "U21": [
+      {
+        "issue": 2267,
+        "confidence": "medium",
+        "evidence": "#2267 L06-M3 ordinary Text tool and editor placement/edit"
+      }
+    ],
+    "U22": [
+      {
+        "issue": 2267,
+        "confidence": "medium",
+        "evidence": "#2267 L06-M3 text/font/size/alignment editing via native text transactions; parent #2240"
+      }
+    ],
+    "U23": [
+      {
+        "issue": 2256,
+        "confidence": "medium",
+        "evidence": "#2256 L04-N native component adapters; footage/lip-sync not cited"
+      }
+    ],
+    "U24": [
+      {
+        "issue": 2256,
+        "confidence": "medium",
+        "evidence": "#2256 L04-N component/duplicator adapters"
+      }
+    ],
+    "U25": [
+      {
+        "issue": 2255,
+        "confidence": "low",
+        "evidence": "#2255 L03-T rig adapters; combine-group, motion-blur, shy not cited"
+      }
+    ],
+    "U26": [
+      {
+        "issue": 2355,
+        "confidence": "low",
+        "evidence": "#2355 CS8-WRITERS retires legacy serialization writers behind native snapshots"
+      }
+    ],
+    "U33": [
+      {
+        "issue": 2362,
+        "confidence": "low",
+        "evidence": "#2362 CS8-LABS routes persistent Labs operations natively; cites U36 only"
+      }
+    ],
+    "U34": [
+      {
+        "issue": 2362,
+        "confidence": "low",
+        "evidence": "#2362 CS8-LABS routes persistent Labs operations natively; cites U36 only"
+      }
+    ],
+    "U35": [
+      {
+        "issue": 2248,
+        "confidence": "low",
+        "evidence": "#2248 L05-K maps retime/extend/duplicate shortcuts (F9-F13); no Labs ping-pong cited"
+      }
+    ],
+    "X01": [
+      {
+        "issue": 2050,
+        "confidence": "medium",
+        "evidence": "#2050 T03-HELD-EXPOSURE frozen integration review/publish"
+      }
+    ],
+    "X02": [
+      {
+        "issue": 2050,
+        "confidence": "medium",
+        "evidence": "#2050 held-frame native/GPU/PNG gates"
+      }
+    ],
+    "X03": [
+      {
+        "issue": 2050,
+        "confidence": "medium",
+        "evidence": "PR #2052 merge/release for #2050"
+      }
+    ],
+    "X04": [
+      {
+        "issue": 2058,
+        "confidence": "medium",
+        "evidence": "#2058 timing UI review, PR #2060"
+      }
+    ],
+    "X05": [
+      {
+        "issue": 2058,
+        "confidence": "medium",
+        "evidence": "#2058 final timing UI checks"
+      }
+    ],
+    "X06": [
+      {
+        "issue": 2058,
+        "confidence": "medium",
+        "evidence": "PR #2060 integrate/release for #2058"
+      }
+    ],
+    "X07": [
+      {
+        "issue": 2056,
+        "confidence": "high",
+        "evidence": "#2056 regenerate canonical fixtures with authored timing; #1959 PNG fixture"
+      }
+    ],
+    "X08": [
+      {
+        "issue": 1959,
+        "confidence": "low",
+        "evidence": "#1959 ordinary picker method; #1573/#1864 prior refusals"
+      }
+    ],
+    "X09": [
+      {
+        "issue": 2368,
+        "confidence": "low",
+        "evidence": "combined candidate builds precede final promotion #2368; no dedicated candidate-qualification issue (review fix)"
+      }
+    ],
+    "X10": [
+      {
+        "issue": 1645,
+        "confidence": "high",
+        "evidence": "#1645 P38 populated-tab guard; #2272 retained activation"
+      }
+    ],
+    "X11": [
+      {
+        "issue": 1959,
+        "confidence": "high",
+        "evidence": "#1959 ordinary installed two-frame PNG export UI"
+      }
+    ],
+    "X12": [
+      {
+        "issue": 1573,
+        "confidence": "high",
+        "evidence": "#1573 resume native viewport after occlusion (playback minimize/restore)"
+      }
+    ],
+    "X13": [
+      {
+        "issue": 1864,
+        "confidence": "high",
+        "evidence": "#1864 ordinary still-reference attach/save/reopen/viewport"
+      }
+    ],
+    "X14": [
+      {
+        "issue": 1996,
+        "confidence": "medium",
+        "evidence": "#1996 eye control acceptance, #2058 timing UI"
+      }
+    ],
+    "X15": [
+      {
+        "issue": 1049,
+        "confidence": "high",
+        "evidence": "#1049 installed Codex workflow; #1648 common client"
+      }
+    ],
+    "X16": [
+      {
+        "issue": 1005,
+        "confidence": "medium",
+        "evidence": "#1005 P03 field/consumer reconciliation"
+      }
+    ],
+    "X17": [
+      {
+        "issue": 2346,
+        "confidence": "medium",
+        "evidence": "CS6 #2346 part 2 runs the per-family native acceptance commands (cross-family regression matrix) (review fix)"
+      }
+    ],
+    "X18": [
+      {
+        "issue": 2348,
+        "confidence": "medium",
+        "evidence": "#2348 CS7 batched installed-run driver for all Ready matrix rows"
+      }
+    ],
+    "X20": [
+      {
+        "issue": 1035,
+        "confidence": "low",
+        "evidence": "#1035 P33 final policy/coverage acceptance"
+      }
+    ],
+    "X22": [
+      {
+        "issue": 1035,
+        "confidence": "high",
+        "evidence": "#1035 P33 accepts census mapping against integrated evidence"
+      }
+    ]
+  }
+}

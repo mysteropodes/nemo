@@ -10,7 +10,7 @@ use native_engine::{
     compositor::Compositor,
     desktop_viewport::{
         DesktopViewportHost, ObjectPresentedFrame, ObjectPreviewNavigation, ObjectPreviewView,
-        ObjectViewProjection, SurfacePort,
+        ObjectViewProjection, SurfacePort, ViewportDisplayFilter,
     },
     object_document::FrameScopeKind,
     object_frame_packet::ObjectFrameSelector,
@@ -25,6 +25,7 @@ pub(crate) struct ObjectPreviewReceipt {
     #[serde(flatten)]
     pub(crate) preview: NativePreviewReceipt,
     pub(crate) view: ObjectViewProjection,
+    pub(crate) display_filter: ViewportDisplayFilter,
 }
 impl std::ops::Deref for ObjectPreviewReceipt {
     type Target = NativePreviewReceipt;
@@ -74,6 +75,8 @@ pub(crate) struct ObjectPreviewRequest {
     pub(crate) view_mode: ObjectPreviewView,
     #[serde(default)]
     pub(crate) navigation: ObjectPreviewNavigation,
+    #[serde(default)]
+    pub(crate) display_filter: ViewportDisplayFilter,
     pub(crate) revision_sync: Option<PreviewRevisionProof>,
     #[serde(default)]
     pub(crate) cancelled_before_dispatch: bool,
@@ -162,6 +165,7 @@ pub(crate) fn admit_request(raw: &str, instance: &str) -> HostResult<ObjectPrevi
 pub(crate) struct ObjectPreviewConsumer<'a> {
     owner: &'a mut NativeObjectHost,
     selector: ObjectFrameSelector<'a>,
+    display_filter: ViewportDisplayFilter,
 }
 impl ObjectPreviewConsumer<'_> {
     pub(crate) fn present<P: SurfacePort>(
@@ -169,8 +173,12 @@ impl ObjectPreviewConsumer<'_> {
         compositor: &mut Compositor,
         viewport: &mut DesktopViewportHost<P>,
     ) -> Result<ObjectPresentedFrame, String> {
-        self.owner
-            .present_prepared_object_preview_view(&self.selector, compositor, viewport)
+        self.owner.present_prepared_object_preview_filtered(
+            &self.selector,
+            compositor,
+            viewport,
+            self.display_filter,
+        )
     }
 }
 impl NativeViewportConsumer for ObjectPreviewConsumer<'_> {
@@ -215,6 +223,7 @@ pub(crate) fn preview_with_target(
                     Ok(target(ObjectPreviewConsumer {
                         owner,
                         selector: selector.clone(),
+                        display_filter: request.display_filter,
                     }))
                 };
                 owner.with_prepared_object_preview_for_navigation(
@@ -235,6 +244,7 @@ pub(crate) fn preview_with_target(
             status: viewport_host::status_label(receipt.receipt.status()),
         },
         view: receipt.view,
+        display_filter: request.display_filter,
     })
 }
 

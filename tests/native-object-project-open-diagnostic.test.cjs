@@ -6,6 +6,49 @@ const Project=require('../src/js/adapters/native-object-project.js');
 const Workflow=require('../src/js/application/native-object-save-as-workflow.js');
 const Ack=require('../src/js/application/native-object-saved-acknowledgement.js');
 const turn=()=>new Promise(setImmediate);
+test('settings chronology is bounded, correlated, sanitized and independent of the Open ring',async()=>{
+  const files=new Map(),writes=[],root={__TAURI__:{path:{appDataDir:async()=>'/isolated/'},fs:{mkdir:async()=>{},
+    writeTextFile:async(path,bytes)=>{files.set(path,bytes);writes.push(path);},
+    rename:async(from,to)=>{files.set(to,files.get(from));files.delete(from);}}}};
+  const pin={instanceId:'41fe5026-a1ec-4a5d-9cbd-e88d5860402e',documentId:'native-object-document-2',
+    documentSnapshotId:'native-object:native-object-document-2:9',contentRevision:9,lifecycleGeneration:2};
+  Desktop.settingsDiagnostic(root,'input',{...pin,kind:'setCanvasSize'});
+  Desktop.settingsDiagnostic(root,'dispatch',{...pin,requestId:'project-project-settings-7',expectedRevision:9,kind:'setCanvasSize'});
+  Desktop.settingsDiagnostic(root,'change',{...pin,kind:'setCanvasSize'});
+  Desktop.settingsDiagnostic(root,'metadata',{...pin,contentRevision:10});
+  Desktop.settingsDiagnostic(root,'acknowledged',{...pin,fromRevision:9,toRevision:10});
+  await turn();const file='/isolated/diagnostics/native-settings.json',first=JSON.parse(files.get(file));
+  assert.deepEqual(first.events.map(row=>row.event),['input','dispatch','change','metadata','acknowledged']);
+  assert.deepEqual(first.events.map(row=>row.sequence),[1,2,3,4,5]);
+  assert.equal(first.events[1].requestId,'project-project-settings-7');assert.equal(first.events[4].toRevision,10);
+  for(let i=0;i<150;i++)Desktop.openDiagnostic(root,'camera-presented','canvas');
+  await turn();assert.equal(files.get(file),JSON.stringify(first));
+  let getterCalls=0;const hostile={get documentId(){getterCalls++;throw Error('PRIVATE');},instanceId:'/Users/private',
+    documentSnapshotId:'private document',requestId:'PRIVATE PATH',kind:'PRIVATE',status:'PRIVATE',contentRevision:NaN};
+  for(let i=0;i<150;i++)Desktop.settingsDiagnostic(root,'outcome',hostile);
+  Desktop.settingsDiagnostic(root,'PRIVATE EVENT',hostile);await turn();
+  const last=files.get(file),value=JSON.parse(last);assert.equal(value.events.length,128);assert.equal(value.events.at(-1).sequence,155);
+  assert.equal(getterCalls,0);assert.doesNotMatch(last,/PRIVATE|Users|private document/);
+  assert.ok(writes.every(path=>path.endsWith('.pending.json')));
+});
+test('settings diagnostic missing, failing and hung sinks never delay or throw to the caller',async()=>{
+  for(const fail of['missing','throw','reject','hang']){
+    let writes=0;const root=fail==='missing'?{}:{__TAURI__:{path:{appDataDir:async()=>'/isolated'},fs:{mkdir:async()=>{},
+      writeTextFile(){writes++;if(fail==='throw')throw Error('PRIVATE');if(fail==='reject')return Promise.reject(Error('PRIVATE'));return new Promise(()=>{});},rename:async()=>{}}}};
+    for(let i=0;i<200;i++)assert.equal(Desktop.settingsDiagnostic(root,'intent',{kind:'setFps'}),undefined);
+    await turn();assert.equal(writes,fail==='missing'?0:1);
+  }
+});
+test('stale change diagnostics retain the old gesture and current owner without arbitrary fields',async()=>{
+  let bytes;const root={__TAURI__:{path:{appDataDir:async()=>'/isolated'},fs:{mkdir:async()=>{},
+    writeTextFile:async(_path,value)=>{bytes=value;},rename:async()=>{}}}};
+  Desktop.settingsDiagnostic(root,'stale-rejected',{field:'proj-fps',sourceEvent:'change',documentId:'native-object-document-2',
+    lifecycleGeneration:2,gestureDocumentId:'native-object-document-1',gestureLifecycleGeneration:1,value:'PRIVATE',secret:'PRIVATE'});
+  await turn();const row=JSON.parse(bytes).events[0];
+  assert.equal(row.documentId,'native-object-document-2');assert.equal(row.gestureDocumentId,'native-object-document-1');
+  assert.equal(row.lifecycleGeneration,2);assert.equal(row.gestureLifecycleGeneration,1);assert.equal(row.sourceEvent,'change');
+  assert.equal(row.field,'proj-fps');assert.doesNotMatch(bytes,/PRIVATE|secret/);
+});
 function fixture(mode){
   let installed=false,previews=0,visible=true,pendingBytes=null;
   const writes=[],commands=[],effects=[],notices=[];
@@ -107,6 +150,40 @@ test('safe fixture observer remains optional and receives the existing bootstrap
   assert.equal(await f.ui.openPath('/x'),true);
   assert.deepEqual(observed.filter(e=>e[0].startsWith('bootstrap')).map(e=>e[0]),['bootstrap-dispatched','bootstrap-resolved']);
 });
+test('revision diagnostic storage and observer admit only closed stage and failure codes',async()=>{
+  const f=fixture(),observed=[];f.root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__=(event,code)=>observed.push([event,code]);
+  const accepted=[['revision-stage','final-projection'],['revision-failed','present:local-refusal:unknown:status-deferred-occluded'],
+    ['revision-failed','inspect:invoke-rejected:unavailable:none']];
+  const refused=[['revision-stage','PRIVATE /Users/secret'],['revision-failed','PRIVATE:local-refusal:unknown:none'],
+    ['revision-failed','present:PRIVATE:unknown:none'],['revision-failed','present:local-refusal:PRIVATE:none'],
+    ['revision-failed','present:local-refusal:unknown:PRIVATE'],['revision-failed','present:local-refusal:unknown:none:PRIVATE']];
+  for(const [event,code]of [...accepted,...refused])Desktop.openDiagnostic(f.root,event,code);
+  const events=await f.records();
+  assert.deepEqual(events.map(e=>[e.event,e.code]),[...accepted,...refused.map(([event])=>[event,'unknown'])]);
+  assert.deepEqual(observed,events.map(e=>[e.event,e.code]));
+  assert.doesNotMatch(JSON.stringify(events),/PRIVATE|Users|secret/);
+});
+test('attempt observer preserves invoke arguments, values and exact errors across stage retirement',async()=>{
+  let open=null,revision=null,result,thrown;const calls=[],events=[],details=new WeakMap();
+  const observer=Desktop.attemptObserver(function(){calls.push([...arguments]);if(thrown)throw thrown;return result;},
+    (event,code)=>events.push([event,code]),()=>open,()=>revision,details);
+  result={value:1};assert.strictEqual(observer.invoke('plain'),result);
+  const promise=Promise.resolve(result);result=promise;assert.strictEqual(observer.invoke('plain-promise',undefined),promise);
+  assert.deepEqual(calls,[['plain'],['plain-promise',undefined]]);
+  open={stage:'metadata',invokeErrors:new Set()};revision={stage:'inspect',invokeErrors:new Set()};
+  const error={code:'unavailable',message:'PRIVATE /secret',details:{disposition:'notDispatched'}};
+  thrown=error;assert.throws(()=>observer.invoke('sync'),caught=>caught===error);thrown=null;
+  observer.openFailure(open,error);assert.strictEqual(observer.revisionFailure(revision,error),error);
+  assert.deepEqual(events,[['post-bootstrap-failed','post-bootstrap-metadata:invoke-rejected:unavailable:notDispatched'],
+    ['revision-failed','inspect:invoke-rejected:unavailable:none']]);
+  let reject;result=new Promise((_,r)=>{reject=r;});const pending=observer.invoke('async');
+  observer.stage(open,'first-preview');observer.stage(revision,'present','revision-stage');
+  reject(error);await assert.rejects(pending,caught=>caught===error);
+  assert.equal(open.invokeErrors.size,0);assert.equal(revision.invokeErrors.size,0);
+  details.set(error,'status-deferred-occluded');observer.revisionFailure(revision,error);
+  assert.deepEqual(events.at(-1),['revision-failed','present:local-refusal:unavailable:status-deferred-occluded']);
+  assert.doesNotMatch(JSON.stringify(events),/PRIVATE|secret/);
+});
 test('file terminal records distinguish cancellation and pre-dispatch refusal without error text',async()=>{
   for(const mode of ['cancelled','refused']){
     const f=fixture(),error={message:'PRIVATE REFUSAL',details:{disposition:'notDispatched'}};
@@ -146,5 +223,26 @@ test('BPM entry refusal uses only fixed collector vocabulary and never records c
   assert.ok(records.every(record=>record.event==='bpm-settings-refused'));
   assert.deepEqual(observed.map(record=>record[1]),[...codes,'unknown','unknown','unknown']);
   assert.doesNotMatch(JSON.stringify(records),/PRIVATE|Users|secret|document-id|stack/);
+  assert.deepEqual(f.commands,[]);assert.deepEqual(f.effects,[]);
+});
+
+test('tab capture refusal records a bounded fixed vocabulary without caller or project detail',async()=>{
+  const f=fixture(),observed=[];
+  f.root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__=(event,code)=>observed.push([event,code]);
+  const codes=['inactive','synchronizing','subscription-inactive','presentation-missing','view-mismatch',
+    'owner-mismatch','queue-pending','capture-superseded','capture-unavailable','tab-unavailable','ui-changed'];
+  for(const code of codes)Desktop.openDiagnostic(f.root,'tab-capture-refused',code);
+  for(const code of ['PRIVATE /Users/secret/name.json',null,{documentId:'PRIVATE'}])
+    Desktop.openDiagnostic(f.root,'tab-capture-refused',code);
+  const records=await f.records();
+  assert.deepEqual(records.map(record=>record.code),[...codes,'unknown','unknown','unknown']);
+  assert.ok(records.every(record=>record.event==='tab-capture-refused'));
+  assert.deepEqual(observed.map(record=>record[1]),[...codes,'unknown','unknown','unknown']);
+  assert.doesNotMatch(JSON.stringify(records),/PRIVATE|Users|secret|name.json|documentId/);
+  for(let i=0;i<40;i++)Desktop.openDiagnostic(f.root,'tab-capture-refused','queue-pending');
+  assert.equal((await f.records()).length,32);
+  f.root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__=()=>{throw Error('PRIVATE observer failure');};
+  assert.doesNotThrow(()=>Desktop.openDiagnostic(f.root,'tab-capture-refused','ui-changed'));
+  assert.equal((await f.records()).at(-1).code,'ui-changed');
   assert.deepEqual(f.commands,[]);assert.deepEqual(f.effects,[]);
 });

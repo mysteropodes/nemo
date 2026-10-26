@@ -184,7 +184,12 @@ function manualBakeCache(){
     else showToast(SM.t('toastPlaybackCacheReady')+res.cached+' images)','success');
   });
 }
-function stopPlay(mode){if(!state.playing){if(nativePlayScheduler)nativePlayScheduler.stop();return;}state.playing=false;
+function stopPlay(mode){
+  var settings=window.NemoNativeProjectSettingsController;
+  if(mode!=='native-settings-intent'&&mode!=='native-settings-publication'&&settings&&settings.cancelPlaybackResume)settings.cancelPlaybackResume();
+  try{var diagnostics=window.NemoNativeObjectProjectDesktop,session=window.NemoNativeObjectProject&&window.NemoNativeObjectProject.desktop(window);
+    if(diagnostics&&diagnostics.settingsDiagnostic)diagnostics.settingsDiagnostic(window,'stop',Object.assign({},session&&session.info(),{kind:mode||'user',frame:state.currentFrame}));}catch(_){}
+  if(!state.playing){if(nativePlayScheduler)nativePlayScheduler.stop();return;}state.playing=false;
   try{var observer=window.NemoTestPlayObserver;if(observer)observer.playState(state.playing,state.currentFrame);}catch(_){}
   var nativeStop=nativePlayScheduler&&nativePlayScheduler.stop();
   if(playRaf){cancelAnimationFrame(playRaf);playRaf=null;}
@@ -200,7 +205,11 @@ function stopPlay(mode){if(!state.playing){if(nativePlayScheduler)nativePlaySche
   }
   if(mode==='native-settings-publication')return nativeStop;renderOS();renderArcs();updateUI();
 }
-function togglePlay(){if(state.playing)stopPlay();else startPlay();}
+function togglePlay(){
+  var settings=window.NemoNativeProjectSettingsController;
+  var pendingStop=settings&&settings.cancelPlaybackResume&&settings.cancelPlaybackResume();
+  if(state.playing||pendingStop)stopPlay();else startPlay();
+}
 
 // Keyframe diamonds (.motion-key/.km) land at frame*FC+FC/2 in Motion —
 // CSS flex justify-content:center inside `.fc`, no explicit JS positioning
@@ -8967,17 +8976,14 @@ else initFillGradientButton();
 function initCycleAndPropagate(){
   var cyc=document.getElementById('btn-cycle');
   if(cyc)cyc.addEventListener('click',function(){
-    // Check the precondition BEFORE asking the question (2026-07-25 UX audit).
-    // repeatSelection already refuses with a clear message when no frame range
-    // is selected — but the prompt ran first, so the user typed a count, hit
-    // OK, and only then learned they needed a selection. Worse, cancelling the
-    // prompt returned before repeatSelection ever ran, so clicking this button
-    // with nothing selected was completely silent. Same message, raised to the
-    // point where it's actually useful.
+    // Check selection first; native WKWebView needs the ordinary DOM count form.
     if(typeof selBounds==='function'&&!selBounds()){
       showToast(SM.t('toastSelectFrameRangeFirst'));
       return;
     }
+    var native=!!window.__TAURI__,project=window.NemoNativeObjectProject,session,cutover=window.NemoNativeOpacityCutover;
+    try{session=project&&project.desktop(window);native=native||!!(session&&(session.isActive()||session.blocksLegacy&&session.blocksLegacy())||cutover&&cutover.blocksLegacy&&cutover.blocksLegacy());}catch(_){native=true;}
+    if(native){if(!window.NemoNativeObjectUI||typeof window.NemoNativeObjectUI.showRepeatDialog!=='function'||!window.NemoNativeObjectUI.showRepeatDialog(window))showToast('Native Repeat input is unavailable.');return;}
     var n=prompt('Repeter la plage selectionnee combien de fois ?','2');
     if(n===null)return;
     window.SM.repeatSelection(n);

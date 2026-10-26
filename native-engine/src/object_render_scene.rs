@@ -11,6 +11,9 @@ pub(crate) mod component_scene;
 #[cfg(all(test, feature = "history"))]
 #[path = "../tests/object_component_render_scene.rs"]
 mod component_tests;
+#[cfg(all(test, feature = "history"))]
+#[path = "../tests/object_component_exposed_override.rs"]
+mod component_override_tests;
 
 use scene_effect_kernels::object_scene_resource_set::{
     same_scene_resources, SceneResourceMismatch,
@@ -62,6 +65,9 @@ mod paint;
 // L07-F (#2113): contour scene producer joined through the L07-C pin registry.
 #[path = "object_duplicator_scene.rs"]
 pub(crate) mod duplicator_scene;
+// L03-P (#2252): the single rig pose call site shared by the contour and raster joins.
+#[path = "object_rig_packet_pose.rs"]
+pub(crate) mod rig_packet_pose;
 #[path = "object_scene_producer_contour.rs"]
 mod object_scene_producer_contour;
 use object_scene_producer_contour::CompiledContour;

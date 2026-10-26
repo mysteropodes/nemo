@@ -309,6 +309,8 @@ fn cutting_nothing_and_pasting_nothing_publish_nothing() {
         frame: 0,
         records: Vec::new(),
         groups: crate::object_document::Presence::Missing,
+        rasters: crate::object_document::Presence::Missing,
+        source: crate::object_document::Presence::Missing,
     };
     assert_eq!(
         paste(&mut owner, &empty, &target("L1", 0, EditMode::Motion)),

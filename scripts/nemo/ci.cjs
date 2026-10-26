@@ -12,6 +12,7 @@ const { checkProfile } = require('./lib/boundaries.cjs');
 const { checkRustCrate } = require('./lib/boundaries-rust.cjs');
 const { checkSourceCoverage } = require('./lib/boundaries-coverage.cjs');
 const { discoverSourcePaths } = require('./lib/boundaries-discovery.cjs');
+const { checkCoverageFreeze, FROZEN } = require('./lib/boundaries-freeze.cjs');
 const { discoverRepositoryFiles } = require('./lib/boundaries-repository.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -24,7 +25,7 @@ const RUST_PROFILE = 'engineering/boundaries/profiles/rust.profile.json';
 // Rust crate edge policies (P12/#1014): one per crate whose intra-crate module graph is enforced.
 const RUST_CRATE_POLICIES = ['engineering/boundaries/profiles/geometry-wasm.edges.json', 'engineering/boundaries/profiles/nemo-desktop.edges.json', 'engineering/boundaries/profiles/native-engine.edges.json'];
 const LANES = ['quick', 'boundaries', 'surfaces'];
-const QUICK = ['doctor', 'check', 'test:unit', 'test:rust', 'test:rust-native-engine'];
+const QUICK = ['doctor', 'check', 'test:unit', 'test:rust', 'test:rust-native-engine', 'test:rust-mcp'];
 const SURFACES = ['test:integration', 'test:browser', 'test:rust-tauri', 'build:wasm', 'build:desktop', 'test:desktop'];
 
 function aggregate(needs) {
@@ -174,6 +175,11 @@ function verify(required, root = ROOT) {
     stderr: result.stderr || null };
 }
 
+// The base's frozen rust.coverage.json key list, or null before it existed.
+function baseFrozenKeys(base, root) {
+  try { return JSON.parse(git(['show', `${base}:${FROZEN}`], root)); } catch (_) { return null; }
+}
+
 function boundaries(base, root = ROOT) {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-ci-baseline-'));
   try {
@@ -189,10 +195,12 @@ function boundaries(base, root = ROOT) {
     const application = applicationBoundaries(base, scratch, root);
     const rust = rustBoundaries(root);
     const repository = discoverRepositoryFiles({ root });
-    const ok = repository.ok && toolingOk && (!application || application.ok) && (!rust || rust.ok);
-    return { ok, problems: ok ? [] : ['repository inventory, boundary checker, source coverage, current size, protected baseline ratchet, or Rust crate edges did not pass'],
+    const freeze = checkCoverageFreeze(root, { baseFrozen: baseFrozenKeys(base, root) });
+    const ok = repository.ok && (!freeze || freeze.ok) && toolingOk && (!application || application.ok) && (!rust || rust.ok);
+    const freezeProblems = (freeze?.violations || []).map((v) => v.message);
+    return { ok, problems: ok ? [] : ['repository inventory, boundary checker, source coverage, rust.coverage.json freeze, current size, protected baseline ratchet, or Rust crate edges did not pass', ...freezeProblems],
       baseline: { base: baseline.base, sourcePath: baseline.sourcePath, sha256: baseline.sha256 },
-      report: report || null, toolingSourceCoverage, application, rust, repository, stderr: result.stderr || null };
+      report: report || null, toolingSourceCoverage, application, rust, repository, freeze, stderr: result.stderr || null };
   } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 }
 

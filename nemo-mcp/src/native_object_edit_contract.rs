@@ -1,10 +1,12 @@
 //! L02-J closed public contract of the native object edit operations (layer lifecycle, groups, selection edit,
-//! clipboard paste, boolean). Pure shape and receipt validation: execution, storage, history and replay stay in
+//! clipboard copy/cut/paste, boolean). Pure shape and receipt validation: execution, storage, history and replay stay in
 //! the native owner. The table is mirrored by `src/js/adapters/native-object-edit-contract.js`.
 use crate::contract::{NativeApplicationRequest, NativeApplicationResponse};
 use crate::native_contract::{exact, object};
 use serde_json::Value;
 use std::collections::HashSet;
+#[path = "native_object_edit_clipboard.rs"]
+mod clipboard;
 #[path = "native_fill_trace_wire.rs"]
 mod fill;
 
@@ -38,8 +40,8 @@ enum K {
 }
 
 /// (operation suffix, command, "member:kind ..." in wire order). Every operation is a revisioned command; only a
-/// duplicate reports the identity it minted, every other receipt is the compact command result.
-static SPECS: [(&str, &str, &str); 18] = [
+/// duplicate names its minted identity; copy/cut carry a bounded clipboard; other receipts are compact.
+static SPECS: [(&str, &str, &str); 20] = [
     ("layer.delete", "object.layer.delete", "selection:selection"),
     (
         "layer.duplicate",
@@ -122,6 +124,8 @@ static SPECS: [(&str, &str, &str); 18] = [
         "layerUid:uid contextId:uid frame:frame groupId:uid",
     ),
     ("fill.trace","object.fill.trace","layerUid:uid contextId:uid frame:frame point:point color:color opacity:opacity remove:flag"),
+    ("clipboard.copy", "object.clipboard.copy", "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0"),
+    ("clipboard.cut", "object.clipboard.cut", "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0"),
 ];
 const PREFIX: &str = "command.document.object.";
 
@@ -206,51 +210,6 @@ fn footprint(value: &Value) -> bool {
     })
 }
 
-fn clip_record(value: &Value) -> bool {
-    exact(
-        value,
-        &["schemaVersion", "family", "target", "geometry"],
-        &["fill", "vector", "vectorExt"],
-    )
-    .is_some_and(|record| {
-        record.get("target").is_some_and(|target| {
-            exact(
-                target,
-                &["contextId", "frameScope", "layerUid", "strokeId"],
-                &[],
-            )
-            .is_some_and(|target| {
-                target
-                    .get("frameScope")
-                    .is_some_and(|scope| exact(scope, &["kind", "frame"], &[]).is_some())
-            })
-        }) && record.get("geometry").is_some_and(Value::is_object)
-    })
-}
-
-/// Bounded structural pre-check; the native owner re-validates every record.
-fn clip(value: &Value) -> bool {
-    exact(
-        value,
-        &["contextId", "layerUid", "frame", "records"],
-        &["groups"],
-    )
-    .is_some_and(|object| {
-        object.get("contextId").is_some_and(uid)
-            && object.get("layerUid").is_some_and(uid)
-            && object.get("frame").is_some_and(frame)
-            && object
-                .get("records")
-                .and_then(Value::as_array)
-                .is_some_and(|records| {
-                    records.len() <= MAX_ITEMS && records.iter().all(clip_record)
-                })
-            && object.get("groups").is_none_or(|groups| {
-                exact(groups, &["contextId", "entries", "members"], &[]).is_some()
-            })
-    })
-}
-
 fn kind(token: &str) -> Option<K> {
     Some(match token {
         "uid" => K::Uid,
@@ -302,7 +261,7 @@ fn check(kind: K, value: &Value) -> bool {
             .as_str()
             .is_some_and(|mode| matches!(mode, "animation2d" | "motion")),
         K::Labels => labels(value),
-        K::Clip => clip(value),
+        K::Clip => clipboard::clip(value),
         K::Footprint => footprint(value),
         K::Fill(field) => fill::check(field, value),
     }
@@ -335,6 +294,8 @@ pub(super) fn result(operation: &str, value: &Value) -> bool {
     }
     if operation.ends_with(".layer.duplicate") {
         object::create_result(value)
+    } else if clipboard::operation(operation) {
+        clipboard::result(operation, value)
     } else {
         object::visibility_result(value)
     }
@@ -358,6 +319,7 @@ pub(crate) fn response_matches(
         && response.document_id == request.document_id
         && response.result.as_ref().is_some_and(|value| {
             revision_matches(request.expected_revision, response.content_revision, value)
+                && clipboard::correlated(request, value)
         })
 }
 

@@ -89,15 +89,54 @@ test('module absence leaves the native inspector unavailable and never activates
 test('duplicate native Motion registration is rejected',()=>{const h=host();assert.throws(()=>UI.bindMotion(h.root,{paint(){return true;},retire(){}}),/already bound/);h.retire();});
 
 test('direct public reveal entrypoints consume native ownership even with missing binding',async()=>{const h=host({omitBinding:true}),a=motion.indexOf('  function routeNativeMotionRead('),b=motion.indexOf('  function handlePropShortcut(',a),helper=motion.slice(a,b);const ctx=vm.createContext({window:h.root,state:h.root.state,PROP_SHORTCUT:{p:'position'},n20AllowLegacyWrite:()=>false});for(const [name,end] of [['handlePropShortcut','    // Filtering'],['handleRevealAnimatedShortcut','    // U is a TOGGLE'],['handleRevealEffectsShortcut','    return revealByLayerPredicate'],['handleRevealMattesShortcut','    return revealByLayerPredicate']]){const start=motion.indexOf('  function '+name+'('),finish=motion.indexOf(end,start);assert.ok(start>0&&finish>start);vm.runInContext(helper+motion.slice(start,finish)+"throw Error('LEGACY FALLTHROUGH');}",ctx);let consumed;assert.doesNotThrow(()=>{consumed=vm.runInContext(name+"('p',false)",ctx);});assert.equal(consumed,true);}h.retire();});
-test('ordinary UI paint and public reveal use actual sole Project cached port and SDK owner request IDs',async()=>{
+async function ordinaryProjectHost(){
  const {createRequire}=require('node:module'),ownerPath=path.join(__dirname,'native-object-project-desktop-ports.test.cjs'),ownerSource=fs.readFileSync(ownerPath,'utf8');
  const makeOwner=new Function('require',ownerSource.slice(0,ownerSource.indexOf('\ntest('))+';return fixture;')(createRequire(ownerPath));
  const f=makeOwner();await f.open();const h=host({root:f.root}),Project=require('../src/js/adapters/native-object-project.js'),before=f.session.info();
  f.root.NemoNativeObjectProject=Project;require('../src/js/bootstrap/native-opacity-application.js').bindObjectUI(f.root);
  f.mutateReply(reply=>{const request=f.calls.at(-1).r;if(request.operation!=='query.document.object.property.metadata')return;const v=request.payload.view,list=v.kind==='targets'?[{kind:'context',contextId:'scene-root'},{kind:'layer',target:{contextId:'scene-root',layerUid:'drawing'}}]:fixture.propertyPageOracle.slice(0,5);reply.result={instanceId:request.instanceId,documentId:request.documentId,atRevision:request.payload.atRevision,documentSnapshotId:request.payload.documentSnapshotId,kind:v.kind,target:v.kind==='targets'?null:v.target,items:clone(list.slice(v.offset,v.offset+v.limit)),nextOffset:null,unavailableCategories:clone(fixture.cases.find(c=>c.expectedResult).expectedResult.unavailableCategories)};});
+ return {f,h,Project,before};
+}
+test('ordinary UI paint and public reveal use actual sole Project cached port and SDK owner request IDs',async()=>{
+ const {f,h,Project,before}=await ordinaryProjectHost();
  assert.equal(Project.paintUI(f.root,false),true);await h.settle();assert.equal(h.rows().length,5);assert.equal(h.status(),'Select Keys to inspect native animation.');assert.ok(h.button('Keys'));
  await h.doc.body.fire('keydown',{key:'p'});await h.settle();assert.equal(h.rows().length,1);assert.equal(h.rows()[0].dataset.property,'position');assert.equal(Project.desktop(f.root),f.session);assert.strictEqual(f.session.info(),before);assert.equal(f.transports.length,1);
  const queries=f.calls.filter(c=>c.r?.operation==='query.document.object.property.metadata');assert.ok(queries.length>=3);assert.ok(queries.every(c=>/^project-metadata-/.test(c.r.requestId)&&!('expectedRevision'in c.r)));assert.ok(f.calls.every(c=>!c.r?.operation?.startsWith('command.')));h.retire();
+});
+
+test('ordinary Motion inspector recovers automatically when the requested frame finishes presenting',async()=>{
+ const {f,h,Project,before}=await ordinaryProjectHost();
+ h.nodes['drawing-canvas'].getBoundingClientRect=()=>({left:20.5,top:30.25,width:320.5,height:180.25});
+ try{
+  assert.equal(Project.paintUI(f.root,false),true);await h.settle();
+  assert.equal(h.rows().length,5);
+  const search=tree(h.nodes['motion-props-body']).find(n=>n.tagName==='INPUT');
+  search.value='Position';await search.fire('input');await search.focus();
+  for(const frame of [1,0]){
+   let release;const wait={promise:new Promise(resolve=>{release=resolve;})};
+   f.previewGate(wait);f.root.state.currentFrame=frame;
+   const preview=f.session.presentPreview(frame);await tick();
+   assert.equal(f.session.readPresentedObjectSession(),null);
+   assert.equal(Project.paintUI(f.root,true),true);await h.settle();
+   assert.equal(h.rows().length,0);assert.match(h.status(),/unavailable/);
+   release();await preview;f.previewGate(null);
+   await new Promise(resolve=>setTimeout(resolve,0));await h.settle();
+   // No extra paint, keypress or selection after native completion.
+   assert.deepEqual(h.rows().map(row=>row.dataset.property),['position']);
+   assert.equal(search.value,'Position');assert.equal(h.doc.activeElement,search);
+   assert.equal(h.header.listeners.get('contextmenu').length,1);
+   assert.equal(f.session.readPresentedObjectSession().presentation.frame,frame);
+   assert.strictEqual(f.session.info(),before);
+  }
+  assert.ok(f.calls.every(c=>!c.r?.operation?.startsWith('command.')));
+  let release;f.previewGate({promise:new Promise(resolve=>{release=resolve;})});
+  f.root.state.currentFrame=1;const retiredPreview=f.session.presentPreview(1);await tick();
+  h.retire();const reads=f.calls.filter(c=>c.r?.operation==='query.document.object.property.metadata').length;
+  release();await retiredPreview;await new Promise(resolve=>setTimeout(resolve,0));await h.settle();
+  assert.deepEqual(h.nodes['motion-props-body'].children,[h.old]);
+  assert.equal(h.header.listeners.get('contextmenu').length,0);
+  assert.equal(f.calls.filter(c=>c.r?.operation==='query.document.object.property.metadata').length,reads);
+ }finally{h.retire();}
 });
 
 test('ordinary Motion hooks expose known cleared selection only after native editor retirement',async()=>{

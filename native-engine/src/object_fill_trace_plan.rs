@@ -83,6 +83,8 @@ pub(crate) fn fill_record(
             box_angle: Presence::Missing,
             fill_gradient: Presence::Missing,
             bitmap_brush: Presence::Missing,
+            linked_fill_id: Presence::Missing,
+            is_linked_fill_companion: Presence::Missing,
             is_mask: Presence::Missing,
             mask_mode: Presence::Missing,
             mask_feather: Presence::Missing,

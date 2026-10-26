@@ -48,12 +48,19 @@
         !Array.isArray(value.layers)||!object(value.origin)||value.origin.documentId!==req.documentId||
         !ID.test(value.origin.documentSnapshotId)||!int(value.origin.contentRevision,0))throw new Error('Native inactive project metadata is invalid');
       if(expectedRequest&&value.preparationRequestId!==expectedRequest)throw new Error('Native inactive project belongs to another request');
-      return Object.freeze({kind:'native-object-inactive',path:null,name:'Inactive project',preparationToken:value.preparationToken,
+      var meta={kind:'native-object-inactive',path:null,name:'Inactive project',preparationToken:value.preparationToken,
         preparationRequestId:value.preparationRequestId,instanceId:req.instanceId,ownerDocumentId:req.documentId,
         lifecycleGeneration:req.lifecycleGeneration,
         documentSnapshotId:value.documentSnapshotId,contentRevision:value.contentRevision,originSnapshotId:value.origin.documentSnapshotId,
         originRevision:value.origin.contentRevision,
-        digest:value.documentDigest,byteCount:value.byteCount,canvasW:value.canvasW,canvasH:value.canvasH,fps:value.fps,totalFrames:value.totalFrames});
+        digest:value.documentDigest,byteCount:value.byteCount,canvasW:value.canvasW,canvasH:value.canvasH,fps:value.fps,totalFrames:value.totalFrames};
+      if(typeof value.documentId==='string'&&ID.test(value.documentId)&&value.documentId!==req.documentId){
+        meta.documentId=value.documentId;
+        meta.layerUids=Object.freeze(value.layers.map(function(layer){return layer.layerUid;}));
+        meta.view=Object.freeze({frame:0,layerUids:Object.freeze(value.layers.length?[value.layers[0].layerUid]:[]),
+          activeLayerUid:value.layers.length?value.layers[0].layerUid:null,anchorLayerUid:null});
+      }
+      return Object.freeze(meta);
     }
     function tabMeta(project,path){var name=path?ports.baseName(path):'Inactive project';
       return Object.freeze(Object.assign({},project,{path:path||null,name:name}));}
@@ -113,6 +120,7 @@
     });}
     function reconcile(){
       if(!uncertain)return Promise.resolve({status:'idle'});
+      if(uncertain.kind==='activate')return Promise.resolve({status:'indeterminate',meta:held});
       var pending=uncertain,p=pins();
       return recover(pending,p);
     }
@@ -139,7 +147,7 @@
           var prepared=safeProject(v.project,req,req.requestId);
           if(prepared.preparationToken!==v.preparationToken||prepared.originSnapshotId!==req.documentSnapshotId||
             prepared.originRevision!==req.expectedRevision)throw new Error('Inactive prepare token or owner mismatch');
-          add(prepared,path);uncertain=null;show('Project prepared; switching remains unavailable in this build.');return {status:'prepared',meta:held};
+          add(prepared,path);uncertain=null;show(ports.canActivate&&ports.canActivate()===true?'Project prepared. Select its tab to switch.':'Project prepared; switching remains unavailable in this build.');return {status:'prepared',meta:held};
         }catch(error){
           if(error&&error.details&&['notDispatched','closed'].includes(error.details.disposition)){
             uncertain=null;show('Inactive project was not prepared: '+(error.message||'request refused'));return {status:'refused'};
@@ -173,13 +181,55 @@
       finally{busy=false;}
     }
     async function activateClick(meta){
+      if(busy)return {status:'busy'};
       if(!held||meta!==held){show('Inactive project identity is unavailable; switching is unavailable in this build.');return {status:'unavailable'};}
+      busy=true;
+      var original=held,committed=false,projecting=false,outgoing=null,capture=null;
       try{
+        if(uncertain)throw new Error('Native tab transition requires reconciliation');
         var p=pins();if(!sameEpoch({instanceId:held.instanceId,documentId:held.ownerDocumentId,lifecycleGeneration:held.lifecycleGeneration},p))throw new Error('Native owner changed');
         var result=await inspect(p,held.preparationToken,null),v=result.value;
         if(v.state!=='inactive-retained'||!v.project||v.project.preparationToken!==held.preparationToken)throw new Error('Inactive project retention is unconfirmed');
-        show('Switching project tabs is unavailable in this build.');return {status:'unavailable'};
-      }catch(error){show('Inactive project remains visible, but switching is unavailable: '+(error&&error.message||'retention is unconfirmed'));return {status:'indeterminate'};}
+        if(typeof ports.activate!=='function'||ports.canActivate&&ports.canActivate()!==true){
+          show('Switching project tabs is unavailable in this build.');return {status:'unavailable'};
+        }
+        var verified=safeProject(v.project,result.request,held.preparationRequestId);
+        if(!verified.documentId||verified.documentId!==held.documentId||verified.documentSnapshotId!==held.documentSnapshotId||
+            verified.contentRevision!==held.contentRevision||verified.digest!==held.digest)throw new Error('Native retained target changed');
+        capture=await ports.capture(held);
+        var activated=await ports.activate(held,{
+          isCurrent:function(){return !uncertain&&(committed?held===outgoing:held===original)&&ports.isCurrent(capture,committed,projecting)===true;},
+          projecting:function(){projecting=true;},
+          commit:async function(current,activation){
+            var next={apiVersion:2,instanceId:current.instanceId,documentId:current.documentId,contentRevision:current.contentRevision,
+              documentSnapshotId:current.documentSnapshotId,lifecycleGeneration:current.lifecycleGeneration};
+            var inspected=await inspect(next,activation.inactiveProject.preparationToken,null);
+            var value=inspected.value,project=value.project,pin=activation.inactiveProject;
+            if(value.state!=='inactive-retained'||!project||value.preparationToken!==pin.preparationToken||
+                project.preparationToken!==pin.preparationToken||project.documentId!==pin.documentId||
+                project.contentRevision!==pin.contentRevision||project.documentSnapshotId!==pin.documentSnapshotId||
+                project.documentDigest!==pin.documentDigest||project.preparationRequestId!==pin.preparationRequestId||
+                !project.origin||project.origin.documentSnapshotId!==current.documentSnapshotId||project.origin.contentRevision!==current.contentRevision)
+              throw new Error('Outgoing native project retention is uncorrelated');
+            outgoing=tabMeta(safeProject(project,inspected.request,pin.preparationRequestId),capture.path);
+            outgoing=Object.freeze(Object.assign({},outgoing,{name:capture.name,view:capture.view}));
+            if(!outgoing.layerUids||new Set(outgoing.layerUids).size!==outgoing.layerUids.length||
+                outgoing.layerUids.some(function(uid){return typeof uid!=='string'||!uid;})||capture.view.frame>=outgoing.totalFrames||
+                capture.view.layerUids.some(function(uid){return !outgoing.layerUids.includes(uid);})||
+                [capture.view.activeLayerUid,capture.view.anchorLayerUid].some(function(uid){return uid!==null&&!outgoing.layerUids.includes(uid);}))
+              throw new Error('Outgoing native view context is uncorrelated');
+            if(ports.publish(original,outgoing,capture)!==true)throw new Error('Native tab UI publication is unconfirmed');
+            held=outgoing;committed=true;return true;
+          }
+        },capture);
+        if(activated&&activated.notDispatched===true)return {status:'refused',meta:held};
+        if(!activated||!committed)throw new Error('Native tab activation was not confirmed');
+        show('Switched to '+meta.name);return {status:'activated',meta:held};
+      }catch(error){
+        if(capture)uncertain={kind:'activate',target:original,capture:capture};
+        show('Native project switch is unconfirmed: '+(error&&error.message||'retention is unconfirmed'));
+        return {status:'indeterminate',meta:held};
+      }finally{busy=false;}
     }
     return Object.freeze({openPath:openPath,close:close,activateClick:activateClick,reconcile:reconcile,
       // Replacement drops this owner's retained project; uncertainty is not

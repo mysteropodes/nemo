@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-evaluation => motion_parent_chain_tests
 use crate::evaluation::motion_parent_chain::{
     apply_chain_to_image_rect, apply_chain_to_segments, blend_two, blend_weighted,
     compose_static_chain, invert_vector_through_chain, legacy_chain, lerp_angle_deg,

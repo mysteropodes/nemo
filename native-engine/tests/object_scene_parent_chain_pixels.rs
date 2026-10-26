@@ -160,3 +160,74 @@ fn real_parented_text_and_raster_metal_viewport_export_and_original_h_oracle() {
         before
     );
 }
+#[test]
+fn rotated_and_scaled_parent_moves_text_and_raster_to_hand_computed_metal_pixels() {
+    // Parent P (hidden 0..40 x 0..20, so pivot c = (20,10)): scale 200%, rotate +90 deg, position (150,30).
+    // Hand map p' = c + R(2 (p - c)) + (150,30) with R(dx,dy) = (-dy,dx): x' = 190 - 2 py, y' = 2 px.
+    // Source probes are on the Roboto H of "Hello" at the origin (stems x 8.25..17.68 / 53.52..62.89,
+    // y 8.9..80, crossbar y 39.47..47.14 between them) and sit on pixel centres of the destination.
+    let mut doc = drawing();
+    doc["items"]["raster"][0]["item"]["x"] = json!(50);
+    doc["items"]["raster"][0]["item"]["y"] = json!(90);
+    let case: Value = include_str!("fixtures/text-glyph-source/oracle.txt")
+        .lines()
+        .filter_map(|l| l.strip_prefix("CASE "))
+        .map(|s| serde_json::from_str::<Value>(s).unwrap())
+        .find(|v| v["name"] == "hello_roboto_100")
+        .unwrap();
+    doc["items"]["text"][0]["block"] = json!({"text":case["text"],"font":{"kind":"bundled","fontKey":case["font"]},
+        "size":case["size"],"color":"#112233","align":case["align"],"anchorTopLeft":{"x":case["tl"][0],"y":case["tl"][1]}});
+    doc["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"P"},"properties":[
+        {"property":"position","static":[150,30]},{"property":"rotation","static":[90]},
+        {"property":"scale","static":[200,200]}]}]);
+    let o = owner(&doc);
+    let s = snapshot(&o);
+    let before = crate::object_codec::encode_storage_project(s.document()).unwrap();
+    let p = plan(&s, 7);
+    let chain = p.native_parent_chains().chain(0).unwrap();
+    assert_eq!(chain.len(), 1);
+    assert_eq!(chain[0].pivot, [20.0, 10.0]);
+    let pins = pins(&s, 7);
+    let view = prepare_object_viewport_composition(&p, &pins, None).unwrap();
+    let export = prepare_object_composition(&p, &pins).unwrap();
+    let mut gpu = Compositor::new().expect("rotated parent acceptance requires real Metal");
+    assert_eq!(gpu.adapter().get_info().backend, wgpu::Backend::Metal);
+    let shown = render(&mut gpu, &view);
+    assert_eq!(shown, render(&mut gpu, &export));
+    let ink = [17, 34, 51, 255];
+    // Glyph: stems, crossbar (solid) and the hole above the bar (white), plus the untouched far corner.
+    assert_eq!(pixel(&shown, 129, 26), ink, "left stem (13.25,30.25)");
+    assert_eq!(pixel(&shown, 129, 116), ink, "right stem (58.25,30.25)");
+    assert_eq!(pixel(&shown, 103, 70), ink, "crossbar (35.25,43.25)");
+    assert_eq!(pixel(&shown, 141, 70), [255; 4], "hole (35.25,24.25)");
+    assert_eq!(pixel(&shown, 319, 179), [255; 4]);
+    // Raster: the 2x2 PNG becomes a 4x4 px square centred on (10,100) rotated +90 deg, so source texel
+    // (tx,ty) lands at centre offset R((2tx-1, 2ty-1)); its outermost corner pixel is pure (edge pad).
+    let mut reader = png::Decoder::new(std::io::Cursor::new(support::png()))
+        .read_info()
+        .unwrap();
+    let mut rgba = vec![0; reader.output_buffer_size().unwrap()];
+    let _ = reader.next_frame(&mut rgba).unwrap();
+    for (tx, ty, x, y) in [
+        (0, 0, 11, 98),
+        (1, 0, 11, 101),
+        (0, 1, 8, 98),
+        (1, 1, 8, 101),
+    ] {
+        let t = &rgba[(ty * 2 + tx) * 4..(ty * 2 + tx) * 4 + 4];
+        let a = f64::from(t[3]) / 255.0;
+        let want: Vec<u8> = (0..3)
+            .map(|k| (f64::from(t[k]) * a + 255.0 * (1.0 - a)).round() as u8)
+            .chain([255])
+            .collect();
+        let got = pixel(&shown, x, y);
+        assert!(
+            got.iter().zip(&want).all(|(g, w)| g.abs_diff(*w) <= 1),
+            "texel ({tx},{ty}) at ({x},{y}): {got:?} != {want:?}"
+        );
+    }
+    assert_eq!(
+        crate::object_codec::encode_storage_project(s.document()).unwrap(),
+        before
+    );
+}

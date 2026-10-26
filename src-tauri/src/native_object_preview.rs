@@ -2,6 +2,7 @@
 use crate::native_dispatch::{NativeObjectHost, NativeReleaseProgress};
 use native_engine::desktop_viewport::{
     ObjectPresentedFrame, ObjectPreviewNavigation, ObjectPreviewView, ObjectViewProjection,
+    ViewportDisplayFilter,
 };
 use native_engine::{
     application::{ApplicationReleaseReceipt, ObjectBrushRuntime, ObjectMotionFrameControl},
@@ -44,6 +45,7 @@ pub(super) struct ObjectPreview {
     // become a render-time history edit or disappear into an error string.
     pub(super) motion_control: ObjectMotionFrameControl,
     pending: Option<ScheduledFrame>,
+    pending_filter: Option<ViewportDisplayFilter>,
     blocked: Option<String>,
     released: bool,
     cancelled_on_release: BTreeSet<WorkId>,
@@ -106,6 +108,7 @@ impl ObjectPreview {
             .cancel(id)
             .map_err(|error| error.to_string())?;
         self.pending = None;
+        self.pending_filter = None;
         if self.released {
             self.cancelled_on_release.insert(id);
         }
@@ -144,6 +147,10 @@ impl ObjectPreview {
 }
 
 impl NativeObjectHost {
+    #[cfg(test)]
+    pub(crate) fn fail_preview_cancel_for_test(&mut self, fail: bool) {
+        self.preview.fail_cancel = fail;
+    }
     /// Internal owner operation only. A later common-authority route must hold
     /// its lifecycle/revision admission throughout this synchronous call.
     /// Only final RGBA8/sRGB/straight output with retained native resources is admitted.
@@ -255,6 +262,21 @@ impl NativeObjectHost {
         compositor: &mut Compositor,
         viewport: &mut DesktopViewportHost<P>,
     ) -> Result<ObjectPresentedFrame, String> {
+        self.present_prepared_object_preview_filtered(
+            expected,
+            compositor,
+            viewport,
+            ViewportDisplayFilter::None,
+        )
+    }
+
+    pub(crate) fn present_prepared_object_preview_filtered<P: SurfacePort>(
+        &mut self,
+        expected: &ObjectFrameSelector<'_>,
+        compositor: &mut Compositor,
+        viewport: &mut DesktopViewportHost<P>,
+        display_filter: ViewportDisplayFilter,
+    ) -> Result<ObjectPresentedFrame, String> {
         let prepared = self
             .preview
             .prepared
@@ -290,6 +312,7 @@ impl NativeObjectHost {
                 || key.frame() != expected.frame
                 || key.output_spec() != &prepared.output
                 || key.quality() != quality.as_str()
+                || self.preview.pending_filter != Some(display_filter)
         }) {
             self.preview.cancel_pending()?;
         }
@@ -392,6 +415,7 @@ impl NativeObjectHost {
         // Retain the actual scheduler work before compose/register/acquire/settle.
         // An Err or unwind cannot lose the work that release must reconcile.
         self.preview.pending = Some(work.clone());
+        self.preview.pending_filter = Some(display_filter);
         self.preview.blocked = Some("preview presentation did not complete".into());
         let result = (|| {
             let live = prepare_scheduled_object_composition_from_witness(
@@ -403,7 +427,7 @@ impl NativeObjectHost {
             let frame =
                 ObjectViewportFrame::compose(compositor, &live).map_err(|e| e.to_string())?;
             viewport
-                .register(frame.identity().clone())
+                .register_with_display_filter(frame.identity().clone(), display_filter)
                 .map_err(|e| format!("preview register: {e:?}"))?;
             frame
                 .present(viewport, compositor, &live)
@@ -426,6 +450,7 @@ impl NativeObjectHost {
                     .succeed(work.work_id())
                     .map_err(|e| e.to_string())?;
                 self.preview.pending = None;
+                self.preview.pending_filter = None;
                 self.preview.blocked = None;
             }
             ViewportStatus::Deferred(_) => self.preview.blocked = None,

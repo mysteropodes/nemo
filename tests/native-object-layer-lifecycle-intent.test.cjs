@@ -119,23 +119,12 @@ test('a clip over the 4096-byte envelope is refused locally, never split', async
   assert.equal(small.ok, true, 'a small clip with a structurally valid record is sent');
 });
 
-test('copy and cut have no native wire operation and report typed unavailability without touching the transport', async () => {
-  const h = createHarness({ strokes });
-  const intent = createLayerLifecycleIntent(h.ports);
-  const pending = [intent.copyShapes({ ...cell, mode: 'motion', strokeIds: ['stroke-1'] }), intent.cutShapes({ ...cell, mode: 'motion', strokeIds: ['stroke-1'] })];
-  pending.forEach((entry) => assert.equal(typeof entry.then, 'function', 'every intent method returns a promise'));
-  for (const outcome of await Promise.all(pending)) {
-    assert.deepEqual({ ok: outcome.ok, code: outcome.code, reason: outcome.reason }, { ok: false, code: 'unavailable', reason: 'native_declaration_absent' });
-  }
-  assert.deepEqual([h.state.sent.length, h.state.pins, h.state.submits], [0, 0, 0]);
-});
-
 test('absent declarations and sessions are typed unavailability for every operation; a declared sibling still works', async () => {
   const undeclared = createHarness({ strokes, declared: () => false });
   const intent = createLayerLifecycleIntent(undeclared.ports);
   const calls = [intent.duplicateLayer({ layerUid: 'layer-a' }), intent.renameLayer({ layerUid: 'layer-a', name: 'n' }),
     intent.deleteShapes({ ...cell, mode: 'motion', strokeIds: [] }), intent.splitLayer({ ...cell, labels: { shape: 's', stroke: 't' } }),
-    intent.pasteShapes({ ...cell, mode: 'motion', clip })];
+    intent.pasteShapes({ ...cell, mode: 'motion', clip }), intent.copyShapes({ ...cell, mode: 'motion', strokeIds: [] }), intent.cutShapes({ ...cell, mode: 'motion', strokeIds: [] })];
   for (const outcome of await Promise.all(calls)) assert.deepEqual({ code: outcome.code, reason: outcome.reason }, { code: 'unavailable', reason: 'native_declaration_absent' });
   const partial = createHarness({ strokes, declared: (op) => op === P + 'layer.rename' });
   const part = createLayerLifecycleIntent(partial.ports);
@@ -188,7 +177,7 @@ test('no legacy writer is reachable from the lifecycle, selection or clipboard i
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'js', 'adapters', 'native-object-layer-lifecycle-intent.js'), 'utf8');
   assert.equal(/\b(?:reorderLayersAtGap|splitLayerIntoElements|deleteSelStrokes|pasteSelection|copySelection)\s*\(/.test(source), false);
   assert.equal(/(?<![\w.])(?:Paper|paper|SM|window|document|localStorage)\./.test(source), false);
-  assert.deepEqual(OPERATIONS, ['layer.delete', 'layer.duplicate', 'layer.rename', 'layer.reorder', 'selection.delete', 'selection.duplicate', 'layer.split', 'clipboard.paste'].map((s) => P + s));
+  assert.deepEqual(OPERATIONS, ['layer.delete', 'layer.duplicate', 'layer.rename', 'layer.reorder', 'selection.delete', 'selection.duplicate', 'layer.split', 'clipboard.paste', 'clipboard.copy', 'clipboard.cut'].map((s) => P + s));
 });
 
 test('an un-awaited second layer intent is judged against the projection its predecessor left, not the one at call time', async () => {
@@ -204,4 +193,94 @@ test('an un-awaited second layer intent is judged against the projection its pre
   assert.equal(a.ok && b.ok, true);
   assert.deepEqual(h.state.sent[2].payload.selection, { active: 'layer-b', selected: [] });
   assert.equal(h.state.sent[2].expectedRevision, h.state.sent[1].expectedRevision + 1);
+});
+
+
+test('copy returns a detached clipboard without changing revision or rebuilding selection; cut rebuilds only its changed selection', async () => {
+  const clipboard = { ...clip, records: [JSON.parse(fs.readFileSync(path.join(__dirname, '../engineering/application/examples/native-object-v1/cases.json'), 'utf8')).records[0]] };
+  const h = createHarness({ strokes, step: (r) => r.operation === P + 'clipboard.copy'
+    ? { applied: false, clipboard }
+    : { applied: true, clipboard, strokes: { 'layer-a': ['stroke-2', 'stroke-3'] } } });
+  const intent = createLayerLifecycleIntent(h.ports);
+  intent.selectShapes(cell, ['stroke-1', 'stroke-2']);
+  intent.selectLayers({ active: 'layer-a', selected: ['layer-a'] });
+  const selected = intent.shapeSelection(), layerSelection = intent.layerSelection(), reads = h.state.strokeReads;
+  const copied = await intent.copyShapes({ ...cell, mode: 'animation2d', strokeIds: ['stroke-1'] });
+  assert.deepEqual(h.state.sent[0], request(P + 'clipboard.copy', { command: 'object.clipboard.copy', ...cell, mode: 'animation2d', strokeIds: ['stroke-1'] }, 'clipboard-copy-1', 7));
+  assert.deepEqual({ ok: copied.ok, applied: copied.applied, revision: copied.revision }, { ok: true, applied: false, revision: 7 });
+  assert.deepEqual(copied.clipboard, clipboard);
+  assert.notEqual(copied.clipboard, clipboard); assert.notEqual(copied.clipboard.records[0], clipboard.records[0]);
+  assert.equal(h.state.strokeReads, reads + 1, 'copy checks input against current ids but never rebuilds selection');
+  assert.equal(Object.hasOwn(copied, 'selectionRebuilt'), false);
+  assert.deepEqual(intent.shapeSelection(), selected); assert.deepEqual(intent.layerSelection(), layerSelection);
+  assert.equal(h.state.revision, 7);
+  copied.clipboard.records[0].target.strokeId = 'changed-only-by-consumer';
+  assert.notEqual(clipboard.records[0].target.strokeId, 'changed-only-by-consumer');
+  const cut = await intent.cutShapes({ ...cell, mode: 'motion', strokeIds: ['stroke-1'] });
+  assert.deepEqual(h.state.sent[1], request(P + 'clipboard.cut', { command: 'object.clipboard.cut', ...cell, mode: 'motion', strokeIds: ['stroke-1'] }, 'clipboard-cut-2', 7));
+  assert.deepEqual({ ok: cut.ok, applied: cut.applied, revision: cut.revision, selection: cut.selection, rejected: cut.rejected },
+    { ok: true, applied: true, revision: 8, selection: ['stroke-2'], rejected: ['stroke-1'] });
+  assert.equal(cut.selectionRebuilt, true); assert.deepEqual(cut.clipboard, clipboard);
+  assert.deepEqual(intent.layerSelection(), layerSelection);
+});
+
+test('empty clipboard results are explicit null and copy/cut malformed or stale selections send nothing', async () => {
+  for (const method of ['copyShapes', 'cutShapes']) {
+    const h = createHarness({ strokes, step: () => ({ applied: false, clipboard: null }) });
+    const intent = createLayerLifecycleIntent(h.ports);
+    intent.selectShapes(cell, ['stroke-2']);
+    const outcome = await intent[method]({ ...cell, mode: 'motion', strokeIds: [] });
+    assert.deepEqual({ ok: outcome.ok, applied: outcome.applied, revision: outcome.revision, clipboard: outcome.clipboard },
+      { ok: true, applied: false, revision: 7, clipboard: null });
+    assert.deepEqual(intent.shapeSelection(), ['stroke-2']); assert.equal(h.state.sent.length, 1);
+    const fresh = createHarness({ strokes }), other = createLayerLifecycleIntent(fresh.ports);
+    for (const input of [null, {}, { ...cell, mode: 'other', strokeIds: [] }, { ...cell, mode: 'motion', strokeIds: [''] },
+      { ...cell, mode: 'motion', strokeIds: [], extra: true }, { ...cell, mode: 'motion', strokeIds: null }]) {
+      assert.equal((await other[method](input)).code, 'invalid_request');
+    }
+    assert.equal((await other[method]({ ...cell, mode: 'motion', strokeIds: ['gone'] })).code, 'stale_selection');
+    assert.equal(fresh.state.sent.length, 0);
+  }
+});
+
+test('clipboard refuses owner errors without retries or shape state changes, and a large selection is never split', async () => {
+  for (const method of ['copyShapes', 'cutShapes']) {
+    for (const code of ['stale_revision', 'wrong_document', 'unavailable', 'cancelled_before_dispatch']) {
+      const h = createHarness({ strokes, step: () => ({ error: { code, message: 'refused' } }) });
+      const intent = createLayerLifecycleIntent(h.ports); intent.selectShapes(cell, ['stroke-1']);
+      const outcome = await intent[method]({ ...cell, mode: 'motion', strokeIds: ['stroke-1'] });
+      assert.equal(outcome.ok, false); assert.equal(outcome.code, code); assert.equal(h.state.sent.length, 1);
+      assert.deepEqual(intent.shapeSelection(), ['stroke-1']); assert.equal(h.state.revision, 7);
+      assert.equal(Object.hasOwn(outcome, 'clipboard'), false);
+    }
+    const ids = Array.from({ length: 100 }, (_, i) => 'stroke-' + i + 'x'.repeat(80));
+    const h = createHarness({ strokes: { 'layer-a': ids } });
+    const outcome = await createLayerLifecycleIntent(h.ports)[method]({ ...cell, mode: 'motion', strokeIds: ids });
+    assert.equal(outcome.code, 'request_too_large'); assert.equal(h.state.sent.length, 0);
+  }
+});
+
+test('clipboard raw-port replies require closed bounded owner-correlated receipts before exposing a detached result', async () => {
+  const record = JSON.parse(fs.readFileSync(path.join(__dirname, '../engineering/application/examples/native-object-v1/cases.json'), 'utf8')).records[0];
+  const clipboard = { ...clip, records: [record] };
+  for (const method of ['copyShapes', 'cutShapes']) {
+    const applied = method === 'cutShapes';
+    const reply = (r) => ({ apiVersion: 2, requestId: r.requestId, instanceId: r.instanceId, documentId: r.documentId,
+      contentRevision: r.expectedRevision + (applied ? 1 : 0), ok: true,
+      result: { applied, historyEntriesAdded: applied ? 1 : 0, clipboard: JSON.parse(JSON.stringify(clipboard)) } });
+    for (const mutate of [(r) => { r.requestId = 'foreign'; }, (r) => { r.instanceId = 'foreign'; }, (r) => { r.documentId = 'foreign'; },
+      (r) => { r.contentRevision += 1; }, (r) => { r.apiVersion = 1; }, (r) => { r.extra = true; },
+      (r) => { delete r.result.clipboard; }, (r) => { r.result.clipboard = []; },
+      (r) => { r.result.clipboard.contextId = 'foreign'; }, (r) => { r.result.clipboard.layerUid = 'foreign'; }, (r) => { r.result.clipboard.frame += 1; },
+      (r) => { r.result.clipboard.records[0].target.frameScope = null; },
+      (r) => { r.result.clipboard.records[0].target.strokeId = 'x'.repeat(4096); },
+      (r) => { r.result.historyEntriesAdded = applied ? 0 : 1; }]) {
+      const h = createHarness({ strokes, rawResponse: (q) => { const r = reply(q); mutate(r); return r; } });
+      const intent = createLayerLifecycleIntent(h.ports); intent.selectShapes(cell, ['stroke-1']);
+      const outcome = await intent[method]({ ...cell, mode: 'motion', strokeIds: ['stroke-1'] });
+      assert.deepEqual({ ok: outcome.ok, code: outcome.code, indeterminate: outcome.indeterminate }, { ok: false, code: 'transport_failed', indeterminate: true });
+      assert.deepEqual(intent.shapeSelection(), ['stroke-1']); assert.equal(h.state.submits, 1);
+      assert.equal(Object.hasOwn(outcome, 'clipboard'), false);
+    }
+  }
 });
