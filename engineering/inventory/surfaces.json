@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "4c4f160615095f71089520ba98d6a4a0a79cb9c8",
-  "describe": "v0.7.0-alpha.4-3172-g4c4f1606"
+  "head": "51453ed36e3cb591099cf7a715189f115d110df1",
+  "describe": "v0.7.0-alpha.4-3174-g51453ed3"
  },
- "inputsDigest": "be16f74cae5b4f2e9b8af72c39b12f2c581524a9c9d636ee3e507cc68cdee54b",
+ "inputsDigest": "8e136950eac04b5cbf0c2573fd91f853b08a1240897c2f0c7b3477089c877a2b",
  "states": [
   "inventoried",
   "characterized",
@@ -346,7 +346,7 @@
   },
   "SMSymmetry": {
    "file": "src/js/symmetry-bridge.js",
-   "line": 350,
+   "line": 353,
    "members": 0
   },
   "SMTextAnimator": {
