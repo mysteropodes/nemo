@@ -23,6 +23,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const lib = require('./lib/parity-matrix.cjs');
+const family = require('./lib/family-acceptance.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DIR = path.join(ROOT, 'engineering', 'inventory', 'parity');
@@ -48,11 +49,34 @@ function refreshOwners(tasks) {
   return lib.ownersSnapshot(JSON.parse(out), tasks.map((t) => t.task), new Date().toISOString().slice(0, 10), readOptional('ownership.json'));
 }
 
+// results/<family>.json are source-level records at their own SHA; only their shape and
+// cross-references are checked here, never freshness against HEAD.
+function readEvidence(taskIds) {
+  const list = (dir) => (fs.existsSync(file(dir)) ? fs.readdirSync(file(dir)).filter((n) => n.endsWith('.json')).sort() : []);
+  const families = {}, results = [], problems = [];
+  for (const n of list('families')) {
+    families[n.replace(/\.json$/, '')] = readJson(`families/${n}`);
+    problems.push(...family.validateFamily(families[n.replace(/\.json$/, '')], taskIds, `families/${n}`));
+  }
+  for (const n of list('results')) {
+    const r = readJson(`results/${n}`);
+    const decl = families[n.replace(/\.json$/, '')];
+    if (r.family !== n.replace(/\.json$/, '')) problems.push(`results/${n}: family ${r.family} does not match the file name`);
+    const own = family.validateResult(r, decl, taskIds, `results/${n}`);
+    problems.push(...own);
+    if (!own.length) results.push(r);
+  }
+  return { results, problems };
+}
+
 function outputs() {
   const input = { config: readJson('config.json'), tasks: readJson('tasks.json'),
     baseline: readJson('baseline-surfaces.json'), mapping: readJson('mapping.json'), owners: readJson('owners.json'),
     ownership: readOptional('ownership.json') };
   const problems = lib.validate(input);
+  const evidence = readEvidence(new Set(input.tasks.map((t) => t.task)));
+  problems.push(...evidence.problems);
+  input.results = evidence.results;
   if (!fs.existsSync(file('ownership.json'))) problems.push('ownership.json is missing');
   if (input.baseline.baseline !== input.config.baseline) problems.push('baseline-surfaces.json was frozen at a different SHA than config.json');
   const matrix = lib.buildMatrix(input);
