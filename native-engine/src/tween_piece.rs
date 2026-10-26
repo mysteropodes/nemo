@@ -87,7 +87,7 @@ pub(super) enum VanishPlan {
 }
 pub(super) fn vanish_plan(record: &ObjectRecord, others: &[ObjectRecord]) -> R<VanishPlan> {
     let pressure = record.is_pressure_ribbon();
-    if texture(record).is_some_and(|t| !t.preset.missing())
+    if texture(record).is_some_and(|t| !t.brush_texture_preset.missing())
         || (!pressure && (record.geometry.closed || record.solid_fill().is_some()))
         || record
             .vector_ext

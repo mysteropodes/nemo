@@ -1,15 +1,15 @@
 //! Match anchors only; resolve the existing preset catalog and re-stamp each generated frame.
-use crate::object_document::VectorTextureFields;
+use crate::object_document::BrushTexture;
 use crate::object_document::{
     BrushPresetRecord, ObjectRecord, Presence, ProjectPresetCatalog, VectorExt,
 };
 use crate::tween_kernels::*;
 use std::collections::BTreeMap;
-pub(super) fn texture(r: &ObjectRecord) -> Option<&VectorTextureFields> {
-    r.vector_ext.value().and_then(|v| v.texture.value())
+pub(super) fn texture(r: &ObjectRecord) -> Option<&BrushTexture> {
+    r.vector_ext.value().and_then(|v| v.brush_texture.value())
 }
 pub(super) fn is_dab(r: &ObjectRecord) -> bool {
-    texture(r).is_some_and(|t| t.is_copy.value() == Some(&true))
+    texture(r).is_some_and(|t| t.is_brush_texture_copy.value() == Some(&true))
 }
 pub(super) struct PairTexture {
     preset: String,
@@ -29,8 +29,8 @@ impl PairTexture {
     ) -> Option<Self> {
         let ta = texture(a);
         let tb = texture(b);
-        let ka = ta.and_then(|t| t.preset.value());
-        let kb = tb.and_then(|t| t.preset.value());
+        let ka = ta.and_then(|t| t.brush_texture_preset.value());
+        let kb = tb.and_then(|t| t.brush_texture_preset.value());
         let preset = ka.or(kb)?.clone();
         static BUILTINS: std::sync::OnceLock<BTreeMap<String, BrushPresetRecord>> =
             std::sync::OnceLock::new();
@@ -53,8 +53,8 @@ impl PairTexture {
                 })
                 .cloned()
         };
-        let pre = |t: Option<&VectorTextureFields>| {
-            t.and_then(|t| t.pre_stroke.value())
+        let pre = |t: Option<&BrushTexture>| {
+            t.and_then(|t| t.pre_texture_stroke.value())
                 .and_then(|s| s.clone())
                 .filter(|s| !s.is_empty())
         };
@@ -67,8 +67,8 @@ impl PairTexture {
             preset,
             resolved,
             group: ta
-                .and_then(|t| t.group_id.value())
-                .or_else(|| tb.and_then(|t| t.group_id.value()))
+                .and_then(|t| t.brush_group_id.value())
+                .or_else(|| tb.and_then(|t| t.brush_group_id.value()))
                 .cloned()
                 .map(Presence::Present)
                 .unwrap_or_default(),
@@ -89,10 +89,12 @@ impl PairTexture {
     pub(super) fn emit(&self, anchor: &mut ObjectRecord, t: f64) -> R<Vec<ObjectRecord>> {
         let ext = anchor.vector_ext.value().cloned().unwrap_or_default();
         anchor.vector_ext = Presence::Present(VectorExt {
-            texture: Presence::Present(VectorTextureFields {
-                preset: Presence::Present(self.preset.clone()),
-                group_id: self.group.clone(),
-                ..Default::default()
+            brush_texture: Presence::Present(BrushTexture {
+                brush_texture_preset: Presence::Present(self.preset.clone()),
+                brush_group_id: self.group.clone(),
+                is_brush_texture_copy: Presence::Missing,
+                pre_texture_stroke: Presence::Missing,
+                pre_texture_opacity: Presence::Missing,
             }),
             ..ext
         });
@@ -125,10 +127,12 @@ impl PairTexture {
                 r.vector = Presence::Present(body);
                 r.effects = Presence::Missing;
                 r.vector_ext = Presence::Present(VectorExt {
-                    texture: Presence::Present(VectorTextureFields {
-                        group_id: self.group.clone(),
-                        is_copy: Presence::Present(true),
-                        ..Default::default()
+                    brush_texture: Presence::Present(BrushTexture {
+                        brush_group_id: self.group.clone(),
+                        is_brush_texture_copy: Presence::Present(true),
+                        brush_texture_preset: Presence::Missing,
+                        pre_texture_stroke: Presence::Missing,
+                        pre_texture_opacity: Presence::Missing,
                     }),
                     ..Default::default()
                 });
@@ -143,16 +147,16 @@ pub(super) fn faded_dabs(
     keep: f64,
     frame: u32,
 ) -> R<Vec<ObjectRecord>> {
-    let Some(t) = texture(anchor).filter(|t| !t.preset.missing()) else {
+    let Some(t) = texture(anchor).filter(|t| !t.brush_texture_preset.missing()) else {
         return Ok(vec![]);
     };
-    let Some(group) = t.group_id.value() else {
+    let Some(group) = t.brush_group_id.value() else {
         return Ok(vec![]);
     };
     let mut out = vec![];
     for r in source
         .iter()
-        .filter(|r| is_dab(r) && texture(r).and_then(|t| t.group_id.value()) == Some(group))
+        .filter(|r| is_dab(r) && texture(r).and_then(|t| t.brush_group_id.value()) == Some(group))
     {
         let mut r = r.clone();
         r.target.frame_scope.frame = frame;

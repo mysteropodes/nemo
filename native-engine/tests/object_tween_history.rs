@@ -52,11 +52,11 @@ fn record(s: &Value, frame: usize) -> Value {
         "geometry":{"kind":"cubic-path","closed":s["closed"].as_bool().unwrap_or(false),"coordinateSpace":"document-world","handleSpace":"relative","segments":segments},"fill":paint(&s["fillColor"]),"vector":vector});
     let mut texture = json!({});
     for (old, new) in [
-        ("brushTexturePreset", "preset"),
-        ("brushGroupId", "groupId"),
-        ("isBrushTextureCopy", "isCopy"),
-        ("preTextureStroke", "preStroke"),
-        ("preTextureOpacity", "preOpacity"),
+        ("brushTexturePreset", "brushTexturePreset"),
+        ("brushGroupId", "brushGroupId"),
+        ("isBrushTextureCopy", "isBrushTextureCopy"),
+        ("preTextureStroke", "preTextureStroke"),
+        ("preTextureOpacity", "preTextureOpacity"),
     ] {
         if s.get("bitmapBrushSpec").is_some() && old != "isBrushTextureCopy" {
             continue;
@@ -66,7 +66,7 @@ fn record(s: &Value, frame: usize) -> Value {
         }
     }
     if !texture.as_object().unwrap().is_empty() {
-        record["vectorExt"] = json!({"texture":texture});
+        record["vectorExt"] = json!({"brushTexture":texture});
     }
     if let Some(spec) = s.get("bitmapBrushSpec") {
         if record.get("vectorExt").is_none() {

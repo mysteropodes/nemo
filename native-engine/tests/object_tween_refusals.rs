@@ -99,7 +99,7 @@ fn native_tween_store_and_texture_unknown_fields_are_refused_on_reopen() {
     bad["tweens"]["unexpected"] = json!(true);
     assert!(decode_storage_project(&serde_json::to_vec(&bad).unwrap()).is_err());
     let mut bad = wire;
-    bad["objects"][0]["vectorExt"]["texture"]["unexpected"] = json!(true);
+    bad["objects"][0]["vectorExt"]["brushTexture"]["unexpected"] = json!(true);
     assert!(decode_storage_project(&serde_json::to_vec(&bad).unwrap()).is_err());
     assert_eq!(bytes(&o), saved);
 }

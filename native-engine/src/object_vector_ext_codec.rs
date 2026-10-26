@@ -18,9 +18,8 @@ pub(crate) use linked_fill::validate_linked_pairs;
 
 use crate::object_codec::{ObjectCodecError, ObjectCodecErrorKind};
 use crate::object_document::{
-    BrushTexture,
-    ObjectLayer, ObjectRecord, ParamShape, PressureFields, PARAM_SHAPE_KINDS, PATH_FX_TYPE_IDS,
-    STROKE_PROFILE_KINDS, VECTOR_FAMILY,
+    BrushTexture, ObjectLayer, ObjectRecord, ParamShape, PressureFields, PARAM_SHAPE_KINDS,
+    PATH_FX_TYPE_IDS, STROKE_PROFILE_KINDS, VECTOR_FAMILY,
 };
 use serde_json::Number;
 
@@ -59,9 +58,6 @@ pub(crate) fn validate_vector_ext(record: &ObjectRecord) -> Result<(), ObjectCod
     }
     if ext.fill_trace.value().is_some_and(|trace| !trace.valid()) {
         return Err(invalid("invalid fill trace provenance"));
-    }
-    if ext.texture.value().is_some_and(|t| !t.valid()) {
-        return Err(invalid("invalid vector texture identity"));
     }
     linked_fill::validate_record(record)?;
     bitmap_brush::validate(record)?;
@@ -106,7 +102,9 @@ pub(crate) fn validate_vector_ext(record: &ObjectRecord) -> Result<(), ObjectCod
 fn validate_brush_texture(tags: &BrushTexture) -> Result<(), ObjectCodecError> {
     let text = |v: &String| !v.is_empty() && v.len() <= 255 && !v.contains('\0');
     let colour = |v: &String| {
-        [4, 7, 9].contains(&v.len()) && v.starts_with('#') && v.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
+        [4, 7, 9].contains(&v.len())
+            && v.starts_with('#')
+            && v.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
     };
     if tags.brush_group_id.missing()
         && tags.is_brush_texture_copy.missing()
@@ -120,8 +118,15 @@ fn validate_brush_texture(tags: &BrushTexture) -> Result<(), ObjectCodecError> {
     if tags.brush_group_id.value().is_some_and(|v| !text(v))
         || tags.brush_texture_preset.value().is_some_and(|v| !text(v))
         || tags.is_brush_texture_copy.value() == Some(&false)
-        || tags.pre_texture_opacity.value().is_some_and(|n| finite(n).is_none())
-        || tags.pre_texture_stroke.value().and_then(Option::as_ref).is_some_and(|v| !colour(v))
+        || tags
+            .pre_texture_opacity
+            .value()
+            .is_some_and(|n| finite(n).is_none())
+        || tags
+            .pre_texture_stroke
+            .value()
+            .and_then(Option::as_ref)
+            .is_some_and(|v| !colour(v))
     {
         return Err(invalid("invalid brushTexture member"));
     }

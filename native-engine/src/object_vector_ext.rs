@@ -12,15 +12,10 @@ use serde_json::Number;
 #[path = "object_fill_trace_record.rs"]
 mod fill_trace;
 pub(crate) use fill_trace::FillTrace;
-#[path = "object_vector_texture.rs"]
-mod texture;
-pub(crate) use texture::VectorTextureFields;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct VectorExt {
-    #[serde(skip_serializing_if = "Presence::missing")]
-    pub(crate) texture: Presence<VectorTextureFields>,
     /// Present exactly for a vector-brush stroke (the baseline `isVectorBrush`).
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) pressure: Presence<PressureFields>,
@@ -53,7 +48,6 @@ pub struct VectorExt {
     pub(crate) brush_texture: Presence<BrushTexture>,
 }
 object_deserialize!(VectorExt {
-    #[serde(default)] texture: Presence<VectorTextureFields>,
     #[serde(default)] pressure: Presence<PressureFields>,
     #[serde(default)] linked_fill_id: Presence<String>,
     #[serde(default)] is_linked_fill_companion: Presence<bool>,
@@ -70,8 +64,7 @@ object_deserialize!(VectorExt {
 
 impl VectorExt {
     pub(crate) fn is_empty(&self) -> bool {
-        self.texture.missing()
-            && self.linked_fill_id.missing()
+        self.linked_fill_id.missing()
             && self.is_linked_fill_companion.missing()
             && self.pressure.missing()
             && self.param_shape.missing()

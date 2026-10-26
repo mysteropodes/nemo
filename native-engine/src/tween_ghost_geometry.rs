@@ -69,7 +69,7 @@ impl MemberSource for Members<'_> {
 }
 fn facts(r: &ObjectRecord) -> MemberFacts {
     let pressure = r.vector_ext.value().and_then(|e| e.pressure.value());
-    let texture = r.vector_ext.value().and_then(|e| e.texture.value());
+    let texture = r.vector_ext.value().and_then(|e| e.brush_texture.value());
     let body = r.vector();
     MemberFacts {
         visible: true,
@@ -78,7 +78,7 @@ fn facts(r: &ObjectRecord) -> MemberFacts {
             .value()
             .and_then(|p| p.linked_fill_id.value())
             .cloned(),
-        brush_group_id: texture.and_then(|t| t.group_id.value()).cloned(),
+        brush_group_id: texture.and_then(|t| t.brush_group_id.value()).cloned(),
         is_linked_fill_companion: r
             .vector_ext
             .value()

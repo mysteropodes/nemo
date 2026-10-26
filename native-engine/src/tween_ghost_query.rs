@@ -115,8 +115,10 @@ impl TweenGhostFrame {
         let texture = r
             .vector_ext
             .value()
-            .and_then(|v| v.texture.value())
-            .is_some_and(|t| t.is_copy.value() == Some(&true) || !t.preset.missing());
+            .and_then(|v| v.brush_texture.value())
+            .is_some_and(|t| {
+                t.is_brush_texture_copy.value() == Some(&true) || !t.brush_texture_preset.missing()
+            });
         if texture {
             out.opacity *= body.map_or(1., |v| v.opacity.as_f64().unwrap());
         }

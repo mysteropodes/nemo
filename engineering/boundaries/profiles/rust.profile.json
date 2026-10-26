@@ -147,8 +147,7 @@
         "object_selection_compound.rs",
         "object_selection_compound_clones.rs",
         "object_tween_record.rs",
-        "object_tween_timing.rs",
-        "object_vector_texture.rs"
+        "object_tween_timing.rs"
       ],
       "publicApi": [
         "document.rs",

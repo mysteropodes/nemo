@@ -78,7 +78,6 @@ pub(crate) fn fill_record(
         effects: Presence::Missing,
         vector: Presence::Present(body(opacity)),
         vector_ext: Presence::Present(VectorExt {
-            texture: Presence::Missing,
             pressure: Presence::Missing,
             param_shape: Presence::Missing,
             box_angle: Presence::Missing,
