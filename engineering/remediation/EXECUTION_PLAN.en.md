@@ -4,6 +4,57 @@ Approved strategy: **7 September 2026**; native-engine amendment approved **20 S
 
 This is the single operating plan for the current remediation. It supersedes the execution order, forecasts, global blocking gates, remote-agent assumptions and reporting requirements in the older R00–R22 plan and local-agent playbooks. Existing architecture and source documentation remain references; this document governs scope and workflow where they conflict. GitHub issues hold live claims and handoffs; the checklist defines outcomes. The [shared hourly progress log #1062](https://github.com/mysteropodes/nemo/issues/1062) is the one central report destination; do not create competing sprint ledgers or report PRs.
 
+## Clean-slate amendment — proposed 25 October 2026 (requires Ilya and Cyrill)
+
+**Status: proposed, not yet approved.** It takes effect only when this amendment is normally reviewed, approved by both Ilya and Cyrill, and merged to `codex/native-remediation`. Until then, every section below remains authoritative. Tracking: [#2339](https://github.com/mysteropodes/nemo/issues/2339) / [CS9 #2344](https://github.com/mysteropodes/nemo/issues/2344).
+
+**Purpose.** The remaining work is now dominated by process and shared-file churn rather than by code:
+
+- Of the 1,897 non-merge commits on the integration branch since 22 September, generated or registration files absorbed hundreds of edits each:
+  - `surfaces.json`: 263;
+  - `rust.coverage.json`: 177;
+  - `app-js.profile.json`: 70;
+  - `index.html`: 66;
+  - the v2 transport schema: 56;
+  - the MCP operation match and include list: about 30 each.
+- Long issue threads are mostly booking and receipt messages.
+
+This amendment changes how work is sized, evidenced and reported. **It does not relax any acceptance criterion, the 100% desktop baseline-parity obligation, the single-authority rule, independent review or branch protection.**
+
+1. **Frozen commencement baseline.**
+   - The functional baseline for parity is the operational source preserved at the native-only separation, `1065e9d8d9c48e66d9b44bb4de446e8f4e887040` (§0).
+   - The surface inventory is regenerated there once, with stable identifiers (not source line numbers), and frozen as `engineering/inventory/baseline-surfaces.json`.
+   - The 228 original task IDs and every frozen surface are joined in a generated `engineering/inventory/parity-matrix.json` with a `--check` gate. This matrix, not the fixed-50 issue count, is the parity denominator of §9.
+2. **Chain-level outcomes (supersedes the 30–90-minute sizing in §3).**
+   - One owner stays accountable for a dependency chain until its matrix rows are accepted: components and storyboard, scene and paint, mesh and rig, text, media and import, frames.
+   - Leaves remain for genuinely independent work.
+   - An issue names the matrix rows it turns green, its entry source, one acceptance command and the legacy files it deletes.
+3. **Evidence by command, installed acceptance batched per candidate.**
+   - Source-level acceptance of a row is the family's headless native acceptance command at an identified source (real providers, independent oracles, undo/redo, save/reopen, render-to-pixels).
+   - Installed-desktop acceptance runs as one scripted session per candidate covering every Ready row, instead of one booking per issue.
+   - §9's single final candidate, its clean-clone, installed, client and resource evidence, and human acceptance are unchanged.
+   - A repair still creates a new candidate.
+4. **Verification spend.**
+   - Where a compiler and tests can verify a change, use compile plus tests plus one composed technical review per integration batch, in place of separate per-leaf source review.
+   - §7 PR review, change requests and merge protection are unchanged.
+5. **Reporting.**
+   - A status generated from the parity matrix replaces the hourly orchestrator posts in #1062, which has reached GitHub's 2,500-comment limit.
+   - Issue comments are limited to claim, blocker, PR and acceptance, using the short templates in §3.
+   - Comments do not restate preserved history; they link to it.
+6. **Board.**
+   - A repository script sets and reads back the Project #2 fields from issue and matrix state.
+   - Manual multi-field edits remain allowed but are no longer required at each transition.
+7. **Monolith freeze.**
+   - `src/js/motion.js`, `timeline.js`, `tools.js`, `app.js` and `tweens.js` accept deletions and minimal call-site redirections only.
+   - New UI behaviour is a presenter over native read models, mounted through the presenter seam ([CS5 #2347](https://github.com/mysteropodes/nemo/issues/2347)).
+8. **Shared files and slots.**
+   - Capability registration, coverage and profile membership, inventory and adapter loading become generated, under CS1 #2341 and CS3 #2342.
+   - Once they are, the whole-file single-writer rule (§3) applies only to files that remain hand-maintained.
+   - The worktree and writer caps of §2 are reviewed then, against measured contention.
+   - One heavy compiler, GPU or installed job per machine at a time remains in force. Booking is a single claim comment; process-census and conservation narratives are not required.
+
+Items 1–8 are adopted only together with the generated tooling they reference. Until a tool exists, the current rule it replaces continues to apply.
+
 ## Current delivery target — desktop first, 7 October 2026
 
 **This is the current surface and completion-scope amendment.** Deliver a stable,
