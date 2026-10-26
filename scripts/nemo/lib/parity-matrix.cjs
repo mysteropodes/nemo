@@ -6,6 +6,8 @@
 // Pure: every input is passed in, so the gate and its negative controls run on
 // fixtures without git or GitHub.
 
+const family = require('./family-acceptance.cjs');
+
 const SCHEMA = 'nemo.parity-matrix/1';
 const TASK_ID = /^[A-Z][0-9]{2}[a-z]?$/;
 const CONFIDENCE = ['high', 'medium', 'low'];
@@ -155,14 +157,18 @@ function mergedOwners(snapshot, ownership) {
   return owners;
 }
 
-function buildMatrix({ config, tasks, baseline, mapping, owners: snapshot, ownership }) {
+function buildMatrix({ config, tasks, baseline, mapping, owners: snapshot, ownership, results }) {
   const owners = mergedOwners(snapshot, ownership);
   const surfaces = baseline.rows.map((r) => {
     const m = (mapping.surfaces || {})[r.id];
-    return { id: r.id, kind: r.kind, area: r.area, capability: r.capability,
+    const row = { id: r.id, kind: r.kind, area: r.area, capability: r.capability,
       tasks: m ? (m.tasks || []) : [], capabilityId: m && m.capability || null,
       disposition: m && m.disposition || null, proposedDisposition: m && m.proposedDisposition || null,
       confidence: m && m.confidence || null, status: surfaceStatus(m, owners) };
+    // Evidence is additive: it never changes status, and the key is absent when no family applies.
+    const evidence = family.evidenceFor(row.tasks, results);
+    if (evidence) row.evidence = evidence;
+    return row;
   });
   const bySurfaceTask = new Map();
   for (const s of surfaces) for (const t of s.tasks) bySurfaceTask.set(t, (bySurfaceTask.get(t) || 0) + 1);
@@ -174,7 +180,9 @@ function buildMatrix({ config, tasks, baseline, mapping, owners: snapshot, owner
   const count = (rows) => rows.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {});
   return { schema: SCHEMA, baseline: config.baseline, baselineStatus: config.baselineStatus, ownersSnapshotAt: snapshot.snapshotAt || null,
     counts: { surfaces: surfaces.length, tasks: taskRows.length, surfaceStatus: count(surfaces), taskStatus: count(taskRows),
-      mappingConfidence: surfaces.reduce((acc, s) => { if (s.confidence) acc[s.confidence] = (acc[s.confidence] || 0) + 1; return acc; }, {}) },
+      evidence: family.evidenceCounts(surfaces), mappingConfidence: surfaces.reduce((acc, s) => { if (s.confidence) acc[s.confidence] = (acc[s.confidence] || 0) + 1; return acc; }, {}) },
+    evidence: (results || []).map((r) => ({ family: r.family, verdict: r.verdict, sourceSha: r.sourceSha, generatedAt: r.generatedAt,
+      kindsMissing: r.kindsMissing, tasks: r.tasks })).sort((a, b) => (a.family < b.family ? -1 : 1)),
     surfaces, tasks: taskRows };
 }
 
@@ -193,6 +201,9 @@ function renderMarkdown(matrix) {
     `- Surfaces: ${matrix.counts.surfaces} (${line(matrix.counts.surfaceStatus)})`,
     `- Tasks: ${matrix.counts.tasks} (${line(matrix.counts.taskStatus)})`,
     `- Mapping confidence: ${line(matrix.counts.mappingConfidence) || 'none recorded'} (medium/low rows need human review)`, '',
+    `- Family evidence (source-level records, additive; surfaces per verdict): ${Object.entries(matrix.counts.evidence || {}).sort().map(([f, v]) => `${f} (${line(v)})`).join(' · ') || 'none recorded'}`, '',
+    'Evidence comes from `results/<family>.json`, written by `node scripts/nemo/family-acceptance.cjs <family> --write` at the recorded source SHA. It is a source-level record, NOT a freshness claim about the current HEAD and NOT acceptance: row status above is unchanged. `incomplete` lists a check kind still uncovered.', '',
+    ...(matrix.evidence || []).map((e) => `- ${e.family}: ${e.verdict} at \`${e.sourceSha.slice(0, 8)}\` (${e.generatedAt.slice(0, 10)}), kinds missing: ${e.kindsMissing.join(', ') || 'none'}, tasks ${e.tasks.join(', ')}`), '',
     '| Outcome | Tasks | Tasks with no owning issue |', '|---|---:|---|',
     ...Object.keys(byOutcome).sort().map((k) => `| ${k} | ${byOutcome[k].tasks} | ${byOutcome[k].unowned.join(', ') || '—'} |`),
     '',
