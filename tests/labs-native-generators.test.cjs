@@ -1,5 +1,5 @@
 'use strict';
-// U36 (#2362): under native authority the Labs speed lines, boil, follow-path and reference fill send one public native operation each,
+// U36 (#2362): under native authority the Labs speed lines, boil, follow-path, reference fill and pose stamp send one public native operation each,
 // built from the baseline option defaults and clamps, through the real labs adapter, rig command and contract; the legacy
 // document and its writers are never touched. Refusals keep the baseline toasts; without a native session the baseline
 // path still runs.
@@ -27,6 +27,13 @@ function harness(options = {}) {
         sent.push(request);
         if (options.refuse) return { apiVersion: 2, requestId: request.requestId, instanceId: pin.instanceId, documentId: pin.documentId,
           contentRevision: pin.contentRevision, ok: false, error: { code: options.refuse, message: 'refused' } };
+        if (request.operation === 'command.document.object.vector.edit') {
+          // The native owner's batch receipt: allocated ids for the creates, in step order.
+          const ids = request.payload.ops.map((op, i) => (op.op === 'create' ? 'native-stroke:' + (pin.contentRevision + 1) + ':' + i
+            : op.op === 'replace' ? op.record.target.strokeId : op.stableTarget.strokeId));
+          return { apiVersion: 2, requestId: request.requestId, instanceId: pin.instanceId, documentId: pin.documentId,
+            contentRevision: pin.contentRevision + 1, ok: true, result: { applied: true, historyEntriesAdded: 1, operation: 'batch', strokeId: ids[0], strokeIds: ids } };
+        }
         if (options.miss) return { apiVersion: 2, requestId: request.requestId, instanceId: pin.instanceId, documentId: pin.documentId,
           contentRevision: pin.contentRevision, ok: true, result: { applied: false, historyEntriesAdded: 0 } };
         return { apiVersion: 2, requestId: request.requestId, instanceId: pin.instanceId, documentId: pin.documentId,
@@ -40,11 +47,13 @@ function harness(options = {}) {
   const root = { state, console, Math, JSON, document: { addEventListener() {} }, SM: { t: (k) => k }, showToast: (t) => toasts.push(t), clearSel: () => cleared.push(1),
     selectedPaths: options.selected || [], SMLabs: { register() {} }, selBounds: () => options.bounds || null,
     NemoNativeObjectProject: { desktop: () => (options.legacy ? null : session) }, NemoNativeObjectLabs: Labs,
+    NemoNativeObjectVector: require('../src/js/adapters/native-object-vector.js'), SMProject: { getProjectKey: () => 'p1' },
+    localStorage: { getItem: (k) => (options.store || {})[k] || null, setItem: (k, v) => { (options.store = options.store || {})[k] = v; } },
     pushUndo: poisoned, pushUndoLayers: poisoned, saveActiveLayerFrame: poisoned, saveAllLayerFrames: poisoned, loadFrame: poisoned,
     ensureKeyframe: poisoned, getEffectiveStrokes: poisoned, Path: poisoned, renderTimeline: poisoned, userLayers: new Proxy({}, { get: poisoned }) };
   root.window = root;
   vm.createContext(root);
-  for (const file of ['speed-lines.js', 'boil-effect.js', 'follow-path.js', 'reference-fill.js', 'pingpong-cycle.js', 'retime-exposure.js', 'interval-assistant.js', 'move-to-layer.js']) vm.runInContext(read('src/js/labs/' + file), root, { filename: file });
+  for (const file of ['speed-lines.js', 'boil-effect.js', 'follow-path.js', 'reference-fill.js', 'pingpong-cycle.js', 'retime-exposure.js', 'interval-assistant.js', 'move-to-layer.js', 'pose-library.js']) vm.runInContext(read('src/js/labs/' + file), root, { filename: file });
   return { root, sent, toasts, cleared, reads, labs: root.SMLabs };
 }
 
@@ -165,6 +174,39 @@ test('move-to-layer sends the selected stroke ids and keeps the baseline target 
   const none = harness();
   assert.equal(none.labs.moveSelectionToLayer(0), 0, 'no selection is refused before any route, as in the baseline');
   assert.deepEqual(none.toasts, ['labsToastSelectStrokesFirst']);
+});
+
+test('stampPose creates the whole pose in one native batch with fresh ids, no brush group and its own offset', async () => {
+  const seg = (x, y) => ({ point: [x, y], handleIn: [0, 0], handleOut: [0, 0] });
+  const pose = [{ strokeId: 'a', brushGroupId: 'g', segments: [seg(0, 0), seg(10, 0)], strokeColor: '#000000', strokeWidth: 3, opacity: 0.5 },
+    { strokeId: 'b', segments: [seg(5, 5), seg(5, 15)], strokeColor: '#ff0000', strokeWidth: 2 }];
+  const h = harness({ store: { 'nemo-labs-poses-p1': JSON.stringify({ wave: pose }) } });
+  assert.equal(await h.labs.stampPose('wave', { dx: 7, dy: -2 }), 2);
+  assert.equal(h.sent.length, 1, 'one command for the whole pose');
+  const sent = h.sent[0];
+  assert.deepEqual([sent.operation, sent.payload.command, sent.payload.keyframe], ['command.document.object.vector.edit', 'object.vector.batch', 'copy']);
+  const records = sent.payload.ops.map((op) => op.record);
+  assert.deepEqual(sent.payload.ops.map((op) => op.op), ['create', 'create']);
+  assert.deepEqual(records.map((r) => r.target.strokeId), ['', ''], 'the owner allocates fresh ids');
+  assert.deepEqual(records.map((r) => r.geometry.segments[0].point), [{ x: 7, y: -2 }, { x: 12, y: 3 }]);
+  assert.deepEqual(records.map((r) => [r.target.layerUid, r.target.frameScope.frame]), [['native-layer:2:0', 6], ['native-layer:2:0', 6]]);
+  assert.equal(records[0].vector.opacity, 0.5);
+  assert.equal(JSON.stringify(records).includes('brushGroupId'), false);
+  assert.deepEqual(h.toasts, ['labsToastPosePrefixwavelabsToastPoseStampedMid2labsToastStrokeCountCloseSuffix']);
+  assert.equal(JSON.parse(h.root.localStorage.getItem('nemo-labs-poses-p1')).wave[0].segments[0].point[0], 0, 'the saved pose is untouched');
+});
+
+test('a refused or oversized pose stamp sends nothing partial and keeps the baseline toast', async () => {
+  const seg = (x, y) => ({ point: [x, y], handleIn: [0, 0], handleOut: [0, 0] });
+  const one = { segments: [seg(0, 0), seg(1, 1)], strokeColor: '#000000', strokeWidth: 1 };
+  const refused = harness({ refuse: 'layer_locked', store: { 'nemo-labs-poses-p1': JSON.stringify({ p: [one] }) } });
+  assert.equal(await refused.labs.stampPose('p'), 0);
+  assert.equal(refused.sent.length, 1);
+  assert.deepEqual(refused.toasts, ['labsToastLayerInvalidLocked']);
+  const big = harness({ store: { 'nemo-labs-poses-p1': JSON.stringify({ p: Array.from({ length: 65 }, () => one) }) } });
+  assert.equal(await big.labs.stampPose('p'), 0);
+  assert.equal(big.sent.length, 0);
+  assert.equal(big.labs.stampPose('missing'), 0, 'an unknown pose answers synchronously, as the baseline');
 });
 
 test('without a native session the baseline path runs unchanged', () => {
