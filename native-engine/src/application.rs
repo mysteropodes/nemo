@@ -528,3 +528,10 @@ fn export_error_code(kind: ExportJobErrorKind) -> DispatchErrorCode {
         ExportJobErrorKind::Released => DispatchErrorCode::Unavailable,
     }
 }
+
+// Retained overlay results are application ports, like the existing brush runtime.
+#[path = "tween_ghost_query.rs"]
+mod tween_ghost;
+pub use tween_ghost::{
+    TweenGhostFrame, TweenGhostKind, TweenGhostPath, TweenGhostRead, TweenGhostVisual,
+};

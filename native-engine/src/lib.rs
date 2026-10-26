@@ -37,10 +37,6 @@ pub(crate) mod object_expression_runtime;
 
 #[cfg(feature = "application")]
 pub(crate) mod tween_kernels;
-#[cfg(feature = "application")]
-pub use tween_kernels::ghost_query::{
-    TweenGhostFrame, TweenGhostKind, TweenGhostPath, TweenGhostRead, TweenGhostVisual,
-};
 
 // Each named Cargo target uses this existing file as a harness. Selecting its
 // test feature resolves the real future test file; absent tests fail compilation.

@@ -168,3 +168,20 @@ impl TweenStore {
         &mut self.layers[index]
     }
 }
+
+impl crate::object_document::ObjectDocument {
+    /// Shared authored-cell presence for generation and immutable ghost selection.
+    pub(crate) fn tween_frame_has_content(&self, layer: &str, frame: u32) -> bool {
+        let in_cell = |t: &crate::object_document::ObjectTarget| {
+            t.context_id == "scene-root"
+                && t.layer_uid == layer
+                && t.frame_scope.kind == crate::object_document::FrameScopeKind::Authored
+                && t.frame_scope.frame == frame
+        };
+        self.objects.iter().any(|r| in_cell(&r.target))
+            || self
+                .items
+                .value()
+                .is_some_and(|i| i.raster_entries().iter().any(|r| in_cell(&r.target)))
+    }
+}

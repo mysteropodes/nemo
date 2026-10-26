@@ -258,7 +258,7 @@ impl ObjectSnapshot {
             for frame in timing
                 .unwrap()
                 .key_frames()
-                .filter(|&f| f != s.frame && super::has_frame_content(doc, &s.layer_uid, f))
+                .filter(|&f| f != s.frame && doc.tween_frame_has_content(&s.layer_uid, f))
             {
                 frames.push(TweenGhostFrame {
                     frame,
@@ -290,9 +290,8 @@ impl ObjectSnapshot {
                 for frame in indices {
                     let source = timing.and_then(|t| t.exposure(frame).1);
                     if !derived
-                        && source.is_none_or(|source| {
-                            !super::has_frame_content(doc, &s.layer_uid, source)
-                        })
+                        && source
+                            .is_none_or(|source| !doc.tween_frame_has_content(&s.layer_uid, source))
                     {
                         continue;
                     }

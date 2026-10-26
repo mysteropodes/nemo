@@ -80,15 +80,6 @@ pub(super) fn held_entries(
     }
     held
 }
-pub(super) fn has_frame_content(doc: &ObjectDocument, layer: &str, frame: u32) -> bool {
-    !frame_records(doc, layer, frame).is_empty()
-        || doc.items.value().is_some_and(|items| {
-            items
-                .raster_entries()
-                .iter()
-                .any(|r| target_in_cell(&r.target, layer, frame))
-        })
-}
 pub(super) fn replace_mixed(
     doc: &mut ObjectDocument,
     layer: &str,

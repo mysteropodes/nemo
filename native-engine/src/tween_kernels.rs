@@ -108,9 +108,6 @@ use backdrop::*;
 mod held_items;
 use held_items::*;
 
-#[path = "tween_ghost_query.rs"]
-pub(crate) mod ghost_query;
-
 #[path = "tween_bitmap_plan.rs"]
 mod bitmap_plan;
 use bitmap_plan::*;

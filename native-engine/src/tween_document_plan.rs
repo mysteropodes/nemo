@@ -68,7 +68,7 @@ pub(crate) fn plan_tween(
             .value()
             .unwrap()
             .key_frames()
-            .filter(|&f| has_frame_content(doc, &request.layer_uid, f))
+            .filter(|&f| doc.tween_frame_has_content(&request.layer_uid, f))
             .collect()
     };
     if drawn_keys(document).len() < 2 {

@@ -24,7 +24,7 @@ fn native_tween_ghost_policy_matches_original_and_keeps_its_snapshot_after_edit_
             .unwrap();
         let mut actual = vec![];
         for f in read.frames() {
-            let source = if f.kind == crate::TweenGhostKind::AllKeys {
+            let source = if f.kind == crate::application::TweenGhostKind::AllKeys {
                 f.frame
             } else {
                 snapshot.document().layers[0]
@@ -67,7 +67,7 @@ fn native_tween_ghost_policy_matches_original_and_keeps_its_snapshot_after_edit_
             original
         );
         for (i, f) in read.frames().iter().enumerate() {
-            if f.kind == crate::TweenGhostKind::AllKeys {
+            if f.kind == crate::application::TweenGhostKind::AllKeys {
                 let paths = read.all_keys_paths(i).unwrap();
                 assert!(!paths.is_empty());
                 for path in paths {
