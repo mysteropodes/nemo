@@ -157,22 +157,14 @@ pub(crate) fn owner_matches(
     Some(exact || refused)
 }
 
-/// Import-family request route: the linked-video request, else the ordinary import.
-pub(crate) fn route(operation: &str, payload: &Value) -> bool {
-    if operation == OP {
-        request(payload)
-    } else {
-        super::request(payload)
-    }
+/// Router fallback: the shared request table ends here for the linked-video operation.
+pub(crate) fn request_check(operation: &str, payload: &Value) -> Option<bool> {
+    (operation == OP).then(|| request(payload))
 }
 
-/// Import-family result route, paired with [`route`].
-pub(crate) fn routed(operation: &str, value: &Value) -> bool {
-    if operation == OP {
-        result(value)
-    } else {
-        super::result(value)
-    }
+/// Router fallback for the shared result table, paired with [`request_check`].
+pub(crate) fn result_validator(operation: &str) -> Option<crate::native_contract::ResultValidator> {
+    (operation == OP).then_some(|_, _, _, r| result(r))
 }
 
 #[cfg(test)]

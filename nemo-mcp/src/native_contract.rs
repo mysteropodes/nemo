@@ -225,7 +225,7 @@ fn request_check(operation: &str, payload: &Value) -> Option<bool> {
             vector::request(operation, payload)
         }
         "command.document.object.layer.create" => object::create_request(payload),
-        import::OP | import::video_link::OP => import::video_link::route(operation, payload),
+        import::OP => import::request(payload),
         operation if export::owns(operation) => export::request(operation, payload),
         "query.diagnostics.recent" => exact(payload, &[], &[]).is_some(),
         "command.reproduction.opt_in"
@@ -245,7 +245,7 @@ fn request_check(operation: &str, payload: &Value) -> Option<bool> {
                         .is_some_and(bounded_identifier)
                     && frame(object.get("frame")).is_some()
             }),
-        _ => return None,
+        _ => return import::video_link::request_check(operation, payload),
     })
 }
 
@@ -443,7 +443,7 @@ fn result_validator(operation: &str) -> Option<ResultValidator> {
         audio_track::OP => |_, _, _, r| audio_track::result(r),
         "command.document.object.project.settings.edit" => |_, _, _, r| settings::result(r),
         "command.document.object.layer.create" => |_, _, _, r| object::create_result(r),
-        import::OP | import::video_link::OP => |o, _, _, r| import::video_link::routed(o, r),
+        import::OP => |_, _, _, r| import::result(r),
         "command.document.object.layer.visibility.set" => |_, _, _, r| object::visibility_result(r),
         "command.document.object.undo" | "command.document.object.redo" => {
             |_, _, _, r| object::history_result(r)
@@ -454,7 +454,7 @@ fn result_validator(operation: &str) -> Option<ResultValidator> {
             |o, _, _, r| reproduction::validate_result(o, r)
         }
         "query.document.serialize" | "query.document.evaluate" => document_read_result,
-        _ => return None,
+        _ => return import::video_link::result_validator(operation),
     })
 }
 
