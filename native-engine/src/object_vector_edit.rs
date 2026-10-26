@@ -44,6 +44,7 @@ struct VectorPayload {
     record: Presence<ObjectRecord>,
     records: Presence<Vec<ObjectRecord>>,
     placement: Presence<String>,
+    trim_ends: Presence<serde_json::Number>,
     stable_target: Presence<ObjectTarget>,
     mask_edit: Presence<mask_edit::MaskEdit>,
 }
@@ -52,6 +53,7 @@ object_deserialize!(VectorPayload {
     #[serde(default)] record: Presence<ObjectRecord>,
     #[serde(default)] records: Presence<Vec<ObjectRecord>>,
     #[serde(default)] placement: Presence<String>,
+    #[serde(default)] trim_ends: Presence<serde_json::Number>,
     #[serde(default)] stable_target: Presence<ObjectTarget>,
     #[serde(default)] mask_edit: Presence<mask_edit::MaskEdit>
 });
@@ -333,6 +335,7 @@ impl ObjectFillOwner {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         let placement = Placement::parse(&payload.command, &payload.placement)?;
+        let trim = create_ops::trim_ends(&payload.command, &payload.trim_ends)?;
         let mut edit = match (
             payload.command.as_str(),
             payload.record,
@@ -343,14 +346,14 @@ impl ObjectFillOwner {
                 let Presence::Present(records) = payload.records else {
                     return Err(DispatchErrorCode::InvalidRequest);
                 };
-                create_many(&origin, records, placement)?
+                create_many(&origin, records, placement, trim)?
             }
             (
                 "object.vector.create",
                 Presence::Present(record),
                 Presence::Missing,
                 Presence::Missing,
-            ) => create(&origin, record, placement)?,
+            ) => create(&origin, record, placement, trim)?,
             (
                 "object.vector.replace",
                 Presence::Present(record),

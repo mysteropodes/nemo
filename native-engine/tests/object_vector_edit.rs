@@ -12,6 +12,8 @@ mod limits;
 mod lock;
 #[path = "object_vector_create_many.rs"]
 mod create_many;
+#[path = "object_vector_trim_ends.rs"]
+mod trim_ends;
 #[path = "object_vector_edit_support.rs"]
 mod support;
 use support::*;

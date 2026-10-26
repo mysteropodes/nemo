@@ -64,3 +64,20 @@ fn placement_is_an_optional_front_or_behind_on_the_two_creates_only() {
     let delete = json!({"command":"object.vector.delete","stableTarget":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":3},"layerUid":"L1","strokeId":"s"},"placement":"behind"});
     assert!(!request(VECTOR, &delete));
 }
+
+#[test]
+fn trim_ends_is_an_optional_positive_limit_on_the_two_creates_only() {
+    let records = json!([record(), record()]);
+    for command in ["object.vector.create", "object.vector.createMany"] {
+        let body = if command == "object.vector.create" { json!({"record":record()}) } else { json!({"records":records}) };
+        for (trim, ok) in [(json!(24), true), (json!(0.5), true), (json!(0), false), (json!(-1), false), (json!("24"), false), (json!(null), false)] {
+            let mut payload = body.clone();
+            payload["command"] = json!(command);
+            payload["trimEnds"] = trim.clone();
+            payload["placement"] = json!("behind");
+            assert_eq!(request(VECTOR, &payload), ok, "{command} {trim}");
+        }
+    }
+    let delete = json!({"command":"object.vector.delete","stableTarget":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":3},"layerUid":"L1","strokeId":"s"},"trimEnds":24});
+    assert!(!request(VECTOR, &delete));
+}
