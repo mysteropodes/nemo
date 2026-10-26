@@ -270,11 +270,6 @@
   }
 
   function init() {
-    var setTool = window.SM && window.SM.setTool;
-    if (typeof setTool === 'function') window.SM.setTool = function (t) {
-      if (t !== 'pen' && nativePen) nativePen.finish();
-      return setTool.apply(this, arguments);
-    };
     var target = document.getElementById('canvas-area') || document.getElementById('drawing-canvas');
     canvasEl = target;
     target.addEventListener('pointerdown', onDown, { capture: true });

@@ -227,11 +227,14 @@
       else if(ports.pen&&(e.key==='Backspace'||e.key==='Delete')&&drag&&!pending){consume(e);
         if(drag.anchors.length<=1)cancel();else{drag.anchors.pop();drag.handleDrag=false;preview(drag,drag.anchors[drag.anchors.length-1].point);}}
     }
-    // Switching away from Pen commits the open path (timeline.js setTool @1065e9d8: finalizePen()).
     function finish(){if(ports.pen&&drag&&!pending){if(current(drag,true))finishPen(drag,false);else cancel();}}
     root.document.addEventListener('keydown',key,{capture:true});
+    // Switching away from Pen commits the open path (timeline.js setTool @1065e9d8: finalizePen()).
+    var setTool=ports.pen&&root.SM&&typeof root.SM.setTool==='function'?root.SM.setTool:null,boundSetTool=null;
+    if(setTool){boundSetTool=function(next){if(next!=='pen')finish();return setTool.apply(this,arguments);};root.SM.setTool=boundSetTool;}
     return Object.freeze({handle:handle,cancel:cancel,finish:finish,whenSettled:function(){return settled;},isDragging:function(){return !!drag;},
-      dispose:function(){retired=true;cancel();if(pending)pending.cancelled=true;root.document.removeEventListener('keydown',key,{capture:true});}});
+      dispose:function(){retired=true;cancel();if(pending)pending.cancelled=true;root.document.removeEventListener('keydown',key,{capture:true});
+        if(boundSetTool&&root.SM&&root.SM.setTool===boundSetTool)root.SM.setTool=setTool;}});
   }
   // Composition of existing brush filters and detached geometry; no Paper
   // insertion, document writer or second queue. Shared by the real draw route.
