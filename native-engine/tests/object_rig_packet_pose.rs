@@ -18,6 +18,9 @@ use crate::object_render_scene::{prepare_object_render_scene, ObjectSceneError};
 use crate::revision::ObjectSnapshot;
 use serde_json::{json, Value};
 
+#[path = "rig_pose_eval_rows.rs"]
+mod rows;
+
 const ORACLE: &str = include_str!("fixtures/object-rig-mesh-join/oracle.txt");
 const STORED: &str = "stored_sculpt_is_replaced_by_the_rig";
 
@@ -311,4 +314,25 @@ fn a_wrong_pin_or_a_layer_without_a_rig_never_evaluates() {
     assert!(packet_poses(&packet).is_empty());
     let scene = prepare_object_render_scene(&packet, &selector(&snapshot)).unwrap();
     assert!(scene.rasters[0].rig_offsets().is_none());
+}
+
+#[test]
+fn a_rigged_layer_that_also_holds_a_vector_keeps_the_typed_chain_refusal() {
+    // The pivot bounds of a vector in the layer would be the unposed stored ones, so the supported case
+    // stops at pure raster/mesh layers; the mixed layer stays an atomic typed refusal.
+    let row = row("translate_all_bound_vertices");
+    let mut doc = document(&row.input["rig"], &row.input["mesh"], &row.input["rect"], None);
+    let square = [[0., 0., 0., 0., 0., 0.], [10., 0., 0., 0., 0., 0.], [10., 10., 0., 0., 0., 0.]];
+    doc["objects"] = json!([rows::stroke_record("L1", "s1", true, &square, 0)]);
+    doc["compositionOrder"]["contexts"][0]["scopes"][0]["elements"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"layerUid":"L1","strokeId":"s1","naturalPosition":1,"order":{}}));
+    let snapshot = snapshot_of(&doc);
+    let packet = packet_of(&snapshot);
+    assert!(matches!(
+        prepare_object_render_scene(&packet, &selector(&snapshot)),
+        Err(ObjectSceneError::UnsupportedGeometry { reason, .. })
+            if reason == "native parent group, rig or effect context unavailable"
+    ));
 }
