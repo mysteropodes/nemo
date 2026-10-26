@@ -2163,6 +2163,18 @@
       ]
     },
     {
+      "id": "app.native.object.query.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-query-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-query-contract.js"
+      ]
+    },
+    {
       "id": "app.native.application.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
@@ -2628,6 +2640,7 @@
       "files": [
         "native-object-project.js",
         "native-object-project-desktop.js",
+        "native-object-project-reads.js",
         "native-object-project-properties.js",
         "native-object-open-exposure.js",
         "native-object-project-export.js",

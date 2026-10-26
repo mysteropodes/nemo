@@ -2,10 +2,11 @@
 (function (root, factory) {
   const vectorContract = typeof module === 'object' && module.exports ? require('./native-object-vector-contract.js') : root.NemoNativeObjectVectorContract, fontContract = [typeof module === 'object' && module.exports ? require('./native-audio-track-contract.js') : root.NemoNativeAudioTrackContract, typeof module === 'object' && module.exports ? require('./native-layer-playhead-cut-contract.js') : root.NemoNativeLayerPlayheadCutContract, typeof module === 'object' && module.exports ? require('./native-project-placement-contract.js') : root.NemoNativeProjectPlacementContract, typeof module === 'object' && module.exports ? require('./native-text-read-contract.js') : root.NemoNativeTextReadContract, typeof module === 'object' && module.exports ? require('./native-object-rig-contract.js') : root.NemoNativeObjectRigContract, typeof module === 'object' && module.exports ? require('./native-object-component-contract.js') : root.NemoNativeObjectComponentContract, typeof module === 'object' && module.exports ? require('./native-media-export-contract.js') : root.NemoNativeMediaExportContract, typeof module === 'object' && module.exports ? require('./native-import-contract.js') : root.NemoNativeImportContract, typeof module === 'object' && module.exports ? require('./native-bitmap-brush-resources-contract.js') : root.NemoNativeBitmapBrushResourcesContract, typeof module === 'object' && module.exports ? require('./native-composition-contract.js') : root.NemoNativeCompositionContract, typeof module === 'object' && module.exports ? require('./native-palette-contract.js') : root.NemoNativePaletteContract, typeof module === 'object' && module.exports ? require('./native-guide-contract.js') : root.NemoNativeGuideContract, typeof module === 'object' && module.exports ? require('./native-shadow-contract.js') : root.NemoNativeShadowContract, typeof module === 'object' && module.exports ? require('./native-perspective-contract.js') : root.NemoNativePerspectiveContract, typeof module === 'object' && module.exports ? require('./native-symmetry-contract.js') : root.NemoNativeSymmetryContract, typeof module === 'object' && module.exports ? require('./native-workspace-contract.js') : root.NemoNativeWorkspaceContract, typeof module === 'object' && module.exports ? require('./native-custom-brush-contract.js') : root.NemoNativeCustomBrushContract, typeof module === 'object' && module.exports ? require('./native-comments-contract.js') : root.NemoNativeCommentsContract, vectorContract].reduce((base, lane) => (lane ? lane.compose(base) : base), ((base, item) => item ? item.compose(base) : base)(typeof module === 'object' && module.exports ? require('./native-object-edit-seam.js') : root.NemoNativeObjectEditSeam, typeof module === 'object' && module.exports ? require('./native-object-item-contract.js') : root.NemoNativeObjectItemContract));
   const propertyContract = typeof module === 'object' && module.exports ? require('./native-property-contract.js') : root.NemoNativePropertyContract;
-  const api = factory((typeof module === 'object' && module.exports ? require('./native-frame-edit-contract.js') : root.NemoNativeFrameEditContract || { join: (base) => base }).join(fontContract), vectorContract, propertyContract);
+  const queryContract = typeof module === 'object' && module.exports ? require('./native-object-query-contract.js') : root.NemoNativeObjectQueryContract;
+  const api = factory((typeof module === 'object' && module.exports ? require('./native-frame-edit-contract.js') : root.NemoNativeFrameEditContract || { join: (base) => base }).join(fontContract), vectorContract, propertyContract, queryContract);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.NemoNativeApplicationAdapter = api;
-}(typeof globalThis === 'object' ? globalThis : this, function (fontContract, vectorContract, propertyContract) {
+}(typeof globalThis === 'object' ? globalThis : this, function (fontContract, vectorContract, propertyContract, queryContract) {
   'use strict';
 
   const editOperation = 'command.document.object.property.edit';
@@ -72,10 +73,7 @@
     if (fontContract && fontContract.admitted(operation)) return fontContract.paths(operation);
     if(operation==='query.document.object.property.metadata') return {has:p=>p==='payload.view.property'||/^(?:payload\.view\.target|result\.target|result\.items\.\d+\.target)\.(?:contextId|layerUid|strokeId)$/.test(p)||/^result\.items\.\d+\.(?:contextId|controlName|property)$/.test(p)};
     if (operation === 'query.document.object.layer.timing') return new Set(['payload.layerUid', 'result.layerUid']);
-    if (operation === 'query.document.object') return vectorContract ? vectorContract.readPaths : new Set([
-      'payload.stableTarget.layerUid', 'payload.stableTarget.strokeId',
-      'result.object.target.layerUid', 'result.object.target.strokeId',
-    ]);
+    if (operation === 'query.document.object') return {has: (p) => queryContract.paths.has(p) || !!(vectorContract && vectorContract.readPaths.has(p))};
     if (operation === 'command.document.object.layer.create') return new Set(['payload.name', 'result.layerUid']);
     return ['command.document.object.layer.visibility.set', 'command.document.object.layer.policy.edit'].includes(operation) ? new Set(['payload.layerUid']) : null;
   }
@@ -166,8 +164,7 @@
     if (fontContract && fontContract.admitted(operation)) return fontContract.payload(operation, payload, envelope);
     if(operation==='query.document.object.property.metadata') property.metadataPayload(payload);
     else if (operation === 'query.document.object') {
-      exact(payload, ['atRevision', 'stableTarget'], [], 'object query');
-      revision(payload.atRevision, 'atRevision'); objectTarget(payload.stableTarget);
+      queryContract.payload(payload, { exact, revision, objectTarget });
     } else if (operation === 'query.document.object.layer.timing') {
       exact(payload, ['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'], ['view'], 'timing selector');
       if(has(payload,'view')&&!['range','placement','cells'].includes(payload.view))throw new TypeError('invalid timing view');
@@ -334,8 +331,7 @@
     if (fontContract && fontContract.admitted(operation)) return fontContract.result(operation, value);
     if(operation==='query.document.object.property.metadata') property.metadataResult(value);
     else if (operation === 'query.document.object') {
-      exact(value, ['atRevision', 'documentSnapshotId', 'object'], [], 'object read result');
-      revision(value.atRevision, 'atRevision'); objectUid(value.documentSnapshotId); objectRecord(value.object);
+      queryContract.result(value, { exact, revision, objectUid, objectRecord });
     } else if (operation === 'query.document.object.layer.timing') {
       validateNativeObjectLayerTimingResult(value);
     } else if (operation === 'command.document.object.layer.create') {
@@ -467,10 +463,7 @@
             const replacement = !response.ok && response.error.code === 'wrong_document';
             if (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId && !replacement) throw new TypeError('object response identity mismatch');
             if (response.ok && outbound.operation === 'query.document.object') {
-              const expected = outbound.payload.stableTarget, actual = response.result.object.target;
-              if (response.result.atRevision !== outbound.payload.atRevision ||
-                  ['contextId', 'layerUid', 'strokeId'].some((key) => actual[key] !== expected[key]) ||
-                  ['kind', 'frame'].some((key) => actual.frameScope[key] !== expected.frameScope[key])) throw new TypeError('object read selector mismatch');
+              queryContract.correlate(outbound.payload, response.result, undefined, outbound.documentId);
             }
             if (response.ok && outbound.operation==='query.document.object.property.metadata') property.metadataCorrelated(outbound.payload,response.result);
             if (response.ok && outbound.operation === readOperation) property.readCorrelated(outbound.payload, response.result);

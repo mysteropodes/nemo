@@ -197,15 +197,15 @@ test('stage canvas pointer origin still creates exactly one native rectangle thr
  const f=await fixture();f.canvas.fire('pointerdown');f.canvas.fire('pointermove',{clientX:240,clientY:210});f.canvas.fire('pointerup',{clientX:240,clientY:210});
  assert.equal((await f.root.NemoNativeShapeToolController.whenSettled()).status,'applied');assert.equal(f.calls.length,1);
 });
-test('all 43 retained bootstrap identities keep their frozen runs and adjacency in the actual page',()=>{
+test('all 45 retained bootstrap identities keep their frozen runs and adjacency in the actual page',()=>{
  const html=fs.readFileSync(path.join(ROOT,'src/index.html'),'utf8'),fixture=fs.readFileSync(path.join(ROOT,'scripts/nemo/boundaries-application.test.cjs'),'utf8');
  const start=fixture.indexOf("test('N20 contract, authority, adapters and bootstrap load in their frozen order'");assert.ok(start>0);
- const block=fixture.slice(start),paths=Array.from(vm.runInNewContext(block.match(/const paths = (\[[\s\S]*?\]);/)[1]));assert.equal(paths.length,43);
+ const block=fixture.slice(start),paths=Array.from(vm.runInNewContext(block.match(/const paths = (\[[\s\S]*?\]);/)[1]));assert.equal(paths.length,45);
  const runs=JSON.parse(block.match(/assertRuns\(paths\.map\([\s\S]*?scriptOrdinal\),\s*(\[[\d,\s]+\])/)[1]);
  const scripts=[...html.matchAll(/<script\b([^>]*)>/gi)].map((m,i)=>({src:m[1].match(/\bsrc=["']([^"']+)/)?.[1],ordinal:i+1}));
  const ordinals=paths.map(p=>scripts.find(s=>'src/'+s.src===p).ordinal);let at=0;
  for(const size of runs){for(let k=1;k<size;k++)assert.equal(ordinals[at+k],ordinals[at+k-1]+1);if(at)assert.ok(ordinals[at]>ordinals[at-1]+1);at+=size;}
- assert.equal(at,43);
+ assert.equal(at,45);
  // Read actual HTML directly: one helper after SDK, before the following consumer.
  assert.equal(scripts.filter(s=>s.src==='js/adapters/native-frame-edit-desktop.js').length,1);
  const ord=name=>scripts.find(s=>s.src==='js/adapters/'+name+'.js').ordinal;
@@ -213,7 +213,7 @@ test('all 43 retained bootstrap identities keep their frozen runs and adjacency 
  assert.ok(ord('native-frame-edit-desktop')<ord('native-fill-desktop')&&ord('native-fill-desktop')<ord('native-text-read'));
  assert.equal(scripts.find(s=>s.src==='js/i18n.js').ordinal,ord('i18n-runtime')+1);
  assert.match(fixture,/retained\.loadSites\[0\]\.scriptOrdinal, runtime\[0\]\.ordinal/);
- assert.match(fixture,/assertRuns\(positions, \[1, 8, 2\]/);
+ assert.match(fixture,/assertRuns\(positions, \[1, 10, 2\]/);
 });
 
 test('native drawing refuses unavailable, stale and enabled Perspective projections before a document command',async()=>{

@@ -33,6 +33,10 @@ mod import_assets;
 #[path = "object_selection_revision.rs"]
 mod selection;
 
+#[cfg(feature = "application")]
+#[path = "tween_resource_revision.rs"]
+mod tween_resources;
+
 static NEXT_OBJECT_DOCUMENT: AtomicU64 = AtomicU64::new(1);
 #[cfg(feature = "history")]
 const MAX_CONTENT_REVISION: u64 = 9_007_199_254_740_991;

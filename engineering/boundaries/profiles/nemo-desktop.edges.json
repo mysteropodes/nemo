@@ -456,6 +456,8 @@
           "object_render_scene::prepare_scheduled_object_composition_from_witness",
           "object_render_scene::ObjectCompositionWitness",
           "object_snapshot::ObjectSnapshot",
+          "object_snapshot::ImageMeshReadFailure",
+          "object_snapshot::ImageMeshReadProjection",
           "resource_leases::WorkId",
           "scheduler::EvaluationKey",
           "scheduler::FrameScheduler",

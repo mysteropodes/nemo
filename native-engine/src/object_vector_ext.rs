@@ -13,7 +13,7 @@ use serde_json::Number;
 mod fill_trace;
 pub(crate) use fill_trace::FillTrace;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct VectorExt {
     /// Present exactly for a vector-brush stroke (the baseline `isVectorBrush`).
