@@ -24,6 +24,14 @@ distinguishes existing commands from planned coverage and diagnostics work.
 | `npm run build:desktop` | Isolated Tauri build under a task/worktree reservation; preserves its exact package and logs in the report directory, bundles ffmpeg dylibs, then performs owned cleanup. Local, unsigned. | 0/1/2 |
 | `npm run verify` | Runs a profile (`--profile quick` default: doctor, check, inventory, test:unit, test:rust; `--profile full` adds the rest) or `--jobs a,b,c`, and emits **one receipt**. | 0 pass / 1 any fail / 2 required job blocked |
 
+`node scripts/nemo/boundaries.cjs --suggest [paths...] [--root <dir>] [--json]` is read-only: for each
+path, or for every currently unowned Rust/JS source when none is given, it prints the profile module entry
+(and the `app-js.coverage.json` retained-source record) to add. Rust files follow their `mod` / `#[path]`
+declaration to the declaring file's module; JS files follow the module owning sibling files; ambiguous
+cases list each candidate with its reason. Delivery provenance goes in the PR description, not in
+`rust.coverage.json`, which is frozen: `node scripts/nemo/ci.cjs boundaries` fails on any new top-level or
+`provenance` key outside `engineering/boundaries/profiles/rust.coverage.frozen-keys.json`.
+
 Any job can be run alone: `node scripts/nemo/job.cjs test:rust,build:wasm`. Add `--json` to
 print the receipt instead of the summary.
 

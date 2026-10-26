@@ -7,6 +7,9 @@
 // Usage:
 //   node scripts/nemo/boundaries.cjs <profile.json> [--baseline <prior-profile.json>]
 //     [--root <dir>] [--json]
+//   node scripts/nemo/boundaries.cjs --suggest [paths...] [--root <dir>] [--json]
+//     Read-only: print the profile membership entry for each path, or for every
+//     currently unowned Rust/JS source when no path is given. Never writes files.
 //
 // Exit codes: 0 = no violations, 1 = one or more checker/ratchet violations,
 // 2 = bad usage or an input that could not be loaded/run.
@@ -17,6 +20,7 @@ const { checkProfile, validateProfile } = require('./lib/boundaries.cjs');
 const { compareSizeBaseline } = require('./lib/boundaries-ratchet.cjs');
 const { checkSourceSizes } = require('./lib/boundaries-size.cjs');
 const { rustBoundaries } = require('./ci.cjs');
+const { suggest, render } = require('./lib/boundaries-suggest.cjs');
 
 function profileReport(profile, root) {
   validateProfile(profile);
@@ -57,7 +61,29 @@ function parseArgs(argv) {
   return out;
 }
 
+function suggestMain(argv) {
+  const out = { paths: [], root: process.cwd(), json: false };
+  try {
+    for (let i = 0; i < argv.length; i++) {
+      if (argv[i] === '--suggest') continue;
+      if (argv[i] === '--json') out.json = true;
+      else if (argv[i] === '--root') {
+        if (!argv[i + 1] || argv[i + 1].startsWith('--')) throw new Error('--root requires a directory');
+        out.root = argv[++i];
+      } else if (argv[i].startsWith('-')) throw new Error(`unknown option: ${argv[i]}`);
+      else out.paths.push(argv[i]);
+    }
+    const result = suggest(path.resolve(out.root), out.paths);
+    console.log(out.json ? JSON.stringify(result, null, 2) : render(result));
+    return 0;
+  } catch (err) {
+    console.error(`boundaries --suggest could not run: ${err.message}`);
+    return 2;
+  }
+}
+
 function main() {
+  if (process.argv.slice(2).includes('--suggest')) return suggestMain(process.argv.slice(2));
   let args;
   try {
     args = parseArgs(process.argv.slice(2));
