@@ -4,7 +4,7 @@
   "authorities": {
     "legacy-owned": "still owned by the JavaScript/Paper writer on desktop; admitted",
     "native": "owned by the native engine through the named capability; legacy entry refused",
-    "unavailable": "not yet migrated; legacy entry refused and reported unavailable (EXECUTION_PLAN §0)"
+    "unavailable": "not yet migrated; legacy entry refused and reported unavailable (EXECUTION_PLAN \u00a70)"
   },
   "prefixes": {
     "global": "app-",
@@ -352,6 +352,19 @@
       "kinds": []
     },
     {
+      "family": "opacity",
+      "authority": "native",
+      "capability": "native-opacity",
+      "entries": {},
+      "kinds": [
+        "opacity-application-write"
+      ],
+      "kindPrefixes": [
+        "opacity-"
+      ],
+      "note": "bootstrap/opacity-application.js also guards 'opacity-' + kind (set, key-current, key-frame, remove); a prefix family cannot be legacy-owned until its kinds are listed exactly."
+    },
+    {
       "family": "extensions",
       "authority": "unavailable",
       "entries": {
@@ -368,5 +381,9 @@
       },
       "kinds": []
     }
+  ],
+  "guardFunctions": [
+    "n20*",
+    "allowLegacyOpacity"
   ]
 }
