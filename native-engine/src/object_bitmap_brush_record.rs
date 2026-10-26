@@ -30,6 +30,9 @@ object_deserialize!(BitmapBrushSpec {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct BitmapBrushFields {
+    /// Native provenance for interpStroke output, which never runs applyBitmapBrushTexture's camouflage.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) tween_generated: Presence<bool>,
     pub(crate) bitmap_brush_spec: BitmapBrushSpec,
     pub(crate) brush_group_id: String,
     #[serde(skip_serializing_if = "Presence::missing")]
@@ -40,6 +43,7 @@ pub(crate) struct BitmapBrushFields {
     pub(crate) bitmap_pressure_profile: Presence<Vec<[Number; 3]>>,
 }
 object_deserialize!(BitmapBrushFields {
+    #[serde(default)] tween_generated: Presence<bool>,
     bitmap_brush_spec: BitmapBrushSpec,
     brush_group_id: String,
     #[serde(default)] pre_texture_stroke: Presence<Option<String>>,
@@ -165,6 +169,11 @@ pub(crate) fn validate_record(record: &ObjectRecord) -> Result<(), BitmapBrushVa
     let Some(vector) = record.vector.value() else {
         return Err(invalid("bitmap brush anchor has no vector body"));
     };
+    // Generated samples retain the interpolated plain anchor plus separately baked ink.
+    // Their provenance is authored by the sealed tween command, not inferred from missing values.
+    if fields.tween_generated.value() == Some(&true) {
+        return Ok(());
+    }
     if record.solid_fill().is_some() {
         if vector.solid_stroke().is_some() || fields.pre_texture_stroke.missing() {
             return Err(invalid(

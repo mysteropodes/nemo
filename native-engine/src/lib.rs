@@ -35,6 +35,9 @@ pub(crate) mod object_expression_pin;
 #[cfg(feature = "object_expression_runtime")]
 pub(crate) mod object_expression_runtime;
 
+#[cfg(feature = "application")]
+pub(crate) mod tween_kernels;
+
 // Each named Cargo target uses this existing file as a harness. Selecting its
 // test feature resolves the real future test file; absent tests fail compilation.
 // No feature enabled means no test module, not a placeholder passing test.

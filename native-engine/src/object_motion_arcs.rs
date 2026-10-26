@@ -150,7 +150,7 @@ impl MotionArcs {
         layer: &str,
         a_frame: i64,
         b_frame: i64,
-        index: u32,
+        index: i64,
         a: [f64; 2],
         b: [f64; 2],
     ) -> Result<MotionArcHandles, MotionArcError> {
@@ -268,8 +268,39 @@ impl ObjectDocument {
     ) -> Result<MotionArcHandles, MotionArcError> {
         check_pairs(layer, &[(a_frame, b_frame, a_frame, b_frame)])?;
         match self.motion_arcs.value().and_then(Option::as_ref) {
-            Some(arcs) => arcs.handles(layer, a_frame, b_frame, index, a, b),
-            None => MotionArcs::default().handles(layer, a_frame, b_frame, index, a, b),
+            Some(arcs) => arcs.handles(layer, a_frame, b_frame, index.into(), a, b),
+            None => MotionArcs::default().handles(layer, a_frame, b_frame, index.into(), a, b),
+        }
+    }
+    /// Forced tween pairs use negative indices in the baseline arc-key suffix.
+    pub(crate) fn tween_motion_arc_handles(
+        &self,
+        layer: &str,
+        a_frame: u32,
+        b_frame: u32,
+        index: i32,
+        a: [f64; 2],
+        b: [f64; 2],
+    ) -> Result<MotionArcHandles, MotionArcError> {
+        check_pairs(
+            layer,
+            &[(
+                a_frame.into(),
+                b_frame.into(),
+                a_frame.into(),
+                b_frame.into(),
+            )],
+        )?;
+        match self.motion_arcs.value().and_then(Option::as_ref) {
+            Some(arcs) => arcs.handles(layer, a_frame.into(), b_frame.into(), index.into(), a, b),
+            None => MotionArcs::default().handles(
+                layer,
+                a_frame.into(),
+                b_frame.into(),
+                index.into(),
+                a,
+                b,
+            ),
         }
     }
     /// Prepare the entire Arc replacement before field assignment; caller later seals the SAME document with content/range/Motion.
