@@ -11,6 +11,9 @@ pub(crate) mod component_scene;
 #[cfg(all(test, feature = "history"))]
 #[path = "../tests/object_component_render_scene.rs"]
 mod component_tests;
+#[cfg(all(test, feature = "history"))]
+#[path = "../tests/object_component_exposed_override.rs"]
+mod component_override_tests;
 
 use scene_effect_kernels::object_scene_resource_set::{
     same_scene_resources, SceneResourceMismatch,

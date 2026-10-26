@@ -366,6 +366,16 @@ mod tests;
 
 #[cfg(all(
     test,
+    not(feature = "font_asset_admission"),
+    feature = "history",
+    feature = "application",
+    feature = "project_media_codec"
+))]
+#[path = "../tests/object_text_scene_nofont.rs"]
+mod nofont_tests;
+
+#[cfg(all(
+    test,
     feature = "font_asset_admission",
     feature = "history",
     feature = "application",
