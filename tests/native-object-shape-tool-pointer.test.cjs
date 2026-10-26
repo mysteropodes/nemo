@@ -329,7 +329,7 @@ test('symmetry preview draws the stroke and its mirror without writing anything,
  const f=await fixture('rect');Object.assign(f.root.state,{symmetryEnabled:true,symmetryMode:'y',symmetryExtend:true});
  f.area.fire('pointerdown');f.area.fire('pointermove',{clientX:240,clientY:210});
  const overlay=f.body.firstChild;assert.equal(overlay.children.length,2,'stroke plus its mirror');
- assert.match(overlay.children[0].attributes.d,/^M 20 20/);assert.match(overlay.children[1].attributes.d,/^M 300 20/);
+ assert.match(overlay.children[0].attributes.d,/^M 20 20/);assert.match(overlay.children[1].attributes.d,/^M 300 80/,'the mirrored closed copy is re-oriented');
  assert.equal(f.calls.length,0,'preview writes nothing');
  f.area.fire('pointerup',{clientX:240,clientY:210});await f.root.NemoNativeShapeToolController.whenSettled();
  assert.equal(f.body.children.length,0);assert.equal(f.calls.length,1);assert.equal(f.calls[0].payload.records.length,2);
