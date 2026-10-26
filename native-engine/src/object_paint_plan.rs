@@ -51,6 +51,10 @@ impl<'a> ObjectPaintCommand<'a> {
             None => self.entry.solid().channels(),
         }
     }
+    /// The raw layer opacity factor folded into `paint()` and `solid()` (one for an untouched layer).
+    pub(crate) fn layer_opacity(&self) -> f64 {
+        self.entry.layer_opacity()
+    }
     /// Typed straight-RGBA paint (L07-A `SceneSolid`) retained with the contour;
     /// Raw layer opacity is already folded in. At factor one `paint()` retains
     /// its original source-fill borrowing contract.

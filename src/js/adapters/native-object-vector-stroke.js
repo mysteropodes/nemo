@@ -15,9 +15,10 @@
   // Members the record owns; everything else a dictionary carries is reported (UNMAPPED) or refuses the mapping (REFUSED).
   const CARRIED = ['segments', 'closed', 'strokeColor', 'hasRealStroke', 'strokeWidth', 'strokeCap', 'strokeJoin', 'miterLimit', 'fillColor',
     'opacity', 'dashArray', 'dashOffset', 'paintOrder', 'isVectorBrush', 'centerSegments', 'widthProfile', 'strokeProfile', 'profileBase',
-    'strokeId', 'boxAngle', 'paramShape', 'fillGradient', 'fillSeed', 'fillSeeds', 'fillWalls', 'fillGapPx', 'isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion'];
+    'strokeId', 'boxAngle', 'paramShape', 'fillGradient', 'fillSeed', 'fillSeeds', 'fillWalls', 'fillGapPx', 'isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion',
+    'brushGroupId', 'isBrushTextureCopy', 'brushTexturePreset', 'preTextureOpacity', 'preTextureStroke'];
   // Look-changing members with no record slot: mapping them as a plain path would lose the look without a word.
-  const REFUSED = ['strokeGradientAlongPath', 'bitmapBrushSpec', 'brushTexturePreset', 'isBrushTextureCopy', 'isText', 'isTextRoot',
+  const REFUSED = ['strokeGradientAlongPath', 'bitmapBrushSpec', 'isText', 'isTextRoot',
     'isVectorText', 'effects'];
   const SHAPE_MEMBERS = { rect: ['tl', 'tr', 'br', 'bl'], ellipse: ['startAngle', 'sweep', 'innerRadius'], star: ['pointCount', 'innerRatio', 'cornerRadius'] };
   const FX_TYPES = [
@@ -131,6 +132,20 @@
       if(!ok)refuse('invalid_dict','invalid '+key);
       out[key]=JSON.parse(JSON.stringify(v));
     });
+    // G16 serP: group id, copy flag and preset only when truthy; preTexture* whenever defined (null kept).
+    const text = (v) => typeof v === 'string' && new TextEncoder().encode(v).length <= 255 && !v.includes('\0');   // UTF-8 bytes, as native counts
+    if (dict.brushGroupId) { if (!text(dict.brushGroupId)) refuse('invalid_dict', 'invalid brushGroupId'); out.brushGroupId = dict.brushGroupId; }
+    if (dict.isBrushTextureCopy) out.isBrushTextureCopy = true;
+    if (dict.brushTexturePreset) { if (!text(dict.brushTexturePreset)) refuse('invalid_dict', 'invalid brushTexturePreset'); out.brushTexturePreset = dict.brushTexturePreset; }
+    if (dict.preTextureOpacity !== undefined) {
+      if (typeof dict.preTextureOpacity !== 'number' || !Number.isFinite(dict.preTextureOpacity)) refuse('invalid_dict', 'invalid preTextureOpacity');
+      out.preTextureOpacity = dict.preTextureOpacity;
+    }
+    if (dict.preTextureStroke !== undefined) {
+      if (dict.preTextureStroke !== null && !/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(dict.preTextureStroke)) refuse('invalid_dict', 'invalid preTextureStroke');
+      out.preTextureStroke = dict.preTextureStroke;
+    }
+    if (out.isBrushTextureCopy && out.brushTexturePreset) refuse('invalid_dict', 'a brush-texture dab is not also an anchor');
     for (const key of ['linkedFillId', 'isLinkedFillCompanion']) {
       if (!has(dict,key)) continue;
       if (key === 'linkedFillId' ? typeof dict[key] !== 'string' || !dict[key].length : typeof dict[key] !== 'boolean') refuse('invalid_dict','invalid '+key);
@@ -200,6 +215,9 @@
       if (n.paramShape !== undefined) ext.paramShape = shape(n.paramShape);
       if (n.boxAngle !== undefined) ext.boxAngle = n.boxAngle;
       for (const key of ['isMask', 'maskMode', 'maskFeather']) if (has(n, key)) ext[key] = n[key];
+      const texture = {};
+      for (const key of ['brushGroupId', 'isBrushTextureCopy', 'brushTexturePreset', 'preTextureOpacity', 'preTextureStroke']) if (has(n, key)) texture[key] = n[key];
+      if (Object.keys(texture).length) ext.brushTexture = texture;
       const trace={};
       [['fillSeed','seed'],['fillSeeds','seeds'],['fillWalls','walls'],['fillGapPx','gapPx']].forEach(([key,stored])=>{
         if(has(n,key))trace[stored]=JSON.parse(JSON.stringify(n[key]));
@@ -236,7 +254,8 @@
     const out = {
       segments: record.geometry.segments.map((s) => ({ point: pair(s.point), handleIn: pair(s.handleIn), handleOut: pair(s.handleOut) })),
       closed: record.geometry.closed,
-      strokeColor: ribbon ? null : (v.stroke ? colorHex8(v.stroke) : '#ffffff'),   // serP writes the white fallback beside hasRealStroke:false
+      // serP writes the white fallback beside hasRealStroke:false, except for a ribbon or a brush-texture anchor or dab.
+      strokeColor: ribbon ? null : (v.stroke ? colorHex8(v.stroke) : (x.brushTexture && (x.brushTexture.brushTexturePreset || x.brushTexture.isBrushTextureCopy) ? null : '#ffffff')),
       hasRealStroke: ribbon ? false : v.hasRealStroke,
       strokeWidth: v.strokeWidth, strokeCap: v.strokeCap, strokeJoin: v.strokeJoin,
     };
@@ -256,6 +275,7 @@
     if (record.target.strokeId) out.strokeId = record.target.strokeId;
     if (x.boxAngle) out.boxAngle = x.boxAngle;
     for (const key of ['isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion']) if (has(x, key)) out[key] = x[key];
+    if (x.brushTexture) Object.assign(out, x.brushTexture);
     if (x.paramShape) out.paramShape = JSON.parse(JSON.stringify(x.paramShape));
     if (x.fillGradient) out.fillGradient = gradient(x.fillGradient);
     if(x.fillTrace)[['seed','fillSeed'],['seeds','fillSeeds'],['walls','fillWalls'],['gapPx','fillGapPx']].forEach(([stored,key])=>{

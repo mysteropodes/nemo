@@ -66,12 +66,49 @@
       }, describe ? describe(receipt) : null))).catch(failed);
     }
     const strokeFields = (receipt) => ({ strokeId: receipt.strokeId });
+    // G15: `options.placement === 'behind'` enters under the layer's existing artwork; front is the absent default.
+    // `options.trimEnds` asks native to trim the new open stroke's dangling ends (baseline Trim Stroke Ends).
+    const placed = (body, options) => Object.assign(body, options && options.placement === 'behind' ? { placement: 'behind' } : {},
+      options && options.trimEnds !== undefined ? { trimEnds: options.trimEnds } : {},
+      // `options.keyframe: 'copy'` keys a held cell with what it showed instead of Draw's empty key.
+      options && options.keyframe === 'copy' ? { keyframe: 'copy' } : {});
 
     function createStroke(layerUid, frame, dict, options) {
       const map = Stroke.toRecord(dict, { layerUid, frame, strokeId: '' }, { opacity: options && options.opacity });
       if (!map.ok) return Promise.resolve(mapped(map));
-      return send(Contract.VECTOR, { command: 'object.vector.create', record: map.record }, options,
+      return send(Contract.VECTOR, placed({ command: 'object.vector.create', record: map.record }, options), options,
         (receipt) => ({ strokeId: receipt.strokeId, authoredStrokeId: map.authoredStrokeId, unmapped: map.unmapped }));
+    }
+    // G23: several strokes (symmetry copies) on one layer and frame as one native revision and one undo entry.
+    function createStrokes(layerUid, frame, dicts, options) {
+      if (!Array.isArray(dicts) || dicts.length < 2) return Promise.resolve(Object.freeze({ status: 'invalid', reason: 'createStrokes needs at least two strokes' }));
+      const maps = dicts.map((dict) => Stroke.toRecord(dict, { layerUid, frame, strokeId: '' }, { opacity: options && options.opacity }));
+      const refused = maps.find((map) => !map.ok);
+      if (refused) return Promise.resolve(mapped(refused));
+      // The vector edit envelope is bounded at 64 KiB: refuse up front, typed, instead of a transport refusal.
+      if (JSON.stringify(maps.map((map) => map.record)).length > 60000) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'symmetry_too_large' }));
+      return send(Contract.VECTOR, placed({ command: 'object.vector.createMany', records: maps.map((map) => map.record) }, options), options,
+        (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds, unmapped: maps.map((map) => map.unmapped) }));
+    }
+    // #2361/#2362: ordered create/replace/delete steps on one layer as one native revision and one undo entry. Each step
+    // is {create: dict} | {replace: {strokeId, dict}} | {delete: strokeId} at `frame` (or the step's own `frame`); a create
+    // step's own `keyframe: 'copy'` keys its held cell with a copy when the batch's options do not.
+    function batchStrokes(layerUid, frame, steps, options) {
+      if (!Array.isArray(steps) || !steps.length) return Promise.resolve(Object.freeze({ status: 'invalid', reason: 'a batch needs at least one step' }));
+      const ops = [];
+      for (const step of steps) {
+        const at = step.frame === undefined ? frame : step.frame;
+        if (step.delete !== undefined) { ops.push({ op: 'delete', stableTarget: stableTarget(layerUid, at, step.delete) }); continue; }
+        const replacing = step.replace !== undefined;
+        const map = Stroke.toRecord(replacing ? step.replace.dict : step.create, { layerUid, frame: at, strokeId: replacing ? step.replace.strokeId : '' },
+          { opacity: step.opacity !== undefined ? step.opacity : options && options.opacity });
+        if (!map.ok) return Promise.resolve(mapped(map));
+        ops.push(replacing ? { op: 'replace', record: map.record } : Object.assign({ op: 'create', record: map.record }, step.placement ? { placement: step.placement } : {},
+          step.keyframe === 'copy' ? { keyframe: 'copy' } : {}));
+      }
+      const body = Object.assign({ command: 'object.vector.batch', ops }, options && options.keyframe === 'copy' ? { keyframe: 'copy' } : {},
+        options && options.trimEnds !== undefined ? { trimEnds: options.trimEnds } : {});
+      return send(Contract.VECTOR, body, options, (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds }));
     }
     function replaceStroke(target, dict, options) {
       if (!target || typeof target.strokeId !== 'string' || !target.strokeId) return Promise.resolve(Object.freeze({ status: 'invalid', reason: 'a replace names the stroke it replaces' }));
@@ -103,7 +140,7 @@
       if (!map.ok) return Promise.resolve(mapped(map));
       return send(Contract.EFFECTS, { command: 'object.path.effects.set', layerUid, stack: map.stack }, options);
     }
-    return Object.freeze({ createStroke, replaceStroke, deleteStroke, editMask, setParametric, translateParametric, scaleParametric, setPathEffects, defaultEffect: Stroke.defaultsFor });
+    return Object.freeze({ createStroke, createStrokes, batchStrokes, replaceStroke, deleteStroke, editMask, setParametric, translateParametric, scaleParametric, setPathEffects, defaultEffect: Stroke.defaultsFor });
   }
 
   // Read-back validator: the record the owner returns for a target equals what was sent (numbers by value, the allocated

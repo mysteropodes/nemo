@@ -3719,7 +3719,8 @@
         "U37"
       ],
       "confidence": "low",
-      "note": "Labs feature auto-actions"
+      "note": "Labs feature auto-actions",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "labs:boil-effect": {
       "tasks": [
@@ -3740,15 +3741,16 @@
         "U37"
       ],
       "confidence": "low",
-      "note": "Labs feature clip-mask-bake"
+      "note": "Labs feature clip-mask-bake",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "labs:command-palette": {
       "tasks": [
-        "U31",
-        "U30"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "Labs feature command-palette"
+      "confidence": "low",
+      "note": "Labs feature command-palette",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "labs:flip-roll": {
       "tasks": [
@@ -3791,7 +3793,8 @@
         "U37"
       ],
       "confidence": "low",
-      "note": "Labs feature layer-effects-bake"
+      "note": "Labs feature layer-effects-bake",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "labs:lipsync-assistant": {
       "tasks": [
@@ -3799,7 +3802,8 @@
         "I42"
       ],
       "confidence": "low",
-      "note": "Labs feature lipsync-assistant"
+      "note": "Labs feature lipsync-assistant",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "labs:mirror-check": {
       "tasks": [
@@ -3827,7 +3831,8 @@
         "U37"
       ],
       "confidence": "low",
-      "note": "Labs feature oca-export"
+      "note": "Labs feature oca-export",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "labs:out-of-pegs": {
       "tasks": [
@@ -3884,14 +3889,16 @@
         "U25"
       ],
       "confidence": "low",
-      "note": "Labs feature rig-deform"
+      "note": "Labs feature rig-deform",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "labs:screentone-bake": {
       "tasks": [
         "U37"
       ],
       "confidence": "low",
-      "note": "Labs feature screentone-bake"
+      "note": "Labs feature screentone-bake",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "labs:shader-effects-bake": {
       "tasks": [
@@ -3899,7 +3906,8 @@
         "G11"
       ],
       "confidence": "low",
-      "note": "Labs feature shader-effects-bake"
+      "note": "Labs feature shader-effects-bake",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "labs:speed-lines": {
       "tasks": [
@@ -3913,14 +3921,16 @@
         "U37"
       ],
       "confidence": "low",
-      "note": "Labs feature storyboard-mode"
+      "note": "Labs feature storyboard-mode",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "labs:timelapse": {
       "tasks": [
         "U37"
       ],
       "confidence": "low",
-      "note": "Labs feature timelapse"
+      "note": "Labs feature timelapse",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "labs:timeline-markers": {
       "tasks": [
@@ -3931,10 +3941,11 @@
     },
     "labs:timeline-zoom": {
       "tasks": [
-        "U31"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "Labs feature timeline-zoom"
+      "confidence": "low",
+      "note": "Labs feature timeline-zoom",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "labs:vector-sculpt": {
       "tasks": [
@@ -3974,203 +3985,203 @@
     },
     "menu:labs/command-palette.js:commands:labs": {
       "tasks": [
-        "U31",
-        "U30"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette entry"
+      "confidence": "low",
+      "note": "palette entry",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdblankkeyframe": {
       "tasks": [
-        "U31",
-        "I25"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette frame op"
+      "confidence": "low",
+      "note": "palette frame op",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdduplicatelayer": {
       "tasks": [
-        "U31",
-        "U10"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette layer op"
+      "confidence": "low",
+      "note": "palette layer op",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdinsertframe": {
       "tasks": [
-        "U31",
-        "I25"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette frame op"
+      "confidence": "low",
+      "note": "palette frame op",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdinsertkeyframe": {
       "tasks": [
-        "U31",
-        "I25"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette frame op"
+      "confidence": "low",
+      "note": "palette frame op",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdlooptoggle": {
       "tasks": [
-        "U31",
-        "U13"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette playback toggle"
+      "confidence": "low",
+      "note": "palette playback toggle",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdnewlayer": {
       "tasks": [
-        "U31",
-        "U10"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette layer op"
+      "confidence": "low",
+      "note": "palette layer op",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdoniontoggle": {
       "tasks": [
-        "U31",
-        "U20"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette onion toggle"
+      "confidence": "low",
+      "note": "palette onion toggle",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdpingpongtoggle": {
       "tasks": [
-        "U31",
-        "U13"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette playback toggle"
+      "confidence": "low",
+      "note": "palette playback toggle",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdplaystop": {
       "tasks": [
-        "U31",
-        "U13"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette playback toggle"
+      "confidence": "low",
+      "note": "palette playback toggle",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdredo": {
       "tasks": [
-        "U31",
-        "D08"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette undo/redo"
+      "confidence": "low",
+      "note": "palette undo/redo",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdremoveframe": {
       "tasks": [
-        "U31",
-        "I25"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette frame op"
+      "confidence": "low",
+      "note": "palette frame op",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdtoolbrush": {
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette tool switch"
+      "confidence": "low",
+      "note": "palette tool switch",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdtoolbucket": {
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette tool switch"
+      "confidence": "low",
+      "note": "palette tool switch",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdtoolcamera": {
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette tool switch"
+      "confidence": "low",
+      "note": "palette tool switch",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdtoolcomment": {
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette tool switch"
+      "confidence": "low",
+      "note": "palette tool switch",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdtooleraser": {
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette tool switch"
+      "confidence": "low",
+      "note": "palette tool switch",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdtoolfillbrush": {
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette tool switch"
+      "confidence": "low",
+      "note": "palette tool switch",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdtoolhand": {
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette tool switch"
+      "confidence": "low",
+      "note": "palette tool switch",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdtoolpen": {
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette tool switch"
+      "confidence": "low",
+      "note": "palette tool switch",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdtoolselect": {
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette tool switch"
+      "confidence": "low",
+      "note": "palette tool switch",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdtoolsubselect": {
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette tool switch"
+      "confidence": "low",
+      "note": "palette tool switch",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdtooltext": {
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette tool switch"
+      "confidence": "low",
+      "note": "palette tool switch",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdtoolzoom": {
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette tool switch"
+      "confidence": "low",
+      "note": "palette tool switch",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:labs/command-palette.js:commands:labscmdundo": {
       "tasks": [
-        "U31",
-        "D08"
+        "U37"
       ],
-      "confidence": "medium",
-      "note": "palette undo/redo"
+      "confidence": "low",
+      "note": "palette undo/redo",
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md"
     },
     "menu:layer-inout.js:buildBar:aligner-a-droite-out": {
       "tasks": [

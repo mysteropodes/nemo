@@ -18,6 +18,10 @@ pub(crate) use object_exposure_edit_retime_timing::{RetimeEdit, RetimePair, Reti
 #[path = "object_frame_clipboard_repeat_timing.rs"]
 #[allow(dead_code)]
 mod object_frame_clipboard_repeat_timing;
+// U35 (#2362): the Labs ping-pong and exposure-retime plans over the same private fields.
+#[path = "object_labs_timing.rs"]
+#[allow(dead_code)]
+mod object_labs_timing;
 
 #[path = "object_layer_range_evaluate.rs"]
 pub(crate) mod range;

@@ -127,6 +127,53 @@ pub(crate) struct NativeTrace {
     pub(super) click: Point,
 }
 
+/// One record as a fill wall, by the ordinary rule: stroked, solid-filled or a pressure ribbon (its centreline).
+fn stored_wall(record: &ObjectRecord) -> Result<Option<StoredWall>, TraceFailure> {
+    let id = &record.target.stroke_id;
+    let pressure = record.vector_ext.value().and_then(|e| e.pressure.value());
+    let stroked = record.vector().is_some_and(|v| v.solid_stroke().is_some());
+    if !stroked && record.solid_fill().is_none() && pressure.is_none() {
+        return Ok(None);
+    }
+    let center = pressure
+        .and_then(|p| p.center_segments.value())
+        .filter(|c| c.len() > 1);
+    let ring = match center {
+        Some(c) => c
+            .iter()
+            .map(|s| RingSeg {
+                point: point(&s.point),
+                handle_in: point(&s.handle_in),
+                handle_out: point(&s.handle_out),
+            })
+            .collect(),
+        None => ring(record),
+    };
+    if ring
+        .iter()
+        .flat_map(|s| [s.point, s.handle_in, s.handle_out])
+        .flatten()
+        .any(|n| !n.is_finite() || n.abs() > MAX_ABS_COORD)
+    {
+        return Err(TraceFailure::Failed);
+    }
+    let closed = center.is_none() && record.geometry.closed;
+    let near = ring
+        .first()
+        .zip(ring.last())
+        .is_some_and(|(a, b)| (a.point[0] - b.point[0]).hypot(a.point[1] - b.point[1]) < 0.5);
+    Ok(Some(StoredWall {
+        id: id.clone(),
+        ring,
+        closed: closed || near,
+        filled: record.solid_fill().is_some() && center.is_none(),
+        width: record
+            .vector()
+            .and_then(|v| v.stroke_width.as_f64())
+            .unwrap_or(2.0),
+    }))
+}
+
 impl NativeTrace {
     pub(crate) fn new(
         document: &ObjectDocument,
@@ -141,49 +188,20 @@ impl NativeTrace {
             if exclude == Some(id.as_str()) || only.is_some_and(|ids| !ids.contains(id)) {
                 continue;
             }
-            let pressure = record.vector_ext.value().and_then(|e| e.pressure.value());
-            let stroked = record.vector().is_some_and(|v| v.solid_stroke().is_some());
-            if !stroked && record.solid_fill().is_none() && pressure.is_none() {
-                continue;
-            }
-            let center = pressure
-                .and_then(|p| p.center_segments.value())
-                .filter(|c| c.len() > 1);
-            let ring = match center {
-                Some(c) => c
-                    .iter()
-                    .map(|s| RingSeg {
-                        point: point(&s.point),
-                        handle_in: point(&s.handle_in),
-                        handle_out: point(&s.handle_out),
-                    })
-                    .collect(),
-                None => ring(record),
-            };
-            if ring
-                .iter()
-                .flat_map(|s| [s.point, s.handle_in, s.handle_out])
-                .flatten()
-                .any(|n| !n.is_finite() || n.abs() > MAX_ABS_COORD)
-            {
-                return Err(TraceFailure::Failed);
-            }
-            let closed = center.is_none() && record.geometry.closed;
-            let near = ring.first().zip(ring.last()).is_some_and(|(a, b)| {
-                (a.point[0] - b.point[0]).hypot(a.point[1] - b.point[1]) < 0.5
-            });
-            walls.push(StoredWall {
-                id: id.clone(),
-                ring,
-                closed: closed || near,
-                filled: record.solid_fill().is_some() && center.is_none(),
-                width: record
-                    .vector()
-                    .and_then(|v| v.stroke_width.as_f64())
-                    .unwrap_or(2.0),
-            });
+            walls.extend(stored_wall(record)?);
         }
         Ok(Self { walls, click })
+    }
+    /// U36 reference fill: other layers' shown strokes join as walls, after the target cell's own (the baseline
+    /// clones them into the active layer for one fillVectorFind call).
+    pub(crate) fn with_walls<'a>(
+        mut self,
+        records: impl IntoIterator<Item = &'a ObjectRecord>,
+    ) -> Result<Self, TraceFailure> {
+        for record in records {
+            self.walls.extend(stored_wall(record)?);
+        }
+        Ok(self)
     }
 }
 

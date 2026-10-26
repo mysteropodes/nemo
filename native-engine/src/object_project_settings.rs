@@ -18,6 +18,8 @@ mod palette_delta;
 mod perspective_delta;
 #[path = "object_project_shadow_edit.rs"]
 mod shadow_delta;
+#[path = "object_project_symmetry_edit.rs"]
+mod symmetry_delta;
 #[path = "object_project_workspace_edit.rs"]
 mod workspace_capture;
 

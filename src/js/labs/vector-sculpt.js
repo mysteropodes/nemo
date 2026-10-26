@@ -25,6 +25,48 @@
 (function () {
   var RAD_KEY = 'nemo-labs-sculpt-radius';
   var dragging = false, resizing = false, lastW = null, undoPushed = false, touched = [];
+  // Native authority (U33, #2362): the drag deforms the PRESENTED strokes only (a preview, never a document write) and
+  // the gesture end commits their net geometry as ONE native vector batch of replaces with the copy key (the baseline
+  // ensureKeyframe()); the engine re-derives linked fills. `native` is the gesture's route, `saved` the presented
+  // geometry before the gesture's first touch, restored when the batch is not applied.
+  var native = null, saved = [];
+  var MAX_NATIVE_STEPS = 64;
+  function nativeRoute() { return window.NemoNativeObjectLabs && NemoNativeObjectLabs.desktop(window); }
+  function remember(p) {
+    if (!native) return;
+    [p, p.data && p.data.linkedFill].forEach(function (item) {
+      if (!item || saved.some(function (s) { return s.item === item; })) return;
+      saved.push({ item: item, segments: item.segments.map(function (s) { return s.clone(); }),
+        center: item.data && item.data.centerSegments ? JSON.parse(JSON.stringify(item.data.centerSegments)) : undefined });
+    });
+  }
+  function restore() {
+    saved.forEach(function (s) {
+      s.item.segments = s.segments;
+      if (s.center !== undefined) s.item.data.centerSegments = s.center;
+    });
+    saved = [];
+  }
+  // Ends the native gesture by committing what it sculpted: the baseline saved every move, so a gesture that ends
+  // without its pointerup (a missed release, a blur, the prototype disabled) keeps its edit here too.
+  function endNative() {
+    if (!native) return null;
+    var route = native, items = touched.slice();
+    native = null; touched = [];
+    return nativeCommit(route, items);
+  }
+  function nativeCommit(route, items) {
+    var layerUid = route.layerUid(state.activeLayerIdx);
+    var steps = items.map(function (p) { return { replace: { strokeId: p.data && p.data.strokeId, dict: serP(p) } }; });
+    var refuse = function () { restore(); if (typeof showToast === 'function') showToast(SM.t('labsToastLayerInvalidLocked')); return 0; };
+    if (!steps.length) { saved = []; return Promise.resolve(0); }
+    if (!layerUid || steps.length > MAX_NATIVE_STEPS || steps.some(function (s) { return !s.replace.strokeId; })) return Promise.resolve(refuse());
+    return route.batchStrokes(layerUid, state.currentFrame, steps).then(function (result) {
+      if (!result || result.status !== 'applied') return refuse();
+      saved = [];
+      return steps.length;
+    }, refuse);
+  }
   // #122: snapshot BEFORE the gesture whether the current frame is a
   // generated tween in-between — saveActiveLayerFrame (onUp) promotes it to
   // a real keyframe the instant content actually changes, so by onUp time
@@ -276,6 +318,7 @@
     sculptables(layer).forEach(function (p) {
       // Cheap reject: brush circle vs stroke bbox.
       if (!p.bounds.expand(2 * R).contains(center)) return;
+      remember(p);
       densifyUnderBrush(p, center, R);
       var vb = isRibbon(p), hit = false;
       nodesOf(p).forEach(function (seg) {
@@ -299,6 +342,7 @@
     var moved = false;
     sculptables(layer).forEach(function (p) {
       if (!p.bounds.expand(2 * R).contains(center)) return;
+      remember(p);
       var vb = isRibbon(p), segs = nodesOf(p), hit = false;
       // Relax interior points toward their neighbors' midpoint; endpoints
       // stay pinned so the stroke never shrinks off its anchors.
@@ -330,7 +374,15 @@
       updateCursor(e);
       return;
     }
-    dragging = true; undoPushed = false; touched = [];
+    dragging = true; undoPushed = false; touched = []; saved = [];
+    native = nativeRoute();
+    if (native) {
+      var info = native.layerInfo(state.activeLayerIdx);
+      if (!info || info.locked === true) { dragging = false; native = null; return; }
+      var at = SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+      lastW = new Point(at[0], at[1]);
+      return;
+    }
     var curLd = state.layers[state.activeLayerIdx];
     var curF = curLd && curLd.frames[state.currentFrame];
     wasInterpolated = !!(curF && curF.isInterpolated);
@@ -354,6 +406,7 @@
     // stale) — bit 1 is the primary button; if it's not set the drag
     // already ended somewhere this listener never heard about.
     if ((dragging || resizing) && !(e.buttons & 1)) {
+      endNative();
       dragging = false; resizing = false; lastW = null; touched = [];
       updateCursor(e);
       return;
@@ -369,17 +422,19 @@
     var w = SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var cur = new Point(w[0], w[1]);
     var layer = userLayers[state.activeLayerIdx];
-    if (!layer || state.layers[state.activeLayerIdx].locked) return;
+    if (!layer || (!native && state.layers[state.activeLayerIdx].locked)) return;
     var R = radiusScreen() / view.zoom;
-    if (!undoPushed) { pushUndo(); ensureKeyframe(); undoPushed = true; }
+    if (!undoPushed && !native) { pushUndo(); ensureKeyframe(); undoPushed = true; }
     var delta = cur.subtract(lastW);
     var moved = e.shiftKey ? applySmooth(layer, cur, R) : applyPush(layer, cur, delta, R);
     // Meshes are pushed alongside the paths, not instead of them: one drag
     // over an image sitting on top of a stroke moves both, which is what the
     // brush looks like it is doing.
-    if (!e.shiftKey && pushMeshes(layer, cur, delta, R)) moved = true;
+    if (!native && !e.shiftKey && pushMeshes(layer, cur, delta, R)) moved = true;
     lastW = cur;
-    if (moved) {
+    if (moved && native) {
+      SMEngineBridge.renderNow();
+    } else if (moved) {
       saveActiveLayerFrame();
       SMEngineBridge.renderNow();
       // #139: re-stamp textured strokes' visible dabs during the drag too,
@@ -398,6 +453,7 @@
     if (!dragging) return;
     e.stopImmediatePropagation(); e.preventDefault();
     dragging = false; lastW = null;
+    if (native) { endNative(); SMEngineBridge.renderNow(); return; }
     var layer = userLayers[state.activeLayerIdx];
     // Fills whose walls were sculpted re-trace against the new geometry.
     touched.forEach(function (p) { if (typeof fillRegenerateLinked === 'function') fillRegenerateLinked(layer, p); });
@@ -422,6 +478,7 @@
     if (cursor && e.target === document.documentElement) cursor.style.display = 'none';
   }, true);
   window.addEventListener('blur', function () {
+    endNative();
     dragging = false; resizing = false; lastW = null;
     if (cursor) cursor.style.display = 'none';
   });
@@ -438,6 +495,7 @@
     flag: 'nemo-labs-sculpt',
     describe: 'labsDescribeVectorSculpt',
     onDisable: function () {
+      endNative();
       dragging = false; resizing = false; lastW = null; touched = [];
       if (cursor) cursor.style.display = 'none';
     },

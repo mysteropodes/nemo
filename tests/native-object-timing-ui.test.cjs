@@ -15,6 +15,9 @@ const rows=new Map([
   [12,{cellKind:'key',sourceFrame:12,hasContent:false,manualEdit:false}],
   [20,{cellKind:'unexposed',sourceFrame:null,hasContent:false,manualEdit:false}],
 ]);
+// The same row as whole-row cells runs, served three runs per page (U31, #2374).
+const CELLS=[[0,1,'key',0,true,false],[1,5,'held',0,true,false],[6,1,'interpolated',6,true,true],[7,5,'held',6,true,false],
+  [12,1,'key',12,false,false],[13,7,'held',12,false,false],[20,1,'unexposed',null,false,false]];
 function element(){return {children:[],style:{},dataset:{},attributes:{},textContent:'',value:'',
   setAttribute(k,v){this.attributes[k]=v;},addEventListener(name,fn){this[name]=fn;},
   appendChild(node){this.children.push(node);node.parentNode=this;return node;},
@@ -52,11 +55,16 @@ function harness(){
       return null;
     }
     assert.equal(command,'nemo_native_dispatch');assert.equal(r.operation,'query.document.object.layer.timing');
-    assert.deepEqual(Object.keys(r.payload).sort(),['atRevision','contextId','documentSnapshotId','frame','layerUid'].concat(r.payload.view==='range'?['view']:[]));
+    assert.deepEqual(Object.keys(r.payload).sort(),['atRevision','contextId','documentSnapshotId','frame','layerUid'].concat(r.payload.view?['view']:[]));
     const response={apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,contentRevision:r.payload.atRevision,ok:true,
       result:{instanceId:r.instanceId,documentId:r.documentId,...r.payload,...rows.get(r.payload.frame)}};
     if(r.payload.view==='range'){
       const {view,...selector}=r.payload;response.result={kind:'layerRange',instanceId:r.instanceId,documentId:r.documentId,...selector,range:{rawInPoint:-2.5,rawOutPoint:24,inPoint:0,outPoint:20,hasCustomRange:true,hasTimeLink:false}};
+    }
+    if(r.payload.view==='cells'){
+      const {view,...selector}=r.payload,at=CELLS.findIndex(run=>run[0]===r.payload.frame);
+      response.result={kind:'layerCells',instanceId:r.instanceId,documentId:r.documentId,...selector,
+        cells:{runs:CELLS.slice(at,at+3),nextFrame:CELLS[at+3]?CELLS[at+3][0]:null}};
     }
     if(r.payload.layerUid==='missing'&&r.payload.view!=='range'){
       response.ok=false;delete response.result;response.error={code:'unavailable',message:'No authored timing'};
@@ -157,4 +165,19 @@ test('Project range-only read works for untimed layer without inventing cell exp
  assert.equal(h.queries().at(-1).r.payload.view,'range');const revision=h.meta().contentRevision;
  h.fault(r=>r.result.range.extra=1);assert.equal(await h.session.readLayerRange('missing',frame,pin),null);assert.equal(h.meta().contentRevision,revision);
  const old=h.queries().length;assert.equal(await h.session.readLayerRange('missing',frame,{...pin,documentSnapshotId:'foreign'}),null);assert.equal(h.queries().length,old);
+});
+
+test('Project cells read pages the whole row through the same timing query, independent of the presented frame',async()=>{
+  const h=harness();await h.open();const pin=h.session.info(),before=h.queries().length;
+  const row=await h.session.readLayerCells('drawing:雪',pin);
+  assert.deepEqual(row.map(run=>[...run]),CELLS);assert.equal(Object.isFrozen(row)&&Object.isFrozen(row[0]),true);
+  const pages=h.queries().slice(before);
+  assert.deepEqual(pages.map(q=>[q.r.operation,q.r.payload.view,q.r.payload.frame]),
+    [0,7,20].map(f=>['query.document.object.layer.timing','cells',f]));
+  for(const [f,cell] of rows)assert.deepEqual(CELLS.filter(run=>f>=run[0]&&f<run[0]+run[1]).map(run=>[run[2],run[2]==='interpolated'?f:run[3],run[4],run[5]])[0],
+    [cell.cellKind,cell.sourceFrame,cell.hasContent,cell.manualEdit],'the runs agree with the single-cell oracle at '+f);
+  h.fault(r=>{r.result.cells.runs[0][0]=1;});assert.equal(await h.session.readLayerCells('drawing:雪',pin),null,'a misplaced page refuses the row');
+  assert.equal(await h.session.readLayerCells('missing',pin),null,'a layer without timing is unavailable, not blank');
+  const count=h.queries().length;assert.equal(await h.session.readLayerCells('drawing:雪',{...pin,documentSnapshotId:'old'}),null);
+  assert.equal(h.queries().length,count);assert.equal(h.meta().contentRevision,0);
 });

@@ -43,6 +43,9 @@ pub struct VectorExt {
     pub(crate) mask_feather: Presence<Option<Number>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) bitmap_brush: Presence<crate::object_document::BitmapBrushFields>,
+    /// G16: the brush-texture-preset tags of a vector anchor or one of its dabs.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) brush_texture: Presence<BrushTexture>,
 }
 object_deserialize!(VectorExt {
     #[serde(default)] pressure: Presence<PressureFields>,
@@ -55,7 +58,8 @@ object_deserialize!(VectorExt {
     #[serde(default)] is_mask: Presence<Option<bool>>,
     #[serde(default)] mask_mode: Presence<Option<String>>,
     #[serde(default)] mask_feather: Presence<Option<Number>>,
-    #[serde(default)] bitmap_brush: Presence<crate::object_document::BitmapBrushFields>
+    #[serde(default)] bitmap_brush: Presence<crate::object_document::BitmapBrushFields>,
+    #[serde(default)] brush_texture: Presence<BrushTexture>
 });
 
 impl VectorExt {
@@ -71,8 +75,35 @@ impl VectorExt {
             && self.mask_mode.missing()
             && self.mask_feather.missing()
             && self.bitmap_brush.missing()
+            && self.brush_texture.missing()
     }
 }
+
+/// G16: the baseline `serP` brush-texture members, stored as serialized. An anchor (`applyBrushTexture`)
+/// carries its preset key, group id and the pre-texture opacity or stroke it hid; each dab carries
+/// `isBrushTextureCopy` and the same group id. serP drops falsy members, so a present string is
+/// non-empty and a present copy flag is `true`; `preTextureStroke` may be an explicit null.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct BrushTexture {
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) brush_group_id: Presence<String>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) is_brush_texture_copy: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) brush_texture_preset: Presence<String>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) pre_texture_opacity: Presence<Number>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) pre_texture_stroke: Presence<Option<String>>,
+}
+object_deserialize!(BrushTexture {
+    #[serde(default)] brush_group_id: Presence<String>,
+    #[serde(default)] is_brush_texture_copy: Presence<bool>,
+    #[serde(default)] brush_texture_preset: Presence<String>,
+    #[serde(default)] pre_texture_opacity: Presence<Number>,
+    #[serde(default)] pre_texture_stroke: Presence<Option<String>>
+});
 
 /// Named L07-I positive subset: exactly two stops, linear or radial. No coercion or defaults.
 #[derive(Debug, Clone, PartialEq, Serialize)]

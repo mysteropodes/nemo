@@ -1,4 +1,4 @@
-//! Supplied palette, guide and perspective storage. These are project fields,
+//! Supplied palette, guide, perspective and symmetry storage. These are project fields,
 //! distinct from transient tool selection, viewport overlays or local preferences.
 use crate::object_document::{ProjectMetadata, ProjectMetadataError};
 use std::sync::Arc;
@@ -7,6 +7,19 @@ type Palette = (String, String, Vec<String>);
 type ShadowColor = (String, String);
 type GuideAxes = (Option<Arc<[f64]>>, Option<Arc<[f64]>>);
 type VanishingPoint = (f64, f64, Option<bool>);
+
+/// Draw symmetry settings as the baseline exportJSON writes them. The UI clamps
+/// sectors to 2..24 and fills a null axis or centre from the canvas; storage keeps
+/// the supplied finite values, and a supplied null stays distinct from a missing member.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub(crate) struct SymmetrySettings {
+    pub(crate) enabled: Option<bool>,
+    pub(crate) mode: Option<String>,
+    pub(crate) axis: Option<Option<(f64, f64, f64, f64)>>,
+    pub(crate) radial_center: Option<Option<(f64, f64)>>,
+    pub(crate) radial_sectors: Option<f64>,
+    pub(crate) extend: Option<bool>,
+}
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(super) struct VisualMetadata {
@@ -20,6 +33,7 @@ pub(super) struct VisualMetadata {
     perspective_density: Option<f64>,
     // Missing, supplied null and supplied (possibly empty) arrays are distinct.
     perspective_vps: Option<Option<Arc<[VanishingPoint]>>>,
+    symmetry: SymmetrySettings,
 }
 fn text(value: &str) -> bool {
     value.len() <= 1024 && !value.contains('\0')
@@ -139,6 +153,26 @@ impl ProjectMetadata {
                 .as_ref()
                 .map(|value| value.as_deref()),
         )
+    }
+}
+impl ProjectMetadata {
+    pub(crate) fn with_symmetry_metadata(
+        mut self,
+        value: SymmetrySettings,
+    ) -> Result<Self, ProjectMetadataError> {
+        let axis = value.axis.flatten().map(|(a, b, c, d)| [a, b, c, d]);
+        let centre = value.radial_center.flatten().map(|(x, y)| [x, y]);
+        if !finite(value.radial_sectors)
+            || value.mode.as_deref().is_some_and(|v| !text(v))
+            || axis.iter().flatten().chain(centre.iter().flatten()).any(|v| !v.is_finite())
+        {
+            return Err(invalid());
+        }
+        self.visual.symmetry = value;
+        Ok(self)
+    }
+    pub(crate) fn symmetry_metadata(&self) -> &SymmetrySettings {
+        &self.visual.symmetry
     }
 }
 #[cfg(test)]
