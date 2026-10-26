@@ -133,7 +133,7 @@
       out[key]=JSON.parse(JSON.stringify(v));
     });
     // G16 serP: group id, copy flag and preset only when truthy; preTexture* whenever defined (null kept).
-    const text = (v) => typeof v === 'string' && v.length <= 255 && !v.includes('\0');
+    const text = (v) => typeof v === 'string' && new TextEncoder().encode(v).length <= 255 && !v.includes('\0');   // UTF-8 bytes, as native counts
     if (dict.brushGroupId) { if (!text(dict.brushGroupId)) refuse('invalid_dict', 'invalid brushGroupId'); out.brushGroupId = dict.brushGroupId; }
     if (dict.isBrushTextureCopy) out.isBrushTextureCopy = true;
     if (dict.brushTexturePreset) { if (!text(dict.brushTexturePreset)) refuse('invalid_dict', 'invalid brushTexturePreset'); out.brushTexturePreset = dict.brushTexturePreset; }

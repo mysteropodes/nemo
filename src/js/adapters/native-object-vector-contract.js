@@ -146,7 +146,7 @@
   // G16: serP's brush-texture members as stored (an anchor's preset and hidden paint, or a dab's copy flag).
   function brushTexture(value, label) {
     exact(value, [], ['brushGroupId', 'isBrushTextureCopy', 'brushTexturePreset', 'preTextureOpacity', 'preTextureStroke'], label);
-    const text = (v) => typeof v === 'string' && v.length > 0 && v.length <= 255 && !v.includes('\0');
+    const text = (v) => typeof v === 'string' && v.length > 0 && bytes(v) <= 255 && !v.includes('\0');   // UTF-8 bytes, as native counts
     if (!Object.keys(value).length) fail(`${label} must not be empty`);
     if (has(value, 'brushGroupId') && !text(value.brushGroupId)) fail(`${label}.brushGroupId is invalid`);
     if (has(value, 'brushTexturePreset') && !text(value.brushTexturePreset)) fail(`${label}.brushTexturePreset is invalid`);

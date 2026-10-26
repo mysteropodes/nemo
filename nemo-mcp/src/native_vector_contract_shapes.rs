@@ -6,6 +6,9 @@ use crate::native_contract::vector::{
 };
 use serde_json::Value;
 
+#[path = "native_vector_contract_texture.rs"]
+mod texture;
+
 fn point(value: &Value) -> bool {
     exact(value, &["x", "y"], &[]).is_some() && finite(&value["x"]) && finite(&value["y"])
 }
@@ -192,31 +195,6 @@ fn fill_trace(value: &Value) -> bool {
     })
 }
 
-/// G16: serP's brush-texture members (non-empty strings, a `true` copy flag, finite opacity, a hex
-/// stroke or null); an anchor (preset) is never also a dab (copy).
-fn brush_texture(value: &Value) -> bool {
-    let text = |v: &Value| v.as_str().is_some_and(|s| !s.is_empty() && s.len() <= 255 && !s.contains('\0'));
-    let colour = |v: &Value| {
-        v.is_null()
-            || v.as_str().is_some_and(|s| {
-                [4, 7, 9].contains(&s.len()) && s.starts_with('#') && s.bytes().skip(1).all(|b| b.is_ascii_hexdigit())
-            })
-    };
-    exact(
-        value,
-        &[],
-        &["brushGroupId", "isBrushTextureCopy", "brushTexturePreset", "preTextureOpacity", "preTextureStroke"],
-    )
-    .is_some_and(|object| {
-        !object.is_empty()
-            && object.get("brushGroupId").is_none_or(text)
-            && object.get("brushTexturePreset").is_none_or(text)
-            && object.get("isBrushTextureCopy").is_none_or(|v| v == &Value::Bool(true))
-            && object.get("preTextureOpacity").is_none_or(finite)
-            && object.get("preTextureStroke").is_none_or(colour)
-            && !(object.contains_key("isBrushTextureCopy") && object.contains_key("brushTexturePreset"))
-    })
-}
 fn extension(value: &Value, has_stroke: bool) -> bool {
     exact(
         value,
@@ -237,7 +215,7 @@ fn extension(value: &Value, has_stroke: bool) -> bool {
     )
     .is_some_and(|object| {
         !object.is_empty()
-            && object.get("brushTexture").is_none_or(brush_texture)
+            && object.get("brushTexture").is_none_or(texture::brush_texture)
             && object
                 .get("pressure")
                 .is_none_or(|v| pressure(v) && !has_stroke)

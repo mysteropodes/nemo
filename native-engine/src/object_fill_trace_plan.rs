@@ -146,6 +146,16 @@ fn recolor(
     }
 }
 
+fn companion(r: &ObjectRecord) -> bool {
+    r.vector_ext.value().is_some_and(|e| e.is_linked_fill_companion.value() == Some(&true))
+}
+/// A brush-texture dab (G16): the baseline fill and merge kernels skip `isBrushTextureCopy`.
+fn dab(r: &ObjectRecord) -> bool {
+    r.vector_ext
+        .value()
+        .and_then(|e| e.brush_texture.value())
+        .is_some_and(|t| t.is_brush_texture_copy.value() == Some(&true))
+}
 pub(crate) fn plan_trace(
     document: &ObjectDocument,
     scope: &Scope,
@@ -192,10 +202,7 @@ pub(crate) fn plan_trace(
         .map(|(r, ring)| ChildFacts {
             filled_shape: r.solid_fill().is_some(),
             // fillFindExistingMatch skips `isLinkedFillCompanion || isBrushTextureCopy` children.
-            excluded: r.vector_ext.value().is_some_and(|e| {
-                e.is_linked_fill_companion.value() == Some(&true)
-                    || e.brush_texture.value().is_some_and(|t| t.is_brush_texture_copy.value() == Some(&true))
-            }),
+            excluded: companion(r) || dab(r),
             bounds: native::bounds(ring),
             area: native::area(ring),
             covers_click: native::contains(ring, click),
@@ -209,6 +216,8 @@ pub(crate) fn plan_trace(
             fill_hex8: r.solid_fill().map(hex8),
             stroked: r.vector().is_some_and(|v| v.solid_stroke().is_some()),
             is_vector_brush: r.is_pressure_ribbon(),
+            is_linked_fill_companion: companion(r),
+            is_brush_texture_copy: dab(r),
             stroke_id: Some(r.target.stroke_id.clone()),
             fill_walls: r
                 .vector_ext
