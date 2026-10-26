@@ -709,6 +709,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-time-remap-ui.js",
+      "moduleId": "app.native.time.remap.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2651,
+          "scriptOrdinal": 302
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/export-svg-frame.js",
       "moduleId": "app.export.svgframe.adapter",
       "executionClass": "document-classic",
@@ -729,102 +741,6 @@
           "path": "src/index.html",
           "line": 2388,
           "scriptOrdinal": 79
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/feedback-local.js",
-      "moduleId": "app.feedback.local.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2530,
-          "scriptOrdinal": 187
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/feedback-remote.js",
-      "moduleId": "app.feedback.remote.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2531,
-          "scriptOrdinal": 188
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/font-assets.js",
-      "moduleId": "app.font.assets.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2359,
-          "scriptOrdinal": 52
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/i18n-runtime.js",
-      "moduleId": "app.i18n.runtime.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2441,
-          "scriptOrdinal": 123
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/kitsu-service.js",
-      "moduleId": "app.kitsu.service.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2536,
-          "scriptOrdinal": 193
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/labs-floating-ui.js",
-      "moduleId": "app.labs.floating.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2431,
-          "scriptOrdinal": 113
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/labs-registry-model.js",
-      "moduleId": "app.labs.registry.model.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2403,
-          "scriptOrdinal": 85
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/labs-settings-ui.js",
-      "moduleId": "app.labs.settings.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2429,
-          "scriptOrdinal": 111
         }
       ]
     },
@@ -853,150 +769,6 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-audio-track-contract.js",
-      "moduleId": "app.native.audio.track.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2366,
-          "scriptOrdinal": 59
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-bitmap-brush-resources-contract.js",
-      "moduleId": "app.native.bitmap.brush.resources.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2583,
-          "scriptOrdinal": 236
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-bitmap-brush-resources.js",
-      "moduleId": "app.native.bitmap.brush.resources.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2584,
-          "scriptOrdinal": 237
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-comments-contract.js",
-      "moduleId": "app.native.comments.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2597,
-          "scriptOrdinal": 248
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-comments-desktop.js",
-      "moduleId": "app.native.comments.application",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2614,
-          "scriptOrdinal": 265
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-comments-ui.js",
-      "moduleId": "app.native.comments.ui",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2615,
-          "scriptOrdinal": 266
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-composition-contract.js",
-      "moduleId": "app.native.composition.contract.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2590,
-          "scriptOrdinal": 241
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-composition-desktop.js",
-      "moduleId": "app.native.composition.desktop.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2606,
-          "scriptOrdinal": 257
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-composition-ui.js",
-      "moduleId": "app.native.composition.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2607,
-          "scriptOrdinal": 258
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-custom-brush-contract.js",
-      "moduleId": "app.native.custom-brush.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2596,
-          "scriptOrdinal": 247
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-custom-brush-desktop.js",
-      "moduleId": "app.native.custom-brush.application",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2613,
-          "scriptOrdinal": 264
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-custom-brush-ui.js",
-      "moduleId": "app.native.custom-brush.ui",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2355,
-          "scriptOrdinal": 48
-        }
-      ]
-    },
-    {
       "path": "src/js/adapters/native-diagnostics-query.js",
       "moduleId": "app.native.diagnostics.query.adapter",
       "executionClass": "document-classic",
@@ -1009,659 +781,38 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-drawing-add-desktop.js",
-      "moduleId": "app.native.drawing-add.desktop.adapter",
+      "path": "src/js/adapters/native-object-project-file.js",
+      "moduleId": "app.native.object.project-file.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2333,
-          "scriptOrdinal": 32
+          "line": 2330,
+          "scriptOrdinal": 29
         }
       ]
     },
     {
-      "path": "src/js/adapters/native-drawing-add.js",
-      "moduleId": "app.native.drawing-add.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2332,
-          "scriptOrdinal": 31
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-fill-desktop.js",
-      "moduleId": "app.native.fill.desktop.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2601,
-          "scriptOrdinal": 252
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-font-contract.js",
-      "moduleId": "app.native.font.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2360,
-          "scriptOrdinal": 53
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-font-panel.js",
-      "moduleId": "app.native.font.panel.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2317,
-          "scriptOrdinal": 16
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-font-resources.js",
-      "moduleId": "app.native.font.resources.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2361,
-          "scriptOrdinal": 54
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-frame-cell-selection.js",
+      "path": "src/js/adapters/native-object-ui.js",
       "moduleId": "app.native.object.ui.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2662,
-          "scriptOrdinal": 310
+          "line": 2331,
+          "scriptOrdinal": 30
         }
       ]
     },
     {
-      "path": "src/js/adapters/native-frame-edit-contract.js",
-      "moduleId": "app.native.frame-edit.contract",
+      "path": "src/js/adapters/native-object-project-metadata.js",
+      "moduleId": "app.native.object.project-metadata.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2318,
-          "scriptOrdinal": 17
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-frame-edit-desktop.js",
-      "moduleId": "app.native.frame-edit.desktop.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2600,
-          "scriptOrdinal": 251
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-frame-edit-intent.js",
-      "moduleId": "app.native.frame-edit.intent.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2336,
-          "scriptOrdinal": 35
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-guide-contract.js",
-      "moduleId": "app.native.guide.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2592,
-          "scriptOrdinal": 243
-        }
-      ],
-      "sourceEvidence": [
-        {
-          "path": "src/index.html",
-          "line": 2578,
-          "role": "actual ordered classic guide script load; runtime and installed acceptance remain separate gates"
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-guide-desktop.js",
-      "moduleId": "app.native.guide.application",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2609,
-          "scriptOrdinal": 260
-        }
-      ],
-      "sourceEvidence": [
-        {
-          "path": "src/index.html",
-          "line": 2590,
-          "role": "actual ordered classic guide script load; runtime and installed acceptance remain separate gates"
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-guide-ui.js",
-      "moduleId": "app.native.guide.ui",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2617,
-          "scriptOrdinal": 268
-        }
-      ],
-      "sourceEvidence": [
-        {
-          "path": "src/index.html",
-          "line": 2592,
-          "role": "actual ordered classic guide script load; runtime and installed acceptance remain separate gates"
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-import-contract.js",
-      "moduleId": "app.native.import.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2369,
-          "scriptOrdinal": 62
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-import-core.js",
-      "moduleId": "app.native.import.core",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2627,
-          "scriptOrdinal": 278
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-import-desktop.js",
-      "moduleId": "app.native.import.desktop.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2637,
-          "scriptOrdinal": 288
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-import-diagnostic.js",
-      "moduleId": "app.native.import.diagnostic.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2636,
-          "scriptOrdinal": 287
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-import-drop.js",
-      "moduleId": "app.native.import.drop.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2630,
-          "scriptOrdinal": 281
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-import-figma-plan.js",
-      "moduleId": "app.native.import.figma.plan",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2631,
-          "scriptOrdinal": 282
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-import-figma.js",
-      "moduleId": "app.native.import.figma.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2632,
-          "scriptOrdinal": 283
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-import-montage.js",
-      "moduleId": "app.native.import.montage.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2634,
-          "scriptOrdinal": 285
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-import-png-provider.js",
-      "moduleId": "app.native.import.png.provider",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2635,
-          "scriptOrdinal": 286
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-import-png-stage.js",
-      "moduleId": "app.native.import.png.stage.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2628,
-          "scriptOrdinal": 279
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-import-psd.js",
-      "moduleId": "app.native.import.psd.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2633,
-          "scriptOrdinal": 284
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-import-seam.js",
-      "moduleId": "app.native.import.seam",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2370,
-          "scriptOrdinal": 63
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-import-svg.js",
-      "moduleId": "app.native.import.svg",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2629,
-          "scriptOrdinal": 280
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-layer-playhead-cut-contract.js",
-      "moduleId": "app.native.layer.playhead.cut.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2367,
-          "scriptOrdinal": 60
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-layer-playhead-cut-ui.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2368,
-          "scriptOrdinal": 61
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-layer-range-desktop.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2602,
-          "scriptOrdinal": 253
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-main-svg-export.js",
-      "moduleId": "app.native.main.svg.export.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2389,
-          "scriptOrdinal": 80
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-media-export-adapter.js",
-      "moduleId": "app.native.media.export.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2646,
-          "scriptOrdinal": 297
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-media-export-contract.js",
-      "moduleId": "app.native.media.export.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2586,
-          "scriptOrdinal": 239
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-media-export-core.js",
-      "moduleId": "app.native.media.export.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2585,
-          "scriptOrdinal": 238
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-motion-property-binding.js",
-      "moduleId": "app.native.motion.properties.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2463,
-          "scriptOrdinal": 138
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-motion-property-keys.js",
-      "moduleId": "app.native.motion.properties.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2460,
-          "scriptOrdinal": 135
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-motion-property-panel.js",
-      "moduleId": "app.native.motion.properties.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2462,
-          "scriptOrdinal": 137
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-motion-property-value.js",
-      "moduleId": "app.native.motion.properties.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2461,
-          "scriptOrdinal": 136
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-motion-property-view.js",
-      "moduleId": "app.native.motion.properties.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2459,
-          "scriptOrdinal": 134
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-component-contract.js",
-      "moduleId": "app.native.object.component.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2364,
-          "scriptOrdinal": 57
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-component-intent.js",
-      "moduleId": "app.native.object.component.intent",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2624,
-          "scriptOrdinal": 275
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-component.js",
-      "moduleId": "app.native.object.component.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2625,
-          "scriptOrdinal": 276
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-duplicator.js",
-      "moduleId": "app.native.object.duplicator.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2626,
-          "scriptOrdinal": 277
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-edit-contract.js",
-      "moduleId": "app.native.object.edit.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2371,
-          "scriptOrdinal": 64
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-edit-intent-core.js",
-      "moduleId": "app.native.object.edit.intent.core",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2638,
-          "scriptOrdinal": 289
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-edit-seam.js",
-      "moduleId": "app.native.object.edit.seam",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2372,
-          "scriptOrdinal": 65
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-group-intent.js",
-      "moduleId": "app.native.object.group.intent.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2639,
-          "scriptOrdinal": 290
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-image-mesh.js",
-      "moduleId": "app.native.object.image.mesh.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2621,
-          "scriptOrdinal": 272
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-inactive-project-tabs.js",
-      "moduleId": "app.native.object.inactive-project-tabs.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2527,
-          "scriptOrdinal": 184
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-item-command.js",
-      "moduleId": "app.native.object.item.command",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2374,
-          "scriptOrdinal": 67
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-item-contract.js",
-      "moduleId": "app.native.object.item.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2373,
-          "scriptOrdinal": 66
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-layer-lifecycle-intent.js",
-      "moduleId": "app.native.object.layer-lifecycle.intent.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2640,
-          "scriptOrdinal": 291
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-layer-splice.js",
-      "moduleId": "app.native.object.layer.splice.domain",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2329,
-          "scriptOrdinal": 28
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-open-exposure.js",
-      "moduleId": "app.native.object.project.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2325,
-          "scriptOrdinal": 24
+          "line": 2320,
+          "scriptOrdinal": 19
         }
       ]
     },
@@ -1690,78 +841,6 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-project-export.js",
-      "moduleId": "app.native.object.project.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2326,
-          "scriptOrdinal": 25
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-project-file.js",
-      "moduleId": "app.native.object.project-file.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2330,
-          "scriptOrdinal": 29
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-project-metadata.js",
-      "moduleId": "app.native.object.project-metadata.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2320,
-          "scriptOrdinal": 19
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-project-properties.js",
-      "moduleId": "app.native.object.project.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2323,
-          "scriptOrdinal": 22
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-project-reads.js",
-      "moduleId": "app.native.object.project.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2322,
-          "scriptOrdinal": 21
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-project-tabs-ui.js",
-      "moduleId": "app.native.object.inactive-project-tabs.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2528,
-          "scriptOrdinal": 185
-        }
-      ]
-    },
-    {
       "path": "src/js/adapters/native-object-project.js",
       "moduleId": "app.native.object.project.adapter",
       "executionClass": "document-classic",
@@ -1774,30 +853,6 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-query-contract.js",
-      "moduleId": "app.native.object.query.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2321,
-          "scriptOrdinal": 20
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-raster-asset.js",
-      "moduleId": "app.native.object.raster.asset.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2375,
-          "scriptOrdinal": 68
-        }
-      ]
-    },
-    {
       "path": "src/js/adapters/native-object-reference.js",
       "moduleId": "app.native.object.reference.adapter",
       "executionClass": "document-classic",
@@ -1806,150 +861,6 @@
           "path": "src/index.html",
           "line": 2337,
           "scriptOrdinal": 36
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-rig-command.js",
-      "moduleId": "app.native.object.rig.command",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2620,
-          "scriptOrdinal": 271
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-rig-contract.js",
-      "moduleId": "app.native.object.rig.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2362,
-          "scriptOrdinal": 55
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-rig-seam.js",
-      "moduleId": "app.native.object.rig.seam",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2363,
-          "scriptOrdinal": 56
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-rig.js",
-      "moduleId": "app.native.object.rig.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2623,
-          "scriptOrdinal": 274
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-shape-tool.js",
-      "moduleId": "app.native.object.shape.tool",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2574,
-          "scriptOrdinal": 227
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-text-layout.js",
-      "moduleId": "app.native.object.text.layout.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2376,
-          "scriptOrdinal": 69
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-ui.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2331,
-          "scriptOrdinal": 30
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-vector-command.js",
-      "moduleId": "app.native.object.vector.command",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2379,
-          "scriptOrdinal": 72
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-vector-contract.js",
-      "moduleId": "app.native.object.vector.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2377,
-          "scriptOrdinal": 70
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-vector-stroke.js",
-      "moduleId": "app.native.object.vector.stroke",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2378,
-          "scriptOrdinal": 71
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-vector.js",
-      "moduleId": "app.native.object.vector.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2380,
-          "scriptOrdinal": 73
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-widget.js",
-      "moduleId": "app.native.object.widget.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2622,
-          "scriptOrdinal": 273
         }
       ]
     },
@@ -2014,6 +925,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-object-inactive-project-tabs.js",
+      "moduleId": "app.native.object.inactive-project-tabs.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2527,
+          "scriptOrdinal": 184
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-opacity-project-entry.js",
       "moduleId": "adapter.native.opacity.project.entry",
       "executionClass": "document-classic",
@@ -2038,168 +961,6 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-palette-contract.js",
-      "moduleId": "app.native.palette.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2591,
-          "scriptOrdinal": 242
-        }
-      ],
-      "sourceEvidence": [
-        {
-          "path": "src/index.html",
-          "line": 2577,
-          "role": "actual ordered classic script load; capability availability and installed acceptance remain separate gates"
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-palette-desktop.js",
-      "moduleId": "app.native.palette.application",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2608,
-          "scriptOrdinal": 259
-        }
-      ],
-      "sourceEvidence": [
-        {
-          "path": "src/index.html",
-          "line": 2588,
-          "role": "actual ordered classic script load; capability availability and installed acceptance remain separate gates"
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-palette-ui.js",
-      "moduleId": "app.native.palette.ui",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2616,
-          "scriptOrdinal": 267
-        }
-      ],
-      "sourceEvidence": [
-        {
-          "path": "src/index.html",
-          "line": 2589,
-          "role": "actual ordered classic script load of ordinary palette adapter; installed acceptance remains open"
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-perspective-contract.js",
-      "moduleId": "app.native.perspective.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2594,
-          "scriptOrdinal": 245
-        }
-      ],
-      "sourceEvidence": [
-        {
-          "path": "src/index.html",
-          "line": 2580,
-          "role": "actual ordered classic perspective script load; runtime and installed acceptance remain separate gates"
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-perspective-desktop.js",
-      "moduleId": "app.native.perspective.application",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2611,
-          "scriptOrdinal": 262
-        }
-      ],
-      "sourceEvidence": [
-        {
-          "path": "src/index.html",
-          "line": 2594,
-          "role": "actual ordered classic perspective script load; runtime and installed acceptance remain separate gates"
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-perspective-ui.js",
-      "moduleId": "app.native.perspective.ui",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2619,
-          "scriptOrdinal": 270
-        }
-      ],
-      "sourceEvidence": [
-        {
-          "path": "src/index.html",
-          "line": 2598,
-          "role": "actual ordered classic perspective script load; runtime and installed acceptance remain separate gates"
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-project-placement-contract.js",
-      "moduleId": "app.native.project.placement.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2365,
-          "scriptOrdinal": 58
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-project-settings-desktop.js",
-      "moduleId": "app.native.project-settings.desktop.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2335,
-          "scriptOrdinal": 34
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-project-settings-intent.js",
-      "moduleId": "app.native.project-settings.intent.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2334,
-          "scriptOrdinal": 33
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-property-contract.js",
-      "moduleId": "app.native.application.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2598,
-          "scriptOrdinal": 249
-        }
-      ]
-    },
-    {
       "path": "src/js/adapters/native-reproduction.js",
       "moduleId": "app.native.reproduction.adapter",
       "executionClass": "document-classic",
@@ -2208,183 +969,6 @@
           "path": "src/index.html",
           "line": 2652,
           "scriptOrdinal": 303
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-settings-validation-gate.js",
-      "moduleId": "app.native.settings-validation.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2660,
-          "scriptOrdinal": 309
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-shadow-contract.js",
-      "moduleId": "app.native.shadow.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2593,
-          "scriptOrdinal": 244
-        }
-      ],
-      "sourceEvidence": [
-        {
-          "path": "src/index.html",
-          "line": 2579,
-          "role": "actual ordered classic shadow script load; runtime and installed acceptance remain separate gates"
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-shadow-desktop.js",
-      "moduleId": "app.native.shadow.application",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2610,
-          "scriptOrdinal": 261
-        }
-      ],
-      "sourceEvidence": [
-        {
-          "path": "src/index.html",
-          "line": 2592,
-          "role": "actual ordered classic shadow script load; runtime and installed acceptance remain separate gates"
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-shadow-ui.js",
-      "moduleId": "app.native.shadow.ui",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2618,
-          "scriptOrdinal": 269
-        }
-      ],
-      "sourceEvidence": [
-        {
-          "path": "src/index.html",
-          "line": 2595,
-          "role": "actual ordered classic shadow script load; runtime and installed acceptance remain separate gates"
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-text-animator-desktop.js",
-      "moduleId": "app.native.text.animator.desktop",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2658,
-          "scriptOrdinal": 308
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-text-animator.js",
-      "moduleId": "app.native.text.animator",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2657,
-          "scriptOrdinal": 307
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-text-read-contract.js",
-      "moduleId": "app.native.text.read.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2589,
-          "scriptOrdinal": 240
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-text-read.js",
-      "moduleId": "app.native.text.read.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2603,
-          "scriptOrdinal": 254
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-text-tool-desktop.js",
-      "moduleId": "app.native.text.tool.desktop",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2605,
-          "scriptOrdinal": 256
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-text-tool.js",
-      "moduleId": "app.native.text.tool",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2604,
-          "scriptOrdinal": 255
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-time-remap-ui.js",
-      "moduleId": "app.native.time.remap.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2651,
-          "scriptOrdinal": 302
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-vector-export-adapter.js",
-      "moduleId": "app.native.vector.export.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2645,
-          "scriptOrdinal": 296
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-viewport-underlay.js",
-      "moduleId": "app.native.viewport.underlay.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2319,
-          "scriptOrdinal": 18
         }
       ]
     },
@@ -2402,62 +986,14 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-workspace-contract.js",
-      "moduleId": "app.native.workspace.contract",
+      "path": "src/js/adapters/project-native-save.js",
+      "moduleId": "app.project.nativesave.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2595,
-          "scriptOrdinal": 246
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-workspace-desktop.js",
-      "moduleId": "app.native.workspace.application",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2612,
-          "scriptOrdinal": 263
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-workspace-ui.js",
-      "moduleId": "app.native.workspace.ui",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2303,
-          "scriptOrdinal": 4
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/p2p-contact-model.js",
-      "moduleId": "app.p2p.contact.model.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2500,
-          "scriptOrdinal": 160
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/project-comments-presentation.js",
-      "moduleId": "app.comments.presentation.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2356,
-          "scriptOrdinal": 49
+          "line": 2523,
+          "scriptOrdinal": 180
         }
       ]
     },
@@ -2470,30 +1006,6 @@
           "path": "src/index.html",
           "line": 2524,
           "scriptOrdinal": 181
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/project-history-placement.js",
-      "moduleId": "app.project.history-placement.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2656,
-          "scriptOrdinal": 306
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/project-native-save.js",
-      "moduleId": "app.project.nativesave.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2523,
-          "scriptOrdinal": 180
         }
       ]
     },
@@ -2518,66 +1030,6 @@
           "path": "src/index.html",
           "line": 2571,
           "scriptOrdinal": 224
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/settings-preferences-ui.js",
-      "moduleId": "app.settings.preferences.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2439,
-          "scriptOrdinal": 121
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/shader-effect-catalog.js",
-      "moduleId": "app.shader.effect.catalog.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2513,
-          "scriptOrdinal": 170
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/tutorial-native-placement.js",
-      "moduleId": "app.tutorial.native.placement.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2654,
-          "scriptOrdinal": 305
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/tutorial-presentation.js",
-      "moduleId": "app.tutorial.presentation.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2581,
-          "scriptOrdinal": 234
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/updater-platform.js",
-      "moduleId": "app.updater.platform.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2534,
-          "scriptOrdinal": 191
         }
       ]
     },
@@ -2626,19 +1078,6 @@
           "path": "src/index.html",
           "line": 2467,
           "scriptOrdinal": 140
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/diagnostics-capability.js",
-      "moduleId": "app.diagnostics.capability",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
-        {
-          "path": "src/js/application/diagnostics-capability.js",
-          "line": 1,
-          "role": "capability descriptor/registration helper; not wired into a script tag (T08/#1057, bootstrap integration out of scope)"
         }
       ]
     },
@@ -3536,18 +1975,6 @@
       ]
     },
     {
-      "path": "src/js/labs/diagnostics-panel.js",
-      "moduleId": "app.labs.diagnostics.panel",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2416,
-          "scriptOrdinal": 98
-        }
-      ]
-    },
-    {
       "path": "src/js/labs/flip-roll.js",
       "moduleId": "app.labs.flip.roll",
       "executionClass": "document-classic",
@@ -3596,6 +2023,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/labs-registry-model.js",
+      "moduleId": "app.labs.registry.model.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2403,
+          "scriptOrdinal": 85
+        }
+      ]
+    },
+    {
       "path": "src/js/labs/labs-core.js",
       "moduleId": "app.labs.labs.core",
       "executionClass": "document-classic",
@@ -3608,6 +2047,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/labs-floating-ui.js",
+      "moduleId": "app.labs.floating.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2431,
+          "scriptOrdinal": 113
+        }
+      ]
+    },
+    {
       "path": "src/js/labs/labs-float-panel.js",
       "moduleId": "app.labs.labs.float.panel",
       "executionClass": "document-classic",
@@ -3616,6 +2067,18 @@
           "path": "src/index.html",
           "line": 2432,
           "scriptOrdinal": 114
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/labs-settings-ui.js",
+      "moduleId": "app.labs.settings.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2429,
+          "scriptOrdinal": 111
         }
       ]
     },
@@ -3998,18 +2461,6 @@
       ]
     },
     {
-      "path": "src/js/layer-inout-selection.js",
-      "moduleId": "app.layer.inout",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2494,
-          "scriptOrdinal": 154
-        }
-      ]
-    },
-    {
       "path": "src/js/layer-inout.js",
       "moduleId": "app.layer.inout",
       "executionClass": "document-classic",
@@ -4126,6 +2577,42 @@
           "path": "src/index.html",
           "line": 2551,
           "scriptOrdinal": 205
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-motion-property-view.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2459,
+          "scriptOrdinal": 134
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-motion-property-panel.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2462,
+          "scriptOrdinal": 137
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-motion-property-binding.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2463,
+          "scriptOrdinal": 138
         }
       ]
     },
@@ -4282,6 +2769,18 @@
           "path": "src/index.html",
           "line": 2522,
           "scriptOrdinal": 179
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-project-tabs-ui.js",
+      "moduleId": "app.native.object.inactive-project-tabs.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2528,
+          "scriptOrdinal": 185
         }
       ]
     },
@@ -4571,6 +3070,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/settings-preferences-ui.js",
+      "moduleId": "app.settings.preferences.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2439,
+          "scriptOrdinal": 121
+        }
+      ]
+    },
+    {
       "path": "src/js/timeline.js",
       "moduleId": "app.timeline",
       "executionClass": "document-classic",
@@ -4679,6 +3190,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/updater-platform.js",
+      "moduleId": "app.updater.platform.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2534,
+          "scriptOrdinal": 191
+        }
+      ]
+    },
+    {
       "path": "src/js/updater-bridge.js",
       "moduleId": "app.updater.bridge",
       "executionClass": "document-classic",
@@ -4687,6 +3210,42 @@
           "path": "src/index.html",
           "line": 2535,
           "scriptOrdinal": 192
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/font-assets.js",
+      "moduleId": "app.font.assets.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2359,
+          "scriptOrdinal": 52
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-font-contract.js",
+      "moduleId": "app.native.font.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2360,
+          "scriptOrdinal": 53
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-font-resources.js",
+      "moduleId": "app.native.font.resources.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2361,
+          "scriptOrdinal": 54
         }
       ]
     },
@@ -4746,6 +3305,1447 @@
           "path": "src/index.html",
           "line": 2563,
           "scriptOrdinal": 216
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/diagnostics-capability.js",
+      "moduleId": "app.diagnostics.capability",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/application/diagnostics-capability.js",
+          "line": 1,
+          "role": "capability descriptor/registration helper; not wired into a script tag (T08/#1057, bootstrap integration out of scope)"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/diagnostics-panel.js",
+      "moduleId": "app.labs.diagnostics.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2416,
+          "scriptOrdinal": 98
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/project-history-placement.js",
+      "moduleId": "app.project.history-placement.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2656,
+          "scriptOrdinal": 306
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/tutorial-native-placement.js",
+      "moduleId": "app.tutorial.native.placement.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2654,
+          "scriptOrdinal": 305
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-drawing-add.js",
+      "moduleId": "app.native.drawing-add.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2332,
+          "scriptOrdinal": 31
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-drawing-add-desktop.js",
+      "moduleId": "app.native.drawing-add.desktop.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2333,
+          "scriptOrdinal": 32
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-project-settings-intent.js",
+      "moduleId": "app.native.project-settings.intent.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2334,
+          "scriptOrdinal": 33
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-project-settings-desktop.js",
+      "moduleId": "app.native.project-settings.desktop.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2335,
+          "scriptOrdinal": 34
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/i18n-runtime.js",
+      "moduleId": "app.i18n.runtime.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2441,
+          "scriptOrdinal": 123
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-viewport-underlay.js",
+      "moduleId": "app.native.viewport.underlay.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2319,
+          "scriptOrdinal": 18
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-edit-contract.js",
+      "moduleId": "app.native.object.edit.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2371,
+          "scriptOrdinal": 64
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-edit-intent-core.js",
+      "moduleId": "app.native.object.edit.intent.core",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2638,
+          "scriptOrdinal": 289
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-edit-seam.js",
+      "moduleId": "app.native.object.edit.seam",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2372,
+          "scriptOrdinal": 65
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-group-intent.js",
+      "moduleId": "app.native.object.group.intent.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2639,
+          "scriptOrdinal": 290
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-layer-lifecycle-intent.js",
+      "moduleId": "app.native.object.layer-lifecycle.intent.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2640,
+          "scriptOrdinal": 291
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-item-contract.js",
+      "moduleId": "app.native.object.item.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2373,
+          "scriptOrdinal": 66
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-item-command.js",
+      "moduleId": "app.native.object.item.command",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2374,
+          "scriptOrdinal": 67
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-raster-asset.js",
+      "moduleId": "app.native.object.raster.asset.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2375,
+          "scriptOrdinal": 68
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-text-layout.js",
+      "moduleId": "app.native.object.text.layout.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2376,
+          "scriptOrdinal": 69
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-component-contract.js",
+      "moduleId": "app.native.object.component.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2364,
+          "scriptOrdinal": 57
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-component-intent.js",
+      "moduleId": "app.native.object.component.intent",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2624,
+          "scriptOrdinal": 275
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-component.js",
+      "moduleId": "app.native.object.component.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2625,
+          "scriptOrdinal": 276
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-duplicator.js",
+      "moduleId": "app.native.object.duplicator.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2626,
+          "scriptOrdinal": 277
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-bitmap-brush-resources-contract.js",
+      "moduleId": "app.native.bitmap.brush.resources.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2583,
+          "scriptOrdinal": 236
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-bitmap-brush-resources.js",
+      "moduleId": "app.native.bitmap.brush.resources.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2584,
+          "scriptOrdinal": 237
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-import-contract.js",
+      "moduleId": "app.native.import.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2369,
+          "scriptOrdinal": 62
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-import-seam.js",
+      "moduleId": "app.native.import.seam",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2370,
+          "scriptOrdinal": 63
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-import-core.js",
+      "moduleId": "app.native.import.core",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2627,
+          "scriptOrdinal": 278
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-import-svg.js",
+      "moduleId": "app.native.import.svg",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2629,
+          "scriptOrdinal": 280
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-import-figma.js",
+      "moduleId": "app.native.import.figma.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2632,
+          "scriptOrdinal": 283
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-import-drop.js",
+      "moduleId": "app.native.import.drop.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2630,
+          "scriptOrdinal": 281
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-import-psd.js",
+      "moduleId": "app.native.import.psd.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2633,
+          "scriptOrdinal": 284
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-import-montage.js",
+      "moduleId": "app.native.import.montage.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2634,
+          "scriptOrdinal": 285
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-import-desktop.js",
+      "moduleId": "app.native.import.desktop.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2637,
+          "scriptOrdinal": 288
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-import-diagnostic.js",
+      "moduleId": "app.native.import.diagnostic.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2636,
+          "scriptOrdinal": 287
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-frame-edit-contract.js",
+      "moduleId": "app.native.frame-edit.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2318,
+          "scriptOrdinal": 17
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-frame-edit-intent.js",
+      "moduleId": "app.native.frame-edit.intent.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2336,
+          "scriptOrdinal": 35
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-vector-export-adapter.js",
+      "moduleId": "app.native.vector.export.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2645,
+          "scriptOrdinal": 296
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-media-export-adapter.js",
+      "moduleId": "app.native.media.export.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2646,
+          "scriptOrdinal": 297
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-media-export-core.js",
+      "moduleId": "app.native.media.export.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2585,
+          "scriptOrdinal": 238
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-media-export-contract.js",
+      "moduleId": "app.native.media.export.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2586,
+          "scriptOrdinal": 239
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-rig-contract.js",
+      "moduleId": "app.native.object.rig.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2362,
+          "scriptOrdinal": 55
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-rig-seam.js",
+      "moduleId": "app.native.object.rig.seam",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2363,
+          "scriptOrdinal": 56
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-rig-command.js",
+      "moduleId": "app.native.object.rig.command",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2620,
+          "scriptOrdinal": 271
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-image-mesh.js",
+      "moduleId": "app.native.object.image.mesh.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2621,
+          "scriptOrdinal": 272
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-widget.js",
+      "moduleId": "app.native.object.widget.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2622,
+          "scriptOrdinal": 273
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-rig.js",
+      "moduleId": "app.native.object.rig.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2623,
+          "scriptOrdinal": 274
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-vector-contract.js",
+      "moduleId": "app.native.object.vector.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2377,
+          "scriptOrdinal": 70
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-vector-stroke.js",
+      "moduleId": "app.native.object.vector.stroke",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2378,
+          "scriptOrdinal": 71
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-vector-command.js",
+      "moduleId": "app.native.object.vector.command",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2379,
+          "scriptOrdinal": 72
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-vector.js",
+      "moduleId": "app.native.object.vector.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2380,
+          "scriptOrdinal": 73
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-property-contract.js",
+      "moduleId": "app.native.application.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2598,
+          "scriptOrdinal": 249
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-project-properties.js",
+      "moduleId": "app.native.object.project.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2323,
+          "scriptOrdinal": 22
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-motion-property-keys.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2460,
+          "scriptOrdinal": 135
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-motion-property-value.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2461,
+          "scriptOrdinal": 136
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-shape-tool.js",
+      "moduleId": "app.native.object.shape.tool",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2574,
+          "scriptOrdinal": 227
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-font-panel.js",
+      "moduleId": "app.native.font.panel.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2317,
+          "scriptOrdinal": 16
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-text-read-contract.js",
+      "moduleId": "app.native.text.read.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2589,
+          "scriptOrdinal": 240
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-text-read.js",
+      "moduleId": "app.native.text.read.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2603,
+          "scriptOrdinal": 254
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-text-tool.js",
+      "moduleId": "app.native.text.tool",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2604,
+          "scriptOrdinal": 255
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-text-tool-desktop.js",
+      "moduleId": "app.native.text.tool.desktop",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2605,
+          "scriptOrdinal": 256
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-open-exposure.js",
+      "moduleId": "app.native.object.project.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2325,
+          "scriptOrdinal": 24
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-main-svg-export.js",
+      "moduleId": "app.native.main.svg.export.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2389,
+          "scriptOrdinal": 80
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-frame-edit-desktop.js",
+      "moduleId": "app.native.frame-edit.desktop.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2600,
+          "scriptOrdinal": 251
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-audio-track-contract.js",
+      "moduleId": "app.native.audio.track.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2366,
+          "scriptOrdinal": 59
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-layer-playhead-cut-contract.js",
+      "moduleId": "app.native.layer.playhead.cut.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2367,
+          "scriptOrdinal": 60
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-layer-playhead-cut-ui.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2368,
+          "scriptOrdinal": 61
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-layer-range-desktop.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2602,
+          "scriptOrdinal": 253
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-layer-splice.js",
+      "moduleId": "app.native.object.layer.splice.domain",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2329,
+          "scriptOrdinal": 28
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-project-placement-contract.js",
+      "moduleId": "app.native.project.placement.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2365,
+          "scriptOrdinal": 58
+        }
+      ]
+    },
+    {
+      "path": "src/js/layer-inout-selection.js",
+      "moduleId": "app.layer.inout",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2494,
+          "scriptOrdinal": 154
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-fill-desktop.js",
+      "moduleId": "app.native.fill.desktop.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2601,
+          "scriptOrdinal": 252
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-text-animator.js",
+      "moduleId": "app.native.text.animator",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2657,
+          "scriptOrdinal": 307
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-text-animator-desktop.js",
+      "moduleId": "app.native.text.animator.desktop",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2658,
+          "scriptOrdinal": 308
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-composition-contract.js",
+      "moduleId": "app.native.composition.contract.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2590,
+          "scriptOrdinal": 241
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-composition-desktop.js",
+      "moduleId": "app.native.composition.desktop.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2606,
+          "scriptOrdinal": 257
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-composition-ui.js",
+      "moduleId": "app.native.composition.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2607,
+          "scriptOrdinal": 258
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-palette-contract.js",
+      "moduleId": "app.native.palette.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2591,
+          "scriptOrdinal": 242
+        }
+      ],
+      "sourceEvidence": [
+        {
+          "path": "src/index.html",
+          "line": 2577,
+          "role": "actual ordered classic script load; capability availability and installed acceptance remain separate gates"
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-palette-desktop.js",
+      "moduleId": "app.native.palette.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2608,
+          "scriptOrdinal": 259
+        }
+      ],
+      "sourceEvidence": [
+        {
+          "path": "src/index.html",
+          "line": 2588,
+          "role": "actual ordered classic script load; capability availability and installed acceptance remain separate gates"
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-palette-ui.js",
+      "moduleId": "app.native.palette.ui",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2616,
+          "scriptOrdinal": 267
+        }
+      ],
+      "sourceEvidence": [
+        {
+          "path": "src/index.html",
+          "line": 2589,
+          "role": "actual ordered classic script load of ordinary palette adapter; installed acceptance remains open"
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-guide-contract.js",
+      "moduleId": "app.native.guide.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2592,
+          "scriptOrdinal": 243
+        }
+      ],
+      "sourceEvidence": [
+        {
+          "path": "src/index.html",
+          "line": 2578,
+          "role": "actual ordered classic guide script load; runtime and installed acceptance remain separate gates"
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-guide-desktop.js",
+      "moduleId": "app.native.guide.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2609,
+          "scriptOrdinal": 260
+        }
+      ],
+      "sourceEvidence": [
+        {
+          "path": "src/index.html",
+          "line": 2590,
+          "role": "actual ordered classic guide script load; runtime and installed acceptance remain separate gates"
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-guide-ui.js",
+      "moduleId": "app.native.guide.ui",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2617,
+          "scriptOrdinal": 268
+        }
+      ],
+      "sourceEvidence": [
+        {
+          "path": "src/index.html",
+          "line": 2592,
+          "role": "actual ordered classic guide script load; runtime and installed acceptance remain separate gates"
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-shadow-contract.js",
+      "moduleId": "app.native.shadow.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2593,
+          "scriptOrdinal": 244
+        }
+      ],
+      "sourceEvidence": [
+        {
+          "path": "src/index.html",
+          "line": 2579,
+          "role": "actual ordered classic shadow script load; runtime and installed acceptance remain separate gates"
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-shadow-desktop.js",
+      "moduleId": "app.native.shadow.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2610,
+          "scriptOrdinal": 261
+        }
+      ],
+      "sourceEvidence": [
+        {
+          "path": "src/index.html",
+          "line": 2592,
+          "role": "actual ordered classic shadow script load; runtime and installed acceptance remain separate gates"
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-shadow-ui.js",
+      "moduleId": "app.native.shadow.ui",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2618,
+          "scriptOrdinal": 269
+        }
+      ],
+      "sourceEvidence": [
+        {
+          "path": "src/index.html",
+          "line": 2595,
+          "role": "actual ordered classic shadow script load; runtime and installed acceptance remain separate gates"
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-perspective-contract.js",
+      "moduleId": "app.native.perspective.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2594,
+          "scriptOrdinal": 245
+        }
+      ],
+      "sourceEvidence": [
+        {
+          "path": "src/index.html",
+          "line": 2580,
+          "role": "actual ordered classic perspective script load; runtime and installed acceptance remain separate gates"
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-perspective-desktop.js",
+      "moduleId": "app.native.perspective.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2611,
+          "scriptOrdinal": 262
+        }
+      ],
+      "sourceEvidence": [
+        {
+          "path": "src/index.html",
+          "line": 2594,
+          "role": "actual ordered classic perspective script load; runtime and installed acceptance remain separate gates"
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-perspective-ui.js",
+      "moduleId": "app.native.perspective.ui",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2619,
+          "scriptOrdinal": 270
+        }
+      ],
+      "sourceEvidence": [
+        {
+          "path": "src/index.html",
+          "line": 2598,
+          "role": "actual ordered classic perspective script load; runtime and installed acceptance remain separate gates"
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-workspace-contract.js",
+      "moduleId": "app.native.workspace.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2595,
+          "scriptOrdinal": 246
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-workspace-desktop.js",
+      "moduleId": "app.native.workspace.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2612,
+          "scriptOrdinal": 263
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-workspace-ui.js",
+      "moduleId": "app.native.workspace.ui",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2303,
+          "scriptOrdinal": 4
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-custom-brush-contract.js",
+      "moduleId": "app.native.custom-brush.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2596,
+          "scriptOrdinal": 247
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-custom-brush-desktop.js",
+      "moduleId": "app.native.custom-brush.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2613,
+          "scriptOrdinal": 264
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-custom-brush-ui.js",
+      "moduleId": "app.native.custom-brush.ui",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2355,
+          "scriptOrdinal": 48
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-comments-contract.js",
+      "moduleId": "app.native.comments.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2597,
+          "scriptOrdinal": 248
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-comments-desktop.js",
+      "moduleId": "app.native.comments.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2614,
+          "scriptOrdinal": 265
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-comments-ui.js",
+      "moduleId": "app.native.comments.ui",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2615,
+          "scriptOrdinal": 266
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/project-comments-presentation.js",
+      "moduleId": "app.comments.presentation.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2356,
+          "scriptOrdinal": 49
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/kitsu-service.js",
+      "moduleId": "app.kitsu.service.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2536,
+          "scriptOrdinal": 193
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/p2p-contact-model.js",
+      "moduleId": "app.p2p.contact.model.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2500,
+          "scriptOrdinal": 160
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/feedback-local.js",
+      "moduleId": "app.feedback.local.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2530,
+          "scriptOrdinal": 187
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/feedback-remote.js",
+      "moduleId": "app.feedback.remote.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2531,
+          "scriptOrdinal": 188
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/tutorial-presentation.js",
+      "moduleId": "app.tutorial.presentation.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2581,
+          "scriptOrdinal": 234
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/shader-effect-catalog.js",
+      "moduleId": "app.shader.effect.catalog.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2513,
+          "scriptOrdinal": 170
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-import-png-stage.js",
+      "moduleId": "app.native.import.png.stage.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2628,
+          "scriptOrdinal": 279
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-import-figma-plan.js",
+      "moduleId": "app.native.import.figma.plan",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2631,
+          "scriptOrdinal": 282
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-import-png-provider.js",
+      "moduleId": "app.native.import.png.provider",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2635,
+          "scriptOrdinal": 286
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-project-export.js",
+      "moduleId": "app.native.object.project.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2326,
+          "scriptOrdinal": 25
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-settings-validation-gate.js",
+      "moduleId": "app.native.settings-validation.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2660,
+          "scriptOrdinal": 309
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-frame-cell-selection.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2662,
+          "scriptOrdinal": 310
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-project-reads.js",
+      "moduleId": "app.native.object.project.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2322,
+          "scriptOrdinal": 21
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-query-contract.js",
+      "moduleId": "app.native.object.query.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2321,
+          "scriptOrdinal": 20
         }
       ]
     }
