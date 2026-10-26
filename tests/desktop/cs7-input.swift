@@ -2,6 +2,7 @@
 // Acknowledged focus is not fresh focus; a posted event is not product acceptance.
 import Foundation
 import ApplicationServices
+import CoreGraphics
 
 struct CS7InputFailure: Error {
   let cause:Error
@@ -114,4 +115,31 @@ func cs7MotionFocus(_ pinned:OwnedInitialWindow, _ node:AXUIElement, _ search:Bo
       return CFEqual(window,pinned.main) && CFEqual(focused,node)
     })
     try ui32MotionFocus(pinned,node,search,contentScope:contentScope)
+}
+
+// One named additive selection gesture, on the verified F06-B BUTTON only.
+func ui32ToggleB(_ pinned:OwnedInitialWindow, resolve:(UI32Rule) throws -> AXUIElement,
+  visible:(AXUIElement) throws -> Void) throws -> [String:Any] {
+  let rule=try ui32Rule("selection.B",nil), node=try resolve(rule)
+  func context() throws {
+    try verifyOwnedWindow(pinned)
+    guard let focused=axElement(attr(pinned.application,kAXFocusedWindowAttribute)),owns(focused,pinned.pid),CFEqual(focused,pinned.main) else { throw Refusal(code:"adapter-refused") }
+    try check(CFEqual(try resolve(rule),node));try visible(node)
+  }
+  try context()
+  guard let position=xy(node),let size=wh(node),let source=CGEventSource(stateID:.privateState) else { throw Refusal(code:"adapter-refused") }
+  let point=CGPoint(x:position.x+size.width/2,y:position.y+size.height/2)
+  guard let down=CGEvent(mouseEventSource:source,mouseType:.leftMouseDown,mouseCursorPosition:point,mouseButton:.left),
+    let up=CGEvent(mouseEventSource:source,mouseType:.leftMouseUp,mouseCursorPosition:point,mouseButton:.left) else { throw Refusal(code:"adapter-refused") }
+  down.flags = .maskCommand;up.flags = .maskCommand
+  var downPosted=false,upPosted=false
+  do {
+    try cs7InputSequence(context:context,releaseIdentity:{try verifyOwnedWindow(pinned)},
+      down:{down.postToPid(pinned.pid);downPosted=true},up:{up.postToPid(pinned.pid);upPosted=true})
+    return ["buttonDownPosted":downPosted,"buttonUpPosted":upPosted,"note":"Named F06-B additive selection event pair only; verify actual native selection separately."]
+  } catch {
+    var facts:[String:Any]=["purpose":"UI32","command":"selection.toggle.B","buttonDownPosted":downPosted,"buttonUpPosted":upPosted,"retry":false]
+    if let failure=error as? CS7InputFailure {facts["inputCleanup"]=failure.diagnostics}
+    throw ActionRefusal(diagnostics:facts)
+  }
 }
