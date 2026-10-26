@@ -164,8 +164,13 @@ test('chrome, cancellation, Escape and lost capture remain usable or abort witho
   send(f,'pointerup',60,50);assert.equal(f.calls.length,0,action);assert.equal(f.body.children.length,0,action);assert.equal(f.paper.project.activeLayer.children.length,0);}
 });
 test('unsupported brush cells are explicit without native or legacy fallback',async()=>{
- const cases=[s=>s.vectorBrush=true,s=>s.tool='fillbrush',s=>s.drawMode='behind',s=>s.bitmapBrushOn=true,s=>s.brushPreset='charcoal-smooth',s=>s.trimStrokeEnds=true,
-  s=>s.symmetryEnabled=true,s=>s.shadowMode=true,s=>Object.assign(s,{vectorBrush:true,fillEnabled:false,pressureCurve:'unknown'}),s=>s.stabilizer=7];
+ const cases=[s=>s.tool='fillbrush',s=>s.bitmapBrushOn=true,s=>s.brushPreset='charcoal-smooth',
+  // Trim Stroke Ends commits natively for a plain stroke; a pressure-brush trim rebuilds its outline and stays refused.
+  s=>Object.assign(s,{trimStrokeEnds:true,vectorBrush:true,fillEnabled:false}),
+  // With stop-at-axis symmetry the original trims the whole stroke before clipping; native would trim the clipped one.
+  s=>Object.assign(s,{trimStrokeEnds:true,symmetryEnabled:true,symmetryExtend:false}),
+  // Plain-stroke symmetry commits natively since G23 (#2361); with a pressure brush it stays refused.
+  s=>s.shadowMode=true,s=>Object.assign(s,{vectorBrush:true,fillEnabled:false,pressureCurve:'unknown'}),s=>s.stabilizer=7];
  for(const change of cases){const f=await fixture();change(f.root.state);const e=send(f,'pointerdown',20,20);send(f,'pointerup',60,50);assert.equal(e.prevented,true);assert.equal(f.calls.length,0);assert.ok(f.log.some(s=>/unavailable|not available|requires/.test(s)),f.log.join(','));}
 });
 test('owner/frame/style/selection changes and queued external ACK fences cannot commit a stale drawing',async()=>{
@@ -278,4 +283,109 @@ test('queued freehand uses the actual action lease while public presentation sta
   assert.equal(f.calls.length,changed?0:1);assert.equal(f.records.size,changed?0:1);assert.equal(f.session.info().contentRevision,changed?0:1);
   assert.equal(f.body.children.length,0);
  }
+});
+
+test('drawMode behind sends the stroke under the layer artwork in the same single native create (G15)',async()=>{
+ const f=await fixture();f.root.state.drawMode='behind';send(f,'pointerdown',20,20);send(f,'pointermove',45,30);send(f,'pointerup',100,80);
+ assert.equal((await settled(f)).status,'applied');assert.equal(f.calls.length,1);
+ assert.equal(f.calls[0].payload.placement,'behind');assert.equal(f.calls[0].payload.command,'object.vector.create');
+ const front=await fixture();send(front,'pointerdown',20,20);send(front,'pointermove',45,30);send(front,'pointerup',100,80);await settled(front);
+ assert.equal(front.calls[0].payload.placement,undefined,'front stays the absent default');
+});
+test('Trim Stroke Ends asks native to trim the Draw commit with the original limit, and only when it is on',async()=>{
+ const f=await fixture();Object.assign(f.root.state,{trimStrokeEnds:true,trimStrokeEndsMax:24});
+ send(f,'pointerdown',20,20);send(f,'pointermove',45,30);send(f,'pointerup',100,80);
+ assert.equal((await settled(f)).status,'applied');assert.equal(f.calls.length,1);
+ assert.equal(f.calls[0].payload.trimEnds,24);assert.equal(f.calls[0].payload.command,'object.vector.create');
+ for(const state of [{trimStrokeEnds:false,trimStrokeEndsMax:24},{trimStrokeEnds:true,trimStrokeEndsMax:0}]){
+  const off=await fixture();Object.assign(off.root.state,state);send(off,'pointerdown',20,20);send(off,'pointermove',45,30);send(off,'pointerup',100,80);
+  await settled(off);assert.equal(off.calls[0].payload.trimEnds,undefined,JSON.stringify(state));
+ }
+ const sym=await fixture();Object.assign(sym.root.state,{trimStrokeEnds:true,trimStrokeEndsMax:24,symmetryEnabled:true,symmetryExtend:true});
+ send(sym,'pointerdown',20,20);send(sym,'pointermove',45,30);send(sym,'pointerup',100,80);
+ // This fixture's native accepts single creates only; the outgoing request is what is checked here.
+ await settled(sym);assert.equal(sym.calls.length,1);assert.equal(sym.calls[0].payload.command,'object.vector.createMany');
+ assert.equal(sym.calls[0].payload.trimEnds,24,'the copies share the original stroke\'s cuts natively');
+});
+// U33 (#2362): Labs predictive stroke reshapes the native freehand stroke before its single commit (the baseline runs
+// onStroke on the committed path before the frame is saved), through the same recognizer as the legacy hook.
+function predictive(f,on){
+ const protos={};f.root.SMLabs={isOn:name=>on&&name==='predictive-stroke',register(n,d){protos[n]=d;},
+  unmigratedDrawHooks:()=>Object.keys(protos).filter(n=>(protos[n].onStroke||protos[n].onPreview)&&!protos[n].nativeDraw&&f.root.SMLabs.isOn(n))};
+ f.root.Path.Ellipse=function(options){assert.equal(options.insert,false);return new f.paper.Path.Ellipse(options);};
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/labs/predictive-stroke.js'),'utf8'),f.context,{filename:'predictive-stroke.js'});
+}
+test('Labs predictive stroke snaps a near-line and a near-circle in the one native commit, and is inert when off',async()=>{
+ const line=await fixture();predictive(line,true);
+ send(line,'pointerdown',10,40);for(const [x,y] of [[40,41],[70,40],[100,39],[130,40]])send(line,'pointermove',x,y);send(line,'pointerup',160,40);
+ assert.equal((await settled(line)).status,'applied');assert.equal(line.calls.length,1);
+ assert.deepEqual(line.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]),[[10,40],[160,40]]);
+ const circle=await fixture();predictive(circle,true);
+ const ring=Array.from({length:25},(_,i)=>[100+60*Math.cos(i/24*2*Math.PI),90+60*Math.sin(i/24*2*Math.PI)]);
+ send(circle,'pointerdown',...ring[0]);ring.slice(1,-1).forEach(p=>send(circle,'pointermove',...p));send(circle,'pointerup',...ring.at(-1));
+ assert.equal((await settled(circle)).status,'applied');const g=circle.calls[0].payload.record.geometry;
+ assert.equal(g.closed,true);assert.equal(g.segments.length,4,'the baseline Path.Ellipse over the stroke bounds');
+ const off=await fixture();predictive(off,false);
+ send(off,'pointerdown',10,40);for(const [x,y] of [[40,41],[70,40],[100,39],[130,40]])send(off,'pointermove',x,y);send(off,'pointerup',160,40);
+ assert.equal((await settled(off)).status,'applied');assert.equal(off.calls[0].payload.record.geometry.segments.length,6);
+});
+// U34 (#2362): Labs multi-frame draw stamps the native freehand stroke on the other selected frames in the same single
+// commit: the drawn frame takes Draw's key, each stamped frame its own copy key; the prototype names the frames only.
+function multiframe(f,on){
+ const protos={},toasts=[];f.root.SMLabs={isOn:name=>on&&name==='multiframe-draw',register(n,d){protos[n]=d;},
+  unmigratedDrawHooks:()=>Object.keys(protos).filter(n=>(protos[n].onStroke||protos[n].onPreview)&&!protos[n].nativeDraw&&f.root.SMLabs.isOn(n))};
+ f.root._sel={frames:[{layer:0,frame:3},{layer:2,frame:5},{layer:0,frame:0},{layer:0,frame:3},{layer:0,frame:99}]};
+ f.root.SM=f.root.SM||{t:k=>k};f.root.showToast=t=>toasts.push(t);
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/labs/multiframe-draw.js'),'utf8'),f.context,{filename:'multiframe-draw.js'});
+ return toasts;
+}
+test('Labs multi-frame draw stamps the native stroke on the other selected frames in one copy-keyed batch, and is inert when off',async()=>{
+ const f=await fixture();multiframe(f,true);
+ send(f,'pointerdown',10,40);for(const [x,y] of [[40,41],[70,40]])send(f,'pointermove',x,y);send(f,'pointerup',100,40);
+ await settled(f);assert.equal(f.calls.length,1,'the native Drawing guard leaves a migrated hook available');
+ const payload=plain(f.calls[0].payload);
+ assert.equal(payload.command,'object.vector.batch');assert.equal(payload.keyframe,undefined,'the drawn frame keeps Draw\'s key');
+ assert.deepEqual(payload.ops.map(op=>[op.op,op.record.target.frameScope.frame,op.keyframe||null]),[['create',0,null],['create',3,'copy'],['create',5,'copy']]);
+ assert.deepEqual(payload.ops[1].record.geometry,payload.ops[0].record.geometry,'every stamp is the drawn stroke');
+ const trim=await fixture();multiframe(trim,true);trim.root.state.trimStrokeEnds=true;trim.root.state.trimStrokeEndsMax=24;
+ send(trim,'pointerdown',10,40);send(trim,'pointermove',40,41);send(trim,'pointerup',100,40);
+ await settled(trim);assert.equal(trim.calls[0].payload.trimEnds,24,'the drawn stroke and its stamps share one native cut');
+ const SDK=require('../src/js/adapters/native-application.js'),req=plain(trim.calls[0]);
+ req.payload.ops.push({op:'delete',stableTarget:{contextId:'scene-root',frameScope:{kind:'authored',frame:0},layerUid:req.payload.ops[0].record.target.layerUid,strokeId:'s'}});
+ assert.throws(()=>SDK.validateRequest(req),TypeError,'a trimmed batch creates only');
+ const off=await fixture();multiframe(off,false);
+ send(off,'pointerdown',10,40);send(off,'pointermove',40,41);send(off,'pointerup',100,40);
+ await settled(off);assert.equal(off.calls[0].payload.command,'object.vector.create');
+});
+
+// #2361 G15 (draw-bridge.js commitStroke @1065e9d8): the fresh-profile default, a pressure brush with Fill on, commits
+// the ribbon and its linked fill companion (the sampled centreline, closed, in the fill colour, below the ribbon) as one
+// createMany; with Stroke off the stroke is one closed fill of its centreline, without a ribbon.
+test('a pressure stroke with Fill on commits its ribbon and linked fill in one createMany, companion first',async()=>{
+ const f=await fixture();Object.assign(f.root.state,{vectorBrush:true});
+ send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:0});
+ await settled(f);assert.equal(f.calls.length,1);const q=plain(f.calls[0].payload);
+ assert.equal(q.command,'object.vector.createMany');assert.equal(q.records.length,2);
+ const [fill,ribbon]=q.records;
+ assert.deepEqual([fill.vectorExt.isLinkedFillCompanion,ribbon.vectorExt.isLinkedFillCompanion===true],[true,false]);
+ assert.equal(fill.vectorExt.linkedFillId,ribbon.vectorExt.linkedFillId);assert.ok(fill.vectorExt.linkedFillId.length>0);
+ assert.deepEqual([fill.geometry.closed,fill.vector.hasRealStroke,fill.fill.r],[true,false,0x44/255]);
+ assert.equal(fill.vectorExt.pressure,undefined,'the companion is a plain fill');
+ // The companion is the baseline sampler's centreline of the ribbon's own pressure centreline (rebuildVectorBrushOutline).
+ const cs=ribbon.vectorExt.pressure.centerSegments.map(s=>({point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y],width:s.width}));
+ const sampled=f.root.sampleVectorBrushCenterline(cs,ribbon.vectorExt.pressure.widthProfile).centerSegments;
+ assert.deepEqual(fill.geometry.segments.map(s=>[s.point.x,s.point.y,s.handleIn.x,s.handleIn.y,s.handleOut.x,s.handleOut.y]),
+   plain(sampled.map(s=>[s.point.x,s.point.y,s.handleIn.x,s.handleIn.y,s.handleOut.x,s.handleOut.y])),'the companion follows the sampled centreline');
+ assert.equal(ribbon.fill.r,0x11/255,'the ribbon is painted in the stroke colour');
+ const masked=await fixture();Object.assign(masked.root.state,{vectorBrush:true,maskMode:true});
+ send(masked,'pointerdown',20,20);send(masked,'pointermove',50,30);send(masked,'pointerup',80,45);await settled(masked);
+ assert.equal(masked.calls.length,0);assert.ok(masked.log.some(s=>/Mask mode with a pressure fill/.test(s)),masked.log.join(','));
+});
+test('a pressure stroke with Stroke off is one closed fill of its centreline',async()=>{
+ const f=await fixture();Object.assign(f.root.state,{vectorBrush:true,strokeEnabled:false});
+ send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:0});
+ await settled(f);assert.equal(f.calls.length,1);const r=plain(f.calls[0].payload.record);
+ assert.equal(f.calls[0].payload.command,'object.vector.create');
+ assert.deepEqual([r.geometry.closed,r.vector.hasRealStroke,r.fill.r,r.vectorExt&&r.vectorExt.pressure],[true,false,0x44/255,undefined]);
+ assert.deepEqual(r.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,20],[50,30],[80,45]]);
 });

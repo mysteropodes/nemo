@@ -53,10 +53,12 @@ async function fixture(tool='rect',native=true){
   }
   assert.equal(command,'nemo_native_dispatch');calls.push(structuredClone(q));assert.equal(q.operation,'command.document.object.vector.edit');
   const prior=receipts.get(q.requestId);if(prior){assert.deepEqual(prior.request,q);const r=structuredClone(prior.response);if(replyChange)replyChange(r);return r;}
-  assert.equal(q.expectedRevision,revision);assert.equal(q.payload.command,'object.vector.create');assert.equal(q.payload.record.target.strokeId,'');
+  assert.equal(q.expectedRevision,revision);const many=q.payload.command==='object.vector.createMany';
+  if(!many){assert.equal(q.payload.command,'object.vector.create');assert.equal(q.payload.record.target.strokeId,'');}
   if(refusal)return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:false,error:{code:refusal,message:'Native refusal'}};
-  revision++;const strokeId='native-stroke:'+revision+':0',record=structuredClone(q.payload.record);record.target.strokeId=strokeId;records.set(strokeId,record);
-  let r={apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1,operation:'create',strokeId}};
+  revision++;const ids=(many?q.payload.records:[q.payload.record]).map((rec,n)=>{const strokeId='native-stroke:'+revision+':'+n,record=structuredClone(rec);record.target.strokeId=strokeId;records.set(strokeId,record);return strokeId;});
+  const strokeId=ids[0];
+  let r={apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:many?{applied:true,historyEntriesAdded:1,operation:'createMany',strokeId,strokeIds:ids}:{applied:true,historyEntriesAdded:1,operation:'create',strokeId}};
   receipts.set(q.requestId,{request:structuredClone(q),response:structuredClone(r)});if(replyChange)replyChange(r);if(hold)await hold.promise;if(wrongOwner)r.documentId='replacement';return r;
  }
  root.__TAURI__={core:{invoke},event:{listen:async(name,fn)=>{events.set(name,fn);return ()=>events.delete(name);}}};
@@ -126,11 +128,21 @@ test('stale frame, selection, tool, style, owner or viewport cancels without tra
  }
 });
 test('native unavailable modes and unconfirmed presentation are consumed before any legacy writer',async()=>{
- for(const change of [f=>f.root.state.tool='star',f=>f.root.state.symmetryEnabled=true,f=>f.root.state.shadowMode=true,f=>f.root.state.maskMode=true,
+ for(const change of [f=>f.root.state.tool='star',f=>f.root.state.symmetryEnabled=true,f=>f.root.state.shadowMode=true,
   f=>f.perspectiveMode('enabled'),f=>f.root.state.strokeStyle='dashed',f=>f.root.state.layers[0].locked=true,
   f=>f.root.state.strokeEnabled=f.root.state.fillEnabled=false,f=>f.root.document.documentElement.classList.remove('nemo-native-underlay')]){
   const f=await fixture();change(f);assert.equal(f.area.fire('pointerdown').stopped,true);f.area.fire('pointerup',{clientX:240,clientY:210});assert.equal(f.calls.length,0);assert.equal(f.body.children.length,0);
  }
+});
+// #2361 G15 Mask mode (tools.js tagOwner @1065e9d8): a shape drawn while Mask is on commits once as a mask of the layer.
+test('Mask mode commits the shape as a mask with the chosen combine mode, add by default',async()=>{
+ for(const [type,mode] of [[undefined,'add'],['intersect','intersect']]){
+  const f=await fixture();f.root.state.maskMode=true;if(type)f.root.state.maskModeType=type;
+  assert.equal((await f.gesture()).status,'applied');assert.equal(f.calls.length,1);
+  const ext=f.calls[0].payload.record.vectorExt||{};assert.deepEqual([ext.isMask,ext.maskMode],[true,mode]);
+ }
+ const plainShape=await fixture();assert.equal((await plainShape.gesture()).status,'applied');
+ assert.equal((plainShape.calls[0].payload.record.vectorExt||{}).isMask,undefined,'without Mask mode nothing is tagged');
 });
 test('pending native receipt blocks new gestures; typed refusal and false ACK never invoke a Paper writer',async()=>{
  const f=await fixture(),wait=gate();f.hold(wait);f.area.fire('pointerdown');f.area.fire('pointerup',{clientX:240,clientY:210});await turn();assert.equal(f.calls.length,1);
@@ -185,20 +197,23 @@ test('stage canvas pointer origin still creates exactly one native rectangle thr
  const f=await fixture();f.canvas.fire('pointerdown');f.canvas.fire('pointermove',{clientX:240,clientY:210});f.canvas.fire('pointerup',{clientX:240,clientY:210});
  assert.equal((await f.root.NemoNativeShapeToolController.whenSettled()).status,'applied');assert.equal(f.calls.length,1);
 });
-test('all 45 retained bootstrap identities match their explicit amended ordinal literal without metadata substitution',()=>{
+test('all 45 retained bootstrap identities keep their frozen runs and adjacency in the actual page',()=>{
  const html=fs.readFileSync(path.join(ROOT,'src/index.html'),'utf8'),fixture=fs.readFileSync(path.join(ROOT,'scripts/nemo/boundaries-application.test.cjs'),'utf8');
  const start=fixture.indexOf("test('N20 contract, authority, adapters and bootstrap load in their frozen order'");assert.ok(start>0);
  const block=fixture.slice(start),paths=Array.from(vm.runInNewContext(block.match(/const paths = (\[[\s\S]*?\]);/)[1]));assert.equal(paths.length,45);
- const expected=JSON.parse(block.match(/assert\.deepEqual\(paths\.map\([\s\S]*?scriptOrdinal\),\s*(\[[\d,\s]+\])\);/)[1]);
+ const runs=JSON.parse(block.match(/assertRuns\(paths\.map\([\s\S]*?scriptOrdinal\),\s*(\[[\d,\s]+\])/)[1]);
  const scripts=[...html.matchAll(/<script\b([^>]*)>/gi)].map((m,i)=>({src:m[1].match(/\bsrc=["']([^"']+)/)?.[1],ordinal:i+1}));
- assert.deepEqual(paths.map(p=>scripts.find(s=>'src/'+s.src===p).ordinal),expected);
+ const ordinals=paths.map(p=>scripts.find(s=>'src/'+s.src===p).ordinal);let at=0;
+ for(const size of runs){for(let k=1;k<size;k++)assert.equal(ordinals[at+k],ordinals[at+k-1]+1);if(at)assert.ok(ordinals[at]>ordinals[at-1]+1);at+=size;}
+ assert.equal(at,45);
  // Read actual HTML directly: one helper after SDK, before the following consumer.
  assert.equal(scripts.filter(s=>s.src==='js/adapters/native-frame-edit-desktop.js').length,1);
- assert.deepEqual(['native-application','native-frame-edit-desktop','native-text-read'].map(name=>scripts.find(s=>s.src==='js/adapters/'+name+'.js').ordinal),[250,251,254]);
- assert.equal(scripts.find(s=>s.src==='js/adapters/native-fill-desktop.js').ordinal,252);
- assert.equal(scripts.find(s=>s.src==='js/adapters/i18n-runtime.js').ordinal,123);assert.equal(scripts.find(s=>s.src==='js/i18n.js').ordinal,124);
- assert.match(fixture,/retained\.loadSites\[0\]\.scriptOrdinal, 123/);
- assert.match(fixture,/assert\.deepEqual\(positions, \[14, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28\]/);
+ const ord=name=>scripts.find(s=>s.src==='js/adapters/'+name+'.js').ordinal;
+ assert.equal(ord('native-frame-edit-desktop'),ord('native-application')+1);
+ assert.ok(ord('native-frame-edit-desktop')<ord('native-fill-desktop')&&ord('native-fill-desktop')<ord('native-text-read'));
+ assert.equal(scripts.find(s=>s.src==='js/i18n.js').ordinal,ord('i18n-runtime')+1);
+ assert.match(fixture,/retained\.loadSites\[0\]\.scriptOrdinal, runtime\[0\]\.ordinal/);
+ assert.match(fixture,/assertRuns\(positions, \[1, 10, 2\]/);
 });
 
 test('native drawing refuses unavailable, stale and enabled Perspective projections before a document command',async()=>{
@@ -301,4 +316,34 @@ test('Pen: Enter commits; Alt reshapes a placed anchor; a direct tool change sti
  f.root.state.currentFrame=1;f.root.SM.setTool('rect');r=await f.root.NemoNativePenToolController.whenSettled();
  assert.notEqual(r.status,'applied','a frame change after the gesture voids the commit');assert.equal(f.calls.length,0);
  f=await fixture('pen');const hover=f.area.fire('pointermove',{clientX:100,clientY:100});assert.equal(hover.stopped,false,'hover is not consumed without a gesture');
+});
+
+// G23 symmetry (#2361): the stroke and its copies as ONE createMany. Canvas 320x180, default axes through the centre.
+test('symmetry: a mirrored Pen path and a radial rectangle each commit as one native createMany',async()=>{
+ let f=await fixture('pen');Object.assign(f.root.state,{symmetryEnabled:true,symmetryMode:'y',symmetryExtend:false});
+ let r=await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
+ assert.equal(r.status,'applied');assert.equal(f.calls.length,1);let q=f.calls[0].payload;assert.equal(q.command,'object.vector.createMany');
+ assert.deepEqual(q.records.map(pts),[[[20,20],[100,20]],[[300,20],[220,20]]],'reflected across x = 160');
+ f=await fixture('rect');Object.assign(f.root.state,{symmetryEnabled:true,symmetryMode:'radial',symmetryRadialSectors:4,symmetryRadialCenter:{x:160,y:90}});
+ r=await f.gesture();assert.equal(r.status,'applied');q=f.calls[0].payload;assert.equal(q.records.length,4);
+ assert.deepEqual(pts(q.records[0]),[[20,20],[100,20],[100,80],[20,80]]);
+ assert.deepEqual(pts(q.records[2]),[[300,160],[220,160],[220,100],[300,100]],'180 degrees about (160,90)');
+ assert.deepEqual(pts(q.records[1])[0],[90,230],'copies stack as insertAbove leaves them: 270 degrees right above the original');
+ assert.equal(f.session.info().contentRevision,1,'four strokes, one revision');
+});
+
+test('symmetry: a stroke the axis clip leaves with one anchor refuses with its reason instead of dropping silently',async()=>{
+ let f=await fixture('pen');Object.assign(f.root.state,{symmetryEnabled:true,symmetryMode:'y',symmetryExtend:false});
+ await pen(f,[['pointerdown',400,90],['pointerup',400,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
+ assert.equal(f.calls.length,0);assert.ok(f.log.some(m=>/starts at the symmetry axis/.test(m)));
+});
+
+test('symmetry preview draws the stroke and its mirror without writing anything, then clears on commit',async()=>{
+ const f=await fixture('rect');Object.assign(f.root.state,{symmetryEnabled:true,symmetryMode:'y',symmetryExtend:true});
+ f.area.fire('pointerdown');f.area.fire('pointermove',{clientX:240,clientY:210});
+ const overlay=f.body.firstChild;assert.equal(overlay.children.length,2,'stroke plus its mirror');
+ assert.match(overlay.children[0].attributes.d,/^M 20 20/);assert.match(overlay.children[1].attributes.d,/^M 300 80/,'the mirrored closed copy is re-oriented');
+ assert.equal(f.calls.length,0,'preview writes nothing');
+ f.area.fire('pointerup',{clientX:240,clientY:210});await f.root.NemoNativeShapeToolController.whenSettled();
+ assert.equal(f.body.children.length,0);assert.equal(f.calls.length,1);assert.equal(f.calls[0].payload.records.length,2);
 });

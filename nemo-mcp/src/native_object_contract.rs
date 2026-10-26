@@ -71,6 +71,9 @@ pub(super) fn timing_request(value: &Value) -> bool {
     if value.get("view").is_some_and(|view| view == "placement") {
         return layer_placement::request(value);
     }
+    if value.get("view").is_some_and(|view| view == "cells") {
+        return layer_cells::request(value);
+    }
     if value.get("view").is_some() {
         return layer_range::request(value);
     }
@@ -80,6 +83,9 @@ pub(super) fn timing_request(value: &Value) -> bool {
 pub(super) fn timing_result(document_id: &str, payload: &Value, result: &Value) -> bool {
     if payload.get("view").is_some_and(|view| view == "placement") {
         return layer_placement::result(document_id, payload, result);
+    }
+    if payload.get("view").is_some_and(|view| view == "cells") {
+        return layer_cells::result(document_id, payload, result);
     }
     if payload.get("view").is_some() {
         return layer_range::result(document_id, payload, result);
@@ -302,6 +308,8 @@ mod tests;
 
 #[path = "native_layer_placement_contract.rs"]
 mod layer_placement;
+#[path = "native_layer_cells_contract.rs"]
+mod layer_cells;
 #[path = "native_layer_range_contract.rs"]
 mod layer_range;
 

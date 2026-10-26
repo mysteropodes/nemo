@@ -175,7 +175,7 @@
       function ready() {
         const s = ports.state(), p = s && s.presented;
         return s && !s.opening && samePins(s.info, pin) && p && p.available === true &&
-          p.presentation && samePins(p.presentation, pin) && p.presentation.frame === frame && integer(frame, 0) && frame < pin.totalFrames &&
+          p.presentation && samePins(p.presentation, pin) && (view === 'cells' || p.presentation.frame === frame) && integer(frame, 0) && frame < pin.totalFrames &&
           Array.isArray(pin.layers) && pin.layers.filter((l) => l && l.layerUid === layerUid).length === 1;
       }
       try {
@@ -196,6 +196,8 @@
         if (!object(r) || Object.keys(r).length !== (view ? 9 : 11) || r.instanceId !== pin.instanceId || r.documentId !== pin.documentId ||
           ['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'].some((k) => r[k] !== request.payload[k])) return null;
         if (view === 'placement' && !(r.kind === 'layerPlacement' && typeof r.placement === 'object')) return null;
+        if (view === 'cells' && !(r.kind === 'layerCells' && r.cells && Array.isArray(r.cells.runs) &&
+          r.cells.runs.length && r.cells.runs[0][0] === frame)) return null;
         if (view === 'range') {
           const range = r.range, fields = ['rawInPoint', 'rawOutPoint', 'inPoint', 'outPoint', 'hasCustomRange', 'hasTimeLink'];
           if (r.kind !== 'layerRange' || !object(range) || Object.keys(range).length !== 6 || !fields.every((k) => own(range, k)) ||
@@ -208,8 +210,19 @@
         return ready();
       }
     }
+    // Whole-row timing keeps its original paged query and refuses the complete row if any page is unavailable.
+    async function readLayerCells(layerUid, pin) {
+      let runs = [], frame = 0;
+      while (frame !== null) {
+        const page = await readLegacy(layerUid, frame, pin, 'cells');
+        if (!page) return null;
+        runs = runs.concat(page.cells.runs);
+        frame = page.cells.nextFrame;
+      }
+      return freeze(runs.map((run) => freeze(run.slice())));
+    }
     return Object.freeze({ readLayerTiming: (l, f, p) => readLegacy(l, f, p), readLayerRange: (l, f, p) => readLegacy(l, f, p, 'range'),
-      readLayerPlacement: (l, f, p) => readLegacy(l, f, p, 'placement'), readImageMesh: readImageMesh });
+      readLayerPlacement: (l, f, p) => readLegacy(l, f, p, 'placement'), readLayerCells: readLayerCells, readImageMesh: readImageMesh });
   }
   function expectedCount(kind, m) { return kind === 'outline' ? m.outlineCount : kind === 'verts' ? m.vertexCount : kind === 'tris' ? m.triangleIndexCount : m.vertexCount; }
   function copyTarget(t) { return { contextId: t.contextId, layerUid: t.layerUid, frameScope: { kind: t.frameScope.kind, frame: t.frameScope.frame }, strokeId: t.strokeId }; }

@@ -31,4 +31,5 @@
   L.resetAll=model.resetAll;
   L.onStrokeCommitted=model.onStrokeCommitted;
   L.buildDrawPreviewExtras=model.buildDrawPreviewExtras;
+  L.unmigratedDrawHooks=model.unmigratedDrawHooks;
 })();

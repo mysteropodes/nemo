@@ -7,10 +7,11 @@
     "surfaces": 903,
     "tasks": 228,
     "surfaceStatus": {
-      "issues-open": 584,
-      "curated-open": 216,
+      "issues-open": 550,
+      "curated-open": 213,
       "curated-closed": 57,
-      "issues-closed": 46
+      "issues-closed": 46,
+      "disposition": 37
     },
     "taskStatus": {
       "issues-closed": 41,
@@ -28,8 +29,8 @@
     },
     "mappingConfidence": {
       "high": 450,
-      "medium": 390,
-      "low": 63
+      "medium": 363,
+      "low": 90
     }
   },
   "evidence": [
@@ -7208,10 +7209,10 @@
         "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:boil-effect",
@@ -7250,10 +7251,10 @@
         "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:command-palette",
@@ -7261,14 +7262,13 @@
       "area": "labs",
       "capability": "Cmd/Ctrl+K command palette (Umoupen command search): tools, transport, frames, Labs toggles — fuzzy filter, Enter runs",
       "tasks": [
-        "U31",
-        "U30"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "labs:flip-roll",
@@ -7350,10 +7350,10 @@
         "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:lipsync-assistant",
@@ -7365,10 +7365,10 @@
         "I42"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:mirror-check",
@@ -7421,10 +7421,10 @@
         "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:out-of-pegs",
@@ -7534,10 +7534,10 @@
         "U25"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "curated-open"
+      "status": "disposition"
     },
     {
       "id": "labs:screentone-bake",
@@ -7548,10 +7548,10 @@
         "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:shader-effects-bake",
@@ -7563,10 +7563,10 @@
         "G11"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:speed-lines",
@@ -7591,10 +7591,10 @@
         "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:timelapse",
@@ -7605,10 +7605,10 @@
         "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:timeline-markers",
@@ -7630,13 +7630,13 @@
       "area": "labs",
       "capability": "Zoom de la timeline : Ctrl/Cmd+molette au-dessus de la grille, scrollbar custom en bas (glisser le corps = pan, glisser un bord = zoom), ou SMLabs.setTimelineZoom(px)/zoomTimelineIn/Out/resetTimelineZoom — mute FC (JS) + --fc (CSS), les deux déjà lus en direct partout, aucun fichier core touché",
       "tasks": [
-        "U31"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "labs:vector-sculpt",
@@ -7715,14 +7715,13 @@
       "area": "labs",
       "capability": "Labs : ",
       "tasks": [
-        "U31",
-        "U30"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdblankkeyframe",
@@ -7730,14 +7729,13 @@
       "area": "labs",
       "capability": "Blank keyframe (F7)",
       "tasks": [
-        "U31",
-        "I25"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdduplicatelayer",
@@ -7745,14 +7743,13 @@
       "area": "labs",
       "capability": "Duplicate the layer",
       "tasks": [
-        "U31",
-        "U10"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "curated-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdinsertframe",
@@ -7760,14 +7757,13 @@
       "area": "labs",
       "capability": "Insert a frame (F5)",
       "tasks": [
-        "U31",
-        "I25"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdinsertkeyframe",
@@ -7775,14 +7771,13 @@
       "area": "labs",
       "capability": "Insert a keyframe (F6)",
       "tasks": [
-        "U31",
-        "I25"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdlooptoggle",
@@ -7790,14 +7785,13 @@
       "area": "labs",
       "capability": "Loop on/off",
       "tasks": [
-        "U31",
-        "U13"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdnewlayer",
@@ -7805,14 +7799,13 @@
       "area": "labs",
       "capability": "New layer",
       "tasks": [
-        "U31",
-        "U10"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "curated-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdoniontoggle",
@@ -7820,14 +7813,13 @@
       "area": "labs",
       "capability": "Onion skin on/off",
       "tasks": [
-        "U31",
-        "U20"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdpingpongtoggle",
@@ -7835,14 +7827,13 @@
       "area": "labs",
       "capability": "Ping-pong playback on/off",
       "tasks": [
-        "U31",
-        "U13"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdplaystop",
@@ -7850,14 +7841,13 @@
       "area": "labs",
       "capability": "Play / Stop",
       "tasks": [
-        "U31",
-        "U13"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdredo",
@@ -7865,14 +7855,13 @@
       "area": "labs",
       "capability": "Redo",
       "tasks": [
-        "U31",
-        "D08"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdremoveframe",
@@ -7880,14 +7869,13 @@
       "area": "labs",
       "capability": "Remove the frame",
       "tasks": [
-        "U31",
-        "I25"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolbrush",
@@ -7895,14 +7883,13 @@
       "area": "labs",
       "capability": "Tool: Brush",
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolbucket",
@@ -7910,14 +7897,13 @@
       "area": "labs",
       "capability": "Tool: Paint bucket",
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolcamera",
@@ -7925,14 +7911,13 @@
       "area": "labs",
       "capability": "Tool: Camera",
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolcomment",
@@ -7940,14 +7925,13 @@
       "area": "labs",
       "capability": "Tool: Comment",
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtooleraser",
@@ -7955,14 +7939,13 @@
       "area": "labs",
       "capability": "Tool: Eraser",
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolfillbrush",
@@ -7970,14 +7953,13 @@
       "area": "labs",
       "capability": "Tool: Fill brush",
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolhand",
@@ -7985,14 +7967,13 @@
       "area": "labs",
       "capability": "Tool: Hand",
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolpen",
@@ -8000,14 +7981,13 @@
       "area": "labs",
       "capability": "Tool: Pen",
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolselect",
@@ -8015,14 +7995,13 @@
       "area": "labs",
       "capability": "Tool: Select",
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolsubselect",
@@ -8030,14 +8009,13 @@
       "area": "labs",
       "capability": "Tool: Subselect (nodes)",
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtooltext",
@@ -8045,14 +8023,13 @@
       "area": "labs",
       "capability": "Tool: Text",
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolzoom",
@@ -8060,14 +8037,13 @@
       "area": "labs",
       "capability": "Tool: Zoom",
       "tasks": [
-        "U31",
-        "U06"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdundo",
@@ -8075,14 +8051,13 @@
       "area": "labs",
       "capability": "Undo (Cmd+Z)",
       "tasks": [
-        "U31",
-        "D08"
+        "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
-      "confidence": "medium",
-      "status": "issues-open"
+      "confidence": "low",
+      "status": "disposition"
     },
     {
       "id": "menu:layer-inout.js:buildBar:aligner-a-droite-out",
@@ -13568,7 +13543,7 @@
       "task": "D08",
       "outcome": "A03",
       "title": "Complete cross-context application history routing",
-      "surfaces": 10,
+      "surfaces": 8,
       "owners": [
         {
           "issue": 2256,
@@ -15894,7 +15869,7 @@
       "task": "I25",
       "outcome": "A05",
       "title": "Adapt frame insertion, F6/F7, clear, span removal and duplication callers",
-      "surfaces": 5,
+      "surfaces": 1,
       "owners": [
         {
           "issue": 2355,
@@ -16376,7 +16351,7 @@
       "task": "U06",
       "outcome": "B04",
       "title": "Extract temporary tool holds and ordinary brush/tool controls",
-      "surfaces": 30,
+      "surfaces": 18,
       "owners": [
         {
           "issue": 2370,
@@ -16430,7 +16405,7 @@
       "task": "U10",
       "outcome": "B05",
       "title": "Wire layer lifecycle, duplicate/split and folder command callers",
-      "surfaces": 5,
+      "surfaces": 3,
       "owners": [
         {
           "issue": 2234,
@@ -16470,7 +16445,7 @@
       "task": "U13",
       "outcome": "B05",
       "title": "Extract timeline transport and document-timing controls over native ports",
-      "surfaces": 21,
+      "surfaces": 18,
       "owners": [
         {
           "issue": 2371,
@@ -16561,7 +16536,7 @@
       "task": "U20",
       "outcome": "B06",
       "title": "Extract ordinary onion and ghost controls with local view settings",
-      "surfaces": 21,
+      "surfaces": 20,
       "owners": [
         {
           "issue": 2372,
@@ -16697,7 +16672,7 @@
       "task": "U30",
       "outcome": "B09",
       "title": "Partition Labs registry, settings list and floating strip",
-      "surfaces": 4,
+      "surfaces": 2,
       "owners": [
         {
           "issue": 2179,
@@ -16710,7 +16685,7 @@
       "task": "U31",
       "outcome": "B09",
       "title": "Retain Labs view-only aids and local markers",
-      "surfaces": 36,
+      "surfaces": 9,
       "owners": [
         {
           "issue": 2374,
@@ -16791,7 +16766,7 @@
       "task": "U37",
       "outcome": "B09",
       "title": "Disposition dormant Labs without activating prototypes",
-      "surfaces": 10,
+      "surfaces": 37,
       "owners": [
         {
           "issue": 2374,

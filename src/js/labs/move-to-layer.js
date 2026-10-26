@@ -20,11 +20,33 @@
     describe: 'labsDescribeMoveToLayer',
   });
 
+  // Native authority (U34, #2362): one native transaction moves the strokes with their fills and dabs; the call returns a
+  // Promise of the same count. The baseline path follows.
+  function nativeMove(native, targetIdx) {
+    var toast = function (key) { if (typeof showToast === 'function') showToast(SM.t(key)); };
+    var from = native.layerUid(state.activeLayerIdx), target = native.layerInfo(targetIdx);
+    if (!from || !target || targetIdx === state.activeLayerIdx) { toast('labsToastTargetLayerInvalid'); return Promise.resolve(0); }
+    if (target.locked === true) { toast('labsToastTargetLayerLocked'); return Promise.resolve(0); }
+    var ids = [];
+    selectedPaths.forEach(function (p) { var id = p && p.data && p.data.strokeId; if (id && ids.indexOf(id) < 0) ids.push(id); });
+    if (!ids.length) { toast('labsToastSelectStrokesFirst'); return Promise.resolve(0); }
+    return native.moveToLayer({ fromLayer: from, toLayer: target.layerUid, frame: state.currentFrame, strokeIds: ids }).then(function () {
+      if (typeof clearSel === 'function') clearSel();
+      if (typeof showToast === 'function') showToast(ids.length + SM.t('labsToastMovedToLayerMid') + (target.name || '') + ' »');
+      return ids.length;
+    }, function (error) {
+      toast(error && error.code === 'unavailable' ? 'labsToastCannotMoveToComponentLayer' : 'labsToastTargetLayerInvalid');
+      return 0;
+    });
+  }
+
   window.SMLabs.moveSelectionToLayer = function (targetIdx) {
     if (typeof selectedPaths === 'undefined' || !selectedPaths.length) {
       if (typeof showToast === 'function') showToast(SM.t('labsToastSelectStrokesFirst'));
       return 0;
     }
+    var native = window.NemoNativeObjectLabs && NemoNativeObjectLabs.desktop(window);
+    if (native) return nativeMove(native, targetIdx);
     var tl = state.layers[targetIdx];
     if (!tl || targetIdx === state.activeLayerIdx) { if (typeof showToast === 'function') showToast(SM.t('labsToastTargetLayerInvalid')); return 0; }
     if (tl.locked) { if (typeof showToast === 'function') showToast(SM.t('labsToastTargetLayerLocked')); return 0; }

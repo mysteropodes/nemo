@@ -342,13 +342,15 @@ test('timing declaration and closed transport definitions retain the accepted se
     ['ObjectLayerTimingFrame','Frame'], ['ObjectLayerTimingCellPayload','CellSelector'],
     ['ObjectLayerRangePayload','RangeSelector'], ['ObjectLayerTimingCellResult','CellReadResult'],
     ['ObjectLayerRangeResult','RangeReadResult'], ['ObjectLayerPlacementPayload','PlacementSelector'],
-    ['ObjectLayerPlacementResult','PlacementReadResult']
+    ['ObjectLayerPlacementResult','PlacementReadResult'], ['ObjectLayerRowCellsPayload','RowCellsSelector'],
+    ['ObjectLayerRowCellsResult','RowCellsReadResult']
   ].map(([from,to])=>['#/$defs/'+from,'#/$defs/'+to]));
   const normalize = value => JSON.parse(JSON.stringify(value),(key,entry)=>key==='$ref'&&Object.hasOwn(timingReferences,entry)?timingReferences[entry]:entry);
   // Preserve both original cell and admitted range contracts down to their closed leaf definitions.
   for(const [from,to] of [['ObjectLayerTimingCellPayload','CellSelector'],['ObjectLayerRangePayload','RangeSelector'],
     ['ObjectLayerTimingCellResult','CellReadResult'],['ObjectLayerRangeResult','RangeReadResult'],
-    ['ObjectLayerPlacementPayload','PlacementSelector'],['ObjectLayerPlacementResult','PlacementReadResult']])assert.deepEqual(normalize(transport.$defs[from]),accepted[to]);
+    ['ObjectLayerPlacementPayload','PlacementSelector'],['ObjectLayerPlacementResult','PlacementReadResult'],
+    ['ObjectLayerRowCellsPayload','RowCellsSelector'],['ObjectLayerRowCellsResult','RowCellsReadResult']])assert.deepEqual(normalize(transport.$defs[from]),accepted[to]);
   assert.deepEqual(normalize(transport.$defs.ObjectLayerTimingPayload), accepted.Selector);
   assert.deepEqual(normalize(transport.$defs.ObjectLayerTimingResult), accepted.ReadResult);
   assert.deepEqual(transport.$defs.ObjectLayerTimingFrame, accepted.Frame);
@@ -374,6 +376,14 @@ test('timing declaration and closed transport definitions retain the accepted se
   }
   const counted={...placement.response,result:{...placement.response.result,placement:{...placement.response.result.placement,sourceFrameCount:48}}};
   assert.doesNotThrow(()=>validateResponse(counted,placement.request.requestId,placement.request.operation));
+  // U31 cells view (#2374): the same selector with view "cells" and its run-encoded row.
+  const cells=timing.examples.find(e=>e.request.payload.view==='cells');
+  assert.equal(validateRequest(cells.request),cells.request);
+  assert.deepEqual(validateSelector(cells.request.payload),[]);
+  assert.doesNotThrow(()=>validateResponse(cells.response,cells.request.requestId,cells.request.operation));
+  assert.deepEqual(validate(transport.$defs.ObjectLayerRowCellsResult,cells.response.result,transport.$defs),[]);
+  for(const cellsBad of [{runs:[[0,1,'blank',0,true,false]],nextFrame:null},{runs:[[1,1,'key',1,true,false]],nextFrame:null},{runs:[[0,1,'key',0,true,false]],nextFrame:2},{runs:[],nextFrame:null}])
+    assert.throws(()=>validateResponse({...cells.response,result:{...cells.response.result,cells:cellsBad}},cells.request.requestId,cells.request.operation),TypeError,JSON.stringify(cellsBad));
   const empty={...placement.response,result:{...placement.response.result,placement:null}};
   assert.doesNotThrow(()=>validateResponse(empty,placement.request.requestId,placement.request.operation));
   for (const bad of [null, [], {}, { ...request.payload, lifecycleGeneration: 1 }, { ...request.payload, frame: 4294967296 }, { ...request.payload, atRevision: -1 }, {...rangeRequest.payload,view:'other'}]) {

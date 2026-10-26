@@ -3144,6 +3144,18 @@
       ]
     },
     {
+      "id": "app.native.object.labs.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-labs.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-labs.js"
+      ]
+    },
+    {
       "id": "app.native.object.rig.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
@@ -3585,6 +3597,42 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-perspective-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.symmetry.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-symmetry-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-symmetry-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.symmetry.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-symmetry-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-symmetry-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.symmetry.ui",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-symmetry-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-symmetry-ui.js"
       ]
     },
     {
