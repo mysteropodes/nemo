@@ -36,7 +36,7 @@ impl Placement {
 /// `trimEnds` (the baseline `trimStrokeEndsMax`) is optional on the two create commands only: a finite
 /// overshoot limit above zero. Absent means no trim, as with `trimStrokeEnds` off.
 pub(super) fn trim_ends(command: &str, value: &Presence<serde_json::Number>) -> Result<Option<f64>, DispatchErrorCode> {
-    let creates = matches!(command, "object.vector.create" | "object.vector.createMany");
+    let creates = matches!(command, "object.vector.create" | "object.vector.createMany" | "object.vector.batch");
     match value.value() {
         None => Ok(None),
         Some(n) if creates => n.as_f64().filter(|v| v.is_finite() && *v > 0.).map(Some).ok_or(DispatchErrorCode::InvalidRequest),
@@ -101,6 +101,29 @@ fn create_many_or_one(
     create_in(origin.document(), origin.content_revision(), records, placement, trim, copy_key, kind)
 }
 
+/// Trim Stroke Ends (draw-bridge.js @1065e9d8 trims the drawn path before the symmetry copies and the Labs multi-frame
+/// stamps exist): the first record's cut against the paths of its own cell, shared by every record, so copies keep the
+/// same anchors. Nothing is trimmed when any record could not take the cut.
+pub(super) fn trim_records(source: &ObjectDocument, records: &mut [ObjectRecord], max: f64) -> Result<(), DispatchErrorCode> {
+    let first = records.first().ok_or(DispatchErrorCode::InvalidRequest)?.target.clone();
+    // A vector-brush trim rebuilds its outline from the trimmed centreline; that rebuild is not native yet.
+    if records.iter().any(trim::is_vector_brush) {
+        return Err(DispatchErrorCode::Unavailable);
+    }
+    let walls = source.objects.iter().filter(|r| {
+        r.target.context_id == first.context_id
+            && r.target.layer_uid == first.layer_uid
+            && r.target.frame_scope == first.frame_scope
+    });
+    // The baseline trims nothing when a cut would leave fewer than two anchors; neither do the copies.
+    let cut = trim::cuts(&records[0], walls, max);
+    let trimmed: Option<Vec<_>> = cut.and_then(|cut| records.iter().map(|r| trim::apply(r, cut)).collect());
+    for (record, segments) in records.iter_mut().zip(trimmed.into_iter().flatten()) {
+        record.geometry.segments = segments;
+    }
+    Ok(())
+}
+
 /// The create kernel against a document being edited; `revision` is the origin's, so ids stay monotonic.
 pub(super) fn create_in(
     source: &ObjectDocument,
@@ -120,21 +143,7 @@ pub(super) fn create_in(
         return Err(DispatchErrorCode::InvalidRequest);
     }
     if let Some(max) = trim {
-        // A vector-brush trim rebuilds its outline from the trimmed centreline; that rebuild is not native yet.
-        if records.iter().any(trim::is_vector_brush) {
-            return Err(DispatchErrorCode::Unavailable);
-        }
-        let walls = source.objects.iter().filter(|r| {
-            r.target.context_id == first.context_id
-                && r.target.layer_uid == first.layer_uid
-                && r.target.frame_scope == first.frame_scope
-        });
-        // The baseline trims nothing when a cut would leave fewer than two anchors; neither do the copies.
-        let cut = trim::cuts(&records[0], walls, max);
-        let trimmed: Option<Vec<_>> = cut.and_then(|cut| records.iter().map(|r| trim::apply(r, cut)).collect());
-        for (record, segments) in records.iter_mut().zip(trimmed.into_iter().flatten()) {
-            record.geometry.segments = segments;
-        }
+        trim_records(source, &mut records, max)?;
     }
     let mut document = source.clone();
     // Baseline Draw, Pen and shape commits run ensureKeyframe(true) first (draw-bridge.js commitStroke, tools.js

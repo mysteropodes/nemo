@@ -25,6 +25,11 @@ fn a_batch_names_admitted_steps_on_one_layer_and_its_receipt_follows_them() {
     let mut copy = payload.clone();
     copy["keyframe"] = json!("copy");
     assert!(vector_request(VECTOR, &copy));
+    let creates = json!({"command":"object.vector.batch","trimEnds":24,"ops":[{"op":"create","record":record("L1","")}]});
+    assert!(vector_request(VECTOR, &creates), "an all-create batch may trim");
+    let mut own = payload.clone();
+    own["ops"][1]["keyframe"] = json!("copy");
+    assert!(vector_request(VECTOR, &own), "a create may carry its own copy key");
     let receipt = json!({"applied":true,"historyEntriesAdded":1,"operation":"batch","strokeId":"s-a",
         "strokeIds":["s-a","native-stroke:8:0","s-b"]});
     assert!(vector_result(VECTOR, &payload, &receipt));
@@ -53,7 +58,10 @@ fn malformed_steps_mixed_layers_bounds_and_members_are_refused() {
         json!({"command":"object.vector.batch","ops":[{"op":"delete","stableTarget":target("L1","s"),"placement":"behind"}]}),
         json!({"command":"object.vector.batch","ops":[{"op":"create","record":record("L1",""),"placement":"under"}]}),
         json!({"command":"object.vector.batch","ops":[{"op":"replace","record":record("L1","")}]}),
+        json!({"command":"object.vector.batch","ops":[{"op":"create","record":record("L1",""),"keyframe":"blank"}]}),
+        json!({"command":"object.vector.batch","ops":[{"op":"delete","stableTarget":target("L1","s"),"keyframe":"copy"}]}),
     ];
+    cases.push(json!({"command":"object.vector.batch","trimEnds":0,"ops":[{"op":"create","record":record("L1","")}]}));
     for (key, value) in [("keyframe", json!("blank")), ("trimEnds", json!(4)), ("placement", json!("behind"))] {
         let mut payload = cut();
         payload[key] = value;

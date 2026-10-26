@@ -32,7 +32,7 @@
     function style(tool,proof){
       var s=root.state,current=session(),ownerInfo=current&&current.info(),port=root.NemoNativePerspectiveController;
       var perspective=port&&(proof?typeof port.readForCommand==='function'&&port.readForCommand(proof):port.read());
-      if(s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||s.shadowMode||s.maskMode||!perspective||!same(perspective.info,ownerInfo)||perspective.perspective.settings.perspectiveEnabled||s.activeSymbolId)fail('This drawing mode is unavailable in native shape tools.');
+      if(s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||s.shadowMode||!perspective||!same(perspective.info,ownerInfo)||perspective.perspective.settings.perspectiveEnabled||s.activeSymbolId)fail('This drawing mode is unavailable in native shape tools.');
       if(ports.freehand)return ports.style();
       if(ports.pen)return penStyle(s);
       if(typeof s.strokeEnabled!=='boolean'||typeof s.fillEnabled!=='boolean'||(!s.strokeEnabled&&(tool==='line'||!s.fillEnabled)))fail('Enable a supported stroke or fill to draw.');
@@ -164,6 +164,9 @@
       var dict=dictionary(t,end),s=t.session;
       // Labs predictive stroke (draw-bridge.js onStrokeCommitted @1065e9d8) reshapes a freehand stroke before it is committed.
       if(ports.freehand&&root.SMLabs&&typeof root.SMLabs.predictStrokeDict==='function')dict=root.SMLabs.predictStrokeDict(dict)||dict;
+      // Mask mode (tools.js tagOwner @1065e9d8, on every Draw/Pen/shape commit): the shape becomes a mask of the layer
+      // with the chosen combine mode; its symmetry copies and multi-frame stamps carry the same tags.
+      if(root.state.maskMode)dict=Object.assign({},dict,{isMask:true,maskMode:root.state.maskModeType||'add'});
       // No second queue: only add a current-intent check to the real Project
       // resource action. While that action runs, its own pending count hides presentation.
       var guarded={info:s.info,isActive:s.isActive,requestId:s.requestId,runResourceCommand:function(action){return s.runResourceCommand(function(ctx){
@@ -175,6 +178,16 @@
       var options={origin:t.pin,placement:ports.freehand&&t.behind?'behind':'front'};
       // draw-bridge.js @1065e9d8 Trim Stroke Ends: a Draw commit trims before its symmetry copies exist; native shares the cuts.
       if(ports.freehand&&root.state.trimStrokeEnds&&root.state.trimStrokeEndsMax>0)options.trimEnds=root.state.trimStrokeEndsMax;
+      // Labs multi-frame draw (draw-bridge.js onStrokeCommitted @1065e9d8, before the symmetry copies): the stroke is also
+      // stamped on every other selected frame, held ones keyed with what they showed, in the same single undo step.
+      var stamps=ports.freehand&&root.SMLabs&&typeof root.SMLabs.multiframeTargets==='function'?root.SMLabs.multiframeTargets(t.frame):[];
+      if(stamps.length){
+        // Behind, the k-th record of one create lies k-th from the bottom; one create per step lands each at the bottom.
+        var here=dicts.map(function(d){return {create:d,placement:options.placement};});if(options.placement==='behind')here.reverse();
+        var steps=here.concat(stamps.map(function(frame){return {create:dict,frame:frame,keyframe:'copy',placement:options.placement};}));
+        return vector.batchStrokes(t.layerUid,t.frame,steps,Object.assign({origin:t.pin},options.trimEnds?{trimEnds:options.trimEnds}:{})).then(function(result){
+          if(result&&result.status==='applied'&&typeof root.SMLabs.multiframeStamped==='function')root.SMLabs.multiframeStamped(stamps.length);return result;});
+      }
       return dicts.length>1?vector.createStrokes(t.layerUid,t.frame,dicts,options):vector.createStroke(t.layerUid,t.frame,dict,options);
     }
     // Geometry/mapping can refuse synchronously before the existing Project

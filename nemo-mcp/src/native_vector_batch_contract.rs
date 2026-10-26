@@ -11,9 +11,10 @@ const MAX_OPS: usize = 64;
 /// One step's addressed target, when the step is one of the three admitted shapes.
 fn step(op: &Value) -> Option<&Value> {
     match op["op"].as_str()? {
-        "create" => (exact(op, &["op", "record"], &["placement"]).is_some()
+        "create" => (exact(op, &["op", "record"], &["placement", "keyframe"]).is_some()
             && record_shape(&op["record"], true)
-            && op.get("placement").is_none_or(|p| p == "front" || p == "behind"))
+            && op.get("placement").is_none_or(|p| p == "front" || p == "behind")
+            && op.get("keyframe").is_none_or(|k| k == "copy"))
         .then(|| &op["record"]["target"]),
         "replace" => (exact(op, &["op", "record"], &[]).is_some()
             && record_shape(&op["record"], false)
@@ -26,8 +27,13 @@ fn step(op: &Value) -> Option<&Value> {
 }
 
 pub(super) fn request(payload: &Value) -> bool {
-    exact(payload, &["command", "ops"], &["keyframe"]).is_some()
+    exact(payload, &["command", "ops"], &["keyframe", "trimEnds"]).is_some()
         && payload.get("keyframe").is_none_or(|k| k == "copy")
+        // A batch trims only when every step creates: the drawn stroke, its copies and its multi-frame stamps.
+        && payload.get("trimEnds").is_none_or(|t| {
+            t.as_f64().is_some_and(|v| v.is_finite() && v > 0.)
+                && payload["ops"].as_array().is_some_and(|ops| ops.iter().all(|op| op["op"] == "create"))
+        })
         && payload["ops"].as_array().is_some_and(|ops| {
             let targets: Option<Vec<&Value>> = ops.iter().map(step).collect();
             (1..=MAX_OPS).contains(&ops.len())
