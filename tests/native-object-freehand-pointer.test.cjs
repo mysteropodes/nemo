@@ -347,6 +347,12 @@ test('Labs multi-frame draw stamps the native stroke on the other selected frame
  assert.equal(payload.command,'object.vector.batch');assert.equal(payload.keyframe,undefined,'the drawn frame keeps Draw\'s key');
  assert.deepEqual(payload.ops.map(op=>[op.op,op.record.target.frameScope.frame,op.keyframe||null]),[['create',0,null],['create',3,'copy'],['create',5,'copy']]);
  assert.deepEqual(payload.ops[1].record.geometry,payload.ops[0].record.geometry,'every stamp is the drawn stroke');
+ const trim=await fixture();multiframe(trim,true);trim.root.state.trimStrokeEnds=true;trim.root.state.trimStrokeEndsMax=24;
+ send(trim,'pointerdown',10,40);send(trim,'pointermove',40,41);send(trim,'pointerup',100,40);
+ await settled(trim);assert.equal(trim.calls[0].payload.trimEnds,24,'the drawn stroke and its stamps share one native cut');
+ const SDK=require('../src/js/adapters/native-application.js'),req=plain(trim.calls[0]);
+ req.payload.ops.push({op:'delete',stableTarget:{contextId:'scene-root',frameScope:{kind:'authored',frame:0},layerUid:req.payload.ops[0].record.target.layerUid,strokeId:'s'}});
+ assert.throws(()=>SDK.validateRequest(req),TypeError,'a trimmed batch creates only');
  const off=await fixture();multiframe(off,false);
  send(off,'pointerdown',10,40);send(off,'pointermove',40,41);send(off,'pointerup',100,40);
  await settled(off);assert.equal(off.calls[0].payload.command,'object.vector.create');

@@ -106,7 +106,8 @@
         ops.push(replacing ? { op: 'replace', record: map.record } : Object.assign({ op: 'create', record: map.record }, step.placement ? { placement: step.placement } : {},
           step.keyframe === 'copy' ? { keyframe: 'copy' } : {}));
       }
-      const body = Object.assign({ command: 'object.vector.batch', ops }, options && options.keyframe === 'copy' ? { keyframe: 'copy' } : {});
+      const body = Object.assign({ command: 'object.vector.batch', ops }, options && options.keyframe === 'copy' ? { keyframe: 'copy' } : {},
+        options && options.trimEnds !== undefined ? { trimEnds: options.trimEnds } : {});
       return send(Contract.VECTOR, body, options, (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds }));
     }
     function replaceStroke(target, dict, options) {

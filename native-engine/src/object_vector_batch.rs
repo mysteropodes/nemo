@@ -3,7 +3,7 @@
 //! carries the Labs edits that the baseline makes inside one undo step: the knife's cut pieces, sculpt's rewritten
 //! strokes, pose stamps and multiframe copies. Ids are allocated from the origin revision, as single creates are, and
 //! fill traces regenerate after each step exactly as after the single command. A refused step refuses the batch.
-use crate::commands::object_fill_owner::vector_edit::create_ops::{copy_key as keyframe_copy, create_in, Placement};
+use crate::commands::object_fill_owner::vector_edit::create_ops::{copy_key as keyframe_copy, create_in, trim_records, Placement};
 use crate::commands::object_fill_owner::vector_edit::{delete_in, replace_in, Edit, VectorEditKind};
 use crate::commands::object_fill_owner::object_frame_edit_document::{promote_cells, DocumentEdit};
 use crate::commands::ObjectFillOwner;
@@ -37,7 +37,7 @@ fn target_of(op: &BatchOp) -> Option<ObjectTarget> {
     op.record.value().map(|r| r.target.clone()).or_else(|| op.stable_target.value().cloned())
 }
 
-pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool) -> Result<Edit, DispatchErrorCode> {
+pub(super) fn batch(origin: &ObjectSnapshot, mut ops: Vec<BatchOp>, copy_key: bool, trim: Option<f64>) -> Result<Edit, DispatchErrorCode> {
     use DispatchErrorCode::InvalidRequest;
     if !(1..=MAX_BATCH_OPS).contains(&ops.len()) {
         return Err(InvalidRequest);
@@ -48,6 +48,18 @@ pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool) 
     }
     let revision = origin.content_revision();
     let mut document = origin.document().clone();
+    // `trimEnds` (all-create batches only): the first create is cut against its own cell before any step lands, and every
+    // other create takes the same cut, as the baseline stamps and mirrors the already trimmed path.
+    if let Some(max) = trim {
+        if ops.iter().any(|op| op.op != "create") {
+            return Err(InvalidRequest);
+        }
+        let mut records: Vec<ObjectRecord> = ops.iter().map(|op| op.record.value().cloned().ok_or(InvalidRequest)).collect::<Result<_, _>>()?;
+        trim_records(&document, &mut records, max)?;
+        for (op, record) in ops.iter_mut().zip(records) {
+            op.record = Presence::Present(record);
+        }
+    }
     // A create's own `keyframe: "copy"` keys its cell with a copy even when the batch's does not: multiframe draw keys
     // the drawn frame as Draw does (an empty key) and every stamped frame with what it showed.
     let mut keyed = Vec::with_capacity(ops.len());

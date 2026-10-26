@@ -393,7 +393,7 @@ impl ObjectFillOwner {
                 let Presence::Present(ops) = payload.ops else {
                     return Err(DispatchErrorCode::InvalidRequest);
                 };
-                batch_ops::batch(&origin, ops, copy_key)?
+                batch_ops::batch(&origin, ops, copy_key, trim)?
             }
             _ => return Err(DispatchErrorCode::InvalidRequest),
         };

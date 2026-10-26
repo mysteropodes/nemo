@@ -314,9 +314,11 @@
     // G15: the two creates take an optional placement (absent = front; behind = under the layer's artwork)
     // and an optional trimEnds limit (the baseline trimStrokeEndsMax; finite, above zero).
     const creates = value.command === 'object.vector.create' || value.command === 'object.vector.createMany';
-    exact(value, ['command', ...entry[1]], creates ? ['placement', 'trimEnds', 'keyframe'] : value.command === 'object.vector.batch' ? ['keyframe'] : [], operation);
+    exact(value, ['command', ...entry[1]], creates ? ['placement', 'trimEnds', 'keyframe'] : value.command === 'object.vector.batch' ? ['keyframe', 'trimEnds'] : [], operation);
     if (has(value, 'placement')) oneOf(value.placement, ['front', 'behind'], `${value.command}.placement`);
     if (has(value, 'trimEnds') && !(typeof value.trimEnds === 'number' && Number.isFinite(value.trimEnds) && value.trimEnds > 0)) fail(`${value.command}.trimEnds is invalid`);
+    // A batch trims only when every step creates (the drawn stroke, its copies and its multi-frame stamps share one cut).
+    if (has(value, 'trimEnds') && value.command === 'object.vector.batch' && Array.isArray(value.ops) && value.ops.some((op) => !plain(op) || op.op !== 'create')) fail('object.vector.batch.trimEnds needs create steps only');
     // keyframe: 'copy' keys a held cell with what it showed (the Labs creators' ensureKeyframe()); absent is Draw's empty key.
     if (has(value, 'keyframe') && value.keyframe !== 'copy') fail(`${value.command} keyframe must be 'copy'`);
     entry[1].forEach((key) => member(value.command, key, value[key]));
