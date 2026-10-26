@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-compositor => compositor_tests
 use crate::codec::decode_project;
 use crate::commands::NativeOpacityApplication;
 use crate::compositor::{Compositor, CompositorInstance};

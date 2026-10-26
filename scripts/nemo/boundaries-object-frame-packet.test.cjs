@@ -48,7 +48,7 @@ test('existing evaluation and application targets both register packet tests', (
   const lib = read('native-engine/src/lib.rs');
   assert.match(lib, /"evaluation" => evaluation, animation_curve, object_frame_packet;/);
   for (const target of ['evaluation', 'application']) {
-    assert.match(lib, new RegExp(`"test-${target}" => object_frame_packet_${target}_tests = "../tests/object_frame_packet.rs";`));
+    assert.match(read('native-engine/tests/object_frame_packet.rs'), new RegExp(`^//! nemo-test-harness: test-${target} => object_frame_packet_${target}_tests$`, 'm'));
     assert.match(read('native-engine/Cargo.toml'), new RegExp(`name = "${target}"[\\s\\S]*?required-features = \\["test-${target}"\\]`));
   }
   assert.match(read(controls), /#\[cfg\(feature = "history"\)\][\s\S]*fn actual_history_fill_undo_redo_and_reopen/);
