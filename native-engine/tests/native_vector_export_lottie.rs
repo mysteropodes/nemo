@@ -49,6 +49,19 @@ fn spec_of(case: &Value) -> LottieSpec {
 }
 fn export(case: &Value) -> Result<Value, LottieExportError> {
     let spec = spec_of(case);
+    // A camera case is a whole native project file: the stored camera lives in the project, which only the
+    // project-file codec loads (the application target runs these rows; export_job runs the drawing-only ones).
+    #[cfg(feature = "project_media_codec")]
+    let history = if case["project"].is_null() {
+        owner(&case["document"])
+    } else {
+        NativeObjectHistory::from_project_file(
+            "lottie",
+            &serde_json::to_vec(&case["project"]).unwrap(),
+        )
+        .unwrap()
+    };
+    #[cfg(not(feature = "project_media_codec"))]
     let history = owner(&case["document"]);
     let snapshot = history
         .acquire_snapshot(history.content_revision())
@@ -97,8 +110,17 @@ fn every_oracle_case_matches_the_baseline_writer() {
     let oracle: Value = serde_json::from_str(ORACLE).unwrap();
     assert_eq!(oracle["commit"].as_str().unwrap().len(), 40);
     let cases = oracle["cases"].as_array().unwrap();
-    assert_eq!(cases.len(), 5);
-    for case in cases {
+    assert_eq!(cases.len(), 7);
+    let runs = |case: &&Value| cfg!(feature = "project_media_codec") || case["project"].is_null();
+    assert_eq!(
+        cases.iter().filter(runs).count(),
+        if cfg!(feature = "project_media_codec") {
+            7
+        } else {
+            5
+        }
+    );
+    for case in cases.iter().filter(runs) {
         let lottie = export(case).unwrap_or_else(|error| panic!("{}: {error:?}", case["id"]));
         if let Err(diff) = same(&lottie, &case["lottie"], case["id"].as_str().unwrap()) {
             panic!("{diff}");
@@ -188,4 +210,26 @@ fn the_comparison_catches_a_moved_anchor_a_missing_member_and_a_changed_paint() 
     let mut paint = case["lottie"].clone();
     paint["layers"][0]["shapes"][0]["it"][1]["lc"] = json!(1);
     assert!(same(&lottie, &paint, "paint").is_err());
+}
+
+#[cfg(feature = "project_media_codec")]
+#[test]
+fn a_stored_camera_moves_every_anchor_and_turns_every_handle() {
+    let oracle: Value = serde_json::from_str(ORACLE).unwrap();
+    let case = oracle["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["id"] == "camera-move")
+        .unwrap();
+    let with = export(case).unwrap();
+    let mut flat = case.clone();
+    flat["project"] = Value::Null;
+    let without = export(&flat).unwrap();
+    // Frame 0 sits on the identity key; by frame 4 the camera has zoomed and rolled, so anchors and handles both move.
+    let key =
+        |l: &Value, k: usize| l["layers"][0]["shapes"][0]["it"][0]["ks"]["k"][k]["s"][0].clone();
+    assert!(same(&key(&with, 0), &key(&without, 0), "identity").is_ok());
+    assert!(same(&key(&with, 4)["v"], &key(&without, 4)["v"], "v").is_err());
+    assert!(same(&key(&with, 4)["i"], &key(&without, 4)["i"], "i").is_err());
 }
