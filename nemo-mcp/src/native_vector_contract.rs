@@ -72,6 +72,8 @@ fn target(value: &Value, create: bool) -> bool {
 
 #[path = "native_vector_contract_shapes.rs"]
 mod shapes;
+#[path = "native_vector_batch_contract.rs"]
+mod batch;
 use shapes::{record_shape, shape};
 
 #[path = "native_vector_bitmap_read.rs"]
@@ -114,18 +116,20 @@ pub(crate) fn request(operation: &str, payload: &Value) -> bool {
         keys.extend_from_slice(extra);
         exact(payload, &keys, &[]).is_some()
     };
-    // G15: the two creates take an optional `placement` (front by default, or behind) and an optional
-    // `trimEnds` overshoot limit (finite, above zero; the baseline trimStrokeEndsMax).
+    // G15: the two creates take an optional `placement` (front by default, or behind), an optional
+    // `trimEnds` overshoot limit (finite, above zero; the baseline trimStrokeEndsMax) and an optional
+    // `keyframe: "copy"` (a held cell keys with what it showed; absent keys it empty, as Draw does).
     let creates = |extra: &[&str]| {
         let mut keys = vec!["command"];
         keys.extend_from_slice(extra);
-        exact(payload, &keys, &["placement", "trimEnds"]).is_some()
+        exact(payload, &keys, &["placement", "trimEnds", "keyframe"]).is_some()
             && payload
                 .get("placement")
                 .is_none_or(|p| p == "front" || p == "behind")
             && payload
                 .get("trimEnds")
                 .is_none_or(|t| t.as_f64().is_some_and(|v| v.is_finite() && v > 0.))
+            && payload.get("keyframe").is_none_or(|k| k == "copy")
     };
     match (operation, command) {
         (VECTOR, "object.vector.create") => {
@@ -144,6 +148,7 @@ pub(crate) fn request(operation: &str, payload: &Value) -> bool {
                         })
                 })
         }
+        (VECTOR, "object.vector.batch") => batch::request(payload),
         (VECTOR, "object.vector.replace") => {
             named(&["record"])
                 && record_shape(&payload["record"], false)
@@ -200,6 +205,9 @@ pub(crate) fn result(operation: &str, payload: &Value, value: &Value) -> bool {
             else {
                 return false;
             };
+            if ran == "batch" {
+                return batch::result(payload, value);
+            }
             let Some(stroke) = value["strokeId"].as_str() else {
                 return false;
             };

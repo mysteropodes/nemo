@@ -5,10 +5,10 @@
   const commonjs = typeof module === 'object' && module.exports;
   const command = commonjs ? require('./native-object-rig-command.js') : root.NemoNativeObjectRigCommand;
   const contract = commonjs ? require('./native-object-rig-contract.js') : root.NemoNativeObjectRigContract;
-  const api = factory(command, contract);
+  const api = factory(command, contract, root);
   if (commonjs) module.exports = api;
   else root.NemoNativeObjectLabs = api;
-}(typeof globalThis === 'object' ? globalThis : this, function (Command, Contract) {
+}(typeof globalThis === 'object' ? globalThis : this, function (Command, Contract, root) {
   'use strict';
   // '#rgb', '#rrggbb' or '#rrggbbaa' as the record's 0..1 components; anything else is opaque black.
   function rgba(hex) {
@@ -18,7 +18,9 @@
     const byte = (at) => parseInt(h.slice(at, at + 2), 16) / 255;
     return [byte(0), byte(2), byte(4), h.length === 8 ? byte(6) : 1];
   }
-  function create(session) {
+  function create(session, host) {
+    // The vector route of the host window (or of this realm when bound directly).
+    const vectorRoute = () => (host && host.NemoNativeObjectVector) || root.NemoNativeObjectVector;
     const commands = Command.create(session, 'labs');
     const run = (operation, body) => commands.execute(operation, () => Object.assign({ command: Contract.commandOf(operation) }, body));
     return Object.freeze({
@@ -32,6 +34,19 @@
       retime: (body) => run(Contract.LABS_RETIME, body),
       interval: (body) => run(Contract.LABS_INTERVAL, body),
       moveToLayer: (body) => run(Contract.LABS_MOVE_TO_LAYER, body),
+      // A Labs-created stroke through the ordinary native vector create, keyed with what a held cell showed
+      // (the Labs creators' ensureKeyframe(), not Draw's empty key).
+      // Several Labs strokes as ONE native vector batch (one revision, one undo entry), keyed with what a held cell showed.
+      batchStrokes: (layerUid, frame, steps) => {
+        const Vector = vectorRoute();
+        if (!Vector) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'no_vector_route' }));
+        return Vector.create(session).batchStrokes(layerUid, frame, steps, { keyframe: 'copy' });
+      },
+      createStroke: (layerUid, frame, dict, opacity) => {
+        const Vector = vectorRoute();
+        if (!Vector) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'no_vector_route' }));
+        return Vector.create(session).createStroke(layerUid, frame, dict, { keyframe: 'copy', opacity });
+      },
       // The row's authored/held/blank runs through the native timing query (null when refused).
       cells: (layerUid) => (typeof session.readLayerCells === 'function' ? session.readLayerCells(layerUid, session.info()) : Promise.resolve(null)),
     });
@@ -40,7 +55,7 @@
   function desktop(host) {
     const module = host.NemoNativeObjectProject, session = module && module.desktop(host);
     if (!session || !session.blocksLegacy()) return null;
-    if (!bindings.has(host)) bindings.set(host, create(session));
+    if (!bindings.has(host)) bindings.set(host, create(session, host));
     return bindings.get(host);
   }
   // The bucket colour as the fill contract's '#rrggbbaa'.

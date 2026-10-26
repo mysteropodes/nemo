@@ -247,6 +247,7 @@
     'object.vector.replace': [VECTOR, ['record']],
     'object.vector.delete': [VECTOR, ['stableTarget']],
     'object.vector.mask.edit': [VECTOR, ['stableTarget', 'maskEdit']],
+    'object.vector.batch': [VECTOR, ['ops']],
     'object.parametric.set': [PARAMETRIC, ['stableTarget', 'paramShape']],
     'object.parametric.translate': [PARAMETRIC, ['stableTarget', 'delta']],
     'object.parametric.scale': [PARAMETRIC, ['stableTarget', 'scale', 'anchor']],
@@ -264,6 +265,27 @@
         entry.target.frameScope.kind !== first.frameScope.kind || entry.target.frameScope.frame !== first.frameScope.frame)) fail(`${label} must share one layer and frame`);
     }
     else if (key === 'stableTarget') target(payloadValue, label, false);
+    else if (key === 'ops') {
+      // #2361/#2362: 1..64 ordered create/replace/delete steps on one scene-root layer, one revision and one undo entry.
+      if (!Array.isArray(payloadValue) || payloadValue.length < 1 || payloadValue.length > 64) fail(`${label} must hold 1 to 64 steps`);
+      const targets = payloadValue.map((op, at) => {
+        const where = `${label}[${at}]`;
+        if (!plain(op)) fail(`${where} must be an object`);
+        if (op.op === 'create') {
+          exact(op, ['op', 'record'], ['placement'], where); record(op.record, true);
+          if (has(op, 'placement')) oneOf(op.placement, ['front', 'behind'], `${where}.placement`);
+          return op.record.target;
+        }
+        if (op.op === 'replace') {
+          exact(op, ['op', 'record'], [], where); record(op.record, false);
+          if (op.record.target.frameScope.kind !== 'authored') fail(`${where} replace targets an authored frame`);
+          return op.record.target;
+        }
+        if (op.op === 'delete') { exact(op, ['op', 'stableTarget'], [], where); target(op.stableTarget, `${where}.stableTarget`, false); return op.stableTarget; }
+        return fail(`${where}.op must be create, replace or delete`);
+      });
+      if (targets.some((t) => t.contextId !== 'scene-root' || t.layerUid !== targets[0].layerUid)) fail(`${label} must stay on one scene-root layer`);
+    }
     else if (key === 'maskEdit') {
       if (!plain(payloadValue)) fail(`${label} must be an object`);
       if (payloadValue.kind === 'mode') {
@@ -290,9 +312,11 @@
     // G15: the two creates take an optional placement (absent = front; behind = under the layer's artwork)
     // and an optional trimEnds limit (the baseline trimStrokeEndsMax; finite, above zero).
     const creates = value.command === 'object.vector.create' || value.command === 'object.vector.createMany';
-    exact(value, ['command', ...entry[1]], creates ? ['placement', 'trimEnds'] : [], operation);
+    exact(value, ['command', ...entry[1]], creates ? ['placement', 'trimEnds', 'keyframe'] : value.command === 'object.vector.batch' ? ['keyframe'] : [], operation);
     if (has(value, 'placement')) oneOf(value.placement, ['front', 'behind'], `${value.command}.placement`);
     if (has(value, 'trimEnds') && !(typeof value.trimEnds === 'number' && Number.isFinite(value.trimEnds) && value.trimEnds > 0)) fail(`${value.command}.trimEnds is invalid`);
+    // keyframe: 'copy' keys a held cell with what it showed (the Labs creators' ensureKeyframe()); absent is Draw's empty key.
+    if (has(value, 'keyframe') && value.keyframe !== 'copy') fail(`${value.command} keyframe must be 'copy'`);
     entry[1].forEach((key) => member(value.command, key, value[key]));
     // A replace names an existing record; a record of a reference scope is readable storage, never a drawing edit target.
     if (value.command === 'object.vector.replace' && value.record.target.frameScope.kind !== 'authored') fail('a replace targets an authored frame');
@@ -300,12 +324,12 @@
   function result(operation, value) {
     if (!OPS.has(operation)) fail('native vector operation is not declared');
     const edit = operation === VECTOR;
-    const many = edit && plain(value) && value.operation === 'createMany';
+    const many = edit && plain(value) && (value.operation === 'createMany' || value.operation === 'batch');
     exact(value, edit ? ['applied', 'historyEntriesAdded', 'operation', 'strokeId'].concat(many ? ['strokeIds'] : []) : ['applied', 'historyEntriesAdded'], [], 'vector edit result');
     if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) fail('invalid vector edit disposition');
-    if (edit) { oneOf(value.operation, ['create', 'createMany', 'replace', 'delete', 'mask.edit'], 'result.operation'); opaque(value.strokeId, 'result.strokeId'); }
+    if (edit) { oneOf(value.operation, ['create', 'createMany', 'replace', 'delete', 'mask.edit', 'batch'], 'result.operation'); opaque(value.strokeId, 'result.strokeId'); }
     if (many) {
-      if (!Array.isArray(value.strokeIds) || value.strokeIds.length < 2) fail('result.strokeIds must list every created stroke');
+      if (!Array.isArray(value.strokeIds) || value.strokeIds.length < (value.operation === 'batch' ? 1 : 2)) fail('result.strokeIds must list every created stroke');
       value.strokeIds.forEach((id, at) => opaque(id, `result.strokeIds[${at}]`));
     }
   }
@@ -324,6 +348,13 @@
     // A create reports the id the owner allocated; replace and delete report the stable target they named.
     const allocation = 'native-stroke:' + (request.expectedRevision + 1) + ':';
     const allocated = (id) => typeof id === 'string' && id.startsWith(allocation) && /^(0|[1-9][0-9]*)$/.test(id.slice(allocation.length));
+    if (command === 'object.vector.batch') {
+      // One id per step, in order: allocated for a create, the named target for a replace or delete.
+      const ids = response.result.strokeIds, ops = request.payload.ops;
+      if (!(ids.length === ops.length && ids[0] === stroke && ops.every((op, at) => (op.op === 'create' ? allocated(ids[at])
+        : ids[at] === (op.op === 'replace' ? op.record.target.strokeId : op.stableTarget.strokeId))))) fail('vector receipt stroke mismatch');
+      return;
+    }
     if (command === 'object.vector.createMany') {
       const ids = response.result.strokeIds;
       if (!(response.result.applied === true && ids.length === request.payload.records.length && ids[0] === stroke &&
@@ -334,7 +365,7 @@
       : stroke !== (command === 'object.vector.replace' ? request.payload.record.target.strokeId : request.payload.stableTarget.strokeId)) fail('vector receipt stroke mismatch');
   }
   // Authored identities may legitimately start with data: or blob:; the SDK only inspects them as text.
-  const OPAQUE = Object.freeze({ has: (at) => /^payload\.(?:record\.target|records\.[0-9]+\.target|stableTarget)\.(?:layerUid|strokeId)$/.test(at) || at === 'payload.layerUid' || at === 'result.strokeId' || /^result\.strokeIds\.[0-9]+$/.test(at) });
+  const OPAQUE = Object.freeze({ has: (at) => /^payload\.(?:record\.target|records\.[0-9]+\.target|stableTarget|ops\.[0-9]+\.(?:record\.target|stableTarget))\.(?:layerUid|strokeId)$/.test(at) || at === 'payload.layerUid' || at === 'result.strokeId' || /^result\.strokeIds\.[0-9]+$/.test(at) });
   const paths = (operation) => (OPS.has(operation) ? OPAQUE : null);
   const own = Object.freeze({ admitted: (op) => OPS.has(op), requiresRevision: (op) => OPS.has(op), payload, result, correlate, paths });
 

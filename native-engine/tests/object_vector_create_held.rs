@@ -119,3 +119,27 @@ fn symmetry_copies_key_the_held_cell_once() {
     assert_eq!(at(&owner, 6).len(), 2);
     assert_eq!(owner.history_depths(), (1, 0));
 }
+
+#[test]
+fn keyframe_copy_keys_the_held_cell_with_what_it_showed_and_is_admitted_on_creates_only() {
+    for version in [1, 2] {
+        let mut owner = owner_of(&timed(version, &[0], &[], vec![record_at("A", "L1", 0, "s-a")]));
+        let mut payload = create(record_at("B", "L1", 3, ""));
+        payload["keyframe"] = json!("copy");
+        let id = created_id(&send(&mut owner, "copy", payload));
+        assert_eq!(keys(&owner), json!([{"frame":0},{"frame":3}]), "v{version}");
+        assert_eq!(at(&owner, 3), vec!["s-a".to_string(), id], "the held drawing is kept below the new stroke");
+        assert_eq!(owner.history_depths(), (1, 0));
+    }
+    let base = timed(1, &[0], &[], vec![record_at("A", "L1", 0, "s-a")]);
+    for payload in [
+        { let mut p = create(record_at("B", "L1", 3, "")); p["keyframe"] = json!("blank"); p },
+        { let mut p = replace(record_at("A", "L1", 0, "s-a")); p["keyframe"] = json!("copy"); p },
+    ] {
+        let mut owner = owner_of(&base);
+        let before = state(&owner);
+        let reply = send(&mut owner, "bad", payload.clone());
+        assert_eq!(reply["ok"], false, "{payload}");
+        assert_eq!(state(&owner), before);
+    }
+}

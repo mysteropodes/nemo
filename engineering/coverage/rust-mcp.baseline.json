@@ -716,6 +716,17 @@
       "reason": "no executable regions in the coverage report",
       "note": "U31 cells contract (#2374): floors derived by the original floorPct from the cargo-llvm-cov measurement of a coverage-rust --check run on branch claude/cs8-b09-labs-timing (candidate lines 98.88%, regions 99.08%, functions 100%). Only these two entries are added; all existing entries, aggregate floors, exclusions and recorded provenance are preserved."
     },
+    "nemo-mcp/src/native_vector_batch_contract.rs": {
+      "lines": 96.07,
+      "regions": 97.36,
+      "functions": 100,
+      "note": "Vector batch contract (#2361, #2362): floors derived by the original floorPct from the cargo-llvm-cov measurement of a coverage-rust --check run on branch claude/cs8-vector-batch (candidate lines 96.08%, regions 97.37%, functions 100%). Only these two entries are added; all existing entries, aggregate floors, exclusions and recorded provenance are preserved."
+    },
+    "nemo-mcp/src/native_vector_batch_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Vector batch contract (#2361, #2362): floors derived by the original floorPct from the cargo-llvm-cov measurement of a coverage-rust --check run on branch claude/cs8-vector-batch (candidate lines 96.08%, regions 97.37%, functions 100%). Only these two entries are added; all existing entries, aggregate floors, exclusions and recorded provenance are preserved."
+    },
     "nemo-mcp/src/native_layer_placement_contract.rs": {
       "lines": 100,
       "regions": 100,
