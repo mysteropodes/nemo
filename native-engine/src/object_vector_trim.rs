@@ -11,8 +11,10 @@ use kurbo::{CubicBez, ParamCurve, ParamCurveArclen, ParamCurveExtrema, Point, Re
 use serde_json::Number;
 
 const ACCURACY: f64 = 1e-9;
-/// Intersection search budget per curve pair; a degenerate overlap stops here instead of exploding.
+/// Intersection search budget per curve pair, and for one whole trim: a degenerate overlap (tracing over an
+/// existing stroke) stops at these bounds instead of exploding; the crossings found so far still count.
 const NODE_BUDGET: u32 = 1 << 14;
+const TRIM_BUDGET: u32 = 1 << 21;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct Anchor {
@@ -173,14 +175,28 @@ pub(super) fn cuts<'a>(record: &ObjectRecord, walls: impl Iterator<Item = &'a Ob
     }
     let mut first: Option<f64> = None;
     let mut last: Option<f64> = None;
+    let mut spent: u32 = 0;
+    let reach = work.iter().map(ParamCurveExtrema::bounding_box).reduce(|a, b| a.union(b))?;
     for record in walls {
         let Some((points, closed)) = wall(record) else { continue };
         for other in curves(&points, closed) {
+            if !overlaps(reach, other.bounding_box()) {
+                continue;
+            }
             let mut start = 0.;
             for (c, len) in work.iter().zip(&lens) {
-                let (mut hits, mut budget) = (Vec::new(), NODE_BUDGET);
+                let allowance = TRIM_BUDGET.saturating_sub(spent).min(NODE_BUDGET);
+                let (mut hits, mut budget) = (Vec::new(), allowance);
                 crossings(*c, (0., 1.), other, &mut budget, &mut hits);
-                for t in hits {
+                spent += allowance - budget;
+                // An exhausted search may have missed the latest crossing: trim nothing rather than guess.
+                if budget == 0 {
+                    return None;
+                }
+                // Only this pair's earliest and latest crossings can move the stroke's first/last offset.
+                let lo = hits.iter().copied().reduce(f64::min);
+                let hi = hits.iter().copied().reduce(f64::max);
+                for t in lo.into_iter().chain(hi) {
                     let offset = start + c.subsegment(0.0..t).arclen(ACCURACY);
                     first = Some(first.map_or(offset, |f: f64| f.min(offset)));
                     last = Some(last.map_or(offset, |l: f64| l.max(offset)));

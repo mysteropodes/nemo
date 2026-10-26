@@ -167,6 +167,8 @@ test('unsupported brush cells are explicit without native or legacy fallback',as
  const cases=[s=>s.vectorBrush=true,s=>s.tool='fillbrush',s=>s.bitmapBrushOn=true,s=>s.brushPreset='charcoal-smooth',
   // Trim Stroke Ends commits natively for a plain stroke; a pressure-brush trim rebuilds its outline and stays refused.
   s=>Object.assign(s,{trimStrokeEnds:true,vectorBrush:true,fillEnabled:false}),
+  // With stop-at-axis symmetry the original trims the whole stroke before clipping; native would trim the clipped one.
+  s=>Object.assign(s,{trimStrokeEnds:true,symmetryEnabled:true,symmetryExtend:false}),
   // Plain-stroke symmetry commits natively since G23 (#2361); with a pressure brush it stays refused.
   s=>s.shadowMode=true,s=>Object.assign(s,{vectorBrush:true,fillEnabled:false,pressureCurve:'unknown'}),s=>s.stabilizer=7];
  for(const change of cases){const f=await fixture();change(f.root.state);const e=send(f,'pointerdown',20,20);send(f,'pointerup',60,50);assert.equal(e.prevented,true);assert.equal(f.calls.length,0);assert.ok(f.log.some(s=>/unavailable|not available|requires/.test(s)),f.log.join(','));}
@@ -299,4 +301,9 @@ test('Trim Stroke Ends asks native to trim the Draw commit with the original lim
   const off=await fixture();Object.assign(off.root.state,state);send(off,'pointerdown',20,20);send(off,'pointermove',45,30);send(off,'pointerup',100,80);
   await settled(off);assert.equal(off.calls[0].payload.trimEnds,undefined,JSON.stringify(state));
  }
+ const sym=await fixture();Object.assign(sym.root.state,{trimStrokeEnds:true,trimStrokeEndsMax:24,symmetryEnabled:true,symmetryExtend:true});
+ send(sym,'pointerdown',20,20);send(sym,'pointermove',45,30);send(sym,'pointerup',100,80);
+ // This fixture's native accepts single creates only; the outgoing request is what is checked here.
+ await settled(sym);assert.equal(sym.calls.length,1);assert.equal(sym.calls[0].payload.command,'object.vector.createMany');
+ assert.equal(sym.calls[0].payload.trimEnds,24,'the copies share the original stroke\'s cuts natively');
 });

@@ -101,10 +101,11 @@ fn create_many_or_one(
                 && r.target.layer_uid == first.layer_uid
                 && r.target.frame_scope == first.frame_scope
         });
-        if let Some(cut) = trim::cuts(&records[0], walls, max) {
-            for record in &mut records {
-                record.geometry.segments = trim::apply(record, cut).ok_or(DispatchErrorCode::InvalidRequest)?;
-            }
+        // The baseline trims nothing when a cut would leave fewer than two anchors; neither do the copies.
+        let cut = trim::cuts(&records[0], walls, max);
+        let trimmed: Option<Vec<_>> = cut.and_then(|cut| records.iter().map(|r| trim::apply(r, cut)).collect());
+        for (record, segments) in records.iter_mut().zip(trimmed.into_iter().flatten()) {
+            record.geometry.segments = segments;
         }
     }
     let mut document = origin.document().clone();

@@ -169,3 +169,51 @@ fn a_vector_brush_wall_is_crossed_at_its_centreline_not_its_outline() {
     // One crossing: the head (12) is cut; the tail (88) exceeds the limit and stays.
     near(&points(&created[0]), &[(12.0, 50.0), (100.0, 50.0)]);
 }
+
+#[test]
+fn tracing_over_an_existing_stroke_is_bounded_and_still_commits_once() {
+    // Collinear overlap is the subdivision worst case; many identical walls must not stall the create.
+    let mut objects = Vec::new();
+    for i in 0..64 {
+        objects.push(path("L1", 0, &format!("w-{i}"), &[(0.0, 50.0), (25.0, 50.0), (50.0, 50.0), (75.0, 50.0), (100.0, 50.0)]));
+    }
+    let line = path("L1", 0, "", &[(0.0, 50.0), (25.0, 50.0), (50.0, 50.0), (75.0, 50.0), (100.0, 50.0)]);
+    let started = std::time::Instant::now();
+    let (response, created) = trimmed(create_trim(line, json!(24)), objects);
+    assert_eq!(response["ok"], true, "{response}");
+    assert_eq!(created.len(), 1);
+    // An exhausted search may have missed the latest crossing, so nothing is trimmed.
+    near(&points(&created[0]), &[(0.0, 50.0), (25.0, 50.0), (50.0, 50.0), (75.0, 50.0), (100.0, 50.0)]);
+    assert!(started.elapsed().as_secs_f64() < 20.0, "{:?}", started.elapsed());
+}
+
+fn outline(label: &str, stroke: &str, x0: f64, x1: f64) -> Value {
+    let mut record = record_at(label, "L1", 0, stroke);
+    record["geometry"]["closed"] = json!(true);
+    record["geometry"]["segments"] = [(x0, 0.0), (x1, 0.0), (x1, 100.0), (x0, 100.0)]
+        .iter()
+        .map(|(x, y)| json!({"point":{"x":x,"y":y},"handleIn":{"x":0.0,"y":0.0},"handleOut":{"x":0.0,"y":0.0}}))
+        .collect();
+    record
+}
+
+#[test]
+fn a_linked_fill_companion_and_a_wall_without_paint_are_not_walls() {
+    // The backdrop crosses the stroke at x=94/96 but is a linked-fill companion; the baseline filter skips it.
+    let mut backdrop = outline("C", "w-backdrop", 94.0, 96.0);
+    backdrop["vectorExt"] = json!({"linkedFillId":"lf","isLinkedFillCompanion":true});
+    let mut ribbon = outline("C", "w-ribbon", 300.0, 310.0);
+    ribbon["vectorExt"] = json!({"linkedFillId":"lf","isLinkedFillCompanion":false,"pressure":{"centerSegments":[
+        {"point":{"x":305.0,"y":0.0},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":2},
+        {"point":{"x":305.0,"y":100.0},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":2}],
+        "widthProfile":[{"t":0,"width":2},{"t":1,"width":2}]}});
+    // A path with neither stroke nor fill (nor a brush) paints nothing and is no wall either.
+    let mut bare = path("L1", 0, "w-bare", &[(90.0, 0.0), (90.0, 100.0)]);
+    bare["vector"]["stroke"] = Value::Null;
+    bare["vector"]["hasRealStroke"] = json!(false);
+    let line = path("L1", 0, "", &[(0.0, 50.0), (100.0, 50.0)]);
+    let walls = vec![path("L1", 0, "w-10", &[(10.0, 0.0), (10.0, 100.0)]), backdrop, ribbon, bare];
+    let (response, created) = trimmed(create_trim(line, json!(24)), walls);
+    assert_eq!(response["ok"], true, "{response}");
+    near(&points(&created[0]), &[(10.0, 50.0), (100.0, 50.0)]);
+}

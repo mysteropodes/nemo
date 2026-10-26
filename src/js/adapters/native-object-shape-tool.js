@@ -297,7 +297,9 @@
     var simplifyIfNeeded=root.simplifyIfNeeded,applyStrokeStyle=root.applyStrokeStyle;
     function nativeDrawStyle() {
       var state=root.state;
-      if (state.tool !== 'draw' || state.bitmapBrushOn || state.trimStrokeEnds && state.vectorBrush || state.drawMode !== 'front' && state.drawMode !== 'behind' ||
+      // Trim measures the whole stroke before the stop-at-axis clip (draw-bridge then symmetry-bridge); native would trim the clipped one.
+      if (state.tool !== 'draw' || state.bitmapBrushOn || state.trimStrokeEnds && (state.vectorBrush || state.symmetryEnabled && !state.symmetryExtend) ||
+          state.drawMode !== 'front' && state.drawMode !== 'behind' ||
           state.brushPreset && state.brushPreset !== 'none' || root.SMLabs && root.SMLabs.list().some(function(p){return p.on;}))
         throw new Error('This brush combination is unavailable in native Drawing.');
       if (typeof state.vectorBrush !== 'boolean' || typeof state.strokeEnabled !== 'boolean' || typeof state.fillEnabled !== 'boolean' ||
