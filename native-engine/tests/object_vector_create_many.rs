@@ -116,6 +116,7 @@ fn placement_is_an_optional_create_member_only() {
         ("unknown", json!({"command":"object.vector.create","record":record_at("A","L1",0,""),"placement":"inside"})),
         ("on-delete", json!({"command":"object.vector.delete","stableTarget":target("L1",0,"s-a"),"placement":"behind"})),
         ("on-replace", json!({"command":"object.vector.replace","record":record_at("A","L1",0,"s-a"),"placement":"front"})),
+        ("null", json!({"command":"object.vector.create","record":record_at("A","L1",0,""),"placement":null})),
     ] {
         let mut owner = owner_of(&base);
         assert_eq!(send(&mut owner, name, payload)["ok"], false, "{name}");
@@ -124,4 +125,27 @@ fn placement_is_an_optional_create_member_only() {
     let mut owner = owner_of(&base);
     let front = json!({"command":"object.vector.create","record":record_at("A","L1",0,""),"placement":"front"});
     assert_eq!(send(&mut owner, "f", front)["ok"], true, "explicit front is the default placement");
+}
+
+#[test]
+fn behind_moves_only_the_target_layer_in_the_target_frame() {
+    let mut seeded = seeds();
+    seeded.push(record_at("B", "L1", 0, "s-d"));
+    seeded.push(record_at("C", "L2", 0, "s-e"));
+    let mut owner = owner_of(&document(2, seeded, None));
+    let before = state(&owner);
+    let keep = |state: &Value| -> Vec<Value> {
+        state["compositionOrder"]["contexts"][0]["scopes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|scope| scope["elements"].as_array().unwrap().iter().map(move |e| json!([scope["frameScope"]["frame"], e])))
+            .filter(|pair| !(pair[0] == json!(0) && pair[1]["layerUid"] == "L1"))
+            .collect()
+    };
+    assert_eq!(send(&mut owner, "b", behind("object.vector.create", json!({"record":record_at("A", "L1", 0, "")})))["ok"], true);
+    assert_eq!(keep(&state(&owner)), keep(&before), "other layers and frames keep their positions");
+    let mut stack = scene_elements(&state(&owner), 0);
+    stack.sort_by_key(|(_, p)| *p);
+    assert_eq!(stack, vec![("native-stroke:1:0".into(), 0), ("s-a".into(), 1), ("s-d".into(), 2)]);
 }
