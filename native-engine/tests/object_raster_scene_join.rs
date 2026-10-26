@@ -338,3 +338,47 @@ fn unsupported_raster_brush_range_and_context_are_refused_by_the_actual_producti
     pins.scope_kind = FrameScopeKind::Reference;
     assert!(prepare_object_exposure_frame(&snapshot, &pins).is_err());
 }
+
+#[test]
+fn a_raster_whose_asset_pixels_are_unavailable_refuses_the_frame_and_publishes_nothing() {
+    let mut owner = scene_owner();
+    import(&mut owner, "linked");
+    let mut stored: Value = serde_json::from_slice(&saved_bytes(&owner)).unwrap();
+    // The same asset id, now a linked source: its pixels are not embedded, so none can be retained.
+    stored["assets"][0]["source"] = json!({"kind":"linked","locator":"opaque-locator"});
+    let reopened =
+        NativeObjectHistory::from_project_file("linked", &serde_json::to_vec(&stored).unwrap())
+            .unwrap();
+    let before = saved_bytes(&reopened);
+    let snapshot = scene_snapshot(&reopened);
+    let pins = selector(&snapshot, 0);
+    let packet = prepare_object_exposure_frame(&snapshot, &pins).unwrap();
+    // Admission and the pinned order do not need pixels, so the stages before the resource join still pass.
+    let scene = prepare_object_render_scene(&packet, &pins).unwrap();
+    let plan = prepare_object_paint_plan(&scene, &pins).unwrap();
+    // The resource join refuses with the typed reason; no frame witness (viewport or export) is produced.
+    assert!(matches!(
+        object_raster_resource_versions(&plan),
+        Err(
+            crate::object_render_scene::ObjectSceneError::UnsupportedGeometry {
+                reason: "native raster linked source is unavailable",
+                ..
+            }
+        )
+    ));
+    assert!(matches!(
+        prepare_object_composition(&plan, &pins),
+        Err(
+            crate::object_render_scene::ObjectSceneError::UnsupportedGeometry {
+                reason: "native raster pixel resource is unavailable",
+                ..
+            }
+        )
+    ));
+    assert!(matches!(
+        prepare_object_viewport_composition(&plan, &pins, None),
+        Err(crate::object_render_scene::ObjectSceneError::UnsupportedGeometry { .. })
+    ));
+    assert_eq!(saved_bytes(&reopened), before);
+    assert_eq!(reopened.history_depths(), (0, 0));
+}
