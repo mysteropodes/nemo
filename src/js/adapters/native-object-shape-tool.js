@@ -151,9 +151,12 @@
     function finishPen(t,closed){drag=null;clear();release(t);t.closed=closed;t.finished=true;submit(t,null);}
     function penHandle(kind,e){
       if(kind==='down'&&!stageOrigin(e))return !!drag||nativeMode()&&root.state.tool==='pen';
-      if(drag&&root.state.tool!=='pen'){cancel();return false;}
+      // However the tool changed, the open path commits (finalizePen), never silently drops.
+      if(drag&&root.state.tool!=='pen'){var open=drag;open.finished=true;if(current(open,true))finishPen(open,false);else cancel();return false;}
       if(!nativeMode()||root.state.tool!=='pen')return false;
+      if(!drag&&kind!=='down')return true; // hover belongs to the stage; consume nothing
       if(!stageOrigin(e)&&!drag)return true;
+      if(drag&&kind!=='down'&&e.pointerId!==drag.pointer)return true;
       consume(e);if(pending)return true;
       if(kind==='cancel'){cancel();return true;}
       try{
@@ -164,11 +167,15 @@
             if(uncertain){var owner=session(),pin=owner&&owner.info();
               if(owner===uncertain.session&&pin&&['instanceId','documentId','lifecycleGeneration'].every(function(k){return pin[k]===uncertain.pin[k];})){notice('Reopen the native project before drawing again; the previous result is unconfirmed.');return true;}
               uncertain=null;}
-            drag=capture(e);drag.anchors=[{point:drag.start,client:client}];drag.handleDrag=true;drag.last={time:now,client:client};
+            drag=capture(e);drag.pointerType=e.pointerType||'mouse';drag.anchors=[{point:drag.start,client:client}];drag.handleDrag=true;drag.last={time:now,client:client};
             grab(e);preview(drag,drag.start);return true;
           }
           var t=drag;if(!current(t,true)){cancel();return true;}
-          t.pointer=e.pointerId;var last=t.last;t.last={time:now,client:client};
+          if((e.pointerType||'mouse')!==t.pointerType)return true;
+          release(t);t.pointer=e.pointerId;var last=t.last;t.last={time:now,client:client};
+          // pen-bridge.js @1065e9d8: Alt+press on a placed anchor reshapes its outgoing handle.
+          if(e.altKey){var hit=-1;t.anchors.forEach(function(a,i){if(Math.hypot(client[0]-a.client[0],client[1]-a.client[1])<10)hit=i;});
+            if(hit>=0){t.reshape=hit;t.handleDrag=true;grab(e);return true;}}
           if(now-last.time<350&&Math.hypot(client[0]-last.client[0],client[1]-last.client[1])<10){finishPen(t,false);return true;}
           var first=t.anchors[0];
           if(t.anchors.length>1&&Math.hypot(client[0]-first.client[0],client[1]-first.client[1])<10){finishPen(t,true);return true;}
@@ -179,11 +186,11 @@
         if(!current(drag,true)){cancel();return true;}
         var q=point(e,drag);
         if(kind==='move'){
-          if(drag.handleDrag){var a=drag.anchors[drag.anchors.length-1],d=[q[0]-a.point[0],q[1]-a.point[1]];
-            a.handleOut=d;if(!e.altKey)a.handleIn=[-d[0],-d[1]];}
+          if(drag.handleDrag){var a=drag.anchors[drag.reshape===undefined?drag.anchors.length-1:drag.reshape],d=[q[0]-a.point[0],q[1]-a.point[1]];
+            a.handleOut=d;if(!e.altKey&&drag.reshape===undefined)a.handleIn=[-d[0],-d[1]];}
           preview(drag,q);return true;
         }
-        if(kind==='up'){drag.handleDrag=false;release(drag);preview(drag,q);return true;}
+        if(kind==='up'){drag.handleDrag=false;drag.reshape=undefined;release(drag);preview(drag,q);return true;}
       }catch(error){cancel();notice(error.message||'Native Pen is unavailable.');return true;}
       return true;
     }

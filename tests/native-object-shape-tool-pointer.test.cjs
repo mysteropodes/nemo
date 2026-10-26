@@ -285,3 +285,20 @@ test('Pen: Escape and a single anchor commit nothing; Backspace drops the last a
  f=await fixture('pen');f.root.state.taperEnds=true;await pen(f,[['pointerdown',80,90]]);
  assert.ok(f.log.includes('Tapered Pen strokes are unavailable in native Drawing.'));assert.equal(f.calls.length,0);
 });
+
+test('Pen: Enter commits; Alt reshapes a placed anchor; a direct tool change still commits; another pointer type cannot join',async()=>{
+ let f=await fixture('pen');await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['wait',500],
+  ['pointerdown',240,90,{altKey:true}],['pointermove',260,110,{altKey:true}],['pointerup',260,110],['wait',500],['pointerdown',240,210,{pointerType:'touch'}]]);
+ f.doc.listeners.get('keydown').forEach(l=>l.fn({key:'Enter',stopImmediatePropagation(){},preventDefault(){}}));
+ let r=await f.root.NemoNativePenToolController.whenSettled();assert.equal(r.status,'applied');
+ const rec=f.calls[0].payload.record;assert.deepEqual(pts(rec),[[20,20],[100,20]],'the touch press did not join the mouse gesture');
+ assert.deepEqual([rec.geometry.segments[1].handleOut.x,rec.geometry.segments[1].handleOut.y],[10,10]);
+ assert.deepEqual([rec.geometry.segments[1].handleIn.x,rec.geometry.segments[1].handleIn.y],[0,0],'Alt reshape leaves the incoming handle');
+ f=await fixture('pen');await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90]]);
+ f.root.state.tool='hand';f.area.fire('pointerdown',{clientX:100,clientY:100});r=await f.root.NemoNativePenToolController.whenSettled();
+ assert.equal(r.status,'applied','a tool change that bypassed SM.setTool still commits at the next event the Pen sees');
+ f=await fixture('pen');await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90]]);
+ f.root.state.currentFrame=1;f.root.SM.setTool('rect');r=await f.root.NemoNativePenToolController.whenSettled();
+ assert.notEqual(r.status,'applied','a frame change after the gesture voids the commit');assert.equal(f.calls.length,0);
+ f=await fixture('pen');const hover=f.area.fire('pointermove',{clientX:100,clientY:100});assert.equal(hover.stopped,false,'hover is not consumed without a gesture');
+});
