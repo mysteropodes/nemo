@@ -57,7 +57,25 @@
     );
   }
 
+  // Native documents: the Pen variant of the native shape tool owns the gesture; no Paper path.
+  var nativePen = null;
+  function nativeEvent(kind, e) {
+    if (!nativePen && window.NemoNativeObjectShapeTool) {
+      nativePen = window.NemoNativeObjectShapeTool.create(window, { pen: true,
+        mapping: window.NemoNativeViewportUnderlay && window.NemoNativeViewportUnderlay.canvasMapping,
+        constrain: function (_tool, a, b) { var p = constrainAngle45(new Point(a[0], a[1]), new Point(b[0], b[1])); return [p.x, p.y]; },
+        lineStyle: function () {
+          var style = { strokeWidth: state.brushSize, data: {} }; applyStrokeStyle(style);
+          var out = { miterLimit: style.miterLimit, dashOffset: style.dashOffset };
+          if (style.dashArray.length) out.dashArray = style.dashArray.slice();
+          return out;
+        } });
+      window.NemoNativePenToolController = nativePen;
+    }
+    return !!nativePen && nativePen.handle(kind, e);
+  }
   function onDown(e) {
+    if (nativeEvent('down', e)) return;
     if (!shouldIntercept()) return;
     if (!allowLegacyEdit(e)) return;
     e.stopImmediatePropagation();
@@ -174,6 +192,7 @@
   }
 
   function onMove(e) {
+    if (nativeEvent('move', e)) return;
     if (!shouldIntercept()) return;
     if (draggingHandle && !allowLegacyEdit(e)) return;
     e.stopImmediatePropagation();
@@ -228,6 +247,7 @@
   }
 
   function onUp(e) {
+    if (nativeEvent(e.type === 'pointercancel' ? 'cancel' : 'up', e)) return;
     // Only swallow this pointerup if OUR OWN handle-drag was actually in
     // progress — checking shouldIntercept() alone (as an earlier version of
     // this guard did) meant ANY pointerup bubbling through #canvas-area
@@ -250,6 +270,11 @@
   }
 
   function init() {
+    var setTool = window.SM && window.SM.setTool;
+    if (typeof setTool === 'function') window.SM.setTool = function (t) {
+      if (t !== 'pen' && nativePen) nativePen.finish();
+      return setTool.apply(this, arguments);
+    };
     var target = document.getElementById('canvas-area') || document.getElementById('drawing-canvas');
     canvasEl = target;
     target.addEventListener('pointerdown', onDown, { capture: true });

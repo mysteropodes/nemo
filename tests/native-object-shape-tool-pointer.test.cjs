@@ -88,6 +88,7 @@ async function fixture(tool='rect',native=true){
  for(const name of ['constrainSquare','constrainAngle45','applyStrokeStyle'])vm.runInContext(baselineFunction(tools,name),context,{filename:'tools.js:'+name});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-shape-tool.js'),'utf8'),context,{filename:'native-object-shape-tool.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/shape-bridge.js'),'utf8'),context,{filename:'shape-bridge.js'});
+ if(tool==='pen'){root.SM={setTool(t){root.state.tool=t;}};vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/pen-bridge.js'),'utf8'),context,{filename:'pen-bridge.js'});}
  return {perspectiveMode:value=>perspectiveMode=value,root,context,session,area,canvas,zoom,fit,ruler,doc,body,calls,records,log,events,info,setRect:r=>rect=r,refuse:code=>refusal=code,hold:g=>hold=g,mutate:fn=>replyChange=fn,
   async external(g){ack=g;const from=revision;revision++;return events.get('nemo-native-revision')({payload:{instanceId:'instance-A',documentId:info().documentId,lifecycleGeneration:generation,requestId:'external-'+revision,fromRevision:from,toRevision:revision}});},
   async gesture(end={clientX:240,clientY:210}){area.fire('pointerdown');area.fire('pointermove',end);area.fire('pointerup',end);return root.NemoNativeShapeToolController.whenSettled();}};
@@ -244,4 +245,43 @@ test('queued shape uses the actual action lease while public presentation stays 
   assert.equal(f.calls.length,changed?0:1);assert.equal(f.records.size,changed?0:1);assert.equal(f.session.info().contentRevision,changed?0:1);
   assert.equal(f.body.children.length,0);
  }
+});
+
+// Pen (G15, #2361): tools.js Pen @1065e9d8 over the same native create. Client (80,90) is document (20,20); scale 2.
+const pts=r=>r.geometry.segments.map(s=>[s.point.x,s.point.y]);
+async function pen(f,steps){let t=1000;const now=Date.now;Date.now=()=>t;
+ try{for(const [kind,x,y,extra] of steps){if(kind==='wait'){t+=x;continue;}f.area.fire(kind,{clientX:x,clientY:y,...(extra||{})});t+=kind==='pointerdown'?1:0;}}finally{Date.now=now;}
+ return f.root.NemoNativePenToolController&&f.root.NemoNativePenToolController.whenSettled();}
+test('Pen: clicks place anchors, a drag sets symmetric handles, a double press commits one open native path',async()=>{
+ const f=await fixture('pen');
+ const r=await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointermove',260,110],['pointerup',260,110],['wait',500],
+  ['pointerdown',240,210],['pointerup',240,210],['pointerdown',240,210]]);
+ assert.equal(r.status,'applied');assert.equal(f.calls.length,1);const rec=f.calls[0].payload.record;
+ assert.deepEqual(pts(rec),[[20,20],[100,20],[100,80]]);assert.equal(rec.geometry.closed,false);
+ assert.deepEqual([rec.geometry.segments[1].handleOut.x,rec.geometry.segments[1].handleOut.y],[10,10]);
+ assert.deepEqual([rec.geometry.segments[1].handleIn.x,rec.geometry.segments[1].handleIn.y],[-10,-10]);
+ assert.equal(rec.fill,null);assert.equal(rec.vector.strokeCap,'round');assert.equal(rec.vector.opacity,0.5);
+ assert.deepEqual(f.root.state.layers[0].frames,[],'no legacy frame was written');
+});
+test('Pen: pressing near the first anchor closes; Shift snaps to 45 degrees; Alt keeps the incoming handle',async()=>{
+ const f=await fixture('pen');
+ const r=await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,100,{shiftKey:true}],['pointermove',250,100,{altKey:true}],['pointerup',250,100],['wait',500],
+  ['pointerdown',240,210],['pointerup',240,210],['wait',500],['pointerdown',84,94]]);
+ assert.equal(r.status,'applied');const rec=f.calls[0].payload.record;assert.equal(rec.geometry.closed,true);
+ assert.deepEqual(pts(rec),[[20,20],[100.156,20],[100,80]],'Shift snaps the angle and keeps the distance (constrainAngle45)');
+ const second=rec.geometry.segments[1];assert.deepEqual([second.handleOut.x,second.handleOut.y],[4.844,5]);assert.deepEqual([second.handleIn.x,second.handleIn.y],[0,0]);
+});
+test('Pen: Escape and a single anchor commit nothing; Backspace drops the last anchor; a tool switch commits; taper refuses',async()=>{
+ let f=await fixture('pen');await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90]]);
+ f.doc.listeners.get('keydown').forEach(l=>l.fn({key:'Escape',stopImmediatePropagation(){},preventDefault(){}}));
+ await pen(f,[['wait',500],['pointerdown',240,210],['pointerup',240,210]]);assert.equal(f.calls.length,0,'Escape dropped the gesture; the next press starts a new one');
+ f=await fixture('pen');const single=await pen(f,[['pointerdown',80,90],['pointerup',80,90],['pointerdown',80,90]]);
+ assert.equal(single.status,'cancelled');assert.equal(f.calls.length,0);
+ f=await fixture('pen');await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210]]);
+ f.doc.listeners.get('keydown').forEach(l=>l.fn({key:'Backspace',stopImmediatePropagation(){},preventDefault(){}}));
+ f.root.SM.setTool('rect');const switched=await f.root.NemoNativePenToolController.whenSettled();
+ assert.equal(switched.status,'applied','switching tools commits the open path, as finalizePen does');
+ assert.deepEqual(pts(f.calls[0].payload.record),[[20,20],[100,20]],'Backspace removed the last anchor first');
+ f=await fixture('pen');f.root.state.taperEnds=true;await pen(f,[['pointerdown',80,90]]);
+ assert.ok(f.log.includes('Tapered Pen strokes are unavailable in native Drawing.'));assert.equal(f.calls.length,0);
 });
