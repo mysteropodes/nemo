@@ -188,8 +188,7 @@
     {
       "id": "text-targets",
       "issue": 2264,
-      "status": "Blocked",
-      "reason": "Original task citation is resolved. Shared Text20 target-clause mapping awaits independent review; current private packet, package and operator qualification remain outstanding.",
+      "status": "Ready",
       "tasks": [
         "G38a",
         "G41"
@@ -247,7 +246,9 @@
           "save-after",
           "stale-read"
         ]
-      }
+      },
+      "evidence": "Pinned native Text target provider: https://github.com/mysteropodes/nemo/pull/2187 merged at b62396a533e4720301c2b93d45f1ab42717bbc97; protected-provider reconciliation https://github.com/mysteropodes/nemo/issues/2264#issuecomment-6403866784. Shared original Text20 scenario approved at 16a7ded6adfc39610dc708ee4bcc693bbb0c6db4 by https://github.com/mysteropodes/nemo/pull/2403#issuecomment-6428865050.",
+      "runtimePrerequisites": "Same qualified original Text20 packet, standard package and owned session as #2267. Earned provider clauses and original Text20 result remain separate, with no replay; all passing credit waits for verified owner cleanup. Ready does not establish installed acceptance."
     },
     {
       "id": "text20",
