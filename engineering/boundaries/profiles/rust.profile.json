@@ -1532,6 +1532,7 @@
         "object_scene_style_emit_controls.rs",
         "object_scene_style_emit_rows.rs",
         "object_scene_style_emit_gpu.rs",
+        "object_scene_style_emit_refusal.rs",
         "scene_effect_layer_record.rs",
         "scene_effect_layer_record_rows.rs",
         "scene_effect_layer_record_refs.rs",
