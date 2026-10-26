@@ -1,5 +1,5 @@
 'use strict';
-// U36 (#2362): the public declaration of the four Labs operations. The contract table (shared with the Rust
+// U35/U36 (#2362): the public declaration of the seven Labs operations. The contract table (shared with the Rust
 // validator), the closed transport schema and the common SDK accept the same payloads and refuse the same flaws; the
 // descriptor examples are copyable requests and receipts.
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
@@ -10,7 +10,8 @@ const { validator } = require('./native-object-rig-schema.cjs');
 const ROOT = path.resolve(__dirname, '..');
 const schema = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/native-transport-v2.schema.json'), 'utf8'));
 const descriptor = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/capabilities-v2/native-object-labs.json'), 'utf8'));
-const OPS = [contract.LABS_SPEED_LINES, contract.LABS_BOIL, contract.LABS_FOLLOW_PATH, contract.LABS_REFERENCE_FILL];
+const OPS = [contract.LABS_SPEED_LINES, contract.LABS_BOIL, contract.LABS_FOLLOW_PATH, contract.LABS_REFERENCE_FILL,
+  contract.LABS_PINGPONG, contract.LABS_RETIME, contract.LABS_INTERVAL];
 const defOf = (operation) => schema.$defs.Request.oneOf.find((b) => b.allOf[1].properties.operation.const === operation)
   .allOf[1].properties.payload.$ref.replace('#/$defs/', '');
 const valid = {
@@ -18,6 +19,9 @@ const valid = {
   [contract.LABS_BOIL]: descriptor.examples[1].request.payload,
   [contract.LABS_FOLLOW_PATH]: descriptor.examples[2].request.payload,
   [contract.LABS_REFERENCE_FILL]: descriptor.examples[3].request.payload,
+  [contract.LABS_PINGPONG]: descriptor.examples[4].request.payload,
+  [contract.LABS_RETIME]: descriptor.examples[5].request.payload,
+  [contract.LABS_INTERVAL]: descriptor.examples[6].request.payload,
 };
 const flawsOf = (payload) => {
   const out = [['extra member', { ...payload, extra: 1 }], ['command', { ...payload, command: 'object.labs.other' }]];
@@ -32,6 +36,9 @@ const bounds = {
   [contract.LABS_FOLLOW_PATH]: [['frames', 1], ['frames', 121], ['ease', 'bounce'], ['removeTrajectory', 'yes'], ['strokeIds', []],
     ['strokeIds', Array.from({ length: 257 }, (_, i) => 's' + i)], ['strokeIds', ['']], ['pathId', 5]],
   [contract.LABS_REFERENCE_FILL]: [['point', [1]], ['point', [0, 2e12]], ['point', ['0', 0]], ['color', '#336699'], ['color', 7], ['opacity', 1.5], ['frame', 0.5]],
+  [contract.LABS_PINGPONG]: [['times', 0], ['times', 51], ['fromFrame', -1], ['toLayer', '']],
+  [contract.LABS_RETIME]: [['spacing', 0], ['spacing', 13], ['toFrame', 1.5]],
+  [contract.LABS_INTERVAL]: [['count', 0], ['count', 1000], ['ease', 'bounce'], ['layerUid', 5]],
 };
 
 test('the contract and the closed schema accept each valid payload and refuse every flaw alike', () => {
@@ -49,7 +56,7 @@ test('the contract and the closed schema accept each valid payload and refuse ev
   }
 });
 
-test('the descriptor declares the four operations with one copyable example each and the SDK correlates the receipts', () => {
+test('the descriptor declares the seven operations with one copyable example each and the SDK correlates the receipts', () => {
   assert.equal(descriptor.id, 'native.object.labs');
   assert.deepEqual(descriptor.operations, OPS);
   assert.deepEqual(descriptor.examples.map((e) => e.request.operation), OPS);

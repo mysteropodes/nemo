@@ -5,11 +5,14 @@ use crate::history::object_history::ObjectHistoryEntry;
 use crate::history::NativeObjectHistory;
 use crate::transaction::CompactResult;
 
-const OPS: [&str; 4] = [
+const OPS: [&str; 7] = [
     "command.document.object.labs.speedLines",
     "command.document.object.labs.boil",
     "command.document.object.labs.followPath",
     "command.document.object.labs.referenceFill",
+    "command.document.object.labs.pingpong",
+    "command.document.object.labs.retime",
+    "command.document.object.labs.interval",
 ];
 
 pub(crate) const FAMILY: CommandFamily = CommandFamily {

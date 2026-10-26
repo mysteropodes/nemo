@@ -19,7 +19,9 @@ function harness(options = {}) {
   const sent = [], toasts = [], cleared = [];
   const pin = { instanceId: 'instance-A', documentId: 'document-A', lifecycleGeneration: 1, contentRevision: 4,
     layers: [{ layerUid: 'native-layer:1:0' }, { layerUid: 'native-layer:2:0' }] };
+  const reads = [];
   const session = { info: () => pin, isActive: () => true, blocksLegacy: () => true, requestId: (label) => label + '-' + (sent.length + 1),
+    async readLayerCells(uid, p) { reads.push([uid, p === pin]); return options.cells || null; },
     runResourceCommand: (action) => action({
       async dispatch(request) {
         sent.push(request);
@@ -36,14 +38,14 @@ function harness(options = {}) {
     brushSize: 3, opacity: 80, fillColor: '#336699' };
   if (!options.legacy) Object.defineProperty(state, 'layers', { get: poisoned });
   const root = { state, console, Math, JSON, document: { addEventListener() {} }, SM: { t: (k) => k }, showToast: (t) => toasts.push(t), clearSel: () => cleared.push(1),
-    selectedPaths: options.selected || [], SMLabs: { register() {} },
+    selectedPaths: options.selected || [], SMLabs: { register() {} }, selBounds: () => options.bounds || null,
     NemoNativeObjectProject: { desktop: () => (options.legacy ? null : session) }, NemoNativeObjectLabs: Labs,
     pushUndo: poisoned, pushUndoLayers: poisoned, saveActiveLayerFrame: poisoned, saveAllLayerFrames: poisoned, loadFrame: poisoned,
     ensureKeyframe: poisoned, getEffectiveStrokes: poisoned, Path: poisoned, renderTimeline: poisoned, userLayers: new Proxy({}, { get: poisoned }) };
   root.window = root;
   vm.createContext(root);
-  for (const file of ['speed-lines.js', 'boil-effect.js', 'follow-path.js', 'reference-fill.js']) vm.runInContext(read('src/js/labs/' + file), root, { filename: file });
-  return { root, sent, toasts, cleared, labs: root.SMLabs };
+  for (const file of ['speed-lines.js', 'boil-effect.js', 'follow-path.js', 'reference-fill.js', 'pingpong-cycle.js', 'retime-exposure.js', 'interval-assistant.js']) vm.runInContext(read('src/js/labs/' + file), root, { filename: file });
+  return { root, sent, toasts, cleared, reads, labs: root.SMLabs };
 }
 
 test('speed lines send the baseline defaults, the seed and the resolved colour as one native operation', async () => {
@@ -108,6 +110,41 @@ test('reference fill sends the bucket colour as #rrggbbaa and keeps the baseline
   const locked = harness({ refuse: 'unavailable' });
   assert.equal(await locked.labs.referenceFill(0, 0), false);
   assert.deepEqual(locked.toasts, ['labsToastActiveLayerInvalidLocked']);
+});
+
+test('ping-pong and retime send the selected rows and range with the baseline clamps and toasts', async () => {
+  const bounds = { minL: 0, maxL: 1, minF: 2, maxF: 6 };
+  const h = harness({ bounds });
+  await h.labs.pingpongCycle(80);
+  assert.deepEqual(plain(h.sent[0].payload), { command: 'object.labs.pingpong', fromLayer: 'native-layer:1:0', toLayer: 'native-layer:2:0',
+    fromFrame: 2, toFrame: 6, times: 50 });
+  await h.labs.retimeExposure(20);
+  assert.deepEqual(plain(h.sent[1].payload), { command: 'object.labs.retime', fromLayer: 'native-layer:1:0', toLayer: 'native-layer:2:0',
+    fromFrame: 2, toFrame: 6, spacing: 12 });
+  assert.deepEqual(h.toasts, ['labsToastPingpongPrefix50labsToastPingpongSuffix', 'labsToastExposureRetimedPrefix12 (12)']);
+  const single = harness({ bounds: { minL: 0, maxL: 0, minF: 3, maxF: 3 } });
+  assert.equal(single.labs.pingpongCycle(2), undefined);
+  assert.deepEqual([single.toasts, single.sent.length], [['labsToastNeedAtLeast2FramesPingpong'], 0]);
+  const none = harness({ bounds, refuse: 'not_found' });
+  await none.labs.retimeExposure(2);
+  assert.deepEqual(none.toasts, ['labsToastNoKeyframeInRange']);
+});
+
+test('interval sends the clamped count and eases its own slots without the native keys', async () => {
+  const cells = [[0, 1, 'key', 0, true, false], [1, 3, 'held', 0, true, false], [4, 1, 'key', 4, true, false], [5, 1, 'held', 4, true, false]];
+  const h = harness({ bounds: { minL: 0, maxL: 1, minF: 0, maxF: 5 }, cells });
+  const slots = await h.labs.intervalAssistant(9, 'linear');
+  assert.deepEqual(plain(slots), [1, 2, 3], 'frame 4 is a key; the count clamps to span - 1 = 4');
+  assert.deepEqual(plain(h.reads), [['native-layer:2:0', true]]);
+  assert.deepEqual(plain(h.sent[0].payload), { command: 'object.labs.interval', layerUid: 'native-layer:2:0', fromFrame: 0, toFrame: 5,
+    count: 4, ease: 'linear' });
+  assert.deepEqual(h.toasts, ['3labsToastBreakdownsPlacedMid2, 3, 4']);
+  const full = harness({ bounds: { minL: 0, maxL: 0, minF: 0, maxF: 2 }, cells: [[0, 3, 'key', 0, true, false]] });
+  assert.equal(await full.labs.intervalAssistant(1, 'bounce'), undefined);
+  assert.deepEqual([full.toasts, full.sent.length], [['labsToastNoFreeSlotForBreakdowns'], 0]);
+  const tight = harness({ bounds: { minL: 0, maxL: 0, minF: 0, maxF: 1 } });
+  await tight.labs.intervalAssistant(1);
+  assert.deepEqual([tight.toasts, tight.sent.length], [['labsToastNeedAtLeast2FramesGap'], 0]);
 });
 
 test('without a native session the baseline path runs unchanged', () => {

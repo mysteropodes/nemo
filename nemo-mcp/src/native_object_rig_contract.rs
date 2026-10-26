@@ -1,5 +1,5 @@
 //! L03-T closed public contract of the lane-3 native object operations: image mesh edit, widget create / write /
-//! settings, rig edit and rig pose, and the U36 Labs operations (speed lines, boil, follow-path, reference fill). Pure shape and receipt validation: execution, storage, history and replay stay in
+//! settings, rig edit and rig pose, and the U36 Labs operations (speed lines, boil, follow-path, reference fill, ping-pong, retime, interval). Pure shape and receipt validation: execution, storage, history and replay stay in
 //! the native owner. The legacy shape table came from the leaf's historical `tools/spec.js`. Binding shapes are
 //! source-derived additions shared with the JS adapter, transport schema and descriptor; the historical generator
 //! is absent. The original agreement corpus remains unchanged and binding agreement is checked separately.
@@ -19,10 +19,13 @@ const SPEC: &str = r####"{
 "labs.speedLines": {"command":"object.labs.speedLines","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":256},"frame":{"t":"int","min":0,"max":4294967295},"cx":{"t":"num","abs":10000000},"cy":{"t":"num","abs":10000000},"count":{"t":"int","min":3,"max":400},"r0":{"t":"num","abs":10000000},"r1":{"t":"num","abs":10000000},"jitter":{"t":"num","min":0,"max":1},"seed":{"t":"int","min":0,"max":4294967295},"color":{"t":"arr","min":4,"max":4,"of":{"t":"num","min":0,"max":1}},"brushSize":{"t":"num","min":0,"max":10000},"opacity":{"t":"num","min":0,"max":1}}}},
 "labs.boil": {"command":"object.labs.boil","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":256},"frame":{"t":"int","min":0,"max":4294967295},"frames":{"t":"int","min":1,"max":24},"amplitude":{"t":"num","min":0.2,"max":1000000},"seedStep":{"t":"int","min":-4294967295,"max":4294967295}}}},
 "labs.followPath": {"command":"object.labs.followPath","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":256},"frame":{"t":"int","min":0,"max":4294967295},"pathId":{"t":"str","min":1,"max":256},"strokeIds":{"t":"arr","min":1,"max":256,"of":{"t":"str","min":1,"max":256}},"frames":{"t":"int","min":2,"max":120},"ease":{"t":"enum","v":["linear","in","out","inout"]},"removeTrajectory":{"t":"bool"}}}},
-"labs.referenceFill": {"command":"object.labs.referenceFill","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":256},"frame":{"t":"int","min":0,"max":4294967295},"point":{"t":"pair","abs":1000000000000},"color":{"t":"str","min":9,"max":9},"opacity":{"t":"num","min":0,"max":1}}}}
+"labs.referenceFill": {"command":"object.labs.referenceFill","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":256},"frame":{"t":"int","min":0,"max":4294967295},"point":{"t":"pair","abs":1000000000000},"color":{"t":"str","min":9,"max":9},"opacity":{"t":"num","min":0,"max":1}}}},
+"labs.pingpong": {"command":"object.labs.pingpong","result":"command","node":{"t":"obj","req":{"fromLayer":{"t":"str","min":1,"max":256},"toLayer":{"t":"str","min":1,"max":256},"fromFrame":{"t":"int","min":0,"max":4294967295},"toFrame":{"t":"int","min":0,"max":4294967295},"times":{"t":"int","min":1,"max":50}}}},
+"labs.retime": {"command":"object.labs.retime","result":"command","node":{"t":"obj","req":{"fromLayer":{"t":"str","min":1,"max":256},"toLayer":{"t":"str","min":1,"max":256},"fromFrame":{"t":"int","min":0,"max":4294967295},"toFrame":{"t":"int","min":0,"max":4294967295},"spacing":{"t":"int","min":1,"max":12}}}},
+"labs.interval": {"command":"object.labs.interval","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":256},"fromFrame":{"t":"int","min":0,"max":4294967295},"toFrame":{"t":"int","min":0,"max":4294967295},"count":{"t":"int","min":1,"max":999},"ease":{"t":"enum","v":["linear","in","out","inout"]}}}}
 }"####;
 
-const DECLARED: [&str; 10] = [
+const DECLARED: [&str; 13] = [
     "image.mesh.edit",
     "widget.create",
     "widget.write",
@@ -33,6 +36,9 @@ const DECLARED: [&str; 10] = [
     "labs.boil",
     "labs.followPath",
     "labs.referenceFill",
+    "labs.pingpong",
+    "labs.retime",
+    "labs.interval",
 ];
 fn parse_table(source: &str) -> Map<String, Value> {
     match serde_json::from_str::<Value>(source) {
