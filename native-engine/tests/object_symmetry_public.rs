@@ -6,18 +6,23 @@ use serde_json::{json, Value};
 const EDIT: &str = "command.document.object.project.symmetry.edit";
 const READ: &str = "query.document.object.project.symmetry.read";
 fn owner(extra: Value) -> NativeObjectHistory {
+    NativeObjectHistory::from_project_file("public-symmetry", &file(1, extra)).unwrap()
+}
+/// The saved-file envelope in both admitted wire versions.
+fn file(version: u32, extra: Value) -> Vec<u8> {
     let mut project = json!({"canvasW":64,"canvasH":48,"fps":24});
     project
         .as_object_mut()
         .unwrap()
         .extend(extra.as_object().unwrap().clone());
-    let wire = json!({
-        "format":"nemo.native-project-document","formatVersion":1,
+    let mut wire = json!({"format":"nemo.native-project-document","formatVersion":version,
         "project":project,"viewportReference":null,"assets":[],
         "drawing":{"format":"nemo.native-object-document","formatVersion":1,
-            "totalFrames":40,"layers":[{"layerUid":"L"}],"objects":[]}
-    });
-    NativeObjectHistory::from_project_file("public-symmetry", wire.to_string().as_bytes()).unwrap()
+            "totalFrames":40,"layers":[{"layerUid":"L"}],"objects":[]}});
+    if version == 2 {
+        wire["assetInventory"] = json!({"assetIds":[],"placements":[]});
+    }
+    serde_json::to_vec(&wire).unwrap()
 }
 fn pin(o: &NativeObjectHistory) -> ObjectSnapshot {
     o.acquire_snapshot(o.content_revision()).unwrap()
@@ -227,4 +232,52 @@ fn malformed_unknown_stale_and_misrouted_requests_are_refused_without_change() {
         q["payload"][field] = value;
         assert_eq!(read(&p, q)["error"]["code"], code, "{field}");
     }
+}
+
+#[test]
+fn symmetry_members_keep_null_and_missing_distinct_and_refuse_malformed_records() {
+    for fields in [
+        json!({}),
+        json!({"symmetryAxis":null,"symmetryMode":""}),
+        json!({"symmetryRadialCenter":null,"symmetryAxis":{"x1":1.0,"y1":2.0,"x2":3.0,"y2":4.0}}),
+    ] {
+        for version in [1, 2] {
+            let owner =
+                NativeObjectHistory::from_project_file("symmetry", &file(version, fields.clone()))
+                    .unwrap();
+            let raw = project(&owner);
+            for field in KEYS {
+                assert_eq!(raw.get(field), fields.get(field), "{version}:{field}:{fields}");
+            }
+        }
+    }
+    for invalid in [
+        json!({"symmetryEnabled":"true"}),
+        json!({"symmetryEnabled":null}),
+        json!({"symmetryMode":7}),
+        json!({"symmetryMode":null}),
+        json!({"symmetryAxis":[0.0,0.0,1.0,1.0]}),
+        json!({"symmetryAxis":{"x1":0.0,"y1":0.0,"x2":1.0}}),
+        json!({"symmetryAxis":{"x1":0.0,"y1":0.0,"x2":1.0,"y2":1.0,"z":0.0}}),
+        json!({"symmetryAxis":{"x1":"0","y1":0.0,"x2":1.0,"y2":1.0}}),
+        json!({"symmetryRadialCenter":[1.0,2.0]}),
+        json!({"symmetryRadialCenter":{"x":1.0}}),
+        json!({"symmetryRadialSectors":"6"}),
+        json!({"symmetryRadialSectors":null}),
+        json!({"symmetryExtend":1}),
+        json!({"symmetryRadialCentre":{"x":1.0,"y":2.0}}),
+    ] {
+        for version in [1, 2] {
+            assert!(
+                NativeObjectHistory::from_project_file("symmetry-bad", &file(version, invalid.clone()))
+                    .is_err(),
+                "{version}:{invalid}"
+            );
+        }
+    }
+    let raw = String::from_utf8(file(1, json!({"symmetryExtend":true}))).unwrap();
+    let duplicated =
+        raw.replace("\"symmetryExtend\":true", "\"symmetryExtend\":true,\"symmetryExtend\":false");
+    assert_ne!(raw, duplicated);
+    assert!(NativeObjectHistory::from_project_file("symmetry-dup", duplicated.as_bytes()).is_err());
 }
