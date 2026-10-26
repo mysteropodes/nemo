@@ -28,7 +28,22 @@ function ownerDouble(state, options) {
     let applied = false, extra = {};
     if (request.operation === Contract.VECTOR) {
       const kind = p.command.slice('object.vector.'.length);
-      if (kind === 'createMany') {
+      if (kind === 'batch') {
+        // Every step or none, as the native owner applies a batch.
+        const next = new Map(records), ids = [];
+        for (const op of p.ops) {
+          const id = op.op === 'create' ? null : (op.op === 'replace' ? op.record.target.strokeId : op.stableTarget.strokeId);
+          if (id !== null && !next.has(id)) return reply(request, false, refusal('not_found'));
+          if (op.op === 'create') {
+            let n = 0;
+            while (next.has(`native-stroke:${state.revision + 1}:${n}`)) n += 1;
+            const strokeId = `native-stroke:${state.revision + 1}:${n}`, stored = clone(op.record);
+            stored.target.strokeId = strokeId; next.set(strokeId, stored); ids.push(strokeId);
+          } else { if (op.op === 'replace') next.set(id, clone(op.record)); else next.delete(id); ids.push(id); }
+        }
+        records.clear(); next.forEach((value, key) => records.set(key, value));
+        applied = true; extra = { operation: 'batch', strokeId: ids[0], strokeIds: ids };
+      } else if (kind === 'createMany') {
         const ids = p.records.map((record) => {
           let n = 0;
           while (records.has(`native-stroke:${state.revision + 1}:${n}`)) n += 1;

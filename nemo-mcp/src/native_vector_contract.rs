@@ -72,6 +72,8 @@ fn target(value: &Value, create: bool) -> bool {
 
 #[path = "native_vector_contract_shapes.rs"]
 mod shapes;
+#[path = "native_vector_batch_contract.rs"]
+mod batch;
 use shapes::{record_shape, shape};
 
 #[path = "native_vector_bitmap_read.rs"]
@@ -146,6 +148,7 @@ pub(crate) fn request(operation: &str, payload: &Value) -> bool {
                         })
                 })
         }
+        (VECTOR, "object.vector.batch") => batch::request(payload),
         (VECTOR, "object.vector.replace") => {
             named(&["record"])
                 && record_shape(&payload["record"], false)
@@ -202,6 +205,9 @@ pub(crate) fn result(operation: &str, payload: &Value, value: &Value) -> bool {
             else {
                 return false;
             };
+            if ran == "batch" {
+                return batch::result(payload, value);
+            }
             let Some(stroke) = value["strokeId"].as_str() else {
                 return false;
             };

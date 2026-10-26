@@ -14,6 +14,8 @@ mod lock;
 mod create_many;
 #[path = "object_vector_create_held.rs"]
 mod create_held;
+#[path = "object_vector_batch.rs"]
+mod batch;
 #[path = "object_vector_trim_ends.rs"]
 mod trim_ends;
 #[path = "object_vector_edit_support.rs"]

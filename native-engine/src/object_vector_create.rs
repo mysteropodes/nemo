@@ -48,7 +48,7 @@ pub(super) fn trim_ends(command: &str, value: &Presence<serde_json::Number>) -> 
 /// speed lines, pose stamps): a held or unexposed cell becomes a key holding a copy of what it showed. Absent is the
 /// Draw/Pen/shape `ensureKeyframe(true)`: an empty key.
 pub(super) fn copy_key(command: &str, value: &Presence<String>) -> Result<bool, DispatchErrorCode> {
-    let creates = matches!(command, "object.vector.create" | "object.vector.createMany");
+    let creates = matches!(command, "object.vector.create" | "object.vector.createMany" | "object.vector.batch");
     match value.value().map(String::as_str) {
         None => Ok(false),
         Some("copy") if creates => Ok(true),
@@ -92,6 +92,19 @@ pub(super) fn create(
 /// existing elements of that frame (the baseline inserts the stroke at index 0 and symmetry copies above it).
 fn create_many_or_one(
     origin: &ObjectSnapshot,
+    records: Vec<ObjectRecord>,
+    placement: Placement,
+    trim: Option<f64>,
+    copy_key: bool,
+    kind: VectorEditKind,
+) -> Result<Edit, DispatchErrorCode> {
+    create_in(origin.document(), origin.content_revision(), records, placement, trim, copy_key, kind)
+}
+
+/// The create kernel against a document being edited; `revision` is the origin's, so ids stay monotonic.
+pub(super) fn create_in(
+    source: &ObjectDocument,
+    revision: u64,
     mut records: Vec<ObjectRecord>,
     placement: Placement,
     trim: Option<f64>,
@@ -111,7 +124,7 @@ fn create_many_or_one(
         if records.iter().any(trim::is_vector_brush) {
             return Err(DispatchErrorCode::Unavailable);
         }
-        let walls = origin.document().objects.iter().filter(|r| {
+        let walls = source.objects.iter().filter(|r| {
             r.target.context_id == first.context_id
                 && r.target.layer_uid == first.layer_uid
                 && r.target.frame_scope == first.frame_scope
@@ -123,7 +136,7 @@ fn create_many_or_one(
             record.geometry.segments = segments;
         }
     }
-    let mut document = origin.document().clone();
+    let mut document = source.clone();
     // Baseline Draw, Pen and shape commits run ensureKeyframe(true) first (draw-bridge.js commitStroke, tools.js
     // @1065e9d8): a held or unexposed target cell becomes an empty key in the same undo step, so the new drawing is not
     // the held one carried forward and does not land under it unseen. An in-between is left as it is. With `copy_key`
@@ -162,7 +175,7 @@ fn create_many_or_one(
         if !is_vector_record(&record) || !record.target.stroke_id.is_empty() {
             return Err(DispatchErrorCode::InvalidRequest);
         }
-        let stroke_id = allocate_stroke_id(&document, origin.content_revision())?;
+        let stroke_id = allocate_stroke_id(&document, revision)?;
         record.target.stroke_id = stroke_id.clone();
         check_target(&document, &record.target)?;
         check_drawing_layer(&document, &record.target)?;
