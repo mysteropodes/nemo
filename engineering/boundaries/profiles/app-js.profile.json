@@ -1995,6 +1995,18 @@
       ]
     },
     {
+      "id": "app.script.native.api",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "script-native-api.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "script-native-api.js"
+      ]
+    },
+    {
       "id": "app.opacity.capability",
       "layer": "application",
       "dir": "src/js/application",
