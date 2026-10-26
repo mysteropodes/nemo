@@ -164,7 +164,9 @@ test('chrome, cancellation, Escape and lost capture remain usable or abort witho
   send(f,'pointerup',60,50);assert.equal(f.calls.length,0,action);assert.equal(f.body.children.length,0,action);assert.equal(f.paper.project.activeLayer.children.length,0);}
 });
 test('unsupported brush cells are explicit without native or legacy fallback',async()=>{
- const cases=[s=>s.vectorBrush=true,s=>s.tool='fillbrush',s=>s.bitmapBrushOn=true,s=>s.brushPreset='charcoal-smooth',s=>s.trimStrokeEnds=true,
+ const cases=[s=>s.vectorBrush=true,s=>s.tool='fillbrush',s=>s.bitmapBrushOn=true,s=>s.brushPreset='charcoal-smooth',
+  // Trim Stroke Ends commits natively for a plain stroke; a pressure-brush trim rebuilds its outline and stays refused.
+  s=>Object.assign(s,{trimStrokeEnds:true,vectorBrush:true,fillEnabled:false}),
   // Plain-stroke symmetry commits natively since G23 (#2361); with a pressure brush it stays refused.
   s=>s.shadowMode=true,s=>Object.assign(s,{vectorBrush:true,fillEnabled:false,pressureCurve:'unknown'}),s=>s.stabilizer=7];
  for(const change of cases){const f=await fixture();change(f.root.state);const e=send(f,'pointerdown',20,20);send(f,'pointerup',60,50);assert.equal(e.prevented,true);assert.equal(f.calls.length,0);assert.ok(f.log.some(s=>/unavailable|not available|requires/.test(s)),f.log.join(','));}
@@ -287,4 +289,14 @@ test('drawMode behind sends the stroke under the layer artwork in the same singl
  assert.equal(f.calls[0].payload.placement,'behind');assert.equal(f.calls[0].payload.command,'object.vector.create');
  const front=await fixture();send(front,'pointerdown',20,20);send(front,'pointermove',45,30);send(front,'pointerup',100,80);await settled(front);
  assert.equal(front.calls[0].payload.placement,undefined,'front stays the absent default');
+});
+test('Trim Stroke Ends asks native to trim the Draw commit with the original limit, and only when it is on',async()=>{
+ const f=await fixture();Object.assign(f.root.state,{trimStrokeEnds:true,trimStrokeEndsMax:24});
+ send(f,'pointerdown',20,20);send(f,'pointermove',45,30);send(f,'pointerup',100,80);
+ assert.equal((await settled(f)).status,'applied');assert.equal(f.calls.length,1);
+ assert.equal(f.calls[0].payload.trimEnds,24);assert.equal(f.calls[0].payload.command,'object.vector.create');
+ for(const state of [{trimStrokeEnds:false,trimStrokeEndsMax:24},{trimStrokeEnds:true,trimStrokeEndsMax:0}]){
+  const off=await fixture();Object.assign(off.root.state,state);send(off,'pointerdown',20,20);send(off,'pointermove',45,30);send(off,'pointerup',100,80);
+  await settled(off);assert.equal(off.calls[0].payload.trimEnds,undefined,JSON.stringify(state));
+ }
 });

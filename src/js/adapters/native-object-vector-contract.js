@@ -274,10 +274,12 @@
     if (!OPS.has(operation)) fail('native vector operation is not declared');
     if (!plain(value) || !has(COMMANDS, value.command) || COMMANDS[value.command][0] !== operation) fail(`${operation} command is invalid`);
     const entry = COMMANDS[value.command];
-    // G15: the two creates take an optional placement (absent = front; behind = under the layer's artwork).
+    // G15: the two creates take an optional placement (absent = front; behind = under the layer's artwork)
+    // and an optional trimEnds limit (the baseline trimStrokeEndsMax; finite, above zero).
     const creates = value.command === 'object.vector.create' || value.command === 'object.vector.createMany';
-    exact(value, ['command', ...entry[1]], creates ? ['placement'] : [], operation);
+    exact(value, ['command', ...entry[1]], creates ? ['placement', 'trimEnds'] : [], operation);
     if (has(value, 'placement')) oneOf(value.placement, ['front', 'behind'], `${value.command}.placement`);
+    if (has(value, 'trimEnds') && !(typeof value.trimEnds === 'number' && Number.isFinite(value.trimEnds) && value.trimEnds > 0)) fail(`${value.command}.trimEnds is invalid`);
     entry[1].forEach((key) => member(value.command, key, value[key]));
     // A replace names an existing record; a record of a reference scope is readable storage, never a drawing edit target.
     if (value.command === 'object.vector.replace' && value.record.target.frameScope.kind !== 'authored') fail('a replace targets an authored frame');

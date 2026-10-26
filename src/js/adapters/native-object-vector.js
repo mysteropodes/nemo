@@ -67,7 +67,9 @@
     }
     const strokeFields = (receipt) => ({ strokeId: receipt.strokeId });
     // G15: `options.placement === 'behind'` enters under the layer's existing artwork; front is the absent default.
-    const placed = (body, options) => (options && options.placement === 'behind' ? Object.assign(body, { placement: 'behind' }) : body);
+    // `options.trimEnds` asks native to trim the new open stroke's dangling ends (baseline Trim Stroke Ends).
+    const placed = (body, options) => Object.assign(body, options && options.placement === 'behind' ? { placement: 'behind' } : {},
+      options && options.trimEnds !== undefined ? { trimEnds: options.trimEnds } : {});
 
     function createStroke(layerUid, frame, dict, options) {
       const map = Stroke.toRecord(dict, { layerUid, frame, strokeId: '' }, { opacity: options && options.opacity });
