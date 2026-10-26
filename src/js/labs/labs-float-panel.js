@@ -80,8 +80,6 @@
     symmetry: {
       isOn: function () { return !!(window.state && state.symmetryEnabled); },
       toggle: function () {
-        var native = window.NemoNativeSymmetryController;
-        if (native && native.route({ kind: 'setEnabled', enabled: !state.symmetryEnabled })) return;
         state.symmetryEnabled = !state.symmetryEnabled;
         if (state.symmetryEnabled) {
           if (window.ensureSymmetryAxis) window.ensureSymmetryAxis();
@@ -96,6 +94,8 @@
         }
         var cb = document.getElementById('p-sym-on'); if (cb) cb.checked = state.symmetryEnabled;
         if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+        var native = window.NemoNativeSymmetryController;
+        if (native) native.route({ kind: 'setEnabled', enabled: state.symmetryEnabled });
       },
     },
     perspective: {
@@ -305,8 +305,8 @@
       refreshSettings:function(){if(window.renderLabsPanel)window.renderLabsPanel();},
       getItem:function(key){return localStorage.getItem(key);},setItem:function(key,value){return localStorage.setItem(key,value);},
       addEventListener:function(name,fn){return window.addEventListener(name,fn);},setTimeout:function(fn,delay){return setTimeout(fn,delay);},
-      setSectors:function(value){var c=window.NemoNativeSymmetryController;if(c&&c.route({kind:'setSectors',sectors:value}))return;state.symmetryRadialSectors=Math.max(2,Math.min(24,value));},
-      toggleExtend:function(){var c=window.NemoNativeSymmetryController;if(c&&c.route({kind:'setExtend',extend:!state.symmetryExtend}))return;state.symmetryExtend=!state.symmetryExtend;},
+      setSectors:function(value){state.symmetryRadialSectors=Math.max(2,Math.min(24,value));var c=window.NemoNativeSymmetryController;if(c)c.route({kind:'setSectors',sectors:state.symmetryRadialSectors});},
+      toggleExtend:function(){state.symmetryExtend=!state.symmetryExtend;var c=window.NemoNativeSymmetryController;if(c)c.route({kind:'setExtend',extend:state.symmetryExtend});},
       perspectiveLocked:function(){var vps=window.ensurePerspectiveVPs?window.ensurePerspectiveVPs():[];return !!(vps.length&&vps.every(function(vp){return vp.locked;}));},
       lockPerspective:function(locked,origin){
         if(window.__TAURI__&&window.__TAURI__.core){if(window.lockPerspectiveVPs)return window.lockPerspectiveVPs(locked,origin);return;}

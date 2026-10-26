@@ -13,6 +13,8 @@ test('the seven original gestures are closed intents and nothing else is admitte
     C.payload(C.EDIT, { command: 'object.project.symmetry.edit', action });
     assert.ok(Object.isFrozen(C.action(action)));
   }
+  // Deliberate strictness: the Labs slider and mode cycle only produce finite sectors and the four modes,
+  // so native refuses non-finite sectors and unknown modes that the original would have stored.
   for (const action of [{ kind: 'setMode', mode: 'z' }, { kind: 'setEnabled', enabled: 1 }, { kind: 'setAxis', x1: 0, y1: 0, x2: 1 },
     { kind: 'setRadialCenter', x: 0, y: Infinity }, { kind: 'setSectors', sectors: NaN }, { kind: 'resetGuide', mode: 'x' },
     { kind: 'toggle' }, [], null]) {

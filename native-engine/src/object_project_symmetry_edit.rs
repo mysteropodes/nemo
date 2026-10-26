@@ -48,7 +48,20 @@ fn change(before: &ProjectMetadata, action: Action) -> Result<ProjectMetadata, E
         }
     };
     match action {
-        Action::SetEnabled { enabled } => next.enabled = Some(enabled),
+        Action::SetEnabled { enabled } => {
+            next.enabled = Some(enabled);
+            // The original Labs toggle ensures an axis (for the effective mode) and a centre on enable.
+            if enabled {
+                let mode = next.mode.clone().filter(|m| !m.is_empty());
+                let mode = Some(mode.as_deref().unwrap_or("y"));
+                if next.axis.flatten().is_none() {
+                    next.axis = Some(Some(ObjectSnapshot::symmetry_default_axis(dimensions, mode)));
+                }
+                if next.radial_center.flatten().is_none() {
+                    next.radial_center = Some(Some(ObjectSnapshot::symmetry_default_center(dimensions)));
+                }
+            }
+        }
         Action::SetMode { mode } => {
             reset(&mut next, Some(&mode));
             next.mode = Some(mode);

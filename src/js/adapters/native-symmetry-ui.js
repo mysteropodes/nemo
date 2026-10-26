@@ -1,6 +1,8 @@
 /* Draw symmetry use case; the existing Labs floating panel and guide stay the only UI.
- * Native owns the six settings. On desktop the original state fields are a presentation
- * projection, rewritten only from a confirmed native read; original writers route here. */
+ * Native owns the six settings. On desktop the original state fields are presentation:
+ * an original gesture applies its local effect immediately (as the baseline did) and queues
+ * one native edit; confirmed native values replace the fields once the queue drains, and any
+ * refusal restores the last confirmed values before re-reading. */
 (function (root, factory) {
   var common = typeof module === 'object' && module.exports;
   var api = factory(common ? require('./native-symmetry-desktop.js') : root.NemoNativeSymmetryDesktop);
@@ -12,7 +14,8 @@
   var keys = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
   function install(root) {
     if (installed.has(root)) return installed.get(root);
-    var retired = false, pending = false, loading = null, refreshNeeded = false, epoch = 0, busyStamp = null, failedRead = null;
+    var retired = false, loading = null, refreshNeeded = false, epoch = 0, busyStamp = null, failedRead = null;
+    var queue = [], draining = null, held = 0, confirmed = null;
     function native() { return !!(root.__TAURI__ && root.__TAURI__.core); }
     function current() { return root.NemoNativeObjectProject && root.NemoNativeObjectProject.desktop(root); }
     function available(session, info) {
@@ -23,9 +26,8 @@
     function notice() {
       if (typeof root.showToast === 'function') root.showToast('Symmetry changes are not confirmed. Wait for synchronization before trying again.');
     }
-    function project(value) {
-      var e = value && value.symmetry.settings.effective, s = root.state;
-      if (!e || !s || retired || model.read() !== value) return;
+    function write(e) {
+      var s = root.state; if (!e || !s || retired) return;
       s.symmetryEnabled = e.enabled; s.symmetryMode = e.mode;
       s.symmetryAxis = { x1: e.axis.x1, y1: e.axis.y1, x2: e.axis.x2, y2: e.axis.y2 };
       s.symmetryRadialCenter = { x: e.radialCenter.x, y: e.radialCenter.y };
@@ -34,6 +36,13 @@
     function repaint() {
       if (typeof root.renderLabsFloatPanel === 'function') root.renderLabsFloatPanel();
       if (root.SMEngineBridge && typeof root.SMEngineBridge.renderNow === 'function') root.SMEngineBridge.renderNow();
+    }
+    // Pending local intent stays on screen until its native edit settles; a gesture in progress is never overwritten.
+    function quiet() { return !held && !queue.length && !draining; }
+    function project() {
+      var value = model.read();
+      if (value) confirmed = value.symmetry.settings.effective;
+      if (confirmed && quiet()) { write(confirmed); repaint(); }
     }
     function identity() {
       try {
@@ -50,7 +59,7 @@
     function sameReadOwner(stamp) {
       try {
         var next = identity();
-        return !retired && !pending && !!next && !changed(stamp, next) && available(next.session, next.info);
+        return !retired && !draining && !!next && !changed(stamp, next) && available(next.session, next.info);
       } catch (_) { return false; }
     }
     function readStamp() {
@@ -64,12 +73,12 @@
     }
     function settled() {
       busyStamp = null;
-      var refresh = refreshNeeded; refreshNeeded = false; project(model.read()); repaint();
+      var refresh = refreshNeeded; refreshNeeded = false; project();
       if (refresh && !retired) presented();
     }
     function presented() {
       if (!native() || retired) return Promise.resolve(null);
-      if (pending || loading) {
+      if (draining || loading) {
         var next = identity();
         if (next && changed(busyStamp, next) && available(next.session, next.info)) refreshNeeded = true;
         return loading || Promise.resolve(null);
@@ -77,7 +86,7 @@
       var stamp;
       try { stamp = readStamp(); } catch (_) {}
       if (!stamp) return Promise.resolve(null);
-      var value = model.read(); if (value) { project(value); return Promise.resolve(value); }
+      var value = model.read(); if (value) { project(); return Promise.resolve(value); }
       if (failedRead && sameReadOwner(failedRead) && failedRead.presentation === stamp.presentation) return Promise.resolve(null);
       failedRead = null; busyStamp = stamp;
       loading = model.refresh().then(function (value) {
@@ -89,39 +98,42 @@
       }).finally(function () { loading = null; settled(); });
       return loading;
     }
-    async function edit(action) {
-      var origin = model.read();
-      if (retired || pending || loading || !origin) {
-        notice(); project(origin); repaint(); if (!origin) presented();
-        return { status: 'unavailable' };
-      }
-      busyStamp = identity(); pending = true;
-      try {
-        var result = await model.edit(action, origin);
-        if (!['applied-presented', 'unchanged'].includes(result.status) || model.read() !== result.projection) notice();
-        return result;
-      } catch (error) {
-        notice(); return { status: 'unconfirmed', code: error && error.code || 'unavailable' };
-      } finally {
-        pending = false;
-        // An unconfirmed edit leaves no cached read; re-read so the guide returns to native truth.
-        if (!model.read()) refreshNeeded = true;
-        settled();
+    // Later queued intents were built on the refused one; settling then shows the last confirmed values.
+    function refuse() { queue = []; notice(); refreshNeeded = true; }
+    async function run() {
+      while (queue.length && !retired) {
+        var origin = model.read();
+        if (!origin) { await (loading || presented()); origin = model.read(); }
+        if (!origin || retired) { refuse(); return; }
+        busyStamp = identity();
+        var result;
+        try { result = await model.edit(queue.shift(), origin); } catch (_) { result = { status: 'unconfirmed' }; }
+        if (!['applied-presented', 'unchanged'].includes(result.status) || model.read() !== result.projection) { refuse(); return; }
       }
     }
-    // Original writers ask first; true means native owns the gesture on this host.
+    function drain() {
+      if (!draining) draining = run().finally(function () { draining = null; settled(); });
+      return draining;
+    }
+    // Original writers call this after their local effect; true means native owns the gesture on this host.
+    // Every action is an absolute setting, so a queued, not yet started action of the same kind is replaced.
     function route(action) {
       if (!native() || retired) return false;
-      edit(action); return true;
+      var last = queue[queue.length - 1];
+      if (last && last.kind === action.kind) queue[queue.length - 1] = action; else queue.push(action);
+      failedRead = null; drain(); return true;
     }
+    function hold() { if (native() && !retired) held++; }
+    function release() { if (held > 0 && --held === 0 && quiet()) project(); }
     function dispose() {
       if (retired) return;
-      retired = true; refreshNeeded = false; failedRead = null; model.dispose();
+      retired = true; queue = []; refreshNeeded = false; failedRead = null; model.dispose();
       if (typeof root.removeEventListener === 'function') root.removeEventListener('pagehide', dispose);
     }
-    var controller = Object.freeze({ read: model.read, edit: edit, route: route, presented: presented, native: native,
-      isPending: function () { return pending || !!loading; },
-      willProject: function () { epoch++; failedRead = null; if (!pending) model.invalidate(); }, dispose: dispose });
+    var controller = Object.freeze({ read: model.read, route: route, hold: hold, release: release, presented: presented, native: native,
+      whenSettled: function () { return draining || loading || Promise.resolve(null); },
+      isPending: function () { return !!draining || !!loading || queue.length > 0; },
+      willProject: function () { epoch++; failedRead = null; if (!draining) model.invalidate(); }, dispose: dispose });
     installed.set(root, controller); root.NemoNativeSymmetryController = controller;
     if (typeof root.addEventListener === 'function') root.addEventListener('pagehide', dispose, { once: true });
     return controller;

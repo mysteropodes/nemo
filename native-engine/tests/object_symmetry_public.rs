@@ -121,7 +121,11 @@ fn original_gestures_commit_once_each_through_history_and_survive_fresh_reopen()
     let mut o = owner(json!({"palettes":[{"id":"p","name":"P","colors":["#AbC"]}],"bpm":137.5}));
     let before = saved(&o);
     let steps = [
-        (json!({"kind":"setEnabled","enabled":true}), json!({"symmetryEnabled":true})),
+        (
+            json!({"kind":"setEnabled","enabled":true}),
+            json!({"symmetryEnabled":true,"symmetryAxis":{"x1":32.0,"y1":0.0,"x2":32.0,"y2":48.0},
+                "symmetryRadialCenter":{"x":32.0,"y":24.0}}),
+        ),
         (
             json!({"kind":"setMode","mode":"radial"}),
             json!({"symmetryMode":"radial","symmetryRadialCenter":{"x":32.0,"y":24.0}}),
@@ -280,4 +284,20 @@ fn symmetry_members_keep_null_and_missing_distinct_and_refuse_malformed_records(
         raw.replace("\"symmetryExtend\":true", "\"symmetryExtend\":true,\"symmetryExtend\":false");
     assert_ne!(raw, duplicated);
     assert!(NativeObjectHistory::from_project_file("symmetry-dup", duplicated.as_bytes()).is_err());
+}
+
+#[test]
+fn enabling_seeds_only_missing_or_null_guides_for_the_effective_mode_and_disabling_seeds_nothing() {
+    let mut o = owner(json!({"symmetryMode":"x","symmetryAxis":null}));
+    assert_eq!(edit(&mut o, "off", json!({"kind":"setEnabled","enabled":false}))["result"], applied());
+    assert!(project(&o)["symmetryAxis"].is_null());
+    assert!(project(&o).get("symmetryRadialCenter").is_none());
+    edit(&mut o, "on", json!({"kind":"setEnabled","enabled":true}));
+    assert_eq!(project(&o)["symmetryAxis"], json!({"x1":0.0,"y1":24.0,"x2":64.0,"y2":24.0}));
+    assert_eq!(project(&o)["symmetryRadialCenter"], json!({"x":32.0,"y":24.0}));
+    let mut kept = owner(json!({"symmetryAxis":{"x1":1.0,"y1":2.0,"x2":3.0,"y2":4.0},
+        "symmetryRadialCenter":{"x":-5.0,"y":6.5},"symmetryMode":""}));
+    edit(&mut kept, "on", json!({"kind":"setEnabled","enabled":true}));
+    assert_eq!(project(&kept)["symmetryAxis"], json!({"x1":1.0,"y1":2.0,"x2":3.0,"y2":4.0}));
+    assert_eq!(project(&kept)["symmetryRadialCenter"], json!({"x":-5.0,"y":6.5}));
 }

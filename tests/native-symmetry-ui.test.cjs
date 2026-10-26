@@ -38,7 +38,11 @@ function effective(m) {
 }
 function apply(m, a) {
   const reset = mode => { if (mode === 'radial') m.symmetryRadialCenter = { x: 160, y: 90 }; else m.symmetryAxis = axisFor(mode); };
-  if (a.kind === 'setEnabled') m.symmetryEnabled = a.enabled;
+  if (a.kind === 'setEnabled') {
+    m.symmetryEnabled = a.enabled;
+    if (a.enabled && !m.symmetryAxis) m.symmetryAxis = axisFor(m.symmetryMode || 'y');
+    if (a.enabled && !m.symmetryRadialCenter) m.symmetryRadialCenter = { x: 160, y: 90 };
+  }
   else if (a.kind === 'setMode') { reset(a.mode); m.symmetryMode = a.mode; }
   else if (a.kind === 'resetGuide') reset(m.symmetryMode);
   else if (a.kind === 'setAxis') m.symmetryAxis = { x1: a.x1, y1: a.y1, x2: a.x2, y2: a.y2 };
@@ -52,14 +56,15 @@ function fixture(options = {}) {
   let info = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0',
     canvasW: 320, canvasH: 180, fps: 24, totalFrames: 40, layers: [{ layerUid: 'drawing', visible: true }] };
   const metadata = clone(options.metadata || {});
-  let revision = 0, serial = 0, active = true, refuse = false, running = 0, tail = Promise.resolve(), controller, context;
+  let revision = 0, serial = 0, active = true, refuse = false, refuseReads = false, block = null, running = 0, tail = Promise.resolve(), controller, context;
   const calls = [], notices = [];
   const projected = pin => ({ ...pin, presentation: { ...pin, owner: 'native', status: 'presented' } });
   async function dispatch(request) {
     calls.push(clone(request));
+    if (block && request.operation === Contract.READ) { const held = block; block = null; held.entered(); await held.wait; }
     const response = { apiVersion: 2, requestId: request.requestId, instanceId: info.instanceId,
       documentId: info.documentId, contentRevision: revision, ok: true };
-    if (refuse && request.operation === Contract.EDIT) { response.ok = false; response.error = { code: 'unavailable', message: 'Unavailable' }; }
+    if (refuse && request.operation === Contract.EDIT || refuseReads && request.operation === Contract.READ) { response.ok = false; response.error = { code: 'unavailable', message: 'Unavailable' }; }
     else if (request.operation === Contract.EDIT) {
       assert.equal(request.expectedRevision, revision);
       const before = JSON.stringify(metadata); apply(metadata, request.payload.action);
@@ -110,7 +115,19 @@ function fixture(options = {}) {
   const edits = () => calls.filter(c => c.operation === Contract.EDIT).map(c => c.payload.action);
   const shown = () => ({ enabled: state.symmetryEnabled, mode: state.symmetryMode, axis: clone(state.symmetryAxis),
     radialCenter: clone(state.symmetryRadialCenter), radialSectors: state.symmetryRadialSectors, extend: state.symmetryExtend });
-  return { root, state, area, controller, calls, notices, metadata, settled, edits, shown, refuse: v => { refuse = v; } };
+  // Another writer (an undo, say) changes the document while this UI is busy.
+  function external(change) {
+    change(metadata); revision++;
+    info = { ...info, contentRevision: revision, documentSnapshotId: 's' + revision };
+    controller.willProject(info); assert.equal(ProjectFile.refreshLayerTable(browserRoot, info), true); controller.presented(info);
+  }
+  function holdNextRead() {
+    let entered, release; const wait = new Promise(r => { release = r; }), started = new Promise(r => { entered = r; });
+    block = { entered, wait }; return { started, release };
+  }
+  const run = code => vm.runInContext(code, context);
+  return { root, state, area, controller, calls, notices, metadata, settled, edits, shown, external, holdNextRead, run,
+    refuse: v => { refuse = v; }, refuseReads: v => { refuseReads = v; } };
 }
 
 test('a confirmed native read projects the original import values into the existing guide fields', async () => {
@@ -150,6 +167,7 @@ test('a refused edit restores the guide to native truth and warns once', async (
   f.refuse(true);
   f.area.fire('pointerdown', { clientX: 160, clientY: 90 });
   f.area.fire('pointermove', { clientX: 10, clientY: 10 });
+  f.refuseReads(true);
   f.area.fire('pointerup', { clientX: 10, clientY: 10 }); await f.settled();
   assert.equal(f.notices.length, 1);
   assert.deepEqual(f.shown(), before, 'the controller re-reads native truth on its own');
@@ -162,4 +180,44 @@ test('without a native host the original writers keep their local behaviour and 
   assert.equal(f.state.symmetryMode, 'x'); assert.deepEqual(clone(f.state.symmetryAxis), { x1: 0, y1: 90, x2: 320, y2: 90 });
   assert.equal(f.controller.route({ kind: 'resetGuide' }), false);
   assert.deepEqual(f.calls, []);
+});
+
+test('a gesture made while a native read is loading is applied after it, never dropped', async () => {
+  const f = fixture({ metadata: { symmetryEnabled: true } });
+  await f.controller.presented(); await f.settled();
+  const gate = f.holdNextRead();
+  f.external(m => { m.symmetryExtend = false; });
+  await gate.started;
+  f.root.setSymmetryMode('x');
+  assert.equal(f.state.symmetryMode, 'x', 'the original local effect is immediate');
+  gate.release(); await f.settled(); await f.controller.whenSettled(); await f.settled();
+  assert.deepEqual(f.edits(), [{ kind: 'setMode', mode: 'x' }]);
+  assert.deepEqual(f.shown(), effective(f.metadata));
+  assert.equal(f.metadata.symmetryExtend, false, 'the other writer\'s change survives');
+  assert.deepEqual(f.notices, []);
+});
+
+test('rapid sector steps keep the local value and reach native in order', async () => {
+  const f = fixture({ metadata: { symmetryEnabled: true, symmetryMode: 'radial' } });
+  await f.controller.presented(); await f.settled();
+  // The Labs port's own body (labs-float-panel.js setSectors), run in the page realm.
+  for (const value of [5, 4, 3]) f.run(`state.symmetryRadialSectors = Math.max(2, Math.min(24, ${value}));
+    NemoNativeSymmetryController.route({ kind: 'setSectors', sectors: state.symmetryRadialSectors });`);
+  assert.equal(f.state.symmetryRadialSectors, 3);
+  await f.controller.whenSettled(); await f.settled();
+  assert.deepEqual(f.edits(), [{ kind: 'setSectors', sectors: 5 }, { kind: 'setSectors', sectors: 3 }], 'queued steps coalesce');
+  assert.equal(f.metadata.symmetryRadialSectors, 3); assert.equal(f.state.symmetryRadialSectors, 3);
+});
+
+test('another writer\'s revision during a guide drag neither moves the dragged guide nor loses the release', async () => {
+  const f = fixture({ metadata: { symmetryEnabled: true, symmetryMode: 'radial' } });
+  await f.controller.presented(); await f.settled();
+  f.area.fire('pointerdown', { clientX: 160, clientY: 90 });
+  f.area.fire('pointermove', { clientX: 50, clientY: 60 });
+  f.external(m => { m.symmetryRadialSectors = 12; }); await f.settled();
+  assert.deepEqual(clone(f.state.symmetryRadialCenter), { x: 50, y: 60 }, 'the held guide is not overwritten');
+  f.area.fire('pointermove', { clientX: 70, clientY: 80 });
+  f.area.fire('pointerup', { clientX: 70, clientY: 80 }); await f.controller.whenSettled(); await f.settled();
+  assert.deepEqual(f.edits(), [{ kind: 'setRadialCenter', x: 70, y: 80 }]);
+  assert.deepEqual(f.shown(), effective(f.metadata)); assert.equal(f.state.symmetryRadialSectors, 12);
 });
