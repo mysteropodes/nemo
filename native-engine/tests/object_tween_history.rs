@@ -53,6 +53,7 @@ fn record(s: &Value, frame: usize) -> Value {
     let mut texture = json!({});
     for (old, new) in [
         ("brushTexturePreset", "brushTexturePreset"),
+        ("strokeSeed", "strokeSeed"),
         ("brushGroupId", "brushGroupId"),
         ("isBrushTextureCopy", "isBrushTextureCopy"),
         ("preTextureStroke", "preTextureStroke"),
@@ -240,6 +241,17 @@ fn assert_frames(doc: &ObjectDocument, expected: &Value, name: &str) {
             // Baseline generated brush companions have no id; native records require one.
             if s.get("strokeId").is_none() {
                 actual["target"]["strokeId"] = wanted["target"]["strokeId"].clone();
+            }
+            // strokeSeed is native-only metadata added by G16; fixed baseline
+            // geometry/style remains exact. Its value and persistence have a
+            // separate fixed-seed test below, rather than altering the oracle.
+            if wanted["vectorExt"]["brushTexture"]
+                .get("strokeSeed")
+                .is_none()
+            {
+                if let Some(texture) = actual["vectorExt"]["brushTexture"].as_object_mut() {
+                    texture.remove("strokeSeed");
+                }
             }
             numeric(&actual, &wanted, &format!("{name}:{frame}"));
         }

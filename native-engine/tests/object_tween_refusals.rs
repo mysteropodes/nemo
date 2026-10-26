@@ -310,3 +310,51 @@ fn native_tween_noop_and_replay_receipts_preserve_revision_and_history() {
     assert_eq!(replay["result"], reply["result"]);
     assert_eq!(state(&owner), before);
 }
+
+#[test]
+fn native_tween_stamping_seed_is_persisted_per_pair_and_never_on_dabs() {
+    let c = fixture_cases()
+        .into_iter()
+        .find(|c| c["input"]["name"] == "texture-both")
+        .unwrap();
+    let mut frames = c["input"]["frames"].clone();
+    frames[0]["strokes"][0]["strokeSeed"] = json!(99);
+    frames[3]["strokes"][0]["strokeSeed"] = json!(88);
+    let mut owner = NativeObjectHistory::new("tween-seed", document(&frames, true)).unwrap();
+    let q = request(
+        &owner,
+        "seed",
+        "tween.generate",
+        json!({"command":"object.tween.generate","layerUid":"L0"}),
+    );
+    assert_eq!(dispatch(&mut owner, &q)["ok"], true);
+    let reopened = decode_storage_project(&bytes(&owner)).unwrap();
+    let mut anchors = 0;
+    let mut dabs = 0;
+    for record in &reopened.objects {
+        let Some(tags) = record
+            .vector_ext
+            .value()
+            .and_then(|ext| ext.brush_texture.value())
+        else {
+            continue;
+        };
+        if tags.brush_texture_preset.value().is_some() {
+            let expected = match record.target.frame() {
+                0 => 99,
+                3 => 88,
+                _ => 1,
+            };
+            assert_eq!(
+                tags.stroke_seed.value().and_then(|n| n.as_u64()),
+                Some(expected)
+            );
+            anchors += 1;
+        } else if tags.is_brush_texture_copy.value() == Some(&true) {
+            assert!(tags.stroke_seed.missing());
+            dabs += 1;
+        }
+    }
+    assert_eq!(anchors, 4);
+    assert!(dabs > 0);
+}

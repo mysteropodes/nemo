@@ -91,6 +91,7 @@ impl PairTexture {
         anchor.vector_ext = Presence::Present(VectorExt {
             brush_texture: Presence::Present(BrushTexture {
                 brush_texture_preset: Presence::Present(self.preset.clone()),
+                stroke_seed: Presence::Present(self.seed.into()),
                 brush_group_id: self.group.clone(),
                 is_brush_texture_copy: Presence::Missing,
                 pre_texture_stroke: Presence::Missing,
@@ -131,6 +132,7 @@ impl PairTexture {
                         brush_group_id: self.group.clone(),
                         is_brush_texture_copy: Presence::Present(true),
                         brush_texture_preset: Presence::Missing,
+                        stroke_seed: Presence::Missing,
                         pre_texture_stroke: Presence::Missing,
                         pre_texture_opacity: Presence::Missing,
                     }),
