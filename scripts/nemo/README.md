@@ -108,3 +108,12 @@ sha256), `limitations[]`, `details`, and `summary` (`overall`, `exitCode`, `coun
   in the same runner. Desktop build and test prerequisites are required when selected.
 - Historical counts are never treated as current proof: every receipt is bound to the SHA
   and dirty digest it was measured on.
+
+## Parity matrix and family acceptance (CS6, #2346)
+
+- `node scripts/nemo/parity-matrix.cjs [--check]` builds/gates `engineering/inventory/parity/matrix.json` and `PARITY.md`.
+- `node scripts/nemo/family-acceptance.cjs <family> [--write] [--json]` runs the native-test checks declared in
+  `engineering/inventory/parity/families/<family>.json` (one cargo job at a time; hold the compiler slot) and, with
+  `--write` on a clean tree, records `results/<family>.json`. A check matching zero tests fails. The matrix annotates every
+  surface whose tasks intersect a family with `evidence: {family, verdict, sourceSha}`. Results are source-level records at
+  their SHA: `--check` validates their shape and task references, not freshness, and evidence never changes row status.

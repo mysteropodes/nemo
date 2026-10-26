@@ -18,12 +18,14 @@
       "curated-open": 33,
       "issues-open": 126
     },
+    "evidence": {},
     "mappingConfidence": {
       "high": 450,
       "medium": 390,
       "low": 63
     }
   },
+  "evidence": [],
   "surfaces": [
     {
       "id": "dom:#app-check-update",

@@ -8,6 +8,11 @@ Owners snapshot: 2026-10-25. A *declared* owner is a non-parent issue declaring 
 - Tasks: 228 (curated-closed 28 · curated-open 33 · issues-closed 41 · issues-open 126)
 - Mapping confidence: high 450 · low 63 · medium 390 (medium/low rows need human review)
 
+- Family evidence (source-level records, additive; surfaces per verdict): none recorded
+
+Evidence comes from `results/<family>.json`, written by `node scripts/nemo/family-acceptance.cjs <family> --write` at the recorded source SHA. It is a source-level record, NOT a freshness claim about the current HEAD and NOT acceptance: row status above is unchanged. `incomplete` lists a check kind still uncovered.
+
+
 | Outcome | Tasks | Tasks with no owning issue |
 |---|---:|---|
 | A01 | 4 | — |
