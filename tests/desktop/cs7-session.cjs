@@ -1,0 +1,139 @@
+'use strict';
+// One normal packaged runtime, with the existing owner/window/input protocols.
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawn, execFileSync } = require('node:child_process');
+const harness = require('./native-harness.cjs');
+const { requireCheck: check, hash } = harness;
+const { cleanupHelper } = require('./p38-helper-protocol.cjs');
+const { OperatorInputError } = require('./cs7-runner.cjs');
+const ROOT = path.resolve(__dirname, '../..');
+
+function createInput({ executable, env, timeout = 10_000 }) {
+  let child, pinned, ordinal = 0, pending, buffer = '', failed = false, starting = false, lastCommand = null;
+  function fail() {
+    failed = true; buffer = '';
+    if (pending) { const reject = pending.reject; clearTimeout(pending.timer); pending = null;
+      reject(new OperatorInputError('input-refused', { command: lastCommand, ordinal })); }
+  }
+  function next(deadline = timeout) {
+    check(!failed && !pending, 'input is failed or busy');
+    return new Promise((resolve, reject) => {
+      pending = { resolve, reject, timer: setTimeout(fail, deadline) };
+    });
+  }
+  async function open(pid) {
+    check(!starting, 'input helper already started'); starting = true;
+    child = spawn(executable, ['--ui32-persistent', String(pid)], {
+      detached: true, stdio: ['pipe', 'pipe', 'pipe'], env,
+    });
+    child.p38DetachedGroup = true;
+    child.p38GroupMayContainDescendants = true; // The finite capture command spawns screencapture.
+    child.on('error', fail); child.stdin.on('error', fail); child.stderr.resume();
+    child.once('close', () => { if (pending) fail(); });
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', chunk => {
+      if (failed) return;
+      buffer += chunk;
+      if (Buffer.byteLength(buffer) > 1024 * 1024) { fail(); return; }
+      let index;
+      while ((index = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, index); buffer = buffer.slice(index + 1);
+        if (!pending || failed) { fail(); return; }
+        let value;
+        try { value = JSON.parse(line); } catch { fail(); return; }
+        if (!value || value.status === 'refused') { fail(); return; }
+        const resolve = pending.resolve; clearTimeout(pending.timer); pending = null; resolve(value);
+      }
+    });
+    pinned = await next(Math.max(timeout, 5000));
+    check(pinned.status === 'pinned' && pinned.purpose === 'UI32' && pinned.pid === pid &&
+      pinned.matchedAX === true && Number.isInteger(pinned.windowId) && pinned.windowId > 0 &&
+      Number.isSafeInteger(pinned.processStartSeconds) && Number.isSafeInteger(pinned.processStartMicroseconds), 'input window identity refused');
+    return { ...pinned };
+  }
+  async function command(command, option, value) {
+    check(pinned && !failed && !pending && ordinal < 255, 'input helper unavailable');
+    check(/^[a-z][a-z0-9.-]*$/.test(command), 'input command invalid');
+    const request = { purpose: 'UI32', pid: pinned.pid, windowId: pinned.windowId, command,
+      ...(option === undefined ? {} : { option }), ...(value === undefined ? {} : { value }) };
+    const line = JSON.stringify(request);
+    check(Buffer.byteLength(line) <= 2048, 'input request too large');
+    const reply = next(); ordinal += 1; lastCommand = command;
+    child.stdin.write(line + '\n');
+    try {
+      const result = await reply;
+      check(result.status === 'ok' && result.purpose === 'UI32' && result.pid === pinned.pid &&
+        result.windowId === pinned.windowId && result.ordinal === ordinal && result.command === command, 'input response identity refused');
+      return result;
+    } catch { fail(); throw new OperatorInputError('input-refused', { command: lastCommand, ordinal }); }
+  }
+  async function close() {
+    if (pending) fail();
+    if (child) await cleanupHelper(child);
+  }
+  return { open, command, close };
+}
+
+function createInstalledSession(config) {
+  const identity = require('../../scripts/nemo/lib/identity.cjs');
+  const runtime = require('../../scripts/nemo/lib/native-runtime.cjs');
+  const isolation = require('../../scripts/nemo/lib/isolation.cjs');
+  const source = identity.sourceIdentity(), build = identity.buildIdentity();
+  check(!source.dirty && source.head === config.sourceSha, 'clean frozen source required');
+  check(/^1062\/[0-9]+$/.test(config.grant || ''), 'recorded local slot required');
+  const app = harness.packagedApp(config.app, runtime);
+  check(app.executableSha256 === config.executableSha256, 'packaged executable differs');
+  const proof = JSON.parse(fs.readFileSync(config.buildProof, 'utf8'));
+  check(proof.status === 'pass' && proof.details?.source?.head === source.head && proof.details.source.dirty === false &&
+    proof.details.cleanup?.stopped === true && proof.details.cleanup.released === true &&
+    proof.artifacts?.some(a => a.sha256 === app.executableSha256 && a.path.endsWith('/Contents/MacOS/nemo')), 'standard package proof required');
+  const helperProof = JSON.parse(fs.readFileSync(config.helperProof, 'utf8'));
+  const helper = require('./ui32-owned-window-build.cjs').manifest();
+  check(helperProof.schema === 'nemo.ui32-window-helper/1' && helperProof.sourceHead === source.head &&
+    helperProof.sourceSha256 === helper.sourceSha256 && helperProof.executableSha256 === hash(config.helper), 'frozen helper proof required');
+  const report = fs.realpathSync(config.reportDirectory), stat = fs.lstatSync(config.reportDirectory);
+  check(report === config.reportDirectory && stat.isDirectory() && !stat.isSymbolicLink(), 'owned report directory required');
+  const environment = { ...process.env };
+  // Never inherit another historical operator's admission or fixture mode.
+  for (const key of Object.keys(environment)) if (/^NEMO_(UI32|P38|REFERENCE|PNG_UI)_/.test(key)) delete environment[key];
+  Object.assign(environment, { NEMO_UI32_GRANT: config.grant, NEMO_UI32_REPORT_ROOT: report });
+  if (config.fixtureKind) environment.NEMO_UI32_FIXTURE_KIND = config.fixtureKind;
+  const input = createInput({ executable: config.helper, env: environment });
+  const controller = harness.createController({ root: ROOT, app: app.bundle });
+  const tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd: ROOT, encoding: 'utf8' }).trim();
+  let instance, started = false, pinned;
+  async function currentIdentity() {
+    check(instance, 'installed session not started');
+    const current = identity.sourceIdentity();
+    check(!current.dirty && current.head === source.head && hash(app.executable) === app.executableSha256 &&
+      hash(config.helper) === helperProof.executableSha256, 'installed source or executable changed');
+    const status = await controller.status(instance);
+    check(status.code === 0, 'installed status refused');
+    harness.validateSnapshot(status.value, instance, { isolation, runtime, source, build, app });
+    const pid = status.value.app.pid;
+    if (pinned) check(pid === pinned.pid, 'installed PID changed');
+    return { sourceSha: source.head, tree, driverSha: source.head, executableSha256: app.executableSha256,
+      sessionId: config.taskId, pid, dirty: false };
+  }
+  return {
+    async start() {
+      check(!started, 'installed session cannot restart'); started = true;
+      instance = await controller.start(config.taskId, ['desktop-input', 'gpu-reference']);
+      const current = await currentIdentity(); pinned = await input.open(current.pid); return current;
+    },
+    identity: currentIdentity,
+    async input(command, option, value) {
+      await currentIdentity();
+      return input.command(command, option, value);
+    },
+    async cleanup() {
+      let failed = false;
+      try { await input.close(); } catch { failed = true; }
+      try { await controller.cleanup(); } catch { failed = true; }
+      check(!failed, 'installed session cleanup incomplete');
+    },
+  };
+}
+
+module.exports = { createInput, createInstalledSession };

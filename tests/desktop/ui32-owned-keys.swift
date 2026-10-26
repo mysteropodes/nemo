@@ -56,10 +56,6 @@ func ui32Key(_ option:String) throws -> (code:CGKeyCode,text:String,shift:Bool) 
   guard let code=keys[label], !shifted || Set(["P","A","R","S","T"]).contains(label) else { throw Refusal(code:"adapter-refused") }
   return (code,shifted ? label : label.lowercased(),shifted)
 }
-// Mandatory shared route: production and static controls use the same three fences.
-func ui32MotionKeyPair(_ focus:() throws -> Void, down:()->Void, up:()->Void) throws {
-  try focus();down();try focus();up();try focus()
-}
 func ui32MotionContent<Node>(_ certificate:UI32ContentCertificate<Node>, _ focus:Node,
   equal:(Node,Node)->Bool, identifier:(Node) throws -> String?) throws {
   guard let target=certificate.nodes.firstIndex(where:{equal($0,focus)}),certificate.inside.contains(target) else {
@@ -108,7 +104,7 @@ func runUI32Keys(_ command:String, _ option:String?, _ pinned:OwnedInitialWindow
     try check(AXUIElementIsAttributeSettable(node,kAXFocusedAttribute as CFString,&writable) == .success && writable.boolValue)
     try verifyOwnedWindow(pinned);try check(CFEqual(try resolve(rule),node))
     try check(AXUIElementSetAttributeValue(node,kAXFocusedAttribute as CFString,kCFBooleanTrue) == .success)
-    try ui32MotionFocus(pinned,node,search,contentScope:contentScope)
+    try cs7MotionFocus(pinned,node,search,rule,resolve:resolve,visible:visible,contentScope:contentScope)
     return ["focusAcknowledged":true,"note":"Focus proof only; no feature acceptance."]
   }
   try check(command == "motion.shortcut" || command == "motion.guard-typing")
@@ -131,10 +127,15 @@ func runUI32Keys(_ command:String, _ option:String?, _ pinned:OwnedInitialWindow
       }
       down=false;up=false
       try ui32MotionKeyPair({ try ui32MotionFocus(pinned,search,typing,contentScope:contentScope) },
-        down:{press.postToPid(pinned.pid);down=true},up:{release.postToPid(pinned.pid);up=true;postedPairs += 1})
+        down:{press.postToPid(pinned.pid);down=true},up:{release.postToPid(pinned.pid);up=true;postedPairs += 1},
+        releaseIdentity:{try verifyOwnedWindow(pinned)})
     }
     return ["postedPairs":postedPairs,"note":"Exact PID event posting, not application acknowledgement or acceptance."]
-  } catch { throw ActionRefusal(diagnostics:["purpose":"UI32","command":command,"postedPairs":postedPairs,"lastDownPosted":down,"lastUpPosted":up,"retry":false]) }
+  } catch {
+    var facts:[String:Any]=["purpose":"UI32","command":command,"postedPairs":postedPairs,"lastDownPosted":down,"lastUpPosted":up,"retry":false]
+    if let failure=error as? CS7InputFailure {facts["inputCleanup"]=failure.diagnostics}
+    throw ActionRefusal(diagnostics:facts)
+  }
 }
 // One named additive selection gesture, on the verified F06-B BUTTON only.
 func ui32ToggleB(_ pinned:OwnedInitialWindow, resolve:(UI32Rule) throws -> AXUIElement,
@@ -153,11 +154,14 @@ func ui32ToggleB(_ pinned:OwnedInitialWindow, resolve:(UI32Rule) throws -> AXUIE
   down.flags = .maskCommand;up.flags = .maskCommand
   var downPosted=false,upPosted=false
   do {
-    try context();down.postToPid(pinned.pid);downPosted=true
-    try context();up.postToPid(pinned.pid);upPosted=true
-    try verifyOwnedWindow(pinned)
+    try cs7InputSequence(context:context,releaseIdentity:{try verifyOwnedWindow(pinned)},
+      down:{down.postToPid(pinned.pid);downPosted=true},up:{up.postToPid(pinned.pid);upPosted=true})
     return ["buttonDownPosted":downPosted,"buttonUpPosted":upPosted,"note":"Named F06-B additive selection event pair only; verify actual native selection separately."]
-  } catch { throw ActionRefusal(diagnostics:["purpose":"UI32","command":"selection.toggle.B","buttonDownPosted":downPosted,"buttonUpPosted":upPosted,"retry":false]) }
+  } catch {
+    var facts:[String:Any]=["purpose":"UI32","command":"selection.toggle.B","buttonDownPosted":downPosted,"buttonUpPosted":upPosted,"retry":false]
+    if let failure=error as? CS7InputFailure {facts["inputCleanup"]=failure.diagnostics}
+    throw ActionRefusal(diagnostics:facts)
+  }
 }
 func ui32KeysSelfTest() throws {
   try ui32IdentifierSelfTest()
@@ -198,7 +202,7 @@ func ui32MotionScopeSelfTest() throws {
     } catch {refused=true}
     try check(refused == (fault != "none"))
     if fault == "none" {try check(down == 1 && up == 1 && calls == 3)}
-    else if fault == "move-after-down" {try check(down == 1 && up == 0 && calls == 2)}
+    else if fault == "move-after-down" {try check(down == 1 && up == 0 && calls == 3)}
     else if fault == "move-after-up" {try check(down == 1 && up == 1 && calls == 3)}
     else {try check(down == 0 && up == 0 && calls == 1)}
   }

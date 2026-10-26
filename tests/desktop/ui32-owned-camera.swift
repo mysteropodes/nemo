@@ -126,8 +126,8 @@ final class UI32CameraOperator {
           let down=CGEvent(keyboardEventSource:source,virtualKey:code,keyDown:true),
           let up=CGEvent(keyboardEventSource:source,virtualKey:code,keyDown:false) else {throw Refusal(code:"adapter-refused")}
         down.flags=[.maskCommand,.maskAlternate];up.flags=down.flags
-        try ui32CameraEvents({try fence(true)},[{actions.post {down.postToPid(self.pinned.pid)}},
-          {actions.post {up.postToPid(self.pinned.pid)}}])
+        try cs7InputSequence(context:{try fence(true)},releaseIdentity:{try verifyOwnedWindow(self.pinned)},
+          down:{actions.post {down.postToPid(self.pinned.pid)}},up:{actions.post {up.postToPid(self.pinned.pid)}})
       } else {
         guard let source=CGEventSource(stateID:.privateState) else {throw Refusal(code:"adapter-refused")}
         let point=CGPoint(x:before.bounds.midX,y:before.bounds.midY)
@@ -146,13 +146,18 @@ final class UI32CameraOperator {
           try fence()
           let end=command == "camera.pan" ? CGPoint(x:point.x+before.bounds.width/20,y:point.y) : point
           guard before.bounds.contains(end),
+            let hover=CGEvent(mouseEventSource:source,mouseType:.mouseMoved,mouseCursorPosition:point,mouseButton:.left),
             let down=CGEvent(mouseEventSource:source,mouseType:.leftMouseDown,mouseCursorPosition:point,mouseButton:.left),
             let drag=CGEvent(mouseEventSource:source,mouseType:.leftMouseDragged,mouseCursorPosition:end,mouseButton:.left),
             let up=CGEvent(mouseEventSource:source,mouseType:.leftMouseUp,mouseCursorPosition:end,mouseButton:.left) else {
             throw Refusal(code:"adapter-refused")
           }
-          let events=command == "camera.pan" ? [down,drag,up] : [down,up]
-          try ui32CameraEvents({try fence()},events.map { event in {actions.post {event.postToPid(self.pinned.pid)}} })
+          // Establish hover at the actual canvas point before starting the gesture.
+          try ui32CameraEvents({try fence()},[{actions.post {hover.postToPid(self.pinned.pid)}}])
+          let moves:[()->Void]=command == "camera.pan" ? [{actions.post {drag.postToPid(self.pinned.pid)}}] : []
+          try cs7InputSequence(context:{try fence()},releaseIdentity:{try verifyOwnedWindow(self.pinned)},
+            down:{actions.post {down.postToPid(self.pinned.pid)}},moves:moves,
+            up:{actions.post {up.postToPid(self.pinned.pid)}})
         }
       }
       return ["cameraBefore":evidence(before),"attemptedInputs":actions.attempted,
@@ -160,6 +165,7 @@ final class UI32CameraOperator {
         "awaitPresentedObservation":true,"note":"Input posting only; actual native pixels/source checks remain mandatory."]
     } catch {
       var diagnostics=actions.diagnostics
+      if let failure=error as? CS7InputFailure {diagnostics["inputCleanup"]=failure.diagnostics}
       diagnostics.merge(["purpose":"UI32","command":command,"retry":false,
         "underlying":ui32ActionCause(error)]) {_,new in new}
       throw ActionRefusal(diagnostics:diagnostics)
