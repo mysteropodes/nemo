@@ -6,7 +6,7 @@ use std::sync::Arc;
 mod project_settings;
 pub(crate) use project_settings::{
     BrushPresetRecord, ProjectCommentRecord, ProjectMetadata, ProjectMetadataError,
-    ProjectPresetCatalog, ProjectWorkspaceRecord,
+    ProjectPresetCatalog, ProjectWorkspaceRecord, SymmetrySettings,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
