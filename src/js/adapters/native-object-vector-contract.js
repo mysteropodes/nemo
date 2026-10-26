@@ -274,7 +274,10 @@
     if (!OPS.has(operation)) fail('native vector operation is not declared');
     if (!plain(value) || !has(COMMANDS, value.command) || COMMANDS[value.command][0] !== operation) fail(`${operation} command is invalid`);
     const entry = COMMANDS[value.command];
-    exact(value, ['command', ...entry[1]], [], operation);
+    // G15: the two creates take an optional placement (absent = front; behind = under the layer's artwork).
+    const creates = value.command === 'object.vector.create' || value.command === 'object.vector.createMany';
+    exact(value, ['command', ...entry[1]], creates ? ['placement'] : [], operation);
+    if (has(value, 'placement')) oneOf(value.placement, ['front', 'behind'], `${value.command}.placement`);
     entry[1].forEach((key) => member(value.command, key, value[key]));
     // A replace names an existing record; a record of a reference scope is readable storage, never a drawing edit target.
     if (value.command === 'object.vector.replace' && value.record.target.frameScope.kind !== 'authored') fail('a replace targets an authored frame');

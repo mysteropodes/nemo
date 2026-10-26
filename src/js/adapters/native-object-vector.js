@@ -66,11 +66,13 @@
       }, describe ? describe(receipt) : null))).catch(failed);
     }
     const strokeFields = (receipt) => ({ strokeId: receipt.strokeId });
+    // G15: `options.placement === 'behind'` enters under the layer's existing artwork; front is the absent default.
+    const placed = (body, options) => (options && options.placement === 'behind' ? Object.assign(body, { placement: 'behind' }) : body);
 
     function createStroke(layerUid, frame, dict, options) {
       const map = Stroke.toRecord(dict, { layerUid, frame, strokeId: '' }, { opacity: options && options.opacity });
       if (!map.ok) return Promise.resolve(mapped(map));
-      return send(Contract.VECTOR, { command: 'object.vector.create', record: map.record }, options,
+      return send(Contract.VECTOR, placed({ command: 'object.vector.create', record: map.record }, options), options,
         (receipt) => ({ strokeId: receipt.strokeId, authoredStrokeId: map.authoredStrokeId, unmapped: map.unmapped }));
     }
     // G23: several strokes (symmetry copies) on one layer and frame as one native revision and one undo entry.
@@ -81,7 +83,7 @@
       if (refused) return Promise.resolve(mapped(refused));
       // The vector edit envelope is bounded at 64 KiB: refuse up front, typed, instead of a transport refusal.
       if (JSON.stringify(maps.map((map) => map.record)).length > 60000) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'symmetry_too_large' }));
-      return send(Contract.VECTOR, { command: 'object.vector.createMany', records: maps.map((map) => map.record) }, options,
+      return send(Contract.VECTOR, placed({ command: 'object.vector.createMany', records: maps.map((map) => map.record) }, options), options,
         (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds, unmapped: maps.map((map) => map.unmapped) }));
     }
     function replaceStroke(target, dict, options) {

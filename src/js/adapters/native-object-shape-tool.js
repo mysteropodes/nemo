@@ -76,7 +76,7 @@
           !root.NemoNativeObjectProjectFile||root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||!root.NemoNativeObjectVector)fail('Native Drawing is not ready.');
       var perspective=root.NemoNativePerspectiveController&&root.NemoNativePerspectiveController.read();
       var t={perspective:perspective,session:s,pin:pin,presentation:shown.presentation,frame:frame,tool:state.tool,layerUid:selection(pin),style:style(state.tool,perspective),bounds:bounds(pin),pointer:e.pointerId,cancelled:false};
-      t.start=point(e,t);if(ports.freehand)t.samples=ports.begin(t.start,e,t);return t;
+      t.behind=root.state.drawMode==='behind';t.start=point(e,t);if(ports.freehand)t.samples=ports.begin(t.start,e,t);return t;
     }
     function current(t,requirePresentation,lease){
       try{var s=session(),pin=s&&s.info();
@@ -162,8 +162,10 @@
         if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});
         return action({reconcile:ctx.reconcile,dispatch:function(q){if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});return ctx.dispatch(q);}});
       });}};
+      // tools.js @1065e9d8 Draw commit: drawMode 'behind' slips the stroke under the layer's artwork.
       var vector=root.NemoNativeObjectVector.create(guarded),dicts=symmetric(dict,t.pin);
-      return dicts.length>1?vector.createStrokes(t.layerUid,t.frame,dicts,{origin:t.pin}):vector.createStroke(t.layerUid,t.frame,dict,{origin:t.pin});
+      var options={origin:t.pin,placement:ports.freehand&&t.behind?'behind':'front'};
+      return dicts.length>1?vector.createStrokes(t.layerUid,t.frame,dicts,options):vector.createStroke(t.layerUid,t.frame,dict,options);
     }
     // Geometry/mapping can refuse synchronously before the existing Project
     // queue starts. Always return a promise so release finalization clears
@@ -287,7 +289,7 @@
     var simplifyIfNeeded=root.simplifyIfNeeded,applyStrokeStyle=root.applyStrokeStyle;
     function nativeDrawStyle() {
       var state=root.state;
-      if (state.tool !== 'draw' || state.bitmapBrushOn || state.trimStrokeEnds || state.drawMode !== 'front' ||
+      if (state.tool !== 'draw' || state.bitmapBrushOn || state.trimStrokeEnds || state.drawMode !== 'front' && state.drawMode !== 'behind' ||
           state.brushPreset && state.brushPreset !== 'none' || root.SMLabs && root.SMLabs.list().some(function(p){return p.on;}))
         throw new Error('This brush combination is unavailable in native Drawing.');
       if (typeof state.vectorBrush !== 'boolean' || typeof state.strokeEnabled !== 'boolean' || typeof state.fillEnabled !== 'boolean' ||

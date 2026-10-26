@@ -114,13 +114,22 @@ pub(crate) fn request(operation: &str, payload: &Value) -> bool {
         keys.extend_from_slice(extra);
         exact(payload, &keys, &[]).is_some()
     };
+    // G15: the two creates take an optional `placement` (front by default, or behind).
+    let creates = |extra: &[&str]| {
+        let mut keys = vec!["command"];
+        keys.extend_from_slice(extra);
+        exact(payload, &keys, &["placement"]).is_some()
+            && payload
+                .get("placement")
+                .is_none_or(|p| p == "front" || p == "behind")
+    };
     match (operation, command) {
         (VECTOR, "object.vector.create") => {
-            named(&["record"]) && record_shape(&payload["record"], true)
+            creates(&["record"]) && record_shape(&payload["record"], true)
         }
         // G23: 2..=32 creates sharing one layer and frame, as one revision and one undo entry.
         (VECTOR, "object.vector.createMany") => {
-            named(&["records"])
+            creates(&["records"])
                 && payload["records"].as_array().is_some_and(|records| {
                     (2..=32).contains(&records.len())
                         && records.iter().all(|r| record_shape(r, true))

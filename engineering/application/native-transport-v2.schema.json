@@ -864,6 +864,13 @@
         },
         "record": {
           "$ref": "#/$defs/ObjectVectorCreateRecord"
+        },
+        "placement": {
+          "enum": [
+            "front",
+            "behind"
+          ],
+          "description": "Optional (absent = front). G15: behind enters under the layer's existing artwork of the frame (baseline drawMode 'behind')."
         }
       }
     },
@@ -885,6 +892,13 @@
           "items": {
             "$ref": "#/$defs/ObjectVectorCreateRecord"
           }
+        },
+        "placement": {
+          "enum": [
+            "front",
+            "behind"
+          ],
+          "description": "Optional (absent = front). G15: behind enters under the layer's existing artwork of the frame (baseline drawMode 'behind')."
         }
       },
       "description": "G23: 2 to 32 creates on one layer and frame as one revision and one undo entry (symmetry copies); owner-allocated ids in order."

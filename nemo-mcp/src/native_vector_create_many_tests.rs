@@ -48,3 +48,19 @@ fn create_many_is_bounded_to_one_layer_and_frame_and_its_receipt_lists_every_own
         assert!(!result(VECTOR, &payload, &value), "{key}");
     }
 }
+
+#[test]
+fn placement_is_an_optional_front_or_behind_on_the_two_creates_only() {
+    let records = json!([record(), record()]);
+    for command in ["object.vector.create", "object.vector.createMany"] {
+        let body = if command == "object.vector.create" { json!({"record":record()}) } else { json!({"records":records}) };
+        for (placement, ok) in [(json!("behind"), true), (json!("front"), true), (json!("inside"), false), (json!(null), false)] {
+            let mut payload = body.clone();
+            payload["command"] = json!(command);
+            payload["placement"] = placement.clone();
+            assert_eq!(request(VECTOR, &payload), ok, "{command} {placement}");
+        }
+    }
+    let delete = json!({"command":"object.vector.delete","stableTarget":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":3},"layerUid":"L1","strokeId":"s"},"placement":"behind"});
+    assert!(!request(VECTOR, &delete));
+}

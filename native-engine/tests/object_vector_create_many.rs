@@ -59,3 +59,69 @@ fn a_bad_record_count_mixed_targets_or_a_preset_id_refuse_the_whole_request() {
         assert_eq!(state(&owner), state(&owner_of(&base)), "{name}");
     }
 }
+
+fn behind(command: &str, body: Value) -> Value {
+    let mut payload = body;
+    payload["command"] = json!(command);
+    payload["placement"] = json!("behind");
+    payload
+}
+fn scene_elements(state: &Value, frame: u64) -> Vec<(String, u64)> {
+    state["compositionOrder"]["contexts"][0]["scopes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|scope| scope["frameScope"]["frame"] == json!(frame))
+        .map(|scope| {
+            scope["elements"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|e| e["layerUid"] == "L1")
+                .map(|e| (e["strokeId"].as_str().unwrap().to_string(), e["naturalPosition"].as_u64().unwrap()))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[test]
+fn behind_places_new_strokes_under_the_layer_artwork_of_that_frame() {
+    // v2 with an order plan: the new element takes position 0 and the layer's others move up.
+    let mut owner = owner_of(&document(2, seeds(), None));
+    let response = send(&mut owner, "b", behind("object.vector.create", json!({"record":record_at("B", "L1", 0, "")})));
+    assert_eq!(response["ok"], true, "{response}");
+    let mut stack = scene_elements(&state(&owner), 0);
+    stack.sort_by_key(|(_, p)| *p);
+    assert_eq!(stack, vec![("native-stroke:1:0".into(), 0), ("s-a".into(), 1)]);
+    // Symmetry behind: the original at 0 and its copies above it, all under the existing artwork.
+    let records = vec![record_at("A", "L1", 0, ""), record_at("B", "L1", 0, "")];
+    assert_eq!(send(&mut owner, "bm", behind("object.vector.createMany", json!({"records":records})))["ok"], true);
+    let mut stack = scene_elements(&state(&owner), 0);
+    stack.sort_by_key(|(_, p)| *p);
+    let ids: Vec<&str> = stack.iter().map(|(id, _)| id.as_str()).collect();
+    assert_eq!(ids, ["native-stroke:2:0", "native-stroke:2:1", "native-stroke:1:0", "s-a"]);
+    owner.undo(2).unwrap();
+    assert_eq!(scene_elements(&state(&owner), 0).len(), 2, "one undo removes the behind batch");
+    // v1 without a plan: the object array is the stack, so the record goes before the layer's first record there.
+    let mut plain = owner_of(&document(1, seeds(), None));
+    assert_eq!(send(&mut plain, "b1", behind("object.vector.create", json!({"record":record_at("B", "L1", 0, "")})))["ok"], true);
+    let order: Vec<String> = objects(&state(&plain)).iter().map(|o| o["target"]["strokeId"].as_str().unwrap().to_string()).collect();
+    assert_eq!(order, ["native-stroke:1:0", "s-a", "s-b", "s-c"]);
+}
+
+#[test]
+fn placement_is_an_optional_create_member_only() {
+    let base = document(2, seeds(), None);
+    for (name, payload) in [
+        ("unknown", json!({"command":"object.vector.create","record":record_at("A","L1",0,""),"placement":"inside"})),
+        ("on-delete", json!({"command":"object.vector.delete","stableTarget":target("L1",0,"s-a"),"placement":"behind"})),
+        ("on-replace", json!({"command":"object.vector.replace","record":record_at("A","L1",0,"s-a"),"placement":"front"})),
+    ] {
+        let mut owner = owner_of(&base);
+        assert_eq!(send(&mut owner, name, payload)["ok"], false, "{name}");
+        assert_eq!(owner.content_revision(), 0, "{name}");
+    }
+    let mut owner = owner_of(&base);
+    let front = json!({"command":"object.vector.create","record":record_at("A","L1",0,""),"placement":"front"});
+    assert_eq!(send(&mut owner, "f", front)["ok"], true, "explicit front is the default placement");
+}
