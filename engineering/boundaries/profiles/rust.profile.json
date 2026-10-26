@@ -2253,6 +2253,7 @@
         "native_object_font.rs",
         "native_object_image.rs",
         "native_object_preview_prepare.rs",
+        "native_object_reference_preview.rs",
         "native_object_video.rs",
         "native_object_import_batch.rs"
       ],
