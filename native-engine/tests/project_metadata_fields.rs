@@ -326,6 +326,77 @@ mod wire {
         }
     }
 
+    // F05: opening another project must not leak any record of the previous one.
+    fn full_records(tag: &str) -> Value {
+        json!({"palettes":[{"id":tag,"name":tag,"colors":["#AbC"]}],"activePaletteIdx":1.5,
+            "shadowPalette":[{"id":tag,"color":"#AA00cc"}],"shadowActiveId":tag,
+            "guides":{"h":[-0.25],"v":[4.5]},"perspectiveEnabled":true,"perspectiveMode":"custom",
+            "perspectiveDensity":-3.5,"perspectiveVPs":[{"x":1.0,"y":2.0,"locked":true}],
+            "workspace":{"panelOrder":null,"motionColumns":tag},
+            "comments":[{"id":tag,"authorName":"Writer","text":tag,"createdAt":1.5,"resolved":false}]})
+    }
+
+    #[test]
+    fn full_record_two_document_replacement_leaks_no_previous_palette_aid_workspace_or_comment() {
+        for version in [1, 2] {
+            let mut owner = NativeObjectHistory::from_project_file(
+                "records-replacement",
+                &input(version, full_records("first")),
+            )
+            .unwrap();
+            let old = owner.acquire_snapshot(owner.content_revision()).unwrap();
+            let first_bytes = save(&owner);
+            for fields in [json!({}), full_records("second"), json!({"guides":{"h":[],"v":[]}})] {
+                let current = owner.acquire_snapshot(owner.content_revision()).unwrap();
+                let next = owner
+                    .prepare_project_replacement(current.snapshot_id(), &input(version, fields.clone()))
+                    .unwrap();
+                owner.commit_project_replacement(next).unwrap();
+                let actual = project(&owner);
+                for field in FIELDS.iter().copied().chain(["workspace", "comments"]) {
+                    assert_eq!(actual.get(field), fields.get(field), "{version}:{field}:{fields}");
+                }
+                assert_eq!(owner.history_depths(), (0, 0));
+                let reopened =
+                    NativeObjectHistory::from_project_file("records-fresh", &save(&owner)).unwrap();
+                assert_eq!(save(&reopened), save(&owner));
+            }
+            assert_eq!(old.serialize_project_file().unwrap(), first_bytes);
+        }
+    }
+
+    // Baseline exportJSON (timeline.js @1065e9d8) writes `guides` but never the ruler/guide
+    // toggles, the undo stacks or the action log.
+    const SESSION_ONLY: [&str; 9] = [
+        "rulersOn", "guidesLocked", "guidesSnap", "showTweenCurves", "selectedStrokeIndices",
+        "undoStack", "redoStack", "undoLabels", "actionLog",
+    ];
+
+    #[test]
+    fn session_only_flags_never_enter_the_saved_file_and_are_not_admitted_from_one() {
+        for version in [1, 2] {
+            let owner = NativeObjectHistory::from_project_file(
+                "records-session",
+                &input(version, full_records("kept")),
+            )
+            .unwrap();
+            let saved = save(&owner);
+            let text = String::from_utf8(saved.clone()).unwrap();
+            let project = project(&owner);
+            for flag in SESSION_ONLY {
+                assert!(project.get(flag).is_none(), "{version}:{flag}");
+                assert!(!text.contains(&format!("\"{flag}\"")), "{version}:{flag}");
+                let mut fields = full_records("kept");
+                fields[flag] = json!(true);
+                assert!(
+                    NativeObjectHistory::from_project_file("records-flag", &input(version, fields))
+                        .is_err(),
+                    "{version}:{flag} must not be admitted as a persistent record"
+                );
+            }
+        }
+    }
+
     #[test]
     fn flat_palette_alias_retains_strict_value_duplicate_unknown_and_envelope_guards() {
         for version in [1, 2] {
