@@ -9,6 +9,8 @@
 //! - `object.vector.replace`: `record` replaces the record with the same full target, in place.
 //! - `object.vector.delete`: `stableTarget` names the record to remove.
 //! - `object.vector.mask.edit`: `stableTarget` and `maskEdit` change only original Path mask tags.
+//! - `object.vector.createMany`: `records` (2..=32 create records on one layer and frame) land in ONE
+//!   revision and one undo entry, ids allocated in order (G23: one symmetry stroke undo removes all copies).
 use crate::commands::ObjectFillOwner;
 use crate::object_document::{
     object_deserialize, FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget, Presence,
@@ -31,17 +33,21 @@ use order::OrderEditError;
 /// (identifiers and metadata included). Every other object operation keeps its 4096-byte bound.
 pub(crate) const MAX_VECTOR_REQUEST_BYTES: usize = 65_536;
 const MAX_SAFE_REVISION: u64 = 9_007_199_254_740_991;
+/// Bound on one atomic multi-create (symmetry copies): enough for an 8-way radial with mirrors.
+pub(crate) const MAX_CREATE_MANY: usize = 32;
 
 #[derive(Debug)]
 struct VectorPayload {
     command: String,
     record: Presence<ObjectRecord>,
+    records: Presence<Vec<ObjectRecord>>,
     stable_target: Presence<ObjectTarget>,
     mask_edit: Presence<mask_edit::MaskEdit>,
 }
 object_deserialize!(VectorPayload {
     command: String,
     #[serde(default)] record: Presence<ObjectRecord>,
+    #[serde(default)] records: Presence<Vec<ObjectRecord>>,
     #[serde(default)] stable_target: Presence<ObjectTarget>,
     #[serde(default)] mask_edit: Presence<mask_edit::MaskEdit>
 });
@@ -49,6 +55,7 @@ object_deserialize!(VectorPayload {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum VectorEditKind {
     Create,
+    CreateMany,
     Replace,
     Delete,
     Mask,
@@ -57,6 +64,7 @@ impl VectorEditKind {
     fn label(self) -> &'static str {
         match self {
             Self::Create => "create",
+            Self::CreateMany => "createMany",
             Self::Replace => "replace",
             Self::Delete => "delete",
             Self::Mask => "mask.edit",
@@ -69,16 +77,21 @@ impl VectorEditKind {
 pub(crate) struct VectorEditResult {
     kind: VectorEditKind,
     stroke_id: String,
+    stroke_ids: Vec<String>,
     applied: bool,
 }
 impl VectorEditResult {
     pub(crate) fn result(&self) -> Value {
-        json!({
+        let mut value = json!({
             "applied": self.applied,
             "historyEntriesAdded": u64::from(self.applied),
             "operation": self.kind.label(),
             "strokeId": self.stroke_id,
-        })
+        });
+        if self.kind == VectorEditKind::CreateMany {
+            value["strokeIds"] = json!(self.stroke_ids);
+        }
+        value
     }
 }
 
@@ -101,6 +114,7 @@ struct Edit {
     document: ObjectDocument,
     kind: VectorEditKind,
     stroke_id: String,
+    stroke_ids: Vec<String>,
     changed: bool,
 }
 
@@ -191,7 +205,47 @@ fn create(origin: &ObjectSnapshot, mut record: ObjectRecord) -> Result<Edit, Dis
     Ok(Edit {
         document,
         kind: VectorEditKind::Create,
+        stroke_ids: vec![stroke_id.clone()],
         stroke_id,
+        changed: true,
+    })
+}
+
+/// Several creates on one layer and frame as one candidate: each record is admitted exactly as a single
+/// create would be, against the document as it grows, so ids and order positions follow the given order.
+fn create_many(origin: &ObjectSnapshot, records: Vec<ObjectRecord>) -> Result<Edit, DispatchErrorCode> {
+    if !(2..=MAX_CREATE_MANY).contains(&records.len()) {
+        return Err(DispatchErrorCode::InvalidRequest);
+    }
+    let first = records[0].target.clone();
+    if records.iter().any(|r| {
+        r.target.context_id != first.context_id
+            || r.target.layer_uid != first.layer_uid
+            || r.target.frame_scope != first.frame_scope
+    }) {
+        return Err(DispatchErrorCode::InvalidRequest);
+    }
+    let mut document = origin.document().clone();
+    let mut stroke_ids = Vec::with_capacity(records.len());
+    for mut record in records {
+        if !is_vector_record(&record) || !record.target.stroke_id.is_empty() {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        let stroke_id = allocate_stroke_id(&document, origin.content_revision())?;
+        record.target.stroke_id = stroke_id.clone();
+        check_target(&document, &record.target)?;
+        check_drawing_layer(&document, &record.target)?;
+        if let Presence::Present(plan) = &mut document.composition_order {
+            order::insert_element(plan, &record.target).map_err(order_code)?;
+        }
+        document.objects.push(record);
+        stroke_ids.push(stroke_id);
+    }
+    Ok(Edit {
+        document,
+        kind: VectorEditKind::CreateMany,
+        stroke_id: stroke_ids[0].clone(),
+        stroke_ids,
         changed: true,
     })
 }
@@ -276,6 +330,7 @@ fn replace(origin: &ObjectSnapshot, record: ObjectRecord) -> Result<Edit, Dispat
     Ok(Edit {
         document,
         kind: VectorEditKind::Replace,
+        stroke_ids: vec![stroke_id.clone()],
         stroke_id,
         changed,
     })
@@ -325,6 +380,7 @@ fn delete(origin: &ObjectSnapshot, target: ObjectTarget) -> Result<Edit, Dispatc
     Ok(Edit {
         document,
         kind: VectorEditKind::Delete,
+        stroke_ids: vec![target.stroke_id.clone()],
         stroke_id: target.stroke_id,
         changed: true,
     })
@@ -348,13 +404,24 @@ impl ObjectFillOwner {
             .record
             .value()
             .map(|r| r.target.clone())
+            .or_else(|| payload.records.value().and_then(|r| r.first()).map(|r| r.target.clone()))
             .or_else(|| payload.stable_target.value().cloned());
+        let many = payload.command == "object.vector.createMany";
+        if many != payload.records.value().is_some() {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
         let mut edit = match (
             payload.command.as_str(),
             payload.record,
             payload.stable_target,
             payload.mask_edit,
         ) {
+            ("object.vector.createMany", Presence::Missing, Presence::Missing, Presence::Missing) => {
+                let Presence::Present(records) = payload.records else {
+                    return Err(DispatchErrorCode::InvalidRequest);
+                };
+                create_many(&origin, records)?
+            }
             (
                 "object.vector.create",
                 Presence::Present(record),
@@ -390,13 +457,10 @@ impl ObjectFillOwner {
                     layer_uid: target.layer_uid,
                     frame: target.frame_scope.frame,
                 };
-            edit.document = regenerate(
-                edit.document,
-                &scope,
-                &edit.stroke_id,
-                origin.content_revision(),
-            )
-            .map_err(|error| Self::fill_plan_error(&error))?;
+            for stroke_id in &edit.stroke_ids {
+                edit.document = regenerate(edit.document, &scope, stroke_id, origin.content_revision())
+                    .map_err(|error| Self::fill_plan_error(&error))?;
+            }
         }
         ObjectSnapshot::validate_drawing(&edit.document)
             .map_err(|_| DispatchErrorCode::InvalidRequest)?;
@@ -406,6 +470,7 @@ impl ObjectFillOwner {
             result: VectorEditResult {
                 kind: edit.kind,
                 stroke_id: edit.stroke_id,
+                stroke_ids: edit.stroke_ids,
                 applied: edit.changed,
             },
         })

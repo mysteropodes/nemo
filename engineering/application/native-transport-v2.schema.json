@@ -867,6 +867,28 @@
         }
       }
     },
+    "ObjectVectorCreateManyPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "records"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.vector.createMany"
+        },
+        "records": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/ObjectVectorCreateRecord"
+          }
+        }
+      },
+      "description": "G23: 2 to 32 creates on one layer and frame as one revision and one undo entry (symmetry copies); owner-allocated ids in order."
+    },
     "ObjectVectorReplacePayload": {
       "type": "object",
       "additionalProperties": false,
@@ -977,6 +999,9 @@
       "oneOf": [
         {
           "$ref": "#/$defs/ObjectVectorCreatePayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectVectorCreateManyPayload"
         },
         {
           "$ref": "#/$defs/ObjectVectorReplacePayload"

@@ -28,7 +28,15 @@ function ownerDouble(state, options) {
     let applied = false, extra = {};
     if (request.operation === Contract.VECTOR) {
       const kind = p.command.slice('object.vector.'.length);
-      if (kind === 'create') {
+      if (kind === 'createMany') {
+        const ids = p.records.map((record) => {
+          let n = 0;
+          while (records.has(`native-stroke:${state.revision + 1}:${n}`)) n += 1;
+          const strokeId = `native-stroke:${state.revision + 1}:${n}`, stored = clone(record);
+          stored.target.strokeId = strokeId; records.set(strokeId, stored); return strokeId;
+        });
+        applied = true; extra = { operation: 'createMany', strokeId: ids[0], strokeIds: ids };
+      } else if (kind === 'create') {
         let n = 0;
         while (records.has(`native-stroke:${state.revision + 1}:${n}`)) n += 1;
         const strokeId = `native-stroke:${state.revision + 1}:${n}`;

@@ -32,7 +32,7 @@
     function style(tool,proof){
       var s=root.state,current=session(),ownerInfo=current&&current.info(),port=root.NemoNativePerspectiveController;
       var perspective=port&&(proof?typeof port.readForCommand==='function'&&port.readForCommand(proof):port.read());
-      if(s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||s.shadowMode||s.maskMode||s.symmetryEnabled||!perspective||!same(perspective.info,ownerInfo)||perspective.perspective.settings.perspectiveEnabled||s.activeSymbolId)fail('This drawing mode is unavailable in native shape tools.');
+      if(s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||s.shadowMode||s.maskMode||!perspective||!same(perspective.info,ownerInfo)||perspective.perspective.settings.perspectiveEnabled||s.activeSymbolId)fail('This drawing mode is unavailable in native shape tools.');
       if(ports.freehand)return ports.style();
       if(ports.pen)return penStyle(s);
       if(typeof s.strokeEnabled!=='boolean'||typeof s.fillEnabled!=='boolean'||(!s.strokeEnabled&&(tool==='line'||!s.fillEnabled)))fail('Enable a supported stroke or fill to draw.');
@@ -117,6 +117,40 @@
       if(dict.dashArray)path.setAttribute('stroke-dasharray',dict.dashArray.join(' '));path.setAttribute('stroke-dashoffset',dict.dashOffset);path.setAttribute('stroke-miterlimit',dict.miterLimit);
       path.setAttribute('paint-order',dict.paintOrder==='strokeFirst'?'stroke fill':'fill stroke');
     }
+    // G23 (symmetry-bridge.js @1065e9d8, onStrokeCommitted): the stroke and its mirrored or rotated copies.
+    // Mirrors clip the committed stroke at the axis unless Extend is on, reflect points and handles and
+    // re-orient closed copies; radial adds n-1 rotations about the centre (2..24 sectors), stacked as the
+    // baseline's insertAbove leaves them (original, then copy n-1 down to copy 1).
+    function symmetric(dict,pin){
+      var s=root.state;if(!s.symmetryEnabled)return [dict];
+      if(dict.centerSegments||dict.isVectorBrush)fail('Symmetry with pressure brushes is unavailable in native Drawing.');
+      function map(d,fp,fv){return Object.assign({},d,{segments:d.segments.map(function(x){
+        return {point:fp(x.point[0],x.point[1]),handleIn:fv(x.handleIn[0],x.handleIn[1]),handleOut:fv(x.handleOut[0],x.handleOut[1])};})});}
+      var w=pin.canvasW,h=pin.canvasH;
+      if(s.symmetryMode==='radial'){
+        var c=s.symmetryRadialCenter||{x:w/2,y:h/2},n=Math.max(2,Math.min(24,s.symmetryRadialSectors|0||6)),out=[dict];
+        for(var k=n-1;k>=1;k--)(function(a){var cs=Math.cos(a),sn=Math.sin(a);
+          out.push(map(dict,function(x,y){var dx=x-c.x,dy=y-c.y;return [c.x+dx*cs-dy*sn,c.y+dx*sn+dy*cs];},function(x,y){return [x*cs-y*sn,x*sn+y*cs];}));})(k*2*Math.PI/n);
+        return out;
+      }
+      var cx=w/2,cy=h/2,r=Math.min(w,h)*0.4;
+      var axis=s.symmetryAxis||(s.symmetryMode==='x'?{x1:0,y1:cy,x2:w,y2:cy}:s.symmetryMode==='free'?{x1:cx-r,y1:cy-r,x2:cx+r,y2:cy+r}:{x1:cx,y1:0,x2:cx,y2:h});
+      var len=Math.hypot(axis.x2-axis.x1,axis.y2-axis.y1)||1,ux=(axis.x2-axis.x1)/len,uy=(axis.y2-axis.y1)/len;
+      function side(p){return (axis.x2-axis.x1)*(p[1]-axis.y1)-(axis.y2-axis.y1)*(p[0]-axis.x1)>=0;}
+      function vector(x,y){var t=x*ux+y*uy;return [2*t*ux-x,2*t*uy-y];}
+      function point(x,y){var t=(x-axis.x1)*ux+(y-axis.y1)*uy;return [2*(axis.x1+t*ux)-x,2*(axis.y1+t*uy)-y];}
+      var base=dict;
+      if(!s.symmetryExtend&&dict.segments.length){
+        var first=side(dict.segments[0].point),cut=dict.segments.length;
+        for(var i=1;i<dict.segments.length;i++)if(side(dict.segments[i].point)!==first){cut=i;break;}
+        // The baseline keeps a one-anchor remnant; a native path needs two, so refuse rather than drop it silently.
+        if(cut<2)fail('This stroke starts at the symmetry axis; nothing remains to mirror.');
+        base=Object.assign({},dict,{segments:dict.segments.slice(0,cut)});
+      }
+      var mirrored=map(base,point,vector);
+      if(mirrored.closed)mirrored=Object.assign({},mirrored,{segments:mirrored.segments.slice().reverse().map(function(x){return {point:x.point,handleIn:x.handleOut,handleOut:x.handleIn};})});
+      return [base,mirrored];
+    }
     function commit(t,end){
       if(!current(t,true))return Promise.resolve({status:'cancelled'});
       if(ports.pen&&t.anchors.length<2)return Promise.resolve({status:'cancelled'});
@@ -128,19 +162,20 @@
         if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});
         return action({reconcile:ctx.reconcile,dispatch:function(q){if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});return ctx.dispatch(q);}});
       });}};
-      return root.NemoNativeObjectVector.create(guarded).createStroke(t.layerUid,t.frame,dict,{origin:t.pin});
+      var vector=root.NemoNativeObjectVector.create(guarded),dicts=symmetric(dict,t.pin);
+      return dicts.length>1?vector.createStrokes(t.layerUid,t.frame,dicts,{origin:t.pin}):vector.createStroke(t.layerUid,t.frame,dict,{origin:t.pin});
     }
     // Geometry/mapping can refuse synchronously before the existing Project
     // queue starts. Always return a promise so release finalization clears
     // pending, without classifying a pre-dispatch refusal as owner uncertainty.
     function commitAttempt(t,end){
       try{return Promise.resolve(commit(t,end));}
-      catch(_){return Promise.resolve({status:'unavailable',reason:'pre_dispatch_failed'});}
+      catch(error){t.refusal=error&&error.message;return Promise.resolve({status:'unavailable',reason:'pre_dispatch_failed'});}
     }
     function submit(t,end){
       pending=t;settled=commitAttempt(t,end).catch(function(){return {status:'unconfirmed'};}).then(function(result){
         if(result.status==='indeterminate'||result.status==='unconfirmed')uncertain=t;
-        if(!retired&&result.status!=='applied'&&result.status!=='noop'&&result.status!=='cancelled')notice('Native shape drawing was not confirmed.');return result;
+        if(!retired&&result.status!=='applied'&&result.status!=='noop'&&result.status!=='cancelled')notice(t.refusal||'Native shape drawing was not confirmed.');return result;
       }).finally(function(){if(pending===t)pending=null;});
     }
     function grab(e){var el=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(el.setPointerCapture)el.setPointerCapture(e.pointerId);}

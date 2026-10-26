@@ -230,6 +230,7 @@
   // command -> [operation, wire members]. Member order is the wire order.
   const COMMANDS = {
     'object.vector.create': [VECTOR, ['record']],
+    'object.vector.createMany': [VECTOR, ['records']],
     'object.vector.replace': [VECTOR, ['record']],
     'object.vector.delete': [VECTOR, ['stableTarget']],
     'object.vector.mask.edit': [VECTOR, ['stableTarget', 'maskEdit']],
@@ -241,6 +242,14 @@
   function member(command, key, payloadValue) {
     const label = `${command}.${key}`;
     if (key === 'record') record(payloadValue, command === 'object.vector.create');
+    else if (key === 'records') {
+      // G23: 2..32 creates on one layer and frame, one revision and one undo entry.
+      if (!Array.isArray(payloadValue) || payloadValue.length < 2 || payloadValue.length > 32) fail(`${label} must hold 2 to 32 records`);
+      payloadValue.forEach((entry) => record(entry, true));
+      const first = payloadValue[0].target;
+      if (payloadValue.some((entry) => entry.target.layerUid !== first.layerUid || entry.target.contextId !== first.contextId ||
+        entry.target.frameScope.kind !== first.frameScope.kind || entry.target.frameScope.frame !== first.frameScope.frame)) fail(`${label} must share one layer and frame`);
+    }
     else if (key === 'stableTarget') target(payloadValue, label, false);
     else if (key === 'maskEdit') {
       if (!plain(payloadValue)) fail(`${label} must be an object`);
@@ -273,9 +282,14 @@
   function result(operation, value) {
     if (!OPS.has(operation)) fail('native vector operation is not declared');
     const edit = operation === VECTOR;
-    exact(value, edit ? ['applied', 'historyEntriesAdded', 'operation', 'strokeId'] : ['applied', 'historyEntriesAdded'], [], 'vector edit result');
+    const many = edit && plain(value) && value.operation === 'createMany';
+    exact(value, edit ? ['applied', 'historyEntriesAdded', 'operation', 'strokeId'].concat(many ? ['strokeIds'] : []) : ['applied', 'historyEntriesAdded'], [], 'vector edit result');
     if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) fail('invalid vector edit disposition');
-    if (edit) { oneOf(value.operation, ['create', 'replace', 'delete', 'mask.edit'], 'result.operation'); opaque(value.strokeId, 'result.strokeId'); }
+    if (edit) { oneOf(value.operation, ['create', 'createMany', 'replace', 'delete', 'mask.edit'], 'result.operation'); opaque(value.strokeId, 'result.strokeId'); }
+    if (many) {
+      if (!Array.isArray(value.strokeIds) || value.strokeIds.length < 2) fail('result.strokeIds must list every created stroke');
+      value.strokeIds.forEach((id, at) => opaque(id, `result.strokeIds[${at}]`));
+    }
   }
   function correlate(request, response) {
     // Native refusals report the actual owner; no successful or unrelated reply gains this exception.
@@ -291,11 +305,18 @@
     const stroke = response.result.strokeId;
     // A create reports the id the owner allocated; replace and delete report the stable target they named.
     const allocation = 'native-stroke:' + (request.expectedRevision + 1) + ':';
-    if (command === 'object.vector.create' ? !(response.result.applied === true && stroke.startsWith(allocation) && /^(0|[1-9][0-9]*)$/.test(stroke.slice(allocation.length)))
+    const allocated = (id) => typeof id === 'string' && id.startsWith(allocation) && /^(0|[1-9][0-9]*)$/.test(id.slice(allocation.length));
+    if (command === 'object.vector.createMany') {
+      const ids = response.result.strokeIds;
+      if (!(response.result.applied === true && ids.length === request.payload.records.length && ids[0] === stroke &&
+        ids.every(allocated) && new Set(ids).size === ids.length)) fail('vector receipt stroke mismatch');
+      return;
+    }
+    if (command === 'object.vector.create' ? !(response.result.applied === true && allocated(stroke))
       : stroke !== (command === 'object.vector.replace' ? request.payload.record.target.strokeId : request.payload.stableTarget.strokeId)) fail('vector receipt stroke mismatch');
   }
   // Authored identities may legitimately start with data: or blob:; the SDK only inspects them as text.
-  const OPAQUE = Object.freeze({ has: (at) => /^payload\.(?:record\.target|stableTarget)\.(?:layerUid|strokeId)$/.test(at) || at === 'payload.layerUid' || at === 'result.strokeId' });
+  const OPAQUE = Object.freeze({ has: (at) => /^payload\.(?:record\.target|records\.[0-9]+\.target|stableTarget)\.(?:layerUid|strokeId)$/.test(at) || at === 'payload.layerUid' || at === 'result.strokeId' || /^result\.strokeIds\.[0-9]+$/.test(at) });
   const paths = (operation) => (OPS.has(operation) ? OPAQUE : null);
   const own = Object.freeze({ admitted: (op) => OPS.has(op), requiresRevision: (op) => OPS.has(op), payload, result, correlate, paths });
 

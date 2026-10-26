@@ -53,10 +53,12 @@ async function fixture(tool='rect',native=true){
   }
   assert.equal(command,'nemo_native_dispatch');calls.push(structuredClone(q));assert.equal(q.operation,'command.document.object.vector.edit');
   const prior=receipts.get(q.requestId);if(prior){assert.deepEqual(prior.request,q);const r=structuredClone(prior.response);if(replyChange)replyChange(r);return r;}
-  assert.equal(q.expectedRevision,revision);assert.equal(q.payload.command,'object.vector.create');assert.equal(q.payload.record.target.strokeId,'');
+  assert.equal(q.expectedRevision,revision);const many=q.payload.command==='object.vector.createMany';
+  if(!many){assert.equal(q.payload.command,'object.vector.create');assert.equal(q.payload.record.target.strokeId,'');}
   if(refusal)return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:false,error:{code:refusal,message:'Native refusal'}};
-  revision++;const strokeId='native-stroke:'+revision+':0',record=structuredClone(q.payload.record);record.target.strokeId=strokeId;records.set(strokeId,record);
-  let r={apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1,operation:'create',strokeId}};
+  revision++;const ids=(many?q.payload.records:[q.payload.record]).map((rec,n)=>{const strokeId='native-stroke:'+revision+':'+n,record=structuredClone(rec);record.target.strokeId=strokeId;records.set(strokeId,record);return strokeId;});
+  const strokeId=ids[0];
+  let r={apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:many?{applied:true,historyEntriesAdded:1,operation:'createMany',strokeId,strokeIds:ids}:{applied:true,historyEntriesAdded:1,operation:'create',strokeId}};
   receipts.set(q.requestId,{request:structuredClone(q),response:structuredClone(r)});if(replyChange)replyChange(r);if(hold)await hold.promise;if(wrongOwner)r.documentId='replacement';return r;
  }
  root.__TAURI__={core:{invoke},event:{listen:async(name,fn)=>{events.set(name,fn);return ()=>events.delete(name);}}};
@@ -301,4 +303,24 @@ test('Pen: Enter commits; Alt reshapes a placed anchor; a direct tool change sti
  f.root.state.currentFrame=1;f.root.SM.setTool('rect');r=await f.root.NemoNativePenToolController.whenSettled();
  assert.notEqual(r.status,'applied','a frame change after the gesture voids the commit');assert.equal(f.calls.length,0);
  f=await fixture('pen');const hover=f.area.fire('pointermove',{clientX:100,clientY:100});assert.equal(hover.stopped,false,'hover is not consumed without a gesture');
+});
+
+// G23 symmetry (#2361): the stroke and its copies as ONE createMany. Canvas 320x180, default axes through the centre.
+test('symmetry: a mirrored Pen path and a radial rectangle each commit as one native createMany',async()=>{
+ let f=await fixture('pen');Object.assign(f.root.state,{symmetryEnabled:true,symmetryMode:'y',symmetryExtend:false});
+ let r=await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
+ assert.equal(r.status,'applied');assert.equal(f.calls.length,1);let q=f.calls[0].payload;assert.equal(q.command,'object.vector.createMany');
+ assert.deepEqual(q.records.map(pts),[[[20,20],[100,20]],[[300,20],[220,20]]],'reflected across x = 160');
+ f=await fixture('rect');Object.assign(f.root.state,{symmetryEnabled:true,symmetryMode:'radial',symmetryRadialSectors:4,symmetryRadialCenter:{x:160,y:90}});
+ r=await f.gesture();assert.equal(r.status,'applied');q=f.calls[0].payload;assert.equal(q.records.length,4);
+ assert.deepEqual(pts(q.records[0]),[[20,20],[100,20],[100,80],[20,80]]);
+ assert.deepEqual(pts(q.records[2]),[[300,160],[220,160],[220,100],[300,100]],'180 degrees about (160,90)');
+ assert.deepEqual(pts(q.records[1])[0],[90,230],'copies stack as insertAbove leaves them: 270 degrees right above the original');
+ assert.equal(f.session.info().contentRevision,1,'four strokes, one revision');
+});
+
+test('symmetry: a stroke the axis clip leaves with one anchor refuses with its reason instead of dropping silently',async()=>{
+ let f=await fixture('pen');Object.assign(f.root.state,{symmetryEnabled:true,symmetryMode:'y',symmetryExtend:false});
+ await pen(f,[['pointerdown',400,90],['pointerup',400,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
+ assert.equal(f.calls.length,0);assert.ok(f.log.some(m=>/starts at the symmetry axis/.test(m)));
 });

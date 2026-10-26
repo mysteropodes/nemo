@@ -150,7 +150,7 @@ test('desktop() binds one client per host window', () => {
   assert.ok(client && typeof client.createStroke === 'function');
   assert.equal(Vector.desktop(host), client);
   assert.notEqual(Vector.desktop({ NemoNativeObjectProject: { desktop: () => session } }), client);
-  assert.deepEqual(Object.keys(client).sort(), ['createStroke', 'defaultEffect', 'deleteStroke', 'editMask', 'replaceStroke', 'scaleParametric', 'setParametric', 'setPathEffects', 'translateParametric']);
+  assert.deepEqual(Object.keys(client).sort(), ['createStroke', 'createStrokes', 'defaultEffect', 'deleteStroke', 'editMask', 'replaceStroke', 'scaleParametric', 'setParametric', 'setPathEffects', 'translateParametric']);
 });
 
 test('a stroke the record cannot carry, or the owner could not store, is named and never sent', async () => {
@@ -321,4 +321,20 @@ test('read-back validator: the returned record equals what was sent, with the al
   assert.equal(Vector.verifyReadBack(request, stored, { strokeId: 'native-stroke:9:9' }).reason, 'mismatch', 'a different allocated id is a different record');
   assert.equal(Vector.stableTarget('L1', 3, 'x').frameScope.frame, 3);
   assert.deepEqual(Vector.OPERATIONS.slice(), Contract.OPERATIONS.slice());
+});
+
+test('createStrokes sends one createMany for every symmetry copy and reports the ordered owner ids (G23)', async () => {
+  const a = adapter();
+  const result = await a.vector.createStrokes('L1', 3, [dict('open-line'), dict('open-line')]);
+  assert.equal(result.status, 'applied');assert.equal(a.owner.log.received.length, 1);
+  const q = a.owner.log.received[0];assert.equal(q.payload.command, 'object.vector.createMany');
+  assert.deepEqual(q.payload.records, [LINE_RECORD(''), LINE_RECORD('')]);
+  assert.deepEqual(result.strokeIds, ['native-stroke:8:0', 'native-stroke:8:1']);
+  for (const bad of [[], [dict('open-line')]]) {
+    const refused = await a.vector.createStrokes('L1', 3, bad);assert.equal(refused.status, 'invalid');
+  }
+  assert.equal(a.owner.log.received.length, 1, 'a refused batch sends nothing');
+  assert.throws(() => Contract.payload(Contract.VECTOR, { command: 'object.vector.createMany', records: [LINE_RECORD('')] }), /2 to 32/);
+  const other = LINE_RECORD(''); other.target.layerUid = 'L2';
+  assert.throws(() => Contract.payload(Contract.VECTOR, { command: 'object.vector.createMany', records: [LINE_RECORD(''), other] }), /one layer and frame/);
 });
