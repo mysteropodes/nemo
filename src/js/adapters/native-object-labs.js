@@ -18,7 +18,9 @@
     const byte = (at) => parseInt(h.slice(at, at + 2), 16) / 255;
     return [byte(0), byte(2), byte(4), h.length === 8 ? byte(6) : 1];
   }
-  function create(session) {
+  function create(session, host) {
+    // The vector route of the host window (or of this realm when bound directly).
+    const vectorRoute = () => (host && host.NemoNativeObjectVector) || root.NemoNativeObjectVector;
     const commands = Command.create(session, 'labs');
     const run = (operation, body) => commands.execute(operation, () => Object.assign({ command: Contract.commandOf(operation) }, body));
     return Object.freeze({
@@ -34,8 +36,14 @@
       moveToLayer: (body) => run(Contract.LABS_MOVE_TO_LAYER, body),
       // A Labs-created stroke through the ordinary native vector create, keyed with what a held cell showed
       // (the Labs creators' ensureKeyframe(), not Draw's empty key).
+      // Several Labs strokes as ONE native vector batch (one revision, one undo entry), keyed with what a held cell showed.
+      batchStrokes: (layerUid, frame, steps) => {
+        const Vector = vectorRoute();
+        if (!Vector) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'no_vector_route' }));
+        return Vector.create(session).batchStrokes(layerUid, frame, steps, { keyframe: 'copy' });
+      },
       createStroke: (layerUid, frame, dict, opacity) => {
-        const Vector = root.NemoNativeObjectVector;
+        const Vector = vectorRoute();
         if (!Vector) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'no_vector_route' }));
         return Vector.create(session).createStroke(layerUid, frame, dict, { keyframe: 'copy', opacity });
       },
@@ -47,7 +55,7 @@
   function desktop(host) {
     const module = host.NemoNativeObjectProject, session = module && module.desktop(host);
     if (!session || !session.blocksLegacy()) return null;
-    if (!bindings.has(host)) bindings.set(host, create(session));
+    if (!bindings.has(host)) bindings.set(host, create(session, host));
     return bindings.get(host);
   }
   // The bucket colour as the fill contract's '#rrggbbaa'.
