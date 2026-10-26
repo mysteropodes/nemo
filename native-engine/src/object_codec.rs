@@ -48,7 +48,7 @@ mod project;
 pub(crate) mod project_settings_test_codec {
     pub(crate) use super::project::{decode_project, encode_project, ProjectWireLimits};
 }
-#[cfg(all(feature = "history", feature = "project_media_codec"))]
+#[cfg(feature = "history")]
 pub(crate) use crate::object_document::{ProjectEnvelope, ProjectReferenceState};
 // L06-H (lane #2112): the lane-6 document kernels the read-queries preparation consumes.
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
