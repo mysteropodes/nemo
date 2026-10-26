@@ -1,7 +1,7 @@
 //! L01-F / G23 / G15: vector creates for `object_vector_edit.rs`: one record, or 2..=32 records on one layer
 //! and frame as one candidate, placed in front (the baseline's default) or behind the layer's existing
 //! artwork (`drawMode === 'behind'`: `insertChild(0, path)` in tools.js/draw-bridge.js @1065e9d8).
-use super::{
+use crate::commands::object_fill_owner::vector_edit::{
     check_drawing_layer, check_target, is_vector_record, order, order_code, Edit, VectorEditKind,
     MAX_CREATE_MANY, MAX_SAFE_REVISION,
 };
