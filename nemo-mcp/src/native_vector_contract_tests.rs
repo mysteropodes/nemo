@@ -491,10 +491,20 @@ fn create_many_is_bounded_to_one_layer_and_frame_and_its_receipt_lists_every_own
     let mut other = record(created());
     other["target"]["layerUid"] = json!("L2");
     assert!(!request(VECTOR, &many(vec![record(created()), other])));
+    assert!(!request(VECTOR, &json!({"command":"object.vector.createMany","records":record(created())})));
     let payload = many(vec![record(created()), record(created())]);
     let ids = json!(["native-stroke:8:0", "native-stroke:8:1"]);
     let good = json!({"applied":true,"historyEntriesAdded":1,"operation":"createMany","strokeId":"native-stroke:8:0","strokeIds":ids});
     assert!(result(VECTOR, &payload, &good));
+    let mut missing = good.clone();
+    missing.as_object_mut().unwrap().remove("strokeIds");
+    assert!(!result(VECTOR, &payload, &missing), "a createMany receipt lists its ids");
+    let mut extra = good.clone();
+    extra["unexpected"] = json!(1);
+    assert!(!result(VECTOR, &payload, &extra));
+    let mut foreign = good.clone();
+    foreign["strokeIds"] = json!(["native-stroke:8:0", "other:8:1"]);
+    assert!(!result(VECTOR, &payload, &foreign));
     for (key, bad) in [
         ("strokeIds", json!(["native-stroke:8:0"])),
         ("strokeIds", json!(["native-stroke:8:1", "native-stroke:8:0"])),

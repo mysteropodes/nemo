@@ -1169,6 +1169,7 @@
         "object_font_asset_history.rs",
         "object_vector_edit.rs",
         "object_vector_edit_controls.rs",
+        "object_vector_create_many.rs",
         "object_vector_edit_limits.rs",
         "object_vector_edit_lock.rs",
         "object_vector_edit_support.rs",

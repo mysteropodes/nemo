@@ -165,7 +165,8 @@ test('chrome, cancellation, Escape and lost capture remain usable or abort witho
 });
 test('unsupported brush cells are explicit without native or legacy fallback',async()=>{
  const cases=[s=>s.vectorBrush=true,s=>s.tool='fillbrush',s=>s.drawMode='behind',s=>s.bitmapBrushOn=true,s=>s.brushPreset='charcoal-smooth',s=>s.trimStrokeEnds=true,
-  s=>s.symmetryEnabled=true,s=>s.shadowMode=true,s=>Object.assign(s,{vectorBrush:true,fillEnabled:false,pressureCurve:'unknown'}),s=>s.stabilizer=7];
+  // Plain-stroke symmetry commits natively since G23 (#2361); with a pressure brush it stays refused.
+  s=>s.shadowMode=true,s=>Object.assign(s,{vectorBrush:true,fillEnabled:false,pressureCurve:'unknown'}),s=>s.stabilizer=7];
  for(const change of cases){const f=await fixture();change(f.root.state);const e=send(f,'pointerdown',20,20);send(f,'pointerup',60,50);assert.equal(e.prevented,true);assert.equal(f.calls.length,0);assert.ok(f.log.some(s=>/unavailable|not available|requires/.test(s)),f.log.join(','));}
 });
 test('owner/frame/style/selection changes and queued external ACK fences cannot commit a stale drawing',async()=>{
