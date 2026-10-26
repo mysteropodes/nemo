@@ -182,11 +182,10 @@
       // stamped on every other selected frame, held ones keyed with what they showed, in the same single undo step.
       var stamps=ports.freehand&&root.SMLabs&&typeof root.SMLabs.multiframeTargets==='function'?root.SMLabs.multiframeTargets(t.frame):[];
       if(stamps.length){
-        if(options.trimEnds)fail('Multi-frame draw with Trim Stroke Ends is unavailable in native Drawing.');
         // Behind, the k-th record of one create lies k-th from the bottom; one create per step lands each at the bottom.
         var here=dicts.map(function(d){return {create:d,placement:options.placement};});if(options.placement==='behind')here.reverse();
         var steps=here.concat(stamps.map(function(frame){return {create:dict,frame:frame,keyframe:'copy',placement:options.placement};}));
-        return vector.batchStrokes(t.layerUid,t.frame,steps,{origin:t.pin}).then(function(result){
+        return vector.batchStrokes(t.layerUid,t.frame,steps,Object.assign({origin:t.pin},options.trimEnds?{trimEnds:options.trimEnds}:{})).then(function(result){
           if(result&&result.status==='applied'&&typeof root.SMLabs.multiframeStamped==='function')root.SMLabs.multiframeStamped(stamps.length);return result;});
       }
       return dicts.length>1?vector.createStrokes(t.layerUid,t.frame,dicts,options):vector.createStroke(t.layerUid,t.frame,dict,options);

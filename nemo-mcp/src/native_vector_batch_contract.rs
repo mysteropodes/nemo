@@ -27,8 +27,13 @@ fn step(op: &Value) -> Option<&Value> {
 }
 
 pub(super) fn request(payload: &Value) -> bool {
-    exact(payload, &["command", "ops"], &["keyframe"]).is_some()
+    exact(payload, &["command", "ops"], &["keyframe", "trimEnds"]).is_some()
         && payload.get("keyframe").is_none_or(|k| k == "copy")
+        // A batch trims only when every step creates: the drawn stroke, its copies and its multi-frame stamps.
+        && payload.get("trimEnds").is_none_or(|t| {
+            t.as_f64().is_some_and(|v| v.is_finite() && v > 0.)
+                && payload["ops"].as_array().is_some_and(|ops| ops.iter().all(|op| op["op"] == "create"))
+        })
         && payload["ops"].as_array().is_some_and(|ops| {
             let targets: Option<Vec<&Value>> = ops.iter().map(step).collect();
             (1..=MAX_OPS).contains(&ops.len())

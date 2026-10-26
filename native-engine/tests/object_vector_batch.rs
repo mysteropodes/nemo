@@ -80,7 +80,7 @@ fn any_refused_step_refuses_the_whole_batch() {
         batch(vec![json!({"op":"move","record":record_at("B", "L1", 0, "")})]),
         batch(vec![op_create(record_at("B", "L1", 0, "")), json!({"op":"delete","stableTarget":target("L1", 0, "missing")})]),
         batch(vec![json!({"op":"delete","stableTarget":target("L1", 0, "s-a"),"placement":"behind"})]),
-        { let mut p = batch(vec![op_create(record_at("B", "L1", 0, ""))]); p["trimEnds"] = json!(4); p },
+        { let mut p = batch(vec![op_create(record_at("B", "L1", 0, "")), json!({"op":"delete","stableTarget":target("L1", 0, "s-a")})]); p["trimEnds"] = json!(4); p },
         { let mut p = batch(vec![op_create(record_at("B", "L1", 0, ""))]); p["placement"] = json!("behind"); p },
         { let mut p = create(record_at("B", "L1", 0, "")); p["ops"] = json!([]); p },
     ] {

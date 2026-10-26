@@ -229,3 +229,18 @@ fn a_brush_texture_dab_is_not_a_wall() {
     assert_eq!(response["ok"], true, "{response}");
     near(&points(&created[0]), &[(10.0, 50.0), (100.0, 50.0)]);
 }
+
+#[test]
+fn a_multi_frame_batch_cuts_the_drawn_stroke_in_its_own_cell_and_every_stamp_takes_the_same_cut() {
+    // The baseline trims the drawn path before the Labs multi-frame hook stamps it: the frame-5 stamp is the frame-0
+    // cut, never re-trimmed against frame 5's own wall at x=60.
+    let drawn = path("L1", 0, "", &[(0.0, 50.0), (100.0, 50.0)]);
+    let stamp = path("L1", 5, "", &[(0.0, 50.0), (100.0, 50.0)]);
+    let payload = json!({"command":"object.vector.batch","trimEnds":24,
+        "ops":[{"op":"create","record":drawn},{"op":"create","record":stamp,"keyframe":"copy"}]});
+    let (response, created) = trimmed(payload, walls());
+    assert_eq!(response["result"]["historyEntriesAdded"], 1, "{response}");
+    assert_eq!(created.len(), 2);
+    near(&points(&created[0]), &[(10.0, 50.0), (95.0, 50.0)]);
+    near(&points(&created[1]), &[(10.0, 50.0), (95.0, 50.0)]);
+}
