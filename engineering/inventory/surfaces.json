@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "65d8efc1526810bb01f0696fb90215c048108a1d",
-  "describe": "v0.7.0-alpha.4-3217-g65d8efc1"
+  "head": "e286f753fe8c16969e5aaa8db690d7a79b0f5758",
+  "describe": "v0.7.0-alpha.4-3219-ge286f753"
  },
- "inputsDigest": "d40bc2f130664b234618c3d21544e1023ed3d4673311cf369f2a949f210ac9d0",
+ "inputsDigest": "9d4df1b8a08d43fdb5563c1b0dd78feab65b8a6e2801ca4f5702adf46cb65498",
  "states": [
   "inventoried",
   "characterized",
@@ -22144,7 +22144,7 @@
    "capability": "CSP vector knife: drag a knife-stroke across one or more lines to cut them at their nearest intersections",
    "area": "labs",
    "handler": [
-    "src/js/labs/vector-trim.js:260"
+    "src/js/labs/vector-trim.js:314"
    ],
    "events": [],
    "exposure": [
@@ -22157,7 +22157,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/vector-trim.js:260",
+   "source": "src/js/labs/vector-trim.js:314",
    "meta": {
     "functionsVisited": 0
    },

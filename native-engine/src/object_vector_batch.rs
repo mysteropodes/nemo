@@ -46,12 +46,13 @@ pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool) 
     }
     let revision = origin.content_revision();
     let mut document = origin.document().clone();
-    // With the copy key, every held or unexposed cell a create targets is keyed first with what it showed before the
-    // batch (the baseline freezes all its targets before stamping any): a later step never copies an earlier one.
+    // With the copy key, every held or unexposed cell a step targets is keyed first with what it showed before the
+    // batch (the baseline freezes all its targets before stamping any): a later step never copies an earlier one, and a
+    // replace or delete on a held cell edits that cell's copy (same stroke ids), never the key it held.
     if copy_key {
         let timing = document.layers.iter().find(|l| l.layer_uid == first.layer_uid).and_then(|l| l.timing.value());
         let mut plain: Vec<u32> = Vec::new();
-        for op in ops.iter().filter(|op| op.op == "create") {
+        for op in &ops {
             let frame = target_of(op).ok_or(InvalidRequest)?.frame_scope.frame;
             let shown = timing.is_some_and(|t| matches!(t.exposure(frame).0, "held" | "unexposed"));
             if shown && frame < document.total_frames && !plain.contains(&frame) {
