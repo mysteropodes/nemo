@@ -157,6 +157,24 @@ pub(crate) fn owner_matches(
     Some(exact || refused)
 }
 
+/// Import-family request route: the linked-video request, else the ordinary import.
+pub(crate) fn route(operation: &str, payload: &Value) -> bool {
+    if operation == OP {
+        request(payload)
+    } else {
+        super::request(payload)
+    }
+}
+
+/// Import-family result route, paired with [`route`].
+pub(crate) fn routed(operation: &str, value: &Value) -> bool {
+    if operation == OP {
+        result(value)
+    } else {
+        super::result(value)
+    }
+}
+
 #[cfg(test)]
 #[path = "native_video_link_contract_tests.rs"]
 mod tests;

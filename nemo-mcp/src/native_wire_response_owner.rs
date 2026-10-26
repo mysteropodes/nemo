@@ -10,7 +10,7 @@ pub(super) fn correlated(
     let property_read = request.operation == crate::native_contract::property_read::OP;
     let frame_edit_command = crate::native_contract::frame_edit::declares(&request.operation);
     let image_owner = crate::native_contract::item::placed_png_owner_matches(request, response);
-    let video_owner = crate::native_contract::video_link::owner_matches(request, response);
+    let video_owner = crate::native_contract::import::video_link::owner_matches(request, response);
     let correlated_operation = request.operation == crate::native_contract::history_read::OP
         || request.operation == crate::native_contract::text_read::OP
         || matches!(
@@ -87,10 +87,10 @@ pub(super) fn correlated(
                     result,
                 )
             }))
-        && (request.operation != crate::native_contract::video_link::OP
+        && (request.operation != crate::native_contract::import::video_link::OP
             || !response.ok
             || response.result.as_ref().is_some_and(|result| {
-                crate::native_contract::video_link::revision_matches(
+                crate::native_contract::import::video_link::revision_matches(
                     request,
                     response.content_revision,
                     result,
@@ -117,7 +117,9 @@ pub(super) fn reports_document(
                 || crate::native_contract::item::placed_png_wrong_instance_refusal(
                     request, response,
                 )
-                || crate::native_contract::video_link::wrong_instance_refusal(request, response)
+                || crate::native_contract::import::video_link::wrong_instance_refusal(
+                    request, response,
+                )
         })
 }
 

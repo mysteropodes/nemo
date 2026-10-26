@@ -75,8 +75,6 @@ pub(crate) mod property_read;
 pub(crate) mod property_track;
 #[path = "native_vector_contract.rs"]
 pub(crate) mod vector;
-#[path = "native_video_link_contract.rs"]
-pub(crate) mod video_link;
 use diagnostics::diagnostics_result;
 
 const OPACITY_CURVE: [[f64; 2]; 5] = [
@@ -227,8 +225,7 @@ fn request_check(operation: &str, payload: &Value) -> Option<bool> {
             vector::request(operation, payload)
         }
         "command.document.object.layer.create" => object::create_request(payload),
-        import::OP => import::request(payload),
-        video_link::OP => video_link::request(payload),
+        import::OP | import::video_link::OP => import::video_link::route(operation, payload),
         operation if export::owns(operation) => export::request(operation, payload),
         "query.diagnostics.recent" => exact(payload, &[], &[]).is_some(),
         "command.reproduction.opt_in"
@@ -446,8 +443,7 @@ fn result_validator(operation: &str) -> Option<ResultValidator> {
         audio_track::OP => |_, _, _, r| audio_track::result(r),
         "command.document.object.project.settings.edit" => |_, _, _, r| settings::result(r),
         "command.document.object.layer.create" => |_, _, _, r| object::create_result(r),
-        import::OP => |_, _, _, r| import::result(r),
-        video_link::OP => |_, _, _, r| video_link::result(r),
+        import::OP | import::video_link::OP => |o, _, _, r| import::video_link::routed(o, r),
         "command.document.object.layer.visibility.set" => |_, _, _, r| object::visibility_result(r),
         "command.document.object.undo" | "command.document.object.redo" => {
             |_, _, _, r| object::history_result(r)

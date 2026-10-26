@@ -112,7 +112,7 @@ impl NativeApplicationRequest {
                 | crate::native_contract::item::ITEM
                 | crate::native_contract::item::ATTACH
                 | crate::native_contract::item::REMOVE
-                | crate::native_contract::video_link::OP
+                | crate::native_contract::import::video_link::OP
                 | crate::native_contract::vector::VECTOR
                 | crate::native_contract::vector::PARAMETRIC
                 | crate::native_contract::vector::EFFECTS
@@ -129,7 +129,7 @@ impl NativeApplicationRequest {
             } else if self.operation == crate::native_contract::property_track::OP {
                 "property track"
             } else if crate::native_contract::item::owns(&self.operation)
-                || self.operation == crate::native_contract::video_link::OP
+                || self.operation == crate::native_contract::import::video_link::OP
             {
                 "item or asset"
             } else if crate::native_contract::vector::owns(&self.operation) {

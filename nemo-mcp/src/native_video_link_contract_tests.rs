@@ -1,6 +1,6 @@
 //! T12 registered wire/shape/correlation controls of the linked-video op.
 use crate::contract::{NativeApplicationRequest, NativeApplicationResponse};
-use crate::native_contract::video_link::{owner_matches, result, revision_matches, OP};
+use crate::native_contract::import::video_link::{owner_matches, result, revision_matches, OP};
 use crate::wire::{decode_native_request, validate_native_response};
 use serde_json::{json, Value};
 
@@ -95,8 +95,8 @@ fn closed_payload_refuses_unknown_members_bad_paths_ids_and_a_missing_revision()
         "lifecycleGeneration":1,"source":{"kind":"file","path":format!("/{}", "a".repeat(n - 1))},
         "intent":{"kind":"newLayer"}})
     };
-    assert!(crate::native_contract::video_link::request(&path(2048)));
-    assert!(!crate::native_contract::video_link::request(&path(2049)));
+    assert!(crate::native_contract::import::video_link::request(&path(2048)));
+    assert!(!crate::native_contract::import::video_link::request(&path(2049)));
     let mut missing = q;
     missing.expected_revision = None;
     assert!(missing.validate_input().is_err());
