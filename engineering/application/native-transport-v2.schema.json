@@ -743,6 +743,47 @@
         },
         "isLinkedFillCompanion": {
           "type": "boolean"
+        },
+        "brushTexture": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "brushGroupId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "isBrushTextureCopy": {
+              "const": true
+            },
+            "brushTexturePreset": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "preTextureOpacity": {
+              "type": "number"
+            },
+            "preTextureStroke": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+                }
+              ]
+            }
+          },
+          "not": {
+            "required": [
+              "isBrushTextureCopy",
+              "brushTexturePreset"
+            ]
+          },
+          "description": "G16: the baseline serP brush-texture members of an anchor (preset, group, hidden paint) or a dab (copy flag, group)."
         }
       },
       "minProperties": 1,
@@ -871,6 +912,11 @@
             "behind"
           ],
           "description": "Optional (absent = front). G15: behind enters under the layer's existing artwork of the frame (baseline drawMode 'behind')."
+        },
+        "trimEnds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Optional (absent = no trim). Baseline trimStrokeEndsMax: cut the new open stroke's head/tail back to its first/last crossing with the layer's paths in the frame when the overshoot is at most this; symmetry copies share the cuts."
         }
       }
     },
@@ -899,6 +945,11 @@
             "behind"
           ],
           "description": "Optional (absent = front). G15: behind enters under the layer's existing artwork of the frame (baseline drawMode 'behind')."
+        },
+        "trimEnds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Optional (absent = no trim). Baseline trimStrokeEndsMax: cut the new open stroke's head/tail back to its first/last crossing with the layer's paths in the frame when the overshoot is at most this; symmetry copies share the cuts."
         }
       },
       "description": "G23: 2 to 32 creates on one layer and frame as one revision and one undo entry (symmetry copies); owner-allocated ids in order."
@@ -16522,6 +16573,47 @@
         },
         "bitmapBrush": {
           "$ref": "#/$defs/ObjectClipboardBitmapBrush"
+        },
+        "brushTexture": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "brushGroupId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "isBrushTextureCopy": {
+              "const": true
+            },
+            "brushTexturePreset": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "preTextureOpacity": {
+              "type": "number"
+            },
+            "preTextureStroke": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+                }
+              ]
+            }
+          },
+          "not": {
+            "required": [
+              "isBrushTextureCopy",
+              "brushTexturePreset"
+            ]
+          },
+          "description": "G16: the baseline serP brush-texture members of an anchor (preset, group, hidden paint) or a dab (copy flag, group)."
         }
       },
       "minProperties": 1,
@@ -16667,6 +16759,47 @@
         },
         "bitmapBrush": {
           "$ref": "#/$defs/ObjectClipboardBitmapBrush"
+        },
+        "brushTexture": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "brushGroupId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "isBrushTextureCopy": {
+              "const": true
+            },
+            "brushTexturePreset": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "preTextureOpacity": {
+              "type": "number"
+            },
+            "preTextureStroke": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+                }
+              ]
+            }
+          },
+          "not": {
+            "required": [
+              "isBrushTextureCopy",
+              "brushTexturePreset"
+            ]
+          },
+          "description": "G16: the baseline serP brush-texture members of an anchor (preset, group, hidden paint) or a dab (copy flag, group)."
         }
       },
       "minProperties": 1,

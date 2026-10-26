@@ -146,7 +146,7 @@ pub(crate) use bitmap_brush::{BitmapBrushFields, BitmapBrushSpec};
 #[path = "object_vector_ext.rs"]
 #[allow(dead_code)]
 mod vector_ext;
-pub(crate) use vector_ext::{FillTrace, StoredGradient, StoredGradientStop, VectorExt};
+pub(crate) use vector_ext::{BrushTexture, FillTrace, StoredGradient, StoredGradientStop, VectorExt};
 
 // L08-J (#2114): layer compositing fields; transactions are scene_effect_layer_edit.rs / _history.rs.
 #[path = "scene_effect_layer_record.rs"]

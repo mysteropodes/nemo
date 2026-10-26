@@ -171,6 +171,8 @@
       // tools.js @1065e9d8 Draw commit: drawMode 'behind' slips the stroke under the layer's artwork.
       var vector=root.NemoNativeObjectVector.create(guarded),dicts=symmetric(dict,t.pin);
       var options={origin:t.pin,placement:ports.freehand&&t.behind?'behind':'front'};
+      // draw-bridge.js @1065e9d8 Trim Stroke Ends: a Draw commit trims before its symmetry copies exist; native shares the cuts.
+      if(ports.freehand&&root.state.trimStrokeEnds&&root.state.trimStrokeEndsMax>0)options.trimEnds=root.state.trimStrokeEndsMax;
       return dicts.length>1?vector.createStrokes(t.layerUid,t.frame,dicts,options):vector.createStroke(t.layerUid,t.frame,dict,options);
     }
     // Geometry/mapping can refuse synchronously before the existing Project
@@ -295,7 +297,9 @@
     var simplifyIfNeeded=root.simplifyIfNeeded,applyStrokeStyle=root.applyStrokeStyle;
     function nativeDrawStyle() {
       var state=root.state;
-      if (state.tool !== 'draw' || state.bitmapBrushOn || state.trimStrokeEnds || state.drawMode !== 'front' && state.drawMode !== 'behind' ||
+      // Trim measures the whole stroke before the stop-at-axis clip (draw-bridge then symmetry-bridge); native would trim the clipped one.
+      if (state.tool !== 'draw' || state.bitmapBrushOn || state.trimStrokeEnds && (state.vectorBrush || state.symmetryEnabled && !state.symmetryExtend) ||
+          state.drawMode !== 'front' && state.drawMode !== 'behind' ||
           state.brushPreset && state.brushPreset !== 'none' || root.SMLabs && root.SMLabs.list().some(function(p){return p.on;}))
         throw new Error('This brush combination is unavailable in native Drawing.');
       if (typeof state.vectorBrush !== 'boolean' || typeof state.strokeEnabled !== 'boolean' || typeof state.fillEnabled !== 'boolean' ||

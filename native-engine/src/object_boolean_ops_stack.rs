@@ -244,6 +244,7 @@ pub(crate) fn island_record(
                 mask_mode: Presence::Missing,
                 mask_feather: Presence::Missing,
                 bitmap_brush: Presence::Missing,
+                brush_texture: Presence::Missing,
                 linked_fill_id: Presence::Missing,
                 is_linked_fill_companion: Presence::Missing,
             })
