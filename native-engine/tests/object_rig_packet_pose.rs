@@ -336,3 +336,84 @@ fn a_rigged_layer_that_also_holds_a_vector_keeps_the_typed_chain_refusal() {
             if reason == "native parent group, rig or effect context unavailable"
     ));
 }
+
+/// #2230 registry clause: a posed meshed raster (rigged layer L1) and a contour (rig-less layer L2) share one
+/// packet; the production join (`prepare_with_brush_indices`) must carry the raster as an item of the
+/// "raster-image" producer next to the "contour" producer, under one pin, with the single call site's offsets.
+fn registry_scene() -> (ObjectSnapshot, Value) {
+    let row = row("translate_all_bound_vertices");
+    let mut doc = document(&row.input["rig"], &row.input["mesh"], &row.input["rect"], None);
+    let square = [[0., 0., 0., 0., 0., 0.], [10., 0., 0., 0., 0., 0.], [10., 10., 0., 0., 0., 0.]];
+    doc["layers"].as_array_mut().unwrap().push(json!({"layerUid":"L2"}));
+    doc["objects"] = json!([rows::stroke_record("L2", "s1", true, &square, 0)]);
+    doc["compositionOrder"]["contexts"][0]["layers"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"layerUid":"L2","naturalPosition":1,"order":{}}));
+    doc["compositionOrder"]["contexts"][0]["scopes"][0]["elements"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"layerUid":"L2","strokeId":"s1","naturalPosition":0,"order":{}}));
+    (snapshot_of(&doc), doc)
+}
+
+#[test]
+fn posed_mesh_enters_the_registry_as_raster_image_with_the_contour_pin_and_the_single_site_offsets() {
+    use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::{
+        join_scene, ProducerOutput, SceneOutcome, ScenePin,
+    };
+    use crate::object_render_scene::paint::raster::{prepare_with_brush_indices, PaintIndex};
+    let (snapshot, _) = registry_scene();
+    let packet = packet_of(&snapshot);
+    let pins = selector(&snapshot);
+    let scene = prepare_object_render_scene(&packet, &pins).unwrap();
+    assert_eq!((scene.entries().count(), scene.rasters.len()), (1, 1));
+    // Production join: complete, one contour then one raster, in composition order.
+    let (indices, mixed) = prepare_with_brush_indices(&scene, &pins, &[]).unwrap();
+    assert_eq!(indices, [0]);
+    assert_eq!(mixed, [PaintIndex::Raster(0), PaintIndex::Contour(0)]);
+    // Rebuild the two producers exactly as the join does and read the registry's own pins.
+    let pin = ScenePin::of_packet(&packet);
+    assert_eq!(pin.document_snapshot_id, snapshot.snapshot_id());
+    assert_eq!((pin.content_revision, pin.frame), (snapshot.content_revision(), 0));
+    let contour = scene.entries().next().unwrap().source().source_object_index();
+    let raster = scene.rasters[0].source_index;
+    assert_ne!(contour, raster);
+    let contours = ProducerOutput::new("contour", pin.clone())
+        .with_item(contour, PaintIndex::Contour(0));
+    let rasters = ProducerOutput::new("raster-image", pin.clone())
+        .with_item(raster, PaintIndex::Raster(0));
+    assert_eq!(contours.pin, rasters.pin);
+    let joined = join_scene(&packet, &pin, vec![contours, rasters]).expect("one pin joins");
+    assert!(joined.is_complete());
+    assert_eq!(joined.pin(), &pin);
+    let producers: Vec<_> = joined
+        .entries()
+        .iter()
+        .map(|e| match e.outcome() {
+            SceneOutcome::Item { producer, .. } => producer.as_str(),
+            SceneOutcome::Unavailable(_) => panic!("registry entry unavailable"),
+        })
+        .collect();
+    assert_eq!(producers, ["raster-image", "contour"]);
+    // A foreign pin on the raster producer is refused: pins are not interchangeable.
+    let mut foreign = pin.clone();
+    foreign.frame += 1;
+    let bad = ProducerOutput::new("raster-image", foreign).with_item(raster, PaintIndex::Raster(0));
+    assert!(join_scene(&packet, &pin, vec![bad]).is_err());
+    // Offsets are the single call site's output, and a second evaluation is bit-identical.
+    let evaluation = layer_pose(&packet, 0);
+    let expected = mesh_offsets(&packet, 0, "im_1", &evaluation).unwrap().expect("linked bind poses");
+    let posed = scene.rasters[0].rig_offsets().expect("posed raster carries offsets");
+    assert_eq!(posed, expected.as_slice());
+    let again = prepare_object_render_scene(&packet_of(&snapshot), &selector(&snapshot)).unwrap();
+    let second = again.rasters[0].rig_offsets().unwrap();
+    assert_eq!(posed.len(), second.len());
+    for (a, b) in posed.iter().zip(second) {
+        assert_eq!((a[0].to_bits(), a[1].to_bits()), (b[0].to_bits(), b[1].to_bits()));
+    }
+    // A stale expected pin refuses the whole join instead of dropping the raster.
+    let mut stale = selector(&snapshot);
+    stale.content_revision += 1;
+    assert!(prepare_with_brush_indices(&scene, &stale, &[]).is_err());
+}
