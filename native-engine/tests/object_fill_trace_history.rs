@@ -65,6 +65,105 @@ fn one_native_fill_commit_preserves_tags_history_and_fresh_codec_reopen() {
 }
 
 #[test]
+fn same_colour_neighbour_is_absorbed_through_the_real_union_in_one_history_entry() {
+    // Wall square 0..60 x 0..40 (stroked, unfilled) holds an unstroked same-colour (#336699ff) island
+    // 30..50 x 10..30. A click at (10,10) traces the wall interior minus the island; the island touches
+    // that region, so the baseline fillMergeSameColor unites them into ONE solid 0..60 x 0..40 record
+    // and removes the island.
+    let wall = f::vector(
+        "L0",
+        "wall",
+        0,
+        &f::rect(0.0, 0.0, 60.0, 40.0),
+        &f::VectorSpec {
+            fill: None,
+            stroke: Some(f::BLUE),
+            ..Default::default()
+        },
+    );
+    let island = f::vector(
+        "L0",
+        "island",
+        0,
+        &f::rect(30.0, 10.0, 20.0, 20.0),
+        &f::VectorSpec {
+            fill: Some([0.2, 0.4, 0.6, 1.0]),
+            ..Default::default()
+        },
+    );
+    let mut owner = f::owner_of(&f::document(2, vec![wall, island], None, None));
+    let before = f::bytes(&owner);
+    let mut click = payload();
+    click["point"] = json!([10, 10]);
+    paint(&mut owner, &click);
+    assert_eq!(
+        (owner.content_revision(), owner.history_depths()),
+        (1, (1, 0))
+    );
+    let state = f::state(&owner);
+    let objects = state["objects"].as_array().unwrap();
+    let ids: Vec<&Value> = objects.iter().map(|r| &r["target"]["strokeId"]).collect();
+    assert_eq!(ids.len(), 2, "wall + one merged fill, got {ids:?}");
+    assert!(
+        ids.iter().all(|id| *id != "island"),
+        "absorbed island removed: {ids:?}"
+    );
+    assert!(ids.contains(&&json!("wall")));
+    let merged = fill(&state);
+    let axis = |k: &str| -> (f64, f64) {
+        let v: Vec<f64> = merged["geometry"]["segments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s["point"][k].as_f64().unwrap())
+            .collect();
+        (
+            v.iter().cloned().fold(f64::INFINITY, f64::min),
+            v.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+        )
+    };
+    assert_eq!((axis("x"), axis("y")), ((0.0, 60.0), (0.0, 40.0)));
+    assert_eq!(
+        merged["vectorExt"]["fillTrace"]["seeds"],
+        json!([[10.0, 10.0]])
+    );
+    let edited = f::bytes(&owner);
+    assert_eq!(f::bytes(&f::owner_of(&state)), edited);
+    owner.undo(1).unwrap();
+    assert_eq!(f::bytes(&owner), before);
+    owner.redo(2).unwrap();
+    assert_eq!(f::bytes(&owner), edited);
+}
+
+#[test]
+fn a_cancelled_fill_trace_request_publishes_nothing_and_keeps_redo() {
+    // Same envelope control as apply/erase/flatten: prime one redo entry, then dispatch the real fill.trace
+    // request with cancelledBeforeDispatch; bytes, revision and both stacks must be untouched.
+    let mut owner = f::owner_of(&document());
+    paint(&mut owner, &payload());
+    owner.undo(1).unwrap();
+    assert_eq!(owner.history_depths(), (0, 1));
+    let frozen = |o: &NativeObjectHistory| (f::bytes(o), o.history_depths(), o.content_revision());
+    let before = frozen(&owner);
+    let mut req = json!({"apiVersion":2,"requestId":"fill-cancel","instanceId":owner.instance_id(),
+        "documentId":owner.document_id(),"expectedRevision":owner.content_revision(),
+        "operation":"command.document.object.fill.trace","payload":payload()});
+    req["cancelledBeforeDispatch"] = json!(true);
+    let reply = f::dispatch(&mut owner, &req);
+    assert_eq!(
+        (reply["ok"].clone(), reply["error"]["code"].clone()),
+        (json!(false), json!("cancelled_before_dispatch"))
+    );
+    assert_eq!(frozen(&owner), before);
+    // the same request without the cancel flag is accepted, so the refusal was the cancel's doing
+    req["cancelledBeforeDispatch"] = json!(false);
+    req["requestId"] = json!("fill-ok");
+    let accepted = f::dispatch(&mut owner, &req);
+    assert_eq!(accepted["ok"], true, "{accepted}");
+    assert_eq!(owner.history_depths().0, 1);
+}
+
+#[test]
 fn replacing_a_stored_wall_regenerates_its_fill_in_the_same_undo_entry() {
     let mut owner = f::owner_of(&document());
     paint(&mut owner, &payload());
