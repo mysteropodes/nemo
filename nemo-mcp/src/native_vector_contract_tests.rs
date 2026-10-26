@@ -68,6 +68,10 @@ fn commands() -> Vec<(&'static str, Value)> {
             EFFECTS,
             json!({"command":"object.path.effects.set","layerUid":"L1","stack":[{"type":"zigzag","enabled":true,"p1":12,"p2":4,"p3":0},{"type":"roughen","p1":null}]}),
         ),
+        (
+            VECTOR,
+            json!({"command":"object.vector.createMany","records":[record(created()),record(created())]}),
+        ),
     ]
 }
 fn envelope(operation: &str, payload: Value, expected: Option<u64>) -> NativeApplicationRequest {

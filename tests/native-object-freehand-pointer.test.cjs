@@ -164,8 +164,9 @@ test('chrome, cancellation, Escape and lost capture remain usable or abort witho
   send(f,'pointerup',60,50);assert.equal(f.calls.length,0,action);assert.equal(f.body.children.length,0,action);assert.equal(f.paper.project.activeLayer.children.length,0);}
 });
 test('unsupported brush cells are explicit without native or legacy fallback',async()=>{
- const cases=[s=>s.vectorBrush=true,s=>s.tool='fillbrush',s=>s.drawMode='behind',s=>s.bitmapBrushOn=true,s=>s.brushPreset='charcoal-smooth',s=>s.trimStrokeEnds=true,
-  s=>s.symmetryEnabled=true,s=>s.shadowMode=true,s=>Object.assign(s,{vectorBrush:true,fillEnabled:false,pressureCurve:'unknown'}),s=>s.stabilizer=7];
+ const cases=[s=>s.vectorBrush=true,s=>s.tool='fillbrush',s=>s.bitmapBrushOn=true,s=>s.brushPreset='charcoal-smooth',s=>s.trimStrokeEnds=true,
+  // Plain-stroke symmetry commits natively since G23 (#2361); with a pressure brush it stays refused.
+  s=>s.shadowMode=true,s=>Object.assign(s,{vectorBrush:true,fillEnabled:false,pressureCurve:'unknown'}),s=>s.stabilizer=7];
  for(const change of cases){const f=await fixture();change(f.root.state);const e=send(f,'pointerdown',20,20);send(f,'pointerup',60,50);assert.equal(e.prevented,true);assert.equal(f.calls.length,0);assert.ok(f.log.some(s=>/unavailable|not available|requires/.test(s)),f.log.join(','));}
 });
 test('owner/frame/style/selection changes and queued external ACK fences cannot commit a stale drawing',async()=>{
@@ -278,4 +279,12 @@ test('queued freehand uses the actual action lease while public presentation sta
   assert.equal(f.calls.length,changed?0:1);assert.equal(f.records.size,changed?0:1);assert.equal(f.session.info().contentRevision,changed?0:1);
   assert.equal(f.body.children.length,0);
  }
+});
+
+test('drawMode behind sends the stroke under the layer artwork in the same single native create (G15)',async()=>{
+ const f=await fixture();f.root.state.drawMode='behind';send(f,'pointerdown',20,20);send(f,'pointermove',45,30);send(f,'pointerup',100,80);
+ assert.equal((await settled(f)).status,'applied');assert.equal(f.calls.length,1);
+ assert.equal(f.calls[0].payload.placement,'behind');assert.equal(f.calls[0].payload.command,'object.vector.create');
+ const front=await fixture();send(front,'pointerdown',20,20);send(front,'pointermove',45,30);send(front,'pointerup',100,80);await settled(front);
+ assert.equal(front.calls[0].payload.placement,undefined,'front stays the absent default');
 });
