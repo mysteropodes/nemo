@@ -136,6 +136,34 @@ fn same_colour_neighbour_is_absorbed_through_the_real_union_in_one_history_entry
 }
 
 #[test]
+fn a_cancelled_fill_trace_request_publishes_nothing_and_keeps_redo() {
+    // Same envelope control as apply/erase/flatten: prime one redo entry, then dispatch the real fill.trace
+    // request with cancelledBeforeDispatch; bytes, revision and both stacks must be untouched.
+    let mut owner = f::owner_of(&document());
+    paint(&mut owner, &payload());
+    owner.undo(1).unwrap();
+    assert_eq!(owner.history_depths(), (0, 1));
+    let frozen = |o: &NativeObjectHistory| (f::bytes(o), o.history_depths(), o.content_revision());
+    let before = frozen(&owner);
+    let mut req = json!({"apiVersion":2,"requestId":"fill-cancel","instanceId":owner.instance_id(),
+        "documentId":owner.document_id(),"expectedRevision":owner.content_revision(),
+        "operation":"command.document.object.fill.trace","payload":payload()});
+    req["cancelledBeforeDispatch"] = json!(true);
+    let reply = f::dispatch(&mut owner, &req);
+    assert_eq!(
+        (reply["ok"].clone(), reply["error"]["code"].clone()),
+        (json!(false), json!("cancelled_before_dispatch"))
+    );
+    assert_eq!(frozen(&owner), before);
+    // the same request without the cancel flag is accepted, so the refusal was the cancel's doing
+    req["cancelledBeforeDispatch"] = json!(false);
+    req["requestId"] = json!("fill-ok");
+    let accepted = f::dispatch(&mut owner, &req);
+    assert_eq!(accepted["ok"], true, "{accepted}");
+    assert_eq!(owner.history_depths().0, 1);
+}
+
+#[test]
 fn replacing_a_stored_wall_regenerates_its_fill_in_the_same_undo_entry() {
     let mut owner = f::owner_of(&document());
     paint(&mut owner, &payload());
