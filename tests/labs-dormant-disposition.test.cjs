@@ -43,7 +43,9 @@ test('each dormant file is a retained source without a load site and its matrix 
   }
   const matrix = JSON.parse(read('engineering/inventory/parity/matrix.json'));
   const rows = matrix.surfaces.filter((s) => (s.tasks || []).includes('U37'));
-  assert.equal(rows.length, 10);
+  // Ten labs:* rows plus the command palette's 25 menu entries and its own row, and labs:timeline-zoom (#2374 U31).
+  assert.equal(rows.length, 37);
+  assert.equal(rows.filter((r) => r.id.startsWith('menu:labs/command-palette.js:')).length, 25);
   for (const row of rows) {
     assert.equal(row.status, 'disposition', row.id);
     assert.match(row.disposition, /^dormant-in-baseline \(U37\)/, row.id);
