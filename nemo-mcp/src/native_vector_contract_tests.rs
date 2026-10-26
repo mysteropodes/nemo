@@ -482,38 +482,3 @@ fn a_well_formed_vector_receipt_cannot_bless_a_missing_or_foreign_command() {
         "echoing an unknown operation with a valid-looking native stroke is not admission"
     );
 }
-
-#[test]
-fn create_many_is_bounded_to_one_layer_and_frame_and_its_receipt_lists_every_owner_id() {
-    let many = |records: Vec<Value>| json!({"command":"object.vector.createMany","records":records});
-    assert!(!request(VECTOR, &many(vec![record(created())])), "one record is a plain create");
-    assert!(!request(VECTOR, &many((0..33).map(|_| record(created())).collect())));
-    let mut other = record(created());
-    other["target"]["layerUid"] = json!("L2");
-    assert!(!request(VECTOR, &many(vec![record(created()), other])));
-    assert!(!request(VECTOR, &json!({"command":"object.vector.createMany","records":record(created())})));
-    let payload = many(vec![record(created()), record(created())]);
-    let ids = json!(["native-stroke:8:0", "native-stroke:8:1"]);
-    let good = json!({"applied":true,"historyEntriesAdded":1,"operation":"createMany","strokeId":"native-stroke:8:0","strokeIds":ids});
-    assert!(result(VECTOR, &payload, &good));
-    let mut missing = good.clone();
-    missing.as_object_mut().unwrap().remove("strokeIds");
-    assert!(!result(VECTOR, &payload, &missing), "a createMany receipt lists its ids");
-    let mut extra = good.clone();
-    extra["unexpected"] = json!(1);
-    assert!(!result(VECTOR, &payload, &extra));
-    let mut foreign = good.clone();
-    foreign["strokeIds"] = json!(["native-stroke:8:0", "other:8:1"]);
-    assert!(!result(VECTOR, &payload, &foreign));
-    for (key, bad) in [
-        ("strokeIds", json!(["native-stroke:8:0"])),
-        ("strokeIds", json!(["native-stroke:8:1", "native-stroke:8:0"])),
-        ("strokeId", json!("native-stroke:8:1")),
-        ("operation", json!("create")),
-        ("applied", json!(false)),
-    ] {
-        let mut value = good.clone();
-        value[key] = bad;
-        assert!(!result(VECTOR, &payload, &value), "{key}");
-    }
-}

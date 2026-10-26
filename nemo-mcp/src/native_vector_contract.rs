@@ -263,5 +263,9 @@ pub(crate) fn response_matches(
 mod tests;
 
 #[cfg(test)]
+#[path = "native_vector_create_many_tests.rs"]
+mod create_many_tests;
+
+#[cfg(test)]
 #[path = "native_vector_bitmap_read_tests.rs"]
 mod bitmap_read_tests;
