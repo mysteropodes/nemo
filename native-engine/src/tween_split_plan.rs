@@ -1,6 +1,6 @@
 //! Original geometric split matching, evaluated before order-coherence and interpolation.
-use super::*;
 use crate::object_document::ObjectRecord;
+use crate::tween_kernels::*;
 pub(super) fn ordered_pieces(
     merged: &ObjectRecord,
     parts: &[ObjectRecord],

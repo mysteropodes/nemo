@@ -1,16 +1,10 @@
 //! Bitmap tween recipes are native transient work, never persisted client-supplied pixels.
-use super::*;
+pub(crate) use crate::object_document::tween::BitmapTweenBake;
 use crate::object_document::{
     BitmapBrushFields, ObjectRecord, ObjectTarget, Presence, RasterEntry,
 };
+use crate::tween_kernels::*;
 use serde_json::json;
-#[derive(Debug)]
-pub(crate) struct BitmapTweenBake {
-    pub(crate) target: ObjectTarget,
-    pub(crate) anchor: ObjectRecord,
-    pub(crate) fields: BitmapBrushFields,
-    pub(crate) opacity: f64,
-}
 pub(super) fn bitmap_fields(r: &ObjectRecord) -> Option<&BitmapBrushFields> {
     r.vector_ext.value().and_then(|v| v.bitmap_brush.value())
 }

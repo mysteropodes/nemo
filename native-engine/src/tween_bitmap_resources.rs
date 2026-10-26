@@ -1,6 +1,6 @@
 //! Complete charged native brush resources and placements before the sealed owner may publish.
-use super::BitmapTweenBake;
-use crate::object_document::{ObjectDocument, ProjectEnvelope};
+use crate::object_codec::BitmapTweenBake;
+use crate::object_codec::{ObjectDocument, ProjectEnvelope};
 use crate::request_receipts::DispatchErrorCode as Error;
 use crate::revision::ObjectSnapshot;
 
@@ -29,13 +29,26 @@ pub(crate) fn prepare_tween_resources(
 #[cfg(feature = "project_media_codec")]
 fn prepare(
     origin: &ObjectSnapshot,
-    mut drawing: ObjectDocument,
+    drawing: ObjectDocument,
     bakes: Vec<BitmapTweenBake>,
 ) -> Result<PreparedTweenResources, Error> {
+    prepare_with(origin, drawing, bakes, |_, _| Ok(()))
+}
+#[cfg(feature = "project_media_codec")]
+fn prepare_with(
+    origin: &ObjectSnapshot,
+    mut drawing: ObjectDocument,
+    bakes: Vec<BitmapTweenBake>,
+    mut before_bake: impl FnMut(usize, &ProjectEnvelope) -> Result<(), Error>,
+) -> Result<PreparedTweenResources, Error> {
+    if bakes.len() > crate::object_codec::MAX_TWEEN_BAKES {
+        return Err(Error::Unavailable);
+    }
     use crate::evaluation::object_scene_style_kernels::object_scene_producer_brush_slot::{
         BakeRefused, TrimAnchor,
     };
-    use crate::object_document::{AssetInventory, AssetRecord, ItemRecords};
+    use crate::object_codec::AssetRecord;
+    use crate::object_codec::{AssetInventory, ItemRecords};
     use crate::object_snapshot::AssetEdit;
     use std::sync::Arc;
     let mut project = origin.project().ok_or(Error::Unavailable)?.clone();
@@ -48,6 +61,7 @@ fn prepare(
         .value()
         .map_or(vec![], |i| i.text_entries().to_vec());
     for (index, bake) in bakes.into_iter().enumerate() {
+        before_bake(index, &project)?;
         let anchor = TrimAnchor::from_record(&bake.anchor).map_err(|_| Error::Unavailable)?;
         let (png, rect) = crate::evaluation::brush_trim_bake::consume_full_native(
             &bake.fields,
@@ -55,8 +69,10 @@ fn prepare(
             crate::revision::shared_image_resource_budget(),
             |ink| {
                 let ink = ink.ok_or(BakeRefused("empty tween brush ink"))?;
-                let png = crate::png_output::encode_rgba8(ink.width, ink.height, &ink.rgba)
-                    .map_err(|_| BakeRefused("tween PNG encoding unavailable"))?;
+                let png = crate::object_snapshot::tween_read::encode_brush_png(
+                    ink.width, ink.height, &ink.rgba,
+                )
+                .map_err(|_| BakeRefused("tween PNG encoding unavailable"))?;
                 Ok((png, ink.rect))
             },
         )
@@ -74,7 +90,7 @@ fn prepare(
             origin.document_id()
         );
         let admitted = staged
-            .prepare_asset_attachment(&request_id, "Tween brush.png", "image/png", &png)
+            .prepare_asset_attachment(&request_id, "Tween brush.png", "image/png", png.as_ref())
             .map_err(|e| e.code())?;
         let mut records = project
             .asset_inventory()
@@ -90,7 +106,7 @@ fn prepare(
                     r.source().media_type() == Some("image/png")
                         && r.source()
                             .encoded_allocation()
-                            .is_some_and(|a| a.as_slice() == &*png)
+                            .is_some_and(|a| a.as_slice() == png.as_ref())
                 })
                 .cloned()
                 .ok_or(Error::Unavailable)?,
@@ -112,10 +128,14 @@ fn prepare(
     }
     drawing.items = ItemRecords::normalized(rasters, texts);
     ObjectSnapshot::validate_drawing(&drawing).map_err(|_| Error::InvalidRequest)?;
-    if crate::object_document::item_asset_issue(&drawing, project.asset_inventory()).is_some() {
+    if crate::object_codec::item_asset_issue(&drawing, project.asset_inventory()).is_some() {
         return Err(Error::Unavailable);
     }
     let project = project.with_drawing(drawing);
     ObjectSnapshot::check_candidate_saveable(&project)?;
     Ok(PreparedTweenResources { project })
 }
+
+#[cfg(all(test, feature = "project_media_codec"))]
+#[path = "../tests/tween_resource_rollback.rs"]
+pub(crate) mod tests;

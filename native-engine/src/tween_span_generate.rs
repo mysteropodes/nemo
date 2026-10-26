@@ -1,10 +1,11 @@
 //! Plan one span; emit geometry and authored stacking before a single owner publication.
-use super::*;
 use crate::object_document::{
-    tween::{tween_easing, TweenOptions, TweenSpan},
+    tween::{TweenOptions, TweenSpan},
     ObjectDocument, ObjectRecord, Presence,
 };
+use crate::object_snapshot::tween_read::tween_easing;
 use crate::request_receipts::DispatchErrorCode;
+use crate::tween_kernels::*;
 struct PreparedPair {
     spec: PairSpec,
     geometry: PreparedInterpolation,
@@ -14,6 +15,7 @@ struct PreparedPair {
     widths: Option<(Vec<f64>, Vec<f64>)>,
     backdrop: PairBackdrop,
     bitmap: Option<PairBitmap>,
+    emitted_dabs: usize,
 }
 pub(super) fn generate_span(
     doc: &mut ObjectDocument,
@@ -40,9 +42,7 @@ pub(super) fn generate_span(
     let manual = settings.and_then(|s| s.manual_strokes.value());
     let held = held_entries(doc, layer, from, manual);
     a.retain(|r| manual.is_none_or(|ids| ids.contains(&r.target.stroke_id)));
-    if a.len() > 256 || b.len() > 256 {
-        return Err(DispatchErrorCode::InvalidRequest);
-    }
+    limits::require(a.len().max(b.len()), limits::STROKES_PER_FRAME)?;
     let (specs, un_a, un_b) = pair_plan(&a, &b, settings.map_or(&[], |s| s.overrides.as_slice()))?;
     if a.is_empty() && b.is_empty() && specs.is_empty() {
         return Ok(());
@@ -128,6 +128,7 @@ pub(super) fn generate_span(
         }
         let texture = PairTexture::new(&spec.a_data, &spec.b_data, from, spec.mi, custom);
         pairs.push(PreparedPair {
+            emitted_dabs: 0,
             bitmap: PairBitmap::new(&spec.a_data, &spec.b_data, from, spec.mi),
             backdrop: PairBackdrop::new(&spec.a_data, &spec.b_data, &original_a, &original_b),
             texture,
@@ -174,6 +175,8 @@ pub(super) fn generate_span(
         .and_then(|s| s.easing.value())
         .filter(|p| !p.is_empty())
         .unwrap_or(&options.easing);
+    let mut faded_counts_a = vec![0usize; a.len()];
+    let mut faded_counts_b = vec![0usize; b.len()];
     for frame in from + 1..to {
         if options.skip_manual && timing.exposure(frame).2 {
             continue;
@@ -186,7 +189,7 @@ pub(super) fn generate_span(
         let et = tween_easing(easing, t);
         let mut out: Vec<(f64, ObjectRecord)> = vec![];
         let mut bitmap_items = vec![];
-        for p in &pairs {
+        for p in &mut pairs {
             let segs = p
                 .geometry
                 .evaluate(et, Some(p.controls))
@@ -203,16 +206,15 @@ pub(super) fn generate_span(
                 out.push((rank - 1e-4, backdrop));
             }
             if let Some(texture) = &p.texture {
-                out.extend(
-                    texture
-                        .emit(&mut record, et)?
-                        .into_iter()
-                        .map(|r| (rank + 1e-4, r)),
-                );
+                let dabs = texture.emit(&mut record, et)?;
+                p.emitted_dabs += dabs.len();
+                limits::require(p.emitted_dabs, limits::DABS_PER_PAIR)?;
+                out.extend(dabs.into_iter().map(|r| (rank + 1e-4, r)));
             }
             if let Some(bitmap) = &p.bitmap {
                 if let Some((raster, bake)) = bitmap.emit(&mut record, et)? {
                     bitmap_items.push((rank + 1e-4, Held::Raster(raster)));
+                    limits::require(bakes.len() + 1, limits::BAKES_PER_COMMAND)?;
                     bakes.push(bake);
                 }
             }
@@ -229,11 +231,15 @@ pub(super) fn generate_span(
                 };
                 if matches!(plan, VanishPlan::Fade) {
                     let rank = i as f64 / source.len().saturating_sub(1).max(1) as f64;
-                    out.extend(
-                        faded_dabs(original, &source[i], keep, frame)?
-                            .into_iter()
-                            .map(|r| (rank + 1e-4, r)),
-                    );
+                    let dabs = faded_dabs(original, &source[i], keep, frame)?;
+                    let counts = if std::ptr::eq(source, &a) {
+                        &mut faded_counts_a
+                    } else {
+                        &mut faded_counts_b
+                    };
+                    counts[i] += dabs.len();
+                    limits::require(counts[i], limits::DABS_PER_PAIR)?;
+                    out.extend(dabs.into_iter().map(|r| (rank + 1e-4, r)));
                 }
                 if let Some(record) = vanish(&source[i], plan, keep, frame)? {
                     let mul = if matches!(plan, VanishPlan::Fade) {

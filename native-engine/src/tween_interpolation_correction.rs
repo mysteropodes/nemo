@@ -1,5 +1,5 @@
 //! Baseline fold correction, handle re-harmonisation and safe point reduction.
-use super::*;
+use crate::tween_kernels::interpolation::*;
 #[derive(Clone)]
 pub(super) struct Folds {
     pub(super) a: Vec<f64>,

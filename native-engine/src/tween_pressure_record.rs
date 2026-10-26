@@ -1,6 +1,6 @@
 //! Pressure records use the same native centreline fields as editing and rendering.
-use super::*;
 use crate::object_document::{ObjectRecord, Presence, PressureFields, VectorExt};
+use crate::tween_kernels::*;
 
 pub(super) fn set_pressure(record: &mut ObjectRecord, center: &[SegOut], widths: &[f64]) -> R<()> {
     let segments = native_segments(center)?;

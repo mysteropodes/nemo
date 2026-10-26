@@ -1,5 +1,5 @@
 //! Sparse landmark fallback when no coherent full-curve fit exists.
-use super::*;
+use crate::tween_kernels::pair::*;
 pub(super) fn landmark_fractions(
     a: &PathSampler,
     b: &PathSampler,

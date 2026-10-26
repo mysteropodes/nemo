@@ -1,5 +1,5 @@
 //! Feature detection and sample spacing from the pinned production tween baseline.
-use super::*;
+use crate::tween_kernels::pair::*;
 pub(super) fn pair_wrap_pi(mut d: f64) -> f64 {
     while d > std::f64::consts::PI {
         d -= std::f64::consts::TAU;

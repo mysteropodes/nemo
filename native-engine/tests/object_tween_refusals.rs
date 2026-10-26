@@ -55,13 +55,17 @@ fn native_tween_refusals_preserve_revision_bytes_and_redo() {
     assert!(o
         .owner
         .prepare_tween_json(
+            "command.document.object.tween.generate",
             br#"{"command":"object.tween.generate","layerUid":"L0","layerUid":"L0"}"#
         )
         .is_err());
     assert_eq!(state(&o), before);
     let candidate = o
         .owner
-        .prepare_tween_json(&serde_json::to_vec(&payload).unwrap())
+        .prepare_tween_json(
+            "command.document.object.tween.generate",
+            &serde_json::to_vec(&payload).unwrap(),
+        )
         .unwrap();
     let q = request(&o, "fresh", "tween.generate", payload);
     assert_eq!(dispatch(&mut o, &q)["ok"], true);
@@ -178,4 +182,131 @@ fn native_tween_pressure_output_capacity_is_unavailable_without_mutation() {
     assert_eq!(owner.content_revision(), 0);
     assert_eq!(owner.history_depths(), (0, 0));
     assert_eq!(bytes(&owner), before);
+}
+
+#[test]
+fn native_tween_operation_mismatch_refuses_before_layer_lookup_or_baking() {
+    let c = fixture_cases()
+        .into_iter()
+        .find(|c| c["input"]["name"] == "move")
+        .unwrap();
+    let mut owner =
+        NativeObjectHistory::new("mismatch", document(&c["input"]["frames"], true)).unwrap();
+    let before = state(&owner);
+    // The planner would return NotFound. InvalidRequest proves envelope equality wins.
+    let q = request(
+        &owner,
+        "mismatch",
+        "tween.generate",
+        json!({"command":"object.tween.regenerate","layerUid":"missing"}),
+    );
+    let reply = dispatch(&mut owner, &q);
+    assert_eq!(reply["error"]["code"], "invalid_request", "{reply}");
+    assert_eq!(state(&owner), before);
+}
+
+fn refuse_limit(frames: Value) {
+    let mut owner = NativeObjectHistory::new("limits", document(&frames, true)).unwrap();
+    let before = state(&owner);
+    let q = request(
+        &owner,
+        "limit",
+        "tween.generate",
+        json!({"command":"object.tween.generate","layerUid":"L0"}),
+    );
+    let reply = dispatch(&mut owner, &q);
+    assert_eq!(reply["error"]["code"], "unavailable", "{reply}");
+    assert_eq!(state(&owner), before);
+}
+
+#[test]
+fn native_tween_stroke_limit_refuses_before_cubic_matcher() {
+    let c = fixture_cases()
+        .into_iter()
+        .find(|c| c["input"]["name"] == "move")
+        .unwrap();
+    let mut frames = c["input"]["frames"].clone();
+    let seed = frames[0]["strokes"][0].clone();
+    frames[0]["strokes"] = Value::Array(
+        (0..=crate::tween_kernels::limits::STROKES_PER_FRAME)
+            .map(|i| {
+                let mut s = seed.clone();
+                s["strokeId"] = json!(format!("a-{i}"));
+                s
+            })
+            .collect(),
+    );
+    refuse_limit(frames);
+}
+
+#[test]
+fn native_tween_span_limit_refuses_before_generation() {
+    let c = fixture_cases()
+        .into_iter()
+        .find(|c| c["input"]["name"] == "move")
+        .unwrap();
+    let frame = c["input"]["frames"][0].clone();
+    refuse_limit(Value::Array(vec![
+        frame;
+        crate::tween_kernels::limits::SPANS_PER_REQUEST
+            + 2
+    ]));
+}
+
+#[test]
+fn native_tween_dab_pair_limit_refuses_without_publishing_partial_frames() {
+    let c = fixture_cases()
+        .into_iter()
+        .find(|c| c["input"]["name"] == "texture-both")
+        .unwrap();
+    let mut frames = vec![json!({"strokes":[]}); 500];
+    frames[0] = c["input"]["frames"][0].clone();
+    frames[499] = c["input"]["frames"][3].clone();
+    refuse_limit(Value::Array(frames));
+}
+
+#[test]
+fn native_tween_bake_limit_refuses_before_project_resource_work() {
+    let c = fixture_cases()
+        .into_iter()
+        .find(|c| c["input"]["name"] == "bitmap-both")
+        .unwrap();
+    let n = crate::tween_kernels::limits::BAKES_PER_COMMAND + 3;
+    let mut frames = vec![json!({"strokes":[]}); n];
+    frames[0] = c["input"]["frames"][0].clone();
+    frames[n - 1] = c["input"]["frames"][2].clone();
+    // Strip held endpoint raster companions: the planner limit is reachable with
+    // a bare document and therefore precedes the unavailable project/bake seam.
+    for frame in &mut frames {
+        frame["strokes"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|s| s["isRaster"] != true);
+    }
+    refuse_limit(Value::Array(frames));
+}
+
+#[test]
+fn native_tween_noop_and_replay_receipts_preserve_revision_and_history() {
+    let c = fixture_cases()
+        .into_iter()
+        .find(|c| c["input"]["name"] == "move")
+        .unwrap();
+    let frames = json!([c["input"]["frames"][0].clone()]);
+    let mut owner = NativeObjectHistory::new("noop", document(&frames, true)).unwrap();
+    let before = state(&owner);
+    let q = request(
+        &owner,
+        "noop",
+        "tween.generate",
+        json!({"command":"object.tween.generate","layerUid":"L0"}),
+    );
+    let reply = dispatch(&mut owner, &q);
+    assert_eq!(reply["ok"], true, "{reply}");
+    assert_eq!(reply["result"]["applied"], false, "{reply}");
+    assert_eq!(reply["result"]["historyEntriesAdded"], 0, "{reply}");
+    let replay = dispatch(&mut owner, &q);
+    assert_eq!(replay["ok"], true, "{replay}");
+    assert_eq!(replay["result"], reply["result"]);
+    assert_eq!(state(&owner), before);
 }

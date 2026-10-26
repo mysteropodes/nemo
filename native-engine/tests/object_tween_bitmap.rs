@@ -67,7 +67,10 @@ fn native_tween_bitmap_bakes_are_atomic_stale_safe_and_reuse_identical_png_resou
     let payload = json!({"command":"object.tween.generate","layerUid":"L0","options":{"resamplePoints":12,"step":1,"skipManual":true,"easing":[]}});
     let sealed = o
         .owner
-        .prepare_tween_json(&serde_json::to_vec(&payload).unwrap())
+        .prepare_tween_json(
+            "command.document.object.tween.generate",
+            &serde_json::to_vec(&payload).unwrap(),
+        )
         .unwrap();
     assert_eq!(o.content_revision(), 0);
     assert_eq!(snapshot.serialize_project_file().unwrap(), initial);
@@ -154,4 +157,13 @@ fn native_tween_bitmap_ghost_admission_materializes_through_existing_brush_runti
         assert_eq!(plan.packet().document_snapshot_id(), snapshot.snapshot_id());
         assert!(!plan.scene_resource_versions().unwrap().is_empty());
     }
+}
+
+#[test]
+fn native_tween_second_bake_failure_keeps_store_and_history_unchanged() {
+    let owner = owner();
+    let snapshot = owner.acquire_snapshot(0).unwrap();
+    crate::tween_kernels::assert_second_bake_rollback(&snapshot);
+    assert_eq!(owner.content_revision(), 0);
+    assert_eq!(owner.history_depths(), (0, 0));
 }

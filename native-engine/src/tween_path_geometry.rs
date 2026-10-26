@@ -1,5 +1,5 @@
 //! Paper-compatible path smoothing and bounds used by the original vector dab/ribbon producer.
-use super::*;
+use crate::tween_kernels::*;
 pub(super) fn path_of(s: &[SegOut], closed: bool) -> BezPath {
     let mut path = BezPath::new();
     add_segs(

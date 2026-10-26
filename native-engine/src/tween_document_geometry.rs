@@ -1,10 +1,10 @@
 //! Adapt admitted native records to pure tween geometry and back; no writable state here.
-use super::*;
 use crate::object_document::{
     ObjectPoint, ObjectRecord, ObjectSegment, Presence, SolidFill, VectorBody, VectorExt,
     VECTOR_FAMILY,
 };
 use crate::request_receipts::DispatchErrorCode;
+use crate::tween_kernels::*;
 use serde_json::Number;
 pub(super) type R<T> = Result<T, DispatchErrorCode>;
 pub(super) fn number(x: f64) -> R<Number> {

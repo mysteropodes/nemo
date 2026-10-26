@@ -1,5 +1,5 @@
 //! Geometric primitives used by baseline tween interpolation.
-use super::*;
+use crate::tween_kernels::interpolation::*;
 pub(super) fn lerp(a: f64, b: f64, t: f64) -> f64 {
     a + (b - a) * t
 }

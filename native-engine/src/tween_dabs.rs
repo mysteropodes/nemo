@@ -1,7 +1,7 @@
 //! Deterministic native vector-dab stamping along the interpolated anchor, never independent matching.
-use super::*;
 use crate::object_document::BrushPresetRecord;
 use crate::request_receipts::DispatchErrorCode;
+use crate::tween_kernels::*;
 #[path = "tween_dab_sampling.rs"]
 mod sampling;
 use sampling::*;

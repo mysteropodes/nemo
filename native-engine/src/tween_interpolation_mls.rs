@@ -1,5 +1,5 @@
 //! Baseline moving-least-squares per-vertex interpolation.
-use super::*;
+use crate::tween_kernels::interpolation::*;
 #[derive(Clone)]
 pub(super) struct LocalFit {
     theta: f64,

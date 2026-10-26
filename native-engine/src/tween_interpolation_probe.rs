@@ -1,5 +1,5 @@
 //! Baseline pair-level strategy probes: preserve length, direction, folds and trajectory continuity.
-use super::*;
+use crate::tween_kernels::interpolation::*;
 #[derive(Default)]
 pub(super) struct Decision {
     pub(super) weight: f64,

@@ -1,5 +1,5 @@
 //! #2358: tween features; adapted from geometry-wasm at 46442ea9.
-use super::*;
+use crate::tween_kernels::*;
 
 pub(super) fn parse_hex_color(css: &Option<String>) -> Option<(f64, f64, f64)> {
     let s = css.as_ref()?;

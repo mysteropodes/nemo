@@ -1,7 +1,7 @@
 //! Original arc-fraction pieces and anchored trim; all sampled through the Paper-compatible native sampler.
-use super::*;
 use crate::object_document::{ObjectRecord, Presence};
 use crate::request_receipts::DispatchErrorCode;
+use crate::tween_kernels::*;
 pub(super) fn extract_piece(record: &ObjectRecord, f0: f64, f1: f64, n: usize) -> R<ObjectRecord> {
     let s = stroke(record);
     let vb = is_vb(&s);

@@ -1,6 +1,6 @@
 //! Seeded scatter and analytic trajectory roughness from the original vector dab producer.
-use super::*;
 use crate::object_document::{BrushPresetRecord, Presence};
+use crate::tween_kernels::dabs::*;
 pub(super) fn val(v: &Presence<f64>, default: f64) -> f64 {
     v.value().copied().unwrap_or(default)
 }

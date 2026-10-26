@@ -1,5 +1,4 @@
 //! Persisted tween intent in the existing object document; generated cells remain ordinary records.
-use crate::animation_curve::{evaluate_curve, CurveSample};
 use crate::object_document::{object_deserialize, OrderCurvePoint, Presence};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -85,18 +84,6 @@ pub(crate) fn valid_tween_curve(points: &[OrderCurvePoint]) -> bool {
         prev = x;
         ok
     })
-}
-pub(crate) fn tween_easing(points: &[OrderCurvePoint], t: f64) -> f64 {
-    let points: Vec<_> = points
-        .iter()
-        .map(|p| CurveSample {
-            x: p.x.as_f64().unwrap(),
-            y: p.y.as_f64().unwrap(),
-            tx: p.tx.value().and_then(|n| n.as_f64()),
-            ty: p.ty.value().and_then(|n| n.as_f64()),
-        })
-        .collect();
-    evaluate_curve(&points, t)
 }
 impl TweenOverride {
     fn valid(&self) -> bool {
@@ -184,4 +171,14 @@ impl crate::object_document::ObjectDocument {
                 .value()
                 .is_some_and(|i| i.raster_entries().iter().any(|r| in_cell(&r.target)))
     }
+}
+
+pub(crate) const MAX_TWEEN_BAKES: usize = 128;
+/// Detached bake input; no resource or revision authority.
+#[derive(Debug, Clone)]
+pub(crate) struct BitmapTweenBake {
+    pub(crate) target: crate::object_document::ObjectTarget,
+    pub(crate) anchor: crate::object_document::ObjectRecord,
+    pub(crate) fields: crate::object_document::BitmapBrushFields,
+    pub(crate) opacity: f64,
 }

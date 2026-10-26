@@ -1,5 +1,5 @@
 //! Resolve drawing direction before assigning corresponding fractions and pressure.
-use super::*;
+use crate::tween_kernels::pair::*;
 pub(super) fn source_segments(s: &StrokeIn, vb: bool) -> Vec<CenterSegIn> {
     if vb && s.center_segments.as_ref().is_some_and(|c| c.len() > 1) {
         return s.center_segments.clone().unwrap();

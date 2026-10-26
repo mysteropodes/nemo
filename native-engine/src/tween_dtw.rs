@@ -1,5 +1,5 @@
 //! Monotone full-curve correspondence; production default position/tangent cost.
-use super::*;
+use crate::tween_kernels::pair::*;
 pub(super) fn dtw(a: &PathSampler, b: &PathSampler, n: usize) -> Option<(Vec<f64>, Vec<f64>)> {
     if a.total <= 0. || b.total <= 0. {
         return None;

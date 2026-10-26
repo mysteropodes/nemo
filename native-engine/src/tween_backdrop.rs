@@ -1,6 +1,6 @@
 //! Linked pressure fills follow their own generated centreline; they never enter assignment.
-use super::*;
 use crate::object_document::{ObjectRecord, Presence};
+use crate::tween_kernels::*;
 pub(super) fn is_backdrop(r: &ObjectRecord) -> bool {
     r.vector_ext
         .value()

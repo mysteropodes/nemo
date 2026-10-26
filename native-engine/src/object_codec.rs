@@ -19,12 +19,13 @@ pub(crate) use font_assets::{
 };
 
 pub(crate) use crate::object_document::object_raster_asset_kernels::object_raster_asset_item::RasterItem;
-#[cfg(feature = "font_asset_wire")]
+#[cfg(any(feature = "font_asset_wire", feature = "application"))]
 pub(crate) use crate::object_document::AssetRecord;
+pub(crate) use crate::object_document::OrderCurvePoint;
+pub(crate) use crate::object_document::{item_asset_issue, ObjectLayer, Presence, PropertyHolder};
 #[cfg(all(feature = "font_asset_wire", not(feature = "history")))]
 pub(crate) use crate::object_document::{AssetId, AssetKind};
-pub(crate) use crate::object_document::{ImageMesh, ImageMeshStore, MeshIdSequence};
-pub(crate) use crate::object_document::{ObjectLayer, Presence, PropertyHolder};
+pub(crate) use crate::object_document::{ImageMesh, ImageMeshStore, ItemRecords, MeshIdSequence};
 use crate::object_document::{OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION};
 #[path = "object_property_codec.rs"]
 mod property_codec;
@@ -515,3 +516,6 @@ fn validate_content_inner(
     }
     Ok(())
 }
+
+#[cfg(feature = "application")]
+pub(crate) use crate::object_document::tween::{BitmapTweenBake, MAX_TWEEN_BAKES};

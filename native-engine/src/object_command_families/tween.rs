@@ -14,7 +14,7 @@ pub(crate) const FAMILY: CommandFamily = CommandFamily {
         )
     },
     refusal: "Native tween request refused.",
-    request_limit: 262144,
+    request_limit: crate::tween_kernels::limits::REQUEST_BYTES,
     dispatch: |history, request| {
         let bytes =
             serde_json::to_vec(&request.payload).map_err(|_| DispatchErrorCode::InvalidRequest)?;

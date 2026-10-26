@@ -1,6 +1,6 @@
 //! One stamp position: preserve the baseline random draw order, including unused colour jitter.
-use super::*;
 use crate::object_document::BrushPresetRecord;
+use crate::tween_kernels::dabs::*;
 #[derive(Serialize)]
 pub(in crate::tween_kernels) struct Dab {
     pub segments: Vec<SegOut>,

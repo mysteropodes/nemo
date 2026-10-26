@@ -110,7 +110,13 @@ use held_items::*;
 
 #[path = "tween_bitmap_plan.rs"]
 mod bitmap_plan;
+pub(crate) use crate::object_snapshot::tween_resources::{
+    prepare_tween_resources, PreparedTweenResources,
+};
 use bitmap_plan::*;
-#[path = "tween_bitmap_resources.rs"]
-mod bitmap_resources;
-pub(crate) use bitmap_resources::{prepare_tween_resources, PreparedTweenResources};
+
+#[path = "tween_limits.rs"]
+pub(crate) mod limits;
+
+#[cfg(all(test, feature = "project_media_codec"))]
+pub(crate) use crate::object_snapshot::tween_resources::tests::assert_second_bake_rollback;

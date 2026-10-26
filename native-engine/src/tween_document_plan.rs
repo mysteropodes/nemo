@@ -1,11 +1,11 @@
 //! Detached tween command planner. No publication, history stack or UI mirror lives here.
-use super::*;
 use crate::object_document::{
     object_deserialize,
     tween::{TweenOptions, TweenSpan, TweenStore},
     ObjectDocument, Presence, TimingEdit,
 };
 use crate::request_receipts::DispatchErrorCode;
+use crate::tween_kernels::*;
 use serde::Deserialize;
 #[derive(Debug)]
 pub(crate) struct TweenRequest {
@@ -138,6 +138,12 @@ pub(crate) fn plan_tween(
     let keys = drawn_keys(&next);
     let options = settings.options.clone();
     let spans = settings.spans.clone();
+    limits::require(
+        keys.windows(2)
+            .filter(|p| starts.as_ref().is_none_or(|s| s.contains(&p[0])))
+            .count(),
+        limits::SPANS_PER_REQUEST,
+    )?;
     let mut bakes = vec![];
     for endpoints in keys.windows(2) {
         let (from, to) = (endpoints[0], endpoints[1]);

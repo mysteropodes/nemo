@@ -1,7 +1,7 @@
 //! Resolve ribbon crossings by tracing original cubic edges, then keep the largest contour.
 //! Intersection connectivity is explicit: distinct nearby roots must never be merged by position.
-use super::*;
 use crate::request_receipts::DispatchErrorCode;
+use crate::tween_kernels::*;
 use kurbo::{CubicBez, ParamCurve};
 #[path = "tween_curve_crossings.rs"]
 mod crossings;

@@ -1,7 +1,7 @@
 //! Paper.js 0.12.18 fat-line cubic clipping, retained for baseline pressure crossing parity.
 //! Adapted from https://github.com/paperjs/paper.js/blob/v0.12.18/src/path/Curve.js
 //! Copyright (c) 2011–2020 Jürg Lehni & Jonathan Puckey. MIT license (see tween_paper_license.txt).
-use super::*;
+use crate::tween_kernels::outline_cleanup::crossings::*;
 type V = [f64; 8];
 type Hull = Vec<[f64; 2]>;
 fn signed(v: V, x: f64, y: f64) -> f64 {

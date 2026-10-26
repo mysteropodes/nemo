@@ -1,5 +1,5 @@
 //! #2358: tween assignment; adapted from geometry-wasm at 46442ea9.
-use super::*;
+use crate::tween_kernels::*;
 
 // ---- "force line" similarity transform (fitSimilarityTransform) ----
 #[derive(Clone)]

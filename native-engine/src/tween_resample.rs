@@ -1,5 +1,5 @@
 //! #2358: tween resample; adapted from geometry-wasm at 46442ea9.
-use super::*;
+use crate::tween_kernels::*;
 
 // ---- resampleP / resampleCenterline ----
 #[derive(Serialize, Deserialize, Clone)]

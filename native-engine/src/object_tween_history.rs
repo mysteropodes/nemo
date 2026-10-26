@@ -1,5 +1,5 @@
 //! One native undo checkpoint for a whole generate/regenerate/split/reassignment operation.
-use super::{NativeObjectHistory, ObjectHistoryEntry};
+use crate::history::object_history::{NativeObjectHistory, ObjectHistoryEntry};
 use crate::request_receipts::DispatchErrorCode;
 use crate::transaction::CompactResult;
 impl NativeObjectHistory {
@@ -8,18 +8,15 @@ impl NativeObjectHistory {
         operation: &str,
         bytes: &[u8],
     ) -> Result<CompactResult, (DispatchErrorCode, &'static str)> {
-        let candidate = self.owner.prepare_tween_json(bytes).map_err(|code| {
-            (
-                code,
-                "Tween payload or native producer is invalid or unavailable.",
-            )
-        })?;
-        if operation.strip_prefix("command.document.") != Some(candidate.command()) {
-            return Err((
-                DispatchErrorCode::InvalidRequest,
-                "Tween operation and payload command disagree.",
-            ));
-        }
+        let candidate = self
+            .owner
+            .prepare_tween_json(operation, bytes)
+            .map_err(|code| {
+                (
+                    code,
+                    "Tween payload or native producer is invalid or unavailable.",
+                )
+            })?;
         let before = self.content_revision();
         let after = self
             .owner

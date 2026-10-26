@@ -1,5 +1,5 @@
 //! #2358: tween sampling; adapted from geometry-wasm at 46442ea9.
-use super::*;
+use crate::tween_kernels::*;
 
 // ---- shared stroke shape (mirrors the app's frame.strokes[i] records) ----
 #[derive(Deserialize, Clone)]
@@ -64,7 +64,7 @@ pub(super) struct PathSampler {
 }
 impl PathSampler {
     pub(super) fn new(path: &BezPath) -> Self {
-        use crate::evaluation::property_follow_path_sample::path_length;
+        use crate::object_snapshot::tween_read::path_length;
         let curves: Vec<_> = path
             .segments()
             .map(|seg| {
@@ -90,7 +90,7 @@ impl PathSampler {
         }
     }
     pub(super) fn point_at(&self, dist: f64) -> Point {
-        use crate::evaluation::property_follow_path_sample::point_tangent_at;
+        use crate::object_snapshot::tween_read::point_tangent_at;
         let point = point_tangent_at(&self.curves, self.closed, dist.clamp(0.0, self.total))
             .map(|p| p.point)
             .unwrap_or([0.0; 2]);
@@ -100,18 +100,14 @@ impl PathSampler {
         &self,
         p: [f64; 2],
     ) -> Result<
-        Option<crate::evaluation::object_image_mesh_kernels::rig_pose_nearest::NearestLocation>,
+        Option<crate::object_snapshot::tween_read::NearestLocation>,
         crate::request_receipts::DispatchErrorCode,
     > {
-        crate::evaluation::object_image_mesh_kernels::rig_pose_nearest::nearest_on_curves(
-            &self.curves,
-            self.closed,
-            p,
-        )
-        .map_err(|_| crate::request_receipts::DispatchErrorCode::Unavailable)
+        crate::object_snapshot::tween_read::nearest_on_curves(&self.curves, self.closed, p)
+            .map_err(|_| crate::request_receipts::DispatchErrorCode::Unavailable)
     }
     pub(super) fn tangent_at(&self, dist: f64) -> (f64, f64) {
-        use crate::evaluation::property_follow_path_sample::point_tangent_at;
+        use crate::object_snapshot::tween_read::point_tangent_at;
         let tangent = point_tangent_at(&self.curves, self.closed, dist.clamp(0.0, self.total))
             .and_then(|p| p.tangent)
             .unwrap_or([1.0, 0.0]);

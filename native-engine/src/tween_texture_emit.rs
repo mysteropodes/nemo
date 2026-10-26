@@ -1,9 +1,9 @@
 //! Match anchors only; resolve the existing preset catalog and re-stamp each generated frame.
-use super::*;
 use crate::object_document::VectorTextureFields;
 use crate::object_document::{
     BrushPresetRecord, ObjectRecord, Presence, ProjectPresetCatalog, VectorExt,
 };
+use crate::tween_kernels::*;
 use std::collections::BTreeMap;
 pub(super) fn texture(r: &ObjectRecord) -> Option<&VectorTextureFields> {
     r.vector_ext.value().and_then(|v| v.texture.value())

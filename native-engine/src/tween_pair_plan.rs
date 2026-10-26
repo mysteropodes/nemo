@@ -1,6 +1,6 @@
 //! Baseline forced-pair admission, plausible-match threshold and locally supported rescue.
-use super::*;
 use crate::object_document::{tween::TweenOverride, ObjectRecord};
+use crate::tween_kernels::*;
 #[derive(Clone)]
 pub(super) struct PairSpec {
     pub a: usize,

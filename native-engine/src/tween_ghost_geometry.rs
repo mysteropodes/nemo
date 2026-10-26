@@ -1,6 +1,6 @@
 //! Stored Ghost All geometry and the existing native group/boolean ports.
 //! No current-head lookup, document clone with forged pins, or normal-frame effects.
-use super::{Error, TweenGhostFrame, TweenGhostVisual};
+use crate::application::tween::ghost::{Error, TweenGhostFrame, TweenGhostVisual};
 use crate::object_document::object_group_kernels::{
     object_boolean_ops::{
         self as boolean,

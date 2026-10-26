@@ -1,5 +1,5 @@
 //! Baseline feature-aware paired sampling, including empirical motion-crossing arbitration.
-use super::*;
+use crate::tween_kernels::*;
 #[path = "tween_fractions.rs"]
 mod fractions;
 use fractions::*;

@@ -507,3 +507,10 @@ impl ObjectSnapshot {
         })
     }
 }
+
+#[cfg(feature = "application")]
+#[path = "object_tween_read.rs"]
+pub(crate) mod tween_read;
+#[cfg(feature = "application")]
+#[path = "tween_bitmap_resources.rs"]
+pub(crate) mod tween_resources;

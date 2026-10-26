@@ -1,6 +1,6 @@
 //! Original ellipse, rectangle, polygon, splatter and custom vector nib geometry.
-use super::*;
 use crate::object_document::BrushPresetRecord;
+use crate::tween_kernels::*;
 const K: f64 = 0.5522847498307936;
 pub(super) fn ellipse(w: f64, h: f64) -> Vec<SegOut> {
     let (x, y) = (w / 2., h / 2.);

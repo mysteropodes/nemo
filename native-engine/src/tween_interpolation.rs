@@ -1,5 +1,5 @@
 //! Prepared native baseline interpolation. Expensive pair probes run once, not per frame.
-use super::*;
+use crate::tween_kernels::*;
 #[path = "tween_interpolation_math.rs"]
 mod math;
 use math::*;

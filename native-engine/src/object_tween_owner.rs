@@ -1,5 +1,5 @@
 //! Sealed tween edit using the existing native object revision owner.
-use super::ObjectFillOwner;
+use crate::commands::ObjectFillOwner;
 use crate::object_document::ObjectDocument;
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
@@ -10,24 +10,22 @@ use crate::tween_kernels::{
 pub(crate) struct PreparedTween {
     origin: ObjectSnapshot,
     document: Option<ObjectDocument>,
-    command: String,
     resources: Option<PreparedTweenResources>,
-}
-impl PreparedTween {
-    pub(crate) fn command(&self) -> &str {
-        &self.command
-    }
 }
 impl ObjectFillOwner {
     pub(crate) fn prepare_tween_json(
         &self,
+        operation: &str,
         bytes: &[u8],
     ) -> Result<PreparedTween, DispatchErrorCode> {
-        if bytes.len() > 262144 {
+        if bytes.len() > crate::tween_kernels::limits::REQUEST_BYTES {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         let request: TweenRequest =
             serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        if operation.strip_prefix("command.document.") != Some(request.command.as_str()) {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
         let origin = self.current_snapshot();
         let planned = plan_tween(
             origin.document(),
@@ -60,7 +58,6 @@ impl ObjectFillOwner {
             origin,
             resources,
             document,
-            command: request.command,
         })
     }
     pub(crate) fn commit_tween(
@@ -82,7 +79,7 @@ impl ObjectFillOwner {
         if let Some(resources) = candidate.resources {
             return self
                 .revisions
-                .publish_tween_resources(resources)
+                .publish_tween_resources(resources.into_project())
                 .map_err(|_| DispatchErrorCode::Unavailable);
         }
         match candidate.document {

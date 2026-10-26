@@ -1,6 +1,6 @@
 //! Bounded cubic/cubic intersections for pressure-outline crossing cleanup.
-use super::*;
 use crate::request_receipts::DispatchErrorCode;
+use crate::tween_kernels::outline_cleanup::*;
 use kurbo::{CubicBez, ParamCurve, ParamCurveDeriv};
 fn bounds(c: &CubicBez) -> Rect {
     let mut r = Rect::from_points(c.p0, c.p3);

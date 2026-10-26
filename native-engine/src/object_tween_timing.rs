@@ -1,5 +1,5 @@
 //! Replace generated samples without exposing mutable timing fields to the tween planner.
-use super::{LayerTiming, LayerTimingError, TimingSample};
+use crate::object_document::timing::{LayerTiming, LayerTimingError, TimingSample};
 use crate::object_document::Presence;
 impl LayerTiming {
     pub(crate) fn tween_samples(

@@ -1,5 +1,5 @@
 //! #2358: tween align; adapted from geometry-wasm at 46442ea9.
-use super::*;
+use crate::tween_kernels::*;
 
 // ---- alignResampledPair (reverse / cyclic-rotate search) ----
 // Loosened 2026-07-17 — verbatim port of tweens.js's resampledIsClosed

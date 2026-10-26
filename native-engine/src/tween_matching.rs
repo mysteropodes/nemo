@@ -1,5 +1,5 @@
 //! #2358: tween matching; adapted from geometry-wasm at 46442ea9.
-use super::*;
+use crate::tween_kernels::*;
 
 // ---- autoMatch, two-pass ----
 #[derive(Serialize, Clone)]

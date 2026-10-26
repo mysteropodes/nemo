@@ -145,7 +145,10 @@
         "project_camera_state.rs",
         "object_bitmap_brush_record.rs",
         "object_selection_compound.rs",
-        "object_selection_compound_clones.rs"
+        "object_selection_compound_clones.rs",
+        "object_tween_record.rs",
+        "object_tween_timing.rs",
+        "object_vector_texture.rs"
       ],
       "publicApi": [
         "document.rs",
@@ -224,7 +227,9 @@
         "object_media_link_revision.rs",
         "object_raster_image_import_revision.rs",
         "native_import_transaction_assets_revision.rs",
-        "object_selection_revision.rs"
+        "object_selection_revision.rs",
+        "tween_resource_revision.rs",
+        "encoded_retention_batch.rs"
       ],
       "publicApi": [
         "revision.rs"
@@ -340,7 +345,50 @@
         "object_project_comments_edit.rs",
         "object_mask_edit.rs",
         "native_import_transaction_assets_owner.rs",
-        "object_clipboard_provenance.rs"
+        "object_clipboard_provenance.rs",
+        "object_tween_owner.rs",
+        "tween_align.rs",
+        "tween_assignment.rs",
+        "tween_backdrop.rs",
+        "tween_bitmap_plan.rs",
+        "tween_cost.rs",
+        "tween_curve_clip.rs",
+        "tween_curve_crossings.rs",
+        "tween_dab_emit.rs",
+        "tween_dab_sampling.rs",
+        "tween_dab_shape.rs",
+        "tween_dabs.rs",
+        "tween_document_geometry.rs",
+        "tween_document_plan.rs",
+        "tween_dtw.rs",
+        "tween_features.rs",
+        "tween_fractions.rs",
+        "tween_frame_store.rs",
+        "tween_held_items.rs",
+        "tween_interpolation.rs",
+        "tween_interpolation_correction.rs",
+        "tween_interpolation_math.rs",
+        "tween_interpolation_mls.rs",
+        "tween_interpolation_probe.rs",
+        "tween_kernels.rs",
+        "tween_landmarks.rs",
+        "tween_matching.rs",
+        "tween_outline_cleanup.rs",
+        "tween_pair.rs",
+        "tween_pair_plan.rs",
+        "tween_pair_sampling.rs",
+        "tween_partition.rs",
+        "tween_path_geometry.rs",
+        "tween_piece.rs",
+        "tween_pressure_outline.rs",
+        "tween_pressure_record.rs",
+        "tween_relational.rs",
+        "tween_resample.rs",
+        "tween_sampling.rs",
+        "tween_span_generate.rs",
+        "tween_split_plan.rs",
+        "tween_texture_emit.rs",
+        "tween_limits.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -417,7 +465,9 @@
         "native_import_transaction_assets.rs",
         "native_import_transaction_sources.rs",
         "native_import_transaction_source_types.rs",
-        "object_history_read.rs"
+        "object_history_read.rs",
+        "object_command_families/tween.rs",
+        "object_tween_history.rs"
       ],
       "publicApi": [
         "history.rs",
@@ -797,7 +847,10 @@
         "object_expression_bake.rs",
         "object_brush_runtime.rs",
         "native_media_frame_export.rs",
-        "native_media_video_facts.rs"
+        "native_media_video_facts.rs",
+        "tween_ghost_geometry.rs",
+        "tween_ghost_query.rs",
+        "application_tween.rs"
       ],
       "publicApi": [
         "application.rs",
@@ -844,7 +897,10 @@
         "object_project_metadata_dispatch.rs",
         "object_project_custom_brush_read.rs",
         "object_project_comments_read.rs",
-        "object_brush_read.rs"
+        "object_brush_read.rs",
+        "object_tween_read.rs",
+        "tween_bitmap_resources.rs",
+        "tween_png_encode.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -1807,7 +1863,14 @@
         "object_revision_owner.rs",
         "object_command_ownership.rs",
         "object_rig_packet_pose.rs",
-        "object_rig_packet_pose_gpu.rs"
+        "object_rig_packet_pose_gpu.rs",
+        "object_tween_bitmap.rs",
+        "object_tween_ghosts.rs",
+        "object_tween_history.rs",
+        "object_tween_refusals.rs",
+        "tween_kernels.rs",
+        "encoded_retention_batch.rs",
+        "tween_resource_rollback.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

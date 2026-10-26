@@ -1,6 +1,6 @@
 //! Pressure outline reconstruction from the interpolated centerline and widths.
-use super::*;
 use crate::request_receipts::DispatchErrorCode;
+use crate::tween_kernels::*;
 pub(super) fn pressure_outline(center: &[SegOut], widths: &[f64]) -> R<Vec<SegOut>> {
     if center.len() < 2 || center.len() != widths.len() {
         return Err(DispatchErrorCode::InvalidRequest);

@@ -1,5 +1,5 @@
 //! Relational matching refinement from baseline tweens.js (enabled by default).
-use super::*;
+use crate::tween_kernels::*;
 
 pub(super) fn relational_refine(
     matches: Vec<MatchOut>,
