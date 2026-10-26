@@ -118,3 +118,20 @@ fn a_copy_keyed_cut_on_a_held_cell_keys_that_cell_and_leaves_the_key() {
     owner.undo(1).unwrap();
     assert_eq!(state(&owner), before, "one undo removes the key and the cut");
 }
+
+#[test]
+fn a_create_keyed_with_its_own_copy_keys_only_its_cell_with_what_it_showed() {
+    let mut doc = document(2, vec![record_at("A", "L1", 0, "s-a")], None);
+    doc["layers"][0]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+        "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+    let mut owner = owner_of(&doc);
+    let mut stamped = op_create(record_at("B", "L1", 4, ""));
+    stamped["keyframe"] = json!("copy");
+    let response = send(&mut owner, "multiframe", batch(vec![op_create(record_at("B", "L1", 2, "")), stamped]));
+    assert_eq!(response["ok"], true, "{response}");
+    assert_eq!(ids_at(&owner, "L1", 2), ["native-stroke:1:0"].map(String::from).to_vec(), "the drawn frame takes Draw's empty key");
+    assert_eq!(ids_at(&owner, "L1", 4), ["s-a", "native-stroke:1:1"].map(String::from).to_vec(), "a stamped frame keeps what it showed");
+    let mut wrong = json!({"op":"delete","stableTarget":target("L1", 0, "s-a")});
+    wrong["keyframe"] = json!("copy");
+    assert_eq!(send(&mut owner, "wrong", batch(vec![wrong]))["ok"], false, "only a create carries its own key");
+}

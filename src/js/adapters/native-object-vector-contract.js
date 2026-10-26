@@ -272,8 +272,10 @@
         const where = `${label}[${at}]`;
         if (!plain(op)) fail(`${where} must be an object`);
         if (op.op === 'create') {
-          exact(op, ['op', 'record'], ['placement'], where); record(op.record, true);
+          exact(op, ['op', 'record'], ['placement', 'keyframe'], where); record(op.record, true);
           if (has(op, 'placement')) oneOf(op.placement, ['front', 'behind'], `${where}.placement`);
+          // A create's own keyframe: 'copy' keys its held cell with a copy even when the batch's does not (multiframe draw).
+          if (has(op, 'keyframe')) oneOf(op.keyframe, ['copy'], `${where}.keyframe`);
           return op.record.target;
         }
         if (op.op === 'replace') {

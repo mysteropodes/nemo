@@ -91,7 +91,8 @@
         (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds, unmapped: maps.map((map) => map.unmapped) }));
     }
     // #2361/#2362: ordered create/replace/delete steps on one layer as one native revision and one undo entry. Each step
-    // is {create: dict} | {replace: {strokeId, dict}} | {delete: strokeId} at `frame` (or the step's own `frame`).
+    // is {create: dict} | {replace: {strokeId, dict}} | {delete: strokeId} at `frame` (or the step's own `frame`); a create
+    // step's own `keyframe: 'copy'` keys its held cell with a copy when the batch's options do not.
     function batchStrokes(layerUid, frame, steps, options) {
       if (!Array.isArray(steps) || !steps.length) return Promise.resolve(Object.freeze({ status: 'invalid', reason: 'a batch needs at least one step' }));
       const ops = [];
@@ -102,7 +103,8 @@
         const map = Stroke.toRecord(replacing ? step.replace.dict : step.create, { layerUid, frame: at, strokeId: replacing ? step.replace.strokeId : '' },
           { opacity: step.opacity !== undefined ? step.opacity : options && options.opacity });
         if (!map.ok) return Promise.resolve(mapped(map));
-        ops.push(replacing ? { op: 'replace', record: map.record } : Object.assign({ op: 'create', record: map.record }, step.placement ? { placement: step.placement } : {}));
+        ops.push(replacing ? { op: 'replace', record: map.record } : Object.assign({ op: 'create', record: map.record }, step.placement ? { placement: step.placement } : {},
+          step.keyframe === 'copy' ? { keyframe: 'copy' } : {}));
       }
       const body = Object.assign({ command: 'object.vector.batch', ops }, options && options.keyframe === 'copy' ? { keyframe: 'copy' } : {});
       return send(Contract.VECTOR, body, options, (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds }));
