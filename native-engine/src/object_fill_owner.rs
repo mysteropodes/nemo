@@ -464,3 +464,6 @@ mod tests {
 #[path = "object_frame_bulk_move.rs"]
 mod object_frame_bulk_move;
 pub(crate) use object_frame_bulk_move::{PreparedBulkFrameEdit, PreparedLayerShift};
+
+#[path = "object_tween_owner.rs"]
+mod tween;

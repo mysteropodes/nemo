@@ -10,6 +10,7 @@ const root = path.resolve(__dirname, '../../../..');
 const baseline = '46442ea96c09e6bfaadf956eb8586e273a658085';
 const read = (file) => cp.execFileSync('git', ['show', `${baseline}:${file}`], { cwd: root, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
 const source = read('src/js/tweens.js');
+if (fs.readFileSync(path.join(root,'src/paper-full.min.js'),'utf8') !== read('src/paper-full.min.js')) throw new Error('Paper source must match the pinned baseline');
 const paper = require(path.join(root, 'tests/helpers/native-import-paper.cjs')).load();
 const context = vm.createContext({
   Path: paper.Path, Point: paper.Point, Segment: paper.Segment, Math, console,
@@ -93,4 +94,53 @@ for (const n of [6, 24, 90]) {
     call('pair', {name, a,b,n,vb}, () => context.resamplePairFeatureAware(copy(a),copy(b),n,vb));
   }
 }
-process.stdout.write(JSON.stringify({ baseline, sourceSha256: crypto.createHash('sha256').update(source).digest('hex'), cases }, null, 2) + '\n');
+// Execute the original document-mutating generation entry point in an isolated baseline store.
+vm.runInContext(source.slice(source.indexOf('function generateTweens('),source.indexOf('// #122 ("harmoniser')),context);
+Object.assign(context,{n20AllowLegacyWrite:()=>true,saveAllLayerFrames:()=>{},pushUndoLayers:()=>{},
+  loadFrame:()=>{},renderOS:()=>{},renderArcs:()=>{},updateUI:()=>{},showToast:()=>{},SM:{t:()=>''}});
+const idStroke=(s,id)=>({...copy(s),strokeId:id,hasRealStroke:true});
+for (const mode of ['move','reorder','step','manual','force','style','deform','fade']) {
+  const aa=[idStroke(a,'a')],bb=[idStroke(b,'b')];
+  if(mode==='reorder'){aa.push(idStroke(stroke([[0,60],[40,60]]),'a2'));bb.unshift(idStroke(stroke([[20,90],[60,90]]),'b2'));}
+  if(mode==='force'){bb[0]=idStroke(stroke([[200,300],[350,350]]),'b');}
+  if(mode==='fade'){bb[0]=idStroke(stroke([[800,900],[900,900],[900,1000],[800,1000]],{closed:true,fillColor:'#ff0000'}),'b');}
+  if(mode==='style'){aa[0].dashArray=[4,3];bb[0].dashArray=[8,2];aa[0].dashOffset=3;bb[0].dashOffset=8;aa[0].miterLimit=10;bb[0].miterLimit=5;}
+  if(mode==='deform'){aa[0]=idStroke(stroke([[0,0],[60,0],[60,60],[100,60]]),'a');bb[0]=idStroke(stroke([[10,10],[30,30],[90,90],[150,90]]),'b');}
+  const frames=Array.from({length:6},()=>({strokes:[],isKeyframe:false,isInterpolated:false}));
+  frames[0]={strokes:aa,isKeyframe:true,isInterpolated:false};frames[5]={strokes:bb,isKeyframe:true,isInterpolated:false};
+  if(mode==='manual'){frames[2]={strokes:[idStroke(stroke([[200,200],[220,230]]),'manual')],isKeyframe:false,isInterpolated:true,isManualEdit:true};}
+  const options={resamplePoints:12,step:mode==='step'?2:1,skipManual:true,easing:[]};
+  const span={from:0,to:5,overrides:mode==='force'?[{aId:'a',bId:'b'}]:[]};
+  context._sel={frames:[]};context.state={layers:[{layerUid:'L0',frames:copy(frames)}],activeLayerIdx:0,currentFrame:0,totalFrames:6,
+    resamplePts:options.resamplePoints,tweenStep:options.step,tweenSkipManual:true,motionArcs:{},tweenOverrides:{'L0:0-5':span.overrides}};
+  call('generate',{name:mode,frames,options,span},()=>{context.generateTweens();return context.state.layers[0].frames;});
+}
+// The original vector dab producer (all built-in nib families and one pressure/custom case).
+vm.runInContext(toolsSource.slice(toolsSource.indexOf('var BRUSH_PRESETS='),toolsSource.indexOf('// Builds the real, layer-inserted texture')),context);
+for(const [key,preset] of Object.entries(context.BRUSH_PRESETS)){
+  const rec={...stroke([[0,0],[24,7]]),brushGroupId:'group'};
+  call('dabs',{name:key,rec,preset:copy(preset),width:5,seed:7919,mul:0.7},()=>context.dabRecordsForTween(copy(rec),key,'#223344',5,7919,0.7));
+}
+const custom={tipShape:'custom',customStamp:{closed:true,segments:[seg(-.5,-.5),seg(.5,-.5),seg(0,.5)]},roughness:.7,scatterDistribution:'center',noise:.3,sharpness:.5,spacing:.5};
+context.state.customBrushPresets={'custom-case':custom};
+const pressureRec={...stroke([[0,0],[24,7]]),brushGroupId:'group',isVectorBrush:true,centerSegments:[{...seg(0,0),width:2},{...seg(24,7),width:8}]};
+call('dabs',{name:'custom-pressure',rec:pressureRec,preset:custom,width:5,seed:0xffffffff,mul:.8},()=>context.dabRecordsForTween(copy(pressureRec),'custom-case','#223344',5,0xffffffff,.8));
+// End-to-end textured spans exercise partitioning (including >256 source dabs), ordering and fades.
+for (const mode of ['texture-both','texture-a','texture-b','texture-fade']) {
+  const textured=(s,id,key)=>({...idStroke(s,id),strokeColor:null,hasRealStroke:false,opacity:0,
+    brushTexturePreset:key,brushGroupId:'group-'+id,preTextureStroke:'#223344',preTextureOpacity:1});
+  const left = mode==='texture-b' ? idStroke(a,'a') : textured(a,'a','pencil-thick');
+  const right = mode==='texture-a' ? idStroke(b,'b') : textured(b,'b','pencil-thick');
+  const bundle=(r)=>[r,...(r.brushTexturePreset?context.dabRecordsForTween(copy(r),r.brushTexturePreset,'#223344',4,17,1).map((d,i)=>({...d,strokeId:r.strokeId+'_source_'+i})):[])];
+  const leftStrokes=bundle(left), rightStrokes=mode==='texture-fade'?[idStroke(stroke([[200,200],[220,210]],{closed:true,fillColor:'#ff0000'}),'other')]:bundle(right);
+  if(mode==='texture-both') for(let i=leftStrokes.length;i<300;i++)leftStrokes.push({...copy(leftStrokes[1]),strokeId:'extra-dab-'+i});
+  const frames=Array.from({length:4},()=>({strokes:[],isKeyframe:false,isInterpolated:false}));
+  frames[0]={strokes:leftStrokes,isKeyframe:true,isInterpolated:false};frames[3]={strokes:rightStrokes,isKeyframe:true,isInterpolated:false};
+  const options={resamplePoints:12,step:1,skipManual:true,easing:[]};
+  context._sel={frames:[]};context.state={layers:[{layerUid:'L0',frames:copy(frames)}],activeLayerIdx:0,currentFrame:0,totalFrames:4,
+    resamplePts:12,tweenStep:1,tweenSkipManual:true,motionArcs:{}};
+  call('generate',{name:mode,frames,options},()=>{context.generateTweens();return context.state.layers[0].frames;});
+}
+const hash=s=>crypto.createHash('sha256').update(s).digest('hex');
+const provenance={baseline,sourceSha256:hash(source),toolsSha256:hash(toolsSource),paperSha256:hash(read('src/paper-full.min.js'))};
+process.stdout.write(JSON.stringify(provenance).slice(0,-1)+',"cases":[\n'+cases.map(c=>JSON.stringify(c)).join(',\n')+'\n]}\n');

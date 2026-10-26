@@ -218,6 +218,7 @@ mod tests {
             items: Presence::Missing,
             component_tables: Presence::Missing,
             motion_arcs: Presence::Missing,
+            tweens: Presence::Missing,
             audio_tracks: Presence::Missing,
         }
     }

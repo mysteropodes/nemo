@@ -234,6 +234,7 @@ pub(crate) fn island_record(
     let ext = match (&style.box_angle, gradient) {
         (angle, gradient) if angle.is_some() || gradient.is_some() || trace.is_some() => {
             Presence::Present(VectorExt {
+                texture: Presence::Missing,
                 pressure: Presence::Missing,
                 param_shape: Presence::Missing,
                 box_angle: angle.clone().map_or(Presence::Missing, Presence::Present),

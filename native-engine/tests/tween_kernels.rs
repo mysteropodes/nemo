@@ -211,3 +211,46 @@ fn tween_feature_pair_sampling_matches_independent_baseline() {
         }
     }
 }
+
+#[test]
+fn tween_vector_dabs_match_every_original_preset_and_seeded_pressure_custom_stamp() {
+    for c in cases().into_iter().filter(|c| c["operation"] == "dabs") {
+        let i = &c["input"];
+        let shape: StrokeIn = serde_json::from_value(i["rec"].clone()).unwrap();
+        let preset = serde_json::from_value(i["preset"].clone()).unwrap();
+        let actual = build_dabs(
+            &shape,
+            &preset,
+            i["width"].as_f64().unwrap(),
+            i["seed"].as_u64().unwrap() as u32,
+            i["mul"].as_f64().unwrap(),
+        )
+        .unwrap();
+        let expected = c["expected"].as_array().unwrap();
+        assert_eq!(actual.len(), expected.len(), "{}", i["name"]);
+        for (di, (a, e)) in actual.iter().zip(expected).enumerate() {
+            assert!(
+                (a.opacity - e["opacity"].as_f64().unwrap()).abs() < 1e-8,
+                "{} dab {di} opacity",
+                i["name"]
+            );
+            let e: Vec<SegOut> = serde_json::from_value(e["segments"].clone()).unwrap();
+            assert_eq!(a.segments.len(), e.len());
+            for (vi, (a, b)) in a.segments.iter().zip(e).enumerate() {
+                for (a, b) in a
+                    .point
+                    .iter()
+                    .chain(&a.handle_in)
+                    .chain(&a.handle_out)
+                    .zip(b.point.iter().chain(&b.handle_in).chain(&b.handle_out))
+                {
+                    assert!(
+                        (a - b).abs() < 1e-8,
+                        "{} dab {di} vertex {vi}: {a} != {b}",
+                        i["name"]
+                    );
+                }
+            }
+        }
+    }
+}

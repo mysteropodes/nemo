@@ -181,6 +181,7 @@ pub fn decode_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCodecError> 
         component_tables: Presence::Missing,
         motion_arcs: wire.motion_arcs,
         audio_tracks: wire.audio_tracks,
+        tweens: wire.tweens,
     };
     validate(&document)?;
     Ok(document)
@@ -199,6 +200,7 @@ struct LegacyDocument {
     items: Presence<crate::object_document::ItemRecords>,
     motion_arcs: Presence<Option<crate::object_document::MotionArcs>>,
     audio_tracks: Presence<crate::object_document::AudioTracks>,
+    tweens: Presence<crate::object_document::tween::TweenStore>,
 }
 crate::object_document::object_deserialize!(LegacyDocument {
     format: String, format_version: u32, total_frames: u32,
@@ -208,7 +210,8 @@ crate::object_document::object_deserialize!(LegacyDocument {
     #[serde(default)] image_meshes: Presence<ImageMeshStore>,
     #[serde(default)] items: Presence<crate::object_document::ItemRecords>,
     #[serde(default)] motion_arcs: Presence<Option<crate::object_document::MotionArcs>>,
-    #[serde(default)] audio_tracks: Presence<crate::object_document::AudioTracks>
+    #[serde(default)] audio_tracks: Presence<crate::object_document::AudioTracks>,
+    #[serde(default)] tweens: Presence<crate::object_document::tween::TweenStore>
 });
 
 /// Route canonical v2 to its strict codec so its typed refusal is not masked by v1.
@@ -234,6 +237,7 @@ pub fn encode_storage_project(document: &ObjectDocument) -> Result<Vec<u8>, Obje
 }
 
 pub(crate) fn validate_storage(document: &ObjectDocument) -> Result<(), ObjectCodecError> {
+    order::validate_tweens(document.tweens.value())?;
     object_vector_ext_codec::validate_linked_pairs(document)?;
     if document.format_version == 1 {
         return validate(document);
@@ -270,6 +274,7 @@ pub fn encode_project(document: &ObjectDocument) -> Result<Vec<u8>, ObjectCodecE
 pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError> {
     object_vector_ext_codec::validate_linked_pairs(document)?;
     order::validate_audio_tracks(document.audio_tracks.value())?;
+    order::validate_tweens(document.tweens.value())?;
     use ObjectCodecErrorKind::Unsupported;
     let reject = |kind, message: &str| ObjectCodecError::new(kind, message);
     if document.format != OBJECT_DOCUMENT_FORMAT

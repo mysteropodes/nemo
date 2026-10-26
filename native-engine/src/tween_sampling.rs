@@ -96,6 +96,20 @@ impl PathSampler {
             .unwrap_or([0.0; 2]);
         Point::new(point[0], point[1])
     }
+    pub(super) fn nearest(
+        &self,
+        p: [f64; 2],
+    ) -> Result<
+        Option<crate::evaluation::object_image_mesh_kernels::rig_pose_nearest::NearestLocation>,
+        crate::request_receipts::DispatchErrorCode,
+    > {
+        crate::evaluation::object_image_mesh_kernels::rig_pose_nearest::nearest_on_curves(
+            &self.curves,
+            self.closed,
+            p,
+        )
+        .map_err(|_| crate::request_receipts::DispatchErrorCode::Unavailable)
+    }
     pub(super) fn tangent_at(&self, dist: f64) -> (f64, f64) {
         use crate::evaluation::property_follow_path_sample::point_tangent_at;
         let tangent = point_tangent_at(&self.curves, self.closed, dist.clamp(0.0, self.total))

@@ -60,6 +60,9 @@ pub(crate) fn validate_vector_ext(record: &ObjectRecord) -> Result<(), ObjectCod
     if ext.fill_trace.value().is_some_and(|trace| !trace.valid()) {
         return Err(invalid("invalid fill trace provenance"));
     }
+    if ext.texture.value().is_some_and(|t| !t.valid()) {
+        return Err(invalid("invalid vector texture identity"));
+    }
     linked_fill::validate_record(record)?;
     bitmap_brush::validate(record)?;
     if let Some(gradient) = ext.fill_gradient.value() {

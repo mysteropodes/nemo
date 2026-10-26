@@ -146,7 +146,9 @@ pub(crate) use bitmap_brush::{BitmapBrushFields, BitmapBrushSpec};
 #[path = "object_vector_ext.rs"]
 #[allow(dead_code)]
 mod vector_ext;
-pub(crate) use vector_ext::{BrushTexture, FillTrace, StoredGradient, StoredGradientStop, VectorExt};
+pub(crate) use vector_ext::{
+    BrushTexture, FillTrace, StoredGradient, StoredGradientStop, VectorExt, VectorTextureFields,
+};
 
 // L08-J (#2114): layer compositing fields; transactions are scene_effect_layer_edit.rs / _history.rs.
 #[path = "scene_effect_layer_record.rs"]
@@ -187,6 +189,8 @@ pub use object_record::{
 
 #[path = "object_motion_arcs.rs"]
 mod object_motion_arcs;
+#[path = "object_tween_record.rs"]
+pub(crate) mod tween;
 #[allow(unused_imports)]
 pub(crate) use object_motion_arcs::{KeyLockMode, MotionArcError, MotionArcHandles, MotionArcs};
 
@@ -215,6 +219,8 @@ pub struct ObjectDocument {
     pub(crate) motion_arcs: Presence<Option<MotionArcs>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) audio_tracks: Presence<AudioTracks>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) tweens: Presence<tween::TweenStore>,
 }
 
 #[path = "object_follow_path_record.rs"]
@@ -327,7 +333,8 @@ object_deserialize!(ObjectDocument { format: String, format_version: u32, total_
     #[serde(default)] items: Presence<ItemRecords>,
     #[serde(default)] component_tables: Presence<ComponentTables>,
     #[serde(default)] motion_arcs: Presence<Option<MotionArcs>>,
-    #[serde(default)] audio_tracks: Presence<AudioTracks> });
+    #[serde(default)] audio_tracks: Presence<AudioTracks>,
+    #[serde(default)] tweens: Presence<tween::TweenStore> });
 object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Presence<String>,
     #[serde(default)] three_d: Presence<bool>,
     #[serde(default)] visible: Presence<bool>, #[serde(default)] locked: Presence<bool>,
