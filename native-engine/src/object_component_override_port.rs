@@ -11,10 +11,8 @@ use crate::evaluation::object_component_kernels::object_component_exposed::{
     ExposedEntry, ExposedValue,
 };
 use crate::evaluation::object_component_kernels::object_component_exposed_apply::OverridePort;
-use crate::object_document::object_component_record_kernels::object_component_records::{
-    ComponentRecord, SCENE_CONTEXT,
-};
-use crate::object_document::{is_colour_field, SolidFill};
+use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
+use crate::object_document::{is_colour_field, ObjectTarget, SolidFill};
 use crate::object_frame_packet::{
     sample_property_raw, ObjectFramePacket, Presence, PropertyHolderTarget,
 };
@@ -84,11 +82,15 @@ impl OverridePort for PacketOverrides<'_> {
     }
 }
 
-/// Whether the component declares a `__visible` override on this stroke (the only way an ordered
-/// source can be absent from the evaluated shapes).
-pub(crate) fn hides_stroke(component: &ComponentRecord, stroke_id: &str) -> bool {
-    component
-        .exposed_props()
-        .iter()
-        .any(|prop| prop.target_field == "__visible" && prop.target_stroke_id == stroke_id)
+/// An ordered source without an evaluated shape is legitimate only when the override evaluator
+/// itself reported it hidden; a `__visible` declaration alone never excuses a missing shape.
+pub(crate) fn absent_source_allowed(
+    hidden: &[ObjectTarget],
+    target: &ObjectTarget,
+) -> Result<(), &'static str> {
+    if hidden.iter().any(|t| t == target) {
+        Ok(())
+    } else {
+        Err("component order and evaluated shapes disagree")
+    }
 }

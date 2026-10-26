@@ -3,7 +3,7 @@
 //! post-override record: gradients and stroke widths are not transformed again.
 use crate::evaluation::object_component_kernels::object_component_evaluate::evaluate_packet;
 use crate::evaluation::object_component_kernels::object_component_override_port::{
-    hides_stroke, PacketOverrides,
+    absent_source_allowed, PacketOverrides,
 };
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_component_join::NoPorts;
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_component_scene::{
@@ -462,12 +462,13 @@ pub(crate) fn prepare(
                             )
                         })?;
                         let Some(&shape) = shapes.get(&key(source.1.target())) else {
-                            // Only an exposed `__visible` override drops an ordered source.
-                            let stroke = source.1.target().stroke_id();
-                            if !hides_stroke(component, stroke) || !seen_sources.insert(index) {
+                            // Only a source the override evaluator reported hidden may be absent.
+                            absent_source_allowed(&placed.hidden, source.1.target())
+                                .map_err(|reason| unavailable(entry.source_layer_index, reason))?;
+                            if !seen_sources.insert(index) {
                                 return Err(unavailable(
                                     entry.source_layer_index,
-                                    "component order and evaluated shapes disagree",
+                                    "component order/source correlation is not unique",
                                 ));
                             }
                             continue;

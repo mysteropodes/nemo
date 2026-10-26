@@ -342,6 +342,42 @@ fn negative_controls_non_exposed_key_non_instance_layer_and_malformed_values_are
 }
 
 #[test]
+fn declared_but_visible_stroke_missing_from_the_shapes_is_a_typed_disagreement() {
+    use crate::evaluation::object_component_kernels::object_component_override_port::absent_source_allowed;
+    // `__visible` is declared on the stroke and its value (60) keeps it visible.
+    let holders = json!([holder("host-a", json!([static_value("ep_x", json!([60]))]))]);
+    let d = doc(one("__visible", Some(100)), &[("host-a", 0)], holders);
+    let sc = scene_of(&d, 0);
+    assert_eq!(sc.components.paints.len(), 1);
+    let o = owner(&d);
+    let s = o.acquire_snapshot(0).unwrap();
+    let target = s
+        .document()
+        .component_set()
+        .unwrap()
+        .component("comp-a")
+        .unwrap()
+        .objects()[0]
+        .target()
+        .clone();
+    // the evaluator reported nothing hidden: a missing shape must refuse, not be skipped
+    assert_eq!(
+        absent_source_allowed(&[], &target),
+        Err("component order and evaluated shapes disagree")
+    );
+    // while an evaluator-reported hidden target is allowed
+    assert!(absent_source_allowed(std::slice::from_ref(&target), &target).is_ok());
+    // and the real hide path still drops it end to end
+    let hide = json!([holder("host-a", json!([static_value("ep_x", json!([10]))]))]);
+    assert!(
+        scene_of(&doc(one("__visible", Some(100)), &[("host-a", 0)], hide), 0)
+            .components
+            .paints
+            .is_empty()
+    );
+}
+
+#[test]
 fn old_unavailable_port_contract_is_gone_but_unrelated_providers_still_refuse() {
     // formerly: any declared exposed property refused at the scene join
     let d = doc(one("opacity", Some(100)), &[("host-a", 0)], Value::Null);
