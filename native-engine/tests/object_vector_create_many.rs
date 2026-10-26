@@ -149,3 +149,42 @@ fn behind_moves_only_the_target_layer_in_the_target_frame() {
     stack.sort_by_key(|(_, p)| *p);
     assert_eq!(stack, vec![("native-stroke:1:0".into(), 0), ("s-a".into(), 1), ("s-d".into(), 2)]);
 }
+
+/// A closed, filled vector path with a pressure-ribbon body, as the native Draw adapter maps it (no stroke of its own).
+fn pressure_record(fill: [f64; 3], ext: Value) -> Value {
+    let corner = |x: f64, y: f64| json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}});
+    json!({"schemaVersion":1,"family":"editable-vector-path",
+        "target":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},"layerUid":"L1","strokeId":""},
+        "geometry":{"kind":"cubic-path","closed":true,"coordinateSpace":"document-world","handleSpace":"relative",
+            "segments":[corner(0.0, 0.0), corner(40.0, 10.0), corner(0.0, 20.0)]},
+        "fill":{"kind":"solid","r":fill[0],"g":fill[1],"b":fill[2],"a":1},
+        "vector":{"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"butt","strokeJoin":"miter",
+            "miterLimit":10,"dashOffset":0,"opacity":1},"vectorExt":ext})
+}
+
+/// #2361 G15: the fresh-profile default (a pressure brush with Fill on) is a ribbon plus its linked fill companion; the
+/// native Draw adapter sends both, companion first, in one createMany, and the owner keeps the pair through undo,
+/// redo and reopen.
+#[test]
+fn a_pressure_ribbon_and_its_linked_fill_land_as_one_pair() {
+    let mut owner = owner_of(&document(1, seeds(), None));
+    let before = state(&owner);
+    let companion = pressure_record([0.2, 0.4, 0.6], json!({"linkedFillId":"lf-draw","isLinkedFillCompanion":true}));
+    let ribbon = pressure_record([0.1, 0.1, 0.1], json!({"linkedFillId":"lf-draw","pressure":{"centerSegments":[
+        {"point":{"x":0,"y":10},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":2},
+        {"point":{"x":40,"y":10},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":4}],
+        "widthProfile":[{"t":0,"width":2},{"t":1,"width":4}]}}));
+    let response = send(&mut owner, "pair", many(vec![companion, ribbon]));
+    assert_eq!(response["ok"], true, "{response}");
+    assert_eq!(response["result"]["strokeIds"], json!(["native-stroke:1:0", "native-stroke:1:1"]));
+    let after = state(&owner);
+    let created: Vec<&Value> = objects(&after).iter().filter(|r| r["vectorExt"]["linkedFillId"] == "lf-draw").collect();
+    assert_eq!(created.len(), 2);
+    assert_eq!(created[0]["vectorExt"]["isLinkedFillCompanion"], true, "the companion stays below its ribbon");
+    assert!(created[1]["vectorExt"]["pressure"].is_object());
+    owner.undo(1).unwrap();
+    assert_eq!(state(&owner), before, "one undo removes the pair");
+    owner.redo(2).unwrap();
+    assert_eq!(state(&owner), after);
+    assert_eq!(state(&owner_of(&after)), after, "the saved pair reopens unchanged");
+}
