@@ -987,6 +987,18 @@
       "sizeProfile": "Domain/application JS or TS"
     },
     {
+      "id": "nemo.cli.legacyWriters",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo",
+      "files": [
+        "legacy-writers.cjs"
+      ],
+      "publicApi": [
+        "legacy-writers.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
       "id": "nemo.test.familyAcceptance",
       "layer": "tooling-test",
       "dir": "scripts/nemo",
