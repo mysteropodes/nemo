@@ -249,7 +249,11 @@ fn assert_frames(doc: &ObjectDocument, expected: &Value, name: &str) {
                 .get("strokeSeed")
                 .is_none()
             {
-                if let Some(texture) = actual["vectorExt"]["brushTexture"].as_object_mut() {
+                if let Some(texture) = actual
+                    .get_mut("vectorExt")
+                    .and_then(|ext| ext.get_mut("brushTexture"))
+                    .and_then(Value::as_object_mut)
+                {
                     texture.remove("strokeSeed");
                 }
             }
