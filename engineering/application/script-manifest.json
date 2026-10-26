@@ -22,6 +22,8 @@
     {"src":"js/adapters/native-frame-edit-contract.js"},
     {"src":"js/adapters/native-viewport-underlay.js"},
     {"src":"js/adapters/native-object-project-metadata.js"},
+    {"src":"js/adapters/native-object-query-contract.js"},
+    {"src":"js/adapters/native-object-project-reads.js"},
     {"src":"js/adapters/native-object-project-properties.js"},
     {"src":"js/adapters/native-object-project-desktop.js"},
     {"src":"js/adapters/native-object-open-exposure.js"},

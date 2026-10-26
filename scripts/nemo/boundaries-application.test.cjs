@@ -215,6 +215,8 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     'src/js/adapters/native-font-panel.js',
     'src/js/adapters/native-viewport-underlay.js',
     'src/js/adapters/native-object-project-metadata.js',
+    'src/js/adapters/native-object-query-contract.js',
+    'src/js/adapters/native-object-project-reads.js',
     'src/js/adapters/native-object-project-properties.js',
     'src/js/adapters/native-object-project-desktop.js',
     'src/js/adapters/native-object-project-export.js',
@@ -252,9 +254,9 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.equal(entry.executionClass, 'document-classic', sourcePath);
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
-  // The 2026-10-26 literal 7-16, 18-21, 23, 25, 27-32, 34-38, 132-136, 182, 248-249, 291-294, 297-300 as runs.
-  assertRuns(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal), [10, 4, 1, 1, 6, 5, 5, 1, 2, 4, 4], 'N20 chain');
-  // Custom brush catalog adds its UI before tools.js, its contract before SDK and its native model afterward. All 43 identities and adjacency stay fixed; Comments adds its four ordinary source members. Symmetry adds its contract before SDK and its model/UI after the last tag.
+  // The 2026-10-26 frozen runs extended only by the adjacent query contract and reads helper.
+  assertRuns(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal), [10, 6, 1, 1, 6, 5, 5, 1, 2, 4, 4], 'N20 chain');
+  // Custom brush catalog adds its UI before tools.js, its contract before SDK and its native model afterward. All 45 identities and adjacency stay fixed; Comments adds its four ordinary source members. Symmetry adds its contract before SDK and its model/UI after the last tag.
   assert.equal(actual.get('src/js/adapters/native-application.js').scriptOrdinal + 1, actual.get('src/js/adapters/native-frame-edit-desktop.js').scriptOrdinal);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
@@ -425,7 +427,7 @@ function assertF06Bootstrap(html) {
     tag: match[0], src: match[1].match(/\bsrc=["']([^"']+)/)?.[1],
   }));
   const sources = ['native-font-panel', 'native-viewport-underlay', 'native-object-project-metadata',
-    'native-object-project-properties', 'native-object-project-desktop', 'native-object-open-exposure', 'native-object-project-export', 'native-object-project-entry-contract', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
+    'native-object-query-contract', 'native-object-project-reads', 'native-object-project-properties', 'native-object-project-desktop', 'native-object-open-exposure', 'native-object-project-export', 'native-object-project-entry-contract', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
   const positions = sources.map((name) => {
     const source = 'js/adapters/' + name + '.js';
     const selected = scripts.filter((entry) => entry.src === source);
@@ -433,8 +435,8 @@ function assertF06Bootstrap(html) {
     assert.equal(selected[0].tag, '<script src="' + source + '"></script>', source + ' must be synchronous classic');
     return scripts.indexOf(selected[0]);
   });
-  // The 2026-10-26 literal 14, 16-23, 25-26 as runs.
-  assertRuns(positions, [1, 8, 2],
+  // The 2026-10-26 frozen runs extended by the query contract and reads helper before properties.
+  assertRuns(positions, [1, 10, 2],
     'underlay → parser → properties → desktop → Exposure → Export → Entry → Project → ProjectFile → UI must remain in that order');
   const updater = ['js/adapters/updater-platform.js', 'js/updater-bridge.js'].map((source) => {
     const selected = scripts.filter((entry) => entry.src === source);
@@ -488,14 +490,14 @@ test('F06 parser bootstrap is unique synchronous and precedes Project, ProjectFi
 
 test('F06 real browser exports initialize in declared order and missing parser refuses before Project export', () => {
   const vm = require('node:vm'), html = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
-  const names = ['native-object-project-metadata', 'native-object-project-properties', 'native-object-project-desktop', 'native-object-open-exposure', 'native-object-project-export', 'native-object-project-entry-contract', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
+  const names = ['native-object-project-metadata', 'native-object-query-contract', 'native-object-project-reads', 'native-object-project-properties', 'native-object-project-desktop', 'native-object-open-exposure', 'native-object-project-export', 'native-object-project-entry-contract', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
   const load = (context, name) => vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/js/adapters', name + '.js'), 'utf8'), context, {filename: name});
   const context = vm.createContext({});
   const actual = [...html.matchAll(/<script src="js\/adapters\/([^"/]+)\.js"><\/script>/g)]
     .map((match) => match[1]).filter((name) => names.includes(name));
   assert.deepEqual(actual, names);
   for (const name of actual) load(context, name);
-  for (const [global, method] of [['NemoNativeObjectProjectMetadata', 'decode'], ['NemoNativeObjectProjectDesktop', 'createPorts'], ['NemoNativeObjectOpenExposure', 'create'], ['NemoNativeObjectProjectExport', 'run'], ['NemoNativeObjectProject', 'create'],
+  for (const [global, method] of [['NemoNativeObjectProjectMetadata', 'decode'], ['NemoNativeObjectQueryContract', 'payload'], ['NemoNativeObjectProjectDesktop', 'createPorts'], ['NemoNativeObjectOpenExposure', 'create'], ['NemoNativeObjectProjectExport', 'run'], ['NemoNativeObjectProject', 'create'],
     ['NemoNativeObjectProjectFile', 'projectionReadyForUI'], ['NemoNativeObjectUI', 'createPolicyPorts']]) {
     assert.equal(typeof context[global][method], 'function'); assert.equal(Object.isFrozen(context[global]), true);
   }

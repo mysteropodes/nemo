@@ -18,7 +18,6 @@ use native_engine::{
     object_render_scene::{
         prepare_object_navigated_viewport_composition,
         prepare_scheduled_object_composition_from_witness, ObjectCompositionWitness,
-        ObjectPaintPlan,
     },
     resource_leases::WorkId,
     scheduler::{
@@ -30,7 +29,11 @@ use std::collections::BTreeSet;
 
 #[path = "native_object_preview_prepare.rs"]
 mod prepare;
+#[path = "native_object_reference_preview.rs"]
+mod reference_preview;
 use prepare::PreparedObjectPreview;
+#[path = "native_object_image_mesh_read.rs"]
+mod image_mesh_read;
 
 #[derive(Default)]
 pub(super) struct ObjectPreview {
@@ -38,6 +41,7 @@ pub(super) struct ObjectPreview {
     pub(super) brush_runtime: ObjectBrushRuntime,
     prepared: Option<PreparedObjectPreview>,
     reference_cache: Option<ObjectCompositionWitness>,
+    presented_mesh_view: Option<PresentationReceipt>,
     // Required original C02 effects remain at this actual owner. They never
     // become a render-time history edit or disappear into an error string.
     pub(super) motion_control: ObjectMotionFrameControl,
@@ -113,6 +117,7 @@ impl ObjectPreview {
         Ok(())
     }
     pub(super) fn invalidate(&mut self) {
+        self.presented_mesh_view = None;
         self.prepared = None;
         if let Err(error) = self.cancel_pending() {
             self.blocked = Some(error);
@@ -278,6 +283,7 @@ impl NativeObjectHost {
             .prepared
             .take()
             .ok_or("native object preview has no current CPU preparation")?;
+        self.preview.presented_mesh_view = None;
         if self.released.is_some() || self.preview.released || self.preview.blocked.is_some() {
             return Err("native object preview owner requires cleanup or was released".into());
         }
@@ -458,39 +464,13 @@ impl NativeObjectHost {
             // A leaked decoded frame blocks the next preview until cleanup.
             self.preview.blocked = Some("preview video frames were not released".into());
         }
+        if media_released && receipt.status() == &ViewportStatus::Presented {
+            self.preview.presented_mesh_view = Some(receipt.clone());
+        }
         Ok(ObjectPresentedFrame { receipt, view })
     }
 
-    fn prepare_reference_preview(
-        &mut self,
-        plan: &ObjectPaintPlan,
-        dimensions: (u32, u32),
-        compositor: &mut Compositor,
-        decode: impl FnOnce(
-            Option<&ObjectCompositionWitness>,
-        ) -> Result<ObjectCompositionWitness, String>,
-    ) -> Result<ObjectCompositionWitness, String> {
-        // Both Vello and the host retain charged pixels. A failed reset leaves
-        // both intact; a failed decode leaves neither stale cache and is retryable.
-        compositor
-            .retire_object_reference_for(plan, dimensions)
-            .map_err(|error| error.to_string())?;
-        if self
-            .preview
-            .reference_cache
-            .as_ref()
-            .is_some_and(|previous| !previous.reference_matches_plan(plan))
-        {
-            self.preview.reference_cache = None;
-        }
-        let composition = decode(self.preview.reference_cache.as_ref())?;
-        if composition.has_scene_images() {
-            self.preview.reference_cache = Some(composition.clone());
-        } else {
-            self.preview.reference_cache = None;
-        }
-        Ok(composition)
-    }
+
 }
 
 #[cfg(test)]

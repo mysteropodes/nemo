@@ -303,7 +303,11 @@ for(const fault of ['sdk-missing','visibility-refused'])test('eye '+fault+' is a
   if(fault==='sdk-missing')delete h.root.NemoNativeApplicationAdapter;else h.fault(fault);
   assert.equal(await eye(h.root,0).click(),false);assert.equal(h.meta().layers[0].visible,true);assert.equal(h.root.state.layers[0].visible,true);
   assert.equal(h.meta().undoDepth,0);assert.equal(eye(h.root,0).textContent,'Hide');
-  const sent=h.calls.slice(before);assert.equal(sent.filter(c=>c.command==='nemo_native_dispatch').length,fault==='sdk-missing'?0:1);
+  const sent=h.calls.slice(before),publicCalls=sent.filter(c=>c.command==='nemo_native_dispatch');
+  // T11's real read provider refreshes timing after the refused command's preview.
+  assert.deepEqual(publicCalls.map(c=>c.request.operation),fault==='sdk-missing'?[]:
+    ['command.document.object.layer.visibility.set','query.document.object.layer.timing']);
+  assert.equal(publicCalls.filter(c=>c.request.operation.startsWith('command.')).length,fault==='sdk-missing'?0:1);
   assert.equal(sent.filter(c=>c.command==='nemo_native_object_dispatch').length,0);
   assert.ok(h.log.includes('toast:Native layer visibility was not confirmed.'));
 });

@@ -84,8 +84,9 @@ test('the SDK seam is the single composition point and replaces one line', () =>
   assert.match(fontSeam, /const font = commonjs \? require\('\.\/native-font-contract\.js'\) : root\.NemoNativeFontContract;/);
   assert.match(fontSeam, /return edit\.compose\(font\);/, 'the base seam retains the font contract');
   assert.equal(lines[3], "  const propertyContract = typeof module === 'object' && module.exports ? require('./native-property-contract.js') : root.NemoNativePropertyContract;");
-  assert.equal(lines[4], "  const api = factory((typeof module === 'object' && module.exports ? require('./native-frame-edit-contract.js') : root.NemoNativeFrameEditContract || { join: (base) => base }).join(fontContract), vectorContract, propertyContract);");
-  assert.match(sdk, /function \(fontContract, vectorContract, propertyContract\) \{/);
+  assert.equal(lines[4], "  const queryContract = typeof module === 'object' && module.exports ? require('./native-object-query-contract.js') : root.NemoNativeObjectQueryContract;");
+  assert.equal(lines[5], "  const api = factory((typeof module === 'object' && module.exports ? require('./native-frame-edit-contract.js') : root.NemoNativeFrameEditContract || { join: (base) => base }).join(fontContract), vectorContract, propertyContract, queryContract);");
+  assert.match(sdk, /function \(fontContract, vectorContract, propertyContract, queryContract\) \{/);
   assert.match(sdk, /const property = propertyContract && propertyContract\.create\(/);
 });
 
