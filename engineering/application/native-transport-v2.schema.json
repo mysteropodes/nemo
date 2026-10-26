@@ -2951,6 +2951,197 @@
         }
       }
     },
+    "ObjectLabsSpeedLinesPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "frame",
+        "cx",
+        "cy",
+        "count",
+        "r0",
+        "r1",
+        "jitter",
+        "seed",
+        "color",
+        "brushSize",
+        "opacity"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.speedLines"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "cx": {
+          "type": "number",
+          "minimum": -10000000,
+          "maximum": 10000000
+        },
+        "cy": {
+          "type": "number",
+          "minimum": -10000000,
+          "maximum": 10000000
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 400
+        },
+        "r0": {
+          "type": "number",
+          "minimum": -10000000,
+          "maximum": 10000000
+        },
+        "r1": {
+          "type": "number",
+          "minimum": -10000000,
+          "maximum": 10000000
+        },
+        "jitter": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "color": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "brushSize": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "ObjectLabsBoilPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "frame",
+        "frames",
+        "amplitude",
+        "seedStep"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.boil"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "frames": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 24
+        },
+        "amplitude": {
+          "type": "number",
+          "minimum": 0.2,
+          "maximum": 1000000
+        },
+        "seedStep": {
+          "type": "integer",
+          "minimum": -4294967295,
+          "maximum": 4294967295
+        }
+      }
+    },
+    "ObjectLabsFollowPathPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "frame",
+        "pathId",
+        "strokeIds",
+        "frames",
+        "ease",
+        "removeTrajectory"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.followPath"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "pathId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "strokeIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 1,
+          "maxItems": 256
+        },
+        "frames": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 120
+        },
+        "ease": {
+          "enum": [
+            "linear",
+            "in",
+            "out",
+            "inout"
+          ]
+        },
+        "removeTrajectory": {
+          "type": "boolean"
+        }
+      }
+    },
     "ObjectUndoPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -6303,6 +6494,57 @@
                 },
                 "payload": {
                   "$ref": "#/$defs/ObjectRigPosePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.speedLines"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsSpeedLinesPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.boil"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsBoilPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.followPath"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsFollowPathPayload"
                 }
               }
             }
