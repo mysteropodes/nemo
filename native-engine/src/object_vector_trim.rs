@@ -12,7 +12,7 @@ use serde_json::Number;
 
 const ACCURACY: f64 = 1e-9;
 /// Intersection search budget per curve pair, and for one whole trim: a degenerate overlap (tracing over an
-/// existing stroke) stops at these bounds instead of exploding; the crossings found so far still count.
+/// existing stroke) stops at these bounds instead of exploding, and an exhausted search trims nothing.
 const NODE_BUDGET: u32 = 1 << 14;
 const TRIM_BUDGET: u32 = 1 << 21;
 
