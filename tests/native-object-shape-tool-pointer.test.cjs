@@ -185,20 +185,20 @@ test('stage canvas pointer origin still creates exactly one native rectangle thr
  const f=await fixture();f.canvas.fire('pointerdown');f.canvas.fire('pointermove',{clientX:240,clientY:210});f.canvas.fire('pointerup',{clientX:240,clientY:210});
  assert.equal((await f.root.NemoNativeShapeToolController.whenSettled()).status,'applied');assert.equal(f.calls.length,1);
 });
-test('all 43 retained bootstrap identities match their explicit amended ordinal literal without metadata substitution',()=>{
+test('all 45 retained bootstrap identities match their explicit amended ordinal literal without metadata substitution',()=>{
  const html=fs.readFileSync(path.join(ROOT,'src/index.html'),'utf8'),fixture=fs.readFileSync(path.join(ROOT,'scripts/nemo/boundaries-application.test.cjs'),'utf8');
  const start=fixture.indexOf("test('N20 contract, authority, adapters and bootstrap load in their frozen order'");assert.ok(start>0);
- const block=fixture.slice(start),paths=Array.from(vm.runInNewContext(block.match(/const paths = (\[[\s\S]*?\]);/)[1]));assert.equal(paths.length,43);
+ const block=fixture.slice(start),paths=Array.from(vm.runInNewContext(block.match(/const paths = (\[[\s\S]*?\]);/)[1]));assert.equal(paths.length,45);
  const expected=JSON.parse(block.match(/assert\.deepEqual\(paths\.map\([\s\S]*?scriptOrdinal\),\s*(\[[\d,\s]+\])\);/)[1]);
  const scripts=[...html.matchAll(/<script\b([^>]*)>/gi)].map((m,i)=>({src:m[1].match(/\bsrc=["']([^"']+)/)?.[1],ordinal:i+1}));
  assert.deepEqual(paths.map(p=>scripts.find(s=>'src/'+s.src===p).ordinal),expected);
  // Read actual HTML directly: one helper after SDK, before the following consumer.
  assert.equal(scripts.filter(s=>s.src==='js/adapters/native-frame-edit-desktop.js').length,1);
- assert.deepEqual(['native-application','native-frame-edit-desktop','native-text-read'].map(name=>scripts.find(s=>s.src==='js/adapters/'+name+'.js').ordinal),[248,249,252]);
- assert.equal(scripts.find(s=>s.src==='js/adapters/native-fill-desktop.js').ordinal,250);
- assert.equal(scripts.find(s=>s.src==='js/adapters/i18n-runtime.js').ordinal,121);assert.equal(scripts.find(s=>s.src==='js/i18n.js').ordinal,122);
- assert.match(fixture,/retained\.loadSites\[0\]\.scriptOrdinal, 121/);
- assert.match(fixture,/assert\.deepEqual\(positions, \[14, 16, 17, 18, 19, 20, 21, 22, 23, 25, 26\]/);
+ assert.deepEqual(['native-application','native-frame-edit-desktop','native-text-read'].map(name=>scripts.find(s=>s.src==='js/adapters/'+name+'.js').ordinal),[250,251,254]);
+ assert.equal(scripts.find(s=>s.src==='js/adapters/native-fill-desktop.js').ordinal,252);
+ assert.equal(scripts.find(s=>s.src==='js/adapters/i18n-runtime.js').ordinal,123);assert.equal(scripts.find(s=>s.src==='js/i18n.js').ordinal,124);
+ assert.match(fixture,/retained\.loadSites\[0\]\.scriptOrdinal, 123/);
+ assert.match(fixture,/assert\.deepEqual\(positions, \[14, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28\]/);
 });
 
 test('native drawing refuses unavailable, stale and enabled Perspective projections before a document command',async()=>{
