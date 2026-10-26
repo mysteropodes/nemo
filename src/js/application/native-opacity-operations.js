@@ -45,7 +45,7 @@
       'setKeyInterp', 'applyEasyEase'
     ]],
     ['script', 'script-', [
-      'run', 'openFile', 'api'
+      'openFile', 'api'
     ]],
     ['plugin', 'plugin-', [
       'openFile', 'loadArchive', 'loadFiles'

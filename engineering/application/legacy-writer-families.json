@@ -369,7 +369,6 @@
       "authority": "unavailable",
       "entries": {
         "script": [
-          "run",
           "openFile",
           "api"
         ],
@@ -379,7 +378,8 @@
           "loadFiles"
         ]
       },
-      "kinds": []
+      "kinds": [],
+      "note": "SMScript.run is not a legacy writer since CS8-SDK (#2354): on a native document it runs through NemoScriptNativeApi, and on desktop without one it refuses; openFile, api and the plugin host stay refused until bound."
     }
   ],
   "guardFunctions": [

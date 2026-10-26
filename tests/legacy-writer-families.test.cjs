@@ -8,7 +8,7 @@ const clone=()=>JSON.parse(JSON.stringify(DOC));
 test('generated wraps and desktop kinds are current, and every guard kind is declared exactly once',()=>{
   assert.match(Writers.run(['--check'],ROOT),/legacy writers current/);
   const {names,kinds}=Writers.validate(DOC,ROOT);
-  assert.equal(names.size,134);assert.equal(kinds.size,48);
+  assert.equal(names.size,133);assert.equal(kinds.size,48);
   assert.deepEqual(Writers.plan(DOC).admitted,[],'no family is legacy-owned on desktop today');
 });
 
