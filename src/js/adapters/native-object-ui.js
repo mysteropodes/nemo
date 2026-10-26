@@ -1,6 +1,4 @@
 /* Private native document metadata presenter.
- * Owner: Ilya/A1; independent reviewer: Ilya/O Root.
- * API: render, select, toggleVisibility, restoreInspector, refreshTiming.
  * Rust owns document/revision state. Visibility uses the existing native.object
  * declaration/shared visibility handler through Project's SDK/transport queue.
  * UI state: this adapter's WeakMaps retain DOM bindings, read pins and the prior
