@@ -248,6 +248,14 @@ fn holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
     if crate::object_document::bitmap_brush::trim_holder_consumed(document, holder) {
         return true;
     }
+    // Exposed component keys on an instance layer are read by the component override port.
+    if let Some(rest) = crate::object_document::without_exposed(document.component_set(), holder) {
+        return rest
+            .controls
+            .value()
+            .is_none_or(|controls| controls.is_empty())
+            && (rest.properties().is_empty() || holder_consumed(document, &rest));
+    }
     if let Some(consumed) = crate::evaluation::object_scene_style_kernels::object_scene_producer_component_select::component_holder_consumed(document, holder) {
         return consumed;
     }

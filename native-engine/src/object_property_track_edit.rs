@@ -205,7 +205,7 @@ impl ObjectFillOwner {
                             .collect::<R<Vec<_>>>()?;
                         if values.len()
                             != holder
-                                .metadata(&record.property)
+                                .metadata_in_document(source, &record.property)
                                 .ok_or(DispatchErrorCode::Unavailable)?
                                 .dimension()
                         {

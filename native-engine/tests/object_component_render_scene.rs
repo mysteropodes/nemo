@@ -243,7 +243,7 @@ fn missing_override_or_nonconsumed_motion_refuses_before_any_partial_scene_is_pu
         match kind {
             0 => {
                 d["componentTables"]["components"]["components"][0]["exposedProps"] = json!([
-                {"key":"ep_alpha","label":"Alpha","targetStrokeId":"ink","targetField":"opacity","default":100}])
+                {"key":"ep_alpha","label":"Fill","targetStrokeId":"ink","targetField":"fillColor"}])
             }
             1 => {
                 d["componentTables"]["components"]["instances"][0]["timeRemap"] =
