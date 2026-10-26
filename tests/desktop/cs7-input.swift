@@ -53,6 +53,7 @@ func cs7InputSequence(context:() throws -> Void, releaseIdentity:() throws -> Vo
 }
 
 func cs7InputSelfTest() throws -> Int {
+  try cs7StartKeysSelfTest()
   var cases=0
   for readyAt in [0,1,4] {
     var clock:UInt64=0,reads=0,identities=0
@@ -141,5 +142,79 @@ func ui32ToggleB(_ pinned:OwnedInitialWindow, resolve:(UI32Rule) throws -> AXUIE
     var facts:[String:Any]=["purpose":"UI32","command":"selection.toggle.B","buttonDownPosted":downPosted,"buttonUpPosted":upPosted,"retry":false]
     if let failure=error as? CS7InputFailure {facts["inputCleanup"]=failure.diagnostics}
     throw ActionRefusal(diagnostics:facts)
+  }
+}
+
+// Fixed CS4 diagnostic from #2343. Never accepts caller-supplied keys or modifiers.
+func cs7StartAdmission(_ command:String, entry:Bool, fixture:Bool, sync:Bool, f03:Bool,
+  used:Bool, option:Any?, value:Any?) throws {
+  try check(command == "cs4.start-keys" && !entry && !fixture && !sync && !f03 && !used && option == nil && value == nil)
+}
+func cs7StartSurface(_ classes:Set<String>) throws {
+  try check(!classes.contains("hid") && !classes.contains("hidden"))
+}
+func cs7StartKeys(_ pinned:OwnedInitialWindow, resolve:(UI32Rule) throws -> AXUIElement,
+  visible:(AXUIElement) throws -> Void) throws -> [String:Any] {
+  let rule=UI32Rule(identifier:"start-open",region:"start-screen",labels:[],roles:["AXButton"],operation:"focus",values:[])
+  let node=try resolve(rule);try visible(node)
+  var cursor=node,screen:AXUIElement?,seen=[AXUIElement]()
+  for _ in 0..<20 {
+    try check(owns(cursor,pinned.pid) && !seen.contains {CFEqual($0,cursor)});seen.append(cursor)
+    if try ui32DOMIdentifiers(cursor,pinned.pid).resolved == "start-screen" {screen=cursor;break}
+    guard let parent=axElement(attr(cursor,kAXParentAttribute)),owns(parent,pinned.pid),
+      let children=attr(parent,kAXChildrenAttribute) as? [AXUIElement],children.contains(where:{CFEqual($0,cursor)}) else {throw Refusal(code:"child-owner")}
+    cursor=parent
+  }
+  guard let screen else {throw Refusal(code:"adapter-refused")}
+  func owner() throws {
+    try verifyOwnedWindow(pinned);try check(owns(node,pinned.pid) && owns(screen,pinned.pid))
+    try cs7StartSurface(ui32EntryDOMClasses(screen,pinned.pid));try visible(node)
+  }
+  func focused() throws -> Bool {
+    guard let window=axElement(attr(pinned.application,kAXFocusedWindowAttribute)),owns(window,pinned.pid),
+      let focus=axElement(attr(pinned.application,kAXFocusedUIElementAttribute)),owns(focus,pinned.pid) else {return false}
+    return CFEqual(window,pinned.main) && CFEqual(focus,node)
+  }
+  try owner();var writable=DarwinBoolean(false)
+  try check(AXUIElementIsAttributeSettable(node,kAXFocusedAttribute as CFString,&writable) == .success && writable.boolValue)
+  try check(AXUIElementSetAttributeValue(node,kAXFocusedAttribute as CFString,kCFBooleanTrue) == .success)
+  try cs7AwaitFocus(identity:owner,read:focused)
+  let keys:[(String,CGKeyCode,CGEventFlags)]=[("Right",124,[]),("Left",123,[]),
+    ("Cmd+Z",6,.maskCommand),("Shift+Cmd+Z",6,[.maskCommand,.maskShift]),
+    ("V",9,[]),("B",11,[]),("P",35,[]),("R",15,[]),("Y",16,[]),("E",14,[])]
+  var pairs=[String]()
+  do {
+    for (name,code,flags) in keys {
+      guard let source=CGEventSource(stateID:.privateState),
+        let down=CGEvent(keyboardEventSource:source,virtualKey:code,keyDown:true),
+        let up=CGEvent(keyboardEventSource:source,virtualKey:code,keyDown:false) else {throw Refusal(code:"adapter-refused")}
+      down.flags=flags;up.flags=[]
+      down.setIntegerValueField(.keyboardEventAutorepeat,value:0);up.setIntegerValueField(.keyboardEventAutorepeat,value:0)
+      try cs7InputSequence(context:{try owner();try check(try focused())},
+        releaseIdentity:{try verifyOwnedWindow(pinned)},down:{down.postToPid(pinned.pid)},
+        up:{up.postToPid(pinned.pid)})
+      pairs.append(name)
+    }
+    try check(CFEqual(try resolve(rule),node))
+    return ["postedPairs":pairs,"focusAcknowledged":true,"ownedReleasesPosted":true,
+      "note":"Fixed PID key down/up posting and owner/focus proofs; not application acknowledgement or feature acceptance."]
+  } catch {
+    var facts:[String:Any]=["purpose":"UI32","command":"cs4.start-keys","postedPairs":pairs,"retry":false]
+    if let failure=error as? CS7InputFailure {facts["inputCleanup"]=failure.diagnostics}
+    throw ActionRefusal(diagnostics:facts)
+  }
+}
+func cs7StartKeysSelfTest() throws {
+  try cs7StartAdmission("cs4.start-keys",entry:false,fixture:false,sync:false,f03:false,used:false,option:nil,value:nil)
+  for fault in ["command","entry","fixture","sync","f03","used","option","value"] {
+    var refused=false
+    do {try cs7StartAdmission(fault == "command" ? "cs4.arbitrary" : "cs4.start-keys",entry:fault == "entry",
+      fixture:fault == "fixture",sync:fault == "sync",f03:fault == "f03",used:fault == "used",
+      option:fault == "option" ? "Left" : nil,value:fault == "value" ? "Right" : nil)} catch {refused=true}
+    try check(refused)
+  }
+  try cs7StartSurface([])
+  for classes in [Set(["hid"]),Set(["hidden"]),Set(["hid","visible"])] {
+    var refused=false;do {try cs7StartSurface(classes)} catch {refused=true};try check(refused)
   }
 }
