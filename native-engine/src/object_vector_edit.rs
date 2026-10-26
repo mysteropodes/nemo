@@ -20,19 +20,21 @@ use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::collections::HashSet;
 
 #[path = "object_mask_edit.rs"]
 mod mask_edit;
 #[path = "object_vector_edit_order.rs"]
 pub(crate) mod order;
+#[path = "object_vector_create.rs"]
+mod create_ops;
+use create_ops::{create, create_many, Placement};
 use crate::object_document::object_group_kernels::object_fill_trace_ops::regenerate::regenerate;
 use order::OrderEditError;
 
 /// Operation-specific bound on the FULL serialized request envelope of the vector edit operation only
 /// (identifiers and metadata included). Every other object operation keeps its 4096-byte bound.
 pub(crate) const MAX_VECTOR_REQUEST_BYTES: usize = 65_536;
-const MAX_SAFE_REVISION: u64 = 9_007_199_254_740_991;
+pub(super) const MAX_SAFE_REVISION: u64 = 9_007_199_254_740_991;
 /// Bound on one atomic multi-create (symmetry copies): enough for an 8-way radial with mirrors.
 pub(crate) const MAX_CREATE_MANY: usize = 32;
 
@@ -41,6 +43,7 @@ struct VectorPayload {
     command: String,
     record: Presence<ObjectRecord>,
     records: Presence<Vec<ObjectRecord>>,
+    placement: Presence<String>,
     stable_target: Presence<ObjectTarget>,
     mask_edit: Presence<mask_edit::MaskEdit>,
 }
@@ -48,6 +51,7 @@ object_deserialize!(VectorPayload {
     command: String,
     #[serde(default)] record: Presence<ObjectRecord>,
     #[serde(default)] records: Presence<Vec<ObjectRecord>>,
+    #[serde(default)] placement: Presence<String>,
     #[serde(default)] stable_target: Presence<ObjectTarget>,
     #[serde(default)] mask_edit: Presence<mask_edit::MaskEdit>
 });
@@ -110,15 +114,15 @@ impl PreparedVectorEdit {
     }
 }
 
-struct Edit {
-    document: ObjectDocument,
-    kind: VectorEditKind,
-    stroke_id: String,
-    stroke_ids: Vec<String>,
-    changed: bool,
+pub(super) struct Edit {
+    pub(super) document: ObjectDocument,
+    pub(super) kind: VectorEditKind,
+    pub(super) stroke_id: String,
+    pub(super) stroke_ids: Vec<String>,
+    pub(super) changed: bool,
 }
 
-fn order_code(error: OrderEditError) -> DispatchErrorCode {
+pub(super) fn order_code(error: OrderEditError) -> DispatchErrorCode {
     match error {
         OrderEditError::ContextAbsent => DispatchErrorCode::NotFound,
         OrderEditError::ReferenceScope | OrderEditError::PositionOverflow => {
@@ -166,88 +170,6 @@ pub(super) fn check_drawing_layer(
 
 pub(super) fn is_vector_record(record: &ObjectRecord) -> bool {
     record.schema_version == 1 && record.family == VECTOR_FAMILY
-}
-
-/// Revision identity is monotonic across undo/redo; imported IDs are skipped, so neither preparation nor a
-/// refused commit consumes an ID.
-fn allocate_stroke_id(
-    document: &ObjectDocument,
-    revision: u64,
-) -> Result<String, DispatchErrorCode> {
-    let next = revision
-        .checked_add(1)
-        .filter(|next| *next <= MAX_SAFE_REVISION)
-        .ok_or(DispatchErrorCode::Unavailable)?;
-    let existing: HashSet<&str> = document
-        .objects
-        .iter()
-        .map(|record| record.target.stroke_id())
-        .collect();
-    (0..=existing.len())
-        .map(|suffix| format!("native-stroke:{next}:{suffix}"))
-        .find(|id| !existing.contains(id.as_str()))
-        .ok_or(DispatchErrorCode::Unavailable)
-}
-
-fn create(origin: &ObjectSnapshot, mut record: ObjectRecord) -> Result<Edit, DispatchErrorCode> {
-    if !is_vector_record(&record) || !record.target.stroke_id.is_empty() {
-        return Err(DispatchErrorCode::InvalidRequest);
-    }
-    let mut document = origin.document().clone();
-    let stroke_id = allocate_stroke_id(&document, origin.content_revision())?;
-    record.target.stroke_id = stroke_id.clone();
-    check_target(&document, &record.target)?;
-    check_drawing_layer(&document, &record.target)?;
-    if let Presence::Present(plan) = &mut document.composition_order {
-        order::insert_element(plan, &record.target).map_err(order_code)?;
-    }
-    document.objects.push(record);
-    Ok(Edit {
-        document,
-        kind: VectorEditKind::Create,
-        stroke_ids: vec![stroke_id.clone()],
-        stroke_id,
-        changed: true,
-    })
-}
-
-/// Several creates on one layer and frame as one candidate: each record is admitted exactly as a single
-/// create would be, against the document as it grows, so ids and order positions follow the given order.
-fn create_many(origin: &ObjectSnapshot, records: Vec<ObjectRecord>) -> Result<Edit, DispatchErrorCode> {
-    if !(2..=MAX_CREATE_MANY).contains(&records.len()) {
-        return Err(DispatchErrorCode::InvalidRequest);
-    }
-    let first = records[0].target.clone();
-    if records.iter().any(|r| {
-        r.target.context_id != first.context_id
-            || r.target.layer_uid != first.layer_uid
-            || r.target.frame_scope != first.frame_scope
-    }) {
-        return Err(DispatchErrorCode::InvalidRequest);
-    }
-    let mut document = origin.document().clone();
-    let mut stroke_ids = Vec::with_capacity(records.len());
-    for mut record in records {
-        if !is_vector_record(&record) || !record.target.stroke_id.is_empty() {
-            return Err(DispatchErrorCode::InvalidRequest);
-        }
-        let stroke_id = allocate_stroke_id(&document, origin.content_revision())?;
-        record.target.stroke_id = stroke_id.clone();
-        check_target(&document, &record.target)?;
-        check_drawing_layer(&document, &record.target)?;
-        if let Presence::Present(plan) = &mut document.composition_order {
-            order::insert_element(plan, &record.target).map_err(order_code)?;
-        }
-        document.objects.push(record);
-        stroke_ids.push(stroke_id);
-    }
-    Ok(Edit {
-        document,
-        kind: VectorEditKind::CreateMany,
-        stroke_id: stroke_ids[0].clone(),
-        stroke_ids,
-        changed: true,
-    })
 }
 
 /// Compare mixed integer/float representations only when the float is exactly that integer.
@@ -410,6 +332,7 @@ impl ObjectFillOwner {
         if many != payload.records.value().is_some() {
             return Err(DispatchErrorCode::InvalidRequest);
         }
+        let placement = Placement::parse(&payload.command, &payload.placement)?;
         let mut edit = match (
             payload.command.as_str(),
             payload.record,
@@ -420,14 +343,14 @@ impl ObjectFillOwner {
                 let Presence::Present(records) = payload.records else {
                     return Err(DispatchErrorCode::InvalidRequest);
                 };
-                create_many(&origin, records)?
+                create_many(&origin, records, placement)?
             }
             (
                 "object.vector.create",
                 Presence::Present(record),
                 Presence::Missing,
                 Presence::Missing,
-            ) => create(&origin, record)?,
+            ) => create(&origin, record, placement)?,
             (
                 "object.vector.replace",
                 Presence::Present(record),
