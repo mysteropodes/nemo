@@ -1,5 +1,5 @@
 /* Public v2 contract of the lane-3 object operations: image mesh edit, widget create / write / settings, rig edit and
- * rig pose, and the U36 Labs generators (speed lines, boil, follow-path). Pure validation with the interface of the font contract (admitted, requiresRevision, payload, result,
+ * rig pose, and the U36 Labs operations (speed lines, boil, follow-path, reference fill). Pure validation with the interface of the font contract (admitted, requiresRevision, payload, result,
  * correlate, paths); `compose(base)` joins another contract of that interface. The legacy shapes came from the
  * historical tools/spec.js table. Binding shapes are source-derived additions shared with Rust and the schema;
  * that generator is absent. The original corpus stays unchanged, with separate binding agreement controls.
@@ -21,7 +21,8 @@
     "rig.pose": {"command":"object.rig.pose","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":128},"action":{"t":"union","by":"kind","cases":{"reset":{"req":{}},"commit":{"req":{"frame":{"t":"int","min":0,"max":4294967295}}}}}}}},
     "labs.speedLines": {"command":"object.labs.speedLines","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":256},"frame":{"t":"int","min":0,"max":4294967295},"cx":{"t":"num","abs":10000000},"cy":{"t":"num","abs":10000000},"count":{"t":"int","min":3,"max":400},"r0":{"t":"num","abs":10000000},"r1":{"t":"num","abs":10000000},"jitter":{"t":"num","min":0,"max":1},"seed":{"t":"int","min":0,"max":4294967295},"color":{"t":"arr","min":4,"max":4,"of":{"t":"num","min":0,"max":1}},"brushSize":{"t":"num","min":0,"max":10000},"opacity":{"t":"num","min":0,"max":1}}}},
     "labs.boil": {"command":"object.labs.boil","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":256},"frame":{"t":"int","min":0,"max":4294967295},"frames":{"t":"int","min":1,"max":24},"amplitude":{"t":"num","min":0.2,"max":1000000},"seedStep":{"t":"int","min":-4294967295,"max":4294967295}}}},
-    "labs.followPath": {"command":"object.labs.followPath","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":256},"frame":{"t":"int","min":0,"max":4294967295},"pathId":{"t":"str","min":1,"max":256},"strokeIds":{"t":"arr","min":1,"max":256,"of":{"t":"str","min":1,"max":256}},"frames":{"t":"int","min":2,"max":120},"ease":{"t":"enum","v":["linear","in","out","inout"]},"removeTrajectory":{"t":"bool"}}}}
+    "labs.followPath": {"command":"object.labs.followPath","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":256},"frame":{"t":"int","min":0,"max":4294967295},"pathId":{"t":"str","min":1,"max":256},"strokeIds":{"t":"arr","min":1,"max":256,"of":{"t":"str","min":1,"max":256}},"frames":{"t":"int","min":2,"max":120},"ease":{"t":"enum","v":["linear","in","out","inout"]},"removeTrajectory":{"t":"bool"}}}},
+    "labs.referenceFill": {"command":"object.labs.referenceFill","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":256},"frame":{"t":"int","min":0,"max":4294967295},"point":{"t":"pair","abs":1000000000000},"color":{"t":"str","min":9,"max":9},"opacity":{"t":"num","min":0,"max":1}}}}
   };
   const has = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
   const fail = (message) => { throw new TypeError(message); };
@@ -146,5 +147,6 @@
   return Object.freeze({ OPERATIONS, SPEC, admitted, requiresRevision: admitted, payload, result, correlate, paths: own.paths, compose, commandOf, bytes,
     MESH_EDIT: PREFIX + 'image.mesh.edit', WIDGET_CREATE: PREFIX + 'widget.create', WIDGET_WRITE: PREFIX + 'widget.write',
     WIDGET_SETTINGS: PREFIX + 'widget.settings', RIG_EDIT: PREFIX + 'rig.edit', RIG_POSE: PREFIX + 'rig.pose',
-    LABS_SPEED_LINES: PREFIX + 'labs.speedLines', LABS_BOIL: PREFIX + 'labs.boil', LABS_FOLLOW_PATH: PREFIX + 'labs.followPath' });
+    LABS_SPEED_LINES: PREFIX + 'labs.speedLines', LABS_BOIL: PREFIX + 'labs.boil', LABS_FOLLOW_PATH: PREFIX + 'labs.followPath',
+    LABS_REFERENCE_FILL: PREFIX + 'labs.referenceFill' });
 }));

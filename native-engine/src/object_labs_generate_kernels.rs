@@ -219,6 +219,7 @@ pub(super) fn generate(
             *ease,
             *remove_trajectory,
         ),
+        LabsRequest::ReferenceFill { .. } => Err(DispatchErrorCode::Internal),
     }
 }
 

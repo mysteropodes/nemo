@@ -147,7 +147,9 @@ fn recolor(
 }
 
 fn companion(r: &ObjectRecord) -> bool {
-    r.vector_ext.value().is_some_and(|e| e.is_linked_fill_companion.value() == Some(&true))
+    r.vector_ext
+        .value()
+        .is_some_and(|e| e.is_linked_fill_companion.value() == Some(&true))
 }
 /// A brush-texture dab (G16): the baseline fill and merge kernels skip `isBrushTextureCopy`.
 fn dab(r: &ObjectRecord) -> bool {
@@ -164,6 +166,7 @@ pub(crate) fn plan_trace(
     opacity: f64,
     remove: bool,
     revision: u64,
+    reference: Option<&[&ObjectRecord]>,
 ) -> Result<BooleanPlan, PlanError> {
     check_scope(document, scope)?;
     let ids = stack_of(document, scope);
@@ -187,9 +190,21 @@ pub(crate) fn plan_trace(
         ));
     }
     let mut tracer = NativeTrace::new(document, scope, click, None, None)
+        .and_then(|tracer| tracer.with_walls(reference.into_iter().flatten().copied()))
         .map_err(|_| PlanError::FillUnavailable)?;
     let hit = find_fill_region(&mut tracer, None).map_err(|_| PlanError::FillUnavailable)?;
+    // U36 reference fill: walls from other layers are not this layer's to regenerate against, so the fill keeps
+    // its seed and gap but no wall ids, and a miss recolors nothing (the baseline only toasts).
+    let hit = hit.map(|mut hit| {
+        if reference.is_some() {
+            hit.wall_ids.clear();
+        }
+        hit
+    });
     let Some(hit) = hit else {
+        if reference.is_some() {
+            return Ok(unchanged(document));
+        }
         return Ok(fallback.map_or_else(
             || unchanged(document),
             |i| recolor(document, i, paint, opacity, false),

@@ -1,5 +1,5 @@
 'use strict';
-// U36 (#2362): under native authority the Labs speed lines, boil and follow-path send one public native operation each,
+// U36 (#2362): under native authority the Labs speed lines, boil, follow-path and reference fill send one public native operation each,
 // built from the baseline option defaults and clamps, through the real labs adapter, rig command and contract; the legacy
 // document and its writers are never touched. Refusals keep the baseline toasts; without a native session the baseline
 // path still runs.
@@ -25,22 +25,24 @@ function harness(options = {}) {
         sent.push(request);
         if (options.refuse) return { apiVersion: 2, requestId: request.requestId, instanceId: pin.instanceId, documentId: pin.documentId,
           contentRevision: pin.contentRevision, ok: false, error: { code: options.refuse, message: 'refused' } };
+        if (options.miss) return { apiVersion: 2, requestId: request.requestId, instanceId: pin.instanceId, documentId: pin.documentId,
+          contentRevision: pin.contentRevision, ok: true, result: { applied: false, historyEntriesAdded: 0 } };
         return { apiVersion: 2, requestId: request.requestId, instanceId: pin.instanceId, documentId: pin.documentId,
           contentRevision: pin.contentRevision + 1, ok: true, result: { applied: true, historyEntriesAdded: 1 } };
       },
       async reconcile() {},
     }) };
   const state = { activeLayerIdx: 1, currentFrame: 6, canvasW: 1920, canvasH: 1080, strokeEnabled: true, strokeColor: '#ff000080',
-    brushSize: 3, opacity: 80 };
+    brushSize: 3, opacity: 80, fillColor: '#336699' };
   if (!options.legacy) Object.defineProperty(state, 'layers', { get: poisoned });
-  const root = { state, console, Math, JSON, SM: { t: (k) => k }, showToast: (t) => toasts.push(t), clearSel: () => cleared.push(1),
+  const root = { state, console, Math, JSON, document: { addEventListener() {} }, SM: { t: (k) => k }, showToast: (t) => toasts.push(t), clearSel: () => cleared.push(1),
     selectedPaths: options.selected || [], SMLabs: { register() {} },
     NemoNativeObjectProject: { desktop: () => (options.legacy ? null : session) }, NemoNativeObjectLabs: Labs,
     pushUndo: poisoned, pushUndoLayers: poisoned, saveActiveLayerFrame: poisoned, saveAllLayerFrames: poisoned, loadFrame: poisoned,
     ensureKeyframe: poisoned, getEffectiveStrokes: poisoned, Path: poisoned, renderTimeline: poisoned, userLayers: new Proxy({}, { get: poisoned }) };
   root.window = root;
   vm.createContext(root);
-  for (const file of ['speed-lines.js', 'boil-effect.js', 'follow-path.js']) vm.runInContext(read('src/js/labs/' + file), root, { filename: file });
+  for (const file of ['speed-lines.js', 'boil-effect.js', 'follow-path.js', 'reference-fill.js']) vm.runInContext(read('src/js/labs/' + file), root, { filename: file });
   return { root, sent, toasts, cleared, labs: root.SMLabs };
 }
 
@@ -91,6 +93,21 @@ test('follow-path sends the selection with its linked fills, or explicit ids, an
   const locked = harness({ refuse: 'unavailable' });
   assert.equal(await locked.labs.speedLines({}), 0);
   assert.deepEqual(locked.toasts, ['labsToastLayerInvalidLocked']);
+});
+
+test('reference fill sends the bucket colour as #rrggbbaa and keeps the baseline outcome toasts', async () => {
+  const h = harness();
+  assert.equal(await h.labs.referenceFill(12.5, -4), true);
+  assert.deepEqual(plain(h.sent[0].payload), { command: 'object.labs.referenceFill', layerUid: 'native-layer:2:0', frame: 6,
+    point: [12.5, -4], color: '#336699ff', opacity: 0.8 });
+  assert.equal(h.sent[0].operation, 'command.document.object.labs.referenceFill');
+  assert.deepEqual(h.toasts, ['labsToastFillPlacedAllLayers']);
+  const miss = harness({ miss: true });
+  assert.equal(await miss.labs.referenceFill(0, 0), false);
+  assert.deepEqual(miss.toasts, ['labsToastNoClosedAreaAllLayers']);
+  const locked = harness({ refuse: 'unavailable' });
+  assert.equal(await locked.labs.referenceFill(0, 0), false);
+  assert.deepEqual(locked.toasts, ['labsToastActiveLayerInvalidLocked']);
 });
 
 test('without a native session the baseline path runs unchanged', () => {

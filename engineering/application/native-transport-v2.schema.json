@@ -3142,6 +3142,53 @@
         }
       }
     },
+    "ObjectLabsReferenceFillPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "frame",
+        "point",
+        "color",
+        "opacity"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.referenceFill"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "point": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": -1000000000000,
+            "maximum": 1000000000000
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "color": {
+          "type": "string",
+          "minLength": 9,
+          "maxLength": 9
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
     "ObjectUndoPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -6545,6 +6592,23 @@
                 },
                 "payload": {
                   "$ref": "#/$defs/ObjectLabsFollowPathPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.referenceFill"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsReferenceFillPayload"
                 }
               }
             }

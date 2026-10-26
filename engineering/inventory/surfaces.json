@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "0da944212ea03e690d076928ed948075f4746f6b",
-  "describe": "v0.7.0-alpha.4-3202-g0da94421"
+  "head": "5d8ac4e8547571e8f8a8547efbc512de51436966",
+  "describe": "v0.7.0-alpha.4-3204-g5d8ac4e8"
  },
- "inputsDigest": "eb6cfadeb7a5237fa364dd36d06331d2cd6b74abf4e3904c7cdabb4125b4a6b8",
+ "inputsDigest": "ed6793036353c15f26ac31a2ba698afb6f692604d083b6c5cdce325fb53b3b34",
  "states": [
   "inventoried",
   "characterized",
@@ -21858,7 +21858,7 @@
    "capability": "Ink & paint (CSP reference layer): SMLabs.referenceFill(x,y) fills on the active layer, reading the strokes of ALL visible layers as walls",
    "area": "labs",
    "handler": [
-    "src/js/labs/reference-fill.js:81"
+    "src/js/labs/reference-fill.js:96"
    ],
    "events": [],
    "exposure": [
@@ -21871,7 +21871,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/reference-fill.js:81",
+   "source": "src/js/labs/reference-fill.js:96",
    "meta": {
     "functionsVisited": 0
    },
