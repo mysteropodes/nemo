@@ -25,6 +25,8 @@ pub(super) fn correlated(
                 | crate::native_contract::shadow::EDIT
                 | crate::native_contract::perspective::READ
                 | crate::native_contract::perspective::EDIT
+                | crate::native_contract::settings::symmetry::READ
+                | crate::native_contract::settings::symmetry::EDIT
                 | crate::native_contract::workspace::READ
                 | crate::native_contract::workspace::EDIT
                 | crate::native_contract::custom_brush::READ
@@ -138,6 +140,7 @@ pub(super) fn pinned_read_correlated(
             | crate::native_contract::guide::READ
             | crate::native_contract::shadow::READ
             | crate::native_contract::perspective::READ
+            | crate::native_contract::settings::symmetry::READ
             | crate::native_contract::workspace::READ
             | crate::native_contract::custom_brush::READ
             | crate::native_contract::comments::READ
@@ -154,6 +157,7 @@ pub(super) fn pinned_read_correlated(
                 | crate::native_contract::guide::READ
                 | crate::native_contract::shadow::READ
                 | crate::native_contract::perspective::READ
+                | crate::native_contract::settings::symmetry::READ
                 | crate::native_contract::workspace::READ
                 | crate::native_contract::custom_brush::READ
                 | crate::native_contract::comments::READ

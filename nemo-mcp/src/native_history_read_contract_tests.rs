@@ -51,7 +51,7 @@ fn published_history_schema_keeps_existing_branches_and_closes_new_shapes() {
     let branches = schema["$defs"]["ResponseBase"]["properties"]["result"]["oneOf"]
         .as_array()
         .unwrap();
-    assert_eq!(branches.len(), 39);
+    assert_eq!(branches.len(), 40);
     assert_eq!(
         branches[37],
         json!({"$ref":"#/$defs/ObjectHistoryReadResult"})

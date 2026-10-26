@@ -7193,6 +7193,40 @@
             {
               "properties": {
                 "operation": {
+                  "const": "query.document.object.project.symmetry.read"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectSymmetryReadPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.project.symmetry.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectSymmetryEditPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
                   "const": "query.document.object.project.workspace.read"
                 },
                 "payload": {
@@ -8205,6 +8239,9 @@
             },
             {
               "$ref": "#/$defs/ObjectHistoryReadResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectSymmetryReadResult"
             },
             {
               "$ref": "#/$defs/ObjectVideoLinkResult"
@@ -13836,6 +13873,340 @@
               "$ref": "#/$defs/ObjectProjectPerspectiveVPPageValue"
             }
           ]
+        }
+      }
+    },
+    "ObjectProjectSymmetryAxis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x1",
+        "y1",
+        "x2",
+        "y2"
+      ],
+      "properties": {
+        "x1": {
+          "type": "number"
+        },
+        "y1": {
+          "type": "number"
+        },
+        "x2": {
+          "type": "number"
+        },
+        "y2": {
+          "type": "number"
+        }
+      }
+    },
+    "ObjectProjectSymmetryPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      }
+    },
+    "ObjectProjectSymmetryEditAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "enabled"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setEnabled"
+            },
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "mode"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setMode"
+            },
+            "mode": {
+              "enum": [
+                "y",
+                "x",
+                "free",
+                "radial"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "resetGuide"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "x1",
+            "y1",
+            "x2",
+            "y2"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setAxis"
+            },
+            "x1": {
+              "type": "number"
+            },
+            "y1": {
+              "type": "number"
+            },
+            "x2": {
+              "type": "number"
+            },
+            "y2": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "x",
+            "y"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setRadialCenter"
+            },
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "sectors"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setSectors"
+            },
+            "sectors": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "extend"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setExtend"
+            },
+            "extend": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectSymmetryEditPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.project.symmetry.edit"
+        },
+        "action": {
+          "$ref": "#/$defs/ObjectProjectSymmetryEditAction"
+        }
+      }
+    },
+    "ObjectProjectSymmetrySelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "const": "settings"
+        }
+      }
+    },
+    "ObjectProjectSymmetryReadPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "selector"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selector": {
+          "$ref": "#/$defs/ObjectProjectSymmetrySelector"
+        }
+      }
+    },
+    "ObjectProjectSymmetrySettingsValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "effective"
+      ],
+      "properties": {
+        "effective": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "mode",
+            "axis",
+            "radialCenter",
+            "radialSectors",
+            "extend"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "mode": {
+              "type": "string",
+              "maxLength": 1024,
+              "minLength": 1
+            },
+            "axis": {
+              "$ref": "#/$defs/ObjectProjectSymmetryAxis"
+            },
+            "radialCenter": {
+              "$ref": "#/$defs/ObjectProjectSymmetryPoint"
+            },
+            "radialSectors": {
+              "type": "number"
+            },
+            "extend": {
+              "type": "boolean"
+            }
+          }
+        },
+        "symmetryEnabled": {
+          "type": "boolean"
+        },
+        "symmetryMode": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "symmetryAxis": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectSymmetryAxis"
+            }
+          ]
+        },
+        "symmetryRadialCenter": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectSymmetryPoint"
+            }
+          ]
+        },
+        "symmetryRadialSectors": {
+          "type": "number"
+        },
+        "symmetryExtend": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ObjectProjectSymmetryReadResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "result"
+      ],
+      "properties": {
+        "instanceId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "documentId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "result": {
+          "$ref": "#/$defs/ObjectProjectSymmetrySettingsValue"
         }
       }
     },
