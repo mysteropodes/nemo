@@ -81,6 +81,7 @@ function extract(lines) {
 
 /** The region of `html` between the markers: { before, region, after } with exact text. */
 function split(html) {
+  if (html.includes('\r')) fail('src/index.html must use LF line endings');
   const begin = html.indexOf(BEGIN), end = html.indexOf(END);
   if (begin < 0 || end < 0 || end < begin || html.indexOf(BEGIN, begin + 1) >= 0 || html.indexOf(END, end + 1) >= 0) {
     fail('src/index.html must hold exactly one script-manifest begin/end marker pair');

@@ -12,6 +12,10 @@ const ROOT = path.join(__dirname, '..');
 const quiet = { log() {}, error() {} };
 function sandbox() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-script-manifest-'));
+  for (const name of ['native-new-contract.js', 'native-new-ui.js']) {
+    fs.mkdirSync(path.join(root, 'src/js/adapters'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'src/js/adapters', name), '');
+  }
   for (const file of ['src/index.html', M.MANIFEST]) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     fs.copyFileSync(path.join(ROOT, file), path.join(root, file));
@@ -47,6 +51,8 @@ test('a hand-edited or stale region fails --check and --write restores it byte f
   }
   fs.writeFileSync(path.join(root, 'src/index.html'), original.replace(M.END, ''));
   assert.throws(() => main(['--check'], root, quiet), /exactly one script-manifest begin\/end marker pair/);
+  fs.writeFileSync(path.join(root, 'src/index.html'), original.replace(/\n/g, '\r\n'));
+  assert.throws(() => main(['--check'], root, quiet), /LF line endings/);
 });
 
 test('--add places a new adapter by name and the region follows; bad paths and duplicates are refused', () => {
@@ -59,7 +65,11 @@ test('--add places a new adapter by name and the region follows; bad paths and d
   assert.equal(order[order.length - 1], 'js/adapters/native-new-ui.js');
   assert.throws(() => main(['--add', 'js/adapters/native-new-ui.js'], root, quiet), /listed twice/);
   assert.throws(() => main(['--add', '../outside.js'], root, quiet), /invalid script path/);
+  fs.writeFileSync(path.join(root, 'src/js/x.js'), '');
   assert.throws(() => main(['--add', 'js/x.js', '--after', 'js/not-listed.js'], root, quiet), /is not listed/);
+  assert.throws(() => main(['--add', 'js/x.js', '--before'], root, quiet), /needs a value/);
+  assert.throws(() => main(['--add', 'js/missing.js'], root, quiet), /does not exist/);
+  assert.equal(main(['--check'], root, quiet), 0, 'a refused --add leaves page and manifest consistent');
   for (const entry of [{ src: 'js/x.js', defer: true }, { inline: 'a</script>' }, { comment: ['no comment'] }, { comment: ['<!-- script-manifest:end -->'] }]) {
     assert.equal(M.validEntry(entry), false, JSON.stringify(entry));
   }
