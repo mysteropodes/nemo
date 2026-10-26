@@ -18,7 +18,7 @@ const plain = (value) => JSON.parse(JSON.stringify(value)); // arrays built insi
 function harness(options = {}) {
   const sent = [], toasts = [], cleared = [];
   const pin = { instanceId: 'instance-A', documentId: 'document-A', lifecycleGeneration: 1, contentRevision: 4,
-    layers: [{ layerUid: 'native-layer:1:0' }, { layerUid: 'native-layer:2:0' }] };
+    layers: [{ layerUid: 'native-layer:1:0', name: 'Ink' }, { layerUid: 'native-layer:2:0', name: 'Color' }, { layerUid: 'native-layer:3:0', name: 'Locked', locked: true }] };
   const reads = [];
   const session = { info: () => pin, isActive: () => true, blocksLegacy: () => true, requestId: (label) => label + '-' + (sent.length + 1),
     async readLayerCells(uid, p) { reads.push([uid, p === pin]); return options.cells || null; },
@@ -44,7 +44,7 @@ function harness(options = {}) {
     ensureKeyframe: poisoned, getEffectiveStrokes: poisoned, Path: poisoned, renderTimeline: poisoned, userLayers: new Proxy({}, { get: poisoned }) };
   root.window = root;
   vm.createContext(root);
-  for (const file of ['speed-lines.js', 'boil-effect.js', 'follow-path.js', 'reference-fill.js', 'pingpong-cycle.js', 'retime-exposure.js', 'interval-assistant.js']) vm.runInContext(read('src/js/labs/' + file), root, { filename: file });
+  for (const file of ['speed-lines.js', 'boil-effect.js', 'follow-path.js', 'reference-fill.js', 'pingpong-cycle.js', 'retime-exposure.js', 'interval-assistant.js', 'move-to-layer.js']) vm.runInContext(read('src/js/labs/' + file), root, { filename: file });
   return { root, sent, toasts, cleared, reads, labs: root.SMLabs };
 }
 
@@ -145,6 +145,26 @@ test('interval sends the clamped count and eases its own slots without the nativ
   const tight = harness({ bounds: { minL: 0, maxL: 0, minF: 0, maxF: 1 } });
   await tight.labs.intervalAssistant(1);
   assert.deepEqual([tight.toasts, tight.sent.length], [['labsToastNeedAtLeast2FramesGap'], 0]);
+});
+
+test('move-to-layer sends the selected stroke ids and keeps the baseline target toasts', async () => {
+  const selected = [{ data: { strokeId: 'a' } }, { data: { strokeId: 'b' } }, { data: { strokeId: 'a' } }];
+  const h = harness({ selected });
+  assert.equal(await h.labs.moveSelectionToLayer(0), 2);
+  assert.deepEqual(plain(h.sent[0].payload), { command: 'object.labs.moveToLayer', fromLayer: 'native-layer:2:0', toLayer: 'native-layer:1:0',
+    frame: 6, strokeIds: ['a', 'b'] });
+  assert.deepEqual([h.toasts, h.cleared], [['2labsToastMovedToLayerMidInk »'], [1]]);
+  for (const [index, toast] of [[1, 'labsToastTargetLayerInvalid'], [2, 'labsToastTargetLayerLocked'], [9, 'labsToastTargetLayerInvalid']]) {
+    const g = harness({ selected });
+    assert.equal(await g.labs.moveSelectionToLayer(index), 0);
+    assert.deepEqual([g.toasts, g.sent.length], [[toast], 0], String(index));
+  }
+  const component = harness({ selected, refuse: 'unavailable' });
+  assert.equal(await component.labs.moveSelectionToLayer(0), 0);
+  assert.deepEqual(component.toasts, ['labsToastCannotMoveToComponentLayer']);
+  const none = harness();
+  assert.equal(none.labs.moveSelectionToLayer(0), 0, 'no selection is refused before any route, as in the baseline');
+  assert.deepEqual(none.toasts, ['labsToastSelectStrokesFirst']);
 });
 
 test('without a native session the baseline path runs unchanged', () => {

@@ -22,6 +22,8 @@ use serde_json::Value;
 mod actions;
 #[path = "object_labs_generate_kernels.rs"]
 mod kernels;
+#[path = "object_labs_move.rs"]
+mod moves;
 pub(crate) use kernels::Ease;
 
 #[path = "object_labs_request.rs"]
@@ -149,6 +151,12 @@ impl ObjectFillOwner {
                 last,
                 spacing,
             } => actions::retime(&origin, from_layer, to_layer, *first, *last, *spacing),
+            LabsRequest::MoveToLayer {
+                from_layer,
+                to_layer,
+                frame,
+                stroke_ids,
+            } => moves::move_to_layer(&origin, from_layer, to_layer, *frame, stroke_ids),
             LabsRequest::Interval {
                 layer_uid,
                 first,

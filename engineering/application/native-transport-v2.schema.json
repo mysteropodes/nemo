@@ -3318,6 +3318,47 @@
         }
       }
     },
+    "ObjectLabsMoveToLayerPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "fromLayer",
+        "toLayer",
+        "frame",
+        "strokeIds"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.moveToLayer"
+        },
+        "fromLayer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "toLayer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "strokeIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 1,
+          "maxItems": 256
+        }
+      }
+    },
     "ObjectUndoPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -6789,6 +6830,23 @@
                 },
                 "payload": {
                   "$ref": "#/$defs/ObjectLabsIntervalPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.moveToLayer"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsMoveToLayerPayload"
                 }
               }
             }
