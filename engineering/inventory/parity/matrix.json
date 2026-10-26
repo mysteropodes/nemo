@@ -7,10 +7,11 @@
     "surfaces": 903,
     "tasks": 228,
     "surfaceStatus": {
-      "issues-open": 584,
-      "curated-open": 216,
+      "issues-open": 575,
+      "curated-open": 215,
       "curated-closed": 57,
-      "issues-closed": 46
+      "issues-closed": 46,
+      "disposition": 10
     },
     "taskStatus": {
       "issues-closed": 41,
@@ -7208,10 +7209,10 @@
         "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:boil-effect",
@@ -7250,10 +7251,10 @@
         "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:command-palette",
@@ -7350,10 +7351,10 @@
         "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:lipsync-assistant",
@@ -7365,10 +7366,10 @@
         "I42"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:mirror-check",
@@ -7421,10 +7422,10 @@
         "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:out-of-pegs",
@@ -7534,10 +7535,10 @@
         "U25"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "curated-open"
+      "status": "disposition"
     },
     {
       "id": "labs:screentone-bake",
@@ -7548,10 +7549,10 @@
         "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:shader-effects-bake",
@@ -7563,10 +7564,10 @@
         "G11"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:speed-lines",
@@ -7591,10 +7592,10 @@
         "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:timelapse",
@@ -7605,10 +7606,10 @@
         "U37"
       ],
       "capabilityId": null,
-      "disposition": null,
+      "disposition": "dormant-in-baseline (U37): not in the 1065e9d8 or current startup script graph; retained source classic-without-load-site; no desktop functionality acceptance claimed — see engineering/inventory/parity/dispositions/U37.md",
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "disposition"
     },
     {
       "id": "labs:timeline-markers",
