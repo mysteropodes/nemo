@@ -1,5 +1,5 @@
 //! Closed Draw symmetry metadata contract. Native owns persistent settings and history.
-use super::{exact, revision};
+use crate::native_contract::{exact, revision};
 use crate::contract::bounded_identifier;
 use serde_json::Value;
 
@@ -39,7 +39,7 @@ fn action(v: &Value) -> bool {
         _ => false,
     }
 }
-pub(super) fn request(op: &str, v: &Value) -> bool {
+pub(crate) fn request(op: &str, v: &Value) -> bool {
     if op == EDIT {
         return exact(v, &["command", "action"], &[]).is_some()
             && v["command"] == "object.project.symmetry.edit"
@@ -97,9 +97,9 @@ fn settings(v: &Value) -> bool {
         && v.get("symmetryRadialSectors").is_none_or(|_| numbers(v, &["symmetryRadialSectors"]))
         && v.get("symmetryExtend").is_none_or(Value::is_boolean)
 }
-pub(super) fn result(op: &str, document: &str, payload: &Value, value: &Value) -> bool {
+pub(crate) fn result(op: &str, document: &str, payload: &Value, value: &Value) -> bool {
     if op == EDIT {
-        return super::settings::result(value);
+        return super::result(value);
     }
     op == READ
         && request(op, payload)

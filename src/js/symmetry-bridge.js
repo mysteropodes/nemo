@@ -104,12 +104,15 @@
   }
   window.ensureSymmetryAxis = ensureSymmetryAxis;
   window.ensureSymmetryRadialCenter = ensureSymmetryRadialCenter;
+  function nativeRoute(action) { var c = window.NemoNativeSymmetryController; return !!(c && c.route(action)); }
   window.resetSymmetryGuide = function () {
+    if (nativeRoute({ kind: 'resetGuide' })) return;
     if (state.symmetryMode === 'radial') state.symmetryRadialCenter = defaultRadialCenter();
     else state.symmetryAxis = defaultAxis(state.symmetryMode);
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   };
   window.setSymmetryMode = function (mode) {
+    if (nativeRoute({ kind: 'setMode', mode: mode })) return;
     state.symmetryMode = mode;
     if (mode === 'radial') state.symmetryRadialCenter = defaultRadialCenter();
     else state.symmetryAxis = defaultAxis(mode);
@@ -446,6 +449,10 @@
   function onUp(e) {
     if (!shouldEdit() || (!draggingEndpoint && !draggingWhole && !draggingCenter)) return;
     e.stopImmediatePropagation(); e.preventDefault();
+    // On desktop the drag moved only the presented guide; the release is one native edit.
+    var c = state.symmetryRadialCenter, a = state.symmetryAxis;
+    if (draggingCenter) nativeRoute({ kind: 'setRadialCenter', x: c.x, y: c.y });
+    else nativeRoute({ kind: 'setAxis', x1: a.x1, y1: a.y1, x2: a.x2, y2: a.y2 });
     draggingEndpoint = null; draggingWhole = null; draggingCenter = false;
     window.SMEngineBridge.resume();
     window.SMEngineBridge.renderNow();

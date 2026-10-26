@@ -116,3 +116,6 @@ mod tests {
         }
     }
 }
+// Draw symmetry is a project setting with its own closed read/edit namespace.
+#[path = "native_symmetry_contract.rs"]
+pub(crate) mod symmetry;
