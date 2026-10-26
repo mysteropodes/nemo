@@ -8,6 +8,9 @@
   var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
   function same(a,b){return !!a&&!!b&&pinKeys.every(function(k){return a[k]===b[k];});}
   function fail(message){throw new Error(message);}
+  // A pressure ribbon drawn with Fill on carries its linked fill companion (draw-bridge.js @1065e9d8): the dictionary
+  // builder records it here, against the ribbon's dictionary, and the commit creates both in one createMany.
+  var linkedCompanions=new WeakMap();
   function consume(e){if(e&&e.stopImmediatePropagation)e.stopImmediatePropagation();if(e&&e.preventDefault)e.preventDefault();}
   function create(root,ports){
     var Mapping=ports.mapping;
@@ -161,7 +164,8 @@
       if(!current(t,true))return Promise.resolve({status:'cancelled'});
       if(ports.pen&&t.anchors.length<2)return Promise.resolve({status:'cancelled'});
       if(!ports.freehand&&!ports.pen&&Math.hypot(end[0]-t.start[0],end[1]-t.start[1])<2)return Promise.resolve({status:'cancelled'});
-      var dict=dictionary(t,end),s=t.session;
+      var dict=dictionary(t,end),s=t.session,companion=linkedCompanions.get(dict)||null;
+      if(companion&&root.state.maskMode)fail('Mask mode with a pressure fill is unavailable in native Drawing.');
       // Labs predictive stroke (draw-bridge.js onStrokeCommitted @1065e9d8) reshapes a freehand stroke before it is committed.
       if(ports.freehand&&root.SMLabs&&typeof root.SMLabs.predictStrokeDict==='function')dict=root.SMLabs.predictStrokeDict(dict)||dict;
       // Mask mode (tools.js tagOwner @1065e9d8, on every Draw/Pen/shape commit): the shape becomes a mask of the layer
@@ -175,6 +179,9 @@
       });}};
       // tools.js @1065e9d8 Draw commit: drawMode 'behind' slips the stroke under the layer's artwork.
       var vector=root.NemoNativeObjectVector.create(guarded),dicts=symmetric(dict,t.pin);
+      // The linked fill lies below its ribbon: one createMany in that order (behind keeps the order at the bottom).
+      var group=companion?[companion,dict]:[dict];
+      if(companion)dicts=group;
       var options={origin:t.pin,placement:ports.freehand&&t.behind?'behind':'front'};
       // draw-bridge.js @1065e9d8 Trim Stroke Ends: a Draw commit trims before its symmetry copies exist; native shares the cuts.
       if(ports.freehand&&root.state.trimStrokeEnds&&root.state.trimStrokeEndsMax>0)options.trimEnds=root.state.trimStrokeEndsMax;
@@ -184,7 +191,9 @@
       if(stamps.length){
         // Behind, the k-th record of one create lies k-th from the bottom; one create per step lands each at the bottom.
         var here=dicts.map(function(d){return {create:d,placement:options.placement};});if(options.placement==='behind')here.reverse();
-        var steps=here.concat(stamps.map(function(frame){return {create:dict,frame:frame,keyframe:'copy',placement:options.placement};}));
+        var steps=here.concat([].concat.apply([],stamps.map(function(frame){
+          var cell=group.map(function(d){return {create:d,frame:frame,keyframe:'copy',placement:options.placement};});
+          return options.placement==='behind'?cell.reverse():cell;})));
         return vector.batchStrokes(t.layerUid,t.frame,steps,Object.assign({origin:t.pin},options.trimEnds?{trimEnds:options.trimEnds}:{})).then(function(result){
           if(result&&result.status==='applied'&&typeof root.SMLabs.multiframeStamped==='function')root.SMLabs.multiframeStamped(stamps.length);return result;});
       }
@@ -319,8 +328,8 @@
             ? root.SMLabs.unmigratedDrawHooks().length > 0 : root.SMLabs.list().some(function(p){return p.on;})))
         throw new Error('This brush combination is unavailable in native Drawing.');
       if (typeof state.vectorBrush !== 'boolean' || typeof state.strokeEnabled !== 'boolean' || typeof state.fillEnabled !== 'boolean' ||
-          !state.strokeEnabled && !state.fillEnabled || state.vectorBrush && (!state.strokeEnabled || state.fillEnabled))
-        throw new Error('Native pressure Drawing requires one stroke ribbon without a linked fill.');
+          !state.strokeEnabled && !state.fillEnabled)
+        throw new Error('Enable a stroke or a fill to draw.');
       var keys = ['vectorBrush','strokeEnabled','fillEnabled','strokeColor','fillColor','brushSize','opacity','strokeCap','strokeJoin',
         'strokeStyle','miterLimit','dashOffset','paintOrder','smoothing','stabilizer','taperEnds','pressureMin','pressureMax',
         'pressureInvert','pressureCurve','pressureCurvePoints','brushAngle','brushAngleFactor'];
@@ -377,7 +386,15 @@
       var out={strokeColor:style.strokeEnabled?style.strokeColor:null,hasRealStroke:style.strokeEnabled,strokeWidth:style.brushSize,
         strokeCap:style.strokeCap,strokeJoin:style.strokeJoin,fillColor:style.fillEnabled?style.fillColor:null,opacity:style.opacity/100};
       function segments(item){return item.segments.map(function(s){return {point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};});}
-      if(style.vectorBrush){
+      // draw-bridge.js @1065e9d8: a pressure stroke with Stroke off is one closed fill of its smoothed centreline, no ribbon
+      // and no taper, at the Paper defaults of a new Path.
+      if(style.vectorBrush&&!style.strokeEnabled){
+        var fo=buildCenterSegmentsFromRawStroke(pts,widths,style.smoothing);
+        path=new Path({insert:false});
+        fo.forEach(function(s){path.add(new root.Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
+        path.closed=true;
+        out.strokeWidth=1;out.strokeCap='butt';out.strokeJoin='miter';out.miterLimit=10;out.dashOffset=0;
+      }else if(style.vectorBrush){
         var cs=buildCenterSegmentsFromRawStroke(pts,widths,style.smoothing);
         if(style.taperEnds)applyTaperToCenterSegments(cs,0.15);
         var sampled=sampleVectorBrushCenterline(cs,cs.widthProfile);
@@ -388,6 +405,15 @@
         // Matches a new baseline pressure Path: no actual stroke, Paper default
         // stroke width/cap/join, and applyBrushKeyline has no width to paint.
         out.strokeWidth=1;out.strokeCap='butt';out.strokeJoin='miter';out.miterLimit=10;out.dashOffset=0;
+        if(style.fillEnabled){
+          // The companion is the ribbon's sampled centreline, closed and filled (rebuildVectorBrushOutline), below the
+          // ribbon, under a fresh link id of its own (ensureStrokeId shape), with no stroke of its own.
+          var link='s'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e9)+'_lf';
+          out.linkedFillId=link;
+          linkedCompanions.set(out,{segments:sampled.centerSegments.map(function(s){return {point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};}),
+            closed:true,strokeColor:null,hasRealStroke:false,strokeWidth:1,strokeCap:'butt',strokeJoin:'miter',miterLimit:10,dashOffset:0,
+            fillColor:style.fillColor,opacity:style.opacity/100,isLinkedFillCompanion:true,linkedFillId:link});
+        }
       }else{
         path=new Path({insert:false});pts.forEach(function(p){path.add(p);});simplifyIfNeeded(path,style.smoothing);
         var stroke={strokeWidth:style.brushSize,data:{}};applyStrokeStyle(stroke);

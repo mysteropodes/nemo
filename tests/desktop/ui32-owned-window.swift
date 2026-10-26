@@ -40,7 +40,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
   }
   let pid=pinned.pid, main=pinned.main
   var ordinal=0, originals=[String:String](), observed=false, menuOpened=false, phase2ReadUsed=false
-  var currentCommand:String?
+  var currentCommand:String?,cs4KeysUsed=false
   let entryEnabled=try ui32EntryMode(environment["NEMO_UI32_ENTRY_MODE"]);var entryStage=0,sourceCaptureStage = -1,newSettingsOpen=false
   var fixture:UI32Fixture?, syncPanel:UI32Fixture?
   let f03=try f03Operator(pinned,environment)
@@ -291,6 +291,13 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
       result["capture"]=name; try emit(result); continue
     }
     try ui32RequireObserved(observed)
+    if command == "cs4.start-keys" {
+      try cs7StartAdmission(command,entry:entryEnabled,fixture:fixture != nil,sync:syncPanel != nil,
+        f03:f03 != nil,used:cs4KeysUsed,option:request["option"],value:request["value"])
+      cs4KeysUsed=true
+      result.merge(try cs7StartKeys(pinned,resolve:resolve,visible:enabledVisible)) {_,new in new}
+      try emit(result);continue
+    }
     if command.hasPrefix("f03.") {
       try check(request["option"] == nil && request["value"] == nil)
       guard let f03 else {throw Refusal(code:"adapter-refused")}

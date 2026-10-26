@@ -44,6 +44,19 @@ test('members serP can never write refuse the mapping and the contract', () => {
     assert.equal(result.ok, false, key + ' ' + String(value)); assert.equal(result.code, 'invalid_dict', key);
   }
   assert.equal(Stroke.toRecord(Object.assign({}, base, { brushTexturePreset: 'p' }), WHERE).code, 'invalid_dict', 'a dab is not an anchor');
+  // G16 option C: an anchor's stamping seed maps both ways; a seed on a dab, or out of uint32, refuses.
+  const anchor = oracle.cases.find((c) => c.in.brushTexturePreset).in;
+  const seeded = Stroke.toRecord(Object.assign({}, anchor, { strokeSeed: 4294967295 }), WHERE);
+  assert.equal(seeded.ok, true, JSON.stringify(seeded));
+  assert.equal(seeded.record.vectorExt.brushTexture.strokeSeed, 4294967295);
+  assert.equal(Stroke.toDict(seeded.record).strokeSeed, 4294967295);
+  Contract.payload(Contract.VECTOR, { command: 'object.vector.create', record: seeded.record });
+  for (const [dict, why] of [[Object.assign({}, base, { strokeSeed: 1 }), 'dab'], [Object.assign({}, anchor, { strokeSeed: -1 }), 'negative'],
+    [Object.assign({}, anchor, { strokeSeed: 2 ** 32 }), 'too large'], [Object.assign({}, anchor, { strokeSeed: 1.5 }), 'fraction']]) {
+    assert.equal(Stroke.toRecord(dict, WHERE).code, 'invalid_dict', why);
+  }
+  const unseeded = JSON.parse(JSON.stringify(seeded.record)); delete unseeded.vectorExt.brushTexture.brushTexturePreset;
+  assert.throws(() => Contract.payload(Contract.VECTOR, { command: 'object.vector.create', record: unseeded }), TypeError, 'a seed without a preset');
   const record = Stroke.toRecord(base, WHERE).record;
   for (const tags of [{}, { isBrushTextureCopy: false }, { brushGroupId: '' }, { brushGroupId: 'g', extra: 1 }]) {
     const bad = JSON.parse(JSON.stringify(record)); bad.vectorExt.brushTexture = tags;

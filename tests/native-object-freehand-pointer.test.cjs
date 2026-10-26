@@ -164,7 +164,7 @@ test('chrome, cancellation, Escape and lost capture remain usable or abort witho
   send(f,'pointerup',60,50);assert.equal(f.calls.length,0,action);assert.equal(f.body.children.length,0,action);assert.equal(f.paper.project.activeLayer.children.length,0);}
 });
 test('unsupported brush cells are explicit without native or legacy fallback',async()=>{
- const cases=[s=>s.vectorBrush=true,s=>s.tool='fillbrush',s=>s.bitmapBrushOn=true,s=>s.brushPreset='charcoal-smooth',
+ const cases=[s=>s.tool='fillbrush',s=>s.bitmapBrushOn=true,s=>s.brushPreset='charcoal-smooth',
   // Trim Stroke Ends commits natively for a plain stroke; a pressure-brush trim rebuilds its outline and stays refused.
   s=>Object.assign(s,{trimStrokeEnds:true,vectorBrush:true,fillEnabled:false}),
   // With stop-at-axis symmetry the original trims the whole stroke before clipping; native would trim the clipped one.
@@ -356,4 +356,36 @@ test('Labs multi-frame draw stamps the native stroke on the other selected frame
  const off=await fixture();multiframe(off,false);
  send(off,'pointerdown',10,40);send(off,'pointermove',40,41);send(off,'pointerup',100,40);
  await settled(off);assert.equal(off.calls[0].payload.command,'object.vector.create');
+});
+
+// #2361 G15 (draw-bridge.js commitStroke @1065e9d8): the fresh-profile default, a pressure brush with Fill on, commits
+// the ribbon and its linked fill companion (the sampled centreline, closed, in the fill colour, below the ribbon) as one
+// createMany; with Stroke off the stroke is one closed fill of its centreline, without a ribbon.
+test('a pressure stroke with Fill on commits its ribbon and linked fill in one createMany, companion first',async()=>{
+ const f=await fixture();Object.assign(f.root.state,{vectorBrush:true});
+ send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:0});
+ await settled(f);assert.equal(f.calls.length,1);const q=plain(f.calls[0].payload);
+ assert.equal(q.command,'object.vector.createMany');assert.equal(q.records.length,2);
+ const [fill,ribbon]=q.records;
+ assert.deepEqual([fill.vectorExt.isLinkedFillCompanion,ribbon.vectorExt.isLinkedFillCompanion===true],[true,false]);
+ assert.equal(fill.vectorExt.linkedFillId,ribbon.vectorExt.linkedFillId);assert.ok(fill.vectorExt.linkedFillId.length>0);
+ assert.deepEqual([fill.geometry.closed,fill.vector.hasRealStroke,fill.fill.r],[true,false,0x44/255]);
+ assert.equal(fill.vectorExt.pressure,undefined,'the companion is a plain fill');
+ // The companion is the baseline sampler's centreline of the ribbon's own pressure centreline (rebuildVectorBrushOutline).
+ const cs=ribbon.vectorExt.pressure.centerSegments.map(s=>({point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y],width:s.width}));
+ const sampled=f.root.sampleVectorBrushCenterline(cs,ribbon.vectorExt.pressure.widthProfile).centerSegments;
+ assert.deepEqual(fill.geometry.segments.map(s=>[s.point.x,s.point.y,s.handleIn.x,s.handleIn.y,s.handleOut.x,s.handleOut.y]),
+   plain(sampled.map(s=>[s.point.x,s.point.y,s.handleIn.x,s.handleIn.y,s.handleOut.x,s.handleOut.y])),'the companion follows the sampled centreline');
+ assert.equal(ribbon.fill.r,0x11/255,'the ribbon is painted in the stroke colour');
+ const masked=await fixture();Object.assign(masked.root.state,{vectorBrush:true,maskMode:true});
+ send(masked,'pointerdown',20,20);send(masked,'pointermove',50,30);send(masked,'pointerup',80,45);await settled(masked);
+ assert.equal(masked.calls.length,0);assert.ok(masked.log.some(s=>/Mask mode with a pressure fill/.test(s)),masked.log.join(','));
+});
+test('a pressure stroke with Stroke off is one closed fill of its centreline',async()=>{
+ const f=await fixture();Object.assign(f.root.state,{vectorBrush:true,strokeEnabled:false});
+ send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:0});
+ await settled(f);assert.equal(f.calls.length,1);const r=plain(f.calls[0].payload.record);
+ assert.equal(f.calls[0].payload.command,'object.vector.create');
+ assert.deepEqual([r.geometry.closed,r.vector.hasRealStroke,r.fill.r,r.vectorExt&&r.vectorExt.pressure],[true,false,0x44/255,undefined]);
+ assert.deepEqual(r.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,20],[50,30],[80,45]]);
 });

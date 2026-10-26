@@ -1,0 +1,205 @@
+[
+  {
+    "name": "open",
+    "roles": [],
+    "fontPresent": false,
+    "assetBound": false,
+    "reopened": false,
+    "instruction": "Open Initial-text.json via the ordinary menu and real picker. Require editor AND actual three colored fixture objects."
+  },
+  {
+    "name": "blank-cancel",
+    "roles": [],
+    "fontPresent": false,
+    "assetBound": false,
+    "reopened": false,
+    "instruction": "Select the actual Text toolbar control. Click observed canvas, leave blank, use Cancel/Escape. No new object/revision."
+  },
+  {
+    "name": "point-create",
+    "roles": [
+      "point"
+    ],
+    "fontPresent": false,
+    "assetBound": false,
+    "reopened": false,
+    "instruction": "Ordinary Text click at an observed clear canvas location. Enter Native Text A; font Roboto-Regular; size20; color#123456; align left; Apply. Witness real glyphs."
+  },
+  {
+    "name": "point-edit",
+    "roles": [
+      "point"
+    ],
+    "fontPresent": false,
+    "assetBound": false,
+    "reopened": false,
+    "instruction": "Choose the owner-discovered point UID in Native text block. Set Native Text B, Roboto-Bold, size24, color#224466; Apply."
+  },
+  {
+    "name": "undo-edit",
+    "roles": [
+      "point"
+    ],
+    "fontPresent": false,
+    "assetBound": false,
+    "reopened": false,
+    "instruction": "Use ordinary Undo once. Point text/style must return to Native Text A/Regular20/#123456."
+  },
+  {
+    "name": "redo-edit",
+    "roles": [
+      "point"
+    ],
+    "fontPresent": false,
+    "assetBound": false,
+    "reopened": false,
+    "instruction": "Use ordinary Redo once. Restore Native Text B/Bold24/#224466."
+  },
+  {
+    "name": "font-import",
+    "roles": [
+      "point"
+    ],
+    "fontPresent": true,
+    "assetBound": false,
+    "reopened": false,
+    "instruction": "Open Fonts; choose bundled Roboto-Regular; Import bundled font. Read the actual new available asset ID and fingerprint; do not invent an ID or inject embedded bytes."
+  },
+  {
+    "name": "font-bind",
+    "roles": [
+      "point"
+    ],
+    "fontPresent": true,
+    "assetBound": true,
+    "reopened": false,
+    "instruction": "Select the discovered point UID. In the ordinary Text font select choose the document font row with the exact admitted asset ID; Apply."
+  },
+  {
+    "name": "undo-font",
+    "roles": [
+      "point"
+    ],
+    "fontPresent": true,
+    "assetBound": false,
+    "reopened": false,
+    "instruction": "Ordinary Undo restores bundled Roboto-Bold while preserving text/style/anchor and font inventory."
+  },
+  {
+    "name": "redo-font",
+    "roles": [
+      "point"
+    ],
+    "fontPresent": true,
+    "assetBound": true,
+    "reopened": false,
+    "instruction": "Ordinary Redo restores the exact document asset font binding."
+  },
+  {
+    "name": "area-create",
+    "roles": [
+      "point",
+      "area"
+    ],
+    "fontPresent": true,
+    "assetBound": true,
+    "reopened": false,
+    "instruction": "Ordinary Text drag a visible box in remaining canvas space; DOM draft Native area\\nsecond line; size16; Roboto-Regular; color#336699; Apply or Ctrl/CmdEnter. Witness wrapping/position."
+  },
+  {
+    "name": "save-as",
+    "roles": [
+      "point",
+      "area"
+    ],
+    "fontPresent": true,
+    "assetBound": true,
+    "reopened": false,
+    "instruction": "Ordinary Save As to new Saved-text.json. Wait for native saved acknowledgement; capture exact saved file."
+  },
+  {
+    "name": "replace-initial",
+    "roles": [],
+    "fontPresent": false,
+    "assetBound": false,
+    "reopened": false,
+    "instruction": "Ordinary Open Initial-text.json again. Verify a fresh owner/presentation, no old text targets/font rows/editor draft."
+  },
+  {
+    "name": "reopen-saved",
+    "roles": [
+      "point",
+      "area"
+    ],
+    "fontPresent": true,
+    "assetBound": true,
+    "reopened": true,
+    "instruction": "Ordinary Open Saved-text.json. Require both exact opaque native UIDs, text, optional-field presence and admitted font bytes/binding to survive."
+  },
+  {
+    "name": "edit-reopened",
+    "roles": [
+      "point",
+      "area"
+    ],
+    "fontPresent": true,
+    "assetBound": true,
+    "reopened": false,
+    "instruction": "Select reopened point UID in actual native target dropdown. Set text Reopened Text C only; Apply. No duplicate native record."
+  },
+  {
+    "name": "undo-reopened",
+    "roles": [
+      "point",
+      "area"
+    ],
+    "fontPresent": true,
+    "assetBound": true,
+    "reopened": false,
+    "instruction": "Ordinary Undo restores Native Text B with the exact asset font."
+  },
+  {
+    "name": "redo-reopened",
+    "roles": [
+      "point",
+      "area"
+    ],
+    "fontPresent": true,
+    "assetBound": true,
+    "reopened": false,
+    "instruction": "Ordinary Redo restores Reopened Text C."
+  },
+  {
+    "name": "save-after",
+    "roles": [
+      "point",
+      "area"
+    ],
+    "fontPresent": true,
+    "assetBound": true,
+    "reopened": false,
+    "instruction": "Ordinary Save As to new Saved-text-after.json. Validate full retained fixture semantics and exact two text/font records."
+  },
+  {
+    "name": "stale-read",
+    "roles": [
+      "point",
+      "area"
+    ],
+    "fontPresent": true,
+    "assetBound": true,
+    "reopened": false,
+    "instruction": "Use the public read client with an earlier captured revision/snapshot (read-only). Require typed stale_revision, then fresh reads prove no state mutation."
+  },
+  {
+    "name": "locked-placement",
+    "roles": [
+      "point",
+      "area"
+    ],
+    "fontPresent": true,
+    "assetBound": true,
+    "reopened": false,
+    "instruction": "Select visible locked F06-C if ordinary UI permits; Text placement must refuse without new draft/item/revision. Return to F06-A. Preserve an unavailable route as a failed/unavailable gate, never fabricate success."
+  }
+]
