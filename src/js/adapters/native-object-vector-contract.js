@@ -145,7 +145,7 @@
   }
   // G16: serP's brush-texture members as stored (an anchor's preset and hidden paint, or a dab's copy flag).
   function brushTexture(value, label) {
-    exact(value, [], ['brushGroupId', 'isBrushTextureCopy', 'brushTexturePreset', 'preTextureOpacity', 'preTextureStroke'], label);
+    exact(value, [], ['brushGroupId', 'isBrushTextureCopy', 'brushTexturePreset', 'preTextureOpacity', 'preTextureStroke', 'strokeSeed'], label);
     const text = (v) => typeof v === 'string' && v.length > 0 && bytes(v) <= 255 && !v.includes('\0');   // UTF-8 bytes, as native counts
     if (!Object.keys(value).length) fail(`${label} must not be empty`);
     if (has(value, 'brushGroupId') && !text(value.brushGroupId)) fail(`${label}.brushGroupId is invalid`);
@@ -154,6 +154,8 @@
     if (has(value, 'preTextureOpacity') && !(typeof value.preTextureOpacity === 'number' && Number.isFinite(value.preTextureOpacity))) fail(`${label}.preTextureOpacity must be finite`);
     if (has(value, 'preTextureStroke') && value.preTextureStroke !== null && !/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value.preTextureStroke)) fail(`${label}.preTextureStroke is invalid`);
     if (has(value, 'isBrushTextureCopy') && has(value, 'brushTexturePreset')) fail(`${label} is not both an anchor and a dab`);
+    // G16 option C: an anchor's stamping seed, a uint32.
+    if (has(value, 'strokeSeed') && !(Number.isInteger(value.strokeSeed) && value.strokeSeed >= 0 && value.strokeSeed <= 0xFFFFFFFF && has(value, 'brushTexturePreset'))) fail(`${label}.strokeSeed is invalid`);
   }
   function ext(value, label, hasStroke) {
     exact(value, [], ['pressure', 'paramShape', 'boxAngle', 'fillGradient', 'fillTrace', 'isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion', 'brushTexture'], label);

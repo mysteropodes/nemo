@@ -25,6 +25,9 @@ fn anchor_dab_and_lone_group_members_round_trip_exactly_as_serp_writes_them() {
         // dab, and a group id alone (serP keeps it without a preset or copy flag).
         json!({"brushGroupId":"bg1","isBrushTextureCopy":true}),
         json!({"brushGroupId":"lone"}),
+        // G16 option C: a native anchor carries its stamping seed (uint32), from 0 to the top of the range.
+        json!({"brushGroupId":"bg4","brushTexturePreset":"chalk-round","preTextureOpacity":1,"strokeSeed":4294967295u64}),
+        json!({"brushGroupId":"bg5","brushTexturePreset":"ink-chisel","preTextureStroke":null,"strokeSeed":0}),
     ] {
         let record = tagged(tags.clone());
         assert_eq!(saved(record.clone())["vectorExt"]["brushTexture"], tags);
@@ -47,6 +50,12 @@ fn members_serp_never_writes_and_a_record_that_is_anchor_and_dab_are_refused() {
         json!({"preTextureOpacity":"1"}),
         json!({"brushGroupId":"g","unknown":1}),
         json!({"brushGroupId":null}),
+        json!({"brushGroupId":"g","isBrushTextureCopy":true,"strokeSeed":1}),
+        json!({"brushGroupId":"g","strokeSeed":1}),
+        json!({"brushTexturePreset":"p","strokeSeed":-1}),
+        json!({"brushTexturePreset":"p","strokeSeed":4294967296u64}),
+        json!({"brushTexturePreset":"p","strokeSeed":1.5}),
+        json!({"brushTexturePreset":"p","strokeSeed":"1"}),
     ] {
         let kind = kind_of(&record_doc(vec![tagged(tags.clone())]));
         assert!(matches!(kind, ObjectCodecErrorKind::Invalid | ObjectCodecErrorKind::Unsupported), "{tags}: {kind:?}");

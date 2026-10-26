@@ -96,13 +96,17 @@ pub struct BrushTexture {
     pub(crate) pre_texture_opacity: Presence<Number>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) pre_texture_stroke: Presence<Option<String>>,
+    /// G16 option C: the anchor's stamping seed (`strokeSeed`, a uint32), from which native produces its dabs.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) stroke_seed: Presence<Number>,
 }
 object_deserialize!(BrushTexture {
     #[serde(default)] brush_group_id: Presence<String>,
     #[serde(default)] is_brush_texture_copy: Presence<bool>,
     #[serde(default)] brush_texture_preset: Presence<String>,
     #[serde(default)] pre_texture_opacity: Presence<Number>,
-    #[serde(default)] pre_texture_stroke: Presence<Option<String>>
+    #[serde(default)] pre_texture_stroke: Presence<Option<String>>,
+    #[serde(default)] stroke_seed: Presence<Number>
 });
 
 /// Named L07-I positive subset: exactly two stops, linear or radial. No coercion or defaults.
