@@ -1,0 +1,243 @@
+{
+  "schema": "nemo.installed-parity/1",
+  "contract": "https://github.com/mysteropodes/nemo/issues/2348#issuecomment-6415465173",
+  "rows": [
+    {
+      "id": "f03-clients",
+      "issue": 1049,
+      "status": "Blocked",
+      "reason": "Installed operator admission unresolved; scenario qualification/review outstanding. Original task citation awaits CS0 owner disposition (#2348/6416085168). Both actual Codex and Claude client routes must be available in the same batch lifetime.",
+      "tasks": [],
+      "surfaces": [],
+      "dependsOn": [],
+      "scenario": "f03-clients",
+      "acceptanceReference": "https://github.com/mysteropodes/nemo/issues/1049#issuecomment-6403867728",
+      "checks": [
+        {
+          "id": "codex-opacity-workflow",
+          "clause": "Original Codex opacity Read → edit/history/save-reopen: static25 →40/60 Undo → replacement/stale → keyed0/20.",
+          "covers": [
+            "positive",
+            "oracle",
+            "undo-redo",
+            "save-reopen"
+          ]
+        },
+        {
+          "id": "claude-opacity-workflow",
+          "clause": "The same original workflow through actual Claude; actual client identities and advertised schema, with no handwritten payload oracle replacing usability.",
+          "covers": [
+            "positive",
+            "oracle",
+            "undo-redo",
+            "save-reopen"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "play-resume",
+      "issue": 1573,
+      "status": "Blocked",
+      "reason": "Installed operator admission unresolved; scenario qualification/review outstanding. Original task citation awaits CS0 owner disposition (#2348/6416085168).",
+      "tasks": [],
+      "surfaces": [],
+      "dependsOn": [],
+      "scenario": "play-resume",
+      "acceptanceReference": "https://github.com/mysteropodes/nemo/issues/1573#issuecomment-6403867878",
+      "checks": [
+        {
+          "id": "visible-recovery",
+          "clause": "Visible Play → minimize → restore → Play/Stop recovers without stale-frame publication.",
+          "covers": [
+            "positive"
+          ]
+        },
+        {
+          "id": "ordered-telemetry",
+          "clause": "Ordered same-owner native and JS telemetry proves accepted/rejected publications through the recovery.",
+          "covers": [
+            "oracle"
+          ]
+        },
+        {
+          "id": "visible-frames",
+          "clause": "Independent visible-frame evidence at0/10/20.",
+          "covers": [
+            "pixels"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "play-publication",
+      "issue": 1706,
+      "status": "Blocked",
+      "reason": "Installed operator admission unresolved; scenario qualification/review outstanding. Original task citation awaits CS0 owner disposition (#2348/6416085168). O1/#1708 collectibility smoke must be resolved in the admitted lifetime.",
+      "tasks": [],
+      "surfaces": [],
+      "dependsOn": [],
+      "scenario": "play-publication",
+      "acceptanceReference": "https://github.com/mysteropodes/nemo/issues/1706#issuecomment-6403868021",
+      "checks": [
+        {
+          "id": "bounded-trace",
+          "clause": "Installed opt-in bounded trace collection in the same installed lifetime; complete retained output survives official owner stop. O1/#1708 collectibility smoke remains required.",
+          "covers": [
+            "oracle"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "opacity-consumption",
+      "issue": 2268,
+      "status": "Blocked",
+      "reason": "Installed operator admission unresolved; scenario qualification/review outstanding. Original task citation awaits CS0 owner disposition (#2348/6416085168).",
+      "tasks": [],
+      "surfaces": [],
+      "dependsOn": [],
+      "scenario": "opacity-consumption",
+      "acceptanceReference": "https://github.com/mysteropodes/nemo/issues/2268#issuecomment-6403867158",
+      "checks": [
+        {
+          "id": "motion-history",
+          "clause": "Ordinary installed Motion opacity editing and Undo/Redo.",
+          "covers": [
+            "positive",
+            "undo-redo"
+          ]
+        },
+        {
+          "id": "save-reopen",
+          "clause": "Ordinary save and reopen preserves raw layer opacity.",
+          "covers": [
+            "save-reopen"
+          ]
+        },
+        {
+          "id": "preview-export",
+          "clause": "Installed preview and export consume raw opacity per the original task.",
+          "covers": [
+            "pixels",
+            "oracle"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "text-scene",
+      "issue": 2269,
+      "status": "Blocked",
+      "reason": "Installed operator admission unresolved; scenario qualification/review outstanding. Original task citation awaits CS0 owner disposition (#2348/6416085168).",
+      "tasks": [],
+      "surfaces": [],
+      "dependsOn": [],
+      "scenario": "text-scene",
+      "acceptanceReference": "https://github.com/mysteropodes/nemo/issues/2269#issuecomment-6403867337",
+      "checks": [
+        {
+          "id": "font-edit",
+          "clause": "Installed retained Text font and edit workflow.",
+          "covers": [
+            "positive"
+          ]
+        },
+        {
+          "id": "save-reopen",
+          "clause": "Installed Text save/reopen with retained font and text.",
+          "covers": [
+            "save-reopen"
+          ]
+        },
+        {
+          "id": "preview-export",
+          "clause": "Installed Text preview/export consumes retained Text and raw layer alpha once.",
+          "covers": [
+            "pixels",
+            "oracle"
+          ]
+        },
+        {
+          "id": "recovery",
+          "clause": "Installed Text recovery from the original task.",
+          "covers": [
+            "positive",
+            "oracle"
+          ]
+        },
+        {
+          "id": "sdk-client",
+          "clause": "Original SDK/client exit, depending on the unchanged #2267 Text workflow.",
+          "covers": [
+            "oracle"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "text-targets",
+      "issue": 2264,
+      "status": "Blocked",
+      "reason": "Installed operator admission unresolved; scenario qualification/review outstanding.",
+      "tasks": [
+        "G38a",
+        "G41"
+      ],
+      "surfaces": [],
+      "dependsOn": [],
+      "scenario": "text-targets",
+      "acceptanceReference": "https://github.com/mysteropodes/nemo/issues/2264#issuecomment-6403866784",
+      "checks": [
+        {
+          "id": "text-edit",
+          "clause": "Original clause4: installed Text edit through pinned native target list/read.",
+          "covers": [
+            "positive",
+            "oracle"
+          ]
+        },
+        {
+          "id": "font-bind",
+          "clause": "Original clause4: installed font binding via #2267.",
+          "covers": [
+            "positive",
+            "oracle"
+          ]
+        },
+        {
+          "id": "reopen",
+          "clause": "Original clause4: installed reopen via #2267; prior installed Text failure remains open until the real rerun.",
+          "covers": [
+            "save-reopen"
+          ]
+        }
+      ],
+      "taskEvidence": "https://github.com/mysteropodes/nemo/issues/2264 — body: existing agreed baseline G38a/G41."
+    },
+    {
+      "id": "text20",
+      "issue": 2267,
+      "status": "Blocked",
+      "reason": "Installed operator admission unresolved; scenario qualification/review outstanding. Original task citation awaits CS0 owner disposition (#2348/6416085168).",
+      "tasks": [],
+      "surfaces": [],
+      "dependsOn": [],
+      "scenario": "text20",
+      "acceptanceReference": "https://github.com/mysteropodes/nemo/issues/2267#issuecomment-6403866970",
+      "checks": [
+        {
+          "id": "original-text20",
+          "clause": "Build the final candidate and run the unchanged ordinary20-phase Text workflow, including bind/history/reopen/preview; preserve every original phase and oracle.",
+          "covers": [
+            "positive",
+            "oracle",
+            "undo-redo",
+            "save-reopen",
+            "pixels"
+          ]
+        }
+      ]
+    }
+  ]
+}

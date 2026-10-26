@@ -17,7 +17,8 @@ async function main(config) {
     if (scenarios[row.scenario]) continue;
     const file = path.join(__dirname, 'cs7-scenarios', row.scenario + '.cjs');
     check(fs.realpathSync(file) === file && fs.lstatSync(file).isFile(), 'reviewed installed scenario required');
-    scenarios[row.scenario] = require(file);
+    const module = require(file);
+    scenarios[row.scenario] = typeof module.prepare === 'function' ? await module.prepare({ config, root: ROOT }) : module;
   }
   const rows = readyRows(declarations, { taskIds: new Set(matrix.tasks.map(t => t.task)),
     surfaceIds: new Set(matrix.surfaces.map(s => s.id)), scenarios });

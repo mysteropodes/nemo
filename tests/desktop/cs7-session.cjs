@@ -100,9 +100,16 @@ function createInstalledSession(config) {
   Object.assign(environment, { NEMO_UI32_GRANT: config.grant, NEMO_UI32_REPORT_ROOT: report });
   if (config.fixtureKind) environment.NEMO_UI32_FIXTURE_KIND = config.fixtureKind;
   const input = createInput({ executable: config.helper, env: environment });
+  const operatorDirectory = path.join(report, 'operator');
+  check(!fs.existsSync(operatorDirectory), 'fresh operator handoff directory required');
+  fs.mkdirSync(operatorDirectory, { mode: 0o700 });
+  const operator = require('./cs7-scenarios/operator.cjs').createOperator({
+    directory: operatorDirectory,
+    announce: request => process.stdout.write(JSON.stringify({ operatorRequest: request }) + '\n'),
+  });
   const controller = harness.createController({ root: ROOT, app: app.bundle });
   const tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd: ROOT, encoding: 'utf8' }).trim();
-  let instance, started = false, pinned;
+  let instance, started = false, pinned, latestSnapshot;
   async function currentIdentity() {
     check(instance, 'installed session not started');
     const current = identity.sourceIdentity();
@@ -111,6 +118,7 @@ function createInstalledSession(config) {
     const status = await controller.status(instance);
     check(status.code === 0, 'installed status refused');
     harness.validateSnapshot(status.value, instance, { isolation, runtime, source, build, app });
+    latestSnapshot = status.value;
     const pid = status.value.app.pid;
     if (pinned) check(pid === pinned.pid, 'installed PID changed');
     return { sourceSha: source.head, tree, driverSha: source.head, executableSha256: app.executableSha256,
@@ -127,8 +135,19 @@ function createInstalledSession(config) {
       await currentIdentity();
       return input.command(command, option, value);
     },
+    async runtimeContext() {
+      const current = await currentIdentity();
+      return { identity: current, snapshot: structuredClone(latestSnapshot), window: { ...pinned } };
+    },
+    async requestEvidence(request) {
+      const current = await currentIdentity();
+      const evidence = await operator.request({ ...request, identity: current });
+      check(require('node:util').isDeepStrictEqual(await currentIdentity(), current), 'operator candidate changed');
+      return evidence;
+    },
     async cleanup() {
       let failed = false;
+      operator.close();
       try { await input.close(); } catch { failed = true; }
       try { await controller.cleanup(); } catch { failed = true; }
       check(!failed, 'installed session cleanup incomplete');
