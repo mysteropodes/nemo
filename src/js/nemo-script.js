@@ -626,7 +626,7 @@
   function run(source, opts) {
     opts = opts || {}; _log = [];
     // CS8-SDK (#2354): the desktop host never runs a script against state.layers.
-    if (window.__TAURI__) return window.NemoScriptNativeApi ? NemoScriptNativeApi.runOnDesktop(window, source) : { ok: false, error: 'Scripts run on an open native document only.', log: [] };
+    if (window.__TAURI__ || window.NemoScriptNativeApi && NemoScriptNativeApi.owns(window)) return window.NemoScriptNativeApi ? NemoScriptNativeApi.runOnDesktop(window, source) : { ok: false, error: 'Scripts run on an open native document only.', log: [] };
     var api = buildApi(), fn;
     try {
       // The last expression is the script's result, which is what a console-

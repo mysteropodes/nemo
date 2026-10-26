@@ -6,8 +6,11 @@
  * afterwards, in order, through the ordinary UI's native entry points, so a script
  * reaches the same handler as the UI and never writes state.layers. A row that is not
  * bound here throws {code:'unavailable', row, reason} before any write is sent.
- * Injected ports: info(), write.{visibility,locked,shy}(index) -> Promise<boolean>,
- * goToFrame(frame), selection() -> indices, toast(message).
+ * Injected ports: info(), write.{visible,locked,shy}(index) -> Promise<boolean>,
+ * goToFrame(frame), frame(), activeIndex(), selection() -> indices, toast(message).
+ * Undeclared members throw instead of reading undefined. The script body still runs
+ * in the page realm: common globals are shadowed as hygiene, which is not a sandbox
+ * (the baseline runner had the same unsandboxed shape, recorded under I30).
  */
 (function (root, factory) {
   var api = factory();
@@ -26,7 +29,7 @@
   put(S, ['layers', 'layer', 'activeLayer'], op(Q, null, true));
   put(S, ['Layer.visible'], op(Q, O + 'layer.visibility.set', true));
   put(S, ['Layer.locked', 'Layer.shy'], op(Q, O + 'layer.policy.edit', true));
-  put(S, ['Layer.name'], op(Q, O + 'layer.rename'));
+  put(S, ['Layer.name'], Object.assign(op(Q, O + 'layer.rename', true), { writeBound: false }));
   put(S, ['isKeyframe'], op(Q + '.layer.timing'));
   put(S, ['addLayer'], op(null, O + 'layer.create'));
   put(S, ['Layer.remove'], op(null, O + 'layer.delete'));
@@ -66,6 +69,24 @@
   }
   function need(row) { var route = byRow[row]; if (!route || !route.bound) throw unavailable(row); return route; }
   function fail(message) { var e = new Error('nemo: ' + message); e.code = 'refused'; return e; }
+  // Every member a script can reach is declared; anything else throws rather than reading undefined.
+  var INERT = { then: 1, toJSON: 1, constructor: 1, valueOf: 1, toString: 1 };
+  function undeclared(label, key) {
+    var e = new Error('nemo: ' + label + String(key) + ' is not part of the native script API'); e.code = 'unavailable'; e.reason = 'undeclared'; return e;
+  }
+  function guard(target, label) {
+    if (typeof Proxy !== 'function') return target;
+    return new Proxy(target, {
+      get: function (t, key, receiver) {
+        if (typeof key === 'symbol' || key in t || INERT[key]) return Reflect.get(t, key, receiver);
+        throw undeclared(label, key);
+      },
+      set: function (t, key, value, receiver) {
+        if (typeof key === 'symbol' || key in t) return Reflect.set(t, key, value, receiver);
+        throw undeclared(label, key);
+      },
+    });
+  }
   function detached(value) { return value === undefined ? undefined : JSON.parse(JSON.stringify(value)); }
 
   // One run: a pinned read model, a local overlay of queued flag writes, and the queue.
@@ -74,6 +95,8 @@
     if (!start || !Array.isArray(start.layers)) throw fail('no native document is open');
     var pin = {}; PIN.forEach(function (k) { pin[k] = start[k]; });
     var layers = detached(start.layers), overlay = Object.create(null), queue = [], log = [];
+    var seen = Object.create(null);
+    layers.forEach(function (l) { if (seen[l.layerUid]) throw fail('duplicate layer id ' + l.layerUid); seen[l.layerUid] = true; });
     function find(uid) {
       for (var i = 0; i < layers.length; i++) if (layers[i].layerUid === uid) return { layer: layers[i], index: i };
       throw fail('layer ' + uid + ' is not in this document');
@@ -93,11 +116,14 @@
       else queue.push({ uid: uid, key: key, value: next });
       return next;
     }
-    function Layer(uid) { this.layerUid = uid; }
+    function Layer(uid) { this.layerUid = uid; return guard(this, 'Layer.'); }
     Object.defineProperty(Layer.prototype, 'index', { get: function () { return find(this.layerUid).index; } });
     Object.defineProperty(Layer.prototype, 'name', {
       get: function () { need(S + 'layers'); var l = find(this.layerUid).layer; return l.name === undefined ? 'Layer ' + (find(this.layerUid).index + 1) : l.name; },
-      set: function () { throw unavailable(S + 'Layer.name'); },
+      set: function () {
+        var e = new Error('nemo: Layer.name cannot be written on a native document (not-yet-bound)');
+        e.code = 'unavailable'; e.row = S + 'Layer.name'; e.reason = 'not-yet-bound'; throw e;
+      },
     });
     ['visible', 'locked', 'shy'].forEach(function (key) {
       Object.defineProperty(Layer.prototype, key, {
@@ -122,19 +148,26 @@
       get frameCount() { return start.totalFrames; }, get layerCount() { return layers.length; },
       layer: function (which) { need(S + 'layer'); return handle(which); },
       layers: function () { need(S + 'layers'); return layers.map(function (l) { return new Layer(l.layerUid); }); },
-      activeLayer: function () { need(S + 'activeLayer'); var i = ports.selection()[0]; return handle(Number.isInteger(i) ? i : 0); },
+      activeLayer: function () {
+        need(S + 'activeLayer');
+        var i = typeof ports.activeIndex === 'function' ? ports.activeIndex() : ports.selection()[0];
+        return handle(Number.isInteger(i) && i >= 0 && i < layers.length ? i : 0);
+      },
+      get frame() { return typeof ports.frame === 'function' ? ports.frame() : 0; },
+      set frame(f) { need(S + 'goToFrame'); ports.goToFrame(f | 0); },
       goToFrame: function (f) { need(S + 'goToFrame'); ports.goToFrame(f | 0); return nemo; },
       toast: function (m) { need(S + 'toast'); ports.toast(String(m)); log.push('toast'); return nemo; },
       log: function () { need(S + 'log'); return log.slice(); },
-      help: function () { need(S + 'help'); return ROUTES.filter(function (r) { return r.bound; }).map(function (r) { return r.row.replace(/^sdk:nemo-script\./, ''); }); },
-      selection: Object.assign(group(S + 'selection.', ['clear', 'setLayers', 'strokes']),
-        { layers: function () { need(S + 'selection.layers'); return ports.selection().map(function (i) { return handle(i); }); } }),
-      comp: Object.assign(group(S + 'comp.', ['beat', 'beats', 'setWorkArea', 'trimToWorkArea']), {
-        get fps() { return start.fps; }, get frameCount() { return start.totalFrames; } }),
-      markers: group(S + 'markers.', ['add', 'list', 'next', 'prev', 'removeAt']),
-      camera: group(S + 'camera.', ['keys']),
+      help: function () { need(S + 'help'); return ROUTES.filter(function (r) { return r.bound && /^sdk:nemo-script\./.test(r.row); }).map(function (r) { return r.row.replace(/^sdk:nemo-script\./, ''); }); },
+      selection: guard(Object.assign(group(S + 'selection.', ['clear', 'setLayers', 'strokes']),
+        { layers: function () { need(S + 'selection.layers'); return ports.selection().map(function (i) { return handle(i); }); } }), 'selection.'),
+      comp: guard(Object.assign(group(S + 'comp.', ['beat', 'beats', 'setWorkArea', 'trimToWorkArea']), {
+        get fps() { return start.fps; }, get frameCount() { return start.totalFrames; } }), 'comp.'),
+      markers: guard(group(S + 'markers.', ['add', 'list', 'next', 'prev', 'removeAt']), 'markers.'),
+      camera: guard(group(S + 'camera.', ['keys']), 'camera.'),
     };
     ['addLayer', 'addPivot', 'isKeyframe', 'undoGroup'].forEach(function (n) { nemo[n] = stub(S + n); });
+    nemo = guard(nemo, '');
     // Drains queued writes in order. Stops at the first refusal; refuses everything when
     // the document was replaced or closed after the run read its pin.
     function commit() {
@@ -145,21 +178,34 @@
         if (!now || PIN.some(function (k) { return now[k] !== pin[k]; }))
           return Promise.resolve({ ok: false, applied: applied, pending: items.length - i, error: 'document-replaced' });
         var index = -1;
-        for (var j = 0; j < now.layers.length; j++) if (now.layers[j].layerUid === items[i].uid) index = j;
+        for (var j = 0; j < now.layers.length; j++) if (now.layers[j].layerUid === items[i].uid) { index = j; break; }
         if (index < 0) return Promise.resolve({ ok: false, applied: applied, pending: items.length - i, error: 'layer-gone' });
         var current = now.layers[index], has = items[i].key === 'visible' ? current.visible !== false : current[items[i].key] === true;
         if (has === items[i].value) return step(i + 1);
+        var refused = function () { return { ok: false, applied: applied, pending: items.length - i, error: 'write-refused' }; };
         return Promise.resolve().then(function () { return ports.write[items[i].key](index); }).then(function (ok) {
-          if (ok === false) return { ok: false, applied: applied, pending: items.length - i, error: 'write-refused' };
+          if (ok === false) return refused();
+          // The entry's return value is not proof: the native read model must show the new value.
+          var after = ports.info(), row = after && after.layers.filter(function (l) { return l.layerUid === items[i].uid; })[0];
+          var value = row && (items[i].key === 'visible' ? row.visible !== false : row[items[i].key] === true);
+          if (value !== items[i].value) return { ok: false, applied: applied, pending: items.length - i, error: 'write-unconfirmed' };
           applied += 1; return step(i + 1);
-        }, function () { return { ok: false, applied: applied, pending: items.length - i, error: 'write-refused' }; });
+        }, refused);
       }
       return step(0);
     }
     return { nemo: nemo, commit: commit, discard: function () { queue = []; }, log: function () { return log.slice(); } };
   }
   var REFUSED = 'Scripts run on an open native document only.';
-  function compile(source) { return new Function('nemo', '__src', '"use strict";\nreturn eval(__src);'); }
+  // Shadowing is hygiene for ordinary scripts, not isolation (see the header).
+  var SHADOWED = ['state', 'SM', 'SMScript', 'SMMotion', 'NemoNativeObjectProject', 'window', 'globalThis', 'self'];
+  function compile() { return Function.apply(null, ['nemo', '__src'].concat(SHADOWED, ['"use strict";\nreturn eval(__src);'])); }
+  function compileBody(source) { return Function.apply(null, ['nemo'].concat(SHADOWED, ['"use strict";\n' + source])); }
+  // The desktop dispatch predicate shared with nemo-script.js: a Tauri host, or an open native document.
+  function owns(root) {
+    var p = root.NemoNativeObjectProject, s = p && typeof p.desktop === 'function' && p.desktop(root);
+    return !!(root.__TAURI__ && root.__TAURI__.core) || !!(s && s.blocksLegacy() && s.isActive());
+  }
   // The desktop SMScript.run: one run over the active native object session, or a refusal.
   function runOnDesktop(root, source) {
     var project = root.NemoNativeObjectProject, session = project && typeof project.desktop === 'function' && project.desktop(root);
@@ -170,6 +216,8 @@
       run = createRun({ info: function () { return session.isActive() ? session.info() : null; },
         write: { visible: entry('toggleLayerVis'), locked: entry('toggleLayerLock'), shy: entry('toggleLayerShy') },
         goToFrame: function (f) { if (typeof root.goToFrame === 'function') root.goToFrame(f); },
+        frame: function () { return root.state && Number.isInteger(root.state.currentFrame) ? root.state.currentFrame : 0; },
+        activeIndex: function () { return root.state ? root.state.activeLayerIdx : undefined; },
         selection: function () { return (root._layerSel || []).slice(); }, toast: toast });
     } catch (e) { return { ok: false, error: e.message, log: [] }; }
     var value;
@@ -177,7 +225,7 @@
     catch (e) {
       // A script that says `return` at top level runs as a function body (baseline idiom).
       var retry = e instanceof SyntaxError && /return/i.test(e.message || '');
-      try { if (!retry) throw e; value = new Function('nemo', '"use strict";\n' + source)(run.nemo); }
+      try { if (!retry) throw e; value = compileBody(source)(run.nemo); }
       catch (e2) {
         run.discard();
         return { ok: false, error: (e2 instanceof SyntaxError ? 'Erreur de syntaxe : ' : '') + e2.message, code: e2.code, log: run.log() };
@@ -187,5 +235,5 @@
     var committed = run.commit().then(function (c) { if (!c.ok) toast('Script writes stopped: ' + c.error); return c; });
     return { ok: true, value: value, log: run.log(), committed: committed };
   }
-  return Object.freeze({ ROUTES: ROUTES, createRun: createRun, runOnDesktop: runOnDesktop });
+  return Object.freeze({ ROUTES: ROUTES, createRun: createRun, runOnDesktop: runOnDesktop, owns: owns });
 }));

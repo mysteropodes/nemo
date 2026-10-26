@@ -69,3 +69,22 @@ test('a replaced document, a removed layer or a refused write stops the drain (m
   assert.deepEqual(await run.commit(),{ok:true,applied:0,pending:0});assert.deepEqual(h.calls,[]);
   assert.throws(()=>Api.createRun({...h.ports,info:()=>null}),/no native document/);
 });
+
+test('undeclared members throw, frame routes to presentation, and the active layer is the active index',()=>{
+  const h=harness(L),n=Api.createRun({...h.ports,frame:()=>3,activeIndex:()=>2}).nemo;
+  const undeclared=(fn,pattern)=>assert.throws(fn,e=>e.code==='unavailable'&&e.reason==='undeclared'&&pattern.test(e.message));
+  undeclared(()=>n.backgrond,/backgrond is not part/);undeclared(()=>{n.typo=1;},/typo/);
+  undeclared(()=>n.layer(0).opacityy,/Layer\.opacityy/);undeclared(()=>{n.layer(0).custom=1;},/Layer\.custom/);
+  undeclared(()=>n.comp.workAreaa,/comp\.workAreaa/);undeclared(()=>n.selection.everything(),/selection\.everything/);
+  assert.equal(n.frame,3);n.frame=7;assert.deepEqual(h.frames,[7]);
+  assert.equal(n.activeLayer().layerUid,'c');assert.equal(typeof n.then,'undefined','a returned API is not mistaken for a thenable');
+  assert.equal(n.layer(0).name,'A');assert.ok(n.help().includes('Layer.name'));
+  assert.throws(()=>{n.layer(0).name='x';},e=>e.code==='unavailable'&&e.reason==='not-yet-bound');
+  assert.throws(()=>Api.createRun(harness([{layerUid:'x'},{layerUid:'x'}]).ports),/duplicate layer id x/);
+});
+
+test('a write the native read model does not confirm is reported, not counted',async()=>{
+  const h=harness(L),run=Api.createRun({...h.ports,write:{...h.ports.write,visible:()=>Promise.resolve(true)}});
+  run.nemo.layer('A').visible=false;
+  assert.deepEqual(await run.commit(),{ok:false,applied:0,pending:1,error:'write-unconfirmed'});
+});

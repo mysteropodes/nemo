@@ -45,3 +45,9 @@ test('the desktop dispatch fails closed when the native script module is not loa
   const r=boot({session:true,native:false}).SMScript.run('nemo.layer(0).visible=false');
   assert.equal(r.ok,false);assert.equal(r.error,'Scripts run on an open native document only.');
 });
+
+test('common page globals are shadowed inside the script (hygiene, not a sandbox)',()=>{
+  const h=boot({session:true});
+  const r=h.SMScript.run('[typeof state, typeof SM, typeof SMScript, typeof window, typeof globalThis].join(",")');
+  assert.equal(r.ok,true);assert.equal(r.value,'undefined,undefined,undefined,undefined,undefined');
+});
