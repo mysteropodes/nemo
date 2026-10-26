@@ -1,0 +1,381 @@
+{
+  "schema": "nemo.script-routes/1",
+  "purpose": "CS8-SDK (#2354): every baseline sdk: surface row is routed to a declared v2 operation (read and/or write), is presentation or host-only (no document write), or reports a typed unavailable reason. A script on a native document may reach the document only through an operation route.",
+  "kinds": {
+    "operation": "reads and/or writes through the named declared v2 operations only",
+    "presentation": "editor presentation state; never a document write",
+    "host": "host or plugin-window effect; never a document write",
+    "unavailable": "refused with {code:\"unavailable\", reason} on a native document; never falls back to state.layers"
+  },
+  "routes": [
+    {
+      "row": "sdk:nemo-plugin.closeAll",
+      "kind": "host",
+      "note": "plugin window management"
+    },
+    {
+      "row": "sdk:nemo-plugin.openCount",
+      "kind": "host",
+      "note": "plugin window management"
+    },
+    {
+      "row": "sdk:nemo-plugin.setTitle",
+      "kind": "host",
+      "note": "plugin window management"
+    },
+    {
+      "row": "sdk:nemo-script.Effect.enabled",
+      "kind": "unavailable",
+      "reason": "no-native-effects"
+    },
+    {
+      "row": "sdk:nemo-script.Effect.get",
+      "kind": "unavailable",
+      "reason": "no-native-effects"
+    },
+    {
+      "row": "sdk:nemo-script.Effect.key",
+      "kind": "unavailable",
+      "reason": "no-native-effects"
+    },
+    {
+      "row": "sdk:nemo-script.Effect.keys",
+      "kind": "unavailable",
+      "reason": "no-native-effects"
+    },
+    {
+      "row": "sdk:nemo-script.Effect.params",
+      "kind": "unavailable",
+      "reason": "no-native-effects"
+    },
+    {
+      "row": "sdk:nemo-script.Effect.remove",
+      "kind": "unavailable",
+      "reason": "no-native-effects"
+    },
+    {
+      "row": "sdk:nemo-script.Effect.set",
+      "kind": "unavailable",
+      "reason": "no-native-effects"
+    },
+    {
+      "row": "sdk:nemo-script.Effect.type",
+      "kind": "unavailable",
+      "reason": "no-native-effects"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.addEffect",
+      "kind": "unavailable",
+      "reason": "no-native-effects"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.addMarker",
+      "kind": "unavailable",
+      "reason": "no-native-layer-markers"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.blendMode",
+      "kind": "unavailable",
+      "reason": "no-native-blend-matte"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.clearKeys",
+      "kind": "operation",
+      "write": "command.document.object.property.track.edit"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.color",
+      "kind": "unavailable",
+      "reason": "no-native-layer-color"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.disableTimeRemap",
+      "kind": "unavailable",
+      "reason": "no-native-time-remap"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.duplicate",
+      "kind": "operation",
+      "write": "command.document.object.layer.duplicate"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.effects",
+      "kind": "unavailable",
+      "reason": "no-native-effects"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.enableTimeRemap",
+      "kind": "unavailable",
+      "reason": "no-native-time-remap"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.expression",
+      "kind": "unavailable",
+      "reason": "no-native-expressions"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.get",
+      "kind": "operation",
+      "read": "query.document.object.property.read"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.hold",
+      "kind": "operation",
+      "write": "command.document.object.property.track.edit"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.inFrame",
+      "kind": "unavailable",
+      "reason": "no-native-layer-range"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.key",
+      "kind": "operation",
+      "write": "command.document.object.property.track.edit"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.keyLock",
+      "kind": "unavailable",
+      "reason": "no-native-key-lock"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.keys",
+      "kind": "operation",
+      "read": "query.document.object.property.read"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.linkTime",
+      "kind": "unavailable",
+      "reason": "no-native-time-link"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.locked",
+      "kind": "operation",
+      "read": "query.document.object",
+      "write": "command.document.object.layer.policy.edit"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.markers",
+      "kind": "unavailable",
+      "reason": "no-native-layer-markers"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.matte",
+      "kind": "unavailable",
+      "reason": "no-native-blend-matte"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.mergeWith",
+      "kind": "unavailable",
+      "reason": "no-native-layer-merge"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.motionBlur",
+      "kind": "unavailable",
+      "reason": "no-native-motion-blur"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.name",
+      "kind": "operation",
+      "read": "query.document.object",
+      "write": "command.document.object.layer.rename"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.outFrame",
+      "kind": "unavailable",
+      "reason": "no-native-layer-range"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.parent",
+      "kind": "unavailable",
+      "reason": "no-native-parenting"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.remove",
+      "kind": "operation",
+      "write": "command.document.object.layer.delete"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.select",
+      "kind": "presentation",
+      "note": "editor selection state"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.set",
+      "kind": "operation",
+      "write": "command.document.object.property.edit"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.setExpression",
+      "kind": "unavailable",
+      "reason": "no-native-expressions"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.shy",
+      "kind": "operation",
+      "read": "query.document.object",
+      "write": "command.document.object.layer.policy.edit"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.solo",
+      "kind": "unavailable",
+      "reason": "no-native-solo"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.splitAt",
+      "kind": "operation",
+      "write": "command.document.object.layer.cut"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.strokeProfile",
+      "kind": "unavailable",
+      "reason": "no-native-stroke-profile"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.strokes",
+      "kind": "operation",
+      "read": "query.document.object"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.timeLink",
+      "kind": "unavailable",
+      "reason": "no-native-time-link"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.unlinkTime",
+      "kind": "unavailable",
+      "reason": "no-native-time-link"
+    },
+    {
+      "row": "sdk:nemo-script.Layer.visible",
+      "kind": "operation",
+      "read": "query.document.object",
+      "write": "command.document.object.layer.visibility.set"
+    },
+    {
+      "row": "sdk:nemo-script.activeLayer",
+      "kind": "operation",
+      "read": "query.document.object"
+    },
+    {
+      "row": "sdk:nemo-script.addLayer",
+      "kind": "operation",
+      "write": "command.document.object.layer.create"
+    },
+    {
+      "row": "sdk:nemo-script.addPivot",
+      "kind": "unavailable",
+      "reason": "no-native-pivot"
+    },
+    {
+      "row": "sdk:nemo-script.camera.keys",
+      "kind": "unavailable",
+      "reason": "no-native-camera"
+    },
+    {
+      "row": "sdk:nemo-script.comp.beat",
+      "kind": "operation",
+      "read": "query.document.object.project.composition.read"
+    },
+    {
+      "row": "sdk:nemo-script.comp.beats",
+      "kind": "operation",
+      "read": "query.document.object.project.composition.read"
+    },
+    {
+      "row": "sdk:nemo-script.comp.setWorkArea",
+      "kind": "unavailable",
+      "reason": "no-native-work-area"
+    },
+    {
+      "row": "sdk:nemo-script.comp.trimToWorkArea",
+      "kind": "unavailable",
+      "reason": "no-native-work-area"
+    },
+    {
+      "row": "sdk:nemo-script.goToFrame",
+      "kind": "presentation",
+      "note": "viewport frame presentation; no document write"
+    },
+    {
+      "row": "sdk:nemo-script.help",
+      "kind": "host",
+      "note": "static API listing"
+    },
+    {
+      "row": "sdk:nemo-script.isKeyframe",
+      "kind": "operation",
+      "read": "query.document.object.layer.timing"
+    },
+    {
+      "row": "sdk:nemo-script.layer",
+      "kind": "operation",
+      "read": "query.document.object"
+    },
+    {
+      "row": "sdk:nemo-script.layers",
+      "kind": "operation",
+      "read": "query.document.object"
+    },
+    {
+      "row": "sdk:nemo-script.log",
+      "kind": "host",
+      "note": "script console output"
+    },
+    {
+      "row": "sdk:nemo-script.markers.add",
+      "kind": "operation",
+      "write": "command.document.object.project.composition.edit"
+    },
+    {
+      "row": "sdk:nemo-script.markers.list",
+      "kind": "operation",
+      "read": "query.document.object.project.composition.read"
+    },
+    {
+      "row": "sdk:nemo-script.markers.next",
+      "kind": "operation",
+      "read": "query.document.object.project.composition.read"
+    },
+    {
+      "row": "sdk:nemo-script.markers.prev",
+      "kind": "operation",
+      "read": "query.document.object.project.composition.read"
+    },
+    {
+      "row": "sdk:nemo-script.markers.removeAt",
+      "kind": "operation",
+      "write": "command.document.object.project.composition.edit"
+    },
+    {
+      "row": "sdk:nemo-script.selection.clear",
+      "kind": "presentation",
+      "note": "editor selection state"
+    },
+    {
+      "row": "sdk:nemo-script.selection.layers",
+      "kind": "presentation",
+      "note": "editor selection state"
+    },
+    {
+      "row": "sdk:nemo-script.selection.setLayers",
+      "kind": "presentation",
+      "note": "editor selection state"
+    },
+    {
+      "row": "sdk:nemo-script.selection.strokes",
+      "kind": "presentation",
+      "note": "editor selection state"
+    },
+    {
+      "row": "sdk:nemo-script.toast",
+      "kind": "host",
+      "note": "editor toast"
+    },
+    {
+      "row": "sdk:nemo-script.undoGroup",
+      "kind": "unavailable",
+      "reason": "script-run-grouping"
+    }
+  ]
+}
