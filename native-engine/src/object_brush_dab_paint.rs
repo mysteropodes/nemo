@@ -108,6 +108,6 @@ pub(crate) fn expand(
     Ok((out, dabs))
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "history"))]
 #[path = "../tests/object_brush_dab_paint.rs"]
 mod tests;
