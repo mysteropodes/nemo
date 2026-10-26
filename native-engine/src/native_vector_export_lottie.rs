@@ -9,10 +9,12 @@
 //! Each plan is one frame of the range, all pinned to one snapshot. A path is the geometry the
 //! compositor draws (`ObjectPaintCommand::path`), so motion and poses are the evaluated ones; an
 //! open path's first handle-in and last handle-out do not reach the drawn path and are emitted as
-//! zero, which no player draws. Dropped as the baseline drops them: rasters, masks (never paint
-//! commands) and zero-opacity strokes. Refused, until later increments admit them with oracle
-//! rows: text, components, duplicators, bitmap brush, video, legacy fill records, a layer opacity
-//! factor other than one and a stored camera.
+//! zero, which no player draws. A stored camera bakes into every anchor and handle of the frame,
+//! as `lottieCamMatrix` does (the camera matrix of the frame, its linear part for handles). Dropped
+//! as the baseline drops them: rasters, masks (never paint commands) and zero-opacity strokes.
+//! Refused, until later increments admit them with oracle rows: text, components, duplicators,
+//! bitmap brush, video, legacy fill records and a layer opacity factor other than one (the baseline
+//! writes every layer at full opacity, `ks.o` 100).
 use crate::object_render_scene::{ordered_entries, ObjectPaintPlan, PaintEntry};
 use kurbo::{BezPath, PathEl, Point};
 use serde_json::{json, Number, Value};
@@ -38,8 +40,6 @@ pub(crate) enum LottieExportError {
     MixedSnapshot,
     /// The stored camera of a frame could not be read.
     CameraUnavailable { frame: u32 },
-    /// A stored camera bakes into every vertex (`lottieCamMatrix`); not admitted yet.
-    UnsupportedCamera { frame: u32 },
     Unsupported {
         source_object_index: usize,
         reason: &'static str,
@@ -80,9 +80,14 @@ fn float(value: &Number) -> Result<f64, LottieExportError> {
         .ok_or(LottieExportError::NonFinite)
 }
 
-/// `lottieShapeValue` without a camera: `i`, `o`, `v` and `c` from the drawn path (one subpath of
-/// cubic segments, as `build_path` writes it; a closed path's closing curve ends on its first point).
-fn shape_value(path: &BezPath, source_object_index: usize) -> Result<Value, LottieExportError> {
+/// `lottieShapeValue`: `i`, `o`, `v` and `c` from the drawn path (one subpath of cubic segments, as
+/// `build_path` writes it; a closed path's closing curve ends on its first point), through the
+/// frame's camera matrix `[a, b, c, d, e, f]` when one is stored (`lottieCamPoint`/`lottieCamVector`).
+fn shape_value(
+    path: &BezPath,
+    camera: Option<[f64; 6]>,
+    source_object_index: usize,
+) -> Result<Value, LottieExportError> {
     let unsupported = |reason| LottieExportError::Unsupported {
         source_object_index,
         reason,
@@ -132,6 +137,18 @@ fn shape_value(path: &BezPath, source_object_index: usize) -> Result<Value, Lott
     }
     if v.len() < 2 {
         return Err(unsupported("the drawn path has fewer than two anchors"));
+    }
+    if let Some([a, b, c, d, e, f]) = camera {
+        let linear = |p: [f64; 2]| [a * p[0] + c * p[1], b * p[0] + d * p[1]];
+        v.iter_mut().for_each(|p| {
+            *p = {
+                let l = linear(*p);
+                [l[0] + e, l[1] + f]
+            }
+        });
+        i.iter_mut()
+            .chain(o.iter_mut())
+            .for_each(|h| *h = linear(*h));
     }
     let list = |values: &[[f64; 2]]| {
         values
@@ -219,11 +236,10 @@ fn shown_by_layer(
     layers: usize,
 ) -> Result<Vec<Vec<Shown>>, LottieExportError> {
     let frame = plan.packet().frame();
-    match plan.packet().stored_camera_matrix() {
-        Ok(None) => {}
-        Ok(Some(_)) => return Err(LottieExportError::UnsupportedCamera { frame }),
-        Err(_) => return Err(LottieExportError::CameraUnavailable { frame }),
-    }
+    let camera = plan
+        .packet()
+        .stored_camera_matrix()
+        .map_err(|_| LottieExportError::CameraUnavailable { frame })?;
     let mut out: Vec<Vec<Shown>> = (0..layers).map(|_| Vec::new()).collect();
     for entry in ordered_entries(plan) {
         let refuse = |source_object_index, reason| {
@@ -320,7 +336,7 @@ fn shown_by_layer(
             None => None,
         };
         layer.push(Shown {
-            shape: shape_value(command.path(), index)?,
+            shape: shape_value(command.path(), camera, index)?,
             stroke,
             fill,
             opacity,
