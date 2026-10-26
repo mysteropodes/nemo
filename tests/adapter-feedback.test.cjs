@@ -286,3 +286,15 @@ test('GitHub list remains public and token triage retains exact URLs, headers, o
   await assert.rejects(f.api.deleteGithubIssue('N1'), /GitHub delete failed: not admin/);
   f.quota(true); f.api.setGithubTriageToken('ignored'); assert.equal(f.api.githubTriageToken(), 'personal');
 });
+
+test('only an explicit submit publishes: logging, reading and pulling never reach the Worker or GitHub (CS8-D08 G47)', async () => {
+  const f = fixture(); f.desktop();
+  f.api.logAction('pen'); f.api.logAction();
+  for (const [kind, handler] of f.listeners) if (kind === 'click' || kind === 'pointerdown') handler({ target: { tagName: 'BUTTON', id: 'btn', closest: () => null } });
+  await f.api.readAllLocal(); await f.api.checkIncomingFeedback(); await f.api.pullAllIncoming();
+  assert.deepEqual(f.requests.filter(r => r.url.startsWith(WORKER) || r.url.includes('github.com')), [], 'no publication without the explicit action');
+  await f.api.submitFeedback({ note: 'repro' });
+  const published = f.requests.filter(r => r.url.startsWith(WORKER));
+  assert.equal(published.length, 1, 'one explicit submit is one Worker publication');
+  assert.equal(published[0].url, WORKER + '/issue');
+});

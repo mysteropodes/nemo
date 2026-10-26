@@ -411,6 +411,30 @@
       "sizeProfile": "Domain/application JS or TS"
     },
     {
+      "id": "nemo.scriptManifest",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo",
+      "files": [
+        "script-manifest.cjs"
+      ],
+      "publicApi": [
+        "script-manifest.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.scriptManifest",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "script-manifest.cjs"
+      ],
+      "publicApi": [
+        "script-manifest.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
       "id": "nemo.lib.jobs",
       "layer": "tooling-application",
       "dir": "scripts/nemo/lib",

@@ -260,3 +260,12 @@ test('gradient record admission is closed at the same public vector and read DTO
   const missing=JSON.parse(JSON.stringify(record));delete missing.vectorExt;assert.doesNotThrow(()=>C.record(missing,true));
   const nullGradient=JSON.parse(JSON.stringify(record));nullGradient.vectorExt.fillGradient=null;assert.throws(()=>C.record(nullGradient,true),TypeError);
 });
+
+test('trimEnds is an optional finite positive limit on the two creates and refused elsewhere', () => {
+  const create = COMMANDS.find(([, p]) => p.command === 'object.vector.create');
+  const replace = COMMANDS.find(([, p]) => p.command === 'object.vector.replace');
+  for (const [value, ok] of [[24, true], [0.5, true], [0, false], [-1, false], [Infinity, false], ['24', false], [null, false]]) {
+    assert.equal(accepts(create[0], { ...create[1], trimEnds: value }), ok, String(value));
+  }
+  assert.equal(accepts(replace[0], { ...replace[1], trimEnds: 24 }), false);
+});

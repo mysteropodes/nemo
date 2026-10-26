@@ -6,6 +6,7 @@ mod annotations;
 #[path = "project_metadata_fields.rs"]
 mod visual;
 pub(crate) use annotations::{ProjectCommentRecord, ProjectWorkspaceRecord};
+pub(crate) use visual::SymmetrySettings;
 #[path = "project_metadata_presets.rs"]
 mod presets;
 pub(crate) use presets::{BrushPresetRecord, ProjectPresetCatalog};

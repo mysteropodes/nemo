@@ -152,7 +152,7 @@ fn remap_scopes(
 }
 
 /// Apply a per-layer frame map (`None` drops) to the scene-root authored records and order scopes.
-fn remap(
+pub(crate) fn remap(
     document: &mut ObjectDocument,
     map: &dyn Fn(&str, u32) -> Option<u32>,
     empty: &dyn Fn(u32) -> Option<u32>,

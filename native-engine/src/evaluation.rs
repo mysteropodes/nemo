@@ -55,6 +55,10 @@ pub(crate) mod property_expression_views;
 #[path = "property_follow_path_sample.rs"]
 #[allow(dead_code)]
 pub(crate) mod property_follow_path_sample;
+// G16 option C (#2361): the baseline vector-brush dab stamper (presets, Paper dab geometry, seeded stamping walk).
+#[path = "brush_dab_core.rs"]
+#[allow(dead_code)]
+pub(crate) mod brush_dab;
 #[path = "property_projection_3d.rs"]
 #[allow(dead_code)]
 pub(crate) mod property_projection_3d;

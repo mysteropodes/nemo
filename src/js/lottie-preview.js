@@ -9,6 +9,9 @@
 (function () {
   var mainProject = null, previewProject = null, currentJson = null;
   var playing = false, playTimer = null;
+  // I41 (#2357): `currentPin` names the exported snapshot the preview shows (null for the baseline in-memory result);
+  // `generation` moves on every open and close, so a result requested before either can never repaint the preview.
+  var currentPin = null, generation = 0;
 
   function ensurePreviewProject() {
     if (previewProject) return previewProject;
@@ -106,8 +109,8 @@
     var closeBtn = document.getElementById('lottie-preview-close');
     var scrub = document.getElementById('lottie-preview-scrub');
     var playBtn = document.getElementById('lottie-preview-play');
-    if (closeBtn) closeBtn.addEventListener('click', function () { stopPlayback(); modal.style.display = 'none'; });
-    modal.addEventListener('click', function (e) { if (e.target === modal) { stopPlayback(); modal.style.display = 'none'; } });
+    if (closeBtn) closeBtn.addEventListener('click', function () { close(); });
+    modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
     if (scrub) scrub.addEventListener('input', function () { stopPlayback(); goToFrame(parseInt(scrub.value, 10)); });
     if (playBtn) playBtn.addEventListener('click', function () {
       if (playing) { stopPlayback(); return; }
@@ -122,16 +125,48 @@
   }
   var controlsReady = false;
 
+  function open(json, pin) {
+    if (!controlsReady) { initControls(); controlsReady = true; }
+    generation++;
+    currentJson = json;
+    currentPin = pin || null;
+    stopPlayback();
+    var scrub = document.getElementById('lottie-preview-scrub');
+    if (scrub) { scrub.min = json.ip; scrub.max = json.op - 1; scrub.value = json.ip; }
+    var modal = document.getElementById('lottie-preview-modal');
+    modal.style.display = 'flex';
+    goToFrame(json.ip);
+    return generation;
+  }
+  // Disposes the player: no timer, no document, no pin, nothing drawn; a pending result is now late.
+  function close() {
+    generation++;
+    stopPlayback();
+    currentJson = null;
+    currentPin = null;
+    if (previewProject) previewProject.clear();
+    var modal = document.getElementById('lottie-preview-modal');
+    if (modal) modal.style.display = 'none';
+  }
+  // A pinned result is {json, pin}: the document a native export produced and the snapshot it was pinned to.
+  function pinned(result) {
+    var pin = result && result.pin;
+    return !!(result && result.json && Array.isArray(result.json.layers) && pin && typeof pin.documentId === 'string' &&
+      typeof pin.instanceId === 'string' && Number.isSafeInteger(pin.contentRevision));
+  }
+
   window.SMLottiePreview = {
-    open: function (json) {
-      if (!controlsReady) { initControls(); controlsReady = true; }
-      currentJson = json;
-      stopPlayback();
-      var scrub = document.getElementById('lottie-preview-scrub');
-      if (scrub) { scrub.min = json.ip; scrub.max = json.op - 1; scrub.value = json.ip; }
-      var modal = document.getElementById('lottie-preview-modal');
-      modal.style.display = 'flex';
-      goToFrame(json.ip);
-    }
+    open: function (json) { return open(json, null); },
+    close: close,
+    // Opens a pinned export result; false (and nothing shown) for anything else.
+    openPinned: function (result) { return pinned(result) ? open(result.json, Object.freeze(Object.assign({}, result.pin))) : false; },
+    // A ticket for a result still being exported: `present` shows it only if the preview was neither closed nor
+    // replaced since, so a late result cannot update a preview that is gone or shows another export.
+    expect: function () { return { generation: generation }; },
+    present: function (ticket, result) {
+      if (!ticket || ticket.generation !== generation) return false;
+      return window.SMLottiePreview.openPinned(result) !== false;
+    },
+    current: function () { return { open: currentJson !== null, pin: currentPin, generation: generation }; },
   };
 })();
