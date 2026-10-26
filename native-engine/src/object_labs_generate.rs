@@ -11,6 +11,8 @@ use crate::commands::object_fill_owner::object_frame_clipboard_paste::{
 use crate::commands::object_fill_owner::object_frame_clipboard_repeat::repeat_project_metadata;
 use crate::commands::object_fill_owner::object_frame_edit_document::DocumentEdit;
 use crate::commands::ObjectFillOwner;
+use crate::commands::PreparedBooleanEdit;
+use crate::object_document::object_group_kernels::object_boolean_ops::stack::Scope;
 use crate::object_document::{ObjectDocument, ProjectMetadata};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
@@ -21,10 +23,11 @@ mod kernels;
 pub(crate) use kernels::Ease;
 
 /// One public operation per generator; the payload `command` repeats the operation suffix.
-pub(crate) const OPS: [&str; 3] = [
+pub(crate) const OPS: [&str; 4] = [
     "command.document.object.labs.speedLines",
     "command.document.object.labs.boil",
     "command.document.object.labs.followPath",
+    "command.document.object.labs.referenceFill",
 ];
 const CONTEXT: &str = "scene-root";
 
@@ -59,6 +62,13 @@ pub(crate) enum LabsRequest {
         frames: u32,
         ease: Ease,
         remove_trajectory: bool,
+    },
+    ReferenceFill {
+        layer_uid: String,
+        frame: u32,
+        point: [f64; 2],
+        color: String,
+        opacity: f64,
     },
 }
 
@@ -228,6 +238,29 @@ pub(crate) fn parse_labs_request(
                 remove_trajectory: m["removeTrajectory"].as_bool().ok_or(InvalidRequest)?,
             })
         }
+        "object.labs.referenceFill" => {
+            let m = fields(
+                payload,
+                &["command", "layerUid", "frame", "point", "color", "opacity"],
+            )?;
+            let point = m["point"]
+                .as_array()
+                .filter(|p| p.len() == 2)
+                .ok_or(InvalidRequest)?;
+            let at = |i: usize| {
+                point[i]
+                    .as_f64()
+                    .filter(|v| v.is_finite() && v.abs() <= 1e12)
+                    .ok_or(InvalidRequest)
+            };
+            Ok(LabsRequest::ReferenceFill {
+                layer_uid: text(m, "layerUid")?,
+                frame: integer(m, "frame", 0, u64::from(u32::MAX))?,
+                point: [at(0)?, at(1)?],
+                color: text(m, "color")?,
+                opacity: number(m, "opacity", 0.0, 1.0)?,
+            })
+        }
         _ => Err(InvalidRequest),
     }
 }
@@ -276,6 +309,12 @@ pub(super) fn write_cells(
     paste_cells(&grown, layer, frame, cells)
 }
 
+/// A prepared Labs operation.
+pub(crate) enum PreparedLabs {
+    Generate(PreparedLabsGenerate),
+    Fill(PreparedBooleanEdit),
+}
+
 /// The prepared transaction: the drawing and, only when the timeline grew, its work-area end.
 pub(crate) struct PreparedLabsGenerate {
     origin: ObjectSnapshot,
@@ -284,14 +323,53 @@ pub(crate) struct PreparedLabsGenerate {
 }
 
 impl ObjectFillOwner {
-    pub(crate) fn prepare_labs_generate(
+    /// Parse and prepare one Labs operation: a generator, or the reference fill, which is the ordinary bucket fill
+    /// with other layers' walls and is committed as the boolean edit it is.
+    pub(crate) fn prepare_labs(
         &self,
         operation: &str,
         payload: &Value,
-    ) -> Result<PreparedLabsGenerate, DispatchErrorCode> {
+    ) -> Result<PreparedLabs, DispatchErrorCode> {
         let request = parse_labs_request(operation, payload)?;
+        if let LabsRequest::ReferenceFill {
+            layer_uid,
+            frame,
+            point,
+            color,
+            opacity,
+        } = &request
+        {
+            let origin = self.current_snapshot();
+            let document = origin.document();
+            layer_position(document, layer_uid).ok_or(DispatchErrorCode::NotFound)?;
+            let instance = document
+                .component_set()
+                .is_some_and(|set| set.instance(CONTEXT, layer_uid).is_some());
+            if *frame >= document.total_frames {
+                return Err(DispatchErrorCode::InvalidRequest);
+            }
+            if document.layer_is_locked(layer_uid) || instance {
+                return Err(DispatchErrorCode::Unavailable);
+            }
+            let scope = Scope {
+                context_id: CONTEXT.to_owned(),
+                layer_uid: layer_uid.clone(),
+                frame: *frame,
+            };
+            return self
+                .prepare_fill_trace_at(scope, *point, color, *opacity, false, true)
+                .map(PreparedLabs::Fill);
+        }
+        self.prepare_labs_generate(&request)
+            .map(PreparedLabs::Generate)
+    }
+
+    fn prepare_labs_generate(
+        &self,
+        request: &LabsRequest,
+    ) -> Result<PreparedLabsGenerate, DispatchErrorCode> {
         let origin = self.current_snapshot();
-        let document = match kernels::generate(&origin, &request)? {
+        let document = match kernels::generate(&origin, request)? {
             DocumentEdit::Changed(next) => Some(next),
             DocumentEdit::NoChange => None,
         };

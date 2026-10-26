@@ -16,8 +16,8 @@ use crate::object_document::object_group_kernels::object_boolean_ops::{Point, Ri
 use crate::object_document::object_group_kernels::object_boolean_topology::IslandBuild;
 use crate::object_document::{
     AuthoredOrder, FrameScope, FrameScopeKind, ObjectDocument, ObjectGeometry, ObjectPoint,
-    ObjectRecord, ObjectSegment, ObjectTarget, OrderElement, Presence, SolidFill, VectorBody,
-    VectorExt, VECTOR_FAMILY,
+    ObjectRecord, ObjectSegment, ObjectTarget, OrderElement, OrderScope, Presence, SolidFill,
+    VectorBody, VectorExt, VECTOR_FAMILY,
 };
 
 pub(crate) const MAX_SAFE_REVISION: u64 = 9_007_199_254_740_991;
@@ -308,9 +308,32 @@ pub(crate) fn apply_stack(
             .iter_mut()
             .find(|c| c.context_id == scope.context_id)
             .ok_or(StackError::ContextAbsent)?;
-        let found = context.scopes.iter_mut().find(|s| {
+        let is_scope = |s: &OrderScope| {
             s.frame_scope.kind == FrameScopeKind::Authored && s.frame_scope.frame == scope.frame
-        });
+        };
+        // A cell with no records yet has no scope (a U36 reference fill paints such a cell): create it in frame order,
+        // the way the ordinary vector create does (`insert_element`).
+        if !stack.is_empty() && !context.scopes.iter().any(is_scope) {
+            let at = context
+                .scopes
+                .iter()
+                .position(|s| {
+                    s.frame_scope.kind == FrameScopeKind::Authored
+                        && s.frame_scope.frame > scope.frame
+                })
+                .unwrap_or(context.scopes.len());
+            context.scopes.insert(
+                at,
+                OrderScope {
+                    frame_scope: FrameScope {
+                        kind: FrameScopeKind::Authored,
+                        frame: scope.frame,
+                    },
+                    elements: Vec::new(),
+                },
+            );
+        }
+        let found = context.scopes.iter_mut().find(|s| is_scope(s));
         if let Some(found) = found {
             let old: Vec<OrderElement> = found
                 .elements

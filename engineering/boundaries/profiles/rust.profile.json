@@ -1292,6 +1292,7 @@
         "object_exposure_edit_retime_timing.rs",
         "object_widget_edit.rs",
         "object_labs_generate.rs",
+        "object_labs_reference_fill.rs",
         "object_widget_edit_rows.rs",
         "object_widget_edit_controls.rs",
         "object_widget_edit_guards.rs",

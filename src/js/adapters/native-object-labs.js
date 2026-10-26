@@ -1,4 +1,4 @@
-/* U36 (#2362): the Labs generators (speed lines, boil, follow-path) through their native operations. The engine reads the
+/* U36 (#2362): the Labs speed lines, boil, follow-path and reference fill through their native operations. The engine reads the
  * shown cell itself and runs the baseline algorithms, so a request carries parameters only. Holds no document state and
  * has no fallback writer: an absent project or route is a typed unavailability. */
 (function (root, factory) {
@@ -26,6 +26,7 @@
       speedLines: (body) => run(Contract.LABS_SPEED_LINES, body),
       boil: (body) => run(Contract.LABS_BOIL, body),
       followPath: (body) => run(Contract.LABS_FOLLOW_PATH, body),
+      referenceFill: (body) => run(Contract.LABS_REFERENCE_FILL, body),
     });
   }
   const bindings = new WeakMap();
@@ -35,5 +36,9 @@
     if (!bindings.has(host)) bindings.set(host, create(session));
     return bindings.get(host);
   }
-  return Object.freeze({ create, desktop, rgba });
+  // The bucket colour as the fill contract's '#rrggbbaa'.
+  function hex8(color) {
+    return '#' + rgba(color).map((c) => Math.round(c * 255).toString(16).padStart(2, '0')).join('');
+  }
+  return Object.freeze({ create, desktop, rgba, hex8 });
 }));
