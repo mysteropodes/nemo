@@ -24,6 +24,10 @@ const ROUTED_ELSEWHERE: &[(&str, &str)] = &[
         "object_font_asset_history.rs (font asset import route)",
     ),
     (
+        "command.document.object.asset.video.link",
+        "object_media_video_link_history.rs (host probe then dispatch_video_link route)",
+    ),
+    (
         "command.document.object.brush.bitmap.publish",
         "object_brush_read.rs and read_queries.rs (brush store publication route)",
     ),
