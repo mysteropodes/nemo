@@ -155,3 +155,25 @@ test('the shadow-guides button flips a view flag only: no persisted or native re
   assert.deepEqual(readers.sort(), ['src/js/app.js', 'src/js/engine-bridge.js', 'src/js/timeline.js'],
     'the default, the two render readers and the toggle; no serializer or native bridge reads the flag');
 });
+
+test('Roll only moves the playhead around the origin while R is held and returns to it on release or disable', () => {
+  const jumps = [], timers = new Map();
+  let next = 0;
+  const h = harness('flip-roll.js', { goToFrame(f) { jumps.push(f); h.state.currentFrame = f; },
+    setInterval(fn) { timers.set(++next, fn); return next; }, clearInterval(id) { timers.delete(id); } });
+  Object.assign(h.state, { currentFrame: 5, totalFrames: 7, playing: false });
+  const doc = () => JSON.stringify({ layers: h.state.layers, contentRevision: h.state.contentRevision }), before = doc();
+  h.key('keydown', 'r');
+  assert.equal(timers.size, 0, 'off: R does nothing');
+  h.enable('flip-roll');
+  h.key('keydown', 'r');
+  for (let i = 0; i < 5; i++) [...timers.values()][0]();
+  assert.deepEqual(jumps, [4, 5, 6, 3, 4], 'origin-2..origin+2 clamped to the last frame, cycling');
+  h.key('keyup', 'r');
+  assert.equal(h.state.currentFrame, 5);
+  assert.equal(timers.size, 0);
+  h.key('keydown', 'r');
+  h.disable('flip-roll');
+  assert.deepEqual([h.state.currentFrame, timers.size], [5, 0]);
+  assert.equal(doc(), before, 'the document is untouched');
+});

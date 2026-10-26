@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 
 #[path = "object_layer_placement_snapshot.rs"]
 mod layer_placement;
+#[path = "object_layer_cells_snapshot.rs"]
+mod layer_cells;
 #[path = "object_layer_range_snapshot.rs"]
 mod layer_range;
 
@@ -52,6 +54,7 @@ impl ObjectSnapshot {
             serde_json::to_vec(&request.payload).map_err(|_| DispatchErrorCode::InvalidRequest)?;
         let selected = match request.payload.get("view") {
             Some(view) if view == "placement" => self.query_layer_placement_json(&payload),
+            Some(view) if view == "cells" => self.query_layer_cells_json(&payload),
             Some(_) => self.query_layer_range_json(&payload),
             None => self.query_layer_timing_json(&payload).and_then(|read| {
                 serde_json::to_value(read).map_err(|_| DispatchErrorCode::Internal)

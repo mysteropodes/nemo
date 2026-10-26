@@ -705,6 +705,17 @@
       "reason": "no executable regions in the coverage report",
       "note": "T26/#2238 mask contract controls: derived only by the original buildBaseline from the complete actual cargo-llvm-cov report at 664958928e8a2f5962080434941172f025b3fed1. Report SHA256 df9ecde2f549df75c1ecf7b64cc1b62416f977d7a7c26d71c0780fdbbb2666e1. Every existing record, floor, aggregate total, exclusion and recorded provenance is preserved. No owner/installed/GPU acceptance is implied."
     },
+    "nemo-mcp/src/native_layer_cells_contract.rs": {
+      "lines": 98.87,
+      "regions": 99.08,
+      "functions": 100,
+      "note": "U31 cells contract (#2374): floors derived by the original floorPct from the cargo-llvm-cov measurement of a coverage-rust --check run on branch claude/cs8-b09-labs-timing (candidate lines 98.88%, regions 99.08%, functions 100%). Only these two entries are added; all existing entries, aggregate floors, exclusions and recorded provenance are preserved."
+    },
+    "nemo-mcp/src/native_layer_cells_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "U31 cells contract (#2374): floors derived by the original floorPct from the cargo-llvm-cov measurement of a coverage-rust --check run on branch claude/cs8-b09-labs-timing (candidate lines 98.88%, regions 99.08%, functions 100%). Only these two entries are added; all existing entries, aggregate floors, exclusions and recorded provenance are preserved."
+    },
     "nemo-mcp/src/native_layer_placement_contract.rs": {
       "lines": 100,
       "regions": 100,
