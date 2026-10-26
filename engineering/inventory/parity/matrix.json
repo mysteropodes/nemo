@@ -18,14 +18,51 @@
       "curated-open": 33,
       "issues-open": 126
     },
-    "evidence": {},
+    "evidence": {
+      "frames": {
+        "incomplete": 19
+      },
+      "components": {
+        "source-pass": 6
+      }
+    },
     "mappingConfidence": {
       "high": 450,
       "medium": 390,
       "low": 63
     }
   },
-  "evidence": [],
+  "evidence": [
+    {
+      "family": "components",
+      "verdict": "source-pass",
+      "sourceSha": "9b274a92b7f3c7d7c76f3e5fb2480ef8a111ad58",
+      "generatedAt": "2026-10-26T02:33:15.263Z",
+      "kindsMissing": [],
+      "tasks": [
+        "D33",
+        "I14",
+        "I15",
+        "I16a"
+      ]
+    },
+    {
+      "family": "frames",
+      "verdict": "incomplete",
+      "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6",
+      "generatedAt": "2026-10-26T02:46:59.851Z",
+      "kindsMissing": [
+        "pixels"
+      ],
+      "tasks": [
+        "F09",
+        "F10",
+        "F11",
+        "F12",
+        "F13"
+      ]
+    }
+  ],
   "surfaces": [
     {
       "id": "dom:#app-check-update",
@@ -462,7 +499,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "dom:#btn-dims-lock",
@@ -1863,7 +1907,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-open",
+      "evidence": [
+        {
+          "family": "components",
+          "verdict": "source-pass",
+          "sourceSha": "9b274a92b7f3c7d7c76f3e5fb2480ef8a111ad58"
+        }
+      ]
     },
     {
       "id": "dom:#comp-playmode",
@@ -1878,7 +1929,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-open",
+      "evidence": [
+        {
+          "family": "components",
+          "verdict": "source-pass",
+          "sourceSha": "9b274a92b7f3c7d7c76f3e5fb2480ef8a111ad58"
+        }
+      ]
     },
     {
       "id": "dom:#comp-singleframe",
@@ -1893,7 +1951,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-open",
+      "evidence": [
+        {
+          "family": "components",
+          "verdict": "source-pass",
+          "sourceSha": "9b274a92b7f3c7d7c76f3e5fb2480ef8a111ad58"
+        }
+      ]
     },
     {
       "id": "dom:#comp-speed",
@@ -1908,7 +1973,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-open",
+      "evidence": [
+        {
+          "family": "components",
+          "verdict": "source-pass",
+          "sourceSha": "9b274a92b7f3c7d7c76f3e5fb2480ef8a111ad58"
+        }
+      ]
     },
     {
       "id": "dom:#curve-save-preset",
@@ -5490,7 +5562,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "dom:#tools-invert-btn",
@@ -9898,7 +9977,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "curated-open"
+      "status": "curated-open",
+      "evidence": [
+        {
+          "family": "components",
+          "verdict": "source-pass",
+          "sourceSha": "9b274a92b7f3c7d7c76f3e5fb2480ef8a111ad58"
+        }
+      ]
     },
     {
       "id": "menu:select-bridge.js:onContext:exposer-la-visibilite-comme-propriete-de-compone",
@@ -9913,7 +9999,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "curated-open"
+      "status": "curated-open",
+      "evidence": [
+        {
+          "family": "components",
+          "verdict": "source-pass",
+          "sourceSha": "9b274a92b7f3c7d7c76f3e5fb2480ef8a111ad58"
+        }
+      ]
     },
     {
       "id": "menu:select-bridge.js:onContext:premier-plan",
@@ -11128,7 +11221,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "menu:timeline.js:top:ctxclearkeyframe",
@@ -11142,7 +11242,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "menu:timeline.js:top:ctxconverttokeyframes",
@@ -11157,7 +11264,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "menu:timeline.js:top:ctxcut",
@@ -11171,7 +11285,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "menu:timeline.js:top:ctxduplicateselection",
@@ -11185,7 +11306,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "menu:timeline.js:top:ctxedittweencurve",
@@ -11214,7 +11342,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "menu:timeline.js:top:ctxinsertframe",
@@ -11228,7 +11363,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "menu:timeline.js:top:ctxinsertkeyframe",
@@ -11242,7 +11384,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "menu:timeline.js:top:ctxinsertlayer",
@@ -11357,7 +11506,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "menu:timeline.js:top:ctxregeneratetween",
@@ -11386,7 +11542,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "menu:timeline.js:top:fit",
@@ -12497,7 +12660,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "shortcut:cmdExtendExposure",
@@ -12512,7 +12682,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "shortcut:cmdFlipPreview",
@@ -12570,7 +12747,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "shortcut:cmdInsertFrame",
@@ -12584,7 +12768,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "shortcut:cmdInsertKey",
@@ -12598,7 +12789,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "shortcut:cmdNextFrame",
@@ -12882,7 +13080,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "shortcut:readonly:shortcutRoDelete",
@@ -12912,7 +13117,14 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "issues-open"
+      "status": "issues-open",
+      "evidence": [
+        {
+          "family": "frames",
+          "verdict": "incomplete",
+          "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6"
+        }
+      ]
     },
     {
       "id": "shortcut:readonly:shortcutRoEasyEase",

@@ -1,0 +1,98 @@
+{
+  "schema": "nemo.parity-family-result/1",
+  "family": "frames",
+  "sourceSha": "4c64aee0342872069ae0587d4594157d2a7329c6",
+  "tree": "ec1348a477bcd435d3a312b2dd63a94a6f2122a5",
+  "generatedAt": "2026-10-26T02:46:59.851Z",
+  "checks": [
+    {
+      "id": "frames-blank-key",
+      "target": "application",
+      "filter": "object_blank_key_edit::",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "id": "frames-key-exposure",
+      "target": "application",
+      "filter": "object_exposure_edit_key",
+      "passed": 41,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "id": "frames-retime",
+      "target": "application",
+      "filter": "object_exposure_edit_retime",
+      "passed": 43,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "id": "frames-structure",
+      "target": "application",
+      "filter": "object_frame_edit_structure",
+      "passed": 53,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "id": "frames-sparse",
+      "target": "application",
+      "filter": "object_frame_edit_sparse",
+      "passed": 30,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "id": "frames-range-records",
+      "target": "application",
+      "filter": "object_frame_edit_range_records",
+      "passed": 36,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "id": "frames-clipboard-paste",
+      "target": "application",
+      "filter": "object_frame_clipboard_paste",
+      "passed": 73,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "id": "frames-clipboard-repeat",
+      "target": "application",
+      "filter": "object_frame_clipboard_repeat",
+      "passed": 54,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "id": "frames-bulk-move",
+      "target": "application",
+      "filter": "object_frame_bulk_move::",
+      "passed": 72,
+      "failed": 0,
+      "ignored": 0
+    }
+  ],
+  "kindsCovered": [
+    "positive",
+    "oracle",
+    "undo-redo",
+    "save-reopen"
+  ],
+  "kindsMissing": [
+    "pixels"
+  ],
+  "verdict": "incomplete",
+  "tasks": [
+    "F09",
+    "F10",
+    "F11",
+    "F12",
+    "F13"
+  ]
+}
