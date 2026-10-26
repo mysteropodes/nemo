@@ -115,38 +115,9 @@ fn document_head(width: u32, height: u32) -> String {
     )
 }
 
-/// Shortest round-trip decimal, never an exponent; -0 is `0` like JS `String(-0)`.
-/// Differs from JS only where JS uses an exponent (|x| < 1e-6 or >= 1e21).
-pub(crate) fn format_number(value: f64) -> String {
-    if value == 0.0 {
-        "0".to_owned()
-    } else {
-        format!("{value}")
-    }
-}
-
-/// A channel in 0..=1 as a percentage: the shortest decimal digits with the
-/// point moved two places right (exact on the digits, no float multiply).
-pub(crate) fn channel_percent(value: f64) -> String {
-    let text = format_number(value);
-    let (whole, fraction) = text.split_once('.').unwrap_or((text.as_str(), ""));
-    let mut digits = fraction.to_owned();
-    while digits.len() < 2 {
-        digits.push('0');
-    }
-    let (moved, rest) = digits.split_at(2);
-    let joined = format!("{whole}{moved}");
-    let int = match joined.trim_start_matches('0') {
-        "" => "0",
-        trimmed => trimmed,
-    };
-    let rest = rest.trim_end_matches('0');
-    if rest.is_empty() {
-        int.to_owned()
-    } else {
-        format!("{int}.{rest}")
-    }
-}
+#[path = "native_vector_export_svg_number.rs"]
+mod number;
+pub(crate) use number::{channel_percent, format_number};
 
 /// What a record must be for SVG to represent it exactly.
 pub(crate) struct RecordFacts<'a> {
@@ -440,6 +411,20 @@ fn emit_frame(
                 };
                 let contour = copy.svg_contour.as_ref().ok_or(refusal)?;
                 let rgba = copy.svg_rgba.ok_or(refusal)?;
+                if count > 0 {
+                    sink.put("\n")?;
+                }
+                emit_contour_with_error(sink, contour, rgba, refusal)?;
+                count += 1;
+            }
+            PaintEntry::Dab(dab) => {
+                // G16 option C: a produced dab is one closed fill, as the baseline's dab Path.
+                let refusal = SvgExportError::Unsupported {
+                    source_object_index: dab.source_index,
+                    reason: "brush-texture dab paint has no admitted SVG representation",
+                };
+                let contour = dab.svg_contour.as_ref().ok_or(refusal)?;
+                let rgba = dab.svg_rgba.ok_or(refusal)?;
                 if count > 0 {
                     sink.put("\n")?;
                 }

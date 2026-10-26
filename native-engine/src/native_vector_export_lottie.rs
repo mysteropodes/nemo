@@ -270,6 +270,12 @@ fn shown_by_layer(
                     "duplicator copies have no admitted Lottie representation yet",
                 )
             }
+            PaintEntry::Dab(dab) => {
+                return refuse(
+                    dab.source_index,
+                    "brush-texture dabs have no admitted Lottie representation yet",
+                )
+            }
             PaintEntry::Video(index) => {
                 return Err(LottieExportError::UnsupportedLayer {
                     source_layer_index: plan.video_slots()[index].layer_index,
