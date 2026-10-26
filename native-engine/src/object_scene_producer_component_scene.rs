@@ -25,6 +25,7 @@ use crate::evaluation::object_scene_style_kernels::object_scene_producer_compone
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::{
     PinField, PinnedScene, SceneEntry, ScenePin,
 };
+use crate::object_document::ObjectTarget;
 use crate::object_frame_packet::ObjectFramePacket;
 use std::collections::HashMap;
 
@@ -37,6 +38,9 @@ pub(crate) const PRODUCER: &str = "component";
 pub(crate) struct PlacedComponent {
     pub(crate) inner_frame: ResolvedFrame,
     pub(crate) shapes: Vec<ComponentShape>,
+    /// Selected record targets the exposed `__visible` override dropped (reported by the
+    /// override evaluator itself, never re-derived by a consumer).
+    pub(crate) hidden: Vec<ObjectTarget>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

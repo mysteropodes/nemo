@@ -9,6 +9,8 @@ use std::collections::HashSet;
 
 #[path = "object_property_catalog.rs"]
 mod catalog;
+#[path = "object_property_exposed.rs"]
+pub(crate) mod exposed;
 #[path = "object_property_names.rs"]
 mod names;
 #[path = "object_property_targets.rs"]
@@ -394,9 +396,17 @@ impl PropertyHolder {
                         ));
                     }
                 }
+                let exposed =
+                    crate::object_document::exposed_metadata(components, target, &record.property);
                 let meta = holder
                     .metadata(&record.property)
+                    .or_else(|| exposed.clone())
                     .ok_or_else(|| unsupported("unknown property"))?;
+                if exposed.is_some() && record.expression.value().is_some_and(|e| e.enabled) {
+                    return Err(unsupported(
+                        "exposed component property is read raw; expressions are unsupported",
+                    ));
+                }
                 property(record, &meta)?;
             }
         }
