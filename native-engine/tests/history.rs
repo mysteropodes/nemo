@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-history => history_tests
 use crate::codec::decode_project;
 use crate::commands::{
     DispatchErrorCode, NativeOpacityApplication, OpacityRequest, ResponseEnvelope, OP_QUERY_OPACITY,

@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-application => application_read_tests
 //! Frozen N19A read oracles through the common dispatcher; no production host activation.
 use crate::application::{ExportResourceResolver, NativeApplication, ResourceResolutionError};
 use crate::codec::{decode_project, encode_project};

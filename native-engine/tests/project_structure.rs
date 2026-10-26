@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-codec => project_structure_tests
 use crate::project_structure::{parse_project_structure, ProjectStructureError};
 use serde::Deserialize;
 use serde_json::{json, Value};

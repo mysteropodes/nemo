@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-codec => reference_image_asset_tests
 use crate::reference_image_asset::{decode_png, validate_png, ImageAssetError, ImageAssetLimits};
 
 // Frozen minimal PNG containers: literal IHDR, zlib scanlines and CRCs.

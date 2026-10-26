@@ -1,3 +1,5 @@
+//! nemo-test-harness: test-commands => object_read_tests
+//! nemo-test-harness: test-application => object_application_read_tests
 use crate::object_codec::{decode_project, encode_project};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest};

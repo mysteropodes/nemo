@@ -108,7 +108,11 @@ const CODE=[
   "src-tauri/src/native_layer_policy_dispatch_tests.rs",
   "src-tauri/src/native_object_client.rs",
   "src-tauri/src/native_revision_dispatch.rs",
-  "tests/native-layer-policy-public.test.cjs"
+  "tests/native-layer-policy-public.test.cjs",
+  "native-engine/build.rs",
+  "native-engine/src/object_command_families/mod.rs",
+  "native-engine/src/object_command_families/widget.rs",
+  "native-engine/tests/object_command_ownership.rs"
 ];
 const CANDIDATES=[PROFILE,MCP,COVERAGE,...CODE];
 const read=(root,file)=>JSON.parse(fs.readFileSync(path.join(root,file),'utf8'));

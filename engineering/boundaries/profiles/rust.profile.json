@@ -348,6 +348,8 @@
         "object_raster_asset_dispatch.rs",
         "object_command_dispatch.rs",
         "object_command_dispatch_edits.rs",
+        "object_command_families/mod.rs",
+        "object_command_families/widget.rs",
         "object_project_settings_history.rs",
         "object_media_link_history.rs",
         "object_layer_policy_history.rs",
@@ -1754,7 +1756,8 @@
         "object_linked_fill_codec.rs",
         "object_selection_compound.rs",
         "object_selection_clipboard_groups.rs",
-        "object_revision_owner.rs"
+        "object_revision_owner.rs",
+        "object_command_ownership.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -2338,6 +2341,16 @@
         "startup_cut_j1_exchange_tests.rs",
         "object_window_probe_tests.rs",
         "p38_fixture_open_probe_tests.rs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.build",
+      "layer": "build",
+      "dir": "native-engine",
+      "files": [
+        "build.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
