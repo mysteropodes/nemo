@@ -10,7 +10,7 @@ const DECLARATION = 'engineering/application/legacy-writer-families.json';
 const CAPABILITIES = 'engineering/application/capabilities-v2';
 const OPERATIONS = 'src/js/application/native-opacity-operations.js';
 const SURFACE = 'src/js/adapters/native-opacity-legacy-surface.js';
-const GUARD_SOURCES = ['src/js/app.js', 'src/js/motion.js', 'src/js/timeline.js', 'src/js/tweens.js', 'src/js/project.js'];
+const GUARD_ROOT = 'src/js';
 const TARGETS = ['global', 'timeline', 'motion', 'script', 'plugin'];
 const AUTHORITIES = ['legacy-owned', 'native', 'unavailable'];
 const SPECIAL_KINDS = ['boot-scaffold'];
@@ -91,11 +91,17 @@ function splice(source, name, replacement, file) {
   return source.slice(0, start) + replacement + source.slice(end + endTag.length);
 }
 
+// Every literal n20 guard kind under src/js (vendor excluded), wherever a new guard lands.
 function guardKinds(root) {
   const found = new Set();
-  for (const file of GUARD_SOURCES) {
-    for (const match of fs.readFileSync(path.join(root, file), 'utf8').matchAll(/n20[A-Za-z]*\(['"]([a-z0-9-]+)['"]/g)) found.add(match[1]);
-  }
+  (function walk(dir) {
+    for (const entry of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
+      const rel = path.posix.join(dir, entry.name);
+      if (entry.isDirectory()) { if (entry.name !== 'vendor') walk(rel); continue; }
+      if (!entry.name.endsWith('.js') || entry.name.endsWith('.vendor.js')) continue;
+      for (const match of fs.readFileSync(path.join(root, rel), 'utf8').matchAll(/n20[A-Za-z]*\(['"]([a-z0-9-]+)['"]/g)) found.add(match[1]);
+    }
+  }(GUARD_ROOT));
   return found;
 }
 
