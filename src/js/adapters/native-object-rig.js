@@ -46,7 +46,7 @@
       moveSegment: (layerUid, boneId, vi, part, to, breakTangent) => edit(layerUid, kind('moveSegment', { boneId, vi, part, to, breakTangent })),
       setBoneRadius: (layerUid, boneId, radius) => edit(layerUid, kind('setBoneRadius', { boneId, radius })),
       bindStroke: (layerUid, strokeId, frame, options) => edit(layerUid, kind('bindStroke', Object.assign({ strokeId, frame }, pick(options, ['boneIds', 'radius', 'rotate', 'softness'])))),
-      bindMesh: (layerUid, meshId) => edit(layerUid, kind('bindMesh', { meshId })),
+      bindMesh: (layerUid, meshId, options) => edit(layerUid, kind('bindMesh', Object.assign({ meshId }, pick(options, ['frame', 'boneIds', 'radius', 'rotate', 'softness'])))),
       autoAssign: (layerUid, frame, options) => edit(layerUid, kind('autoAssign', Object.assign({ frame }, pick(options, ['defaultRadius', 'rotate', 'softness', 'paths', 'meshes'])))),
       setWeight: (layerUid, target, vertex, entry, percent) => edit(layerUid, kind('setWeight', { target, vertex, entry, percent })),
       addWeight: (layerUid, target, vertex, boneId) => edit(layerUid, kind('addWeight', { target, vertex, boneId })),

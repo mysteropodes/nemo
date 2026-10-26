@@ -67,14 +67,8 @@ fn auto_assign_rows_match_the_executed_baseline_and_report_what_they_did() {
         // Every stroke of these rows is representable; the CompoundPath of the baseline row has no native
         // record (the planner test counts the unsupported family on an in-memory record).
         assert_eq!(summary.skipped_unsupported, 0, "{}", row.name);
-        let has_bones = row.before.contains("\"bone1\"");
-        let meshes_off = row.action["meshes"] == json!(false);
-        assert_eq!(
-            summary.mesh_binds_unavailable,
-            has_bones && !meshes_off,
-            "{}: the mesh gap is reported, never silent",
-            row.name
-        );
+        // No row of this table carries a raster, so the default `meshes: true` binds nothing extra: the
+        // mesh passes have their own executed rows (`object_rig_edit_meshes.rs`).
     }
 }
 
