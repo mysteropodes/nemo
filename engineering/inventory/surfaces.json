@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "064bcd0fc56fb1c77a8c62c182e3aa3724ed7b50",
-  "describe": "v0.7.0-alpha.4-3231-g064bcd0f"
+  "head": "6b9eacc88b946f76be4c863b476d9a9910aa8c5d",
+  "describe": "v0.7.0-alpha.4-3233-g6b9eacc8"
  },
- "inputsDigest": "94e228677dd7bcbc4a2a85db2fb12961a08498aae5919ac18189d19d0896d077",
+ "inputsDigest": "5a118103f5c86cb7677be19362c01a8cf76b042eed9dc761bdc9402ce71a94af",
  "states": [
   "inventoried",
   "characterized",
@@ -216,8 +216,8 @@
   },
   "SMLottiePreview": {
    "file": "src/js/lottie-preview.js",
-   "line": 125,
-   "members": 1
+   "line": 158,
+   "members": 5
   },
   "SMMarkers": {
    "file": "src/js/markers.js",
@@ -8885,7 +8885,7 @@
    "capability": "&times;",
    "area": "media-import-export",
    "handler": [
-    "src/js/lottie-preview.js:109 initControls()"
+    "src/js/lottie-preview.js:112 initControls()"
    ],
    "events": [
     "click"
@@ -8906,7 +8906,7 @@
     "container": "lottie-preview-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 3,
+    "functionsVisited": 7,
     "via": "variable closeBtn",
     "references": []
    },
@@ -8923,7 +8923,7 @@
    "capability": "&#9654;",
    "area": "media-import-export",
    "handler": [
-    "src/js/lottie-preview.js:112 initControls()"
+    "src/js/lottie-preview.js:115 initControls()"
    ],
    "events": [
     "click"
@@ -8949,7 +8949,7 @@
     "functionsVisited": 6,
     "via": "variable playBtn",
     "references": [
-     "src/js/lottie-preview.js:90 stopPlayback()"
+     "src/js/lottie-preview.js:93 stopPlayback()"
     ]
    },
    "fixtures": [
@@ -8965,7 +8965,7 @@
    "capability": "lottie preview scrub",
    "area": "media-import-export",
    "handler": [
-    "src/js/lottie-preview.js:111 initControls()"
+    "src/js/lottie-preview.js:114 initControls()"
    ],
    "events": [
     "input"
@@ -8991,8 +8991,8 @@
     "functionsVisited": 4,
     "via": "variable scrub",
     "references": [
-     "src/js/lottie-preview.js:98 goToFrame()",
-     "src/js/lottie-preview.js:130 open()"
+     "src/js/lottie-preview.js:101 goToFrame()",
+     "src/js/lottie-preview.js:134 open()"
     ]
    },
    "fixtures": [
