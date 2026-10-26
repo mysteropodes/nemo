@@ -107,7 +107,10 @@
   // Desktop: the local effect is presentation; the native document receives the same gesture.
   function nativeController() { return window.NemoNativeSymmetryController || null; }
   function nativeRoute(action) { var c = nativeController(); if (c) c.route(action); }
-  function holdNative() { var c = nativeController(); if (c) c.hold(); }
+  // One hold per drag; it is released by every drag end, including one where editing stopped mid-drag.
+  var nativeHeld = false;
+  function holdNative() { var c = nativeController(); if (c && !nativeHeld) { nativeHeld = true; c.hold(); } }
+  function releaseNative() { var c = nativeController(); if (c && nativeHeld) { nativeHeld = false; c.release(); } }
   window.resetSymmetryGuide = function () {
     if (state.symmetryMode === 'radial') state.symmetryRadialCenter = defaultRadialCenter();
     else state.symmetryAxis = defaultAxis(state.symmetryMode);
@@ -450,13 +453,13 @@
     window.SMEngineBridge.renderNow();
   }
   function onUp(e) {
-    if (!shouldEdit() || (!draggingEndpoint && !draggingWhole && !draggingCenter)) return;
+    if (!shouldEdit() || (!draggingEndpoint && !draggingWhole && !draggingCenter)) { releaseNative(); return; }
     e.stopImmediatePropagation(); e.preventDefault();
     // On desktop the drag moved only the presented guide; the release is one native edit.
     var c = state.symmetryRadialCenter, a = state.symmetryAxis, native = nativeController();
     if (native && draggingCenter) native.route({ kind: 'setRadialCenter', x: c.x, y: c.y });
     else if (native) native.route({ kind: 'setAxis', x1: a.x1, y1: a.y1, x2: a.x2, y2: a.y2 });
-    if (native) native.release();
+    releaseNative();
     draggingEndpoint = null; draggingWhole = null; draggingCenter = false;
     window.SMEngineBridge.resume();
     window.SMEngineBridge.renderNow();

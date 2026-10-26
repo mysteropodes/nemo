@@ -39,10 +39,13 @@
     }
     // Pending local intent stays on screen until its native edit settles; a gesture in progress is never overwritten.
     function quiet() { return !held && !queue.length && !draining; }
+    // The fallback is the last confirmed read of THIS document lifetime, never another document's.
+    function owner(info) { return info ? [info.instanceId, info.documentId, info.lifecycleGeneration].join('|') : null; }
     function project() {
-      var value = model.read();
-      if (value) confirmed = value.symmetry.settings.effective;
-      if (confirmed && quiet()) { write(confirmed); repaint(); }
+      var value = model.read(), session = current(), now = owner(session && session.info());
+      if (value) confirmed = { owner: owner(value.info), effective: value.symmetry.settings.effective };
+      var e = confirmed && confirmed.owner === now ? confirmed.effective : null;
+      if (e && quiet()) { write(e); repaint(); }
     }
     function identity() {
       try {
@@ -83,10 +86,16 @@
         if (next && changed(busyStamp, next) && available(next.session, next.info)) refreshNeeded = true;
         return loading || Promise.resolve(null);
       }
+      var value = model.read(); if (value) { project(); return Promise.resolve(value); }
+      return load();
+    }
+    // Start or join one pinned read; the queue also uses it while it is draining.
+    function load() {
+      if (loading) return loading;
       var stamp;
       try { stamp = readStamp(); } catch (_) {}
-      if (!stamp) return Promise.resolve(null);
-      var value = model.read(); if (value) { project(); return Promise.resolve(value); }
+      if (!stamp || retired) return Promise.resolve(null);
+      var value = model.read(); if (value) return Promise.resolve(value);
       if (failedRead && sameReadOwner(failedRead) && failedRead.presentation === stamp.presentation) return Promise.resolve(null);
       failedRead = null; busyStamp = stamp;
       loading = model.refresh().then(function (value) {
@@ -102,13 +111,19 @@
     function refuse() { queue = []; notice(); refreshNeeded = true; }
     async function run() {
       while (queue.length && !retired) {
-        var origin = model.read();
-        if (!origin) { await (loading || presented()); origin = model.read(); }
-        if (!origin || retired) { refuse(); return; }
-        busyStamp = identity();
-        var result;
-        try { result = await model.edit(queue.shift(), origin); } catch (_) { result = { status: 'unconfirmed' }; }
-        if (!['applied-presented', 'unchanged'].includes(result.status) || model.read() !== result.projection) { refuse(); return; }
+        var action = queue.shift();
+        for (var attempt = 0; ; attempt++) {
+          var origin = model.read();
+          if (!origin) { await load(); origin = model.read(); }
+          if (!origin || retired) { refuse(); return; }
+          busyStamp = identity();
+          var result;
+          try { result = await model.edit(action, origin); } catch (_) { result = { status: 'unconfirmed' }; }
+          if (['applied-presented', 'unchanged'].includes(result.status) && model.read() === result.projection) break;
+          // Native applied nothing (another writer moved the revision, say): re-read once and retry on the new one.
+          if (result.status === 'unconfirmed' && result.code === 'stale_revision' && attempt === 0) { model.invalidate(); continue; }
+          refuse(); return;
+        }
       }
     }
     function drain() {

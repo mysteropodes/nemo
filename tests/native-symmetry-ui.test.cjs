@@ -56,7 +56,7 @@ function fixture(options = {}) {
   let info = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0',
     canvasW: 320, canvasH: 180, fps: 24, totalFrames: 40, layers: [{ layerUid: 'drawing', visible: true }] };
   const metadata = clone(options.metadata || {});
-  let revision = 0, serial = 0, active = true, refuse = false, refuseReads = false, block = null, running = 0, tail = Promise.resolve(), controller, context;
+  let revision = 0, serial = 0, active = true, refuse = false, refuseReads = false, staleEdits = 0, block = null, running = 0, tail = Promise.resolve(), controller, context;
   const calls = [], notices = [];
   const projected = pin => ({ ...pin, presentation: { ...pin, owner: 'native', status: 'presented' } });
   async function dispatch(request) {
@@ -64,7 +64,8 @@ function fixture(options = {}) {
     if (block && request.operation === Contract.READ) { const held = block; block = null; held.entered(); await held.wait; }
     const response = { apiVersion: 2, requestId: request.requestId, instanceId: info.instanceId,
       documentId: info.documentId, contentRevision: revision, ok: true };
-    if (refuse && request.operation === Contract.EDIT || refuseReads && request.operation === Contract.READ) { response.ok = false; response.error = { code: 'unavailable', message: 'Unavailable' }; }
+    if (staleEdits && request.operation === Contract.EDIT) { staleEdits--; response.ok = false; response.error = { code: 'stale_revision', message: 'Moved' }; }
+    else if (refuse && request.operation === Contract.EDIT || refuseReads && request.operation === Contract.READ) { response.ok = false; response.error = { code: 'unavailable', message: 'Unavailable' }; }
     else if (request.operation === Contract.EDIT) {
       assert.equal(request.expectedRevision, revision);
       const before = JSON.stringify(metadata); apply(metadata, request.payload.action);
@@ -126,8 +127,12 @@ function fixture(options = {}) {
     block = { entered, wait }; return { started, release };
   }
   const run = code => vm.runInContext(code, context);
+  function replaceDocument() {
+    info = { ...info, documentId: 'd2', lifecycleGeneration: 2 };
+    controller.willProject(info); ProjectFile.projectView(browserRoot, info);
+  }
   return { root, state, area, controller, calls, notices, metadata, settled, edits, shown, external, holdNextRead, run,
-    refuse: v => { refuse = v; }, refuseReads: v => { refuseReads = v; } };
+    refuse: v => { refuse = v; }, refuseReads: v => { refuseReads = v; }, replaceDocument, staleEdits: n => { staleEdits = n; } };
 }
 
 test('a confirmed native read projects the original import values into the existing guide fields', async () => {
@@ -220,4 +225,39 @@ test('another writer\'s revision during a guide drag neither moves the dragged g
   f.area.fire('pointerup', { clientX: 70, clientY: 80 }); await f.controller.whenSettled(); await f.settled();
   assert.deepEqual(f.edits(), [{ kind: 'setRadialCenter', x: 70, y: 80 }]);
   assert.deepEqual(f.shown(), effective(f.metadata)); assert.equal(f.state.symmetryRadialSectors, 12);
+});
+
+test('an edit native did not apply is re-read and retried once; a second refusal is surfaced', async () => {
+  const f = fixture({ metadata: { symmetryEnabled: true } });
+  await f.controller.presented(); await f.settled();
+  f.staleEdits(1); f.root.setSymmetryMode('x'); await f.controller.whenSettled(); await f.settled();
+  assert.deepEqual(f.edits(), [{ kind: 'setMode', mode: 'x' }, { kind: 'setMode', mode: 'x' }]);
+  assert.equal(f.metadata.symmetryMode, 'x'); assert.deepEqual(f.notices, []);
+  f.staleEdits(2); f.root.setSymmetryMode('free'); await f.controller.whenSettled(); await f.settled();
+  assert.equal(f.notices.length, 1); assert.equal(f.state.symmetryMode, 'x', 'the last confirmed mode is shown again');
+});
+
+test('a drag that ends after editing stopped releases its hold, and refused intents drop what was queued behind them', async () => {
+  const f = fixture({ metadata: { symmetryEnabled: true, symmetryMode: 'radial' } });
+  await f.controller.presented(); await f.settled();
+  f.area.fire('pointerdown', { clientX: 160, clientY: 90 });
+  f.area.fire('pointermove', { clientX: 20, clientY: 20 });
+  f.state.symmetryEnabled = false;
+  f.area.fire('pointerup', { clientX: 20, clientY: 20 });
+  f.external(m => { m.symmetryRadialSectors = 9; }); await f.settled();
+  assert.equal(f.state.symmetryRadialSectors, 9, 'projection resumed after the drag');
+  assert.deepEqual(f.shown(), effective(f.metadata));
+  f.refuse(true);
+  f.root.setSymmetryMode('x'); f.root.resetSymmetryGuide();
+  await f.controller.whenSettled(); await f.settled();
+  assert.deepEqual(f.edits(), [{ kind: 'setMode', mode: 'x' }], 'the queued reset never ran');
+  assert.equal(f.notices.length, 1); assert.deepEqual(f.shown(), effective(f.metadata));
+});
+
+test('a confirmed read from a previous document is never shown in a later one', async () => {
+  const f = fixture({ metadata: { symmetryEnabled: true, symmetryMode: 'radial' } });
+  await f.controller.presented(); await f.settled();
+  f.state.symmetryMode = 'y';
+  f.replaceDocument(); f.refuseReads(true); await f.controller.presented(); await f.settled();
+  assert.equal(f.state.symmetryMode, 'y', 'no other document\'s settings are projected');
 });
