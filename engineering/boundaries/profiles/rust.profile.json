@@ -31,6 +31,7 @@
         "object_properties.rs",
         "object_expression_holder.rs",
         "object_property_catalog.rs",
+        "object_property_exposed.rs",
         "project_asset_inventory.rs",
         "project_envelope_value.rs",
         "project_settings.rs",
@@ -284,7 +285,9 @@
         "object_rig_edit.rs",
         "object_rig_edit_parse.rs",
         "object_rig_edit_plan.rs",
+        "object_rig_edit_plan_mesh.rs",
         "object_rig_edit_rules.rs",
+        "object_rig_edit_rules_mesh.rs",
         "object_rig_pose_commit.rs",
         "object_rig_pose_commit_meshes.rs",
         "object_rig_pose_commit_parse.rs",
@@ -348,6 +351,8 @@
         "object_raster_asset_dispatch.rs",
         "object_command_dispatch.rs",
         "object_command_dispatch_edits.rs",
+        "object_command_families/mod.rs",
+        "object_command_families/widget.rs",
         "object_project_settings_history.rs",
         "object_media_link_history.rs",
         "object_layer_policy_history.rs",
@@ -474,6 +479,7 @@
         "rig_pose_deform_anchor.rs",
         "rig_pose_deform.rs",
         "object_component_exposed_key.rs",
+        "object_component_override_port.rs",
         "object_component_exposed.rs",
         "object_component_exposed_apply.rs",
         "object_text_layout_record.rs",
@@ -643,7 +649,8 @@
         "scene_effect_scene_join_inputs.rs",
         "object_brush_scene_join.rs",
         "object_brush_admission.rs",
-        "object_brush_paint_join.rs"
+        "object_brush_paint_join.rs",
+        "object_rig_packet_pose.rs"
       ],
       "publicApi": [
         "render_scene.rs",
@@ -884,6 +891,8 @@
         "object_render_scene.rs",
         "object_component_render_scene.rs",
         "object_component_render_scene_fixture.rs",
+        "object_component_exposed_override.rs",
+        "object_component_exposed_override_fixture.rs",
         "object_reference_viewport.rs",
         "object_compositor.rs",
         "object_scheduled_compositor.rs",
@@ -1528,6 +1537,7 @@
         "object_scene_style_emit_controls.rs",
         "object_scene_style_emit_rows.rs",
         "object_scene_style_emit_gpu.rs",
+        "object_scene_style_emit_refusal.rs",
         "scene_effect_layer_record.rs",
         "scene_effect_layer_record_rows.rs",
         "scene_effect_layer_record_refs.rs",
@@ -1571,6 +1581,9 @@
         "object_rig_edit_payloads.rs",
         "object_rig_edit_wire.rs",
         "object_rig_edit_kernels.rs",
+        "object_rig_edit_mesh_rows.rs",
+        "object_rig_edit_meshes.rs",
+        "object_rig_edit_mesh_controls.rs",
         "object_rig_pose_commit.rs",
         "object_rig_pose_commit_oracle.rs",
         "object_rig_pose_commit_rows.rs",
@@ -1642,6 +1655,8 @@
         "object_text_scene_join.rs",
         "object_text_scene_gpu.rs",
         "object_text_scene_history.rs",
+        "object_text_scene_nofont.rs",
+        "object_text_scene_font_refusal.rs",
         "object_text_scene_svg.rs",
         "object_text_animator_scene.rs",
         "object_text_selector_expressions.rs",
@@ -1754,7 +1769,10 @@
         "object_linked_fill_codec.rs",
         "object_selection_compound.rs",
         "object_selection_clipboard_groups.rs",
-        "object_revision_owner.rs"
+        "object_revision_owner.rs",
+        "object_command_ownership.rs",
+        "object_rig_packet_pose.rs",
+        "object_rig_packet_pose_gpu.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -2338,6 +2356,16 @@
         "startup_cut_j1_exchange_tests.rs",
         "object_window_probe_tests.rs",
         "p38_fixture_open_probe_tests.rs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.build",
+      "layer": "build",
+      "dir": "native-engine",
+      "files": [
+        "build.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

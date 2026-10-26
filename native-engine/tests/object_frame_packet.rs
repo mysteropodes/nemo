@@ -1,3 +1,5 @@
+//! nemo-test-harness: test-evaluation => object_frame_packet_evaluation_tests
+//! nemo-test-harness: test-application => object_frame_packet_application_tests
 //! Independent scoped content/provenance oracle; no compositor expectations.
 use crate::object_codec::{decode_project, encode_project};
 use crate::object_document::FrameScopeKind;

@@ -40,9 +40,9 @@ use crate::evaluation::object_image_mesh_kernels::rig_pose_deform::{
 use crate::evaluation::object_image_mesh_kernels::rig_pose_deform_anchor::DeformError;
 use crate::evaluation::object_image_mesh_kernels::rig_pose_weights::Point2;
 use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
-use crate::object_document::object_rig_record::{
-    bind_link, BindLink, BindTarget, MeshVertexLookup,
-};
+// Re-exported for the render-scene join, which may not import the document layer directly (L03-P).
+pub(crate) use crate::object_document::object_rig_record::BindTarget;
+use crate::object_document::object_rig_record::{bind_link, BindLink, MeshVertexLookup};
 use crate::object_document::{FrameScopeKind, ObjectLayer, ObjectRecord};
 use crate::revision::ObjectSnapshot;
 

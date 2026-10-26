@@ -83,7 +83,6 @@ impl PoseSample {
 fn safe_layer(layer: &ObjectLayer) -> bool {
     layer.widget.value().is_none()
         && layer.groups.value().is_none()
-        && layer.rig.value().is_none()
         && !layer.folder_id.value().is_some_and(|v| v.is_some())
         && !layer.blend_mode().is_some_and(|v| v != "normal")
         && !layer.matte_mode().is_some_and(|v| v != "none")
@@ -98,7 +97,7 @@ fn sample(packet: &ObjectFramePacket, layer: usize) -> Result<PoseSample, ChainU
         .source_layers()
         .get(layer)
         .ok_or(ChainUnavailable::MissingLayer)?;
-    if !safe_layer(source) {
+    if !safe_layer(source) || !crate::object_render_scene::rig_packet_pose::rig_leaves_pivot_alone(packet, layer, source) {
         return Err(ChainUnavailable::LayerContext);
     }
     let target = PropertyHolderTarget {

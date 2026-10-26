@@ -223,7 +223,13 @@ impl PropertyHolder {
         if Self::target_ambiguous(document, self.target()) {
             return None;
         }
-        let mut metadata = self.metadata(property)?;
+        let mut metadata = self.metadata(property).or_else(|| {
+            crate::object_document::exposed_metadata(
+                document.component_set(),
+                self.target(),
+                property,
+            )
+        })?;
         if let Some(index) = crate::object_document::properties::catalog::vertex_index(property) {
             let retained = Self::retained_mesh_source(document, self.target());
             match Self::vertex_count(document, self.target()) {

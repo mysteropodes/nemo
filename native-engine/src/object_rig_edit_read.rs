@@ -268,3 +268,48 @@ pub(crate) fn ik_lengths(
         Err(KernelRefusal::Unavailable)
     }
 }
+
+/// The display rect of a raster as `rasterImageRect` returns it: top-left `x`, `y`, `width`, `height` and
+/// the rotation in degrees about the centre.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct MeshPlacement {
+    pub(crate) x: f64,
+    pub(crate) y: f64,
+    pub(crate) width: f64,
+    pub(crate) height: f64,
+    pub(crate) rotation: f64,
+}
+
+/// The REST positions of a mesh in world space: `SMImageMesh.worldVerts` of `rigBindMesh` with every offset
+/// forced to `[0, 0]` (the bind records where the vertices sit before any posing, never the sculpt).
+#[cfg_attr(not(feature = "evaluation"), allow(unused_variables))]
+pub(crate) fn mesh_rest_world(
+    verts: &[[f64; 2]],
+    placement: MeshPlacement,
+) -> Result<Vec<[f64; 2]>, KernelRefusal> {
+    #[cfg(feature = "evaluation")]
+    {
+        use crate::evaluation::object_image_mesh_kernels::object_image_mesh_geometry::{
+            world_verts, MeshRect, MeshView,
+        };
+        let zero = vec![[0.0, 0.0]; verts.len()];
+        let view = MeshView {
+            outline: &[],
+            verts,
+            offsets: &zero,
+            tris: &[],
+        };
+        let rect = MeshRect {
+            x: placement.x,
+            y: placement.y,
+            width: placement.width,
+            height: placement.height,
+            rotation: placement.rotation,
+        };
+        Ok(world_verts(&view, &rect, None))
+    }
+    #[cfg(not(feature = "evaluation"))]
+    {
+        Err(KernelRefusal::Unavailable)
+    }
+}

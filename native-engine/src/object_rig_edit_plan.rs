@@ -26,6 +26,9 @@ use crate::object_snapshot::object_rig_edit_read::{
     KernelRef, KernelRefusal, KernelVertex, OffsetEntry,
 };
 use crate::request_receipts::DispatchErrorCode;
+use crate::commands::object_fill_owner::widget_edit::object_rig_edit::plan_mesh::{
+    self, PlannedMeshBind,
+};
 use serde_json::Number;
 
 /// Why a plan could not be made.
@@ -34,6 +37,8 @@ pub(crate) enum PlanRefusal {
     NoLayer,
     NoRig,
     NoStroke,
+    /// No raster of the layer carries the mesh, or the store does not hold it.
+    NoMesh,
     NoBind,
     AmbiguousBind,
     NoBone,
@@ -52,7 +57,12 @@ impl PlanRefusal {
     /// The dispatch code the command layer reports.
     pub(crate) fn code(self) -> DispatchErrorCode {
         match self {
-            Self::NoLayer | Self::NoRig | Self::NoStroke | Self::NoBind | Self::NoBone => {
+            Self::NoLayer
+            | Self::NoRig
+            | Self::NoStroke
+            | Self::NoMesh
+            | Self::NoBind
+            | Self::NoBone => {
                 DispatchErrorCode::NotFound
             }
             Self::Kernel(KernelRefusal::Unavailable) | Self::PressureRibbon => {
@@ -88,6 +98,8 @@ pub(crate) struct PlannedBind {
 /// The binds one `rigAutoAssignLayer` pass makes, in layer order.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct AutoPlan {
+    /// The mesh binds, made BEFORE the path binds like the baseline (`rigAutoAssignLayer`).
+    pub(crate) mesh_binds: Vec<PlannedMeshBind>,
     pub(crate) binds: Vec<PlannedBind>,
     pub(crate) skipped_unsupported: u32,
     /// The grown fallback radius (`None` when the rig has no bones and nothing was scanned).
@@ -133,7 +145,7 @@ pub(crate) fn kernel_bones(rig: &RigRecord) -> Vec<KernelBone> {
         .collect()
 }
 
-fn every_bone_id(rig: &RigRecord) -> Vec<String> {
+pub(crate) fn every_bone_id(rig: &RigRecord) -> Vec<String> {
     rig.bones
         .entries()
         .iter()
@@ -211,7 +223,7 @@ fn rest_handle(handle: &ObjectPoint) -> Option<RigPair> {
 
 /// The bones a bind pass weighs against: all of them, or the requested ones (each must exist and be
 /// named once; the baseline weigher silently skips an unknown id).
-fn resolve_bone_ids(
+pub(crate) fn resolve_bone_ids(
     rig: &RigRecord,
     requested: Option<&[String]>,
 ) -> Result<Vec<String>, PlanRefusal> {
@@ -288,8 +300,11 @@ pub(crate) fn plan_stroke_bind(
     bind_for(rig, record, &ids, radius, softness)
 }
 
-/// `rigAutoAssignLayer`: one bind per supported path record, the radius grown first. Without bones
-/// the baseline returns `0` before touching anything; the plan is then empty.
+/// `rigAutoAssignLayer`: one bind per supported path record and, with `want_meshes`, per meshed raster
+/// (meshes first), the radius grown first. The radius scan counts the mesh vertices whether or not meshes
+/// are bound (the baseline scan is not gated by `opts.meshes`). Without bones the baseline returns `0`
+/// before touching anything; the plan is then empty.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn plan_auto_assign(
     document: &ObjectDocument,
     layer_uid: &str,
@@ -297,17 +312,19 @@ pub(crate) fn plan_auto_assign(
     default_radius: Option<f64>,
     softness: Option<f64>,
     want_paths: bool,
+    want_meshes: bool,
 ) -> Result<AutoPlan, PlanRefusal> {
     let rig = rig_of(document, layer_uid)?;
-    let empty = AutoPlan {
-        binds: Vec::new(),
-        skipped_unsupported: 0,
-        radius: None,
-    };
     if rig.bones.len() == 0 {
-        return Ok(empty);
+        return Ok(AutoPlan {
+            mesh_binds: Vec::new(),
+            binds: Vec::new(),
+            skipped_unsupported: 0,
+            radius: None,
+        });
     }
     let (paths, skipped) = split_records(document.objects(), layer_uid, frame);
+    let meshes = plan_mesh::layer_meshes(document, layer_uid, frame)?;
     let bones = kernel_bones(rig);
     let mut points = Vec::new();
     for record in &paths {
@@ -315,21 +332,27 @@ pub(crate) fn plan_auto_assign(
             points.push([float(&segment.point.x), float(&segment.point.y)]);
         }
     }
-    let needed = auto_radius(default_radius, &bones, &points)?;
-    if !want_paths {
-        return Ok(AutoPlan {
-            radius: needed,
-            ..empty
-        });
+    for mesh in &meshes {
+        points.extend_from_slice(&mesh.world);
     }
+    let needed = auto_radius(default_radius, &bones, &points)?;
     let ids = every_bone_id(rig);
+    let mut mesh_binds = Vec::new();
+    if want_meshes {
+        for mesh in &meshes {
+            mesh_binds.push(plan_mesh::bind_for(rig, &ids, mesh, needed, softness)?);
+        }
+    }
     let mut binds = Vec::new();
-    for record in paths {
-        binds.push(bind_for(rig, record, &ids, needed, softness)?);
+    if want_paths {
+        for record in paths {
+            binds.push(bind_for(rig, record, &ids, needed, softness)?);
+        }
     }
     Ok(AutoPlan {
+        mesh_binds,
         binds,
-        skipped_unsupported: skipped,
+        skipped_unsupported: if want_paths { skipped } else { 0 },
         radius: needed,
     })
 }

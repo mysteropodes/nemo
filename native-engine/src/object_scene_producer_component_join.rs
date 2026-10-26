@@ -46,7 +46,7 @@ use crate::object_document::object_component_record_kernels::object_component_re
     ComponentInstance, ComponentRecord, ComponentRecordError, ComponentSet, SCENE_CONTEXT,
 };
 use crate::object_document::RangeEvaluator;
-use crate::object_document::{ObjectLayer, ObjectRecord};
+use crate::object_document::{ObjectLayer, ObjectRecord, ObjectTarget};
 use crate::object_frame_packet::ObjectFramePacket;
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -138,14 +138,26 @@ fn apply_exposed_overrides(
     host: &ObjectLayer,
     frame: u32,
     port: &mut dyn OverridePort,
-) -> Result<Vec<ObjectRecord>, ComponentUnavailable> {
+) -> Result<(Vec<ObjectRecord>, Vec<ObjectTarget>), ComponentUnavailable> {
     let props = exposed_entries(component);
     if props.is_empty() {
-        return Ok(selected);
+        return Ok((selected, Vec::new()));
     }
     match apply_overrides(&props, &selected, host.layer_uid(), frame, port) {
         Err(error) => Err(ComponentUnavailable::Overrides(error)),
-        Ok(Cow::Owned(records)) => Ok(records),
+        Ok(Cow::Owned(records)) => {
+            // `apply_overrides` only ever drops a record for the sticky `__visible` hide.
+            let hidden = selected
+                .iter()
+                .filter(|before| {
+                    records
+                        .iter()
+                        .all(|after| after.target() != before.target())
+                })
+                .map(|before| before.target().clone())
+                .collect();
+            Ok((records, hidden))
+        }
         Ok(Cow::Borrowed(_)) => Err(ComponentUnavailable::OverridesUnavailable),
     }
 }
@@ -199,11 +211,12 @@ fn evaluate_instance(
         return Ok(ComponentOutcome::Shapes(PlacedComponent {
             inner_frame: resolved,
             shapes: Vec::new(),
+            hidden: Vec::new(),
         }));
     };
     // `index` guarantees inner < total, which is a u32.
     let selected = select_records(component, inner as u32)?;
-    let records = apply_exposed_overrides(component, selected, host, frame, overrides)?;
+    let (records, hidden) = apply_exposed_overrides(component, selected, host, frame, overrides)?;
     let sym = sym_matrix(instance)?;
     let keys = ports
         .camera_keys(instance.symbol_id())
@@ -219,6 +232,7 @@ fn evaluate_instance(
     Ok(ComponentOutcome::Shapes(PlacedComponent {
         inner_frame: resolved,
         shapes,
+        hidden,
     }))
 }
 

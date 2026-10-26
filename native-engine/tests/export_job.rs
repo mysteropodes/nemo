@@ -1,5 +1,5 @@
-use crate::codec::decode_project;
-use crate::commands::OpacityRequest;
+//! nemo-test-harness: test-export_job => export_job_tests
+use crate::{codec::decode_project, commands::OpacityRequest};
 use crate::compositor::Compositor;
 use crate::export_job::{
     CleanupStatus, ExportBegin, ExportCompositor, ExportFrameInput, ExportJobErrorKind,

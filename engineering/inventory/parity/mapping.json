@@ -1,0 +1,6895 @@
+{
+  "schema": "nemo.parity-mapping/1",
+  "curation": "first-pass agent curation 2026-10-25 (CS8 #2349); label/handler-name based, medium/low rows need human review; proposedDisposition entries are proposals, not approved dispositions",
+  "surfaces": {
+    "dom:#app-check-update": {
+      "tasks": [
+        "I40"
+      ],
+      "confidence": "high",
+      "note": "updater check"
+    },
+    "dom:#app-menu-btn": {
+      "tasks": [
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "App menu dispatch"
+    },
+    "dom:#assets-tab-media": {
+      "tasks": [
+        "G29",
+        "U23"
+      ],
+      "confidence": "medium",
+      "note": "Media library tab"
+    },
+    "dom:#assets-tab-presets": {
+      "tasks": [
+        "G39"
+      ],
+      "confidence": "medium",
+      "note": "Presets tab of assets panel"
+    },
+    "dom:#audio-file-input": {
+      "tasks": [
+        "G32"
+      ],
+      "confidence": "high",
+      "note": "audio import"
+    },
+    "dom:#btn-al": {
+      "tasks": [
+        "F07",
+        "U10"
+      ],
+      "confidence": "high",
+      "note": "new layer command"
+    },
+    "dom:#btn-alphabg": {
+      "tasks": [
+        "G25"
+      ],
+      "confidence": "medium",
+      "note": "canvas bg preview presentation"
+    },
+    "dom:#btn-audio": {
+      "tasks": [
+        "G32"
+      ],
+      "confidence": "high",
+      "note": "audio import"
+    },
+    "dom:#btn-bake-cache": {
+      "tasks": [
+        "G10",
+        "D24"
+      ],
+      "confidence": "medium",
+      "note": "playback bake cache"
+    },
+    "dom:#btn-bool-exclude": {
+      "tasks": [
+        "G19",
+        "U16"
+      ],
+      "confidence": "medium",
+      "note": "boolean op button"
+    },
+    "dom:#btn-bool-intersect": {
+      "tasks": [
+        "G19",
+        "U16"
+      ],
+      "confidence": "medium",
+      "note": "boolean op button"
+    },
+    "dom:#btn-bool-subtract": {
+      "tasks": [
+        "G19",
+        "U16"
+      ],
+      "confidence": "medium",
+      "note": "boolean op button"
+    },
+    "dom:#btn-bool-unite": {
+      "tasks": [
+        "G19",
+        "U16"
+      ],
+      "confidence": "medium",
+      "note": "boolean op button"
+    },
+    "dom:#btn-bpm": {
+      "tasks": [
+        "D26"
+      ],
+      "confidence": "high",
+      "note": "BPM grid ownership"
+    },
+    "dom:#btn-cam-addkey": {
+      "tasks": [
+        "D25"
+      ],
+      "confidence": "high",
+      "note": "camera key add"
+    },
+    "dom:#btn-cam-ease-edit": {
+      "tasks": [
+        "D25",
+        "D12"
+      ],
+      "confidence": "medium",
+      "note": "camera key easing curve"
+    },
+    "dom:#btn-camera": {
+      "tasks": [
+        "D25"
+      ],
+      "confidence": "high",
+      "note": "camera layer"
+    },
+    "dom:#btn-clip": {
+      "tasks": [
+        "G25",
+        "F04"
+      ],
+      "confidence": "low",
+      "note": "clip-to-canvas view/project setting"
+    },
+    "dom:#btn-combine-exclude": {
+      "tasks": [
+        "G19",
+        "G24"
+      ],
+      "confidence": "medium",
+      "note": "combine op"
+    },
+    "dom:#btn-combine-flatten": {
+      "tasks": [
+        "G19",
+        "G24"
+      ],
+      "confidence": "medium",
+      "note": "combine flatten native geometry"
+    },
+    "dom:#btn-combine-intersect": {
+      "tasks": [
+        "G19",
+        "G24"
+      ],
+      "confidence": "medium",
+      "note": "combine op"
+    },
+    "dom:#btn-combine-remove": {
+      "tasks": [
+        "G24"
+      ],
+      "confidence": "medium",
+      "note": "remove from combine group"
+    },
+    "dom:#btn-combine-subtract": {
+      "tasks": [
+        "G19",
+        "G24"
+      ],
+      "confidence": "medium",
+      "note": "combine op"
+    },
+    "dom:#btn-combine-unite": {
+      "tasks": [
+        "G19",
+        "G24"
+      ],
+      "confidence": "medium",
+      "note": "combine op"
+    },
+    "dom:#btn-comp": {
+      "tasks": [
+        "I17"
+      ],
+      "confidence": "high",
+      "note": "convert layer to component"
+    },
+    "dom:#btn-comp-detach": {
+      "tasks": [
+        "U23",
+        "I18"
+      ],
+      "confidence": "medium",
+      "note": "Bake component into layer"
+    },
+    "dom:#btn-comp-enter": {
+      "tasks": [
+        "U23",
+        "I20"
+      ],
+      "confidence": "medium",
+      "note": "Enter component context"
+    },
+    "dom:#btn-comp-preview": {
+      "tasks": [
+        "G48",
+        "U23"
+      ],
+      "confidence": "medium",
+      "note": "Component preview window"
+    },
+    "dom:#btn-convert-media": {
+      "tasks": [
+        "G28"
+      ],
+      "confidence": "high",
+      "note": "bulk embed/link conversion"
+    },
+    "dom:#btn-cycle": {
+      "tasks": [
+        "F12"
+      ],
+      "confidence": "medium",
+      "note": "repeat selected frame range"
+    },
+    "dom:#btn-dims-lock": {
+      "tasks": [
+        "U16",
+        "G22"
+      ],
+      "confidence": "medium",
+      "note": "Shape size/proportion controls"
+    },
+    "dom:#btn-dl": {
+      "tasks": [
+        "F07",
+        "U10"
+      ],
+      "confidence": "high",
+      "note": "delete active layer"
+    },
+    "dom:#btn-dup-add-effector": {
+      "tasks": [
+        "U24",
+        "I07"
+      ],
+      "confidence": "high",
+      "note": "add effector"
+    },
+    "dom:#btn-dup-edit-source": {
+      "tasks": [
+        "U24",
+        "I10"
+      ],
+      "confidence": "medium",
+      "note": "Duplicator setup command"
+    },
+    "dom:#btn-dup-reseed": {
+      "tasks": [
+        "U24",
+        "I10"
+      ],
+      "confidence": "medium",
+      "note": "Duplicator setup command"
+    },
+    "dom:#btn-dupl": {
+      "tasks": [
+        "F08",
+        "U10"
+      ],
+      "confidence": "high",
+      "note": "duplicate active layer"
+    },
+    "dom:#btn-edit-pcurve": {
+      "tasks": [
+        "G16"
+      ],
+      "confidence": "low",
+      "note": "pressure curve editor, brush input"
+    },
+    "dom:#btn-ellipse-arc-convert": {
+      "tasks": [
+        "G22"
+      ],
+      "confidence": "high",
+      "note": "dynamic ellipse conversion"
+    },
+    "dom:#btn-export": {
+      "tasks": [
+        "U27"
+      ],
+      "confidence": "high",
+      "note": "opens export modal"
+    },
+    "dom:#btn-ff": {
+      "tasks": [
+        "D24",
+        "U13"
+      ],
+      "confidence": "high",
+      "note": "transport go-first"
+    },
+    "dom:#btn-fill-propagate": {
+      "tasks": [
+        "I19",
+        "U15"
+      ],
+      "confidence": "medium",
+      "note": "Fill propagate to frames"
+    },
+    "dom:#btn-fit": {
+      "tasks": [
+        "G25",
+        "U28"
+      ],
+      "confidence": "high",
+      "note": "view fit"
+    },
+    "dom:#btn-footage-replace": {
+      "tasks": [
+        "U23",
+        "G28"
+      ],
+      "confidence": "medium",
+      "note": "footage replace source"
+    },
+    "dom:#btn-ghost-all": {
+      "tasks": [
+        "D23",
+        "U20"
+      ],
+      "confidence": "high",
+      "note": "ghost all keyframes"
+    },
+    "dom:#btn-ghost-select": {
+      "tasks": [
+        "I22",
+        "U17"
+      ],
+      "confidence": "medium",
+      "note": "select ghost keyframe contents"
+    },
+    "dom:#btn-grad-add-stop": {
+      "tasks": [
+        "U15",
+        "G04"
+      ],
+      "confidence": "medium",
+      "note": "Gradient fill control"
+    },
+    "dom:#btn-history": {
+      "tasks": [
+        "D05",
+        "D09"
+      ],
+      "confidence": "high",
+      "note": "version history panel open"
+    },
+    "dom:#btn-imagemesh-reset": {
+      "tasks": [
+        "F18",
+        "G40"
+      ],
+      "confidence": "medium",
+      "note": "mesh reset command"
+    },
+    "dom:#btn-import-img": {
+      "tasks": [
+        "G27",
+        "G29"
+      ],
+      "confidence": "medium",
+      "note": "image import"
+    },
+    "dom:#btn-import-psd": {
+      "tasks": [
+        "G36"
+      ],
+      "confidence": "high",
+      "note": "PSD import"
+    },
+    "dom:#btn-import-video": {
+      "tasks": [
+        "G30",
+        "G31"
+      ],
+      "confidence": "high",
+      "note": "video import"
+    },
+    "dom:#btn-kitsu-open": {
+      "tasks": [
+        "D08"
+      ],
+      "confidence": "high",
+      "note": "Kitsu panel open"
+    },
+    "dom:#btn-kitsu-publish": {
+      "tasks": [
+        "I44"
+      ],
+      "confidence": "high",
+      "note": "Kitsu baseline/service"
+    },
+    "dom:#btn-lf": {
+      "tasks": [
+        "D24",
+        "U13"
+      ],
+      "confidence": "high",
+      "note": "transport go-last"
+    },
+    "dom:#btn-lip-apply": {
+      "tasks": [
+        "U23",
+        "I42"
+      ],
+      "confidence": "high",
+      "note": "Lip-sync panel"
+    },
+    "dom:#btn-loop": {
+      "tasks": [
+        "D24",
+        "U13"
+      ],
+      "confidence": "medium",
+      "note": "loop playback work area"
+    },
+    "dom:#btn-mask-unset": {
+      "tasks": [
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "remove as mask"
+    },
+    "dom:#btn-mblur": {
+      "tasks": [
+        "U25"
+      ],
+      "confidence": "medium",
+      "note": "comp motion blur panel"
+    },
+    "dom:#btn-media-cleanup": {
+      "tasks": [
+        "G29"
+      ],
+      "confidence": "medium",
+      "note": "media library cleanup"
+    },
+    "dom:#btn-media-import-img": {
+      "tasks": [
+        "G29",
+        "G27"
+      ],
+      "confidence": "medium",
+      "note": "library image import"
+    },
+    "dom:#btn-media-import-video": {
+      "tasks": [
+        "G29",
+        "G30"
+      ],
+      "confidence": "medium",
+      "note": "library video import"
+    },
+    "dom:#btn-media-mode-embedded": {
+      "tasks": [
+        "G28"
+      ],
+      "confidence": "high",
+      "note": "embedded/linked mode"
+    },
+    "dom:#btn-media-mode-linked": {
+      "tasks": [
+        "G28"
+      ],
+      "confidence": "high",
+      "note": "embedded/linked mode"
+    },
+    "dom:#btn-mgraph": {
+      "tasks": [
+        "I39",
+        "D40"
+      ],
+      "confidence": "medium",
+      "note": "graph editor toggle"
+    },
+    "dom:#btn-mp-new-tab": {
+      "tasks": [
+        "G39"
+      ],
+      "confidence": "medium",
+      "note": "motion preset library tab"
+    },
+    "dom:#btn-mp-save": {
+      "tasks": [
+        "G39"
+      ],
+      "confidence": "high",
+      "note": "save layer as preset"
+    },
+    "dom:#btn-new": {
+      "tasks": [
+        "D03",
+        "D04"
+      ],
+      "confidence": "medium",
+      "note": "new project"
+    },
+    "dom:#btn-nf": {
+      "tasks": [
+        "D24",
+        "U13"
+      ],
+      "confidence": "high",
+      "note": "transport next frame"
+    },
+    "dom:#btn-open": {
+      "tasks": [
+        "D01",
+        "D03"
+      ],
+      "confidence": "high",
+      "note": "open project file"
+    },
+    "dom:#btn-open-tutorial-topbar": {
+      "tasks": [
+        "I38"
+      ],
+      "confidence": "high",
+      "note": "tutorial launcher"
+    },
+    "dom:#btn-os": {
+      "tasks": [
+        "U20",
+        "D23"
+      ],
+      "confidence": "high",
+      "note": "onion skin toggle"
+    },
+    "dom:#btn-os-outline": {
+      "tasks": [
+        "U20",
+        "D23"
+      ],
+      "confidence": "high",
+      "note": "onion outlines"
+    },
+    "dom:#btn-palette-add-fill": {
+      "tasks": [
+        "G12",
+        "U15"
+      ],
+      "confidence": "high",
+      "note": "Palette color tool"
+    },
+    "dom:#btn-palette-add-stroke": {
+      "tasks": [
+        "G12",
+        "U15"
+      ],
+      "confidence": "high",
+      "note": "Palette color tool"
+    },
+    "dom:#btn-palette-new": {
+      "tasks": [
+        "G12",
+        "U15"
+      ],
+      "confidence": "high",
+      "note": "Palette color tool"
+    },
+    "dom:#btn-palette-replace": {
+      "tasks": [
+        "G12",
+        "U15"
+      ],
+      "confidence": "high",
+      "note": "Palette color tool"
+    },
+    "dom:#btn-palette-swap": {
+      "tasks": [
+        "G12",
+        "U15"
+      ],
+      "confidence": "high",
+      "note": "Palette color tool"
+    },
+    "dom:#btn-pf": {
+      "tasks": [
+        "D24",
+        "U13"
+      ],
+      "confidence": "high",
+      "note": "transport prev frame"
+    },
+    "dom:#btn-play": {
+      "tasks": [
+        "D24",
+        "U13"
+      ],
+      "confidence": "high",
+      "note": "play/stop"
+    },
+    "dom:#btn-pt-corner": {
+      "tasks": [
+        "G21",
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "Point type conversion"
+    },
+    "dom:#btn-pt-smooth": {
+      "tasks": [
+        "G21",
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "Point type conversion"
+    },
+    "dom:#btn-pt-symmetric": {
+      "tasks": [
+        "G21",
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "Point type conversion"
+    },
+    "dom:#btn-ref-import": {
+      "tasks": [
+        "G34"
+      ],
+      "confidence": "high",
+      "note": "Reference presenter"
+    },
+    "dom:#btn-ref-remove": {
+      "tasks": [
+        "G34"
+      ],
+      "confidence": "high",
+      "note": "Reference presenter"
+    },
+    "dom:#btn-resetv": {
+      "tasks": [
+        "G25"
+      ],
+      "confidence": "high",
+      "note": "reset view"
+    },
+    "dom:#btn-revision-accept": {
+      "tasks": [
+        "I53"
+      ],
+      "confidence": "medium",
+      "note": "revision ghost accept"
+    },
+    "dom:#btn-revision-reject": {
+      "tasks": [
+        "I53"
+      ],
+      "confidence": "medium",
+      "note": "revision ghost reject"
+    },
+    "dom:#btn-revision-view": {
+      "tasks": [
+        "I53",
+        "U29"
+      ],
+      "confidence": "low",
+      "note": "team review view filter"
+    },
+    "dom:#btn-rig-auto-assign": {
+      "tasks": [
+        "I13"
+      ],
+      "confidence": "high",
+      "note": "rig auto-bind"
+    },
+    "dom:#btn-rig-commit": {
+      "tasks": [
+        "I13"
+      ],
+      "confidence": "high",
+      "note": "rig commit pose"
+    },
+    "dom:#btn-rig-mode-assign": {
+      "tasks": [
+        "I13",
+        "I11"
+      ],
+      "confidence": "medium",
+      "note": "rig editing mode"
+    },
+    "dom:#btn-rig-mode-draw": {
+      "tasks": [
+        "I13",
+        "I11"
+      ],
+      "confidence": "medium",
+      "note": "rig editing mode"
+    },
+    "dom:#btn-rig-mode-move": {
+      "tasks": [
+        "I13",
+        "I11"
+      ],
+      "confidence": "medium",
+      "note": "rig editing mode"
+    },
+    "dom:#btn-rig-reset": {
+      "tasks": [
+        "I13"
+      ],
+      "confidence": "high",
+      "note": "rig reset"
+    },
+    "dom:#btn-rulers": {
+      "tasks": [
+        "G25",
+        "F05"
+      ],
+      "confidence": "medium",
+      "note": "rulers/guides aid"
+    },
+    "dom:#btn-safety": {
+      "tasks": [
+        "G25"
+      ],
+      "confidence": "medium",
+      "note": "safe-area overlay"
+    },
+    "dom:#btn-save": {
+      "tasks": [
+        "D01"
+      ],
+      "confidence": "high",
+      "note": "save project"
+    },
+    "dom:#btn-saveas": {
+      "tasks": [
+        "D01"
+      ],
+      "confidence": "high",
+      "note": "save as"
+    },
+    "dom:#btn-settings": {
+      "tasks": [
+        "U02"
+      ],
+      "confidence": "high",
+      "note": "settings modal"
+    },
+    "dom:#btn-shadow-guides": {
+      "tasks": [
+        "G25",
+        "U31"
+      ],
+      "confidence": "low",
+      "note": "shadow guide view aid"
+    },
+    "dom:#btn-shy": {
+      "tasks": [
+        "U25"
+      ],
+      "confidence": "high",
+      "note": "shy layers panel"
+    },
+    "dom:#btn-sp-size-lock": {
+      "tasks": [
+        "U16",
+        "G22"
+      ],
+      "confidence": "medium",
+      "note": "Shape size/proportion controls"
+    },
+    "dom:#btn-text-animate": {
+      "tasks": [
+        "U22",
+        "D28"
+      ],
+      "confidence": "medium",
+      "note": "Text character actions"
+    },
+    "dom:#btn-text-split-chars": {
+      "tasks": [
+        "U22",
+        "D28"
+      ],
+      "confidence": "medium",
+      "note": "Text character actions"
+    },
+    "dom:#btn-toolbar-customize": {
+      "tasks": [
+        "U28"
+      ],
+      "confidence": "high",
+      "note": "toolbar preferences"
+    },
+    "dom:#btn-toolpreset-save": {
+      "tasks": [
+        "G16",
+        "U06"
+      ],
+      "confidence": "high",
+      "note": "Brush/tool preset"
+    },
+    "dom:#btn-track-apply": {
+      "tasks": [
+        "I52"
+      ],
+      "confidence": "high",
+      "note": "tracker result application"
+    },
+    "dom:#btn-track-pick": {
+      "tasks": [
+        "I52"
+      ],
+      "confidence": "medium",
+      "note": "tracker point pick"
+    },
+    "dom:#btn-track-run": {
+      "tasks": [
+        "I52"
+      ],
+      "confidence": "high",
+      "note": "tracker analyse frame reads"
+    },
+    "dom:#btn-transplant-open": {
+      "tasks": [
+        "I37"
+      ],
+      "confidence": "high",
+      "note": "cross-project transplant"
+    },
+    "dom:#btn-tw": {
+      "tasks": [
+        "D22",
+        "U19"
+      ],
+      "confidence": "high",
+      "note": "generate tween"
+    },
+    "dom:#btn-tw-reassign": {
+      "tasks": [
+        "D22"
+      ],
+      "confidence": "high",
+      "note": "reassign inbetween matching"
+    },
+    "dom:#btn-tween-curves": {
+      "tasks": [
+        "U19",
+        "D22"
+      ],
+      "confidence": "medium",
+      "note": "tween easing curves display"
+    },
+    "dom:#color-fill": {
+      "tasks": [
+        "U15",
+        "G12"
+      ],
+      "confidence": "high",
+      "note": "Fill/stroke color inspector"
+    },
+    "dom:#color-stroke": {
+      "tasks": [
+        "U15",
+        "G12"
+      ],
+      "confidence": "high",
+      "note": "Fill/stroke color inspector"
+    },
+    "dom:#comment-delete": {
+      "tasks": [
+        "U29"
+      ],
+      "confidence": "high",
+      "note": "Comment popover presentation"
+    },
+    "dom:#comment-fb-blocking": {
+      "tasks": [
+        "D08",
+        "G47"
+      ],
+      "confidence": "high",
+      "note": "feedback form field"
+    },
+    "dom:#comment-fb-email": {
+      "tasks": [
+        "D08",
+        "G47"
+      ],
+      "confidence": "high",
+      "note": "feedback form field"
+    },
+    "dom:#comment-fb-name": {
+      "tasks": [
+        "D08",
+        "G47"
+      ],
+      "confidence": "high",
+      "note": "feedback form field"
+    },
+    "dom:#comment-record": {
+      "tasks": [
+        "U29"
+      ],
+      "confidence": "high",
+      "note": "Comment popover presentation"
+    },
+    "dom:#comment-resolved": {
+      "tasks": [
+        "U29"
+      ],
+      "confidence": "high",
+      "note": "Comment popover presentation"
+    },
+    "dom:#comment-save": {
+      "tasks": [
+        "U29"
+      ],
+      "confidence": "high",
+      "note": "Comment popover presentation"
+    },
+    "dom:#comment-save-feedback": {
+      "tasks": [
+        "D08",
+        "G47"
+      ],
+      "confidence": "high",
+      "note": "feedback form field"
+    },
+    "dom:#comment-shot-input": {
+      "tasks": [
+        "U29"
+      ],
+      "confidence": "high",
+      "note": "Comment popover presentation"
+    },
+    "dom:#comment-text": {
+      "tasks": [
+        "U29"
+      ],
+      "confidence": "high",
+      "note": "Comment popover presentation"
+    },
+    "dom:#comp-offset": {
+      "tasks": [
+        "U23",
+        "I15"
+      ],
+      "confidence": "high",
+      "note": "Component playback mode/timing"
+    },
+    "dom:#comp-playmode": {
+      "tasks": [
+        "U23",
+        "I15"
+      ],
+      "confidence": "high",
+      "note": "Component playback mode/timing"
+    },
+    "dom:#comp-singleframe": {
+      "tasks": [
+        "I15",
+        "U23"
+      ],
+      "confidence": "high",
+      "note": "component single-frame mode"
+    },
+    "dom:#comp-speed": {
+      "tasks": [
+        "U23",
+        "I15"
+      ],
+      "confidence": "high",
+      "note": "Component playback mode/timing"
+    },
+    "dom:#curve-save-preset": {
+      "tasks": [
+        "G39",
+        "D12"
+      ],
+      "confidence": "low",
+      "note": "easing curve preset save"
+    },
+    "dom:#dup-anim-direction": {
+      "tasks": [
+        "U24",
+        "I09"
+      ],
+      "confidence": "medium",
+      "note": "Duplicator effector/animation channel"
+    },
+    "dom:#dup-anim-enabled": {
+      "tasks": [
+        "U24",
+        "I09"
+      ],
+      "confidence": "medium",
+      "note": "Duplicator effector/animation channel"
+    },
+    "dom:#dup-anim-offset": {
+      "tasks": [
+        "U24",
+        "I09"
+      ],
+      "confidence": "medium",
+      "note": "Duplicator effector/animation channel"
+    },
+    "dom:#dup-cols": {
+      "tasks": [
+        "U24",
+        "I08"
+      ],
+      "confidence": "high",
+      "note": "Duplicator placement parameter"
+    },
+    "dom:#dup-count": {
+      "tasks": [
+        "U24",
+        "I08"
+      ],
+      "confidence": "high",
+      "note": "Duplicator placement parameter"
+    },
+    "dom:#dup-mode": {
+      "tasks": [
+        "U24",
+        "I08"
+      ],
+      "confidence": "high",
+      "note": "Duplicator placement parameter"
+    },
+    "dom:#dup-path-align": {
+      "tasks": [
+        "U24",
+        "I08"
+      ],
+      "confidence": "high",
+      "note": "Duplicator placement parameter"
+    },
+    "dom:#dup-path-layer": {
+      "tasks": [
+        "I10",
+        "U24"
+      ],
+      "confidence": "high",
+      "note": "duplicator path layer"
+    },
+    "dom:#dup-radial-orient": {
+      "tasks": [
+        "U24",
+        "I08"
+      ],
+      "confidence": "high",
+      "note": "Duplicator placement parameter"
+    },
+    "dom:#dup-radius": {
+      "tasks": [
+        "U24",
+        "I08"
+      ],
+      "confidence": "high",
+      "note": "Duplicator placement parameter"
+    },
+    "dom:#dup-rand-hue": {
+      "tasks": [
+        "U24",
+        "I09"
+      ],
+      "confidence": "medium",
+      "note": "Duplicator effector/animation channel"
+    },
+    "dom:#dup-rand-op": {
+      "tasks": [
+        "U24",
+        "I09"
+      ],
+      "confidence": "medium",
+      "note": "Duplicator effector/animation channel"
+    },
+    "dom:#dup-rand-pos": {
+      "tasks": [
+        "U24",
+        "I09"
+      ],
+      "confidence": "medium",
+      "note": "Duplicator effector/animation channel"
+    },
+    "dom:#dup-rand-rot": {
+      "tasks": [
+        "U24",
+        "I09"
+      ],
+      "confidence": "medium",
+      "note": "Duplicator effector/animation channel"
+    },
+    "dom:#dup-rand-scale": {
+      "tasks": [
+        "U24",
+        "I09"
+      ],
+      "confidence": "medium",
+      "note": "Duplicator effector/animation channel"
+    },
+    "dom:#dup-rows": {
+      "tasks": [
+        "U24",
+        "I08"
+      ],
+      "confidence": "high",
+      "note": "Duplicator placement parameter"
+    },
+    "dom:#dup-seed": {
+      "tasks": [
+        "U24",
+        "I08"
+      ],
+      "confidence": "high",
+      "note": "Duplicator placement parameter"
+    },
+    "dom:#dup-source-add": {
+      "tasks": [
+        "U24",
+        "I10"
+      ],
+      "confidence": "medium",
+      "note": "Duplicator setup command"
+    },
+    "dom:#dup-spacingx": {
+      "tasks": [
+        "U24",
+        "I08"
+      ],
+      "confidence": "high",
+      "note": "Duplicator placement parameter"
+    },
+    "dom:#dup-spacingy": {
+      "tasks": [
+        "U24",
+        "I08"
+      ],
+      "confidence": "high",
+      "note": "Duplicator placement parameter"
+    },
+    "dom:#dup-startangle": {
+      "tasks": [
+        "I10",
+        "U24"
+      ],
+      "confidence": "high",
+      "note": "duplicator start angle"
+    },
+    "dom:#exp-alpha": {
+      "tasks": [
+        "U27",
+        "G42"
+      ],
+      "confidence": "medium",
+      "note": "Export modal option"
+    },
+    "dom:#exp-cancel": {
+      "tasks": [
+        "U27"
+      ],
+      "confidence": "high",
+      "note": "export modal"
+    },
+    "dom:#exp-format": {
+      "tasks": [
+        "U27",
+        "G42"
+      ],
+      "confidence": "high",
+      "note": "export format"
+    },
+    "dom:#exp-h": {
+      "tasks": [
+        "U27",
+        "G42"
+      ],
+      "confidence": "medium",
+      "note": "Export modal option"
+    },
+    "dom:#exp-include-shadow": {
+      "tasks": [
+        "U27",
+        "G42"
+      ],
+      "confidence": "medium",
+      "note": "Export modal option"
+    },
+    "dom:#exp-range": {
+      "tasks": [
+        "U27",
+        "G42"
+      ],
+      "confidence": "high",
+      "note": "export range"
+    },
+    "dom:#exp-run": {
+      "tasks": [
+        "U27",
+        "G42"
+      ],
+      "confidence": "high",
+      "note": "run export"
+    },
+    "dom:#exp-scale": {
+      "tasks": [
+        "U27",
+        "G42"
+      ],
+      "confidence": "medium",
+      "note": "Export modal option"
+    },
+    "dom:#exp-w": {
+      "tasks": [
+        "U27",
+        "G42"
+      ],
+      "confidence": "medium",
+      "note": "Export modal option"
+    },
+    "dom:#export-close": {
+      "tasks": [
+        "U27"
+      ],
+      "confidence": "high",
+      "note": "export modal close"
+    },
+    "dom:#fb-dash-refresh": {
+      "tasks": [
+        "G47",
+        "D08"
+      ],
+      "confidence": "high",
+      "note": "feedback dashboard refresh"
+    },
+    "dom:#fb-dashboard-close": {
+      "tasks": [
+        "U29"
+      ],
+      "confidence": "medium",
+      "note": "feedback dashboard close"
+    },
+    "dom:#fb-dashboard-open": {
+      "tasks": [
+        "U29",
+        "G47"
+      ],
+      "confidence": "medium",
+      "note": "feedback board"
+    },
+    "dom:#fb-pull": {
+      "tasks": [
+        "G47",
+        "U29"
+      ],
+      "confidence": "medium",
+      "note": "feedback pull"
+    },
+    "dom:#figma-import-btn": {
+      "tasks": [
+        "G36"
+      ],
+      "confidence": "high",
+      "note": "Figma import"
+    },
+    "dom:#figma-token": {
+      "tasks": [
+        "U02",
+        "G36"
+      ],
+      "confidence": "medium",
+      "note": "figma token field"
+    },
+    "dom:#figma-token-save": {
+      "tasks": [
+        "G36"
+      ],
+      "confidence": "high",
+      "note": "Figma token"
+    },
+    "dom:#figma-url": {
+      "tasks": [
+        "U02",
+        "G36"
+      ],
+      "confidence": "medium",
+      "note": "figma url field"
+    },
+    "dom:#file-input": {
+      "tasks": [
+        "D01",
+        "F03"
+      ],
+      "confidence": "medium",
+      "note": "file input open/import legacy"
+    },
+    "dom:#fill-enable-toggle": {
+      "tasks": [
+        "U15",
+        "G12"
+      ],
+      "confidence": "high",
+      "note": "Fill/stroke color inspector"
+    },
+    "dom:#fill-enable-toggle-lp": {
+      "tasks": [
+        "U15",
+        "G12"
+      ],
+      "confidence": "high",
+      "note": "Fill/stroke color inspector"
+    },
+    "dom:#footage-count": {
+      "tasks": [
+        "U23"
+      ],
+      "confidence": "medium",
+      "note": "footage panel readout"
+    },
+    "dom:#footage-h": {
+      "tasks": [
+        "U23"
+      ],
+      "confidence": "medium",
+      "note": "footage panel"
+    },
+    "dom:#footage-interp-mode": {
+      "tasks": [
+        "U23",
+        "G31"
+      ],
+      "confidence": "medium",
+      "note": "Footage panel"
+    },
+    "dom:#footage-kind": {
+      "tasks": [
+        "U23"
+      ],
+      "confidence": "medium",
+      "note": "footage panel"
+    },
+    "dom:#footage-name": {
+      "tasks": [
+        "U23"
+      ],
+      "confidence": "medium",
+      "note": "footage panel"
+    },
+    "dom:#footage-w": {
+      "tasks": [
+        "U23"
+      ],
+      "confidence": "medium",
+      "note": "footage panel"
+    },
+    "dom:#gh-token": {
+      "tasks": [
+        "G47"
+      ],
+      "confidence": "medium",
+      "note": "GitHub feedback token"
+    },
+    "dom:#gh-token-save": {
+      "tasks": [
+        "G47"
+      ],
+      "confidence": "medium",
+      "note": "GitHub token save"
+    },
+    "dom:#history-btn": {
+      "tasks": [
+        "D08",
+        "D09"
+      ],
+      "confidence": "medium",
+      "note": "history panel undo/redo"
+    },
+    "dom:#history-close": {
+      "tasks": [
+        "D09"
+      ],
+      "confidence": "medium",
+      "note": "history panel close presentation"
+    },
+    "dom:#image-input": {
+      "tasks": [
+        "G27",
+        "G29"
+      ],
+      "confidence": "medium",
+      "note": "image import input"
+    },
+    "dom:#kitsu-back-btn": {
+      "tasks": [
+        "I43"
+      ],
+      "confidence": "high",
+      "note": "Kitsu baseline/service"
+    },
+    "dom:#kitsu-close": {
+      "tasks": [
+        "I43"
+      ],
+      "confidence": "medium",
+      "note": "Kitsu baseline/service"
+    },
+    "dom:#kitsu-email": {
+      "tasks": [
+        "I43"
+      ],
+      "confidence": "high",
+      "note": "Kitsu baseline/service"
+    },
+    "dom:#kitsu-login-btn": {
+      "tasks": [
+        "I43"
+      ],
+      "confidence": "high",
+      "note": "Kitsu baseline/service"
+    },
+    "dom:#kitsu-logout-btn": {
+      "tasks": [
+        "I43"
+      ],
+      "confidence": "high",
+      "note": "Kitsu baseline/service"
+    },
+    "dom:#kitsu-password": {
+      "tasks": [
+        "I43"
+      ],
+      "confidence": "high",
+      "note": "Kitsu baseline/service"
+    },
+    "dom:#kitsu-url": {
+      "tasks": [
+        "I43"
+      ],
+      "confidence": "high",
+      "note": "Kitsu baseline/service"
+    },
+    "dom:#linked-media-banner-btn": {
+      "tasks": [
+        "G28"
+      ],
+      "confidence": "high",
+      "note": "linked access permission"
+    },
+    "dom:#linked-media-banner-dismiss": {
+      "tasks": [
+        "G28"
+      ],
+      "confidence": "medium",
+      "note": "linked banner dismiss"
+    },
+    "dom:#lip-end": {
+      "tasks": [
+        "U23",
+        "I42"
+      ],
+      "confidence": "high",
+      "note": "Lip-sync panel"
+    },
+    "dom:#lip-hold": {
+      "tasks": [
+        "U23",
+        "I42"
+      ],
+      "confidence": "high",
+      "note": "Lip-sync panel"
+    },
+    "dom:#lip-sens": {
+      "tasks": [
+        "U23",
+        "I42"
+      ],
+      "confidence": "high",
+      "note": "Lip-sync panel"
+    },
+    "dom:#lip-start": {
+      "tasks": [
+        "I42",
+        "U23"
+      ],
+      "confidence": "high",
+      "note": "lip-sync setting"
+    },
+    "dom:#lip-track": {
+      "tasks": [
+        "I42",
+        "U23"
+      ],
+      "confidence": "medium",
+      "note": "lip-sync track"
+    },
+    "dom:#lottie-preview-close": {
+      "tasks": [
+        "I41"
+      ],
+      "confidence": "high",
+      "note": "Lottie preview"
+    },
+    "dom:#lottie-preview-play": {
+      "tasks": [
+        "I41"
+      ],
+      "confidence": "high",
+      "note": "Lottie preview"
+    },
+    "dom:#lottie-preview-scrub": {
+      "tasks": [
+        "I41"
+      ],
+      "confidence": "high",
+      "note": "Lottie preview"
+    },
+    "dom:#mac-update-btn": {
+      "tasks": [
+        "I40"
+      ],
+      "confidence": "high",
+      "note": "mac updater button"
+    },
+    "dom:#media-search": {
+      "tasks": [
+        "G29"
+      ],
+      "confidence": "medium",
+      "note": "library search"
+    },
+    "dom:#media-settings-btn": {
+      "tasks": [
+        "G29"
+      ],
+      "confidence": "medium",
+      "note": "library settings"
+    },
+    "dom:#np-cancel": {
+      "tasks": [
+        "D04",
+        "D03"
+      ],
+      "confidence": "medium",
+      "note": "new-project dialog cancel"
+    },
+    "dom:#np-create": {
+      "tasks": [
+        "D03",
+        "U01"
+      ],
+      "confidence": "medium",
+      "note": "new-project create"
+    },
+    "dom:#np-fps": {
+      "tasks": [
+        "F04",
+        "D03"
+      ],
+      "confidence": "medium",
+      "note": "new project fps setting"
+    },
+    "dom:#np-h": {
+      "tasks": [
+        "F04",
+        "U02"
+      ],
+      "confidence": "low",
+      "note": "New-project size field"
+    },
+    "dom:#np-name": {
+      "tasks": [
+        "F04",
+        "D03"
+      ],
+      "confidence": "medium",
+      "note": "new project name"
+    },
+    "dom:#np-preset": {
+      "tasks": [
+        "F04",
+        "D03"
+      ],
+      "confidence": "medium",
+      "note": "new project preset"
+    },
+    "dom:#np-w": {
+      "tasks": [
+        "F04",
+        "U02"
+      ],
+      "confidence": "low",
+      "note": "New-project size field"
+    },
+    "dom:#om-span-1": {
+      "tasks": [
+        "U20",
+        "D23"
+      ],
+      "confidence": "high",
+      "note": "onion span"
+    },
+    "dom:#om-span-2": {
+      "tasks": [
+        "U20",
+        "D23"
+      ],
+      "confidence": "high",
+      "note": "onion span"
+    },
+    "dom:#om-span-5": {
+      "tasks": [
+        "U20",
+        "D23"
+      ],
+      "confidence": "high",
+      "note": "onion span"
+    },
+    "dom:#om-span-all": {
+      "tasks": [
+        "U20",
+        "D23"
+      ],
+      "confidence": "high",
+      "note": "onion span"
+    },
+    "dom:#p-add-effect-btn": {
+      "tasks": [
+        "G05"
+      ],
+      "confidence": "high",
+      "note": "add effect"
+    },
+    "dom:#p-arc-inner": {
+      "tasks": [
+        "G22",
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "Parametric shape params"
+    },
+    "dom:#p-arc-start": {
+      "tasks": [
+        "G22"
+      ],
+      "confidence": "high",
+      "note": "ellipse arc start angle"
+    },
+    "dom:#p-arc-sweep": {
+      "tasks": [
+        "G22",
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "Parametric shape params"
+    },
+    "dom:#p-blendmode": {
+      "tasks": [
+        "U18",
+        "F16"
+      ],
+      "confidence": "high",
+      "note": "blend mode dropdown"
+    },
+    "dom:#p-brushpreset": {
+      "tasks": [
+        "G16",
+        "U06"
+      ],
+      "confidence": "high",
+      "note": "Brush/tool preset"
+    },
+    "dom:#p-brushpreset-btn": {
+      "tasks": [
+        "G16",
+        "U06"
+      ],
+      "confidence": "high",
+      "note": "Brush/tool preset"
+    },
+    "dom:#p-cap-grp": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "high",
+      "note": "Stroke style inspector"
+    },
+    "dom:#p-cbg": {
+      "tasks": [
+        "F04",
+        "U28"
+      ],
+      "confidence": "medium",
+      "note": "Canvas size/background setting"
+    },
+    "dom:#p-ch": {
+      "tasks": [
+        "F04",
+        "U28"
+      ],
+      "confidence": "medium",
+      "note": "Canvas size/background setting"
+    },
+    "dom:#p-corner-bl": {
+      "tasks": [
+        "G22",
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "Parametric shape params"
+    },
+    "dom:#p-corner-br": {
+      "tasks": [
+        "G22",
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "Parametric shape params"
+    },
+    "dom:#p-corner-tl": {
+      "tasks": [
+        "G22",
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "Parametric shape params"
+    },
+    "dom:#p-corner-tr": {
+      "tasks": [
+        "G22",
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "Parametric shape params"
+    },
+    "dom:#p-corners-link": {
+      "tasks": [
+        "G22",
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "Parametric shape params"
+    },
+    "dom:#p-current-outline": {
+      "tasks": [
+        "U20"
+      ],
+      "confidence": "medium",
+      "note": "onion current outline setting"
+    },
+    "dom:#p-cw": {
+      "tasks": [
+        "F04",
+        "U28"
+      ],
+      "confidence": "medium",
+      "note": "Canvas size/background setting"
+    },
+    "dom:#p-dashoffset": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "high",
+      "note": "Stroke style inspector"
+    },
+    "dom:#p-drawmode": {
+      "tasks": [
+        "G15",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Draw/brush input setting"
+    },
+    "dom:#p-erasersize": {
+      "tasks": [
+        "G15",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Draw/brush input setting"
+    },
+    "dom:#p-fill-grad-btn": {
+      "tasks": [
+        "U15",
+        "G04"
+      ],
+      "confidence": "medium",
+      "note": "Gradient fill control"
+    },
+    "dom:#p-fill-hex": {
+      "tasks": [
+        "U15",
+        "G12"
+      ],
+      "confidence": "high",
+      "note": "Fill/stroke color inspector"
+    },
+    "dom:#p-fill-on": {
+      "tasks": [
+        "U15",
+        "G12"
+      ],
+      "confidence": "high",
+      "note": "Fill/stroke color inspector"
+    },
+    "dom:#p-fillbrushmode-grp": {
+      "tasks": [
+        "G18",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Fill tool / nib settings"
+    },
+    "dom:#p-fillbrushsize": {
+      "tasks": [
+        "G18",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Fill tool / nib settings"
+    },
+    "dom:#p-fillgapclose": {
+      "tasks": [
+        "G18",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Fill tool / nib settings"
+    },
+    "dom:#p-fillgapsize": {
+      "tasks": [
+        "G18",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Fill tool / nib settings"
+    },
+    "dom:#p-grad-kind": {
+      "tasks": [
+        "U15",
+        "G04"
+      ],
+      "confidence": "medium",
+      "note": "Gradient fill control"
+    },
+    "dom:#p-grad-on": {
+      "tasks": [
+        "U15",
+        "G04"
+      ],
+      "confidence": "medium",
+      "note": "Gradient fill control"
+    },
+    "dom:#p-harmonize-tween": {
+      "tasks": [
+        "D22",
+        "U19"
+      ],
+      "confidence": "medium",
+      "note": "Tween generation settings"
+    },
+    "dom:#p-imagemesh-cols": {
+      "tasks": [
+        "F17",
+        "F18"
+      ],
+      "confidence": "high",
+      "note": "image mesh panel"
+    },
+    "dom:#p-imagemesh-edit": {
+      "tasks": [
+        "F17",
+        "F18"
+      ],
+      "confidence": "high",
+      "note": "image mesh panel"
+    },
+    "dom:#p-imagemesh-on": {
+      "tasks": [
+        "F17",
+        "F18"
+      ],
+      "confidence": "high",
+      "note": "image mesh panel"
+    },
+    "dom:#p-imagemesh-rows": {
+      "tasks": [
+        "F17",
+        "F18"
+      ],
+      "confidence": "high",
+      "note": "image mesh panel"
+    },
+    "dom:#p-join-grp": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "high",
+      "note": "Stroke style inspector"
+    },
+    "dom:#p-mask-feather": {
+      "tasks": [
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "mask feather"
+    },
+    "dom:#p-mask-mode": {
+      "tasks": [
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "mask mode"
+    },
+    "dom:#p-maskmode": {
+      "tasks": [
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "mask mode"
+    },
+    "dom:#p-maskmode-type": {
+      "tasks": [
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "mask mode type"
+    },
+    "dom:#p-mattemode": {
+      "tasks": [
+        "U18"
+      ],
+      "confidence": "high",
+      "note": "matte dropdown"
+    },
+    "dom:#p-miterlimit": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "high",
+      "note": "Stroke style inspector"
+    },
+    "dom:#p-nib-angle": {
+      "tasks": [
+        "G18",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Fill tool / nib settings"
+    },
+    "dom:#p-nib-factor": {
+      "tasks": [
+        "G18",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Fill tool / nib settings"
+    },
+    "dom:#p-om-follow": {
+      "tasks": [
+        "U20"
+      ],
+      "confidence": "medium",
+      "note": "onion follow setting"
+    },
+    "dom:#p-omode": {
+      "tasks": [
+        "U20"
+      ],
+      "confidence": "medium",
+      "note": "onion mode"
+    },
+    "dom:#p-onion-shift-next": {
+      "tasks": [
+        "U20"
+      ],
+      "confidence": "high",
+      "note": "onion shift"
+    },
+    "dom:#p-onion-shift-reset": {
+      "tasks": [
+        "U20"
+      ],
+      "confidence": "high",
+      "note": "onion shift"
+    },
+    "dom:#p-onion-shift-x": {
+      "tasks": [
+        "U20"
+      ],
+      "confidence": "high",
+      "note": "onion shift"
+    },
+    "dom:#p-onion-shift-y": {
+      "tasks": [
+        "U20"
+      ],
+      "confidence": "high",
+      "note": "onion shift"
+    },
+    "dom:#p-onion-tint-next": {
+      "tasks": [
+        "U20"
+      ],
+      "confidence": "high",
+      "note": "onion tint"
+    },
+    "dom:#p-onion-tint-prev": {
+      "tasks": [
+        "U20"
+      ],
+      "confidence": "high",
+      "note": "onion tint"
+    },
+    "dom:#p-onion-tint-reset": {
+      "tasks": [
+        "U20"
+      ],
+      "confidence": "high",
+      "note": "onion tint"
+    },
+    "dom:#p-onop": {
+      "tasks": [
+        "U20"
+      ],
+      "confidence": "medium",
+      "note": "onion opacity"
+    },
+    "dom:#p-opacity": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "high",
+      "note": "Stroke style inspector"
+    },
+    "dom:#p-opop": {
+      "tasks": [
+        "U20"
+      ],
+      "confidence": "medium",
+      "note": "onion opacity"
+    },
+    "dom:#p-paintorder-grp": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "high",
+      "note": "Stroke style inspector"
+    },
+    "dom:#p-pcurve": {
+      "tasks": [
+        "G16"
+      ],
+      "confidence": "low",
+      "note": "pressure response curve, brush input"
+    },
+    "dom:#p-pinv": {
+      "tasks": [
+        "G15",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Draw/brush input setting"
+    },
+    "dom:#p-pmax": {
+      "tasks": [
+        "G15",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Draw/brush input setting"
+    },
+    "dom:#p-pmin": {
+      "tasks": [
+        "G15",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Draw/brush input setting"
+    },
+    "dom:#p-poststroke-smooth": {
+      "tasks": [
+        "G15",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Draw/brush input setting"
+    },
+    "dom:#p-ref-menu": {
+      "tasks": [
+        "G34"
+      ],
+      "confidence": "medium",
+      "note": "Reference menu"
+    },
+    "dom:#p-ref-offset": {
+      "tasks": [
+        "G34"
+      ],
+      "confidence": "high",
+      "note": "Reference presenter"
+    },
+    "dom:#p-ref-on": {
+      "tasks": [
+        "G34"
+      ],
+      "confidence": "high",
+      "note": "Reference presenter"
+    },
+    "dom:#p-ref-opacity": {
+      "tasks": [
+        "G34"
+      ],
+      "confidence": "high",
+      "note": "Reference presenter"
+    },
+    "dom:#p-resamp": {
+      "tasks": [
+        "D22",
+        "U19"
+      ],
+      "confidence": "medium",
+      "note": "Tween generation settings"
+    },
+    "dom:#p-shadowmode": {
+      "tasks": [
+        "U25",
+        "I19"
+      ],
+      "confidence": "low",
+      "note": "Shadow-mode drawing tag"
+    },
+    "dom:#p-skipmanual": {
+      "tasks": [
+        "D22",
+        "U19"
+      ],
+      "confidence": "medium",
+      "note": "Tween generation settings"
+    },
+    "dom:#p-smooth": {
+      "tasks": [
+        "G15",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Draw/brush input setting"
+    },
+    "dom:#p-stab": {
+      "tasks": [
+        "G15",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Draw/brush input setting"
+    },
+    "dom:#p-star-corner": {
+      "tasks": [
+        "G22",
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "Parametric shape params"
+    },
+    "dom:#p-star-inner": {
+      "tasks": [
+        "G22",
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "Parametric shape params"
+    },
+    "dom:#p-star-points": {
+      "tasks": [
+        "G22",
+        "U16"
+      ],
+      "confidence": "high",
+      "note": "Parametric shape params"
+    },
+    "dom:#p-step": {
+      "tasks": [
+        "D22",
+        "U19"
+      ],
+      "confidence": "medium",
+      "note": "Tween generation settings"
+    },
+    "dom:#p-stroke-alpha": {
+      "tasks": [
+        "U15",
+        "G12"
+      ],
+      "confidence": "high",
+      "note": "Fill/stroke color inspector"
+    },
+    "dom:#p-stroke-hex": {
+      "tasks": [
+        "U15",
+        "G12"
+      ],
+      "confidence": "high",
+      "note": "Fill/stroke color inspector"
+    },
+    "dom:#p-strokegrad-along": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "medium",
+      "note": "Stroke gradient inspector"
+    },
+    "dom:#p-strokegrad-from": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "medium",
+      "note": "Stroke gradient inspector"
+    },
+    "dom:#p-strokegrad-from-c": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "medium",
+      "note": "Stroke gradient inspector"
+    },
+    "dom:#p-strokegrad-to": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "medium",
+      "note": "Stroke gradient inspector"
+    },
+    "dom:#p-strokegrad-to-c": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "medium",
+      "note": "Stroke gradient inspector"
+    },
+    "dom:#p-strokestyle": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "high",
+      "note": "Stroke style inspector"
+    },
+    "dom:#p-sw": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "high",
+      "note": "Stroke style inspector"
+    },
+    "dom:#p-taper": {
+      "tasks": [
+        "G15",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Draw/brush input setting"
+    },
+    "dom:#p-textanim-add": {
+      "tasks": [
+        "D28"
+      ],
+      "confidence": "high",
+      "note": "text animator add"
+    },
+    "dom:#p-trimends": {
+      "tasks": [
+        "G18",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Fill tool / nib settings"
+    },
+    "dom:#p-trimends-max": {
+      "tasks": [
+        "G18",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Fill tool / nib settings"
+    },
+    "dom:#p-vecbrush": {
+      "tasks": [
+        "G15",
+        "G16"
+      ],
+      "confidence": "medium",
+      "note": "Draw/brush input setting"
+    },
+    "dom:#p-widget-h": {
+      "tasks": [
+        "F19"
+      ],
+      "confidence": "high",
+      "note": "widget settings field"
+    },
+    "dom:#p-widget-w": {
+      "tasks": [
+        "F19"
+      ],
+      "confidence": "high",
+      "note": "widget settings field"
+    },
+    "dom:#p-widget-xadd": {
+      "tasks": [
+        "F19",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "widget axis linking"
+    },
+    "dom:#p-widget-xmax": {
+      "tasks": [
+        "F19"
+      ],
+      "confidence": "high",
+      "note": "widget settings field"
+    },
+    "dom:#p-widget-xmin": {
+      "tasks": [
+        "F19"
+      ],
+      "confidence": "high",
+      "note": "widget settings field"
+    },
+    "dom:#p-widget-xrest": {
+      "tasks": [
+        "F19"
+      ],
+      "confidence": "high",
+      "note": "widget settings field"
+    },
+    "dom:#p-widget-yadd": {
+      "tasks": [
+        "F19",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "widget axis linking"
+    },
+    "dom:#p-widget-ymax": {
+      "tasks": [
+        "F19"
+      ],
+      "confidence": "high",
+      "note": "widget settings field"
+    },
+    "dom:#p-widget-ymin": {
+      "tasks": [
+        "F19"
+      ],
+      "confidence": "high",
+      "note": "widget settings field"
+    },
+    "dom:#p-widget-yrest": {
+      "tasks": [
+        "F19"
+      ],
+      "confidence": "high",
+      "note": "widget settings field"
+    },
+    "dom:#p2p-add-contact": {
+      "tasks": [
+        "I45"
+      ],
+      "confidence": "high",
+      "note": "local P2P contact model"
+    },
+    "dom:#p2p-copy-code": {
+      "tasks": [
+        "I45"
+      ],
+      "confidence": "high",
+      "note": "local P2P contact model"
+    },
+    "dom:#p2p-invite-input": {
+      "tasks": [
+        "I45"
+      ],
+      "confidence": "high",
+      "note": "local P2P contact model"
+    },
+    "dom:#p2p-my-code": {
+      "tasks": [
+        "I45"
+      ],
+      "confidence": "high",
+      "note": "P2P contact code"
+    },
+    "dom:#palette-replace-scope": {
+      "tasks": [
+        "G12",
+        "U15"
+      ],
+      "confidence": "high",
+      "note": "Palette color tool"
+    },
+    "dom:#path-fx-add": {
+      "tasks": [
+        "G05",
+        "G13"
+      ],
+      "confidence": "high",
+      "note": "path effects"
+    },
+    "dom:#pm-fill": {
+      "tasks": [
+        "U15",
+        "G12"
+      ],
+      "confidence": "high",
+      "note": "Fill/stroke color inspector"
+    },
+    "dom:#pm-fill-c": {
+      "tasks": [
+        "U15",
+        "G12"
+      ],
+      "confidence": "high",
+      "note": "Fill/stroke color inspector"
+    },
+    "dom:#pm-stroke": {
+      "tasks": [
+        "U15",
+        "G12"
+      ],
+      "confidence": "high",
+      "note": "Fill/stroke color inspector"
+    },
+    "dom:#pm-stroke-c": {
+      "tasks": [
+        "U15",
+        "G12"
+      ],
+      "confidence": "high",
+      "note": "Fill/stroke color inspector"
+    },
+    "dom:#profile-color": {
+      "tasks": [
+        "U02"
+      ],
+      "confidence": "high",
+      "note": "Profile presentation"
+    },
+    "dom:#profile-color-well": {
+      "tasks": [
+        "U02"
+      ],
+      "confidence": "high",
+      "note": "Profile presentation"
+    },
+    "dom:#profile-email": {
+      "tasks": [
+        "U02"
+      ],
+      "confidence": "high",
+      "note": "profile"
+    },
+    "dom:#profile-name": {
+      "tasks": [
+        "U02"
+      ],
+      "confidence": "high",
+      "note": "profile"
+    },
+    "dom:#profile-role": {
+      "tasks": [
+        "U02"
+      ],
+      "confidence": "high",
+      "note": "profile"
+    },
+    "dom:#proj-fps": {
+      "tasks": [
+        "F04",
+        "U13"
+      ],
+      "confidence": "high",
+      "note": "project fps"
+    },
+    "dom:#proj-frames": {
+      "tasks": [
+        "F04",
+        "U13"
+      ],
+      "confidence": "high",
+      "note": "project frame count"
+    },
+    "dom:#project-tab-add": {
+      "tasks": [
+        "D03"
+      ],
+      "confidence": "high",
+      "note": "new project tab"
+    },
+    "dom:#project-tabs-settings": {
+      "tasks": [
+        "U02"
+      ],
+      "confidence": "high",
+      "note": "settings modal"
+    },
+    "dom:#props-panel-collapse-btn": {
+      "tasks": [
+        "U14"
+      ],
+      "confidence": "low",
+      "note": "props panel collapse presentation"
+    },
+    "dom:#psd-input": {
+      "tasks": [
+        "G36"
+      ],
+      "confidence": "high",
+      "note": "PSD import"
+    },
+    "dom:#ref-file-input": {
+      "tasks": [
+        "G34"
+      ],
+      "confidence": "high",
+      "note": "Reference presenter"
+    },
+    "dom:#rig-drive-meshes": {
+      "tasks": [
+        "U25",
+        "G40"
+      ],
+      "confidence": "low",
+      "note": "rig drive toggle"
+    },
+    "dom:#rig-drive-shapes": {
+      "tasks": [
+        "U25",
+        "G40"
+      ],
+      "confidence": "low",
+      "note": "rig drive toggle"
+    },
+    "dom:#rig-falloff-softness": {
+      "tasks": [
+        "I12"
+      ],
+      "confidence": "medium",
+      "note": "rig weight falloff"
+    },
+    "dom:#rig-rotate-mode": {
+      "tasks": [
+        "I12"
+      ],
+      "confidence": "low",
+      "note": "rig rotate mode"
+    },
+    "dom:#rig-weight-radius": {
+      "tasks": [
+        "I11",
+        "I12"
+      ],
+      "confidence": "medium",
+      "note": "rig weight radius"
+    },
+    "dom:#rm-add-current": {
+      "tasks": [
+        "G10"
+      ],
+      "confidence": "high",
+      "note": "render manager"
+    },
+    "dom:#rm-close": {
+      "tasks": [
+        "G10"
+      ],
+      "confidence": "high",
+      "note": "render manager"
+    },
+    "dom:#rm-delete-all": {
+      "tasks": [
+        "G10"
+      ],
+      "confidence": "high",
+      "note": "render manager"
+    },
+    "dom:#rm-dyn-index": {
+      "tasks": [
+        "G10"
+      ],
+      "confidence": "high",
+      "note": "render manager"
+    },
+    "dom:#rm-dyn-offset": {
+      "tasks": [
+        "G10"
+      ],
+      "confidence": "high",
+      "note": "render manager"
+    },
+    "dom:#rm-render-all": {
+      "tasks": [
+        "G10"
+      ],
+      "confidence": "high",
+      "note": "render manager"
+    },
+    "dom:#settings-close": {
+      "tasks": [
+        "U02"
+      ],
+      "confidence": "high",
+      "note": "settings modal"
+    },
+    "dom:#settings-language": {
+      "tasks": [
+        "U03"
+      ],
+      "confidence": "high",
+      "note": "language"
+    },
+    "dom:#shortcuts-reset": {
+      "tasks": [
+        "U04"
+      ],
+      "confidence": "high",
+      "note": "shortcut reset"
+    },
+    "dom:#sp-h": {
+      "tasks": [
+        "U16",
+        "G22"
+      ],
+      "confidence": "medium",
+      "note": "Shape size/proportion controls"
+    },
+    "dom:#sp-rot": {
+      "tasks": [
+        "G20",
+        "U17"
+      ],
+      "confidence": "medium",
+      "note": "Selection transform field"
+    },
+    "dom:#sp-w": {
+      "tasks": [
+        "G20",
+        "U17"
+      ],
+      "confidence": "medium",
+      "note": "Selection transform field"
+    },
+    "dom:#sp-x": {
+      "tasks": [
+        "G20",
+        "U17"
+      ],
+      "confidence": "medium",
+      "note": "Selection transform field"
+    },
+    "dom:#sp-y": {
+      "tasks": [
+        "G20",
+        "U17"
+      ],
+      "confidence": "medium",
+      "note": "Selection transform field"
+    },
+    "dom:#start-discord": {
+      "tasks": [
+        "U01"
+      ],
+      "confidence": "low",
+      "note": "external community link",
+      "proposedDisposition": "presentational external link; no document behaviour"
+    },
+    "dom:#start-github": {
+      "tasks": [
+        "D04"
+      ],
+      "confidence": "low",
+      "note": "start-screen external repository link (review fix)",
+      "proposedDisposition": "external repository link; presentation only"
+    },
+    "dom:#start-new": {
+      "tasks": [
+        "D04",
+        "D03"
+      ],
+      "confidence": "medium",
+      "note": "start-screen new"
+    },
+    "dom:#start-open": {
+      "tasks": [
+        "D04",
+        "D01"
+      ],
+      "confidence": "medium",
+      "note": "start-screen open"
+    },
+    "dom:#start-resume": {
+      "tasks": [
+        "D04"
+      ],
+      "confidence": "high",
+      "note": "start-screen resume"
+    },
+    "dom:#stroke-enable-toggle": {
+      "tasks": [
+        "U15"
+      ],
+      "confidence": "high",
+      "note": "Stroke enable toggle"
+    },
+    "dom:#stroke-enable-toggle-lp": {
+      "tasks": [
+        "U15"
+      ],
+      "confidence": "high",
+      "note": "Stroke enable toggle"
+    },
+    "dom:#sync-check": {
+      "tasks": [
+        "D06"
+      ],
+      "confidence": "medium",
+      "note": "shared-folder pull/check"
+    },
+    "dom:#sync-choose-folder": {
+      "tasks": [
+        "U02",
+        "D06"
+      ],
+      "confidence": "high",
+      "note": "sync folder choose"
+    },
+    "dom:#sync-folder-path": {
+      "tasks": [
+        "U02",
+        "D06"
+      ],
+      "confidence": "medium",
+      "note": "sync folder path"
+    },
+    "dom:#sync-publish": {
+      "tasks": [
+        "D06"
+      ],
+      "confidence": "high",
+      "note": "shared-folder publish"
+    },
+    "dom:#text-align": {
+      "tasks": [
+        "U21",
+        "U22"
+      ],
+      "confidence": "high",
+      "note": "Text popover control"
+    },
+    "dom:#text-apply": {
+      "tasks": [
+        "U21",
+        "U22"
+      ],
+      "confidence": "high",
+      "note": "Text popover control"
+    },
+    "dom:#text-cancel": {
+      "tasks": [
+        "U21",
+        "U22"
+      ],
+      "confidence": "high",
+      "note": "Text popover control"
+    },
+    "dom:#text-color": {
+      "tasks": [
+        "U21",
+        "U22"
+      ],
+      "confidence": "high",
+      "note": "Text popover control"
+    },
+    "dom:#text-font": {
+      "tasks": [
+        "U21",
+        "U22"
+      ],
+      "confidence": "high",
+      "note": "Text popover control"
+    },
+    "dom:#text-input": {
+      "tasks": [
+        "U21",
+        "U22"
+      ],
+      "confidence": "high",
+      "note": "Text popover control"
+    },
+    "dom:#text-size": {
+      "tasks": [
+        "U21",
+        "U22"
+      ],
+      "confidence": "high",
+      "note": "Text popover control"
+    },
+    "dom:#tl-cf": {
+      "tasks": [
+        "U13",
+        "F04"
+      ],
+      "confidence": "medium",
+      "note": "document timing control"
+    },
+    "dom:#tl-fps": {
+      "tasks": [
+        "U13",
+        "F04"
+      ],
+      "confidence": "high",
+      "note": "timeline fps"
+    },
+    "dom:#tl-total": {
+      "tasks": [
+        "U13",
+        "F11"
+      ],
+      "confidence": "high",
+      "note": "total frames"
+    },
+    "dom:#tools-invert-btn": {
+      "tasks": [
+        "G12",
+        "U06"
+      ],
+      "confidence": "medium",
+      "note": "Swap colors / flip selection"
+    },
+    "dom:#topbar-comment-btn": {
+      "tasks": [
+        "U29",
+        "U06"
+      ],
+      "confidence": "medium",
+      "note": "Comment tool button"
+    },
+    "dom:#tp-color": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:#tp-content": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:#tp-fixed-width": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:#tp-font": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:#tp-font-add-btn": {
+      "tasks": [
+        "G41",
+        "U22"
+      ],
+      "confidence": "medium",
+      "note": "Add Google font"
+    },
+    "dom:#tp-font-add-confirm": {
+      "tasks": [
+        "G41",
+        "U22"
+      ],
+      "confidence": "medium",
+      "note": "Add Google font"
+    },
+    "dom:#tp-font-add-input": {
+      "tasks": [
+        "G41",
+        "U22"
+      ],
+      "confidence": "medium",
+      "note": "Add Google font"
+    },
+    "dom:#tp-letter-spacing": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:#tp-line-height": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:#tp-size": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:#tp-word-spacing": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:#track-end": {
+      "tasks": [
+        "I52"
+      ],
+      "confidence": "high",
+      "note": "tracker panel field"
+    },
+    "dom:#track-start": {
+      "tasks": [
+        "I52"
+      ],
+      "confidence": "high",
+      "note": "tracker panel field"
+    },
+    "dom:#track-target": {
+      "tasks": [
+        "I52"
+      ],
+      "confidence": "medium",
+      "note": "tracker target"
+    },
+    "dom:#track-x": {
+      "tasks": [
+        "I52"
+      ],
+      "confidence": "high",
+      "note": "tracker panel field"
+    },
+    "dom:#track-y": {
+      "tasks": [
+        "I52"
+      ],
+      "confidence": "high",
+      "note": "tracker panel field"
+    },
+    "dom:#transplant-file-input": {
+      "tasks": [
+        "I37"
+      ],
+      "confidence": "high",
+      "note": "transplant file picker"
+    },
+    "dom:#video-input": {
+      "tasks": [
+        "G30",
+        "G31"
+      ],
+      "confidence": "high",
+      "note": "video import input"
+    },
+    "dom:#web-changelog-toggle": {
+      "tasks": [
+        "I40",
+        "U28"
+      ],
+      "confidence": "low",
+      "note": "web changelog toggle; browser deferred",
+      "proposedDisposition": "browser/web-only; defer to R24"
+    },
+    "dom:#zoom-scrub": {
+      "tasks": [
+        "U07",
+        "G25"
+      ],
+      "confidence": "medium",
+      "note": "timeline/view zoom scrub"
+    },
+    "dom:align-toolbar>button[data-align=bottom]": {
+      "tasks": [
+        "G20",
+        "U16"
+      ],
+      "confidence": "medium",
+      "note": "Align/distribute selection"
+    },
+    "dom:align-toolbar>button[data-align=centerH]": {
+      "tasks": [
+        "G20",
+        "U16"
+      ],
+      "confidence": "medium",
+      "note": "Align/distribute selection"
+    },
+    "dom:align-toolbar>button[data-align=centerV]": {
+      "tasks": [
+        "G20",
+        "U16"
+      ],
+      "confidence": "medium",
+      "note": "Align/distribute selection"
+    },
+    "dom:align-toolbar>button[data-align=left]": {
+      "tasks": [
+        "G20",
+        "U16"
+      ],
+      "confidence": "medium",
+      "note": "Align/distribute selection"
+    },
+    "dom:align-toolbar>button[data-align=right]": {
+      "tasks": [
+        "G20",
+        "U16"
+      ],
+      "confidence": "medium",
+      "note": "Align/distribute selection"
+    },
+    "dom:align-toolbar>button[data-align=top]": {
+      "tasks": [
+        "G20",
+        "U16"
+      ],
+      "confidence": "medium",
+      "note": "Align/distribute selection"
+    },
+    "dom:align-toolbar>button[data-distribute=horizontal]": {
+      "tasks": [
+        "G20",
+        "U16"
+      ],
+      "confidence": "medium",
+      "note": "Align/distribute selection"
+    },
+    "dom:align-toolbar>button[data-distribute=vertical]": {
+      "tasks": [
+        "G20",
+        "U16"
+      ],
+      "confidence": "medium",
+      "note": "Align/distribute selection"
+    },
+    "dom:app-mode-switch>button[data-mode=anim2d]": {
+      "tasks": [
+        "D40",
+        "U05"
+      ],
+      "confidence": "medium",
+      "note": "mode switch bootstrap"
+    },
+    "dom:app-mode-switch>button[data-mode=motion]": {
+      "tasks": [
+        "D40",
+        "U05"
+      ],
+      "confidence": "medium",
+      "note": "mode switch bootstrap"
+    },
+    "dom:app-mode-switch>button[data-mode=storyboard]": {
+      "tasks": [
+        "D40"
+      ],
+      "confidence": "low",
+      "note": "disabled in-development mode button"
+    },
+    "dom:comment-fb-tags>button[data-tag=bug]": {
+      "tasks": [
+        "G47",
+        "U29"
+      ],
+      "confidence": "medium",
+      "note": "feedback tag button"
+    },
+    "dom:comment-fb-tags>button[data-tag=idea]": {
+      "tasks": [
+        "G47",
+        "U29"
+      ],
+      "confidence": "medium",
+      "note": "feedback tag button"
+    },
+    "dom:comment-fb-tags>button[data-tag=perf]": {
+      "tasks": [
+        "G47",
+        "U29"
+      ],
+      "confidence": "medium",
+      "note": "feedback tag button"
+    },
+    "dom:comment-fb-tags>button[data-tag=polish]": {
+      "tasks": [
+        "G47",
+        "U29"
+      ],
+      "confidence": "medium",
+      "note": "feedback tag button"
+    },
+    "dom:p-cap-grp>button[data-value=butt]": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "high",
+      "note": "Stroke style inspector"
+    },
+    "dom:p-cap-grp>button[data-value=round]": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "high",
+      "note": "Stroke style inspector"
+    },
+    "dom:p-cap-grp>button[data-value=square]": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "high",
+      "note": "Stroke style inspector"
+    },
+    "dom:p-fillbrushmode-grp>button[data-value=above]": {
+      "tasks": [
+        "G18",
+        "U15"
+      ],
+      "confidence": "medium",
+      "note": "Fill brush mode"
+    },
+    "dom:p-fillbrushmode-grp>button[data-value=below]": {
+      "tasks": [
+        "G18",
+        "U15"
+      ],
+      "confidence": "medium",
+      "note": "Fill brush mode"
+    },
+    "dom:p-fillbrushmode-grp>button[data-value=merge]": {
+      "tasks": [
+        "G18",
+        "U15"
+      ],
+      "confidence": "medium",
+      "note": "Fill brush mode"
+    },
+    "dom:p-join-grp>button[data-value=bevel]": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "high",
+      "note": "Stroke style inspector"
+    },
+    "dom:p-join-grp>button[data-value=miter]": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "high",
+      "note": "Stroke style inspector"
+    },
+    "dom:p-join-grp>button[data-value=round]": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "high",
+      "note": "Stroke style inspector"
+    },
+    "dom:p-paintorder-grp>button[data-value=fillFirst]": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "high",
+      "note": "Stroke style inspector"
+    },
+    "dom:p-paintorder-grp>button[data-value=strokeFirst]": {
+      "tasks": [
+        "U15",
+        "G14"
+      ],
+      "confidence": "high",
+      "note": "Stroke style inspector"
+    },
+    "dom:settings-modal>a": {
+      "tasks": [
+        "U02"
+      ],
+      "confidence": "low",
+      "note": "external link in settings",
+      "proposedDisposition": "presentational link; no behaviour"
+    },
+    "dom:settings-modal>a:github-com-mysteropodes": {
+      "tasks": [
+        "U02"
+      ],
+      "confidence": "low",
+      "note": "external link in settings",
+      "proposedDisposition": "presentational link; no behaviour"
+    },
+    "dom:settings-modal>a:https-github-com-mysteropodes-nemo": {
+      "tasks": [
+        "U02"
+      ],
+      "confidence": "low",
+      "note": "external link in settings",
+      "proposedDisposition": "presentational link; no behaviour"
+    },
+    "dom:settings-modal>a:mysteropodes-strokemotion-feedback": {
+      "tasks": [
+        "U02"
+      ],
+      "confidence": "low",
+      "note": "external link in settings",
+      "proposedDisposition": "presentational link; no behaviour"
+    },
+    "dom:settings-modal>div[data-pane=about]": {
+      "tasks": [
+        "U02"
+      ],
+      "confidence": "low",
+      "note": "settings about pane"
+    },
+    "dom:settings-modal>div[data-pane=collab]": {
+      "tasks": [
+        "I45",
+        "D06"
+      ],
+      "confidence": "low",
+      "note": "settings collab pane"
+    },
+    "dom:settings-modal>div[data-pane=feedback]": {
+      "tasks": [
+        "G47",
+        "U29"
+      ],
+      "confidence": "medium",
+      "note": "settings feedback pane"
+    },
+    "dom:settings-modal>div[data-pane=figma]": {
+      "tasks": [
+        "G36",
+        "U02"
+      ],
+      "confidence": "medium",
+      "note": "settings figma pane"
+    },
+    "dom:settings-modal>div[data-pane=general]": {
+      "tasks": [
+        "U02"
+      ],
+      "confidence": "high",
+      "note": "settings general pane"
+    },
+    "dom:settings-modal>div[data-pane=labs]": {
+      "tasks": [
+        "U30"
+      ],
+      "confidence": "high",
+      "note": "settings labs pane"
+    },
+    "dom:settings-modal>div[data-pane=shortcuts]": {
+      "tasks": [
+        "U04"
+      ],
+      "confidence": "high",
+      "note": "settings shortcuts pane"
+    },
+    "dom:settings-modal>div[data-pane=updates]": {
+      "tasks": [
+        "I40"
+      ],
+      "confidence": "high",
+      "note": "settings updates pane"
+    },
+    "dom:settings-tabs>button[data-tab=about]": {
+      "tasks": [
+        "U02"
+      ],
+      "confidence": "low",
+      "note": "settings about pane"
+    },
+    "dom:settings-tabs>button[data-tab=collab]": {
+      "tasks": [
+        "I45",
+        "D06"
+      ],
+      "confidence": "low",
+      "note": "settings collab pane"
+    },
+    "dom:settings-tabs>button[data-tab=feedback]": {
+      "tasks": [
+        "G47",
+        "U29"
+      ],
+      "confidence": "medium",
+      "note": "settings feedback pane"
+    },
+    "dom:settings-tabs>button[data-tab=figma]": {
+      "tasks": [
+        "G36",
+        "U02"
+      ],
+      "confidence": "medium",
+      "note": "settings figma pane"
+    },
+    "dom:settings-tabs>button[data-tab=general]": {
+      "tasks": [
+        "U02"
+      ],
+      "confidence": "high",
+      "note": "settings general pane"
+    },
+    "dom:settings-tabs>button[data-tab=labs]": {
+      "tasks": [
+        "U30"
+      ],
+      "confidence": "high",
+      "note": "settings labs pane"
+    },
+    "dom:settings-tabs>button[data-tab=shortcuts]": {
+      "tasks": [
+        "U04"
+      ],
+      "confidence": "high",
+      "note": "settings shortcuts pane"
+    },
+    "dom:settings-tabs>button[data-tab=updates]": {
+      "tasks": [
+        "I40"
+      ],
+      "confidence": "high",
+      "note": "settings updates pane"
+    },
+    "dom:shape-tool-stack>button[data-tool=ellipse]": {
+      "tasks": [
+        "G15",
+        "G22"
+      ],
+      "confidence": "high",
+      "note": "Shape gesture"
+    },
+    "dom:shape-tool-stack>button[data-tool=line]": {
+      "tasks": [
+        "G15",
+        "G22"
+      ],
+      "confidence": "high",
+      "note": "Shape gesture"
+    },
+    "dom:shape-tool-stack>button[data-tool=rect]": {
+      "tasks": [
+        "G15",
+        "G22"
+      ],
+      "confidence": "high",
+      "note": "Shape gesture"
+    },
+    "dom:shape-tool-stack>button[data-tool=speechbubble]": {
+      "tasks": [
+        "G22",
+        "G15"
+      ],
+      "confidence": "medium",
+      "note": "Parametric shape"
+    },
+    "dom:shape-tool-stack>button[data-tool=star]": {
+      "tasks": [
+        "G22",
+        "G15"
+      ],
+      "confidence": "high",
+      "note": "Parametric shape handles"
+    },
+    "dom:symbol-tabs>div[data-sym=]": {
+      "tasks": [
+        "I20"
+      ],
+      "confidence": "high",
+      "note": "component/scene tab navigation"
+    },
+    "dom:text-props-sec>button[data-flag=bold]": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:text-props-sec>button[data-flag=italic]": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:text-props-sec>button[data-flag=strike]": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:text-props-sec>button[data-flag=underline]": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:text-props-sec>button[data-val=auto]": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:text-props-sec>button[data-val=capitalize]": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:text-props-sec>button[data-val=center]": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:text-props-sec>button[data-val=fixed]": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:text-props-sec>button[data-val=left]": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:text-props-sec>button[data-val=lower]": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:text-props-sec>button[data-val=none]": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:text-props-sec>button[data-val=right]": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:text-props-sec>button[data-val=upper]": {
+      "tasks": [
+        "U22",
+        "G38a"
+      ],
+      "confidence": "high",
+      "note": "Typography control"
+    },
+    "dom:tools-panel>button[data-tool=draw]": {
+      "tasks": [
+        "G15",
+        "U06"
+      ],
+      "confidence": "high",
+      "note": "Brush gesture commit"
+    },
+    "dom:tools-panel>button[data-tool=eraser]": {
+      "tasks": [
+        "G19",
+        "U06"
+      ],
+      "confidence": "high",
+      "note": "Vector eraser geometry history"
+    },
+    "dom:tools-panel>button[data-tool=eyedropper]": {
+      "tasks": [
+        "G12",
+        "U06"
+      ],
+      "confidence": "medium",
+      "note": "Color pick to native color command"
+    },
+    "dom:tools-panel>button[data-tool=fill]": {
+      "tasks": [
+        "G18",
+        "U06"
+      ],
+      "confidence": "high",
+      "note": "Fill tracing"
+    },
+    "dom:tools-panel>button[data-tool=fillbrush]": {
+      "tasks": [
+        "G18",
+        "U06"
+      ],
+      "confidence": "high",
+      "note": "Fill brush auto-paint"
+    },
+    "dom:tools-panel>button[data-tool=fsselect]": {
+      "tasks": [
+        "G20",
+        "U06"
+      ],
+      "confidence": "medium",
+      "note": "Fill/stroke selection"
+    },
+    "dom:tools-panel>button[data-tool=hand]": {
+      "tasks": [
+        "U06",
+        "G25"
+      ],
+      "confidence": "medium",
+      "note": "Pan tool, presentation"
+    },
+    "dom:tools-panel>button[data-tool=pen]": {
+      "tasks": [
+        "G15",
+        "U06"
+      ],
+      "confidence": "high",
+      "note": "Pen gesture commit"
+    },
+    "dom:tools-panel>button[data-tool=rig]": {
+      "tasks": [
+        "G40",
+        "I13"
+      ],
+      "confidence": "medium",
+      "note": "Rig tool editor"
+    },
+    "dom:tools-panel>button[data-tool=rotate]": {
+      "tasks": [
+        "U06",
+        "G25"
+      ],
+      "confidence": "medium",
+      "note": "Canvas rotation, view only"
+    },
+    "dom:tools-panel>button[data-tool=select]": {
+      "tasks": [
+        "G20",
+        "U06"
+      ],
+      "confidence": "high",
+      "note": "Selection/transform"
+    },
+    "dom:tools-panel>button[data-tool=subselect]": {
+      "tasks": [
+        "G21",
+        "U06"
+      ],
+      "confidence": "high",
+      "note": "Vertex/tangent editing"
+    },
+    "dom:tools-panel>button[data-tool=text]": {
+      "tasks": [
+        "U21",
+        "U22"
+      ],
+      "confidence": "high",
+      "note": "Text tool popover"
+    },
+    "dom:tools-panel>button[data-tool=zoom]": {
+      "tasks": [
+        "U06",
+        "G25"
+      ],
+      "confidence": "medium",
+      "note": "Zoom tool, view only"
+    },
+    "dom:xform-anchor-grid>button[data-key=bc]": {
+      "tasks": [
+        "G20",
+        "U17"
+      ],
+      "confidence": "low",
+      "note": "selection transform pivot preset"
+    },
+    "dom:xform-anchor-grid>button[data-key=bl]": {
+      "tasks": [
+        "G20",
+        "U17"
+      ],
+      "confidence": "low",
+      "note": "selection transform pivot preset"
+    },
+    "dom:xform-anchor-grid>button[data-key=br]": {
+      "tasks": [
+        "G20",
+        "U17"
+      ],
+      "confidence": "low",
+      "note": "selection transform pivot preset"
+    },
+    "dom:xform-anchor-grid>button[data-key=mc]": {
+      "tasks": [
+        "G20",
+        "U17"
+      ],
+      "confidence": "low",
+      "note": "selection transform pivot preset"
+    },
+    "dom:xform-anchor-grid>button[data-key=ml]": {
+      "tasks": [
+        "G20",
+        "U17"
+      ],
+      "confidence": "low",
+      "note": "selection transform pivot preset"
+    },
+    "dom:xform-anchor-grid>button[data-key=mr]": {
+      "tasks": [
+        "G20",
+        "U17"
+      ],
+      "confidence": "low",
+      "note": "selection transform pivot preset"
+    },
+    "dom:xform-anchor-grid>button[data-key=tc]": {
+      "tasks": [
+        "G20",
+        "U17"
+      ],
+      "confidence": "low",
+      "note": "selection transform pivot preset"
+    },
+    "dom:xform-anchor-grid>button[data-key=tl]": {
+      "tasks": [
+        "G20",
+        "U17"
+      ],
+      "confidence": "low",
+      "note": "selection transform pivot preset"
+    },
+    "dom:xform-anchor-grid>button[data-key=tr]": {
+      "tasks": [
+        "G20",
+        "U17"
+      ],
+      "confidence": "low",
+      "note": "selection transform pivot preset"
+    },
+    "labs:auto-actions": {
+      "tasks": [
+        "U37"
+      ],
+      "confidence": "low",
+      "note": "Labs feature auto-actions"
+    },
+    "labs:boil-effect": {
+      "tasks": [
+        "U36"
+      ],
+      "confidence": "high",
+      "note": "Labs feature boil-effect"
+    },
+    "labs:canvas-grid": {
+      "tasks": [
+        "U31"
+      ],
+      "confidence": "high",
+      "note": "Labs feature canvas-grid"
+    },
+    "labs:clip-mask-bake": {
+      "tasks": [
+        "U37"
+      ],
+      "confidence": "low",
+      "note": "Labs feature clip-mask-bake"
+    },
+    "labs:command-palette": {
+      "tasks": [
+        "U31",
+        "U30"
+      ],
+      "confidence": "medium",
+      "note": "Labs feature command-palette"
+    },
+    "labs:flip-roll": {
+      "tasks": [
+        "U31"
+      ],
+      "confidence": "medium",
+      "note": "Labs feature flip-roll"
+    },
+    "labs:follow-path": {
+      "tasks": [
+        "U36"
+      ],
+      "confidence": "medium",
+      "note": "Labs feature follow-path"
+    },
+    "labs:french-curve": {
+      "tasks": [
+        "U33"
+      ],
+      "confidence": "high",
+      "note": "Labs feature french-curve"
+    },
+    "labs:interval-assistant": {
+      "tasks": [
+        "U35"
+      ],
+      "confidence": "high",
+      "note": "Labs feature interval-assistant"
+    },
+    "labs:lagoon-menu": {
+      "tasks": [
+        "U31",
+        "U06"
+      ],
+      "confidence": "low",
+      "note": "Labs feature lagoon-menu"
+    },
+    "labs:layer-effects-bake": {
+      "tasks": [
+        "U37"
+      ],
+      "confidence": "low",
+      "note": "Labs feature layer-effects-bake"
+    },
+    "labs:lipsync-assistant": {
+      "tasks": [
+        "U37",
+        "I42"
+      ],
+      "confidence": "low",
+      "note": "Labs feature lipsync-assistant"
+    },
+    "labs:mirror-check": {
+      "tasks": [
+        "U31"
+      ],
+      "confidence": "high",
+      "note": "Labs feature mirror-check"
+    },
+    "labs:move-to-layer": {
+      "tasks": [
+        "U34"
+      ],
+      "confidence": "high",
+      "note": "Labs feature move-to-layer"
+    },
+    "labs:multiframe-draw": {
+      "tasks": [
+        "U34"
+      ],
+      "confidence": "high",
+      "note": "Labs feature multiframe-draw"
+    },
+    "labs:oca-export": {
+      "tasks": [
+        "U37"
+      ],
+      "confidence": "low",
+      "note": "Labs feature oca-export"
+    },
+    "labs:out-of-pegs": {
+      "tasks": [
+        "U31"
+      ],
+      "confidence": "medium",
+      "note": "Labs feature out-of-pegs"
+    },
+    "labs:pingpong-cycle": {
+      "tasks": [
+        "U35"
+      ],
+      "confidence": "high",
+      "note": "Labs feature pingpong-cycle"
+    },
+    "labs:pose-library": {
+      "tasks": [
+        "U34"
+      ],
+      "confidence": "high",
+      "note": "Labs feature pose-library"
+    },
+    "labs:predictive-stroke": {
+      "tasks": [
+        "U33"
+      ],
+      "confidence": "high",
+      "note": "Labs feature predictive-stroke"
+    },
+    "labs:reference-3d": {
+      "tasks": [
+        "U32"
+      ],
+      "confidence": "high",
+      "note": "Labs feature reference-3d"
+    },
+    "labs:reference-fill": {
+      "tasks": [
+        "U36"
+      ],
+      "confidence": "high",
+      "note": "Labs feature reference-fill"
+    },
+    "labs:retime-exposure": {
+      "tasks": [
+        "U35"
+      ],
+      "confidence": "high",
+      "note": "Labs feature retime-exposure"
+    },
+    "labs:rig-deform": {
+      "tasks": [
+        "U37",
+        "U25"
+      ],
+      "confidence": "low",
+      "note": "Labs feature rig-deform"
+    },
+    "labs:screentone-bake": {
+      "tasks": [
+        "U37"
+      ],
+      "confidence": "low",
+      "note": "Labs feature screentone-bake"
+    },
+    "labs:shader-effects-bake": {
+      "tasks": [
+        "U37",
+        "G11"
+      ],
+      "confidence": "low",
+      "note": "Labs feature shader-effects-bake"
+    },
+    "labs:speed-lines": {
+      "tasks": [
+        "U36"
+      ],
+      "confidence": "high",
+      "note": "Labs feature speed-lines"
+    },
+    "labs:storyboard-mode": {
+      "tasks": [
+        "U37"
+      ],
+      "confidence": "low",
+      "note": "Labs feature storyboard-mode"
+    },
+    "labs:timelapse": {
+      "tasks": [
+        "U37"
+      ],
+      "confidence": "low",
+      "note": "Labs feature timelapse"
+    },
+    "labs:timeline-markers": {
+      "tasks": [
+        "U31"
+      ],
+      "confidence": "high",
+      "note": "Labs feature timeline-markers"
+    },
+    "labs:timeline-zoom": {
+      "tasks": [
+        "U31"
+      ],
+      "confidence": "medium",
+      "note": "Labs feature timeline-zoom"
+    },
+    "labs:vector-sculpt": {
+      "tasks": [
+        "U33"
+      ],
+      "confidence": "high",
+      "note": "Labs feature vector-sculpt"
+    },
+    "labs:vector-trim": {
+      "tasks": [
+        "U33"
+      ],
+      "confidence": "high",
+      "note": "Labs feature vector-trim"
+    },
+    "labs:view-filter": {
+      "tasks": [
+        "U31"
+      ],
+      "confidence": "high",
+      "note": "Labs feature view-filter"
+    },
+    "labs:xsheet": {
+      "tasks": [
+        "U31"
+      ],
+      "confidence": "medium",
+      "note": "Labs feature xsheet"
+    },
+    "menu:effects-panel.js:openCustom:new-custom-shader": {
+      "tasks": [
+        "G11",
+        "G05"
+      ],
+      "confidence": "medium",
+      "note": "custom shader"
+    },
+    "menu:labs/command-palette.js:commands:labs": {
+      "tasks": [
+        "U31",
+        "U30"
+      ],
+      "confidence": "medium",
+      "note": "palette entry"
+    },
+    "menu:labs/command-palette.js:commands:labscmdblankkeyframe": {
+      "tasks": [
+        "U31",
+        "I25"
+      ],
+      "confidence": "medium",
+      "note": "palette frame op"
+    },
+    "menu:labs/command-palette.js:commands:labscmdduplicatelayer": {
+      "tasks": [
+        "U31",
+        "U10"
+      ],
+      "confidence": "medium",
+      "note": "palette layer op"
+    },
+    "menu:labs/command-palette.js:commands:labscmdinsertframe": {
+      "tasks": [
+        "U31",
+        "I25"
+      ],
+      "confidence": "medium",
+      "note": "palette frame op"
+    },
+    "menu:labs/command-palette.js:commands:labscmdinsertkeyframe": {
+      "tasks": [
+        "U31",
+        "I25"
+      ],
+      "confidence": "medium",
+      "note": "palette frame op"
+    },
+    "menu:labs/command-palette.js:commands:labscmdlooptoggle": {
+      "tasks": [
+        "U31",
+        "U13"
+      ],
+      "confidence": "medium",
+      "note": "palette playback toggle"
+    },
+    "menu:labs/command-palette.js:commands:labscmdnewlayer": {
+      "tasks": [
+        "U31",
+        "U10"
+      ],
+      "confidence": "medium",
+      "note": "palette layer op"
+    },
+    "menu:labs/command-palette.js:commands:labscmdoniontoggle": {
+      "tasks": [
+        "U31",
+        "U20"
+      ],
+      "confidence": "medium",
+      "note": "palette onion toggle"
+    },
+    "menu:labs/command-palette.js:commands:labscmdpingpongtoggle": {
+      "tasks": [
+        "U31",
+        "U13"
+      ],
+      "confidence": "medium",
+      "note": "palette playback toggle"
+    },
+    "menu:labs/command-palette.js:commands:labscmdplaystop": {
+      "tasks": [
+        "U31",
+        "U13"
+      ],
+      "confidence": "medium",
+      "note": "palette playback toggle"
+    },
+    "menu:labs/command-palette.js:commands:labscmdredo": {
+      "tasks": [
+        "U31",
+        "D08"
+      ],
+      "confidence": "medium",
+      "note": "palette undo/redo"
+    },
+    "menu:labs/command-palette.js:commands:labscmdremoveframe": {
+      "tasks": [
+        "U31",
+        "I25"
+      ],
+      "confidence": "medium",
+      "note": "palette frame op"
+    },
+    "menu:labs/command-palette.js:commands:labscmdtoolbrush": {
+      "tasks": [
+        "U31",
+        "U06"
+      ],
+      "confidence": "medium",
+      "note": "palette tool switch"
+    },
+    "menu:labs/command-palette.js:commands:labscmdtoolbucket": {
+      "tasks": [
+        "U31",
+        "U06"
+      ],
+      "confidence": "medium",
+      "note": "palette tool switch"
+    },
+    "menu:labs/command-palette.js:commands:labscmdtoolcamera": {
+      "tasks": [
+        "U31",
+        "U06"
+      ],
+      "confidence": "medium",
+      "note": "palette tool switch"
+    },
+    "menu:labs/command-palette.js:commands:labscmdtoolcomment": {
+      "tasks": [
+        "U31",
+        "U06"
+      ],
+      "confidence": "medium",
+      "note": "palette tool switch"
+    },
+    "menu:labs/command-palette.js:commands:labscmdtooleraser": {
+      "tasks": [
+        "U31",
+        "U06"
+      ],
+      "confidence": "medium",
+      "note": "palette tool switch"
+    },
+    "menu:labs/command-palette.js:commands:labscmdtoolfillbrush": {
+      "tasks": [
+        "U31",
+        "U06"
+      ],
+      "confidence": "medium",
+      "note": "palette tool switch"
+    },
+    "menu:labs/command-palette.js:commands:labscmdtoolhand": {
+      "tasks": [
+        "U31",
+        "U06"
+      ],
+      "confidence": "medium",
+      "note": "palette tool switch"
+    },
+    "menu:labs/command-palette.js:commands:labscmdtoolpen": {
+      "tasks": [
+        "U31",
+        "U06"
+      ],
+      "confidence": "medium",
+      "note": "palette tool switch"
+    },
+    "menu:labs/command-palette.js:commands:labscmdtoolselect": {
+      "tasks": [
+        "U31",
+        "U06"
+      ],
+      "confidence": "medium",
+      "note": "palette tool switch"
+    },
+    "menu:labs/command-palette.js:commands:labscmdtoolsubselect": {
+      "tasks": [
+        "U31",
+        "U06"
+      ],
+      "confidence": "medium",
+      "note": "palette tool switch"
+    },
+    "menu:labs/command-palette.js:commands:labscmdtooltext": {
+      "tasks": [
+        "U31",
+        "U06"
+      ],
+      "confidence": "medium",
+      "note": "palette tool switch"
+    },
+    "menu:labs/command-palette.js:commands:labscmdtoolzoom": {
+      "tasks": [
+        "U31",
+        "U06"
+      ],
+      "confidence": "medium",
+      "note": "palette tool switch"
+    },
+    "menu:labs/command-palette.js:commands:labscmdundo": {
+      "tasks": [
+        "U31",
+        "D08"
+      ],
+      "confidence": "medium",
+      "note": "palette undo/redo"
+    },
+    "menu:layer-inout.js:buildBar:aligner-a-droite-out": {
+      "tasks": [
+        "D27"
+      ],
+      "confidence": "high",
+      "note": "layer in/out bar"
+    },
+    "menu:layer-inout.js:buildBar:aligner-a-gauche-in": {
+      "tasks": [
+        "D27"
+      ],
+      "confidence": "high",
+      "note": "layer in/out bar"
+    },
+    "menu:layer-inout.js:buildBar:aligner-au-centre": {
+      "tasks": [
+        "D27"
+      ],
+      "confidence": "high",
+      "note": "layer in/out bar"
+    },
+    "menu:layer-inout.js:buildBar:distribuer-uniformement": {
+      "tasks": [
+        "D27",
+        "D13"
+      ],
+      "confidence": "medium",
+      "note": "batch bar editing"
+    },
+    "menu:layer-inout.js:buildBar:echelonner-stagger": {
+      "tasks": [
+        "D27",
+        "D13"
+      ],
+      "confidence": "medium",
+      "note": "batch bar editing"
+    },
+    "menu:layer-inout.js:buildBar:inverser-l-ordre-flip": {
+      "tasks": [
+        "D27",
+        "D13"
+      ],
+      "confidence": "medium",
+      "note": "batch bar editing"
+    },
+    "menu:layer-inout.js:buildBar:inverser-la-selection": {
+      "tasks": [
+        "D27",
+        "D13"
+      ],
+      "confidence": "medium",
+      "note": "batch bar editing"
+    },
+    "menu:layer-inout.js:buildBar:parent-in-time-lier-le-temps-a": {
+      "tasks": [
+        "D27",
+        "U12"
+      ],
+      "confidence": "high",
+      "note": "time link"
+    },
+    "menu:layer-inout.js:buildBar:reinitialiser-pleine-duree": {
+      "tasks": [
+        "D27"
+      ],
+      "confidence": "high",
+      "note": "layer in/out bar"
+    },
+    "menu:layer-inout.js:buildBar:selectionner-1-sur-2": {
+      "tasks": [
+        "D27",
+        "D13"
+      ],
+      "confidence": "medium",
+      "note": "batch bar editing"
+    },
+    "menu:markers.js:buildEl:aller-a-ce-repere": {
+      "tasks": [
+        "D26"
+      ],
+      "confidence": "high",
+      "note": "markers/BPM"
+    },
+    "menu:markers.js:buildEl:renommer-le-repere": {
+      "tasks": [
+        "D26"
+      ],
+      "confidence": "high",
+      "note": "markers/BPM"
+    },
+    "menu:markers.js:buildEl:supprimer-le-repere": {
+      "tasks": [
+        "D26"
+      ],
+      "confidence": "high",
+      "note": "markers/BPM"
+    },
+    "menu:markers.js:initRulerMenu:ajouter-un-repere-ici-frame": {
+      "tasks": [
+        "D26"
+      ],
+      "confidence": "high",
+      "note": "markers/BPM"
+    },
+    "menu:markers.js:initRulerMenu:ajouter-un-repere-nomme": {
+      "tasks": [
+        "D26"
+      ],
+      "confidence": "high",
+      "note": "markers/BPM"
+    },
+    "menu:markers.js:initRulerMenu:grille-bpm": {
+      "tasks": [
+        "D26"
+      ],
+      "confidence": "high",
+      "note": "markers/BPM"
+    },
+    "menu:markers.js:initRulerMenu:reduire-la-composition-a-la-zone-de-travail": {
+      "tasks": [
+        "D26",
+        "D27"
+      ],
+      "confidence": "low",
+      "note": "comp to work area; markers-adjacent"
+    },
+    "menu:markers.js:initRulerMenu:repere-precedent-maj": {
+      "tasks": [
+        "D26"
+      ],
+      "confidence": "high",
+      "note": "markers/BPM"
+    },
+    "menu:markers.js:initRulerMenu:repere-suivant-maj": {
+      "tasks": [
+        "D26"
+      ],
+      "confidence": "high",
+      "note": "markers/BPM"
+    },
+    "menu:markers.js:initRulerMenu:supprimer-tous-les-reperes": {
+      "tasks": [
+        "D26"
+      ],
+      "confidence": "high",
+      "note": "markers/BPM"
+    },
+    "menu:media-library.js:buildRow:ctxdeletetrack": {
+      "tasks": [
+        "G32",
+        "G29"
+      ],
+      "confidence": "medium",
+      "note": "delete audio track"
+    },
+    "menu:media-library.js:buildRow:ctxinsertcopyonactivelayer": {
+      "tasks": [
+        "G29"
+      ],
+      "confidence": "high",
+      "note": "media library ctx menu"
+    },
+    "menu:media-library.js:buildRow:ctxrelinkreplacefile": {
+      "tasks": [
+        "G28",
+        "G29"
+      ],
+      "confidence": "high",
+      "note": "relink"
+    },
+    "menu:media-library.js:buildRow:ctxrelinkreplacefile#2": {
+      "tasks": [
+        "G28",
+        "G29"
+      ],
+      "confidence": "high",
+      "note": "relink"
+    },
+    "menu:media-library.js:buildRow:ctxremovefromlibrary": {
+      "tasks": [
+        "G29"
+      ],
+      "confidence": "high",
+      "note": "media library ctx menu"
+    },
+    "menu:media-library.js:buildRow:ctxselectlayer": {
+      "tasks": [
+        "G29"
+      ],
+      "confidence": "high",
+      "note": "media library ctx menu"
+    },
+    "menu:motion-preset-picker.js:renderTabs:renommer": {
+      "tasks": [
+        "G39"
+      ],
+      "confidence": "high",
+      "note": "preset library tab menu"
+    },
+    "menu:motion-preset-picker.js:renderTabs:supprimer-l-onglet": {
+      "tasks": [
+        "G39"
+      ],
+      "confidence": "high",
+      "note": "preset library tab menu"
+    },
+    "menu:motion.js:action:ctrlmenudelete": {
+      "tasks": [
+        "D18"
+      ],
+      "confidence": "high",
+      "note": "expression controls"
+    },
+    "menu:motion.js:action:ctrlmenumovedown": {
+      "tasks": [
+        "D18"
+      ],
+      "confidence": "high",
+      "note": "expression controls"
+    },
+    "menu:motion.js:action:ctrlmenumoveup": {
+      "tasks": [
+        "D18"
+      ],
+      "confidence": "high",
+      "note": "expression controls"
+    },
+    "menu:motion.js:action:ctrlmenurenameellipsis": {
+      "tasks": [
+        "D18"
+      ],
+      "confidence": "high",
+      "note": "expression controls"
+    },
+    "menu:motion.js:action:ctxremovecolor": {
+      "tasks": [
+        "D39",
+        "D11"
+      ],
+      "confidence": "low",
+      "note": "key colour label"
+    },
+    "menu:motion.js:buildExprEditorRow:exprexangleto": {
+      "tasks": [
+        "D17",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "cross-layer expression snippet"
+    },
+    "menu:motion.js:buildExprEditorRow:exprexbounce": {
+      "tasks": [
+        "D16",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "expression snippet insertion"
+    },
+    "menu:motion.js:buildExprEditorRow:exprexcontentbox": {
+      "tasks": [
+        "D17",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "cross-layer expression snippet"
+    },
+    "menu:motion.js:buildExprEditorRow:exprexcontrol": {
+      "tasks": [
+        "D17",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "cross-layer expression snippet"
+    },
+    "menu:motion.js:buildExprEditorRow:exprexfirstkey": {
+      "tasks": [
+        "D16",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "expression snippet insertion"
+    },
+    "menu:motion.js:buildExprEditorRow:exprexfollowlayer": {
+      "tasks": [
+        "D17",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "cross-layer expression snippet"
+    },
+    "menu:motion.js:buildExprEditorRow:exprexloopbefore": {
+      "tasks": [
+        "D16",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "expression snippet insertion"
+    },
+    "menu:motion.js:buildExprEditorRow:exprexloopcycle": {
+      "tasks": [
+        "D16",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "expression snippet insertion"
+    },
+    "menu:motion.js:buildExprEditorRow:exprexloopoffset": {
+      "tasks": [
+        "D16",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "expression snippet insertion"
+    },
+    "menu:motion.js:buildExprEditorRow:exprexlooppingpong": {
+      "tasks": [
+        "D16",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "expression snippet insertion"
+    },
+    "menu:motion.js:buildExprEditorRow:exprexoscillate": {
+      "tasks": [
+        "D16",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "expression snippet insertion"
+    },
+    "menu:motion.js:buildExprEditorRow:exprexremapother": {
+      "tasks": [
+        "D17",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "cross-layer expression snippet"
+    },
+    "menu:motion.js:buildExprEditorRow:exprexstagger": {
+      "tasks": [
+        "D16",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "expression snippet insertion"
+    },
+    "menu:motion.js:buildExprEditorRow:exprexstepped": {
+      "tasks": [
+        "D16",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "expression snippet insertion"
+    },
+    "menu:motion.js:buildExprEditorRow:exprexvalue": {
+      "tasks": [
+        "D16",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "expression snippet insertion"
+    },
+    "menu:motion.js:buildExprEditorRow:exprexwiggle": {
+      "tasks": [
+        "D16",
+        "D18"
+      ],
+      "confidence": "medium",
+      "note": "expression snippet insertion"
+    },
+    "menu:motion.js:buildKeyLockMenuItems:ctxlockkeyframesoncolon": {
+      "tasks": [
+        "D13",
+        "D37"
+      ],
+      "confidence": "medium",
+      "note": "key lock"
+    },
+    "menu:motion.js:buildKeySelectionLockMenuItems:ctxlockkeyframesoncolon": {
+      "tasks": [
+        "D13",
+        "D37"
+      ],
+      "confidence": "medium",
+      "note": "key lock"
+    },
+    "menu:motion.js:decorateMotionPropertyRow:ctxbakeexpressionellipsis": {
+      "tasks": [
+        "D19"
+      ],
+      "confidence": "high",
+      "note": "bake expression"
+    },
+    "menu:motion.js:decorateMotionPropertyRow:ctxexprcontrolsellipsis": {
+      "tasks": [
+        "D18"
+      ],
+      "confidence": "high",
+      "note": "expression controls"
+    },
+    "menu:motion.js:openExprControlsMenu:ctrlmenuaddellipsis": {
+      "tasks": [
+        "D18"
+      ],
+      "confidence": "high",
+      "note": "expression controls"
+    },
+    "menu:motion.js:openExprControlsMenu:ctrlmenuexistingcolon": {
+      "tasks": [
+        "D18"
+      ],
+      "confidence": "high",
+      "note": "expression controls"
+    },
+    "menu:motion.js:openExtraMatteMenu": {
+      "tasks": [
+        "F16",
+        "D36"
+      ],
+      "confidence": "medium",
+      "note": "matte menu"
+    },
+    "menu:motion.js:openExtraMatteMenu#2": {
+      "tasks": [
+        "F16",
+        "D36"
+      ],
+      "confidence": "medium",
+      "note": "matte menu"
+    },
+    "menu:motion.js:openExtraMatteMenu:mattemenumodehdr": {
+      "tasks": [
+        "F16",
+        "D36"
+      ],
+      "confidence": "medium",
+      "note": "matte menu"
+    },
+    "menu:motion.js:openExtraMatteMenu:mattemenuremove": {
+      "tasks": [
+        "F16",
+        "D36"
+      ],
+      "confidence": "medium",
+      "note": "matte menu"
+    },
+    "menu:motion.js:openExtraMatteMenu:mattemenusourcehdr": {
+      "tasks": [
+        "F16",
+        "D36"
+      ],
+      "confidence": "medium",
+      "note": "matte menu"
+    },
+    "menu:motion.js:openExtraParentMenu:menuremovethisparent": {
+      "tasks": [
+        "D36",
+        "D30"
+      ],
+      "confidence": "medium",
+      "note": "parent menu"
+    },
+    "menu:motion.js:openMatteConfigMenu": {
+      "tasks": [
+        "F16",
+        "D36"
+      ],
+      "confidence": "medium",
+      "note": "matte menu"
+    },
+    "menu:motion.js:openMatteConfigMenu#2": {
+      "tasks": [
+        "F16",
+        "D36"
+      ],
+      "confidence": "medium",
+      "note": "matte menu"
+    },
+    "menu:motion.js:openMatteConfigMenu:mattemenumodehdr": {
+      "tasks": [
+        "F16",
+        "D36"
+      ],
+      "confidence": "medium",
+      "note": "matte menu"
+    },
+    "menu:motion.js:openMatteConfigMenu:mattemenuremove": {
+      "tasks": [
+        "F16",
+        "D36"
+      ],
+      "confidence": "medium",
+      "note": "matte menu"
+    },
+    "menu:motion.js:openMatteConfigMenu:mattemenusourcehdr": {
+      "tasks": [
+        "F16",
+        "D36"
+      ],
+      "confidence": "medium",
+      "note": "matte menu"
+    },
+    "menu:motion.js:renderDiscreteKeyGridRow:ctxdeletethiskey": {
+      "tasks": [
+        "D38",
+        "D13"
+      ],
+      "confidence": "medium",
+      "note": "discrete key delete"
+    },
+    "menu:motion.js:renderElementsList:elementsdelete": {
+      "tasks": [
+        "D29",
+        "D38"
+      ],
+      "confidence": "medium",
+      "note": "element holder ops"
+    },
+    "menu:motion.js:renderElementsList:elementsrename": {
+      "tasks": [
+        "D29",
+        "D38"
+      ],
+      "confidence": "medium",
+      "note": "element holder ops"
+    },
+    "menu:motion.js:renderElementsList:elementsrename#2": {
+      "tasks": [
+        "D29",
+        "D38"
+      ],
+      "confidence": "medium",
+      "note": "element holder ops"
+    },
+    "menu:motion.js:renderElementsList:elementsselect": {
+      "tasks": [
+        "D29",
+        "D38"
+      ],
+      "confidence": "medium",
+      "note": "element holder ops"
+    },
+    "menu:motion.js:renderElementsList:elementsselectmembers": {
+      "tasks": [
+        "D29",
+        "D38"
+      ],
+      "confidence": "medium",
+      "note": "element holder ops"
+    },
+    "menu:motion.js:renderElementsList:elementsungroup": {
+      "tasks": [
+        "D29",
+        "D38"
+      ],
+      "confidence": "medium",
+      "note": "element holder ops"
+    },
+    "menu:motion.js:renderLayerListMotion:ctxaddeffectorlayer": {
+      "tasks": [
+        "I07",
+        "I10"
+      ],
+      "confidence": "medium",
+      "note": "duplicator/effector command"
+    },
+    "menu:motion.js:renderLayerListMotion:ctxaddmarkeronlayer": {
+      "tasks": [
+        "D26"
+      ],
+      "confidence": "high",
+      "note": "layer marker"
+    },
+    "menu:motion.js:renderLayerListMotion:ctxbreakapartcomponent": {
+      "tasks": [
+        "I17",
+        "D29"
+      ],
+      "confidence": "medium",
+      "note": "component conversion"
+    },
+    "menu:motion.js:renderLayerListMotion:ctxconverttocomponent": {
+      "tasks": [
+        "I17",
+        "D29"
+      ],
+      "confidence": "medium",
+      "note": "component conversion"
+    },
+    "menu:motion.js:renderLayerListMotion:ctxcutatplayhead": {
+      "tasks": [
+        "F08",
+        "D27"
+      ],
+      "confidence": "low",
+      "note": "cut at playhead"
+    },
+    "menu:motion.js:renderLayerListMotion:ctxexprcontrolsellipsis": {
+      "tasks": [
+        "D18"
+      ],
+      "confidence": "high",
+      "note": "expression controls"
+    },
+    "menu:motion.js:renderLayerListMotion:ctxinsertaudiotrack": {
+      "tasks": [
+        "G32"
+      ],
+      "confidence": "medium",
+      "note": "audio track import"
+    },
+    "menu:motion.js:renderLayerListMotion:ctxinsertcameralayer": {
+      "tasks": [
+        "D25"
+      ],
+      "confidence": "high",
+      "note": "camera layer insert"
+    },
+    "menu:motion.js:renderLayerListMotion:ctxmergeselectedlayers": {
+      "tasks": [
+        "I18"
+      ],
+      "confidence": "high",
+      "note": "merge layers"
+    },
+    "menu:motion.js:renderLayerListMotion:ctxobjectduplicatorellipsis": {
+      "tasks": [
+        "I07",
+        "I10"
+      ],
+      "confidence": "medium",
+      "note": "duplicator/effector command"
+    },
+    "menu:motion.js:renderLayerListMotion:ctxparentintimelinktimeellipsis": {
+      "tasks": [
+        "D27",
+        "D36"
+      ],
+      "confidence": "medium",
+      "note": "time link"
+    },
+    "menu:motion.js:renderLayerListMotion:ctxremovefromfolder": {
+      "tasks": [
+        "F07"
+      ],
+      "confidence": "medium",
+      "note": "folder membership"
+    },
+    "menu:motion.js:renderLayerListMotion:ctxsplitintolayers": {
+      "tasks": [
+        "I18",
+        "F08"
+      ],
+      "confidence": "medium",
+      "note": "split/release to layers"
+    },
+    "menu:motion.js:renderLayerListMotion:ctxstaggerselectedlayersellipsis": {
+      "tasks": [
+        "D13",
+        "D27"
+      ],
+      "confidence": "medium",
+      "note": "stagger layers"
+    },
+    "menu:motion.js:renderLayerListMotion:ctxwidgetsettingsellipsis": {
+      "tasks": [
+        "F19",
+        "G40"
+      ],
+      "confidence": "medium",
+      "note": "widget settings"
+    },
+    "menu:motion.js:renderLayerListMotion:elementsrename": {
+      "tasks": [
+        "D29",
+        "D38"
+      ],
+      "confidence": "medium",
+      "note": "element holder ops"
+    },
+    "menu:motion.js:renderTimeLinkRow:ctxunlinktime": {
+      "tasks": [
+        "D27",
+        "D36"
+      ],
+      "confidence": "medium",
+      "note": "time link"
+    },
+    "menu:motion.js:trackRowHtml:ctxaddkeyhere": {
+      "tasks": [
+        "D11",
+        "D13"
+      ],
+      "confidence": "high",
+      "note": "key add/delete"
+    },
+    "menu:motion.js:trackRowHtml:ctxcolorkeysellipsis": {
+      "tasks": [
+        "D39",
+        "D11"
+      ],
+      "confidence": "low",
+      "note": "key colour label"
+    },
+    "menu:motion.js:trackRowHtml:ctxdeletethiskey": {
+      "tasks": [
+        "D11",
+        "D13"
+      ],
+      "confidence": "high",
+      "note": "key add/delete"
+    },
+    "menu:motion.js:trackRowHtml:ctxdistributeevenly": {
+      "tasks": [
+        "D13"
+      ],
+      "confidence": "high",
+      "note": "batch key edit"
+    },
+    "menu:motion.js:trackRowHtml:ctxeasyeasef9": {
+      "tasks": [
+        "D12",
+        "D13"
+      ],
+      "confidence": "high",
+      "note": "key easing"
+    },
+    "menu:motion.js:trackRowHtml:ctxeasyeaseinshiftf9": {
+      "tasks": [
+        "D12",
+        "D13"
+      ],
+      "confidence": "high",
+      "note": "key easing"
+    },
+    "menu:motion.js:trackRowHtml:ctxeasyeaseoutcmdshiftf9": {
+      "tasks": [
+        "D12",
+        "D13"
+      ],
+      "confidence": "high",
+      "note": "key easing"
+    },
+    "menu:motion.js:trackRowHtml:ctxediteasecurve": {
+      "tasks": [
+        "D12",
+        "D13"
+      ],
+      "confidence": "high",
+      "note": "key easing"
+    },
+    "menu:motion.js:trackRowHtml:ctxfliporder": {
+      "tasks": [
+        "D13"
+      ],
+      "confidence": "high",
+      "note": "batch key edit"
+    },
+    "menu:motion.js:trackRowHtml:ctxinvertselection": {
+      "tasks": [
+        "D13"
+      ],
+      "confidence": "high",
+      "note": "batch key edit"
+    },
+    "menu:motion.js:trackRowHtml:ctxkeeprandomellipsis": {
+      "tasks": [
+        "D13"
+      ],
+      "confidence": "high",
+      "note": "batch key edit"
+    },
+    "menu:motion.js:trackRowHtml:ctxlinearcmdaltk": {
+      "tasks": [
+        "D12",
+        "D13"
+      ],
+      "confidence": "high",
+      "note": "key easing"
+    },
+    "menu:motion.js:trackRowHtml:ctxparentintimelinktimeellipsis": {
+      "tasks": [
+        "D27",
+        "D36"
+      ],
+      "confidence": "medium",
+      "note": "time link"
+    },
+    "menu:motion.js:trackRowHtml:ctxselectevery2nd": {
+      "tasks": [
+        "D13"
+      ],
+      "confidence": "high",
+      "note": "batch key edit"
+    },
+    "menu:motion.js:trackRowHtml:ctxselecteverynthellipsis": {
+      "tasks": [
+        "D13"
+      ],
+      "confidence": "high",
+      "note": "batch key edit"
+    },
+    "menu:motion.js:trackRowHtml:ctxsubdividemidpoint": {
+      "tasks": [
+        "D13"
+      ],
+      "confidence": "high",
+      "note": "batch key edit"
+    },
+    "menu:palette-panel.js:render:remplacer-dans-le-calque": {
+      "tasks": [
+        "G12",
+        "U15"
+      ],
+      "confidence": "high",
+      "note": "Palette color command"
+    },
+    "menu:palette-panel.js:render:retirer-de-la-palette": {
+      "tasks": [
+        "F05",
+        "G12"
+      ],
+      "confidence": "medium",
+      "note": "Palette entry removal"
+    },
+    "menu:palette-panel.js:render:utiliser-comme-fill": {
+      "tasks": [
+        "G12",
+        "U15"
+      ],
+      "confidence": "high",
+      "note": "Palette color command"
+    },
+    "menu:palette-panel.js:render:utiliser-comme-stroke": {
+      "tasks": [
+        "G12",
+        "U15"
+      ],
+      "confidence": "high",
+      "note": "Palette color command"
+    },
+    "menu:palette-panel.js:renderTabs:dupliquer": {
+      "tasks": [
+        "F05",
+        "G12"
+      ],
+      "confidence": "medium",
+      "note": "Palette tab management"
+    },
+    "menu:palette-panel.js:renderTabs:renommer": {
+      "tasks": [
+        "F05",
+        "G12"
+      ],
+      "confidence": "medium",
+      "note": "Palette tab management"
+    },
+    "menu:palette-panel.js:renderTabs:supprimer": {
+      "tasks": [
+        "F05",
+        "G12"
+      ],
+      "confidence": "medium",
+      "note": "Palette tab management"
+    },
+    "menu:rig-widget.js:axisItem:widgetmenuaxisrangeprefix": {
+      "tasks": [
+        "F19",
+        "G40"
+      ],
+      "confidence": "medium",
+      "note": "widget settings"
+    },
+    "menu:rig-widget.js:openWidgetMenu:widgetmenusizeellipsis": {
+      "tasks": [
+        "F19",
+        "G40"
+      ],
+      "confidence": "medium",
+      "note": "widget settings"
+    },
+    "menu:select-bridge.js:onContext:accepter-la-correction": {
+      "tasks": [
+        "I53",
+        "U29"
+      ],
+      "confidence": "medium",
+      "note": "Revision ghost accept/reject"
+    },
+    "menu:select-bridge.js:onContext:animer-le-texte": {
+      "tasks": [
+        "D28",
+        "U22"
+      ],
+      "confidence": "medium",
+      "note": "Text animator"
+    },
+    "menu:select-bridge.js:onContext:aplatir": {
+      "tasks": [
+        "G19",
+        "G24"
+      ],
+      "confidence": "medium",
+      "note": "Flatten/combine geometry"
+    },
+    "menu:select-bridge.js:onContext:arriere-plan": {
+      "tasks": [
+        "G20",
+        "F15"
+      ],
+      "confidence": "medium",
+      "note": "Arrange z-order"
+    },
+    "menu:select-bridge.js:onContext:centrer-le-point-d-ancrage": {
+      "tasks": [
+        "G20"
+      ],
+      "confidence": "low",
+      "note": "Anchor centering"
+    },
+    "menu:select-bridge.js:onContext:coller": {
+      "tasks": [
+        "F15",
+        "G20"
+      ],
+      "confidence": "high",
+      "note": "Clipboard/duplicate selection"
+    },
+    "menu:select-bridge.js:onContext:coller#2": {
+      "tasks": [
+        "F15",
+        "G20"
+      ],
+      "confidence": "high",
+      "note": "Clipboard/duplicate selection"
+    },
+    "menu:select-bridge.js:onContext:combiner-union-non-destructif": {
+      "tasks": [
+        "G19",
+        "G24"
+      ],
+      "confidence": "medium",
+      "note": "Flatten/combine geometry"
+    },
+    "menu:select-bridge.js:onContext:convertir-le-trait-en-remplissage-fill": {
+      "tasks": [
+        "G14",
+        "I19"
+      ],
+      "confidence": "medium",
+      "note": "Stroke to fill / width profile"
+    },
+    "menu:select-bridge.js:onContext:copier": {
+      "tasks": [
+        "F15",
+        "G20"
+      ],
+      "confidence": "high",
+      "note": "Clipboard/duplicate selection"
+    },
+    "menu:select-bridge.js:onContext:couper": {
+      "tasks": [
+        "F15",
+        "G20"
+      ],
+      "confidence": "high",
+      "note": "Clipboard/duplicate selection"
+    },
+    "menu:select-bridge.js:onContext:ctxmaskimagewithshape": {
+      "tasks": [
+        "G40",
+        "F18"
+      ],
+      "confidence": "medium",
+      "note": "Image mesh mask by shape"
+    },
+    "menu:select-bridge.js:onContext:dupliquer": {
+      "tasks": [
+        "F15",
+        "G20"
+      ],
+      "confidence": "high",
+      "note": "Clipboard/duplicate selection"
+    },
+    "menu:select-bridge.js:onContext:exposer-l-opacite-comme-propriete-de-component": {
+      "tasks": [
+        "I14",
+        "U23"
+      ],
+      "confidence": "medium",
+      "note": "Expose component property"
+    },
+    "menu:select-bridge.js:onContext:exposer-la-visibilite-comme-propriete-de-compone": {
+      "tasks": [
+        "I14",
+        "U23"
+      ],
+      "confidence": "medium",
+      "note": "Expose component property"
+    },
+    "menu:select-bridge.js:onContext:premier-plan": {
+      "tasks": [
+        "G20",
+        "F15"
+      ],
+      "confidence": "medium",
+      "note": "Arrange z-order"
+    },
+    "menu:select-bridge.js:onContext:profil-de-contour": {
+      "tasks": [
+        "G14",
+        "I19"
+      ],
+      "confidence": "medium",
+      "note": "Stroke to fill / width profile"
+    },
+    "menu:select-bridge.js:onContext:rejeter-la-correction": {
+      "tasks": [
+        "I53",
+        "U29"
+      ],
+      "confidence": "medium",
+      "note": "Revision ghost accept/reject"
+    },
+    "menu:select-bridge.js:onContext:sortir-du-groupe": {
+      "tasks": [
+        "G24",
+        "G20"
+      ],
+      "confidence": "medium",
+      "note": "Leave group"
+    },
+    "menu:select-bridge.js:onContext:suggerer-la-forme-pour": {
+      "tasks": [
+        "I13",
+        "G40"
+      ],
+      "confidence": "low",
+      "note": "Rig role suggestion apply"
+    },
+    "menu:shapes-panel.js:buildShapeRow:elementsrename": {
+      "tasks": [
+        "G26",
+        "G24"
+      ],
+      "confidence": "medium",
+      "note": "Shape tree panel action"
+    },
+    "menu:shapes-panel.js:buildShapeRow:elementsselect": {
+      "tasks": [
+        "G26",
+        "G24"
+      ],
+      "confidence": "medium",
+      "note": "Shape tree panel action"
+    },
+    "menu:shapes-panel.js:renderNode:elementsexplodetext": {
+      "tasks": [
+        "U22",
+        "G38b"
+      ],
+      "confidence": "medium",
+      "note": "Break text into shapes"
+    },
+    "menu:shapes-panel.js:renderNode:elementsrename": {
+      "tasks": [
+        "G26",
+        "G24"
+      ],
+      "confidence": "medium",
+      "note": "Shape tree panel action"
+    },
+    "menu:shapes-panel.js:renderNode:elementsselectmembers": {
+      "tasks": [
+        "G26",
+        "G24"
+      ],
+      "confidence": "medium",
+      "note": "Shape tree panel action"
+    },
+    "menu:shapes-panel.js:renderNode:elementsselectmembers#2": {
+      "tasks": [
+        "G26",
+        "G24"
+      ],
+      "confidence": "medium",
+      "note": "Shape tree panel action"
+    },
+    "menu:shapes-panel.js:renderNode:elementsungroup": {
+      "tasks": [
+        "G26",
+        "G24"
+      ],
+      "confidence": "medium",
+      "note": "Shape tree panel action"
+    },
+    "menu:storyboard.js:renderSound:detacher-du-montage": {
+      "tasks": [
+        "I36",
+        "G32"
+      ],
+      "confidence": "medium",
+      "note": "sound clip montage op"
+    },
+    "menu:storyboard.js:renderSound:scinder-cliquer-la-forme-d-onde-pour-placer-le-p": {
+      "tasks": [
+        "I36",
+        "G32"
+      ],
+      "confidence": "medium",
+      "note": "sound clip montage op"
+    },
+    "menu:storyboard.js:renderSound:scinder-ici": {
+      "tasks": [
+        "I36",
+        "G32"
+      ],
+      "confidence": "medium",
+      "note": "sound clip montage op"
+    },
+    "menu:storyboard.js:renderSound:supprimer-le-module": {
+      "tasks": [
+        "I36",
+        "G32"
+      ],
+      "confidence": "medium",
+      "note": "delete sound module"
+    },
+    "menu:storyboard.js:wireModuleMenu:detacher-du-montage": {
+      "tasks": [
+        "I36",
+        "I35"
+      ],
+      "confidence": "medium",
+      "note": "montage module op"
+    },
+    "menu:storyboard.js:wireModuleMenu:detacher-du-montage#2": {
+      "tasks": [
+        "I36",
+        "I35"
+      ],
+      "confidence": "medium",
+      "note": "montage module op"
+    },
+    "menu:storyboard.js:wireModuleMenu:editer-l-animation": {
+      "tasks": [
+        "I20"
+      ],
+      "confidence": "medium",
+      "note": "edit component animation"
+    },
+    "menu:storyboard.js:wireModuleMenu:placer-comme-calque-dans-animation-2d": {
+      "tasks": [
+        "I17",
+        "I20"
+      ],
+      "confidence": "medium",
+      "note": "place component as layer"
+    },
+    "menu:storyboard.js:wireModuleMenu:reinitialiser-le-retiming": {
+      "tasks": [
+        "I36"
+      ],
+      "confidence": "medium",
+      "note": "montage retime/split"
+    },
+    "menu:storyboard.js:wireModuleMenu:renommer": {
+      "tasks": [
+        "I36",
+        "I35"
+      ],
+      "confidence": "medium",
+      "note": "montage module op"
+    },
+    "menu:storyboard.js:wireModuleMenu:scinder-au-lecteur": {
+      "tasks": [
+        "I36"
+      ],
+      "confidence": "medium",
+      "note": "montage retime/split"
+    },
+    "menu:storyboard.js:wireModuleMenu:scinder-placez-le-lecteur-dans-ce-clip": {
+      "tasks": [
+        "I36"
+      ],
+      "confidence": "medium",
+      "note": "montage retime/split"
+    },
+    "menu:storyboard.js:wireModuleMenu:supprimer-le-module": {
+      "tasks": [
+        "I36",
+        "I35"
+      ],
+      "confidence": "medium",
+      "note": "montage module op"
+    },
+    "menu:storyboard.js:wireSpace:aucun-composant-creez-en-un-en-animation-2d": {
+      "tasks": [
+        "I17",
+        "I36"
+      ],
+      "confidence": "medium",
+      "note": "add component instance to montage"
+    },
+    "menu:storyboard.js:wireSpace:importer-un-son": {
+      "tasks": [
+        "G32",
+        "I36"
+      ],
+      "confidence": "medium",
+      "note": "import sound to montage"
+    },
+    "menu:storyboard.js:wireSpace:instance": {
+      "tasks": [
+        "I17",
+        "I36"
+      ],
+      "confidence": "medium",
+      "note": "add component instance to montage"
+    },
+    "menu:storyboard.js:wireSpace:nouveau-montage": {
+      "tasks": [
+        "I35"
+      ],
+      "confidence": "high",
+      "note": "new montage"
+    },
+    "menu:timeline.js:buildFollowPathMenuItems:chemin": {
+      "tasks": [
+        "U12",
+        "D30"
+      ],
+      "confidence": "high",
+      "note": "follow-path picker"
+    },
+    "menu:timeline.js:buildFollowPathMenuItems:chemin-aucun": {
+      "tasks": [
+        "U12",
+        "D30"
+      ],
+      "confidence": "high",
+      "note": "follow-path picker"
+    },
+    "menu:timeline.js:buildMatteMenuItems:matte-aucune-retirer": {
+      "tasks": [
+        "U12",
+        "F16"
+      ],
+      "confidence": "high",
+      "note": "matte picker"
+    },
+    "menu:timeline.js:buildMatteMenuItems:source": {
+      "tasks": [
+        "U12",
+        "F16"
+      ],
+      "confidence": "high",
+      "note": "matte picker"
+    },
+    "menu:timeline.js:buildParentMenuItems:parent-a": {
+      "tasks": [
+        "U12",
+        "D30"
+      ],
+      "confidence": "high",
+      "note": "parent picker"
+    },
+    "menu:timeline.js:buildParentMenuItems:parent-a-aucun-parentage-libre": {
+      "tasks": [
+        "U12",
+        "D30"
+      ],
+      "confidence": "high",
+      "note": "parent picker"
+    },
+    "menu:timeline.js:buildParentMenuItems:parent-b": {
+      "tasks": [
+        "U12",
+        "D30"
+      ],
+      "confidence": "high",
+      "note": "parent picker"
+    },
+    "menu:timeline.js:buildParentMenuItems:parent-b-aucun": {
+      "tasks": [
+        "U12",
+        "D30"
+      ],
+      "confidence": "high",
+      "note": "parent picker"
+    },
+    "menu:timeline.js:buildTimeLinkMenuItems:ctxlinktimetoprefix": {
+      "tasks": [
+        "U12",
+        "D27"
+      ],
+      "confidence": "high",
+      "note": "time-link picker"
+    },
+    "menu:timeline.js:buildTimeLinkMenuItems:ctxtimenoneunlink": {
+      "tasks": [
+        "U12",
+        "D27"
+      ],
+      "confidence": "high",
+      "note": "time-link picker"
+    },
+    "menu:timeline.js:renderLayerList:ctxbreakapartcomponent": {
+      "tasks": [
+        "I18"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxbreakapartgroup": {
+      "tasks": [
+        "I18",
+        "G24"
+      ],
+      "confidence": "medium",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxconverttocomponent": {
+      "tasks": [
+        "I17"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxcutatplayhead": {
+      "tasks": [
+        "F08"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxdeletelayer": {
+      "tasks": [
+        "F07"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxduplicatelayer": {
+      "tasks": [
+        "F08"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxeditfill": {
+      "tasks": [
+        "I19"
+      ],
+      "confidence": "medium",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxeditline": {
+      "tasks": [
+        "I19"
+      ],
+      "confidence": "medium",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxeditshadow": {
+      "tasks": [
+        "I19"
+      ],
+      "confidence": "medium",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxgroupintofolder": {
+      "tasks": [
+        "F07"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxgrouplfs": {
+      "tasks": [
+        "I19"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxinsertlayer": {
+      "tasks": [
+        "F07"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxinsertlayereffect": {
+      "tasks": [
+        "F06",
+        "F16"
+      ],
+      "confidence": "medium",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxinsertlayerfolder": {
+      "tasks": [
+        "F07"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxinsertlayerguide": {
+      "tasks": [
+        "F06"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxinsertlayerjoystick": {
+      "tasks": [
+        "G40",
+        "F19"
+      ],
+      "confidence": "medium",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxinsertlayernull": {
+      "tasks": [
+        "F06"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxinsertlayerslider": {
+      "tasks": [
+        "G40",
+        "F19"
+      ],
+      "confidence": "medium",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxlayerblend": {
+      "tasks": [
+        "U18",
+        "F16"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxmattesource": {
+      "tasks": [
+        "U12",
+        "F16"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxmenuappearance": {
+      "tasks": [
+        "F16",
+        "U18"
+      ],
+      "confidence": "low",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxmenuinsert": {
+      "tasks": [
+        "F06",
+        "F07"
+      ],
+      "confidence": "low",
+      "note": "insert layer/null/folder/effect/guide: layer kinds first (review fix)"
+    },
+    "menu:timeline.js:renderLayerList:ctxmenulfs": {
+      "tasks": [
+        "I19"
+      ],
+      "confidence": "low",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxmenuorganise": {
+      "tasks": [
+        "F06",
+        "I17",
+        "I18"
+      ],
+      "confidence": "medium",
+      "note": "organise submenu: folder hierarchy, convert to component, merge (review fix)"
+    },
+    "menu:timeline.js:renderLayerList:ctxmergeselectedlayers": {
+      "tasks": [
+        "I18"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxobjectduplicatorellipsis": {
+      "tasks": [
+        "I10",
+        "U24"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxpropagatefillotherframes": {
+      "tasks": [
+        "I19"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxpropagateshadowotherframes": {
+      "tasks": [
+        "I19"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxremovefromfolder": {
+      "tasks": [
+        "F07"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxremovefromfolderparent": {
+      "tasks": [
+        "F07"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxsplitintolayers": {
+      "tasks": [
+        "F08",
+        "I18"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxsplitstrokefillshadow": {
+      "tasks": [
+        "I19"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxunlinkfromlfsgroup": {
+      "tasks": [
+        "I19"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:ctxwidgetsettingsellipsis": {
+      "tasks": [
+        "G40",
+        "F19"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:dissoudre-le-dossier": {
+      "tasks": [
+        "F07"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:elementsrename": {
+      "tasks": [
+        "F07"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderLayerList:renommer-le-dossier": {
+      "tasks": [
+        "F07"
+      ],
+      "confidence": "high",
+      "note": "layer-list context menu"
+    },
+    "menu:timeline.js:renderShapeTreeRowsInto:elementsrename": {
+      "tasks": [
+        "D29",
+        "F07"
+      ],
+      "confidence": "low",
+      "note": "shape-tree element rename"
+    },
+    "menu:timeline.js:renderShapeTreeRowsInto:elementsrename#2": {
+      "tasks": [
+        "D29",
+        "F07"
+      ],
+      "confidence": "low",
+      "note": "shape-tree element rename"
+    },
+    "menu:timeline.js:renderShapeTreeRowsInto:elementsselect": {
+      "tasks": [
+        "D29",
+        "U11"
+      ],
+      "confidence": "medium",
+      "note": "shape-tree select"
+    },
+    "menu:timeline.js:renderShapeTreeRowsInto:elementsselectmembers": {
+      "tasks": [
+        "D29",
+        "U11"
+      ],
+      "confidence": "medium",
+      "note": "shape-tree select"
+    },
+    "menu:timeline.js:renderShapeTreeRowsInto:elementsungroup": {
+      "tasks": [
+        "G24",
+        "D29"
+      ],
+      "confidence": "medium",
+      "note": "ungroup in shape tree"
+    },
+    "menu:timeline.js:renderShapeTreeRowsInto:fxdelete": {
+      "tasks": [
+        "G05",
+        "D29"
+      ],
+      "confidence": "low",
+      "note": "delete shape-tree effect row"
+    },
+    "menu:timeline.js:top:btncopy": {
+      "tasks": [
+        "F12"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxclearkeyframe": {
+      "tasks": [
+        "F13"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxconverttokeyframes": {
+      "tasks": [
+        "F13",
+        "I24"
+      ],
+      "confidence": "medium",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxcut": {
+      "tasks": [
+        "F12"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxduplicateselection": {
+      "tasks": [
+        "F12"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxedittweencurve": {
+      "tasks": [
+        "U19",
+        "D21"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxinsertblankkeyframe": {
+      "tasks": [
+        "F09"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxinsertframe": {
+      "tasks": [
+        "F11"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxinsertkeyframe": {
+      "tasks": [
+        "F10"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxinsertlayer": {
+      "tasks": [
+        "F07"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxinsertlayereffect": {
+      "tasks": [
+        "F06",
+        "F16"
+      ],
+      "confidence": "medium",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxinsertlayerfolder": {
+      "tasks": [
+        "F07"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxinsertlayerguide": {
+      "tasks": [
+        "F06"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxinsertlayerjoystick": {
+      "tasks": [
+        "G40",
+        "F19"
+      ],
+      "confidence": "medium",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxinsertlayernull": {
+      "tasks": [
+        "F06"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxinsertlayerslider": {
+      "tasks": [
+        "G40",
+        "F19"
+      ],
+      "confidence": "medium",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxpaste": {
+      "tasks": [
+        "F12"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxregeneratetween": {
+      "tasks": [
+        "D22"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:ctxremoveframes": {
+      "tasks": [
+        "F11",
+        "F13"
+      ],
+      "confidence": "medium",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:fit": {
+      "tasks": [
+        "G25"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:propager-ce-remplissage-toutes-les-frames": {
+      "tasks": [
+        "I19"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:reset-view-100": {
+      "tasks": [
+        "G25"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "menu:timeline.js:top:supprimer-le-tween": {
+      "tasks": [
+        "D22"
+      ],
+      "confidence": "high",
+      "note": "frame-grid/timeline menu"
+    },
+    "sdk:nemo-plugin.closeAll": {
+      "tasks": [
+        "I34"
+      ],
+      "confidence": "high",
+      "note": "plugin host lifecycle"
+    },
+    "sdk:nemo-plugin.openCount": {
+      "tasks": [
+        "I34"
+      ],
+      "confidence": "high",
+      "note": "plugin host lifecycle"
+    },
+    "sdk:nemo-plugin.setTitle": {
+      "tasks": [
+        "I34"
+      ],
+      "confidence": "high",
+      "note": "plugin host lifecycle"
+    },
+    "sdk:nemo-script.Effect.enabled": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "high",
+      "note": "script effect op"
+    },
+    "sdk:nemo-script.Effect.get": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "high",
+      "note": "script effect op"
+    },
+    "sdk:nemo-script.Effect.key": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "high",
+      "note": "script effect op"
+    },
+    "sdk:nemo-script.Effect.keys": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "high",
+      "note": "script effect op"
+    },
+    "sdk:nemo-script.Effect.params": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "high",
+      "note": "script effect op"
+    },
+    "sdk:nemo-script.Effect.remove": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "high",
+      "note": "script effect op"
+    },
+    "sdk:nemo-script.Effect.set": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "high",
+      "note": "script effect op"
+    },
+    "sdk:nemo-script.Effect.type": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "high",
+      "note": "script effect op"
+    },
+    "sdk:nemo-script.Layer.addEffect": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "high",
+      "note": "script effect op"
+    },
+    "sdk:nemo-script.Layer.addMarker": {
+      "tasks": [
+        "I31",
+        "D26"
+      ],
+      "confidence": "medium",
+      "note": "script markers/beats"
+    },
+    "sdk:nemo-script.Layer.blendMode": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer property mutation"
+    },
+    "sdk:nemo-script.Layer.clearKeys": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "medium",
+      "note": "script track/key/expression op"
+    },
+    "sdk:nemo-script.Layer.color": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer property mutation"
+    },
+    "sdk:nemo-script.Layer.disableTimeRemap": {
+      "tasks": [
+        "I31",
+        "D27"
+      ],
+      "confidence": "medium",
+      "note": "script time link/remap"
+    },
+    "sdk:nemo-script.Layer.duplicate": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer mutation"
+    },
+    "sdk:nemo-script.Layer.effects": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "high",
+      "note": "script effect op"
+    },
+    "sdk:nemo-script.Layer.enableTimeRemap": {
+      "tasks": [
+        "I31",
+        "D27"
+      ],
+      "confidence": "medium",
+      "note": "script time link/remap"
+    },
+    "sdk:nemo-script.Layer.expression": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "medium",
+      "note": "script track/key/expression op"
+    },
+    "sdk:nemo-script.Layer.get": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "medium",
+      "note": "script track/key/expression op"
+    },
+    "sdk:nemo-script.Layer.hold": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "medium",
+      "note": "script track/key/expression op"
+    },
+    "sdk:nemo-script.Layer.inFrame": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer property mutation"
+    },
+    "sdk:nemo-script.Layer.key": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "medium",
+      "note": "script track/key/expression op"
+    },
+    "sdk:nemo-script.Layer.keyLock": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer property mutation"
+    },
+    "sdk:nemo-script.Layer.keys": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "medium",
+      "note": "script track/key/expression op"
+    },
+    "sdk:nemo-script.Layer.linkTime": {
+      "tasks": [
+        "I31",
+        "D27"
+      ],
+      "confidence": "medium",
+      "note": "script time link/remap"
+    },
+    "sdk:nemo-script.Layer.locked": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer property mutation"
+    },
+    "sdk:nemo-script.Layer.markers": {
+      "tasks": [
+        "I31",
+        "D26"
+      ],
+      "confidence": "medium",
+      "note": "script markers/beats"
+    },
+    "sdk:nemo-script.Layer.matte": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer property mutation"
+    },
+    "sdk:nemo-script.Layer.mergeWith": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer mutation"
+    },
+    "sdk:nemo-script.Layer.motionBlur": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer property mutation"
+    },
+    "sdk:nemo-script.Layer.name": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer property mutation"
+    },
+    "sdk:nemo-script.Layer.outFrame": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer property mutation"
+    },
+    "sdk:nemo-script.Layer.parent": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer property mutation"
+    },
+    "sdk:nemo-script.Layer.remove": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer mutation"
+    },
+    "sdk:nemo-script.Layer.select": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer mutation"
+    },
+    "sdk:nemo-script.Layer.set": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "medium",
+      "note": "script track/key/expression op"
+    },
+    "sdk:nemo-script.Layer.setExpression": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "medium",
+      "note": "script track/key/expression op"
+    },
+    "sdk:nemo-script.Layer.shy": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer property mutation"
+    },
+    "sdk:nemo-script.Layer.solo": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer property mutation"
+    },
+    "sdk:nemo-script.Layer.splitAt": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer mutation"
+    },
+    "sdk:nemo-script.Layer.strokeProfile": {
+      "tasks": [
+        "I30"
+      ],
+      "confidence": "medium",
+      "note": "script stroke read"
+    },
+    "sdk:nemo-script.Layer.strokes": {
+      "tasks": [
+        "I30"
+      ],
+      "confidence": "medium",
+      "note": "script stroke read"
+    },
+    "sdk:nemo-script.Layer.timeLink": {
+      "tasks": [
+        "I31",
+        "D27"
+      ],
+      "confidence": "medium",
+      "note": "script time link/remap"
+    },
+    "sdk:nemo-script.Layer.unlinkTime": {
+      "tasks": [
+        "I31",
+        "D27"
+      ],
+      "confidence": "medium",
+      "note": "script time link/remap"
+    },
+    "sdk:nemo-script.Layer.visible": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer property mutation"
+    },
+    "sdk:nemo-script.activeLayer": {
+      "tasks": [
+        "I30"
+      ],
+      "confidence": "high",
+      "note": "script read/identity"
+    },
+    "sdk:nemo-script.addLayer": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "high",
+      "note": "script layer mutation"
+    },
+    "sdk:nemo-script.addPivot": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "medium",
+      "note": "script composition mutation"
+    },
+    "sdk:nemo-script.camera.keys": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "medium",
+      "note": "script track/key/expression op"
+    },
+    "sdk:nemo-script.comp.beat": {
+      "tasks": [
+        "I31",
+        "D26"
+      ],
+      "confidence": "medium",
+      "note": "script markers/beats"
+    },
+    "sdk:nemo-script.comp.beats": {
+      "tasks": [
+        "I31",
+        "D26"
+      ],
+      "confidence": "medium",
+      "note": "script markers/beats"
+    },
+    "sdk:nemo-script.comp.setWorkArea": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "medium",
+      "note": "script composition mutation"
+    },
+    "sdk:nemo-script.comp.trimToWorkArea": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "medium",
+      "note": "script composition mutation"
+    },
+    "sdk:nemo-script.goToFrame": {
+      "tasks": [
+        "I31"
+      ],
+      "confidence": "medium",
+      "note": "script composition mutation"
+    },
+    "sdk:nemo-script.help": {
+      "tasks": [
+        "I33"
+      ],
+      "confidence": "medium",
+      "note": "script run/log helper"
+    },
+    "sdk:nemo-script.isKeyframe": {
+      "tasks": [
+        "I32"
+      ],
+      "confidence": "medium",
+      "note": "script track/key/expression op"
+    },
+    "sdk:nemo-script.layer": {
+      "tasks": [
+        "I30"
+      ],
+      "confidence": "high",
+      "note": "script read/identity"
+    },
+    "sdk:nemo-script.layers": {
+      "tasks": [
+        "I30"
+      ],
+      "confidence": "high",
+      "note": "script read/identity"
+    },
+    "sdk:nemo-script.log": {
+      "tasks": [
+        "I33"
+      ],
+      "confidence": "medium",
+      "note": "script run/log helper"
+    },
+    "sdk:nemo-script.markers.add": {
+      "tasks": [
+        "I31",
+        "D26"
+      ],
+      "confidence": "medium",
+      "note": "script markers/beats"
+    },
+    "sdk:nemo-script.markers.list": {
+      "tasks": [
+        "I31",
+        "D26"
+      ],
+      "confidence": "medium",
+      "note": "script markers/beats"
+    },
+    "sdk:nemo-script.markers.next": {
+      "tasks": [
+        "I31",
+        "D26"
+      ],
+      "confidence": "medium",
+      "note": "script markers/beats"
+    },
+    "sdk:nemo-script.markers.prev": {
+      "tasks": [
+        "I31",
+        "D26"
+      ],
+      "confidence": "medium",
+      "note": "script markers/beats"
+    },
+    "sdk:nemo-script.markers.removeAt": {
+      "tasks": [
+        "I31",
+        "D26"
+      ],
+      "confidence": "medium",
+      "note": "script markers/beats"
+    },
+    "sdk:nemo-script.selection.clear": {
+      "tasks": [
+        "I31",
+        "I30"
+      ],
+      "confidence": "medium",
+      "note": "script selection"
+    },
+    "sdk:nemo-script.selection.layers": {
+      "tasks": [
+        "I31",
+        "I30"
+      ],
+      "confidence": "medium",
+      "note": "script selection"
+    },
+    "sdk:nemo-script.selection.setLayers": {
+      "tasks": [
+        "I31",
+        "I30"
+      ],
+      "confidence": "medium",
+      "note": "script selection"
+    },
+    "sdk:nemo-script.selection.strokes": {
+      "tasks": [
+        "I31",
+        "I30"
+      ],
+      "confidence": "medium",
+      "note": "script selection"
+    },
+    "sdk:nemo-script.toast": {
+      "tasks": [
+        "I33"
+      ],
+      "confidence": "medium",
+      "note": "script run/log helper"
+    },
+    "sdk:nemo-script.undoGroup": {
+      "tasks": [
+        "I33"
+      ],
+      "confidence": "high",
+      "note": "script undo grouping"
+    },
+    "shortcut:cmdDuplicateKey": {
+      "tasks": [
+        "F12",
+        "I25"
+      ],
+      "confidence": "medium",
+      "note": "command shortcut"
+    },
+    "shortcut:cmdExtendExposure": {
+      "tasks": [
+        "F11",
+        "F13"
+      ],
+      "confidence": "medium",
+      "note": "command shortcut"
+    },
+    "shortcut:cmdFlipPreview": {
+      "tasks": [
+        "D24"
+      ],
+      "confidence": "low",
+      "note": "command shortcut"
+    },
+    "shortcut:cmdGoEnd": {
+      "tasks": [
+        "D24",
+        "U13"
+      ],
+      "confidence": "high",
+      "note": "command shortcut"
+    },
+    "shortcut:cmdGoStart": {
+      "tasks": [
+        "D24",
+        "U13"
+      ],
+      "confidence": "high",
+      "note": "command shortcut"
+    },
+    "shortcut:cmdInsertBlankKey": {
+      "tasks": [
+        "F09"
+      ],
+      "confidence": "high",
+      "note": "command shortcut"
+    },
+    "shortcut:cmdInsertFrame": {
+      "tasks": [
+        "F11"
+      ],
+      "confidence": "high",
+      "note": "command shortcut"
+    },
+    "shortcut:cmdInsertKey": {
+      "tasks": [
+        "F10"
+      ],
+      "confidence": "high",
+      "note": "command shortcut"
+    },
+    "shortcut:cmdNextFrame": {
+      "tasks": [
+        "D24",
+        "U13"
+      ],
+      "confidence": "high",
+      "note": "command shortcut"
+    },
+    "shortcut:cmdNextKey": {
+      "tasks": [
+        "D24",
+        "U07"
+      ],
+      "confidence": "medium",
+      "note": "command shortcut"
+    },
+    "shortcut:cmdPrevFrame": {
+      "tasks": [
+        "D24",
+        "U13"
+      ],
+      "confidence": "high",
+      "note": "command shortcut"
+    },
+    "shortcut:cmdPrevKey": {
+      "tasks": [
+        "D24",
+        "U07"
+      ],
+      "confidence": "medium",
+      "note": "command shortcut"
+    },
+    "shortcut:cmdRenameLayer": {
+      "tasks": [
+        "F07"
+      ],
+      "confidence": "high",
+      "note": "command shortcut"
+    },
+    "shortcut:cmdResetView": {
+      "tasks": [
+        "G25"
+      ],
+      "confidence": "high",
+      "note": "command shortcut"
+    },
+    "shortcut:cmdTween": {
+      "tasks": [
+        "D22"
+      ],
+      "confidence": "high",
+      "note": "command shortcut"
+    },
+    "shortcut:comment": {
+      "tasks": [
+        "U29",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Comment tool"
+    },
+    "shortcut:draw": {
+      "tasks": [
+        "G15",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Brush gesture commit"
+    },
+    "shortcut:ellipse": {
+      "tasks": [
+        "G15",
+        "G22",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Shape gesture"
+    },
+    "shortcut:eraser": {
+      "tasks": [
+        "G19",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Vector eraser geometry history"
+    },
+    "shortcut:eyedropper": {
+      "tasks": [
+        "G12",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Color pick to native color command"
+    },
+    "shortcut:fill": {
+      "tasks": [
+        "G18",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Fill tracing"
+    },
+    "shortcut:fillbrush": {
+      "tasks": [
+        "G18",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Fill brush auto-paint"
+    },
+    "shortcut:fsselect": {
+      "tasks": [
+        "G20",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Fill/stroke selection"
+    },
+    "shortcut:hand": {
+      "tasks": [
+        "G25",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Pan tool, presentation"
+    },
+    "shortcut:line": {
+      "tasks": [
+        "G15",
+        "G22",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Shape gesture"
+    },
+    "shortcut:pen": {
+      "tasks": [
+        "G15",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Pen gesture commit"
+    },
+    "shortcut:readonly:shortcutRoClipboard": {
+      "tasks": [
+        "F12",
+        "F15"
+      ],
+      "confidence": "medium",
+      "note": "read-only shortcut"
+    },
+    "shortcut:readonly:shortcutRoDelete": {
+      "tasks": [
+        "F15",
+        "F07"
+      ],
+      "confidence": "medium",
+      "note": "read-only shortcut"
+    },
+    "shortcut:readonly:shortcutRoDuplicate": {
+      "tasks": [
+        "F12",
+        "F08"
+      ],
+      "confidence": "low",
+      "note": "read-only shortcut"
+    },
+    "shortcut:readonly:shortcutRoEasyEase": {
+      "tasks": [
+        "D12",
+        "U19"
+      ],
+      "confidence": "medium",
+      "note": "read-only shortcut"
+    },
+    "shortcut:readonly:shortcutRoEscape": {
+      "tasks": [
+        "F14"
+      ],
+      "confidence": "low",
+      "note": "read-only shortcut"
+    },
+    "shortcut:readonly:shortcutRoGroup": {
+      "tasks": [
+        "G24"
+      ],
+      "confidence": "low",
+      "note": "read-only shortcut"
+    },
+    "shortcut:readonly:shortcutRoNudgeKeys": {
+      "tasks": [
+        "D13"
+      ],
+      "confidence": "medium",
+      "note": "read-only shortcut"
+    },
+    "shortcut:readonly:shortcutRoPlay": {
+      "tasks": [
+        "D24",
+        "U13"
+      ],
+      "confidence": "high",
+      "note": "read-only shortcut"
+    },
+    "shortcut:readonly:shortcutRoSelectAll": {
+      "tasks": [
+        "F14",
+        "U07"
+      ],
+      "confidence": "low",
+      "note": "read-only shortcut"
+    },
+    "shortcut:readonly:shortcutRoSplitLayer": {
+      "tasks": [
+        "F08"
+      ],
+      "confidence": "high",
+      "note": "read-only shortcut"
+    },
+    "shortcut:readonly:shortcutRoStepFrame": {
+      "tasks": [
+        "D24",
+        "U13"
+      ],
+      "confidence": "high",
+      "note": "read-only shortcut"
+    },
+    "shortcut:readonly:shortcutRoStepLayer": {
+      "tasks": [
+        "F14",
+        "U07"
+      ],
+      "confidence": "low",
+      "note": "read-only shortcut"
+    },
+    "shortcut:readonly:shortcutRoUndo": {
+      "tasks": [
+        "D08"
+      ],
+      "confidence": "high",
+      "note": "read-only shortcut"
+    },
+    "shortcut:readonly:shortcutRoWorkArea": {
+      "tasks": [
+        "D27",
+        "U13"
+      ],
+      "confidence": "medium",
+      "note": "read-only shortcut"
+    },
+    "shortcut:rect": {
+      "tasks": [
+        "G15",
+        "G22",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Shape gesture"
+    },
+    "shortcut:rig": {
+      "tasks": [
+        "G40",
+        "I13",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Rig tool editor"
+    },
+    "shortcut:rotate": {
+      "tasks": [
+        "G25",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Canvas rotation, view only"
+    },
+    "shortcut:select": {
+      "tasks": [
+        "G20",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Selection/transform"
+    },
+    "shortcut:speechbubble": {
+      "tasks": [
+        "G22",
+        "G15",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Parametric shape"
+    },
+    "shortcut:star": {
+      "tasks": [
+        "G22",
+        "G15",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Parametric shape handles"
+    },
+    "shortcut:subselect": {
+      "tasks": [
+        "G21",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Vertex/tangent editing"
+    },
+    "shortcut:text": {
+      "tasks": [
+        "U21",
+        "U22",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Text tool popover"
+    },
+    "shortcut:toggleOnion": {
+      "tasks": [
+        "U20",
+        "D23",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Onion toggle"
+    },
+    "shortcut:zoom": {
+      "tasks": [
+        "G25",
+        "U04"
+      ],
+      "confidence": "medium",
+      "note": "Tool shortcut: Zoom tool, view only"
+    }
+  }
+}

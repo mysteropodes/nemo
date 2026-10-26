@@ -11,7 +11,8 @@ distinguishes existing commands from planned coverage and diagnostics work.
 |---|---|---|
 | `npm run doctor` | Read-only: source identity (HEAD, branch, dirty digest), build identity (versions, wasm/sidecar hashes), platform, tool prerequisites, capabilities. Never installs or writes outside `reports/`. | always 0 |
 | `npm run check` | Static integrity: version strings in sync (package.json, tauri.conf.json, index.html fallback), JSON validity, `src/js` syntax (ES modules checked as such), `index.html` script references resolve, private-labs guard, committed artifacts present. | 0 pass / 1 fail / 2 blocked |
-| `npm run inventory` | Regenerates `engineering/inventory/{surfaces.json,surfaces.csv,SURFACES.md}` through static `src/` discovery and handler/consumer binding analysis. Unbound rows remain `unmapped`; this does not prove runtime behavior or exhaust the fixed source/consumer census. The `inventory` job runs `npm run inventory -- --check` and fails on stale committed output; it is in both verify profiles. | 0/1 |
+| `npm run inventory` | Regenerates `engineering/inventory/{surfaces.json,surfaces.csv,SURFACES.md}` through static `src/` discovery and handler/consumer binding analysis. Unbound rows remain `unmapped`; this does not prove runtime behavior or exhaust the fixed source/consumer census. The `inventory` job runs `npm run inventory -- --check` and fails when a committed row's content is stale. Line positions (`src/…:123`) and the inputs digest are advisory: an edit that only shifts lines passes `--check` (CS3/#2342). It is in both verify profiles. | 0/1 |
+| `node scripts/nemo/refresh-app-pins.cjs` | Rewrites the derived provenance pins in `engineering/boundaries/profiles/app-js.coverage.json` (source trees, inventory digest, bootstrap/profile/exclusion-support blobs) for the committed HEAD (it refuses a dirty source tree); `--check` names drifted pins. Policy, membership and exclusions stay human-owned. Commit the source first, then the refreshed pins (CS3/#2342). | 0/1 |
 | `npm test` | Node unit tests in `tests/*.test.cjs` and `tests/animation/*.test.cjs`; the named `test:unit` job uses the same scope. | node |
 | `npm run test:rust` | `cargo test` for `geometry-wasm` (CPU, native host). | 0/1/2 |
 | `npm run test:integration` | Runs test files in `tests/integration`, currently the R06 browser-runtime isolation suite. This is not complete document/history/persistence coverage. | 0/1/2 |
@@ -22,6 +23,14 @@ distinguishes existing commands from planned coverage and diagnostics work.
 | `npm run build:wasm` | `wasm-pack build` into the run directory and compare with the committed `src/wasm`; `blocked` without wasm-pack. | 0/1/2 |
 | `npm run build:desktop` | Isolated Tauri build under a task/worktree reservation; preserves its exact package and logs in the report directory, bundles ffmpeg dylibs, then performs owned cleanup. Local, unsigned. | 0/1/2 |
 | `npm run verify` | Runs a profile (`--profile quick` default: doctor, check, inventory, test:unit, test:rust; `--profile full` adds the rest) or `--jobs a,b,c`, and emits **one receipt**. | 0 pass / 1 any fail / 2 required job blocked |
+
+`node scripts/nemo/boundaries.cjs --suggest [paths...] [--root <dir>] [--json]` is read-only: for each
+path, or for every currently unowned Rust/JS source when none is given, it prints the profile module entry
+(and the `app-js.coverage.json` retained-source record) to add. Rust files follow their `mod` / `#[path]`
+declaration to the declaring file's module; JS files follow the module owning sibling files; ambiguous
+cases list each candidate with its reason. Delivery provenance goes in the PR description, not in
+`rust.coverage.json`, which is frozen: `node scripts/nemo/ci.cjs boundaries` fails on any new top-level or
+`provenance` key outside `engineering/boundaries/profiles/rust.coverage.frozen-keys.json`.
 
 Any job can be run alone: `node scripts/nemo/job.cjs test:rust,build:wasm`. Add `--json` to
 print the receipt instead of the summary.
@@ -99,3 +108,12 @@ sha256), `limitations[]`, `details`, and `summary` (`overall`, `exitCode`, `coun
   in the same runner. Desktop build and test prerequisites are required when selected.
 - Historical counts are never treated as current proof: every receipt is bound to the SHA
   and dirty digest it was measured on.
+
+## Parity matrix and family acceptance (CS6, #2346)
+
+- `node scripts/nemo/parity-matrix.cjs [--check]` builds/gates `engineering/inventory/parity/matrix.json` and `PARITY.md`.
+- `node scripts/nemo/family-acceptance.cjs <family> [--write] [--json]` runs the native-test checks declared in
+  `engineering/inventory/parity/families/<family>.json` (one cargo job at a time; hold the compiler slot) and, with
+  `--write` on a clean tree, records `results/<family>.json`. A check matching zero tests fails. The matrix annotates every
+  surface whose tasks intersect a family with `evidence: {family, verdict, sourceSha}`. Results are source-level records at
+  their SHA: `--check` validates their shape and task references, not freshness, and evidence never changes row status.

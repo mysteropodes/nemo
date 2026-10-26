@@ -30,6 +30,10 @@ use placement::OP_PLACEMENT_EDIT;
 mod audio_track;
 use audio_track::OP_AUDIO_TRACK_EDIT;
 
+// CS2 (#2345): command families register by adding a file under object_command_families/.
+#[path = "object_command_families/mod.rs"]
+pub(crate) mod families;
+
 const OP_OBJECT_FILL: &str = "command.document.object.fill.set";
 const OP_OBJECT_UNDO: &str = "command.document.object.undo";
 const OP_OBJECT_REDO: &str = "command.document.object.redo";
@@ -40,17 +44,16 @@ const OP_LAYER_POLICY: &str = "command.document.object.layer.policy.edit";
 const OP_PROPERTY_EDIT: &str = "command.document.object.property.edit";
 const OP_PROPERTY_TRACK_EDIT: &str = "command.document.object.property.track.edit";
 const OP_OBJECT_ITEM: &str = "command.document.object.item.edit";
-const OP_WIDGET_CREATE: &str = "command.document.object.widget.create";
-const OP_WIDGET_WRITE: &str = "command.document.object.widget.write";
-const OP_WIDGET_SETTINGS: &str = "command.document.object.widget.settings";
 const OP_OBJECT_VECTOR: &str = "command.document.object.vector.edit";
 const OP_IMAGE_MESH_EDIT: &str = "command.document.object.image.mesh.edit";
-const MAX_MESSAGE_BYTES: usize = 4096;
+const MAX_MESSAGE_BYTES: usize = families::DEFAULT_REQUEST_BYTES;
 
 /// Request-envelope bound per operation: only the vector and image-mesh edits may carry a bounded body
 /// (a hand-drawn mask outline is hundreds of points).
 fn request_limit(operation: &str) -> usize {
-    if frame_clipboard_transport::owns(operation) {
+    if let Some(family) = families::owner(operation) {
+        family.request_limit
+    } else if frame_clipboard_transport::owns(operation) {
         frame_clipboard_transport::request_limit(operation)
     } else if operation == OP_OBJECT_VECTOR || operation == OP_IMAGE_MESH_EDIT {
         MAX_VECTOR_REQUEST_BYTES
@@ -96,15 +99,10 @@ impl NativeObjectHistory {
         })
     }
 
-    pub(crate) fn try_dispatch_object_command_with_bake(
-        &mut self,
-        request: &OpacityRequest,
-        bake: impl FnOnce(
-            &Self,
-            &[u8],
-        ) -> Result<crate::commands::PreparedPropertyEdit, DispatchErrorCode>,
-    ) -> Result<Option<ResponseEnvelope>, DispatchErrorCode> {
-        if !Self::layer_lifecycle_operation(&request.operation)
+    /// True when the hand-routed chain below does NOT admit the request. Registry families
+    /// (`families::owner`) are consulted first and are not listed here.
+    pub(crate) fn legacy_chain_declines(request: &OpacityRequest) -> bool {
+        !Self::layer_lifecycle_operation(&request.operation)
             && !edits::is_project_settings_operation(&request.operation)
             && !Self::group_operation(&request.operation)
             && !Self::component_setup_operation(&request.operation)
@@ -128,9 +126,6 @@ impl NativeObjectHistory {
                     | OP_AUDIO_TRACK_EDIT
                     | OP_OBJECT_VECTOR
                     | OP_IMAGE_MESH_EDIT
-                    | OP_WIDGET_CREATE
-                    | OP_WIDGET_WRITE
-                    | OP_WIDGET_SETTINGS
                     | OP_OBJECT_ITEM
             )
             && !is_frame_structure_operation(request.operation.as_str())
@@ -142,7 +137,17 @@ impl NativeObjectHistory {
             && !is_frame_repeat_operation(request.operation.as_str())
             && !is_frame_bulk_move_operation(request.operation.as_str())
             && !is_layer_shift_operation(request.operation.as_str())
-        {
+    }
+
+    pub(crate) fn try_dispatch_object_command_with_bake(
+        &mut self,
+        request: &OpacityRequest,
+        bake: impl FnOnce(
+            &Self,
+            &[u8],
+        ) -> Result<crate::commands::PreparedPropertyEdit, DispatchErrorCode>,
+    ) -> Result<Option<ResponseEnvelope>, DispatchErrorCode> {
+        if families::owner(&request.operation).is_none() && Self::legacy_chain_declines(request) {
             return Ok(None);
         }
         if [
@@ -166,11 +171,8 @@ impl NativeObjectHistory {
                 "Vector parameter request refused."
             } else if request.operation == OP_IMAGE_MESH_EDIT {
                 "Image mesh edit request refused."
-            } else if matches!(
-                request.operation.as_str(),
-                OP_WIDGET_CREATE | OP_WIDGET_WRITE | OP_WIDGET_SETTINGS
-            ) {
-                "Widget request refused."
+            } else if let Some(family) = families::owner(&request.operation) {
+                family.refusal
             } else if request.operation == OP_AUDIO_TRACK_EDIT {
                 "AudioTrack edit request refused."
             } else if request.operation == OP_PLACEMENT_EDIT {
@@ -310,7 +312,9 @@ impl NativeObjectHistory {
                 ),
             ))
         } else {
-            if request.operation == OP_OBJECT_ITEM {
+            if let Some(family) = families::owner(&request.operation) {
+                (family.dispatch)(self, request)?
+            } else if request.operation == OP_OBJECT_ITEM {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;
                 self.dispatch_item_edit_command(request, &payload)
@@ -368,13 +372,6 @@ impl NativeObjectHistory {
                 self.dispatch_layer_visibility_command(&payload)
             } else if is_frame_structure_operation(request.operation.as_str()) {
                 self.dispatch_frame_structure(request.operation.as_str(), &request.payload)
-            } else if matches!(
-                request.operation.as_str(),
-                OP_WIDGET_CREATE | OP_WIDGET_WRITE | OP_WIDGET_SETTINGS
-            ) {
-                let payload = serde_json::to_vec(&request.payload)
-                    .map_err(|_| DispatchErrorCode::InvalidRequest)?;
-                self.dispatch_widget_command(request.operation.as_str(), &payload)
             } else if is_frame_clipboard_operation(request.operation.as_str()) {
                 self.dispatch_frame_clipboard(request)
             } else if request.operation == OP_AUDIO_TRACK_EDIT {
@@ -439,39 +436,6 @@ impl NativeObjectHistory {
         self.object_reply(request, &disposition).map(Some)
     }
 
-    /// Widget creation, write-from-local and settings: the common envelope, replay and revision checks
-    /// already ran, so only the typed preparation and the sealed commit remain.
-    fn dispatch_widget_command(
-        &mut self,
-        operation: &str,
-        payload: &[u8],
-    ) -> Result<CompactResult, (DispatchErrorCode, &'static str)> {
-        const REFUSED: &str = "Widget payload or target is invalid or unavailable.";
-        if operation == OP_WIDGET_CREATE {
-            let candidate = self
-                .prepare_widget_create_json(payload)
-                .map_err(|code| (code, REFUSED))?;
-            let layer_uid = candidate.layer_uid().to_owned();
-            return self
-                .commit_layer_create(candidate)
-                .map(|_| CompactResult::LayerCreated { layer_uid })
-                .map_err(|code| (code, "Widget layer creation could not commit."));
-        }
-        let candidate = if operation == OP_WIDGET_WRITE {
-            self.prepare_widget_write_json(payload)
-        } else {
-            self.prepare_widget_settings_json(payload)
-        }
-        .map_err(|code| (code, REFUSED))?;
-        let before = self.content_revision();
-        self.commit_widget_edit(candidate)
-            .map(|revision| CompactResult::Command {
-                applied: revision != before,
-                history_entries_added: u64::from(revision != before),
-            })
-            .map_err(|code| (code, "Widget edit could not commit."))
-    }
-
     fn object_failure(&self, code: DispatchErrorCode, message: &str) -> RetainedDisposition {
         RetainedDisposition::Exact {
             content_revision: self.content_revision(),
@@ -499,3 +463,8 @@ impl NativeObjectHistory {
         Ok(response)
     }
 }
+
+// CS2 (#2345): every declared object operation has exactly one owner.
+#[cfg(test)]
+#[path = "../tests/object_command_ownership.rs"]
+mod ownership_tests;
