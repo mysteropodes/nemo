@@ -240,10 +240,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 23, 25, 27, 28, 29, 30, 31, 32, 34, 35, 36, 37, 38, 132, 133, 134, 135, 136, 182, 247, 248, 290, 291, 292, 293, 296, 297, 298, 299]);
-  // Custom brush catalog adds its UI before tools.js, its contract before SDK and its native model afterward. All 43 identities and adjacency stay fixed; Comments adds its four ordinary source members.
-  assert.equal(actual.get('src/js/adapters/native-frame-edit-desktop.js').scriptOrdinal, 249);
-  assert.equal(actual.get('src/js/adapters/native-application.js').scriptOrdinal + 1, 249);
+    [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 23, 25, 27, 28, 29, 30, 31, 32, 34, 35, 36, 37, 38, 132, 133, 134, 135, 136, 182, 248, 249, 291, 292, 293, 294, 297, 298, 299, 300]);
+  // Custom brush catalog adds its UI before tools.js, its contract before SDK and its native model afterward. All 43 identities and adjacency stay fixed; Comments adds its four ordinary source members. Symmetry adds its contract before SDK and its model/UI after the last tag.
+  assert.equal(actual.get('src/js/adapters/native-frame-edit-desktop.js').scriptOrdinal, 250);
+  assert.equal(actual.get('src/js/adapters/native-application.js').scriptOrdinal + 1, 250);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   assert.equal(actual.get('src/js/adapters/native-object-project-entry-contract.js').scriptOrdinal + 1, actual.get('src/js/adapters/native-object-project.js').scriptOrdinal);
