@@ -47,6 +47,18 @@ test('an absent policy is skipped, a malformed allow-list is rejected', () => {
   assert.throws(() => checkCoverageFreeze(ROOT, { policy: policy(), frozen: { ...frozen(), topLevel: 'x' } }), /topLevel/);
 });
 
+test('the frozen list may shrink but never grow against the base', () => {
+  const base = frozen();
+  const grown = { ...base, provenance: [...base.provenance, 'nativeFakeDelivery'].sort() };
+  const candidate = { ...policy(), provenance: { ...policy().provenance, nativeFakeDelivery: 'prose' } };
+  const report = checkCoverageFreeze(ROOT, { policy: candidate, frozen: grown, baseFrozen: base });
+  assert.deepEqual(report.violations.map((v) => v.key), ['provenance.nativeFakeDelivery']);
+  assert.equal(report.violations[0].rule, 'rust-coverage-frozen-list');
+  const shrunk = { ...base, provenance: base.provenance.slice(1) };
+  const trimmed = policy(); delete trimmed.provenance[base.provenance[0]];
+  assert.equal(checkCoverageFreeze(ROOT, { policy: trimmed, frozen: shrunk, baseFrozen: base }).ok, true);
+});
+
 test('frozen lists are sorted so additions and removals diff cleanly', () => {
   const list = frozen();
   assert.deepEqual(list.topLevel, [...list.topLevel].sort());

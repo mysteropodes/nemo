@@ -41,6 +41,17 @@ function checkCoverageFreeze(root, opts = {}) {
   };
   scan('', policy);
   if (policy.provenance && typeof policy.provenance === 'object') scan('provenance', policy.provenance);
+  // The allow-list may only shrink against the protected base; growing it would
+  // reopen the per-delivery log through the list instead of the policy.
+  if (opts.baseFrozen) {
+    for (const scope of ['topLevel', 'provenance']) {
+      const before = stringList(opts.baseFrozen[scope], scope);
+      for (const key of [...allowed[scope === 'topLevel' ? '' : scope]].sort()) {
+        if (before.has(key)) continue;
+        violations.push({ rule: 'rust-coverage-frozen-list', file: FROZEN, key: `${scope}.${key}`, message: `${FROZEN} may only shrink against the base (added: ${scope}.${key})` });
+      }
+    }
+  }
   return { ok: violations.length === 0, violations };
 }
 
