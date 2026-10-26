@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "08564e9244bc1d25065da1c3dbee94b9917ad9da",
-  "describe": "v0.7.0-alpha.4-3149-g08564e92"
+  "head": "9742cac23228ce949bfdf0c0a3170b787becee16",
+  "describe": "v0.7.0-alpha.4-3152-g9742cac2"
  },
- "inputsDigest": "d51b29619d155f1d917da671a73eef5b1816e2abff93b71f6f59831bfa4ee772",
+ "inputsDigest": "4a33ca9cd5d257a32f5de2cd11fbaa00de6b30db7d0c2e38daa13d31c7dad35b",
  "states": [
   "inventoried",
   "characterized",
@@ -26,21 +26,21 @@
   "native"
  ],
  "counts": {
-  "total": 914,
+  "total": 911,
   "byKind": {
    "dom": 484,
    "labs": 36,
    "menu": 265,
-   "sdk": 79,
+   "sdk": 76,
    "shortcut": 50
   },
   "byStatus": {
-   "inventoried": 885,
+   "inventoried": 882,
    "unmapped": 28,
    "unavailable-with-reason": 1
   },
   "byArea": {
-   "project-lifecycle-integrations": 130,
+   "project-lifecycle-integrations": 127,
    "drawing-selection": 266,
    "media-import-export": 52,
    "timeline-layers-frames": 175,
@@ -54,7 +54,7 @@
   "byConsumer": {
    "native": 255,
    "export": 5,
-   "animation": 445,
+   "animation": 444,
    "history": 355,
    "selection": 372,
    "render": 474,
@@ -256,7 +256,7 @@
   },
   "SMScript": {
    "file": "src/js/nemo-script.js",
-   "line": 735,
+   "line": 694,
    "members": 0
   },
   "SMPathFx": {
@@ -32600,36 +32600,6 @@
    ]
   },
   {
-   "id": "sdk:nemo-script.goToFrame#2",
-   "kind": "sdk",
-   "surface": "SMScript.api().goToFrame",
-   "capability": "goToFrame",
-   "area": "project-lifecycle-integrations",
-   "handler": [
-    "src/js/nemo-script.js:645 goToFrame"
-   ],
-   "events": [],
-   "exposure": [
-    "script API"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "SMScript",
-   "consumers": {
-    "animation": 1
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:645",
-   "meta": {
-    "functionsVisited": 1
-   },
-   "fixtures": [
-    "media",
-    "migration"
-   ]
-  },
-  {
    "id": "sdk:nemo-script.help",
    "kind": "sdk",
    "surface": "SMScript.api().help",
@@ -34157,34 +34127,6 @@
    ]
   },
   {
-   "id": "sdk:nemo-script.selection",
-   "kind": "sdk",
-   "surface": "SMScript.api().selection",
-   "capability": "selection",
-   "area": "project-lifecycle-integrations",
-   "handler": [
-    "src/js/nemo-script.js:646 selection"
-   ],
-   "events": [],
-   "exposure": [
-    "script API"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "SMScript",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:646",
-   "meta": {
-    "functionsVisited": 1
-   },
-   "fixtures": [
-    "media",
-    "migration"
-   ]
-  },
-  {
    "id": "sdk:nemo-script.selection.clear",
    "kind": "sdk",
    "surface": "SMScript.api().selection.clear",
@@ -34369,34 +34311,6 @@
    "source": "src/js/nemo-script.js:459",
    "meta": {
     "functionsVisited": 10
-   },
-   "fixtures": [
-    "media",
-    "migration"
-   ]
-  },
-  {
-   "id": "sdk:nemo-script.toast#2",
-   "kind": "sdk",
-   "surface": "SMScript.api().toast",
-   "capability": "toast",
-   "area": "project-lifecycle-integrations",
-   "handler": [
-    "src/js/nemo-script.js:647 toast"
-   ],
-   "events": [],
-   "exposure": [
-    "script API"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "SMScript",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:647",
-   "meta": {
-    "functionsVisited": 8
    },
    "fixtures": [
     "media",
