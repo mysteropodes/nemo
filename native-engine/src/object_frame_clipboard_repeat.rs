@@ -258,7 +258,7 @@ impl PreparedFrameRepeat {
 
 /// Prepare growth-only settings against the same retained input as the drawing.
 /// Bare documents and edits without timeline growth keep their existing publication.
-fn repeat_project_metadata(
+pub(super) fn repeat_project_metadata(
     origin: &ObjectSnapshot,
     document: Option<&ObjectDocument>,
 ) -> Result<Option<ProjectMetadata>, DispatchErrorCode> {

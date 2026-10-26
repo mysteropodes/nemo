@@ -1,5 +1,5 @@
 'use strict';
-// L03-T public declaration of the six lane-3 object operations: the contract, the Rust validator data, the common SDK, the
+// L03-T public declaration of the six lane-3 object operations and the three U36 Labs generators: the contract, the Rust validator data, the common SDK, the
 // capability descriptors and the closed transport schema agree on one table and on one corpus. Run on the COMPOSED candidate
 // (SDK seam patch + schema patch applied).
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
@@ -13,8 +13,10 @@ const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const corpus = JSON.parse(read('tests/native-object-rig-fixtures/public-corpus.json'));
 const schema = JSON.parse(read('engineering/application/native-transport-v2.schema.json'));
 const P = 'command.document.object.';
-const SUFFIXES = ['image.mesh.edit', 'widget.create', 'widget.write', 'widget.settings', 'rig.edit', 'rig.pose'];
-const COMMANDS = { 'image.mesh.edit': 'object.image.mesh.edit', 'widget.create': 'object.widget.create', 'widget.write': 'object.widget.write', 'widget.settings': 'object.widget.settings', 'rig.edit': 'object.rig.edit', 'rig.pose': 'object.rig.pose' };
+const SUFFIXES = ['image.mesh.edit', 'widget.create', 'widget.write', 'widget.settings', 'rig.edit', 'rig.pose', 'labs.speedLines', 'labs.boil', 'labs.followPath'];
+const COMMANDS = { 'image.mesh.edit': 'object.image.mesh.edit', 'widget.create': 'object.widget.create', 'widget.write': 'object.widget.write', 'widget.settings': 'object.widget.settings', 'rig.edit': 'object.rig.edit', 'rig.pose': 'object.rig.pose' , 'labs.speedLines': 'object.labs.speedLines', 'labs.boil': 'object.labs.boil', 'labs.followPath': 'object.labs.followPath' };
+// The original agreement corpus covers the six lane-3 operations; the U36 Labs rows are tests/native-object-labs-public.test.cjs.
+const ORIGINAL = SUFFIXES.slice(0, 6).map((s) => P + s);
 const envelope = (operation, payload, extra) => Object.assign({ apiVersion: 2, requestId: 'edit-1', instanceId: 'instance-A', documentId: 'document-A', expectedRevision: 7, operation, payload }, extra);
 const defOf = (operation) => {
   const branches = schema.$defs.Request.oneOf.filter((b) => b.allOf[1].properties.operation.const === operation);
@@ -23,7 +25,7 @@ const defOf = (operation) => {
   return branches[0].allOf[1].properties.payload.$ref.replace('#/$defs/', '');
 };
 
-test('the contract admits exactly the six declared operations, all revisioned commands, and nothing else', () => {
+test('the contract admits exactly the nine declared operations, all revisioned commands, and nothing else', () => {
   assert.deepEqual(contract.OPERATIONS, SUFFIXES.map((s) => P + s));
   for (const op of contract.OPERATIONS) {
     assert.equal(contract.admitted(op), true); assert.equal(contract.requiresRevision(op), true); assert.equal(seam.admitted(op), true);
@@ -38,11 +40,11 @@ test('the agreement corpus: every valid payload is accepted and every single fla
   assert.ok(corpus.flaws.length >= 700);
   for (const row of corpus.valid) contract.payload(row.operation, row.payload);
   const seen = new Set(corpus.valid.map((row) => row.operation));
-  assert.deepEqual([...seen].sort(), contract.OPERATIONS.slice().sort(), 'every operation has a valid row');
+  assert.deepEqual([...seen].sort(), ORIGINAL.slice().sort(), 'every original operation has a valid row');
   for (const row of corpus.flaws) assert.throws(() => contract.payload(row.operation, row.payload), TypeError, row.operation + ' ' + row.path + ' ' + row.why);
   const byOperation = new Map();
   corpus.flaws.forEach((row) => byOperation.set(row.operation, (byOperation.get(row.operation) || 0) + 1));
-  for (const op of contract.OPERATIONS) assert.ok(byOperation.get(op) >= 20, op + ' has its own flaws');
+  for (const op of ORIGINAL) assert.ok(byOperation.get(op) >= 20, op + ' has its own flaws');
 });
 
 test('the closed schema accepts the same payloads and refuses the same flaws (except the owner-computed perimeter)', () => {
@@ -170,7 +172,7 @@ test('the Rust validator data is the same table as the JS contract', () => {
 test('capability descriptors and the closed transport schema declare exactly the contract operations', () => {
   const dir = path.join(ROOT, 'engineering/application/capabilities-v2');
   const ids = new Set(), declared = [];
-  for (const family of ['image-mesh', 'widget', 'rig']) {
+  for (const family of ['image-mesh', 'widget', 'rig', 'labs']) {
     const d = JSON.parse(fs.readFileSync(path.join(dir, 'native-object-' + family + '.json'), 'utf8'));
     assert.equal(d.schemaVersion, 2); assert.equal(d.apiVersion, 2); assert.equal(d.id, 'native.object.' + family);
     assert.deepEqual(d.availability, { state: 'available', reason: null });
