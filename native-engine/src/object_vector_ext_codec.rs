@@ -110,6 +110,7 @@ fn validate_brush_texture(tags: &BrushTexture) -> Result<(), ObjectCodecError> {
         && tags.brush_texture_preset.missing()
         && tags.pre_texture_opacity.missing()
         && tags.pre_texture_stroke.missing()
+        && tags.stroke_seed.missing()
     {
         return Err(invalid("an empty brushTexture must be omitted"));
     }
@@ -123,6 +124,12 @@ fn validate_brush_texture(tags: &BrushTexture) -> Result<(), ObjectCodecError> {
     }
     if tags.is_brush_texture_copy.value().is_some() && tags.brush_texture_preset.value().is_some() {
         return Err(invalid("a brush-texture dab is not also an anchor"));
+    }
+    // The stamping seed belongs to an anchor (it names its preset) and is an unsigned 32-bit integer.
+    if let Some(seed) = tags.stroke_seed.value() {
+        if seed.as_u64().is_none_or(|s| s > u64::from(u32::MAX)) || tags.brush_texture_preset.missing() {
+            return Err(invalid("strokeSeed is a uint32 of a brush-texture anchor"));
+        }
     }
     Ok(())
 }

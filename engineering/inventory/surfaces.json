@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "021bf02556338849b0bd63db22f07ad5a0c5eba2",
-  "describe": "v0.7.0-alpha.4-3237-g021bf025"
+  "head": "02977b203ae6d1aa898032698c5b148b27bd9f56",
+  "describe": "v0.7.0-alpha.4-3239-g02977b20"
  },
- "inputsDigest": "fc145017a27804938fa5e4024ff61ef4762066015e734c938e9c6e771e39ea87",
+ "inputsDigest": "61890c59c821c9b4a8b1105dc046ef30aa39c0b3174ed3ada99f46ead14ccfdd",
  "states": [
   "inventoried",
   "characterized",
@@ -3891,7 +3891,7 @@
     "container": "sp-pointtype-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 103,
+    "functionsVisited": 104,
     "via": "chain",
     "references": []
    },
@@ -3936,7 +3936,7 @@
     "container": "sp-pointtype-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 103,
+    "functionsVisited": 104,
     "via": "chain",
     "references": []
    },
@@ -3981,7 +3981,7 @@
     "container": "sp-pointtype-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 103,
+    "functionsVisited": 104,
     "via": "chain",
     "references": []
    },
