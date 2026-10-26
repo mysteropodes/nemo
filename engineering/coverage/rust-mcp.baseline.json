@@ -346,6 +346,12 @@
       "reason": "no executable regions in the coverage report",
       "note": "#2106 (L01-J): pinned cargo-llvm-cov 0.9.1 measured clean source 653236a0c1aa8ffd0e5b716276a25c8e8d7c5d08, MCP tree c4eebeecfa13489a1e9ef5b3356a6c9ac08008e1; 20 binaries, 266 tests passed, none failed. Artifact: reports/b8-coverage-rust/coverage.json SHA256 cc9257c8c63d051f7d241fff353eb20248f7319ba8907ddfa94e91e1cea2f8bf. The real LLVM export holds no file record or executable regions for this cfg(test) child; explicitly listed, not excluded or assigned a guessed zero floor. Every prior file/aggregate floor, exclusion, tool and recorded provenance remains unchanged; this additive registration is not whole-crate coverage acceptance."
     },
+    "nemo-mcp/src/native_vector_contract_texture.rs": {
+      "lines": 100,
+      "regions": 100,
+      "functions": 100,
+      "note": "#2361 (G16) brush-texture admission child of native_vector_contract_shapes.rs: observed floors from the coverage-rust --check measurement of the candidate tree (coverage.json SHA256 66330bee108fbce23c81c16403aeb89fd5f928452468b4505c58d96190ab12b0). Hand-added for this file only; unrelated entries are not re-recorded."
+    },
     "nemo-mcp/src/native_vector_create_many_tests.rs": {
       "noRegions": true,
       "reason": "no executable regions in the coverage report",

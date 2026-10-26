@@ -743,6 +743,47 @@
         },
         "isLinkedFillCompanion": {
           "type": "boolean"
+        },
+        "brushTexture": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "brushGroupId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "isBrushTextureCopy": {
+              "const": true
+            },
+            "brushTexturePreset": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "preTextureOpacity": {
+              "type": "number"
+            },
+            "preTextureStroke": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+                }
+              ]
+            }
+          },
+          "not": {
+            "required": [
+              "isBrushTextureCopy",
+              "brushTexturePreset"
+            ]
+          },
+          "description": "G16: the baseline serP brush-texture members of an anchor (preset, group, hidden paint) or a dab (copy flag, group)."
         }
       },
       "minProperties": 1,
@@ -16327,6 +16368,47 @@
         },
         "bitmapBrush": {
           "$ref": "#/$defs/ObjectClipboardBitmapBrush"
+        },
+        "brushTexture": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "brushGroupId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "isBrushTextureCopy": {
+              "const": true
+            },
+            "brushTexturePreset": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "preTextureOpacity": {
+              "type": "number"
+            },
+            "preTextureStroke": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+                }
+              ]
+            }
+          },
+          "not": {
+            "required": [
+              "isBrushTextureCopy",
+              "brushTexturePreset"
+            ]
+          },
+          "description": "G16: the baseline serP brush-texture members of an anchor (preset, group, hidden paint) or a dab (copy flag, group)."
         }
       },
       "minProperties": 1,
@@ -16472,6 +16554,47 @@
         },
         "bitmapBrush": {
           "$ref": "#/$defs/ObjectClipboardBitmapBrush"
+        },
+        "brushTexture": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "brushGroupId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "isBrushTextureCopy": {
+              "const": true
+            },
+            "brushTexturePreset": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "preTextureOpacity": {
+              "type": "number"
+            },
+            "preTextureStroke": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+                }
+              ]
+            }
+          },
+          "not": {
+            "required": [
+              "isBrushTextureCopy",
+              "brushTexturePreset"
+            ]
+          },
+          "description": "G16: the baseline serP brush-texture members of an anchor (preset, group, hidden paint) or a dab (copy flag, group)."
         }
       },
       "minProperties": 1,

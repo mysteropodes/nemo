@@ -43,13 +43,16 @@ pub(super) fn is_vector_brush(record: &ObjectRecord) -> bool {
     pressure(record).is_some()
 }
 /// The baseline wall filter (`layer.children` of the frame): an uncompounded path of two or more anchors that
-/// strokes, fills or is a vector brush, excluding a linked-fill companion. `fillWallPath` reads a vector
+/// strokes, fills or is a vector brush, excluding a linked-fill companion and a brush-texture dab. `fillWallPath` reads a vector
 /// brush's centreline (two or more centre segments) instead of its outline.
 fn wall(record: &ObjectRecord) -> Option<(Vec<Anchor>, bool)> {
     let ext = record.vector_ext.value();
     if record.geometry.kind != "cubic-path"
         || record.geometry.segments.len() < 2
-        || ext.is_some_and(|e| e.is_linked_fill_companion.value() == Some(&true))
+        || ext.is_some_and(|e| {
+            e.is_linked_fill_companion.value() == Some(&true)
+                || e.brush_texture.value().is_some_and(|t| t.is_brush_texture_copy.value() == Some(&true))
+        })
     {
         return None;
     }

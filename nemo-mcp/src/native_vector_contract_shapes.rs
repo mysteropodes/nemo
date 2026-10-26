@@ -6,6 +6,9 @@ use crate::native_contract::vector::{
 };
 use serde_json::Value;
 
+#[path = "native_vector_contract_texture.rs"]
+mod texture;
+
 fn point(value: &Value) -> bool {
     exact(value, &["x", "y"], &[]).is_some() && finite(&value["x"]) && finite(&value["y"])
 }
@@ -207,10 +210,12 @@ fn extension(value: &Value, has_stroke: bool) -> bool {
             "maskFeather",
             "linkedFillId",
             "isLinkedFillCompanion",
+            "brushTexture",
         ],
     )
     .is_some_and(|object| {
         !object.is_empty()
+            && object.get("brushTexture").is_none_or(texture::brush_texture)
             && object
                 .get("pressure")
                 .is_none_or(|v| pressure(v) && !has_stroke)

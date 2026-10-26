@@ -217,3 +217,15 @@ fn a_linked_fill_companion_and_a_wall_without_paint_are_not_walls() {
     assert_eq!(response["ok"], true, "{response}");
     near(&points(&created[0]), &[(10.0, 50.0), (100.0, 50.0)]);
 }
+
+#[test]
+fn a_brush_texture_dab_is_not_a_wall() {
+    // trimStrokeEnds skips `isBrushTextureCopy` children; a dab crossing at x=95 must not cut the tail.
+    let mut dab = path("L1", 0, "w-dab", &[(95.0, 0.0), (95.0, 100.0)]);
+    dab["vectorExt"] = json!({"brushTexture":{"brushGroupId":"g","isBrushTextureCopy":true}});
+    let line = path("L1", 0, "", &[(0.0, 50.0), (100.0, 50.0)]);
+    let walls = vec![path("L1", 0, "w-10", &[(10.0, 0.0), (10.0, 100.0)]), dab];
+    let (response, created) = trimmed(create_trim(line, json!(24)), walls);
+    assert_eq!(response["ok"], true, "{response}");
+    near(&points(&created[0]), &[(10.0, 50.0), (100.0, 50.0)]);
+}
