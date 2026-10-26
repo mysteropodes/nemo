@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "e286f753fe8c16969e5aaa8db690d7a79b0f5758",
-  "describe": "v0.7.0-alpha.4-3219-ge286f753"
+  "head": "1edd5af139bc7b63ce6df9d03539874893a3de78",
+  "describe": "v0.7.0-alpha.4-3221-g1edd5af1"
  },
- "inputsDigest": "9d4df1b8a08d43fdb5563c1b0dd78feab65b8a6e2801ca4f5702adf46cb65498",
+ "inputsDigest": "028277ef92b344a8d5cc6add14875c511d54a0b366de45f7d58b9597a14356de",
  "states": [
   "inventoried",
   "characterized",
@@ -22118,7 +22118,7 @@
    "capability": "Vector push: drag pushes the points under the brush, Shift smooths, Alt+drag sets the radius",
    "area": "labs",
    "handler": [
-    "src/js/labs/vector-sculpt.js:437"
+    "src/js/labs/vector-sculpt.js:494"
    ],
    "events": [],
    "exposure": [
@@ -22131,9 +22131,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/vector-sculpt.js:437",
+   "source": "src/js/labs/vector-sculpt.js:494",
    "meta": {
-    "functionsVisited": 0
+    "functionsVisited": 3
    },
    "fixtures": []
   },
