@@ -12,7 +12,12 @@
   "operations": [
     "command.document.object.labs.speedLines",
     "command.document.object.labs.boil",
-    "command.document.object.labs.followPath"
+    "command.document.object.labs.followPath",
+    "command.document.object.labs.referenceFill",
+    "command.document.object.labs.pingpong",
+    "command.document.object.labs.retime",
+    "command.document.object.labs.interval",
+    "command.document.object.labs.moveToLayer"
   ],
   "input": {
     "oneOf": [
@@ -24,6 +29,21 @@
       },
       {
         "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLabsFollowPathPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLabsReferenceFillPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLabsPingpongPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLabsRetimePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLabsIntervalPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLabsMoveToLayerPayload"
       }
     ]
   },
@@ -37,7 +57,7 @@
     "maxReadResponseBytes": 4096,
     "policy": "Complete correlated retained receipt or typed refusal; the engine reads the shown drawing itself, so no record travels in the request. Requests above 4096 encoded bytes are refused, never split."
   },
-  "semantics": "U36 (#2362): the baseline Labs generators as one native transaction each (src/js/labs/speed-lines.js, boil-effect.js, follow-path.js @1065e9d8). Speed lines rewrite the target cell as its shown drawing plus count seeded radial strokes (the baseline ensureKeyframe then append; the seed replaces Math.random). Boil writes keys frame+1..frame+frames with the shown drawing jittered by seededRng(0xB011 + k * seedStep), rasters and brush-texture dabs unjittered. Follow-path writes keys frame..frame+frames-1 holding the backdrop plus fresh-id copies of the moving strokes translated along the trajectory at ease(k/(frames-1)) of its arc length. Boil and follow-path grow the timeline (and the work-area end, like Repeat) when needed. One history entry; a refusal publishes nothing. No JS/Paper writer or fallback.",
+  "semantics": "U36 (#2362): the baseline Labs generators as one native transaction each (src/js/labs/speed-lines.js, boil-effect.js, follow-path.js @1065e9d8). Speed lines rewrite the target cell as its shown drawing plus count seeded radial strokes (the baseline ensureKeyframe then append; the seed replaces Math.random). Boil writes keys frame+1..frame+frames with the shown drawing jittered by seededRng(0xB011 + k * seedStep), rasters and brush-texture dabs unjittered. Follow-path writes keys frame..frame+frames-1 holding the backdrop plus fresh-id copies of the moving strokes translated along the trajectory at ease(k/(frames-1)) of its arc length. Reference fill is the ordinary native bucket fill on the target cell with every other effectively visible scene-root layer's shown strokes added as walls (hidden layers and hidden folders, component instances, linked-fill companions and dabs excluded); the fill keeps its seed and gap but no wall ids, and a miss changes nothing. Boil and follow-path grow the timeline (and the work-area end, like Repeat) when needed. U35 timing actions (pingpong-cycle.js, retime-exposure.js, interval-assistant.js): ping-pong writes the block after the range reversed then forward `times` times, copying key, in-between and plain cells (no manual-edit flag); retime re-spaces the range keys from its first frame after wiping first..max(last, end); interval promotes eased non-key slots strictly inside the range to keys holding their shown drawing. Component layers are skipped. U34 move-to-layer moves the selected strokes of a cell with their linked-fill companions and brush-texture dabs, identities kept, above the same frame of another unlocked non-component layer (fill, dabs, stroke); a plain target is promoted first and a held source too, so nothing is duplicated. One history entry; a refusal publishes nothing. No JS/Paper writer or fallback.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",
@@ -158,6 +178,165 @@
       "response": {
         "apiVersion": 2,
         "requestId": "labs-3",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "U36 reference fill bounded by other visible layers' strokes",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "labs-4",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.labs.referenceFill",
+        "payload": {
+          "command": "object.labs.referenceFill",
+          "layerUid": "layer-2",
+          "frame": 3,
+          "point": [
+            640,
+            360
+          ],
+          "color": "#336699ff",
+          "opacity": 1
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "labs-4",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "U35 ping-pong of a frame range",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "labs-5",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.labs.pingpong",
+        "payload": {
+          "command": "object.labs.pingpong",
+          "fromLayer": "layer-1",
+          "toLayer": "layer-2",
+          "fromFrame": 0,
+          "toFrame": 3,
+          "times": 2
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "labs-5",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "U35 exposure retime on twos",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "labs-6",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.labs.retime",
+        "payload": {
+          "command": "object.labs.retime",
+          "fromLayer": "layer-1",
+          "toLayer": "layer-1",
+          "fromFrame": 0,
+          "toFrame": 11,
+          "spacing": 2
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "labs-6",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "U35 eased breakdown slots between two keys",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "labs-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.labs.interval",
+        "payload": {
+          "command": "object.labs.interval",
+          "layerUid": "layer-1",
+          "fromFrame": 0,
+          "toFrame": 12,
+          "count": 3,
+          "ease": "inout"
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "labs-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "U34 move the selected strokes, their fills and dabs to another layer",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "labs-8",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.labs.moveToLayer",
+        "payload": {
+          "command": "object.labs.moveToLayer",
+          "fromLayer": "layer-1",
+          "toLayer": "layer-2",
+          "frame": 3,
+          "strokeIds": [
+            "native-stroke:2:0"
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "labs-8",
         "instanceId": "instance-A",
         "documentId": "document-A",
         "contentRevision": 8,

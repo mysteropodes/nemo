@@ -5,7 +5,7 @@ use crate::commands::object_fill_owner::vector_edit::{
     check_drawing_layer, check_target, is_vector_record, order, order_code, Edit, VectorEditKind,
     MAX_CREATE_MANY, MAX_SAFE_REVISION,
 };
-use crate::object_document::{ObjectDocument, ObjectRecord, Presence};
+use crate::object_document::{ObjectDocument, ObjectRecord, Presence, TimingEdit};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use std::collections::HashSet;
@@ -109,6 +109,23 @@ fn create_many_or_one(
         }
     }
     let mut document = origin.document().clone();
+    // Baseline Draw, Pen and shape commits run ensureKeyframe(true) first (draw-bridge.js commitStroke, tools.js
+    // @1065e9d8): a held or unexposed target cell becomes an empty key in the same undo step, so the new drawing is not
+    // the held one carried forward and does not land under it unseen. An in-between is left as it is.
+    if first.context_id == "scene-root" {
+        let total = document.total_frames;
+        if let Some(layer) = document.layers.iter_mut().find(|l| l.layer_uid == first.layer_uid) {
+            let edit = match layer.timing.value() {
+                Some(timing) if matches!(timing.exposure(first.frame()).0, "held" | "unexposed") => {
+                    Some(timing.promote_cell(first.frame(), total).map_err(|_| DispatchErrorCode::InvalidRequest)?)
+                }
+                _ => None,
+            };
+            if let Some(TimingEdit::Changed(timing)) = edit {
+                layer.timing = Presence::Present(timing);
+            }
+        }
+    }
     // Without an order plan the object array is the stack: behind goes before the layer's first record there.
     let mut at = document
         .objects

@@ -100,6 +100,7 @@ pub(crate) use object_frame_clipboard_repeat_wire::repeat_payload;
 #[path = "object_labs_generate.rs"]
 #[allow(dead_code)]
 mod object_labs_generate;
+pub(crate) use object_labs_generate::PreparedLabs;
 // L03-M (#2109): widget (rig control) transactions; the settings edit is a child of this module.
 #[path = "object_widget_edit.rs"]
 mod widget_edit;

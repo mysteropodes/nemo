@@ -46,7 +46,7 @@ impl Ease {
             _ => Err(DispatchErrorCode::InvalidRequest),
         }
     }
-    fn at(self, t: f64) -> f64 {
+    pub(crate) fn at(self, t: f64) -> f64 {
         match self {
             Self::Linear => t,
             Self::In => t * t,
@@ -219,6 +219,11 @@ pub(super) fn generate(
             *ease,
             *remove_trajectory,
         ),
+        LabsRequest::ReferenceFill { .. }
+        | LabsRequest::Pingpong { .. }
+        | LabsRequest::Retime { .. }
+        | LabsRequest::Interval { .. }
+        | LabsRequest::MoveToLayer { .. } => Err(DispatchErrorCode::Internal),
     }
 }
 

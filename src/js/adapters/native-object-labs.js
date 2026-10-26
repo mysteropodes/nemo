@@ -1,4 +1,4 @@
-/* U36 (#2362): the Labs generators (speed lines, boil, follow-path) through their native operations. The engine reads the
+/* U35/U36 (#2362): the Labs generators, reference fill and timing actions through their native operations. The engine reads the
  * shown cell itself and runs the baseline algorithms, so a request carries parameters only. Holds no document state and
  * has no fallback writer: an absent project or route is a typed unavailability. */
 (function (root, factory) {
@@ -22,10 +22,18 @@
     const commands = Command.create(session, 'labs');
     const run = (operation, body) => commands.execute(operation, () => Object.assign({ command: Contract.commandOf(operation) }, body));
     return Object.freeze({
+      layerInfo: (index) => { const info = session.info(); return info && info.layers ? info.layers[index] || null : null; },
       layerUid: (index) => { const info = session.info(), layer = info && info.layers && info.layers[index]; return layer ? layer.layerUid : null; },
       speedLines: (body) => run(Contract.LABS_SPEED_LINES, body),
       boil: (body) => run(Contract.LABS_BOIL, body),
       followPath: (body) => run(Contract.LABS_FOLLOW_PATH, body),
+      referenceFill: (body) => run(Contract.LABS_REFERENCE_FILL, body),
+      pingpong: (body) => run(Contract.LABS_PINGPONG, body),
+      retime: (body) => run(Contract.LABS_RETIME, body),
+      interval: (body) => run(Contract.LABS_INTERVAL, body),
+      moveToLayer: (body) => run(Contract.LABS_MOVE_TO_LAYER, body),
+      // The row's authored/held/blank runs through the native timing query (null when refused).
+      cells: (layerUid) => (typeof session.readLayerCells === 'function' ? session.readLayerCells(layerUid, session.info()) : Promise.resolve(null)),
     });
   }
   const bindings = new WeakMap();
@@ -35,5 +43,9 @@
     if (!bindings.has(host)) bindings.set(host, create(session));
     return bindings.get(host);
   }
-  return Object.freeze({ create, desktop, rgba });
+  // The bucket colour as the fill contract's '#rrggbbaa'.
+  function hex8(color) {
+    return '#' + rgba(color).map((c) => Math.round(c * 255).toString(16).padStart(2, '0')).join('');
+  }
+  return Object.freeze({ create, desktop, rgba, hex8 });
 }));

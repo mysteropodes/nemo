@@ -32,6 +32,8 @@ pub(crate) use object_fill_owner::scene_effect_layer_edit::PreparedLayerComposit
 #[cfg(feature = "history")]
 pub(crate) use object_fill_owner::PreparedBlankKey;
 #[cfg(feature = "history")]
+pub(crate) use object_fill_owner::PreparedLabs;
+#[cfg(feature = "history")]
 pub(crate) use object_fill_owner::PreparedExposureKey;
 #[cfg(feature = "history")]
 pub(crate) use object_fill_owner::PreparedExposureRetime;

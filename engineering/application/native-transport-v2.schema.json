@@ -3142,6 +3142,223 @@
         }
       }
     },
+    "ObjectLabsReferenceFillPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "frame",
+        "point",
+        "color",
+        "opacity"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.referenceFill"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "point": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": -1000000000000,
+            "maximum": 1000000000000
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "color": {
+          "type": "string",
+          "minLength": 9,
+          "maxLength": 9
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "ObjectLabsPingpongPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "fromLayer",
+        "toLayer",
+        "fromFrame",
+        "toFrame",
+        "times"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.pingpong"
+        },
+        "fromLayer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "toLayer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "fromFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "toFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "times": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      }
+    },
+    "ObjectLabsRetimePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "fromLayer",
+        "toLayer",
+        "fromFrame",
+        "toFrame",
+        "spacing"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.retime"
+        },
+        "fromLayer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "toLayer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "fromFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "toFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "spacing": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        }
+      }
+    },
+    "ObjectLabsIntervalPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "fromFrame",
+        "toFrame",
+        "count",
+        "ease"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.interval"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "fromFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "toFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999
+        },
+        "ease": {
+          "enum": [
+            "linear",
+            "in",
+            "out",
+            "inout"
+          ]
+        }
+      }
+    },
+    "ObjectLabsMoveToLayerPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "fromLayer",
+        "toLayer",
+        "frame",
+        "strokeIds"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.moveToLayer"
+        },
+        "fromLayer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "toLayer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "strokeIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 1,
+          "maxItems": 256
+        }
+      }
+    },
     "ObjectUndoPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -6545,6 +6762,91 @@
                 },
                 "payload": {
                   "$ref": "#/$defs/ObjectLabsFollowPathPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.referenceFill"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsReferenceFillPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.pingpong"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsPingpongPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.retime"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsRetimePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.interval"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsIntervalPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.moveToLayer"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsMoveToLayerPayload"
                 }
               }
             }

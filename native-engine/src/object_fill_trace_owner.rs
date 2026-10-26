@@ -11,7 +11,7 @@ use crate::object_document::object_group_kernels::object_boolean_ops::plan::{
 };
 use crate::object_document::object_group_kernels::object_boolean_ops::stack::Scope;
 use crate::object_document::object_group_kernels::object_fill_trace_ops::document::plan_trace;
-use crate::object_document::SolidFill;
+use crate::object_document::{FrameScopeKind, ObjectDocument, ObjectRecord, SolidFill};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
@@ -48,14 +48,43 @@ impl ObjectFillOwner {
             || !p.point.iter().all(|n| n.is_finite() && n.abs() <= 1.0e12)
             || !p.opacity.is_finite()
             || !(0.0..=1.0).contains(&p.opacity)
-            || p.color.len() != 9
-            || !p.color.starts_with('#')
-            || !p.color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
+        {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        self.prepare_fill_trace_at(
+            Scope {
+                context_id: p.context_id,
+                layer_uid: p.layer_uid,
+                frame: p.frame,
+            },
+            p.point,
+            &p.color,
+            p.opacity,
+            p.remove,
+            false,
+        )
+    }
+
+    /// The ordinary bucket fill over an admitted scope. With `reference`, every other effectively visible layer's
+    /// shown drawing at the frame joins the walls (U36 reference fill, `src/js/labs/reference-fill.js`).
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn prepare_fill_trace_at(
+        &self,
+        scope: Scope,
+        point: [f64; 2],
+        color: &str,
+        opacity: f64,
+        remove: bool,
+        reference: bool,
+    ) -> Result<PreparedBooleanEdit, DispatchErrorCode> {
+        if color.len() != 9
+            || !color.starts_with('#')
+            || !color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
         {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         let channel = |i| {
-            Number::from_f64(f64::from(u8::from_str_radix(&p.color[i..i + 2], 16).unwrap()) / 255.0)
+            Number::from_f64(f64::from(u8::from_str_radix(&color[i..i + 2], 16).unwrap()) / 255.0)
                 .unwrap()
         };
         let paint = SolidFill {
@@ -66,11 +95,6 @@ impl ObjectFillOwner {
             a: channel(7),
         };
         let origin = self.current_snapshot();
-        let scope = Scope {
-            context_id: p.context_id,
-            layer_uid: p.layer_uid,
-            frame: p.frame,
-        };
         check_scope(origin.document(), &scope).map_err(|error| Self::fill_plan_error(&error))?;
         let held = scope.context_id == "scene-root"
             && origin
@@ -98,14 +122,16 @@ impl ObjectFillOwner {
         } else {
             None
         };
+        let walls = reference.then(|| reference_walls(origin.document(), &scope));
         let mut plan = plan_trace(
             promoted.as_ref().unwrap_or_else(|| origin.document()),
             &scope,
-            p.point,
+            point,
             &paint,
-            p.opacity,
-            p.remove,
+            opacity,
+            remove,
             origin.content_revision(),
+            walls.as_deref(),
         )
         .map_err(|error| Self::fill_plan_error(&error))?;
         plan.changed |= promoted.is_some();
@@ -117,4 +143,61 @@ impl ObjectFillOwner {
             kind: BooleanEditKind::FillTrace,
         })
     }
+}
+
+/// The shown drawing of every other effectively visible scene-root layer at the scope's frame, by the baseline filter:
+/// hidden layers and hidden folders, component instances, linked-fill companions, brush-texture dabs and paths with
+/// fewer than two anchors are not walls. The native document stores no solo, so none applies.
+fn reference_walls<'a>(document: &'a ObjectDocument, scope: &Scope) -> Vec<&'a ObjectRecord> {
+    let visible = |uid: &str| {
+        document
+            .layers
+            .iter()
+            .find(|l| l.layer_uid == uid)
+            .is_some_and(|l| l.visible())
+    };
+    let mut walls = Vec::new();
+    for layer in &document.layers {
+        let folder_hidden = layer
+            .parent_layer_uid
+            .value()
+            .and_then(Option::as_deref)
+            .is_some_and(|parent| {
+                document
+                    .layers
+                    .iter()
+                    .any(|l| l.layer_uid == parent && l.is_folder_layer.value() == Some(&true))
+                    && !visible(parent)
+            });
+        let instance = document
+            .component_set()
+            .is_some_and(|set| set.instance(&scope.context_id, &layer.layer_uid).is_some());
+        if layer.layer_uid == scope.layer_uid || !layer.visible() || folder_hidden || instance {
+            continue;
+        }
+        // An untimed layer has no held cells: the frame is its own key.
+        let source = match layer.timing.value() {
+            Some(timing) => timing.exposure(scope.frame).1,
+            None => Some(scope.frame),
+        };
+        let Some(source) = source else {
+            continue;
+        };
+        walls.extend(document.objects.iter().filter(|r| {
+            let ext = r.vector_ext.value();
+            r.target.context_id == scope.context_id
+                && r.target.layer_uid == layer.layer_uid
+                && r.target.frame_scope.kind == FrameScopeKind::Authored
+                && r.target.frame_scope.frame == source
+                && r.geometry.segments.len() >= 2
+                && !ext
+                    .and_then(|e| e.is_linked_fill_companion.value())
+                    .is_some_and(|v| *v)
+                && !ext
+                    .and_then(|e| e.brush_texture.value())
+                    .and_then(|b| b.is_brush_texture_copy.value())
+                    .is_some_and(|v| *v)
+        }));
+    }
+    walls
 }
