@@ -8,6 +8,7 @@
 //   baseline-surfaces.json surfaces of the frozen baseline, stable CS3 IDs
 //   mapping.json           CURATED: surface → tasks / capability / disposition
 //   owners.json            snapshot: task → issues declaring that task ID
+//   ownership.json         CURATED: task → issues owning it without declaring the ID
 //   matrix.json, PARITY.md DERIVED from the above; `--check` fails when stale
 //
 //   node scripts/nemo/parity-matrix.cjs                    regenerate matrix
@@ -28,6 +29,7 @@ const DIR = path.join(ROOT, 'engineering', 'inventory', 'parity');
 const file = (name) => path.join(DIR, name);
 const readJson = (name) => JSON.parse(fs.readFileSync(file(name), 'utf8'));
 const json = (value) => JSON.stringify(value, null, 2) + '\n';
+const readOptional = (name) => (fs.existsSync(file(name)) ? readJson(name) : { tasks: {} });
 
 function freezeBaseline(sha) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-parity-baseline-'));
@@ -43,13 +45,15 @@ function freezeBaseline(sha) {
 function refreshOwners(tasks) {
   const out = execFileSync('gh', ['issue', 'list', '--repo', 'mysteropodes/nemo', '--state', 'all',
     '--limit', '3000', '--json', 'number,title,state,body,labels'], { cwd: ROOT, maxBuffer: 1 << 30, encoding: 'utf8' });
-  return lib.ownersSnapshot(JSON.parse(out), tasks.map((t) => t.task), new Date().toISOString().slice(0, 10));
+  return lib.ownersSnapshot(JSON.parse(out), tasks.map((t) => t.task), new Date().toISOString().slice(0, 10), readOptional('ownership.json'));
 }
 
 function outputs() {
   const input = { config: readJson('config.json'), tasks: readJson('tasks.json'),
-    baseline: readJson('baseline-surfaces.json'), mapping: readJson('mapping.json'), owners: readJson('owners.json') };
+    baseline: readJson('baseline-surfaces.json'), mapping: readJson('mapping.json'), owners: readJson('owners.json'),
+    ownership: readOptional('ownership.json') };
   const problems = lib.validate(input);
+  if (!fs.existsSync(file('ownership.json'))) problems.push('ownership.json is missing');
   if (input.baseline.baseline !== input.config.baseline) problems.push('baseline-surfaces.json was frozen at a different SHA than config.json');
   const matrix = lib.buildMatrix(input);
   return { problems, matrix, files: { 'matrix.json': json(matrix), 'PARITY.md': lib.renderMarkdown(matrix) } };

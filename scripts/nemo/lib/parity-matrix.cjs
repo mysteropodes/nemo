@@ -8,6 +8,7 @@
 
 const SCHEMA = 'nemo.parity-matrix/1';
 const TASK_ID = /^[A-Z][0-9]{2}[a-z]?$/;
+const CONFIDENCE = ['high', 'medium', 'low'];
 
 // Minimal RFC 4180 reader: quoted fields may hold commas, newlines and "".
 function parseCsv(text) {
@@ -83,11 +84,17 @@ function ownersFromIssues(issues, taskIds) {
   return Object.fromEntries(Object.keys(owners).sort().map((t) => [t, owners[t]]));
 }
 
-function ownersSnapshot(issues, taskIds, snapshotAt) {
-  return { schema: 'nemo.parity-owners/1', snapshotAt, owners: ownersFromIssues(issues, taskIds) };
+// Curated ownership (ownership.json: task -> [{issue, confidence, evidence}]) covers
+// issues that own a task without declaring its ID; the snapshot records their state.
+function ownersSnapshot(issues, taskIds, snapshotAt, ownership) {
+  const wanted = new Set(Object.values((ownership && ownership.tasks) || {}).flat().map((o) => o.issue));
+  const states = {};
+  for (const issue of issues) if (wanted.has(issue.number)) states[issue.number] = String(issue.state).toLowerCase();
+  return { schema: 'nemo.parity-owners/1', snapshotAt, owners: ownersFromIssues(issues, taskIds),
+    curatedStates: Object.fromEntries(Object.keys(states).sort((x, y) => x - y).map((k) => [k, states[k]])) };
 }
 
-function validate({ tasks, baseline, mapping }) {
+function validate({ tasks, baseline, mapping, ownership, owners }) {
   const problems = [];
   const taskIds = new Set(tasks.map((t) => t.task));
   const surfaceIds = new Set();
@@ -101,9 +108,23 @@ function validate({ tasks, baseline, mapping }) {
     if (!surfaceIds.has(id)) problems.push(`mapping names unknown baseline surface ${id}`);
     const ts = Array.isArray(m.tasks) ? m.tasks : [];
     for (const t of ts) if (!taskIds.has(t)) problems.push(`mapping for ${id} names unknown task ${t}`);
-    if (!ts.length && !m.disposition) problems.push(`mapping for ${id} needs tasks or a disposition`);
+    if (!ts.length && !m.disposition && m.noTask !== true) problems.push(`mapping for ${id} needs tasks, a disposition or noTask`);
     if (m.disposition !== undefined && (typeof m.disposition !== 'string' || !m.disposition.trim())) {
       problems.push(`mapping for ${id} has an empty disposition`);
+    }
+    if (m.confidence !== undefined && !CONFIDENCE.includes(m.confidence)) problems.push(`mapping for ${id} has invalid confidence ${m.confidence}`);
+    if (m.noTask === true && ts.length) problems.push(`mapping for ${id} sets noTask but lists tasks`);
+  }
+  for (const [task, list] of Object.entries((ownership && ownership.tasks) || {})) {
+    if (!taskIds.has(task)) problems.push(`ownership names unknown task ${task}`);
+    const seen = new Set();
+    for (const o of Array.isArray(list) ? list : []) {
+      if (!Number.isSafeInteger(o.issue) || o.issue <= 0) problems.push(`ownership for ${task} has an invalid issue`);
+      if (seen.has(o.issue)) problems.push(`ownership for ${task} lists #${o.issue} twice`);
+      seen.add(o.issue);
+      if (!CONFIDENCE.includes(o.confidence)) problems.push(`ownership for ${task} #${o.issue} has invalid confidence`);
+      if (typeof o.evidence !== 'string' || !o.evidence.trim()) problems.push(`ownership for ${task} #${o.issue} has no evidence`);
+      if (owners && !(owners.curatedStates || {})[o.issue]) problems.push(`ownership for ${task} #${o.issue} has no state in the owners snapshot (refresh owners)`);
     }
   }
   return problems;
@@ -112,29 +133,48 @@ function validate({ tasks, baseline, mapping }) {
 function surfaceStatus(m, owners) {
   if (!m) return 'unmapped';
   if (m.disposition) return 'disposition';
+  // A baseline surface that no original task covers is a gap in the task contract.
+  if (m.noTask === true && !(m.tasks || []).length) return 'no-task';
   const states = m.tasks.flatMap((t) => (owners[t] || []).map((o) => o.state));
   if (m.tasks.some((t) => !(owners[t] || []).length)) return 'unowned';
-  return states.every((s) => s === 'closed') ? 'issues-closed' : 'issues-open';
+  // A task whose only owners are curated guesses is reported apart from declared ownership.
+  const curated = m.tasks.some((t) => (owners[t] || []).every((o) => o.curated));
+  const closed = states.every((s) => s === 'closed');
+  return (curated ? 'curated-' : 'issues-') + (closed ? 'closed' : 'open');
 }
 
-function buildMatrix({ config, tasks, baseline, mapping, owners: snapshot }) {
-  const owners = snapshot.owners || {};
+function mergedOwners(snapshot, ownership) {
+  const owners = JSON.parse(JSON.stringify(snapshot.owners || {}));
+  for (const [task, list] of Object.entries((ownership && ownership.tasks) || {})) {
+    for (const o of list) {
+      if ((owners[task] || []).some((x) => x.issue === o.issue)) continue;
+      (owners[task] = owners[task] || []).push({ issue: o.issue, state: (snapshot.curatedStates || {})[o.issue] || 'unknown', curated: o.confidence || 'low' });
+    }
+    if (owners[task]) owners[task].sort((x, y) => x.issue - y.issue);
+  }
+  return owners;
+}
+
+function buildMatrix({ config, tasks, baseline, mapping, owners: snapshot, ownership }) {
+  const owners = mergedOwners(snapshot, ownership);
   const surfaces = baseline.rows.map((r) => {
     const m = (mapping.surfaces || {})[r.id];
     return { id: r.id, kind: r.kind, area: r.area, capability: r.capability,
       tasks: m ? (m.tasks || []) : [], capabilityId: m && m.capability || null,
-      disposition: m && m.disposition || null, status: surfaceStatus(m, owners) };
+      disposition: m && m.disposition || null, proposedDisposition: m && m.proposedDisposition || null,
+      confidence: m && m.confidence || null, status: surfaceStatus(m, owners) };
   });
   const bySurfaceTask = new Map();
   for (const s of surfaces) for (const t of s.tasks) bySurfaceTask.set(t, (bySurfaceTask.get(t) || 0) + 1);
   const taskRows = tasks.map((t) => {
     const o = owners[t.task] || [];
     return { task: t.task, outcome: t.outcome, title: t.title, surfaces: bySurfaceTask.get(t.task) || 0,
-      owners: o, status: !o.length ? 'unowned' : o.every((x) => x.state === 'closed') ? 'issues-closed' : 'issues-open' };
+      owners: o, status: !o.length ? 'unowned' : (o.every((x) => x.curated) ? 'curated-' : 'issues-') + (o.every((x) => x.state === 'closed') ? 'closed' : 'open') };
   });
   const count = (rows) => rows.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {});
   return { schema: SCHEMA, baseline: config.baseline, baselineStatus: config.baselineStatus, ownersSnapshotAt: snapshot.snapshotAt || null,
-    counts: { surfaces: surfaces.length, tasks: taskRows.length, surfaceStatus: count(surfaces), taskStatus: count(taskRows) },
+    counts: { surfaces: surfaces.length, tasks: taskRows.length, surfaceStatus: count(surfaces), taskStatus: count(taskRows),
+      mappingConfidence: surfaces.reduce((acc, s) => { if (s.confidence) acc[s.confidence] = (acc[s.confidence] || 0) + 1; return acc; }, {}) },
     surfaces, tasks: taskRows };
 }
 
@@ -149,9 +189,10 @@ function renderMarkdown(matrix) {
     '# Parity matrix', '',
     `Generated by \`node scripts/nemo/parity-matrix.cjs\` (CS6/#2346). Baseline \`${matrix.baseline}\` (${matrix.baselineStatus}).`,
     'Do not edit by hand: curate `mapping.json`, refresh `owners.json`, then regenerate.',
-    `Owners snapshot: ${matrix.ownersSnapshotAt || 'unknown'}. An owner is a non-parent issue declaring the task ID (title list or range, \`[NEMO:…]\` prefix or \`**IDs:**\` line); parent-only or prose mentions are not ownership. \`issues-closed\` means every declaring issue is closed, not that the task is accepted.`, '',
+    `Owners snapshot: ${matrix.ownersSnapshotAt || 'unknown'}. A *declared* owner is a non-parent issue declaring the task ID (title list or range, \`[NEMO:…]\` prefix or \`**IDs:**\` line); a *curated* owner comes from \`ownership.json\` (first-pass research). \`issues-*\` rows rest on declared owners, \`curated-*\` rows on at least one curated-only task. \`*-closed\` means every owning issue is closed, NOT that the task is accepted; acceptance is matrix rows green at a candidate. \`no-task\` marks a baseline surface no original task covers. The mapping itself is a first-pass curation: medium/low rows need human review.`, '',
     `- Surfaces: ${matrix.counts.surfaces} (${line(matrix.counts.surfaceStatus)})`,
-    `- Tasks: ${matrix.counts.tasks} (${line(matrix.counts.taskStatus)})`, '',
+    `- Tasks: ${matrix.counts.tasks} (${line(matrix.counts.taskStatus)})`,
+    `- Mapping confidence: ${line(matrix.counts.mappingConfidence) || 'none recorded'} (medium/low rows need human review)`, '',
     '| Outcome | Tasks | Tasks with no owning issue |', '|---|---:|---|',
     ...Object.keys(byOutcome).sort().map((k) => `| ${k} | ${byOutcome[k].tasks} | ${byOutcome[k].unowned.join(', ') || '—'} |`),
     '',
@@ -159,4 +200,4 @@ function renderMarkdown(matrix) {
   return out.join('\n');
 }
 
-module.exports = { SCHEMA, parseCsv, tasksFromCsv, baselineRow, issueTaskIds, ownersFromIssues, ownersSnapshot, validate, buildMatrix, renderMarkdown };
+module.exports = { SCHEMA, parseCsv, tasksFromCsv, baselineRow, issueTaskIds, ownersFromIssues, ownersSnapshot, mergedOwners, validate, buildMatrix, renderMarkdown };

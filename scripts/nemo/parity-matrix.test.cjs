@@ -22,7 +22,7 @@ test('the committed matrix is valid and up to date (`parity-matrix.cjs --check`)
 test('validate rejects unknown surfaces, unknown tasks, empty mappings and duplicates', () => {
   const mapping = { surfaces: { 'dom:#zz': { tasks: ['F09'] }, 'dom:#a': { tasks: ['Q99'] }, 'dom:#b': {}, 'dom:#c': { disposition: ' ' } } };
   const problems = lib.validate({ tasks, baseline: { rows: [...baseline.rows, { id: 'dom:#a' }] }, mapping });
-  for (const pattern of [/unknown baseline surface dom:#zz/, /unknown task Q99/, /dom:#b needs tasks or a disposition/,
+  for (const pattern of [/unknown baseline surface dom:#zz/, /unknown task Q99/, /dom:#b needs tasks, a disposition or noTask/,
     /dom:#c has an empty disposition/, /duplicate baseline surface dom:#a/]) {
     assert.ok(problems.some((p) => pattern.test(p)), pattern + ' in ' + problems.join(' | '));
   }
@@ -52,9 +52,26 @@ test('surface and task status follow mapping, ownership and closure', () => {
   assert.deepEqual(m.tasks.map((t) => [t.task, t.status, t.surfaces]), [['F09', 'issues-closed', 2], ['G43', 'issues-open', 1]]);
   const none = lib.buildMatrix({ config, tasks, baseline, mapping: { surfaces: { 'dom:#a': { tasks: ['G43'] } } }, owners: { owners: {} } });
   assert.deepEqual(none.surfaces.map((s) => s.status), ['unowned', 'unmapped', 'unmapped']);
+  const gap = lib.buildMatrix({ config, tasks, baseline, mapping: { surfaces: { 'dom:#a': { tasks: [], noTask: true } } }, owners: { owners: {} } });
+  assert.equal(gap.surfaces[0].status, 'no-task', 'a surface no original task covers is reported as a contract gap');
 });
 
 test('the CSV reader keeps quoted commas, quotes and newlines inside one field', () => {
   const rows = lib.parseCsv('\uFEFFtask,title\nF09,"a, ""b""\nc"\nG43,d\n');
   assert.deepEqual(rows, [{ task: 'F09', title: 'a, "b"\nc' }, { task: 'G43', title: 'd' }]);
+});
+
+test('curated ownership adds owners with snapshot state and is validated', () => {
+  const snapshot = { owners: { F09: [{ issue: 1, state: 'closed' }] }, curatedStates: { 7: 'open' } };
+  const ownership = { tasks: { G43: [{ issue: 7, confidence: 'medium', evidence: 'x' }], F09: [{ issue: 1, confidence: 'high', evidence: 'y' }] } };
+  const owners = lib.mergedOwners(snapshot, ownership);
+  assert.deepEqual(owners.G43, [{ issue: 7, state: 'open', curated: 'medium' }]);
+  assert.deepEqual(owners.F09, [{ issue: 1, state: 'closed' }], 'a declared owner is not duplicated');
+  const m = lib.buildMatrix({ config, tasks, baseline, mapping: { surfaces: { 'dom:#a': { tasks: ['G43'] } } }, owners: snapshot, ownership });
+  assert.equal(m.surfaces[0].status, 'curated-open', 'curated-only ownership is reported apart from declared');
+  const bad = lib.validate({ tasks, baseline, owners: snapshot,
+    mapping: { surfaces: { 'dom:#a': { tasks: ['F09'], confidence: 'sure' }, 'dom:#b': { tasks: ['F09'], noTask: true } } },
+    ownership: { tasks: { Q99: [{ issue: 0 }], G43: [{ issue: 9, confidence: 'high', evidence: 'e' }, { issue: 9, confidence: 'high', evidence: '' }] } } });
+  for (const pattern of [/unknown task Q99/, /invalid issue/, /invalid confidence sure/, /noTask but lists tasks/, /lists #9 twice/,
+    /#9 has no evidence/, /#9 has no state in the owners snapshot/]) assert.ok(bad.some((p) => pattern.test(p)), pattern + ' in ' + bad.join(' | '));
 });
