@@ -917,6 +917,10 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Optional (absent = no trim). Baseline trimStrokeEndsMax: cut the new open stroke's head/tail back to its first/last crossing with the layer's paths in the frame when the overshoot is at most this; symmetry copies share the cuts."
+        },
+        "keyframe": {
+          "const": "copy",
+          "description": "Optional (absent = the Draw/Pen/shape empty key). A held or unexposed target cell becomes a key holding a copy of what it showed (the Labs creators' ensureKeyframe())."
         }
       }
     },
@@ -950,6 +954,10 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Optional (absent = no trim). Baseline trimStrokeEndsMax: cut the new open stroke's head/tail back to its first/last crossing with the layer's paths in the frame when the overshoot is at most this; symmetry copies share the cuts."
+        },
+        "keyframe": {
+          "const": "copy",
+          "description": "Optional (absent = the Draw/Pen/shape empty key). A held or unexposed target cell becomes a key holding a copy of what it showed (the Labs creators' ensureKeyframe())."
         }
       },
       "description": "G23: 2 to 32 creates on one layer and frame as one revision and one undo entry (symmetry copies); owner-allocated ids in order."

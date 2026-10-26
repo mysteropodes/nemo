@@ -5,10 +5,10 @@
   const commonjs = typeof module === 'object' && module.exports;
   const command = commonjs ? require('./native-object-rig-command.js') : root.NemoNativeObjectRigCommand;
   const contract = commonjs ? require('./native-object-rig-contract.js') : root.NemoNativeObjectRigContract;
-  const api = factory(command, contract);
+  const api = factory(command, contract, root);
   if (commonjs) module.exports = api;
   else root.NemoNativeObjectLabs = api;
-}(typeof globalThis === 'object' ? globalThis : this, function (Command, Contract) {
+}(typeof globalThis === 'object' ? globalThis : this, function (Command, Contract, root) {
   'use strict';
   // '#rgb', '#rrggbb' or '#rrggbbaa' as the record's 0..1 components; anything else is opaque black.
   function rgba(hex) {
@@ -32,6 +32,13 @@
       retime: (body) => run(Contract.LABS_RETIME, body),
       interval: (body) => run(Contract.LABS_INTERVAL, body),
       moveToLayer: (body) => run(Contract.LABS_MOVE_TO_LAYER, body),
+      // A Labs-created stroke through the ordinary native vector create, keyed with what a held cell showed
+      // (the Labs creators' ensureKeyframe(), not Draw's empty key).
+      createStroke: (layerUid, frame, dict, opacity) => {
+        const Vector = root.NemoNativeObjectVector;
+        if (!Vector) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'no_vector_route' }));
+        return Vector.create(session).createStroke(layerUid, frame, dict, { keyframe: 'copy', opacity });
+      },
       // The row's authored/held/blank runs through the native timing query (null when refused).
       cells: (layerUid) => (typeof session.readLayerCells === 'function' ? session.readLayerCells(layerUid, session.info()) : Promise.resolve(null)),
     });

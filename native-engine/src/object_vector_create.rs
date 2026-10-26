@@ -6,6 +6,7 @@ use crate::commands::object_fill_owner::vector_edit::{
     MAX_CREATE_MANY, MAX_SAFE_REVISION,
 };
 use crate::object_document::{ObjectDocument, ObjectRecord, Presence, TimingEdit};
+use crate::commands::object_fill_owner::object_frame_edit_document::{promote_cells, DocumentEdit};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use std::collections::HashSet;
@@ -43,6 +44,18 @@ pub(super) fn trim_ends(command: &str, value: &Presence<serde_json::Number>) -> 
     }
 }
 
+/// `keyframe: "copy"` (optional, creates only) keeps the baseline `ensureKeyframe()` of the Labs creators (French curve,
+/// speed lines, pose stamps): a held or unexposed cell becomes a key holding a copy of what it showed. Absent is the
+/// Draw/Pen/shape `ensureKeyframe(true)`: an empty key.
+pub(super) fn copy_key(command: &str, value: &Presence<String>) -> Result<bool, DispatchErrorCode> {
+    let creates = matches!(command, "object.vector.create" | "object.vector.createMany");
+    match value.value().map(String::as_str) {
+        None => Ok(false),
+        Some("copy") if creates => Ok(true),
+        Some(_) => Err(DispatchErrorCode::InvalidRequest),
+    }
+}
+
 /// Revision identity is monotonic across undo/redo; imported IDs are skipped, so neither preparation nor a
 /// refused commit consumes an ID.
 pub(super) fn allocate_stroke_id(
@@ -69,8 +82,9 @@ pub(super) fn create(
     record: ObjectRecord,
     placement: Placement,
     trim: Option<f64>,
+    copy_key: bool,
 ) -> Result<Edit, DispatchErrorCode> {
-    create_many_or_one(origin, vec![record], placement, trim, VectorEditKind::Create)
+    create_many_or_one(origin, vec![record], placement, trim, copy_key, VectorEditKind::Create)
 }
 
 /// Admit each record exactly as a single create would be, against the document as it grows: ids and order
@@ -81,6 +95,7 @@ fn create_many_or_one(
     mut records: Vec<ObjectRecord>,
     placement: Placement,
     trim: Option<f64>,
+    copy_key: bool,
     kind: VectorEditKind,
 ) -> Result<Edit, DispatchErrorCode> {
     let first = records.first().ok_or(DispatchErrorCode::InvalidRequest)?.target.clone();
@@ -111,8 +126,18 @@ fn create_many_or_one(
     let mut document = origin.document().clone();
     // Baseline Draw, Pen and shape commits run ensureKeyframe(true) first (draw-bridge.js commitStroke, tools.js
     // @1065e9d8): a held or unexposed target cell becomes an empty key in the same undo step, so the new drawing is not
-    // the held one carried forward and does not land under it unseen. An in-between is left as it is.
-    if first.context_id == "scene-root" {
+    // the held one carried forward and does not land under it unseen. An in-between is left as it is. With `copy_key`
+    // the key holds a copy of what the cell showed (the Labs creators' ensureKeyframe()).
+    let held = first.context_id == "scene-root"
+        && document.layers.iter().find(|l| l.layer_uid == first.layer_uid).and_then(|l| l.timing.value())
+            .is_some_and(|timing| matches!(timing.exposure(first.frame()).0, "held" | "unexposed"));
+    if held && copy_key {
+        if let DocumentEdit::Changed(next) = promote_cells(&document, &first.layer_uid, &[first.frame()])
+            .map_err(|_| DispatchErrorCode::Unavailable)?
+        {
+            document = next;
+        }
+    } else if held {
         let total = document.total_frames;
         if let Some(layer) = document.layers.iter_mut().find(|l| l.layer_uid == first.layer_uid) {
             let edit = match layer.timing.value() {
@@ -170,9 +195,10 @@ pub(super) fn create_many(
     records: Vec<ObjectRecord>,
     placement: Placement,
     trim: Option<f64>,
+    copy_key: bool,
 ) -> Result<Edit, DispatchErrorCode> {
     if !(2..=MAX_CREATE_MANY).contains(&records.len()) {
         return Err(DispatchErrorCode::InvalidRequest);
     }
-    create_many_or_one(origin, records, placement, trim, VectorEditKind::CreateMany)
+    create_many_or_one(origin, records, placement, trim, copy_key, VectorEditKind::CreateMany)
 }

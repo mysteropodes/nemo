@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "ee278e981e1520671615bbe6abf6087e638815c6",
-  "describe": "v0.7.0-alpha.4-3211-gee278e98"
+  "head": "c3c1fe609cee3874b65cd0e9588dfbd2ca313e21",
+  "describe": "v0.7.0-alpha.4-3213-gc3c1fe60"
  },
- "inputsDigest": "6eb4ab4175cf52e2948e1fffda05a57199e71400fe6b5f72f56b014698433c10",
+ "inputsDigest": "71bb6e73d2584b2c5f15e11aa1efb69b5b5ef6022b6f9fee7a0b92203856b2e5",
  "states": [
   "inventoried",
   "characterized",
@@ -21491,7 +21491,7 @@
    "capability": "Magnetic curve/ellipse guide: hold F + drag draws a stroke snapped to the guide (SMLabs.setCurveGuide('ellipse'|'line', opts))",
    "area": "labs",
    "handler": [
-    "src/js/labs/french-curve.js:139"
+    "src/js/labs/french-curve.js:160"
    ],
    "events": [],
    "exposure": [
@@ -21504,7 +21504,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/french-curve.js:139",
+   "source": "src/js/labs/french-curve.js:160",
    "meta": {
     "functionsVisited": 1
    },
@@ -21806,7 +21806,7 @@
    "capability": "Recognizes a freehand-drawn line / circle-ellipse / rectangle and corrects it to a perfect shape on release",
    "area": "labs",
    "handler": [
-    "src/js/labs/predictive-stroke.js:133"
+    "src/js/labs/predictive-stroke.js:180"
    ],
    "events": [],
    "exposure": [
@@ -21819,9 +21819,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/predictive-stroke.js:133",
+   "source": "src/js/labs/predictive-stroke.js:180",
    "meta": {
-    "functionsVisited": 23
+    "functionsVisited": 0
    },
    "fixtures": []
   },
