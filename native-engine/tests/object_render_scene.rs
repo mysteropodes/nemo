@@ -1,3 +1,5 @@
+//! nemo-test-harness: test-compositor => object_render_scene_compositor_tests
+//! nemo-test-harness: test-application => object_render_scene_application_tests
 //! Fixed contour/source oracles for the order-neutral production consumer.
 use crate::object_codec::{decode_project, decode_storage_project, encode_project};
 use crate::object_document::FrameScopeKind;

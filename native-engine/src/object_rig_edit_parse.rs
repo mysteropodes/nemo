@@ -157,6 +157,25 @@ impl<'a> Members<'a> {
         whole(&self.req::<Number>("frame")?, f64::from(u32::MAX))
     }
 
+    /// An optional frame (`bindMesh` without one resolves the raster from every authored frame).
+    fn opt_frame(&self) -> Result<Option<u32>, Refusal> {
+        match self.opt::<Number>("frame")? {
+            None => Ok(None),
+            Some(number) => whole(&number, f64::from(u32::MAX)).map(Some),
+        }
+    }
+
+    /// `boneIds` of a bind: absent means every bone, every id is a valid identifier.
+    fn opt_bone_ids(&self) -> Result<Option<Vec<String>>, Refusal> {
+        let bone_ids: Option<Vec<String>> = self.opt("boneIds")?;
+        if let Some(ids) = &bone_ids {
+            for id in ids {
+                identifier(id, MAX_ID_BYTES)?;
+            }
+        }
+        Ok(bone_ids)
+    }
+
     fn number(&self, name: &str) -> Result<f64, Refusal> {
         bounded(&self.req::<Number>(name)?)
     }
@@ -252,7 +271,9 @@ fn allowed_members(kind: &str) -> Option<&'static [&'static str]> {
         "bindStroke" => &[
             "kind", "strokeId", "frame", "boneIds", "radius", "rotate", "softness",
         ],
-        "bindMesh" => &["kind", "meshId"],
+        "bindMesh" => &[
+            "kind", "meshId", "frame", "boneIds", "radius", "rotate", "softness",
+        ],
         "autoAssign" => &[
             "kind",
             "frame",
@@ -299,25 +320,23 @@ fn action_of(table: &KeyedTable<Value>) -> Result<RigAction, Refusal> {
             radius: m.number("radius")?,
         }),
         "bindStroke" => {
-            let bone_ids: Option<Vec<String>> = m.opt("boneIds")?;
-            if let Some(ids) = &bone_ids {
-                for id in ids {
-                    identifier(id, MAX_ID_BYTES)?;
-                }
-            }
             Ok(RigAction::BindStroke {
                 stroke_id: m.id("strokeId")?,
                 frame: m.frame()?,
-                bone_ids,
+                bone_ids: m.opt_bone_ids()?,
                 radius: m.opt_radius("radius")?,
                 rotate: m.flag("rotate", false)?,
                 softness: m.opt_number("softness")?,
             })
         }
-        "bindMesh" => {
-            m.id("meshId")?;
-            Ok(RigAction::BindMesh)
-        }
+        "bindMesh" => Ok(RigAction::BindMesh {
+            mesh_id: m.id("meshId")?,
+            frame: m.opt_frame()?,
+            bone_ids: m.opt_bone_ids()?,
+            radius: m.opt_radius("radius")?,
+            rotate: m.flag("rotate", false)?,
+            softness: m.opt_number("softness")?,
+        }),
         "autoAssign" => Ok(RigAction::AutoAssign {
             frame: m.frame()?,
             default_radius: m.opt_radius("defaultRadius")?,

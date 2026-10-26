@@ -27,6 +27,8 @@ const CALLS = [
   [(r) => r.bindStroke(L, stroke.strokeId, 0, { boneIds: ['bone1'], radius: 200, rotate: false, softness: 0.25 }),
     { kind: 'bindStroke', strokeId: 'native-stroke:3:0', frame: 0, boneIds: ['bone1'], radius: 200, rotate: false, softness: 0.25 }],
   [(r) => r.bindMesh(L, 'im_1'), { kind: 'bindMesh', meshId: 'im_1' }],
+  [(r) => r.bindMesh(L, 'im_1', { frame: 2, boneIds: ['bone1'], radius: 120, rotate: true, softness: 0.5 }),
+    { kind: 'bindMesh', meshId: 'im_1', frame: 2, boneIds: ['bone1'], radius: 120, rotate: true, softness: 0.5 }],
   [(r) => r.autoAssign(L, 4, { defaultRadius: 200, rotate: true, softness: 0, paths: true, meshes: false }),
     { kind: 'autoAssign', frame: 4, defaultRadius: 200, rotate: true, softness: 0, paths: true, meshes: false }],
   [(r) => r.setWeight(L, stroke, 2, 0, 75), { kind: 'setWeight', target: stroke, vertex: 2, entry: 0, percent: 75 }],

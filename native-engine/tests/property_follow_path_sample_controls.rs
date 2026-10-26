@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-evaluation => property_follow_path_sample_controls_tests
 //! Controls for the follow-path sampler: mutation detection, oracle coverage
 //! and the cases Paper cannot be driven into by the oracle.
 

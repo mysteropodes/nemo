@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-evaluation => property_expression_lookup_tests
 //! Oracle and control tests for the expression lookup kernel (D16-K1, #2278).
 //!
 //! `ORACLE` below was produced by a Node 22.22 (Unicode 16.0) generator kept

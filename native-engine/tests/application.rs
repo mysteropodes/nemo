@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-application => application_tests
 use crate::application::{
     ExportResourceResolver, NativeApplication, ResourceResolutionError, ResourceResolutionErrorKind,
 };

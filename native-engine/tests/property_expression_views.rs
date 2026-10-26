@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-evaluation => property_expression_views_tests
 //! Oracle tests for the detached expression context views (D17/#2076).
 //!
 //! `fixtures/property-expression-views/oracle.txt` (`ORACLE`) was produced by

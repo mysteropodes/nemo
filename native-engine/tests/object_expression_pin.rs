@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-object_expression_pin => object_expression_pin_tests
 //! Frozen request literals through the real, non-Clone native history owner.
 use crate::history::NativeObjectHistory;
 use crate::object_codec::{decode_storage_project, encode_storage_project};

@@ -95,3 +95,15 @@ mod object_rig_edit_wire_tests;
 #[cfg(all(test, feature = "evaluation"))]
 #[path = "../tests/object_rig_edit_kernels.rs"]
 mod object_rig_edit_kernel_tests;
+
+#[cfg(all(test, feature = "evaluation"))]
+#[path = "../tests/object_rig_edit_mesh_rows.rs"]
+mod object_rig_edit_mesh_rows;
+
+#[cfg(all(test, feature = "evaluation"))]
+#[path = "../tests/object_rig_edit_meshes.rs"]
+mod object_rig_edit_mesh_tests;
+
+#[cfg(all(test, feature = "evaluation"))]
+#[path = "../tests/object_rig_edit_mesh_controls.rs"]
+mod object_rig_edit_mesh_control_tests;

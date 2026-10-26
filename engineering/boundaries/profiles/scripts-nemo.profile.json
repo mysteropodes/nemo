@@ -961,6 +961,42 @@
         "coverage-rust.test.cjs"
       ],
       "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.cli.familyAcceptance",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo",
+      "files": [
+        "family-acceptance.cjs"
+      ],
+      "publicApi": [
+        "family-acceptance.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.test.familyAcceptance",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "family-acceptance.test.cjs"
+      ],
+      "publicApi": [
+        "family-acceptance.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.lib.familyAcceptance",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "family-acceptance.cjs"
+      ],
+      "publicApi": [
+        "family-acceptance.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
     }
   ],
   "layerRules": {

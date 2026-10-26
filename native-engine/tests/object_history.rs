@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-history => object_history_tests
 //! Independent N25A content oracle through the sole staged object history owner.
 use crate::commands::{prepare_object_fill_json, PreparedObjectFill};
 use crate::history::NativeObjectHistory;
