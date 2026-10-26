@@ -324,3 +324,13 @@ test('symmetry: a stroke the axis clip leaves with one anchor refuses with its r
  await pen(f,[['pointerdown',400,90],['pointerup',400,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
  assert.equal(f.calls.length,0);assert.ok(f.log.some(m=>/starts at the symmetry axis/.test(m)));
 });
+
+test('symmetry preview draws the stroke and its mirror without writing anything, then clears on commit',async()=>{
+ const f=await fixture('rect');Object.assign(f.root.state,{symmetryEnabled:true,symmetryMode:'y',symmetryExtend:true});
+ f.area.fire('pointerdown');f.area.fire('pointermove',{clientX:240,clientY:210});
+ const overlay=f.body.firstChild;assert.equal(overlay.children.length,2,'stroke plus its mirror');
+ assert.match(overlay.children[0].attributes.d,/^M 20 20/);assert.match(overlay.children[1].attributes.d,/^M 300 20/);
+ assert.equal(f.calls.length,0,'preview writes nothing');
+ f.area.fire('pointerup',{clientX:240,clientY:210});await f.root.NemoNativeShapeToolController.whenSettled();
+ assert.equal(f.body.children.length,0);assert.equal(f.calls.length,1);assert.equal(f.calls[0].payload.records.length,2);
+});

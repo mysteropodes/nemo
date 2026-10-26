@@ -104,18 +104,24 @@
       if(t.tool==='rect')out.paramShape={kind:'rect',tl:0,tr:0,br:0,bl:0,box:{x1:Math.min(t.start[0],end[0]),y1:Math.min(t.start[1],end[1]),x2:Math.max(t.start[0],end[0]),y2:Math.max(t.start[1],end[1])}};
       return out;
     }
+    // The live preview shows the stroke and, with symmetry on, every copy the commit will create
+    // (symmetry-bridge.js onPreview @1065e9d8); a refused symmetry previews only the stroke itself.
     function preview(t,end){
-      var d=root.document,dict=dictionary(t,end);if(!dict)return;var segments=dict.segments;
+      var d=root.document,dict=dictionary(t,end);if(!dict)return;
+      var dicts;try{dicts=symmetric(dict,t.pin);}catch(_){dicts=[dict];}
       if(!overlay){overlay=d.createElementNS('http://www.w3.org/2000/svg','svg');overlay.setAttribute('aria-hidden','true');
         Object.assign(overlay.style,{position:'fixed',pointerEvents:'none',zIndex:'20',left:t.bounds.left+'px',top:t.bounds.top+'px',width:t.bounds.width+'px',height:t.bounds.height+'px'});
-        overlay.setAttribute('viewBox','0 0 '+t.pin.canvasW+' '+t.pin.canvasH);overlay.setAttribute('preserveAspectRatio','none');
-        overlay.appendChild(d.createElementNS('http://www.w3.org/2000/svg','path'));d.body.appendChild(overlay);}
-      var path=overlay.firstChild;path.setAttribute('transform','matrix('+Mapping.transform({presentation:t.presentation},false).join(' ')+')');var start=segments[0].point,text='M '+start[0]+' '+start[1],count=segments.length+(dict.closed?1:0);
-      for(var i=1;i<count;i++){var a=segments[i-1],b=segments[i%segments.length];text+=' C '+(a.point[0]+a.handleOut[0])+' '+(a.point[1]+a.handleOut[1])+' '+(b.point[0]+b.handleIn[0])+' '+(b.point[1]+b.handleIn[1])+' '+b.point[0]+' '+b.point[1];}
-      if(dict.closed)text+=' Z';path.setAttribute('d',text);path.setAttribute('fill',dict.fillColor||'none');path.setAttribute('stroke',dict.strokeColor||'none');
-      path.setAttribute('stroke-width',dict.strokeWidth);path.setAttribute('stroke-linecap',dict.strokeCap);path.setAttribute('stroke-linejoin',dict.strokeJoin);path.setAttribute('opacity',dict.opacity);
-      if(dict.dashArray)path.setAttribute('stroke-dasharray',dict.dashArray.join(' '));path.setAttribute('stroke-dashoffset',dict.dashOffset);path.setAttribute('stroke-miterlimit',dict.miterLimit);
-      path.setAttribute('paint-order',dict.paintOrder==='strokeFirst'?'stroke fill':'fill stroke');
+        overlay.setAttribute('viewBox','0 0 '+t.pin.canvasW+' '+t.pin.canvasH);overlay.setAttribute('preserveAspectRatio','none');d.body.appendChild(overlay);}
+      while(overlay.children.length<dicts.length)overlay.appendChild(d.createElementNS('http://www.w3.org/2000/svg','path'));
+      while(overlay.children.length>dicts.length)overlay.children[overlay.children.length-1].remove();
+      var matrix='matrix('+Mapping.transform({presentation:t.presentation},false).join(' ')+')';
+      dicts.forEach(function(one,at){var path=overlay.children[at],segments=one.segments;if(!segments.length)return;
+        path.setAttribute('transform',matrix);var start=segments[0].point,text='M '+start[0]+' '+start[1],count=segments.length+(one.closed?1:0);
+        for(var i=1;i<count;i++){var a=segments[i-1],b=segments[i%segments.length];text+=' C '+(a.point[0]+a.handleOut[0])+' '+(a.point[1]+a.handleOut[1])+' '+(b.point[0]+b.handleIn[0])+' '+(b.point[1]+b.handleIn[1])+' '+b.point[0]+' '+b.point[1];}
+        if(one.closed)text+=' Z';path.setAttribute('d',text);path.setAttribute('fill',one.fillColor||'none');path.setAttribute('stroke',one.strokeColor||'none');
+        path.setAttribute('stroke-width',one.strokeWidth);path.setAttribute('stroke-linecap',one.strokeCap);path.setAttribute('stroke-linejoin',one.strokeJoin);path.setAttribute('opacity',one.opacity);
+        if(one.dashArray)path.setAttribute('stroke-dasharray',one.dashArray.join(' '));path.setAttribute('stroke-dashoffset',one.dashOffset);path.setAttribute('stroke-miterlimit',one.miterLimit);
+        path.setAttribute('paint-order',one.paintOrder==='strokeFirst'?'stroke fill':'fill stroke');});
     }
     // G23 (symmetry-bridge.js @1065e9d8, onStrokeCommitted): the stroke and its mirrored or rotated copies.
     // Mirrors clip the committed stroke at the axis unless Extend is on, reflect points and handles and
