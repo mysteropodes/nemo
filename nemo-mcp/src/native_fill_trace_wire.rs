@@ -12,6 +12,8 @@ pub(super) enum Field {
     Placement,
     /// Mask mode's tag for the committed Fill Brush shape, or `false` when Mask mode is off.
     Mask,
+    /// Up to 23 symmetry copies, each an affine `[a, b, c, d, e, f]` of finite numbers.
+    Copies,
 }
 pub(super) fn kind(token: &str) -> Option<Field> {
     match token {
@@ -22,6 +24,7 @@ pub(super) fn kind(token: &str) -> Option<Field> {
         "outline" => Some(Field::Outline),
         "placement" => Some(Field::Placement),
         "mask" => Some(Field::Mask),
+        "copies" => Some(Field::Copies),
         _ => None,
     }
 }
@@ -57,6 +60,15 @@ pub(super) fn check(field: Field, value: &Value) -> bool {
         Field::Placement => value
             .as_str()
             .is_some_and(|mode| matches!(mode, "above" | "below" | "merge")),
+        Field::Copies => value.as_array().is_some_and(|copies| {
+            copies.len() <= 23
+                && copies.iter().all(|m| {
+                    m.as_array().is_some_and(|m| {
+                        m.len() == 6
+                            && m.iter().all(|n| n.as_f64().is_some_and(|n| n.is_finite() && n.abs() <= 1.0e12))
+                    })
+                })
+        }),
         Field::Mask => {
             value == &Value::Bool(false)
                 || value.as_str().is_some_and(|m| {

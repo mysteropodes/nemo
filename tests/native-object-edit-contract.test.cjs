@@ -31,7 +31,7 @@ const VALID = [
   ['boolean.erase', { command: 'object.boolean.erase', ...at, frame: 0, strokeId: 'stroke-1', footprint: [[0, 0], [4, 0], [4, 4]] }],
   ['boolean.flatten', { command: 'object.boolean.flatten', ...at, frame: 0, groupId: 'group-1' }],
   ['fill.trace', {command:'object.fill.trace',...cell,point:[20,20],color:'#336699ff',opacity:0.5,remove:false}],
-  ['fill.brush', {command:'object.fill.brush',...cell,outline:[[10,10],[60,10],[60,40]].map((p)=>({point:p,handleIn:[0,0],handleOut:[0,0]})),color:'#336699ff',opacity:0.5,placement:'below',mask:false}],
+  ['fill.brush', {command:'object.fill.brush',...cell,outline:[[10,10],[60,10],[60,40]].map((p)=>({point:p,handleIn:[0,0],handleOut:[0,0]})),color:'#336699ff',opacity:0.5,placement:'below',mask:false,copies:[]}],
   ['clipboard.copy', { command: 'object.clipboard.copy', ...cell, mode: 'animation2d', strokeIds: ['stroke-1'] }],
   ['clipboard.cut', { command: 'object.clipboard.cut', ...cell, mode: 'motion', strokeIds: [] }],
 ];

@@ -170,7 +170,7 @@ test('chrome, cancellation, Escape and lost capture remain usable or abort witho
   send(f,'pointerup',60,50);assert.equal(f.calls.length,0,action);assert.equal(f.body.children.length,0,action);assert.equal(f.paper.project.activeLayer.children.length,0);}
 });
 test('unsupported brush cells are explicit without native or legacy fallback',async()=>{
- const cases=[s=>Object.assign(s,{tool:'fillbrush',fillBrushMode:'below',fillBrushSize:40,symmetryEnabled:true,symmetryExtend:true}),s=>s.bitmapBrushOn=true,s=>s.brushPreset='my-custom-brush',s=>Object.assign(s,{brushPreset:'charcoal-smooth',symmetryEnabled:true}),
+ const cases=[s=>Object.assign(s,{tool:'fillbrush',fillBrushMode:'front',fillBrushSize:40}),s=>s.bitmapBrushOn=true,s=>s.brushPreset='my-custom-brush',s=>Object.assign(s,{brushPreset:'charcoal-smooth',symmetryEnabled:true}),
   // Trim Stroke Ends commits natively for a plain stroke; a pressure-brush trim rebuilds its outline and stays refused.
   s=>Object.assign(s,{trimStrokeEnds:true,vectorBrush:true,fillEnabled:false}),
   // With stop-at-axis symmetry the original trims the whole stroke before clipping; native would trim the clipped one.
@@ -481,11 +481,20 @@ test('Fill Brush commits its outline through the native Fill Brush command with 
  await settled(shadow);const r=plain(shadow.calls[0].payload.record);
  assert.deepEqual([shadow.calls[0].payload.command,r.geometry.closed,r.vectorExt.shadow.shadowSwatchId,r.fill,r.vector.strokeWidth],['object.vector.create',false,'sh3',null,1],
    'Shadow mode inks the Fill Brush centreline in the swatch');
- for(const change of [s=>s.symmetryEnabled=true,s=>s.fillBrushMode='front']){
-  const f=await fixture('fillbrush');Object.assign(f.root.state,{fillBrushMode:'below',fillBrushSize:40});change(f.root.state);
-  const e=send(f,'pointerdown',20,20);send(f,'pointerup',60,50);assert.equal(e.prevented,true);assert.equal(f.calls.length,0);
-  assert.ok(f.log.some((s)=>/Fill Brush combination is unavailable/.test(s)),f.log.join(','));
- }
+ const front=await fixture('fillbrush');Object.assign(front.root.state,{fillBrushMode:'front',fillBrushSize:40});
+ const e=send(front,'pointerdown',20,20);send(front,'pointerup',60,50);assert.equal(e.prevented,true);assert.equal(front.calls.length,0);
+ assert.ok(front.log.some((s)=>/Fill Brush combination is unavailable/.test(s)),front.log.join(','));
+ // G23 (symmetry-bridge onStrokeCommitted on the Fill Brush result): the copies travel as affine maps the native owner applies
+ // to the path its merge hands back; stop-at-axis would clip that committed path and stays refused.
+ const draw=async(state)=>{const f=await fixture('fillbrush');Object.assign(f.root.state,{fillBrushMode:'below',fillBrushSize:40,symmetryEnabled:true},state);
+  send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:0});
+  await settled(f);return f;};
+ const mirror=await draw({symmetryMode:'y',symmetryExtend:true});assert.deepEqual(plain(mirror.calls[0]).payload.copies,[[-1,0,0,1,320,0]],'the x = 160 mirror');
+ const radial=await draw({symmetryMode:'radial',symmetryRadialSectors:3,symmetryRadialCenter:{x:160,y:90}});
+ const rot=(a)=>{const c=Math.cos(a),s=Math.sin(a);return [c,s,-s,c,160-(c*160-s*90),90-(s*160+c*90)];};
+ plain(radial.calls[0]).payload.copies.forEach((m,i)=>m.forEach((v,k)=>assert.ok(Math.abs(v-rot((2-i)*2*Math.PI/3)[k])<1e-9,'copy '+i+' term '+k)));
+ const stop=await draw({symmetryMode:'y',symmetryExtend:false});assert.equal(stop.calls.length,0);
+ assert.ok(stop.log.some((s)=>/Stop-at-axis symmetry with the Fill Brush/.test(s)),stop.log.join(','));
 });
 
 // #2361 G23: symmetry-bridge.js onStrokeCommitted @1065e9d8 over a pressure ribbon. Each copy carries its mapped centreline;

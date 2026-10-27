@@ -93,7 +93,7 @@ pub(super) fn valid() -> Vec<(&'static str, Value)> {
         (
             "fill.brush",
             json!({"command":"object.fill.brush","layerUid":"layer-a","contextId":"scene-root","frame":0,
-            "outline":[{"point":[10,10],"handleIn":[0,0],"handleOut":[0,0]},{"point":[60,10],"handleIn":[0,0],"handleOut":[0,0]},{"point":[60,40],"handleIn":[0,0],"handleOut":[0,0]}],"color":"#336699ff","opacity":0.5,"placement":"merge","mask":false}),
+            "outline":[{"point":[10,10],"handleIn":[0,0],"handleOut":[0,0]},{"point":[60,10],"handleIn":[0,0],"handleOut":[0,0]},{"point":[60,40],"handleIn":[0,0],"handleOut":[0,0]}],"color":"#336699ff","opacity":0.5,"placement":"merge","mask":false,"copies":[]}),
         ),
         (
             "clipboard.copy",
@@ -388,6 +388,10 @@ fn fill_brush_wire_bounds_refuse_invalid_outlines_placements_and_mask_modes() {
         ("mask", json!("")),
         ("mask", json!("a\u{7}b")),
         ("mask", json!("m".repeat(65))),
+        ("copies", json!([[1, 0, 0, 1, 0]])),
+        ("copies", json!([[1, 0, 0, 1, 0, 1e13]])),
+        ("copies", json!((0..24).map(|_| json!([1, 0, 0, 1, 0, 0])).collect::<Vec<_>>())),
+        ("copies", json!({})),
     ] {
         let mut payload = good.clone();
         payload[key] = bad;
@@ -396,6 +400,7 @@ fn fill_brush_wire_bounds_refuse_invalid_outlines_placements_and_mask_modes() {
     for mask in [json!("add"), json!("subtract"), json!("m".repeat(64))] {
         let mut payload = good.clone();
         payload["mask"] = mask;
+        payload["copies"] = json!([[-1, 0, 0, 1, 320, 0]]);
         payload["placement"] = json!("below");
         assert!(request(&operation, &payload), "{payload}");
     }

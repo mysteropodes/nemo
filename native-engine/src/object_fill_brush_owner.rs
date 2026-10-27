@@ -37,6 +37,8 @@ struct Payload {
     placement: String,
     /// Mask mode's `maskModeType` (tagOwner), stored verbatim like any mask tag, or `false` when Mask mode is off.
     mask: serde_json::Value,
+    /// The symmetry copies of the committed path (Extend mirror or radial), affine `[a, b, c, d, e, f]`, in stack order.
+    copies: Vec<[f64; 6]>,
 }
 
 impl ObjectFillOwner {
@@ -65,6 +67,8 @@ impl ObjectFillOwner {
                 .all(|s| finite(&s.point) && finite(&s.handle_in) && finite(&s.handle_out))
             || !p.opacity.is_finite()
             || !(0.0..=1.0).contains(&p.opacity)
+            || p.copies.len() > 23
+            || !p.copies.iter().all(|m| m.iter().all(|n| n.is_finite() && n.abs() <= 1.0e12))
             || !(p.mask == serde_json::Value::Bool(false)
                 || p.mask.as_str().is_some_and(|m| !m.is_empty() && m.len() <= 64 && !m.chars().any(char::is_control)))
         {
@@ -96,6 +100,7 @@ impl ObjectFillOwner {
             p.opacity,
             placement,
             p.mask.as_str(),
+            &p.copies,
             origin.content_revision(),
         )
         .map_err(|error| Self::fill_plan_error(&error))?;

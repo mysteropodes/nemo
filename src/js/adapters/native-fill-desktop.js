@@ -46,7 +46,7 @@
       const pin=Object.fromEntries(PIN.map((key)=>[key,before[key]]));
       const payload={command:'object.fill.brush',contextId:target.contextId||'scene-root',layerUid:target.layerUid,frame:target.frame,
         outline:input.outline.map((s)=>({point:s.point.slice(),handleIn:s.handleIn.slice(),handleOut:s.handleOut.slice()})),
-        color:hex(input.color),opacity:input.opacity,placement:input.placement,mask:typeof input.mask==='string'?input.mask:false};
+        color:hex(input.color),opacity:input.opacity,placement:input.placement,mask:typeof input.mask==='string'?input.mask:false,copies:(input.copies||[]).map((m)=>m.slice())};
       contract.payload(BRUSH,payload);
       return command.create(session,'fill',contract).execute(BRUSH,(current)=>{
         if(ports.current()!==session||!ports.ready(session,current)||!PIN.every((key)=>pin[key]===current[key]))
