@@ -64,5 +64,22 @@
     out.push.apply(out,adopt(root,mirrored,companion,point,vector));
     return out;
   }
-  return Object.freeze({copies:copies});
+  // The same copies as affine maps [a, b, c, d, e, f] (x' = a x + c y + e, y' = b x + d y + f), in stack order above the
+  // path, for a commit whose final path only the native owner knows (the Fill Brush). A mirror needs Extend: stop-at-axis
+  // would clip the committed path itself.
+  function matrices(root,pin){
+    var s=root.state,w=pin.canvasW,h=pin.canvasH,out=[];if(!s.symmetryEnabled)return out;
+    if(s.symmetryMode==='radial'){
+      var c=s.symmetryRadialCenter||{x:w/2,y:h/2},n=Math.max(2,Math.min(24,s.symmetryRadialSectors|0||6));
+      for(var k=n-1;k>=1;k--){var a=k*2*Math.PI/n,cs=Math.cos(a),sn=Math.sin(a);out.push([cs,sn,-sn,cs,c.x-(cs*c.x-sn*c.y),c.y-(sn*c.x+cs*c.y)]);}
+      return out;
+    }
+    if(!s.symmetryExtend)fail('Stop-at-axis symmetry with the Fill Brush is unavailable in native Drawing.');
+    var cx=w/2,cy=h/2,r=Math.min(w,h)*0.4;
+    var axis=s.symmetryAxis||(s.symmetryMode==='x'?{x1:0,y1:cy,x2:w,y2:cy}:s.symmetryMode==='free'?{x1:cx-r,y1:cy-r,x2:cx+r,y2:cy+r}:{x1:cx,y1:0,x2:cx,y2:h});
+    var len=Math.hypot(axis.x2-axis.x1,axis.y2-axis.y1)||1,ux=(axis.x2-axis.x1)/len,uy=(axis.y2-axis.y1)/len;
+    var r00=2*ux*ux-1,r01=2*ux*uy,r11=2*uy*uy-1;
+    return [[r00,r01,r01,r11,axis.x1-(r00*axis.x1+r01*axis.y1),axis.y1-(r01*axis.x1+r11*axis.y1)]];
+  }
+  return Object.freeze({copies:copies,matrices:matrices});
 }));

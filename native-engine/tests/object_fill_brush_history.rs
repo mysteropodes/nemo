@@ -11,7 +11,7 @@ fn outline(x: f64, y: f64, w: f64, h: f64) -> Value {
 }
 fn payload(outline: Value, placement: &str) -> Value {
     json!({"command":"object.fill.brush","layerUid":"L0","contextId":"scene-root","frame":0,
-        "outline":outline,"color":"#0000ffff","opacity":0.75,"placement":placement,"mask":false})
+        "outline":outline,"color":"#0000ffff","opacity":0.75,"placement":placement,"mask":false,"copies":[]})
 }
 fn fill(id: &str, x: f64, y: f64, w: f64, h: f64, paint: [f64; 4]) -> Value {
     f::vector(
@@ -237,4 +237,49 @@ fn in_mask_mode_the_path_the_merge_hands_back_becomes_a_mask_of_the_layer() {
             .is_err(),
         "an empty mask mode"
     );
+}
+
+#[test]
+fn symmetry_copies_of_the_returned_path_land_directly_above_it_mapped_and_reoriented() {
+    // symmetry-bridge onStrokeCommitted on the Fill Brush result: a mirror about x = 160 re-orients the closed copy; radial
+    // copies are rotations about the centre, stacked in the given order directly above the path.
+    let mut mirrored = payload(outline(10.0, 0.0, 40.0, 30.0), "above");
+    mirrored["copies"] = json!([[-1, 0, 0, 1, 320, 0]]);
+    let red = fill("red", 200.0, 100.0, 5.0, 5.0, [1.0, 0.0, 0.0, 1.0]);
+    let records = brush(&mut owner(vec![red]), &mirrored);
+    assert_eq!(
+        ids(&records),
+        ["red", "native-stroke:1:0", "native-stroke:1:1"]
+    );
+    assert_eq!(extent(&records[2]), [270.0, 0.0, 310.0, 30.0], "320 - x");
+    let xs = |r: &Value| -> Vec<f64> {
+        r["geometry"]["segments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s["point"]["x"].as_f64().unwrap())
+            .collect()
+    };
+    let mut back: Vec<f64> = xs(&records[1]).iter().map(|x| 320.0 - x).collect();
+    back.reverse();
+    assert_eq!(
+        xs(&records[2]),
+        back,
+        "the reflected copy runs the other way round"
+    );
+    assert_eq!(
+        records[2]["vectorExt"],
+        json!({"isFillShape": true}),
+        "the copy keeps the shape's data"
+    );
+    let mut radial = payload(outline(0.0, 0.0, 10.0, 10.0), "below");
+    radial["copies"] = json!([[0, 1, -1, 0, 0, 0], [-1, 0, 0, -1, 0, 0]]);
+    let records = brush(&mut owner(vec![]), &radial);
+    assert_eq!(records.len(), 3);
+    assert_eq!(
+        extent(&records[1]),
+        [-10.0, 0.0, 0.0, 10.0],
+        "a quarter turn"
+    );
+    assert_eq!(extent(&records[2]), [-10.0, -10.0, 0.0, 0.0], "a half turn");
 }

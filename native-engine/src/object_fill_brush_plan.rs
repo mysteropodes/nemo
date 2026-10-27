@@ -124,6 +124,7 @@ pub(crate) fn plan_brush(
     opacity: f64,
     placement: Placement,
     mask: Option<&str>,
+    copies: &[[f64; 6]],
     revision: u64,
 ) -> Result<BooleanPlan, PlanError> {
     check_scope(document, scope)?;
@@ -187,11 +188,64 @@ pub(crate) fn plan_brush(
         ext.mask_mode = Presence::Present(Some(mode.to_string()));
         record.vector_ext = Presence::Present(ext);
     }
+    append_copies(&mut plan.document, scope, &shown, copies, revision)?;
     let after = stack_of(&plan.document, scope);
     plan.created = after.iter().filter(|id| !ids.contains(id)).cloned().collect();
     plan.removed = ids.iter().filter(|id| !after.contains(id)).cloned().collect();
     plan.changed = plan.document != *document;
     Ok(plan)
+}
+
+/// symmetry-bridge.js onStrokeCommitted over the path the commit hands back: each copy directly above it, in the given
+/// order (`[a, b, c, d, e, f]`: x' = a x + c y + e, y' = b x + d y + f; handles through the linear part). A reflection
+/// re-orients a closed copy (`mirrored.reverse()`); adoptFreshIdentity gives it a fresh id and keeps the rest of its data.
+fn append_copies(
+    document: &mut ObjectDocument,
+    scope: &Scope,
+    shown: &str,
+    copies: &[[f64; 6]],
+    revision: u64,
+) -> Result<(), PlanError> {
+    if copies.is_empty() {
+        return Ok(());
+    }
+    let source = document.objects[find_record(document, scope, shown).ok_or(PlanError::FillUnavailable)?].clone();
+    let ids = fresh_ids(document, revision, copies.len()).ok_or(PlanError::IdUnavailable)?;
+    let value = |n: &Number| n.as_f64().ok_or(PlanError::Internal("non-finite source coordinate"));
+    let mut created = Vec::with_capacity(copies.len());
+    for (m, id) in copies.iter().zip(&ids) {
+        let at = |x: f64, y: f64, e: f64, f: f64| -> Result<ObjectPoint, PlanError> {
+            let (px, py) = (m[0] * x + m[2] * y + e, m[1] * x + m[3] * y + f);
+            Ok(ObjectPoint {
+                x: Number::from_f64(px).ok_or(PlanError::Internal("non-finite copy coordinate"))?,
+                y: Number::from_f64(py).ok_or(PlanError::Internal("non-finite copy coordinate"))?,
+            })
+        };
+        let mut segments = Vec::with_capacity(source.geometry.segments.len());
+        for s in &source.geometry.segments {
+            segments.push(ObjectSegment {
+                point: at(value(&s.point.x)?, value(&s.point.y)?, m[4], m[5])?,
+                handle_in: at(value(&s.handle_in.x)?, value(&s.handle_in.y)?, 0.0, 0.0)?,
+                handle_out: at(value(&s.handle_out.x)?, value(&s.handle_out.y)?, 0.0, 0.0)?,
+            });
+        }
+        if m[0] * m[3] - m[1] * m[2] < 0.0 && source.geometry.closed {
+            segments.reverse();
+            for s in &mut segments {
+                std::mem::swap(&mut s.handle_in, &mut s.handle_out);
+            }
+        }
+        let mut copy = source.clone();
+        copy.target = scope.target(id);
+        copy.geometry.segments = segments;
+        created.push(copy);
+    }
+    let mut stack = stack_of(document, scope);
+    let above = stack.iter().position(|id| id == shown).ok_or(PlanError::FillUnavailable)? + 1;
+    for (k, id) in ids.iter().enumerate() {
+        stack.insert(above + k, id.clone());
+    }
+    apply_stack(document, scope, &stack, &[], created).map_err(PlanError::Stack)
 }
 
 /// `fillMergeSameColor(layer, shape, true)` over the placed document, and the id of the path it hands back.

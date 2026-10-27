@@ -12971,7 +12971,8 @@
         "color",
         "opacity",
         "placement",
-        "mask"
+        "mask",
+        "copies"
       ],
       "properties": {
         "command": {
@@ -13059,6 +13060,20 @@
               "maxLength": 64
             }
           ]
+        },
+        "copies": {
+          "type": "array",
+          "maxItems": 23,
+          "items": {
+            "type": "array",
+            "minItems": 6,
+            "maxItems": 6,
+            "items": {
+              "type": "number",
+              "minimum": -1000000000000,
+              "maximum": 1000000000000
+            }
+          }
         }
       }
     },

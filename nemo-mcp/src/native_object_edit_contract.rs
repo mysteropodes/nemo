@@ -124,7 +124,7 @@ static SPECS: [(&str, &str, &str); 21] = [
         "layerUid:uid contextId:uid frame:frame groupId:uid",
     ),
     ("fill.trace","object.fill.trace","layerUid:uid contextId:uid frame:frame point:point color:color opacity:opacity remove:flag"),
-    ("fill.brush","object.fill.brush","layerUid:uid contextId:uid frame:frame outline:outline color:color opacity:opacity placement:placement mask:mask"),
+    ("fill.brush","object.fill.brush","layerUid:uid contextId:uid frame:frame outline:outline color:color opacity:opacity placement:placement mask:mask copies:copies"),
     ("clipboard.copy", "object.clipboard.copy", "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0"),
     ("clipboard.cut", "object.clipboard.cut", "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0"),
 ];
