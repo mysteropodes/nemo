@@ -148,10 +148,12 @@
         return action({reconcile:ctx.reconcile,dispatch:function(q){if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});return ctx.dispatch(q);}});
       });}};
       // draw-bridge.js Fill Brush: one native command places the shape (fillBrushMode) and merges same-colour fills.
-      if(dict.isFillShape&&root.SMLabs&&typeof root.SMLabs.multiframeTargets==='function'&&root.SMLabs.multiframeTargets(t.frame).length)fail('Multi-frame Fill Brush is unavailable in native Drawing.');
+      // Labs multi-frame draw stamps the path the merge hands back on the other selected frames, in the same commit.
+      var fbStamps=dict.isFillShape&&root.SMLabs&&typeof root.SMLabs.multiframeTargets==='function'?root.SMLabs.multiframeTargets(t.frame):[];
       if(dict.isFillShape)return root.NemoNativeFillDesktop.create({current:function(){return guarded;},ready:function(){return true;},
-        target:function(){return {layerUid:t.layerUid,frame:t.frame,contextId:'scene-root'};}}).brush({outline:dict.segments,color:dict.fillColor,opacity:dict.opacity,placement:root.state.fillBrushMode,mask:root.state.maskMode?root.state.maskModeType||'add':false,copies:Symmetry.matrices(root,t.pin)})
-        .then(function(r){return {status:r&&r.applied?'applied':'noop'};},root.NemoNativeObjectVector.statusOf);
+        target:function(){return {layerUid:t.layerUid,frame:t.frame,contextId:'scene-root'};}}).brush({outline:dict.segments,color:dict.fillColor,opacity:dict.opacity,placement:root.state.fillBrushMode,mask:root.state.maskMode?root.state.maskModeType||'add':false,copies:Symmetry.matrices(root,t.pin),stamps:fbStamps})
+        .then(function(r){if(r&&r.applied&&fbStamps.length&&typeof root.SMLabs.multiframeStamped==='function')root.SMLabs.multiframeStamped(fbStamps.length);
+          return {status:r&&r.applied?'applied':'noop'};},root.NemoNativeObjectVector.statusOf);
       // draw-bridge.js Bitmap Brush: the anchor, its baked companion and the PNG in one native command.
       if(t.style&&t.style.bitmap)return Bitmap.commit(root,guarded,t,dict,root.NemoNativeObjectVector.statusOf);
       // tools.js @1065e9d8 Draw commit: drawMode 'behind' slips the stroke under the layer's artwork.
@@ -299,10 +301,9 @@
     function nativeDrawStyle() {
       var state=root.state,fb=state.tool==='fillbrush';
       // Fill Brush (draw-bridge's isFillBrush branch) draws no texture, bitmap or Trim and ignores drawMode. Labs runs its
-      // hooks on the placed path: predictive skips a fill shape, multi-frame would stamp the merged result (not native yet).
+      // hooks on the placed path: predictive skips a fill shape, multi-frame stamps the merged result (native, at commit).
       if (fb && (['above','below','merge'].indexOf(state.fillBrushMode) < 0 || root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
-          ? root.SMLabs.unmigratedDrawHooks().length > 0 || typeof root.SMLabs.multiframeTargets === 'function' && root.SMLabs.multiframeTargets(state.currentFrame).length > 0
-          : root.SMLabs.list().some(function(p){return p.on;})))) throw new Error('This Fill Brush combination is unavailable in native Drawing.');
+          ? root.SMLabs.unmigratedDrawHooks().length > 0 : root.SMLabs.list().some(function(p){return p.on;})))) throw new Error('This Fill Brush combination is unavailable in native Drawing.');
       // Trim measures the whole stroke before the stop-at-axis clip (draw-bridge then symmetry-bridge); native would trim the clipped one.
       // A pressure ribbon trims natively alone, with its linked fill and with its multi-frame stamps; its symmetry copies do not yet.
       if (!fb && (state.tool !== 'draw' || state.trimStrokeEnds && (state.vectorBrush && state.symmetryEnabled || state.symmetryEnabled && !state.symmetryExtend) ||

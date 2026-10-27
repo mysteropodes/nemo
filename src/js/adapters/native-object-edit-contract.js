@@ -102,6 +102,7 @@
     placement: (v,at)=>{if(!['above','below','merge'].includes(v))fail(at+' requires above, below or merge');},
     copies: (v,at)=>{if(!Array.isArray(v)||v.length>23)fail(at+' requires at most 23 copies');
       v.forEach((m,i)=>{if(!Array.isArray(m)||m.length!==6||m.some((n)=>typeof n!=='number'||!Number.isFinite(n)||Math.abs(n)>1e12))fail(at+'['+i+'] invalid affine');});},
+    stamps: (v,at)=>{if(!Array.isArray(v)||v.length>256||new Set(v).size!==v.length||v.some((f)=>!Number.isInteger(f)||f<0||f>4294967295))fail(at+' requires at most 256 distinct frames');},
     mask: (v,at)=>{if(v!==false&&!(typeof v==='string'&&v.length>0&&bytes(v)<=64&&!/[\u0000-\u001f\u007f-\u009f]/.test(v)))fail(at+' requires false or a mask mode');},
     uid: uid, layerUid: layerUid, layerUids: (v, at) => { list(v, at, 1, MAX_ITEMS, opaque); if (new Set(v).size !== v.length) fail(`${at} repeats a layer`); },
     gap: (v, at) => { if (typeof v !== 'number' || !Number.isFinite(v)) fail(`${at} must be a finite number`); },
@@ -132,7 +133,7 @@
     'boolean.erase': ['object.boolean.erase', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['strokeId', 'strokeId'], ['footprint', 'footprint']]],
     'boolean.flatten': ['object.boolean.flatten', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['groupId', 'groupId']]],
     'fill.trace':['object.fill.trace','command',[['layerUid','uid'],['contextId','contextId'],['frame','frame'],['point','point'],['color','color'],['opacity','opacity'],['remove','flag']]],
-    'fill.brush':['object.fill.brush','command',[['layerUid','uid'],['contextId','contextId'],['frame','frame'],['outline','outline'],['color','color'],['opacity','opacity'],['placement','placement'],['mask','mask'],['copies','copies']]],
+    'fill.brush':['object.fill.brush','command',[['layerUid','uid'],['contextId','contextId'],['frame','frame'],['outline','outline'],['color','color'],['opacity','opacity'],['placement','placement'],['mask','mask'],['copies','copies'],['stamps','stamps']]],
     'clipboard.copy': ['object.clipboard.copy', 'clipboard-copy', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['strokeIds', 'strokeIds0']]],
     'clipboard.cut': ['object.clipboard.cut', 'clipboard-cut', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['strokeIds', 'strokeIds0']]],
   };
