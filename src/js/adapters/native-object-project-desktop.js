@@ -347,6 +347,11 @@
           if(shown&&root.state&&root.state.playing!==true)settingsDiagnostic(root,'preview-presented',shown);
           settingsNotice('presented',info);
           renderCameraViewLock(root);
+          // A timing read refused while this queue was busy needs the settled
+          // presentation signal; its existing readiness pin deduplicates reads.
+          if(shown&&root.state&&shown.frame===root.state.currentFrame&&
+            root.NemoNativeObjectUI&&typeof root.NemoNativeObjectUI.refreshTiming==='function')
+            root.NemoNativeObjectUI.refreshTiming(root);
           if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshPolicy)root.NemoNativeObjectUI.refreshPolicy(root);
           if(root.SMImageMeshUI&&typeof root.SMImageMeshUI.refresh==='function')root.SMImageMeshUI.refresh();
           // A frame paint can precede native completion and leave Motion unavailable.
