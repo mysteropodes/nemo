@@ -11,12 +11,13 @@
 //! open path's first handle-in and last handle-out do not reach the drawn path and are emitted as
 //! zero, which no player draws. A stored camera bakes into every anchor and handle of the frame,
 //! as `lottieCamMatrix` does (the camera matrix of the frame, its linear part for handles). Dropped
-//! as the baseline drops them: rasters, masks (never paint commands) and zero-opacity strokes. As
+//! as the baseline drops them: rasters (bitmap-brush ink included), video frames, masks (never paint
+//! commands) and zero-opacity strokes. As
 //! `getEffectiveStrokesRendered` returns them, a placed component is its inner strokes on the host
 //! layer under camera then symMatrix, and a duplicator its copies (factored opacity, hue-turned
 //! paints). A text block is the baseline's vector text: each painted contour a closed fill-only shape
 //! in the block colour (`buildGlyphPaths`). Refused, until later increments admit them with oracle
-//! rows: bitmap brush, video, legacy fill records and a layer opacity factor other than one (the baseline
+//! rows: legacy fill records and a layer opacity factor other than one (the baseline
 //! writes every layer at full opacity, `ks.o` 100). A seeded brush-texture anchor's dabs are written as
 //! the dabs the baseline stores for it: each a fill-only shape at the dab opacity, its colour through
 //! the hex Paper stores (`toCSS(true)`) and its outline through the three-decimal rounding `serP`
@@ -206,12 +207,6 @@ fn shown_by_layer(
         .map_err(|_| LottieExportError::CameraUnavailable { frame })?;
     let mut out: Vec<Vec<Shown>> = (0..layers).map(|_| Vec::new()).collect();
     for entry in ordered_entries(plan) {
-        let refuse = |source_object_index, reason| {
-            Err(LottieExportError::Unsupported {
-                source_object_index,
-                reason,
-            })
-        };
         let command = match entry {
             PaintEntry::Contour(command) => command,
             // `lottieBuild` drops rasters (and with them bitmap-brush companions).
@@ -286,12 +281,9 @@ fn shown_by_layer(
             // `lottieBuild` writes nothing for it.
             PaintEntry::Video(_) => continue,
             #[cfg(all(feature = "application", feature = "project_media_codec"))]
-            PaintEntry::Brush(_) => {
-                return refuse(
-                    plan.first_brush_source().unwrap_or(0),
-                    "bitmap brush paint has no admitted Lottie representation yet",
-                )
-            }
+            // A bitmap brush's ink is its raster companions, which `lottieBuild` filters (`!sd.isRaster`);
+            // its vector anchor is written as its own contour.
+            PaintEntry::Brush(_) => continue,
         };
         let source = command.source();
         let layer = source.source_layer_index();
