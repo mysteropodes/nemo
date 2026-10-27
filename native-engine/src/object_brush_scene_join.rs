@@ -229,3 +229,6 @@ pub(crate) fn prepare_object_render_scene_with_brush(
 #[cfg(all(test, feature = "application", feature = "project_media_codec"))]
 #[path = "../tests/object_brush_scene_join.rs"]
 mod tests;
+#[cfg(all(test, feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_brush_scene_lottie.rs"]
+mod lottie_tests;
