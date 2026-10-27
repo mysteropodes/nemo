@@ -393,9 +393,12 @@ test('a pressure stroke with Fill on commits its ribbon and linked fill in one c
  assert.deepEqual(fill.geometry.segments.map(s=>[s.point.x,s.point.y,s.handleIn.x,s.handleIn.y,s.handleOut.x,s.handleOut.y]),
    plain(sampled.map(s=>[s.point.x,s.point.y,s.handleIn.x,s.handleIn.y,s.handleOut.x,s.handleOut.y])),'the companion follows the sampled centreline');
  assert.equal(ribbon.fill.r,0x11/255,'the ribbon is painted in the stroke colour');
- const masked=await fixture();Object.assign(masked.root.state,{vectorBrush:true,maskMode:true});
+ // Mask mode: tagOwner tags the ribbon (the committed path); its linked fill stays an ordinary fill.
+ const masked=await fixture();Object.assign(masked.root.state,{vectorBrush:true,maskMode:true,maskModeType:'subtract'});
  send(masked,'pointerdown',20,20);send(masked,'pointermove',50,30);send(masked,'pointerup',80,45);await settled(masked);
- assert.equal(masked.calls.length,0);assert.ok(masked.log.some(s=>/Mask mode with a pressure fill/.test(s)),masked.log.join(','));
+ assert.equal(masked.calls.length,1,masked.log.join(','));const [mfill,mribbon]=plain(masked.calls[0].payload.records);
+ assert.deepEqual([mribbon.vectorExt.isMask,mribbon.vectorExt.maskMode],[true,'subtract']);
+ assert.deepEqual([mfill.vectorExt.isMask,mfill.vectorExt.isLinkedFillCompanion],[undefined,true]);
 });
 test('a pressure stroke with Stroke off is one closed fill of its centreline',async()=>{
  const f=await fixture();Object.assign(f.root.state,{vectorBrush:true,strokeEnabled:false});

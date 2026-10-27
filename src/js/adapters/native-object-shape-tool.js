@@ -135,11 +135,11 @@
       if(ports.pen&&t.anchors.length<2)return Promise.resolve({status:'cancelled'});
       if(!ports.freehand&&!ports.pen&&Math.hypot(end[0]-t.start[0],end[1]-t.start[1])<2)return Promise.resolve({status:'cancelled'});
       var dict=dictionary(t,end,true),s=t.session,companion=linkedCompanions.get(dict)||null;
-      if(companion&&root.state.maskMode)fail('Mask mode with a pressure fill is unavailable in native Drawing.');
       // Labs predictive stroke (draw-bridge.js onStrokeCommitted @1065e9d8) reshapes a freehand stroke before it is committed.
       if(ports.freehand&&root.SMLabs&&typeof root.SMLabs.predictStrokeDict==='function')dict=root.SMLabs.predictStrokeDict(dict)||dict;
       // Mask mode (tools.js tagOwner @1065e9d8, on every Draw/Pen/shape commit): the shape becomes a mask of the layer
-      // with the chosen combine mode; its symmetry copies and multi-frame stamps carry the same tags.
+      // with the chosen combine mode; its symmetry copies and multi-frame stamps carry the same tags. tagOwner tags the
+      // committed path only, so a pressure ribbon's linked fill stays an ordinary fill.
       if(root.state.maskMode)dict=Object.assign({},dict,{isMask:true,maskMode:root.state.maskModeType||'add'});
       // No second queue: only add a current-intent check to the real Project
       // resource action. While that action runs, its own pending count hides presentation.
