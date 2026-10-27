@@ -407,6 +407,20 @@ test('a pressure stroke with Stroke off is one closed fill of its centreline',as
  assert.deepEqual(r.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,20],[50,30],[80,45]]);
 });
 
+// A preset key the confirmed native catalog lacks (a deleted custom preset) draws plain, as the baseline's resolveBrushPreset
+// null leaves applyBrushTexture a no-op. An unknown, changing or unreadable catalog keeps the key unavailable.
+test('a preset key absent from the settled native catalog draws a plain stroke; an unconfirmed catalog refuses',async()=>{
+ const draw=async(catalog)=>{const f=await fixture();f.root.NemoNativeCustomBrushUI={controller:()=>catalog.controller,exists:()=>catalog.exists,record:()=>null};
+  f.root.state.brushPreset='deleted-custom';send(f,'pointerdown',10,40);send(f,'pointermove',40,41);send(f,'pointerup',100,40);await settled(f);return f;};
+ const plainDraw=await draw({controller:{isPending:()=>false},exists:false});assert.equal(plainDraw.calls.length,1,plainDraw.log.join(','));
+ const r=plain(plainDraw.calls[0].payload).record;
+ assert.equal(r.vectorExt&&r.vectorExt.brushTexture,undefined,'no texture fields, as the baseline writes none');
+ assert.deepEqual([r.vector.opacity,r.vector.stroke.r],[0.5,0x11/255],'the stroke is not camouflaged');
+ for(const catalog of [{controller:null,exists:null},{controller:{isPending:()=>true},exists:false},{controller:{isPending:()=>false},exists:null},
+  {controller:{isPending:()=>false},exists:true}]){
+  const f=await draw(catalog);assert.equal(f.calls.length,0,JSON.stringify(catalog.exists));assert.ok(f.log.some(s=>/unavailable/.test(s)),f.log.join(','));
+ }
+});
 // #2361 G16 option C: a built-in preset on a plain stroke commits one seeded, camouflaged anchor (applyBrushTexture
 // @1065e9d8); native stamps its dabs from the preset and seed. No dab is sent.
 test('a textured plain stroke commits one seeded anchor, camouflaged as the baseline hides it',async()=>{
@@ -615,7 +629,10 @@ test('a mirrored or rotated pressure ribbon commits each copy with its own centr
  const at=(rec)=>rec.vectorExt.pressure.centerSegments[0].point,o=at(rq.records[0]);
  [[2,4*Math.PI/3],[1,2*Math.PI/3]].forEach(([k,a],i)=>{const p=at(rq.records[i+1]),dx=o.x-160,dy=o.y-90;
   assert.ok(Math.abs(p.x-(160+dx*Math.cos(a)-dy*Math.sin(a)))<1e-6&&Math.abs(p.y-(90+dx*Math.sin(a)+dy*Math.cos(a)))<1e-6,'copy '+k);});
- // Stop-at-axis clips only a ribbon's outline in the baseline, never its centreline: refused rather than inconsistent.
+ // Stop-at-axis clips only a ribbon's outline, never its centreline (live against the baseline in
+ // native-object-draw-symmetry-stop-axis.test.cjs). This stroke stays left of x = 160, so it commits as with Extend.
  const stop=await fixture();Object.assign(stop.root.state,{vectorBrush:true,symmetryEnabled:true,symmetryMode:'y',symmetryExtend:false});
- pen(stop);await settled(stop);assert.equal(stop.calls.length,0);assert.ok(stop.log.some((s)=>/Stop-at-axis symmetry with pressure brushes/.test(s)),stop.log.join(','));
+ pen(stop);await settled(stop);assert.equal(stop.calls.length,1,stop.log.join(','));const sq=plain(stop.calls[0].payload);
+ assert.equal(sq.records.length,4);assert.deepEqual(sq.records[1].geometry,ribbon0.geometry);
+ assert.deepEqual(sq.records[1].vectorExt.pressure.centerSegments,c0);
 });

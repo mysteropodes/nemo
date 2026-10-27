@@ -9091,10 +9091,10 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       // thing in that section with no action of its own.
       {label:(window.SMProject&&window.SMProject.getCurrentLabel)?window.SMProject.getCurrentLabel():tt('menuUntitledNotSaved'),disabled:true},
       {sep:true},
-      {label:tt('menuNewProject'),shortcut:'⌘N',action:function(){clickEl('project-tab-add');}},
-      {label:tt('menuOpen'),shortcut:'⌘O',action:function(){if(window.SMProject)window.SMProject.open();}},
-      {label:tt('menuSave'),shortcut:'⌘S',action:function(){if(window.SMProject)window.SMProject.save();}},
-      {label:tt('menuSaveAs'),shortcut:'⇧⌘S',action:function(){if(window.SMProject)window.SMProject.saveAs();}},
+      {label:tt('menuNewProject'),id:'ctx-new-project',shortcut:'⌘N',action:function(){clickEl('project-tab-add');}},
+      {label:tt('menuOpen'),id:'ctx-open',shortcut:'⌘O',action:function(){if(window.SMProject)window.SMProject.open();}},
+      {label:tt('menuSave'),id:'ctx-save',shortcut:'⌘S',action:function(){if(window.SMProject)window.SMProject.save();}},
+      {label:tt('menuSaveAs'),id:'ctx-save-as',shortcut:'⇧⌘S',action:function(){if(window.SMProject)window.SMProject.saveAs();}},
       {label:tt('menuFromKitsu'),id:'ctx-kitsu-open',action:function(){clickEl('btn-kitsu-open');}},
       // Nemo's own extensibility (nemo-script.js / nemo-plugin.js) — this
       // app's model in this app's vocabulary, so it ships.
@@ -9105,11 +9105,11 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       // Duplicate canvas viewer (2026-08, AE feature audit 8.4 "New
       // Viewer") — a second panel on the same comp, independently panned/
       // zoomed and optionally locked to a frame.
-      {label:tt('menuNewView'),action:function(){if(window.SMSecondViewer)SMSecondViewer.open();}},
+      {label:tt('menuNewView'),id:'ctx-new-view',action:function(){if(window.SMSecondViewer)SMSecondViewer.open();}},
       {label:tt('menuVersionHistory'),id:'ctx-history',action:function(){clickEl('btn-history');}},
       {sep:true},
-      {label:tt('menuImportImg'),action:function(){clickEl('btn-import-img');}},
-      {label:tt('menuImportVideo'),action:function(){clickEl('btn-import-video');}},
+      {label:tt('menuImportImg'),id:'ctx-import-img',action:function(){clickEl('btn-import-img');}},
+      {label:tt('menuImportVideo'),id:'ctx-import-video',action:function(){clickEl('btn-import-video');}},
       {label:tt('menuImportPsd'),id:'ctx-import-psd',action:function(){clickEl('btn-import-psd');}},
       // SVG sits with the other importers now, not behind a Labs flag and a
       // floating button (2026-07-27): it is the only import path that yields
@@ -9138,13 +9138,13 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       {label:tt('menuExport'),id:'ctx-export',action:function(){clickEl('btn-export');}},
       {label:tt('menuRenderManager'),id:'ctx-render-manager',action:function(){if(window.SMRenderManager)SMRenderManager.open();}},
       {sep:true},
-      {label:tt('menuSettings'),action:function(){clickEl('btn-settings');}},
-      {label:tt('menuKeyboardShortcuts'),action:function(){
+      {label:tt('menuSettings'),id:'ctx-settings',action:function(){clickEl('btn-settings');}},
+      {label:tt('menuKeyboardShortcuts'),id:'ctx-shortcuts',action:function(){
         clickEl('btn-settings');
         var t=document.querySelector('#settings-tabs .settings-tab[data-tab="shortcuts"]');
         if(t)t.click();
       }},
-      {label:tt('menuAboutNemo'),action:function(){
+      {label:tt('menuAboutNemo'),id:'ctx-about',action:function(){
         clickEl('btn-settings');
         var t=document.querySelector('#settings-tabs .settings-tab[data-tab="about"]');
         if(t)t.click();
@@ -9159,7 +9159,10 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       items.splice(1,0,{label:'Kitsu: '+ks.projectName+(ks.sequenceName?' / '+ks.sequenceName:'')+' / '+ks.shotName+(ks.taskName?' ('+ks.taskName+')':''),disabled:true});
       items.splice(2,0,{label:tt('menuPublishToKitsu'),id:'ctx-kitsu-publish',action:function(){clickEl('btn-kitsu-publish');}});
     }
-    window.showContextMenu(r.left,r.bottom+4,items);
+    // U04 (#2370): on desktop every action has a declared target; unavailable ones show their reason (app-menu-targets.js).
+    var Targets=window.NemoAppMenuTargets,desktop=!!(window.__TAURI__&&window.__TAURI__.core);
+    if(desktop&&!Targets){showToast('The app menu is unavailable.');return;}
+    window.showContextMenu(r.left,r.bottom+4,Targets?Targets.guard(window,items):items);
   });
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initAppMenu);else initAppMenu();

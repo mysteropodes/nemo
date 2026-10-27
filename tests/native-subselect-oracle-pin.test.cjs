@@ -41,3 +41,13 @@ test('subselect modifier oracle executes frozen pointer handlers with explicit i
   assert.deepEqual(duplicate.selection,[0,0]); // Preserve the observed baseline defect; native admission stays unique.
   assert.deepEqual(duplicate.start,[20,20]);
 });
+
+test('pressure centerline and ribbon fixture executes frozen edits and the pinned Paper build',()=>{
+  const pressure=JSON.parse(fs.readFileSync(path.join(root,'native-engine/tests/fixtures/subselect-baseline/pressure.json')));
+  assert.equal(pressure.baseline,baseline);assert.equal(pressure.cases.length,180);
+  assert.deepEqual(Object.keys(pressure.hashes).sort(),['src/js/app.js','src/js/subselect-bridge.js','src/js/tools.js','src/paper-full.min.js'].sort());
+  for(const [file,hash] of Object.entries(pressure.hashes))assert.equal(crypto.createHash('sha256').update(cp.execFileSync('git',['show',`${baseline}:${file}`],{cwd:root,maxBuffer:8e6})).digest('hex'),hash);
+  assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(root,'src/paper-full.min.js'))).digest('hex'),pressure.hashes['src/paper-full.min.js']);
+  assert.deepEqual(JSON.parse(cp.execFileSync(process.execPath,['native-engine/tests/fixtures/subselect-baseline/gen-pressure.cjs'],{cwd:root,maxBuffer:8e6})),pressure);
+  for(const index of [0,2])assert.ok(pressure.cases.some(row=>row.name==='line'&&row.intent.kind==='toggle'&&row.intent.index===index));
+});

@@ -2007,6 +2007,18 @@
       ]
     },
     {
+      "id": "app.menu.targets",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "app-menu-targets.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "app-menu-targets.js"
+      ]
+    },
+    {
       "id": "app.opacity.capability",
       "layer": "application",
       "dir": "src/js/application",
