@@ -332,7 +332,7 @@ impl ObjectFramePacket {
     pub fn source_layers(&self) -> &[ObjectLayer] {
         self.context.layers(self.snapshot.document())
     }
-    fn source_objects(&self) -> &[ObjectRecord] {
+    pub(crate) fn source_objects(&self) -> &[ObjectRecord] {
         self.context.objects(self.snapshot.document())
     }
     /// Borrow one selected provenance position in constant time, not paint rank.

@@ -154,6 +154,10 @@ pub(crate) fn prepare_with_brush_indices(
         scene.packet().selected_source_indices().collect();
     let mut rasters = ProducerOutput::new("raster-image", pin.clone());
     for (index, source) in scene.rasters.iter().enumerate() {
+        // A placed component's image paints at its host slot below.
+        if source.placed {
+            continue;
+        }
         if selected.get(&source.source_index) != Some(&source.layer_index) {
             return Err(ObjectPaintPlanError::InvalidOrder);
         }
@@ -201,9 +205,9 @@ pub(crate) fn prepare_with_brush_indices(
                     append_object_entry(entry, &mut indices, &mut mixed)?;
                 }
                 SceneSlot::Component(slot) => {
-                    for (index, paint) in scene.components.paints.iter().enumerate() {
-                        if paint.host_layer_index == slot.entry().source_layer_index {
-                            mixed.push(PaintIndex::Component(index));
+                    for (host, index) in &scene.components.sequence {
+                        if *host == slot.entry().source_layer_index {
+                            mixed.push(*index);
                         }
                     }
                 }

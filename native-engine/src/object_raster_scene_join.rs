@@ -13,9 +13,22 @@ pub(crate) struct RasterSource {
     mesh_id: Option<String>,
     /// Rig-posed offsets of the mesh (one per stored vertex), from the one pose evaluation of the scene join.
     rig_offsets: Option<Vec<[f64; 2]>>,
+    /// An image of a placed component: `layer_index` is its host, `source.rect` is already the
+    /// baseline's instance placement, no scene chain applies, and it paints at the host slot.
+    pub(crate) placed: bool,
     pub(crate) source: RasterSceneSource,
 }
 impl RasterSource {
+    pub(crate) fn placed(source_index: usize, host: usize, source: RasterSceneSource) -> Self {
+        Self {
+            source_index,
+            layer_index: host,
+            mesh_id: None,
+            rig_offsets: None,
+            placed: true,
+            source,
+        }
+    }
     /// The rig-posed offsets of this mesh-bound raster, or `None` when no linked bind poses it.
     pub(crate) fn rig_offsets(&self) -> Option<&[[f64; 2]]> {
         self.rig_offsets.as_deref()
@@ -87,6 +100,7 @@ pub(super) fn sources_excluding(
                 layer_index: record.layer_index(),
                 mesh_id: item.mesh_id().map(str::to_owned),
                 rig_offsets,
+                placed: false,
                 source: RasterSceneSource {
                     asset_id: item.asset_id().as_str().to_owned(),
                     rect: crate::evaluation::motion_parent_chain::ImageRect {
@@ -242,10 +256,13 @@ mod retained {
                         },
                     );
                 }
-                let chain = plan
-                    .native_parent_chains()
-                    .chain(source.layer_index)
-                    .map_err(|error| unavailable(source.source_index, error.reason()))?;
+                let chain = if source.placed {
+                    Vec::new()
+                } else {
+                    plan.native_parent_chains()
+                        .chain(source.layer_index)
+                        .map_err(|error| unavailable(source.source_index, error.reason()))?
+                };
                 let image = prepare_raster_scene_image(&source.source, &chain, &Pixels(&assets))
                     .map_err(|_| {
                         unavailable(
