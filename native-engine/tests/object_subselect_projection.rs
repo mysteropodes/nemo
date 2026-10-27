@@ -103,7 +103,16 @@ fn check(snapshot: &crate::revision::ObjectSnapshot, expected: &Value) {
 }
 #[test]
 fn subselect_native_affine_and_point_types_match_original_under_scaled_rotated_parent() {
-    let mut owner = support::owner_of(&source());
+    for parametric in [false, true] {
+        check_parent_edits(parametric);
+    }
+}
+fn check_parent_edits(parametric: bool) {
+    let mut input = source();
+    if parametric {
+        input["objects"][0]["vectorExt"] = json!({"paramShape":{"kind":"rect"}});
+    }
+    let mut owner = support::owner_of(&input);
     check(&owner.acquire_snapshot(0).unwrap(), &oracle()["expected"]);
     for edit in oracle()["edits"].as_array().unwrap() {
         let before = support::bytes(&owner);
@@ -152,7 +161,7 @@ fn subselect_native_affine_and_point_types_match_original_under_scaled_rotated_p
         }
 
         // Each frozen edit starts from the same canonical source, just as the baseline oracle.
-        owner = support::owner_of(&source());
+        owner = support::owner_of(&input);
     }
 }
 #[test]

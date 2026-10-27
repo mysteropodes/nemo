@@ -6,7 +6,7 @@ const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '../../../..');
 const baseline = '46442ea96c09e6bfaadf956eb8586e273a658085';
 const read = (p) => execFileSync('git', ['show', `${baseline}:${p}`], { cwd: root, encoding: 'utf8', maxBuffer: 8e6 });
-const sources = Object.fromEntries(['src/js/tools.js', 'src/js/subselect-bridge.js', 'src/js/timeline.js', 'src/paper-full.min.js'].map(p => [p, read(p)]));
+const sources = Object.fromEntries(['src/js/tools.js', 'src/js/subselect-bridge.js', 'src/js/timeline.js', 'src/js/app.js', 'src/paper-full.min.js'].map(p => [p, read(p)]));
 if (fs.readFileSync(path.join(root, 'src/paper-full.min.js'), 'utf8') !== sources['src/paper-full.min.js']) throw Error('Paper baseline changed');
 const paper = require(path.join(root, 'tests/helpers/native-import-paper.cjs')).load();
 const copy = v => JSON.parse(JSON.stringify(v));
@@ -40,13 +40,17 @@ const paths = [
 ];
 const result = pressure => pressure ? copy(selected.data.centerSegments) : selected.segments.map(s => ({
   point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]}));
+const app=sources['src/js/app.js'];
+vm.runInContext(app.slice(app.indexOf('function _r3('),app.indexOf('function desP(')),c);
 const cases=[];
 function run(p,pressure,intent,fn) {
   selected = new paper.Path({insert:false,closed:p.closed,segments:p.segments.map(s => new paper.Segment(s.point,s.handleIn,s.handleOut))});
+  if(p.vectorExt)selected.data=copy(p.vectorExt);
   if (pressure) selected.data = {isVectorBrush:true,centerSegments:copy(p.segments)};
   c._nodeSel = intent.indices || [intent.index];
   fn();
   cases.push({name:p.name,pressure,closed:p.closed,segments:copy(p.segments),intent,expected:result(pressure)});
+  if(p.vectorExt){const saved=c.serP(selected);Object.assign(cases[cases.length-1],{vectorExt:copy(p.vectorExt),expectedVectorExt:{paramShape:copy(saved.paramShape),boxAngle:saved.boxAngle}});}
   selected.remove();
 }
 for(const p of paths) for(const pressure of [false,true]) {
@@ -77,6 +81,21 @@ for(const p of paths.slice(0,2)) for(const pressure of [false,true]) for(const t
     c.insertVertexAt(selected,location.point,1e-6);
     if(pressure)geometry.remove();
   });
+}
+// Parametric intent remains attached when the original editor reshapes the stored path.
+for(const kind of ['rect','ellipse','star']){
+  const shape=kind==='rect'?new paper.Path.Rectangle({from:[10,10],to:[70,50],insert:false}):
+    kind==='ellipse'?new paper.Path.Ellipse({rectangle:[10,10,60,40],insert:false}):new paper.Path.Star({center:[40,30],points:5,radius1:10,radius2:25,insert:false});
+  shape.rotate(17,new paper.Point(40,30));
+  const paramShape=Object.assign({kind,box:{x1:10,y1:10,x2:70,y2:50}},kind==='rect'?{tl:0,tr:0,br:0,bl:0}:kind==='ellipse'?{startAngle:0,sweep:359.9,innerRadius:0}:{pointCount:5,innerRatio:.4,cornerRadius:0});
+  const p={name:'parametric-'+kind,closed:true,vectorExt:{paramShape,boxAngle:17},segments:shape.segments.map(s=>({point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]}))};shape.remove();
+  for(const pointType of ['corner','smooth','symmetric'])run(p,false,{kind:'pointType',indices:[1],pointType},()=>c.setPointType(pointType));
+  run(p,false,{kind:'move',indices:[0,1],delta:[-7,13]},()=>c.nodeSelApplyMove(-7,13));
+  run(p,false,{kind:'handle',index:1,handle:'handleOut',point:[47,31],breakPair:false},()=>{c._nodeDrag={active:true,type:'handleOut',path:selected,segIndex:1};c.lastPt=new paper.Point(0,0);c.onMove({clientX:47,clientY:31,altKey:false,shiftKey:false,stopImmediatePropagation:noop,preventDefault:noop});});
+  run(p,false,{kind:'toggle',index:1},()=>c.toggleTangentAt(selected,1));
+  run(p,false,{kind:'delete',indices:[1]},()=>c.deleteBaseline());
+  const intent={kind:'insert',curve:0,time:.5};
+  run(p,false,intent,()=>{const loc=selected.curves[0].getLocationAtTime(.5),hit=selected.getNearestLocation(loc.point);intent.curve=hit.index;intent.time=hit.curve.getTimeAt(hit.curveOffset);c.insertVertexAt(selected,loc.point,1e-6);});
 }
 const hashes=Object.fromEntries(Object.entries(sources).map(([p,s])=>[p,createHash('sha256').update(s).digest('hex')]));
 process.stdout.write(JSON.stringify({baseline,hashes,cases})+'\n');
