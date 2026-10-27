@@ -87,6 +87,18 @@ pub(crate) fn validate_vector_ext(record: &ObjectRecord) -> Result<(), ObjectCod
     if let Some(tags) = ext.brush_texture.value() {
         validate_brush_texture(tags)?;
     }
+    if let Some(shadow) = ext.shadow.value() {
+        if shadow.channel_tag != "shadow" {
+            return Err(invalid("channelTag is only ever 'shadow'"));
+        }
+        if shadow
+            .shadow_swatch_id
+            .value()
+            .is_some_and(|id| id.is_empty() || id.len() > 256)
+        {
+            return Err(invalid("shadowSwatchId is a non-empty bounded string"));
+        }
+    }
     if ext
         .box_angle
         .value()

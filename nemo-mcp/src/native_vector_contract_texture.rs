@@ -1,4 +1,5 @@
-//! G16 (#2361): serP's brush-texture members on a vector record's `vectorExt.brushTexture`.
+//! G16 (#2361): serP's brush-texture members on a vector record's `vectorExt.brushTexture`, and its Shadow Brush
+//! channel members on `vectorExt.shadow`.
 use crate::native_contract::exact;
 use serde_json::Value;
 
@@ -22,5 +23,15 @@ pub(super) fn brush_texture(value: &Value) -> bool {
             && object.get("strokeSeed").is_none_or(|v| {
                 v.as_u64().is_some_and(|s| s <= u64::from(u32::MAX)) && object.contains_key("brushTexturePreset")
             })
+    })
+}
+
+/// `applyShadowBrushTag`: `channelTag` is only ever `'shadow'`; the swatch id is a non-empty string (256 bytes).
+pub(super) fn shadow(value: &Value) -> bool {
+    exact(value, &["channelTag"], &["shadowSwatchId"]).is_some_and(|object| {
+        object["channelTag"] == "shadow"
+            && object
+                .get("shadowSwatchId")
+                .is_none_or(|v| v.as_str().is_some_and(|s| !s.is_empty() && s.len() <= 256))
     })
 }

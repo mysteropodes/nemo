@@ -39,7 +39,7 @@ use crate::render_geometry::{ClosedCubicPath, CubicSegment};
 use vello::kurbo::BezPath;
 
 #[path = "object_scene_vector_batch.rs"]
-mod batch;
+pub(crate) mod batch;
 
 /// Producer name in the pinned registry.
 pub(crate) const PRODUCER: &str = "contour";

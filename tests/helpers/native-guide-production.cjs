@@ -259,7 +259,7 @@ function fixture({ composition = false, shadow = false, palette = false } = {}) 
     'js/adapters/native-object-project-entry-contract.js',
     'js/adapters/native-object-project.js', 'js/adapters/native-object-layer-splice.js', 'js/adapters/native-object-project-file.js',
     'js/application/native-opacity-operations.js', 'js/adapters/native-opacity-legacy-surface.js',
-    'js/draw-bridge.js', 'js/adapters/native-object-shape-tool.js', 'js/rulers-bridge.js',
+    'js/draw-bridge.js', 'js/adapters/native-object-draw-paint.js', 'js/adapters/native-object-shape-tool.js', 'js/rulers-bridge.js',
     ...(composition ? ['js/adapters/native-composition-contract.js'] : []),
     ...(palette ? ['js/adapters/native-palette-contract.js'] : []),
     'js/adapters/native-guide-contract.js',

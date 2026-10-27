@@ -4,7 +4,7 @@
 //! camouflaged opacity; the layer factor applies as to every paint. The baseline inserts each dab directly above the
 //! anchor, so the last dab made is the lowest: items come in that paint order. Unseeded anchors (imported projects
 //! store their dabs as records) are not stamped.
-use crate::evaluation::brush_dab::presets::builtin;
+use crate::evaluation::brush_dab::presets::{builtin, from_catalog};
 use crate::evaluation::brush_dab::sampling::{jitter_color_value, SeededRng};
 use crate::evaluation::brush_dab::shape::DabPath;
 use crate::evaluation::brush_dab::stamp::build_brush_dabs;
@@ -12,7 +12,7 @@ use crate::evaluation::object_scene_style_kernels::object_scene_style_item::Scen
 use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::{
     FillResolution, PaintOrder, SceneSolid,
 };
-use crate::object_document::{ObjectRecord, SolidFill};
+use crate::object_document::{ObjectRecord, ProjectPresetCatalog, SolidFill};
 use serde_json::Number;
 
 /// One dab to paint: its closed path and its fill style.
@@ -246,13 +246,21 @@ pub(crate) fn anchor_dab_items(
     drawn: &[[f64; 6]],
     closed: bool,
     layer_opacity: f64,
+    catalog: Option<&ProjectPresetCatalog>,
 ) -> Result<Vec<DabItem>, &'static str> {
     let (key, seed) = seeded(record).ok_or("not a seeded brush-texture anchor")?;
     let ext = record
         .vector_ext
         .value()
         .ok_or("not a seeded brush-texture anchor")?;
-    let preset = builtin(key).ok_or("custom brush presets await native stamping")?;
+    // `resolveBrushPreset(key)`: a built-in first, then the project's custom catalog.
+    let preset = match builtin(key) {
+        Some(preset) => preset,
+        None => catalog
+            .and_then(|c| c.entries().iter().find(|(id, _)| id == key))
+            .ok_or("an unknown brush preset")
+            .and_then(|(_, p)| from_catalog(p).ok_or("a custom stamp without handles"))?,
+    };
     let body = record
         .vector()
         .ok_or("a brush-texture anchor needs a vector body")?;

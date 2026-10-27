@@ -46,6 +46,9 @@ pub struct VectorExt {
     /// G16: the brush-texture-preset tags of a vector anchor or one of its dabs.
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) brush_texture: Presence<BrushTexture>,
+    /// Shadow Brush construction ink (`applyShadowBrushTag`): serP's `channelTag` and `shadowSwatchId`.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) shadow: Presence<ShadowChannel>,
 }
 object_deserialize!(VectorExt {
     #[serde(default)] pressure: Presence<PressureFields>,
@@ -59,7 +62,22 @@ object_deserialize!(VectorExt {
     #[serde(default)] mask_mode: Presence<Option<String>>,
     #[serde(default)] mask_feather: Presence<Option<Number>>,
     #[serde(default)] bitmap_brush: Presence<crate::object_document::BitmapBrushFields>,
-    #[serde(default)] brush_texture: Presence<BrushTexture>
+    #[serde(default)] brush_texture: Presence<BrushTexture>,
+    #[serde(default)] shadow: Presence<ShadowChannel>
+});
+
+/// serP's shadow channel members: `channelTag` (only ever `'shadow'`, written when truthy) and the swatch that drew
+/// the stroke (`shadowSwatchId`, written when truthy, so a present id is non-empty).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ShadowChannel {
+    pub(crate) channel_tag: String,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) shadow_swatch_id: Presence<String>,
+}
+object_deserialize!(ShadowChannel {
+    channel_tag: String,
+    #[serde(default)] shadow_swatch_id: Presence<String>
 });
 
 impl VectorExt {
@@ -76,6 +94,7 @@ impl VectorExt {
             && self.mask_feather.missing()
             && self.bitmap_brush.missing()
             && self.brush_texture.missing()
+            && self.shadow.missing()
     }
 }
 

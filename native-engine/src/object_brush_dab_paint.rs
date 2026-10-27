@@ -1,8 +1,9 @@
 //! G16 option C (#2361): the dabs a seeded brush-texture anchor paints, joined into the paint plan right after the
 //! anchor's own (camouflaged) contour, in the baseline order. They are stamped over the stored stroke and posed with
 //! the path the compositor draws for the anchor (`ObjectRenderEntry::path`, so motion and poses are the evaluated ones),
-//! and carry prepared paint like duplicator copies do. An anchor native cannot stamp yet (a custom preset, a pose no
-//! affine carries) makes the plan unavailable rather than silently losing its texture.
+//! and carry prepared paint like duplicator copies do. The preset resolves as `resolveBrushPreset` does (a built-in,
+//! then the project's catalog). An anchor native cannot stamp (a key neither holds, a pose no affine carries) makes the
+//! plan unavailable rather than silently losing its texture.
 use crate::evaluation::brush_dab::paint::{anchor_dab_items, is_seeded_anchor, texture_group};
 use std::collections::HashSet;
 use crate::object_render_scene::object_scene_style_emit::{prepare_item, PreparedItem};
@@ -90,7 +91,8 @@ pub(crate) fn expand(
         }
         let unavailable = |_| ObjectPaintPlanError::Unavailable;
         let (drawn, closed) = segments_of(entry.path()).ok_or(ObjectPaintPlanError::Unavailable)?;
-        let items = anchor_dab_items(source.record(), &drawn, closed, entry.layer_opacity())
+        let catalog = scene.packet().custom_brush_presets();
+        let items = anchor_dab_items(source.record(), &drawn, closed, entry.layer_opacity(), catalog)
             .map_err(unavailable)?;
         for item in items {
             let segments: Vec<CubicSegment> = item

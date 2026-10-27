@@ -4,10 +4,11 @@
  * native-object-edit-seam.js performs the single composition the common v2 SDK injects.
  * No owner, no writer, no host. */
 (function (root, factory) {
-  const api = factory();
+  const subselect = typeof module === 'object' && module.exports ? require('./native-subselect-contract.js') : root.NemoNativeSubselectContract;
+  const api = factory(subselect);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.NemoNativeObjectEditContract = api;
-}(typeof globalThis === 'object' ? globalThis : this, function () {
+}(typeof globalThis === 'object' ? globalThis : this, function (Subselect) {
   'use strict';
 
   const PREFIX = 'command.document.object.';
@@ -88,6 +89,8 @@
   const uid = (v, at) => text(v, MAX_ID, at), layerUid = opaque;
   const uids = (min) => (v, at) => list(v, at, min, MAX_ITEMS, (item, i) => text(item, MAX_ID, i));
   const FIELDS = {
+    subselectTarget: v=>{if(!Subselect.target(v))fail('Invalid subselect target');},
+    subselectIntent: v=>{if(!Subselect.intent(v))fail('Invalid subselect intent');},
     point: (v,at)=>{if(!Array.isArray(v)||v.length!==2||v.some((n)=>typeof n!=='number'||!Number.isFinite(n)||Math.abs(n)>1e12))fail(at+' invalid fill point');},
     color: (v,at)=>{if(typeof v!=='string'||!/^#[0-9a-fA-F]{8}$/.test(v))fail(at+' requires hex8');},
     opacity: (v,at)=>{if(typeof v!=='number'||!Number.isFinite(v)||v<0||v>1)fail(at+' invalid opacity');},
@@ -102,6 +105,7 @@
   };
   // operation suffix -> [command, result kind, [wire member, validator]...]. Member order is the wire order.
   const SPEC = {
+    'subselect.edit': ['object.subselect.edit', 'command', [['stableTarget','subselectTarget'],['intent','subselectIntent']]],
     'layer.delete': ['object.layer.delete', 'command', [['selection', 'selection']]],
     'layer.duplicate': ['object.layer.duplicate', 'created', [['layerUid', 'layerUid']]],
     'layer.rename': ['object.layer.rename', 'command', [['layerUid', 'layerUid'], ['name', 'name']]],

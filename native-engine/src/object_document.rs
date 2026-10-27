@@ -147,7 +147,7 @@ pub(crate) use bitmap_brush::{BitmapBrushFields, BitmapBrushSpec};
 #[allow(dead_code)]
 mod vector_ext;
 pub(crate) use vector_ext::{
-    BrushTexture, FillTrace, StoredGradient, StoredGradientStop, VectorExt,
+    BrushTexture, FillTrace, ShadowChannel, StoredGradient, StoredGradientStop, VectorExt,
 };
 
 // L08-J (#2114): layer compositing fields; transactions are scene_effect_layer_edit.rs / _history.rs.
@@ -191,6 +191,8 @@ pub use object_record::{
 mod object_motion_arcs;
 #[path = "object_tween_record.rs"]
 pub(crate) mod tween;
+#[path = "object_subselect_geometry.rs"]
+pub(crate) mod subselect;
 #[allow(unused_imports)]
 pub(crate) use object_motion_arcs::{KeyLockMode, MotionArcError, MotionArcHandles, MotionArcs};
 

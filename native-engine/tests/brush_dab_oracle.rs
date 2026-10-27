@@ -2,8 +2,10 @@
 //! (`tests/native-object-vector-fixtures/brush-dab-oracle.json`, #2416): every built-in preset on a straight and a
 //! curved path with fixed seeds, plus a pressure profile. The first eight dabs of each case are compared anchor and
 //! handle for handle (the oracle rounds to 1e-6), and every dab by its anchor centroid, extent, opacity, value delta,
-//! closure and segment count (rounded to 1e-3).
-use super::presets::builtin;
+//! closure and segment count (rounded to 1e-3). Two project catalog presets with captured stamps (`customCases`) go
+//! through the catalog mapping and are compared on every dab.
+use super::presets::{builtin, from_catalog, DabPreset};
+use crate::object_document::BrushPresetRecord;
 use super::sampling::{jitter_color_value, width_at_frac, SeededRng};
 use super::stamp::{build_brush_dabs, Dab};
 use serde_json::Value;
@@ -21,6 +23,9 @@ fn near(a: f64, b: f64, tolerance: f64) -> bool {
     (a - b).abs() <= tolerance
 }
 fn stamp(o: &Value, case: &Value) -> Vec<Dab> {
+    stamp_with(o, case, &builtin(case["preset"].as_str().unwrap()).unwrap())
+}
+fn stamp_with(o: &Value, case: &Value, preset: &DabPreset) -> Vec<Dab> {
     let segments: Vec<[f64; 6]> = o["paths"][case["path"].as_str().unwrap()]["segments"]
         .as_array()
         .unwrap()
@@ -39,12 +44,11 @@ fn stamp(o: &Value, case: &Value) -> Vec<Dab> {
     let profile: Option<Vec<(f64, f64)>> = case["profile"]
         .as_array()
         .map(|p| p.iter().map(|s| (f(&s["t"]), f(&s["width"]))).collect());
-    let preset = builtin(case["preset"].as_str().unwrap()).unwrap();
     let mut rng = SeededRng::new(case["seed"].as_u64().unwrap() as u32);
     build_brush_dabs(
         &segments,
         false,
-        &preset,
+        preset,
         f(&case["width"]),
         &mut rng,
         profile.as_deref(),
@@ -192,4 +196,40 @@ fn the_comparison_catches_another_seed() {
     assert!(!near(first.p[0], f(&expected[0]), 1.5e-6) || !near(first.p[1], f(&expected[1]), 1.5e-6));
     let same = stamp(&o, case)[0].path.segments[0];
     assert!(near(same.p[0], f(&expected[0]), 1.5e-6) && near(same.p[1], f(&expected[1]), 1.5e-6));
+}
+
+#[test]
+fn every_custom_catalog_preset_matches_the_baseline_dab_for_dab() {
+    let o = oracle();
+    let cases = o["customCases"].as_array().unwrap();
+    assert_eq!(cases.len(), 2);
+    for case in cases {
+        let id = case["id"].as_str().unwrap();
+        let record: BrushPresetRecord = serde_json::from_value(case["preset"].clone()).unwrap();
+        let dabs = stamp_with(&o, case, &from_catalog(&record).unwrap());
+        let expected = case["dabs"].as_array().unwrap();
+        assert_eq!(dabs.len(), expected.len(), "{id}");
+        for (i, (dab, e)) in dabs.iter().zip(expected).enumerate() {
+            let part = &e["parts"][0];
+            let segments = part["segments"].as_array().unwrap();
+            assert_eq!(part["closed"].as_bool(), Some(dab.path.closed), "{id} dab {i}");
+            assert_eq!(segments.len(), dab.path.segments.len(), "{id} dab {i}");
+            for (s, e) in dab.path.segments.iter().zip(segments) {
+                let got = [s.p[0], s.p[1], s.h_in[0], s.h_in[1], s.h_out[0], s.h_out[1]];
+                let same = got.iter().zip(e.as_array().unwrap()).all(|(g, e)| near(*g, f(e), 1.5e-6));
+                assert!(same, "{id} dab {i}: {got:?} != {e}");
+            }
+            assert!(near(dab.opacity, f(&e["opacity"]), 1.5e-6), "{id} dab {i} opacity");
+            assert!(near(dab.value_delta, f(&e["valueDelta"]), 1.5e-6), "{id} dab {i} value");
+        }
+    }
+}
+
+#[test]
+fn a_captured_stamp_without_its_handles_has_no_catalog_preset() {
+    let o = oracle();
+    let mut preset = o["customCases"][0]["preset"].clone();
+    preset["customStamp"]["segments"][1].as_object_mut().unwrap().remove("handleOut");
+    let record: BrushPresetRecord = serde_json::from_value(preset).unwrap();
+    assert_eq!(from_catalog(&record), None, "the baseline reads s.handleOut[0] and throws");
 }

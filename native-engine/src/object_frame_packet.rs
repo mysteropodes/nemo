@@ -1,6 +1,8 @@
 //! Internal CPU scene inputs from one admitted immutable object snapshot.
 //! Array positions are provenance only; composition policy belongs to consumers.
 use crate::evaluation::object_vector_kernels::render_vector_eval::holders_fully_consumed;
+// Detached geometry planning is a frame-source port; rendering never owns publication.
+pub(crate) use crate::object_document::subselect::record as subselect_record;
 pub(crate) use crate::object_document::{
     AuthoredOrder, BitmapBrushFields, FrameScopeKind, ObjectLayer, ObjectRecord, ObjectTarget,
     Presence, PropertyHolderTarget, SolidFill, VECTOR_FAMILY,
@@ -288,6 +290,10 @@ impl ObjectFramePacket {
         self.frame
     }
     /// Same stored camera provider for trusted export and locked-view consumers.
+    /// The project's custom brush catalog (`state.customBrushPresets`), when the snapshot carries a project.
+    pub(crate) fn custom_brush_presets(&self) -> Option<&crate::object_document::ProjectPresetCatalog> {
+        self.snapshot.project().and_then(|p| p.project().custom_brush_presets())
+    }
     pub(crate) fn stored_camera_matrix(&self) -> Result<Option<[f64; 6]>, ObjectFrameError> {
         self.snapshot
             .sampled_camera_matrix(f64::from(self.frame))
