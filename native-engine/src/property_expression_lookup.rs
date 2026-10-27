@@ -464,3 +464,7 @@ impl MarkerList {
         self.nearest(js_num(t) * fps.get(), fps)
     }
 }
+
+// D16-K2: the same marker API bound to the pinned native composition and layer records.
+#[path = "property_expression_marker_binding.rs"]
+pub(crate) mod marker_binding;
