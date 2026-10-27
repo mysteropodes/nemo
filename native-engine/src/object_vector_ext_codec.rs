@@ -87,6 +87,9 @@ pub(crate) fn validate_vector_ext(record: &ObjectRecord) -> Result<(), ObjectCod
     if let Some(tags) = ext.brush_texture.value() {
         validate_brush_texture(tags)?;
     }
+    if ext.is_fill_shape.value() == Some(&false) {
+        return Err(invalid("isFillShape is only ever true"));
+    }
     if let Some(shadow) = ext.shadow.value() {
         if shadow.channel_tag != "shadow" {
             return Err(invalid("channelTag is only ever 'shadow'"));

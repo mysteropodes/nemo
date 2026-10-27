@@ -85,6 +85,7 @@ pub(crate) fn fill_record(
             bitmap_brush: Presence::Missing,
             brush_texture: Presence::Missing,
             shadow: Presence::Missing,
+            is_fill_shape: Presence::Missing,
             linked_fill_id: Presence::Missing,
             is_linked_fill_companion: Presence::Missing,
             is_mask: Presence::Missing,
@@ -234,6 +235,10 @@ pub(crate) fn plan_trace(
             is_vector_brush: r.is_pressure_ribbon(),
             is_linked_fill_companion: companion(r),
             is_brush_texture_copy: dab(r),
+            is_fill_shape: r
+                .vector_ext
+                .value()
+                .is_some_and(|e| e.is_fill_shape.value() == Some(&true)),
             stroke_id: Some(r.target.stroke_id.clone()),
             fill_walls: r
                 .vector_ext

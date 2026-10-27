@@ -49,6 +49,9 @@ pub struct VectorExt {
     /// Shadow Brush construction ink (`applyShadowBrushTag`): serP's `channelTag` and `shadowSwatchId`.
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) shadow: Presence<ShadowChannel>,
+    /// A Fill Brush shape (serP's `isFillShape`, written only when true), which the same-colour merge treats apart.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) is_fill_shape: Presence<bool>,
 }
 object_deserialize!(VectorExt {
     #[serde(default)] pressure: Presence<PressureFields>,
@@ -63,7 +66,8 @@ object_deserialize!(VectorExt {
     #[serde(default)] mask_feather: Presence<Option<Number>>,
     #[serde(default)] bitmap_brush: Presence<crate::object_document::BitmapBrushFields>,
     #[serde(default)] brush_texture: Presence<BrushTexture>,
-    #[serde(default)] shadow: Presence<ShadowChannel>
+    #[serde(default)] shadow: Presence<ShadowChannel>,
+    #[serde(default)] is_fill_shape: Presence<bool>
 });
 
 /// serP's shadow channel members: `channelTag` (only ever `'shadow'`, written when truthy) and the swatch that drew
@@ -95,6 +99,7 @@ impl VectorExt {
             && self.bitmap_brush.missing()
             && self.brush_texture.missing()
             && self.shadow.missing()
+            && self.is_fill_shape.missing()
     }
 }
 
