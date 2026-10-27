@@ -9,6 +9,7 @@
   const same=(a,b)=>!!a&&!!b&&pins.every(k=>a[k]===b[k]);
   const map=(m,p)=>[m[0]*p[0]+m[2]*p[1]+m[4],m[1]*p[0]+m[3]*p[1]+m[5]];
   function inverse(m,p){const d=m[0]*m[3]-m[1]*m[2];if(!Number.isFinite(d)||Math.abs(d)<1e-12)throw new Error('Subselect transform is singular');const x=p[0]-m[4],y=p[1]-m[5];return [(m[3]*x-m[2]*y)/d,(-m[1]*x+m[0]*y)/d];}
+  function snap(start,p){const x=p[0]-start[0],y=p[1]-start[1],distance=Math.sqrt(x*x+y*y),angle=Math.round(Math.atan2(y,x)/(Math.PI/4))*(Math.PI/4);return [start[0]+Math.cos(angle)*distance,start[1]+Math.sin(angle)*distance];}
   const consume=e=>{if(e.stopImmediatePropagation)e.stopImmediatePropagation();if(e.preventDefault)e.preventDefault();};
   function create(root){
     let selection=null,drag=null,marquee=null,overlay=null,pending=null,uncertain=null,recovering=false,readToken=0,previewToken=0,previewBusy=false,previewNext=null,retired=false;
@@ -107,8 +108,9 @@
       settled=pending.then(receipt=>{cancel(true);return {status:receipt.applied?'applied':'noop',receipt};},error=>{cancel(true);notice(error);if(error&&error.code==='subselect_command_indeterminate'){uncertain=error;return {status:'indeterminate',error};}return {status:'refused',error};}).finally(()=>{pending=null;});return settled;
     }
     function start(e,t,hit){
-      if(e.shiftKey&&hit.key==='point'){const pos=t.indices.indexOf(hit.index);if(pos<0)t.indices.push(hit.index);else t.indices.splice(pos,1);draw(t,t.item.segments);return;}
-      if(hit.key==='point'&&!t.indices.includes(hit.index))t.indices=[hit.index];
+      const group=hit.key==='point'&&t.indices.includes(hit.index)&&t.indices.length>1;
+      t.dragIndices=group?t.indices.slice():[hit.index];t.pairedPoint=null;
+      if(hit.key==='point'&&!group)t.indices=e.shiftKey?Array.from(new Set(t.indices.concat(hit.index))):[hit.index];
       t.hit=hit;t.start=inverse(t.item.matrix,point(e,t));t.clientStart=[e.clientX,e.clientY];t.pointer=e.pointerId;t.alt=e.altKey;t.intent=null;drag=t;t.capture=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(t.capture.setPointerCapture)t.capture.setPointerCapture(t.pointer);draw(t,t.item.segments);
     }
     function down(e){if(pending||drag)return;
@@ -128,8 +130,11 @@
     }
     function move(e){if(marquee&&marquee.pointer===e.pointerId){const t=marquee;if(!current(t)){cancel(true);return;}t.end=point(e,t);t.moved=true;if(t.items)drawMarquee(t);return;}
       const t=drag;if(!t||t.pointer!==e.pointerId)return;if(!current(t)){cancel(true);return;}
-      const p=inverse(t.item.matrix,point(e,t));t.intent=t.hit.key==='point'?{kind:'move',indices:t.indices.slice(),delta:[p[0]-t.start[0],p[1]-t.start[1]]}:
-        {kind:'handle',index:t.hit.index,handle:t.hit.key,point:p,breakPair:!!e.altKey};preview(t,t.intent);}
+      let p=inverse(t.item.matrix,point(e,t));if(e.shiftKey)p=snap(t.hit.key==='point'?t.start:t.item.segments[t.hit.index].point,p);
+      if(t.hit.key==='point')t.intent={kind:'move',indices:t.dragIndices.slice(),delta:[p[0]-t.start[0],p[1]-t.start[1]]};
+      else {if(!e.altKey)t.pairedPoint=p;t.intent={kind:'handle',index:t.hit.index,handle:t.hit.key,point:p,breakPair:!!e.altKey};
+        if(e.altKey&&t.pairedPoint)t.intent.pairedPoint=t.pairedPoint;}
+      preview(t,t.intent);}
     function up(e){if(marquee&&marquee.pointer===e.pointerId){const t=marquee;t.ended=true;if(t.items)settled=Promise.resolve(finishMarquee(t));return;}
       const t=drag;if(!t||t.pointer!==e.pointerId)return;drag=null;release(t);++previewToken;previewNext=null;
       if(!current(t)){cancel(true);return;}const click=Math.hypot(e.clientX-t.clientStart[0],e.clientY-t.clientStart[1])<3;

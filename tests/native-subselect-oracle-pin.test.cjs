@@ -31,3 +31,13 @@ test('subselect held-frame promotion oracle executes the original key and exposu
   for(const [file,hash] of Object.entries(held.hashes))assert.equal(crypto.createHash('sha256').update(cp.execFileSync('git',['show',`${baseline}:${file}`],{cwd:root,maxBuffer:8e6})).digest('hex'),hash);
   assert.deepEqual(JSON.parse(cp.execFileSync(process.execPath,['native-engine/tests/fixtures/subselect-baseline/gen-held.cjs'],{cwd:root,maxBuffer:8e6})),held);
 });
+
+test('subselect modifier oracle executes frozen pointer handlers with explicit injected affine maps',()=>{
+  const modifiers=JSON.parse(fs.readFileSync(path.join(root,'native-engine/tests/fixtures/subselect-baseline/modifiers.json')));
+  assert.equal(modifiers.baseline,baseline);assert.equal(modifiers.cases.length,45);
+  for(const [file,hash] of Object.entries(modifiers.hashes))assert.equal(crypto.createHash('sha256').update(cp.execFileSync('git',['show',`${baseline}:${file}`],{cwd:root,maxBuffer:8e6})).digest('hex'),hash);
+  assert.deepEqual(JSON.parse(cp.execFileSync(process.execPath,['native-engine/tests/fixtures/subselect-baseline/gen-modifiers.cjs'],{cwd:root,maxBuffer:8e6})),modifiers);
+  const duplicate=modifiers.cases.find(row=>row.name==='point-shift-000');
+  assert.deepEqual(duplicate.selection,[0,0]); // Preserve the observed baseline defect; native admission stays unique.
+  assert.deepEqual(duplicate.start,[20,20]);
+});

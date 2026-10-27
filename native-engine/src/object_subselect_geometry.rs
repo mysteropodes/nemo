@@ -32,6 +32,12 @@ pub(crate) enum Intent {
         point: [f64; 2],
         #[serde(rename = "breakPair")]
         break_pair: bool,
+        #[serde(
+            default,
+            rename = "pairedPoint",
+            skip_serializing_if = "crate::object_document::Presence::missing"
+        )]
+        paired_point: crate::object_document::Presence<[f64; 2]>,
     },
     PointType {
         indices: Vec<usize>,
@@ -306,23 +312,38 @@ pub(crate) fn edit(
             handle,
             point,
             break_pair,
+            paired_point,
         } => {
             indices(&[*index], a.len())?;
             if !point.iter().all(|v| v.is_finite()) {
                 return Err(Refusal::Invalid);
             }
+            let paired = match paired_point {
+                crate::object_document::Presence::Missing => None,
+                crate::object_document::Presence::Present(p)
+                    if *break_pair && p.iter().all(|v| v.is_finite()) =>
+                {
+                    Some(*p)
+                }
+                _ => return Err(Refusal::Invalid),
+            };
             let v = sub(*point, a[*index].point);
+            let opposite = if !break_pair {
+                Some(mul(v, -1.0))
+            } else {
+                paired.map(|p| mul(sub(p, a[*index].point), -1.0))
+            };
             match handle.as_str() {
                 "handleIn" => {
                     a[*index].handle_in = v;
-                    if !break_pair {
-                        a[*index].handle_out = mul(v, -1.0);
+                    if let Some(opposite) = opposite {
+                        a[*index].handle_out = opposite;
                     }
                 }
                 "handleOut" => {
                     a[*index].handle_out = v;
-                    if !break_pair {
-                        a[*index].handle_in = mul(v, -1.0);
+                    if let Some(opposite) = opposite {
+                        a[*index].handle_in = opposite;
                     }
                 }
                 _ => return Err(Refusal::Invalid),

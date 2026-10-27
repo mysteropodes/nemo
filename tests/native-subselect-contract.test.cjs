@@ -42,3 +42,13 @@ test('application transport preserves opaque source IDs in native subselect prev
   A.validateRequest(q);
   A.validateResponse({apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:7,ok:true,result},q.requestId,q.operation);
 });
+
+test('paired tangent endpoint stays closed, finite and limited to broken pairs',()=>{
+  const A=require('../src/js/adapters/native-application.js');
+  const intent={kind:'handle',index:0,handle:'handleOut',point:[50,40],breakPair:true,pairedPoint:[30,20]};
+  assert.equal(C.intent(intent),true);
+  A.validateRequest({apiVersion:2,requestId:'paired-tangent',instanceId:'instance',documentId:'document',expectedRevision:7,operation:C.EDIT,payload:{command:'object.subselect.edit',stableTarget:target,intent}});
+  for(const patch of [{breakPair:false},{pairedPoint:null},{pairedPoint:[Infinity,0]},{pairedPoint:[0]},{extra:1}])assert.equal(C.intent({...intent,...patch}),false);
+  assert.equal(C.intent({kind:'toggle',index:0,pairedPoint:[1,2]}),false);
+  for(const row of require('../native-engine/tests/fixtures/subselect-baseline/modifiers.json').cases)for(const step of row.steps)assert.equal(C.intent(step.intent),true,row.name);
+});
