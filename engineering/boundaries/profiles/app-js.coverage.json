@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "9204b2cb29ec4994e8014ca957dae14f7fdb866f",
-    "sourceRootTree": "2850857e96f478ecc3a2a2010768bcbccb4f9e86",
+    "candidateCommit": "eba08ab2611b616eb02508e6b832c4f806d871a0",
+    "sourceRootTree": "72a9aeb8fbbde2b2e56ec1b3185941e57b8c4aaa",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "b580aee01c0fd7d05d95daa3263881c9fa3fd027",
-      "lastChangedCommit": "9204b2cb29ec4994e8014ca957dae14f7fdb866f"
+      "gitTree": "d655cc40f2d997f77e33b239e469d2f88e284c1a",
+      "lastChangedCommit": "eba08ab2611b616eb02508e6b832c4f806d871a0"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "e0401cb3f5abda9ce12b404945871b3491c4692f",
-      "sha256": "8607f9c604ef14493fe0d7c3cc906bb7c71d4b1728782b2411dc4bcc3fe8af3f",
+      "gitBlob": "36dc8cfb7edbebd93af07dba85dab867b91444de",
+      "sha256": "5103bec7b62131cd8cbc67179361ce9b1726902a8ce92f9572c704a35c4ef6c4",
       "lastChangedCommit": "f606f3b2ea60c6bf5cdb7d031b8c54b3b60d291a"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "9ac12cc6611b011ce8b8ce96a00a827171812afa3056884bcc7b700d727d7efa"
+      "value": "b5b2953b9c08bf058542c026947c466ae010a5df9aff6fac43d6159a6cbcd5c9"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "3b702ca1ca5d7a4d7f0e4d3bdcbe7230ad22ff3a",
-        "sha256": "d7003ac4f4b818437b07e8cdcef3dd87fc28c6894e92454c5fe3b163cc43ff40",
+        "gitBlob": "dd5ce94ccdbc5fd96076ace563e784c38a1934fe",
+        "sha256": "f6314b9aa9355bbb1643a493714d46bc9913d706e6b4fc91b12e4ece6c3874cc",
         "moduleCount": 307,
-        "basedOnCommit": "9204b2cb29ec4994e8014ca957dae14f7fdb866f"
+        "basedOnCommit": "eba08ab2611b616eb02508e6b832c4f806d871a0"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -121,13 +121,13 @@
   "bootstrapObservations": {
     "path": "src/index.html",
     "scriptOrdinalConvention": "One-based order of all script start tags, including inline and excluded vendor tags.",
-    "totalScriptTags": 322,
-    "externalClassicTags": 319,
+    "totalScriptTags": 323,
+    "externalClassicTags": 320,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
-    "retainedClassicTags": 315,
+    "retainedClassicTags": 316,
     "retainedModuleTags": 2,
-    "classicTagsUnderSrcJsIncludingVendors": 318,
+    "classicTagsUnderSrcJsIncludingVendors": 319,
     "inlineScripts": [
       {
         "path": "src/index.html",
@@ -817,14 +817,26 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-layer-list-presenter.js",
-      "moduleId": "app.native.object.ui.adapter",
+      "path": "src/js/application/shortcut-targets.js",
+      "moduleId": "app.shortcut.targets",
       "executionClass": "document-classic",
       "loadSites": [
         {
           "path": "src/index.html",
           "line": 2673,
           "scriptOrdinal": 320
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-layer-list-presenter.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2674,
+          "scriptOrdinal": 321
         }
       ]
     },
@@ -4583,8 +4595,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2674,
-          "scriptOrdinal": 321
+          "line": 2675,
+          "scriptOrdinal": 322
         }
       ],
       "sourceEvidence": [
@@ -4602,8 +4614,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2675,
-          "scriptOrdinal": 322
+          "line": 2676,
+          "scriptOrdinal": 323
         }
       ],
       "sourceEvidence": [
