@@ -45,6 +45,7 @@ fn spec_of(case: &Value) -> LottieSpec {
         width: s["width"].as_u64().unwrap() as u32,
         height: s["height"].as_u64().unwrap() as u32,
         background: s["background"].as_str().unwrap().to_string(),
+        include_shadow_guides: s["includeShadowGuides"].as_bool().unwrap_or(false),
     }
 }
 fn export(case: &Value) -> Result<Value, LottieExportError> {
@@ -110,14 +111,14 @@ fn every_oracle_case_matches_the_baseline_writer() {
     let oracle: Value = serde_json::from_str(ORACLE).unwrap();
     assert_eq!(oracle["commit"].as_str().unwrap().len(), 40);
     let cases = oracle["cases"].as_array().unwrap();
-    assert_eq!(cases.len(), 10);
+    assert_eq!(cases.len(), 13);
     let runs = |case: &&Value| cfg!(feature = "project_media_codec") || case["project"].is_null();
     assert_eq!(
         cases.iter().filter(runs).count(),
         if cfg!(feature = "project_media_codec") {
-            10
+            13
         } else {
-            7
+            10
         }
     );
     for case in cases.iter().filter(runs) {
@@ -299,6 +300,11 @@ fn a_text_block_writes_as_its_vector_text_glyph_paths() {
     let with_text = with_text_block(case);
     let glyphs = as_glyph_records(case, &with_text);
     assert_eq!(export(&with_text).unwrap(), export(&glyphs).unwrap());
+    // The layer's own opacity never reaches a written shape, text included (its glyph factor is divided out).
+    let mut faded = with_text.clone();
+    faded["document"]["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"L0"},
+        "properties":[{"property":"opacity","static":[40]}]}]);
+    assert_eq!(export(&faded).unwrap(), export(&with_text).unwrap());
     assert_ne!(export(&with_text).unwrap(), export(case).unwrap(), "the text really reaches the Lottie");
 }
 

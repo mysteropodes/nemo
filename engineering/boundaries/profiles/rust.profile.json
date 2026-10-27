@@ -1887,6 +1887,7 @@
         "object_brush_export.rs",
         "object_brush_runtime.rs",
         "object_brush_scene_join.rs",
+        "object_brush_scene_lottie.rs",
         "object_brush_trim_bake.rs",
         "object_bitmap_brush_transition.rs",
         "native_import_transaction_assets.rs",

@@ -11,13 +11,14 @@
 //! open path's first handle-in and last handle-out do not reach the drawn path and are emitted as
 //! zero, which no player draws. A stored camera bakes into every anchor and handle of the frame,
 //! as `lottieCamMatrix` does (the camera matrix of the frame, its linear part for handles). Dropped
-//! as the baseline drops them: rasters, masks (never paint commands) and zero-opacity strokes. As
+//! as the baseline drops them: rasters (bitmap-brush ink included), video frames, masks (never paint
+//! commands) and zero-opacity strokes. As
 //! `getEffectiveStrokesRendered` returns them, a placed component is its inner strokes on the host
 //! layer under camera then symMatrix, and a duplicator its copies (factored opacity, hue-turned
 //! paints). A text block is the baseline's vector text: each painted contour a closed fill-only shape
 //! in the block colour (`buildGlyphPaths`). Refused, until later increments admit them with oracle
-//! rows: bitmap brush, video, legacy fill records and a layer opacity factor other than one (the baseline
-//! writes every layer at full opacity, `ks.o` 100). A seeded brush-texture anchor's dabs are written as
+//! rows: legacy fill records. A layer's own opacity is not written: the baseline writes every
+//! layer at full opacity (`ks.o` 100) and each shape at its stroke's own opacity. A seeded brush-texture anchor's dabs are written as
 //! the dabs the baseline stores for it: each a fill-only shape at the dab opacity, its colour through
 //! the hex Paper stores (`toCSS(true)`) and its outline through the three-decimal rounding `serP`
 //! stores (`_r3`), right after the anchor's own slot.
@@ -35,6 +36,9 @@ pub(crate) struct LottieSpec {
     pub(crate) width: u32,
     pub(crate) height: u32,
     pub(crate) background: String,
+    /// `state.exportIncludeShadowGuides` (off by default): without it, `lottieBuild` filters out every
+    /// Shadow Brush construction stroke (`sd.channelTag === 'shadow'`).
+    pub(crate) include_shadow_guides: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,7 +118,7 @@ fn path_layer(
 /// One drawn stroke dict as `lottieBuild` shows it, or `None` when its filter drops it. A macro, not a
 /// function: the record type belongs to the evaluation layer, which this export layer may read but not name.
 macro_rules! shown_of {
-    ($record:expr, $path:expr, $index:expr, $camera:expr) => {{
+    ($record:expr, $path:expr, $index:expr, $camera:expr, $shadows:expr) => {{
         let (record, path, index, camera): (_, &BezPath, usize, _) = ($record, $path, $index, $camera);
         let shown: Result<Option<Shown>, LottieExportError> = 'shown: {
                 if record.family != VECTOR_FAMILY {
@@ -122,6 +126,15 @@ macro_rules! shown_of {
                         source_object_index: index,
                         reason: "legacy fill records have no admitted Lottie representation yet",
                     });
+                }
+                // `state.exportIncludeShadowGuides || sd.channelTag !== 'shadow'`.
+                let shadow = record
+                    .vector_ext
+                    .value()
+                    .and_then(|e| e.shadow.value())
+                    .is_some_and(|s| s.channel_tag == "shadow");
+                if shadow && !$shadows {
+                    break 'shown Ok(None);
                 }
                 let body = record.vector().ok_or(LottieExportError::Unsupported {
                     source_object_index: index,
@@ -176,18 +189,9 @@ fn host_opacity(plan: &ObjectPaintPlan, host: usize) -> Result<f64, LottieExport
         })
 }
 
-fn push(
-    out: &mut [Vec<Shown>],
-    layer: usize,
-    layer_opacity: f64,
-    shown: Shown,
-) -> Result<(), LottieExportError> {
-    if layer_opacity != 1.0 {
-        return Err(LottieExportError::UnsupportedLayer {
-            source_layer_index: layer,
-            reason: "a layer opacity factor has no admitted Lottie representation yet",
-        });
-    }
+/// A layer's own opacity is never written: `lottieBuild` gives every layer `ks.o` 100 and each shape the
+/// stroke dict's own opacity, which no layer factor reaches.
+fn push(out: &mut [Vec<Shown>], layer: usize, shown: Shown) -> Result<(), LottieExportError> {
     out.get_mut(layer)
         .ok_or(LottieExportError::InvalidRange)?
         .push(shown);
@@ -198,6 +202,7 @@ fn push(
 fn shown_by_layer(
     plan: &ObjectPaintPlan,
     layers: usize,
+    shadows: bool,
 ) -> Result<Vec<Vec<Shown>>, LottieExportError> {
     let frame = plan.packet().frame();
     let camera = plan
@@ -206,12 +211,6 @@ fn shown_by_layer(
         .map_err(|_| LottieExportError::CameraUnavailable { frame })?;
     let mut out: Vec<Vec<Shown>> = (0..layers).map(|_| Vec::new()).collect();
     for entry in ordered_entries(plan) {
-        let refuse = |source_object_index, reason| {
-            Err(LottieExportError::Unsupported {
-                source_object_index,
-                reason,
-            })
-        };
         let command = match entry {
             PaintEntry::Contour(command) => command,
             // `lottieBuild` drops rasters (and with them bitmap-brush companions).
@@ -227,6 +226,13 @@ fn shown_by_layer(
                     }
                 })?;
                 let channel = |c: u8| number(f64::from(c) / 255.0);
+                // A scene block's glyph opacity carries its layer's factor, which the dict never has.
+                if host == 0.0 && text.item.painted().next().is_some() {
+                    return Err(LottieExportError::UnsupportedLayer {
+                        source_layer_index: text.layer_index,
+                        reason: "text on a fully transparent layer has no recoverable glyph opacity",
+                    });
+                }
                 for (contour, _) in text.item.painted() {
                     // `sd.opacity !== 0`; a placed or animated glyph carries its own factor.
                     if contour.opacity == 0.0 {
@@ -236,9 +242,9 @@ fn shown_by_layer(
                         shape: shape_value(contour.contour.path(), camera, text.source_index)?,
                         stroke: None,
                         fill: Some(Value::Array(vec![channel(r)?, channel(g)?, channel(b)?, json!(1)])),
-                        opacity: contour.opacity,
+                        opacity: contour.opacity / host,
                     };
-                    push(&mut out, text.layer_index, host, shown)?;
+                    push(&mut out, text.layer_index, shown)?;
                 }
                 continue;
             }
@@ -246,15 +252,15 @@ fn shown_by_layer(
             // `applyLayerDuplicator`'s copies on theirs, drawn like any stroke.
             PaintEntry::Component(component) => {
                 let host = component.host_layer_index;
-                if let Some(shown) = shown_of!(&component.record, &component.path, host, camera)? {
-                    push(&mut out, host, host_opacity(plan, host)?, shown)?;
+                if let Some(shown) = shown_of!(&component.record, &component.path, host, camera, shadows)? {
+                    push(&mut out, host, shown)?;
                 }
                 continue;
             }
             PaintEntry::Duplicator(copy) => {
                 let host = copy.layer_index;
-                if let Some(shown) = shown_of!(&copy.record, &copy.path, copy.source_index, camera)? {
-                    push(&mut out, host, host_opacity(plan, host)?, shown)?;
+                if let Some(shown) = shown_of!(&copy.record, &copy.path, copy.source_index, camera, shadows)? {
+                    push(&mut out, host, shown)?;
                 }
                 continue;
             }
@@ -262,12 +268,6 @@ fn shown_by_layer(
                 // `sd.opacity !== 0`, as for any stroke.
                 if dab.opacity == 0.0 {
                     continue;
-                }
-                if dab.layer_opacity != 1.0 {
-                    return Err(LottieExportError::UnsupportedLayer {
-                        source_layer_index: dab.layer_index,
-                        reason: "a layer opacity factor has no admitted Lottie representation yet",
-                    });
                 }
                 let [r, g, b, _] = dab.svg_rgba.ok_or(LottieExportError::NonFinite)?;
                 let hex = |c: f64| number((c.clamp(0.0, 1.0) * 255.0).round() / 255.0);
@@ -286,17 +286,14 @@ fn shown_by_layer(
             // `lottieBuild` writes nothing for it.
             PaintEntry::Video(_) => continue,
             #[cfg(all(feature = "application", feature = "project_media_codec"))]
-            PaintEntry::Brush(_) => {
-                return refuse(
-                    plan.first_brush_source().unwrap_or(0),
-                    "bitmap brush paint has no admitted Lottie representation yet",
-                )
-            }
+            // A bitmap brush's ink is its raster companions, which `lottieBuild` filters (`!sd.isRaster`);
+            // its vector anchor is written as its own contour.
+            PaintEntry::Brush(_) => continue,
         };
         let source = command.source();
         let layer = source.source_layer_index();
-        if let Some(shown) = shown_of!(source.record(), command.path(), source.source_object_index(), camera)? {
-            push(&mut out, layer, command.layer_opacity(), shown)?;
+        if let Some(shown) = shown_of!(source.record(), command.path(), source.source_object_index(), camera, shadows)? {
+            push(&mut out, layer, shown)?;
         }
     }
     Ok(out)
@@ -322,7 +319,7 @@ pub(crate) fn build_lottie(
     let layers = plans[0].packet().source_layers();
     let frames = plans
         .iter()
-        .map(|plan| shown_by_layer(plan, layers.len()))
+        .map(|plan| shown_by_layer(plan, layers.len(), spec.include_shadow_guides))
         .collect::<Result<Vec<_>, _>>()?;
     let mut ind = 1u32;
     let mut out = vec![
