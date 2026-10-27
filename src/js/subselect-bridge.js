@@ -148,8 +148,22 @@
     function handle(kind,e){if(!native()||root.state.tool!=='subselect')return false;
       const d=root.document,canvas=e.target===d.getElementById('drawing-canvas')||e.target===d.getElementById('canvas-area');if(!canvas&&!drag&&!marquee)return false;consume(e);
       try{if(kind==='lost'){if(drag||marquee&&!marquee.ended)cancel(false);}else if(kind==='cancel')cancel(false);else if(kind==='down')down(e);else if(kind==='move')move(e);else if(kind==='up')up(e);}catch(error){cancel(true);notice(error);}return true;}
-    function key(e){if(!native()||root.state.tool!=='subselect'||e.target&&(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)||e.target.isContentEditable))return false;
-      if(e.key==='Escape'){consume(e);cancel(true);return true;}if(e.key==='Delete'||e.key==='Backspace'){consume(e);action({kind:'delete'});return true;}return false;}
+    function deleteFrames(){
+      if(pending||uncertain){notice(new Error('Resolve the previous subselect command before another edit.'));return;}
+      cancel(true);
+      const frames=root.NemoNativeFrameEditController;
+      if(!frames||typeof frames.run!=='function'){notice(new Error('Native frame editing is unavailable.'));settled=Promise.resolve({status:'unavailable'});return;}
+      // The original timeline gives selected cells priority over path points.
+      // Use the native owner directly: releasing this capture must never reach a legacy writer.
+      try{pending=Promise.resolve(frames.run({kind:'deleteFrames'}));}
+      catch(error){notice(error);settled=Promise.resolve({status:'refused',error});return;}
+      settled=pending.catch(error=>{notice(error);return {status:'refused',error};}).finally(()=>{pending=null;refreshUI();});
+    }
+    function key(e){if(retired||!native()||root.state.tool!=='subselect'||e.target&&(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)||e.target.isContentEditable))return false;
+      if(e.key==='Escape'){consume(e);cancel(true);return true;}
+      if(e.key==='Delete'||e.key==='Backspace'){consume(e);
+        if(root.state.appMode==='anim2d'&&root._sel&&Array.isArray(root._sel.frames)&&root._sel.frames.length)deleteFrames();
+        else action({kind:'delete'});return true;}return false;}
     function recover(){if(!uncertain||pending)return Promise.resolve({status:'unavailable'});const prior=uncertain;recovering=true;pending=Promise.resolve().then(()=>prior.replay());settled=pending.then(receipt=>{uncertain=null;return {status:'reconciled',receipt};},error=>{notice(error);return {status:'indeterminate',error};}).finally(()=>{pending=null;recovering=false;});return settled;}
     return Object.freeze({handle,key,recover,selectionState,cancel:()=>cancel(true),setPointType:type=>action({kind:'pointType',pointType:type}),scale:(scale,anchor)=>action({kind:'scale',scale,anchor}),rotate:(degrees,center)=>action({kind:'rotate',degrees,center}),settled:()=>settled,
       dispose:()=>{retired=true;cancel(true);}});
