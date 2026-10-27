@@ -239,3 +239,39 @@ pub(crate) fn apply_wobble(
         })
         .collect()
 }
+
+/// A text block as the baseline's vector-text glyph dicts (`buildGlyphPaths`): each painted contour a closed
+/// path filled with the block colour, no stroke, at its own opacity, in painted order, on the lane of its glyph
+/// key. `sd.opacity !== 0` drops a glyph an animator hides.
+pub(crate) fn text_strokes(
+    text: &crate::object_render_scene::text_scene::TextSource,
+) -> Result<Vec<Stroke>, RiveExportError> {
+    let [r, g, b, a] = crate::object_render_scene::object_scene_producer_text::fill_rgba(text.item.color(), 1.0)
+        .map_err(|_| RiveExportError::Unsupported {
+            source_object_index: text.source_index,
+            reason: "text colour has no Rive representation",
+        })?;
+    let fill = [r, g, b, a].map(|c| f64::from(c) / 255.0);
+    let mut strokes = Vec::new();
+    for (contour, _) in text.item.painted() {
+        if contour.opacity == 0.0 {
+            continue;
+        }
+        let (v, i, o, closed) = geometry(contour.contour.path(), text.source_index)?;
+        strokes.push(Stroke {
+            id: contour.key.clone(),
+            v,
+            i,
+            o,
+            closed,
+            fill: Some(fill),
+            stroke: None,
+            width: 1.0,
+            real: false,
+            opacity: contour.opacity,
+            texture: None,
+            pre_texture_opacity: None,
+        });
+    }
+    Ok(strokes)
+}
