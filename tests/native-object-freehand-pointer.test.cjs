@@ -53,7 +53,7 @@ async function fixture(tool='draw',native=true){
    if(q.action==='acknowledge'){if(ack)await ack.promise;return null;}if(q.action==='disconnect')return null;
   }
   assert.equal(command,'nemo_native_dispatch');calls.push(structuredClone(q));
-  if(q.operation==='command.document.object.fill.brush'){assert.equal(q.expectedRevision,revision);revision++;
+  if(q.operation==='command.document.object.fill.brush'||q.operation==='command.document.object.brush.bitmap.stroke'){assert.equal(q.expectedRevision,revision);revision++;
    return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1}};}
   assert.equal(q.operation,'command.document.object.vector.edit');
   const prior=receipts.get(q.requestId);if(prior){assert.deepEqual(prior.request,q);const r=structuredClone(prior.response);if(replyChange)replyChange(r);return r;}
@@ -98,6 +98,8 @@ async function fixture(tool='draw',native=true){
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/stroke-modeler.js'),'utf8'),context,{filename:'stroke-modeler.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-paint.js'),'utf8'),context,{filename:'native-object-draw-paint.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-symmetry.js'),'utf8'),context,{filename:'native-object-draw-symmetry.js'});
+ // Required like the Fill desktop: its command payload must be built in the SDK's own realm.
+ root.NemoNativeDrawBitmap=require('../src/js/adapters/native-object-draw-bitmap.js');
  root.NemoNativeFillDesktop=require('../src/js/adapters/native-fill-desktop.js');
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-shape-tool.js'),'utf8'),context,{filename:'native-object-shape-tool.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/draw-bridge.js'),'utf8'),context,{filename:'draw-bridge.js'});
@@ -435,6 +437,52 @@ test('a textured pressure ribbon commits one seeded, hidden ribbon anchor; its l
 // #2361 Shadow Brush: applyShadowBrushTag @1065e9d8 over draw-bridge's commitStroke. The active swatch inks a plain
 // stroke (max(1, width), round ends) or, for the Stroke-off pressure fill, fills it; a ribbon goes back to its open
 // centreline; Shadow mode draws neither texture nor linked fill. Every record keeps its channel and swatch.
+// The bake and the host's scoped temp files are simulated; the PNG stage, SDK, contract and command route are the real ones.
+function bitmapPorts(f){
+ const files=new Map(),removed=[],baked=[];
+ const hex=fs.readFileSync(path.join(ROOT,'native-engine/tests/fixtures/object-raster-asset-attach/oracle.txt'),'utf8').split('\n')
+  .filter(l=>l&&!l.startsWith('#')).map(l=>JSON.parse(l)).find(r=>r.name==='blue-2x1').hex,png=Buffer.from(hex,'hex');
+ Object.assign(f.root.__TAURI__,{fs:{mkdir:async()=>{},writeFile:async(p,b)=>{files.set(p,b);},writeTextFile:async(p,t)=>{files.set(p,t);},
+  remove:async p=>{removed.push(p);files.delete(p);},exists:async p=>files.has(p)},path:{tempDir:async()=>'/tmp',join:async(a,b)=>a+'/'+b}});
+ f.root.crypto={randomUUID:()=>'00000000-0000-4000-8000-000000000001'};f.root.NemoNativeImportPngStage=require('../src/js/adapters/native-import-png-stage.js');
+ const canvas={width:2,height:1,toBlob(cb){cb(new Blob([png]));}};
+ f.root.SMBitmapBrush={bake(p,spec){baked.push({segments:p.segments.length,closed:p.closed,profile:p.data.bitmapPressureProfile,spec});return {canvas,minX:5,minY:6,w:40,h:20};}};
+ return {files,removed,baked};
+}
+test('a bitmap-brush Draw stroke commits its camouflaged anchor, baked companion and staged PNG in one native command',async()=>{
+ const f=await fixture(),{removed,baked}=bitmapPorts(f);
+ f.root.BRUSH_PRESETS={'charcoal-smooth':{}};
+ Object.assign(f.root.state,{bitmapBrushOn:true,bitmapTip:'grain',bitmapSpacing:10,bitmapScatter:5,bitmapOpacity:80,bitmapPressure:false,brushPreset:'charcoal-smooth'});
+ send(f,'pointerdown',20,20);send(f,'pointermove',50,30);send(f,'pointerup',80,45);
+ const done=await settled(f);assert.equal(done.status,'applied',JSON.stringify(done));assert.equal(f.calls.length,1);
+ const q=f.calls[0],p=q.payload,ext=p.record.vectorExt;assert.equal(q.operation,'command.document.object.brush.bitmap.stroke');
+ assert.deepEqual(Object.keys(p).sort(),['companion','documentSnapshotId','lifecycleGeneration','record','source']);
+ // applyBitmapBrushTexture: the bake reads the committed path, and the bitmap replaces the texture preset.
+ assert.equal(baked.length,1);assert.equal(baked[0].segments,p.record.geometry.segments.length);assert.equal(baked[0].profile,undefined);
+ const spec=ext.bitmapBrush.bitmapBrushSpec;assert.deepEqual({...spec,seed:0},{tip:'grain',size:4,spacing:10,scatter:5,opacity:.8,color:spec.color,pressure:false,seed:0});
+ assert.match(spec.color,/^#[0-9a-f]{8}$/);assert.ok(Number.isInteger(spec.seed));assert.equal(ext.brushTexture,undefined);
+ // With a fill the anchor keeps it and only its stroke goes, remembered.
+ assert.equal(p.record.vector.stroke,null);assert.equal(p.record.vector.hasRealStroke,false);assert.equal(ext.bitmapBrush.preTextureStroke,spec.color);assert.equal(p.record.vector.opacity,.5);
+ assert.match(ext.bitmapBrush.brushGroupId,/^bmb/);assert.equal(p.record.target.strokeId,'');
+ assert.deepEqual(p.companion,{x:25,y:16,width:40,height:20,opacity:1});
+ assert.equal(p.source.kind,'file');assert.match(p.source.path,/^\/tmp\/nemo-native-import-00000000-0000-4000-8000-000000000001\/source-0000\.png$/);
+ assert.ok(removed.includes(p.source.path),'a confirmed stroke cleans its staged PNG');
+ assert.equal(f.paper.project.activeLayer.children.length,0,'no Raster or path is inserted');
+});
+test('an unfilled bitmap stroke hides its anchor and carries its pressure profile; unsupported bitmap combinations stay refused',async()=>{
+ const f=await fixture(),{baked}=bitmapPorts(f);
+ Object.assign(f.root.state,{bitmapBrushOn:true,bitmapPressure:true,fillEnabled:false});
+ send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:.5});
+ assert.equal((await settled(f)).status,'applied');
+ const r=f.calls[0].payload.record,ext=r.vectorExt.bitmapBrush;
+ assert.equal(r.vector.opacity,0);assert.equal(ext.preTextureOpacity,.5);assert.equal(ext.preTextureStroke,undefined);assert.notEqual(r.vector.stroke,null);assert.equal(r.vector.hasRealStroke,true);
+ assert.equal(ext.bitmapBrushSpec.pressure,true);assert.ok(ext.bitmapPressureProfile.length>=2);assert.deepEqual(plain(baked[0].profile),ext.bitmapPressureProfile);
+ assert.ok(ext.bitmapPressureProfile.every(([x,y,m])=>Number.isFinite(x)&&Number.isFinite(y)&&m>=.2&&m<=2.5));
+ for(const change of [s=>s.symmetryEnabled=true,s=>s.drawMode='behind',s=>s.trimStrokeEnds=true,s=>s.maskMode=true]){
+  const g=await fixture();bitmapPorts(g);Object.assign(g.root.state,{bitmapBrushOn:true});change(g.root.state);
+  const e=send(g,'pointerdown',20,20);send(g,'pointerup',60,50);assert.equal(e.prevented,true);assert.equal(g.calls.length,0);assert.ok(g.log.some(x=>/unavailable/.test(x)),g.log.join(','));
+ }
+});
 test('Shadow mode commits construction ink in the active swatch with its channel and swatch id',async()=>{
  const swatch={id:'sh2',ordinal:2,color:'#ff8800'},ink=[1,0x88/255,0],shadow={channelTag:'shadow',shadowSwatchId:'sh2'};
  const colour=p=>[p.r,p.g,p.b];

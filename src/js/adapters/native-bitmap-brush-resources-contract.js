@@ -2,7 +2,9 @@
  * brush bitmap in the native charged store, and read the brush part of one pinned scene. Pure validation: no state,
  * no transport, no pixels. The SDK forbids raw pixel payloads, so a request names ids and a size only; the bytes
  * reach the native owner as a project asset (asset attach), never through this contract. Joined by the common SDK
- * through compose(); the native owner stays the only authority and repeats every rule on the original bytes. */
+ * through compose(); the native owner stays the only authority and repeats every rule on the original bytes.
+ * #2361 STROKE: one native bitmap-brush Draw stroke (its anchor record, the companion rectangle and the staged PNG's
+ * scoped file path); the host reads that file, so no pixel ever travels in the request. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -11,7 +13,8 @@
   'use strict';
   var PUBLISH = 'command.document.object.brush.bitmap.publish';
   var QUERY = 'query.document.object.brush.bitmap';
-  var OPS = [PUBLISH, QUERY];
+  var STROKE = 'command.document.object.brush.bitmap.stroke';
+  var OPS = [PUBLISH, QUERY, STROKE];
   // bakeToCanvas clamps every bake canvas to MAX_TEX = 4096 per side (src/js/bitmap-brush.js at the baseline).
   var MAX_SIDE = 4096;
   var MAX_FRAME = 4294967295;
@@ -65,7 +68,25 @@
     if (v.bytes !== bytesFor(v.width, v.height)) fail('bitmap cost is not width * height * 4');
   }
 
+  function finite(v) { if (typeof v !== 'number' || !Number.isFinite(v)) fail('number invalid'); }
+  // The anchor is checked here only for what pairs it: a new scene-root vector path carrying its brush group.
+  function stroke(p) {
+    exact(p, ['documentSnapshotId', 'lifecycleGeneration', 'record', 'companion', 'source'], 'bitmap stroke');
+    id(p.documentSnapshotId); int(p.lifecycleGeneration, 1);
+    var r = p.record, ext = plain(r) && plain(r.vectorExt) ? r.vectorExt.bitmapBrush : null;
+    if (!plain(r) || r.family !== 'editable-vector-path' || !plain(r.target) || r.target.strokeId !== '' || r.target.contextId !== 'scene-root' ||
+      !plain(ext) || !plain(ext.bitmapBrushSpec)) fail('bitmap stroke anchor invalid');
+    opaque(ext.brushGroupId);
+    var c = p.companion;
+    exact(c, ['x', 'y', 'width', 'height', 'opacity'], 'bitmap companion');
+    [c.x, c.y, c.width, c.height, c.opacity].forEach(finite);
+    if (!(c.width > 0 && c.height > 0 && c.opacity >= 0 && c.opacity <= 1)) fail('bitmap companion invalid');
+    exact(p.source, ['kind', 'path'], 'bitmap source');
+    if (p.source.kind !== 'file' || typeof p.source.path !== 'string' || !p.source.path || p.source.path.indexOf('\0') >= 0) fail('bitmap source invalid');
+  }
+
   function payload(op, p) {
+    if (op === STROKE) return stroke(p);
     if (op === PUBLISH) {
       exact(p, ['command', 'documentSnapshotId', 'assetId', 'brushId', 'width', 'height'], 'brush publish');
       if (p.command !== 'object.brush.bitmap.publish') fail('brush command invalid');
@@ -92,6 +113,12 @@
   }
 
   function result(op, v) {
+    if (op === STROKE) {
+      exact(v, ['applied', 'historyEntriesAdded'], 'stroke result');
+      bool(v.applied);
+      if (v.historyEntriesAdded !== (v.applied ? 1 : 0)) fail('history disposition invalid');
+      return;
+    }
     if (op === PUBLISH) {
       exact(v, ['applied', 'historyEntriesAdded', 'brushId', 'version', 'width', 'height', 'bytes'], 'publish result');
       bool(v.applied);
@@ -124,6 +151,10 @@
     if (r.instanceId !== q.instanceId || r.documentId !== q.documentId) fail('response owner mismatch');
     if (!r.ok) return;
     var p = q.payload, v = r.result;
+    if (q.operation === STROKE) {
+      if (r.contentRevision !== q.expectedRevision + (v.applied ? 1 : 0)) fail('stroke receipt revision mismatch');
+      return;
+    }
     if (q.operation === PUBLISH) {
       if (r.contentRevision !== q.expectedRevision) fail('a brush publication does not change the revision');
       if (v.brushId !== p.brushId || v.width !== p.width || v.height !== p.height) fail('publish receipt names another bitmap');
@@ -145,7 +176,7 @@
 
   var own = Object.freeze({
     admitted: function (op) { return OPS.indexOf(op) >= 0; },
-    requiresRevision: function (op) { return op === PUBLISH; },
+    requiresRevision: function (op) { return op === PUBLISH || op === STROKE; },
     payload: payload, result: result, correlate: correlate, paths: paths,
   });
   // The common SDK consumes one contract object; this composes it in front of the others without a second SDK seam.
@@ -161,6 +192,6 @@
     });
   }
   return Object.freeze(Object.assign({
-    compose: compose, PUBLISH: PUBLISH, QUERY: QUERY, MAX_SIDE: MAX_SIDE, MAX_ENTRIES: MAX_ENTRIES, bytesFor: bytesFor, validSide: validSide, pngSize: pngSize, compareUtf8: compareUtf8,
+    compose: compose, PUBLISH: PUBLISH, QUERY: QUERY, STROKE: STROKE, STROKE_REQUEST_BYTES: 65536, MAX_SIDE: MAX_SIDE, MAX_ENTRIES: MAX_ENTRIES, bytesFor: bytesFor, validSide: validSide, pngSize: pngSize, compareUtf8: compareUtf8,
   }, own));
 }));

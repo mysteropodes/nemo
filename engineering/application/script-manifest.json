@@ -248,6 +248,7 @@
     {"src":"js/subselect-bridge.js"},
     {"src":"js/adapters/native-object-draw-paint.js"},
     {"src":"js/adapters/native-object-draw-symmetry.js"},
+    {"src":"js/adapters/native-object-draw-bitmap.js"},
     {"src":"js/adapters/native-object-shape-tool.js"},
     {"src":"js/shape-bridge.js"},
     {"src":"js/eraser-bridge.js"},
