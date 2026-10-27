@@ -190,6 +190,25 @@ fn a_pressure_ribbon_and_its_linked_fill_land_as_one_pair() {
 }
 
 #[test]
+fn in_mask_mode_the_ribbon_is_the_mask_and_its_linked_fill_stays_an_ordinary_fill() {
+    // tagOwner (tools.js @1065e9d8) tags the committed path only: the ribbon, not its linked fill.
+    let mut owner = owner_of(&document(1, seeds(), None));
+    let companion = pressure_record([0.2, 0.4, 0.6], json!({"linkedFillId":"lf-mask","isLinkedFillCompanion":true}));
+    let ribbon = pressure_record([0.1, 0.1, 0.1], json!({"linkedFillId":"lf-mask","isMask":true,"maskMode":"subtract",
+        "pressure":{"centerSegments":[
+        {"point":{"x":0,"y":10},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":2},
+        {"point":{"x":40,"y":10},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":4}]}}));
+    let response = send(&mut owner, "mask-pair", many(vec![companion, ribbon]));
+    assert_eq!(response["ok"], true, "{response}");
+    let after = state(&owner);
+    let created: Vec<&Value> = objects(&after).iter().filter(|r| r["vectorExt"]["linkedFillId"] == "lf-mask").collect();
+    assert_eq!(created.len(), 2);
+    assert!(created[0]["vectorExt"]["isMask"].is_null(), "the linked fill is not a mask");
+    assert_eq!((&created[1]["vectorExt"]["isMask"], &created[1]["vectorExt"]["maskMode"]), (&json!(true), &json!("subtract")));
+    assert_eq!(state(&owner_of(&after)), after, "the masked pair reopens unchanged");
+}
+
+#[test]
 fn a_mirrored_ribbon_pair_lands_beside_the_drawn_pair_in_one_create_many() {
     // G23 symmetry over a pressure ribbon with Fill on: each copy has its own linked fill (a fresh link), so one
     // createMany carries two pairs in the same cell, each companion directly below its ribbon.
