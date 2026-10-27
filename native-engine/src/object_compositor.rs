@@ -518,3 +518,7 @@ mod object_scene_style_emit_refusal;
 #[cfg(all(test, feature = "history"))]
 #[path = "../tests/object_compositor_masks.rs"]
 mod mask_tests;
+
+#[cfg(all(test, feature = "history"))]
+#[path = "../tests/object_subselect_pixels.rs"]
+mod subselect_pixels;

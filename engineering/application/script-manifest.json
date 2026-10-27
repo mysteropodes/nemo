@@ -19,6 +19,7 @@
     {"src":"js/application/native-object-save-as-workflow.js"},
     {"src":"js/application/native-object-saved-acknowledgement.js"},
     {"src":"js/adapters/native-font-panel.js"},
+    {"src":"js/adapters/native-subselect-contract.js"},
     {"src":"js/adapters/native-frame-edit-contract.js"},
     {"src":"js/adapters/native-viewport-underlay.js"},
     {"src":"js/adapters/native-object-project-metadata.js"},

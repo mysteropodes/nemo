@@ -147,7 +147,9 @@
         "object_selection_compound.rs",
         "object_selection_compound_clones.rs",
         "object_tween_record.rs",
-        "object_tween_timing.rs"
+        "object_tween_timing.rs",
+        "object_subselect_geometry.rs",
+        "object_subselect_record.rs"
       ],
       "publicApi": [
         "document.rs",
@@ -466,7 +468,9 @@
         "native_import_transaction_source_types.rs",
         "object_history_read.rs",
         "object_command_families/tween.rs",
-        "object_tween_history.rs"
+        "object_tween_history.rs",
+        "object_subselect_history.rs",
+        "object_command_families/subselect.rs"
       ],
       "publicApi": [
         "history.rs",
@@ -718,7 +722,9 @@
         "object_brush_scene_join.rs",
         "object_brush_admission.rs",
         "object_brush_paint_join.rs",
-        "object_rig_packet_pose.rs"
+        "object_rig_packet_pose.rs",
+        "object_scene_subselect_projection.rs",
+        "object_subselect_projection.rs"
       ],
       "publicApi": [
         "render_scene.rs",
@@ -902,7 +908,10 @@
         "object_brush_read.rs",
         "object_tween_read.rs",
         "tween_bitmap_resources.rs",
-        "tween_png_encode.rs"
+        "tween_png_encode.rs",
+        "object_subselect_read.rs",
+        "object_read_admission.rs",
+        "object_subselect_view.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -1874,7 +1883,12 @@
         "object_tween_refusals.rs",
         "tween_kernels.rs",
         "encoded_retention_batch.rs",
-        "tween_resource_rollback.rs"
+        "tween_resource_rollback.rs",
+        "object_subselect_geometry.rs",
+        "object_subselect_history.rs",
+        "object_subselect_read.rs",
+        "object_subselect_projection.rs",
+        "object_subselect_pixels.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1920,6 +1934,8 @@
         "src/main.rs",
         "src/native_contract.rs",
         "src/native_object_contract.rs",
+        "src/native_subselect_contract.rs",
+        "src/native_subselect_contract_tests.rs",
         "src/native_object_contract_tests.rs",
         "src/native_image_mesh_read_contract.rs",
         "src/native_image_mesh_read_contract_tests.rs",
@@ -2337,7 +2353,8 @@
         "native_custom_brush_dispatch_tests.rs",
         "native_comments_dispatch_tests.rs",
         "native_object_brush_preview_tests.rs",
-        "native_import_batch_dispatch_tests.rs"
+        "native_import_batch_dispatch_tests.rs",
+        "native_subselect_read_public_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -2363,7 +2380,8 @@
         "native_object_preview_prepare.rs",
         "native_object_reference_preview.rs",
         "native_object_video.rs",
-        "native_object_import_batch.rs"
+        "native_object_import_batch.rs",
+        "native_object_subselect_read.rs"
       ],
       "publicApi": [
         "native_dispatch.rs"

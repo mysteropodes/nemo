@@ -29,6 +29,12 @@ fn target(value: &Value) -> bool {
 }
 
 pub(super) fn request(value: &Value) -> bool {
+    if value.get("subselect").is_some() {
+        return subselect::request(value);
+    }
+    if value["view"]["kind"] == "subselect" {
+        return subselect::view_request(value);
+    }
     if image_mesh::presentation_view(value) {
         return image_mesh::presentation_request(value);
     }
@@ -280,6 +286,12 @@ fn record(value: &Value) -> bool {
 }
 
 pub(super) fn result(document_id: &str, payload: &Value, result: &Value) -> bool {
+    if payload.get("subselect").is_some() {
+        return subselect::result(document_id, payload, result);
+    }
+    if payload["view"]["kind"] == "subselect" {
+        return subselect::view_result(document_id, payload, result);
+    }
     if image_mesh::presentation_view(payload) {
         return image_mesh::presentation_result(document_id, payload, result);
     }
@@ -306,10 +318,10 @@ pub(super) fn result(document_id: &str, payload: &Value, result: &Value) -> bool
 #[path = "native_object_contract_tests.rs"]
 mod tests;
 
-#[path = "native_layer_placement_contract.rs"]
-mod layer_placement;
 #[path = "native_layer_cells_contract.rs"]
 mod layer_cells;
+#[path = "native_layer_placement_contract.rs"]
+mod layer_placement;
 #[path = "native_layer_range_contract.rs"]
 mod layer_range;
 
@@ -323,3 +335,6 @@ mod image_mesh_tests;
 #[cfg(test)]
 #[path = "native_presentation_read_contract_tests.rs"]
 mod presentation_transport_tests;
+
+#[path = "native_subselect_contract.rs"]
+pub(crate) mod subselect;

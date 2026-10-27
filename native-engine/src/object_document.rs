@@ -191,6 +191,8 @@ pub use object_record::{
 mod object_motion_arcs;
 #[path = "object_tween_record.rs"]
 pub(crate) mod tween;
+#[path = "object_subselect_geometry.rs"]
+pub(crate) mod subselect;
 #[allow(unused_imports)]
 pub(crate) use object_motion_arcs::{KeyLockMode, MotionArcError, MotionArcHandles, MotionArcs};
 

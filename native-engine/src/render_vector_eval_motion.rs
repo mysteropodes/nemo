@@ -18,7 +18,7 @@ use kurbo::Shape;
 
 /// Element Motion is nested inside layer Motion, after the original path-FX
 /// and parametric stages. Its pivot is the actual native cubic bounds centre.
-pub(super) fn apply_element_motion(
+pub(crate) fn apply_element_motion(
     snapshot: &ObjectSnapshot,
     record: &ObjectRecord,
     frame: u32,
