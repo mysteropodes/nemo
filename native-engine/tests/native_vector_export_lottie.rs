@@ -45,6 +45,7 @@ fn spec_of(case: &Value) -> LottieSpec {
         width: s["width"].as_u64().unwrap() as u32,
         height: s["height"].as_u64().unwrap() as u32,
         background: s["background"].as_str().unwrap().to_string(),
+        include_shadow_guides: s["includeShadowGuides"].as_bool().unwrap_or(false),
     }
 }
 fn export(case: &Value) -> Result<Value, LottieExportError> {
@@ -110,14 +111,14 @@ fn every_oracle_case_matches_the_baseline_writer() {
     let oracle: Value = serde_json::from_str(ORACLE).unwrap();
     assert_eq!(oracle["commit"].as_str().unwrap().len(), 40);
     let cases = oracle["cases"].as_array().unwrap();
-    assert_eq!(cases.len(), 11);
+    assert_eq!(cases.len(), 13);
     let runs = |case: &&Value| cfg!(feature = "project_media_codec") || case["project"].is_null();
     assert_eq!(
         cases.iter().filter(runs).count(),
         if cfg!(feature = "project_media_codec") {
-            11
+            13
         } else {
-            8
+            10
         }
     );
     for case in cases.iter().filter(runs) {
