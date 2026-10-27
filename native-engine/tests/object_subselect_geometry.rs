@@ -141,3 +141,71 @@ fn subselect_modifier_intents_match_frozen_pointer_history_at_every_step() {
         assert_eq!(edit(&source, true, false, &intent), Err(Refusal::Invalid));
     }
 }
+
+#[test]
+fn subselect_pressure_centerlines_match_frozen_production_edits() {
+    let oracle: Value =
+        serde_json::from_str(include_str!("fixtures/subselect-baseline/pressure.json")).unwrap();
+    assert_eq!(
+        oracle["baseline"],
+        "46442ea96c09e6bfaadf956eb8586e273a658085"
+    );
+    assert_eq!(oracle["cases"].as_array().unwrap().len(), 180);
+    let anchors = |center: &Value| -> Vec<Anchor> {
+        center
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|segment| Anchor {
+                point: serde_json::from_value(segment["point"].clone()).unwrap(),
+                handle_in: serde_json::from_value(segment["handleIn"].clone()).unwrap(),
+                handle_out: serde_json::from_value(segment["handleOut"].clone()).unwrap(),
+            })
+            .collect()
+    };
+    for case in oracle["cases"].as_array().unwrap() {
+        let source = anchors(&case["before"]["center"]);
+        let before = source.clone();
+        let expected = anchors(&case["expected"]["center"]);
+        let intent: Intent = serde_json::from_value(case["intent"].clone()).unwrap();
+        // Pass the painted closure flag: original toggleTangentAt wraps endpoint
+        // neighbours on a closed ribbon. Other pressure operations use an open
+        // centerline. Width/metadata retention and outline reconstruction remain
+        // obligations of the pending record/paint port, outside this kernel check.
+        let actual = edit(
+            &source,
+            case["before"]["closed"].as_bool().unwrap(),
+            true,
+            &intent,
+        )
+        .unwrap();
+        if case["name"] == "line"
+            && case["profile"].is_null()
+            && matches!(intent, Intent::Toggle { index: 0 })
+        {
+            assert_ne!(
+                edit(&source, false, true, &intent).unwrap(),
+                expected,
+                "forcing open neighbours would erase the original endpoint-toggle quirk"
+            );
+        }
+        assert_eq!(source, before, "input mutated: {}", case["name"]);
+        assert_eq!(actual.len(), expected.len());
+        for (index, (a, b)) in actual.iter().zip(&expected).enumerate() {
+            for (x, y) in a
+                .point
+                .iter()
+                .chain(&a.handle_in)
+                .chain(&a.handle_out)
+                .zip(b.point.iter().chain(&b.handle_in).chain(&b.handle_out))
+            {
+                assert!(
+                    (x - y).abs() < 1e-9,
+                    "{} / {} / anchor {index}: {a:?} != {b:?}",
+                    case["name"],
+                    case["intent"]
+                );
+            }
+        }
+    }
+}
