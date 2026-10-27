@@ -129,16 +129,16 @@ fn every_oracle_case_holds_the_baseline_conversation() {
     let oracle: Value = serde_json::from_str(ORACLE).unwrap();
     assert_eq!(oracle["commit"].as_str().unwrap().len(), 40);
     let cases = oracle["cases"].as_array().unwrap();
-    assert_eq!(cases.len(), 8);
+    assert_eq!(cases.len(), 9);
     // Camera and duplicator cases are whole native project files (the stored camera and the duplicator's canvas
     // live in the project), which only the project-file codec loads; the drawing-only target runs the other rows.
     let runs = |case: &&Value| cfg!(feature = "project_media_codec") || case["project"].is_null();
     assert_eq!(
         cases.iter().filter(runs).count(),
         if cfg!(feature = "project_media_codec") {
-            8
+            9
         } else {
-            6
+            7
         }
     );
     for case in cases.iter().filter(runs) {

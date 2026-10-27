@@ -16,10 +16,12 @@
 //! seeded by its stroke id), painted at its remembered opacity. A stored camera becomes, as in the baseline, a component
 //! artboard holding the drawing that the main artboard instances and moves by the inverse camera on every frame.
 //! Duplicator copies are the dicts `applyLayerDuplicator` returns (clone-outer, source-inner, each keeping its source's
-//! stroke id, so repeats take the `+` lanes), with the copy's factored opacity and hue-turned fill and stroke.
+//! stroke id, so repeats take the `+` lanes), with the copy's factored opacity and hue-turned fill and stroke. A placed
+//! component is its `symbolId` branch's dicts on the host layer: inner strokes in inner order under camera then
+//! symMatrix, inner layer opacity folded in, stroke widths as stored.
 //! Dropped as the baseline drops them: zero-opacity strokes without a texture. Refused, until later increments admit
-//! them with oracle rows: rasters (the baseline throws on them), text, components, bitmap brush, video, legacy fill
-//! records and a layer opacity factor other than one (the baseline reads no layer opacity).
+//! them with oracle rows: rasters (the baseline throws on them), text, bitmap brush, video, legacy fill records and a
+//! layer opacity factor other than one (the baseline reads no layer opacity).
 use crate::object_render_scene::{ordered_entries, ObjectPaintPlan, PaintEntry};
 use kurbo::BezPath;
 use serde_json::{Number, Value};
@@ -194,11 +196,19 @@ fn strokes_by_layer(
                     "text has no admitted Rive representation yet",
                 )
             }
+            // The `symbolId` branch's dicts: inner strokes under camera then symMatrix, inner order.
             PaintEntry::Component(component) => {
-                return Err(RiveExportError::UnsupportedLayer {
-                    source_layer_index: component.host_layer_index,
-                    reason: "a placed component has no admitted Rive representation yet",
-                })
+                let host = component.host_layer_index;
+                if let Some(stroke) = stroke_of!(&component.record, &component.path, host)? {
+                    let opacity = plan.packet().layer_opacity(host).map_err(|_| {
+                        RiveExportError::UnsupportedLayer {
+                            source_layer_index: host,
+                            reason: "component host opacity is unavailable",
+                        }
+                    })?;
+                    push(&mut out, host, opacity, stroke)?;
+                }
+                continue;
             }
             // `applyLayerDuplicator`'s dicts: clone-outer/source-inner, each keeping its source's stroke id.
             PaintEntry::Duplicator(copy) => {
