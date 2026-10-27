@@ -236,8 +236,9 @@ fn a_stored_camera_moves_every_anchor_and_turns_every_handle() {
 
 #[test]
 #[cfg(feature = "font_asset_admission")]
-fn a_text_block_is_dropped_as_the_baselines_baked_text_raster_is() {
-    // `lottieBuild` filters `!sd.isRaster`, and the baseline's text is a raster (`commitText` bakes it to a PNG).
+fn a_text_block_refuses_until_its_vector_text_glyph_row_exists() {
+    // Native text is the baseline's vector text: `buildVectorTextGroup` glyphs are plain filled paths, which
+    // `lottieBuild` writes as shapes. Dropping them would silently lose ink, so the writer refuses for now.
     let oracle: Value = serde_json::from_str(ORACLE).unwrap();
     let case = &oracle["cases"][0];
     let mut with_text = case.clone();
@@ -262,5 +263,11 @@ fn a_text_block_is_dropped_as_the_baselines_baked_text_raster_is() {
             .any(|entry| matches!(entry, crate::object_render_scene::PaintEntry::Text(_))),
         "the frame really paints the text block"
     );
-    assert_eq!(export(&with_text).unwrap(), export(case).unwrap());
+    assert!(matches!(
+        export(&with_text),
+        Err(LottieExportError::Unsupported {
+            reason: "text has no admitted Lottie representation yet",
+            ..
+        })
+    ));
 }
