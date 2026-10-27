@@ -2,7 +2,7 @@
 use crate::object_codec::project::ProjectWireError;
 use crate::object_document::{
     Presence, ProjectCameraKey, ProjectCommentRecord, ProjectMetadata, ProjectPresetCatalog,
-    ProjectWorkspaceRecord,
+    ProjectWorkspaceRecord, SymmetrySettings,
 };
 use serde::{Deserialize, Serialize};
 
@@ -44,6 +44,20 @@ struct VanishingPoint {
 crate::object_document::object_deserialize!(VanishingPoint {
     x:f64, y:f64, #[serde(default)] locked:Presence<bool>
 });
+#[derive(Serialize)]
+struct SymmetryAxis {
+    x1: f64,
+    y1: f64,
+    x2: f64,
+    y2: f64,
+}
+crate::object_document::object_deserialize!(SymmetryAxis { x1:f64, y1:f64, x2:f64, y2:f64 });
+#[derive(Serialize)]
+struct SymmetryCenter {
+    x: f64,
+    y: f64,
+}
+crate::object_document::object_deserialize!(SymmetryCenter { x:f64, y:f64 });
 fn present<T>(value: Option<T>) -> Presence<T> {
     value.map(Presence::Present).unwrap_or(Presence::Missing)
 }
@@ -104,6 +118,18 @@ pub(super) struct Metadata {
     #[serde(skip_serializing_if = "Presence::missing", rename = "perspectiveVPs")]
     perspective_vps: Presence<Option<Vec<VanishingPoint>>>,
     #[serde(skip_serializing_if = "Presence::missing")]
+    symmetry_enabled: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    symmetry_mode: Presence<String>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    symmetry_axis: Presence<Option<SymmetryAxis>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    symmetry_radial_center: Presence<Option<SymmetryCenter>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    symmetry_radial_sectors: Presence<f64>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    symmetry_extend: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
     workspace: Presence<ProjectWorkspaceRecord>,
     #[serde(skip_serializing_if = "Presence::missing")]
     comments: Presence<Vec<ProjectCommentRecord>>,
@@ -137,6 +163,12 @@ crate::object_document::object_deserialize!(Metadata {
     #[serde(default)] perspective_mode:Presence<String>,
     #[serde(default)] perspective_density:Presence<f64>,
     #[serde(default,rename="perspectiveVPs")] perspective_vps:Presence<Option<Vec<VanishingPoint>>>,
+    #[serde(default)] symmetry_enabled:Presence<bool>,
+    #[serde(default)] symmetry_mode:Presence<String>,
+    #[serde(default)] symmetry_axis:Presence<Option<SymmetryAxis>>,
+    #[serde(default)] symmetry_radial_center:Presence<Option<SymmetryCenter>>,
+    #[serde(default)] symmetry_radial_sectors:Presence<f64>,
+    #[serde(default)] symmetry_extend:Presence<bool>,
     #[serde(default)] workspace:Presence<ProjectWorkspaceRecord>,
     #[serde(default)] comments:Presence<Vec<ProjectCommentRecord>>,
     #[serde(default)] custom_brush_presets:Presence<ProjectPresetCatalog>,
@@ -223,6 +255,21 @@ impl Metadata {
                 )
             })
             .and_then(|value| {
+                value.with_symmetry_metadata(SymmetrySettings {
+                    enabled: self.symmetry_enabled.value().copied(),
+                    mode: self.symmetry_mode.value().cloned(),
+                    axis: self.symmetry_axis.value().map(|axis| {
+                        axis.as_ref().map(|a| (a.x1, a.y1, a.x2, a.y2))
+                    }),
+                    radial_center: self
+                        .symmetry_radial_center
+                        .value()
+                        .map(|centre| centre.as_ref().map(|c| (c.x, c.y))),
+                    radial_sectors: self.symmetry_radial_sectors.value().copied(),
+                    extend: self.symmetry_extend.value().copied(),
+                })
+            })
+            .and_then(|value| {
                 value.with_annotations(
                     self.workspace.value().cloned(),
                     self.comments.value().cloned(),
@@ -248,6 +295,7 @@ impl Metadata {
         let (shadow_palette, shadow_active_id) = value.shadow_palette_metadata();
         let (perspective_enabled, perspective_mode, perspective_density, perspective_vps) =
             value.perspective_metadata();
+        let symmetry = value.symmetry_metadata();
         Self {
             canvas_w,
             canvas_h,
@@ -328,6 +376,18 @@ impl Metadata {
                         .collect()
                 })
             })),
+            symmetry_enabled: present(symmetry.enabled),
+            symmetry_mode: present(symmetry.mode.clone()),
+            symmetry_axis: present(symmetry.axis.map(|axis| {
+                axis.map(|(x1, y1, x2, y2)| SymmetryAxis { x1, y1, x2, y2 })
+            })),
+            symmetry_radial_center: present(
+                symmetry
+                    .radial_center
+                    .map(|centre| centre.map(|(x, y)| SymmetryCenter { x, y })),
+            ),
+            symmetry_radial_sectors: present(symmetry.radial_sectors),
+            symmetry_extend: present(symmetry.extend),
             camera_keys: value
                 .camera_keys()
                 .map(|keys| Presence::Present(keys.to_vec()))

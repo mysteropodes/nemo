@@ -73,6 +73,15 @@
   // shaping logic for an alternate samples array (see overlayItemFor's own
   // comment there) — it returns extra overlay item(s) to render alongside
   // the real in-progress stroke, or null/undefined for nothing.
+  // The enabled prototypes whose draw hooks (onStroke/onPreview) have no native route yet: native Drawing refuses while
+  // any is on rather than silently dropping its effect. A prototype that registers `nativeDraw: true` applies its hook
+  // inside the native commit itself (U33, #2362: predictive-stroke).
+  L.unmigratedDrawHooks = function () {
+    return Object.keys(protos).filter(function (n) {
+      var p = protos[n];
+      return (p.onStroke || p.onPreview) && !p.nativeDraw && isOn(n);
+    });
+  };
   L.buildDrawPreviewExtras = function (samples, overlayItemFor) {
     var out = [];
     Object.keys(protos).forEach(function (n) {

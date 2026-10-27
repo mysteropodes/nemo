@@ -32,6 +32,22 @@
          p.interpMode!==null&&(typeof p.interpMode!=='string'||!p.interpMode||p.interpMode.length>32)||
          p.frameBlend!==null&&typeof p.frameBlend!=='boolean'||p.sourceFrameCount!==null&&(!Number.isSafeInteger(p.sourceFrameCount)||p.sourceFrameCount<1||p.sourceFrameCount>4294967295))throw new TypeError('invalid video placement facts');
     }
+    // U31 (#2374): the whole-row cells view; runs tile the page in order from frame, nextFrame follows the last run.
+    function cellsResult(value) {
+      exact(value,['kind','instanceId','documentId','atRevision','documentSnapshotId','contextId','layerUid','frame','cells'],[],'cells result');
+      id(value.instanceId,'instanceId');id(value.documentId,'documentId');revision(value.atRevision,'atRevision');
+      objectUid(value.documentSnapshotId);objectUid(value.layerUid);frame(value.frame);
+      if(value.contextId!=='scene-root')throw new TypeError('invalid cells context');
+      exact(value.cells,['runs','nextFrame'],[],'layer cells');
+      const runs=value.cells.runs;let at=value.frame;
+      if(!Array.isArray(runs)||!runs.length)throw new TypeError('invalid layer cells');
+      runs.forEach(r=>{
+        if(!Array.isArray(r)||r.length!==6||r[0]!==at||!Number.isSafeInteger(r[1])||r[1]<1||!['key','held','interpolated','unexposed'].includes(r[2])||
+           r[3]!==null&&!(Number.isSafeInteger(r[3])&&r[3]>=0)||typeof r[4]!=='boolean'||typeof r[5]!=='boolean')throw new TypeError('invalid layer cell run');
+        at+=r[1];
+      });
+      if(value.cells.nextFrame!==null&&value.cells.nextFrame!==at)throw new TypeError('invalid layer cells page');
+    }
     function metadataPayload(p) {
       exact(p, ['atRevision', 'documentSnapshotId', 'view'], [], 'metadata selector'); revision(p.atRevision, 'atRevision'); objectUid(p.documentSnapshotId);
       const v=p.view, keys=v && v.kind==='targets' ? ['kind','offset','limit'] : v && v.kind==='properties' ? ['kind','target','offset','limit'] : ['kind','target','property'];
@@ -296,7 +312,7 @@
       }
     }
     const readPaths = {has: name => /^(?:payload\.documentSnapshotId|result\.(?:documentSnapshotId|property)|result\.(?:self\.property|mesh\.meshId|evaluation\.diagnostic\.message)|payload\.view\.property|(?:payload\.view\.target|result\.target)\.(?:contextId|layerUid|strokeId))$/.test(name)};
-    return Object.freeze({ rangeResult, placementResult, metadataPayload, metadataResult, metadataCorrelated, editPayload, trackPayload, trackResult,
+    return Object.freeze({ rangeResult, placementResult, cellsResult, metadataPayload, metadataResult, metadataCorrelated, editPayload, trackPayload, trackResult,
       readPayload, readResult, readCorrelated, readPaths });
   }
   return Object.freeze({ create });

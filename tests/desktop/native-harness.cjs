@@ -135,6 +135,7 @@ function createController({ root, app, env = process.env, timeout = 30_000, cli 
       await until(() => instance.process.finished, 'native launcher did not exit after stop', 12_000);
       requireCheck(!alive(instance.info.pid), 'native launcher remains alive after stop');
       if (instance.snapshot) requireCheck(!alive(instance.snapshot.app.pid) && !alive(instance.snapshot.app.pid, true), 'native app process group remains alive after stop');
+      instance.stopReceipt = structuredClone(result.value);
       instance.stopped = true;
     } finally { if (instance.playObserverHandle) finalizePlayObserver(instance); }
     instance.retained = retain;

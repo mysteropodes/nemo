@@ -211,7 +211,7 @@ pub(crate) fn expand_order(
                 .map(|paint| paint.layer_index)
                 .ok_or(ObjectPaintPlanError::InvalidOrder),
             // T12 video slots are inserted after this expansion.
-            PaintIndex::Duplicator(_) | PaintIndex::Video(_) => {
+            PaintIndex::Duplicator(_) | PaintIndex::Video(_) | PaintIndex::Dab(..) => {
                 Err(ObjectPaintPlanError::InvalidOrder)
             }
         }

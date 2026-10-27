@@ -26,12 +26,43 @@
     describe: 'labsDescribeIntervalAssistant',
   });
 
+  // The same eased slots the engine computes, without its keys (read through the native timing query), for the toast
+  // and the returned list.
+  function nativeInterval(native, b, li, count, ease) {
+    var toast = function (key) { if (typeof showToast === 'function') showToast(SM.t(key)); };
+    var layerUid = native.layerUid(li);
+    if (!layerUid) { toast('labsToastLayerInvalid'); return Promise.resolve(); }
+    var span = b.maxF - b.minF;
+    count = Math.max(1, Math.min(span - 1, parseInt(count, 10) || 1));
+    if (span < 2) { toast('labsToastNeedAtLeast2FramesGap'); return Promise.resolve(); }
+    var name = EASES[ease || 'inout'] ? (ease || 'inout') : 'inout';
+    return Promise.resolve(native.cells(layerUid)).then(function (runs) {
+      var isKey = function (f) {
+        var run = (runs || []).filter(function (r) { return f >= r[0] && f < r[0] + r[1]; })[0];
+        return !!run && run[2] === 'key';
+      };
+      var slots = [];
+      for (var k = 1; k <= count; k++) {
+        var f = b.minF + Math.round(EASES[name](k / (count + 1)) * span);
+        if (f > b.minF && f < b.maxF && slots.indexOf(f) < 0 && !isKey(f)) slots.push(f);
+      }
+      if (!slots.length) { toast('labsToastNoFreeSlotForBreakdowns'); return undefined; }
+      return native.interval({ layerUid: layerUid, fromFrame: b.minF, toFrame: b.maxF, count: count, ease: name }).then(function () {
+        if (typeof showToast === 'function') showToast(slots.length + SM.t('labsToastBreakdownsPlacedMid') + slots.map(function (f) { return f + 1; }).join(', '));
+        return slots;
+      }, function (error) { toast(error && error.code === 'not_found' ? 'labsToastNoFreeSlotForBreakdowns' : 'labsToastLayerInvalid'); return undefined; });
+    });
+  }
+
   window.SMLabs.intervalAssistant = function (count, ease) {
     if (typeof selBounds !== 'function') return;
     var b = selBounds();
     if (!b) { if (typeof showToast === 'function') showToast(SM.t('labsToastSelectFrameRangeFirst')); return; }
     var li = state.activeLayerIdx;
     if (b.minL > li || b.maxL < li) li = b.minL; // work on a layer actually in the selection
+    // Native authority (U35, #2362): one native transaction; the call returns a Promise. The baseline path follows.
+    var native = window.NemoNativeObjectLabs && NemoNativeObjectLabs.desktop(window);
+    if (native) return nativeInterval(native, b, li, count, ease);
     var ld = state.layers[li];
     if (!ld || ld.symbolId) { if (typeof showToast === 'function') showToast(SM.t('labsToastLayerInvalid')); return; }
     var span = b.maxF - b.minF;

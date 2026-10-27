@@ -316,7 +316,8 @@ impl ObjectMaskInputs {
             PaintIndex::Raster(_)
             | PaintIndex::Text(_)
             | PaintIndex::Component(_)
-            | PaintIndex::Video(_) => true,
+            | PaintIndex::Video(_)
+            | PaintIndex::Dab(..) => true,
             #[cfg(all(feature = "application", feature = "project_media_codec"))]
             PaintIndex::Brush(_) => true,
         });

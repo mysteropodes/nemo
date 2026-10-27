@@ -31,6 +31,9 @@ const MEDIA: [&str; 7] = [
 ];
 #[path = "native_text_animator_contract.rs"]
 mod animator;
+/// #2361: the bitmap-brush Draw stroke attaches its baked PNG with the anchor and companion it paints.
+#[path = "native_brush_bitmap_stroke_contract.rs"]
+pub(crate) mod bitmap_stroke;
 
 const RESULT_OPERATIONS: [&str; 12] = [
     "raster.create",
@@ -48,7 +51,7 @@ const RESULT_OPERATIONS: [&str; 12] = [
 ];
 
 pub(crate) fn owns(operation: &str) -> bool {
-    matches!(operation, ITEM | ATTACH | REMOVE)
+    matches!(operation, ITEM | ATTACH | REMOVE | bitmap_stroke::OP)
 }
 
 fn opaque(value: &Value) -> bool {
@@ -242,6 +245,7 @@ fn item_request(payload: &Value) -> bool {
 pub(crate) fn request(operation: &str, payload: &Value) -> bool {
     match operation {
         ITEM => item_request(payload),
+        bitmap_stroke::OP => bitmap_stroke::request(payload),
         ATTACH => {
             let placed = payload.get("placement").is_some();
             let required = if placed {
@@ -361,6 +365,7 @@ fn image_matches(request: &NativeApplicationRequest, value: &Value) -> bool {
 }
 pub(crate) fn result(operation: &str, payload: &Value, value: &Value) -> bool {
     match operation {
+        bitmap_stroke::OP => bitmap_stroke::result(value),
         ITEM => {
             let Some(command) = payload["command"].as_str() else {
                 return false;

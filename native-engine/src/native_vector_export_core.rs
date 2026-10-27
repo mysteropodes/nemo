@@ -8,3 +8,6 @@ pub(crate) mod native_vector_export_job;
 
 #[path = "native_vector_export_svg.rs"]
 pub(crate) mod native_vector_export_svg;
+
+#[path = "native_vector_export_lottie.rs"]
+pub(crate) mod native_vector_export_lottie;

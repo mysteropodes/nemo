@@ -133,13 +133,17 @@ test('equal native upsert after undo retains redo rather than adding another che
   assert.equal(result.status,'unchanged');assert.equal(f.checkpoints(),1);f.history(1);await f.settled();assert.equal(f.catalog()[0][1].label,'After');
 });
 
-test('the actual ordinary native freehand provider still refuses a confirmed custom catalog preset',async()=>{
+test('the actual ordinary native freehand provider commits a confirmed custom catalog preset and refuses a key the catalog lacks',async()=>{
+  // G16 option C (#2361): native stamps a catalog preset's dabs from the project catalog, as resolveBrushPreset reads it.
   const f=await fixture([['custom',{label:'Stored'}]]);f.root.BrushPresetPicker.selectPreset('custom');
-  f.root.state.tool='draw';f.root.state.drawMode='front';
+  Object.assign(f.root.state,{tool:'draw',drawMode:'front',vectorBrush:false,strokeEnabled:true,fillEnabled:false,strokeColor:'#112233',
+    brushSize:4,opacity:100,smoothing:0,stabilizer:0,strokeCap:'round',strokeJoin:'round',strokeStyle:'solid',brushAngle:0,brushAngleFactor:0});
   const Shape=require('../src/js/adapters/native-object-shape-tool.js');
   const ports=Shape.freehandPorts(f.root,{});
+  assert.equal(ports.style().brushPreset,'custom');
+  f.root.state.brushPreset='missing';
   assert.throws(()=>ports.style(),/This brush combination is unavailable in native Drawing/);
-  assert.equal(f.edits().length,0);assert.equal(f.checkpoints(),0);assert.equal(f.root.state.brushPreset,'custom');
+  assert.equal(f.edits().length,0);assert.equal(f.checkpoints(),0);
 });
 test('canceling an unsaved draft never materializes absent catalog metadata',async()=>{
   const f=await fixture(undefined),el=edit(f,null);el.querySelector('.bpe-slider[data-key="grain"]').value='1.7';

@@ -72,6 +72,8 @@ fn target(value: &Value, create: bool) -> bool {
 
 #[path = "native_vector_contract_shapes.rs"]
 mod shapes;
+#[path = "native_vector_batch_contract.rs"]
+mod batch;
 use shapes::{record_shape, shape};
 
 #[path = "native_vector_bitmap_read.rs"]
@@ -114,10 +116,39 @@ pub(crate) fn request(operation: &str, payload: &Value) -> bool {
         keys.extend_from_slice(extra);
         exact(payload, &keys, &[]).is_some()
     };
+    // G15: the two creates take an optional `placement` (front by default, or behind), an optional
+    // `trimEnds` overshoot limit (finite, above zero; the baseline trimStrokeEndsMax) and an optional
+    // `keyframe: "copy"` (a held cell keys with what it showed; absent keys it empty, as Draw does).
+    let creates = |extra: &[&str]| {
+        let mut keys = vec!["command"];
+        keys.extend_from_slice(extra);
+        exact(payload, &keys, &["placement", "trimEnds", "keyframe"]).is_some()
+            && payload
+                .get("placement")
+                .is_none_or(|p| p == "front" || p == "behind")
+            && payload
+                .get("trimEnds")
+                .is_none_or(|t| t.as_f64().is_some_and(|v| v.is_finite() && v > 0.))
+            && payload.get("keyframe").is_none_or(|k| k == "copy")
+    };
     match (operation, command) {
         (VECTOR, "object.vector.create") => {
-            named(&["record"]) && record_shape(&payload["record"], true)
+            creates(&["record"]) && record_shape(&payload["record"], true)
         }
+        // G23: 2..=32 creates sharing one layer and frame, as one revision and one undo entry.
+        (VECTOR, "object.vector.createMany") => {
+            creates(&["records"])
+                && payload["records"].as_array().is_some_and(|records| {
+                    (2..=32).contains(&records.len())
+                        && records.iter().all(|r| record_shape(r, true))
+                        && records.iter().all(|r| {
+                            r["target"]["layerUid"] == records[0]["target"]["layerUid"]
+                                && r["target"]["contextId"] == records[0]["target"]["contextId"]
+                                && r["target"]["frameScope"] == records[0]["target"]["frameScope"]
+                        })
+                })
+        }
+        (VECTOR, "object.vector.batch") => batch::request(payload),
         (VECTOR, "object.vector.replace") => {
             named(&["record"])
                 && record_shape(&payload["record"], false)
@@ -174,9 +205,33 @@ pub(crate) fn result(operation: &str, payload: &Value, value: &Value) -> bool {
             else {
                 return false;
             };
+            if ran == "batch" {
+                return batch::result(payload, value);
+            }
             let Some(stroke) = value["strokeId"].as_str() else {
                 return false;
             };
+            if ran == "createMany" {
+                let Some(ids) = value["strokeIds"].as_array() else {
+                    return false;
+                };
+                let count = payload["records"].as_array().map_or(0, Vec::len);
+                return exact(
+                    value,
+                    &["applied", "historyEntriesAdded", "operation", "strokeId", "strokeIds"],
+                    &[],
+                )
+                .is_some()
+                    && command_receipt(value)
+                    && value["applied"] == true
+                    && value["operation"] == "createMany"
+                    && ids.len() == count
+                    && ids.first().and_then(Value::as_str) == Some(stroke)
+                    && ids
+                        .iter()
+                        .all(|id| id.as_str().is_some_and(|id| id.starts_with("native-stroke:")))
+                    && ids.iter().collect::<std::collections::HashSet<_>>().len() == ids.len();
+            }
             let stroke_matches = match ran {
                 "create" => value["applied"] == true && stroke.starts_with("native-stroke:"),
                 "replace" => payload["record"]["target"]["strokeId"].as_str() == Some(stroke),
@@ -228,6 +283,10 @@ pub(crate) fn response_matches(
 #[cfg(test)]
 #[path = "native_vector_contract_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "native_vector_create_many_tests.rs"]
+mod create_many_tests;
 
 #[cfg(test)]
 #[path = "native_vector_bitmap_read_tests.rs"]

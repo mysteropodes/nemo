@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.brush-bitmap-stroke",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.brush.bitmap.stroke"
+  ],
+  "input": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectBrushBitmapStrokePayload"
+  },
+  "authority": {
+    "document": "native-engine::history::NativeObjectHistory",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 65536,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal. The request carries the anchor record (up to 256 segments, 64 KiB); the baked PNG is a host-scoped staged file the host reads (up to 16 MiB), never request bytes."
+  },
+  "semantics": "One bitmap-brush Draw stroke as bitmap-brush.js applyBitmapBrushTexture leaves it, in one revision and one history entry: the baked PNG joins the asset catalog, the camouflaged anchor (bitmapBrushSpec, brush group, pressure profile) lands in its authored scene-root cell (a held or unexposed cell first becomes a key), and its tagged companion raster (isBrushTextureCopy, isBitmapBrush, the same group) lands directly above it, where the brush read pairs and paints it. No JS/Paper document fallback.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Native bitmap-brush Draw stroke; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "bitmap-stroke-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.brush.bitmap.stroke",
+        "payload": {
+          "documentSnapshotId": "native-object:document-A:7",
+          "lifecycleGeneration": 1,
+          "record": {
+            "schemaVersion": 1,
+            "family": "editable-vector-path",
+            "target": {
+              "contextId": "scene-root",
+              "layerUid": "layer-a",
+              "strokeId": "",
+              "frameScope": {
+                "kind": "authored",
+                "frame": 0
+              }
+            },
+            "geometry": {
+              "kind": "cubic-path",
+              "closed": false,
+              "coordinateSpace": "document-world",
+              "handleSpace": "relative",
+              "segments": [
+                {
+                  "point": {
+                    "x": 10,
+                    "y": 10
+                  },
+                  "handleIn": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "handleOut": {
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "point": {
+                    "x": 60,
+                    "y": 20
+                  },
+                  "handleIn": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "handleOut": {
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ]
+            },
+            "fill": null,
+            "vector": {
+              "stroke": {
+                "kind": "solid",
+                "r": 0,
+                "g": 0,
+                "b": 0,
+                "a": 1
+              },
+              "hasRealStroke": true,
+              "strokeWidth": 8,
+              "strokeCap": "round",
+              "strokeJoin": "round",
+              "miterLimit": 10,
+              "dashOffset": 0,
+              "opacity": 0
+            },
+            "vectorExt": {
+              "bitmapBrush": {
+                "bitmapBrushSpec": {
+                  "tip": "soft",
+                  "size": 8,
+                  "spacing": 15,
+                  "scatter": 20,
+                  "opacity": 1,
+                  "color": "#000000ff",
+                  "pressure": false,
+                  "seed": 7
+                },
+                "brushGroupId": "bmb_example",
+                "preTextureOpacity": 1
+              }
+            }
+          },
+          "companion": {
+            "x": 35,
+            "y": 15,
+            "width": 58,
+            "height": 18,
+            "opacity": 1
+          },
+          "source": {
+            "kind": "file",
+            "path": "/tmp/nemo-native-import-00000000-0000-4000-8000-000000000000/source-0001.png"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "bitmap-stroke-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

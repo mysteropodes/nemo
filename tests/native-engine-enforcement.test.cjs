@@ -171,7 +171,7 @@ const EXPECTED_EDGES = [
   'export-job->revision', 'export-job->scheduler', 'history->commands', 'history->document',
   'history->request-receipts', 'history->revision', 'png-output->compositor', 'png-output->render-scene',
   'protocol->commands', 'protocol->export-job', 'render-scene->evaluation', 'render-scene->read-queries', 'render-scene->scheduler',
-  'resource-leases->revision', 'revision->document', 'root->application', 'root->codec',
+  'resource-leases->revision', 'revision->document', 'root->application', 'root->codec', 'root->commands',
   'scheduler->resource-leases', 'scheduler->revision',
   'commands->read-queries', 'read-queries->codec', 'read-queries->evaluation',
   'read-queries->request-receipts', 'read-queries->revision',
@@ -306,7 +306,7 @@ test('native-engine policy adopts the exact clean internal graph with no excepti
   const result = checkRustCrate(profile, policy, { root: ROOT });
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2));
   assert.equal(result.moduleCount, 18);
-  assert.equal(result.edges.length, 49);
+  assert.equal(result.edges.length, 50);
   assert.deepEqual(result.exceptionsApplied, []);
   assert.deepEqual(result.unsupported, []);
   const short = (id) => id.replace('rust.native.engine.', '').replace('rust.native.engine', 'root');

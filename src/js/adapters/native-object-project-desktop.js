@@ -257,7 +257,7 @@
       if(pin)Promise.resolve(response).then(function(receipt){settingsDiagnostic(root,'export-result',receipt);},function(){});
       return response;
     }
-    function settingsNotice(kind,info){[root.NemoNativeProjectSettingsController,root.NemoNativeCompositionController,root.NemoNativePaletteController,root.NemoNativeGuideController,root.NemoNativeShadowController,root.NemoNativePerspectiveController,root.NemoNativeWorkspaceController,root.NemoNativeCustomBrushController,root.NemoNativeCommentsController].forEach(function(c){if(c&&typeof c[kind]==='function')c[kind](info);});}
+    function settingsNotice(kind,info){[root.NemoNativeProjectSettingsController,root.NemoNativeCompositionController,root.NemoNativePaletteController,root.NemoNativeGuideController,root.NemoNativeShadowController,root.NemoNativePerspectiveController,root.NemoNativeSymmetryController,root.NemoNativeWorkspaceController,root.NemoNativeCustomBrushController,root.NemoNativeCommentsController].forEach(function(c){if(c&&typeof c[kind]==='function')c[kind](info);});}
     function presentationStamp(info){
       var project=root.NemoNativeObjectProject;
       if(!project||typeof project.desktop!=='function')return null;
@@ -348,6 +348,7 @@
           settingsNotice('presented',info);
           renderCameraViewLock(root);
           if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshPolicy)root.NemoNativeObjectUI.refreshPolicy(root);
+          if(root.SMImageMeshUI&&typeof root.SMImageMeshUI.refresh==='function')root.SMImageMeshUI.refresh();
           // A frame paint can precede native completion and leave Motion unavailable.
           // Refresh its existing inspector only after the current frame is presented.
           if(shown&&root.state&&root.state.appMode==='motion'&&shown.frame===root.state.currentFrame&&

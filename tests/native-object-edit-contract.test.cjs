@@ -12,6 +12,7 @@ const at = { layerUid: 'layer-a', contextId: 'scene-root' };
 const cell = { contextId: 'scene-root', layerUid: 'layer-a', frame: 0 };
 // [suffix, literal payload]. Independent of the contract table: command strings and members are spelled out here.
 const VALID = [
+  ['subselect.edit', {command:'object.subselect.edit',stableTarget:{contextId:'scene-root',layerUid:'layer-a',frameScope:{kind:'authored',frame:0},strokeId:'stroke-a'},intent:{kind:'move',indices:[0],delta:[5,2]}}],
   ['layer.delete', { command: 'object.layer.delete', selection: sel }],
   ['layer.duplicate', { command: 'object.layer.duplicate', layerUid: 'layer-b' }],
   ['layer.rename', { command: 'object.layer.rename', layerUid: 'layer-b', name: 'Ink' }],
@@ -30,16 +31,17 @@ const VALID = [
   ['boolean.erase', { command: 'object.boolean.erase', ...at, frame: 0, strokeId: 'stroke-1', footprint: [[0, 0], [4, 0], [4, 4]] }],
   ['boolean.flatten', { command: 'object.boolean.flatten', ...at, frame: 0, groupId: 'group-1' }],
   ['fill.trace', {command:'object.fill.trace',...cell,point:[20,20],color:'#336699ff',opacity:0.5,remove:false}],
+  ['fill.brush', {command:'object.fill.brush',...cell,outline:[[10,10],[60,10],[60,40]].map((p)=>({point:p,handleIn:[0,0],handleOut:[0,0]})),color:'#336699ff',opacity:0.5,placement:'below',mask:false,copies:[],stamps:[]}],
   ['clipboard.copy', { command: 'object.clipboard.copy', ...cell, mode: 'animation2d', strokeIds: ['stroke-1'] }],
   ['clipboard.cut', { command: 'object.clipboard.cut', ...cell, mode: 'motion', strokeIds: [] }],
 ];
 const envelope = (suffix, payload, extra) => Object.assign({ apiVersion: 2, requestId: 'edit-1', instanceId: 'instance-A', documentId: 'document-A',
   operation: P + suffix, expectedRevision: 7, payload }, extra);
 
-test('the contract admits exactly the 20 declared operations, all revisioned commands', () => {
+test('the contract admits exactly the 22 declared operations, all revisioned commands', () => {
   const edit = contract;
   assert.deepEqual(edit.OPERATIONS, VALID.map(([s]) => P + s));
-  assert.equal(edit.OPERATIONS.length, 20);
+  assert.equal(edit.OPERATIONS.length, 22);
   for (const op of edit.OPERATIONS) { assert.equal(edit.admitted(op), true); assert.equal(edit.requiresRevision(op), true); assert.equal(seam.admitted(op), true); }
   for (const op of ['command.document.object.layer.create', 'command.document.object.layer.policy.edit', 'command.document.object.fill.unknown', 'query.document.object', P + 'group', P + 'toString', '', null, undefined]) {
     assert.equal(edit.admitted(op), false, String(op));
@@ -58,7 +60,7 @@ test('every literal payload is accepted and every one-member mutation is refused
     assert.throws(() => contract.payload(P + suffix, Object.keys(payload).map((k) => payload[k])), TypeError, suffix + ' positional');
     assert.throws(() => contract.payload(P + suffix, { ...payload, command: 'object.layer.policy.edit' }), TypeError, suffix + ' foreign command');
   }
-  assert.throws(() => contract.payload(P + 'layer.delete', VALID[1][1]), TypeError, 'a payload of another operation');
+  assert.throws(() => contract.payload(P + 'layer.delete', VALID.find(([s])=>s==='layer.duplicate')[1]), TypeError, 'a payload of another operation');
 });
 
 test('bounds mirror the owner: ids 128 bytes, names 256, labels 64, selections 1024, footprint 3..1024, frame u32', () => {
@@ -162,14 +164,14 @@ test('the injected seam is the font contract composed with the edit contract and
 
 test('capability descriptors and the closed transport schema declare exactly the contract operations', () => {
   const dir = path.join(ROOT, 'engineering/application/capabilities-v2');
-  const files = ['layer-lifecycle', 'group', 'selection-edit', 'boolean', 'fill'].map((k) => path.join(dir, 'native-object-' + k + '.json'));
+  const files = ['layer-lifecycle', 'group', 'selection-edit', 'boolean', 'fill', 'subselect'].map((k) => path.join(dir, 'native-object-' + k + '.json'));
   const schema = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/native-transport-v2.schema.json'), 'utf8'));
   const declared = [];
   const ids = new Set();
   for (const file of files) {
     const d = JSON.parse(fs.readFileSync(file, 'utf8'));
     assert.equal(d.schemaVersion, 2); assert.equal(d.apiVersion, 2); assert.deepEqual(d.availability, { state: 'available', reason: null });
-    assert.equal(d.authority.adapterOwnsWritableMirror, false); assert.equal(d.authority.fallback, 'none'); assert.equal(d.resourceBoundary.maxRequestBytes, 4096);
+    assert.equal(d.authority.adapterOwnsWritableMirror, false); assert.equal(d.authority.fallback, 'none'); assert.equal(d.resourceBoundary.maxRequestBytes, d.id === 'native.object.fill' ? 65536 : 4096, d.id);
     assert.equal(ids.has(d.id), false); ids.add(d.id);
     assert.equal(d.input.oneOf.length, d.operations.length);
     for (const example of d.examples) {
@@ -182,8 +184,8 @@ test('capability descriptors and the closed transport schema declare exactly the
     declared.push(...d.operations);
   }
   assert.deepEqual(declared.slice().sort(), contract.OPERATIONS.slice().sort());
-  assert.equal(new Set(declared).size, 20);
-  assert.deepEqual([...ids].sort(), ['native.object.boolean', 'native.object.fill', 'native.object.group', 'native.object.layer-lifecycle', 'native.object.selection-edit']);
+  assert.equal(new Set(declared).size, 22);
+  assert.deepEqual([...ids].sort(), ['native.object.boolean', 'native.object.fill', 'native.object.group', 'native.object.layer-lifecycle', 'native.object.selection-edit', 'native.object.subselect']);
   for (const [suffix, payload] of VALID) {
     const branches = schema.$defs.Request.oneOf.filter((b) => b.allOf[1].properties.operation.const === P + suffix);
     assert.equal(branches.length, 1, suffix);

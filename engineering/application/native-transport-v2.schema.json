@@ -743,6 +743,73 @@
         },
         "isLinkedFillCompanion": {
           "type": "boolean"
+        },
+        "brushTexture": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "brushGroupId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "isBrushTextureCopy": {
+              "const": true
+            },
+            "brushTexturePreset": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "preTextureOpacity": {
+              "type": "number"
+            },
+            "preTextureStroke": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+                }
+              ]
+            },
+            "strokeSeed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295,
+              "description": "G16 option C: the anchor's stamping seed; native produces its dabs from it."
+            }
+          },
+          "not": {
+            "required": [
+              "isBrushTextureCopy",
+              "brushTexturePreset"
+            ]
+          },
+          "description": "G16: the baseline serP brush-texture members of an anchor (preset, group, hidden paint) or a dab (copy flag, group)."
+        },
+        "shadow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "channelTag"
+          ],
+          "properties": {
+            "channelTag": {
+              "const": "shadow"
+            },
+            "shadowSwatchId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        },
+        "isFillShape": {
+          "const": true
         }
       },
       "minProperties": 1,
@@ -864,8 +931,62 @@
         },
         "record": {
           "$ref": "#/$defs/ObjectVectorCreateRecord"
+        },
+        "placement": {
+          "enum": [
+            "front",
+            "behind"
+          ],
+          "description": "Optional (absent = front). G15: behind enters under the layer's existing artwork of the frame (baseline drawMode 'behind')."
+        },
+        "trimEnds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Optional (absent = no trim). Baseline trimStrokeEndsMax: cut the new open stroke's head/tail back to its first/last crossing with the layer's paths in the frame when the overshoot is at most this; symmetry copies share the cuts."
+        },
+        "keyframe": {
+          "const": "copy",
+          "description": "Optional (absent = the Draw/Pen/shape empty key). A held or unexposed target cell becomes a key holding a copy of what it showed (the Labs creators' ensureKeyframe())."
         }
       }
+    },
+    "ObjectVectorCreateManyPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "records"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.vector.createMany"
+        },
+        "records": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/ObjectVectorCreateRecord"
+          }
+        },
+        "placement": {
+          "enum": [
+            "front",
+            "behind"
+          ],
+          "description": "Optional (absent = front). G15: behind enters under the layer's existing artwork of the frame (baseline drawMode 'behind')."
+        },
+        "trimEnds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Optional (absent = no trim). Baseline trimStrokeEndsMax: cut the new open stroke's head/tail back to its first/last crossing with the layer's paths in the frame when the overshoot is at most this; symmetry copies share the cuts."
+        },
+        "keyframe": {
+          "const": "copy",
+          "description": "Optional (absent = the Draw/Pen/shape empty key). A held or unexposed target cell becomes a key holding a copy of what it showed (the Labs creators' ensureKeyframe())."
+        }
+      },
+      "description": "G23: 2 to 32 creates on one layer and frame as one revision and one undo entry (symmetry copies); owner-allocated ids in order."
     },
     "ObjectVectorReplacePayload": {
       "type": "object",
@@ -973,10 +1094,101 @@
       },
       "description": "Original Path mask metadata: selected mode/unset or same-frame layer-shared feather; authored geometry and paint remain unchanged."
     },
+    "ObjectVectorBatchPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "ops"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.vector.batch"
+        },
+        "ops": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "op",
+                  "record"
+                ],
+                "properties": {
+                  "op": {
+                    "const": "create"
+                  },
+                  "record": {
+                    "$ref": "#/$defs/ObjectVectorCreateRecord"
+                  },
+                  "placement": {
+                    "enum": [
+                      "front",
+                      "behind"
+                    ]
+                  },
+                  "keyframe": {
+                    "const": "copy"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "op",
+                  "record"
+                ],
+                "properties": {
+                  "op": {
+                    "const": "replace"
+                  },
+                  "record": {
+                    "$ref": "#/$defs/ObjectVectorRecord"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "op",
+                  "stableTarget"
+                ],
+                "properties": {
+                  "op": {
+                    "const": "delete"
+                  },
+                  "stableTarget": {
+                    "$ref": "#/$defs/ObjectTarget"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "keyframe": {
+          "const": "copy"
+        },
+        "trimEnds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Optional, create steps only. Baseline trimStrokeEndsMax: the first create is cut against its own cell and every other create (symmetry copies, Labs multi-frame stamps) takes the same cut."
+        }
+      },
+      "description": "#2361/#2362: 1..64 ordered create/replace/delete steps on one scene-root layer as one revision and one undo entry; the native owner refuses the whole batch when any step is refused."
+    },
     "ObjectVectorEditPayload": {
       "oneOf": [
         {
           "$ref": "#/$defs/ObjectVectorCreatePayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectVectorCreateManyPayload"
         },
         {
           "$ref": "#/$defs/ObjectVectorReplacePayload"
@@ -986,6 +1198,9 @@
         },
         {
           "$ref": "#/$defs/ObjectVectorMaskPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectVectorBatchPayload"
         }
       ],
       "description": "Vector create, replace, delete or original Path mask metadata edit. The complete original UTF-8 request envelope is bounded at 65536 bytes, never split or truncated. Other operations and all replies retain their 4096-byte bounds."
@@ -1163,11 +1378,20 @@
             "create",
             "replace",
             "delete",
-            "mask.edit"
+            "mask.edit",
+            "createMany",
+            "batch"
           ]
         },
         "strokeId": {
           "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "strokeIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          }
         }
       },
       "description": "Compact vector edit receipt: the stroke an owner allocated (create) or the stable target named (replace, delete, mask.edit). Parameter and path-effect edits answer with the compact CommandResult."
@@ -1193,6 +1417,9 @@
         },
         {
           "$ref": "#/$defs/ObjectLayerPlacementPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectLayerRowCellsPayload"
         }
       ]
     },
@@ -1206,10 +1433,57 @@
         },
         {
           "$ref": "#/$defs/ObjectLayerPlacementResult"
+        },
+        {
+          "$ref": "#/$defs/ObjectLayerRowCellsResult"
         }
       ]
     },
     "ObjectQueryPayload": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObjectStableTargetQueryPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectImageMeshQueryPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectPresentationQueryPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectSubselectQueryPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectSubselectViewPayload"
+        }
+      ]
+    },
+    "ObjectPresentationQueryPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "view"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "view": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "presentation"
+            }
+          }
+        }
+      }
+    },
+    "ObjectStableTargetQueryPayload": {
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -1222,6 +1496,118 @@
         },
         "stableTarget": {
           "$ref": "#/$defs/ObjectTarget"
+        }
+      }
+    },
+    "ObjectImageMeshQueryId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ObjectImageMeshSelectionPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "const": "selection"
+        }
+      }
+    },
+    "ObjectImageMeshDataPageRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "meshId",
+        "cursor",
+        "limit"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "outline",
+            "verts",
+            "tris",
+            "offsets"
+          ]
+        },
+        "meshId": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "cursor": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        }
+      }
+    },
+    "ObjectImageMeshQueryView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "contextId",
+        "layerUid",
+        "frame",
+        "workId",
+        "viewGeneration",
+        "page"
+      ],
+      "properties": {
+        "kind": {
+          "const": "imageMesh"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "workId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "viewGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "page": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectImageMeshSelectionPage"
+            },
+            {
+              "$ref": "#/$defs/ObjectImageMeshDataPageRequest"
+            }
+          ]
+        }
+      }
+    },
+    "ObjectImageMeshQueryPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "view"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "view": {
+          "$ref": "#/$defs/ObjectImageMeshQueryView"
         }
       }
     },
@@ -2852,6 +3238,414 @@
         },
         "action": {
           "$ref": "#/$defs/ObjectRigPoseAction"
+        }
+      }
+    },
+    "ObjectLabsSpeedLinesPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "frame",
+        "cx",
+        "cy",
+        "count",
+        "r0",
+        "r1",
+        "jitter",
+        "seed",
+        "color",
+        "brushSize",
+        "opacity"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.speedLines"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "cx": {
+          "type": "number",
+          "minimum": -10000000,
+          "maximum": 10000000
+        },
+        "cy": {
+          "type": "number",
+          "minimum": -10000000,
+          "maximum": 10000000
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 400
+        },
+        "r0": {
+          "type": "number",
+          "minimum": -10000000,
+          "maximum": 10000000
+        },
+        "r1": {
+          "type": "number",
+          "minimum": -10000000,
+          "maximum": 10000000
+        },
+        "jitter": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "color": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "brushSize": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "ObjectLabsBoilPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "frame",
+        "frames",
+        "amplitude",
+        "seedStep"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.boil"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "frames": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 24
+        },
+        "amplitude": {
+          "type": "number",
+          "minimum": 0.2,
+          "maximum": 1000000
+        },
+        "seedStep": {
+          "type": "integer",
+          "minimum": -4294967295,
+          "maximum": 4294967295
+        }
+      }
+    },
+    "ObjectLabsFollowPathPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "frame",
+        "pathId",
+        "strokeIds",
+        "frames",
+        "ease",
+        "removeTrajectory"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.followPath"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "pathId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "strokeIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 1,
+          "maxItems": 256
+        },
+        "frames": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 120
+        },
+        "ease": {
+          "enum": [
+            "linear",
+            "in",
+            "out",
+            "inout"
+          ]
+        },
+        "removeTrajectory": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ObjectLabsReferenceFillPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "frame",
+        "point",
+        "color",
+        "opacity"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.referenceFill"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "point": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": -1000000000000,
+            "maximum": 1000000000000
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "color": {
+          "type": "string",
+          "minLength": 9,
+          "maxLength": 9
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "ObjectLabsPingpongPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "fromLayer",
+        "toLayer",
+        "fromFrame",
+        "toFrame",
+        "times"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.pingpong"
+        },
+        "fromLayer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "toLayer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "fromFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "toFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "times": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      }
+    },
+    "ObjectLabsRetimePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "fromLayer",
+        "toLayer",
+        "fromFrame",
+        "toFrame",
+        "spacing"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.retime"
+        },
+        "fromLayer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "toLayer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "fromFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "toFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "spacing": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        }
+      }
+    },
+    "ObjectLabsIntervalPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "fromFrame",
+        "toFrame",
+        "count",
+        "ease"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.interval"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "fromFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "toFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999
+        },
+        "ease": {
+          "enum": [
+            "linear",
+            "in",
+            "out",
+            "inout"
+          ]
+        }
+      }
+    },
+    "ObjectLabsMoveToLayerPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "fromLayer",
+        "toLayer",
+        "frame",
+        "strokeIds"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.labs.moveToLayer"
+        },
+        "fromLayer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "toLayer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "strokeIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 1,
+          "maxItems": 256
         }
       }
     },
@@ -4576,6 +5370,64 @@
       "description": "Compact receipt: outer contentRevision equals expectedRevision plus one iff applied. Every declared layer, vector/raster/text object, retained asset, source asset and skip is accounted for. Optional assets maps retained assets then sources in declaration order to newly minted assetIds and is omitted by the owner when empty. The serialized result is limited to 3072 bytes."
     },
     "ObjectQueryResult": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObjectStableTargetQueryResult"
+        },
+        {
+          "$ref": "#/$defs/ObjectImageMeshQueryResult"
+        },
+        {
+          "$ref": "#/$defs/ObjectPresentationQueryResult"
+        },
+        {
+          "$ref": "#/$defs/ObjectSubselectQueryResult"
+        },
+        {
+          "$ref": "#/$defs/ObjectSubselectViewResult"
+        }
+      ]
+    },
+    "ObjectPresentationQueryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "frame",
+        "workId",
+        "viewGeneration"
+      ],
+      "properties": {
+        "kind": {
+          "const": "presentation"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "workId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "viewGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "description": "Bounded actual successful native presentation discovery. The unchanged complete-envelope limit is 4096 bytes. Rust correlates atRevision with the request and outer contentRevision and requires native-object:<documentId>:<atRevision>; the host supplies the actual context, frame, work and view generation. Historical generator absent; this additive shape is source-derived."
+    },
+    "ObjectStableTargetQueryResult": {
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -4602,6 +5454,316 @@
         }
       },
       "description": "Staged immutable common-envelope result: atRevision equals outer contentRevision; snapshot token is native-object:<documentId>:<atRevision>. Complete envelope is limited to 4096 bytes."
+    },
+    "ObjectImageMeshQueryTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contextId",
+        "layerUid",
+        "frameScope",
+        "strokeId"
+      ],
+      "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "frameScope": {
+          "$ref": "#/$defs/ObjectFrameScope"
+        },
+        "strokeId": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        }
+      }
+    },
+    "ObjectImageMeshQueryRect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height",
+        "rotation"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "rotation": {
+          "type": "number"
+        }
+      }
+    },
+    "ObjectImageMeshQueryMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "meshId",
+        "outlineCount",
+        "vertexCount",
+        "triangleIndexCount",
+        "offsetsPresent"
+      ],
+      "properties": {
+        "meshId": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "outlineCount": {
+          "$ref": "#/$defs/Revision"
+        },
+        "vertexCount": {
+          "$ref": "#/$defs/Revision"
+        },
+        "triangleIndexCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991,
+          "multipleOf": 3
+        },
+        "offsetsPresent": {
+          "type": "boolean"
+        },
+        "cols": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        }
+      }
+    },
+    "ObjectImageMeshPointPageResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "cursor",
+        "total",
+        "nextCursor",
+        "items"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "outline",
+            "verts",
+            "offsets"
+          ]
+        },
+        "cursor": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "total": {
+          "$ref": "#/$defs/Revision"
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectFrame"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "ObjectImageMeshIndexPageResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "cursor",
+        "total",
+        "nextCursor",
+        "items"
+      ],
+      "properties": {
+        "kind": {
+          "const": "tris"
+        },
+        "cursor": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "total": {
+          "$ref": "#/$defs/Revision"
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectFrame"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/ObjectFrame"
+          }
+        }
+      }
+    },
+    "ObjectImageMeshDataPageResult": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObjectImageMeshPointPageResult"
+        },
+        {
+          "$ref": "#/$defs/ObjectImageMeshIndexPageResult"
+        }
+      ]
+    },
+    "ObjectImageMeshQueryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame",
+        "workId",
+        "viewGeneration",
+        "target",
+        "rect",
+        "mesh",
+        "page"
+      ],
+      "properties": {
+        "kind": {
+          "const": "imageMesh"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "workId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "viewGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "target": {
+          "$ref": "#/$defs/ObjectImageMeshQueryTarget"
+        },
+        "rect": {
+          "$ref": "#/$defs/ObjectImageMeshQueryRect"
+        },
+        "mesh": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/ObjectImageMeshQueryMetadata"
+            }
+          ]
+        },
+        "page": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectImageMeshSelectionPage"
+            },
+            {
+              "$ref": "#/$defs/ObjectImageMeshDataPageResult"
+            }
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "page": {
+              "$ref": "#/$defs/ObjectImageMeshSelectionPage"
+            }
+          }
+        },
+        {
+          "properties": {
+            "mesh": {
+              "$ref": "#/$defs/ObjectImageMeshQueryMetadata"
+            },
+            "page": {
+              "$ref": "#/$defs/ObjectImageMeshDataPageResult"
+            }
+          }
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "page": {
+                "properties": {
+                  "kind": {
+                    "const": "offsets"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "mesh": {
+                "properties": {
+                  "offsetsPresent": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "description": "Source-derived bounded immutable image-mesh view. The complete envelope remains limited to 4096 bytes. Rust validates exact request/presentation/snapshot and full target correlation, held source frame <= presented frame, metadata/count relationships, triangle bounds and cursor progress; JSON Schema shape acceptance alone does not prove them."
     },
     "SerializeQueryPayload": {
       "type": "object",
@@ -6215,6 +7377,142 @@
         {
           "allOf": [
             {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.speedLines"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsSpeedLinesPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.boil"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsBoilPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.followPath"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsFollowPathPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.referenceFill"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsReferenceFillPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.pingpong"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsPingpongPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.retime"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsRetimePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.interval"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsIntervalPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.labs.moveToLayer"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLabsMoveToLayerPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
               "$ref": "#/$defs/ForbiddenRevisionRequest"
             },
             {
@@ -6962,6 +8260,40 @@
         {
           "allOf": [
             {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.fill.brush"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectFillBrushPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.brush.bitmap.stroke"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectBrushBitmapStrokePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
               "$ref": "#/$defs/ForbiddenRevisionRequest"
             },
             {
@@ -7137,6 +8469,40 @@
             {
               "properties": {
                 "operation": {
+                  "const": "query.document.object.project.symmetry.read"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectSymmetryReadPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.project.symmetry.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectSymmetryEditPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
                   "const": "query.document.object.project.workspace.read"
                 },
                 "payload": {
@@ -7277,6 +8643,23 @@
                 },
                 "payload": {
                   "$ref": "#/$defs/ObjectClipboardCutPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.subselect.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectSubselectPayload"
                 }
               }
             }
@@ -8149,6 +9532,9 @@
             },
             {
               "$ref": "#/$defs/ObjectHistoryReadResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectSymmetryReadResult"
             }
           ]
         },
@@ -10915,6 +12301,44 @@
       },
       "description": "Original selector is bounded to4096bytes; exact actual immutable revision and snapshot token must match. Unsupported contexts return Unavailable. No caller-supplied lifecycle echo."
     },
+    "ObjectLayerRowCellsPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame",
+        "view"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        },
+        "view": {
+          "const": "cells"
+        }
+      },
+      "description": "Whole-row cells view of the same query (U31, #2374): frame is the first frame of the page. Bounded to 4096 bytes; exact actual immutable revision and snapshot token must match. Unsupported contexts return Unavailable; a layer without timing is Unavailable, not blank."
+    },
     "ObjectLayerTimingCellPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -11173,6 +12597,116 @@
             }
           ],
           "description": "T12: the layer's video drawing placement, or null. Remap keys are counted, never listed, so the read stays within 4096 bytes."
+        }
+      }
+    },
+    "ObjectLayerRowCellsResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame",
+        "cells"
+      ],
+      "properties": {
+        "kind": {
+          "const": "layerCells"
+        },
+        "instanceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "documentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        },
+        "cells": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runs",
+            "nextFrame"
+          ],
+          "properties": {
+            "runs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "array",
+                "minItems": 6,
+                "maxItems": 6,
+                "prefixItems": [
+                  {
+                    "$ref": "#/$defs/ObjectLayerTimingFrame"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  {
+                    "enum": [
+                      "key",
+                      "held",
+                      "interpolated",
+                      "unexposed"
+                    ]
+                  },
+                  {
+                    "oneOf": [
+                      {
+                        "$ref": "#/$defs/ObjectLayerTimingFrame"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "boolean"
+                  }
+                ]
+              }
+            },
+            "nextFrame": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/ObjectLayerTimingFrame"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "description": "Runs [startFrame, frameCount, cellKind, sourceFrame, hasContent, manualEdit] tile the page in order; each frame of a run answers the single-cell read identically, an interpolated frame being its own source (sourceFrame is the run start). nextFrame starts the next page, or null when the row is complete."
         }
       }
     },
@@ -11439,6 +12973,298 @@
         },
         "remove": {
           "type": "boolean"
+        }
+      }
+    },
+    "ObjectFillBrushPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "contextId",
+        "frame",
+        "outline",
+        "color",
+        "opacity",
+        "placement",
+        "mask",
+        "copies",
+        "stamps"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.fill.brush"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "outline": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "point",
+              "handleIn",
+              "handleOut"
+            ],
+            "properties": {
+              "point": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000
+                }
+              },
+              "handleIn": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000
+                }
+              },
+              "handleOut": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000
+                }
+              }
+            }
+          }
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{8}$"
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "placement": {
+          "enum": [
+            "above",
+            "below",
+            "merge"
+          ]
+        },
+        "mask": {
+          "anyOf": [
+            {
+              "const": false
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          ]
+        },
+        "copies": {
+          "type": "array",
+          "maxItems": 23,
+          "items": {
+            "type": "array",
+            "minItems": 6,
+            "maxItems": 6,
+            "items": {
+              "type": "number",
+              "minimum": -1000000000000,
+              "maximum": 1000000000000
+            }
+          }
+        },
+        "stamps": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "description": "Labs multi-frame draw: the other selected frames of the layer the committed shape is also stamped on.",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          }
+        }
+      }
+    },
+    "ObjectBrushBitmapStrokePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentSnapshotId",
+        "lifecycleGeneration",
+        "record",
+        "companion",
+        "source"
+      ],
+      "properties": {
+        "documentSnapshotId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "lifecycleGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "record": {
+          "type": "object",
+          "required": [
+            "family",
+            "target",
+            "geometry",
+            "vectorExt"
+          ],
+          "properties": {
+            "family": {
+              "const": "editable-vector-path"
+            },
+            "target": {
+              "type": "object",
+              "required": [
+                "contextId",
+                "layerUid",
+                "strokeId",
+                "frameScope"
+              ],
+              "properties": {
+                "contextId": {
+                  "const": "scene-root"
+                },
+                "strokeId": {
+                  "const": ""
+                },
+                "frameScope": {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "frame"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "authored"
+                    }
+                  }
+                }
+              }
+            },
+            "geometry": {
+              "type": "object",
+              "required": [
+                "segments"
+              ],
+              "properties": {
+                "segments": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 256
+                }
+              }
+            },
+            "vectorExt": {
+              "type": "object",
+              "required": [
+                "bitmapBrush"
+              ],
+              "properties": {
+                "bitmapBrush": {
+                  "type": "object",
+                  "required": [
+                    "bitmapBrushSpec",
+                    "brushGroupId"
+                  ],
+                  "properties": {
+                    "bitmapBrushSpec": {
+                      "type": "object"
+                    },
+                    "brushGroupId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "companion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height",
+            "opacity"
+          ],
+          "properties": {
+            "x": {
+              "type": "number",
+              "minimum": -1000000000000,
+              "maximum": 1000000000000
+            },
+            "y": {
+              "type": "number",
+              "minimum": -1000000000000,
+              "maximum": 1000000000000
+            },
+            "width": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1000000000000
+            },
+            "height": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1000000000000
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "path"
+          ],
+          "properties": {
+            "kind": {
+              "const": "file"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            }
+          }
+        },
+        "placement": {
+          "const": "behind",
+          "description": "drawMode 'behind': the anchor at the bottom of the layer's natural stack, its companion directly above it."
         }
       }
     },
@@ -13740,6 +15566,340 @@
         }
       }
     },
+    "ObjectProjectSymmetryAxis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x1",
+        "y1",
+        "x2",
+        "y2"
+      ],
+      "properties": {
+        "x1": {
+          "type": "number"
+        },
+        "y1": {
+          "type": "number"
+        },
+        "x2": {
+          "type": "number"
+        },
+        "y2": {
+          "type": "number"
+        }
+      }
+    },
+    "ObjectProjectSymmetryPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      }
+    },
+    "ObjectProjectSymmetryEditAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "enabled"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setEnabled"
+            },
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "mode"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setMode"
+            },
+            "mode": {
+              "enum": [
+                "y",
+                "x",
+                "free",
+                "radial"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "resetGuide"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "x1",
+            "y1",
+            "x2",
+            "y2"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setAxis"
+            },
+            "x1": {
+              "type": "number"
+            },
+            "y1": {
+              "type": "number"
+            },
+            "x2": {
+              "type": "number"
+            },
+            "y2": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "x",
+            "y"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setRadialCenter"
+            },
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "sectors"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setSectors"
+            },
+            "sectors": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "extend"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setExtend"
+            },
+            "extend": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectSymmetryEditPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.project.symmetry.edit"
+        },
+        "action": {
+          "$ref": "#/$defs/ObjectProjectSymmetryEditAction"
+        }
+      }
+    },
+    "ObjectProjectSymmetrySelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "const": "settings"
+        }
+      }
+    },
+    "ObjectProjectSymmetryReadPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "selector"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selector": {
+          "$ref": "#/$defs/ObjectProjectSymmetrySelector"
+        }
+      }
+    },
+    "ObjectProjectSymmetrySettingsValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "effective"
+      ],
+      "properties": {
+        "effective": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "mode",
+            "axis",
+            "radialCenter",
+            "radialSectors",
+            "extend"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "mode": {
+              "type": "string",
+              "maxLength": 1024,
+              "minLength": 1
+            },
+            "axis": {
+              "$ref": "#/$defs/ObjectProjectSymmetryAxis"
+            },
+            "radialCenter": {
+              "$ref": "#/$defs/ObjectProjectSymmetryPoint"
+            },
+            "radialSectors": {
+              "type": "number"
+            },
+            "extend": {
+              "type": "boolean"
+            }
+          }
+        },
+        "symmetryEnabled": {
+          "type": "boolean"
+        },
+        "symmetryMode": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "symmetryAxis": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectSymmetryAxis"
+            }
+          ]
+        },
+        "symmetryRadialCenter": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectSymmetryPoint"
+            }
+          ]
+        },
+        "symmetryRadialSectors": {
+          "type": "number"
+        },
+        "symmetryExtend": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ObjectProjectSymmetryReadResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "result"
+      ],
+      "properties": {
+        "instanceId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "documentId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "result": {
+          "$ref": "#/$defs/ObjectProjectSymmetrySettingsValue"
+        }
+      }
+    },
     "ObjectProjectWorkspaceRecord": {
       "type": "object",
       "additionalProperties": false,
@@ -15907,6 +18067,73 @@
         },
         "bitmapBrush": {
           "$ref": "#/$defs/ObjectClipboardBitmapBrush"
+        },
+        "brushTexture": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "brushGroupId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "isBrushTextureCopy": {
+              "const": true
+            },
+            "brushTexturePreset": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "preTextureOpacity": {
+              "type": "number"
+            },
+            "preTextureStroke": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+                }
+              ]
+            },
+            "strokeSeed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295,
+              "description": "G16 option C: the anchor's stamping seed; native produces its dabs from it."
+            }
+          },
+          "not": {
+            "required": [
+              "isBrushTextureCopy",
+              "brushTexturePreset"
+            ]
+          },
+          "description": "G16: the baseline serP brush-texture members of an anchor (preset, group, hidden paint) or a dab (copy flag, group)."
+        },
+        "shadow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "channelTag"
+          ],
+          "properties": {
+            "channelTag": {
+              "const": "shadow"
+            },
+            "shadowSwatchId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        },
+        "isFillShape": {
+          "const": true
         }
       },
       "minProperties": 1,
@@ -16052,6 +18279,73 @@
         },
         "bitmapBrush": {
           "$ref": "#/$defs/ObjectClipboardBitmapBrush"
+        },
+        "brushTexture": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "brushGroupId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "isBrushTextureCopy": {
+              "const": true
+            },
+            "brushTexturePreset": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "preTextureOpacity": {
+              "type": "number"
+            },
+            "preTextureStroke": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+                }
+              ]
+            },
+            "strokeSeed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295,
+              "description": "G16 option C: the anchor's stamping seed; native produces its dabs from it."
+            }
+          },
+          "not": {
+            "required": [
+              "isBrushTextureCopy",
+              "brushTexturePreset"
+            ]
+          },
+          "description": "G16: the baseline serP brush-texture members of an anchor (preset, group, hidden paint) or a dab (copy flag, group)."
+        },
+        "shadow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "channelTag"
+          ],
+          "properties": {
+            "channelTag": {
+              "const": "shadow"
+            },
+            "shadowSwatchId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        },
+        "isFillShape": {
+          "const": true
         }
       },
       "minProperties": 1,
@@ -16098,6 +18392,652 @@
         }
       },
       "description": "Immutable stored vector record returned by an object query. Generic vector create/replace retain ObjectVectorRecord and cannot write bitmap anchors."
+    },
+    "ObjectSubselectIntent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "indices",
+            "delta"
+          ],
+          "properties": {
+            "kind": {
+              "const": "move"
+            },
+            "indices": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            },
+            "delta": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "indices",
+            "scale",
+            "anchor"
+          ],
+          "properties": {
+            "kind": {
+              "const": "scale"
+            },
+            "indices": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            },
+            "scale": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            },
+            "anchor": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "indices",
+            "degrees",
+            "center"
+          ],
+          "properties": {
+            "kind": {
+              "const": "rotate"
+            },
+            "indices": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            },
+            "degrees": {
+              "type": "number"
+            },
+            "center": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "indices",
+            "pointType"
+          ],
+          "properties": {
+            "kind": {
+              "const": "pointType"
+            },
+            "indices": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            },
+            "pointType": {
+              "enum": [
+                "corner",
+                "smooth",
+                "symmetric"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "index",
+            "handle",
+            "point",
+            "breakPair"
+          ],
+          "properties": {
+            "kind": {
+              "const": "handle"
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            },
+            "handle": {
+              "enum": [
+                "handleIn",
+                "handleOut"
+              ]
+            },
+            "point": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            },
+            "breakPair": {
+              "type": "boolean"
+            },
+            "pairedPoint": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "dependentSchemas": {
+            "pairedPoint": {
+              "properties": {
+                "breakPair": {
+                  "const": true
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "index"
+          ],
+          "properties": {
+            "kind": {
+              "const": "toggle"
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "curve",
+            "time"
+          ],
+          "properties": {
+            "kind": {
+              "const": "insert"
+            },
+            "curve": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            },
+            "time": {
+              "type": "number",
+              "minimum": 1e-8,
+              "maximum": 0.99999999
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "indices"
+          ],
+          "properties": {
+            "kind": {
+              "const": "delete"
+            },
+            "indices": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ObjectSubselectPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "stableTarget",
+        "intent"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.subselect.edit"
+        },
+        "stableTarget": {
+          "$ref": "#/$defs/ObjectImageMeshQueryTarget"
+        },
+        "intent": {
+          "$ref": "#/$defs/ObjectSubselectIntent"
+        },
+        "atFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      }
+    },
+    "ObjectSubselectQueryPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "stableTarget",
+        "subselect"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stableTarget": {
+          "$ref": "#/$defs/ObjectImageMeshQueryTarget"
+        },
+        "subselect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cursor",
+            "limit"
+          ],
+          "properties": {
+            "cursor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 256
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "preview": {
+              "$ref": "#/$defs/ObjectSubselectIntent"
+            }
+          }
+        }
+      }
+    },
+    "ObjectSubselectQueryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "subselect"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subselect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "stableTarget",
+            "closed",
+            "total",
+            "cursor",
+            "nextCursor",
+            "segments",
+            "preview"
+          ],
+          "properties": {
+            "stableTarget": {
+              "$ref": "#/$defs/ObjectImageMeshQueryTarget"
+            },
+            "closed": {
+              "type": "boolean"
+            },
+            "total": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 256
+            },
+            "cursor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 256
+            },
+            "nextCursor": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 256
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "segments": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "point",
+                  "handleIn",
+                  "handleOut"
+                ],
+                "properties": {
+                  "point": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  "handleIn": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  "handleOut": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            },
+            "preview": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "ObjectSubselectViewPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "view"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "view": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "contextId",
+            "layerUid",
+            "frame",
+            "workId",
+            "viewGeneration",
+            "cursor",
+            "limit"
+          ],
+          "properties": {
+            "kind": {
+              "const": "subselect"
+            },
+            "contextId": {
+              "const": "scene-root"
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1
+            },
+            "frame": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "workId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+            },
+            "viewGeneration": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "cursor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1024
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "preview": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "stableTarget",
+                "intent"
+              ],
+              "properties": {
+                "stableTarget": {
+                  "$ref": "#/$defs/ObjectImageMeshQueryTarget"
+                },
+                "intent": {
+                  "$ref": "#/$defs/ObjectSubselectIntent"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "ObjectSubselectViewResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "kind",
+        "contextId",
+        "layerUid",
+        "frame",
+        "workId",
+        "viewGeneration",
+        "cursor",
+        "total",
+        "nextCursor",
+        "items",
+        "preview"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "subselect"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "workId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+        },
+        "viewGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1024
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "stableTarget",
+              "closed",
+              "count",
+              "matrix"
+            ],
+            "properties": {
+              "stableTarget": {
+                "$ref": "#/$defs/ObjectImageMeshQueryTarget"
+              },
+              "closed": {
+                "type": "boolean"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 256
+              },
+              "matrix": {
+                "type": "array",
+                "minItems": 6,
+                "maxItems": 6,
+                "items": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        "preview": {
+          "type": "boolean"
+        }
+      }
     }
   }
 }
