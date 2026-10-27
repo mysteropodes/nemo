@@ -547,6 +547,17 @@ test('Fill Brush commits its outline through the native Fill Brush command with 
 
 // #2361 G23: symmetry-bridge.js onStrokeCommitted @1065e9d8 over a pressure ribbon. Each copy carries its mapped centreline;
 // a ribbon with a linked fill gets a fresh fill of its own, its outline rebuilt from that centreline (adoptFreshIdentity).
+test('Fill Brush with Labs on: predictive leaves the fill shape alone, multi-frame stays refused, an unrelated prototype is no refusal',async()=>{
+ const stroke=f=>{send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:0});};
+ const off=await fixture('fillbrush');Object.assign(off.root.state,{fillBrushMode:'above',fillBrushSize:40});stroke(off);await settled(off);
+ const on=await fixture('fillbrush');Object.assign(on.root.state,{fillBrushMode:'above',fillBrushSize:40});predictive(on,true);stroke(on);await settled(on);
+ assert.equal(on.calls.length,1,on.log.join(','));assert.deepEqual(plain(on.calls[0].payload.outline),plain(off.calls[0].payload.outline),'predictive-stroke skips isFillShape');
+ const grid=await fixture('fillbrush');Object.assign(grid.root.state,{fillBrushMode:'above',fillBrushSize:40});
+ grid.root.SMLabs={list:()=>[{name:'canvas-grid',on:true}],unmigratedDrawHooks:()=>[]};stroke(grid);await settled(grid);assert.equal(grid.calls.length,1,grid.log.join(','));
+ const many=await fixture('fillbrush');Object.assign(many.root.state,{fillBrushMode:'above',fillBrushSize:40});const toasts=multiframe(many,true);
+ const e=send(many,'pointerdown',20,20);send(many,'pointerup',60,50);assert.equal(e.prevented,true);assert.equal(many.calls.length,0);
+ assert.ok(toasts.some(x=>/unavailable/.test(x)),toasts.join(','));
+});
 test('a mirrored or rotated pressure ribbon commits each copy with its own centreline and linked fill',async()=>{
  const pen=(f)=>{send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();
   send(f,'pointerup',80,45,{pointerType:'pen',pressure:0});};
