@@ -22,11 +22,16 @@ pub(crate) mod parent_chain;
 #[path = "object_text_scene_fonts.rs"]
 mod fonts;
 
+#[path = "object_text_scene_placed.rs"]
+pub(crate) mod placed;
+
 #[derive(Debug, Clone)]
 pub(crate) struct TextSource {
     pub(crate) source_index: usize,
     pub(crate) layer_index: usize,
     pub(crate) item: TextSceneItem,
+    /// A placed component's block (`placed`): `layer_index` is its host and it paints at the host slot.
+    pub(crate) placed: bool,
 }
 impl TextSource {
     pub(crate) fn draw(&self, scene: &mut Scene) {
@@ -47,7 +52,7 @@ pub(crate) struct TextSources {
     pub(crate) resources: Arc<ObjectSceneResourceSet>,
     pub(crate) parent_chains: Arc<parent_chain::SceneParentChains>,
 }
-fn unavailable(index: usize, reason: &'static str) -> ObjectSceneError {
+pub(crate) fn unavailable(index: usize, reason: &'static str) -> ObjectSceneError {
     ObjectSceneError::UnsupportedGeometry {
         source_object_index: index,
         reason,
@@ -288,6 +293,7 @@ pub(super) fn prepare(packet: &ObjectFramePacket) -> Result<TextSources, ObjectS
             source_index: input.source_index,
             layer_index: input.layer_index,
             item,
+            placed: false,
         });
     }
     let resources = resources

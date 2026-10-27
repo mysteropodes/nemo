@@ -132,6 +132,20 @@ impl TextSceneItem {
         &self.font_resource
     }
 
+    /// The block inside a placed component: its glyph contours through each matrix of the
+    /// placement chain in turn (camera, then symMatrix), fills unchanged.
+    pub(crate) fn placed_by(
+        &self,
+        chain: &[[f64; 6]],
+        admission: crate::object_render_scene::text_glyph_scene_kernels::text_glyph_scene::GeometryAdmission,
+    ) -> Result<Self, TextSceneError> {
+        let mut item = self.clone();
+        for m in chain {
+            item.scene = item.scene.affine(*m, admission)?;
+        }
+        Ok(item)
+    }
+
     /// Paint order (per line the decorations, then the glyph paths), each contour with
     /// its straight RGBA8 fill.
     pub(crate) fn painted(&self) -> impl Iterator<Item = (&SceneContour, [u8; 4])> + '_ {

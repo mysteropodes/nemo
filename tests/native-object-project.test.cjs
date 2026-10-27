@@ -847,8 +847,36 @@ test('an edit presented while the window is not visible is no failure and re-pre
   await s.openPath('/project.json');assert.ok(s.readPresentedObjectSession());
   const previews=()=>h.calls.filter(c=>c.command==='nemo_native_object_preview').length,before=previews();
   h.preview('deferred-occluded');await s.reference({kind:'remove'});
-  assert.equal(previews(),before+1);assert.equal(s.readPresentedObjectSession(),null);assert.deepEqual(notices,[]);
-  h.preview('presented');await turn();await turn();listeners.forEach(l=>l({visible:true}));
   for(let i=0;i<6;i++)await turn();
-  assert.equal(previews(),before+2,'one re-present');assert.ok(s.readPresentedObjectSession(),'presented again');assert.deepEqual(notices,[]);
+  // The edit's present and the one present on the wake's registration both stay deferred while occluded.
+  assert.equal(previews(),before+2);assert.equal(s.readPresentedObjectSession(),null);assert.deepEqual(notices,[]);
+  h.preview('presented');listeners.forEach(l=>l({visible:true}));
+  for(let i=0;i<6;i++)await turn();
+  assert.equal(previews(),before+3,'one re-present');assert.ok(s.readPresentedObjectSession(),'presented again');assert.deepEqual(notices,[]);
+});
+
+test('an exposure between the deferral and the listener registration is not lost (#2471 registration race)',async()=>{
+  // The desktop port replays no current visibility: a window that became visible before the listener registered sends
+  // no later hint, so the wake presents once on registration; a window still occluded defers again and waits.
+  const h=host(),notices=[],listeners=[];let release,subscriptions=0;
+  const registered=new Promise(r=>{release=r;});
+  // Open registers its own exposure scope first; only the post-Open wake's registration is held open.
+  const s=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{x:0,y:0,width:320,height:180},
+    physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0,
+    notice:m=>notices.push(m),subscribeWindowOcclusion:async hint=>{if(++subscriptions>1)await registered;listeners.push(hint);return {detach(){},close(){}};}});
+  await s.openPath('/project.json');
+  const previews=()=>h.calls.filter(c=>c.command==='nemo_native_object_preview').length,before=previews();
+  h.preview('deferred-occluded');await s.reference({kind:'remove'});
+  assert.equal(previews(),before+1);
+  // The window turns visible while the registration is still pending: no hint will ever arrive for it.
+  h.preview('presented');release();
+  for(let i=0;i<8;i++)await turn();
+  assert.equal(previews(),before+2,'one present on registration');assert.ok(s.readPresentedObjectSession());
+  // Still occluded at the registered retry: it defers again, re-arms on the live listener and waits for a hint.
+  h.preview('deferred-occluded');await s.reference({kind:'remove'});
+  for(let i=0;i<8;i++)await turn();
+  assert.equal(previews(),before+3,'no retry without a hint once registered');
+  h.preview('presented');listeners.forEach(l=>l({visible:true}));
+  for(let i=0;i<8;i++)await turn();
+  assert.equal(previews(),before+4);assert.ok(s.readPresentedObjectSession());assert.deepEqual(notices,[]);
 });

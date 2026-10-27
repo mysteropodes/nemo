@@ -340,6 +340,8 @@
     {"comment":["<!-- Native frame selection binds on ordinary Open, after parser-loaded adapters exist. -->"]},
     {"src":"js/adapters/native-frame-cell-selection.js"},
     {"src":"js/application/script-native-api.js"},
+    {"src":"js/application/presenter-seam.js"},
+    {"src":"js/adapters/native-layer-list-presenter.js"},
     {"src":"js/adapters/native-symmetry-desktop.js"},
     {"src":"js/adapters/native-symmetry-ui.js"}
   ]

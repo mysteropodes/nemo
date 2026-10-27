@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "b14282e7763008fc42f6572ab0492155a48aa04b",
-    "sourceRootTree": "8fcfe2dc06767737c4069cf4f7b5eebf73d2588d",
+    "candidateCommit": "b40978567fdf7fedf1de1ce594d66acf3c36f151",
+    "sourceRootTree": "8cacd4d85d4d0de1f3f170755bcca7c1843b4cde",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "304caf33c3f16bc8d4361b7d580fab7148382621",
-      "lastChangedCommit": "b14282e7763008fc42f6572ab0492155a48aa04b"
+      "gitTree": "b0c3cf0e1c23afe2aae1eeaba4f6f3cc552e6dab",
+      "lastChangedCommit": "b40978567fdf7fedf1de1ce594d66acf3c36f151"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "278b410d5a08c4286945219205f49e6b15c47326",
-      "sha256": "20d07420b2a3a68bdff3b359eb73bdad996554ddd709e80750d478ba79185101",
+      "gitBlob": "17450324e37ef42e9e918ebbd70dc879f877d585",
+      "sha256": "36f6de3d99a290e6b96611582f43de7248fe2202ef1540995b784b31f1187000",
       "lastChangedCommit": "f606f3b2ea60c6bf5cdb7d031b8c54b3b60d291a"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "2bbb9e416a2aa7f0e00e2060e58862038f52489f35ff18b7371f23fd87e44bdd"
+      "value": "8f9509a001dd059a56c755405dad8cd6e3896cd776f8ea9a128e09059dceb771"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "1b4afd62b512dc4dd927755050c45cb3c58aafa3",
-        "sha256": "f5945e465624adfd077bd34268dc4a59e7069da635ba16dc6c7d73cf9a41d9ff",
+        "gitBlob": "e4f4ff072fe36423132312568fd4a9368518594f",
+        "sha256": "14b2c85d6365bbbd0657f41088d923dec6f14ab61b51bc1b2c58150655251cc7",
         "moduleCount": 307,
-        "basedOnCommit": "b14282e7763008fc42f6572ab0492155a48aa04b"
+        "basedOnCommit": "b40978567fdf7fedf1de1ce594d66acf3c36f151"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -121,13 +121,13 @@
   "bootstrapObservations": {
     "path": "src/index.html",
     "scriptOrdinalConvention": "One-based order of all script start tags, including inline and excluded vendor tags.",
-    "totalScriptTags": 319,
-    "externalClassicTags": 316,
+    "totalScriptTags": 321,
+    "externalClassicTags": 318,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
-    "retainedClassicTags": 312,
+    "retainedClassicTags": 314,
     "retainedModuleTags": 2,
-    "classicTagsUnderSrcJsIncludingVendors": 315,
+    "classicTagsUnderSrcJsIncludingVendors": 317,
     "inlineScripts": [
       {
         "path": "src/index.html",
@@ -789,6 +789,30 @@
           "path": "src/index.html",
           "line": 2332,
           "scriptOrdinal": 30
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/presenter-seam.js",
+      "moduleId": "app.presenter.seam",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2671,
+          "scriptOrdinal": 318
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-layer-list-presenter.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2672,
+          "scriptOrdinal": 319
         }
       ]
     },
@@ -4547,8 +4571,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2671,
-          "scriptOrdinal": 318
+          "line": 2673,
+          "scriptOrdinal": 320
         }
       ],
       "sourceEvidence": [
@@ -4566,8 +4590,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2672,
-          "scriptOrdinal": 319
+          "line": 2674,
+          "scriptOrdinal": 321
         }
       ],
       "sourceEvidence": [

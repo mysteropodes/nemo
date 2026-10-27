@@ -2007,6 +2007,18 @@
       ]
     },
     {
+      "id": "app.presenter.seam",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "presenter-seam.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "presenter-seam.js"
+      ]
+    },
+    {
       "id": "app.opacity.capability",
       "layer": "application",
       "dir": "src/js/application",
@@ -2682,6 +2694,7 @@
       "dir": "src/js/adapters",
       "files": [
         "native-frame-cell-selection.js",
+        "native-layer-list-presenter.js",
         "native-object-ui.js",
         "native-layer-range-desktop.js",
         "native-layer-playhead-cut-ui.js"
