@@ -15,10 +15,13 @@
   const EFFECTS = 'command.document.object.path.effects.edit';
   const OPS = new Set([VECTOR, PARAMETRIC, EFFECTS]);
   const FAMILY = 'editable-vector-path';
-  // Full encoded request envelopes: vector edits may carry a complete 256-anchor record;
-  // every other operation keeps the default bound. Replies remain bounded separately.
-  const MAX_REQUEST_BYTES = 4096, ENGINE_VECTOR_REQUEST_BYTES = 65536;
-  const requestByteLimit = (operation) => operation === VECTOR ? ENGINE_VECTOR_REQUEST_BYTES : MAX_REQUEST_BYTES;
+  // Full encoded request envelopes: vector edits may carry a complete 256-anchor record, and the Fill Brush commit
+  // (an edit-contract operation) a 256-segment outline; every other operation keeps the default bound. Replies remain
+  // bounded separately.
+  const MAX_REQUEST_BYTES = 4096, ENGINE_VECTOR_REQUEST_BYTES = 65536, FILL_BRUSH = 'command.document.object.fill.brush';
+  // #2361: a bitmap-brush Draw stroke carries a whole anchor record (its PNG is a staged file, never request bytes).
+  const BITMAP_STROKE = 'command.document.object.brush.bitmap.stroke';
+  const requestByteLimit = (operation) => operation === VECTOR || operation === FILL_BRUSH || operation === BITMAP_STROKE ? ENGINE_VECTOR_REQUEST_BYTES : MAX_REQUEST_BYTES;
   const MAX_ANCHORS = 256, MAX_FRAME = 4294967295;
   const CAPS = ['butt', 'round', 'square'], JOINS = ['miter', 'round', 'bevel'], ORDERS = ['fillFirst', 'strokeFirst'];
   const PROFILES = ['taper-in', 'taper-out', 'taper-both', 'bulge', 'even'];
@@ -145,7 +148,7 @@
   }
   // G16: serP's brush-texture members as stored (an anchor's preset and hidden paint, or a dab's copy flag).
   function brushTexture(value, label) {
-    exact(value, [], ['brushGroupId', 'isBrushTextureCopy', 'brushTexturePreset', 'preTextureOpacity', 'preTextureStroke'], label);
+    exact(value, [], ['brushGroupId', 'isBrushTextureCopy', 'brushTexturePreset', 'preTextureOpacity', 'preTextureStroke', 'strokeSeed'], label);
     const text = (v) => typeof v === 'string' && v.length > 0 && bytes(v) <= 255 && !v.includes('\0');   // UTF-8 bytes, as native counts
     if (!Object.keys(value).length) fail(`${label} must not be empty`);
     if (has(value, 'brushGroupId') && !text(value.brushGroupId)) fail(`${label}.brushGroupId is invalid`);
@@ -154,10 +157,16 @@
     if (has(value, 'preTextureOpacity') && !(typeof value.preTextureOpacity === 'number' && Number.isFinite(value.preTextureOpacity))) fail(`${label}.preTextureOpacity must be finite`);
     if (has(value, 'preTextureStroke') && value.preTextureStroke !== null && !/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value.preTextureStroke)) fail(`${label}.preTextureStroke is invalid`);
     if (has(value, 'isBrushTextureCopy') && has(value, 'brushTexturePreset')) fail(`${label} is not both an anchor and a dab`);
+    // G16 option C: an anchor's stamping seed, a uint32.
+    if (has(value, 'strokeSeed') && !(Number.isInteger(value.strokeSeed) && value.strokeSeed >= 0 && value.strokeSeed <= 0xFFFFFFFF && has(value, 'brushTexturePreset'))) fail(`${label}.strokeSeed is invalid`);
   }
   function ext(value, label, hasStroke) {
-    exact(value, [], ['pressure', 'paramShape', 'boxAngle', 'fillGradient', 'fillTrace', 'isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion', 'brushTexture'], label);
+    exact(value, [], ['pressure', 'paramShape', 'boxAngle', 'fillGradient', 'fillTrace', 'isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion', 'brushTexture', 'shadow', 'isFillShape'], label);
+    if (has(value, 'isFillShape') && value.isFillShape !== true) fail(`${label}.isFillShape must be true`);
     if (has(value, 'brushTexture')) brushTexture(value.brushTexture, `${label}.brushTexture`);
+    // Shadow Brush (applyShadowBrushTag): channelTag is only ever 'shadow'; the swatch id is non-empty.
+    if (has(value, 'shadow')) { exact(value.shadow, ['channelTag'], ['shadowSwatchId'], `${label}.shadow`);
+      if (value.shadow.channelTag !== 'shadow' || has(value.shadow, 'shadowSwatchId') && !(typeof value.shadow.shadowSwatchId === 'string' && value.shadow.shadowSwatchId.length > 0 && bytes(value.shadow.shadowSwatchId) <= 256)) fail(`${label}.shadow is invalid`); }
     if (!Object.keys(value).length) fail(`${label} must be omitted when empty`);
     if (has(value, 'pressure')) {
       pressure(value.pressure, `${label}.pressure`);

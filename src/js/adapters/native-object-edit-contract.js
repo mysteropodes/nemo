@@ -4,10 +4,11 @@
  * native-object-edit-seam.js performs the single composition the common v2 SDK injects.
  * No owner, no writer, no host. */
 (function (root, factory) {
-  const api = factory();
+  const subselect = typeof module === 'object' && module.exports ? require('./native-subselect-contract.js') : root.NemoNativeSubselectContract;
+  const api = factory(subselect);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.NemoNativeObjectEditContract = api;
-}(typeof globalThis === 'object' ? globalThis : this, function () {
+}(typeof globalThis === 'object' ? globalThis : this, function (Subselect) {
   'use strict';
 
   const PREFIX = 'command.document.object.';
@@ -88,10 +89,21 @@
   const uid = (v, at) => text(v, MAX_ID, at), layerUid = opaque;
   const uids = (min) => (v, at) => list(v, at, min, MAX_ITEMS, (item, i) => text(item, MAX_ID, i));
   const FIELDS = {
+    subselectTarget: v=>{if(!Subselect.target(v))fail('Invalid subselect target');},
+    subselectIntent: v=>{if(!Subselect.intent(v))fail('Invalid subselect intent');},
     point: (v,at)=>{if(!Array.isArray(v)||v.length!==2||v.some((n)=>typeof n!=='number'||!Number.isFinite(n)||Math.abs(n)>1e12))fail(at+' invalid fill point');},
     color: (v,at)=>{if(typeof v!=='string'||!/^#[0-9a-fA-F]{8}$/.test(v))fail(at+' requires hex8');},
     opacity: (v,at)=>{if(typeof v!=='number'||!Number.isFinite(v)||v<0||v>1)fail(at+' invalid opacity');},
     flag: (v,at)=>{if(typeof v!=='boolean')fail(at+' requires boolean');},
+    // A Fill Brush outline: 3 to 256 closed-path segments, each point and relative handle a finite pair.
+    outline: (v,at)=>{if(!Array.isArray(v)||v.length<3||v.length>256)fail(at+' requires 3 to 256 segments');
+      v.forEach((s,i)=>{if(!s||typeof s!=='object'||Array.isArray(s)||Object.keys(s).sort().join()!=='handleIn,handleOut,point')fail(at+'['+i+'] invalid segment');
+        ['point','handleIn','handleOut'].forEach((k)=>FIELDS.point(s[k],at+'['+i+'].'+k));});},
+    placement: (v,at)=>{if(!['above','below','merge'].includes(v))fail(at+' requires above, below or merge');},
+    copies: (v,at)=>{if(!Array.isArray(v)||v.length>23)fail(at+' requires at most 23 copies');
+      v.forEach((m,i)=>{if(!Array.isArray(m)||m.length!==6||m.some((n)=>typeof n!=='number'||!Number.isFinite(n)||Math.abs(n)>1e12))fail(at+'['+i+'] invalid affine');});},
+    stamps: (v,at)=>{if(!Array.isArray(v)||v.length>256||new Set(v).size!==v.length||v.some((f)=>!Number.isInteger(f)||f<0||f>4294967295))fail(at+' requires at most 256 distinct frames');},
+    mask: (v,at)=>{if(v!==false&&!(typeof v==='string'&&v.length>0&&bytes(v)<=64&&!/[\u0000-\u001f\u007f-\u009f]/.test(v)))fail(at+' requires false or a mask mode');},
     uid: uid, layerUid: layerUid, layerUids: (v, at) => { list(v, at, 1, MAX_ITEMS, opaque); if (new Set(v).size !== v.length) fail(`${at} repeats a layer`); },
     gap: (v, at) => { if (typeof v !== 'number' || !Number.isFinite(v)) fail(`${at} must be a finite number`); },
     selection: selection, name: (v, at) => { if (typeof v !== 'string') fail(`${at} must be a string`); },
@@ -102,6 +114,7 @@
   };
   // operation suffix -> [command, result kind, [wire member, validator]...]. Member order is the wire order.
   const SPEC = {
+    'subselect.edit': ['object.subselect.edit', 'command', [['stableTarget','subselectTarget'],['intent','subselectIntent']]],
     'layer.delete': ['object.layer.delete', 'command', [['selection', 'selection']]],
     'layer.duplicate': ['object.layer.duplicate', 'created', [['layerUid', 'layerUid']]],
     'layer.rename': ['object.layer.rename', 'command', [['layerUid', 'layerUid'], ['name', 'name']]],
@@ -120,6 +133,7 @@
     'boolean.erase': ['object.boolean.erase', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['strokeId', 'strokeId'], ['footprint', 'footprint']]],
     'boolean.flatten': ['object.boolean.flatten', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['groupId', 'groupId']]],
     'fill.trace':['object.fill.trace','command',[['layerUid','uid'],['contextId','contextId'],['frame','frame'],['point','point'],['color','color'],['opacity','opacity'],['remove','flag']]],
+    'fill.brush':['object.fill.brush','command',[['layerUid','uid'],['contextId','contextId'],['frame','frame'],['outline','outline'],['color','color'],['opacity','opacity'],['placement','placement'],['mask','mask'],['copies','copies'],['stamps','stamps']]],
     'clipboard.copy': ['object.clipboard.copy', 'clipboard-copy', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['strokeIds', 'strokeIds0']]],
     'clipboard.cut': ['object.clipboard.cut', 'clipboard-cut', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['strokeIds', 'strokeIds0']]],
   };
@@ -184,5 +198,8 @@
   function commandOf(operation) { const entry = spec(operation); return entry ? entry[0] : null; }
   function members(operation) { const entry = spec(operation); return entry ? entry[2].map((m) => m[0]) : null; }
   function kinds(operation) { const entry = spec(operation); return entry ? entry[2].map((m) => m.slice()) : null; }
-  return Object.freeze({ OPERATIONS, admitted, requiresRevision: admitted, payload, result, correlate, paths: own.paths, compose, commandOf, members, kinds, bytes });
+  // The command runner's bound for an edit request: a Fill Brush outline (up to 256 segments) gets the vector-geometry bound,
+  // as the SDK does (native-object-vector-contract.js); every other edit stays at 4096.
+  const requestByteLimit = (op) => (op === PREFIX + 'fill.brush' ? 65536 : 4096);
+  return Object.freeze({ OPERATIONS, admitted, requiresRevision: admitted, payload, result, correlate, paths: own.paths, compose, commandOf, members, kinds, bytes, requestByteLimit });
 }));

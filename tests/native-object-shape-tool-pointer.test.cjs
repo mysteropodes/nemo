@@ -88,6 +88,9 @@ async function fixture(tool='rect',native=true){
  root.SMEngineBridge={isEnabled:()=>true,nativeEditGuard:{allow:()=>!native},screenToWorld:()=>assert.fail('stale legacy viewport used'),suspend:()=>assert.fail('legacy engine suspended')};
  root.window=root;root.console=console;root.TextEncoder=TextEncoder;const context=vm.createContext(root),tools=fs.readFileSync(path.join(ROOT,'src/js/tools.js'),'utf8');
  for(const name of ['constrainSquare','constrainAngle45','applyStrokeStyle'])vm.runInContext(baselineFunction(tools,name),context,{filename:'tools.js:'+name});
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-paint.js'),'utf8'),context,{filename:'native-object-draw-paint.js'});
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-symmetry.js'),'utf8'),context,{filename:'native-object-draw-symmetry.js'});
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-bitmap.js'),'utf8'),context,{filename:'native-object-draw-bitmap.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-shape-tool.js'),'utf8'),context,{filename:'native-object-shape-tool.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/shape-bridge.js'),'utf8'),context,{filename:'shape-bridge.js'});
  if(tool==='pen'){root.SM={setTool(t){root.state.tool=t;}};vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/pen-bridge.js'),'utf8'),context,{filename:'pen-bridge.js'});}
@@ -197,15 +200,15 @@ test('stage canvas pointer origin still creates exactly one native rectangle thr
  const f=await fixture();f.canvas.fire('pointerdown');f.canvas.fire('pointermove',{clientX:240,clientY:210});f.canvas.fire('pointerup',{clientX:240,clientY:210});
  assert.equal((await f.root.NemoNativeShapeToolController.whenSettled()).status,'applied');assert.equal(f.calls.length,1);
 });
-test('all 43 retained bootstrap identities keep their frozen runs and adjacency in the actual page',()=>{
+test('all 45 retained bootstrap identities keep their frozen runs and adjacency in the actual page',()=>{
  const html=fs.readFileSync(path.join(ROOT,'src/index.html'),'utf8'),fixture=fs.readFileSync(path.join(ROOT,'scripts/nemo/boundaries-application.test.cjs'),'utf8');
  const start=fixture.indexOf("test('N20 contract, authority, adapters and bootstrap load in their frozen order'");assert.ok(start>0);
- const block=fixture.slice(start),paths=Array.from(vm.runInNewContext(block.match(/const paths = (\[[\s\S]*?\]);/)[1]));assert.equal(paths.length,43);
+ const block=fixture.slice(start),paths=Array.from(vm.runInNewContext(block.match(/const paths = (\[[\s\S]*?\]);/)[1]));assert.equal(paths.length,45);
  const runs=JSON.parse(block.match(/assertRuns\(paths\.map\([\s\S]*?scriptOrdinal\),\s*(\[[\d,\s]+\])/)[1]);
  const scripts=[...html.matchAll(/<script\b([^>]*)>/gi)].map((m,i)=>({src:m[1].match(/\bsrc=["']([^"']+)/)?.[1],ordinal:i+1}));
  const ordinals=paths.map(p=>scripts.find(s=>'src/'+s.src===p).ordinal);let at=0;
  for(const size of runs){for(let k=1;k<size;k++)assert.equal(ordinals[at+k],ordinals[at+k-1]+1);if(at)assert.ok(ordinals[at]>ordinals[at-1]+1);at+=size;}
- assert.equal(at,43);
+ assert.equal(at,45);
  // Read actual HTML directly: one helper after SDK, before the following consumer.
  assert.equal(scripts.filter(s=>s.src==='js/adapters/native-frame-edit-desktop.js').length,1);
  const ord=name=>scripts.find(s=>s.src==='js/adapters/'+name+'.js').ordinal;
@@ -213,7 +216,7 @@ test('all 43 retained bootstrap identities keep their frozen runs and adjacency 
  assert.ok(ord('native-frame-edit-desktop')<ord('native-fill-desktop')&&ord('native-fill-desktop')<ord('native-text-read'));
  assert.equal(scripts.find(s=>s.src==='js/i18n.js').ordinal,ord('i18n-runtime')+1);
  assert.match(fixture,/retained\.loadSites\[0\]\.scriptOrdinal, runtime\[0\]\.ordinal/);
- assert.match(fixture,/assertRuns\(positions, \[1, 8, 2\]/);
+ assert.match(fixture,/assertRuns\(positions, \[1, 10, 2\]/);
 });
 
 test('native drawing refuses unavailable, stale and enabled Perspective projections before a document command',async()=>{
@@ -267,6 +270,30 @@ const pts=r=>r.geometry.segments.map(s=>[s.point.x,s.point.y]);
 async function pen(f,steps){let t=1000;const now=Date.now;Date.now=()=>t;
  try{for(const [kind,x,y,extra] of steps){if(kind==='wait'){t+=x;continue;}f.area.fire(kind,{clientX:x,clientY:y,...(extra||{})});t+=kind==='pointerdown'?1:0;}}finally{Date.now=now;}
  return f.root.NemoNativePenToolController&&f.root.NemoNativePenToolController.whenSettled();}
+// #2361 Shadow Brush: tools.js tags the committed Pen/Shape path (applyShadowBrushTag @1065e9d8): the active swatch
+// strokes it at max(1, width) with round ends and clears its fill; the channel and swatch id travel with the record.
+test('Shadow mode commits Pen and Shape paths as construction ink in the active swatch, never in the preview',async()=>{
+ const swatch={id:'sh5',ordinal:5,color:'#2288ff'},shadow={channelTag:'shadow',shadowSwatchId:'sh5'};
+ const ink=r=>[r.vector.stroke.r,r.vector.stroke.g,r.vector.stroke.b,r.vector.hasRealStroke,r.fill,r.vector.strokeWidth,r.vector.strokeCap,r.vector.strokeJoin];
+ const want=[0x22/255,0x88/255,1,true,null,4,'round','round'];
+ const rect=await fixture();rect.root.SMShadowBrush={activeSwatch:()=>swatch};rect.root.state.shadowMode=true;
+ assert.equal((await rect.gesture()).status,'applied');const r=rect.calls[0].payload.record;
+ assert.deepEqual(ink(r),want,'the rectangle is ink, not a fill');assert.deepEqual(r.vectorExt.shadow,shadow);
+ assert.equal(r.vectorExt.paramShape.kind,'rect','its parametric shape survives');
+ const off=await fixture();off.root.SMShadowBrush={activeSwatch:()=>swatch};Object.assign(off.root.state,{shadowMode:true,strokeEnabled:false});
+ assert.equal((await off.gesture()).status,'applied');assert.deepEqual(ink(off.calls[0].payload.record),want,'Stroke off still inks in Shadow mode');
+ const p=await fixture('pen');p.root.SMShadowBrush={activeSwatch:()=>swatch};p.root.state.shadowMode=true;
+ const res=await pen(p,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
+ assert.equal(res.status,'applied');const q=p.calls[0].payload.record;assert.deepEqual(ink(q),want);assert.deepEqual(q.vectorExt.shadow,shadow);
+ // The baseline tags at pointer-up: while dragging, the preview keeps the drawing colours and never names the swatch.
+ const live=await fixture();live.root.SMShadowBrush={activeSwatch:()=>swatch};live.root.state.shadowMode=true;
+ live.area.fire('pointerdown');live.area.fire('pointermove',{clientX:240,clientY:210});const shown=live.body.firstChild.firstChild.attributes;
+ assert.deepEqual([shown.stroke,shown.fill],['#112233','#44556680'],'the preview is not the committed ink');
+ live.area.fire('pointerup',{clientX:240,clientY:210});await live.root.NemoNativeShapeToolController.whenSettled();
+ assert.deepEqual(live.calls[0].payload.record.vectorExt.shadow,shadow);
+ const none=await fixture();none.root.SMShadowBrush={activeSwatch:()=>null};none.root.state.shadowMode=true;
+ none.area.fire('pointerdown');none.area.fire('pointerup',{clientX:240,clientY:210});assert.equal(none.calls.length,0,'no swatch, no commit');
+});
 test('Pen: clicks place anchors, a drag sets symmetric handles, a double press commits one open native path',async()=>{
  const f=await fixture('pen');
  const r=await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointermove',260,110],['pointerup',260,110],['wait',500],

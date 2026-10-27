@@ -2871,3 +2871,27 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 .history-version-row:hover{background:var(--panel3);}
 .history-version-row span{min-width:0;overflow-wrap:anywhere;}
 .history-version-row button{flex:none;font-size:10px;}
+
+/* Native presenter controls (2026-10-26): the buttons and selects the native adapters create without an app
+   class or id render as the app's dark pill on one line (a static control with an id keeps its own styling). `:where()` keeps the rule at zero specificity, so every control
+   that already has its own rule keeps it; only the browser's default white button is replaced. */
+:where(button:not([class]):not([id]), select:not([class]):not([id])){background:var(--panel3);border:none;color:rgba(236,234,231,.75);
+  border-radius:6px;padding:4px 8px;font:inherit;font-size:12px;font-weight:600;line-height:1.3;white-space:nowrap;
+  cursor:pointer;transition:background .15s,color .15s;}
+:where(button:not([class]):not([id]):hover:not(:disabled)){background:#2c2a31;color:var(--text);}
+:where(button:not([class]):not([id])[aria-pressed="true"]){background:var(--accent-dim);color:var(--text);}
+:where(button:not([class]):not([id]):disabled,select:not([class]):not([id]):disabled){opacity:.4;cursor:not-allowed;}
+:where(select:not([class]):not([id])){max-width:100%;text-overflow:ellipsis;}
+:where(button:not([class]):not([id]),select:not([class]):not([id])){margin:2px 0;}
+:where(:not(.native-object-layer)>button:not([class]):not([id])+button:not([class]):not([id])){margin-left:4px;}
+/* Native layer rows stay one line: the layer name truncates instead of wrapping under its Hide/Lock/Shy pills. */
+.native-object-layer{gap:3px;align-items:center;min-width:0;margin:1px 0;}
+.native-object-layer>button{flex:none;}
+.native-object-layer>button:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+/* Badges, panel buttons and shortcut pills never break their label over two rows. */
+.badge,.pbtn,.sc{white-space:nowrap;}
+/* The status-bar help is one line, truncated, never a second row inside the 20px bar. */
+#statusbar>span{white-space:nowrap;}
+#statusbar>span:first-child{min-width:0;overflow:hidden;}
+#statusbar>span:last-child{flex:none;margin-left:12px;}
+#statusbar-help{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}

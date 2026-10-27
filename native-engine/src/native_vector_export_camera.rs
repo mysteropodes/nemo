@@ -84,6 +84,11 @@ pub(super) fn for_plan(plan: &ObjectPaintPlan) -> Result<Option<Camera>, SvgExpo
                     preflight(camera, contour)?;
                 }
             }
+            PaintEntry::Dab(d) => {
+                if let Some(contour) = d.svg_contour.as_ref() {
+                    preflight(camera, contour)?;
+                }
+            }
             PaintEntry::Raster(_) => {}
             PaintEntry::Video(index) => return Err(unsupported_video(plan, index)),
             #[cfg(all(feature = "application", feature = "project_media_codec"))]

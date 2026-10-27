@@ -1,17 +1,22 @@
 /* Ordinary native shape, Pen and bounded freehand gestures. Only pointer-local data and SVG preview live here;
  * the existing vector client and Project resource queue own every committed command. */
-(function(root,factory){var api=factory();if(typeof module==='object'&&module.exports)module.exports=api;
-  else root.NemoNativeObjectShapeTool=api;
-}(typeof globalThis==='object'?globalThis:this,function(){
+(function(root,factory){var node=typeof module==='object'&&module.exports;
+  var api=factory(node?require('./native-object-draw-paint.js'):root.NemoNativeDrawPaint,node?require('./native-object-draw-symmetry.js'):root.NemoNativeDrawSymmetry,
+    node?require('./native-object-draw-bitmap.js'):root.NemoNativeDrawBitmap);
+  if(node)module.exports=api;else root.NemoNativeObjectShapeTool=api;
+}(typeof globalThis==='object'?globalThis:this,function(Paint,Symmetry,Bitmap){
   'use strict';
   var tools=['line','rect','ellipse'],shapeTools=tools.concat(['star','speechbubble']);
   var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
   function same(a,b){return !!a&&!!b&&pinKeys.every(function(k){return a[k]===b[k];});}
   function fail(message){throw new Error(message);}
+  // A pressure ribbon drawn with Fill on carries its linked fill companion (draw-bridge.js @1065e9d8): the dictionary
+  // builder records it here, against the ribbon's dictionary, and the commit creates both in one createMany.
+  var linkedCompanions=new WeakMap();
   function consume(e){if(e&&e.stopImmediatePropagation)e.stopImmediatePropagation();if(e&&e.preventDefault)e.preventDefault();}
   function create(root,ports){
     var Mapping=ports.mapping;
-    var admitted=ports.freehand?['draw']:ports.pen?['pen']:tools,handled=ports.freehand?['draw','fillbrush']:ports.pen?['pen']:shapeTools;
+    var admitted=ports.freehand?['draw','fillbrush']:ports.pen?['pen']:tools,handled=ports.freehand?['draw','fillbrush']:ports.pen?['pen']:shapeTools;
     var drag=null,pending=null,uncertain=null,overlay=null,retired=false,settled=Promise.resolve({status:'idle'});
     function session(){return root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);}
     function nativeMode(){try{var s=session();return !!s&&s.blocksLegacy();}catch(_){return true;}}
@@ -32,10 +37,11 @@
     function style(tool,proof){
       var s=root.state,current=session(),ownerInfo=current&&current.info(),port=root.NemoNativePerspectiveController;
       var perspective=port&&(proof?typeof port.readForCommand==='function'&&port.readForCommand(proof):port.read());
-      if(s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||s.shadowMode||!perspective||!same(perspective.info,ownerInfo)||perspective.perspective.settings.perspectiveEnabled||s.activeSymbolId)fail('This drawing mode is unavailable in native shape tools.');
+      if(s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||!perspective||!same(perspective.info,ownerInfo)||perspective.perspective.settings.perspectiveEnabled||s.activeSymbolId)fail('This drawing mode is unavailable in native shape tools.');
       if(ports.freehand)return ports.style();
-      if(ports.pen)return penStyle(s);
-      if(typeof s.strokeEnabled!=='boolean'||typeof s.fillEnabled!=='boolean'||(!s.strokeEnabled&&(tool==='line'||!s.fillEnabled)))fail('Enable a supported stroke or fill to draw.');
+      if(ports.pen)return Paint.shadowStyle(root,s,penStyle(s));
+      // Shadow mode inks the shape in the swatch whatever Stroke/Fill say (applyShadowBrushTag).
+      if(typeof s.strokeEnabled!=='boolean'||typeof s.fillEnabled!=='boolean'||!s.shadowMode&&!s.strokeEnabled&&(tool==='line'||!s.fillEnabled))fail('Enable a supported stroke or fill to draw.');
       if(!Number.isFinite(s.brushSize)||s.brushSize<=0||!Number.isFinite(s.opacity)||s.opacity<0||s.opacity>100)fail('Native shape style is unavailable.');
       var hex=/^#(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/;
       if(s.strokeEnabled&&!hex.test(s.strokeColor)||tool!=='line'&&s.fillEnabled&&!hex.test(s.fillColor))fail('Native shapes require solid colours.');
@@ -46,7 +52,8 @@
       // Reuse applyStrokeStyle on a detached plain style, never a Paper item.
       if(tool==='line')Object.assign(out,ports.lineStyle());
       if(!['butt','round','square'].includes(out.strokeCap))fail('Native stroke cap is unavailable.');
-      return out;
+      // tools.js Pen/Shape commit @1065e9d8 runs applyShadowBrushTag on the committed path in Shadow mode.
+      return Paint.shadowStyle(root,s,out);
     }
     // tools.js Pen @1065e9d8: strokeColor/brushSize/cap/join/opacity, no fill, applyStrokeStyle dashes.
     function penStyle(s){
@@ -92,23 +99,23 @@
     function release(t){try{var el=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(el.releasePointerCapture)el.releasePointerCapture(t.pointer);}catch(_){} }
     function cancel(){if(drag){var t=drag;drag=null;t.cancelled=true;clear();release(t);}return {status:'cancelled'};}
     function endpoint(t,e){var end=point(e,t);return !ports.freehand&&e.shiftKey?ports.constrain(t.tool,t.start,end):end;}
-    function dictionary(t,end){
+    function dictionary(t,end,final){
       if(ports.pen){
         var anchors=t.anchors.concat(end&&!t.handleDrag?[{point:end}]:[]);
-        return Object.assign({},t.style,{closed:!!t.closed,segments:anchors.map(function(a){
-          return {point:a.point.slice(),handleIn:(a.handleIn||[0,0]).slice(),handleOut:(a.handleOut||[0,0]).slice()};})});
+        return Paint.shade(Object.assign({},t.style,{closed:!!t.closed,segments:anchors.map(function(a){
+          return {point:a.point.slice(),handleIn:(a.handleIn||[0,0]).slice(),handleOut:(a.handleOut||[0,0]).slice()};})}),final);
       }
       if(ports.freehand)return ports.dictionary(t.samples,t.style);
       var g=ports.geometry(t.tool,t.start[0],t.start[1],end[0],end[1]);
       var out=Object.assign({},t.style,{closed:g.closed,segments:g.segments.map(function(s){return {point:s.point.slice(),handleIn:(s.handleIn||[0,0]).slice(),handleOut:(s.handleOut||[0,0]).slice()};})});
       if(t.tool==='rect')out.paramShape={kind:'rect',tl:0,tr:0,br:0,bl:0,box:{x1:Math.min(t.start[0],end[0]),y1:Math.min(t.start[1],end[1]),x2:Math.max(t.start[0],end[0]),y2:Math.max(t.start[1],end[1])}};
-      return out;
+      return Paint.shade(out,final);
     }
     // The live preview shows the stroke and, with symmetry on, every copy the commit will create
     // (symmetry-bridge.js onPreview @1065e9d8); a refused symmetry previews only the stroke itself.
     function preview(t,end){
       var d=root.document,dict=dictionary(t,end);if(!dict)return;
-      var dicts;try{dicts=symmetric(dict,t.pin);}catch(_){dicts=[dict];}
+      var dicts;try{dicts=Symmetry.copies(root,dict,t.pin,linkedCompanions.get(dict)||null);}catch(_){dicts=[dict];}
       if(!overlay){overlay=d.createElementNS('http://www.w3.org/2000/svg','svg');overlay.setAttribute('aria-hidden','true');
         Object.assign(overlay.style,{position:'fixed',pointerEvents:'none',zIndex:'20',left:t.bounds.left+'px',top:t.bounds.top+'px',width:t.bounds.width+'px',height:t.bounds.height+'px'});
         overlay.setAttribute('viewBox','0 0 '+t.pin.canvasW+' '+t.pin.canvasH);overlay.setAttribute('preserveAspectRatio','none');d.body.appendChild(overlay);}
@@ -123,49 +130,16 @@
         if(one.dashArray)path.setAttribute('stroke-dasharray',one.dashArray.join(' '));path.setAttribute('stroke-dashoffset',one.dashOffset);path.setAttribute('stroke-miterlimit',one.miterLimit);
         path.setAttribute('paint-order',one.paintOrder==='strokeFirst'?'stroke fill':'fill stroke');});
     }
-    // G23 (symmetry-bridge.js @1065e9d8, onStrokeCommitted): the stroke and its mirrored or rotated copies.
-    // Mirrors clip the committed stroke at the axis unless Extend is on, reflect points and handles and
-    // re-orient closed copies; radial adds n-1 rotations about the centre (2..24 sectors), stacked as the
-    // baseline's insertAbove leaves them (original, then copy n-1 down to copy 1).
-    function symmetric(dict,pin){
-      var s=root.state;if(!s.symmetryEnabled)return [dict];
-      if(dict.centerSegments||dict.isVectorBrush)fail('Symmetry with pressure brushes is unavailable in native Drawing.');
-      function map(d,fp,fv){return Object.assign({},d,{segments:d.segments.map(function(x){
-        return {point:fp(x.point[0],x.point[1]),handleIn:fv(x.handleIn[0],x.handleIn[1]),handleOut:fv(x.handleOut[0],x.handleOut[1])};})});}
-      var w=pin.canvasW,h=pin.canvasH;
-      if(s.symmetryMode==='radial'){
-        var c=s.symmetryRadialCenter||{x:w/2,y:h/2},n=Math.max(2,Math.min(24,s.symmetryRadialSectors|0||6)),out=[dict];
-        for(var k=n-1;k>=1;k--)(function(a){var cs=Math.cos(a),sn=Math.sin(a);
-          out.push(map(dict,function(x,y){var dx=x-c.x,dy=y-c.y;return [c.x+dx*cs-dy*sn,c.y+dx*sn+dy*cs];},function(x,y){return [x*cs-y*sn,x*sn+y*cs];}));})(k*2*Math.PI/n);
-        return out;
-      }
-      var cx=w/2,cy=h/2,r=Math.min(w,h)*0.4;
-      var axis=s.symmetryAxis||(s.symmetryMode==='x'?{x1:0,y1:cy,x2:w,y2:cy}:s.symmetryMode==='free'?{x1:cx-r,y1:cy-r,x2:cx+r,y2:cy+r}:{x1:cx,y1:0,x2:cx,y2:h});
-      var len=Math.hypot(axis.x2-axis.x1,axis.y2-axis.y1)||1,ux=(axis.x2-axis.x1)/len,uy=(axis.y2-axis.y1)/len;
-      function side(p){return (axis.x2-axis.x1)*(p[1]-axis.y1)-(axis.y2-axis.y1)*(p[0]-axis.x1)>=0;}
-      function vector(x,y){var t=x*ux+y*uy;return [2*t*ux-x,2*t*uy-y];}
-      function point(x,y){var t=(x-axis.x1)*ux+(y-axis.y1)*uy;return [2*(axis.x1+t*ux)-x,2*(axis.y1+t*uy)-y];}
-      var base=dict;
-      if(!s.symmetryExtend&&dict.segments.length){
-        var first=side(dict.segments[0].point),cut=dict.segments.length;
-        for(var i=1;i<dict.segments.length;i++)if(side(dict.segments[i].point)!==first){cut=i;break;}
-        // The baseline keeps a one-anchor remnant; a native path needs two, so refuse rather than drop it silently.
-        if(cut<2)fail('This stroke starts at the symmetry axis; nothing remains to mirror.');
-        base=Object.assign({},dict,{segments:dict.segments.slice(0,cut)});
-      }
-      var mirrored=map(base,point,vector);
-      if(mirrored.closed)mirrored=Object.assign({},mirrored,{segments:mirrored.segments.slice().reverse().map(function(x){return {point:x.point,handleIn:x.handleOut,handleOut:x.handleIn};})});
-      return [base,mirrored];
-    }
     function commit(t,end){
       if(!current(t,true))return Promise.resolve({status:'cancelled'});
       if(ports.pen&&t.anchors.length<2)return Promise.resolve({status:'cancelled'});
       if(!ports.freehand&&!ports.pen&&Math.hypot(end[0]-t.start[0],end[1]-t.start[1])<2)return Promise.resolve({status:'cancelled'});
-      var dict=dictionary(t,end),s=t.session;
+      var dict=dictionary(t,end,true),s=t.session,companion=linkedCompanions.get(dict)||null;
       // Labs predictive stroke (draw-bridge.js onStrokeCommitted @1065e9d8) reshapes a freehand stroke before it is committed.
       if(ports.freehand&&root.SMLabs&&typeof root.SMLabs.predictStrokeDict==='function')dict=root.SMLabs.predictStrokeDict(dict)||dict;
       // Mask mode (tools.js tagOwner @1065e9d8, on every Draw/Pen/shape commit): the shape becomes a mask of the layer
-      // with the chosen combine mode; its symmetry copies and multi-frame stamps carry the same tags.
+      // with the chosen combine mode; its symmetry copies and multi-frame stamps carry the same tags. tagOwner tags the
+      // committed path only, so a pressure ribbon's linked fill stays an ordinary fill.
       if(root.state.maskMode)dict=Object.assign({},dict,{isMask:true,maskMode:root.state.maskModeType||'add'});
       // No second queue: only add a current-intent check to the real Project
       // resource action. While that action runs, its own pending count hides presentation.
@@ -173,8 +147,20 @@
         if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});
         return action({reconcile:ctx.reconcile,dispatch:function(q){if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});return ctx.dispatch(q);}});
       });}};
+      // draw-bridge.js Fill Brush: one native command places the shape (fillBrushMode) and merges same-colour fills.
+      // Labs multi-frame draw stamps the path the merge hands back on the other selected frames, in the same commit.
+      var fbStamps=dict.isFillShape&&root.SMLabs&&typeof root.SMLabs.multiframeTargets==='function'?root.SMLabs.multiframeTargets(t.frame):[];
+      if(dict.isFillShape)return root.NemoNativeFillDesktop.create({current:function(){return guarded;},ready:function(){return true;},
+        target:function(){return {layerUid:t.layerUid,frame:t.frame,contextId:'scene-root'};}}).brush({outline:dict.segments,color:dict.fillColor,opacity:dict.opacity,placement:root.state.fillBrushMode,mask:root.state.maskMode?root.state.maskModeType||'add':false,copies:Symmetry.matrices(root,t.pin),stamps:fbStamps})
+        .then(function(r){if(r&&r.applied&&fbStamps.length&&typeof root.SMLabs.multiframeStamped==='function')root.SMLabs.multiframeStamped(fbStamps.length);
+          return {status:r&&r.applied?'applied':'noop'};},root.NemoNativeObjectVector.statusOf);
+      // draw-bridge.js Bitmap Brush: the anchor, its baked companion and the PNG in one native command.
+      if(t.style&&t.style.bitmap)return Bitmap.commit(root,guarded,t,dict,root.NemoNativeObjectVector.statusOf);
       // tools.js @1065e9d8 Draw commit: drawMode 'behind' slips the stroke under the layer's artwork.
-      var vector=root.NemoNativeObjectVector.create(guarded),dicts=symmetric(dict,t.pin);
+      // G23 (symmetry-bridge.js onStrokeCommitted @1065e9d8): the stroke and its copies, each linked fill below its ribbon,
+      // in one createMany (behind keeps the order at the bottom).
+      var vector=root.NemoNativeObjectVector.create(guarded),dicts=Symmetry.copies(root,dict,t.pin,companion);
+      var group=companion?[companion,dict]:[dict];
       var options={origin:t.pin,placement:ports.freehand&&t.behind?'behind':'front'};
       // draw-bridge.js @1065e9d8 Trim Stroke Ends: a Draw commit trims before its symmetry copies exist; native shares the cuts.
       if(ports.freehand&&root.state.trimStrokeEnds&&root.state.trimStrokeEndsMax>0)options.trimEnds=root.state.trimStrokeEndsMax;
@@ -184,7 +170,9 @@
       if(stamps.length){
         // Behind, the k-th record of one create lies k-th from the bottom; one create per step lands each at the bottom.
         var here=dicts.map(function(d){return {create:d,placement:options.placement};});if(options.placement==='behind')here.reverse();
-        var steps=here.concat(stamps.map(function(frame){return {create:dict,frame:frame,keyframe:'copy',placement:options.placement};}));
+        var steps=here.concat([].concat.apply([],stamps.map(function(frame){
+          var cell=group.map(function(d){return {create:d,frame:frame,keyframe:'copy',placement:options.placement};});
+          return options.placement==='behind'?cell.reverse():cell;})));
         return vector.batchStrokes(t.layerUid,t.frame,steps,Object.assign({origin:t.pin},options.trimEnds?{trimEnds:options.trimEnds}:{})).then(function(result){
           if(result&&result.status==='applied'&&typeof root.SMLabs.multiframeStamped==='function')root.SMLabs.multiframeStamped(stamps.length);return result;});
       }
@@ -311,22 +299,32 @@
     var sampleVectorBrushCenterline=root.sampleVectorBrushCenterline,buildVariableWidthPath=root.buildVariableWidthPath;
     var simplifyIfNeeded=root.simplifyIfNeeded,applyStrokeStyle=root.applyStrokeStyle;
     function nativeDrawStyle() {
-      var state=root.state;
+      var state=root.state,fb=state.tool==='fillbrush';
+      // Fill Brush (draw-bridge's isFillBrush branch) draws no texture, bitmap or Trim and ignores drawMode. Labs runs its
+      // hooks on the placed path: predictive skips a fill shape, multi-frame stamps the merged result (native, at commit).
+      if (fb && (['above','below','merge'].indexOf(state.fillBrushMode) < 0 || root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
+          ? root.SMLabs.unmigratedDrawHooks().length > 0 : root.SMLabs.list().some(function(p){return p.on;})))) throw new Error('This Fill Brush combination is unavailable in native Drawing.');
       // Trim measures the whole stroke before the stop-at-axis clip (draw-bridge then symmetry-bridge); native would trim the clipped one.
-      if (state.tool !== 'draw' || state.bitmapBrushOn || state.trimStrokeEnds && (state.vectorBrush || state.symmetryEnabled && !state.symmetryExtend) ||
+      // A pressure ribbon trims natively alone, with its linked fill and with its multi-frame stamps; its symmetry copies do not yet.
+      if (!fb && (state.tool !== 'draw' || state.trimStrokeEnds && (state.vectorBrush && state.symmetryEnabled || state.symmetryEnabled && !state.symmetryExtend) ||
           state.drawMode !== 'front' && state.drawMode !== 'behind' ||
-          state.brushPreset && state.brushPreset !== 'none' || root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
-            ? root.SMLabs.unmigratedDrawHooks().length > 0 : root.SMLabs.list().some(function(p){return p.on;})))
+          // G16 option C (#2361): one seeded anchor whose dabs native stamps; the key resolves as resolveBrushPreset (a built-in,
+          // else a confirmed native catalog record). A key neither holds, and texture with symmetry or Trim, stay unavailable.
+          !state.shadowMode && state.brushPreset && state.brushPreset !== 'none' && (!(root.BRUSH_PRESETS && Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS, state.brushPreset) ||
+            root.NemoNativeCustomBrushUI && root.NemoNativeCustomBrushUI.record(root, state.brushPreset)) ||
+            state.strokeEnabled && (state.symmetryEnabled || state.trimStrokeEnds)) ||
+          root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
+            ? root.SMLabs.unmigratedDrawHooks().length > 0 : root.SMLabs.list().some(function(p){return p.on;}))))
         throw new Error('This brush combination is unavailable in native Drawing.');
       if (typeof state.vectorBrush !== 'boolean' || typeof state.strokeEnabled !== 'boolean' || typeof state.fillEnabled !== 'boolean' ||
-          !state.strokeEnabled && !state.fillEnabled || state.vectorBrush && (!state.strokeEnabled || state.fillEnabled))
-        throw new Error('Native pressure Drawing requires one stroke ribbon without a linked fill.');
-      var keys = ['vectorBrush','strokeEnabled','fillEnabled','strokeColor','fillColor','brushSize','opacity','strokeCap','strokeJoin',
+          !fb && !state.strokeEnabled && !state.fillEnabled)
+        throw new Error('Enable a stroke or a fill to draw.');
+      var keys = ['vectorBrush','strokeEnabled','fillEnabled','strokeColor','fillColor','brushSize','opacity','strokeCap','strokeJoin','brushPreset',
         'strokeStyle','miterLimit','dashOffset','paintOrder','smoothing','stabilizer','taperEnds','pressureMin','pressureMax',
-        'pressureInvert','pressureCurve','pressureCurvePoints','brushAngle','brushAngleFactor'];
+        'pressureInvert','pressureCurve','pressureCurvePoints','brushAngle','brushAngleFactor','tool','fillBrushMode'];
       var out = {}; keys.forEach(function(k){if(state[k] !== undefined)out[k]=state[k];});
-      var hex = /^#(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/;
-      if (state.strokeEnabled && !hex.test(state.strokeColor) || state.fillEnabled && !hex.test(state.fillColor) ||
+      var hex = /^#(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/;Paint.shadowStyle(root, state, out);
+      if (state.strokeEnabled && !hex.test(state.strokeColor) || (state.fillEnabled || fb) && !hex.test(state.fillColor) ||
           !Number.isFinite(state.brushSize) || state.brushSize <= 0 || !Number.isFinite(state.opacity) || state.opacity < 0 || state.opacity > 100 ||
           !Number.isFinite(state.smoothing) || state.smoothing < 0 || !Number.isInteger(state.stabilizer) || state.stabilizer < 0 || state.stabilizer > 6 ||
           !['butt','round','square'].includes(state.strokeCap) || !['miter','round','bevel'].includes(state.strokeJoin) ||
@@ -342,7 +340,7 @@
         throw new Error('Native brush pressure settings are unavailable.');
       if (state.stabilizer >= 4 && (!root.SMStrokeModeler || typeof root.SMStrokeModeler.create !== 'function'))
         throw new Error('Native brush stabilizer is not ready.');
-      return JSON.parse(JSON.stringify(out));
+      return JSON.parse(JSON.stringify(Bitmap.style(root, state, out)));
     }
     function validPressure(e){if(e.pressure!==undefined&&(!Number.isFinite(e.pressure)||e.pressure<0||e.pressure>1))throw new Error('Brush pressure is invalid.');}
     function nativeBegin(w, e, intent) {
@@ -377,7 +375,16 @@
       var out={strokeColor:style.strokeEnabled?style.strokeColor:null,hasRealStroke:style.strokeEnabled,strokeWidth:style.brushSize,
         strokeCap:style.strokeCap,strokeJoin:style.strokeJoin,fillColor:style.fillEnabled?style.fillColor:null,opacity:style.opacity/100};
       function segments(item){return item.segments.map(function(s){return {point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};});}
-      if(style.vectorBrush){
+      if(style.tool==='fillbrush')return Paint.fillBrush(root,pts,widths,style,segments);
+      // draw-bridge.js @1065e9d8: a pressure stroke with Stroke off is one closed fill of its smoothed centreline, no ribbon
+      // and no taper, at the Paper defaults of a new Path.
+      if(style.vectorBrush&&!style.strokeEnabled){
+        var fo=buildCenterSegmentsFromRawStroke(pts,widths,style.smoothing);
+        path=new Path({insert:false});
+        fo.forEach(function(s){path.add(new root.Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
+        path.closed=true;
+        out.strokeWidth=1;out.strokeCap='butt';out.strokeJoin='miter';out.miterLimit=10;out.dashOffset=0;
+      }else if(style.vectorBrush){
         var cs=buildCenterSegmentsFromRawStroke(pts,widths,style.smoothing);
         if(style.taperEnds)applyTaperToCenterSegments(cs,0.15);
         var sampled=sampleVectorBrushCenterline(cs,cs.widthProfile);
@@ -388,14 +395,28 @@
         // Matches a new baseline pressure Path: no actual stroke, Paper default
         // stroke width/cap/join, and applyBrushKeyline has no width to paint.
         out.strokeWidth=1;out.strokeCap='butt';out.strokeJoin='miter';out.miterLimit=10;out.dashOffset=0;
+        // Shadow mode draws neither texture nor linked fill (draw-bridge.js ribbon branch @1065e9d8).
+        if(!style.shadowSwatch&&style.brushPreset&&style.brushPreset!=='none')Paint.textureRibbon(out,style.brushPreset);
+        if(style.fillEnabled&&!style.shadowSwatch){
+          // The companion is the ribbon's sampled centreline, closed and filled (rebuildVectorBrushOutline), below the
+          // ribbon, under a fresh link id of its own (ensureStrokeId shape), with no stroke of its own.
+          var link='s'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e9)+'_lf';
+          out.linkedFillId=link;
+          linkedCompanions.set(out,{segments:sampled.centerSegments.map(function(s){return {point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};}),
+            closed:true,strokeColor:null,hasRealStroke:false,strokeWidth:1,strokeCap:'butt',strokeJoin:'miter',miterLimit:10,dashOffset:0,
+            fillColor:style.fillColor,opacity:style.opacity/100,isLinkedFillCompanion:true,linkedFillId:link});
+        }
       }else{
         path=new Path({insert:false});pts.forEach(function(p){path.add(p);});simplifyIfNeeded(path,style.smoothing);
         var stroke={strokeWidth:style.brushSize,data:{}};applyStrokeStyle(stroke);
         out.miterLimit=stroke.miterLimit;out.dashOffset=stroke.dashOffset;
         if(stroke.dashArray.length)out.dashArray=stroke.dashArray.slice();
         if(stroke.data.paintOrder!==undefined)out.paintOrder=stroke.data.paintOrder;
+        // applyBrushTexture on a plain stroke drawn with Stroke on: the path becomes its texture's invisible anchor.
+        if(!style.shadowSwatch&&!style.bitmap&&style.brushPreset&&style.brushPreset!=='none'&&style.strokeEnabled)Paint.texturePlain(out,style.brushPreset);
       }
       try{out.segments=segments(path);out.closed=path.closed;
+        if(style.shadowSwatch)Paint.shadow(out,style.shadowSwatch,style.vectorBrush&&!style.strokeEnabled,style.brushSize);
         if(out.segments.some(function(s){return !['point','handleIn','handleOut'].every(function(k){return s[k].every(Number.isFinite);});}))throw new Error('Brush geometry must stay finite.');
         return out;}finally{path.remove();}
     }

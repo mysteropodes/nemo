@@ -221,3 +221,17 @@ test('connected invoke rejection remains invoke-rejected rather than receipt-acc
   assert.equal(diagnostics.find(e=>e.event==='post-bootstrap-failed').code,'post-bootstrap-first-preview:invoke-rejected:unknown:other');
   assert.doesNotMatch(JSON.stringify(diagnostics),/PRIVATE/);assert.equal(h.previews(),1);assert.equal(h.effects.includes('reveal'),false);assert.equal(h.removes(),1);
 });
+test('after Open, a preview deferred by an occluded window is no failure and re-presents on the next visible exposure',async()=>{
+  // #2343 B1 check 3: an edit's present while the window was not visible blanked the canvas with a failure notice.
+  const notices=[];const h=harness({receipts:[{status:'deferred-occluded',workId:'work-1',viewGeneration:1},
+    {status:'presented',workId:'work-1',viewGeneration:1},{status:'presented',workId:'work-2',viewGeneration:2},
+    {status:'deferred-occluded',workId:'work-3',viewGeneration:2},{status:'presented',workId:'work-4',viewGeneration:2}]});
+  const pending=h.open();await turn();h.hint({visible:true});await pending;assert.equal(h.previews(),3);
+  const shown=h.session.readPresentedObjectSession();assert.ok(shown);
+  assert.equal(await h.session.renderPreview(0),null,'deferred, not failed');assert.equal(h.previews(),4);
+  assert.equal(h.session.readPresentedObjectSession(),null,'no frame is claimed as presented while occluded');
+  await turn();await turn();h.hint({visible:false});await turn();assert.equal(h.previews(),4,'an occluded hint does not retry');
+  h.hint({visible:true});await turn();await turn();await turn();assert.equal(h.previews(),5,'the visible exposure re-presents once');
+  assert.ok(h.session.readPresentedObjectSession(),'presented again');assert.deepEqual(notices,[]);
+  h.hint({visible:true});await turn();await turn();assert.equal(h.previews(),5,'no spin without a new deferral');
+});

@@ -18,9 +18,8 @@ pub(crate) use linked_fill::validate_linked_pairs;
 
 use crate::object_codec::{ObjectCodecError, ObjectCodecErrorKind};
 use crate::object_document::{
-    BrushTexture,
-    ObjectLayer, ObjectRecord, ParamShape, PressureFields, PARAM_SHAPE_KINDS, PATH_FX_TYPE_IDS,
-    STROKE_PROFILE_KINDS, VECTOR_FAMILY,
+    BrushTexture, ObjectLayer, ObjectRecord, ParamShape, PressureFields, PARAM_SHAPE_KINDS,
+    PATH_FX_TYPE_IDS, STROKE_PROFILE_KINDS, VECTOR_FAMILY,
 };
 use serde_json::Number;
 
@@ -88,6 +87,21 @@ pub(crate) fn validate_vector_ext(record: &ObjectRecord) -> Result<(), ObjectCod
     if let Some(tags) = ext.brush_texture.value() {
         validate_brush_texture(tags)?;
     }
+    if ext.is_fill_shape.value() == Some(&false) {
+        return Err(invalid("isFillShape is only ever true"));
+    }
+    if let Some(shadow) = ext.shadow.value() {
+        if shadow.channel_tag != "shadow" {
+            return Err(invalid("channelTag is only ever 'shadow'"));
+        }
+        if shadow
+            .shadow_swatch_id
+            .value()
+            .is_some_and(|id| id.is_empty() || id.len() > 256)
+        {
+            return Err(invalid("shadowSwatchId is a non-empty bounded string"));
+        }
+    }
     if ext
         .box_angle
         .value()
@@ -103,26 +117,42 @@ pub(crate) fn validate_vector_ext(record: &ObjectRecord) -> Result<(), ObjectCod
 fn validate_brush_texture(tags: &BrushTexture) -> Result<(), ObjectCodecError> {
     let text = |v: &String| !v.is_empty() && v.len() <= 255 && !v.contains('\0');
     let colour = |v: &String| {
-        [4, 7, 9].contains(&v.len()) && v.starts_with('#') && v.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
+        [4, 7, 9].contains(&v.len())
+            && v.starts_with('#')
+            && v.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
     };
     if tags.brush_group_id.missing()
         && tags.is_brush_texture_copy.missing()
         && tags.brush_texture_preset.missing()
         && tags.pre_texture_opacity.missing()
         && tags.pre_texture_stroke.missing()
+        && tags.stroke_seed.missing()
     {
         return Err(invalid("an empty brushTexture must be omitted"));
     }
     if tags.brush_group_id.value().is_some_and(|v| !text(v))
         || tags.brush_texture_preset.value().is_some_and(|v| !text(v))
         || tags.is_brush_texture_copy.value() == Some(&false)
-        || tags.pre_texture_opacity.value().is_some_and(|n| finite(n).is_none())
-        || tags.pre_texture_stroke.value().and_then(Option::as_ref).is_some_and(|v| !colour(v))
+        || tags
+            .pre_texture_opacity
+            .value()
+            .is_some_and(|n| finite(n).is_none())
+        || tags
+            .pre_texture_stroke
+            .value()
+            .and_then(Option::as_ref)
+            .is_some_and(|v| !colour(v))
     {
         return Err(invalid("invalid brushTexture member"));
     }
     if tags.is_brush_texture_copy.value().is_some() && tags.brush_texture_preset.value().is_some() {
         return Err(invalid("a brush-texture dab is not also an anchor"));
+    }
+    // The stamping seed belongs to an anchor (it names its preset) and is an unsigned 32-bit integer.
+    if let Some(seed) = tags.stroke_seed.value() {
+        if seed.as_u64().is_none_or(|s| s > u64::from(u32::MAX)) || tags.brush_texture_preset.missing() {
+            return Err(invalid("strokeSeed is a uint32 of a brush-texture anchor"));
+        }
     }
     Ok(())
 }

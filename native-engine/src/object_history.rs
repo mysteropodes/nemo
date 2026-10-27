@@ -24,6 +24,9 @@ mod layer_policy;
 #[cfg(feature = "project_media_codec")]
 #[path = "object_raster_image_import_history.rs"]
 mod image_import;
+#[cfg(feature = "project_media_codec")]
+#[path = "object_brush_bitmap_stroke_history.rs"]
+mod bitmap_stroke;
 #[path = "object_raster_asset_history.rs"]
 mod item_history;
 #[path = "object_command_dispatch.rs"]
@@ -91,6 +94,8 @@ mod object_media_link_history;
 // L01-G (#2107): parameter edit and path-effect stack edit as history transactions (G22, G13).
 #[path = "object_parametric_edit_history.rs"]
 mod object_parametric_edit_history;
+#[path = "object_subselect_history.rs"]
+mod object_subselect_history;
 // L10-B (#2124): lane-10 shot/montage/import family aggregator.
 #[path = "object_shot_kernels.rs"]
 #[allow(dead_code)]
@@ -486,3 +491,6 @@ impl NativeObjectHistory {
 mod object_frame_bulk_move;
 #[path = "object_layer_shift_history.rs"]
 mod object_layer_shift;
+
+#[path = "object_tween_history.rs"]
+mod tween;

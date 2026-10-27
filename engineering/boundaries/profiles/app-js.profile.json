@@ -2163,6 +2163,18 @@
       ]
     },
     {
+      "id": "app.native.object.query.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-query-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-query-contract.js"
+      ]
+    },
+    {
       "id": "app.native.application.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
@@ -2628,6 +2640,7 @@
       "files": [
         "native-object-project.js",
         "native-object-project-desktop.js",
+        "native-object-project-reads.js",
         "native-object-project-properties.js",
         "native-object-open-exposure.js",
         "native-object-project-export.js",
@@ -3255,7 +3268,10 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-shape-tool.js"
+        "native-object-shape-tool.js",
+        "native-object-draw-paint.js",
+        "native-object-draw-symmetry.js",
+        "native-object-draw-bitmap.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
@@ -3752,6 +3768,18 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-settings-validation-gate.js"
+      ]
+    },
+    {
+      "id": "app.native.subselect.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-subselect-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-subselect-contract.js"
       ]
     }
   ],

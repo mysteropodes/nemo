@@ -231,8 +231,26 @@ pub(crate) fn island_record(
         .value()
         .and_then(|ext| ext.fill_trace.value())
         .cloned();
+    // ... and its Shadow Brush channel (`channelTag`, `shadowSwatchId`) and Fill Brush flag (`isFillShape`).
+    let shadow = style
+        .source
+        .vector_ext
+        .value()
+        .and_then(|ext| ext.shadow.value())
+        .cloned();
+    let fill_shape = style
+        .source
+        .vector_ext
+        .value()
+        .is_some_and(|ext| ext.is_fill_shape.value() == Some(&true));
     let ext = match (&style.box_angle, gradient) {
-        (angle, gradient) if angle.is_some() || gradient.is_some() || trace.is_some() => {
+        (angle, gradient)
+            if angle.is_some()
+                || gradient.is_some()
+                || trace.is_some()
+                || shadow.is_some()
+                || fill_shape =>
+        {
             Presence::Present(VectorExt {
                 pressure: Presence::Missing,
                 param_shape: Presence::Missing,
@@ -245,6 +263,12 @@ pub(crate) fn island_record(
                 mask_feather: Presence::Missing,
                 bitmap_brush: Presence::Missing,
                 brush_texture: Presence::Missing,
+                shadow: shadow.map_or(Presence::Missing, Presence::Present),
+                is_fill_shape: if fill_shape {
+                    Presence::Present(true)
+                } else {
+                    Presence::Missing
+                },
                 linked_fill_id: Presence::Missing,
                 is_linked_fill_companion: Presence::Missing,
             })

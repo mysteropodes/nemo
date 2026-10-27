@@ -876,7 +876,7 @@
     regenerate: regenerate,
     liveRestamp: liveRestamp,
     recordForTween: recordForTween,
-    bakeTrimmed: bakeTrimmed,
+    bakeTrimmed: bakeTrimmed, bake: function (path, spec) { return bakeToCanvas(path, spec, null); }, // native Draw #2361: detached path, no Raster
     eraseBite: eraseBite,
     flushEraseDirty: flushEraseDirty,
     beginLivePreview: beginLivePreview,

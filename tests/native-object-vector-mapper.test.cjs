@@ -146,7 +146,7 @@ test('literal records: a pressure ribbon has no real stroke and carries the cent
   }
   assert.deepEqual(map('vb-no-center-no-profile').record.vectorExt, { pressure: {} }, 'a ribbon without centreline or profile is still a vector brush');
   assert.deepEqual(map('vb-empty-arrays-zero-base').record.vectorExt, { pressure: { centerSegments: [], widthProfile: [] } }, 'empty arrays are kept; strokeProfile "" and profileBase 0 are dropped');
-  assert.deepEqual(map('vb-fill-shape').unmapped, ['isFillShape'], 'the fill-shape flag has no record slot and is reported');
+  assert.deepEqual(map('vb-fill-shape').unmapped, ['isFillShape'], 'importing drops the fill-shape flag as the baseline reload does (desP never restores it) and reports it');
   // pressure-looking members on a plain stroke are dropped by the baseline and are not a ribbon
   const plain = map('non-vb-with-pressure-fields');
   assert.equal('vectorExt' in plain.record, false);

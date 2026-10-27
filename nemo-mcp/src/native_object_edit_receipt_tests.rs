@@ -188,7 +188,7 @@ fn the_catalog_declares_each_operation_once_under_five_owner_descriptors() {
         | "clipboard.paste"
         | "clipboard.copy"
         | "clipboard.cut" => "native.object.selection-edit",
-        "fill.trace" => "native.object.fill",
+        "fill.trace" | "fill.brush" => "native.object.fill",
         _ => "native.object.boolean",
     };
     let mut declared = 0;
@@ -201,10 +201,12 @@ fn the_catalog_declares_each_operation_once_under_five_owner_descriptors() {
         assert_eq!(descriptor["authority"]["fallback"], "none");
         assert_eq!(descriptor["authority"]["adapterOwnsWritableMirror"], false);
         assert_eq!(descriptor["availability"]["state"], "available");
-        assert_eq!(descriptor["resourceBoundary"]["maxRequestBytes"], 4096);
+        // A Fill Brush outline carries up to 256 segments: the fill descriptor declares the engine payload bound.
+        let bound = if suffix.starts_with("fill.") { 65536 } else { 4096 };
+        assert_eq!(descriptor["resourceBoundary"]["maxRequestBytes"], bound, "{suffix}");
         declared += 1;
     }
-    assert_eq!(declared, 20);
+    assert_eq!(declared, 21);
 }
 
 #[test]
@@ -245,7 +247,7 @@ fn every_descriptor_example_is_a_valid_request_with_a_correlated_valid_response(
             seen += 1;
         }
     }
-    assert_eq!(seen, 20, "one copyable example per declared operation");
+    assert_eq!(seen, 21, "one copyable example per declared operation");
 }
 
 fn literal_clip() -> Value {

@@ -16,7 +16,9 @@
   const CARRIED = ['segments', 'closed', 'strokeColor', 'hasRealStroke', 'strokeWidth', 'strokeCap', 'strokeJoin', 'miterLimit', 'fillColor',
     'opacity', 'dashArray', 'dashOffset', 'paintOrder', 'isVectorBrush', 'centerSegments', 'widthProfile', 'strokeProfile', 'profileBase',
     'strokeId', 'boxAngle', 'paramShape', 'fillGradient', 'fillSeed', 'fillSeeds', 'fillWalls', 'fillGapPx', 'isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion',
-    'brushGroupId', 'isBrushTextureCopy', 'brushTexturePreset', 'preTextureOpacity', 'preTextureStroke'];
+    'brushGroupId', 'isBrushTextureCopy', 'brushTexturePreset', 'preTextureOpacity', 'preTextureStroke', 'channelTag', 'shadowSwatchId'];
+  // Members only the native record owns (no serP member): G16 option C's anchor stamping seed.
+  const NATIVE_CARRIED = ['strokeSeed'];
   // Look-changing members with no record slot: mapping them as a plain path would lose the look without a word.
   const REFUSED = ['strokeGradientAlongPath', 'bitmapBrushSpec', 'isText', 'isTextRoot',
     'isVectorText', 'effects'];
@@ -91,7 +93,7 @@
     const out = {
       segments, closed: !!dict.closed,
       // serP: a ribbon and a brush-texture anchor without a stroke write null; every other stroke-less path writes the white fallback.
-      strokeColor: vb ? null : (strokeColor ? colorHex8(strokeColor) : ((dict.brushTexturePreset || dict.isBrushTextureCopy || dict.bitmapBrushSpec) ? null : '#ffffff')),
+      strokeColor: vb ? null : (strokeColor ? colorHex8(strokeColor) : ((dict.brushTexturePreset || dict.isBrushTextureCopy || dict.bitmapBrushSpec || dict.channelTag === 'shadow') ? null : '#ffffff')),
       hasRealStroke: vb ? false : !!strokeColor,
       strokeWidth: dict.strokeWidth || 3,
       strokeCap: (typeof dict.strokeCap === 'string' ? dict.strokeCap : 'round') || 'round',
@@ -146,6 +148,14 @@
       out.preTextureStroke = dict.preTextureStroke;
     }
     if (out.isBrushTextureCopy && out.brushTexturePreset) refuse('invalid_dict', 'a brush-texture dab is not also an anchor');
+    // Shadow Brush (applyShadowBrushTag): serP writes channelTag ('shadow') and the swatch id when truthy.
+    if (dict.channelTag) { if (dict.channelTag !== 'shadow') refuse('invalid_dict', 'invalid channelTag'); out.channelTag = 'shadow'; }
+    if (dict.shadowSwatchId) { if (!text(dict.shadowSwatchId) || !out.channelTag) refuse('invalid_dict', 'invalid shadowSwatchId'); out.shadowSwatchId = dict.shadowSwatchId; }
+    // G16 option C: the anchor's stamping seed (native produces its dabs from it).
+    if (dict.strokeSeed !== undefined) {
+      if (!(Number.isInteger(dict.strokeSeed) && dict.strokeSeed >= 0 && dict.strokeSeed <= 0xFFFFFFFF) || !out.brushTexturePreset) refuse('invalid_dict', 'invalid strokeSeed');
+      out.strokeSeed = dict.strokeSeed;
+    }
     for (const key of ['linkedFillId', 'isLinkedFillCompanion']) {
       if (!has(dict,key)) continue;
       if (key === 'linkedFillId' ? typeof dict[key] !== 'string' || !dict[key].length : typeof dict[key] !== 'boolean') refuse('invalid_dict','invalid '+key);
@@ -216,8 +226,9 @@
       if (n.boxAngle !== undefined) ext.boxAngle = n.boxAngle;
       for (const key of ['isMask', 'maskMode', 'maskFeather']) if (has(n, key)) ext[key] = n[key];
       const texture = {};
-      for (const key of ['brushGroupId', 'isBrushTextureCopy', 'brushTexturePreset', 'preTextureOpacity', 'preTextureStroke']) if (has(n, key)) texture[key] = n[key];
+      for (const key of ['brushGroupId', 'isBrushTextureCopy', 'brushTexturePreset', 'preTextureOpacity', 'preTextureStroke', 'strokeSeed']) if (has(n, key)) texture[key] = n[key];
       if (Object.keys(texture).length) ext.brushTexture = texture;
+      if (has(n, 'channelTag')) ext.shadow = has(n, 'shadowSwatchId') ? { channelTag: n.channelTag, shadowSwatchId: n.shadowSwatchId } : { channelTag: n.channelTag };
       const trace={};
       [['fillSeed','seed'],['fillSeeds','seeds'],['fillWalls','walls'],['fillGapPx','gapPx']].forEach(([key,stored])=>{
         if(has(n,key))trace[stored]=JSON.parse(JSON.stringify(n[key]));
@@ -238,7 +249,7 @@
         vector,
       };
       if (Object.keys(ext).length) record.vectorExt = ext;
-      const unmapped = Object.keys(dict).filter((key) => present(dict[key]) && !CARRIED.includes(key));
+      const unmapped = Object.keys(dict).filter((key) => present(dict[key]) && !CARRIED.includes(key) && !NATIVE_CARRIED.includes(key));
       return Object.freeze({ ok: true, record, unmapped, authoredStrokeId: n.strokeId || null });
     } catch (error) {
       if (error instanceof Refusal) return error.refusal;
@@ -255,7 +266,7 @@
       segments: record.geometry.segments.map((s) => ({ point: pair(s.point), handleIn: pair(s.handleIn), handleOut: pair(s.handleOut) })),
       closed: record.geometry.closed,
       // serP writes the white fallback beside hasRealStroke:false, except for a ribbon or a brush-texture anchor or dab.
-      strokeColor: ribbon ? null : (v.stroke ? colorHex8(v.stroke) : (x.brushTexture && (x.brushTexture.brushTexturePreset || x.brushTexture.isBrushTextureCopy) ? null : '#ffffff')),
+      strokeColor: ribbon ? null : (v.stroke ? colorHex8(v.stroke) : (x.shadow || x.brushTexture && (x.brushTexture.brushTexturePreset || x.brushTexture.isBrushTextureCopy) ? null : '#ffffff')),
       hasRealStroke: ribbon ? false : v.hasRealStroke,
       strokeWidth: v.strokeWidth, strokeCap: v.strokeCap, strokeJoin: v.strokeJoin,
     };
@@ -276,6 +287,10 @@
     if (x.boxAngle) out.boxAngle = x.boxAngle;
     for (const key of ['isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion']) if (has(x, key)) out[key] = x[key];
     if (x.brushTexture) Object.assign(out, x.brushTexture);
+    if (x.shadow) Object.assign(out, x.shadow);
+    // A Fill Brush shape native created carries isFillShape, which serP writes. Importing a dictionary drops it, as
+    // the baseline reload does (desP never restores data.isFillShape), and reports it.
+    if (x.isFillShape) out.isFillShape = true;
     if (x.paramShape) out.paramShape = JSON.parse(JSON.stringify(x.paramShape));
     if (x.fillGradient) out.fillGradient = gradient(x.fillGradient);
     if(x.fillTrace)[['seed','fillSeed'],['seeds','fillSeeds'],['walls','fillWalls'],['gapPx','fillGapPx']].forEach(([stored,key])=>{
@@ -312,7 +327,7 @@
   }
 
   return Object.freeze({
-    FAMILY, CARRIED: Object.freeze(CARRIED.slice()), REFUSED: Object.freeze(REFUSED.slice()), FX_TYPES: Object.freeze(FX_TYPES.map((t) => t.id)),
+    FAMILY, CARRIED: Object.freeze(CARRIED.slice()), NATIVE_CARRIED: Object.freeze(NATIVE_CARRIED.slice()), REFUSED: Object.freeze(REFUSED.slice()), FX_TYPES: Object.freeze(FX_TYPES.map((t) => t.id)),
     parseColor, colorHex8, r3, normalize: (dict, op) => { try { return normalize(dict, op); } catch (e) { if (e instanceof Refusal) return e.refusal; throw e; } },
     toRecord, toDict, defaultsFor, stackToNative, hasActive,
   });

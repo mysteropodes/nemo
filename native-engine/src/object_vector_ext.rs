@@ -13,7 +13,7 @@ use serde_json::Number;
 mod fill_trace;
 pub(crate) use fill_trace::FillTrace;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct VectorExt {
     /// Present exactly for a vector-brush stroke (the baseline `isVectorBrush`).
@@ -46,6 +46,12 @@ pub struct VectorExt {
     /// G16: the brush-texture-preset tags of a vector anchor or one of its dabs.
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) brush_texture: Presence<BrushTexture>,
+    /// Shadow Brush construction ink (`applyShadowBrushTag`): serP's `channelTag` and `shadowSwatchId`.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) shadow: Presence<ShadowChannel>,
+    /// A Fill Brush shape (serP's `isFillShape`, written only when true), which the same-colour merge treats apart.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) is_fill_shape: Presence<bool>,
 }
 object_deserialize!(VectorExt {
     #[serde(default)] pressure: Presence<PressureFields>,
@@ -59,7 +65,23 @@ object_deserialize!(VectorExt {
     #[serde(default)] mask_mode: Presence<Option<String>>,
     #[serde(default)] mask_feather: Presence<Option<Number>>,
     #[serde(default)] bitmap_brush: Presence<crate::object_document::BitmapBrushFields>,
-    #[serde(default)] brush_texture: Presence<BrushTexture>
+    #[serde(default)] brush_texture: Presence<BrushTexture>,
+    #[serde(default)] shadow: Presence<ShadowChannel>,
+    #[serde(default)] is_fill_shape: Presence<bool>
+});
+
+/// serP's shadow channel members: `channelTag` (only ever `'shadow'`, written when truthy) and the swatch that drew
+/// the stroke (`shadowSwatchId`, written when truthy, so a present id is non-empty).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ShadowChannel {
+    pub(crate) channel_tag: String,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) shadow_swatch_id: Presence<String>,
+}
+object_deserialize!(ShadowChannel {
+    channel_tag: String,
+    #[serde(default)] shadow_swatch_id: Presence<String>
 });
 
 impl VectorExt {
@@ -76,6 +98,8 @@ impl VectorExt {
             && self.mask_feather.missing()
             && self.bitmap_brush.missing()
             && self.brush_texture.missing()
+            && self.shadow.missing()
+            && self.is_fill_shape.missing()
     }
 }
 
@@ -96,13 +120,17 @@ pub struct BrushTexture {
     pub(crate) pre_texture_opacity: Presence<Number>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) pre_texture_stroke: Presence<Option<String>>,
+    /// G16 option C: the anchor's stamping seed (`strokeSeed`, a uint32), from which native produces its dabs.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) stroke_seed: Presence<Number>,
 }
 object_deserialize!(BrushTexture {
     #[serde(default)] brush_group_id: Presence<String>,
     #[serde(default)] is_brush_texture_copy: Presence<bool>,
     #[serde(default)] brush_texture_preset: Presence<String>,
     #[serde(default)] pre_texture_opacity: Presence<Number>,
-    #[serde(default)] pre_texture_stroke: Presence<Option<String>>
+    #[serde(default)] pre_texture_stroke: Presence<Option<String>>,
+    #[serde(default)] stroke_seed: Presence<Number>
 });
 
 /// Named L07-I positive subset: exactly two stops, linear or radial. No coercion or defaults.

@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.subselect",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.subselect.edit"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectSubselectPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete requests and replies remain bounded at 4096 bytes; no chunked command or optimistic publication."
+  },
+  "semantics": "Revision-pinned native vertex and tangent intents on editable vector paths. Optional atFrame promotes a held vector-only cell and copies its siblings before editing, preserving the source key; identity geometry still creates that key. A tangent pairedPoint retains the last mirrored endpoint when Alt is pressed during a drag; it is valid only with breakPair. Other identity edits preserve bytes and history. One atomic transaction and one undo entry. Detached paged geometry and preview use query.document.object with the closed subselect selector and retain the source target identity. Unsupported geometry consumers return unavailable; no JavaScript or Paper writer fallback. Installed acceptance remains pending.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "move a vertex through native history",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "subselect-example",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.subselect.edit",
+        "payload": {
+          "command": "object.subselect.edit",
+          "stableTarget": {
+            "contextId": "scene-root",
+            "layerUid": "layer-a",
+            "frameScope": {
+              "kind": "authored",
+              "frame": 0
+            },
+            "strokeId": "stroke-a"
+          },
+          "intent": {
+            "kind": "move",
+            "indices": [
+              0
+            ],
+            "delta": [
+              5,
+              2
+            ]
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "subselect-example",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

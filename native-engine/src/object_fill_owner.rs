@@ -110,6 +110,10 @@ pub(crate) use widget_edit::{
 #[cfg(feature = "project_media_codec")]
 #[path = "object_raster_image_import_owner.rs"]
 pub(crate) mod image_import;
+// #2361: a bitmap-brush Draw stroke (anchor, companion and its baked PNG) in one candidate project.
+#[cfg(feature = "project_media_codec")]
+#[path = "object_brush_bitmap_stroke_owner.rs"]
+pub(crate) mod bitmap_stroke;
 // L06-H (lane #2112): sealed commit of a prepared asset attach / remove.
 #[cfg(feature = "project_media_codec")]
 #[path = "object_raster_asset_owner.rs"]
@@ -464,3 +468,6 @@ mod tests {
 #[path = "object_frame_bulk_move.rs"]
 mod object_frame_bulk_move;
 pub(crate) use object_frame_bulk_move::{PreparedBulkFrameEdit, PreparedLayerShift};
+
+#[path = "object_tween_owner.rs"]
+mod tween;

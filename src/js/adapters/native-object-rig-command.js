@@ -100,7 +100,7 @@
       return run((ctx) => {
         const pin = owner(), key = ownerKey(pin);
         // The payload is judged before a request id is minted: a locally refused call consumes nothing.
-        const payload = build(pin);
+        const payload = build(pin, ctx);
         try { contract.payload(operation, payload); } catch (bad) { throw fault('invalid_request', bad.message, { reason: 'local_validation' }); }
         const request = { apiVersion: 2, requestId: session.requestId(label), instanceId: pin.instanceId, documentId: pin.documentId,
           expectedRevision: pin.contentRevision, operation, payload };

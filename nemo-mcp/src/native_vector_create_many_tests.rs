@@ -106,6 +106,11 @@ fn brush_texture_members_are_admitted_as_serp_writes_them_and_nothing_else() {
         (json!({"brushGroupId":"bg3","brushTexturePreset":"ink","preTextureStroke":null}), true),
         (json!({"brushGroupId":"bg1","isBrushTextureCopy":true}), true),
         (json!({"brushGroupId":"lone"}), true),
+        (json!({"brushGroupId":"bg4","brushTexturePreset":"ink","preTextureOpacity":1,"strokeSeed":4294967295u64}), true),
+        (json!({"brushGroupId":"g","isBrushTextureCopy":true,"strokeSeed":1}), false),
+        (json!({"brushGroupId":"g","strokeSeed":1}), false),
+        (json!({"brushTexturePreset":"p","strokeSeed":4294967296u64}), false),
+        (json!({"brushTexturePreset":"p","strokeSeed":1.5}), false),
         (json!({}), false),
         (json!({"isBrushTextureCopy":false}), false),
         (json!({"brushGroupId":""}), false),
@@ -118,5 +123,33 @@ fn brush_texture_members_are_admitted_as_serp_writes_them_and_nothing_else() {
         r["vectorExt"] = json!({"brushTexture":tags});
         let payload = json!({"command":"object.vector.create","record":r});
         assert_eq!(request(VECTOR, &payload), ok, "{tags}");
+    }
+}
+
+#[test]
+fn shadow_channel_members_are_admitted_as_serp_writes_them_and_nothing_else() {
+    for (shadow, ok) in [
+        (json!({"channelTag":"shadow","shadowSwatchId":"sh1"}), true),
+        (json!({"channelTag":"shadow"}), true),
+        (json!({"channelTag":"fill"}), false),
+        (json!({"shadowSwatchId":"sh1"}), false),
+        (json!({"channelTag":"shadow","shadowSwatchId":""}), false),
+        (json!({"channelTag":"shadow","shadowSwatchId":7}), false),
+        (json!({"channelTag":"shadow","extra":1}), false),
+    ] {
+        let mut r = record();
+        r["vectorExt"] = json!({"shadow":shadow});
+        let payload = json!({"command":"object.vector.create","record":r});
+        assert_eq!(request(VECTOR, &payload), ok, "{shadow}");
+    }
+}
+
+#[test]
+fn the_fill_brush_flag_is_admitted_only_as_serp_writes_it() {
+    for (flag, ok) in [(json!(true), true), (json!(false), false), (json!("true"), false), (json!(null), false)] {
+        let mut r = record();
+        r["vectorExt"] = json!({"isFillShape":flag});
+        let payload = json!({"command":"object.vector.create","record":r});
+        assert_eq!(request(VECTOR, &payload), ok, "{flag}");
     }
 }

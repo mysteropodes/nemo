@@ -211,11 +211,15 @@ fn extension(value: &Value, has_stroke: bool) -> bool {
             "linkedFillId",
             "isLinkedFillCompanion",
             "brushTexture",
+            "shadow",
+            "isFillShape",
         ],
     )
     .is_some_and(|object| {
         !object.is_empty()
             && object.get("brushTexture").is_none_or(texture::brush_texture)
+            && object.get("shadow").is_none_or(texture::shadow)
+            && object.get("isFillShape").is_none_or(|v| v == &Value::Bool(true))
             && object
                 .get("pressure")
                 .is_none_or(|v| pressure(v) && !has_stroke)

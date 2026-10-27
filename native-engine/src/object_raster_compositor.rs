@@ -82,6 +82,7 @@ impl Compositor {
                 PaintEntry::Duplicator(source) => {
                     source.prepared.draw(scene, Affine::IDENTITY, &source.path)
                 }
+                PaintEntry::Dab(dab) => dab.prepared.draw(scene, Affine::IDENTITY, &dab.path),
                 #[cfg(all(feature = "application", feature = "project_media_codec"))]
                 PaintEntry::Brush(index) => {
                     if let Some((image, transform, opacity)) = prepared
