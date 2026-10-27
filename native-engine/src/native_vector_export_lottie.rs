@@ -14,8 +14,12 @@
 //! as the baseline drops them: rasters, masks (never paint commands) and zero-opacity strokes.
 //! Refused, until later increments admit them with oracle rows: text, components, duplicators,
 //! bitmap brush, video, legacy fill records and a layer opacity factor other than one (the baseline
-//! writes every layer at full opacity, `ks.o` 100).
+//! writes every layer at full opacity, `ks.o` 100). A seeded brush-texture anchor's dabs are written as
+//! the dabs the baseline stores for it: each a fill-only shape at the dab opacity, its colour through
+//! the hex Paper stores (`toCSS(true)`) and its outline through the three-decimal rounding `serP`
+//! stores (`_r3`), right after the anchor's own slot.
 use crate::object_render_scene::{ordered_entries, ObjectPaintPlan, PaintEntry};
+use crate::render_geometry::ClosedCubicPath;
 use kurbo::{BezPath, PathEl, Point};
 use serde_json::{json, Number, Value};
 
@@ -138,6 +142,41 @@ fn shape_value(
     if v.len() < 2 {
         return Err(unsupported("the drawn path has fewer than two anchors"));
     }
+    keyed(v, i, o, closed, camera)
+}
+/// `_r3` (app.js): the baseline stores outline coordinates rounded to three decimals, halves toward +∞.
+fn r3(value: f64) -> f64 {
+    (value * 1000.0 + 0.5).floor() / 1000.0
+}
+/// A produced dab as the baseline stores it (`serP`): its own anchors and relative handles through `_r3`.
+fn dab_shape(
+    contour: Option<&ClosedCubicPath>,
+    closed: bool,
+    source_object_index: usize,
+    camera: Option<[f64; 6]>,
+) -> Result<Value, LottieExportError> {
+    let contour = contour.ok_or(LottieExportError::Unsupported {
+        source_object_index,
+        reason: "a brush-texture dab has no single outline",
+    })?;
+    let rounded = |p: [f64; 2]| [r3(p[0]), r3(p[1])];
+    let segments = contour.segments();
+    keyed(
+        segments.iter().map(|s| rounded(s.point)).collect(),
+        segments.iter().map(|s| rounded(s.handle_in)).collect(),
+        segments.iter().map(|s| rounded(s.handle_out)).collect(),
+        closed,
+        camera,
+    )
+}
+/// The keyed shape value through the frame's camera matrix (`lottieCamPoint`/`lottieCamVector`).
+fn keyed(
+    mut v: Vec<[f64; 2]>,
+    mut i: Vec<[f64; 2]>,
+    mut o: Vec<[f64; 2]>,
+    closed: bool,
+    camera: Option<[f64; 6]>,
+) -> Result<Value, LottieExportError> {
     if let Some([a, b, c, d, e, f]) = camera {
         let linear = |p: [f64; 2]| [a * p[0] + c * p[1], b * p[0] + d * p[1]];
         v.iter_mut().for_each(|p| {
@@ -271,10 +310,28 @@ fn shown_by_layer(
                 )
             }
             PaintEntry::Dab(dab) => {
-                return refuse(
-                    dab.source_index,
-                    "brush-texture dabs have no admitted Lottie representation yet",
-                )
+                // `sd.opacity !== 0`, as for any stroke.
+                if dab.opacity == 0.0 {
+                    continue;
+                }
+                if dab.layer_opacity != 1.0 {
+                    return Err(LottieExportError::UnsupportedLayer {
+                        source_layer_index: dab.layer_index,
+                        reason: "a layer opacity factor has no admitted Lottie representation yet",
+                    });
+                }
+                let [r, g, b, _] = dab.svg_rgba.ok_or(LottieExportError::NonFinite)?;
+                let hex = |c: f64| number((c.clamp(0.0, 1.0) * 255.0).round() / 255.0);
+                let shown = Shown {
+                    shape: dab_shape(dab.svg_contour.as_ref(), dab.closed, dab.source_index, camera)?,
+                    stroke: None,
+                    fill: Some(Value::Array(vec![hex(r)?, hex(g)?, hex(b)?, json!(1)])),
+                    opacity: dab.opacity,
+                };
+                out.get_mut(dab.layer_index)
+                    .ok_or(LottieExportError::InvalidRange)?
+                    .push(shown);
+                continue;
             }
             PaintEntry::Video(index) => {
                 return Err(LottieExportError::UnsupportedLayer {

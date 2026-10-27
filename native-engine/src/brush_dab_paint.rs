@@ -20,6 +20,8 @@ use serde_json::Number;
 pub(crate) struct DabItem {
     pub(crate) path: DabPath,
     pub(crate) style: SceneItemStyle,
+    /// The dab's own opacity (`dab.opacity = dabOpacity`), without the colour alpha or the layer factor the style folds in.
+    pub(crate) opacity: f64,
 }
 
 /// The anchor's preset key and seed, when the record is a seeded brush-texture anchor.
@@ -331,6 +333,7 @@ pub(crate) fn anchor_dab_items(
                     stroke: None,
                     order: PaintOrder::FillFirst,
                 },
+                opacity: dab.opacity,
             })
         })
         .collect()

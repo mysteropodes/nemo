@@ -21,6 +21,10 @@ pub(crate) struct DabPaint {
     pub(crate) prepared: PreparedItem,
     pub(crate) svg_contour: Option<ClosedCubicPath>,
     pub(crate) svg_rgba: Option<[f64; 4]>,
+    /// The dab's own opacity and its layer's opacity factor, as a writer of stored dabs reads them apart.
+    pub(crate) opacity: f64,
+    pub(crate) layer_opacity: f64,
+    pub(crate) closed: bool,
 }
 
 /// The segments `build_path` drew (`[x, y, inX, inY, outX, outY]`); a closed path's closing curve ends on its first
@@ -113,6 +117,9 @@ pub(crate) fn expand(
                 prepared,
                 svg_contour: ClosedCubicPath::new(segments).ok(),
                 svg_rgba,
+                opacity: item.opacity,
+                layer_opacity: entry.layer_opacity(),
+                closed: item.path.closed,
             });
         }
     }
