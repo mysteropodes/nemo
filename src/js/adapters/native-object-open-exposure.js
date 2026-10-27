@@ -236,5 +236,22 @@
     return Object.freeze({connect:connect,join:join,run:run,cancel:cancel,detach:detach,close:close,
       assertActive:assertActive,isStopped:function(){return !active;}});
   }
-  return Object.freeze({create:create,inspectReceipt:inspectReceipt,presentedFrame:presentedFrame,viewMode:viewMode,matchesView:matchesView,navigation:navigation,requestView:requestView,sameView:sameView,previewScheduling:previewScheduling});
+  // After Open, a preview the host defers because the window is not visible (NSWindow occlusion) is no failure: the
+  // session re-presents on the next actual visible exposure. One subscription, armed lazily and kept while it lives;
+  // a closed one is re-armed by the next deferral. No timer retries.
+  function occlusionWake(subscribe,onVisible){
+    var binding=null,connecting=false,armed=false;
+    function hint(value){
+      if(!armed||!value||value.visible!==true||Object.keys(value).length!==1)return;
+      armed=false;try{onVisible();}catch(_){}
+    }
+    function arm(){
+      armed=true;if(binding||connecting)return;connecting=true;
+      Promise.resolve().then(function(){return subscribe(hint,function(){binding=null;});}).then(function(value){
+        connecting=false;if(value&&typeof value.close==='function')binding=value;
+      },function(){connecting=false;});
+    }
+    return Object.freeze({arm:arm,isArmed:function(){return armed;}});
+  }
+  return Object.freeze({create:create,occlusionWake:occlusionWake,inspectReceipt:inspectReceipt,presentedFrame:presentedFrame,viewMode:viewMode,matchesView:matchesView,navigation:navigation,requestView:requestView,sameView:sameView,previewScheduling:previewScheduling});
 }));

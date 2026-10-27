@@ -837,3 +837,18 @@ test('native filter receipts reject wrong/missing/unknown values and late direct
  await assert.rejects(pending,/owner/);assert.equal(f.s.readPresentedObjectSession(),null);
  await f.s.renderPreview(0);assert.equal(f.s.readPresentedObjectSession().presentation.displayFilter,'dim');
 });
+test('an edit presented while the window is not visible is no failure and re-presents on the next visible exposure',async()=>{
+  // #2343 B1 check 3: a layer edit while NSWindow occlusion said not visible produced 'Native project frame was not
+  // presented (status-deferred-occluded)' and a blank canvas. The edit stands; its frame waits for the exposure.
+  const h=host(),notices=[],listeners=[];
+  const s=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{x:0,y:0,width:320,height:180},
+    physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0,
+    notice:m=>notices.push(m),subscribeWindowOcclusion:async hint=>{listeners.push(hint);return {detach(){},close(){}};}});
+  await s.openPath('/project.json');assert.ok(s.readPresentedObjectSession());
+  const previews=()=>h.calls.filter(c=>c.command==='nemo_native_object_preview').length,before=previews();
+  h.preview('deferred-occluded');await s.reference({kind:'remove'});
+  assert.equal(previews(),before+1);assert.equal(s.readPresentedObjectSession(),null);assert.deepEqual(notices,[]);
+  h.preview('presented');await turn();await turn();listeners.forEach(l=>l({visible:true}));
+  for(let i=0;i<6;i++)await turn();
+  assert.equal(previews(),before+2,'one re-present');assert.ok(s.readPresentedObjectSession(),'presented again');assert.deepEqual(notices,[]);
+});
