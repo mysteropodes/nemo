@@ -219,6 +219,7 @@ function browserProjectBeforeCut(){
   const context={NemoNativeObjectProjectMetadata:require('../src/js/adapters/native-object-project-metadata.js'),
     NemoNativeObjectProjectDesktop:require('../src/js/adapters/native-object-project-desktop.js'),
     NemoNativeObjectProjectProperties:require('../src/js/adapters/native-object-project-properties.js'),
+    NemoNativeObjectProjectReads:require('../src/js/adapters/native-object-project-reads.js'),
     NemoNativeFrameEditContract:require('../src/js/adapters/native-frame-edit-contract.js'),
     NemoNativeObjectOpenExposure:require('../src/js/adapters/native-object-open-exposure.js'),
     NemoNativeObjectProjectEntryContract:require('../src/js/adapters/native-object-project-entry-contract.js')};

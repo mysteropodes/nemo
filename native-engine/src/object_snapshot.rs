@@ -60,6 +60,13 @@ pub(crate) mod widget_read;
 use serde::{Deserialize, Serialize};
 pub use timing::LayerTimingReadResponse;
 const MAX_MESSAGE_BYTES: usize = 4096;
+enum ReadAdmission {
+    Accepted(Vec<u8>),
+    Refused(ResponseEnvelope),
+}
+#[path = "object_image_mesh_snapshot.rs"]
+mod image_mesh_read;
+pub use image_mesh_read::{ImageMeshReadFailure, ImageMeshReadProjection};
 
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 #[path = "object_project_admission.rs"]
@@ -225,54 +232,26 @@ impl ObjectSnapshot {
     /// return a typed error rather than echoing unbounded IDs or fabricating IDs.
     /// This typed entry cannot detect duplicate members already lost in a Value.
     pub fn dispatch(&self, request: OpacityRequest) -> Result<ResponseEnvelope, DispatchErrorCode> {
-        if [
-            request.request_id.as_str(),
-            request.instance_id.as_str(),
-            request.document_id.as_str(),
-            self.instance_id(),
-            self.document_id(),
-        ]
-        .iter()
-        .any(|value| !envelope_identifier(value))
-        {
-            return Err(DispatchErrorCode::InvalidRequest);
-        }
-        let encoded =
-            serde_json::to_vec(&request).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        self.dispatch_with_image_mesh_view(request, Err(ImageMeshReadFailure::Unpresented))
+    }
+
+    /// A native retained-scene projection is a read port, never execution authority.
+    pub fn dispatch_with_image_mesh_view(
+        &self,
+        request: OpacityRequest,
+        image_mesh_view: Result<&ImageMeshReadProjection, ImageMeshReadFailure>,
+    ) -> Result<ResponseEnvelope, DispatchErrorCode> {
+        let encoded = match self.read_admission(&request)? {
+            ReadAdmission::Accepted(bytes) => bytes,
+            ReadAdmission::Refused(response) => return Ok(response),
+        };
         let failure = |code, message| Ok(self.read_failure(&request, code, message));
-        if request.api_version != APPLICATION_API_VERSION
-            || !envelope_identifier(&request.operation)
-            || !request.payload.is_object()
-            || encoded.len() > MAX_MESSAGE_BYTES
-        {
-            return failure(
-                DispatchErrorCode::InvalidRequest,
-                "Invalid bounded object read request.",
-            );
-        }
-        if request.instance_id != self.instance_id() {
-            return failure(
-                DispatchErrorCode::WrongInstance,
-                "Object read targets a different instance.",
-            );
-        }
-        if request.document_id != self.document_id() {
-            return failure(
-                DispatchErrorCode::WrongDocument,
-                "Object read targets a different document.",
-            );
-        }
-        if request.cancelled_before_dispatch {
-            return failure(
-                DispatchErrorCode::CancelledBeforeDispatch,
-                "Object read was cancelled before dispatch.",
-            );
-        }
-        if request.expected_revision.is_some() {
-            return failure(
-                DispatchErrorCode::InvalidRequest,
-                "Only pinned object reads without expectedRevision are supported.",
-            );
+        if request.operation == "query.document.object" && request.payload.get("view").is_some() {
+            if request.payload["view"]["kind"] == "presentation" {
+                return self
+                    .dispatch_presentation_read(&request, Err(ImageMeshReadFailure::Unpresented));
+            }
+            return self.dispatch_image_mesh_read(&request, image_mesh_view);
         }
         if request.operation == "query.document.object.text" {
             return self.dispatch_text_read(&request);
@@ -396,6 +375,63 @@ impl ObjectSnapshot {
         Ok(response)
     }
 
+    fn read_admission(&self, request: &OpacityRequest) -> Result<ReadAdmission, DispatchErrorCode> {
+        if [
+            request.request_id.as_str(),
+            request.instance_id.as_str(),
+            request.document_id.as_str(),
+            self.instance_id(),
+            self.document_id(),
+        ]
+        .iter()
+        .any(|value| !envelope_identifier(value))
+        {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        let encoded =
+            serde_json::to_vec(&request).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        let failure = |code, message| {
+            Ok(ReadAdmission::Refused(
+                self.read_failure(request, code, message),
+            ))
+        };
+        if request.api_version != APPLICATION_API_VERSION
+            || !envelope_identifier(&request.operation)
+            || !request.payload.is_object()
+            || encoded.len() > MAX_MESSAGE_BYTES
+        {
+            return failure(
+                DispatchErrorCode::InvalidRequest,
+                "Invalid bounded object read request.",
+            );
+        }
+        if request.instance_id != self.instance_id() {
+            return failure(
+                DispatchErrorCode::WrongInstance,
+                "Object read targets a different instance.",
+            );
+        }
+        if request.document_id != self.document_id() {
+            return failure(
+                DispatchErrorCode::WrongDocument,
+                "Object read targets a different document.",
+            );
+        }
+        if request.cancelled_before_dispatch {
+            return failure(
+                DispatchErrorCode::CancelledBeforeDispatch,
+                "Object read was cancelled before dispatch.",
+            );
+        }
+        if request.expected_revision.is_some() {
+            return failure(
+                DispatchErrorCode::InvalidRequest,
+                "Only pinned object reads without expectedRevision are supported.",
+            );
+        }
+        Ok(ReadAdmission::Accepted(encoded))
+    }
+
     fn read_failure(
         &self,
         request: &OpacityRequest,
@@ -471,3 +507,10 @@ impl ObjectSnapshot {
         })
     }
 }
+
+#[cfg(feature = "application")]
+#[path = "object_tween_read.rs"]
+pub(crate) mod tween_read;
+#[cfg(feature = "application")]
+#[path = "tween_bitmap_resources.rs"]
+pub(crate) mod tween_resources;

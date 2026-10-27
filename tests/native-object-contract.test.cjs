@@ -267,7 +267,8 @@ test('transport object selector carries the frozen closed scope and bounded enve
   assert.ok(branch);
   assert.equal(branch.allOf[0].$ref, '#/$defs/ForbiddenRevisionRequest');
   assert.equal(branch.allOf[1].properties.payload.$ref, '#/$defs/ObjectQueryPayload');
-  const payload = transport.$defs.ObjectQueryPayload;
+  assert.deepEqual(transport.$defs.ObjectQueryPayload.oneOf[0], { $ref: '#/$defs/ObjectStableTargetQueryPayload' });
+  const payload = transport.$defs.ObjectStableTargetQueryPayload;
   assert.equal(payload.additionalProperties, false);
   assert.deepEqual(payload.required, ['atRevision', 'stableTarget']);
   assert.deepEqual(validate(payload, cases.read.request.payload, transport.$defs), []);

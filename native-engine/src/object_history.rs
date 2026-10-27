@@ -489,3 +489,6 @@ impl NativeObjectHistory {
 mod object_frame_bulk_move;
 #[path = "object_layer_shift_history.rs"]
 mod object_layer_shift;
+
+#[path = "object_tween_history.rs"]
+mod tween;

@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "1f6a1e516f9d2d61ef6b6c6949b09ba995c177c1",
-  "describe": "1f6a1e51-dirty"
+  "head": "445ca6ee92da04448843c491ddcb55f2bfb66b6a",
+  "describe": "v0.7.0-alpha.4-3320-g445ca6ee"
  },
- "inputsDigest": "66f9c9d032dfd0ed370a51340df1c85de4ae2a45ab2e9c8f3eac19895c0710be",
+ "inputsDigest": "4d20e9c7f7a87ffa3001473bee6ba38d2263b46525fd80811564c5935c389a84",
  "states": [
   "inventoried",
   "characterized",
@@ -54,11 +54,11 @@
   "byConsumer": {
    "native": 255,
    "export": 5,
-   "animation": 444,
-   "history": 355,
-   "selection": 372,
-   "render": 474,
-   "persist": 397
+   "animation": 439,
+   "history": 350,
+   "selection": 367,
+   "render": 468,
+   "persist": 393
   }
  },
  "fixturesByArea": {
@@ -176,8 +176,8 @@
   },
   "SMImageMeshUI": {
    "file": "src/js/image-mesh-bridge.js",
-   "line": 497,
-   "members": 6
+   "line": 306,
+   "members": 7
   },
   "SM": {
    "file": "src/js/timeline.js",
@@ -1852,7 +1852,7 @@
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 199,
+    "functionsVisited": 198,
     "via": "chain",
     "references": []
    },
@@ -2486,7 +2486,7 @@
    "capability": "Reset shape",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/image-mesh-bridge.js:380 init()"
+    "src/js/image-mesh-bridge.js:292 init()"
    ],
    "events": [
     "click"
@@ -2497,12 +2497,7 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "history": 1,
-    "render": 1,
-    "persist": 3,
-    "animation": 3,
-    "native": 3,
-    "selection": 3
+    "native": 2
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -2514,7 +2509,7 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 202,
+    "functionsVisited": 36,
     "via": "helper el()",
     "references": []
    },
@@ -2686,7 +2681,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 20,
+    "functionsVisited": 21,
     "via": "helper el()",
     "references": [
      "src/js/timeline.js:9098 action()"
@@ -5065,7 +5060,7 @@
     "container": "track-apply-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 99,
+    "functionsVisited": 98,
     "via": "helper el()",
     "references": []
    },
@@ -5108,7 +5103,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 23,
+    "functionsVisited": 22,
     "via": "helper el()",
     "references": []
    },
@@ -8020,7 +8015,7 @@
     "container": "footage-blend-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 34,
+    "functionsVisited": 35,
     "via": "variable sel",
     "references": []
    },
@@ -8342,7 +8337,7 @@
     "container": "kitsu-step-browse",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 22,
+    "functionsVisited": 23,
     "via": "helper el()",
     "references": []
    },
@@ -8457,7 +8452,7 @@
     "container": "kitsu-step-login",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 39,
+    "functionsVisited": 40,
     "via": "helper el()",
     "references": []
    },
@@ -9919,7 +9914,7 @@
     "functionsVisited": 27,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:325 renderNativeObjectUiMetadata()"
+     "src/js/adapters/native-object-ui.js:324 renderNativeObjectUiMetadata()"
     ]
    },
    "fixtures": [
@@ -10889,7 +10884,7 @@
    "capability": "imagemesh cols",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/image-mesh-bridge.js:377 init()"
+    "src/js/image-mesh-bridge.js:290 init()"
    ],
    "events": [
     "change"
@@ -10900,12 +10895,7 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "history": 1,
-    "render": 1,
-    "persist": 3,
-    "animation": 3,
-    "native": 3,
-    "selection": 3
+    "native": 2
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -10919,11 +10909,11 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 226,
+    "functionsVisited": 41,
     "via": "helper el()",
     "references": [
-     "src/js/image-mesh-bridge.js:317 renderImageMeshPanel()",
-     "src/js/image-mesh-bridge.js:351 setDensity()"
+     "src/js/image-mesh-bridge.js:125 setDensity()",
+     "src/js/image-mesh-bridge.js:155 paintPanel()"
     ]
    },
    "fixtures": [
@@ -10942,7 +10932,7 @@
    "capability": "imagemesh edit",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/image-mesh-bridge.js:375 init()"
+    "src/js/image-mesh-bridge.js:288 init()"
    ],
    "events": [
     "change"
@@ -10952,13 +10942,8 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "render": 1,
-    "animation": 3,
-    "native": 3,
-    "selection": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "consumers": {},
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1058",
@@ -10968,10 +10953,10 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 183,
+    "functionsVisited": 11,
     "via": "helper el()",
     "references": [
-     "src/js/image-mesh-bridge.js:311 renderImageMeshPanel()"
+     "src/js/image-mesh-bridge.js:151 paintPanel()"
     ]
    },
    "fixtures": [
@@ -10990,7 +10975,7 @@
    "capability": "imagemesh on",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/image-mesh-bridge.js:373 init()"
+    "src/js/image-mesh-bridge.js:286 init()"
    ],
    "events": [
     "change"
@@ -11001,10 +10986,9 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "history": 2,
-    "render": 2
+    "native": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1056",
@@ -11014,10 +10998,10 @@
     "container": "p-imagemesh-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 36,
+    "functionsVisited": 22,
     "via": "helper el()",
     "references": [
-     "src/js/image-mesh-bridge.js:309 renderImageMeshPanel()"
+     "src/js/image-mesh-bridge.js:150 paintPanel()"
     ]
    },
    "fixtures": [
@@ -11036,7 +11020,7 @@
    "capability": "imagemesh rows",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/image-mesh-bridge.js:378 init()"
+    "src/js/image-mesh-bridge.js:291 init()"
    ],
    "events": [
     "change"
@@ -11047,12 +11031,7 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "history": 1,
-    "render": 1,
-    "persist": 3,
-    "animation": 3,
-    "native": 3,
-    "selection": 3
+    "native": 2
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -11066,11 +11045,11 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 226,
+    "functionsVisited": 41,
     "via": "helper el()",
     "references": [
-     "src/js/image-mesh-bridge.js:317 renderImageMeshPanel()",
-     "src/js/image-mesh-bridge.js:352 setDensity()"
+     "src/js/image-mesh-bridge.js:125 setDensity()",
+     "src/js/image-mesh-bridge.js:155 paintPanel()"
     ]
    },
    "fixtures": [
@@ -12261,7 +12240,7 @@
     "functionsVisited": 37,
     "via": "variable trig",
     "references": [
-     "src/js/adapters/native-object-ui.js:179 unavailableInspector()",
+     "src/js/adapters/native-object-ui.js:178 unavailableInspector()",
      "src/js/reference-bridge.js:362 syncUI()",
      "src/js/reference-bridge.js:431 openOptions()"
     ]
@@ -16352,7 +16331,7 @@
     "functionsVisited": 99,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:316 renderNativeObjectUiMetadata()",
+     "src/js/adapters/native-object-ui.js:315 renderNativeObjectUiMetadata()",
      "src/js/app.js:5100 syncInput()",
      "src/js/timeline.js:229 updatePlayhead()",
      "src/js/timeline.js:2843 updateUI()"
@@ -17234,7 +17213,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 8,
+    "functionsVisited": 7,
     "via": "callback id",
     "references": [
      "src/js/tracker-panel.js:41 currentPoint()",
@@ -17281,7 +17260,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 8,
+    "functionsVisited": 7,
     "via": "callback id",
     "references": [
      "src/js/tracker-panel.js:42 currentPoint()",
@@ -23631,7 +23610,7 @@
    "source": "src/js/markers.js:167",
    "meta": {
     "i18n": null,
-    "functionsVisited": 15
+    "functionsVisited": 13
    },
    "fixtures": [
     "static-props",
@@ -23668,7 +23647,7 @@
    "source": "src/js/markers.js:170",
    "meta": {
     "i18n": null,
-    "functionsVisited": 13
+    "functionsVisited": 12
    },
    "fixtures": [
     "static-props",
@@ -23705,7 +23684,7 @@
    "source": "src/js/markers.js:235",
    "meta": {
     "i18n": null,
-    "functionsVisited": 19
+    "functionsVisited": 18
    },
    "fixtures": [
     "static-props",
@@ -23742,7 +23721,7 @@
    "source": "src/js/markers.js:236",
    "meta": {
     "i18n": null,
-    "functionsVisited": 20
+    "functionsVisited": 19
    },
    "fixtures": [
     "static-props",
@@ -23930,7 +23909,7 @@
    "source": "src/js/markers.js:247",
    "meta": {
     "i18n": null,
-    "functionsVisited": 33
+    "functionsVisited": 39
    },
    "fixtures": [
     "static-props",
@@ -25774,7 +25753,7 @@
    "source": "src/js/motion.js:9819",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 174
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -25816,7 +25795,7 @@
    "source": "src/js/motion.js:9864",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 438
+    "functionsVisited": 432
    },
    "fixtures": [
     "static-props",
@@ -28030,20 +28009,14 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "history": 2,
-    "selection": 2,
-    "render": 2,
-    "animation": 3,
-    "persist": 3
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/select-bridge.js:3133",
    "meta": {
     "i18n": "ctxMaskImageWithShape",
-    "functionsVisited": 80
+    "functionsVisited": 8
    },
    "fixtures": [
     "static-props",
@@ -28382,7 +28355,7 @@
    "source": "src/js/shapes-panel.js:738",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 100
+    "functionsVisited": 92
    },
    "fixtures": [
     "static-props",
@@ -28496,7 +28469,7 @@
    "source": "src/js/shapes-panel.js:860",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 100
+    "functionsVisited": 92
    },
    "fixtures": [
     "static-props",
@@ -30251,7 +30224,7 @@
    "source": "src/js/timeline.js:6865",
    "meta": {
     "i18n": "ctxLayerBlend",
-    "functionsVisited": 173
+    "functionsVisited": 169
    },
    "fixtures": [
     "keyed-props",
@@ -30328,7 +30301,7 @@
    "source": "src/js/timeline.js:6851",
    "meta": {
     "i18n": "ctxMenuAppearance",
-    "functionsVisited": 175
+    "functionsVisited": 171
    },
    "fixtures": [
     "keyed-props",
@@ -30966,7 +30939,7 @@
    "source": "src/js/timeline.js:5605",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 174
+    "functionsVisited": 166
    },
    "fixtures": [
     "keyed-props",
@@ -31005,7 +30978,7 @@
    "source": "src/js/timeline.js:5636",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 438
+    "functionsVisited": 432
    },
    "fixtures": [
     "keyed-props",

@@ -145,7 +145,9 @@
         "project_camera_state.rs",
         "object_bitmap_brush_record.rs",
         "object_selection_compound.rs",
-        "object_selection_compound_clones.rs"
+        "object_selection_compound_clones.rs",
+        "object_tween_record.rs",
+        "object_tween_timing.rs"
       ],
       "publicApi": [
         "document.rs",
@@ -224,7 +226,9 @@
         "object_media_link_revision.rs",
         "object_raster_image_import_revision.rs",
         "native_import_transaction_assets_revision.rs",
-        "object_selection_revision.rs"
+        "object_selection_revision.rs",
+        "tween_resource_revision.rs",
+        "encoded_retention_batch.rs"
       ],
       "publicApi": [
         "revision.rs"
@@ -342,7 +346,50 @@
         "object_project_comments_edit.rs",
         "object_mask_edit.rs",
         "native_import_transaction_assets_owner.rs",
-        "object_clipboard_provenance.rs"
+        "object_clipboard_provenance.rs",
+        "object_tween_owner.rs",
+        "tween_align.rs",
+        "tween_assignment.rs",
+        "tween_backdrop.rs",
+        "tween_bitmap_plan.rs",
+        "tween_cost.rs",
+        "tween_curve_clip.rs",
+        "tween_curve_crossings.rs",
+        "tween_dab_emit.rs",
+        "tween_dab_sampling.rs",
+        "tween_dab_shape.rs",
+        "tween_dabs.rs",
+        "tween_document_geometry.rs",
+        "tween_document_plan.rs",
+        "tween_dtw.rs",
+        "tween_features.rs",
+        "tween_fractions.rs",
+        "tween_frame_store.rs",
+        "tween_held_items.rs",
+        "tween_interpolation.rs",
+        "tween_interpolation_correction.rs",
+        "tween_interpolation_math.rs",
+        "tween_interpolation_mls.rs",
+        "tween_interpolation_probe.rs",
+        "tween_kernels.rs",
+        "tween_landmarks.rs",
+        "tween_matching.rs",
+        "tween_outline_cleanup.rs",
+        "tween_pair.rs",
+        "tween_pair_plan.rs",
+        "tween_pair_sampling.rs",
+        "tween_partition.rs",
+        "tween_path_geometry.rs",
+        "tween_piece.rs",
+        "tween_pressure_outline.rs",
+        "tween_pressure_record.rs",
+        "tween_relational.rs",
+        "tween_resample.rs",
+        "tween_sampling.rs",
+        "tween_span_generate.rs",
+        "tween_split_plan.rs",
+        "tween_texture_emit.rs",
+        "tween_limits.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -420,7 +467,9 @@
         "native_import_transaction_assets.rs",
         "native_import_transaction_sources.rs",
         "native_import_transaction_source_types.rs",
-        "object_history_read.rs"
+        "object_history_read.rs",
+        "object_command_families/tween.rs",
+        "object_tween_history.rs"
       ],
       "publicApi": [
         "history.rs",
@@ -459,6 +508,7 @@
         "brush_dab_sampling.rs",
         "brush_dab_shape.rs",
         "brush_dab_stamp.rs",
+        "brush_dab_paint.rs",
         "object_property_sampling.rs",
         "property_expression_views.rs",
         "property_camera_eval.rs",
@@ -665,6 +715,7 @@
         "object_media_scene_join.rs",
         "object_scene_producer_text_animator.rs",
         "object_duplicator_scene.rs",
+        "object_brush_dab_paint.rs",
         "object_mask_inputs.rs",
         "scene_effect_scene_join_inputs.rs",
         "object_brush_scene_join.rs",
@@ -747,6 +798,7 @@
         "native_vector_export_core.rs",
         "native_vector_export_svg.rs",
         "native_vector_export_lottie.rs",
+        "native_vector_export_svg_number.rs",
         "native_vector_export_camera.rs",
         "native_media_export_core.rs",
         "native_media_export_plan.rs",
@@ -800,7 +852,10 @@
         "object_expression_bake.rs",
         "object_brush_runtime.rs",
         "native_media_frame_export.rs",
-        "native_media_video_facts.rs"
+        "native_media_video_facts.rs",
+        "tween_ghost_geometry.rs",
+        "tween_ghost_query.rs",
+        "application_tween.rs"
       ],
       "publicApi": [
         "application.rs",
@@ -815,6 +870,7 @@
       "files": [
         "read_queries.rs",
         "object_snapshot.rs",
+        "object_image_mesh_snapshot.rs",
         "object_timing_snapshot.rs",
         "object_layer_placement_snapshot.rs",
         "object_layer_cells_snapshot.rs",
@@ -846,7 +902,10 @@
         "object_project_metadata_dispatch.rs",
         "object_project_custom_brush_read.rs",
         "object_project_comments_read.rs",
-        "object_brush_read.rs"
+        "object_brush_read.rs",
+        "object_tween_read.rs",
+        "tween_bitmap_resources.rs",
+        "tween_png_encode.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -938,6 +997,8 @@
         "property_text_animator.rs",
         "property_follow_path_sample.rs",
         "brush_dab_oracle.rs",
+        "object_brush_dab_paint.rs",
+        "object_paint_plan_tests.rs",
         "property_follow_path_sample_controls.rs",
         "property_expression_views.rs",
         "property_expression_views_controls.rs",
@@ -1556,6 +1617,7 @@
         "object_image_mesh_edit_controls.rs",
         "object_image_mesh_binding_history.rs",
         "object_image_mesh_binding_application.rs",
+        "object_image_mesh_read.rs",
         "object_image_mesh_binding_transactions.rs",
         "object_image_mesh_binding_fixtures.rs",
         "object_image_mesh_binding_provenance.rs",
@@ -1809,7 +1871,14 @@
         "object_revision_owner.rs",
         "object_command_ownership.rs",
         "object_rig_packet_pose.rs",
-        "object_rig_packet_pose_gpu.rs"
+        "object_rig_packet_pose_gpu.rs",
+        "object_tween_bitmap.rs",
+        "object_tween_ghosts.rs",
+        "object_tween_history.rs",
+        "object_tween_refusals.rs",
+        "tween_kernels.rs",
+        "encoded_retention_batch.rs",
+        "tween_resource_rollback.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1856,6 +1925,9 @@
         "src/native_contract.rs",
         "src/native_object_contract.rs",
         "src/native_object_contract_tests.rs",
+        "src/native_image_mesh_read_contract.rs",
+        "src/native_image_mesh_read_contract_tests.rs",
+        "src/native_presentation_read_contract_tests.rs",
         "src/native_object_wire_tests.rs",
         "src/native_reproduction_contract.rs",
         "src/raw_envelope.rs",
@@ -2256,6 +2328,7 @@
         "native_property_edit_dispatch_tests.rs",
         "native_property_bake_dispatch_tests.rs",
         "native_image_mesh_binding_public_tests.rs",
+        "native_image_mesh_read_public_tests.rs",
         "native_composition_dispatch_tests.rs",
         "native_raster_image_dispatch_tests.rs",
         "native_raster_image_preview_tests.rs",
@@ -2288,6 +2361,7 @@
         "native_object_motion_effects.rs",
         "native_object_expression_state.rs",
         "native_object_preview.rs",
+        "native_object_image_mesh_read.rs",
         "native_object_export.rs",
         "native_dispatch_replacement.rs",
         "native_dispatch_tests.rs",
@@ -2296,6 +2370,7 @@
         "native_object_font.rs",
         "native_object_image.rs",
         "native_object_preview_prepare.rs",
+        "native_object_reference_preview.rs",
         "native_object_video.rs",
         "native_object_video_link.rs",
         "native_object_import_batch.rs"

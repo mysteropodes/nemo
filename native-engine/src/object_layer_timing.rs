@@ -176,3 +176,6 @@ impl LayerTiming {
 pub(crate) use object_exposure_edit_retime_timing::{
     plan_move_frames, plan_shift_frames, BulkCell, BulkMoveLayer, BulkMovePlan, BulkRetimePair,
 };
+
+#[path = "object_tween_timing.rs"]
+mod tween;

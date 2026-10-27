@@ -27,6 +27,16 @@ function readResponse(request) {
   value.result.object.target = copy(request.payload.stableTarget);
   return value;
 }
+function presentationRead(revision = 7) {
+  return { apiVersion: 2, requestId: 'presentation-read', instanceId: 'instance-A', documentId: 'document-A',
+    operation: 'query.document.object', payload: { atRevision: revision, view: { kind: 'presentation' } } };
+}
+function presentationResponse(request) {
+  return { apiVersion: 2, requestId: request.requestId, instanceId: request.instanceId, documentId: request.documentId,
+    contentRevision: request.payload.atRevision, ok: true, result: { kind: 'presentation', atRevision: request.payload.atRevision,
+      documentSnapshotId: `native-object:${request.documentId}:${request.payload.atRevision}`, contextId: 'scene-root',
+      frame: 11, workId: 'mesh-work-fixture-11', viewGeneration: 13 } };
+}
 function visibility(visible = false) {
   return { apiVersion: 2, requestId: 'visibility-7', instanceId: 'instance-A', documentId: 'document-A',
     operation: 'command.document.object.layer.visibility.set', expectedRevision: 7,
@@ -61,6 +71,33 @@ test('actual shared adapter preserves complete pinned read and opaque targets wi
     assert.deepEqual(h.calls, [original]); assert.deepEqual(request, original);
     assert.notStrictEqual(h.calls[0], request);
   }
+});
+
+test('presentation bootstrap is closed, bounded and correlated through the shared SDK', async () => {
+  const request = presentationRead(), original = copy(request), h = adapter(presentationResponse);
+  const result = await h.api.dispatch(request);
+  assert.deepEqual(result, presentationResponse(original));
+  assert.deepEqual(h.calls, [original]); assert.deepEqual(request, original);
+  assert.equal(result.result.kind, 'presentation'); assert.equal(result.result.atRevision, request.payload.atRevision);
+  for (const [path, value, remove] of [
+    ['/payload/atRevision', -1], ['/payload/atRevision', Number.MAX_SAFE_INTEGER + 1],
+    ['/payload/view', null], ['/payload/view/kind', 'imageMesh'], ['/payload/view/extra', true],
+    ['/payload/expectedRevision', 7], ['/expectedRevision', 7], ['/payload/extra', true],
+  ]) assert.throws(() => validateRequest(change(request, path, value, remove)), undefined, path);
+  for (const [path, replacement, remove] of [
+    ['/result/extra', true], ['/result/kind', 'imageMesh'], ['/result/documentSnapshotId', ''],
+    ['/result/contextId', ''], ['/result/frame', -1], ['/result/frame', 4294967296],
+    ['/result/viewGeneration', 0], ['/result/viewGeneration', Number.MAX_SAFE_INTEGER + 1],
+    ['/contentRevision', 8], ['/result/atRevision', 8], ['/requestId', 'different-request'],
+    ['/instanceId', 'different-instance'], ['/documentId', 'different-document'],
+    ['/result/workId', 'x'.repeat(129)],
+  ]) await assert.rejects(adapter(req => change(presentationResponse(req), path, replacement, remove)).api.dispatch(request), undefined, path);
+  await assert.rejects(adapter(req => ({ ...presentationResponse(req), result: null })).api.dispatch(request), /result/);
+  const stale = copy(presentationResponse(request)); stale.result.documentSnapshotId = 'native-object:document-A:8';
+  await assert.rejects(adapter(() => stale).api.dispatch(request), /snapshot mismatch/);
+  const foreign = copy(presentationResponse(request)); foreign.result.documentSnapshotId = 'native-object:other-document:7';
+  await assert.rejects(adapter(() => foreign).api.dispatch(request), /snapshot mismatch/,
+    'a correctly correlated envelope cannot carry another document snapshot');
 });
 
 test('visibility uses required revision, strict boolean and exact changed/no-op receipt', async () => {
