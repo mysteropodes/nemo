@@ -7,7 +7,7 @@ fn oracle() -> Value {
 #[test]
 fn subselect_matches_all_original_point_type_toggle_transform_and_insert_cases() {
     let oracle = oracle();
-    assert_eq!(oracle["cases"].as_array().unwrap().len(), 196);
+    assert_eq!(oracle["cases"].as_array().unwrap().len(), 220);
     for case in oracle["cases"].as_array().unwrap() {
         let source: Vec<Anchor> = serde_json::from_value(case["segments"].clone()).unwrap();
         let expected: Vec<Anchor> = serde_json::from_value(case["expected"].clone()).unwrap();

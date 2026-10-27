@@ -4,7 +4,7 @@ use super::tests::{host_info, host_read, host_saved, presented_project};
 use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
 use native_engine::{compositor::Compositor, desktop_viewport::ViewportStatus};
 use serde_json::{json, Value};
-fn project() -> Value {
+fn project(parametric: bool) -> Value {
     let mut p = presented_project();
     p["assets"] = json!([]);
     p["assetInventory"] = json!({"assetIds":[],"placements":[]});
@@ -13,13 +13,23 @@ fn project() -> Value {
     p["drawing"]["objects"]=json!((0..2).map(|frame|json!({"schemaVersion":1,"family":"editable-vector-path","target":{"contextId":"scene-root","layerUid":"L0","strokeId":format!("pixels-{frame}"),"frameScope":{"kind":"authored","frame":frame}},
         "geometry":{"kind":"cubic-path","coordinateSpace":"document-world","handleSpace":"relative","closed":true,"segments":([[4,4],[28,4],[28,28],[4,28]].map(|[x,y]|json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}})))},
         "fill":{"kind":"solid","r":1,"g":0,"b":0,"a":1},"vector":{"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"round","strokeJoin":"round","opacity":1}})).collect::<Vec<_>>());
+    if parametric {
+        for record in p["drawing"]["objects"].as_array_mut().unwrap() {
+            record["vectorExt"] = json!({"paramShape":{"kind":"rect","box":{"x1":4,"y1":4,"x2":28,"y2":28},"tl":0,"tr":0,"br":0,"bl":0}});
+        }
+    }
     p
 }
 #[test]
 fn subselect_presented_host_pages_preview_commit_and_stale_view() {
+    for parametric in [false, true] {
+        check_presented_host(parametric);
+    }
+}
+fn check_presented_host(parametric: bool) {
     let mut owner = NativeObjectHost::from_project_file(
         "subselect-host".into(),
-        project().to_string().as_bytes(),
+        project(parametric).to_string().as_bytes(),
     )
     .unwrap();
     let info = host_info(&owner);
