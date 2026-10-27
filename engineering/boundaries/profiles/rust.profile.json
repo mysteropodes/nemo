@@ -1888,6 +1888,7 @@
         "tween_resource_rollback.rs",
         "object_subselect_geometry.rs",
         "object_subselect_history.rs",
+        "object_subselect_held.rs",
         "object_subselect_read.rs",
         "object_subselect_projection.rs",
         "object_subselect_pixels.rs"

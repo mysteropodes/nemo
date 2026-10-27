@@ -18336,6 +18336,11 @@
         },
         "intent": {
           "$ref": "#/$defs/ObjectSubselectIntent"
+        },
+        "atFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
         }
       }
     },
