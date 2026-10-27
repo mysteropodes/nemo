@@ -829,6 +829,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-subselect-ui.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2333,
+          "scriptOrdinal": 31
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-object-project-metadata.js",
       "moduleId": "app.native.object.project-metadata.adapter",
       "executionClass": "document-classic",
