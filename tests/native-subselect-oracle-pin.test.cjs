@@ -10,8 +10,8 @@ const baseline = '46442ea96c09e6bfaadf956eb8586e273a658085';
 const fixture = JSON.parse(fs.readFileSync(path.join(root, 'native-engine/tests/fixtures/subselect-baseline/oracle.json')));
 test('CS8 subselect oracle executes the pinned original tools, bridge and Paper', () => {
   assert.equal(fixture.baseline, baseline);
-  assert.equal(fixture.cases.length, 196);
-  for (const file of ['src/js/tools.js', 'src/js/subselect-bridge.js', 'src/js/timeline.js', 'src/paper-full.min.js']) {
+  assert.equal(fixture.cases.length, 220);
+  for (const file of ['src/js/tools.js', 'src/js/subselect-bridge.js', 'src/js/timeline.js', 'src/js/app.js', 'src/paper-full.min.js']) {
     const bytes = cp.execFileSync('git', ['show', `${baseline}:${file}`], {cwd:root,maxBuffer:8e6});
     assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'), fixture.hashes[file]);
   }

@@ -28,15 +28,20 @@ fn doc(version: u32) -> Value {
 }
 #[test]
 fn subselect_unsupported_consumers_refuse_read_preview_and_commit_atomically() {
-    for kind in ["3d", "rig", "vtx"] {
+    for kind in ["3d", "rig", "vtx", "animated-parametric"] {
         let mut input = doc(2);
         match kind {
             "3d" => input["layers"][0]["threeD"] = json!(true),
             "rig" => {
                 input["layers"][0]["rig"] = json!({"bones":{},"ikChains":{},"nextId":1,"binds":[]})
             }
-            _ => {
+            "vtx" => {
                 input["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"L1","strokeId":"s-a"},"properties":[{"property":"vtx0","static":[1,2]}]}])
+            }
+            _ => {
+                input["objects"][0]["vectorExt"] =
+                    json!({"paramShape":{"kind":"rect","tl":0,"tr":0,"br":0,"bl":0}});
+                input["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"L1","strokeId":"s-a"},"properties":[{"property":"cornerTL","track":{"keys":[{"frame":0,"v":[0],"curvePoints":[]},{"frame":10,"v":[20],"curvePoints":[]}]}}]}]);
             }
         }
         let mut owner = owner_of(&input);
@@ -225,5 +230,72 @@ fn subselect_identity_transforms_preserve_bytes_revision_and_nonempty_redo() {
         assert_eq!(bytes(&owner), before);
         assert_eq!(owner.content_revision(), 2);
         assert_eq!(owner.history_depths(), (0, 1));
+    }
+}
+
+#[test]
+fn subselect_static_parametric_paths_match_original_geometry_and_saved_metadata() {
+    let oracle: Value =
+        serde_json::from_str(include_str!("fixtures/subselect-baseline/oracle.json")).unwrap();
+    let cases: Vec<_> = oracle["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| c.get("vectorExt").is_some())
+        .collect();
+    assert_eq!(cases.len(), 24);
+    let segments = |values: &Value| {
+        json!(values.as_array().unwrap().iter().map(|s| {
+        let pair=|key:&str| json!({"x":s[key][0],"y":s[key][1]});
+        json!({"point":pair("point"),"handleIn":pair("handleIn"),"handleOut":pair("handleOut")})
+    }).collect::<Vec<_>>())
+    };
+    for version in [1, 2] {
+        for case in &cases {
+            let mut record = record_at("A", "L1", 0, "s-a");
+            record["geometry"]["closed"] = json!(true);
+            record["geometry"]["segments"] = segments(&case["segments"]);
+            record["vectorExt"] = case["vectorExt"].clone();
+            let mut owner = owner_of(&document(version, vec![record], None));
+            let before = bytes(&owner);
+            let q = req(&owner, "parametric-subselect", case["intent"].clone());
+            let r = dispatch(&mut owner, &q);
+            assert_eq!(r["ok"], true, "{case}: {r}");
+            let actual = state(&owner);
+            assert_eq!(actual["objects"][0]["vectorExt"], case["expectedVectorExt"]);
+            let actual = actual["objects"][0]["geometry"]["segments"]
+                .as_array()
+                .unwrap();
+            let expected = segments(&case["expected"]);
+            assert_eq!(actual.len(), expected.as_array().unwrap().len());
+            for (a, b) in actual.iter().zip(expected.as_array().unwrap()) {
+                for key in ["point", "handleIn", "handleOut"] {
+                    for axis in ["x", "y"] {
+                        assert!(
+                            (a[key][axis].as_f64().unwrap() - b[key][axis].as_f64().unwrap()).abs()
+                                < 1e-6,
+                            "{case}"
+                        );
+                    }
+                }
+            }
+            let after = bytes(&owner);
+            if r["result"]["applied"] == true {
+                assert_eq!(owner.history_depths(), (1, 0));
+                assert_eq!(owner.undo(1), Ok(2));
+                assert_eq!(bytes(&owner), before);
+                assert_eq!(owner.redo(2), Ok(3));
+                assert_eq!(bytes(&owner), after);
+            } else {
+                assert_eq!(owner.history_depths(), (0, 0));
+                assert_eq!(after, before);
+            }
+            let reopened = NativeObjectHistory::new(
+                "parametric-reopen",
+                decode_storage_project(&after).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(bytes(&reopened), after);
+        }
     }
 }

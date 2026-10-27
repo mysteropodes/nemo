@@ -9,6 +9,11 @@ use serde_json::json;
 #[test]
 #[ignore = "requires real headless Metal; run under the shared heavy-job lock"]
 fn subselect_gpu_edit_undo_and_reopen_preserve_literal_interior_pixels() {
+    for parametric in [false, true] {
+        check_pixels(parametric);
+    }
+}
+fn check_pixels(parametric: bool) {
     let mut record = support::record_at("A", "L1", 0, "s-a");
     record["geometry"]["closed"] = json!(true);
     record["geometry"]["segments"] = json!([[4, 4], [28, 4], [28, 28], [4, 28]].map(
@@ -17,6 +22,9 @@ fn subselect_gpu_edit_undo_and_reopen_preserve_literal_interior_pixels() {
     record["fill"] = json!({"kind":"solid","r":1,"g":0,"b":0,"a":1});
     record["vector"]["hasRealStroke"] = json!(false);
     record["vector"]["stroke"] = serde_json::Value::Null;
+    if parametric {
+        record["vectorExt"] = json!({"paramShape":{"kind":"rect","box":{"x1":4,"y1":4,"x2":28,"y2":28},"tl":0,"tr":0,"br":0,"bl":0}});
+    }
     let mut owner = support::owner_of(&support::document(2, vec![record], None));
     let mut gpu = Compositor::new().expect("Subselect needs real headless Metal");
     let pixels = |gpu: &mut Compositor, owner: &crate::history::NativeObjectHistory| {

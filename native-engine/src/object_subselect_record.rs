@@ -35,7 +35,26 @@ pub(crate) fn admit(document: &ObjectDocument, record: &ObjectRecord) -> Result<
             h.target.context_id == record.target.context_id
                 && h.target.layer_uid == record.target.layer_uid
                 && h.target.stroke_id.value() == Some(&record.target.stroke_id)
-                && h.properties.iter().any(|p| p.property.starts_with("vtx"))
+                && h.properties.iter().any(|p| {
+                    p.property.starts_with("vtx")
+                        || (record
+                            .vector_ext
+                            .value()
+                            .is_some_and(|e| !e.param_shape.missing())
+                            && matches!(
+                                p.property.as_str(),
+                                "cornerTL"
+                                    | "cornerTR"
+                                    | "cornerBR"
+                                    | "cornerBL"
+                                    | "arcStart"
+                                    | "arcSweep"
+                                    | "arcInner"
+                                    | "starInner"
+                                    | "starCorner"
+                            )
+                            && p.track.value().is_some_and(|track| !track.keys.is_empty()))
+                })
         })
     }) {
         return Err(Refusal::Unsupported);
@@ -51,10 +70,7 @@ pub(crate) fn anchors(record: &ObjectRecord) -> Result<Vec<Anchor>, Refusal> {
     }
     // These consumers require their own geometry/companion projection before a commit can be admitted.
     if record.vector_ext.value().is_some_and(|e| {
-        !e.pressure.missing()
-            || !e.param_shape.missing()
-            || !e.bitmap_brush.missing()
-            || !e.brush_texture.missing()
+        !e.pressure.missing() || !e.bitmap_brush.missing() || !e.brush_texture.missing()
     }) {
         return Err(Refusal::Unsupported);
     }
