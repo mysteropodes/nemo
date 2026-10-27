@@ -5,7 +5,7 @@
 //! tag are dropped. With neither matrix, the stored rect is kept. Opacity is the item's own,
 //! times the inner layer's raw opacity, times the host's. Element Motion never reaches a raster, and
 //! the codec admits exposed properties only on the component's own objects.
-//! Text the inner layers hold stays unavailable until its own placed paint exists.
+//! Held text blocks are `text_scene::placed`, keyed here in the same source space.
 use crate::evaluation::motion_parent_chain::ImageRect;
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_component::{
     evaluate_component_shapes, ResolvedComponentPlacement,
@@ -23,8 +23,9 @@ use crate::object_render_scene::text_glyph_scene_kernels::object_raster_asset_sc
 use crate::object_render_scene::ObjectSceneError;
 use std::collections::HashMap;
 
-/// The images the inner layers hold at this frame, keyed by their position in the component's
-/// order source space (its `local` objects, then the whole raster table): `(inner layer, entry)`.
+/// The images and text blocks the inner layers hold at this frame, keyed by their position in the
+/// component's order source space (its `local` objects, then the whole raster table, then the whole
+/// text table): `(inner layer, entry, is_text)`.
 pub(crate) fn held(
     packet: &ObjectFramePacket,
     local: usize,
@@ -32,7 +33,7 @@ pub(crate) fn held(
     layers: &HashMap<&str, usize>,
     source_frames: &[Option<u32>],
     host: usize,
-) -> Result<HashMap<usize, (usize, usize)>, ObjectSceneError> {
+) -> Result<HashMap<usize, (usize, usize, bool)>, ObjectSceneError> {
     let mut images = HashMap::new();
     let Some(items) = packet.snapshot().document().item_records() else {
         return Ok(images);
@@ -48,12 +49,13 @@ pub(crate) fn held(
     };
     for (entry, raster) in items.raster_entries().iter().enumerate() {
         if let Some(layer) = held_on(&raster.target)? {
-            images.insert(local + entry, (layer, entry));
+            images.insert(local + entry, (layer, entry, false));
         }
     }
-    for text in items.text_entries() {
-        if held_on(&text.target)?.is_some() {
-            return Err(unavailable(host, "component text paint is unavailable"));
+    let texts = local + items.raster_entries().len();
+    for (entry, text) in items.text_entries().iter().enumerate() {
+        if let Some(layer) = held_on(&text.target)? {
+            images.insert(texts + entry, (layer, entry, true));
         }
     }
     Ok(images)
@@ -153,4 +155,48 @@ pub(crate) fn raster(
             opacity,
         },
     ))
+}
+
+/// One held text block as the host paints it: its glyph paths through the placement chain (camera,
+/// then symMatrix), at the item opacity times the inner layer's raw opacity times the host's.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn text(
+    packet: &ObjectFramePacket,
+    layer: &ObjectLayer,
+    placement: &ResolvedComponentPlacement,
+    entry: usize,
+    host: usize,
+    host_factor: f64,
+    inner_frame: u32,
+    texts: &mut crate::object_render_scene::text_scene::TextSources,
+) -> Result<usize, ObjectSceneError> {
+    let items = packet
+        .snapshot()
+        .document()
+        .item_records()
+        .ok_or_else(|| unavailable(host, "component Text block is unavailable"))?;
+    let target = &items
+        .text_entries()
+        .get(entry)
+        .ok_or_else(|| unavailable(host, "component Text block is unavailable"))?
+        .target;
+    layer_supported(packet, target.context_id(), layer, host)?;
+    let layer_target = PropertyHolderTarget {
+        context_id: target.context_id().to_owned(),
+        layer_uid: target.layer_uid().to_owned(),
+        stroke_id: Presence::Missing,
+    };
+    let opacity =
+        raw_opacity(packet, &layer_target, f64::from(inner_frame), host)? * host_factor;
+    let chain: Vec<[f64; 6]> = placement.chain().iter().map(|m| m.0).collect();
+    crate::object_render_scene::text_scene::placed::placed(
+        packet,
+        layer,
+        entry,
+        packet.source_objects().len() + items.raster_entries().len() + entry,
+        host,
+        &chain,
+        opacity,
+        texts,
+    )
 }

@@ -187,6 +187,39 @@ impl TextGlyphScene {
     pub(crate) fn holder_id(&self) -> &str {
         &self.holder_id
     }
+    /// `applyMatrixToStrokeData`'s path branch over every contour (a placed component's camera or
+    /// symMatrix): points through `[a, b, c, d, tx, ty]`, handles through its linear part.
+    pub(crate) fn affine(
+        &self,
+        [a, b, c, d, tx, ty]: [f64; 6],
+        admission: GeometryAdmission,
+    ) -> Result<Self, TextSceneError> {
+        let linear = |[x, y]: [f64; 2]| [x * a + y * c, x * b + y * d];
+        let contours = self
+            .contours
+            .iter()
+            .map(|k| {
+                let ring: Vec<GlyphSegment> = k
+                    .contour
+                    .segments()
+                    .iter()
+                    .map(|s| {
+                        let [x, y] = linear(s.point);
+                        GlyphSegment {
+                            point: [x + tx, y + ty],
+                            handle_in: linear(s.handle_in),
+                            handle_out: linear(s.handle_out),
+                        }
+                    })
+                    .collect();
+                placed(k.role, k.key.clone(), &ring, &[], k.opacity, admission)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self {
+            holder_id: self.holder_id.clone(),
+            contours,
+        })
+    }
     /// Paint order: per line the decorations, then that line's glyph paths.
     pub(crate) fn contours(&self) -> &[SceneContour] {
         &self.contours
