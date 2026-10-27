@@ -69,12 +69,10 @@ fn hex_rgba(hex: &str) -> Option<[f64; 4]> {
 }
 
 /// The centreline and width profile a pressure ribbon stamps along, or `None` for any other anchor. The stored
-/// centreline is unposed: a ribbon whose drawn outline is not its stored one (motion, a pose) awaits native centreline
-/// posing and is refused rather than textured in the wrong place.
+/// centreline is stored unposed, like the outline: the stamp is posed afterwards (`fit_pose`).
 #[allow(clippy::type_complexity)]
 fn ribbon_walk(
     record: &ObjectRecord,
-    drawn: &[[f64; 6]],
 ) -> Result<Option<(Vec<[f64; 6]>, Vec<(f64, f64)>)>, &'static str> {
     let Some(pressure) = record
         .vector_ext
@@ -97,27 +95,6 @@ fn ribbon_walk(
             .filter(|v| v.is_finite())
             .ok_or("non-finite ribbon geometry")
     };
-    let stored = &record.geometry.segments;
-    let near = |a: f64, b: f64| (a - b).abs() <= 1e-9 * (1.0 + b.abs());
-    let unposed = stored.len() == drawn.len()
-        && stored.iter().zip(drawn).all(|(s, d)| {
-            [
-                &s.point.x,
-                &s.point.y,
-                &s.handle_in.x,
-                &s.handle_in.y,
-                &s.handle_out.x,
-                &s.handle_out.y,
-            ]
-            .iter()
-            .zip(d)
-            .enumerate()
-            // An open outline's end handles never reach the drawn path; a ribbon outline is closed.
-            .all(|(_, (s, d))| s.as_f64().is_some_and(|s| near(*d, s)))
-        });
-    if !unposed {
-        return Err("a posed textured pressure ribbon awaits native centreline posing");
-    }
     let centre = centre
         .iter()
         .map(|s| {
@@ -136,6 +113,129 @@ fn ribbon_walk(
         .map(|stop| Ok((f(&stop.t)?, f(&stop.width)?)))
         .collect::<Result<Vec<_>, &'static str>>()?;
     Ok(Some((centre, profile)))
+}
+
+/// The record's own (unposed) outline as `[x, y, inX, inY, outX, outY]` segments.
+fn stored_segments(record: &ObjectRecord) -> Result<Vec<[f64; 6]>, &'static str> {
+    let f = |n: &Number| {
+        n.as_f64()
+            .filter(|v| v.is_finite())
+            .ok_or("non-finite anchor geometry")
+    };
+    record
+        .geometry
+        .segments
+        .iter()
+        .map(|s| {
+            Ok([
+                f(&s.point.x)?,
+                f(&s.point.y)?,
+                f(&s.handle_in.x)?,
+                f(&s.handle_in.y)?,
+                f(&s.handle_out.x)?,
+                f(&s.handle_out.y)?,
+            ])
+        })
+        .collect()
+}
+
+fn det3(m: [[f64; 3]; 3]) -> f64 {
+    m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+        - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+        + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0])
+}
+/// The pose that carries the stored outline onto the drawn one (the baseline stamps the stored stroke once and then
+/// poses its dabs with everything else): `None` when they coincide; otherwise `[a, b, c, d, e, f]` (`x' = a x + c y + e`,
+/// `y' = b x + d y + f`) fitted on three spread anchors, or a similarity when the anchors are collinear, and checked on
+/// every anchor. A pose no affine carries (per-vertex offsets) is unavailable rather than textured in the wrong place.
+fn fit_pose(stored: &[[f64; 6]], drawn: &[[f64; 6]]) -> Result<Option<[f64; 6]>, &'static str> {
+    let refuse = "a non-affine pose of a textured stroke awaits native dab posing";
+    if stored.len() != drawn.len() || stored.is_empty() {
+        return Err(refuse);
+    }
+    if stored
+        .iter()
+        .zip(drawn)
+        .all(|(s, d)| s[0] == d[0] && s[1] == d[1])
+    {
+        return Ok(None);
+    }
+    let pt = |v: &[f64; 6]| [v[0], v[1]];
+    let s0 = pt(&stored[0]);
+    let dist = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).hypot(a[1] - b[1]);
+    let i1 = (0..stored.len())
+        .max_by(|&a, &b| dist(s0, pt(&stored[a])).total_cmp(&dist(s0, pt(&stored[b]))))
+        .unwrap_or(0);
+    let s1 = pt(&stored[i1]);
+    let area =
+        |q: [f64; 2]| ((s1[0] - s0[0]) * (q[1] - s0[1]) - (s1[1] - s0[1]) * (q[0] - s0[0])).abs();
+    let i2 = (0..stored.len())
+        .max_by(|&a, &b| area(pt(&stored[a])).total_cmp(&area(pt(&stored[b]))))
+        .unwrap_or(0);
+    let (d0, d1) = (pt(&drawn[0]), pt(&drawn[i1]));
+    let span = dist(s0, s1);
+    let m = if area(pt(&stored[i2])) > 1e-9 * (1.0 + span * span) {
+        let (s2, d2) = (pt(&stored[i2]), pt(&drawn[i2]));
+        let rows = [
+            [s0[0], s0[1], 1.0],
+            [s1[0], s1[1], 1.0],
+            [s2[0], s2[1], 1.0],
+        ];
+        let det = det3(rows);
+        let solve = |rhs: [f64; 3]| {
+            let column = |c: usize| {
+                let mut m = rows;
+                for (k, row) in m.iter_mut().enumerate() {
+                    row[c] = rhs[k];
+                }
+                det3(m) / det
+            };
+            [column(0), column(1), column(2)]
+        };
+        let ([a, c, e], [b, d, f]) = (solve([d0[0], d1[0], d2[0]]), solve([d0[1], d1[1], d2[1]]));
+        [a, b, c, d, e, f]
+    } else if span == 0.0 {
+        [1.0, 0.0, 0.0, 1.0, d0[0] - s0[0], d0[1] - s0[1]]
+    } else {
+        // Collinear anchors fix rotation, uniform scale and translation: the ratio of the two spans as complex numbers.
+        let (sx, sy, dx, dy) = (s1[0] - s0[0], s1[1] - s0[1], d1[0] - d0[0], d1[1] - d0[1]);
+        let n = sx * sx + sy * sy;
+        let (a, b) = ((dx * sx + dy * sy) / n, (dy * sx - dx * sy) / n);
+        [
+            a,
+            b,
+            -b,
+            a,
+            d0[0] - (a * s0[0] - b * s0[1]),
+            d0[1] - (b * s0[0] + a * s0[1]),
+        ]
+    };
+    let carry = |p: [f64; 2]| {
+        [
+            m[0] * p[0] + m[2] * p[1] + m[4],
+            m[1] * p[0] + m[3] * p[1] + m[5],
+        ]
+    };
+    for (s, d) in stored.iter().zip(drawn) {
+        let q = carry(pt(s));
+        if (q[0] - d[0]).abs() > 1e-6 * (1.0 + d[0].abs())
+            || (q[1] - d[1]).abs() > 1e-6 * (1.0 + d[1].abs())
+        {
+            return Err(refuse);
+        }
+    }
+    Ok(Some(m))
+}
+/// A dab carried through the pose: anchors through the affine, relative handles through its linear part.
+fn posed(mut path: DabPath, m: [f64; 6]) -> DabPath {
+    for s in &mut path.segments {
+        let lin = |v: [f64; 2]| [m[0] * v[0] + m[2] * v[1], m[1] * v[0] + m[3] * v[1]];
+        let p = lin(s.p);
+        s.p = [p[0] + m[4], p[1] + m[5]];
+        s.h_in = lin(s.h_in);
+        s.h_out = lin(s.h_out);
+    }
+    path
 }
 
 /// The dabs of a seeded anchor over its drawn path (`[x, y, inX, inY, outX, outY]` segments), in paint order.
@@ -165,7 +265,10 @@ pub(crate) fn anchor_dab_items(
         .ok_or("not a seeded brush-texture anchor")?;
     // A pressure ribbon (`isVectorBrush` with a centreline and a width profile) stamps along its centreline at the
     // mean profile width, through the profile; anything else stamps along its own drawn path at its stroke width.
-    let ribbon = ribbon_walk(record, drawn)?;
+    let ribbon = ribbon_walk(record)?;
+    // Stamp the stored stroke, then pose every dab as the anchor is posed.
+    let stored = stored_segments(record)?;
+    let pose = fit_pose(&stored, drawn)?;
     let channels =
         |paint: &SolidFill| match [&paint.r, &paint.g, &paint.b, &paint.a].map(|n| n.as_f64()) {
             [Some(r), Some(g), Some(b), Some(a)] => Some([r, g, b, a]),
@@ -195,7 +298,14 @@ pub(crate) fn anchor_dab_items(
             let base_width = profile.iter().map(|stop| stop.1).sum::<f64>() / profile.len() as f64;
             build_brush_dabs(centre, false, &preset, base_width, &mut rng, Some(profile))
         }
-        None => build_brush_dabs(drawn, closed, &preset, width, &mut rng, None),
+        None => build_brush_dabs(
+            &stored,
+            record.geometry.closed,
+            &preset,
+            width,
+            &mut rng,
+            None,
+        ),
     }
     .map_err(|_| "the anchor's drawn path is unavailable")?;
     let number = |v: f64| Number::from_f64(v).ok_or("non-finite dab paint");
@@ -212,7 +322,10 @@ pub(crate) fn anchor_dab_items(
             };
             let solid = SceneSolid::from_fill(&fill).map_err(|_| "unrepresentable dab paint")?;
             Ok(DabItem {
-                path: dab.path,
+                path: match pose {
+                    Some(m) => posed(dab.path, m),
+                    None => dab.path,
+                },
                 style: SceneItemStyle {
                     fill: FillResolution::Solid(solid),
                     stroke: None,

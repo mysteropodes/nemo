@@ -37,6 +37,10 @@ fn plan_of(record: Value) -> Result<ObjectPaintPlan, ObjectPaintPlanError> {
     plan_of_records(vec![record])
 }
 fn plan_of_records(records: Vec<Value>) -> Result<ObjectPaintPlan, ObjectPaintPlanError> {
+    plan_posed(records, None)
+}
+/// The plan with the anchor posed by one element property (`{"property":…,"static":…}`).
+fn plan_posed(records: Vec<Value>, pose: Option<Value>) -> Result<ObjectPaintPlan, ObjectPaintPlanError> {
     let elements: Vec<Value> = records.iter().enumerate().map(|(k, r)| json!({"layerUid":"L0",
         "strokeId":r["target"]["strokeId"],"naturalPosition":k,"order":{}})).collect();
     let doc = json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":1,
@@ -45,6 +49,11 @@ fn plan_of_records(records: Vec<Value>) -> Result<ObjectPaintPlan, ObjectPaintPl
             "migration":"explicit-plan-required","referencePolicy":"unresolved","contexts":[{"contextId":"scene-root",
                 "layers":[{"layerUid":"L0","naturalPosition":0,"order":{}}],
                 "scopes":[{"frameScope":{"kind":"authored","frame":0},"elements":elements}]}]}});
+    let mut doc = doc;
+    if let Some(property) = pose {
+        doc["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"L0","strokeId":"anchor"},
+            "properties":[property]}]);
+    }
     let history = NativeObjectHistory::new("dabs", decode_storage_project(&serde_json::to_vec(&doc).unwrap()).unwrap()).unwrap();
     let snapshot = history.acquire_snapshot(history.content_revision()).unwrap();
     let pins = ObjectFrameSelector {
@@ -155,6 +164,39 @@ fn a_textured_pressure_ribbon_stamps_along_its_centreline_through_its_profile() 
         assert_eq!(got.len(), want.len(), "dab {made}");
         for (g, w) in got.iter().zip(&want) {
             assert!((g[0] - w[0]).abs() <= 1.5e-6 && (g[1] - w[1]).abs() <= 1.5e-6, "dab {made}: {g:?} != {w:?}");
+        }
+    }
+}
+
+fn dab_points(plan: &ObjectPaintPlan) -> Vec<Vec<[f64; 2]>> {
+    ordered_entries(plan).skip(1).map(|e| match e {
+        PaintEntry::Dab(d) => d.svg_contour.as_ref().unwrap().segments().iter().map(|s| s.point).collect(),
+        _ => panic!("a dab"),
+    }).collect()
+}
+
+#[test]
+fn a_posed_textured_anchor_stamps_its_stored_stroke_and_poses_every_dab_with_it() {
+    // The baseline stamps the unposed stroke once and the dabs then move with it: a pose moves the texture, it
+    // never re-rolls it.
+    for anchor in [line_record(Some(seeded()), false), ribbon_record(7)] {
+        let still = dab_points(&plan_of(anchor.clone()).unwrap());
+        assert!(!still.is_empty());
+        let moved = dab_points(&plan_posed(vec![anchor.clone()], Some(json!({"property":"position","static":[30,10]}))).unwrap());
+        assert_eq!(moved.len(), still.len(), "the same dabs");
+        for (m, s) in moved.iter().zip(&still) {
+            for (m, s) in m.iter().zip(s) {
+                assert!((m[0] - s[0] - 30.0).abs() <= 1e-6 && (m[1] - s[1] - 10.0).abs() <= 1e-6, "{m:?} is {s:?} moved");
+            }
+        }
+        let turned = dab_points(&plan_posed(vec![anchor], Some(json!({"property":"rotation","static":[90]}))).unwrap());
+        assert_eq!(turned.len(), still.len(), "the same dabs");
+        // A quarter turn carries every chord of every dab onto its perpendicular.
+        for (t, s) in turned.iter().zip(&still) {
+            for k in 1..s.len() {
+                let (ds, dt) = ([s[k][0] - s[0][0], s[k][1] - s[0][1]], [t[k][0] - t[0][0], t[k][1] - t[0][1]]);
+                assert!((dt[0] + ds[1]).abs() <= 1e-6 && (dt[1] - ds[0]).abs() <= 1e-6, "{dt:?} is {ds:?} turned");
+            }
         }
     }
 }
