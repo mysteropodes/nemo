@@ -101,9 +101,9 @@ pub(crate) enum SetupError {
     ObjectScope {
         layer_uid: String,
     },
-    /// Raster items and text blocks of the layer: the baseline moves a raster with the frames it clones
-    /// into the component, but the component record has no `items` member and item admission resolves
-    /// layers of the scene only, so they cannot follow (stable code `component-convert-items`).
+    /// Text on a layer with text animators, bitmap-brush or brush-texture rasters and mesh-bound
+    /// images of the layer: the baseline moves them with the frames it clones, but no placed
+    /// component paints them yet (stable code `component-convert-items`). Plain items move.
     ItemsUnavailable {
         layer_uid: String,
     },
@@ -349,14 +349,6 @@ pub(crate) fn layer_index(document: &ObjectDocument, uid: &str) -> Result<usize,
         .ok_or_else(|| SetupError::UnknownLayer(uid.to_string()))
 }
 
-/// Whether the scene layer holds raster items or text blocks (`document.items`).
-pub(crate) fn items_on(document: &ObjectDocument, uid: &str) -> bool {
-    document.item_records().is_some_and(|items| {
-        items
-            .targets()
-            .any(|target| target.layer_uid() == uid && target.context_id() == SCENE_CONTEXT)
-    })
-}
 
 /// A live edge: the baseline lifts `inPoint` / `outPoint` only when `!= null`.
 fn live_edge(edge: Presence<Option<i64>>) -> Presence<Option<i64>> {

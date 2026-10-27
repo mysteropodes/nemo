@@ -11,16 +11,20 @@
 //! open path's first handle-in and last handle-out do not reach the drawn path and are emitted as
 //! zero, which no player draws. A stored camera bakes into every anchor and handle of the frame,
 //! as `lottieCamMatrix` does (the camera matrix of the frame, its linear part for handles). Dropped
-//! as the baseline drops them: rasters, masks (never paint commands) and zero-opacity strokes.
-//! Refused, until later increments admit them with oracle rows: text, components, duplicators,
-//! bitmap brush, video, legacy fill records and a layer opacity factor other than one (the baseline
-//! writes every layer at full opacity, `ks.o` 100). A seeded brush-texture anchor's dabs are written as
+//! as the baseline drops them: rasters (bitmap-brush ink included), video frames, masks (never paint
+//! commands) and zero-opacity strokes. As
+//! `getEffectiveStrokesRendered` returns them, a placed component is its inner strokes on the host
+//! layer under camera then symMatrix, and a duplicator its copies (factored opacity, hue-turned
+//! paints). A text block is the baseline's vector text: each painted contour a closed fill-only shape
+//! in the block colour (`buildGlyphPaths`). Refused, until later increments admit them with oracle
+//! rows: legacy fill records. A layer's own opacity is not written: the baseline writes every
+//! layer at full opacity (`ks.o` 100) and each shape at its stroke's own opacity. A seeded brush-texture anchor's dabs are written as
 //! the dabs the baseline stores for it: each a fill-only shape at the dab opacity, its colour through
 //! the hex Paper stores (`toCSS(true)`) and its outline through the three-decimal rounding `serP`
 //! stores (`_r3`), right after the anchor's own slot.
+use crate::object_render_scene::object_scene_producer_text::fill_rgba;
 use crate::object_render_scene::{ordered_entries, ObjectPaintPlan, PaintEntry};
-use crate::render_geometry::ClosedCubicPath;
-use kurbo::{BezPath, PathEl, Point};
+use kurbo::BezPath;
 use serde_json::{json, Number, Value};
 
 /// The range and the document facts the baseline reads from `state`.
@@ -32,6 +36,9 @@ pub(crate) struct LottieSpec {
     pub(crate) width: u32,
     pub(crate) height: u32,
     pub(crate) background: String,
+    /// `state.exportIncludeShadowGuides` (off by default): without it, `lottieBuild` filters out every
+    /// Shadow Brush construction stroke (`sd.channelTag === 'shadow'`).
+    pub(crate) include_shadow_guides: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,171 +76,10 @@ struct Shown {
     opacity: f64,
 }
 
-fn number(value: f64) -> Result<Value, LottieExportError> {
-    Number::from_f64(value)
-        .map(Value::Number)
-        .ok_or(LottieExportError::NonFinite)
-}
-fn pair(value: [f64; 2]) -> Result<Value, LottieExportError> {
-    Ok(Value::Array(vec![number(value[0])?, number(value[1])?]))
-}
-fn float(value: &Number) -> Result<f64, LottieExportError> {
-    value
-        .as_f64()
-        .filter(|v| v.is_finite())
-        .ok_or(LottieExportError::NonFinite)
-}
+#[path = "native_vector_export_lottie_shapes.rs"]
+mod shapes;
+use shapes::{number, float, shape_value, dab_shape, rgb, blend_code, identity_ks};
 
-/// `lottieShapeValue`: `i`, `o`, `v` and `c` from the drawn path (one subpath of cubic segments, as
-/// `build_path` writes it; a closed path's closing curve ends on its first point), through the
-/// frame's camera matrix `[a, b, c, d, e, f]` when one is stored (`lottieCamPoint`/`lottieCamVector`).
-fn shape_value(
-    path: &BezPath,
-    camera: Option<[f64; 6]>,
-    source_object_index: usize,
-) -> Result<Value, LottieExportError> {
-    let unsupported = |reason| LottieExportError::Unsupported {
-        source_object_index,
-        reason,
-    };
-    let (mut v, mut i, mut o): (Vec<[f64; 2]>, Vec<[f64; 2]>, Vec<[f64; 2]>) =
-        (vec![], vec![], vec![]);
-    let mut closed = false;
-    let rel = |c: Point, p: [f64; 2]| [c.x - p[0], c.y - p[1]];
-    for element in path.elements() {
-        if closed {
-            return Err(unsupported(
-                "a drawn path with several subpaths has no single Lottie shape",
-            ));
-        }
-        match *element {
-            PathEl::MoveTo(p) if v.is_empty() => {
-                v.push([p.x, p.y]);
-                i.push([0.0, 0.0]);
-                o.push([0.0, 0.0]);
-            }
-            PathEl::LineTo(p) if !v.is_empty() => {
-                v.push([p.x, p.y]);
-                i.push([0.0, 0.0]);
-                o.push([0.0, 0.0]);
-            }
-            PathEl::CurveTo(c1, c2, p) if !v.is_empty() => {
-                let last = v.len() - 1;
-                o[last] = rel(c1, v[last]);
-                let to = [p.x, p.y];
-                v.push(to);
-                i.push(rel(c2, to));
-                o.push([0.0, 0.0]);
-            }
-            PathEl::ClosePath if v.len() > 1 => {
-                // The closing curve's end repeats the first anchor: its handle-in belongs to anchor 0.
-                let first = v[0];
-                let last = v.len() - 1;
-                if v[last] == first {
-                    v.pop();
-                    o.pop();
-                    i[0] = i.pop().unwrap_or([0.0, 0.0]);
-                }
-                closed = true;
-            }
-            _ => return Err(unsupported("the drawn path is not one cubic subpath")),
-        }
-    }
-    if v.len() < 2 {
-        return Err(unsupported("the drawn path has fewer than two anchors"));
-    }
-    keyed(v, i, o, closed, camera)
-}
-/// `_r3` (app.js): the baseline stores outline coordinates rounded to three decimals, halves toward +∞.
-fn r3(value: f64) -> f64 {
-    (value * 1000.0 + 0.5).floor() / 1000.0
-}
-/// A produced dab as the baseline stores it (`serP`): its own anchors and relative handles through `_r3`.
-fn dab_shape(
-    contour: Option<&ClosedCubicPath>,
-    closed: bool,
-    source_object_index: usize,
-    camera: Option<[f64; 6]>,
-) -> Result<Value, LottieExportError> {
-    let contour = contour.ok_or(LottieExportError::Unsupported {
-        source_object_index,
-        reason: "a brush-texture dab has no single outline",
-    })?;
-    let rounded = |p: [f64; 2]| [r3(p[0]), r3(p[1])];
-    let segments = contour.segments();
-    keyed(
-        segments.iter().map(|s| rounded(s.point)).collect(),
-        segments.iter().map(|s| rounded(s.handle_in)).collect(),
-        segments.iter().map(|s| rounded(s.handle_out)).collect(),
-        closed,
-        camera,
-    )
-}
-/// The keyed shape value through the frame's camera matrix (`lottieCamPoint`/`lottieCamVector`).
-fn keyed(
-    mut v: Vec<[f64; 2]>,
-    mut i: Vec<[f64; 2]>,
-    mut o: Vec<[f64; 2]>,
-    closed: bool,
-    camera: Option<[f64; 6]>,
-) -> Result<Value, LottieExportError> {
-    if let Some([a, b, c, d, e, f]) = camera {
-        let linear = |p: [f64; 2]| [a * p[0] + c * p[1], b * p[0] + d * p[1]];
-        v.iter_mut().for_each(|p| {
-            *p = {
-                let l = linear(*p);
-                [l[0] + e, l[1] + f]
-            }
-        });
-        i.iter_mut()
-            .chain(o.iter_mut())
-            .for_each(|h| *h = linear(*h));
-    }
-    let list = |values: &[[f64; 2]]| {
-        values
-            .iter()
-            .map(|value| pair(*value))
-            .collect::<Result<Vec<_>, _>>()
-    };
-    Ok(json!({"i": list(&i)?, "o": list(&o)?, "v": list(&v)?, "c": closed}))
-}
-
-/// `lottieHexToRGBA(hex, 1)`: the colour's channels with alpha one.
-fn rgb(r: &Number, g: &Number, b: &Number) -> Result<Value, LottieExportError> {
-    Ok(Value::Array(vec![
-        number(float(r)?)?,
-        number(float(g)?)?,
-        number(float(b)?)?,
-        json!(1),
-    ]))
-}
-
-/// `lottieBmCode`: the blend-mode order lottie-web expects; anything else is Normal.
-fn blend_code(mode: Option<&str>) -> u32 {
-    const MODES: [&str; 15] = [
-        "multiply",
-        "screen",
-        "overlay",
-        "darken",
-        "lighten",
-        "colorDodge",
-        "colorBurn",
-        "hardLight",
-        "softLight",
-        "difference",
-        "exclusion",
-        "hue",
-        "saturation",
-        "color",
-        "luminosity",
-    ];
-    mode.and_then(|mode| MODES.iter().position(|known| *known == mode))
-        .map_or(0, |at| at as u32 + 1)
-}
-
-fn identity_ks() -> Value {
-    json!({"o":{"a":0,"k":100},"r":{"a":0,"k":0},"p":{"a":0,"k":[0,0,0]},"a":{"a":0,"k":[0,0,0]},"s":{"a":0,"k":[100,100,100]}})
-}
 
 /// `lottiePathLayer` for one slot run: the path keyed per frame, then stroke, fill and the identity transform.
 fn path_layer(
@@ -269,10 +115,94 @@ fn path_layer(
     )
 }
 
+/// One drawn stroke dict as `lottieBuild` shows it, or `None` when its filter drops it. A macro, not a
+/// function: the record type belongs to the evaluation layer, which this export layer may read but not name.
+macro_rules! shown_of {
+    ($record:expr, $path:expr, $index:expr, $camera:expr, $shadows:expr) => {{
+        let (record, path, index, camera): (_, &BezPath, usize, _) = ($record, $path, $index, $camera);
+        let shown: Result<Option<Shown>, LottieExportError> = 'shown: {
+                if record.family != VECTOR_FAMILY {
+                    break 'shown Err(LottieExportError::Unsupported {
+                        source_object_index: index,
+                        reason: "legacy fill records have no admitted Lottie representation yet",
+                    });
+                }
+                // `state.exportIncludeShadowGuides || sd.channelTag !== 'shadow'`.
+                let shadow = record
+                    .vector_ext
+                    .value()
+                    .and_then(|e| e.shadow.value())
+                    .is_some_and(|s| s.channel_tag == "shadow");
+                if shadow && !$shadows {
+                    break 'shown Ok(None);
+                }
+                let body = record.vector().ok_or(LottieExportError::Unsupported {
+                    source_object_index: index,
+                    reason: "vector body missing",
+                })?;
+                // `sd.opacity !== 0`: a fully transparent stroke is not exported.
+                let opacity = float(&body.opacity)?;
+                if opacity == 0.0 {
+                    break 'shown Ok(None);
+                }
+                let stroke = if body.has_real_stroke {
+                    // A missing stroke colour is `lottieHexToRGBA(undefined)`: white.
+                    let colour = match body.stroke.value().and_then(|paint| paint.as_ref()) {
+                        Some(paint) => rgb(&paint.r, &paint.g, &paint.b)?,
+                        None => json!([1, 1, 1, 1]),
+                    };
+                    let cap = match body.stroke_cap.as_str() {
+                        "round" => 2,
+                        "square" => 3,
+                        _ => 1,
+                    };
+                    let join = match body.stroke_join.as_str() {
+                        "round" => 2,
+                        "bevel" => 3,
+                        _ => 1,
+                    };
+                    Some((colour, float(&body.stroke_width)?, cap, join))
+                } else {
+                    None
+                };
+                let fill = match record.solid_fill() {
+                    Some(paint) => Some(rgb(&paint.r, &paint.g, &paint.b)?),
+                    None => None,
+                };
+                Ok(Some(Shown {
+                    shape: shape_value(path, camera, index)?,
+                    stroke,
+                    fill,
+                    opacity,
+                }))
+        };
+        shown
+    }};
+}
+
+fn host_opacity(plan: &ObjectPaintPlan, host: usize) -> Result<f64, LottieExportError> {
+    plan.packet()
+        .layer_opacity(host)
+        .map_err(|_| LottieExportError::UnsupportedLayer {
+            source_layer_index: host,
+            reason: "the host layer opacity is unavailable",
+        })
+}
+
+/// A layer's own opacity is never written: `lottieBuild` gives every layer `ks.o` 100 and each shape the
+/// stroke dict's own opacity, which no layer factor reaches.
+fn push(out: &mut [Vec<Shown>], layer: usize, shown: Shown) -> Result<(), LottieExportError> {
+    out.get_mut(layer)
+        .ok_or(LottieExportError::InvalidRange)?
+        .push(shown);
+    Ok(())
+}
+
 /// Every layer's shown strokes on one frame, in paint order.
 fn shown_by_layer(
     plan: &ObjectPaintPlan,
     layers: usize,
+    shadows: bool,
 ) -> Result<Vec<Vec<Shown>>, LottieExportError> {
     let frame = plan.packet().frame();
     let camera = plan
@@ -281,44 +211,63 @@ fn shown_by_layer(
         .map_err(|_| LottieExportError::CameraUnavailable { frame })?;
     let mut out: Vec<Vec<Shown>> = (0..layers).map(|_| Vec::new()).collect();
     for entry in ordered_entries(plan) {
-        let refuse = |source_object_index, reason| {
-            Err(LottieExportError::Unsupported {
-                source_object_index,
-                reason,
-            })
-        };
         let command = match entry {
             PaintEntry::Contour(command) => command,
             // `lottieBuild` drops rasters (and with them bitmap-brush companions).
             PaintEntry::Raster(_) => continue,
+            // Native text is the baseline's vector text: `buildGlyphPaths` makes each painted contour a
+            // closed path filled with the block colour, no stroke, at its own opacity, in painted order.
             PaintEntry::Text(text) => {
-                return refuse(
-                    text.source_index,
-                    "text has no admitted Lottie representation yet",
-                )
+                let host = host_opacity(plan, text.layer_index)?;
+                let [r, g, b, _] = fill_rgba(text.item.color(), 1.0).map_err(|_| {
+                    LottieExportError::Unsupported {
+                        source_object_index: text.source_index,
+                        reason: "text colour has no Lottie representation",
+                    }
+                })?;
+                let channel = |c: u8| number(f64::from(c) / 255.0);
+                // A scene block's glyph opacity carries its layer's factor, which the dict never has.
+                if host == 0.0 && text.item.painted().next().is_some() {
+                    return Err(LottieExportError::UnsupportedLayer {
+                        source_layer_index: text.layer_index,
+                        reason: "text on a fully transparent layer has no recoverable glyph opacity",
+                    });
+                }
+                for (contour, _) in text.item.painted() {
+                    // `sd.opacity !== 0`; a placed or animated glyph carries its own factor.
+                    if contour.opacity == 0.0 {
+                        continue;
+                    }
+                    let shown = Shown {
+                        shape: shape_value(contour.contour.path(), camera, text.source_index)?,
+                        stroke: None,
+                        fill: Some(Value::Array(vec![channel(r)?, channel(g)?, channel(b)?, json!(1)])),
+                        opacity: contour.opacity / host,
+                    };
+                    push(&mut out, text.layer_index, shown)?;
+                }
+                continue;
             }
+            // `getEffectiveStrokesRendered`: a placed component's `symbolId`-branch dicts on its host, and
+            // `applyLayerDuplicator`'s copies on theirs, drawn like any stroke.
             PaintEntry::Component(component) => {
-                return Err(LottieExportError::UnsupportedLayer {
-                    source_layer_index: component.host_layer_index,
-                    reason: "a placed component has no admitted Lottie representation yet",
-                })
+                let host = component.host_layer_index;
+                if let Some(shown) = shown_of!(&component.record, &component.path, host, camera, shadows)? {
+                    push(&mut out, host, shown)?;
+                }
+                continue;
             }
             PaintEntry::Duplicator(copy) => {
-                return refuse(
-                    copy.source_index,
-                    "duplicator copies have no admitted Lottie representation yet",
-                )
+                let host = copy.layer_index;
+                if let Some(shown) = shown_of!(&copy.record, &copy.path, copy.source_index, camera, shadows)? {
+                    push(&mut out, host, shown)?;
+                }
+                continue;
             }
             PaintEntry::Dab(dab) => {
                 // `sd.opacity !== 0`, as for any stroke.
                 if dab.opacity == 0.0 {
                     continue;
-                }
-                if dab.layer_opacity != 1.0 {
-                    return Err(LottieExportError::UnsupportedLayer {
-                        source_layer_index: dab.layer_index,
-                        reason: "a layer opacity factor has no admitted Lottie representation yet",
-                    });
                 }
                 let [r, g, b, _] = dab.svg_rgba.ok_or(LottieExportError::NonFinite)?;
                 let hex = |c: f64| number((c.clamp(0.0, 1.0) * 255.0).round() / 255.0);
@@ -333,77 +282,19 @@ fn shown_by_layer(
                     .push(shown);
                 continue;
             }
-            PaintEntry::Video(index) => {
-                return Err(LottieExportError::UnsupportedLayer {
-                    source_layer_index: plan.video_slots()[index].layer_index,
-                    reason: "video has no Lottie representation",
-                })
-            }
+            // A video frame is never a stroke dict (the baseline draws it beside the strokes), so
+            // `lottieBuild` writes nothing for it.
+            PaintEntry::Video(_) => continue,
             #[cfg(all(feature = "application", feature = "project_media_codec"))]
-            PaintEntry::Brush(_) => {
-                return refuse(
-                    plan.first_brush_source().unwrap_or(0),
-                    "bitmap brush paint has no admitted Lottie representation yet",
-                )
-            }
+            // A bitmap brush's ink is its raster companions, which `lottieBuild` filters (`!sd.isRaster`);
+            // its vector anchor is written as its own contour.
+            PaintEntry::Brush(_) => continue,
         };
         let source = command.source();
-        let record = source.record();
-        let index = source.source_object_index();
-        if record.family != VECTOR_FAMILY {
-            return refuse(
-                index,
-                "legacy fill records have no admitted Lottie representation yet",
-            );
+        let layer = source.source_layer_index();
+        if let Some(shown) = shown_of!(source.record(), command.path(), source.source_object_index(), camera, shadows)? {
+            push(&mut out, layer, shown)?;
         }
-        let body = record.vector().ok_or(LottieExportError::Unsupported {
-            source_object_index: index,
-            reason: "vector body missing",
-        })?;
-        // `sd.opacity !== 0`: a fully transparent stroke is not exported.
-        let opacity = float(&body.opacity)?;
-        if opacity == 0.0 {
-            continue;
-        }
-        if command.layer_opacity() != 1.0 {
-            return Err(LottieExportError::UnsupportedLayer {
-                source_layer_index: source.source_layer_index(),
-                reason: "a layer opacity factor has no admitted Lottie representation yet",
-            });
-        }
-        let layer = out
-            .get_mut(source.source_layer_index())
-            .ok_or(LottieExportError::InvalidRange)?;
-        let stroke = if body.has_real_stroke {
-            // A missing stroke colour is `lottieHexToRGBA(undefined)`: white.
-            let colour = match body.stroke.value().and_then(|paint| paint.as_ref()) {
-                Some(paint) => rgb(&paint.r, &paint.g, &paint.b)?,
-                None => json!([1, 1, 1, 1]),
-            };
-            let cap = match body.stroke_cap.as_str() {
-                "round" => 2,
-                "square" => 3,
-                _ => 1,
-            };
-            let join = match body.stroke_join.as_str() {
-                "round" => 2,
-                "bevel" => 3,
-                _ => 1,
-            };
-            Some((colour, float(&body.stroke_width)?, cap, join))
-        } else {
-            None
-        };
-        let fill = match record.solid_fill() {
-            Some(paint) => Some(rgb(&paint.r, &paint.g, &paint.b)?),
-            None => None,
-        };
-        layer.push(Shown {
-            shape: shape_value(command.path(), camera, index)?,
-            stroke,
-            fill,
-            opacity,
-        });
     }
     Ok(out)
 }
@@ -428,7 +319,7 @@ pub(crate) fn build_lottie(
     let layers = plans[0].packet().source_layers();
     let frames = plans
         .iter()
-        .map(|plan| shown_by_layer(plan, layers.len()))
+        .map(|plan| shown_by_layer(plan, layers.len(), spec.include_shadow_guides))
         .collect::<Result<Vec<_>, _>>()?;
     let mut ind = 1u32;
     let mut out = vec![

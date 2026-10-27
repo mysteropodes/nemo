@@ -40,6 +40,7 @@ fn expected_paths(p: &ObjectPaintPlan) -> Vec<(&[CubicSegment], [f64; 4])> {
             PaintEntry::Raster(_) => panic!("positive SVG oracle requires a raster-free plan"),
             PaintEntry::Duplicator(_) => panic!("original fixture gained unexpected Duplicator"),
             PaintEntry::Video(_) => panic!("video-free fixture gained unexpected Video"),
+            PaintEntry::Dab(_) => panic!("dab-free fixture gained an unexpected brush-texture dab"),
             #[cfg(all(feature = "application", feature = "project_media_codec"))]
             PaintEntry::Brush(_) => panic!("non-brush fixture gained unexpected bitmap brush"),
             PaintEntry::Component(_) => {

@@ -84,16 +84,22 @@ fn unavailable() -> DispatchErrorCode {
 }
 impl ObjectSnapshot {
     fn text_target_valid(&self, target: &ObjectTarget) -> Result<(), DispatchErrorCode> {
-        if target.context_id != "scene-root" {
-            return Err(unavailable());
-        }
-        if !self.document().valid_target(target) || target.frame() >= self.document().total_frames()
-        {
+        // The scene or a declared component (a placed component paints its held text): the
+        // layers and frames are that context's own.
+        let (layers, total_frames) = if target.context_id == "scene-root" {
+            (self.document().layers(), self.document().total_frames())
+        } else {
+            let component = self
+                .document()
+                .component_set()
+                .and_then(|set| set.component(&target.context_id))
+                .ok_or_else(unavailable)?;
+            (component.layers(), component.total_frames())
+        };
+        if !self.document().valid_target(target) || target.frame() >= total_frames {
             return Err(invalid());
         }
-        if self
-            .document()
-            .layers()
+        if layers
             .iter()
             .filter(|l| l.layer_uid() == target.layer_uid())
             .count()

@@ -310,6 +310,27 @@ pub(crate) fn paint_style(
     Ok(style)
 }
 
+/// The copy as `applyLayerDuplicator` leaves the baseline dict: `opacity * opacityFactor`, and the
+/// stroke rotated by `hexHueRotate` like the fill already is. Exporters that read dicts read this.
+pub(crate) fn baseline_copy(
+    record: &crate::object_frame_packet::ObjectRecord,
+    opacity_factor: f64,
+    hue: f64,
+) -> Result<crate::object_frame_packet::ObjectRecord, &'static str> {
+    use crate::evaluation::object_component_kernels::duplicator_placement_color::rotate_fill_hue;
+    let mut copy = record.clone();
+    if let crate::object_frame_packet::Presence::Present(body) = &mut copy.vector {
+        let opacity = body.opacity.as_f64().ok_or("duplicator opacity is not finite")? * opacity_factor;
+        body.opacity =
+            serde_json::Number::from_f64(opacity).ok_or("duplicator opacity is not finite")?;
+        if let crate::object_frame_packet::Presence::Present(Some(stroke)) = &mut body.stroke {
+            *stroke =
+                rotate_fill_hue(stroke, hue).map_err(|_| "duplicator stroke hue is unavailable")?;
+        }
+    }
+    Ok(copy)
+}
+
 pub(crate) fn paint_order(
     packet: &ObjectFramePacket,
     source: &crate::object_frame_packet::ObjectTarget,

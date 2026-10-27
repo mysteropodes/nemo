@@ -173,8 +173,6 @@ test('chrome, cancellation, Escape and lost capture remain usable or abort witho
 });
 test('unsupported brush cells are explicit without native or legacy fallback',async()=>{
  const cases=[s=>Object.assign(s,{tool:'fillbrush',fillBrushMode:'front',fillBrushSize:40}),s=>s.bitmapBrushOn=true,s=>s.brushPreset='my-custom-brush',s=>Object.assign(s,{brushPreset:'charcoal-smooth',symmetryEnabled:true}),
-  // Trim Stroke Ends commits natively for a plain stroke and a lone pressure ribbon; a trimmed ribbon's symmetry copies stay refused.
-  s=>Object.assign(s,{trimStrokeEnds:true,vectorBrush:true,fillEnabled:false,symmetryEnabled:true,symmetryExtend:true}),
   // With stop-at-axis symmetry the original trims the whole stroke before clipping; native would trim the clipped one.
   s=>Object.assign(s,{trimStrokeEnds:true,symmetryEnabled:true,symmetryExtend:false}),
   // Plain-stroke symmetry commits natively since G23 (#2361); with a pressure brush it stays refused.
@@ -578,6 +576,14 @@ test('Fill Brush with Labs on: predictive leaves the fill shape alone, multi-fra
  // multiframeTargets: the other selected frames of the drawn one (3 and 5; 0 is the drawn frame, 99 is out of range).
  assert.deepEqual(plain(many.calls[0].payload.stamps),[3,5]);assert.deepEqual(plain(off.calls[0].payload.stamps),[]);
  assert.deepEqual(toasts,['labsToastMultiframePrefix2labsToastMultiframeSuffix']);
+});
+test('a trimmed pressure ribbon with symmetry sends its copies in the one trimmed createMany; a radial copy never clips',async()=>{
+ const f=await fixture();Object.assign(f.root.state,{trimStrokeEnds:true,trimStrokeEndsMax:24,vectorBrush:true,fillEnabled:false,
+  symmetryEnabled:true,symmetryMode:'radial',symmetryExtend:false,symmetryRadialSectors:3,symmetryRadialCenter:{x:160,y:90}});
+ send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:.4});
+ await settled(f);assert.equal(f.calls.length,1,f.log.join(','));const p=plain(f.calls[0].payload);
+ assert.deepEqual([p.command,p.trimEnds,p.records.length],['object.vector.createMany',24,3]);
+ assert.ok(p.records.every(r=>r.vectorExt.pressure&&r.vectorExt.pressure.centerSegments.length>1),'the ribbon and its two rotations');
 });
 test('a trimmed pressure ribbon with multi-frame draw sends one trimmed batch: its cell, then each stamp',async()=>{
  const f=await fixture();multiframe(f,true);Object.assign(f.root.state,{trimStrokeEnds:true,trimStrokeEndsMax:24,vectorBrush:true});
