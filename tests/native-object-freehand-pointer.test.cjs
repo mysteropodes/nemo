@@ -52,7 +52,10 @@ async function fixture(tool='draw',native=true){
    if(q.action==='subscribe'){binding=q.binding;return q.binding;}
    if(q.action==='acknowledge'){if(ack)await ack.promise;return null;}if(q.action==='disconnect')return null;
   }
-  assert.equal(command,'nemo_native_dispatch');calls.push(structuredClone(q));assert.equal(q.operation,'command.document.object.vector.edit');
+  assert.equal(command,'nemo_native_dispatch');calls.push(structuredClone(q));
+  if(q.operation==='command.document.object.fill.brush'){assert.equal(q.expectedRevision,revision);revision++;
+   return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1}};}
+  assert.equal(q.operation,'command.document.object.vector.edit');
   const prior=receipts.get(q.requestId);if(prior){assert.deepEqual(prior.request,q);const r=structuredClone(prior.response);if(replyChange)replyChange(r);return r;}
   assert.equal(q.expectedRevision,revision);assert.equal(q.payload.command,'object.vector.create');assert.equal(q.payload.record.target.strokeId,'');
   if(refusal)return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:false,error:{code:refusal,message:'Native refusal'}};
@@ -94,6 +97,7 @@ async function fixture(tool='draw',native=true){
   'buildVariableWidthPath','buildClosedRingOutline','_polyClosestPair'])vm.runInContext(baselineFunction(tools,name),context,{filename:'tools.js:'+name});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/stroke-modeler.js'),'utf8'),context,{filename:'stroke-modeler.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-paint.js'),'utf8'),context,{filename:'native-object-draw-paint.js'});
+ root.NemoNativeFillDesktop=require('../src/js/adapters/native-fill-desktop.js');
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-shape-tool.js'),'utf8'),context,{filename:'native-object-shape-tool.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/draw-bridge.js'),'utf8'),context,{filename:'draw-bridge.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/shape-bridge.js'),'utf8'),context,{filename:'shape-bridge.js'});
@@ -453,4 +457,28 @@ test('Shadow mode commits construction ink in the active swatch with its channel
  const none=await fixture();none.root.SMShadowBrush={activeSwatch:()=>null};none.root.state.shadowMode=true;
  send(none,'pointerdown',20,20);send(none,'pointerup',60,50);assert.equal(none.calls.length,0);
  assert.ok(none.log.some(s=>/Shadow Brush swatch is unavailable/.test(s)),none.log.join(','));
+});
+
+// #2361 Fill Brush: draw-bridge's isFillBrush branch @1065e9d8. The samples' ribbon outline, filled in the Fill colour,
+// goes to the native Fill Brush command with the chosen placement; in Shadow mode it is the centreline in the swatch.
+test('Fill Brush commits its outline through the native Fill Brush command with the chosen placement',async()=>{
+ for(const mode of ['below','merge','above']){
+  const f=await fixture('fillbrush');Object.assign(f.root.state,{fillBrushMode:mode,fillBrushSize:40,strokeEnabled:false,fillEnabled:false,brushPreset:'charcoal-smooth',trimStrokeEnds:true});
+  send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:0});
+  await settled(f);assert.equal(f.calls.length,1,f.log.join(','));const q=plain(f.calls[0]);
+  assert.equal(q.operation,'command.document.object.fill.brush');
+  assert.deepEqual([q.payload.placement,q.payload.color,q.payload.opacity],[mode,'#44556680',0.5],'the Fill colour, whatever Stroke/Fill say, at the brush opacity');
+  assert.ok(q.payload.outline.length>=4&&q.payload.outline.every((s)=>['point','handleIn','handleOut'].every((k)=>s[k].length===2)),'a closed ribbon outline');
+  assert.equal(f.root.state.layers[0].frames.length,0,'no legacy frame was written');
+ }
+ const shadow=await fixture('fillbrush');shadow.root.SMShadowBrush={activeSwatch:()=>({id:'sh3',ordinal:3,color:'#ffdd00'})};Object.assign(shadow.root.state,{fillBrushMode:'below',fillBrushSize:40,shadowMode:true});
+ send(shadow,'pointerdown',20,20,{pointerType:'pen',pressure:.5});shadow.advance();send(shadow,'pointermove',50,30,{pointerType:'pen',pressure:.8});shadow.advance();send(shadow,'pointerup',80,45,{pointerType:'pen',pressure:0});
+ await settled(shadow);const r=plain(shadow.calls[0].payload.record);
+ assert.deepEqual([shadow.calls[0].payload.command,r.geometry.closed,r.vectorExt.shadow.shadowSwatchId,r.fill,r.vector.strokeWidth],['object.vector.create',false,'sh3',null,1],
+   'Shadow mode inks the Fill Brush centreline in the swatch');
+ for(const change of [s=>s.symmetryEnabled=true,s=>s.maskMode=true,s=>s.fillBrushMode='front']){
+  const f=await fixture('fillbrush');Object.assign(f.root.state,{fillBrushMode:'below',fillBrushSize:40});change(f.root.state);
+  const e=send(f,'pointerdown',20,20);send(f,'pointerup',60,50);assert.equal(e.prevented,true);assert.equal(f.calls.length,0);
+  assert.ok(f.log.some((s)=>/Fill Brush combination is unavailable/.test(s)),f.log.join(','));
+ }
 });

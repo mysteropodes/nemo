@@ -194,5 +194,8 @@
   function commandOf(operation) { const entry = spec(operation); return entry ? entry[0] : null; }
   function members(operation) { const entry = spec(operation); return entry ? entry[2].map((m) => m[0]) : null; }
   function kinds(operation) { const entry = spec(operation); return entry ? entry[2].map((m) => m.slice()) : null; }
-  return Object.freeze({ OPERATIONS, admitted, requiresRevision: admitted, payload, result, correlate, paths: own.paths, compose, commandOf, members, kinds, bytes });
+  // The command runner's bound for an edit request: a Fill Brush outline (up to 256 segments) gets the vector-geometry bound,
+  // as the SDK does (native-object-vector-contract.js); every other edit stays at 4096.
+  const requestByteLimit = (op) => (op === PREFIX + 'fill.brush' ? 65536 : 4096);
+  return Object.freeze({ OPERATIONS, admitted, requiresRevision: admitted, payload, result, correlate, paths: own.paths, compose, commandOf, members, kinds, bytes, requestByteLimit });
 }));

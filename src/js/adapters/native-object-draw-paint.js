@@ -39,5 +39,30 @@
     out.channelTag='shadow';out.shadowSwatchId=swatch.id;
     return out;
   }
-  return Object.freeze({textureRibbon:textureRibbon,texturePlain:texturePlain,shadow:shadow});
+  // The active native swatch a Shadow-mode commit inks with; without one the gesture refuses.
+  function shadowStyle(root,s,out){
+    if(!s.shadowMode)return out;
+    var sw=root.SMShadowBrush&&root.SMShadowBrush.activeSwatch();
+    if(!(sw&&typeof sw.id==='string'&&sw.id&&/^#(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/.test(sw.color)))throw new Error('The Shadow Brush swatch is unavailable.');
+    out.shadowSwatch={id:sw.id,color:sw.color};return out;
+  }
+  // Pen and Shape tag the committed path only (tools.js tags at pointer-up); the live preview keeps the drawing colours.
+  function shade(out,final){var sw=out.shadowSwatch;delete out.shadowSwatch;return sw&&final?shadow(out,sw,false):out;}
+  // draw-bridge.js Fill Brush branch: the samples' centreline and width profile (buildCenterSegmentsFromRawStroke),
+  // outlined as one closed ribbon (rebuildVectorBrushOutline; a Fill Brush shape has no keyline), filled in the Fill
+  // colour at the brush opacity and tagged isFillShape. In Shadow mode applyShadowBrushTag turns it back into its
+  // centreline: construction ink like any other Shadow stroke (the flag has no record slot on that route and only ever
+  // matters to an unstroked fill).
+  function fillBrush(root,pts,widths,style,segments){
+    var cs=root.buildCenterSegmentsFromRawStroke(pts,widths,style.smoothing);
+    var sampled=root.sampleVectorBrushCenterline(cs,cs.widthProfile),path=root.buildVariableWidthPath(sampled.pts,sampled.widths);
+    if(!path)throw new Error('Native brush outline is unavailable.');
+    var out;
+    try{out={segments:segments(path),closed:true,strokeColor:null,hasRealStroke:false,strokeWidth:1,strokeCap:'butt',strokeJoin:'miter',
+      miterLimit:10,dashOffset:0,fillColor:style.fillColor,opacity:style.opacity/100,isFillShape:true};}finally{path.remove();}
+    if(!style.shadowSwatch)return out;
+    out.isVectorBrush=true;out.centerSegments=cs;delete out.isFillShape;
+    return shadow(out,style.shadowSwatch,false,style.brushSize);
+  }
+  return Object.freeze({textureRibbon:textureRibbon,texturePlain:texturePlain,shadow:shadow,shadowStyle:shadowStyle,shade:shade,fillBrush:fillBrush});
 }));

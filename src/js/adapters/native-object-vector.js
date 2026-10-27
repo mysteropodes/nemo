@@ -169,5 +169,6 @@
     if (!bindings.has(host)) bindings.set(host, create(session));
     return bindings.get(host);
   }
-  return Object.freeze({ create, desktop, verifyReadBack, stableTarget, OPERATIONS: Contract.OPERATIONS });
+  // statusOf: the shared rejected-command -> status mapping, for another command route (Fill Brush) to report alike.
+  return Object.freeze({ create, desktop, verifyReadBack, stableTarget, statusOf: failed, OPERATIONS: Contract.OPERATIONS });
 }));

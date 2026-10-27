@@ -8,7 +8,7 @@
   if(common)module.exports=api;else root.NemoNativeFillDesktop=api;
 }(typeof globalThis==='object'?globalThis:this,function(command,contract){
   'use strict';
-  const OP='command.document.object.fill.trace';
+  const OP='command.document.object.fill.trace',BRUSH='command.document.object.fill.brush';
   const PIN=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
   function hex(value){
     if(typeof value!=='string')throw new TypeError('Fill color is unavailable');
@@ -37,7 +37,24 @@
         return payload;
       });
     }
-    return Object.freeze({fill});
+    // The Fill Brush commit (#2361): the drawn outline placed by fillBrushMode, then the same-colour merge, natively.
+    async function brush(input){
+      const session=ports.current(),before=session&&session.info();
+      if(!session||!session.isActive()||!before||!ports.ready(session,before))throw command.fault('unavailable','Native Fill Brush is unavailable');
+      const target=ports.target(before);
+      if(!target||typeof target.layerUid!=='string')throw command.fault('unavailable','Native Fill Brush target is unavailable');
+      const pin=Object.fromEntries(PIN.map((key)=>[key,before[key]]));
+      const payload={command:'object.fill.brush',contextId:target.contextId||'scene-root',layerUid:target.layerUid,frame:target.frame,
+        outline:input.outline.map((s)=>({point:s.point.slice(),handleIn:s.handleIn.slice(),handleOut:s.handleOut.slice()})),
+        color:hex(input.color),opacity:input.opacity,placement:input.placement};
+      contract.payload(BRUSH,payload);
+      return command.create(session,'fill',contract).execute(BRUSH,(current)=>{
+        if(ports.current()!==session||!ports.ready(session,current)||!PIN.every((key)=>pin[key]===current[key]))
+          throw command.fault('stale_owner','Fill Brush target changed before dispatch');
+        return payload;
+      });
+    }
+    return Object.freeze({fill,brush});
   }
   function current(root){return root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);}
   function nativeMode(root){
