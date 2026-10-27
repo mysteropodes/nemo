@@ -18,6 +18,7 @@ pub(super) fn request_limit(operation: &str) -> usize {
         super::native_clipboard_transport::MESSAGE_BYTES
     } else if operation == "command.document.object.vector.edit"
         || operation == "command.document.object.fill.brush"
+        || operation == "command.document.object.brush.bitmap.stroke"
     {
         MAX_REQUEST_BYTES
     } else {

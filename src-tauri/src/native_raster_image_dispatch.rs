@@ -11,9 +11,12 @@ pub(super) enum ImagePhase<'a> {
     Probe,
     Commit(&'a [u8]),
 }
+/// #2361: a bitmap-brush Draw stroke resolves its staged PNG through this same scoped route.
+const BITMAP_STROKE: &str = "command.document.object.brush.bitmap.stroke";
 pub(super) fn is_image_import(request: &NativeApplicationRequest) -> bool {
     request.operation == "command.document.object.asset.attach"
         && request.payload.get("placement").is_some()
+        || request.operation == BITMAP_STROKE
 }
 pub(super) fn invoke_image(
     application: &mut dyn NativeDispatch,
@@ -28,8 +31,11 @@ pub(super) fn invoke_image(
         serde_json::to_value(request).map_err(|_| "native image request invalid")?,
     )
     .map_err(|_| "native image request invalid")?;
+    let stroke = request.operation() == BITMAP_STROKE;
     let response = match phase {
+        ImagePhase::Commit(bytes) if stroke => Some(owner.bitmap_stroke(&request, bytes)?),
         ImagePhase::Commit(bytes) => Some(owner.image_import(&request, bytes)?),
+        ImagePhase::Probe | ImagePhase::Regular if stroke => owner.bitmap_stroke_status(&request)?,
         ImagePhase::Probe | ImagePhase::Regular => owner.image_status(&request)?,
     };
     response

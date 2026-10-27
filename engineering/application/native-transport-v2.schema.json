@@ -8294,6 +8294,23 @@
         {
           "allOf": [
             {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.brush.bitmap.stroke"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectBrushBitmapStrokePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
               "$ref": "#/$defs/ForbiddenRevisionRequest"
             },
             {
@@ -13132,6 +13149,164 @@
               "type": "number",
               "minimum": -1000000000000,
               "maximum": 1000000000000
+            }
+          }
+        }
+      }
+    },
+    "ObjectBrushBitmapStrokePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentSnapshotId",
+        "lifecycleGeneration",
+        "record",
+        "companion",
+        "source"
+      ],
+      "properties": {
+        "documentSnapshotId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "lifecycleGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "record": {
+          "type": "object",
+          "required": [
+            "family",
+            "target",
+            "geometry",
+            "vectorExt"
+          ],
+          "properties": {
+            "family": {
+              "const": "editable-vector-path"
+            },
+            "target": {
+              "type": "object",
+              "required": [
+                "contextId",
+                "layerUid",
+                "strokeId",
+                "frameScope"
+              ],
+              "properties": {
+                "contextId": {
+                  "const": "scene-root"
+                },
+                "strokeId": {
+                  "const": ""
+                },
+                "frameScope": {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "frame"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "authored"
+                    }
+                  }
+                }
+              }
+            },
+            "geometry": {
+              "type": "object",
+              "required": [
+                "segments"
+              ],
+              "properties": {
+                "segments": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 256
+                }
+              }
+            },
+            "vectorExt": {
+              "type": "object",
+              "required": [
+                "bitmapBrush"
+              ],
+              "properties": {
+                "bitmapBrush": {
+                  "type": "object",
+                  "required": [
+                    "bitmapBrushSpec",
+                    "brushGroupId"
+                  ],
+                  "properties": {
+                    "bitmapBrushSpec": {
+                      "type": "object"
+                    },
+                    "brushGroupId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "companion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height",
+            "opacity"
+          ],
+          "properties": {
+            "x": {
+              "type": "number",
+              "minimum": -1000000000000,
+              "maximum": 1000000000000
+            },
+            "y": {
+              "type": "number",
+              "minimum": -1000000000000,
+              "maximum": 1000000000000
+            },
+            "width": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1000000000000
+            },
+            "height": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1000000000000
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "path"
+          ],
+          "properties": {
+            "kind": {
+              "const": "file"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
             }
           }
         }

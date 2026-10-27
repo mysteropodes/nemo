@@ -1,9 +1,10 @@
 /* Ordinary native shape, Pen and bounded freehand gestures. Only pointer-local data and SVG preview live here;
  * the existing vector client and Project resource queue own every committed command. */
 (function(root,factory){var node=typeof module==='object'&&module.exports;
-  var api=factory(node?require('./native-object-draw-paint.js'):root.NemoNativeDrawPaint,node?require('./native-object-draw-symmetry.js'):root.NemoNativeDrawSymmetry);
+  var api=factory(node?require('./native-object-draw-paint.js'):root.NemoNativeDrawPaint,node?require('./native-object-draw-symmetry.js'):root.NemoNativeDrawSymmetry,
+    node?require('./native-object-draw-bitmap.js'):root.NemoNativeDrawBitmap);
   if(node)module.exports=api;else root.NemoNativeObjectShapeTool=api;
-}(typeof globalThis==='object'?globalThis:this,function(Paint,Symmetry){
+}(typeof globalThis==='object'?globalThis:this,function(Paint,Symmetry,Bitmap){
   'use strict';
   var tools=['line','rect','ellipse'],shapeTools=tools.concat(['star','speechbubble']);
   var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
@@ -147,9 +148,12 @@
         return action({reconcile:ctx.reconcile,dispatch:function(q){if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});return ctx.dispatch(q);}});
       });}};
       // draw-bridge.js Fill Brush: one native command places the shape (fillBrushMode) and merges same-colour fills.
+      if(dict.isFillShape&&root.SMLabs&&typeof root.SMLabs.multiframeTargets==='function'&&root.SMLabs.multiframeTargets(t.frame).length)fail('Multi-frame Fill Brush is unavailable in native Drawing.');
       if(dict.isFillShape)return root.NemoNativeFillDesktop.create({current:function(){return guarded;},ready:function(){return true;},
         target:function(){return {layerUid:t.layerUid,frame:t.frame,contextId:'scene-root'};}}).brush({outline:dict.segments,color:dict.fillColor,opacity:dict.opacity,placement:root.state.fillBrushMode,mask:root.state.maskMode?root.state.maskModeType||'add':false,copies:Symmetry.matrices(root,t.pin)})
         .then(function(r){return {status:r&&r.applied?'applied':'noop'};},root.NemoNativeObjectVector.statusOf);
+      // draw-bridge.js Bitmap Brush: the anchor, its baked companion and the PNG in one native command.
+      if(t.style&&t.style.bitmap)return Bitmap.commit(root,guarded,t,dict,root.NemoNativeObjectVector.statusOf);
       // tools.js @1065e9d8 Draw commit: drawMode 'behind' slips the stroke under the layer's artwork.
       // G23 (symmetry-bridge.js onStrokeCommitted @1065e9d8): the stroke and its copies, each linked fill below its ribbon,
       // in one createMany (behind keeps the order at the bottom).
@@ -294,12 +298,13 @@
     var simplifyIfNeeded=root.simplifyIfNeeded,applyStrokeStyle=root.applyStrokeStyle;
     function nativeDrawStyle() {
       var state=root.state,fb=state.tool==='fillbrush';
-      // Fill Brush (draw-bridge's isFillBrush branch) draws no texture, bitmap or Trim and ignores drawMode; a Labs-processed
-      // Fill Brush stroke is not native yet.
-      if (fb && (['above','below','merge'].indexOf(state.fillBrushMode) < 0 ||
-          root.SMLabs && root.SMLabs.list().some(function(p){return p.on;}))) throw new Error('This Fill Brush combination is unavailable in native Drawing.');
+      // Fill Brush (draw-bridge's isFillBrush branch) draws no texture, bitmap or Trim and ignores drawMode. Labs runs its
+      // hooks on the placed path: predictive skips a fill shape, multi-frame would stamp the merged result (not native yet).
+      if (fb && (['above','below','merge'].indexOf(state.fillBrushMode) < 0 || root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
+          ? root.SMLabs.unmigratedDrawHooks().length > 0 || typeof root.SMLabs.multiframeTargets === 'function' && root.SMLabs.multiframeTargets(state.currentFrame).length > 0
+          : root.SMLabs.list().some(function(p){return p.on;})))) throw new Error('This Fill Brush combination is unavailable in native Drawing.');
       // Trim measures the whole stroke before the stop-at-axis clip (draw-bridge then symmetry-bridge); native would trim the clipped one.
-      if (!fb && (state.tool !== 'draw' || state.bitmapBrushOn && !state.shadowMode || state.trimStrokeEnds && (state.vectorBrush || state.symmetryEnabled && !state.symmetryExtend) ||
+      if (!fb && (state.tool !== 'draw' || state.trimStrokeEnds && (state.vectorBrush || state.symmetryEnabled && !state.symmetryExtend) ||
           state.drawMode !== 'front' && state.drawMode !== 'behind' ||
           // G16 option C (#2361): one seeded anchor whose dabs native stamps; the key resolves as resolveBrushPreset (a built-in,
           // else a confirmed native catalog record). A key neither holds, and texture with symmetry or Trim, stay unavailable.
@@ -333,7 +338,7 @@
         throw new Error('Native brush pressure settings are unavailable.');
       if (state.stabilizer >= 4 && (!root.SMStrokeModeler || typeof root.SMStrokeModeler.create !== 'function'))
         throw new Error('Native brush stabilizer is not ready.');
-      return JSON.parse(JSON.stringify(out));
+      return JSON.parse(JSON.stringify(Bitmap.style(root, state, out)));
     }
     function validPressure(e){if(e.pressure!==undefined&&(!Number.isFinite(e.pressure)||e.pressure<0||e.pressure>1))throw new Error('Brush pressure is invalid.');}
     function nativeBegin(w, e, intent) {
@@ -406,7 +411,7 @@
         if(stroke.dashArray.length)out.dashArray=stroke.dashArray.slice();
         if(stroke.data.paintOrder!==undefined)out.paintOrder=stroke.data.paintOrder;
         // applyBrushTexture on a plain stroke drawn with Stroke on: the path becomes its texture's invisible anchor.
-        if(!style.shadowSwatch&&style.brushPreset&&style.brushPreset!=='none'&&style.strokeEnabled)Paint.texturePlain(out,style.brushPreset);
+        if(!style.shadowSwatch&&!style.bitmap&&style.brushPreset&&style.brushPreset!=='none'&&style.strokeEnabled)Paint.texturePlain(out,style.brushPreset);
       }
       try{out.segments=segments(path);out.closed=path.closed;
         if(style.shadowSwatch)Paint.shadow(out,style.shadowSwatch,style.vectorBrush&&!style.strokeEnabled,style.brushSize);
