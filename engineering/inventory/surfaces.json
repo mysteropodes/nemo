@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "a5925da612041ffaac39567fdeb1961a6cb4bc0b",
-  "describe": "v0.7.0-alpha.4-3400-ga5925da6"
+  "head": "1d9a4ae2416a999322e1fce3559ccecea52fc18b",
+  "describe": "v0.7.0-alpha.4-3408-g1d9a4ae2"
  },
- "inputsDigest": "9658790695bfcb601ace800fa8814ac5966050c72a48070c13a7e7ba9fbb3410",
+ "inputsDigest": "54a9666f8952fa21de2908bd6ac48b41b42c8a4aa435d8e7522eadcfd5d6487d",
  "states": [
   "inventoried",
   "characterized",
@@ -2206,7 +2206,7 @@
     "container": "p-fillpropagate-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 473,
+    "functionsVisited": 475,
     "via": "variable propBtn",
     "references": []
    },
@@ -28588,7 +28588,7 @@
    "source": "src/js/shapes-panel.js:869",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 314
+    "functionsVisited": 316
    },
    "fixtures": [
     "static-props",
