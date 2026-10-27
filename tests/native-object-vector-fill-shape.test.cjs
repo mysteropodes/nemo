@@ -15,7 +15,8 @@ const pick = (object, keys) => Object.fromEntries(keys.filter((key) => key in ob
 
 // Observed baseline defect (CLAUDE.md section 1 family): serP writes isFillShape, but desP never restores
 // data.isFillShape, so serP(desP(dict)) drops it and a reopened baseline project forgets which fills the Fill Brush
-// made. Native maps the stored document, which carries the flag, and keeps it.
+// made. The mapper keeps its contract (import = the baseline reload), so an imported shape loses the flag too; only a
+// shape the native Fill Brush creates carries it.
 test('the oracle is the pinned baseline run, and the baseline reload drops the Fill Brush flag', () => {
   assert.equal(oracle.commit, 'fbe4b8a33e6d5a229f014154df2ba21988a9fabc');
   assert.deepEqual(oracle.cases.map((c) => c.id), ['fill-shape', 'fill-shape-shadow']);
@@ -27,19 +28,20 @@ test('the oracle is the pinned baseline run, and the baseline reload drops the F
   assert.deepEqual([oracle.cases[0].out.strokeColor, oracle.cases[0].out.hasRealStroke], ['#ffffff', false]);
 });
 
-test('each stored Fill Brush dictionary keeps its flag in vectorExt.isFillShape and maps back with every other member serP wrote', () => {
+test('import follows the baseline reload: the flag is dropped and reported; a native Fill Brush record writes it back', () => {
   for (const c of oracle.cases) {
     const mapped = Stroke.toRecord(c.in, WHERE);
     assert.equal(mapped.ok, true, c.id + ' ' + JSON.stringify(mapped));
-    assert.deepEqual(mapped.unmapped, [], c.id);
-    assert.doesNotThrow(() => Contract.payload(Contract.VECTOR, { command: 'object.vector.create', record: mapped.record }), c.id);
-    assert.equal(mapped.record.vectorExt.isFillShape, true, c.id);
-    assert.deepEqual(Stroke.toDict(mapped.record), Object.assign(pick(c.out, Stroke.CARRIED), { isFillShape: true }), c.id + ' inverse');
-    assert.deepEqual(Stroke.toRecord(Stroke.toDict(mapped.record), WHERE).record, mapped.record, c.id + ' fixed point');
-  }
-  const record = Stroke.toRecord(oracle.cases[0].in, WHERE).record;
-  for (const flag of [false, 'true', 1]) {
-    const bad = JSON.parse(JSON.stringify(record)); bad.vectorExt.isFillShape = flag;
-    assert.throws(() => Contract.payload(Contract.VECTOR, { command: 'object.vector.create', record: bad }), String(flag));
+    assert.deepEqual(mapped.unmapped, ['isFillShape'], c.id);
+    assert.equal((mapped.record.vectorExt || {}).isFillShape, undefined, c.id);
+    assert.deepEqual(Stroke.toDict(mapped.record), pick(c.out, Stroke.CARRIED), c.id + ' the baseline reload');
+    // A shape the native Fill Brush creates carries the flag, which the contract admits and serP's form writes.
+    const native = JSON.parse(JSON.stringify(mapped.record)); native.vectorExt = Object.assign({}, native.vectorExt, { isFillShape: true });
+    assert.doesNotThrow(() => Contract.payload(Contract.VECTOR, { command: 'object.vector.create', record: native }), c.id);
+    assert.equal(Stroke.toDict(native).isFillShape, true, c.id);
+    for (const flag of [false, 'true', 1]) {
+      const bad = JSON.parse(JSON.stringify(native)); bad.vectorExt.isFillShape = flag;
+      assert.throws(() => Contract.payload(Contract.VECTOR, { command: 'object.vector.create', record: bad }), String(flag));
+    }
   }
 });

@@ -16,7 +16,7 @@
   const CARRIED = ['segments', 'closed', 'strokeColor', 'hasRealStroke', 'strokeWidth', 'strokeCap', 'strokeJoin', 'miterLimit', 'fillColor',
     'opacity', 'dashArray', 'dashOffset', 'paintOrder', 'isVectorBrush', 'centerSegments', 'widthProfile', 'strokeProfile', 'profileBase',
     'strokeId', 'boxAngle', 'paramShape', 'fillGradient', 'fillSeed', 'fillSeeds', 'fillWalls', 'fillGapPx', 'isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion',
-    'brushGroupId', 'isBrushTextureCopy', 'brushTexturePreset', 'preTextureOpacity', 'preTextureStroke', 'channelTag', 'shadowSwatchId', 'isFillShape'];
+    'brushGroupId', 'isBrushTextureCopy', 'brushTexturePreset', 'preTextureOpacity', 'preTextureStroke', 'channelTag', 'shadowSwatchId'];
   // Members only the native record owns (no serP member): G16 option C's anchor stamping seed.
   const NATIVE_CARRIED = ['strokeSeed'];
   // Look-changing members with no record slot: mapping them as a plain path would lose the look without a word.
@@ -151,8 +151,6 @@
     // Shadow Brush (applyShadowBrushTag): serP writes channelTag ('shadow') and the swatch id when truthy.
     if (dict.channelTag) { if (dict.channelTag !== 'shadow') refuse('invalid_dict', 'invalid channelTag'); out.channelTag = 'shadow'; }
     if (dict.shadowSwatchId) { if (!text(dict.shadowSwatchId) || !out.channelTag) refuse('invalid_dict', 'invalid shadowSwatchId'); out.shadowSwatchId = dict.shadowSwatchId; }
-    // A Fill Brush shape: serP writes isFillShape only when truthy.
-    if (dict.isFillShape) out.isFillShape = true;
     // G16 option C: the anchor's stamping seed (native produces its dabs from it).
     if (dict.strokeSeed !== undefined) {
       if (!(Number.isInteger(dict.strokeSeed) && dict.strokeSeed >= 0 && dict.strokeSeed <= 0xFFFFFFFF) || !out.brushTexturePreset) refuse('invalid_dict', 'invalid strokeSeed');
@@ -230,7 +228,6 @@
       const texture = {};
       for (const key of ['brushGroupId', 'isBrushTextureCopy', 'brushTexturePreset', 'preTextureOpacity', 'preTextureStroke', 'strokeSeed']) if (has(n, key)) texture[key] = n[key];
       if (Object.keys(texture).length) ext.brushTexture = texture;
-      if (n.isFillShape) ext.isFillShape = true;
       if (has(n, 'channelTag')) ext.shadow = has(n, 'shadowSwatchId') ? { channelTag: n.channelTag, shadowSwatchId: n.shadowSwatchId } : { channelTag: n.channelTag };
       const trace={};
       [['fillSeed','seed'],['fillSeeds','seeds'],['fillWalls','walls'],['fillGapPx','gapPx']].forEach(([key,stored])=>{
@@ -291,6 +288,8 @@
     for (const key of ['isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion']) if (has(x, key)) out[key] = x[key];
     if (x.brushTexture) Object.assign(out, x.brushTexture);
     if (x.shadow) Object.assign(out, x.shadow);
+    // A Fill Brush shape native created carries isFillShape, which serP writes. Importing a dictionary drops it, as
+    // the baseline reload does (desP never restores data.isFillShape), and reports it.
     if (x.isFillShape) out.isFillShape = true;
     if (x.paramShape) out.paramShape = JSON.parse(JSON.stringify(x.paramShape));
     if (x.fillGradient) out.fillGradient = gradient(x.fillGradient);
