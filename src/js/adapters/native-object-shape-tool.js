@@ -324,13 +324,18 @@
       // Trim measures the whole stroke before the stop-at-axis clip (draw-bridge then symmetry-bridge); native would trim the clipped one.
       if (state.tool !== 'draw' || state.bitmapBrushOn || state.trimStrokeEnds && (state.vectorBrush || state.symmetryEnabled && !state.symmetryExtend) ||
           state.drawMode !== 'front' && state.drawMode !== 'behind' ||
-          state.brushPreset && state.brushPreset !== 'none' || root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
+          // G16 option C (#2361): only a built-in vector-brush preset on a plain stroke drawn with Stroke on commits
+          // natively (one seeded anchor; native stamps its dabs). Custom presets, textured pressure ribbons and texture
+          // with symmetry or Trim stay unavailable.
+          state.brushPreset && state.brushPreset !== 'none' && (!root.BRUSH_PRESETS || !Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS, state.brushPreset) ||
+            state.strokeEnabled && (state.vectorBrush || state.symmetryEnabled || state.trimStrokeEnds)) ||
+          root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
             ? root.SMLabs.unmigratedDrawHooks().length > 0 : root.SMLabs.list().some(function(p){return p.on;})))
         throw new Error('This brush combination is unavailable in native Drawing.');
       if (typeof state.vectorBrush !== 'boolean' || typeof state.strokeEnabled !== 'boolean' || typeof state.fillEnabled !== 'boolean' ||
           !state.strokeEnabled && !state.fillEnabled)
         throw new Error('Enable a stroke or a fill to draw.');
-      var keys = ['vectorBrush','strokeEnabled','fillEnabled','strokeColor','fillColor','brushSize','opacity','strokeCap','strokeJoin',
+      var keys = ['vectorBrush','strokeEnabled','fillEnabled','strokeColor','fillColor','brushSize','opacity','strokeCap','strokeJoin','brushPreset',
         'strokeStyle','miterLimit','dashOffset','paintOrder','smoothing','stabilizer','taperEnds','pressureMin','pressureMax',
         'pressureInvert','pressureCurve','pressureCurvePoints','brushAngle','brushAngleFactor'];
       var out = {}; keys.forEach(function(k){if(state[k] !== undefined)out[k]=state[k];});
@@ -420,6 +425,18 @@
         out.miterLimit=stroke.miterLimit;out.dashOffset=stroke.dashOffset;
         if(stroke.dashArray.length)out.dashArray=stroke.dashArray.slice();
         if(stroke.data.paintOrder!==undefined)out.paintOrder=stroke.data.paintOrder;
+        // applyBrushTexture (tools.js @1065e9d8) on a plain stroke drawn with Stroke on: the path becomes the invisible
+        // anchor of its texture. A filled anchor hides only its stroke (preTextureStroke, colorHex8); an unfilled one
+        // hides itself (preTextureOpacity, opacity 0). The seed is draw-bridge's strokeSeed (a fresh uint32 per stroke).
+        if(style.brushPreset&&style.brushPreset!=='none'&&style.strokeEnabled){
+          out.brushTexturePreset=style.brushPreset;
+          out.brushGroupId='bg'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);
+          out.strokeSeed=(Math.random()*0xFFFFFFFF)>>>0;
+          if(out.fillColor){
+            var h=out.strokeColor.slice(1),full=h.length===3?h.replace(/./g,function(c){return c+c;}):h;
+            out.preTextureStroke='#'+(full.length===6?full+'ff':full).toLowerCase();out.strokeColor=null;
+          }else{out.preTextureOpacity=out.opacity;out.opacity=0;}
+        }
       }
       try{out.segments=segments(path);out.closed=path.closed;
         if(out.segments.some(function(s){return !['point','handleIn','handleOut'].every(function(k){return s[k].every(Number.isFinite);});}))throw new Error('Brush geometry must stay finite.');

@@ -164,7 +164,7 @@ test('chrome, cancellation, Escape and lost capture remain usable or abort witho
   send(f,'pointerup',60,50);assert.equal(f.calls.length,0,action);assert.equal(f.body.children.length,0,action);assert.equal(f.paper.project.activeLayer.children.length,0);}
 });
 test('unsupported brush cells are explicit without native or legacy fallback',async()=>{
- const cases=[s=>s.tool='fillbrush',s=>s.bitmapBrushOn=true,s=>s.brushPreset='charcoal-smooth',
+ const cases=[s=>s.tool='fillbrush',s=>s.bitmapBrushOn=true,s=>s.brushPreset='my-custom-brush',s=>Object.assign(s,{brushPreset:'charcoal-smooth',vectorBrush:true,fillEnabled:false}),
   // Trim Stroke Ends commits natively for a plain stroke; a pressure-brush trim rebuilds its outline and stays refused.
   s=>Object.assign(s,{trimStrokeEnds:true,vectorBrush:true,fillEnabled:false}),
   // With stop-at-axis symmetry the original trims the whole stroke before clipping; native would trim the clipped one.
@@ -388,4 +388,26 @@ test('a pressure stroke with Stroke off is one closed fill of its centreline',as
  assert.equal(f.calls[0].payload.command,'object.vector.create');
  assert.deepEqual([r.geometry.closed,r.vector.hasRealStroke,r.fill.r,r.vectorExt&&r.vectorExt.pressure],[true,false,0x44/255,undefined]);
  assert.deepEqual(r.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,20],[50,30],[80,45]]);
+});
+
+// #2361 G16 option C: a built-in preset on a plain stroke commits one seeded, camouflaged anchor (applyBrushTexture
+// @1065e9d8); native stamps its dabs from the preset and seed. No dab is sent.
+test('a textured plain stroke commits one seeded anchor, camouflaged as the baseline hides it',async()=>{
+ for(const fillEnabled of [true,false]){
+  const f=await fixture();f.root.BRUSH_PRESETS={'charcoal-smooth':{}};Object.assign(f.root.state,{brushPreset:'charcoal-smooth',fillEnabled});
+  send(f,'pointerdown',10,40);for(const [x,y] of [[40,41],[70,40]])send(f,'pointermove',x,y);send(f,'pointerup',100,40);
+  await settled(f);assert.equal(f.calls.length,1);const q=plain(f.calls[0].payload);
+  assert.equal(q.command,'object.vector.create','one anchor, no dab records');
+  const t=q.record.vectorExt.brushTexture;
+  assert.equal(t.brushTexturePreset,'charcoal-smooth');assert.ok(Number.isInteger(t.strokeSeed)&&t.strokeSeed>=0&&t.strokeSeed<=0xFFFFFFFF);
+  assert.match(t.brushGroupId,/^bg[0-9a-z]+_[0-9]+$/);
+  if(fillEnabled){
+   assert.deepEqual([t.preTextureStroke,q.record.vector.stroke,q.record.vector.opacity],['#112233ff',null,0.5],'a filled anchor hides only its stroke');
+  }else{
+   assert.deepEqual([t.preTextureOpacity,q.record.vector.opacity,q.record.vector.stroke.r],[0.5,0,0x11/255],'an unfilled anchor hides itself');
+  }
+ }
+ const off=await fixture();off.root.BRUSH_PRESETS={'charcoal-smooth':{}};Object.assign(off.root.state,{brushPreset:'charcoal-smooth',strokeEnabled:false});
+ send(off,'pointerdown',10,40);send(off,'pointermove',40,41);send(off,'pointerup',100,40);await settled(off);
+ assert.equal(off.calls[0].payload.record.vectorExt,undefined,'with Stroke off the baseline applies no texture');
 });
