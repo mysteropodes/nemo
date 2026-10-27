@@ -37,6 +37,13 @@ fn seeded(record: &ObjectRecord) -> Option<(&str, u32)> {
 pub(crate) fn is_seeded_anchor(record: &ObjectRecord) -> bool {
     seeded(record).is_some()
 }
+/// The brush group of an anchor (`Some(false)`) or of a stored dab copy (`Some(true)`): stored dabs (an imported
+/// project, a tween re-stamp) already paint their anchor's texture, so native does not stamp that group again.
+pub(crate) fn texture_group(record: &ObjectRecord) -> Option<(&str, bool)> {
+    let texture = record.vector_ext.value()?.brush_texture.value()?;
+    let group = texture.brush_group_id.value()?;
+    Some((group.as_str(), texture.is_brush_texture_copy.value() == Some(&true)))
+}
 
 fn hex_rgba(hex: &str) -> Option<[f64; 4]> {
     let digits = hex.strip_prefix('#')?;

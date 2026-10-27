@@ -34,13 +34,17 @@ fn line_record(texture: Option<Value>, pressure: bool) -> Value {
     record
 }
 fn plan_of(record: Value) -> Result<ObjectPaintPlan, ObjectPaintPlanError> {
+    plan_of_records(vec![record])
+}
+fn plan_of_records(records: Vec<Value>) -> Result<ObjectPaintPlan, ObjectPaintPlanError> {
+    let elements: Vec<Value> = records.iter().enumerate().map(|(k, r)| json!({"layerUid":"L0",
+        "strokeId":r["target"]["strokeId"],"naturalPosition":k,"order":{}})).collect();
     let doc = json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":1,
-        "layers":[{"layerUid":"L0"}],"objects":[record],
+        "layers":[{"layerUid":"L0"}],"objects":records,
         "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
             "migration":"explicit-plan-required","referencePolicy":"unresolved","contexts":[{"contextId":"scene-root",
                 "layers":[{"layerUid":"L0","naturalPosition":0,"order":{}}],
-                "scopes":[{"frameScope":{"kind":"authored","frame":0},
-                    "elements":[{"layerUid":"L0","strokeId":"anchor","naturalPosition":0,"order":{}}]}]}]}});
+                "scopes":[{"frameScope":{"kind":"authored","frame":0},"elements":elements}]}]}});
     let history = NativeObjectHistory::new("dabs", decode_storage_project(&serde_json::to_vec(&doc).unwrap()).unwrap()).unwrap();
     let snapshot = history.acquire_snapshot(history.content_revision()).unwrap();
     let pins = ObjectFrameSelector {
@@ -103,4 +107,20 @@ fn an_anchor_native_cannot_stamp_yet_makes_the_plan_unavailable() {
     let mut custom = seeded();
     custom["brushTexturePreset"] = json!("my-custom-brush");
     assert_eq!(plan_of(line_record(Some(custom), false)).err(), Some(ObjectPaintPlanError::Unavailable));
+}
+
+#[test]
+fn an_anchor_whose_dabs_are_stored_records_is_not_stamped_again() {
+    // An imported project or a native tween re-stamp stores the group's dabs: they paint as ordinary contours.
+    let mut stored = line_record(Some(json!({"brushGroupId":"g","isBrushTextureCopy":true})), false);
+    stored["target"]["strokeId"] = json!("stored-dab");
+    stored["vector"]["opacity"] = json!(0.5);
+    let plan = plan_of_records(vec![line_record(Some(seeded()), false), stored]).unwrap();
+    let entries: Vec<_> = ordered_entries(&plan).collect();
+    assert_eq!(entries.len(), 2, "the anchor and its stored dab, nothing produced");
+    assert!(entries.iter().all(|e| matches!(e, PaintEntry::Contour(_))));
+    let mut other = line_record(Some(json!({"brushGroupId":"another","isBrushTextureCopy":true})), false);
+    other["target"]["strokeId"] = json!("other-dab");
+    let plan = plan_of_records(vec![line_record(Some(seeded()), false), other]).unwrap();
+    assert!(ordered_entries(&plan).count() > 2, "another group's stored dabs do not hide this anchor's");
 }

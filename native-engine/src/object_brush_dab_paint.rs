@@ -3,7 +3,8 @@
 //! the anchor (`ObjectRenderEntry::path`, so motion and poses are the evaluated ones) and carry prepared paint like
 //! duplicator copies do. An anchor native cannot stamp yet (a pressure ribbon, a custom preset) makes the plan
 //! unavailable rather than silently losing its texture.
-use crate::evaluation::brush_dab::paint::{anchor_dab_items, is_seeded_anchor};
+use crate::evaluation::brush_dab::paint::{anchor_dab_items, is_seeded_anchor, texture_group};
+use std::collections::HashSet;
 use crate::object_render_scene::object_scene_style_emit::{prepare_item, PreparedItem};
 use crate::object_render_scene::render_vector_path::build_path;
 use crate::object_render_scene::{ObjectPaintPlanError, ObjectRenderScene, PaintIndex};
@@ -63,6 +64,14 @@ pub(crate) fn expand(
     mixed: Vec<PaintIndex>,
 ) -> Result<(Vec<PaintIndex>, Vec<DabPaint>), ObjectPaintPlanError> {
     let (mut out, mut dabs) = (Vec::with_capacity(mixed.len()), Vec::new());
+    // Groups whose dabs are stored records in this frame (imported, or a tween re-stamp): never stamped twice.
+    let stored: HashSet<(usize, &str)> = scene
+        .entries()
+        .filter_map(|entry| {
+            let (group, copy) = texture_group(entry.source().record())?;
+            copy.then_some((entry.source().source_layer_index(), group))
+        })
+        .collect();
     for index in mixed {
         out.push(index);
         let PaintIndex::Contour(i) = index else {
@@ -70,7 +79,9 @@ pub(crate) fn expand(
         };
         let entry = scene.entry(i).ok_or(ObjectPaintPlanError::InvalidOrder)?;
         let source = entry.source();
-        if !is_seeded_anchor(source.record()) {
+        if !is_seeded_anchor(source.record())
+            || texture_group(source.record()).is_some_and(|(group, _)| stored.contains(&(source.source_layer_index(), group)))
+        {
             continue;
         }
         let unavailable = |_| ObjectPaintPlanError::Unavailable;
