@@ -3268,7 +3268,8 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-shape-tool.js"
+        "native-object-shape-tool.js",
+        "native-object-draw-paint.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [

@@ -1332,6 +1332,7 @@
         "bitmap_brush_resources_publish_controls.rs",
         "object_vector_extensions.rs",
         "object_vector_brush_texture.rs",
+        "object_vector_shadow_channel.rs",
         "object_vector_extensions_controls.rs",
         "object_vector_extensions_pins.rs",
         "object_vector_extensions_pair_controls.rs",

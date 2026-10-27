@@ -93,6 +93,7 @@ async function fixture(tool='draw',native=true){
   'sampleVectorBrushCenterline','_polylineCrossCandidates','_ribbonHasRealSelfIntersections','_flattenResolvedRibbon','_cleanupSelfIntersectingOutline',
   'buildVariableWidthPath','buildClosedRingOutline','_polyClosestPair'])vm.runInContext(baselineFunction(tools,name),context,{filename:'tools.js:'+name});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/stroke-modeler.js'),'utf8'),context,{filename:'stroke-modeler.js'});
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-paint.js'),'utf8'),context,{filename:'native-object-draw-paint.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-shape-tool.js'),'utf8'),context,{filename:'native-object-shape-tool.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/draw-bridge.js'),'utf8'),context,{filename:'draw-bridge.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/shape-bridge.js'),'utf8'),context,{filename:'shape-bridge.js'});
@@ -424,4 +425,32 @@ test('a textured pressure ribbon commits one seeded, hidden ribbon anchor; its l
   assert.ok(Number.isInteger(ribbon.vectorExt.brushTexture.strokeSeed));
   if(fillEnabled){const fill=q.records[0];assert.equal(fill.vectorExt.brushTexture,undefined);assert.equal(fill.vector.opacity,0.5,'the linked fill is not hidden');}
  }
+});
+
+// #2361 Shadow Brush: applyShadowBrushTag @1065e9d8 over draw-bridge's commitStroke. The active swatch inks a plain
+// stroke (max(1, width), round ends) or, for the Stroke-off pressure fill, fills it; a ribbon goes back to its open
+// centreline; Shadow mode draws neither texture nor linked fill. Every record keeps its channel and swatch.
+test('Shadow mode commits construction ink in the active swatch with its channel and swatch id',async()=>{
+ const swatch={id:'sh2',ordinal:2,color:'#ff8800'},ink=[1,0x88/255,0],shadow={channelTag:'shadow',shadowSwatchId:'sh2'};
+ const colour=p=>[p.r,p.g,p.b];
+ async function draw(state,pen){
+  const f=await fixture();f.root.SMShadowBrush={activeSwatch:()=>swatch};f.root.BRUSH_PRESETS={'charcoal-smooth':{}};
+  Object.assign(f.root.state,{shadowMode:true},state);const o=pen?{pointerType:'pen',pressure:.6}:{};
+  send(f,'pointerdown',20,20,o);f.advance();send(f,'pointermove',50,30,o);f.advance();send(f,'pointerup',80,45,pen?{pointerType:'pen',pressure:0}:{});
+  await settled(f);assert.equal(f.calls.length,1,f.log.join(','));
+  assert.equal(f.calls[0].payload.command,'object.vector.create','one record: no linked fill, no texture');return plain(f.calls[0].payload.record);
+ }
+ const line=await draw({brushPreset:'charcoal-smooth'});
+ assert.deepEqual([colour(line.vector.stroke),line.vector.hasRealStroke,line.fill,line.vector.strokeWidth,line.vector.strokeCap,line.vector.strokeJoin],
+   [ink,true,null,4,'round','round']);
+ assert.deepEqual(line.vectorExt,{shadow},'the preset draws no texture');
+ const ribbon=await draw({vectorBrush:true},true);
+ assert.deepEqual([ribbon.geometry.closed,ribbon.vectorExt,colour(ribbon.vector.stroke),ribbon.vector.strokeWidth,ribbon.fill],[false,{shadow},ink,1,null],
+   'the ribbon is its open centreline at the new Path width');
+ const fillOnly=await draw({vectorBrush:true,strokeEnabled:false},true);
+ assert.deepEqual([fillOnly.geometry.closed,fillOnly.vector.hasRealStroke,colour(fillOnly.fill),fillOnly.vectorExt],[true,false,ink,{shadow}],
+   'the Stroke-off pressure fill keeps its fill (preferFill)');
+ const none=await fixture();none.root.SMShadowBrush={activeSwatch:()=>null};none.root.state.shadowMode=true;
+ send(none,'pointerdown',20,20);send(none,'pointerup',60,50);assert.equal(none.calls.length,0);
+ assert.ok(none.log.some(s=>/Shadow Brush swatch is unavailable/.test(s)),none.log.join(','));
 });

@@ -790,6 +790,23 @@
             ]
           },
           "description": "G16: the baseline serP brush-texture members of an anchor (preset, group, hidden paint) or a dab (copy flag, group)."
+        },
+        "shadow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "channelTag"
+          ],
+          "properties": {
+            "channelTag": {
+              "const": "shadow"
+            },
+            "shadowSwatchId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
         }
       },
       "minProperties": 1,
@@ -17768,6 +17785,23 @@
             ]
           },
           "description": "G16: the baseline serP brush-texture members of an anchor (preset, group, hidden paint) or a dab (copy flag, group)."
+        },
+        "shadow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "channelTag"
+          ],
+          "properties": {
+            "channelTag": {
+              "const": "shadow"
+            },
+            "shadowSwatchId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
         }
       },
       "minProperties": 1,
@@ -17960,6 +17994,23 @@
             ]
           },
           "description": "G16: the baseline serP brush-texture members of an anchor (preset, group, hidden paint) or a dab (copy flag, group)."
+        },
+        "shadow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "channelTag"
+          ],
+          "properties": {
+            "channelTag": {
+              "const": "shadow"
+            },
+            "shadowSwatchId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
         }
       },
       "minProperties": 1,
