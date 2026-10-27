@@ -170,9 +170,64 @@ mod platform {
 pub(crate) use platform::NativeViewport;
 
 #[cfg(target_os = "macos")]
-pub(crate) use platform::occlusion::observe_preview;
+pub(crate) use platform::occlusion::{observe_preview, PreviewObservation};
 #[cfg(all(test, target_os = "macos"))]
 pub(crate) use platform::occlusion::test_observations;
+
+/// The composed frame a preview diagnostic correlates: the opacity path's `CompositionResult`,
+/// or an object preview's request pins and composed work ([`ScheduledPreview`]).
+pub(crate) trait PreviewSubject {
+    fn document_id(&self) -> &str;
+    fn content_revision(&self) -> u64;
+    fn frame(&self) -> u32;
+    fn work_id(&self) -> u64;
+    fn view_generation(&self) -> u64;
+}
+
+impl PreviewSubject for native_engine::compositor::CompositionResult {
+    fn document_id(&self) -> &str {
+        Self::document_id(self)
+    }
+    fn content_revision(&self) -> u64 {
+        Self::content_revision(self)
+    }
+    fn frame(&self) -> u32 {
+        self.scheduled_identity().evaluation_key().frame()
+    }
+    fn work_id(&self) -> u64 {
+        self.scheduled_identity().work_id().value()
+    }
+    fn view_generation(&self) -> u64 {
+        self.scheduled_identity().view_generation().value()
+    }
+}
+
+/// An object preview's request pins and composed work (`ObjectPreviewDiagnostic`).
+pub(crate) struct ScheduledPreview<'a> {
+    pub(crate) document_id: &'a str,
+    pub(crate) content_revision: u64,
+    pub(crate) frame: u32,
+    pub(crate) work_id: u64,
+    pub(crate) view_generation: u64,
+}
+
+impl PreviewSubject for ScheduledPreview<'_> {
+    fn document_id(&self) -> &str {
+        self.document_id
+    }
+    fn content_revision(&self) -> u64 {
+        self.content_revision
+    }
+    fn frame(&self) -> u32 {
+        self.frame
+    }
+    fn work_id(&self) -> u64 {
+        self.work_id
+    }
+    fn view_generation(&self) -> u64 {
+        self.view_generation
+    }
+}
 
 #[cfg(not(target_os = "macos"))]
 pub(crate) struct PreviewObservation;
@@ -183,7 +238,7 @@ impl PreviewObservation {
 #[cfg(not(target_os = "macos"))]
 pub(crate) fn observe_preview(
     _instance: &str,
-    _result: &native_engine::compositor::CompositionResult,
+    _result: &impl PreviewSubject,
 ) -> PreviewObservation {
     PreviewObservation
 }
