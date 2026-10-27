@@ -164,7 +164,7 @@ test('chrome, cancellation, Escape and lost capture remain usable or abort witho
   send(f,'pointerup',60,50);assert.equal(f.calls.length,0,action);assert.equal(f.body.children.length,0,action);assert.equal(f.paper.project.activeLayer.children.length,0);}
 });
 test('unsupported brush cells are explicit without native or legacy fallback',async()=>{
- const cases=[s=>s.tool='fillbrush',s=>s.bitmapBrushOn=true,s=>s.brushPreset='my-custom-brush',s=>Object.assign(s,{brushPreset:'charcoal-smooth',vectorBrush:true,fillEnabled:false}),
+ const cases=[s=>s.tool='fillbrush',s=>s.bitmapBrushOn=true,s=>s.brushPreset='my-custom-brush',s=>Object.assign(s,{brushPreset:'charcoal-smooth',symmetryEnabled:true}),
   // Trim Stroke Ends commits natively for a plain stroke; a pressure-brush trim rebuilds its outline and stays refused.
   s=>Object.assign(s,{trimStrokeEnds:true,vectorBrush:true,fillEnabled:false}),
   // With stop-at-axis symmetry the original trims the whole stroke before clipping; native would trim the clipped one.
@@ -410,4 +410,18 @@ test('a textured plain stroke commits one seeded anchor, camouflaged as the base
  const off=await fixture();off.root.BRUSH_PRESETS={'charcoal-smooth':{}};Object.assign(off.root.state,{brushPreset:'charcoal-smooth',strokeEnabled:false});
  send(off,'pointerdown',10,40);send(off,'pointermove',40,41);send(off,'pointerup',100,40);await settled(off);
  assert.equal(off.calls[0].payload.record.vectorExt,undefined,'with Stroke off the baseline applies no texture');
+});
+
+test('a textured pressure ribbon commits one seeded, hidden ribbon anchor; its linked fill stays visible',async()=>{
+ for(const fillEnabled of [false,true]){
+  const f=await fixture();f.root.BRUSH_PRESETS={'chalk-round':{}};Object.assign(f.root.state,{brushPreset:'chalk-round',vectorBrush:true,fillEnabled});
+  send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:0});
+  await settled(f);assert.equal(f.calls.length,1);const q=plain(f.calls[0].payload);
+  const ribbon=fillEnabled?q.records[1]:q.record;
+  assert.equal(q.command,fillEnabled?'object.vector.createMany':'object.vector.create');
+  assert.ok(ribbon.vectorExt.pressure.centerSegments.length>=2,'the anchor is the ribbon');
+  assert.deepEqual([ribbon.vectorExt.brushTexture.brushTexturePreset,ribbon.vectorExt.brushTexture.preTextureOpacity,ribbon.vector.opacity],['chalk-round',0.5,0]);
+  assert.ok(Number.isInteger(ribbon.vectorExt.brushTexture.strokeSeed));
+  if(fillEnabled){const fill=q.records[0];assert.equal(fill.vectorExt.brushTexture,undefined);assert.equal(fill.vector.opacity,0.5,'the linked fill is not hidden');}
+ }
 });

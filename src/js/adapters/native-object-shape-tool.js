@@ -324,11 +324,10 @@
       // Trim measures the whole stroke before the stop-at-axis clip (draw-bridge then symmetry-bridge); native would trim the clipped one.
       if (state.tool !== 'draw' || state.bitmapBrushOn || state.trimStrokeEnds && (state.vectorBrush || state.symmetryEnabled && !state.symmetryExtend) ||
           state.drawMode !== 'front' && state.drawMode !== 'behind' ||
-          // G16 option C (#2361): only a built-in vector-brush preset on a plain stroke drawn with Stroke on commits
-          // natively (one seeded anchor; native stamps its dabs). Custom presets, textured pressure ribbons and texture
-          // with symmetry or Trim stay unavailable.
+          // G16 option C (#2361): only a built-in vector-brush preset commits natively (one seeded anchor, plain or
+          // pressure ribbon; native stamps its dabs). Custom presets and texture with symmetry or Trim stay unavailable.
           state.brushPreset && state.brushPreset !== 'none' && (!root.BRUSH_PRESETS || !Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS, state.brushPreset) ||
-            state.strokeEnabled && (state.vectorBrush || state.symmetryEnabled || state.trimStrokeEnds)) ||
+            state.strokeEnabled && (state.symmetryEnabled || state.trimStrokeEnds)) ||
           root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
             ? root.SMLabs.unmigratedDrawHooks().length > 0 : root.SMLabs.list().some(function(p){return p.on;})))
         throw new Error('This brush combination is unavailable in native Drawing.');
@@ -410,6 +409,14 @@
         // Matches a new baseline pressure Path: no actual stroke, Paper default
         // stroke width/cap/join, and applyBrushKeyline has no width to paint.
         out.strokeWidth=1;out.strokeCap='butt';out.strokeJoin='miter';out.miterLimit=10;out.dashOffset=0;
+        // applyBrushTexture on a pressure ribbon (draw-bridge.js ribbon branch @1065e9d8): the ribbon becomes the
+        // invisible anchor (preTextureOpacity, opacity 0); its linked fill stays visible.
+        if(style.brushPreset&&style.brushPreset!=='none'){
+          out.brushTexturePreset=style.brushPreset;
+          out.brushGroupId='bg'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);
+          out.strokeSeed=(Math.random()*0xFFFFFFFF)>>>0;
+          out.preTextureOpacity=out.opacity;out.opacity=0;
+        }
         if(style.fillEnabled){
           // The companion is the ribbon's sampled centreline, closed and filled (rebuildVectorBrushOutline), below the
           // ribbon, under a fresh link id of its own (ensureStrokeId shape), with no stroke of its own.

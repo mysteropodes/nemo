@@ -124,3 +124,37 @@ fn an_anchor_whose_dabs_are_stored_records_is_not_stamped_again() {
     let plan = plan_of_records(vec![line_record(Some(seeded()), false), other]).unwrap();
     assert!(ordered_entries(&plan).count() > 2, "another group's stored dabs do not hide this anchor's");
 }
+
+/// A pressure ribbon: a closed outline painted with its ink, the oracle line as its centreline, the oracle profile.
+fn ribbon_record(seed: u64) -> Value {
+    let p = |x: f64, y: f64| json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}});
+    let c = |x: f64, w: f64| json!({"point":{"x":x,"y":0},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":w});
+    json!({"schemaVersion":1,"family":"editable-vector-path",
+        "target":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},"layerUid":"L0","strokeId":"anchor"},
+        "geometry":{"kind":"cubic-path","closed":true,"coordinateSpace":"document-world","handleSpace":"relative",
+            "segments":[p(0.0, -3.0), p(200.0, -3.0), p(200.0, 3.0), p(0.0, 3.0)]},
+        "fill":{"kind":"solid","r":0,"g":0,"b":0,"a":1},
+        "vector":{"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"butt","strokeJoin":"miter",
+            "miterLimit":10,"dashOffset":0,"opacity":0},
+        "vectorExt":{"pressure":{"centerSegments":[c(0.0, 2.0), c(200.0, 6.0)],
+            "widthProfile":[{"t":0,"width":2},{"t":0.5,"width":20},{"t":1,"width":6}]},
+            "brushTexture":{"brushGroupId":"g","brushTexturePreset":"chalk-round","preTextureOpacity":1,"strokeSeed":seed}}})
+}
+
+#[test]
+fn a_textured_pressure_ribbon_stamps_along_its_centreline_through_its_profile() {
+    let oracle: Value = serde_json::from_str(ORACLE).unwrap();
+    let case = oracle["cases"].as_array().unwrap().iter().find(|c| c["id"] == "chalk-round/line/profile").unwrap();
+    let plan = plan_of(ribbon_record(case["seed"].as_u64().unwrap())).unwrap();
+    let dabs: Vec<_> = ordered_entries(&plan).skip(1).map(|e| match e { PaintEntry::Dab(d) => d, _ => panic!("a dab") }).collect();
+    assert_eq!(dabs.len() as u64, case["count"].as_u64().unwrap(), "the baseline count at the mean profile width");
+    for (made, dab) in dabs.iter().rev().enumerate().take(oracle["full"].as_u64().unwrap() as usize) {
+        let want: Vec<[f64; 2]> = case["dabs"][made]["parts"][0]["segments"].as_array().unwrap().iter()
+            .map(|s| [s[0].as_f64().unwrap(), s[1].as_f64().unwrap()]).collect();
+        let got: Vec<[f64; 2]> = dab.svg_contour.as_ref().unwrap().segments().iter().map(|s| s.point).collect();
+        assert_eq!(got.len(), want.len(), "dab {made}");
+        for (g, w) in got.iter().zip(&want) {
+            assert!((g[0] - w[0]).abs() <= 1.5e-6 && (g[1] - w[1]).abs() <= 1.5e-6, "dab {made}: {g:?} != {w:?}");
+        }
+    }
+}
