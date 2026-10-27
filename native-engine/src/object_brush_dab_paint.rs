@@ -1,8 +1,8 @@
 //! G16 option C (#2361): the dabs a seeded brush-texture anchor paints, joined into the paint plan right after the
-//! anchor's own (camouflaged) contour, in the baseline order. They are stamped over the path the compositor draws for
-//! the anchor (`ObjectRenderEntry::path`, so motion and poses are the evaluated ones) and carry prepared paint like
-//! duplicator copies do. An anchor native cannot stamp yet (a pressure ribbon, a custom preset) makes the plan
-//! unavailable rather than silently losing its texture.
+//! anchor's own (camouflaged) contour, in the baseline order. They are stamped over the stored stroke and posed with
+//! the path the compositor draws for the anchor (`ObjectRenderEntry::path`, so motion and poses are the evaluated ones),
+//! and carry prepared paint like duplicator copies do. An anchor native cannot stamp yet (a custom preset, a pose no
+//! affine carries) makes the plan unavailable rather than silently losing its texture.
 use crate::evaluation::brush_dab::paint::{anchor_dab_items, is_seeded_anchor, texture_group};
 use std::collections::HashSet;
 use crate::object_render_scene::object_scene_style_emit::{prepare_item, PreparedItem};
