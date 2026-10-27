@@ -97,5 +97,33 @@ for(const kind of ['rect','ellipse','star']){
   const intent={kind:'insert',curve:0,time:.5};
   run(p,false,intent,()=>{const loc=selected.curves[0].getLocationAtTime(.5),hit=selected.getNearestLocation(loc.point);intent.curve=hit.index;intent.time=hit.curve.getTimeAt(hit.curveOffset);c.insertVertexAt(selected,loc.point,1e-6);});
 }
+// Execute the original marquee completion on real inserted Paper paths. The input
+// matrices describe presentation geometry; the original receives those posed paths.
+const up=bridge.indexOf('  function onUp('),end=bridge.indexOf('    } else if (_nodeDrag.active &&',up);
+if(up<0||end<0)throw Error('Baseline marquee slice missing');
+vm.runInContext(bridge.slice(up,end)+'\n    }\n  }',c);
+const marquee=[];
+const square={closed:true,segments:[anchor(20,20),anchor(80,20),anchor(80,80),anchor(20,80)]};
+const inputs=[
+  {name:'topmost',items:[square,square],matrices:[[1,0,0,1,0,0],[1,0,0,1,5,5]],from:[0,0],to:[50,50]},
+  {name:'existing-target',items:[square,square],matrices:[[1,0,0,1,0,0],[1,0,0,1,5,5]],target:0,from:[0,0],to:[90,50]},
+  {name:'shear',items:[square],matrices:[[1.5,.2,.5,1,0,0]],from:[10,10],to:[80,100]},
+  {name:'reverse',items:[square],matrices:[[1.5,.2,.5,1,0,0]],from:[80,100],to:[10,10]},
+  {name:'empty',items:[square],matrices:[[1,0,0,1,0,0]],from:[0,0],to:[10,10]},
+  {name:'inside-without-anchors',items:[square],matrices:[[1,0,0,1,0,0]],from:[0,30],to:[40,40],target:0},
+  {name:'bounds-touch',items:[square],matrices:[[1,0,0,1,0,0]],from:[0,0],to:[20,20]},
+];
+for(const input of inputs){
+  const layer=new paper.Layer();
+  const paths=input.items.map((p,i)=>{const path=new paper.Path({insert:false,closed:p.closed,segments:p.segments.map(s=>[s.point,s.handleIn,s.handleOut])});path.transform(new paper.Matrix(...input.matrices[i]));layer.addChild(path);return path;});
+  if(paths.some(p=>p.parent!==layer))throw Error('Marquee fixture not inserted');
+  c.userLayers=[layer];c.selectedPaths=input.target===undefined?[]:[paths[input.target]];c._nodeSel=[];
+  c.nodeEditTargetPath=()=>c.selectedPaths[0]||null;c.nodeEditSegmentsData=p=>p.segments.map(s=>({point:[s.point.x,s.point.y]}));
+  c.clearSel=()=>{c.selectedPaths=[];c._nodeSel=[];};c.isSelectablePathChild=()=>true;c.getSI=p=>paths.indexOf(p);
+  c._nodeDrag={active:false};c._nmq={active:true,rect:{bounds:new paper.Rectangle(new paper.Point(input.from),new paper.Point(input.to)),remove:noop}};
+  c.onUp({stopImmediatePropagation:noop,preventDefault:noop});
+  marquee.push({...input,expected:{target:c.selectedPaths.length?paths.indexOf(c.selectedPaths[0]):null,indices:Array.from(c._nodeSel)}});
+  layer.remove();
+}
 const hashes=Object.fromEntries(Object.entries(sources).map(([p,s])=>[p,createHash('sha256').update(s).digest('hex')]));
-process.stdout.write(JSON.stringify({baseline,hashes,cases})+'\n');
+process.stdout.write(JSON.stringify({baseline,hashes,cases,marquee})+'\n');
