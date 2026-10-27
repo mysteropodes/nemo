@@ -46,6 +46,9 @@ pub(crate) fn anchors(record: &ObjectRecord) -> Result<Vec<Anchor>, Refusal> {
     if record.family != VECTOR_FAMILY {
         return Err(Refusal::Unsupported);
     }
+    if !(2..=256).contains(&record.geometry.segments.len()) {
+        return Err(Refusal::Limit);
+    }
     // These consumers require their own geometry/companion projection before a commit can be admitted.
     if record.vector_ext.value().is_some_and(|e| {
         !e.pressure.missing()
