@@ -31,16 +31,17 @@ const VALID = [
   ['boolean.erase', { command: 'object.boolean.erase', ...at, frame: 0, strokeId: 'stroke-1', footprint: [[0, 0], [4, 0], [4, 4]] }],
   ['boolean.flatten', { command: 'object.boolean.flatten', ...at, frame: 0, groupId: 'group-1' }],
   ['fill.trace', {command:'object.fill.trace',...cell,point:[20,20],color:'#336699ff',opacity:0.5,remove:false}],
+  ['fill.brush', {command:'object.fill.brush',...cell,outline:[[10,10],[60,10],[60,40]].map((p)=>({point:p,handleIn:[0,0],handleOut:[0,0]})),color:'#336699ff',opacity:0.5,placement:'below',mask:false,copies:[]}],
   ['clipboard.copy', { command: 'object.clipboard.copy', ...cell, mode: 'animation2d', strokeIds: ['stroke-1'] }],
   ['clipboard.cut', { command: 'object.clipboard.cut', ...cell, mode: 'motion', strokeIds: [] }],
 ];
 const envelope = (suffix, payload, extra) => Object.assign({ apiVersion: 2, requestId: 'edit-1', instanceId: 'instance-A', documentId: 'document-A',
   operation: P + suffix, expectedRevision: 7, payload }, extra);
 
-test('the contract admits exactly the 21 declared operations, all revisioned commands', () => {
+test('the contract admits exactly the 22 declared operations, all revisioned commands', () => {
   const edit = contract;
   assert.deepEqual(edit.OPERATIONS, VALID.map(([s]) => P + s));
-  assert.equal(edit.OPERATIONS.length, 21);
+  assert.equal(edit.OPERATIONS.length, 22);
   for (const op of edit.OPERATIONS) { assert.equal(edit.admitted(op), true); assert.equal(edit.requiresRevision(op), true); assert.equal(seam.admitted(op), true); }
   for (const op of ['command.document.object.layer.create', 'command.document.object.layer.policy.edit', 'command.document.object.fill.unknown', 'query.document.object', P + 'group', P + 'toString', '', null, undefined]) {
     assert.equal(edit.admitted(op), false, String(op));
@@ -170,7 +171,7 @@ test('capability descriptors and the closed transport schema declare exactly the
   for (const file of files) {
     const d = JSON.parse(fs.readFileSync(file, 'utf8'));
     assert.equal(d.schemaVersion, 2); assert.equal(d.apiVersion, 2); assert.deepEqual(d.availability, { state: 'available', reason: null });
-    assert.equal(d.authority.adapterOwnsWritableMirror, false); assert.equal(d.authority.fallback, 'none'); assert.equal(d.resourceBoundary.maxRequestBytes, 4096);
+    assert.equal(d.authority.adapterOwnsWritableMirror, false); assert.equal(d.authority.fallback, 'none'); assert.equal(d.resourceBoundary.maxRequestBytes, d.id === 'native.object.fill' ? 65536 : 4096, d.id);
     assert.equal(ids.has(d.id), false); ids.add(d.id);
     assert.equal(d.input.oneOf.length, d.operations.length);
     for (const example of d.examples) {
@@ -183,7 +184,7 @@ test('capability descriptors and the closed transport schema declare exactly the
     declared.push(...d.operations);
   }
   assert.deepEqual(declared.slice().sort(), contract.OPERATIONS.slice().sort());
-  assert.equal(new Set(declared).size, 21);
+  assert.equal(new Set(declared).size, 22);
   assert.deepEqual([...ids].sort(), ['native.object.boolean', 'native.object.fill', 'native.object.group', 'native.object.layer-lifecycle', 'native.object.selection-edit', 'native.object.subselect']);
   for (const [suffix, payload] of VALID) {
     const branches = schema.$defs.Request.oneOf.filter((b) => b.allOf[1].properties.operation.const === P + suffix);

@@ -41,7 +41,7 @@ enum K {
 
 /// (operation suffix, command, "member:kind ..." in wire order). Every operation is a revisioned command; only a
 /// duplicate names its minted identity; copy/cut carry a bounded clipboard; other receipts are compact.
-static SPECS: [(&str, &str, &str); 20] = [
+static SPECS: [(&str, &str, &str); 21] = [
     ("layer.delete", "object.layer.delete", "selection:selection"),
     (
         "layer.duplicate",
@@ -124,6 +124,7 @@ static SPECS: [(&str, &str, &str); 20] = [
         "layerUid:uid contextId:uid frame:frame groupId:uid",
     ),
     ("fill.trace","object.fill.trace","layerUid:uid contextId:uid frame:frame point:point color:color opacity:opacity remove:flag"),
+    ("fill.brush","object.fill.brush","layerUid:uid contextId:uid frame:frame outline:outline color:color opacity:opacity placement:placement mask:mask copies:copies"),
     ("clipboard.copy", "object.clipboard.copy", "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0"),
     ("clipboard.cut", "object.clipboard.cut", "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0"),
 ];

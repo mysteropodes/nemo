@@ -519,9 +519,9 @@ impl NativeOpacityApplication {
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 pub(crate) use object_fill_owner::image_import::{wire::ImageImport, ImageImportResult};
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
-pub(crate) use object_fill_owner::video_link::{wire::VideoLink, VideoLinkResult};
+pub(crate) use object_fill_owner::bitmap_stroke::wire::BitmapStroke;
 #[cfg(feature = "project_media_codec")]
-pub use object_fill_owner::video_link::LinkedVideoFacts;
+pub use object_fill_owner::video_link::exports::*;
 
 // Same sealed candidates; no extra document or history owner.
 #[cfg(feature = "history")]

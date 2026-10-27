@@ -16,6 +16,12 @@ use std::sync::Arc;
 
 #[path = "object_media_video_link_wire.rs"]
 pub(crate) mod wire;
+/// What `commands` re-exports, each name at its own visibility, through one glob.
+pub(crate) mod exports {
+    pub use super::LinkedVideoFacts;
+    #[cfg(feature = "history")]
+    pub(crate) use super::{wire::VideoLink, VideoLinkResult};
+}
 use wire::{VideoIntent, VideoLink, MAX_LOCATOR_BYTES};
 
 /// What the host's probe-then-close established about the canonical file.

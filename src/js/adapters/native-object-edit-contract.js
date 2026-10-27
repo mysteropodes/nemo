@@ -95,6 +95,14 @@
     color: (v,at)=>{if(typeof v!=='string'||!/^#[0-9a-fA-F]{8}$/.test(v))fail(at+' requires hex8');},
     opacity: (v,at)=>{if(typeof v!=='number'||!Number.isFinite(v)||v<0||v>1)fail(at+' invalid opacity');},
     flag: (v,at)=>{if(typeof v!=='boolean')fail(at+' requires boolean');},
+    // A Fill Brush outline: 3 to 256 closed-path segments, each point and relative handle a finite pair.
+    outline: (v,at)=>{if(!Array.isArray(v)||v.length<3||v.length>256)fail(at+' requires 3 to 256 segments');
+      v.forEach((s,i)=>{if(!s||typeof s!=='object'||Array.isArray(s)||Object.keys(s).sort().join()!=='handleIn,handleOut,point')fail(at+'['+i+'] invalid segment');
+        ['point','handleIn','handleOut'].forEach((k)=>FIELDS.point(s[k],at+'['+i+'].'+k));});},
+    placement: (v,at)=>{if(!['above','below','merge'].includes(v))fail(at+' requires above, below or merge');},
+    copies: (v,at)=>{if(!Array.isArray(v)||v.length>23)fail(at+' requires at most 23 copies');
+      v.forEach((m,i)=>{if(!Array.isArray(m)||m.length!==6||m.some((n)=>typeof n!=='number'||!Number.isFinite(n)||Math.abs(n)>1e12))fail(at+'['+i+'] invalid affine');});},
+    mask: (v,at)=>{if(v!==false&&!(typeof v==='string'&&v.length>0&&bytes(v)<=64&&!/[\u0000-\u001f\u007f-\u009f]/.test(v)))fail(at+' requires false or a mask mode');},
     uid: uid, layerUid: layerUid, layerUids: (v, at) => { list(v, at, 1, MAX_ITEMS, opaque); if (new Set(v).size !== v.length) fail(`${at} repeats a layer`); },
     gap: (v, at) => { if (typeof v !== 'number' || !Number.isFinite(v)) fail(`${at} must be a finite number`); },
     selection: selection, name: (v, at) => { if (typeof v !== 'string') fail(`${at} must be a string`); },
@@ -124,6 +132,7 @@
     'boolean.erase': ['object.boolean.erase', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['strokeId', 'strokeId'], ['footprint', 'footprint']]],
     'boolean.flatten': ['object.boolean.flatten', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['groupId', 'groupId']]],
     'fill.trace':['object.fill.trace','command',[['layerUid','uid'],['contextId','contextId'],['frame','frame'],['point','point'],['color','color'],['opacity','opacity'],['remove','flag']]],
+    'fill.brush':['object.fill.brush','command',[['layerUid','uid'],['contextId','contextId'],['frame','frame'],['outline','outline'],['color','color'],['opacity','opacity'],['placement','placement'],['mask','mask'],['copies','copies']]],
     'clipboard.copy': ['object.clipboard.copy', 'clipboard-copy', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['strokeIds', 'strokeIds0']]],
     'clipboard.cut': ['object.clipboard.cut', 'clipboard-cut', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['strokeIds', 'strokeIds0']]],
   };
@@ -188,5 +197,8 @@
   function commandOf(operation) { const entry = spec(operation); return entry ? entry[0] : null; }
   function members(operation) { const entry = spec(operation); return entry ? entry[2].map((m) => m[0]) : null; }
   function kinds(operation) { const entry = spec(operation); return entry ? entry[2].map((m) => m.slice()) : null; }
-  return Object.freeze({ OPERATIONS, admitted, requiresRevision: admitted, payload, result, correlate, paths: own.paths, compose, commandOf, members, kinds, bytes });
+  // The command runner's bound for an edit request: a Fill Brush outline (up to 256 segments) gets the vector-geometry bound,
+  // as the SDK does (native-object-vector-contract.js); every other edit stays at 4096.
+  const requestByteLimit = (op) => (op === PREFIX + 'fill.brush' ? 65536 : 4096);
+  return Object.freeze({ OPERATIONS, admitted, requiresRevision: admitted, payload, result, correlate, paths: own.paths, compose, commandOf, members, kinds, bytes, requestByteLimit });
 }));

@@ -1,8 +1,9 @@
 /* Ordinary native shape, Pen and bounded freehand gestures. Only pointer-local data and SVG preview live here;
  * the existing vector client and Project resource queue own every committed command. */
 (function(root,factory){var node=typeof module==='object'&&module.exports;
-  var api=factory(node?require('./native-object-draw-paint.js'):root.NemoNativeDrawPaint);if(node)module.exports=api;else root.NemoNativeObjectShapeTool=api;
-}(typeof globalThis==='object'?globalThis:this,function(Paint){
+  var api=factory(node?require('./native-object-draw-paint.js'):root.NemoNativeDrawPaint,node?require('./native-object-draw-symmetry.js'):root.NemoNativeDrawSymmetry);
+  if(node)module.exports=api;else root.NemoNativeObjectShapeTool=api;
+}(typeof globalThis==='object'?globalThis:this,function(Paint,Symmetry){
   'use strict';
   var tools=['line','rect','ellipse'],shapeTools=tools.concat(['star','speechbubble']);
   var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
@@ -14,7 +15,7 @@
   function consume(e){if(e&&e.stopImmediatePropagation)e.stopImmediatePropagation();if(e&&e.preventDefault)e.preventDefault();}
   function create(root,ports){
     var Mapping=ports.mapping;
-    var admitted=ports.freehand?['draw']:ports.pen?['pen']:tools,handled=ports.freehand?['draw','fillbrush']:ports.pen?['pen']:shapeTools;
+    var admitted=ports.freehand?['draw','fillbrush']:ports.pen?['pen']:tools,handled=ports.freehand?['draw','fillbrush']:ports.pen?['pen']:shapeTools;
     var drag=null,pending=null,uncertain=null,overlay=null,retired=false,settled=Promise.resolve({status:'idle'});
     function session(){return root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);}
     function nativeMode(){try{var s=session();return !!s&&s.blocksLegacy();}catch(_){return true;}}
@@ -37,7 +38,7 @@
       var perspective=port&&(proof?typeof port.readForCommand==='function'&&port.readForCommand(proof):port.read());
       if(s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||!perspective||!same(perspective.info,ownerInfo)||perspective.perspective.settings.perspectiveEnabled||s.activeSymbolId)fail('This drawing mode is unavailable in native shape tools.');
       if(ports.freehand)return ports.style();
-      if(ports.pen)return shadowStyle(s,penStyle(s));
+      if(ports.pen)return Paint.shadowStyle(root,s,penStyle(s));
       // Shadow mode inks the shape in the swatch whatever Stroke/Fill say (applyShadowBrushTag).
       if(typeof s.strokeEnabled!=='boolean'||typeof s.fillEnabled!=='boolean'||!s.shadowMode&&!s.strokeEnabled&&(tool==='line'||!s.fillEnabled))fail('Enable a supported stroke or fill to draw.');
       if(!Number.isFinite(s.brushSize)||s.brushSize<=0||!Number.isFinite(s.opacity)||s.opacity<0||s.opacity>100)fail('Native shape style is unavailable.');
@@ -50,17 +51,9 @@
       // Reuse applyStrokeStyle on a detached plain style, never a Paper item.
       if(tool==='line')Object.assign(out,ports.lineStyle());
       if(!['butt','round','square'].includes(out.strokeCap))fail('Native stroke cap is unavailable.');
-      return shadowStyle(s,out);
+      // tools.js Pen/Shape commit @1065e9d8 runs applyShadowBrushTag on the committed path in Shadow mode.
+      return Paint.shadowStyle(root,s,out);
     }
-    // tools.js Pen/Shape commit @1065e9d8 runs applyShadowBrushTag on the committed path in Shadow mode: the active
-    // native swatch travels with the style to the commit (dictionary's final pass), never into the live preview.
-    function shadowStyle(s,out){
-      if(!s.shadowMode)return out;
-      var sw=root.SMShadowBrush&&root.SMShadowBrush.activeSwatch();
-      if(!(sw&&typeof sw.id==='string'&&sw.id&&/^#(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/.test(sw.color)))fail('The Shadow Brush swatch is unavailable.');
-      out.shadowSwatch={id:sw.id,color:sw.color};return out;
-    }
-    function shade(out,final){var sw=out.shadowSwatch;delete out.shadowSwatch;return sw&&final?Paint.shadow(out,sw,false):out;}
     // tools.js Pen @1065e9d8: strokeColor/brushSize/cap/join/opacity, no fill, applyStrokeStyle dashes.
     function penStyle(s){
       if(s.taperEnds)fail('Tapered Pen strokes are unavailable in native Drawing.');
@@ -108,20 +101,20 @@
     function dictionary(t,end,final){
       if(ports.pen){
         var anchors=t.anchors.concat(end&&!t.handleDrag?[{point:end}]:[]);
-        return shade(Object.assign({},t.style,{closed:!!t.closed,segments:anchors.map(function(a){
+        return Paint.shade(Object.assign({},t.style,{closed:!!t.closed,segments:anchors.map(function(a){
           return {point:a.point.slice(),handleIn:(a.handleIn||[0,0]).slice(),handleOut:(a.handleOut||[0,0]).slice()};})}),final);
       }
       if(ports.freehand)return ports.dictionary(t.samples,t.style);
       var g=ports.geometry(t.tool,t.start[0],t.start[1],end[0],end[1]);
       var out=Object.assign({},t.style,{closed:g.closed,segments:g.segments.map(function(s){return {point:s.point.slice(),handleIn:(s.handleIn||[0,0]).slice(),handleOut:(s.handleOut||[0,0]).slice()};})});
       if(t.tool==='rect')out.paramShape={kind:'rect',tl:0,tr:0,br:0,bl:0,box:{x1:Math.min(t.start[0],end[0]),y1:Math.min(t.start[1],end[1]),x2:Math.max(t.start[0],end[0]),y2:Math.max(t.start[1],end[1])}};
-      return shade(out,final);
+      return Paint.shade(out,final);
     }
     // The live preview shows the stroke and, with symmetry on, every copy the commit will create
     // (symmetry-bridge.js onPreview @1065e9d8); a refused symmetry previews only the stroke itself.
     function preview(t,end){
       var d=root.document,dict=dictionary(t,end);if(!dict)return;
-      var dicts;try{dicts=symmetric(dict,t.pin);}catch(_){dicts=[dict];}
+      var dicts;try{dicts=Symmetry.copies(root,dict,t.pin,linkedCompanions.get(dict)||null);}catch(_){dicts=[dict];}
       if(!overlay){overlay=d.createElementNS('http://www.w3.org/2000/svg','svg');overlay.setAttribute('aria-hidden','true');
         Object.assign(overlay.style,{position:'fixed',pointerEvents:'none',zIndex:'20',left:t.bounds.left+'px',top:t.bounds.top+'px',width:t.bounds.width+'px',height:t.bounds.height+'px'});
         overlay.setAttribute('viewBox','0 0 '+t.pin.canvasW+' '+t.pin.canvasH);overlay.setAttribute('preserveAspectRatio','none');d.body.appendChild(overlay);}
@@ -135,40 +128,6 @@
         path.setAttribute('stroke-width',one.strokeWidth);path.setAttribute('stroke-linecap',one.strokeCap);path.setAttribute('stroke-linejoin',one.strokeJoin);path.setAttribute('opacity',one.opacity);
         if(one.dashArray)path.setAttribute('stroke-dasharray',one.dashArray.join(' '));path.setAttribute('stroke-dashoffset',one.dashOffset);path.setAttribute('stroke-miterlimit',one.miterLimit);
         path.setAttribute('paint-order',one.paintOrder==='strokeFirst'?'stroke fill':'fill stroke');});
-    }
-    // G23 (symmetry-bridge.js @1065e9d8, onStrokeCommitted): the stroke and its mirrored or rotated copies.
-    // Mirrors clip the committed stroke at the axis unless Extend is on, reflect points and handles and
-    // re-orient closed copies; radial adds n-1 rotations about the centre (2..24 sectors), stacked as the
-    // baseline's insertAbove leaves them (original, then copy n-1 down to copy 1).
-    function symmetric(dict,pin){
-      var s=root.state;if(!s.symmetryEnabled)return [dict];
-      if(dict.centerSegments||dict.isVectorBrush)fail('Symmetry with pressure brushes is unavailable in native Drawing.');
-      function map(d,fp,fv){return Object.assign({},d,{segments:d.segments.map(function(x){
-        return {point:fp(x.point[0],x.point[1]),handleIn:fv(x.handleIn[0],x.handleIn[1]),handleOut:fv(x.handleOut[0],x.handleOut[1])};})});}
-      var w=pin.canvasW,h=pin.canvasH;
-      if(s.symmetryMode==='radial'){
-        var c=s.symmetryRadialCenter||{x:w/2,y:h/2},n=Math.max(2,Math.min(24,s.symmetryRadialSectors|0||6)),out=[dict];
-        for(var k=n-1;k>=1;k--)(function(a){var cs=Math.cos(a),sn=Math.sin(a);
-          out.push(map(dict,function(x,y){var dx=x-c.x,dy=y-c.y;return [c.x+dx*cs-dy*sn,c.y+dx*sn+dy*cs];},function(x,y){return [x*cs-y*sn,x*sn+y*cs];}));})(k*2*Math.PI/n);
-        return out;
-      }
-      var cx=w/2,cy=h/2,r=Math.min(w,h)*0.4;
-      var axis=s.symmetryAxis||(s.symmetryMode==='x'?{x1:0,y1:cy,x2:w,y2:cy}:s.symmetryMode==='free'?{x1:cx-r,y1:cy-r,x2:cx+r,y2:cy+r}:{x1:cx,y1:0,x2:cx,y2:h});
-      var len=Math.hypot(axis.x2-axis.x1,axis.y2-axis.y1)||1,ux=(axis.x2-axis.x1)/len,uy=(axis.y2-axis.y1)/len;
-      function side(p){return (axis.x2-axis.x1)*(p[1]-axis.y1)-(axis.y2-axis.y1)*(p[0]-axis.x1)>=0;}
-      function vector(x,y){var t=x*ux+y*uy;return [2*t*ux-x,2*t*uy-y];}
-      function point(x,y){var t=(x-axis.x1)*ux+(y-axis.y1)*uy;return [2*(axis.x1+t*ux)-x,2*(axis.y1+t*uy)-y];}
-      var base=dict;
-      if(!s.symmetryExtend&&dict.segments.length){
-        var first=side(dict.segments[0].point),cut=dict.segments.length;
-        for(var i=1;i<dict.segments.length;i++)if(side(dict.segments[i].point)!==first){cut=i;break;}
-        // The baseline keeps a one-anchor remnant; a native path needs two, so refuse rather than drop it silently.
-        if(cut<2)fail('This stroke starts at the symmetry axis; nothing remains to mirror.');
-        base=Object.assign({},dict,{segments:dict.segments.slice(0,cut)});
-      }
-      var mirrored=map(base,point,vector);
-      if(mirrored.closed)mirrored=Object.assign({},mirrored,{segments:mirrored.segments.slice().reverse().map(function(x){return {point:x.point,handleIn:x.handleOut,handleOut:x.handleIn};})});
-      return [base,mirrored];
     }
     function commit(t,end){
       if(!current(t,true))return Promise.resolve({status:'cancelled'});
@@ -187,11 +146,15 @@
         if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});
         return action({reconcile:ctx.reconcile,dispatch:function(q){if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});return ctx.dispatch(q);}});
       });}};
+      // draw-bridge.js Fill Brush: one native command places the shape (fillBrushMode) and merges same-colour fills.
+      if(dict.isFillShape)return root.NemoNativeFillDesktop.create({current:function(){return guarded;},ready:function(){return true;},
+        target:function(){return {layerUid:t.layerUid,frame:t.frame,contextId:'scene-root'};}}).brush({outline:dict.segments,color:dict.fillColor,opacity:dict.opacity,placement:root.state.fillBrushMode,mask:root.state.maskMode?root.state.maskModeType||'add':false,copies:Symmetry.matrices(root,t.pin)})
+        .then(function(r){return {status:r&&r.applied?'applied':'noop'};},root.NemoNativeObjectVector.statusOf);
       // tools.js @1065e9d8 Draw commit: drawMode 'behind' slips the stroke under the layer's artwork.
-      var vector=root.NemoNativeObjectVector.create(guarded),dicts=symmetric(dict,t.pin);
-      // The linked fill lies below its ribbon: one createMany in that order (behind keeps the order at the bottom).
+      // G23 (symmetry-bridge.js onStrokeCommitted @1065e9d8): the stroke and its copies, each linked fill below its ribbon,
+      // in one createMany (behind keeps the order at the bottom).
+      var vector=root.NemoNativeObjectVector.create(guarded),dicts=Symmetry.copies(root,dict,t.pin,companion);
       var group=companion?[companion,dict]:[dict];
-      if(companion)dicts=group;
       var options={origin:t.pin,placement:ports.freehand&&t.behind?'behind':'front'};
       // draw-bridge.js @1065e9d8 Trim Stroke Ends: a Draw commit trims before its symmetry copies exist; native shares the cuts.
       if(ports.freehand&&root.state.trimStrokeEnds&&root.state.trimStrokeEndsMax>0)options.trimEnds=root.state.trimStrokeEndsMax;
@@ -330,9 +293,13 @@
     var sampleVectorBrushCenterline=root.sampleVectorBrushCenterline,buildVariableWidthPath=root.buildVariableWidthPath;
     var simplifyIfNeeded=root.simplifyIfNeeded,applyStrokeStyle=root.applyStrokeStyle;
     function nativeDrawStyle() {
-      var state=root.state;
+      var state=root.state,fb=state.tool==='fillbrush';
+      // Fill Brush (draw-bridge's isFillBrush branch) draws no texture, bitmap or Trim and ignores drawMode; a Labs-processed
+      // Fill Brush stroke is not native yet.
+      if (fb && (['above','below','merge'].indexOf(state.fillBrushMode) < 0 ||
+          root.SMLabs && root.SMLabs.list().some(function(p){return p.on;}))) throw new Error('This Fill Brush combination is unavailable in native Drawing.');
       // Trim measures the whole stroke before the stop-at-axis clip (draw-bridge then symmetry-bridge); native would trim the clipped one.
-      if (state.tool !== 'draw' || state.bitmapBrushOn && !state.shadowMode || state.trimStrokeEnds && (state.vectorBrush || state.symmetryEnabled && !state.symmetryExtend) ||
+      if (!fb && (state.tool !== 'draw' || state.bitmapBrushOn && !state.shadowMode || state.trimStrokeEnds && (state.vectorBrush || state.symmetryEnabled && !state.symmetryExtend) ||
           state.drawMode !== 'front' && state.drawMode !== 'behind' ||
           // G16 option C (#2361): one seeded anchor whose dabs native stamps; the key resolves as resolveBrushPreset (a built-in,
           // else a confirmed native catalog record). A key neither holds, and texture with symmetry or Trim, stay unavailable.
@@ -340,19 +307,17 @@
             root.NemoNativeCustomBrushUI && root.NemoNativeCustomBrushUI.record(root, state.brushPreset)) ||
             state.strokeEnabled && (state.symmetryEnabled || state.trimStrokeEnds)) ||
           root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
-            ? root.SMLabs.unmigratedDrawHooks().length > 0 : root.SMLabs.list().some(function(p){return p.on;})))
+            ? root.SMLabs.unmigratedDrawHooks().length > 0 : root.SMLabs.list().some(function(p){return p.on;}))))
         throw new Error('This brush combination is unavailable in native Drawing.');
       if (typeof state.vectorBrush !== 'boolean' || typeof state.strokeEnabled !== 'boolean' || typeof state.fillEnabled !== 'boolean' ||
-          !state.strokeEnabled && !state.fillEnabled)
+          !fb && !state.strokeEnabled && !state.fillEnabled)
         throw new Error('Enable a stroke or a fill to draw.');
       var keys = ['vectorBrush','strokeEnabled','fillEnabled','strokeColor','fillColor','brushSize','opacity','strokeCap','strokeJoin','brushPreset',
         'strokeStyle','miterLimit','dashOffset','paintOrder','smoothing','stabilizer','taperEnds','pressureMin','pressureMax',
-        'pressureInvert','pressureCurve','pressureCurvePoints','brushAngle','brushAngleFactor'];
+        'pressureInvert','pressureCurve','pressureCurvePoints','brushAngle','brushAngleFactor','tool','fillBrushMode'];
       var out = {}; keys.forEach(function(k){if(state[k] !== undefined)out[k]=state[k];});
-      var hex = /^#(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/, sw = state.shadowMode && root.SMShadowBrush && root.SMShadowBrush.activeSwatch();
-      if (state.shadowMode && !(sw && typeof sw.id === 'string' && sw.id && hex.test(sw.color))) throw new Error('The Shadow Brush swatch is unavailable.');
-      if (sw) out.shadowSwatch = { id: sw.id, color: sw.color };
-      if (state.strokeEnabled && !hex.test(state.strokeColor) || state.fillEnabled && !hex.test(state.fillColor) ||
+      var hex = /^#(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/;Paint.shadowStyle(root, state, out);
+      if (state.strokeEnabled && !hex.test(state.strokeColor) || (state.fillEnabled || fb) && !hex.test(state.fillColor) ||
           !Number.isFinite(state.brushSize) || state.brushSize <= 0 || !Number.isFinite(state.opacity) || state.opacity < 0 || state.opacity > 100 ||
           !Number.isFinite(state.smoothing) || state.smoothing < 0 || !Number.isInteger(state.stabilizer) || state.stabilizer < 0 || state.stabilizer > 6 ||
           !['butt','round','square'].includes(state.strokeCap) || !['miter','round','bevel'].includes(state.strokeJoin) ||
@@ -403,6 +368,7 @@
       var out={strokeColor:style.strokeEnabled?style.strokeColor:null,hasRealStroke:style.strokeEnabled,strokeWidth:style.brushSize,
         strokeCap:style.strokeCap,strokeJoin:style.strokeJoin,fillColor:style.fillEnabled?style.fillColor:null,opacity:style.opacity/100};
       function segments(item){return item.segments.map(function(s){return {point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};});}
+      if(style.tool==='fillbrush')return Paint.fillBrush(root,pts,widths,style,segments);
       // draw-bridge.js @1065e9d8: a pressure stroke with Stroke off is one closed fill of its smoothed centreline, no ribbon
       // and no taper, at the Paper defaults of a new Path.
       if(style.vectorBrush&&!style.strokeEnabled){
