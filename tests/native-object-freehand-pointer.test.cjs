@@ -615,7 +615,10 @@ test('a mirrored or rotated pressure ribbon commits each copy with its own centr
  const at=(rec)=>rec.vectorExt.pressure.centerSegments[0].point,o=at(rq.records[0]);
  [[2,4*Math.PI/3],[1,2*Math.PI/3]].forEach(([k,a],i)=>{const p=at(rq.records[i+1]),dx=o.x-160,dy=o.y-90;
   assert.ok(Math.abs(p.x-(160+dx*Math.cos(a)-dy*Math.sin(a)))<1e-6&&Math.abs(p.y-(90+dx*Math.sin(a)+dy*Math.cos(a)))<1e-6,'copy '+k);});
- // Stop-at-axis clips only a ribbon's outline in the baseline, never its centreline: refused rather than inconsistent.
+ // Stop-at-axis clips only a ribbon's outline, never its centreline (live against the baseline in
+ // native-object-draw-symmetry-stop-axis.test.cjs). This stroke stays left of x = 160, so it commits as with Extend.
  const stop=await fixture();Object.assign(stop.root.state,{vectorBrush:true,symmetryEnabled:true,symmetryMode:'y',symmetryExtend:false});
- pen(stop);await settled(stop);assert.equal(stop.calls.length,0);assert.ok(stop.log.some((s)=>/Stop-at-axis symmetry with pressure brushes/.test(s)),stop.log.join(','));
+ pen(stop);await settled(stop);assert.equal(stop.calls.length,1,stop.log.join(','));const sq=plain(stop.calls[0].payload);
+ assert.equal(sq.records.length,4);assert.deepEqual(sq.records[1].geometry,ribbon0.geometry);
+ assert.deepEqual(sq.records[1].vectorExt.pressure.centerSegments,c0);
 });
