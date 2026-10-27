@@ -438,6 +438,14 @@ mod raster_join_tests;
 ))]
 #[path = "../tests/object_component_render_image.rs"]
 mod component_image_tests;
+#[cfg(all(
+    test,
+    feature = "history",
+    feature = "application",
+    feature = "project_media_codec"
+))]
+#[path = "../tests/object_component_convert_images.rs"]
+mod component_convert_image_tests;
 
 #[path = "object_subselect_projection.rs"]
 mod subselect_projection;

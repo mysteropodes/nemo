@@ -14,7 +14,9 @@ pub(crate) struct RasterSource {
     /// Rig-posed offsets of the mesh (one per stored vertex), from the one pose evaluation of the scene join.
     rig_offsets: Option<Vec<[f64; 2]>>,
     /// An image of a placed component: `layer_index` is its host, `source.rect` is already the
-    /// baseline's instance placement, no scene chain applies, and it paints at the host slot.
+    /// baseline's instance placement, no scene chain applies, and it paints at the host slot. A
+    /// component placed twice gives two sources with the same `source_index`; only the pair with
+    /// `layer_index` is unique.
     pub(crate) placed: bool,
     pub(crate) source: RasterSceneSource,
 }

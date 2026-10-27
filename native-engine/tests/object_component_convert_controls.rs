@@ -429,7 +429,7 @@ fn every_single_deviation_of_the_time_window_is_noticed() {
 
 #[test]
 fn items_that_cannot_enter_a_component_refuse_the_conversion_never_stay_behind() {
-    // Raster items and text blocks live in `items`, which the component record has no member for.
+    // A text block has no placed component paint yet (plain images move: object_component_convert_images.rs).
     let doc = decode(&s1_with_item("ly_hand", 3));
     assert!(
         doc.item_records().is_some(),
