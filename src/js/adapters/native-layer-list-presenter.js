@@ -42,12 +42,15 @@
     return {rows:context.info.layers.map(function(layer,i){return row(context.document,layer,i,context);})};
   }
   // Mounts this default presenter unless a replacement registered first, then presents; rows must map one to one
-  // onto the read-model layers.
+  // onto the read-model layers. A row is an element: its children are a DOM HTMLCollection, not an Array.
+  function element(row){
+    var kids=row&&typeof row==='object'?row.children:null;
+    return !!kids&&typeof kids==='object'&&typeof kids.length==='number';
+  }
   function mountRows(root,seam,context){
     if(!seam.isMounted(root,'layer-list'))seam.register(root,'layer-list',api);
     var result=seam.present(root,'layer-list',context),rows=result&&result.rows;
-    if(!Array.isArray(rows)||rows.length!==context.info.layers.length||
-      !rows.every(function(row){return row&&typeof row==='object'&&Array.isArray(row.children);}))
+    if(!Array.isArray(rows)||rows.length!==context.info.layers.length||!rows.every(element))
       throw new Error('Native layer-list presenter returned rows that do not match the read model');
     return rows;
   }
