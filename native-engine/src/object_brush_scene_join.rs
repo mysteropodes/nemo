@@ -211,13 +211,17 @@ pub(crate) fn prepare_object_render_scene_with_brush(
     let brushes = prepare(packet, runtime, previous, limits, retire)?;
     let claimed = brushes.claimed_rasters();
     let contours = object_scene_producer_contour::produce(packet).into_admitted()?;
+    let duplicators = Arc::new(duplicator_scene::prepare(packet)?);
+    let mut rasters = raster_scene::sources_excluding(packet, &claimed)?;
+    let texts = text_scene::prepare(packet)?;
+    let components = component_scene::prepare(packet, expected, &mut rasters)?;
     Ok(crate::object_render_scene::ObjectRenderScene {
         packet: packet.clone(),
-        duplicators: Arc::new(duplicator_scene::prepare(packet)?),
+        duplicators,
         contours: contours.into(),
-        rasters: raster_scene::sources_excluding(packet, &claimed)?.into(),
-        texts: text_scene::prepare(packet)?,
-        components: component_scene::prepare(packet, expected)?,
+        rasters: rasters.into(),
+        texts,
+        components,
         videos: media_scene::slots(packet)?.into(),
         brushes: Some(Arc::new(brushes)),
     })
