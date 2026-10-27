@@ -168,10 +168,13 @@ test('both existing moving-average and Ready modeler input paths retain the actu
   assert.equal(f.paper.project.activeLayer.children.length,0);
  }
 });
-test('256 outline anchors and 65536 full envelope are hard refusals with no trimming, split commit or local writer',async()=>{
+test('an outline past 256 anchors is refitted into one record; the 65536 full envelope stays a hard refusal with no split commit or local writer',async()=>{
  const anchors=await fixture();send(anchors,'pointerdown',20,20);
  const many=Array.from({length:256},(_,i)=>({clientX:40+(21+i)*2,clientY:100+i%2}));send(anchors,'pointermove',276,25,{getCoalescedEvents:()=>many});send(anchors,'pointerup',278,25);
- assert.equal((await settled(anchors)).status,'unmapped');assert.equal(anchors.calls.length,0);assert.equal(anchors.records.size,0);
+ assert.equal((await settled(anchors)).status,'applied');assert.equal(anchors.calls.length,1);
+ const fitted=anchors.calls[0].payload.record.geometry.segments;assert.ok(fitted.length>=2&&fitted.length<=256,String(fitted.length));
+ assert.deepEqual([plain(fitted[0].point),plain(fitted[fitted.length-1].point)],[{x:20,y:20},{x:278,y:25}],'the refit keeps both ends');
+ assert.equal(anchors.paper.project.activeLayer.children.length,0);
  const bytes=await fixture();Object.assign(bytes.root.state,{vectorBrush:true,fillEnabled:false});send(bytes,'pointerdown',20,20,{pointerType:'pen',pressure:.5});
  const dense=Array.from({length:900},(_,i)=>({clientX:80+i/20,clientY:90+i%2/100,pointerType:'pen',pressure:.3+i%10/20}));
  send(bytes,'pointermove',42,21,{getCoalescedEvents:()=>dense});send(bytes,'pointerup',43,21,{pointerType:'pen',pressure:.5});const result=await settled(bytes);
@@ -246,6 +249,14 @@ test('a whole freehand loop remains one transaction even when its release return
  assert.equal((await settled(f)).status,'applied');assert.equal(f.calls.length,1);assert.equal(f.calls[0].payload.record.geometry.segments.length,5);assert.equal(f.calls[0].payload.record.geometry.closed,false);
 });
 
+test('a closed pressure fill past 256 anchors commits one closed refitted record (#2343 B1)',async()=>{
+ const f=await fixture();Object.assign(f.root.state,{vectorBrush:true,strokeEnabled:false,fillEnabled:true,smoothing:0});
+ const at=(i)=>[20+i*.9,90+40*Math.sin(i/12)];send(f,'pointerdown',...at(0),{pointerType:'pen',pressure:.5});
+ const dense=Array.from({length:300},(_,i)=>{const [x,y]=at(i+1);return {clientX:40+x*2,clientY:50+y*2,pointerType:'pen',pressure:.5};});
+ send(f,'pointermove',...at(300),{getCoalescedEvents:()=>dense});send(f,'pointerup',...at(301),{pointerType:'pen',pressure:.5});
+ const result=await settled(f);assert.equal(result.status,'applied',JSON.stringify(result).slice(0,300));assert.equal(f.calls.length,1);
+ const g=plain(f.calls[0].payload).record.geometry;assert.equal(g.closed,true);assert.ok(g.segments.length>=2&&g.segments.length<=256,String(g.segments.length));
+});
 test('exactly256 ordinary polyline anchors are admitted as one full record without a size-driven fit',async()=>{
  const f=await fixture();send(f,'pointerdown',20,20);const points=Array.from({length:254},(_,i)=>({clientX:82+i*2,clientY:90+i%3}));
  send(f,'pointermove',274,21,{getCoalescedEvents:()=>points});send(f,'pointerup',276,21);assert.equal((await settled(f)).status,'applied');
