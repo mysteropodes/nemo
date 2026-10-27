@@ -30,6 +30,8 @@ use crate::request_receipts::DispatchErrorCode;
 
 #[path = "object_fill_trace_owner.rs"]
 mod fill_trace;
+#[path = "object_fill_brush_owner.rs"]
+mod fill_brush;
 #[cfg(feature = "evaluation")]
 #[path = "object_boolean_frame_motion.rs"]
 mod frame_motion;
@@ -107,6 +109,7 @@ pub(crate) enum BooleanEditKind {
     Erase,
     Flatten,
     FillTrace,
+    FillBrush,
 }
 
 /// A detached candidate sealed to the snapshot it was planned from. Only this

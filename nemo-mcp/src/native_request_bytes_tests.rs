@@ -215,3 +215,12 @@ async fn actual_guarded_stdio_keeps_wrapper_budget_and_rejects_native_spans_or_d
         "legacy malformed syntax stays on the existing SDK error path"
     );
 }
+
+#[test]
+fn a_fill_brush_outline_gets_the_vector_geometry_bound_and_nothing_else_widens() {
+    assert_eq!(super::request_limit("command.document.object.fill.brush"), super::MAX_REQUEST_BYTES);
+    assert_eq!(super::request_limit("command.document.object.vector.edit"), super::MAX_REQUEST_BYTES);
+    for ordinary in ["command.document.object.fill.trace", "command.document.object.boolean.apply"] {
+        assert_eq!(super::request_limit(ordinary), crate::contract::NATIVE_MAX_MESSAGE_BYTES, "{ordinary}");
+    }
+}

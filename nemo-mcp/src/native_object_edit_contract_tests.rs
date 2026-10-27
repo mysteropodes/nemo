@@ -91,6 +91,11 @@ pub(super) fn valid() -> Vec<(&'static str, Value)> {
             "point":[20,20],"color":"#336699ff","opacity":0.5,"remove":false}),
         ),
         (
+            "fill.brush",
+            json!({"command":"object.fill.brush","layerUid":"layer-a","contextId":"scene-root","frame":0,
+            "outline":[{"point":[10,10],"handleIn":[0,0],"handleOut":[0,0]},{"point":[60,10],"handleIn":[0,0],"handleOut":[0,0]},{"point":[60,40],"handleIn":[0,0],"handleOut":[0,0]}],"color":"#336699ff","opacity":0.5,"placement":"merge"}),
+        ),
+        (
             "clipboard.copy",
             json!({"command":"object.clipboard.copy","contextId":"scene-root","layerUid":"layer-a","frame":2,"mode":"animation2d","strokeIds":["stroke-1"]}),
         ),
@@ -138,10 +143,11 @@ fn the_twenty_declared_commands_are_exactly_the_admitted_operations() {
         "boolean.erase",
         "boolean.flatten",
         "fill.trace",
+        "fill.brush",
         "clipboard.copy",
         "clipboard.cut",
     ];
-    assert_eq!(SPECS.len(), 20);
+    assert_eq!(SPECS.len(), 21);
     assert_eq!(
         valid().iter().map(|(s, _)| *s).collect::<Vec<_>>(),
         expected

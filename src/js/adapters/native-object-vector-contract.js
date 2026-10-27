@@ -15,10 +15,11 @@
   const EFFECTS = 'command.document.object.path.effects.edit';
   const OPS = new Set([VECTOR, PARAMETRIC, EFFECTS]);
   const FAMILY = 'editable-vector-path';
-  // Full encoded request envelopes: vector edits may carry a complete 256-anchor record;
-  // every other operation keeps the default bound. Replies remain bounded separately.
-  const MAX_REQUEST_BYTES = 4096, ENGINE_VECTOR_REQUEST_BYTES = 65536;
-  const requestByteLimit = (operation) => operation === VECTOR ? ENGINE_VECTOR_REQUEST_BYTES : MAX_REQUEST_BYTES;
+  // Full encoded request envelopes: vector edits may carry a complete 256-anchor record, and the Fill Brush commit
+  // (an edit-contract operation) a 256-segment outline; every other operation keeps the default bound. Replies remain
+  // bounded separately.
+  const MAX_REQUEST_BYTES = 4096, ENGINE_VECTOR_REQUEST_BYTES = 65536, FILL_BRUSH = 'command.document.object.fill.brush';
+  const requestByteLimit = (operation) => operation === VECTOR || operation === FILL_BRUSH ? ENGINE_VECTOR_REQUEST_BYTES : MAX_REQUEST_BYTES;
   const MAX_ANCHORS = 256, MAX_FRAME = 4294967295;
   const CAPS = ['butt', 'round', 'square'], JOINS = ['miter', 'round', 'bevel'], ORDERS = ['fillFirst', 'strokeFirst'];
   const PROFILES = ['taper-in', 'taper-out', 'taper-both', 'bulge', 'even'];

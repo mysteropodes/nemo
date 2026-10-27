@@ -8260,6 +8260,23 @@
         {
           "allOf": [
             {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.fill.brush"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectFillBrushPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
               "$ref": "#/$defs/ForbiddenRevisionRequest"
             },
             {
@@ -12939,6 +12956,96 @@
         },
         "remove": {
           "type": "boolean"
+        }
+      }
+    },
+    "ObjectFillBrushPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "contextId",
+        "frame",
+        "outline",
+        "color",
+        "opacity",
+        "placement"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.fill.brush"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "outline": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "point",
+              "handleIn",
+              "handleOut"
+            ],
+            "properties": {
+              "point": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000
+                }
+              },
+              "handleIn": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000
+                }
+              },
+              "handleOut": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000
+                }
+              }
+            }
+          }
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{8}$"
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "placement": {
+          "enum": [
+            "above",
+            "below",
+            "merge"
+          ]
         }
       }
     },
