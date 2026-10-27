@@ -29,11 +29,12 @@
 //! registry); an unknown layer is refused instead of silently skipped. Motion holders
 //! follow their stable identities through the existing native holder table; the first
 //! merged layer's expression/control chain belongs to the outer instance exactly once.
-//! A layer with raster items or text blocks is refused (`Unavailable`, `component-convert-items`)
-//! because the component record has no `items` member (the baseline carries a raster
-//! with its frames), never left behind on an instance that no longer owns the strokes.
+//! A layer's plain images move into the component with their stack position
+//! (`object_component_convert_items.rs`). A layer holding text, brush rasters or mesh-bound
+//! images is refused (`Unavailable`, `component-convert-items`), never left behind on an
+//! instance that no longer owns the strokes.
 use crate::commands::object_fill_owner::component_owner::object_component_convert_support::{
-    add_instance_module, append_layer, empty_component_set, items_on, layer_index, lift_window,
+    add_instance_module, append_layer, empty_component_set, layer_index, lift_window,
     mint_layer_uid, mint_symbol_id, new_instance, require_v2, update, with_tables, PermitAll,
     SetupError, SetupPlan, SourceRefusal,
 };
@@ -52,6 +53,8 @@ use crate::object_document::{
 
 #[path = "object_component_convert_holders.rs"]
 mod holders;
+#[path = "object_component_convert_items.rs"]
+mod items;
 
 /// What a layer is, as far as the baseline refusal list needs it. The native
 /// document stores a record for three of the eight kinds (a component instance in
@@ -171,7 +174,7 @@ pub(crate) fn plan_convert(
     }
     for &index in &indices {
         let layer_uid = document.layers[index].layer_uid();
-        if items_on(document, layer_uid) {
+        if items::refused_on(document, layer_uid) {
             return Err(SetupError::ItemsUnavailable {
                 layer_uid: layer_uid.to_string(),
             });
@@ -216,6 +219,13 @@ fn convert_single(
         exposed_props: Presence::Missing,
     };
     let mut candidate = document.clone();
+    let order = items::move_images(
+        &mut candidate,
+        document,
+        &symbol_id,
+        &[(uid.clone(), inner_uid.clone())],
+    )?;
+    items::declare(&mut candidate, order);
     candidate.property_holders = holders::single(document, &uid, &symbol_id, &inner_uid);
     drop_scene_objects(&mut candidate, &uid)?;
     let instance = &mut candidate.layers[index];
@@ -310,6 +320,8 @@ fn convert_merge(
         .and_then(|set| set.duplicator(SCENE_CONTEXT, &gone[0]))
         .map(|found| found.duplicator.clone());
     let mut candidate = document.clone();
+    let pairs: Vec<_> = gone.iter().map(|uid| (uid.clone(), uid.clone())).collect();
+    let order = items::move_images(&mut candidate, document, &symbol_id, &pairs)?;
     append_layer(&mut candidate, instance)?;
     with_tables(&mut candidate, |tables| {
         update(&mut tables.components, empty_component_set, |set| {
@@ -356,6 +368,7 @@ fn convert_merge(
     // Root-layer deletion cannot identify a same-UID holder in another context.
     // Restore the complete scoped transform of the retained origin after deletion.
     removed.document.property_holders = holders::merged(document, &gone, &symbol_id, &instance_uid);
+    items::declare(&mut removed.document, order);
     Ok(SetupPlan {
         document: removed.document,
         changed: true,

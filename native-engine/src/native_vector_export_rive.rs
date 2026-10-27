@@ -1,4 +1,4 @@
-//! Native Rive export plan over pinned paint plans (#2357 G44, increment 1).
+//! Native Rive export plan over pinned paint plans (#2357 G44).
 //!
 //! Mirrors the baseline exporter (`exportRive` and its helpers in `src/js/rive-export.js` @1065e9d8), which builds the
 //! animation in a running Rive Editor over its MCP tools. This module is the pure half: from one paint plan per frame of
@@ -11,10 +11,13 @@
 //! Paths are the geometry the compositor draws, as for the Lottie writer, so motion and poses are the evaluated ones.
 //! Paint comes from the run's first stroke, as the baseline reads `firstSd`. Colours are the hex the baseline stores
 //! (`colorHex8`: six digits when opaque, eight otherwise), so `riveColorHex` keeps a translucent colour's own alpha and
-//! gives an opaque one the stroke opacity. Dropped as the baseline drops them: zero-opacity strokes. Refused, until later
-//! increments admit them with oracle rows: rasters (the baseline throws on them), text, components, duplicators, dabs
-//! and brush-texture wobble, bitmap brush, video, a stored camera, legacy fill records and a layer opacity factor other
-//! than one (the baseline reads no layer opacity).
+//! gives an opaque one the stroke opacity. A seeded brush-texture anchor is written as the baseline writes it: its dabs
+//! stay out (`isBrushTextureCopy`), and its own path wobbles by the preset's nib, scatter and spacing (`riveApplyWobble`,
+//! seeded by its stroke id), painted at its remembered opacity. A stored camera becomes, as in the baseline, a component
+//! artboard holding the drawing that the main artboard instances and moves by the inverse camera on every frame.
+//! Dropped as the baseline drops them: zero-opacity strokes without a texture. Refused, until later increments admit
+//! them with oracle rows: rasters (the baseline throws on them), text, components, duplicators, bitmap brush, video,
+//! legacy fill records and a layer opacity factor other than one (the baseline reads no layer opacity).
 use crate::object_render_scene::{ordered_entries, ObjectPaintPlan, PaintEntry};
 use serde_json::{Number, Value};
 use std::collections::HashMap;
@@ -23,8 +26,11 @@ use std::collections::HashMap;
 pub(crate) mod driver;
 #[path = "native_vector_export_rive_shapes.rs"]
 pub(crate) mod shapes;
+use shapes::{
+    apply_wobble, cubic_vertices, float, geometry, hash_seed, paints, point_command, rgba,
+    straight, translation, wobble_params,
+};
 pub(crate) use shapes::{color_hex, num};
-use shapes::{cubic_vertices, float, geometry, paints, point_command, rgba, straight, translation};
 
 /// The range and the document facts the baseline reads from `state`; the artboard name carries the export clock.
 #[derive(Debug, Clone, PartialEq)]
@@ -54,6 +60,10 @@ pub(crate) enum RiveExportError {
         reason: &'static str,
     },
     NonFinite,
+    /// The stored camera of a frame could not be read.
+    CameraUnavailable {
+        frame: u32,
+    },
     /// The editor refused a call or its reply lacks what the baseline reads from it.
     Editor {
         reason: &'static str,
@@ -75,6 +85,9 @@ pub(crate) struct Stroke {
     width: f64,
     real: bool,
     opacity: f64,
+    /// `brushTexturePreset` and `preTextureOpacity` of a seeded brush-texture anchor.
+    texture: Option<String>,
+    pre_texture_opacity: Option<f64>,
 }
 
 /// `riveSignature`: two frames of a lane are the same stroke when geometry, closure, fill, a real stroke's colour,
@@ -95,18 +108,6 @@ fn strokes_by_layer(
     plan: &ObjectPaintPlan,
     layers: usize,
 ) -> Result<Vec<Vec<Stroke>>, RiveExportError> {
-    if plan
-        .packet()
-        .stored_camera_matrix()
-        .ok()
-        .flatten()
-        .is_some()
-    {
-        return Err(RiveExportError::UnsupportedLayer {
-            source_layer_index: 0,
-            reason: "a stored camera has no admitted Rive representation yet",
-        });
-    }
     let mut out: Vec<Vec<Stroke>> = (0..layers).map(|_| Vec::new()).collect();
     for entry in ordered_entries(plan) {
         let refuse = |source_object_index, reason| {
@@ -141,12 +142,8 @@ fn strokes_by_layer(
                     "duplicator copies have no admitted Rive representation yet",
                 )
             }
-            PaintEntry::Dab(dab) => {
-                return refuse(
-                    dab.source_index,
-                    "brush-texture wobble has no admitted Rive representation yet",
-                )
-            }
+            // `!sd.isBrushTextureCopy`: the dabs stay out; the anchor is written with its own wobble.
+            PaintEntry::Dab(_) => continue,
             PaintEntry::Video(index) => {
                 return Err(RiveExportError::UnsupportedLayer {
                     source_layer_index: plan.video_slots()[index].layer_index,
@@ -169,22 +166,25 @@ fn strokes_by_layer(
                 "legacy fill records have no admitted Rive representation yet",
             );
         }
-        if record
+        let texture = record
             .vector_ext
             .value()
-            .is_some_and(|e| e.brush_texture.value().is_some())
-        {
-            return refuse(
-                index,
-                "brush-texture wobble has no admitted Rive representation yet",
-            );
-        }
+            .and_then(|e| e.brush_texture.value());
+        let preset = texture
+            .and_then(|t| t.brush_texture_preset.value())
+            .filter(|k| !k.is_empty())
+            .cloned();
+        let pre_texture_opacity = match texture.and_then(|t| t.pre_texture_opacity.value()) {
+            Some(n) => Some(float(n)?),
+            None => None,
+        };
         let body = record.vector().ok_or(RiveExportError::Unsupported {
             source_object_index: index,
             reason: "vector body missing",
         })?;
+        // `sd.opacity !== 0 || sd.brushTexturePreset`: a camouflaged brush-texture anchor stays.
         let opacity = float(&body.opacity)?;
-        if opacity == 0.0 {
+        if opacity == 0.0 && preset.is_none() {
             continue;
         }
         if command.layer_opacity() != 1.0 {
@@ -215,6 +215,8 @@ fn strokes_by_layer(
                 width: float(&body.stroke_width)?,
                 real: body.has_real_stroke,
                 opacity,
+                texture: preset,
+                pre_texture_opacity,
             });
     }
     Ok(out)
@@ -250,6 +252,8 @@ pub(crate) struct RivePlan {
     pub(crate) containers: Vec<String>,
     pub(crate) shapes: Vec<ShapeDef>,
     pub(crate) pending: Vec<Pending>,
+    /// The stored camera's `{x, y, w, rot}` per frame of the range, when the camera layer is on with keys (`camActive`).
+    pub(crate) camera: Option<Vec<[f64; 4]>>,
 }
 
 /// The whole range as the baseline plans it, layers from the top of the stack down.
@@ -275,10 +279,24 @@ pub(crate) fn plan_rive(
         .map(|plan| strokes_by_layer(plan, layers.len()))
         .collect::<Result<Vec<_>, _>>()?;
     let (first, last) = (spec.start, spec.end);
+    let snapshot = plans[0].packet().snapshot();
+    let poses = (first..=last)
+        .map(|f| {
+            snapshot
+                .sampled_camera_pose(f64::from(f))
+                .map(|pose| pose.map(|p| [p.x, p.y, p.w, p.rot]))
+                .map_err(|_| RiveExportError::CameraUnavailable { frame: f })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let packet = plans[0].packet();
     let mut out = RivePlan {
         containers: vec![],
         shapes: vec![],
         pending: vec![],
+        camera: poses
+            .iter()
+            .all(Option::is_some)
+            .then(|| poses.into_iter().flatten().collect()),
     };
     let mut lanes_by_layer = vec![];
     for (li, layer) in layers.iter().enumerate().rev() {
@@ -344,8 +362,24 @@ pub(crate) fn plan_rive(
                 if start > first {
                     keys.push((0, 0.0, "hold"));
                 }
-                let varies = (start + 1..=end)
-                    .any(|f| (at(f).map_or(1.0, |s| s.opacity) - first_sd.opacity).abs() > 0.01);
+                // `resolveBrushTexturePreset`: back from the run's start, then forward through the range.
+                let key = (first..=start)
+                    .rev()
+                    .chain(start..=last)
+                    .find_map(|f| at(f).and_then(|s| s.texture.clone()));
+                let brush = key.and_then(|k| packet.brush_wobble_inputs(&k));
+                let wobble = brush.map(|(nib, scatter, spacing)| {
+                    let (amp, freq) = wobble_params(nib, scatter, spacing, first_sd.width);
+                    (amp, freq, hash_seed(&first_sd.id))
+                });
+                let shake = |v: &[[f64; 2]], closed: bool| match wobble {
+                    Some((amp, freq, seed)) => apply_wobble(v, amp, freq, seed, closed),
+                    None => v.to_vec(),
+                };
+                let varies = brush.is_none()
+                    && (start + 1..=end).any(|f| {
+                        (at(f).map_or(1.0, |s| s.opacity) - first_sd.opacity).abs() > 0.01
+                    });
                 if varies {
                     keys.extend(
                         (start..=end)
@@ -357,15 +391,20 @@ pub(crate) fn plan_rive(
                 if end < last {
                     keys.push((end - first + 1, 0.0, "hold"));
                 }
-                let override_opacity = varies.then_some(1.0);
+                let override_opacity = if brush.is_some() {
+                    Some(first_sd.pre_texture_opacity.unwrap_or(1.0))
+                } else {
+                    varies.then_some(1.0)
+                };
+                let anchors = shake(&first_sd.v, first_sd.closed);
                 let paints = paints(first_sd, first_sd.real, override_opacity);
                 let (commands, body) = if !morph {
                     (
                         Value::Array(vec![
-                            point_command("moveTo", first_sd.v[0]),
-                            point_command("lineTo", first_sd.v[0]),
+                            point_command("moveTo", anchors[0]),
+                            point_command("lineTo", anchors[0]),
                         ]),
-                        Body::Cubic(cubic_vertices(first_sd)),
+                        Body::Cubic(cubic_vertices(&anchors, first_sd)),
                     )
                 } else {
                     let raw: Vec<&Vec<[f64; 2]>> = (start..=end)
@@ -373,14 +412,17 @@ pub(crate) fn plan_rive(
                         .collect::<Result<_, _>>()?;
                     match translation(&raw) {
                         Some(deltas) => (
-                            straight(&first_sd.v, first_sd.closed),
+                            straight(&anchors, first_sd.closed),
                             Body::Translate { start, deltas },
                         ),
                         None => (
-                            straight(&first_sd.v, first_sd.closed),
+                            straight(&anchors, first_sd.closed),
                             Body::Morph {
                                 start,
-                                points: raw.into_iter().cloned().collect(),
+                                points: raw
+                                    .into_iter()
+                                    .map(|v| shake(v, first_sd.closed))
+                                    .collect(),
                             },
                         ),
                     }

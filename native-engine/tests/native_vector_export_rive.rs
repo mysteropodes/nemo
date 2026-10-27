@@ -108,20 +108,43 @@ impl RiveEditor for Replay<'_> {
     }
 }
 
+fn history_of(case: &Value) -> NativeObjectHistory {
+    #[cfg(feature = "project_media_codec")]
+    if !case["project"].is_null() {
+        return NativeObjectHistory::from_project_file(
+            "rive",
+            &serde_json::to_vec(&case["project"]).unwrap(),
+        )
+        .unwrap();
+    }
+    NativeObjectHistory::new(
+        "rive",
+        decode_storage_project(&serde_json::to_vec(&case["document"]).unwrap()).unwrap(),
+    )
+    .unwrap()
+}
+
 #[test]
 fn every_oracle_case_holds_the_baseline_conversation() {
     let oracle: Value = serde_json::from_str(ORACLE).unwrap();
     assert_eq!(oracle["commit"].as_str().unwrap().len(), 40);
     let cases = oracle["cases"].as_array().unwrap();
-    assert_eq!(cases.len(), 5);
-    for case in cases {
+    assert_eq!(cases.len(), 7);
+    // A camera case is a whole native project file (the stored camera lives in the project), which only the
+    // project-file codec loads; the drawing-only target runs the other rows.
+    let runs = |case: &&Value| cfg!(feature = "project_media_codec") || case["project"].is_null();
+    assert_eq!(
+        cases.iter().filter(runs).count(),
+        if cfg!(feature = "project_media_codec") {
+            7
+        } else {
+            6
+        }
+    );
+    for case in cases.iter().filter(runs) {
         let id = case["id"].as_str().unwrap();
         let spec = spec_of(case);
-        let history = NativeObjectHistory::new(
-            "rive",
-            decode_storage_project(&serde_json::to_vec(&case["document"]).unwrap()).unwrap(),
-        )
-        .unwrap();
+        let history = history_of(case);
         let snapshot = history
             .acquire_snapshot(history.content_revision())
             .unwrap();

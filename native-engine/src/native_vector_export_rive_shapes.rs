@@ -142,10 +142,11 @@ pub(crate) fn straight(points: &[[f64; 2]], closed: bool) -> Value {
     Value::Array(out)
 }
 /// `riveCubicVerticesFromShapeVal`: absolute handles, the closure carried by the path's own flag.
-pub(crate) fn cubic_vertices(sd: &Stroke) -> Vec<Value> {
-    (0..sd.v.len())
+/// `anchors` are the stroke's own or its wobbled ones; the handles are always the stroke's own.
+pub(crate) fn cubic_vertices(anchors: &[[f64; 2]], sd: &Stroke) -> Vec<Value> {
+    (0..anchors.len())
         .map(|k| {
-            let (v, i, o) = (sd.v[k], sd.i[k], sd.o[k]);
+            let (v, i, o) = (anchors[k], sd.i[k], sd.o[k]);
             json!({"x":num(v[0]),"y":num(v[1]),"type":"cubic","inX":num(v[0] + i[0]),"inY":num(v[1] + i[1]),
                 "outX":num(v[0] + o[0]),"outY":num(v[1] + o[1])})
         })
@@ -169,4 +170,72 @@ pub(crate) fn translation(points: &[&Vec<[f64; 2]>]) -> Option<Vec<[f64; 2]>> {
         deltas.push([dx, dy]);
     }
     Some(deltas)
+}
+
+/// `riveNoise(t, seed)`: three summed sines.
+fn noise(t: f64, seed: f64) -> f64 {
+    let s = seed * 12.9898;
+    (t * 1.00 + s).sin() * 0.55
+        + (t * 2.13 + s * 1.7).sin() * 0.30
+        + (t * 4.71 + s * 2.3).sin() * 0.15
+}
+/// `riveHashSeed(str)`: djb2 over UTF-16 units in int32, then `(h >>> 0) % 1000 / 37`.
+pub(crate) fn hash_seed(text: &str) -> f64 {
+    let h = text.encode_utf16().fold(5381i32, |h, c| {
+        h.wrapping_shl(5).wrapping_add(h).wrapping_add(i32::from(c))
+    });
+    f64::from((h as u32) % 1000) / 37.0
+}
+/// `riveBrushWobbleParams(preset, strokeWidth)`: amplitude in pixels and cycles per stroke.
+pub(crate) fn wobble_params(
+    nib: Option<f64>,
+    scatter: Option<f64>,
+    spacing: Option<f64>,
+    width: f64,
+) -> (f64, f64) {
+    let truthy =
+        |v: Option<f64>, fallback: f64| v.filter(|n| *n != 0.0 && !n.is_nan()).unwrap_or(fallback);
+    let w = truthy(Some(width), 3.0);
+    let nib = truthy(nib, 1.0);
+    let amp = w * nib * truthy(scatter, 0.0) * 0.9;
+    let spacing = truthy(spacing, 0.4).max(0.05);
+    (amp, (100.0 / (w * nib * spacing * 2.0)).max(1.5).min(30.0))
+}
+/// `riveApplyWobble(v, ampPx, freqPer100, seed, closed)`: each anchor pushed along its neighbours' normal.
+pub(crate) fn apply_wobble(
+    v: &[[f64; 2]],
+    amp: f64,
+    freq: f64,
+    seed: f64,
+    closed: bool,
+) -> Vec<[f64; 2]> {
+    let n = v.len();
+    if n < 2 || amp <= 0.0 {
+        return v.to_vec();
+    }
+    (0..n)
+        .map(|k| {
+            let prev = v[if k > 0 {
+                k - 1
+            } else if closed {
+                n - 1
+            } else {
+                k
+            }];
+            let next = v[if k < n - 1 {
+                k + 1
+            } else if closed {
+                0
+            } else {
+                k
+            }];
+            let (dx, dy) = (next[0] - prev[0], next[1] - prev[1]);
+            let len = (dx * dx + dy * dy).sqrt();
+            let len = if len == 0.0 || len.is_nan() { 1.0 } else { len };
+            let (nx, ny) = (-dy / len, dx / len);
+            let phase = (k as f64 / ((n - 1).max(1)) as f64) * freq * 2.0 * std::f64::consts::PI;
+            let w = noise(phase, seed) * amp;
+            [v[k][0] + nx * w, v[k][1] + ny * w]
+        })
+        .collect()
 }
