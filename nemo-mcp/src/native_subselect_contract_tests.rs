@@ -1,6 +1,9 @@
 use super::*;
 use crate::contract::{NativeApplicationRequest, NativeApplicationResponse};
 use serde_json::json;
+fn public_read(q: &Value, r: &Value) -> bool {
+    crate::native_contract::validate_result("query.document.object", "document", q, r)
+}
 fn target() -> Value {
     json!({"contextId":"scene-root","layerUid":"layer-a","frameScope":{"kind":"authored","frame":0},"strokeId":"stroke-a"})
 }
@@ -15,7 +18,7 @@ fn subselect_closed_request_and_geometry_correlation() {
     let q = query();
     let r = page();
     assert!(request(&q));
-    assert!(result("document", &q, &r));
+    assert!(public_read(&q, &r));
     assert!(crate::native_contract::validate_request(
         "query.document.object",
         &q
@@ -29,7 +32,7 @@ fn subselect_closed_request_and_geometry_correlation() {
     ] {
         let mut bad = r.clone();
         *bad.pointer_mut(path).unwrap() = value;
-        assert!(!result("document", &q, &bad), "{path}");
+        assert!(!public_read(&q, &bad), "{path}");
     }
     let mut mixed = q.clone();
     mixed["view"] = json!({"kind":"presentation"});
@@ -71,7 +74,7 @@ fn subselect_view_is_correlated_to_native_presentation_and_preview() {
     let mut q = json!({"atRevision":7,"documentSnapshotId":"native-object:document:7","view":view});
     let mut r = json!({"kind":"subselect","atRevision":7,"documentSnapshotId":"native-object:document:7","contextId":"scene-root","layerUid":"layer-a","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"total":1,"nextCursor":null,"preview":false,"items":[{"stableTarget":target(),"closed":false,"count":2,"matrix":[1,0.2,0.3,1,8,9]}]});
     assert!(view_request(&q));
-    assert!(view_result("document", &q, &r));
+    assert!(public_read(&q, &r));
     for (key, value) in [
         ("workId", json!("native-work-2")),
         ("frame", json!(1)),
@@ -80,13 +83,13 @@ fn subselect_view_is_correlated_to_native_presentation_and_preview() {
     ] {
         let mut bad = r.clone();
         bad[key] = value;
-        assert!(!view_result("document", &q, &bad), "{key}");
+        assert!(!public_read(&q, &bad), "{key}");
     }
     q["view"]["preview"] =
         json!({"stableTarget":target(),"intent":{"kind":"move","indices":[0],"delta":[1,2]}});
     r["preview"] = json!(true);
     assert!(view_request(&q));
-    assert!(view_result("document", &q, &r));
+    assert!(public_read(&q, &r));
     r["items"][0]["matrix"] = json!([1, 2, 2, 4, 0, 0]);
-    assert!(!view_result("document", &q, &r));
+    assert!(!public_read(&q, &r));
 }
