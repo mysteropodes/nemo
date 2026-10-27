@@ -5,6 +5,7 @@ const UI=require('../src/js/adapters/native-object-ui.js');
 const Files=require('../src/js/adapters/native-object-project-file.js');
 const SDK=require('../src/js/adapters/native-application.js');
 const Transport=require('../src/js/adapters/application-mcp.js');
+const SymmetryUI=require('../src/js/adapters/native-symmetry-ui.js'),SymmetryContract=require('../src/js/adapters/native-symmetry-contract.js');
 const turn=()=>new Promise(setImmediate);
 function deferred(){let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};}
 // Independent native-result oracle, including a blank authored key and a sample.
@@ -23,7 +24,7 @@ function element(){return {children:[],style:{},dataset:{},attributes:{},textCon
   appendChild(node){this.children.push(node);node.parentNode=this;return node;},
   replaceChildren(...nodes){for(const n of this.children)n.parentNode=null;this.children=[];nodes.forEach(n=>this.appendChild(n));},
   classList:{add(){},remove(){}},getBoundingClientRect(){return {left:0,top:0,width:64,height:48};}};}
-function harness(){
+function harness(options={}){
   let active=false,revision=0,generation=1,doc='document',hold=null,fault=null,ack=null;
   const calls=[],listeners=new Map(),nodes=new Map();
   for(const id of ['layer-list','frame-hdr','frame-grid','tl-cf','tl-tf','info-frame','info-badge','info-strokes','info-sel','drawing-canvas','start-screen'])nodes.set(id,element());
@@ -54,6 +55,12 @@ function harness(){
       if(r.action==='acknowledge'&&ack){const wait=ack;ack=null;await wait;}
       return null;
     }
+    if(command==='nemo_native_dispatch'&&r.operation===SymmetryContract.READ){
+      const at=r.payload.atRevision,m=meta(),stored={symmetryEnabled:true};
+      return {apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,contentRevision:at,ok:true,
+        result:{instanceId:r.instanceId,documentId:r.documentId,atRevision:at,documentSnapshotId:m.documentSnapshotId,contextId:'scene-root',
+          result:{effective:{enabled:true,mode:'y',axis:{x1:32,y1:0,x2:32,y2:48},radialCenter:{x:32,y:24},radialSectors:6,extend:true},...stored}}};
+    }
     assert.equal(command,'nemo_native_dispatch');assert.equal(r.operation,'query.document.object.layer.timing');
     assert.deepEqual(Object.keys(r.payload).sort(),['atRevision','contextId','documentSnapshotId','frame','layerUid'].concat(r.payload.view?['view']:[]));
     const response={apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,contentRevision:r.payload.atRevision,ok:true,
@@ -77,6 +84,10 @@ function harness(){
   require('./helpers/native-viewport-underlay.cjs').install(root);
   require('../src/js/bootstrap/native-opacity-application.js').bindObjectUI(root);
   const session=Project.desktop(root);root.updateUI=()=>Project.paintUI(root,true);
+  // The real symmetry controller, whose repaint reaches a native preview as SMEngineBridge.renderNow does (#2343 B1).
+  // Capped, so a regressed loop fails the count below instead of hanging the run.
+  if(options.symmetry){let renders=0;root.SMEngineBridge={renderNow(){if(++renders<=50)session.renderPreview(root.state.currentFrame||0);}};
+    SymmetryUI.install(root);}
   function poison(){root.state.layers.forEach(layer=>Object.defineProperty(layer,'frames',{configurable:true,get(){throw Error('legacy frame read');}}));}
   const open=async()=>{await session.openPath('/timed.json',{commit(info){Files.projectView(root,info);}});poison();await turn();await turn();};
   return {root,session,calls,nodes,meta,open,hold(p){hold=p;},fault(fn){fault=fn;},holdAck(p){ack=p;},
@@ -212,4 +223,18 @@ test('Project cells read pages the whole row through the same timing query, inde
   assert.equal(await h.session.readLayerCells('missing',pin),null,'a layer without timing is unavailable, not blank');
   const count=h.queries().length;assert.equal(await h.session.readLayerCells('drawing:雪',{...pin,documentSnapshotId:'old'}),null);
   assert.equal(h.queries().length,count);assert.equal(h.meta().contentRevision,0);
+});
+// #2343 B1: the presentation callback (settingsNotice) calls the symmetry controller, and its repaint renders a native
+// preview. An unchanged confirmed value must not ask for another one, or the queue never settles and timing never reads.
+test('Open with the symmetry controller installed settles its previews and reaches timing',async()=>{
+  const h=harness({symmetry:true});await h.open();
+  const previews=()=>h.calls.filter(c=>c.command==='nemo_native_object_preview').length,pause=()=>new Promise(r=>setTimeout(r,5));
+  for(let i=0;i<20;i++){await turn();await pause();}
+  const settled=previews();
+  for(let i=0;i<20;i++){await turn();await pause();}
+  assert.equal(previews(),settled,'no further preview without a change');
+  assert.ok(settled<=4,'previews: '+settled);
+  assert.equal(h.root.state.symmetryEnabled,true,'the confirmed symmetry value is shown');
+  assert.equal(h.text(),'Key — Source frame 1 — Content');
+  assert.ok(h.calls.some(c=>c.r&&c.r.operation===SymmetryContract.READ),'the controller read native symmetry');
 });
