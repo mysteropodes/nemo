@@ -136,12 +136,7 @@ impl ObjectSnapshot {
         }
         let projection = match projection {
             Ok(v) => v,
-            Err(_) => {
-                return refused(
-                    DispatchErrorCode::Unavailable,
-                    "Subselect requires an available native presentation",
-                )
-            }
+            Err(reason) => return refused(DispatchErrorCode::Unavailable, reason),
         };
         if projection.instance != self.instance_id()
             || projection.document != self.document_id()

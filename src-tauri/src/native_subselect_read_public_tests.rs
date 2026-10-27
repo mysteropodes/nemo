@@ -29,6 +29,8 @@ fn subselect_presented_host_pages_preview_commit_and_stale_view() {
     trace.borrow_mut().pixel = Some([255, 0, 0, 255]);
     let shown = present(&mut owner, &mut gpu, &mut surface).unwrap();
     assert_eq!(shown.status(), &ViewportStatus::Presented);
+    assert!(owner.preview.reference_cache.is_none());
+    assert!(owner.preview.presented_vectors.is_some());
     let query = json!({"apiVersion":2,"requestId":"subselect-view","instanceId":info["instanceId"],"documentId":info["documentId"],"operation":"query.document.object","payload":{"atRevision":info["contentRevision"],"documentSnapshotId":info["documentSnapshotId"],"view":{"kind":"subselect","contextId":"scene-root","layerUid":"L0","frame":0,"workId":format!("native-work-{}",shown.identity().work_id().value()),"viewGeneration":shown.identity().view_generation().value(),"cursor":0,"limit":8}}});
     let first = host_read(&mut owner, &query);
     assert_eq!(first["ok"], true, "{first}");
@@ -55,4 +57,5 @@ fn subselect_presented_host_pages_preview_commit_and_stale_view() {
     assert_ne!(host_saved(&owner), saved);
     assert_eq!(host_read(&mut owner, &query)["ok"], false);
     assert_eq!(owner.content_revision(), 1);
+    assert!(owner.preview.presented_vectors.is_none());
 }

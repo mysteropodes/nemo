@@ -119,9 +119,15 @@ pub(crate) fn plan(record: &ObjectRecord, intent: &Intent) -> Result<ObjectRecor
     Ok(next)
 }
 
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, PartialEq)]
+#[derive(Clone, Debug, serde::Serialize, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) struct Preview {
     pub(crate) stable_target: crate::object_document::ObjectTarget,
     pub(crate) intent: Intent,
 }
+use crate::object_document::{object_deserialize, ObjectTarget};
+use serde::Deserialize;
+object_deserialize!(Preview {
+    stable_target: ObjectTarget,
+    intent: Intent
+});

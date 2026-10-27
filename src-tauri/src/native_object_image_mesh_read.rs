@@ -25,7 +25,8 @@ impl NativeObjectHost {
             return Err(Unpresented);
         }
         let receipt = preview.presented_mesh_view.as_ref().ok_or(Unpresented)?;
-        let witness = preview.reference_cache.as_ref().ok_or(Unpresented)?;
+        let witness = preview.reference_cache.as_ref()
+            .or(preview.presented_vectors.as_ref()).ok_or(Unpresented)?;
         let identity = receipt.identity();
         let key = identity.evaluation_key();
         if receipt.status() != &native_engine::desktop_viewport::ViewportStatus::Presented {

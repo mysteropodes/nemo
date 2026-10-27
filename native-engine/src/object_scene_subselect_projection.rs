@@ -1,7 +1,17 @@
 //! Canonical-to-rendered affine from the same native rest bounds and parent chain as paint.
-use super::*;
 use crate::evaluation::motion_parent_chain::ChainEntry;
+use crate::evaluation::object_vector_kernels::render_vector_eval::{
+    evaluate_record_rest_with_pose, is_vector_record, record_layer_has_active_path_fx, EvalSegment,
+    EvaluatedVector,
+};
+use crate::object_document::subselect::record;
 use crate::object_frame_packet::projection::layer_chain_entry;
+use crate::object_frame_packet::projection::transform_layer_2d;
+use crate::object_frame_packet::{ObjectFramePacket, ObjectRecord, Presence, PropertyHolderTarget};
+use crate::object_render_scene::object_scene_producer_contour::batch::{
+    legacy_rest, parent, prepare_layer,
+};
+use std::collections::BTreeMap;
 use vello::kurbo::{Affine, BezPath, Shape};
 
 fn affine(entry: &ChainEntry) -> Affine {
@@ -51,16 +61,13 @@ pub(crate) fn matrices_with_preview(
     }
     let mut rest = Vec::new();
     for source in &sources {
-        crate::object_codec::subselect::record::admit(
-            packet.snapshot().document(),
-            source.record(),
-        )
-        .map_err(|_| "Subselect geometry consumer is unavailable")?;
+        record::admit(packet.snapshot().document(), source.record())
+            .map_err(|_| "Subselect geometry consumer is unavailable")?;
         if source.record().is_mask() || record_layer_has_active_path_fx(packet, source.record()) {
             return Err("Subselect mask or path effect is unavailable");
         }
         rest.push(if let Some(edited) = preview.filter(|r| r.target == source.record().target) {
-            let points=crate::object_codec::subselect::record::anchors(edited).map_err(|_| "Subselect preview geometry is unavailable")?;
+            let points=record::anchors(edited).map_err(|_| "Subselect preview geometry is unavailable")?;
             let segments=points.into_iter().map(|a| EvalSegment {point:a.point,handle_in:a.handle_in,handle_out:a.handle_out}).collect();
             let segments=crate::evaluation::object_vector_kernels::render_vector_eval::motion::apply_element_motion(packet.snapshot(),edited,packet.frame(),segments).map_err(|e|e.message())?;
             EvaluatedVector {source_object_index:source.source_object_index(),closed:edited.geometry.closed,segments}
@@ -110,7 +117,7 @@ pub(crate) fn matrices_with_preview(
             .map_err(|_| "Subselect element Motion is unavailable")?
         {
             // The canonical cubic bounds are the element consumer's pivot before its own Motion.
-            let points = crate::object_codec::subselect::record::anchors(record)
+            let points = record::anchors(record)
                 .map_err(|_| "Subselect geometry consumer is unavailable")?;
             let mut path = BezPath::new();
             if let Some(first) = points.first() {

@@ -43,6 +43,9 @@ pub(super) struct ObjectPreview {
     pub(super) brush_runtime: ObjectBrushRuntime,
     prepared: Option<PreparedObjectPreview>,
     reference_cache: Option<ObjectCompositionWitness>,
+    // Geometry reads also need the actual successful vector-only presentation.
+    // This witness is captured before media attachment and never retains video leases.
+    presented_vectors: Option<ObjectCompositionWitness>,
     presented_mesh_view: Option<PresentationReceipt>,
     // Required original C02 effects remain at this actual owner. They never
     // become a render-time history edit or disappear into an error string.
@@ -120,6 +123,7 @@ impl ObjectPreview {
     }
     pub(super) fn invalidate(&mut self) {
         self.presented_mesh_view = None;
+        self.presented_vectors = None;
         self.prepared = None;
         if let Err(error) = self.cancel_pending() {
             self.blocked = Some(error);
@@ -286,6 +290,7 @@ impl NativeObjectHost {
             .take()
             .ok_or("native object preview has no current CPU preparation")?;
         self.preview.presented_mesh_view = None;
+        self.preview.presented_vectors = None;
         if self.released.is_some() || self.preview.released || self.preview.blocked.is_some() {
             return Err("native object preview owner requires cleanup or was released".into());
         }
@@ -373,6 +378,8 @@ impl NativeObjectHost {
                 .ok_or("preview requires an actual viewport witness")?,
             composition.viewport_stored_camera_available(),
         )?;
+        let vector_source = (!composition.has_scene_images() && !media.draws_video(expected.frame))
+            .then(|| composition.clone());
         let composition = media.witness(expected.frame, composition)?;
         let key = if media.draws_video(expected.frame) {
             EvaluationKey::new(
@@ -468,6 +475,7 @@ impl NativeObjectHost {
         }
         if media_released && receipt.status() == &ViewportStatus::Presented {
             self.preview.presented_mesh_view = Some(receipt.clone());
+            self.preview.presented_vectors = vector_source;
         }
         Ok(ObjectPresentedFrame { receipt, view })
     }

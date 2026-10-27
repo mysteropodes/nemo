@@ -27,3 +27,13 @@ test('subselect presentation pages bind native transforms to the exact view and 
   Q.correlate({...p,view:{...view,preview}},{...r,preview:true},null,'document');
   assert.throws(()=>Q.payload({...p,view:{...view,preview:{...preview,extra:1}}}));
 });
+test('application transport preserves opaque source IDs in native subselect preview and selection pages',()=>{
+  const A=require('../src/js/adapters/native-application.js');
+  const t={...target,layerUid:'data:opaque layer',strokeId:'blob:opaque stroke'};
+  const view={kind:'subselect',contextId:'scene-root',layerUid:t.layerUid,frame:0,workId:'native-work-1',viewGeneration:1,cursor:0,limit:8,
+    preview:{stableTarget:t,intent:{kind:'move',indices:[0],delta:[1,2]}}};
+  const q={apiVersion:2,requestId:'opaque-subselect',instanceId:'instance',documentId:'document',operation:'query.document.object',payload:{atRevision:7,documentSnapshotId:p.documentSnapshotId,view}};
+  const result={...view,atRevision:7,documentSnapshotId:p.documentSnapshotId,total:1,nextCursor:null,preview:true,items:[{stableTarget:t,closed:false,count:2,matrix:[1,0,0,1,0,0]}]};delete result.limit;
+  A.validateRequest(q);
+  A.validateResponse({apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:7,ok:true,result},q.requestId,q.operation);
+});
