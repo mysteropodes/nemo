@@ -94,7 +94,7 @@ fn refusal_of(error: SetupError) -> SetupRefusal {
         SetupError::ObjectScope { .. } => (Unavailable, "Only authored frames can be converted."),
         SetupError::ItemsUnavailable { .. } => (
             Unavailable,
-            "component-convert-items: raster and text items cannot enter a component yet.",
+            "component-convert-items: text, brush and mesh-bound items cannot enter a component yet.",
         ),
         SetupError::RevisionOutOfRange | SetupError::IdUnavailable | SetupError::TooMany => {
             (Unavailable, "No identity is available for the new record.")

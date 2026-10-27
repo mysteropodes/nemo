@@ -19,7 +19,7 @@ use std::sync::Arc;
 /// A solid opaque green 2x2 PNG.
 const GREEN_PNG: &str = "89504e470d0a1a0a0000000d494844520000000200000002080600000072b60d240000001049444154789c636038c1f01f8c610c003ba4071d8da765460000000049454e44ae426082";
 
-fn inventory() -> AssetInventory {
+pub(super) fn inventory() -> AssetInventory {
     let bytes: Vec<u8> = (0..GREEN_PNG.len())
         .step_by(2)
         .map(|at| u8::from_str_radix(&GREEN_PNG[at..at + 2], 16).unwrap())

@@ -224,7 +224,7 @@ fn an_effect_layer_and_a_layer_with_items_are_refused_in_typed_receipts_that_pub
         assert_eq!(reply["error"]["code"], "unavailable", "{id}");
         assert_eq!(
             reply["error"]["message"],
-            "component-convert-items: raster and text items cannot enter a component yet.",
+            "component-convert-items: text, brush and mesh-bound items cannot enter a component yet.",
             "{id}"
         );
     }
