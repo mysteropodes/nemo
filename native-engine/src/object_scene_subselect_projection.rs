@@ -149,6 +149,7 @@ pub(crate) fn matrices_with_preview(
     Ok(result)
 }
 
-#[cfg(test)]
+// Its support module (object_vector_edit_support.rs) drives the real history owner.
+#[cfg(all(test, feature = "history"))]
 #[path = "../tests/object_subselect_projection.rs"]
 mod tests;
