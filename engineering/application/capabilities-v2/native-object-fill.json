@@ -167,7 +167,8 @@
           "opacity": 1,
           "placement": "below",
           "mask": false,
-          "copies": []
+          "copies": [],
+          "stamps": []
         }
       },
       "response": {

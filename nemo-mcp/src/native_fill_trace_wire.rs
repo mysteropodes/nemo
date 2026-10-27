@@ -14,6 +14,8 @@ pub(super) enum Field {
     Mask,
     /// Up to 23 symmetry copies, each an affine `[a, b, c, d, e, f]` of finite numbers.
     Copies,
+    /// Labs multi-frame stamps: up to 256 distinct frame indices.
+    Stamps,
 }
 pub(super) fn kind(token: &str) -> Option<Field> {
     match token {
@@ -25,6 +27,7 @@ pub(super) fn kind(token: &str) -> Option<Field> {
         "placement" => Some(Field::Placement),
         "mask" => Some(Field::Mask),
         "copies" => Some(Field::Copies),
+        "stamps" => Some(Field::Stamps),
         _ => None,
     }
 }
@@ -67,6 +70,12 @@ pub(super) fn check(field: Field, value: &Value) -> bool {
                         m.len() == 6
                             && m.iter().all(|n| n.as_f64().is_some_and(|n| n.is_finite() && n.abs() <= 1.0e12))
                     })
+                })
+        }),
+        Field::Stamps => value.as_array().is_some_and(|frames| {
+            frames.len() <= 256
+                && frames.iter().enumerate().all(|(i, f)| {
+                    f.as_u64().is_some_and(|n| n <= u64::from(u32::MAX)) && !frames[..i].contains(f)
                 })
         }),
         Field::Mask => {
