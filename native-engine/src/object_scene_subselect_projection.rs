@@ -4,7 +4,7 @@ use crate::evaluation::object_vector_kernels::render_vector_eval::{
     evaluate_record_rest_with_pose, is_vector_record, record_layer_has_active_path_fx, EvalSegment,
     EvaluatedVector,
 };
-use crate::object_document::subselect::record;
+use crate::object_frame_packet::subselect_record as record;
 use crate::object_frame_packet::projection::layer_chain_entry;
 use crate::object_frame_packet::projection::transform_layer_2d;
 use crate::object_frame_packet::{ObjectFramePacket, ObjectRecord, Presence, PropertyHolderTarget};

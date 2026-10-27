@@ -1,5 +1,5 @@
 //! Selection identities and affine maps borrowed from the actual retained native paint plan.
-use crate::object_document::subselect::record;
+use crate::object_frame_packet::subselect_record as record;
 use crate::object_render_scene::{
     object_scene_producer_contour::batch::subselect, ObjectCompositionWitness,
 };

@@ -4822,7 +4822,13 @@
       "path": "src/js/adapters/native-subselect-contract.js",
       "moduleId": "app.native.subselect.contract",
       "executionClass": "document-classic",
-      "loadSites": []
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2319,
+          "scriptOrdinal": 17
+        }
+      ]
     }
   ],
   "nativeAtomicLayerRangePrivateRegistration": "Original #2248 private Shift composition adds two source members: required stateless layer-inout-selection.js under existing app.layer.inout, loaded before layer-inout.js, and optional native-layer-range-desktop.js under existing app.native.object.ui.adapter, loaded after native-frame-edit-desktop.js. The native bar caller uses same-snapshot range-only reads, qualified property-key selection, explicit UI callback ports, actual Motion ancestor capture and the existing Intent/Project serial edit queue. Root F10 activeLayerUid, ordinary Bulk Move, Repeat counters, F7 and F12 clipboard fields remain required semantic union inputs. Property-key marquee, preview/link/batch UI, nonroot/Montage and full installed parity remain separate original obligations. These are private source registration notes, not measured coverage, fresh inventory discovery, executed validation or installed acceptance. Historical provenance/retainedSources remain untouched pending Root canonical generation from the actual final committed candidate. No floors, exclusions, layers, edge rules or retained ceilings are relaxed.",
