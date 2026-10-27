@@ -335,15 +335,48 @@ fn a_ribbon_with_symmetry_copies_or_without_a_centreline_stays_unavailable() {
     let oracle: Value = serde_json::from_str(RIBBON_ORACLE).unwrap();
     let case = &oracle["cases"][0];
     let ribbon = ribbon_of(case, None);
+    // A symmetry copy differs from the drawn ribbon (identical records are multi-frame stamps, which trim alike).
+    let mut copy = ribbon.clone();
+    copy["vectorExt"]["pressure"]["centerSegments"][0]["point"]["y"] = json!(60);
     let mut bare = ribbon.clone();
     bare["vectorExt"]["pressure"] = json!({"widthProfile":[{"t":0,"width":1},{"t":1,"width":1}]});
     for (name, payload) in [
-        ("copies", json!({"command":"object.vector.createMany","records":[ribbon.clone(), ribbon],"trimEnds":20})),
+        ("copies", json!({"command":"object.vector.createMany","records":[ribbon.clone(), copy],"trimEnds":20})),
         ("bare", create_trim(bare, json!(20))),
     ] {
         let mut owner = owner_of(&document(1, walls(), None));
         let refused = send(&mut owner, name, payload);
         assert_eq!(refused["ok"], false, "{name}: {refused}");
         assert_eq!(owner.content_revision(), 0, "{name}");
+    }
+}
+
+#[test]
+fn a_ribbon_and_its_linked_fill_stamped_on_another_frame_take_the_drawn_cells_trim() {
+    // multiframe-draw stamps the already trimmed ribbon and its fill: frame 5's own wall (x=60) never cuts the stamp.
+    let oracle: Value = serde_json::from_str(RIBBON_ORACLE).unwrap();
+    let case = &oracle["cases"][0];
+    let at = |mut record: Value, frame: u32| {
+        record["target"]["frameScope"]["frame"] = json!(frame);
+        record
+    };
+    let ribbon = ribbon_of(case, Some("lf-1"));
+    let mut fill = record_at("C", "L1", 0, "");
+    fill["geometry"]["closed"] = json!(true);
+    fill["geometry"]["segments"] = case["input"]["fill"].as_array().unwrap().iter().map(seg_of).collect();
+    fill["vectorExt"] = json!({"isLinkedFillCompanion":true,"linkedFillId":"lf-1"});
+    let ops = json!([
+        {"op":"create","record":fill.clone()},{"op":"create","record":ribbon.clone()},
+        {"op":"create","record":at(fill, 5),"keyframe":"copy"},{"op":"create","record":at(ribbon, 5),"keyframe":"copy"}]);
+    let (response, created) = trimmed(json!({"command":"object.vector.batch","trimEnds":case["max"],"ops":ops}), walls());
+    assert_eq!(response["result"]["historyEntriesAdded"], 1, "{response}");
+    let expected = &case["expected"];
+    for frame in [0, 5] {
+        let cell: Vec<&Value> = created.iter().filter(|r| r["target"]["frameScope"]["frame"] == frame).collect();
+        let ribbon = cell.iter().find(|r| !r["vectorExt"]["pressure"].is_null()).unwrap();
+        let fill = cell.iter().find(|r| r["vectorExt"]["isLinkedFillCompanion"] == true).unwrap();
+        assert!(worst(&flat(&ribbon["geometry"]["segments"]), &flat(&expected["outline"]), "outline") < 1e-6, "frame {frame}");
+        assert!(worst(&flat(&ribbon["vectorExt"]["pressure"]["centerSegments"]), &flat(&expected["centerSegments"]), "centre") < 1e-6, "frame {frame}");
+        assert!(worst(&flat(&fill["geometry"]["segments"]), &flat(&expected["fill"]), "fill") < 1e-6, "frame {frame}");
     }
 }
