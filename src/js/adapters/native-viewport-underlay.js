@@ -130,11 +130,13 @@
     function fit(info) {
       var html = root.document.documentElement, aspect = info.canvasW / info.canvasH;
       if (!(aspect > 0) || !Number.isFinite(aspect)) throw new Error('Native canvas aspect is unavailable');
+      if (!html || !html.classList || !html.style) return;
       html.style.setProperty('--nemo-native-aspect', String(aspect));
       html.classList.add('nemo-native-fit');
     }
     function unfit() {
       var html = root.document.documentElement;
+      if (!html || !html.classList || !html.style) return;
       html.classList.remove('nemo-native-fit'); html.style.removeProperty('--nemo-native-aspect');
     }
     return Object.freeze({
