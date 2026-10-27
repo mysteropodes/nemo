@@ -100,6 +100,38 @@ test('ordinary Project/SDK/Tauri/UI reads exact fixed native timing and preserve
   assert.equal(h.calls.filter(c=>c.r&&c.r.action==='acknowledge').length,0);
   assert.ok(h.calls.every(c=>!c.command.includes('save')&&!c.command.includes('export')));
 });
+test('Open timing refused during a concurrent resource read converges after the native queue settles',async()=>{
+  const h=harness(),timing=deferred(),resource=deferred();h.hold(timing.promise);await h.open();
+  assert.equal(h.queries().length,1);
+  const pin=h.session.info(),presented=h.session.readPresentedObjectSession();
+  const busy=h.session.runResourceCommand(async lease=>{
+    assert.ok(lease.readPresentedObjectSession());await resource.promise;
+  });
+  try{
+    await turn();assert.equal(h.session.readPresentedObjectSession(),null);
+    timing.resolve();await turn();await turn();
+    assert.equal(h.text(),'Native timing is unavailable.');
+    resource.resolve();await busy;await new Promise(resolve=>setTimeout(resolve,10));await turn();
+    assert.equal(h.text(),'Key — Source frame 1 — Content');
+    assert.equal(h.queries().length,2,'settled presentation retries only the refused read');
+    assert.strictEqual(h.session.info(),pin);
+    assert.deepEqual(h.session.readPresentedObjectSession(),presented);
+    await h.session.runResourceCommand(async()=>{});await new Promise(resolve=>setTimeout(resolve,10));
+    assert.equal(h.queries().length,2,'later queue completions reuse the confirmed timing');
+    assert.equal(h.meta().undoDepth,0);assert.equal(h.meta().contentRevision,0);
+  }finally{timing.resolve();resource.resolve();await busy;}
+});
+test('a genuinely unavailable timing read is not retried on unrelated queue completions',async()=>{
+  const h=harness();await h.open();
+  assert.equal(h.nodes.get('layer-list').children[1].children[0].click(),true);
+  await turn();await turn();assert.equal(h.text(),'Native timing is unavailable.');
+  const count=h.queries().length;
+  for(let i=0;i<3;i++){
+    await h.session.runResourceCommand(async()=>{});await new Promise(resolve=>setTimeout(resolve,10));
+  }
+  assert.equal(h.queries().length,count);assert.equal(h.text(),'Native timing is unavailable.');
+  assert.equal(h.session.isIndeterminate(),false);assert.equal(h.meta().contentRevision,0);
+});
 test('one outstanding read coalesces rapid frame intent and never publishes an obsolete result',async()=>{
   const h=harness();await h.open();const gate=deferred();h.hold(gate.promise);await h.frame(6);
   const before=h.queries().length;
