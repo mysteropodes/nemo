@@ -51,6 +51,7 @@ fn subselect_refuses_invalid_selection_and_limits_without_changing_input() {
             handle: "handleIn".into(),
             point: [1.0, 2.0],
             break_pair: false,
+            paired_point: Default::default(),
         },
         Intent::Insert {
             curve: 0,
@@ -98,4 +99,45 @@ fn subselect_delete_preserves_order_and_handles() {
         .unwrap(),
         vec![source[1].clone(), source[3].clone()]
     );
+}
+
+#[test]
+fn subselect_modifier_intents_match_frozen_pointer_history_at_every_step() {
+    let oracle: Value =
+        serde_json::from_str(include_str!("fixtures/subselect-baseline/modifiers.json")).unwrap();
+    assert_eq!(oracle["cases"].as_array().unwrap().len(), 45);
+    for row in oracle["cases"].as_array().unwrap() {
+        let source: Vec<Anchor> = serde_json::from_value(row["segments"].clone()).unwrap();
+        for step in row["steps"].as_array().unwrap() {
+            let expected: Vec<Anchor> = serde_json::from_value(step["expected"].clone()).unwrap();
+            let intent: Intent = serde_json::from_value(step["intent"].clone()).unwrap();
+            let actual = edit(&source, true, false, &intent).unwrap();
+            for (a, b) in actual.iter().zip(&expected) {
+                for (x, y) in a
+                    .point
+                    .iter()
+                    .chain(&a.handle_in)
+                    .chain(&a.handle_out)
+                    .zip(b.point.iter().chain(&b.handle_in).chain(&b.handle_out))
+                {
+                    assert!((x - y).abs() < 1e-9, "{}: {step}", row["name"]);
+                }
+            }
+        }
+    }
+    let source: Vec<Anchor> =
+        serde_json::from_value(oracle["cases"][0]["segments"].clone()).unwrap();
+    for paired_point in [
+        crate::object_document::Presence::Present([1.0, 2.0]),
+        crate::object_document::Presence::Present([f64::NAN, 0.0]),
+    ] {
+        let intent = Intent::Handle {
+            index: 0,
+            handle: "handleOut".into(),
+            point: [30.0, 40.0],
+            break_pair: false,
+            paired_point,
+        };
+        assert_eq!(edit(&source, true, false, &intent), Err(Refusal::Invalid));
+    }
 }

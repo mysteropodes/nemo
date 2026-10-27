@@ -63,6 +63,18 @@ fn subselect_command_uses_shared_owner_and_revision_correlator() {
         bad.payload["atFrame"] = value;
         assert!(bad.validate().is_err());
     }
+    q.payload["intent"]["breakPair"] = json!(true);
+    q.payload["intent"]["pairedPoint"] = json!([3, 2]);
+    assert!(q.validate_input().is_ok());
+    assert!(q.validate().is_ok());
+    for value in [Value::Null, json!([1]), json!(["x", 2])] {
+        let mut bad = q.clone();
+        bad.payload["intent"]["pairedPoint"] = value;
+        assert!(bad.validate().is_err());
+    }
+    let mut bad = q.clone();
+    bad.payload["intent"]["breakPair"] = json!(false);
+    assert!(bad.validate().is_err());
     let r:NativeApplicationResponse=serde_json::from_value(json!({"apiVersion":2,"requestId":"edit-1","instanceId":"instance","documentId":"document","contentRevision":8,"ok":true,"result":{"applied":true,"historyEntriesAdded":1}})).unwrap();
     assert!(crate::native_contract::object_edit::response_matches(
         &q, &r

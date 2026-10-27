@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "c70064569e1ab2d6af2c72a93224cb6179963132",
-  "describe": "v0.7.0-alpha.4-3365-gc7006456"
+  "head": "58a40c34d9c2a2af24abde33b6a53447fc2deed6",
+  "describe": "v0.7.0-alpha.4-3365-g58a40c34"
  },
- "inputsDigest": "51262f2cb930ee40cec91c9ba0c75fa7ef3ddf9fd09f2b0329d127311f8e65cb",
+ "inputsDigest": "50dec8c24b9e352982f4d278ed3764ea70c34e8a7d79833cba03a78a37a175ee",
  "states": [
   "inventoried",
   "characterized",
@@ -23613,7 +23613,7 @@
    "source": "src/js/markers.js:167",
    "meta": {
     "i18n": null,
-    "functionsVisited": 19
+    "functionsVisited": 20
    },
    "fixtures": [
     "static-props",
@@ -23650,7 +23650,7 @@
    "source": "src/js/markers.js:170",
    "meta": {
     "i18n": null,
-    "functionsVisited": 17
+    "functionsVisited": 18
    },
    "fixtures": [
     "static-props",
@@ -23687,7 +23687,7 @@
    "source": "src/js/markers.js:235",
    "meta": {
     "i18n": null,
-    "functionsVisited": 23
+    "functionsVisited": 24
    },
    "fixtures": [
     "static-props",
@@ -23724,7 +23724,7 @@
    "source": "src/js/markers.js:236",
    "meta": {
     "i18n": null,
-    "functionsVisited": 24
+    "functionsVisited": 25
    },
    "fixtures": [
     "static-props",
@@ -23912,7 +23912,7 @@
    "source": "src/js/markers.js:247",
    "meta": {
     "i18n": null,
-    "functionsVisited": 38
+    "functionsVisited": 41
    },
    "fixtures": [
     "static-props",
@@ -33942,7 +33942,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:564",
    "meta": {
-    "functionsVisited": 26
+    "functionsVisited": 27
    },
    "fixtures": [
     "media",
