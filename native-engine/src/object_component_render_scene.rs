@@ -53,6 +53,8 @@ pub(crate) struct ComponentPaint {
     pub(crate) prepared: PreparedItem,
     /// SVG's currently admitted legacy closed-solid subset, straight and unquantized.
     pub(crate) svg_rgba: Option<[f64; 4]>,
+    /// The post-override inner record as the baseline's dict holds it (untransformed geometry).
+    pub(crate) record: crate::object_frame_packet::ObjectRecord,
 }
 
 pub(crate) fn unavailable(index: usize, reason: &'static str) -> ObjectSceneError {
