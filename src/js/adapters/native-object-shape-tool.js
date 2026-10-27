@@ -32,6 +32,15 @@
     }
     // Confirmed CSS -> native composition pixels -> the painted receipt's inverse.
     // Canvas uses identity; Paper pan/zoom never supplies a native coordinate proof.
+    // CSS pixels per document unit as presented: the painted document-to-composition transform composed with the
+    // element box, the same affine point() inverts. A fitted view letterboxes the document, so the element's own
+    // width/canvasW and height/canvasH differ while the presentation stays uniform (#2343 B1). The brush modeler takes
+    // this one scale (the baseline's view.zoom); null when the presentation is not uniform beyond CSS layout rounding.
+    function presentedScale(t){
+      var m=Mapping.transform({presentation:t.presentation},false),kx=t.bounds.width/t.pin.canvasW,ky=t.bounds.height/t.pin.canvasH,
+        a=m[0]*kx,b=m[1]*ky,c=m[2]*kx,d=m[3]*ky,det=a*d-b*c,scale=Math.sqrt(det),tolerance=scale/1024;
+      return det>0&&Number.isFinite(scale)&&Math.abs(a-d)<=tolerance&&Math.abs(b+c)<=tolerance?scale:null;
+    }
     function point(e,t){if(!Number.isFinite(e.clientX)||!Number.isFinite(e.clientY))fail('Pointer position is unavailable.');
       var p=Mapping.point(e,{bounds:t.bounds,canvasW:t.pin.canvasW,canvasH:t.pin.canvasH,presentation:t.presentation});return [p.x,p.y];}
     function style(tool,proof){
@@ -83,7 +92,7 @@
           !root.NemoNativeObjectProjectFile||root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||!root.NemoNativeObjectVector)fail('Native Drawing is not ready.');
       var perspective=root.NemoNativePerspectiveController&&root.NemoNativePerspectiveController.read();
       var t={perspective:perspective,session:s,pin:pin,presentation:shown.presentation,frame:frame,tool:state.tool,layerUid:selection(pin),style:style(state.tool,perspective),bounds:bounds(pin),pointer:e.pointerId,cancelled:false};
-      t.behind=root.state.drawMode==='behind';t.start=point(e,t);if(ports.freehand)t.samples=ports.begin(t.start,e,t);return t;
+      t.behind=root.state.drawMode==='behind';t.start=point(e,t);t.scale=presentedScale(t);if(ports.freehand)t.samples=ports.begin(t.start,e,t);return t;
     }
     function current(t,requirePresentation,lease){
       try{var s=session(),pin=s&&s.info();
@@ -355,9 +364,8 @@
       filters.reset();
       var pressure = filters.pressure(e,w);
       if ((state.stabilizer>=4?state.stabilizer-3:0)) {
-        var sx=intent.bounds.width/intent.pin.canvasW,sy=intent.bounds.height/intent.pin.canvasH;
-        if (sx !== sy) throw new Error('Native brush stabilizer needs a uniform presented scale.');
-        intent.modeler=root.SMStrokeModeler.create((state.stabilizer>=4?state.stabilizer-3:0),sx);
+        if (!(intent.scale>0)) throw new Error('Native brush stabilizer needs a uniform presented scale.');
+        intent.modeler=root.SMStrokeModeler.create((state.stabilizer>=4?state.stabilizer-3:0),intent.scale);
         intent.modeler.down(w[0],w[1],root.performance.now()/1000,pressure);
       }
       return [[w[0],w[1],filters.width(pressure)]];
