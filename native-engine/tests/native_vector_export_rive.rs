@@ -249,3 +249,47 @@ fn a_text_block_plans_as_its_vector_text_glyph_paths() {
     assert!(planned[0].len() > 4, "the stroke and the glyph and underline contours");
     assert_eq!(planned, super::strokes_by_layer(&glyph_plan, layers).unwrap());
 }
+
+#[test]
+#[cfg(feature = "project_media_codec")]
+fn a_video_frame_plans_nothing_as_exportrive_never_sees_it() {
+    let oracle: Value = serde_json::from_str(ORACLE).unwrap();
+    let case = &oracle["cases"][0];
+    let planned = |placed: bool| {
+        let timing = serde_json::json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+            "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+        let mut stroke = case["document"]["objects"][0].clone();
+        stroke["target"]["layerUid"] = serde_json::json!("D");
+        let placements = if placed {
+            serde_json::json!([{"id":"p1","assetId":"v1","target":{"kind":"drawing","contextId":"scene-root",
+                "layerUid":"V"},"offsetFrames":0}])
+        } else {
+            serde_json::json!([])
+        };
+        let project = serde_json::json!({"format":"nemo.native-project-document","formatVersion":2,
+            "project":{"canvasW":320,"canvasH":240,"fps":24},
+            "drawing":{"format":"nemo.native-object-document","formatVersion":2,"totalFrames":4,
+                "layers":[{"layerUid":"D","name":"Ink","timing":timing},{"layerUid":"V","name":"Clip","timing":timing}],
+                "objects":[stroke],
+                "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
+                    "contexts":[{"contextId":"scene-root","layers":[
+                        {"layerUid":"D","naturalPosition":0,"order":{}},{"layerUid":"V","naturalPosition":1,"order":{}}],
+                    "scopes":[{"frameScope":{"kind":"authored","frame":0},
+                        "elements":[{"layerUid":"D","strokeId":stroke["target"]["strokeId"],"naturalPosition":0,"order":{}}]}]}],
+                    "migration":"explicit-plan-required","referencePolicy":"unresolved"}},
+            "viewportReference":null,
+            "assets":[{"id":"v1","name":"take-1","kind":"video","source":{"kind":"linked","locator":"clips/one.mov"}}],
+            "assetInventory":{"assetIds":["v1"],"placements":placements}});
+        let history =
+            NativeObjectHistory::from_project_file("rive-video", project.to_string().as_bytes()).unwrap();
+        let painted = plan(&history.acquire_snapshot(history.content_revision()).unwrap(), 0);
+        if placed {
+            assert!(crate::object_render_scene::ordered_entries(&painted)
+                .any(|entry| matches!(entry, crate::object_render_scene::PaintEntry::Video(_))));
+        }
+        super::strokes_by_layer(&painted, 2).unwrap()
+    };
+    let with_video = planned(true);
+    assert_eq!(with_video[0].len(), 1);
+    assert_eq!(with_video, planned(false));
+}

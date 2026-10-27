@@ -234,12 +234,8 @@ fn strokes_by_layer(
             }
             // `!sd.isBrushTextureCopy`: the dabs stay out; the anchor is written with its own wobble.
             PaintEntry::Dab(_) => continue,
-            PaintEntry::Video(index) => {
-                return Err(RiveExportError::UnsupportedLayer {
-                    source_layer_index: plan.video_slots()[index].layer_index,
-                    reason: "video has no Rive representation",
-                })
-            }
+            // A video frame is never a stroke dict, so `exportRive` writes nothing for it.
+            PaintEntry::Video(_) => continue,
             #[cfg(all(feature = "application", feature = "project_media_codec"))]
             PaintEntry::Brush(_) => {
                 return refuse(

@@ -282,12 +282,9 @@ fn shown_by_layer(
                     .push(shown);
                 continue;
             }
-            PaintEntry::Video(index) => {
-                return Err(LottieExportError::UnsupportedLayer {
-                    source_layer_index: plan.video_slots()[index].layer_index,
-                    reason: "video has no Lottie representation",
-                })
-            }
+            // A video frame is never a stroke dict (the baseline draws it beside the strokes), so
+            // `lottieBuild` writes nothing for it.
+            PaintEntry::Video(_) => continue,
             #[cfg(all(feature = "application", feature = "project_media_codec"))]
             PaintEntry::Brush(_) => {
                 return refuse(

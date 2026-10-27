@@ -301,3 +301,59 @@ fn a_text_block_writes_as_its_vector_text_glyph_paths() {
     assert_eq!(export(&with_text).unwrap(), export(&glyphs).unwrap());
     assert_ne!(export(&with_text).unwrap(), export(case).unwrap(), "the text really reaches the Lottie");
 }
+
+/// A project whose layer `V` places a linked video beside a vector stroke on `D` (no decode needed to plan).
+#[cfg(feature = "project_media_codec")]
+pub(super) fn video_project(case: &Value, placed: bool) -> Value {
+    let timing = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+        "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+    let mut stroke = case["document"]["objects"][0].clone();
+    stroke["target"] = json!({"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},
+        "layerUid":"D","strokeId":"s"});
+    let placements = if placed {
+        json!([{"id":"p1","assetId":"v1","target":{"kind":"drawing","contextId":"scene-root","layerUid":"V"},
+            "offsetFrames":0}])
+    } else {
+        json!([])
+    };
+    json!({"format":"nemo.native-project-document","formatVersion":2,
+        "project":{"canvasW":320,"canvasH":240,"fps":24},
+        "drawing":{"format":"nemo.native-object-document","formatVersion":2,"totalFrames":4,
+            "layers":[{"layerUid":"D","name":"Ink","blendMode":"normal","timing":timing},
+                      {"layerUid":"V","name":"Clip","blendMode":"normal","timing":timing}],
+            "objects":[stroke],
+            "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
+                "contexts":[{"contextId":"scene-root","layers":[
+                    {"layerUid":"D","naturalPosition":0,"order":{}},{"layerUid":"V","naturalPosition":1,"order":{}}],
+                "scopes":[{"frameScope":{"kind":"authored","frame":0},
+                    "elements":[{"layerUid":"D","strokeId":"s","naturalPosition":0,"order":{}}]}]}],
+                "migration":"explicit-plan-required","referencePolicy":"unresolved"}},
+        "viewportReference":null,
+        "assets":[{"id":"v1","name":"take-1","kind":"video","source":{"kind":"linked","locator":"clips/one.mov"}}],
+        "assetInventory":{"assetIds":["v1"],"placements":placements}})
+}
+
+#[test]
+#[cfg(feature = "project_media_codec")]
+fn a_video_frame_writes_nothing_as_lottiebuild_never_sees_it() {
+    let oracle: Value = serde_json::from_str(ORACLE).unwrap();
+    let case = &oracle["cases"][0];
+    let lottie = |placed: bool| {
+        let history = NativeObjectHistory::from_project_file(
+            "lottie-video",
+            video_project(case, placed).to_string().as_bytes(),
+        )
+        .unwrap();
+        let snapshot = history.acquire_snapshot(history.content_revision()).unwrap();
+        let plans = vec![plan(&snapshot, 0)];
+        if placed {
+            assert!(crate::object_render_scene::ordered_entries(&plans[0])
+                .any(|entry| matches!(entry, crate::object_render_scene::PaintEntry::Video(_))));
+        }
+        let mut spec = spec_of(case);
+        spec.start = 0;
+        spec.end = 0;
+        build_lottie(&plans, &spec).unwrap()
+    };
+    assert_eq!(lottie(true), lottie(false));
+}
