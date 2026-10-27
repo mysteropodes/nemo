@@ -574,6 +574,14 @@ test('Fill Brush with Labs on: predictive leaves the fill shape alone, multi-fra
  const e=send(many,'pointerdown',20,20);send(many,'pointerup',60,50);assert.equal(e.prevented,true);assert.equal(many.calls.length,0);
  assert.ok(toasts.some(x=>/unavailable/.test(x)),toasts.join(','));
 });
+test('a trimmed pressure ribbon with multi-frame draw sends one trimmed batch: its cell, then each stamp',async()=>{
+ const f=await fixture();multiframe(f,true);Object.assign(f.root.state,{trimStrokeEnds:true,trimStrokeEndsMax:24,vectorBrush:true});
+ send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:.4});
+ await settled(f);assert.equal(f.calls.length,1);const p=plain(f.calls[0].payload);
+ assert.deepEqual([p.command,p.trimEnds],['object.vector.batch',24]);
+ const frames=p.ops.map(o=>o.record.target.frameScope.frame);assert.deepEqual(frames,[0,0,3,3,5,5]);
+ assert.ok(p.ops.every((o,i)=>i%2?o.record.vectorExt.pressure:o.record.vectorExt.isLinkedFillCompanion),'each cell: the fill, then its ribbon');
+});
 test('a mirrored or rotated pressure ribbon commits each copy with its own centreline and linked fill',async()=>{
  const pen=(f)=>{send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();
   send(f,'pointerup',80,45,{pointerType:'pen',pressure:0});};

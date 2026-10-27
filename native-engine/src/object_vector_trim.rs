@@ -278,11 +278,39 @@ fn linked(fill: &ObjectRecord, ribbon: &ObjectRecord) -> bool {
 /// each kept anchor's width is the old profile's at its chord position in the untrimmed length (the stroke width when the
 /// ribbon has no profile), the profile is rebuilt from those widths (buildWidthProfile), and rebuildVectorBrushOutline
 /// rebuilds the outline, whose fitted centreline becomes the linked fill's outline. Only a lone ribbon, or its linked fill
-/// and the ribbon (createMany order), is native; symmetry copies and multi-frame stamps of a ribbon are not yet.
+/// and the ribbon (in either stack order), is native. Labs multi-frame stamps repeat that cell unchanged (the baseline
+/// stamps the already trimmed ribbon and its fill), so the drawn cell is trimmed once and every stamp takes the result;
+/// symmetry copies differ from the drawn cell and stay unavailable.
 pub(super) fn ribbon<'a>(records: &mut [ObjectRecord], walls: impl Iterator<Item = &'a ObjectRecord>, max: f64) -> Result<(), DispatchErrorCode> {
+    let width = match &*records {
+        [a, b, ..] if linked(a, b) || linked(b, a) => 2,
+        _ => 1,
+    };
+    if records.is_empty() || records.len() % width != 0 {
+        return Err(DispatchErrorCode::Unavailable);
+    }
+    let (cell, stamps) = records.split_at_mut(width);
+    let repeats = |chunk: &[ObjectRecord]| {
+        chunk.iter().zip(cell.iter()).all(|(a, b)| a.geometry == b.geometry && a.vector_ext == b.vector_ext && a.vector == b.vector)
+    };
+    if !stamps.chunks(width).all(repeats) {
+        return Err(DispatchErrorCode::Unavailable);
+    }
+    trim_cell(cell, walls, max)?;
+    for chunk in stamps.chunks_mut(width) {
+        for (stamp, trimmed) in chunk.iter_mut().zip(cell.iter()) {
+            stamp.geometry = trimmed.geometry.clone();
+            stamp.vector_ext = trimmed.vector_ext.clone();
+            stamp.vector = trimmed.vector.clone();
+        }
+    }
+    Ok(())
+}
+fn trim_cell<'a>(records: &mut [ObjectRecord], walls: impl Iterator<Item = &'a ObjectRecord>, max: f64) -> Result<(), DispatchErrorCode> {
     let (fill, ribbon) = match records {
         [ribbon] => (None, ribbon),
         [fill, ribbon] if linked(fill, ribbon) => (Some(fill), ribbon),
+        [ribbon, fill] if linked(fill, ribbon) => (Some(fill), ribbon),
         _ => return Err(DispatchErrorCode::Unavailable),
     };
     let pressure = pressure(ribbon).ok_or(DispatchErrorCode::Unavailable)?;
