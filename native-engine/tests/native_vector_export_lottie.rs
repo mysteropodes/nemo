@@ -234,33 +234,126 @@ fn a_stored_camera_moves_every_anchor_and_turns_every_handle() {
     assert!(same(&key(&with, 4)["i"], &key(&without, 4)["i"], "i").is_err());
 }
 
-#[test]
+/// Case 0 with a real bundled-font text block on `L0` frame 0, above its stroke.
 #[cfg(feature = "font_asset_admission")]
-fn a_text_block_is_dropped_as_the_baselines_baked_text_raster_is() {
-    // `lottieBuild` filters `!sd.isRaster`, and the baseline's text is a raster (`commitText` bakes it to a PNG).
-    let oracle: Value = serde_json::from_str(ORACLE).unwrap();
-    let case = &oracle["cases"][0];
+pub(super) fn with_text_block(case: &Value) -> Value {
     let mut with_text = case.clone();
     let document = &mut with_text["document"];
     document["items"] = serde_json::json!({"text":[{"target":{"contextId":"scene-root","layerUid":"L0",
-        "strokeId":"words","frameScope":{"kind":"authored","frame":0}},"block":{"text":"Hi",
-        "font":{"kind":"bundled","fontKey":"Roboto-Regular"},"size":48,"color":"#112233","align":"left",
-        "anchorTopLeft":{"x":10,"y":20}}}]});
+        "strokeId":"words","frameScope":{"kind":"authored","frame":0}},"block":{"text":"Hi o",
+        "font":{"kind":"bundled","fontKey":"Roboto-Regular"},"size":48,"color":"#336699","align":"left",
+        "anchorTopLeft":{"x":10,"y":20},"underline":true}}]});
     let scope = &mut document["compositionOrder"]["contexts"][0]["scopes"][0]["elements"];
-    let next = scope
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|element| element["layerUid"] == "L0")
-        .count();
+    let next = scope.as_array().unwrap().iter().filter(|e| e["layerUid"] == "L0").count();
     scope.as_array_mut().unwrap().push(serde_json::json!(
         {"layerUid":"L0","strokeId":"words","naturalPosition":next,"order":{}}));
+    with_text
+}
+/// The same frame with the text block's painted contours written as the baseline's vector-text glyph
+/// dicts (`buildGlyphPaths`): closed fill-only paths in the block colour, each its own record.
+#[cfg(feature = "font_asset_admission")]
+pub(super) fn as_glyph_records(case: &Value, with_text: &Value) -> Value {
     let history = owner(&with_text["document"]);
     let snapshot = history.acquire_snapshot(history.content_revision()).unwrap();
-    assert!(
-        crate::object_render_scene::ordered_entries(&plan(&snapshot, 0))
-            .any(|entry| matches!(entry, crate::object_render_scene::PaintEntry::Text(_))),
-        "the frame really paints the text block"
-    );
-    assert_eq!(export(&with_text).unwrap(), export(case).unwrap());
+    let painted = plan(&snapshot, 0);
+    let mut glyphs = case.clone();
+    let template = glyphs["document"]["objects"][0].clone();
+    let mut records = Vec::new();
+    for entry in crate::object_render_scene::ordered_entries(&painted) {
+        let crate::object_render_scene::PaintEntry::Text(text) = entry else { continue };
+        for (contour, _) in text.item.painted() {
+            let mut r = template.clone();
+            r["target"] = json!({"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},
+                "layerUid":"L0","strokeId":contour.key});
+            r["geometry"]["closed"] = json!(true);
+            r["geometry"]["segments"] = json!(contour.contour.segments().iter().map(|s| json!({
+                "point":{"x":s.point[0],"y":s.point[1]},"handleIn":{"x":s.handle_in[0],"y":s.handle_in[1]},
+                "handleOut":{"x":s.handle_out[0],"y":s.handle_out[1]}})).collect::<Vec<_>>());
+            r["fill"] = json!({"kind":"solid","r":51.0/255.0,"g":102.0/255.0,"b":153.0/255.0,"a":1});
+            r["vector"] = json!({"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"butt",
+                "strokeJoin":"miter","opacity":contour.opacity});
+            records.push(r);
+        }
+    }
+    assert!(records.len() > 3, "the block really paints glyph and underline contours");
+    let document = &mut glyphs["document"];
+    let scope = &mut document["compositionOrder"]["contexts"][0]["scopes"][0]["elements"];
+    let mut next = scope.as_array().unwrap().iter().filter(|e| e["layerUid"] == "L0").count();
+    for r in &records {
+        scope.as_array_mut().unwrap().push(json!(
+            {"layerUid":"L0","strokeId":r["target"]["strokeId"],"naturalPosition":next,"order":{}}));
+        next += 1;
+    }
+    document["objects"].as_array_mut().unwrap().extend(records);
+    glyphs
+}
+
+#[test]
+#[cfg(feature = "font_asset_admission")]
+fn a_text_block_writes_as_its_vector_text_glyph_paths() {
+    // Native text is the baseline's vector text: buildGlyphPaths makes each contour a closed path filled with the
+    // block colour and no stroke, and lottieBuild writes those as ordinary shapes. A text block must therefore
+    // export exactly as its contours written as such records, a path the baseline oracle above pins.
+    let oracle: Value = serde_json::from_str(ORACLE).unwrap();
+    let case = &oracle["cases"][0];
+    let with_text = with_text_block(case);
+    let glyphs = as_glyph_records(case, &with_text);
+    assert_eq!(export(&with_text).unwrap(), export(&glyphs).unwrap());
+    assert_ne!(export(&with_text).unwrap(), export(case).unwrap(), "the text really reaches the Lottie");
+}
+
+/// A project whose layer `V` places a linked video beside a vector stroke on `D` (no decode needed to plan).
+#[cfg(feature = "project_media_codec")]
+pub(super) fn video_project(case: &Value, placed: bool) -> Value {
+    let timing = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+        "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+    let mut stroke = case["document"]["objects"][0].clone();
+    stroke["target"] = json!({"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},
+        "layerUid":"D","strokeId":"s"});
+    let placements = if placed {
+        json!([{"id":"p1","assetId":"v1","target":{"kind":"drawing","contextId":"scene-root","layerUid":"V"},
+            "offsetFrames":0}])
+    } else {
+        json!([])
+    };
+    json!({"format":"nemo.native-project-document","formatVersion":2,
+        "project":{"canvasW":320,"canvasH":240,"fps":24},
+        "drawing":{"format":"nemo.native-object-document","formatVersion":2,"totalFrames":4,
+            "layers":[{"layerUid":"D","name":"Ink","blendMode":"normal","timing":timing},
+                      {"layerUid":"V","name":"Clip","blendMode":"normal","timing":timing}],
+            "objects":[stroke],
+            "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
+                "contexts":[{"contextId":"scene-root","layers":[
+                    {"layerUid":"D","naturalPosition":0,"order":{}},{"layerUid":"V","naturalPosition":1,"order":{}}],
+                "scopes":[{"frameScope":{"kind":"authored","frame":0},
+                    "elements":[{"layerUid":"D","strokeId":"s","naturalPosition":0,"order":{}}]}]}],
+                "migration":"explicit-plan-required","referencePolicy":"unresolved"}},
+        "viewportReference":null,
+        "assets":[{"id":"v1","name":"take-1","kind":"video","source":{"kind":"linked","locator":"clips/one.mov"}}],
+        "assetInventory":{"assetIds":["v1"],"placements":placements}})
+}
+
+#[test]
+#[cfg(feature = "project_media_codec")]
+fn a_video_frame_writes_nothing_as_lottiebuild_never_sees_it() {
+    let oracle: Value = serde_json::from_str(ORACLE).unwrap();
+    let case = &oracle["cases"][0];
+    let lottie = |placed: bool| {
+        let history = NativeObjectHistory::from_project_file(
+            "lottie-video",
+            video_project(case, placed).to_string().as_bytes(),
+        )
+        .unwrap();
+        let snapshot = history.acquire_snapshot(history.content_revision()).unwrap();
+        let plans = vec![plan(&snapshot, 0)];
+        if placed {
+            assert!(crate::object_render_scene::ordered_entries(&plans[0])
+                .any(|entry| matches!(entry, crate::object_render_scene::PaintEntry::Video(_))));
+        }
+        let mut spec = spec_of(case);
+        spec.start = 0;
+        spec.end = 0;
+        build_lottie(&plans, &spec).unwrap()
+    };
+    assert_eq!(lottie(true), lottie(false));
 }

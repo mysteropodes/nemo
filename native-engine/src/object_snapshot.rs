@@ -54,7 +54,7 @@ mod property_read;
 mod text_read;
 #[cfg(all(
     test,
-    feature = "test-commands",
+    any(feature = "test-commands", feature = "application"),
     feature = "history",
     feature = "project_media_codec",
     feature = "font_asset_admission"

@@ -2,7 +2,8 @@
 //! oracle check must notice every single deviation, and every refusal must be the
 //! typed reason of its own rule, leaving the input document untouched.
 use super::fixture::{
-    convert_oracle, decode, document, layer, s1_document, s1_with_item, s2_document, text_item,
+    convert_oracle, decode, document, layer, s1_document, s1_with_animated_item, s1_with_item,
+    s2_document, text_item,
     uids, windowed_document, wire,
 };
 use super::verify::{verify, verify_window};
@@ -429,8 +430,9 @@ fn every_single_deviation_of_the_time_window_is_noticed() {
 
 #[test]
 fn items_that_cannot_enter_a_component_refuse_the_conversion_never_stay_behind() {
-    // A text block has no placed component paint yet (plain images move: object_component_convert_images.rs).
-    let doc = decode(&s1_with_item("ly_hand", 3));
+    // A placed component paints no animated text (plain text and images move:
+    // object_component_convert_images.rs).
+    let doc = decode(&s1_with_animated_item("ly_hand", 3));
     assert!(
         doc.item_records().is_some(),
         "the fixture really holds an item"
@@ -447,9 +449,13 @@ fn items_that_cannot_enter_a_component_refuse_the_conversion_never_stay_behind()
         want,
         "a merge refuses the same way"
     );
-    // An item on a layer that stays out of the selection is not in the way.
-    let elsewhere = decode(&s1_with_item("ly_other", 1));
+    // An item on a layer that stays out of the selection is not in the way, and plain text moves.
+    let elsewhere = decode(&s1_with_animated_item("ly_other", 1));
     assert!(plan_convert(&elsewhere, 1, &uids(&["ly_hand"])).is_ok());
+    let plain = decode(&s1_with_item("ly_hand", 3));
+    let moved = plan_convert(&plain, 1, &uids(&["ly_hand"])).unwrap().document;
+    let text = &moved.item_records().unwrap().text_entries()[0].target;
+    assert!(text.context_id != "scene-root" && text.layer_uid.ends_with(":layer-1"));
     // The baseline reasons win over the items refusal.
     let layers = [
         layer("ly_item", "Item", &[(0, "ia")]),
