@@ -43,7 +43,7 @@ pub(super) fn request(payload: &Value) -> bool {
             "companion",
             "source",
         ],
-        &[],
+        &["placement"],
     )
     .is_some_and(|p| {
         let c = &p["companion"];
@@ -64,6 +64,7 @@ pub(super) fn request(payload: &Value) -> bool {
             && exact(&p["source"], &["kind", "path"], &[]).is_some()
             && p["source"]["kind"] == "file"
             && text(&p["source"]["path"], 4096)
+            && p.get("placement").is_none_or(|v| v == "behind")
     })
 }
 pub(super) fn result(value: &Value) -> bool {

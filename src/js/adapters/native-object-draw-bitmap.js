@@ -20,8 +20,8 @@
   function style(root,state,out){
     if(!(state.tool==='draw'&&state.bitmapBrushOn&&state.strokeEnabled&&!state.vectorBrush&&!state.shadowMode))return out;
     if(!root.SMBitmapBrush||typeof root.SMBitmapBrush.bake!=='function')fail('The bitmap brush is unavailable in native Drawing.');
-    // Symmetry copies, Trim, Behind, Mask and Labs would each need the companion to follow the anchor: not native yet.
-    if(state.symmetryEnabled||state.trimStrokeEnds||state.drawMode==='behind'||state.maskMode||
+    // Symmetry copies, Trim, Mask and Labs would each need the companion to follow the anchor: not native yet.
+    if(state.symmetryEnabled||state.trimStrokeEnds||state.maskMode||
         root.SMLabs&&root.SMLabs.list().some(function(p){return p.on;}))
       fail('This bitmap brush combination is unavailable in native Drawing.');
     out.bitmap={tip:state.bitmapTip||'soft',spacing:state.bitmapSpacing!=null?state.bitmapSpacing:15,
@@ -81,8 +81,11 @@
       return Command.create(session,'bitmap',contract).execute(Contract.STROKE,function(now){
         if(!same(now,t.pin))throw Command.fault('stale_origin','The presented native revision is not the origin the stroke was drawn on',{reason:'origin_changed'});
         mark();
-        return {documentSnapshotId:now.documentSnapshotId,lifecycleGeneration:now.lifecycleGeneration,record:record,companion:companion,
+        var body={documentSnapshotId:now.documentSnapshotId,lifecycleGeneration:now.lifecycleGeneration,record:record,companion:companion,
           source:sealed.sources[0].source};
+        // drawMode 'behind' (read at the press): the anchor under the layer's artwork, its companion directly above it.
+        if(t.behind)body.placement='behind';
+        return body;
       }).then(function(receipt){return {status:'imported',applied:receipt.applied};},function(error){return {status:'failed',error:statusOf(error)};});
     }};
     var attempt=Stage.create({core:core,fs:tauri.fs,path:tauri.path,uuid:function(){return root.crypto.randomUUID();}})

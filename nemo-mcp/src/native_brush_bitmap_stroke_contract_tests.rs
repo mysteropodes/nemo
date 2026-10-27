@@ -44,6 +44,12 @@ fn the_stroke_request_is_admitted_as_the_owner_reads_it_and_nothing_else() {
     }
     let mut extra = payload();
     extra["placement"] = json!({"kind":"newLayer"});
+    assert!(!request(&extra), "no other placement");
+    extra["placement"] = json!("front");
+    assert!(!request(&extra), "front is the absent default");
+    extra["placement"] = json!("behind");
+    assert!(request(&extra), "drawMode behind");
+    extra["other"] = json!(1);
     assert!(!request(&extra), "no other member");
 }
 

@@ -477,6 +477,14 @@ test('a bitmap-brush Draw stroke commits its camouflaged anchor, baked companion
  assert.ok(removed.includes(p.source.path),'a confirmed stroke cleans its staged PNG');
  assert.equal(f.paper.project.activeLayer.children.length,0,'no Raster or path is inserted');
 });
+test('a bitmap stroke drawn behind asks native for the bottom of the layer, its companion above it',async()=>{
+ const f=await fixture();bitmapPorts(f);Object.assign(f.root.state,{bitmapBrushOn:true,drawMode:'behind'});
+ send(f,'pointerdown',20,20);send(f,'pointermove',50,30);send(f,'pointerup',80,45);
+ assert.equal((await settled(f)).status,'applied');assert.equal(f.calls[0].payload.placement,'behind');
+ const front=await fixture();bitmapPorts(front);Object.assign(front.root.state,{bitmapBrushOn:true});
+ send(front,'pointerdown',20,20);send(front,'pointermove',50,30);send(front,'pointerup',80,45);
+ await settled(front);assert.equal(Object.prototype.hasOwnProperty.call(front.calls[0].payload,'placement'),false,'front is the absent default');
+});
 test('an unfilled bitmap stroke hides its anchor and carries its pressure profile; unsupported bitmap combinations stay refused',async()=>{
  const f=await fixture(),{baked}=bitmapPorts(f);
  Object.assign(f.root.state,{bitmapBrushOn:true,bitmapPressure:true,fillEnabled:false});
@@ -486,7 +494,7 @@ test('an unfilled bitmap stroke hides its anchor and carries its pressure profil
  assert.equal(r.vector.opacity,0);assert.equal(ext.preTextureOpacity,.5);assert.equal(ext.preTextureStroke,undefined);assert.notEqual(r.vector.stroke,null);assert.equal(r.vector.hasRealStroke,true);
  assert.equal(ext.bitmapBrushSpec.pressure,true);assert.ok(ext.bitmapPressureProfile.length>=2);assert.deepEqual(plain(baked[0].profile),ext.bitmapPressureProfile);
  assert.ok(ext.bitmapPressureProfile.every(([x,y,m])=>Number.isFinite(x)&&Number.isFinite(y)&&m>=.2&&m<=2.5));
- for(const change of [s=>s.symmetryEnabled=true,s=>s.drawMode='behind',s=>s.trimStrokeEnds=true,s=>s.maskMode=true]){
+ for(const change of [s=>s.symmetryEnabled=true,s=>s.trimStrokeEnds=true,s=>s.maskMode=true]){
   const g=await fixture();bitmapPorts(g);Object.assign(g.root.state,{bitmapBrushOn:true});change(g.root.state);
   const e=send(g,'pointerdown',20,20);send(g,'pointerup',60,50);assert.equal(e.prevented,true);assert.equal(g.calls.length,0);assert.ok(g.log.some(x=>/unavailable/.test(x)),g.log.join(','));
  }
