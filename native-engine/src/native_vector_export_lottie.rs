@@ -36,6 +36,9 @@ pub(crate) struct LottieSpec {
     pub(crate) width: u32,
     pub(crate) height: u32,
     pub(crate) background: String,
+    /// `state.exportIncludeShadowGuides` (off by default): without it, `lottieBuild` filters out every
+    /// Shadow Brush construction stroke (`sd.channelTag === 'shadow'`).
+    pub(crate) include_shadow_guides: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -115,7 +118,7 @@ fn path_layer(
 /// One drawn stroke dict as `lottieBuild` shows it, or `None` when its filter drops it. A macro, not a
 /// function: the record type belongs to the evaluation layer, which this export layer may read but not name.
 macro_rules! shown_of {
-    ($record:expr, $path:expr, $index:expr, $camera:expr) => {{
+    ($record:expr, $path:expr, $index:expr, $camera:expr, $shadows:expr) => {{
         let (record, path, index, camera): (_, &BezPath, usize, _) = ($record, $path, $index, $camera);
         let shown: Result<Option<Shown>, LottieExportError> = 'shown: {
                 if record.family != VECTOR_FAMILY {
@@ -123,6 +126,15 @@ macro_rules! shown_of {
                         source_object_index: index,
                         reason: "legacy fill records have no admitted Lottie representation yet",
                     });
+                }
+                // `state.exportIncludeShadowGuides || sd.channelTag !== 'shadow'`.
+                let shadow = record
+                    .vector_ext
+                    .value()
+                    .and_then(|e| e.shadow.value())
+                    .is_some_and(|s| s.channel_tag == "shadow");
+                if shadow && !$shadows {
+                    break 'shown Ok(None);
                 }
                 let body = record.vector().ok_or(LottieExportError::Unsupported {
                     source_object_index: index,
@@ -190,6 +202,7 @@ fn push(out: &mut [Vec<Shown>], layer: usize, shown: Shown) -> Result<(), Lottie
 fn shown_by_layer(
     plan: &ObjectPaintPlan,
     layers: usize,
+    shadows: bool,
 ) -> Result<Vec<Vec<Shown>>, LottieExportError> {
     let frame = plan.packet().frame();
     let camera = plan
@@ -239,14 +252,14 @@ fn shown_by_layer(
             // `applyLayerDuplicator`'s copies on theirs, drawn like any stroke.
             PaintEntry::Component(component) => {
                 let host = component.host_layer_index;
-                if let Some(shown) = shown_of!(&component.record, &component.path, host, camera)? {
+                if let Some(shown) = shown_of!(&component.record, &component.path, host, camera, shadows)? {
                     push(&mut out, host, shown)?;
                 }
                 continue;
             }
             PaintEntry::Duplicator(copy) => {
                 let host = copy.layer_index;
-                if let Some(shown) = shown_of!(&copy.record, &copy.path, copy.source_index, camera)? {
+                if let Some(shown) = shown_of!(&copy.record, &copy.path, copy.source_index, camera, shadows)? {
                     push(&mut out, host, shown)?;
                 }
                 continue;
@@ -279,7 +292,7 @@ fn shown_by_layer(
         };
         let source = command.source();
         let layer = source.source_layer_index();
-        if let Some(shown) = shown_of!(source.record(), command.path(), source.source_object_index(), camera)? {
+        if let Some(shown) = shown_of!(source.record(), command.path(), source.source_object_index(), camera, shadows)? {
             push(&mut out, layer, shown)?;
         }
     }
@@ -306,7 +319,7 @@ pub(crate) fn build_lottie(
     let layers = plans[0].packet().source_layers();
     let frames = plans
         .iter()
-        .map(|plan| shown_by_layer(plan, layers.len()))
+        .map(|plan| shown_by_layer(plan, layers.len(), spec.include_shadow_guides))
         .collect::<Result<Vec<_>, _>>()?;
     let mut ind = 1u32;
     let mut out = vec![

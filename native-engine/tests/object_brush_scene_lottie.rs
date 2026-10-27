@@ -18,6 +18,7 @@ fn the_lottie_writer_drops_bitmap_ink_and_writes_the_anchor_as_lottiebuild_does(
         width: 48,
         height: 48,
         background: "#ffffff".into(),
+        include_shadow_guides: false,
     };
     let brushed = owner(BitmapBrushFields::test_drawing());
     let pin = brushed.acquire_snapshot(0).unwrap();
