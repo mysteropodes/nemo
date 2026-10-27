@@ -1,7 +1,10 @@
 //! Literal interior pixels through the real native compositor after edit, undo and reopen.
 use super::ObjectOutputSpec;
-use crate::compositor::{object_test_plan as plan, object_test_selector as selector, Compositor};
-use crate::object_render_scene::prepare_object_composition;
+use crate::compositor::{object_test_selector as selector, Compositor};
+use crate::object_frame_packet::prepare_object_exposure_frame;
+use crate::object_render_scene::{
+    prepare_object_composition, prepare_object_paint_plan, prepare_object_render_scene,
+};
 #[path = "object_vector_edit_support.rs"]
 #[allow(dead_code)]
 mod support;
@@ -10,10 +13,12 @@ use serde_json::json;
 #[ignore = "requires real headless Metal; run under the shared heavy-job lock"]
 fn subselect_gpu_edit_undo_and_reopen_preserve_literal_interior_pixels() {
     for parametric in [false, true] {
-        check_pixels(parametric);
+        for held in [false, true] {
+            check_pixels(parametric, held);
+        }
     }
 }
-fn check_pixels(parametric: bool) {
+fn check_pixels(parametric: bool, held: bool) {
     let mut record = support::record_at("A", "L1", 0, "s-a");
     record["geometry"]["closed"] = json!(true);
     record["geometry"]["segments"] = json!([[4, 4], [28, 4], [28, 28], [4, 28]].map(
@@ -25,12 +30,20 @@ fn check_pixels(parametric: bool) {
     if parametric {
         record["vectorExt"] = json!({"paramShape":{"kind":"rect","box":{"x1":4,"y1":4,"x2":28,"y2":28},"tl":0,"tr":0,"br":0,"bl":0}});
     }
-    let mut owner = support::owner_of(&support::document(2, vec![record], None));
+    let mut document = support::document(2, vec![record], None);
+    for layer in document["layers"].as_array_mut().unwrap() {
+        layer["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+    }
+    let mut owner = support::owner_of(&document);
+    let frame = if held { 5 } else { 0 };
     let mut gpu = Compositor::new().expect("Subselect needs real headless Metal");
     let pixels = |gpu: &mut Compositor, owner: &crate::history::NativeObjectHistory| {
         let s = owner.acquire_snapshot(owner.content_revision()).unwrap();
-        let p = plan(&s, 0);
-        let prepared = prepare_object_composition(&p, &selector(&s, 0)).unwrap();
+        let pins = selector(&s, frame);
+        let packet = prepare_object_exposure_frame(&s, &pins).unwrap();
+        let scene = prepare_object_render_scene(&packet, &pins).unwrap();
+        let p = prepare_object_paint_plan(&scene, &pins).unwrap();
+        let prepared = prepare_object_composition(&p, &pins).unwrap();
         let rendered = gpu
             .compose_object(
                 &prepared,
@@ -51,7 +64,7 @@ fn check_pixels(parametric: bool) {
     let mut request = support::request(
         &owner,
         "subselect-pixels",
-        json!({"command":"object.subselect.edit","stableTarget":support::target("L1",0,"s-a"),"intent":{"kind":"move","indices":[0,1,2,3],"delta":[24,0]}}),
+        json!({"command":"object.subselect.edit","stableTarget":support::target("L1",0,"s-a"),"atFrame":frame,"intent":{"kind":"move","indices":[0,1,2,3],"delta":[24,0]}}),
     );
     request["operation"] = json!("command.document.object.subselect.edit");
     assert_eq!(support::dispatch(&mut owner, &request)["ok"], true);

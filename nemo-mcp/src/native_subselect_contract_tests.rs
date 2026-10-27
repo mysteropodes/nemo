@@ -49,6 +49,20 @@ fn subselect_command_uses_shared_owner_and_revision_correlator() {
     let mut q:NativeApplicationRequest=serde_json::from_value(json!({"apiVersion":2,"requestId":"edit-1","instanceId":"instance","documentId":"document","expectedRevision":7,"operation":EDIT,"payload":{"command":"object.subselect.edit","stableTarget":target(),"intent":{"kind":"handle","index":0,"handle":"handleOut","point":[5,4],"breakPair":false}}})).unwrap();
     assert!(q.validate_input().is_ok());
     assert!(q.validate().is_ok());
+    q.payload["atFrame"] = json!(5);
+    assert!(q.validate_input().is_ok());
+    assert!(q.validate().is_ok());
+    for value in [
+        json!(-1),
+        json!(1.5),
+        json!(4294967296u64),
+        Value::Null,
+        json!("5"),
+    ] {
+        let mut bad = q.clone();
+        bad.payload["atFrame"] = value;
+        assert!(bad.validate().is_err());
+    }
     let r:NativeApplicationResponse=serde_json::from_value(json!({"apiVersion":2,"requestId":"edit-1","instanceId":"instance","documentId":"document","contentRevision":8,"ok":true,"result":{"applied":true,"historyEntriesAdded":1}})).unwrap();
     assert!(crate::native_contract::object_edit::response_matches(
         &q, &r

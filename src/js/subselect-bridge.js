@@ -97,16 +97,16 @@
       }catch(e){if(job.token===previewToken){cancel(false);notice(e);}}}previewBusy=false;})();}
     function admitted(t,lease){if(!recovering)return current(t,lease);const s=session(),p=s&&s.info();return !retired&&s===t.session&&s.isActive()&&p&&['instanceId','documentId','lifecycleGeneration'].every(k=>p[k]===t.pin[k]);}
     function commit(t,intent){if(uncertain)throw new Error('Resolve the previous subselect command before another edit.');if(pending)throw new Error('A native subselect command is still pending.');
-      if(!current(t)||t.item.stableTarget.frameScope.frame!==t.selector.frame)throw new Error('Subselect target or frame changed.');
+      if(!current(t))throw new Error('Subselect target or frame changed.');
       const s=t.session,guarded={info:s.info,isActive:s.isActive,requestId:s.requestId,runResourceCommand:action=>s.runResourceCommand(ctx=>{
         if(!admitted(t,ctx))throw new Error('Subselect intent changed before dispatch.');return action({reconcile:ctx.reconcile,dispatch:q=>{if(!admitted(t,ctx))throw new Error('Subselect intent changed before dispatch.');return ctx.dispatch(q);}});
       })};
       const command=root.NemoNativeObjectVectorCommand.create(guarded,'subselect',root.NemoNativeSubselectContract);
       clear();++previewToken;previewNext=null;
-      pending=command.execute(root.NemoNativeSubselectContract.EDIT,pin=>{if(!same(pin,t.pin))throw new Error('Subselect revision changed.');return {command:'object.subselect.edit',stableTarget:t.item.stableTarget,intent:intent};});
+      pending=command.execute(root.NemoNativeSubselectContract.EDIT,pin=>{if(!same(pin,t.pin))throw new Error('Subselect revision changed.');return {command:'object.subselect.edit',stableTarget:t.item.stableTarget,atFrame:t.selector.frame,intent:intent};});
       settled=pending.then(receipt=>{cancel(true);return {status:receipt.applied?'applied':'noop',receipt};},error=>{cancel(true);notice(error);if(error&&error.code==='subselect_command_indeterminate'){uncertain=error;return {status:'indeterminate',error};}return {status:'refused',error};}).finally(()=>{pending=null;});return settled;
     }
-    function start(e,t,hit){if(t.item.stableTarget.frameScope.frame!==t.selector.frame)throw new Error('Subselect held-frame key promotion is unavailable.');
+    function start(e,t,hit){
       if(e.shiftKey&&hit.key==='point'){const pos=t.indices.indexOf(hit.index);if(pos<0)t.indices.push(hit.index);else t.indices.splice(pos,1);draw(t,t.item.segments);return;}
       if(hit.key==='point'&&!t.indices.includes(hit.index))t.indices=[hit.index];
       t.hit=hit;t.start=inverse(t.item.matrix,point(e,t));t.clientStart=[e.clientX,e.clientY];t.pointer=e.pointerId;t.alt=e.altKey;t.intent=null;drag=t;t.capture=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(t.capture.setPointerCapture)t.capture.setPointerCapture(t.pointer);draw(t,t.item.segments);
@@ -133,7 +133,8 @@
     function up(e){if(marquee&&marquee.pointer===e.pointerId){const t=marquee;t.ended=true;if(t.items)settled=Promise.resolve(finishMarquee(t));return;}
       const t=drag;if(!t||t.pointer!==e.pointerId)return;drag=null;release(t);++previewToken;previewNext=null;
       if(!current(t)){cancel(true);return;}const click=Math.hypot(e.clientX-t.clientStart[0],e.clientY-t.clientStart[1])<3;
-      if(click&&t.alt&&t.hit.key==='point')commit(t,{kind:'toggle',index:t.hit.index});else if(t.intent&&!click)commit(t,t.intent);else draw(t,t.item.segments);}
+      if(click&&t.alt&&t.hit.key==='point')commit(t,{kind:'toggle',index:t.hit.index});else if(t.intent&&!click)commit(t,t.intent);
+      else if(t.item.stableTarget.frameScope.frame!==t.selector.frame)commit(t,{kind:'move',indices:[t.hit.index],delta:[0,0]});else draw(t,t.item.segments);}
     function action(intent){if(!selection||!current(selection)||!selection.indices.length){notice(new Error('Select one or more native path points.'));return Promise.resolve({status:'refused'});}
       try{return commit(selection,Object.assign({indices:selection.indices.slice()},intent));}catch(error){notice(error);return Promise.resolve({status:'refused',error});}}
     function handle(kind,e){if(!native()||root.state.tool!=='subselect')return false;

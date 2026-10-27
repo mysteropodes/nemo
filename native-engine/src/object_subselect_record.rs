@@ -5,6 +5,67 @@ use crate::object_document::{
 };
 use serde_json::Number;
 
+/// The displayed frame may hold an earlier key. Admit promotion only when its
+/// source and complete copied cell are representable by the native frame owner.
+pub(crate) fn at_frame(
+    document: &ObjectDocument,
+    record: &ObjectRecord,
+    frame: u32,
+) -> Result<bool, Refusal> {
+    use crate::object_document::{FrameScopeKind, RangeEvaluator};
+    let target = &record.target;
+    if frame >= document.total_frames
+        || target.context_id != "scene-root"
+        || target.frame_scope.kind != FrameScopeKind::Authored
+    {
+        return Err(Refusal::Invalid);
+    }
+    let layer = document
+        .layers
+        .iter()
+        .find(|l| l.layer_uid == target.layer_uid)
+        .ok_or(Refusal::Unsupported)?;
+    let ranges = RangeEvaluator::for_document(document, "scene-root", frame)
+        .map_err(|_| Refusal::Unsupported)?;
+    if ranges
+        .gates(&target.layer_uid)
+        .map_err(|_| Refusal::Unsupported)?
+        && !ranges
+            .resolve(&target.layer_uid, true)
+            .map_err(|_| Refusal::Unsupported)?
+            .contains(frame)
+    {
+        return Err(Refusal::Unsupported);
+    }
+    if frame == target.frame_scope.frame {
+        return Ok(false);
+    }
+    let timing = layer.timing.value().ok_or(Refusal::Unsupported)?;
+    let (kind, source, _) = timing.exposure(frame);
+    if kind != "held" || source != Some(target.frame_scope.frame) {
+        return Err(Refusal::Unsupported);
+    }
+    let in_cell = |other: &crate::object_document::ObjectTarget| {
+        other.context_id == target.context_id
+            && other.layer_uid == target.layer_uid
+            && other.frame_scope.kind == FrameScopeKind::Authored
+            && [frame, target.frame_scope.frame].contains(&other.frame_scope.frame)
+    };
+    if document.items.value().is_some_and(|items| {
+        items
+            .raster
+            .value()
+            .is_some_and(|entries| entries.iter().any(|r| in_cell(&r.target)))
+            || items
+                .text
+                .value()
+                .is_some_and(|entries| entries.iter().any(|r| in_cell(&r.target)))
+    }) {
+        return Err(Refusal::Unsupported);
+    }
+    Ok(true)
+}
+
 fn pair(p: &ObjectPoint) -> Result<[f64; 2], Refusal> {
     Ok([
         p.x.as_f64().ok_or(Refusal::Invalid)?,

@@ -26,7 +26,7 @@
     }
     return valid&&exact(v,keys);
   }
-  function payload(op,v){if(op!==EDIT||!exact(v,['command','stableTarget','intent'])||v.command!=='object.subselect.edit'||!target(v.stableTarget)||!intent(v.intent))fail('Invalid native subselect intent');}
+  function payload(op,v){if(op!==EDIT||!exact(v,['command','stableTarget','intent'],['atFrame'])||v.command!=='object.subselect.edit'||!target(v.stableTarget)||!intent(v.intent)||own(v,'atFrame')&&!integer(v.atFrame,4294967295))fail('Invalid native subselect intent');}
   function result(op,v){if(op!==EDIT||!exact(v,['applied','historyEntriesAdded'])||typeof v.applied!=='boolean'||v.historyEntriesAdded!==Number(v.applied))fail('Invalid subselect receipt');}
   function correlate(q,r){result(q.operation,r.result);if(q.instanceId!==r.instanceId||q.documentId!==r.documentId||q.expectedRevision+Number(r.result.applied)!==r.contentRevision)fail('Subselect receipt origin mismatch');}
   function readPayload(v){if(!exact(v,['atRevision','documentSnapshotId','stableTarget','subselect'])||!integer(v.atRevision)||typeof v.documentSnapshotId!=='string'||!v.documentSnapshotId||!target(v.stableTarget)||

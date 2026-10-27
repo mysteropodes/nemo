@@ -1,10 +1,10 @@
 //! Actual presented host and public contract for the subselect view, preview and command.
-use super::super::tests::{present, viewport};
+use super::super::tests::{output, selector, snapshot, viewport};
 use super::tests::{host_info, host_read, host_saved, presented_project};
 use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
 use native_engine::{compositor::Compositor, desktop_viewport::ViewportStatus};
 use serde_json::{json, Value};
-fn project(parametric: bool) -> Value {
+fn project(parametric: bool, held: bool) -> Value {
     let mut p = presented_project();
     p["assets"] = json!([]);
     p["assetInventory"] = json!({"assetIds":[],"placements":[]});
@@ -18,18 +18,28 @@ fn project(parametric: bool) -> Value {
             record["vectorExt"] = json!({"paramShape":{"kind":"rect","box":{"x1":4,"y1":4,"x2":28,"y2":28},"tl":0,"tr":0,"br":0,"bl":0}});
         }
     }
+    if held {
+        p["drawing"]["objects"].as_array_mut().unwrap().truncate(1);
+        p["drawing"]["compositionOrder"]["contexts"][0]["scopes"]
+            .as_array_mut()
+            .unwrap()
+            .truncate(1);
+        p["drawing"]["layers"][0]["timing"]["keys"] = json!([{"frame":0}]);
+    }
     p
 }
 #[test]
 fn subselect_presented_host_pages_preview_commit_and_stale_view() {
     for parametric in [false, true] {
-        check_presented_host(parametric);
+        for held in [false, true] {
+            check_presented_host(parametric, held);
+        }
     }
 }
-fn check_presented_host(parametric: bool) {
+fn check_presented_host(parametric: bool, held: bool) {
     let mut owner = NativeObjectHost::from_project_file(
         "subselect-host".into(),
-        project(parametric).to_string().as_bytes(),
+        project(parametric, held).to_string().as_bytes(),
     )
     .unwrap();
     let info = host_info(&owner);
@@ -37,11 +47,15 @@ fn check_presented_host(parametric: bool) {
     let mut gpu = Compositor::new().expect("Subselect host requires headless Metal");
     let (mut surface, trace) = viewport(&gpu, 64);
     trace.borrow_mut().pixel = Some([255, 0, 0, 255]);
-    let shown = present(&mut owner, &mut gpu, &mut surface).unwrap();
+    let frame = u32::from(held);
+    let snap = snapshot(&owner);
+    let shown = owner
+        .present_object_preview(&selector(&snap, frame), output(), &mut gpu, &mut surface)
+        .unwrap();
     assert_eq!(shown.status(), &ViewportStatus::Presented);
     assert!(owner.preview.reference_cache.is_none());
     assert!(owner.preview.presented_vectors.is_some());
-    let query = json!({"apiVersion":2,"requestId":"subselect-view","instanceId":info["instanceId"],"documentId":info["documentId"],"operation":"query.document.object","payload":{"atRevision":info["contentRevision"],"documentSnapshotId":info["documentSnapshotId"],"view":{"kind":"subselect","contextId":"scene-root","layerUid":"L0","frame":0,"workId":format!("native-work-{}",shown.identity().work_id().value()),"viewGeneration":shown.identity().view_generation().value(),"cursor":0,"limit":8}}});
+    let query = json!({"apiVersion":2,"requestId":"subselect-view","instanceId":info["instanceId"],"documentId":info["documentId"],"operation":"query.document.object","payload":{"atRevision":info["contentRevision"],"documentSnapshotId":info["documentSnapshotId"],"view":{"kind":"subselect","contextId":"scene-root","layerUid":"L0","frame":frame,"workId":format!("native-work-{}",shown.identity().work_id().value()),"viewGeneration":shown.identity().view_generation().value(),"cursor":0,"limit":8}}});
     let first = host_read(&mut owner, &query);
     assert_eq!(first["ok"], true, "{first}");
     let item = &first["result"]["items"][0];
@@ -49,6 +63,7 @@ fn check_presented_host(parametric: bool) {
     assert_eq!(first["result"]["preview"], false);
     let intent = json!({"kind":"move","indices":[0,1,2,3],"delta":[24,0]});
     let target = item["stableTarget"].clone();
+    assert_eq!(target["frameScope"]["frame"], 0);
     let mut preview = query.clone();
     preview["requestId"] = json!("subselect-preview");
     preview["payload"]["view"]["preview"] = json!({"stableTarget":target,"intent":intent});
@@ -60,7 +75,7 @@ fn check_presented_host(parametric: bool) {
     let mut foreign = query.clone();
     foreign["payload"]["view"]["workId"] = json!("native-work-9999");
     assert_eq!(host_read(&mut owner, &foreign)["ok"], false);
-    let command = json!({"apiVersion":2,"requestId":"subselect-commit","instanceId":info["instanceId"],"documentId":info["documentId"],"expectedRevision":0,"operation":"command.document.object.subselect.edit","payload":{"command":"object.subselect.edit","stableTarget":target,"intent":intent}});
+    let command = json!({"apiVersion":2,"requestId":"subselect-commit","instanceId":info["instanceId"],"documentId":info["documentId"],"expectedRevision":0,"operation":"command.document.object.subselect.edit","payload":{"command":"object.subselect.edit","stableTarget":target,"atFrame":frame,"intent":intent}});
     let committed = host_read(&mut owner, &command);
     assert_eq!(committed["ok"], true, "{committed}");
     assert_eq!(committed["result"]["historyEntriesAdded"], 1);
