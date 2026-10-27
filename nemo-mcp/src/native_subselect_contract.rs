@@ -174,10 +174,12 @@ pub(super) fn intent(v: &Value) -> bool {
     valid && exact(v, required, &[]).is_some()
 }
 pub(crate) fn edit_request(v: &Value) -> bool {
-    exact(v, &["command", "stableTarget", "intent"], &[]).is_some()
+    exact(v, &["command", "stableTarget", "intent"], &["atFrame"]).is_some()
         && v["command"] == "object.subselect.edit"
         && super::target(&v["stableTarget"])
         && intent(&v["intent"])
+        && v.get("atFrame")
+            .is_none_or(|n| n.as_u64().is_some_and(|n| n <= u64::from(u32::MAX)))
 }
 pub(super) fn request(v: &Value) -> bool {
     exact(

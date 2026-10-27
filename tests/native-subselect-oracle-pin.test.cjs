@@ -25,3 +25,9 @@ test('subselect parent-space oracle runs frozen Motion and point-type code',()=>
   assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),projection.sourceHash);
   assert.deepEqual(JSON.parse(cp.execFileSync(process.execPath,['native-engine/tests/fixtures/subselect-baseline/gen-projection.cjs'],{cwd:root,maxBuffer:8e6})),projection);
 });
+test('subselect held-frame promotion oracle executes the original key and exposure functions',()=>{
+  const held=JSON.parse(fs.readFileSync(path.join(root,'native-engine/tests/fixtures/subselect-baseline/held.json')));
+  assert.equal(held.baseline,baseline);assert.equal(held.cases.length,3);
+  for(const [file,hash] of Object.entries(held.hashes))assert.equal(crypto.createHash('sha256').update(cp.execFileSync('git',['show',`${baseline}:${file}`],{cwd:root,maxBuffer:8e6})).digest('hex'),hash);
+  assert.deepEqual(JSON.parse(cp.execFileSync(process.execPath,['native-engine/tests/fixtures/subselect-baseline/gen-held.cjs'],{cwd:root,maxBuffer:8e6})),held);
+});

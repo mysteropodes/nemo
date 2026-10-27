@@ -1,7 +1,7 @@
 //! Native subselect uses the existing sealed vector transaction and history publication.
 use crate::history::object_history::{NativeObjectHistory, ObjectHistoryEntry};
 use crate::object_document::subselect::{record, Intent, Refusal};
-use crate::object_document::{object_deserialize, ObjectTarget};
+use crate::object_document::{object_deserialize, ObjectTarget, Presence};
 use crate::request_receipts::DispatchErrorCode;
 use crate::transaction::CompactResult;
 use serde::Deserialize;
@@ -11,11 +11,13 @@ struct Payload {
     command: String,
     stable_target: ObjectTarget,
     intent: Intent,
+    at_frame: Presence<u32>,
 }
 object_deserialize!(Payload {
     command: String,
     stable_target: ObjectTarget,
-    intent: Intent
+    intent: Intent,
+    #[serde(default)] at_frame: Presence<u32>
 });
 impl NativeObjectHistory {
     pub(crate) fn dispatch_subselect_command(
@@ -43,8 +45,14 @@ impl NativeObjectHistory {
             .iter()
             .find(|r| r.target == payload.stable_target)
             .ok_or((DispatchErrorCode::NotFound, "Subselect target is absent."))?;
-        let next = record::admit(snapshot.document(), stored)
-            .and_then(|_| record::plan(stored, &payload.intent))
+        let mut promote = false;
+        let mut next = record::admit(snapshot.document(), stored)
+            .and_then(|_| {
+                if let Some(frame) = payload.at_frame.value() {
+                    promote = record::at_frame(snapshot.document(), stored, *frame)?;
+                }
+                record::plan(stored, &payload.intent)
+            })
             .map_err(|r| match r {
                 Refusal::Invalid => invalid,
                 Refusal::Limit => (
@@ -56,7 +64,22 @@ impl NativeObjectHistory {
                     "Subselect target requires an unavailable geometry consumer.",
                 ),
             })?;
-        let vector = serde_json::to_vec(&json!({"command":"object.vector.replace","record":next}))
+        // The old controller ensures a key even for an identity click. Reuse the
+        // frame owner's genuine promotion transaction, never manufacture a changed
+        // coordinate to make the vector batch report a change.
+        if promote && next == *stored {
+            let unchanged =
+                serde_json::to_vec(&json!({"command":"object.vector.replace","record":next}))
+                    .map_err(|_| invalid)?;
+            self.owner
+                .prepare_vector_edit_json(&unchanged)
+                .map_err(|c| (c, "Subselect drawing policy refused."))?;
+            return self.dispatch_exposure_key("command.document.object.layer.key.promote",&json!({"command":"object.layer.key.promote","layerUids":[stored.target.layer_uid],"cells":[payload.at_frame.value().unwrap()]}));
+        }
+        let vector = serde_json::to_vec(&if promote {
+            next.target.frame_scope.frame=*payload.at_frame.value().unwrap();
+            json!({"command":"object.vector.batch","keyframe":"copy","ops":[{"op":"replace","record":next}]})
+        } else {json!({"command":"object.vector.replace","record":next})})
             .map_err(|_| invalid)?;
         let candidate = self
             .owner
@@ -84,3 +107,7 @@ impl NativeObjectHistory {
 #[cfg(test)]
 #[path = "../tests/object_subselect_history.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/object_subselect_held.rs"]
+mod held_tests;

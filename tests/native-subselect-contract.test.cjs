@@ -16,6 +16,11 @@ test('subselect accepts independent baseline intents and closed geometry pages',
 test('subselect rejects duplicate indices, unknown fields and nonfinite or singular wire values',()=>{
   for(const intent of [{kind:'move',indices:[0,0],delta:[0,0]},{kind:'move',indices:[0],delta:[NaN,0]},{kind:'toggle',index:256},{kind:'toggle',index:1,extra:true},{kind:'insert',curve:0,time:0}])assert.equal(C.intent(intent),false);
 });
+test('subselect atFrame is an optional bounded integer, with source identity retained separately',()=>{
+  const payload={command:'object.subselect.edit',stableTarget:target,intent:{kind:'move',indices:[0],delta:[0,0]}};
+  C.payload(C.EDIT,payload);for(const atFrame of [0,5,4294967295])C.payload(C.EDIT,{...payload,atFrame});
+  for(const atFrame of [-1,1.5,4294967296,null,'5',NaN])assert.throws(()=>C.payload(C.EDIT,{...payload,atFrame}));
+});
 test('subselect presentation pages bind native transforms to the exact view and preview disposition',()=>{
   const view={kind:'subselect',contextId:'scene-root',layerUid:'layer-a',frame:0,workId:'native-work-1',viewGeneration:1,cursor:0,limit:8};
   const p={atRevision:7,documentSnapshotId:'native-object:document:7',view};

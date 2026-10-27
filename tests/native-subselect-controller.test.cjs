@@ -24,7 +24,7 @@ function fixture(){
   const controller=Bridge.create(root),event=(x,y,extra={})=>({clientX:x,clientY:y,pointerId:1,target:stage,preventDefault(){},stopImmediatePropagation(){},...extra});
   async function select(){controller.handle('down',event(100,60));await controller.settled();assert.equal(paper.project.activeLayer.children.length,0);}
   function drag(){controller.handle('down',event(40,24));controller.handle('move',event(52,34));}
-  return {root,s,controller,event,select,drag,sent,notices,item,paper,setItems:v=>items=v,setGate:g=>gate=g,failTransport:count=>{transportFailures=count;reconcileFailure=true;},allowRecovery:()=>{reconcileFailure=false;},setReadGate:g=>readGate=g,replace:()=>{pin={...pin,documentId:'replacement',documentSnapshotId:'native-object:replacement:0'};presentation={...presentation,...pin};}};
+  return {root,s,controller,event,select,drag,sent,notices,item,paper,setFrame:n=>{root.state.currentFrame=n;presentation={...presentation,frame:n};},setItems:v=>items=v,setGate:g=>gate=g,failTransport:count=>{transportFailures=count;reconcileFailure=true;},allowRecovery:()=>{reconcileFailure=false;},setReadGate:g=>readGate=g,replace:()=>{pin={...pin,documentId:'replacement',documentSnapshotId:'native-object:replacement:0'};presentation={...presentation,...pin};}};
 }
 test('subselect dispatches through a lease while the public presentation is hidden by the real command adapter',async()=>{
   const f=fixture();await f.select();f.drag();f.controller.handle('up',f.event(52,34));const result=await f.controller.settled();
@@ -83,6 +83,17 @@ test('a new vertex drag or Alt-insert supersedes an unresolved earlier marquee',
     gate.resolve();await prior;assert.equal((await f.controller.settled()).status,'applied',f.notices.join(';'));
     assert.equal(f.sent.length,1);assert.equal(f.sent[0].payload.intent.kind,insert?'insert':'move');
     if(!insert)assert.deepEqual(f.sent[0].payload.intent.indices,[0]);
+  }
+});
+test('held gestures retain the source target and commit promotion only at pointerup',async()=>{
+  for(const gesture of ['drag','click','cancel']){const f=fixture();f.setFrame(5);await f.select();
+    f.controller.handle('down',f.event(40,24));assert.equal(f.sent.length,0);
+    if(gesture==='drag')f.controller.handle('move',f.event(52,34));
+    if(gesture==='cancel')f.controller.handle('cancel',f.event(40,24));
+    f.controller.handle('up',f.event(...(gesture==='drag'?[52,34]:[40,24])));await f.controller.settled();
+    assert.equal(f.sent.length,gesture==='cancel'?0:1,f.notices.join(';'));
+    if(f.sent.length){assert.equal(f.sent[0].payload.atFrame,5);assert.equal(f.sent[0].payload.stableTarget.frameScope.frame,0);
+      if(gesture==='click')assert.deepEqual(f.sent[0].payload.intent.delta,[0,0]);}
   }
 });
 
