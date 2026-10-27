@@ -9,7 +9,8 @@ use crate::commands::object_fill_owner::component_owner::object_component_conver
 use crate::commands::remove_order_element;
 use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
 use crate::object_document::{
-    AuthoredOrder, ItemRecords, ObjectDocument, OrderContext, OrderLayer, OrderScope, Presence,
+    AuthoredOrder, FrameScopeKind, ItemRecords, ObjectDocument, OrderContext, OrderLayer,
+    OrderScope, Presence,
 };
 
 fn scene_on(target: &crate::object_document::ObjectTarget, layer_uid: &str) -> bool {
@@ -60,6 +61,12 @@ pub(crate) fn move_images(
             continue;
         }
         if let Some(inner) = inner_of(&entry.target.layer_uid) {
+            // As `retarget_objects`: only authored frames can enter a component.
+            if entry.target.frame_scope.kind != FrameScopeKind::Authored {
+                return Err(SetupError::ObjectScope {
+                    layer_uid: entry.target.layer_uid.clone(),
+                });
+            }
             moved.push(entry.target.clone());
             entry.target.context_id = symbol.to_string();
             entry.target.layer_uid = inner;

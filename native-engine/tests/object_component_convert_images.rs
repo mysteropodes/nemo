@@ -76,6 +76,9 @@ fn convert(owner: &mut NativeObjectHistory, layers: &[&str]) -> Value {
     .unwrap()
 }
 fn selector(snapshot: &ObjectSnapshot) -> ObjectFrameSelector<'_> {
+    selector_at(snapshot, 0)
+}
+fn selector_at(snapshot: &ObjectSnapshot, frame: u32) -> ObjectFrameSelector<'_> {
     ObjectFrameSelector {
         instance_id: snapshot.instance_id(),
         document_id: snapshot.document_id(),
@@ -83,12 +86,15 @@ fn selector(snapshot: &ObjectSnapshot) -> ObjectFrameSelector<'_> {
         document_snapshot_id: snapshot.snapshot_id(),
         context_id: "scene-root",
         scope_kind: FrameScopeKind::Authored,
-        frame: 0,
+        frame,
     }
 }
 fn plan(owner: &NativeObjectHistory) -> ObjectPaintPlan {
+    plan_at(owner, 0)
+}
+fn plan_at(owner: &NativeObjectHistory, frame: u32) -> ObjectPaintPlan {
     let snapshot = owner.acquire_snapshot(owner.content_revision()).unwrap();
-    let pins = selector(&snapshot);
+    let pins = selector_at(&snapshot, frame);
     let packet = prepare_object_exposure_frame(&snapshot, &pins).unwrap();
     let scene = prepare_object_render_scene(&packet, &pins).unwrap();
     prepare_object_paint_plan(&scene, &pins).unwrap()
@@ -182,6 +188,44 @@ fn a_converted_image_survives_save_and_reopen() {
         .unwrap();
     let reopened = NativeObjectHistory::from_project_file("reopened", &bytes).unwrap();
     assert_eq!(order(&plan(&reopened)), "icC");
+}
+
+#[test]
+fn an_image_on_a_later_key_moves_with_its_own_frame_scope() {
+    let mut doc = drawing();
+    doc["layers"][1]["timing"]["keys"] = json!([{"frame":0},{"frame":2}]);
+    let mut later = doc["objects"][0].clone();
+    later["target"]["frameScope"]["frame"] = json!(2);
+    doc["objects"].as_array_mut().unwrap().push(later);
+    doc["items"]["raster"][0]["target"]["frameScope"]["frame"] = json!(2);
+    let element = |stroke: &str, at: u32| json!({"layerUid":"ly","strokeId":stroke,"naturalPosition":at,"order":{}});
+    let scopes = &mut doc["compositionOrder"]["contexts"][0]["scopes"];
+    scopes[0]["elements"] = json!([element("ink", 0), {"layerUid":"ly2","strokeId":"sky","naturalPosition":0,"order":{}}]);
+    scopes
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"frameScope":{"kind":"authored","frame":2},
+        "elements":[element("img", 0), element("ink", 1)]}));
+    let document = decode_storage_project(doc.to_string().as_bytes()).unwrap();
+    let project = ProjectEnvelope::no_media(ProjectMetadata::new(64, 64, 24.).unwrap(), document)
+        .with_asset_inventory(Some(inventory()));
+    let mut owner = NativeObjectHistory::from_admitted_project("later", project).unwrap();
+    assert_eq!(
+        (order(&plan_at(&owner, 0)), order(&plan_at(&owner, 2))),
+        ("CC".into(), "ICC".into())
+    );
+    assert_eq!(convert(&mut owner, &["ly", "ly2"])["ok"], true);
+    let after = stored(&owner);
+    let scopes = &after["compositionOrder"]["contexts"][1]["scopes"];
+    assert_eq!(scopes.as_array().unwrap().len(), 2, "{scopes}");
+    assert_eq!(scopes[1]["frameScope"]["frame"], 2);
+    // A merged component paints its layers in source index order (`natural_component`, the
+    // baseline's `sym.layers` concatenation), so `ly2`'s square now comes first; inside `ly` the
+    // image stays under its square, on its own key only.
+    assert_eq!(
+        (order(&plan_at(&owner, 0)), order(&plan_at(&owner, 2))),
+        ("cc".into(), "cic".into())
+    );
 }
 
 #[test]
