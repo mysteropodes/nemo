@@ -22,8 +22,8 @@
 //! A text block is the baseline's vector text (`buildGlyphPaths`): each painted contour a closed fill-only path in the
 //! block colour, on the lane of its glyph key.
 //! Dropped as the baseline drops them: zero-opacity strokes without a texture. Refused, until later increments admit
-//! them with oracle rows: rasters (the baseline throws on them), bitmap brush, video, legacy fill records and a
-//! layer opacity factor other than one (the baseline reads no layer opacity).
+//! them with oracle rows: rasters and bitmap brush (the baseline throws on them) and legacy fill records. A layer's
+//! own opacity is not written (the baseline reads none); video frames write nothing (they are never stroke dicts).
 use crate::object_render_scene::{ordered_entries, ObjectPaintPlan, PaintEntry};
 use kurbo::BezPath;
 use serde_json::{Number, Value};
@@ -200,8 +200,17 @@ fn strokes_by_layer(
                         reason: "text host opacity is unavailable",
                     }
                 })?;
-                for stroke in shapes::text_strokes(text)? {
-                    push(&mut out, text.layer_index, host, stroke)?;
+                let strokes = shapes::text_strokes(text)?;
+                // A scene block's glyph opacity carries its layer's factor, which the dict never has.
+                if host == 0.0 && text.item.painted().next().is_some() {
+                    return Err(RiveExportError::UnsupportedLayer {
+                        source_layer_index: text.layer_index,
+                        reason: "text on a fully transparent layer has no recoverable glyph opacity",
+                    });
+                }
+                for mut stroke in strokes {
+                    stroke.opacity /= host;
+                    push(&mut out, text.layer_index, stroke)?;
                 }
                 continue;
             }
@@ -209,26 +218,14 @@ fn strokes_by_layer(
             PaintEntry::Component(component) => {
                 let host = component.host_layer_index;
                 if let Some(stroke) = stroke_of!(&component.record, &component.path, host)? {
-                    let opacity = plan.packet().layer_opacity(host).map_err(|_| {
-                        RiveExportError::UnsupportedLayer {
-                            source_layer_index: host,
-                            reason: "component host opacity is unavailable",
-                        }
-                    })?;
-                    push(&mut out, host, opacity, stroke)?;
+                    push(&mut out, host, stroke)?;
                 }
                 continue;
             }
             // `applyLayerDuplicator`'s dicts: clone-outer/source-inner, each keeping its source's stroke id.
             PaintEntry::Duplicator(copy) => {
                 if let Some(stroke) = stroke_of!(&copy.record, &copy.path, copy.source_index)? {
-                    let host = plan.packet().layer_opacity(copy.layer_index).map_err(|_| {
-                        RiveExportError::UnsupportedLayer {
-                            source_layer_index: copy.layer_index,
-                            reason: "duplicator host opacity is unavailable",
-                        }
-                    })?;
-                    push(&mut out, copy.layer_index, host, stroke)?;
+                    push(&mut out, copy.layer_index, stroke)?;
                 }
                 continue;
             }
@@ -247,24 +244,14 @@ fn strokes_by_layer(
         let source = command.source();
         let layer = source.source_layer_index();
         if let Some(stroke) = stroke_of!(source.record(), command.path(), source.source_object_index())? {
-            push(&mut out, layer, command.layer_opacity(), stroke)?;
+            push(&mut out, layer, stroke)?;
         }
     }
     Ok(out)
 }
 
-fn push(
-    out: &mut [Vec<Stroke>],
-    layer: usize,
-    layer_opacity: f64,
-    stroke: Stroke,
-) -> Result<(), RiveExportError> {
-    if layer_opacity != 1.0 {
-        return Err(RiveExportError::UnsupportedLayer {
-            source_layer_index: layer,
-            reason: "a layer opacity factor has no admitted Rive representation yet",
-        });
-    }
+/// A layer's own opacity is never written: `exportRive` reads only the stroke dict's own opacity.
+fn push(out: &mut [Vec<Stroke>], layer: usize, stroke: Stroke) -> Result<(), RiveExportError> {
     out.get_mut(layer)
         .ok_or(RiveExportError::InvalidRange)?
         .push(stroke);
