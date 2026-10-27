@@ -82,5 +82,7 @@ test('page mode refuses to paint, before touching the DOM, when the seam or pres
 
 test('a presenter whose rows do not match the read model is refused',()=>{
   assert.throws(()=>render(CASES[0],root=>Seam.register(root,'layer-list',{render:()=>({rows:[]})})),/do not match the read model/);
+  // A row must still be an element (it has a children collection); a plain object of the right count is refused.
+  assert.throws(()=>render(CASES[0],root=>Seam.register(root,'layer-list',{render:()=>({rows:[{},{}]})})),/do not match the read model/);
   assert.throws(()=>Seam.query({},{documentId:'x'},()=>1),/stale/);
 });
