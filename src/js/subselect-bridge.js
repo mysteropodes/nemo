@@ -159,7 +159,7 @@
       catch(error){notice(error);settled=Promise.resolve({status:'refused',error});return;}
       settled=pending.catch(error=>{notice(error);return {status:'refused',error};}).finally(()=>{pending=null;refreshUI();});
     }
-    function key(e){if(!native()||root.state.tool!=='subselect'||e.target&&(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)||e.target.isContentEditable))return false;
+    function key(e){if(retired||!native()||root.state.tool!=='subselect'||e.target&&(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)||e.target.isContentEditable))return false;
       if(e.key==='Escape'){consume(e);cancel(true);return true;}
       if(e.key==='Delete'||e.key==='Backspace'){consume(e);
         if(root.state.appMode==='anim2d'&&root._sel&&Array.isArray(root._sel.frames)&&root._sel.frames.length)deleteFrames();

@@ -128,3 +128,11 @@ test('an existing pending point command is not replaced by a frame Delete',async
   await new Promise(setImmediate);assert.equal(h.sent.length,1);assert.equal(h.sent[0].operation,POINT);
   gate.resolve();assert.equal((await h.controller.settled()).status,'applied');assert.deepEqual(h.history,[POINT]);
 });
+
+test('a disposed controller cannot consume Delete or Backspace or invoke the frame owner',async()=>{
+  for(const key of ['Delete','Backspace']){
+    const h=await harness();await h.select();h.controller.dispose();h.root._sel.frames=[{layer:0,frame:1}];
+    assert.equal(h.press(key).defaultPrevented,false);await h.controller.settled();
+    assert.equal(h.sent.length,0);assert.deepEqual(h.history,[]);assert.equal(h.bubbled(),1);
+  }
+});
