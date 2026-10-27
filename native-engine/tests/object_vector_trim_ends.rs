@@ -331,18 +331,15 @@ fn a_pressure_ribbon_trims_its_centreline_and_rebuilds_its_outline_profile_and_l
 }
 
 #[test]
-fn a_ribbon_with_symmetry_copies_or_without_a_centreline_stays_unavailable() {
+fn a_ribbon_without_a_centreline_stays_unavailable() {
     let oracle: Value = serde_json::from_str(RIBBON_ORACLE).unwrap();
     let case = &oracle["cases"][0];
     let ribbon = ribbon_of(case, None);
-    // A symmetry copy differs from the drawn ribbon (identical records are multi-frame stamps, which trim alike).
-    let mut copy = ribbon.clone();
-    copy["vectorExt"]["pressure"]["centerSegments"][0]["point"]["y"] = json!(60);
     let mut bare = ribbon.clone();
     bare["vectorExt"]["pressure"] = json!({"widthProfile":[{"t":0,"width":1},{"t":1,"width":1}]});
     for (name, payload) in [
-        ("copies", json!({"command":"object.vector.createMany","records":[ribbon.clone(), copy],"trimEnds":20})),
         ("bare", create_trim(bare, json!(20))),
+        ("plain-copy", json!({"command":"object.vector.createMany","records":[ribbon, path("L1", 0, "", &[(0.0, 50.0), (100.0, 50.0)])],"trimEnds":20})),
     ] {
         let mut owner = owner_of(&document(1, walls(), None));
         let refused = send(&mut owner, name, payload);
@@ -378,5 +375,75 @@ fn a_ribbon_and_its_linked_fill_stamped_on_another_frame_take_the_drawn_cells_tr
         assert!(worst(&flat(&ribbon["geometry"]["segments"]), &flat(&expected["outline"]), "outline") < 1e-6, "frame {frame}");
         assert!(worst(&flat(&ribbon["vectorExt"]["pressure"]["centerSegments"]), &flat(&expected["centerSegments"]), "centre") < 1e-6, "frame {frame}");
         assert!(worst(&flat(&fill["geometry"]["segments"]), &flat(&expected["fill"]), "fill") < 1e-6, "frame {frame}");
+    }
+}
+
+// symmetry-bridge.js onStrokeCommitted after trimStrokeEnds (@1065e9d8): the copies of the trimmed ribbon.
+const SYMMETRY_ORACLE: &str = include_str!("fixtures/object-vector-trim-ribbon/symmetry-oracle.json");
+fn ribbon_entry(entry: &Value, width: &Value, link: Option<&str>) -> Value {
+    let mut r = record_at("C", "L1", 0, "");
+    r["geometry"]["closed"] = json!(true);
+    r["geometry"]["segments"] = entry["outline"].as_array().unwrap().iter().map(seg_of).collect();
+    r["vector"]["strokeWidth"] = width.clone();
+    let centre: Vec<Value> = entry["centerSegments"].as_array().unwrap().iter().map(|s| {
+        let mut v = seg_of(s);
+        v["width"] = s["width"].clone();
+        v
+    }).collect();
+    r["vectorExt"] = json!({"pressure":{"centerSegments":centre,"widthProfile":entry["widthProfile"]}});
+    if let Some(id) = link {
+        r["vectorExt"]["linkedFillId"] = json!(id);
+    }
+    r
+}
+
+#[test]
+fn symmetry_copies_of_a_trimmed_ribbon_take_the_drawn_ribbons_cut_and_rebuild_as_the_baseline() {
+    let oracle: Value = serde_json::from_str(SYMMETRY_ORACLE).unwrap();
+    for case in oracle["cases"].as_array().unwrap() {
+        let name = case["name"].as_str().unwrap();
+        assert_eq!(case["trimmed"], true, "{name}");
+        let walls: Vec<Value> = case["walls"].as_array().unwrap().iter().enumerate().map(|(i, w)| {
+            path("L1", 0, &format!("w-{i}"), &[(w[0][0].as_f64().unwrap(), w[0][1].as_f64().unwrap()), (w[1][0].as_f64().unwrap(), w[1][1].as_f64().unwrap())])
+        }).collect();
+        // The native Draw createMany: each cell bottom to top, a linked fill directly below its ribbon.
+        let mut records = Vec::new();
+        for (k, entry) in case["input"].as_array().unwrap().iter().enumerate() {
+            let link = format!("lf-{k}");
+            let linked = !entry["fill"].is_null();
+            if linked {
+                let mut fill = record_at("C", "L1", 0, "");
+                fill["geometry"]["closed"] = json!(true);
+                fill["geometry"]["segments"] = entry["fill"].as_array().unwrap().iter().map(seg_of).collect();
+                fill["vectorExt"] = json!({"isLinkedFillCompanion":true,"linkedFillId":link});
+                records.push(fill);
+            }
+            records.push(ribbon_entry(entry, &case["strokeWidth"], linked.then_some(link.as_str())));
+        }
+        let payload = json!({"command":"object.vector.createMany","records":records,"trimEnds":case["max"]});
+        let (response, created) = trimmed(payload, walls);
+        assert_eq!(response["ok"], true, "{name}: {response}");
+        let ribbons: Vec<&Value> = created.iter().filter(|r| !r["vectorExt"]["pressure"].is_null()).collect();
+        let expected = case["expected"].as_array().unwrap();
+        assert_eq!(ribbons.len(), expected.len(), "{name}");
+        let mut worst_seen: f64 = 0.;
+        for (k, (made, want)) in ribbons.iter().zip(expected).enumerate() {
+            let centre = &made["vectorExt"]["pressure"]["centerSegments"];
+            let widths: Vec<f64> = centre.as_array().unwrap().iter().map(|c| c["width"].as_f64().unwrap()).collect();
+            let want_widths: Vec<f64> = want["centerSegments"].as_array().unwrap().iter().map(|c| c["width"].as_f64().unwrap()).collect();
+            let errors = [
+                worst(&flat(centre), &flat(&want["centerSegments"]), "centre"),
+                worst(&widths, &want_widths, "widths"),
+                worst(&flat(&made["geometry"]["segments"]), &flat(&want["outline"]), "outline"),
+            ];
+            assert!(errors.iter().all(|&e| e < 1e-6), "{name} cell {k}: {errors:?}");
+            worst_seen = errors.iter().copied().fold(worst_seen, f64::max);
+            if !want["fill"].is_null() {
+                let link = made["vectorExt"]["linkedFillId"].as_str().unwrap();
+                let fill = created.iter().find(|r| r["vectorExt"]["isLinkedFillCompanion"] == true && r["vectorExt"]["linkedFillId"] == link).unwrap();
+                assert!(worst(&flat(&fill["geometry"]["segments"]), &flat(&want["fill"]), "fill") < 1e-6, "{name} cell {k}: linked fill");
+            }
+        }
+        eprintln!("{name}: worst {worst_seen:e}");
     }
 }

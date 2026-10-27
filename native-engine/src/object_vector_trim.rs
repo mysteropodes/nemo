@@ -274,49 +274,100 @@ fn linked(fill: &ObjectRecord, ribbon: &ObjectRecord) -> bool {
     f.is_some_and(|f| f.is_linked_fill_companion.value() == Some(&true))
         && f.and_then(|f| f.linked_fill_id.value()).is_some_and(|id| r.and_then(|r| r.linked_fill_id.value()) == Some(id))
 }
-/// Trim Stroke Ends on a pressure ribbon (tools.js trimStrokeEnds isVB @1065e9d8). The cut is measured on its centreline;
-/// each kept anchor's width is the old profile's at its chord position in the untrimmed length (the stroke width when the
-/// ribbon has no profile), the profile is rebuilt from those widths (buildWidthProfile), and rebuildVectorBrushOutline
-/// rebuilds the outline, whose fitted centreline becomes the linked fill's outline. Only a lone ribbon, or its linked fill
-/// and the ribbon (in either stack order), is native. Labs multi-frame stamps repeat that cell unchanged (the baseline
-/// stamps the already trimmed ribbon and its fill), so the drawn cell is trimmed once and every stamp takes the result;
-/// symmetry copies differ from the drawn cell and stay unavailable.
+/// Trim Stroke Ends on a pressure ribbon (tools.js trimStrokeEnds isVB @1065e9d8). The cut is measured on the drawn
+/// ribbon's centreline; each kept anchor's width is the old profile's at its chord position in the untrimmed length (the
+/// stroke width when the ribbon has no profile), the profile is rebuilt from those widths (buildWidthProfile), and
+/// rebuildVectorBrushOutline rebuilds the outline, whose fitted centreline becomes the linked fill's outline.
+/// The baseline trims before symmetry-bridge copies the ribbon and before multiframe-draw stamps it, and a mirror or a
+/// rotation keeps arc length: every other cell of the create (a copy or a stamp, each with its linked fill, in either
+/// stack order) takes the same cut on its own centreline. adoptFreshIdentity rebuilds a copy's outline only when it has
+/// a linked fill; one without keeps the drawn ribbon's (trimmed) outline carried by the copy's own map (`carried`).
 pub(super) fn ribbon<'a>(records: &mut [ObjectRecord], walls: impl Iterator<Item = &'a ObjectRecord>, max: f64) -> Result<(), DispatchErrorCode> {
-    let width = match &*records {
-        [a, b, ..] if linked(a, b) || linked(b, a) => 2,
-        _ => 1,
-    };
-    if records.is_empty() || records.len() % width != 0 {
-        return Err(DispatchErrorCode::Unavailable);
+    let mut widths = Vec::new();
+    let mut i = 0;
+    while i < records.len() {
+        let pair = records.get(i + 1).is_some_and(|b| linked(&records[i], b) || linked(b, &records[i]));
+        let width = if pair { 2 } else { 1 };
+        widths.push(width);
+        i += width;
     }
-    let (cell, stamps) = records.split_at_mut(width);
-    let repeats = |chunk: &[ObjectRecord]| {
-        chunk.iter().zip(cell.iter()).all(|(a, b)| a.geometry == b.geometry && a.vector_ext == b.vector_ext && a.vector == b.vector)
+    let lead = match widths.first() {
+        Some(2) if !is_vector_brush(&records[0]) => &records[1],
+        Some(_) => &records[0],
+        None => return Err(DispatchErrorCode::InvalidRequest),
     };
-    if !stamps.chunks(width).all(repeats) {
-        return Err(DispatchErrorCode::Unavailable);
-    }
-    trim_cell(cell, walls, max)?;
-    for chunk in stamps.chunks_mut(width) {
-        for (stamp, trimmed) in chunk.iter_mut().zip(cell.iter()) {
-            stamp.geometry = trimmed.geometry.clone();
-            stamp.vector_ext = trimmed.vector_ext.clone();
-            stamp.vector = trimmed.vector.clone();
+    let Some(cut) = cuts_on(&centre_of(lead)?, walls, max) else { return Ok(()) };
+    let outline = |r: &ObjectRecord| anchors(&r.geometry.segments).ok_or(DispatchErrorCode::InvalidRequest);
+    let ribbon_of = |cell: &[ObjectRecord]| if cell.len() == 2 && !is_vector_brush(&cell[0]) { 1 } else { 0 };
+    let lead_before = outline(lead)?;
+    let mut lead_after = None;
+    let mut rest: &mut [ObjectRecord] = records;
+    for width in widths {
+        let (cell, tail) = std::mem::take(&mut rest).split_at_mut(width);
+        let at = ribbon_of(cell);
+        let before = outline(&cell[at])?;
+        trim_cell(cell, cut)?;
+        match &lead_after {
+            None => lead_after = Some(outline(&cell[at])?),
+            Some(after) if width == 1 => {
+                let mapped = carried(&lead_before, &before, after).ok_or(DispatchErrorCode::Unavailable)?;
+                cell[at].geometry.segments = segments_of(&mapped).ok_or(DispatchErrorCode::InvalidRequest)?;
+            }
+            Some(_) => {}
         }
+        rest = tail;
     }
     Ok(())
 }
-fn trim_cell<'a>(records: &mut [ObjectRecord], walls: impl Iterator<Item = &'a ObjectRecord>, max: f64) -> Result<(), DispatchErrorCode> {
+/// The affine that carried the drawn ribbon's untrimmed outline onto a copy's (a mirror's copy reversed, as
+/// `mirrored.reverse()` re-orients it), applied to the drawn ribbon's trimmed outline. `None` when no map fits.
+fn carried(before: &[Anchor], copy: &[Anchor], after: &[Anchor]) -> Option<Vec<Anchor>> {
+    let n = before.len();
+    if n < 3 || copy.len() != n {
+        return None;
+    }
+    for reversed in [false, true] {
+        let at = |i: usize| if reversed { copy[n - 1 - i].p } else { copy[i].p };
+        let (p0, p1, p2) = (before[0].p, before[n / 3].p, before[2 * n / 3].p);
+        let (u, v, du, dv) = (p1 - p0, p2 - p0, at(n / 3) - at(0), at(2 * n / 3) - at(0));
+        let det = u.x * v.y - u.y * v.x;
+        if det.abs() < 1e-9 {
+            continue;
+        }
+        // x' = a x + c y + e, y' = b x + d y + f: the linear part maps u, v onto du, dv.
+        let (a, c) = ((du.x * v.y - dv.x * u.y) / det, (dv.x * u.x - du.x * v.x) / det);
+        let (b, d) = ((du.y * v.y - dv.y * u.y) / det, (dv.y * u.x - du.y * v.x) / det);
+        let (e, f) = (at(0).x - (a * p0.x + c * p0.y), at(0).y - (b * p0.x + d * p0.y));
+        let point = |p: Point| Point::new(a * p.x + c * p.y + e, b * p.x + d * p.y + f);
+        let vector = |h: Vec2| Vec2::new(a * h.x + c * h.y, b * h.x + d * h.y);
+        if !(0..n).all(|i| point(before[i].p).distance(at(i)) <= 1e-6 * (1.0 + at(i).to_vec2().hypot())) {
+            continue;
+        }
+        let mut mapped: Vec<Anchor> =
+            after.iter().map(|s| Anchor { p: point(s.p), handle_in: vector(s.handle_in), handle_out: vector(s.handle_out) }).collect();
+        if reversed {
+            mapped.reverse();
+            for s in &mut mapped {
+                std::mem::swap(&mut s.handle_in, &mut s.handle_out);
+            }
+        }
+        return Some(mapped);
+    }
+    None
+}
+fn centre_of(ribbon: &ObjectRecord) -> Result<Vec<Anchor>, DispatchErrorCode> {
+    let centre = pressure(ribbon).and_then(|p| p.center_segments.value()).filter(|c| c.len() > 1).ok_or(DispatchErrorCode::Unavailable)?;
+    centre.iter().map(|c| anchor(&c.point, &c.handle_in, &c.handle_out)).collect::<Option<_>>().ok_or(DispatchErrorCode::InvalidRequest)
+}
+fn trim_cell(records: &mut [ObjectRecord], cut: (f64, f64)) -> Result<(), DispatchErrorCode> {
     let (fill, ribbon) = match records {
         [ribbon] => (None, ribbon),
         [fill, ribbon] if linked(fill, ribbon) => (Some(fill), ribbon),
         [ribbon, fill] if linked(fill, ribbon) => (Some(fill), ribbon),
         _ => return Err(DispatchErrorCode::Unavailable),
     };
+    let points = centre_of(ribbon)?;
     let pressure = pressure(ribbon).ok_or(DispatchErrorCode::Unavailable)?;
-    let centre = pressure.center_segments.value().filter(|c| c.len() > 1).ok_or(DispatchErrorCode::Unavailable)?;
-    let points: Vec<Anchor> =
-        centre.iter().map(|c| anchor(&c.point, &c.handle_in, &c.handle_out)).collect::<Option<_>>().ok_or(DispatchErrorCode::InvalidRequest)?;
     // An empty profile is not the baseline's absent one (widthAtFrac would answer null for every anchor).
     let profile = match pressure.width_profile.value() {
         Some(stops) if stops.is_empty() => return Err(DispatchErrorCode::Unavailable),
@@ -325,7 +376,6 @@ fn trim_cell<'a>(records: &mut [ObjectRecord], walls: impl Iterator<Item = &'a O
     };
     let stroke_width = ribbon.vector.value().and_then(|v| number(&v.stroke_width)).ok_or(DispatchErrorCode::InvalidRequest)?;
     let source: f64 = lengths(&curves(&points, false)).iter().sum();
-    let Some(cut) = cuts_on(&points, walls, max) else { return Ok(()) };
     let Some(kept) = cut_anchors(points, cut) else { return Ok(()) };
     let (mut chord, mut lens, mut widths) = (0., Vec::with_capacity(kept.len()), Vec::with_capacity(kept.len()));
     for (i, a) in kept.iter().enumerate() {

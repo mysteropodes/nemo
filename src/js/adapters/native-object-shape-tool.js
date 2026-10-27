@@ -305,8 +305,9 @@
       if (fb && (['above','below','merge'].indexOf(state.fillBrushMode) < 0 || root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
           ? root.SMLabs.unmigratedDrawHooks().length > 0 : root.SMLabs.list().some(function(p){return p.on;})))) throw new Error('This Fill Brush combination is unavailable in native Drawing.');
       // Trim measures the whole stroke before the stop-at-axis clip (draw-bridge then symmetry-bridge); native would trim the clipped one.
-      // A pressure ribbon trims natively alone, with its linked fill and with its multi-frame stamps; its symmetry copies do not yet.
-      if (!fb && (state.tool !== 'draw' || state.trimStrokeEnds && (state.vectorBrush && state.symmetryEnabled || state.symmetryEnabled && !state.symmetryExtend) ||
+      // A pressure ribbon trims natively alone, with its linked fill, its symmetry copies and its multi-frame stamps. Only a
+      // mirror clips at its axis (symmetry-bridge.js clipPathAtAxis); a radial copy never does.
+      if (!fb && (state.tool !== 'draw' || state.trimStrokeEnds && state.symmetryEnabled && state.symmetryMode !== 'radial' && !state.symmetryExtend ||
           state.drawMode !== 'front' && state.drawMode !== 'behind' ||
           // G16 option C (#2361): one seeded anchor whose dabs native stamps; the key resolves as resolveBrushPreset (a built-in,
           // else a confirmed native catalog record). A key neither holds, and texture with symmetry or Trim, stay unavailable.
