@@ -2019,6 +2019,18 @@
       ]
     },
     {
+      "id": "app.shortcut.targets",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "shortcut-targets.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "shortcut-targets.js"
+      ]
+    },
+    {
       "id": "app.opacity.capability",
       "layer": "application",
       "dir": "src/js/application",

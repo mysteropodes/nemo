@@ -7563,13 +7563,19 @@ var shortcutRegistry=NemoShortcutRegistry.create({storage:window.localStorage,on
 // COMMAND_SHORTCUTS is pure {action,key,cat,label} data (P30/#1032, review on
 // #1114); dispatch by action lives here, same pattern as runToolShortcut below.
 function runCommandShortcutAction(action,e){if(window.NemoNativeFrameEditDesktop&&window.NemoNativeFrameEditDesktop.install(window).shortcut(action,e))return;switch(action){case'cmdPrevKey':if(state.playing)stopPlay();goToFrame(prevKeyframeFrame(state.activeLayerIdx,state.currentFrame));return;case'cmdNextKey':if(state.playing)stopPlay();goToFrame(nextKeyframeFrame(state.activeLayerIdx,state.currentFrame));return;case'cmdPrevFrame':if(state.playing)stopPlay();goToFrame(state.currentFrame-1);return;case'cmdNextFrame':if(state.playing)stopPlay();goToFrame(state.currentFrame+1);return;case'cmdGoStart':if(state.playing)stopPlay();goToFrame(0);return;case'cmdGoEnd':if(state.playing)stopPlay();goToFrame(state.totalFrames-1);return;case'cmdInsertFrame':e.preventDefault();insertFrame();return;case'cmdInsertKey':e.preventDefault();insertKeyframe();return;case'cmdInsertBlankKey':e.preventDefault();insertBlankKeyframe();return;case'cmdDuplicateKey':window.SM.duplicateKeyframe();return;case'cmdExtendExposure':window.SM.extendExposure(1);return;case'cmdTween':window.SM.generateTweens();return;case'cmdFlipPreview':if(!e.shiftKey)window.SM.flipPreview();return;case'cmdResetView':e.preventDefault();window.SM.resetView();return;case'cmdRenameLayer':e.preventDefault();if(state.layers[state.activeLayerIdx])startLayerRename(state.activeLayerIdx);return;}}
+// U04 (#2370): on desktop every rebindable shortcut has a declared target; an unavailable one shows its reason (shortcut-targets.js).
+function shortcutAllowed(action){
+  var Targets=window.NemoShortcutTargets;if(Targets)return Targets.allow(window,action);
+  if(window.__TAURI__&&window.__TAURI__.core){showToast('Keyboard shortcuts are unavailable.');return false;}
+  return true;
+}
 function runCommandShortcut(k,event){
   var lk=(k||'').toLowerCase();
   if(!lk)return false;
   var commands=shortcutRegistry.commandShortcuts();
   for(var i=0;i<commands.length;i++){
     var c=commands[i];
-    if((shortcutRegistry.keyFor(c.action)||'').toLowerCase()===lk){runCommandShortcutAction(c.action,event);return true;}
+    if((shortcutRegistry.keyFor(c.action)||'').toLowerCase()===lk){if(shortcutAllowed(c.action))runCommandShortcutAction(c.action,event);return true;}
   }
   return false;
 }
@@ -7599,6 +7605,7 @@ function runToolShortcut(k){
   var tools=shortcutRegistry.toolShortcuts();
   for(var i=0;i<tools.length;i++){
     if(shortcutRegistry.keyFor(tools[i].action)===lk){
+      if(!shortcutAllowed(tools[i].action))return true;
       if(tools[i].action==='toggleOnion')window.SM.toggleOnion();
       else window.SM.setTool(tools[i].action);
       return true;
