@@ -6,8 +6,12 @@
 //! Numerics follow the baseline's Paper.js steps (curve lengths, earliest/latest crossing offset, tail split
 //! first, de Casteljau division keeping both divided handles on the split anchor) within floating-point
 //! tolerance; they are not bit-identical to Paper's own integrators.
-use crate::object_document::{CenterSegment, ObjectPoint, ObjectRecord, ObjectSegment, Presence, PressureFields, WidthStop};
+use crate::object_document::{ObjectPoint, ObjectRecord, ObjectSegment, PressureFields};
+#[cfg(feature = "application")]
+use crate::object_document::{CenterSegment, Presence, WidthStop};
 use crate::request_receipts::DispatchErrorCode;
+// The ribbon rebuild is the tween outline kernel, which only the application build carries.
+#[cfg(feature = "application")]
 use crate::tween_kernels::{profiled_outline, width_at_frac, SegOut};
 use kurbo::{CubicBez, ParamCurve, ParamCurveArclen, ParamCurveExtrema, Point, Rect, Vec2};
 use serde_json::Number;
@@ -269,6 +273,7 @@ fn segments_of(points: &[Anchor]) -> Option<Vec<ObjectSegment>> {
         .collect()
 }
 
+#[cfg(feature = "application")]
 fn linked(fill: &ObjectRecord, ribbon: &ObjectRecord) -> bool {
     let (f, r) = (fill.vector_ext.value(), ribbon.vector_ext.value());
     f.is_some_and(|f| f.is_linked_fill_companion.value() == Some(&true))
@@ -282,6 +287,7 @@ fn linked(fill: &ObjectRecord, ribbon: &ObjectRecord) -> bool {
 /// rotation keeps arc length: every other cell of the create (a copy or a stamp, each with its linked fill, in either
 /// stack order) takes the same cut on its own centreline. adoptFreshIdentity rebuilds a copy's outline only when it has
 /// a linked fill; one without keeps the drawn ribbon's (trimmed) outline carried by the copy's own map (`carried`).
+#[cfg(feature = "application")]
 pub(super) fn ribbon<'a>(records: &mut [ObjectRecord], walls: impl Iterator<Item = &'a ObjectRecord>, max: f64) -> Result<(), DispatchErrorCode> {
     let mut widths = Vec::new();
     let mut i = 0;
@@ -321,6 +327,7 @@ pub(super) fn ribbon<'a>(records: &mut [ObjectRecord], walls: impl Iterator<Item
 }
 /// The affine that carried the drawn ribbon's untrimmed outline onto a copy's (a mirror's copy reversed, as
 /// `mirrored.reverse()` re-orients it), applied to the drawn ribbon's trimmed outline. `None` when no map fits.
+#[cfg(feature = "application")]
 fn carried(before: &[Anchor], copy: &[Anchor], after: &[Anchor]) -> Option<Vec<Anchor>> {
     let n = before.len();
     if n < 3 || copy.len() != n {
@@ -355,10 +362,12 @@ fn carried(before: &[Anchor], copy: &[Anchor], after: &[Anchor]) -> Option<Vec<A
     }
     None
 }
+#[cfg(feature = "application")]
 fn centre_of(ribbon: &ObjectRecord) -> Result<Vec<Anchor>, DispatchErrorCode> {
     let centre = pressure(ribbon).and_then(|p| p.center_segments.value()).filter(|c| c.len() > 1).ok_or(DispatchErrorCode::Unavailable)?;
     centre.iter().map(|c| anchor(&c.point, &c.handle_in, &c.handle_out)).collect::<Option<_>>().ok_or(DispatchErrorCode::InvalidRequest)
 }
+#[cfg(feature = "application")]
 fn trim_cell(records: &mut [ObjectRecord], cut: (f64, f64)) -> Result<(), DispatchErrorCode> {
     let (fill, ribbon) = match records {
         [ribbon] => (None, ribbon),
@@ -431,4 +440,9 @@ fn trim_cell(records: &mut [ObjectRecord], cut: (f64, f64)) -> Result<(), Dispat
         fill.geometry.closed = true;
     }
     Ok(())
+}
+/// Without the application build there is no outline kernel to rebuild a trimmed ribbon with.
+#[cfg(not(feature = "application"))]
+pub(super) fn ribbon<'a>(_: &mut [ObjectRecord], _: impl Iterator<Item = &'a ObjectRecord>, _: f64) -> Result<(), DispatchErrorCode> {
+    Err(DispatchErrorCode::Unavailable)
 }
