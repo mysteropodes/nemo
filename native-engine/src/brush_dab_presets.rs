@@ -2,6 +2,7 @@
 //! object): every member a preset may set, with JavaScript's "missing" kept as `None`, so each reader applies the
 //! baseline's own default (`!== undefined ? v : d`) or falsy fallback (`v || d`) where the stamper reads it. A project
 //! catalog preset maps onto the same struct.
+use crate::object_document::{BrushPresetRecord, Presence};
 
 /// A captured stamp: unit segments `[x, y, inX, inY, outX, outY]` scaled by the dab size.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -50,6 +51,63 @@ pub(crate) struct DabPreset {
 }
 
 /// `BRUSH_MAX_DABS`: the hard ceiling on dabs per stroke.
+/// `resolveBrushPreset(key)`'s second source, a project catalog preset, read field for field as the stamper reads it.
+/// A stamp segment without both handles has no baseline reading (`s.handleIn[0]` throws), so the preset has none either.
+pub(crate) fn from_catalog(p: &BrushPresetRecord) -> Option<DabPreset> {
+    let n = |v: &Presence<f64>| v.value().copied();
+    let s = |v: &Presence<String>| v.value().cloned();
+    let custom_stamp = match p.custom_stamp.value() {
+        None => None,
+        Some(stamp) => Some(CustomStamp {
+            segments: stamp
+                .segments
+                .iter()
+                .map(|g| {
+                    let (i, o) = (g.handle_in.value()?, g.handle_out.value()?);
+                    Some([g.point[0], g.point[1], i[0], i[1], o[0], o[1]])
+                })
+                .collect::<Option<Vec<_>>>()?,
+            closed: stamp.closed.value().copied().unwrap_or(false),
+        }),
+    };
+    Some(DabPreset {
+        nib_size: n(&p.nib_size),
+        roundness: n(&p.roundness),
+        spacing: n(&p.spacing),
+        space_jitter: n(&p.space_jitter),
+        rotation_mode: s(&p.rotation_mode),
+        rotation_jitter: n(&p.rotation_jitter),
+        fixed_angle: n(&p.fixed_angle),
+        size_jitter: n(&p.size_jitter),
+        opacity: n(&p.opacity),
+        opacity_jitter: n(&p.opacity_jitter),
+        scatter: n(&p.scatter),
+        scatter_distribution: s(&p.scatter_distribution),
+        dash_gap: n(&p.dash_gap),
+        value_jitter: n(&p.value_jitter),
+        tip_shape: s(&p.tip_shape),
+        tip_corner: n(&p.tip_corner),
+        poly_sides: n(&p.poly_sides),
+        edge_noise: n(&p.edge_noise),
+        bristle_count: n(&p.bristle_count),
+        scribble_count: n(&p.scribble_count),
+        scribble_len: n(&p.scribble_len),
+        scribble_len_jitter: n(&p.scribble_len_jitter),
+        scribble_width: n(&p.scribble_width),
+        scribble_spread: n(&p.scribble_spread),
+        scribble_angle_spread: n(&p.scribble_angle_spread),
+        pressure_start: n(&p.pressure_start),
+        pressure_mid: n(&p.pressure_mid),
+        pressure_end: n(&p.pressure_end),
+        sharpness: n(&p.sharpness),
+        roughness: n(&p.roughness),
+        grain: n(&p.grain),
+        noise: n(&p.noise),
+        marker_tip: p.marker_tip.value().copied(),
+        custom_stamp,
+    })
+}
+
 pub(crate) const BRUSH_MAX_DABS: usize = 900;
 /// `SHARPNESS_LAYERS`: concentric layers of a soft-edged dab.
 pub(crate) const SHARPNESS_LAYERS: usize = 3;

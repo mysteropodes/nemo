@@ -37,10 +37,11 @@ fn plan_of(record: Value) -> Result<ObjectPaintPlan, ObjectPaintPlanError> {
     plan_of_records(vec![record])
 }
 fn plan_of_records(records: Vec<Value>) -> Result<ObjectPaintPlan, ObjectPaintPlanError> {
-    plan_posed(records, None)
+    plan_posed(records, None, None)
 }
 /// The plan with the anchor posed by one element property (`{"property":…,"static":…}`).
-fn plan_posed(records: Vec<Value>, pose: Option<Value>) -> Result<ObjectPaintPlan, ObjectPaintPlanError> {
+/// With `presets`, the drawing is opened as a project file whose catalog (`customBrushPresets`) holds them.
+fn plan_posed(records: Vec<Value>, pose: Option<Value>, presets: Option<Value>) -> Result<ObjectPaintPlan, ObjectPaintPlanError> {
     let elements: Vec<Value> = records.iter().enumerate().map(|(k, r)| json!({"layerUid":"L0",
         "strokeId":r["target"]["strokeId"],"naturalPosition":k,"order":{}})).collect();
     let doc = json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":1,
@@ -54,7 +55,14 @@ fn plan_posed(records: Vec<Value>, pose: Option<Value>) -> Result<ObjectPaintPla
         doc["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"L0","strokeId":"anchor"},
             "properties":[property]}]);
     }
-    let history = NativeObjectHistory::new("dabs", decode_storage_project(&serde_json::to_vec(&doc).unwrap()).unwrap()).unwrap();
+    let history = match presets {
+        #[cfg(feature = "project_media_codec")]
+        Some(presets) => NativeObjectHistory::from_project_file("dabs", &serde_json::to_vec(&json!({
+            "format":"nemo.native-project-document","formatVersion":1,
+            "project":{"canvasW":320,"canvasH":180,"fps":24,"customBrushPresets":presets},
+            "drawing":doc,"viewportReference":null,"assets":[]})).unwrap()).unwrap(),
+        _ => NativeObjectHistory::new("dabs", decode_storage_project(&serde_json::to_vec(&doc).unwrap()).unwrap()).unwrap(),
+    };
     let snapshot = history.acquire_snapshot(history.content_revision()).unwrap();
     let pins = ObjectFrameSelector {
         instance_id: snapshot.instance_id(),
@@ -182,14 +190,14 @@ fn a_posed_textured_anchor_stamps_its_stored_stroke_and_poses_every_dab_with_it(
     for anchor in [line_record(Some(seeded()), false), ribbon_record(7)] {
         let still = dab_points(&plan_of(anchor.clone()).unwrap());
         assert!(!still.is_empty());
-        let moved = dab_points(&plan_posed(vec![anchor.clone()], Some(json!({"property":"position","static":[30,10]}))).unwrap());
+        let moved = dab_points(&plan_posed(vec![anchor.clone()], Some(json!({"property":"position","static":[30,10]})), None).unwrap());
         assert_eq!(moved.len(), still.len(), "the same dabs");
         for (m, s) in moved.iter().zip(&still) {
             for (m, s) in m.iter().zip(s) {
                 assert!((m[0] - s[0] - 30.0).abs() <= 1e-6 && (m[1] - s[1] - 10.0).abs() <= 1e-6, "{m:?} is {s:?} moved");
             }
         }
-        let turned = dab_points(&plan_posed(vec![anchor], Some(json!({"property":"rotation","static":[90]}))).unwrap());
+        let turned = dab_points(&plan_posed(vec![anchor], Some(json!({"property":"rotation","static":[90]})), None).unwrap());
         assert_eq!(turned.len(), still.len(), "the same dabs");
         // A quarter turn carries every chord of every dab onto its perpendicular.
         for (t, s) in turned.iter().zip(&still) {
@@ -199,4 +207,33 @@ fn a_posed_textured_anchor_stamps_its_stored_stroke_and_poses_every_dab_with_it(
             }
         }
     }
+}
+
+#[cfg(feature = "project_media_codec")]
+#[test]
+fn a_custom_catalog_preset_stamps_from_the_project_and_an_unknown_key_stays_unavailable() {
+    // `resolveBrushPreset`: a key that is no built-in resolves in the project's catalog (oracle row `custom/hook`).
+    let oracle: Value = serde_json::from_str(ORACLE).unwrap();
+    let case = &oracle["customCases"][1];
+    let mut anchor = line_record(Some(json!({"brushGroupId":"g","brushTexturePreset":case["key"],"preTextureOpacity":1,
+        "strokeSeed":case["seed"]})), false);
+    anchor["vector"]["strokeWidth"] = case["width"].clone();
+    let mut catalog = serde_json::Map::new();
+    catalog.insert(case["key"].as_str().unwrap().to_owned(), case["preset"].clone());
+    let plan = plan_posed(vec![anchor.clone()], None, Some(Value::Object(catalog))).unwrap();
+    let painted = dab_points(&plan);
+    let made = case["dabs"].as_array().unwrap();
+    assert_eq!(painted.len(), made.len(), "every baseline dab");
+    // The last dab painted is the first one made.
+    for (k, (got, want)) in painted.iter().rev().zip(made).enumerate() {
+        let want: Vec<[f64; 2]> = want["parts"][0]["segments"].as_array().unwrap().iter()
+            .map(|s| [s[0].as_f64().unwrap(), s[1].as_f64().unwrap()]).collect();
+        assert_eq!(got.len(), want.len(), "dab {k}");
+        for (g, w) in got.iter().zip(&want) {
+            assert!((g[0] - w[0]).abs() <= 1.5e-6 && (g[1] - w[1]).abs() <= 1.5e-6, "dab {k}: {g:?} != {w:?}");
+        }
+    }
+    let mut other = serde_json::Map::new();
+    other.insert("another".to_owned(), case["preset"].clone());
+    assert_eq!(plan_posed(vec![anchor], None, Some(Value::Object(other))).err(), Some(ObjectPaintPlanError::Unavailable));
 }
