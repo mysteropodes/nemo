@@ -14,12 +14,14 @@
 //! as the baseline drops them: rasters, masks (never paint commands) and zero-opacity strokes. As
 //! `getEffectiveStrokesRendered` returns them, a placed component is its inner strokes on the host
 //! layer under camera then symMatrix, and a duplicator its copies (factored opacity, hue-turned
-//! paints). Refused, until later increments admit them with oracle rows: text (the baseline's vector
-//! text glyphs are filled paths it writes as shapes), bitmap brush, video, legacy fill records and a layer opacity factor other than one (the baseline
+//! paints). A text block is the baseline's vector text: each painted contour a closed fill-only shape
+//! in the block colour (`buildGlyphPaths`). Refused, until later increments admit them with oracle
+//! rows: bitmap brush, video, legacy fill records and a layer opacity factor other than one (the baseline
 //! writes every layer at full opacity, `ks.o` 100). A seeded brush-texture anchor's dabs are written as
 //! the dabs the baseline stores for it: each a fill-only shape at the dab opacity, its colour through
 //! the hex Paper stores (`toCSS(true)`) and its outline through the three-decimal rounding `serP`
 //! stores (`_r3`), right after the anchor's own slot.
+use crate::object_render_scene::object_scene_producer_text::fill_rgba;
 use crate::object_render_scene::{ordered_entries, ObjectPaintPlan, PaintEntry};
 use kurbo::BezPath;
 use serde_json::{json, Number, Value};
@@ -214,13 +216,31 @@ fn shown_by_layer(
             PaintEntry::Contour(command) => command,
             // `lottieBuild` drops rasters (and with them bitmap-brush companions).
             PaintEntry::Raster(_) => continue,
-            // Native text is the baseline's vector text (`buildVectorTextGroup`): its glyphs are plain
-            // filled paths that `lottieBuild` writes as shapes. Until that row has an oracle, refuse.
+            // Native text is the baseline's vector text: `buildGlyphPaths` makes each painted contour a
+            // closed path filled with the block colour, no stroke, at its own opacity, in painted order.
             PaintEntry::Text(text) => {
-                return refuse(
-                    text.source_index,
-                    "text has no admitted Lottie representation yet",
-                )
+                let host = host_opacity(plan, text.layer_index)?;
+                let [r, g, b, _] = fill_rgba(text.item.color(), 1.0).map_err(|_| {
+                    LottieExportError::Unsupported {
+                        source_object_index: text.source_index,
+                        reason: "text colour has no Lottie representation",
+                    }
+                })?;
+                let channel = |c: u8| number(f64::from(c) / 255.0);
+                for (contour, _) in text.item.painted() {
+                    // `sd.opacity !== 0`; a placed or animated glyph carries its own factor.
+                    if contour.opacity == 0.0 {
+                        continue;
+                    }
+                    let shown = Shown {
+                        shape: shape_value(contour.contour.path(), camera, text.source_index)?,
+                        stroke: None,
+                        fill: Some(Value::Array(vec![channel(r)?, channel(g)?, channel(b)?, json!(1)])),
+                        opacity: contour.opacity,
+                    };
+                    push(&mut out, text.layer_index, host, shown)?;
+                }
+                continue;
             }
             // `getEffectiveStrokesRendered`: a placed component's `symbolId`-branch dicts on its host, and
             // `applyLayerDuplicator`'s copies on theirs, drawn like any stroke.

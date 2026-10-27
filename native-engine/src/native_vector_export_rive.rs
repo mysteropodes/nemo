@@ -19,8 +19,10 @@
 //! stroke id, so repeats take the `+` lanes), with the copy's factored opacity and hue-turned fill and stroke. A placed
 //! component is its `symbolId` branch's dicts on the host layer: inner strokes in inner order under camera then
 //! symMatrix, inner layer opacity folded in, stroke widths as stored.
+//! A text block is the baseline's vector text (`buildGlyphPaths`): each painted contour a closed fill-only path in the
+//! block colour, on the lane of its glyph key.
 //! Dropped as the baseline drops them: zero-opacity strokes without a texture. Refused, until later increments admit
-//! them with oracle rows: rasters (the baseline throws on them), text, bitmap brush, video, legacy fill records and a
+//! them with oracle rows: rasters (the baseline throws on them), bitmap brush, video, legacy fill records and a
 //! layer opacity factor other than one (the baseline reads no layer opacity).
 use crate::object_render_scene::{ordered_entries, ObjectPaintPlan, PaintEntry};
 use kurbo::BezPath;
@@ -190,11 +192,18 @@ fn strokes_by_layer(
                     "rasters have no admitted Rive representation",
                 )
             }
+            // The baseline's vector text: each painted contour a filled glyph path on its own lane.
             PaintEntry::Text(text) => {
-                return refuse(
-                    text.source_index,
-                    "text has no admitted Rive representation yet",
-                )
+                let host = plan.packet().layer_opacity(text.layer_index).map_err(|_| {
+                    RiveExportError::UnsupportedLayer {
+                        source_layer_index: text.layer_index,
+                        reason: "text host opacity is unavailable",
+                    }
+                })?;
+                for stroke in shapes::text_strokes(text)? {
+                    push(&mut out, text.layer_index, host, stroke)?;
+                }
+                continue;
             }
             // The `symbolId` branch's dicts: inner strokes under camera then symMatrix, inner order.
             PaintEntry::Component(component) => {
