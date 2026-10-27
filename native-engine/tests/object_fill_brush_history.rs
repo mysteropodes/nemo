@@ -11,7 +11,7 @@ fn outline(x: f64, y: f64, w: f64, h: f64) -> Value {
 }
 fn payload(outline: Value, placement: &str) -> Value {
     json!({"command":"object.fill.brush","layerUid":"L0","contextId":"scene-root","frame":0,
-        "outline":outline,"color":"#0000ffff","opacity":0.75,"placement":placement})
+        "outline":outline,"color":"#0000ffff","opacity":0.75,"placement":placement,"mask":false})
 }
 fn fill(id: &str, x: f64, y: f64, w: f64, h: f64, paint: [f64; 4]) -> Value {
     f::vector(
@@ -200,5 +200,41 @@ fn malformed_fill_brush_requests_are_refused_before_any_edit() {
         o.prepare_fill_brush_json(extra.to_string().as_bytes())
             .is_err(),
         "unknown member"
+    );
+}
+
+#[test]
+fn in_mask_mode_the_path_the_merge_hands_back_becomes_a_mask_of_the_layer() {
+    // tagOwner after the Fill Brush commit tags the returned path: the new shape, or the near-identical fill it gave way to.
+    let mut masked = payload(outline(0.0, 0.0, 40.0, 30.0), "above");
+    masked["mask"] = json!("subtract");
+    let records = brush(&mut owner(vec![]), &masked);
+    assert_eq!(
+        records[0]["vectorExt"],
+        json!({"isFillShape": true, "isMask": true, "maskMode": "subtract"})
+    );
+    let mut earlier = fill("earlier", 0.0, 0.0, 30.0, 30.0, BLUE);
+    earlier["vector"]["opacity"] = json!(0.75);
+    masked["outline"] = outline(0.0, 0.0, 30.0, 30.0);
+    let records = brush(&mut owner(vec![earlier]), &masked);
+    assert_eq!(
+        ids(&records),
+        ["earlier"],
+        "the shape gave way to the near-identical fill"
+    );
+    assert_eq!(
+        (
+            &records[0]["vectorExt"]["isMask"],
+            &records[0]["vectorExt"]["maskMode"]
+        ),
+        (&json!(true), &json!("subtract"))
+    );
+    let mut bad = payload(outline(0.0, 0.0, 10.0, 10.0), "above");
+    bad["mask"] = json!("");
+    assert!(
+        owner(vec![])
+            .prepare_fill_brush_json(bad.to_string().as_bytes())
+            .is_err(),
+        "an empty mask mode"
     );
 }

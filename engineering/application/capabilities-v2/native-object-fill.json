@@ -165,7 +165,8 @@
           ],
           "color": "#336699ff",
           "opacity": 1,
-          "placement": "below"
+          "placement": "below",
+          "mask": false
         }
       },
       "response": {

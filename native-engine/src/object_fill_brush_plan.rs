@@ -123,6 +123,7 @@ pub(crate) fn plan_brush(
     paint: &SolidFill,
     opacity: f64,
     placement: Placement,
+    mask: Option<&str>,
     revision: u64,
 ) -> Result<BooleanPlan, PlanError> {
     check_scope(document, scope)?;
@@ -176,7 +177,16 @@ pub(crate) fn plan_brush(
         }
     };
     // The receipt names what the whole commit created and removed in the scope (a merge-placed target keeps its id).
-    let mut plan = same_colour_merge(work, scope, &current, revision)?;
+    let (mut plan, shown) = same_colour_merge(work, scope, &current, revision)?;
+    // tagOwner in Mask mode (tools.js @1065e9d8): the path the merge hands back becomes a mask of the layer.
+    if let Some(mode) = mask {
+        let at = find_record(&plan.document, scope, &shown).ok_or(PlanError::FillUnavailable)?;
+        let record = &mut plan.document.objects[at];
+        let mut ext = record.vector_ext.value().cloned().unwrap_or_default();
+        ext.is_mask = Presence::Present(Some(true));
+        ext.mask_mode = Presence::Present(Some(mode.to_string()));
+        record.vector_ext = Presence::Present(ext);
+    }
     let after = stack_of(&plan.document, scope);
     plan.created = after.iter().filter(|id| !ids.contains(id)).cloned().collect();
     plan.removed = ids.iter().filter(|id| !after.contains(id)).cloned().collect();
@@ -184,8 +194,8 @@ pub(crate) fn plan_brush(
     Ok(plan)
 }
 
-/// `fillMergeSameColor(layer, shape, true)` over the placed document.
-fn same_colour_merge(work: ObjectDocument, scope: &Scope, current: &str, revision: u64) -> Result<BooleanPlan, PlanError> {
+/// `fillMergeSameColor(layer, shape, true)` over the placed document, and the id of the path it hands back.
+fn same_colour_merge(work: ObjectDocument, scope: &Scope, current: &str, revision: u64) -> Result<(BooleanPlan, String), PlanError> {
     let ids = stack_of(&work, scope);
     let at = ids.iter().position(|id| id == current).ok_or(PlanError::FillUnavailable)?;
     let shown = records(&work, scope, &ids)?;
@@ -223,7 +233,7 @@ fn same_colour_merge(work: ObjectDocument, scope: &Scope, current: &str, revisio
     };
     let absorbed = select_absorbed(&candidates, &mut probe).map_err(|_| PlanError::FillUnavailable)?;
     if absorbed.is_empty() {
-        return Ok(unchanged_shape());
+        return Ok((unchanged_shape(), current.to_string()));
     }
     let area = |k: usize| AreaFacts { area: native::area(&rings[k]), bounds: native::bounds(&rings[k]) };
     let children: Vec<Absorbed> = absorbed.iter().map(|&index| Absorbed { index, area: area(index) }).collect();
@@ -234,14 +244,14 @@ fn same_colour_merge(work: ObjectDocument, scope: &Scope, current: &str, revisio
         outcomes.push(provider.unite(step).map_err(|_| PlanError::FillUnavailable)?);
     }
     match resolve_union(&union, &outcomes).map_err(|_| PlanError::FillUnavailable)? {
-        MergeDecision::NoChange => Ok(unchanged_shape()),
+        MergeDecision::NoChange => Ok((unchanged_shape(), current.to_string())),
         // A near-identical fill already covers it: the new shape goes, that fill stays.
-        MergeDecision::KeepExisting(_) => {
+        MergeDecision::KeepExisting(kept) => {
             let removed = vec![current.to_string()];
             let mut doc = detach(work, scope, &removed)?;
             let stack: Vec<String> = ids.iter().filter(|id| *id != current).cloned().collect();
             apply_stack(&mut doc, scope, &stack, &removed, Vec::new()).map_err(PlanError::Stack)?;
-            Ok(BooleanPlan { document: doc, changed: true, created: Vec::new(), removed })
+            Ok((BooleanPlan { document: doc, changed: true, created: Vec::new(), removed }, ids[kept].clone()))
         }
         MergeDecision::Unite(_) => {
             // The participants' seeds, walls and widest gap go onto every part (mergedSeeds, mergedWallIds, gap or 24).
@@ -284,7 +294,7 @@ fn same_colour_merge(work: ObjectDocument, scope: &Scope, current: &str, revisio
                 keep_source_stroke_style: false,
             };
             let doc = detach(work.clone(), scope, &removed)?;
-            finish(doc, scope, &removed, Some(top - below), &islands, current, &style, revision)
+            Ok((finish(doc, scope, &removed, Some(top - below), &islands, current, &style, revision)?, current.to_string()))
         }
     }
 }

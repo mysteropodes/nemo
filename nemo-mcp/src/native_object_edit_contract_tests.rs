@@ -93,7 +93,7 @@ pub(super) fn valid() -> Vec<(&'static str, Value)> {
         (
             "fill.brush",
             json!({"command":"object.fill.brush","layerUid":"layer-a","contextId":"scene-root","frame":0,
-            "outline":[{"point":[10,10],"handleIn":[0,0],"handleOut":[0,0]},{"point":[60,10],"handleIn":[0,0],"handleOut":[0,0]},{"point":[60,40],"handleIn":[0,0],"handleOut":[0,0]}],"color":"#336699ff","opacity":0.5,"placement":"merge"}),
+            "outline":[{"point":[10,10],"handleIn":[0,0],"handleOut":[0,0]},{"point":[60,10],"handleIn":[0,0],"handleOut":[0,0]},{"point":[60,40],"handleIn":[0,0],"handleOut":[0,0]}],"color":"#336699ff","opacity":0.5,"placement":"merge","mask":false}),
         ),
         (
             "clipboard.copy",
