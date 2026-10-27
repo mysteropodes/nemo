@@ -1429,6 +1429,12 @@
         },
         {
           "$ref": "#/$defs/ObjectPresentationQueryPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectSubselectQueryPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectSubselectViewPayload"
         }
       ]
     },
@@ -5353,6 +5359,12 @@
         },
         {
           "$ref": "#/$defs/ObjectPresentationQueryResult"
+        },
+        {
+          "$ref": "#/$defs/ObjectSubselectQueryResult"
+        },
+        {
+          "$ref": "#/$defs/ObjectSubselectViewResult"
         }
       ]
     },
@@ -8577,6 +8589,23 @@
                 },
                 "payload": {
                   "$ref": "#/$defs/ObjectClipboardCutPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.subselect.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectSubselectPayload"
                 }
               }
             }
@@ -17977,6 +18006,630 @@
         }
       },
       "description": "Immutable stored vector record returned by an object query. Generic vector create/replace retain ObjectVectorRecord and cannot write bitmap anchors."
+    },
+    "ObjectSubselectIntent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "indices",
+            "delta"
+          ],
+          "properties": {
+            "kind": {
+              "const": "move"
+            },
+            "indices": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            },
+            "delta": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "indices",
+            "scale",
+            "anchor"
+          ],
+          "properties": {
+            "kind": {
+              "const": "scale"
+            },
+            "indices": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            },
+            "scale": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            },
+            "anchor": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "indices",
+            "degrees",
+            "center"
+          ],
+          "properties": {
+            "kind": {
+              "const": "rotate"
+            },
+            "indices": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            },
+            "degrees": {
+              "type": "number"
+            },
+            "center": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "indices",
+            "pointType"
+          ],
+          "properties": {
+            "kind": {
+              "const": "pointType"
+            },
+            "indices": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            },
+            "pointType": {
+              "enum": [
+                "corner",
+                "smooth",
+                "symmetric"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "index",
+            "handle",
+            "point",
+            "breakPair"
+          ],
+          "properties": {
+            "kind": {
+              "const": "handle"
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            },
+            "handle": {
+              "enum": [
+                "handleIn",
+                "handleOut"
+              ]
+            },
+            "point": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            },
+            "breakPair": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "index"
+          ],
+          "properties": {
+            "kind": {
+              "const": "toggle"
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "curve",
+            "time"
+          ],
+          "properties": {
+            "kind": {
+              "const": "insert"
+            },
+            "curve": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            },
+            "time": {
+              "type": "number",
+              "minimum": 1e-08,
+              "maximum": 0.99999999
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "indices"
+          ],
+          "properties": {
+            "kind": {
+              "const": "delete"
+            },
+            "indices": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ObjectSubselectPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "stableTarget",
+        "intent"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.subselect.edit"
+        },
+        "stableTarget": {
+          "$ref": "#/$defs/ObjectImageMeshQueryTarget"
+        },
+        "intent": {
+          "$ref": "#/$defs/ObjectSubselectIntent"
+        }
+      }
+    },
+    "ObjectSubselectQueryPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "stableTarget",
+        "subselect"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stableTarget": {
+          "$ref": "#/$defs/ObjectImageMeshQueryTarget"
+        },
+        "subselect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cursor",
+            "limit"
+          ],
+          "properties": {
+            "cursor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 256
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "preview": {
+              "$ref": "#/$defs/ObjectSubselectIntent"
+            }
+          }
+        }
+      }
+    },
+    "ObjectSubselectQueryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "subselect"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subselect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "stableTarget",
+            "closed",
+            "total",
+            "cursor",
+            "nextCursor",
+            "segments",
+            "preview"
+          ],
+          "properties": {
+            "stableTarget": {
+              "$ref": "#/$defs/ObjectImageMeshQueryTarget"
+            },
+            "closed": {
+              "type": "boolean"
+            },
+            "total": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 256
+            },
+            "cursor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 256
+            },
+            "nextCursor": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 256
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "segments": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "point",
+                  "handleIn",
+                  "handleOut"
+                ],
+                "properties": {
+                  "point": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  "handleIn": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  "handleOut": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            },
+            "preview": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "ObjectSubselectViewPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "view"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "view": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "contextId",
+            "layerUid",
+            "frame",
+            "workId",
+            "viewGeneration",
+            "cursor",
+            "limit"
+          ],
+          "properties": {
+            "kind": {
+              "const": "subselect"
+            },
+            "contextId": {
+              "const": "scene-root"
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1
+            },
+            "frame": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "workId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+            },
+            "viewGeneration": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "cursor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1024
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "preview": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "stableTarget",
+                "intent"
+              ],
+              "properties": {
+                "stableTarget": {
+                  "$ref": "#/$defs/ObjectImageMeshQueryTarget"
+                },
+                "intent": {
+                  "$ref": "#/$defs/ObjectSubselectIntent"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "ObjectSubselectViewResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "kind",
+        "contextId",
+        "layerUid",
+        "frame",
+        "workId",
+        "viewGeneration",
+        "cursor",
+        "total",
+        "nextCursor",
+        "items",
+        "preview"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "subselect"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "workId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+        },
+        "viewGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1024
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "stableTarget",
+              "closed",
+              "count",
+              "matrix"
+            ],
+            "properties": {
+              "stableTarget": {
+                "$ref": "#/$defs/ObjectImageMeshQueryTarget"
+              },
+              "closed": {
+                "type": "boolean"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 256
+              },
+              "matrix": {
+                "type": "array",
+                "minItems": 6,
+                "maxItems": 6,
+                "items": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        "preview": {
+          "type": "boolean"
+        }
+      }
     }
   }
 }

@@ -10,7 +10,7 @@ use native_engine::{
 use serde_json::Value;
 
 impl NativeObjectHost {
-    fn presented_object_source(
+    pub(super) fn presented_object_source(
         &self,
         snapshot: &ObjectSnapshot,
     ) -> Result<(&PresentationReceipt, &ObjectCompositionWitness), ImageMeshReadFailure> {
@@ -239,3 +239,7 @@ mod presentation_guards {
         assert_eq!(owner.history.history_depths(), history);
     }
 }
+
+#[cfg(test)]
+#[path = "native_subselect_read_public_tests.rs"]
+mod subselect_tests;

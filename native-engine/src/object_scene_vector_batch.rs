@@ -368,3 +368,6 @@ fn legacy_record_rest(
         segments,
     })
 }
+
+#[path = "object_scene_subselect_projection.rs"]
+pub(crate) mod subselect;

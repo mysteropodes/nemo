@@ -40,12 +40,11 @@ pub(crate) fn layer_bounds(
     geometry::bounds(vectors)
 }
 
-/// Whole-layer Motion, after the caller's existing pathFX/rebuild/element stages.
-/// Opacity and stroke-scale paint semantics remain with the actual paint producer.
-pub(crate) fn transform_layer_2d(
+/// The exact own-layer transform, shared by paint and immutable edit projections.
+pub(crate) fn layer_chain_entry(
     vectors: &[EvaluatedVector],
     motion: &MotionValues,
-) -> Result<Vec<EvaluatedVector>, ProjectionError> {
+) -> Result<Option<crate::evaluation::motion_parent_chain::ChainEntry>, ProjectionError> {
     if motion
         .position
         .iter()
@@ -64,10 +63,10 @@ pub(crate) fn transform_layer_2d(
         motion.scale,
         motion.opacity,
     ) else {
-        return Ok(vectors.to_vec());
+        return Ok(None);
     };
     let Some(bounds) = bounds else {
-        return Ok(vectors.to_vec());
+        return Ok(None);
     };
     let pivot = [
         bounds.x + bounds.width / 2. + mat.ax,
@@ -76,6 +75,23 @@ pub(crate) fn transform_layer_2d(
     if pivot.iter().any(|n| !n.is_finite()) {
         return Err(ProjectionError::NonFinite);
     }
+    Ok(Some(crate::evaluation::motion_parent_chain::ChainEntry {
+        mat,
+        pivot,
+    }))
+}
+
+/// Whole-layer Motion, after the caller's existing pathFX/rebuild/element stages.
+/// Opacity and stroke-scale paint semantics remain with the actual paint producer.
+pub(crate) fn transform_layer_2d(
+    vectors: &[EvaluatedVector],
+    motion: &MotionValues,
+) -> Result<Vec<EvaluatedVector>, ProjectionError> {
+    let Some(entry) = layer_chain_entry(vectors, motion)? else {
+        return Ok(vectors.to_vec());
+    };
+    let mat = entry.mat;
+    let pivot = entry.pivot;
     vectors
         .iter()
         .map(|vector| {

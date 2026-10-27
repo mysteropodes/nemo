@@ -426,3 +426,6 @@ fn validate_pins(
 ))]
 #[path = "../tests/object_raster_scene_join.rs"]
 mod raster_join_tests;
+
+#[path = "object_subselect_projection.rs"]
+mod subselect_projection;

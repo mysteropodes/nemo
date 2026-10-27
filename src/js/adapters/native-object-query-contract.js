@@ -2,10 +2,11 @@
 // Pure closed-shape validation shared by the native application SDK and the
 // Project's read adapter. It owns no session, state, dispatch or query endpoint.
 (function (root, factory) {
-  const api = factory();
+  const subselect = typeof module === 'object' && module.exports ? require('./native-subselect-contract.js') : root.NemoNativeSubselectContract;
+  const api = factory(subselect);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.NemoNativeObjectQueryContract = api;
-}(typeof globalThis === 'object' ? globalThis : this, function () {
+}(typeof globalThis === 'object' ? globalThis : this, function (Subselect) {
   const PAGE_KINDS = ['outline', 'verts', 'tris', 'offsets'];
   const own = (v, k) => Object.prototype.hasOwnProperty.call(v, k);
   const object = (v) => !!v && typeof v === 'object' && !Array.isArray(v) &&
@@ -85,6 +86,8 @@
     return true;
   }
   function payload(value, legacyValidator) {
+    if (object(value) && own(value, 'subselect')) return Subselect.readPayload(value);
+    if (object(value) && object(value.view) && value.view.kind === 'subselect') return Subselect.viewPayload(value);
     if (object(value) && object(value.view) && value.view.kind === 'presentation') return presentationPayload(value);
     if (object(value) && object(value.view) && value.view.kind === 'imageMesh') return imagePayload(value);
     if (typeof legacyValidator === 'function') return legacyValidator(value);
@@ -96,6 +99,8 @@
     fail('legacy project-read payload validator is required');
   }
   function result(value, legacyValidator) {
+    if (object(value) && own(value, 'subselect')) return Subselect.readResult(value);
+    if (object(value) && value.kind === 'subselect') return Subselect.viewResult(value);
     if (object(value) && value.kind === 'presentation') return presentationResult(value);
     if (object(value) && value.kind === 'imageMesh') { if (!imageResult(value)) fail('invalid image-mesh query result'); return; }
     if (typeof legacyValidator === 'function') return legacyValidator(value);
@@ -108,6 +113,8 @@
     fail('legacy project-read result validator is required');
   }
   function correlate(p, value, legacyCorrelator, documentId) {
+    if (object(p) && own(p, 'subselect')) return Subselect.readCorrelate(p, value, documentId);
+    if (object(p) && object(p.view) && p.view.kind === 'subselect') return Subselect.viewCorrelate(p, value, documentId);
     if (object(p) && object(p.view) && p.view.kind === 'presentation') {
       presentationPayload(p); presentationResult(value);
       if (value.atRevision !== p.atRevision) fail('presentation query result does not match its request');
@@ -136,6 +143,9 @@
     'payload.view.layerUid', 'payload.view.workId', 'payload.view.page.meshId', 'result.documentSnapshotId', 'result.contextId',
     'result.layerUid', 'result.workId', 'result.target.contextId', 'result.target.layerUid',
     'result.target.strokeId', 'result.mesh.meshId']);
-  paths.has = paths.has.bind(paths);
+  ['result.subselect.stableTarget.contextId','result.subselect.stableTarget.layerUid','result.subselect.stableTarget.strokeId',
+    'payload.view.preview.stableTarget.contextId','payload.view.preview.stableTarget.layerUid','payload.view.preview.stableTarget.strokeId'].forEach(p=>paths.add(p));
+  const knownPath = paths.has.bind(paths);
+  paths.has = p => knownPath(p) || /^result\.items\.[0-7]\.stableTarget\.(contextId|layerUid|strokeId)$/.test(p);
   return Object.freeze({ payload, result, correlate, paths });
 }));

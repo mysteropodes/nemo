@@ -34,6 +34,8 @@ mod reference_preview;
 use prepare::PreparedObjectPreview;
 #[path = "native_object_image_mesh_read.rs"]
 mod image_mesh_read;
+#[path = "native_object_subselect_read.rs"]
+mod subselect_read;
 
 #[derive(Default)]
 pub(super) struct ObjectPreview {
