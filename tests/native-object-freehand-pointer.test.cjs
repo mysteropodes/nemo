@@ -472,12 +472,16 @@ test('Fill Brush commits its outline through the native Fill Brush command with 
   assert.ok(q.payload.outline.length>=4&&q.payload.outline.every((s)=>['point','handleIn','handleOut'].every((k)=>s[k].length===2)),'a closed ribbon outline');
   assert.equal(f.root.state.layers[0].frames.length,0,'no legacy frame was written');
  }
+ // Mask mode (tagOwner): the commit names the mask mode for the path the native merge hands back.
+ const masked=await fixture('fillbrush');Object.assign(masked.root.state,{fillBrushMode:'above',fillBrushSize:40,maskMode:true,maskModeType:'intersect'});
+ send(masked,'pointerdown',20,20,{pointerType:'pen',pressure:.5});masked.advance();send(masked,'pointermove',50,30,{pointerType:'pen',pressure:.8});masked.advance();send(masked,'pointerup',80,45,{pointerType:'pen',pressure:0});
+ await settled(masked);assert.equal(plain(masked.calls[0]).payload.mask,'intersect');
  const shadow=await fixture('fillbrush');shadow.root.SMShadowBrush={activeSwatch:()=>({id:'sh3',ordinal:3,color:'#ffdd00'})};Object.assign(shadow.root.state,{fillBrushMode:'below',fillBrushSize:40,shadowMode:true});
  send(shadow,'pointerdown',20,20,{pointerType:'pen',pressure:.5});shadow.advance();send(shadow,'pointermove',50,30,{pointerType:'pen',pressure:.8});shadow.advance();send(shadow,'pointerup',80,45,{pointerType:'pen',pressure:0});
  await settled(shadow);const r=plain(shadow.calls[0].payload.record);
  assert.deepEqual([shadow.calls[0].payload.command,r.geometry.closed,r.vectorExt.shadow.shadowSwatchId,r.fill,r.vector.strokeWidth],['object.vector.create',false,'sh3',null,1],
    'Shadow mode inks the Fill Brush centreline in the swatch');
- for(const change of [s=>s.symmetryEnabled=true,s=>s.maskMode=true,s=>s.fillBrushMode='front']){
+ for(const change of [s=>s.symmetryEnabled=true,s=>s.fillBrushMode='front']){
   const f=await fixture('fillbrush');Object.assign(f.root.state,{fillBrushMode:'below',fillBrushSize:40});change(f.root.state);
   const e=send(f,'pointerdown',20,20);send(f,'pointerup',60,50);assert.equal(e.prevented,true);assert.equal(f.calls.length,0);
   assert.ok(f.log.some((s)=>/Fill Brush combination is unavailable/.test(s)),f.log.join(','));

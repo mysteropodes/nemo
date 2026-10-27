@@ -10,6 +10,8 @@ pub(super) enum Field {
     Outline,
     /// `state.fillBrushMode`.
     Placement,
+    /// Mask mode's tag for the committed Fill Brush shape, or `false` when Mask mode is off.
+    Mask,
 }
 pub(super) fn kind(token: &str) -> Option<Field> {
     match token {
@@ -19,6 +21,7 @@ pub(super) fn kind(token: &str) -> Option<Field> {
         "flag" => Some(Field::Flag),
         "outline" => Some(Field::Outline),
         "placement" => Some(Field::Placement),
+        "mask" => Some(Field::Mask),
         _ => None,
     }
 }
@@ -54,5 +57,11 @@ pub(super) fn check(field: Field, value: &Value) -> bool {
         Field::Placement => value
             .as_str()
             .is_some_and(|mode| matches!(mode, "above" | "below" | "merge")),
+        Field::Mask => {
+            value == &Value::Bool(false)
+                || value.as_str().is_some_and(|m| {
+                    !m.is_empty() && m.len() <= 64 && !m.chars().any(char::is_control)
+                })
+        }
     }
 }

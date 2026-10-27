@@ -35,6 +35,8 @@ struct Payload {
     color: String,
     opacity: f64,
     placement: String,
+    /// Mask mode's `maskModeType` (tagOwner), stored verbatim like any mask tag, or `false` when Mask mode is off.
+    mask: serde_json::Value,
 }
 
 impl ObjectFillOwner {
@@ -63,6 +65,8 @@ impl ObjectFillOwner {
                 .all(|s| finite(&s.point) && finite(&s.handle_in) && finite(&s.handle_out))
             || !p.opacity.is_finite()
             || !(0.0..=1.0).contains(&p.opacity)
+            || !(p.mask == serde_json::Value::Bool(false)
+                || p.mask.as_str().is_some_and(|m| !m.is_empty() && m.len() <= 64 && !m.chars().any(char::is_control)))
         {
             return Err(DispatchErrorCode::InvalidRequest);
         }
@@ -91,6 +95,7 @@ impl ObjectFillOwner {
             &paint,
             p.opacity,
             placement,
+            p.mask.as_str(),
             origin.content_revision(),
         )
         .map_err(|error| Self::fill_plan_error(&error))?;
