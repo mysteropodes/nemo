@@ -17,8 +17,8 @@
 //! layer under camera then symMatrix, and a duplicator its copies (factored opacity, hue-turned
 //! paints). A text block is the baseline's vector text: each painted contour a closed fill-only shape
 //! in the block colour (`buildGlyphPaths`). Refused, until later increments admit them with oracle
-//! rows: legacy fill records and a layer opacity factor other than one (the baseline
-//! writes every layer at full opacity, `ks.o` 100). A seeded brush-texture anchor's dabs are written as
+//! rows: legacy fill records. A layer's own opacity is not written: the baseline writes every
+//! layer at full opacity (`ks.o` 100) and each shape at its stroke's own opacity. A seeded brush-texture anchor's dabs are written as
 //! the dabs the baseline stores for it: each a fill-only shape at the dab opacity, its colour through
 //! the hex Paper stores (`toCSS(true)`) and its outline through the three-decimal rounding `serP`
 //! stores (`_r3`), right after the anchor's own slot.
@@ -177,18 +177,9 @@ fn host_opacity(plan: &ObjectPaintPlan, host: usize) -> Result<f64, LottieExport
         })
 }
 
-fn push(
-    out: &mut [Vec<Shown>],
-    layer: usize,
-    layer_opacity: f64,
-    shown: Shown,
-) -> Result<(), LottieExportError> {
-    if layer_opacity != 1.0 {
-        return Err(LottieExportError::UnsupportedLayer {
-            source_layer_index: layer,
-            reason: "a layer opacity factor has no admitted Lottie representation yet",
-        });
-    }
+/// A layer's own opacity is never written: `lottieBuild` gives every layer `ks.o` 100 and each shape the
+/// stroke dict's own opacity, which no layer factor reaches.
+fn push(out: &mut [Vec<Shown>], layer: usize, shown: Shown) -> Result<(), LottieExportError> {
     out.get_mut(layer)
         .ok_or(LottieExportError::InvalidRange)?
         .push(shown);
@@ -222,6 +213,13 @@ fn shown_by_layer(
                     }
                 })?;
                 let channel = |c: u8| number(f64::from(c) / 255.0);
+                // A scene block's glyph opacity carries its layer's factor, which the dict never has.
+                if host == 0.0 && text.item.painted().next().is_some() {
+                    return Err(LottieExportError::UnsupportedLayer {
+                        source_layer_index: text.layer_index,
+                        reason: "text on a fully transparent layer has no recoverable glyph opacity",
+                    });
+                }
                 for (contour, _) in text.item.painted() {
                     // `sd.opacity !== 0`; a placed or animated glyph carries its own factor.
                     if contour.opacity == 0.0 {
@@ -231,9 +229,9 @@ fn shown_by_layer(
                         shape: shape_value(contour.contour.path(), camera, text.source_index)?,
                         stroke: None,
                         fill: Some(Value::Array(vec![channel(r)?, channel(g)?, channel(b)?, json!(1)])),
-                        opacity: contour.opacity,
+                        opacity: contour.opacity / host,
                     };
-                    push(&mut out, text.layer_index, host, shown)?;
+                    push(&mut out, text.layer_index, shown)?;
                 }
                 continue;
             }
@@ -242,14 +240,14 @@ fn shown_by_layer(
             PaintEntry::Component(component) => {
                 let host = component.host_layer_index;
                 if let Some(shown) = shown_of!(&component.record, &component.path, host, camera)? {
-                    push(&mut out, host, host_opacity(plan, host)?, shown)?;
+                    push(&mut out, host, shown)?;
                 }
                 continue;
             }
             PaintEntry::Duplicator(copy) => {
                 let host = copy.layer_index;
                 if let Some(shown) = shown_of!(&copy.record, &copy.path, copy.source_index, camera)? {
-                    push(&mut out, host, host_opacity(plan, host)?, shown)?;
+                    push(&mut out, host, shown)?;
                 }
                 continue;
             }
@@ -257,12 +255,6 @@ fn shown_by_layer(
                 // `sd.opacity !== 0`, as for any stroke.
                 if dab.opacity == 0.0 {
                     continue;
-                }
-                if dab.layer_opacity != 1.0 {
-                    return Err(LottieExportError::UnsupportedLayer {
-                        source_layer_index: dab.layer_index,
-                        reason: "a layer opacity factor has no admitted Lottie representation yet",
-                    });
                 }
                 let [r, g, b, _] = dab.svg_rgba.ok_or(LottieExportError::NonFinite)?;
                 let hex = |c: f64| number((c.clamp(0.0, 1.0) * 255.0).round() / 255.0);
@@ -288,7 +280,7 @@ fn shown_by_layer(
         let source = command.source();
         let layer = source.source_layer_index();
         if let Some(shown) = shown_of!(source.record(), command.path(), source.source_object_index(), camera)? {
-            push(&mut out, layer, command.layer_opacity(), shown)?;
+            push(&mut out, layer, shown)?;
         }
     }
     Ok(out)
