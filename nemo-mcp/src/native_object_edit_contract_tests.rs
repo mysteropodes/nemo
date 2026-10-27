@@ -370,3 +370,33 @@ fn bounds_mirror_the_owner_text_count_frame_and_mode_domains() {
         json!({"contextId":"scene-root","layerUid":"layer-a","frame":0,"records":[],"extra":1}),
     );
 }
+
+#[test]
+fn fill_brush_wire_bounds_refuse_invalid_outlines_placements_and_mask_modes() {
+    let operation = format!("{P}fill.brush");
+    let good = valid().into_iter().find(|(name, _)| *name == "fill.brush").unwrap().1;
+    let seg = |x: f64| json!({"point":[x,0],"handleIn":[0,0],"handleOut":[0,0]});
+    for (key, bad) in [
+        ("outline", json!([seg(0.0), seg(1.0)])),
+        ("outline", json!((0..257).map(|i| seg(f64::from(i))).collect::<Vec<_>>())),
+        ("outline", json!([seg(0.0), seg(1.0), {"point":[2,0],"handleIn":[0,0]}])),
+        ("outline", json!([seg(0.0), seg(1.0), {"point":[1e13,0],"handleIn":[0,0],"handleOut":[0,0]}])),
+        ("outline", json!([seg(0.0), seg(1.0), {"point":[2,0],"handleIn":[0,0],"handleOut":[0,0],"width":1}])),
+        ("placement", json!("front")),
+        ("mask", json!(true)),
+        ("mask", json!(null)),
+        ("mask", json!("")),
+        ("mask", json!("a\u{7}b")),
+        ("mask", json!("m".repeat(65))),
+    ] {
+        let mut payload = good.clone();
+        payload[key] = bad;
+        assert!(!request(&operation, &payload), "{key}");
+    }
+    for mask in [json!("add"), json!("subtract"), json!("m".repeat(64))] {
+        let mut payload = good.clone();
+        payload["mask"] = mask;
+        payload["placement"] = json!("below");
+        assert!(request(&operation, &payload), "{payload}");
+    }
+}
