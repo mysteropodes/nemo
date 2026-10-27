@@ -1,5 +1,5 @@
 //! Stored camera/3D inputs joined to the existing numerical kernels at one snapshot.
-use crate::evaluation::property_camera_eval::{camera_matrix_at_frame, CameraKey};
+use crate::evaluation::property_camera_eval::{camera_at_frame, camera_matrix_at_frame, CameraKey, CameraPose};
 use crate::evaluation::property_projection_3d::Pose3D;
 use crate::object_document::PropertyHolderTarget;
 use crate::object_frame_packet::{sample_property_raw, PropertySampleError};
@@ -27,10 +27,41 @@ impl ObjectSnapshot {
         let Some(project) = self.project().map(|p| p.project()) else {
             return Ok(None);
         };
-        if project.camera_layer_on() != Some(true) {
+        let Some(keys) = self.stored_camera_keys() else {
             return Ok(None);
+        };
+        let (width, height) = project.canvas_dimensions();
+        let matrix =
+            camera_matrix_at_frame(keys.as_deref(), frame, f64::from(width), f64::from(height));
+        if matrix.is_some_and(|matrix| matrix.iter().any(|n| !n.is_finite())) {
+            return Err(PropertySampleError::Unavailable);
         }
-        let keys = project.camera_keys().map(|keys| {
+        Ok(matrix)
+    }
+
+    /// The stored camera's pose at `frame` (`SMCamera.cameraAtFrame`), for an exporter that writes the camera
+    /// as its own animated node rather than baking it into the geometry.
+    pub(crate) fn sampled_camera_pose(&self, frame: f64) -> Result<Option<CameraPose>, PropertySampleError> {
+        if !frame.is_finite() {
+            return Err(PropertySampleError::InvalidFrame);
+        }
+        let Some(keys) = self.stored_camera_keys() else {
+            return Ok(None);
+        };
+        let pose = camera_at_frame(keys.as_deref(), frame);
+        if pose.is_some_and(|p| ![p.x, p.y, p.w, p.rot].iter().all(|n| n.is_finite())) {
+            return Err(PropertySampleError::Unavailable);
+        }
+        Ok(pose)
+    }
+
+    /// The stored camera keys when the camera layer is on (`state.cameraLayerOn`).
+    fn stored_camera_keys(&self) -> Option<Option<Vec<CameraKey>>> {
+        let project = self.project().map(|p| p.project())?;
+        if project.camera_layer_on() != Some(true) {
+            return None;
+        }
+        Some(project.camera_keys().map(|keys| {
             keys.iter()
                 .map(|key| CameraKey {
                     frame: key.frame,
@@ -43,14 +74,7 @@ impl ObjectSnapshot {
                     ease: key.ease.value().copied(),
                 })
                 .collect::<Vec<_>>()
-        });
-        let (width, height) = project.canvas_dimensions();
-        let matrix =
-            camera_matrix_at_frame(keys.as_deref(), frame, f64::from(width), f64::from(height));
-        if matrix.is_some_and(|matrix| matrix.iter().any(|n| !n.is_finite())) {
-            return Err(PropertySampleError::Unavailable);
-        }
-        Ok(matrix)
+        }))
     }
 
     /// The persisted threeD flag gates the stored Z/X/Y tracks. Merely having

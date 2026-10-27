@@ -19,6 +19,7 @@
 //! the rule of `prepare_object_paint_plan`.
 
 use crate::evaluation::object_component_kernels::object_component_playback::ResolvedFrame;
+use crate::evaluation::object_scene_style_kernels::object_scene_producer_component::ResolvedComponentPlacement;
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_component_select::{
     ComponentShape, ComponentUnavailable,
 };
@@ -41,6 +42,8 @@ pub(crate) struct PlacedComponent {
     /// Selected record targets the exposed `__visible` override dropped (reported by the
     /// override evaluator itself, never re-derived by a consumer).
     pub(crate) hidden: Vec<ObjectTarget>,
+    /// The camera -> symMatrix chain the shapes went through; `None` when no inner frame resolved.
+    pub(crate) placement: Option<ResolvedComponentPlacement>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

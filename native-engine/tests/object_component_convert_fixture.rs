@@ -272,6 +272,18 @@ pub(crate) fn text_item(layer_uid: &str) -> Value {
 }
 
 /// The S1 document with one text block on `layer_uid` (frame 0), covered by the order plan as a v2 file must.
+/// [`s1_with_item`] with text animators on its layer: a placed component paints no animated text.
+pub(crate) fn s1_with_animated_item(layer_uid: &str, position: u32) -> Value {
+    let mut doc = s1_with_item(layer_uid, position);
+    for layer in doc["layers"].as_array_mut().unwrap() {
+        if layer["layerUid"] == layer_uid {
+            layer["textAnimators"] = json!([{"id":"a1","selector":{},"props":{},
+                "properties":[{"property":"amount","expression":{"enabled":true,"code":"50"}}]}]);
+        }
+    }
+    doc
+}
+
 pub(crate) fn s1_with_item(layer_uid: &str, position: u32) -> Value {
     let mut doc = s1_document(json!({"items":{"text":[text_item(layer_uid)]}}));
     doc["compositionOrder"]["contexts"][0]["scopes"][0]["elements"]

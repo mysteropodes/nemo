@@ -26,6 +26,9 @@ pub(crate) struct DuplicatorPaint {
     pub(crate) prepared: PreparedItem,
     pub(crate) svg_contour: Option<ClosedCubicPath>,
     pub(crate) svg_rgba: Option<[f64; 4]>,
+    /// The copy as the baseline's dict holds it (`duplicators::baseline_copy`): moved geometry,
+    /// rotated paints, factored opacity, the source's stroke id under the host's layer uid.
+    pub(crate) record: crate::object_frame_packet::ObjectRecord,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -157,6 +160,12 @@ pub(crate) fn prepare(packet: &ObjectFramePacket) -> Result<DuplicatorScene, Obj
                     .then(|| ClosedCubicPath::new(segments.clone()).ok())
                     .flatten(),
                 svg_rgba,
+                record: crate::object_frame_packet::duplicators::baseline_copy(
+                    &record,
+                    placement.placement.opacity_factor,
+                    placement.placement.hue_deg,
+                )
+                .map_err(invalid)?,
             });
         }
         // Same stable descending element-Order sort as engine-bridge.js.

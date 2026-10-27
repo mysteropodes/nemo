@@ -68,7 +68,8 @@ test('opacity application slice declares native workflows, compatibility, bootst
     return module;
   });
   // The real bootstrap now binds the existing UI composition adapter explicitly.
-  for(const id of ['app.native.object.ui.adapter','app.native.layer.playhead.cut.contract']){
+  // The UI adapter mounts its layer list through the CS5 presenter seam.
+  for(const id of ['app.native.object.ui.adapter','app.native.layer.playhead.cut.contract','app.presenter.seam']){
     const dependency=applicationProfile.modules.find(module=>module.id===id);
     assert.ok(dependency,id);modules.push(dependency);
   }

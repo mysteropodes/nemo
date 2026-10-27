@@ -212,6 +212,7 @@ fn evaluate_instance(
             inner_frame: resolved,
             shapes: Vec::new(),
             hidden: Vec::new(),
+            placement: None,
         }));
     };
     // `index` guarantees inner < total, which is a u32.
@@ -233,6 +234,7 @@ fn evaluate_instance(
         inner_frame: resolved,
         shapes,
         hidden,
+        placement: Some(placement),
     }))
 }
 

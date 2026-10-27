@@ -3567,3 +3567,121 @@ test('N20V absent ResizeObserver does not touch optional DOM lookup and keeps OS
   assert.equal(fixture.invocations[0].viewport.physicalExtent.width, 1360);
   dispose(); assert.equal(fixture.listenerCount, 0);
 });
+
+test('a post-Open occluded preview waits for the next exposure instead of failing or fencing (#2268)', async () => {
+  for (const published of [true, false]) {
+    let exposed = false;
+    const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+      return state.previews.length === 1 || exposed ? receipt : { ...receipt, status: 'deferred-occluded' };
+    } });
+    assert.equal(await harness.controller.activate(harness.prepared), true);
+    const ports = occlusionPorts();
+    const viewport = NativeOpacityViewport.create(harness.state.lifecycle, ports, () => false, () => published);
+    await viewport.presentPreview(0);
+    let settled = false;
+    const pending = viewport.presentPreview(10).finally(() => { settled = true; });
+    await turn(); await turn();
+    for (let i = 0; i < 5; i++) ports.tick();
+    assert.equal(settled, false, `published ${published}`);
+    assert.equal(harness.state.previews.length, 3, 'one retry once the subscription is registered, then only hints');
+    assert.equal(harness.controller.status(), 'native', 'an occluded window never fences the document');
+    ports.hint({ visible: false });
+    for (let i = 0; i < 5; i++) ports.tick();
+    assert.equal(harness.state.previews.length, 3, 'an occluded hint never retries');
+    exposed = true;
+    ports.hint({ visible: true });
+    const presented = await pending;
+    assert.equal(presented.status, 'presented');
+    assert.equal(presented.frame, 10);
+    assert.equal(harness.state.previews.length, 4);
+    assert.equal(ports.disposed, 1);
+    assert.equal(ports.timerCount, 0);
+  }
+});
+
+test('a post-Open occluded preview exposed before its subscription registers presents on the registered retry', async () => {
+  const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+    return state.previews.length === 2 ? { ...receipt, status: 'deferred-occluded' } : receipt;
+  } });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const ports = occlusionPorts();
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, ports, () => false, () => true);
+  await viewport.presentPreview(0);
+  const presented = await viewport.presentPreview(10);
+  assert.equal(presented.status, 'presented');
+  assert.equal(harness.state.previews.length, 3);
+  assert.equal(ports.disposed, 1);
+});
+
+test('a post-Open exposure wait stops when the document is released', async () => {
+  const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+    return state.previews.length === 1 ? receipt : { ...receipt, status: 'deferred-occluded' };
+  } });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const ports = occlusionPorts();
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, ports, () => false, () => true);
+  await viewport.presentPreview(0);
+  const pending = viewport.presentPreview(10);
+  const rejected = assert.rejects(pending, /changed while waiting for a visible viewport/);
+  await turn(); await turn();
+  await harness.controller.releaseCurrent('occluded-preview-cancelled');
+  ports.tick();
+  await rejected;
+  ports.hint({ visible: true });
+  assert.equal(harness.state.previews.length, 3, 'no presentation after the release');
+  assert.equal(ports.disposed, 1);
+});
+
+test('a busy owner keeps a post-Open exposure wait alive and an identity change supersedes it without a fence', async () => {
+  let exposed = false, busy = false, revision = null;
+  const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+    return state.previews.length === 1 || exposed ? receipt : { ...receipt, status: 'deferred-occluded' };
+  } });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const real = harness.state.lifecycle;
+  const lifecycle = Object.assign(Object.create(null), real, { inspect() {
+    const value = real.inspect();
+    const identity = value.identity && revision !== null ? { ...value.identity, contentRevision: revision } : value.identity;
+    return { ...value, busy: busy || value.busy, identity };
+  } });
+  const ports = occlusionPorts();
+  const viewport = NativeOpacityViewport.create(lifecycle, ports, () => false, () => true);
+  await viewport.presentPreview(0);
+  let settled = false;
+  const pending = viewport.presentPreview(10).finally(() => { settled = true; });
+  await turn(); await turn();
+  busy = true;
+  exposed = true;
+  ports.hint({ visible: true });
+  for (let i = 0; i < 3; i++) ports.tick();
+  await turn();
+  assert.equal(settled, false, 'a busy owner never retries and never rejects');
+  busy = false;
+  ports.tick();
+  assert.equal((await pending).status, 'presented');
+  exposed = false;
+  const parked = viewport.presentPreview(12);
+  await turn(); await turn();
+  revision = 99;
+  ports.tick();
+  await assert.rejects(parked, error => error && error.code === 'native_preview_superseded');
+  assert.equal(harness.controller.status(), 'native', 'a superseded wait never fences');
+});
+
+test('a failed occlusion subscription and an in-progress Open keep the prompt deferral', async () => {
+  for (const variant of ['subscription', 'opening']) {
+    const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+      return state.previews.length === 1 ? receipt : { ...receipt, status: 'deferred-occluded' };
+    } });
+    assert.equal(await harness.controller.activate(harness.prepared), true);
+    const ports = occlusionPorts();
+    if (variant === 'subscription') ports.subscribeWindowOcclusion = async () => { throw new Error('no events'); };
+    let opening = false;
+    const viewport = NativeOpacityViewport.create(harness.state.lifecycle, ports, () => opening, () => true);
+    await viewport.presentPreview(0);
+    opening = variant === 'opening';
+    await assert.rejects(viewport.presentPreview(10), error =>
+      error && error.code === 'native_preview_deferred', variant);
+    assert.equal(harness.controller.status(), 'native', variant);
+  }
+});
