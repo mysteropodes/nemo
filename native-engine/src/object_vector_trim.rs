@@ -6,7 +6,9 @@
 //! Numerics follow the baseline's Paper.js steps (curve lengths, earliest/latest crossing offset, tail split
 //! first, de Casteljau division keeping both divided handles on the split anchor) within floating-point
 //! tolerance; they are not bit-identical to Paper's own integrators.
-use crate::object_document::{ObjectPoint, ObjectRecord, ObjectSegment, PressureFields};
+use crate::object_document::{CenterSegment, ObjectPoint, ObjectRecord, ObjectSegment, Presence, PressureFields, WidthStop};
+use crate::request_receipts::DispatchErrorCode;
+use crate::tween_kernels::{profiled_outline, width_at_frac, SegOut};
 use kurbo::{CubicBez, ParamCurve, ParamCurveArclen, ParamCurveExtrema, Point, Rect, Vec2};
 use serde_json::Number;
 
@@ -167,10 +169,17 @@ fn split(anchors: &mut Vec<Anchor>, i: usize, t: f64) -> usize {
 }
 /// Head/tail overshoot to remove from `record`, measured against `walls`, or `None` when nothing is cut.
 pub(super) fn cuts<'a>(record: &ObjectRecord, walls: impl Iterator<Item = &'a ObjectRecord>, max: f64) -> Option<(f64, f64)> {
-    if !(max > 0.) || is_vector_brush(record) || record.geometry.closed || record.geometry.segments.len() < 2 {
+    if is_vector_brush(record) || record.geometry.closed || record.geometry.segments.len() < 2 {
         return None;
     }
-    let work = curves(&anchors(&record.geometry.segments)?, false);
+    cuts_on(&anchors(&record.geometry.segments)?, walls, max)
+}
+/// The cut on one open run of anchors: a stroke's own, or a pressure ribbon's centreline (`fillWallPath`).
+fn cuts_on<'a>(points: &[Anchor], walls: impl Iterator<Item = &'a ObjectRecord>, max: f64) -> Option<(f64, f64)> {
+    if !(max > 0.) || points.len() < 2 {
+        return None;
+    }
+    let work = curves(points, false);
     let lens = lengths(&work);
     let total: f64 = lens.iter().sum();
     if !(total > 0.) {
@@ -219,9 +228,14 @@ pub(super) fn cuts<'a>(record: &ObjectRecord, walls: impl Iterator<Item = &'a Ob
     (total - head - tail >= (max * 0.25).max(1.)).then_some((head, tail))
 }
 /// Applies a head/tail cut to one record's open geometry. `None` leaves fewer than two anchors.
-pub(super) fn apply(record: &ObjectRecord, (head, tail): (f64, f64)) -> Option<Vec<ObjectSegment>> {
-    let mut points = anchors(&record.geometry.segments)?;
-    if record.geometry.closed || points.len() < 2 {
+pub(super) fn apply(record: &ObjectRecord, cut: (f64, f64)) -> Option<Vec<ObjectSegment>> {
+    if record.geometry.closed {
+        return None;
+    }
+    segments_of(&cut_anchors(anchors(&record.geometry.segments)?, cut)?)
+}
+fn cut_anchors(mut points: Vec<Anchor>, (head, tail): (f64, f64)) -> Option<Vec<Anchor>> {
+    if points.len() < 2 {
         return None;
     }
     let total: f64 = lengths(&curves(&points, false)).iter().sum();
@@ -238,9 +252,9 @@ pub(super) fn apply(record: &ObjectRecord, (head, tail): (f64, f64)) -> Option<V
         let at = split(&mut points, i, t);
         points.drain(..at);
     }
-    if points.len() < 2 {
-        return None;
-    }
+    (points.len() >= 2).then_some(points)
+}
+fn segments_of(points: &[Anchor]) -> Option<Vec<ObjectSegment>> {
     let n = |v: f64| Number::from_f64(v);
     points
         .iter()
@@ -253,4 +267,90 @@ pub(super) fn apply(record: &ObjectRecord, (head, tail): (f64, f64)) -> Option<V
             })
         })
         .collect()
+}
+
+fn linked(fill: &ObjectRecord, ribbon: &ObjectRecord) -> bool {
+    let (f, r) = (fill.vector_ext.value(), ribbon.vector_ext.value());
+    f.is_some_and(|f| f.is_linked_fill_companion.value() == Some(&true))
+        && f.and_then(|f| f.linked_fill_id.value()).is_some_and(|id| r.and_then(|r| r.linked_fill_id.value()) == Some(id))
+}
+/// Trim Stroke Ends on a pressure ribbon (tools.js trimStrokeEnds isVB @1065e9d8). The cut is measured on its centreline;
+/// each kept anchor's width is the old profile's at its chord position in the untrimmed length (the stroke width when the
+/// ribbon has no profile), the profile is rebuilt from those widths (buildWidthProfile), and rebuildVectorBrushOutline
+/// rebuilds the outline, whose fitted centreline becomes the linked fill's outline. Only a lone ribbon, or its linked fill
+/// and the ribbon (createMany order), is native; symmetry copies and multi-frame stamps of a ribbon are not yet.
+pub(super) fn ribbon<'a>(records: &mut [ObjectRecord], walls: impl Iterator<Item = &'a ObjectRecord>, max: f64) -> Result<(), DispatchErrorCode> {
+    let (fill, ribbon) = match records {
+        [ribbon] => (None, ribbon),
+        [fill, ribbon] if linked(fill, ribbon) => (Some(fill), ribbon),
+        _ => return Err(DispatchErrorCode::Unavailable),
+    };
+    let pressure = pressure(ribbon).ok_or(DispatchErrorCode::Unavailable)?;
+    let centre = pressure.center_segments.value().filter(|c| c.len() > 1).ok_or(DispatchErrorCode::Unavailable)?;
+    let points: Vec<Anchor> =
+        centre.iter().map(|c| anchor(&c.point, &c.handle_in, &c.handle_out)).collect::<Option<_>>().ok_or(DispatchErrorCode::InvalidRequest)?;
+    // An empty profile is not the baseline's absent one (widthAtFrac would answer null for every anchor).
+    let profile = match pressure.width_profile.value() {
+        Some(stops) if stops.is_empty() => return Err(DispatchErrorCode::Unavailable),
+        Some(stops) => Some(stops.iter().map(|s| Some((number(&s.t)?, number(&s.width)?))).collect::<Option<Vec<_>>>().ok_or(DispatchErrorCode::InvalidRequest)?),
+        None => None,
+    };
+    let stroke_width = ribbon.vector.value().and_then(|v| number(&v.stroke_width)).ok_or(DispatchErrorCode::InvalidRequest)?;
+    let source: f64 = lengths(&curves(&points, false)).iter().sum();
+    let Some(cut) = cuts_on(&points, walls, max) else { return Ok(()) };
+    let Some(kept) = cut_anchors(points, cut) else { return Ok(()) };
+    let (mut chord, mut lens, mut widths) = (0., Vec::with_capacity(kept.len()), Vec::with_capacity(kept.len()));
+    for (i, a) in kept.iter().enumerate() {
+        if i > 0 {
+            chord += a.p.distance(kept[i - 1].p);
+        }
+        lens.push(chord);
+        widths.push(match &profile {
+            Some(p) => width_at_frac(p, (cut.0 + chord) / source).ok_or(DispatchErrorCode::InvalidRequest)?,
+            None => stroke_width,
+        });
+    }
+    let total = if chord == 0. { 1. } else { chord };
+    let rebuilt: Vec<(f64, f64)> = lens.iter().zip(&widths).map(|(l, w)| (l / total, *w)).collect();
+    let center: Vec<SegOut> = kept
+        .iter()
+        .map(|a| SegOut { point: [a.p.x, a.p.y], handle_in: [a.handle_in.x, a.handle_in.y], handle_out: [a.handle_out.x, a.handle_out.y] })
+        .collect();
+    let outline = profiled_outline(&center, &rebuilt)?;
+    if outline.len() > crate::object_document::object_group_kernels::object_boolean_ops::stack::MAX_SEGMENTS {
+        return Err(DispatchErrorCode::Unavailable);
+    }
+    let anchors_out: Vec<Anchor> = outline
+        .iter()
+        .map(|s| Anchor { p: Point::new(s.point[0], s.point[1]), handle_in: Vec2::new(s.handle_in[0], s.handle_in[1]), handle_out: Vec2::new(s.handle_out[0], s.handle_out[1]) })
+        .collect();
+    let outline = segments_of(&anchors_out).ok_or(DispatchErrorCode::InvalidRequest)?;
+    let kept_segments = segments_of(&kept).ok_or(DispatchErrorCode::InvalidRequest)?;
+    let n = |v: f64| Number::from_f64(v).ok_or(DispatchErrorCode::InvalidRequest);
+    let centre_out = kept_segments
+        .iter()
+        .zip(&widths)
+        .map(|(s, &w)| Ok(CenterSegment { point: s.point.clone(), handle_in: s.handle_in.clone(), handle_out: s.handle_out.clone(), width: n(w)? }))
+        .collect::<Result<Vec<_>, DispatchErrorCode>>()?;
+    let profile_out = rebuilt.iter().map(|&(t, w)| Ok(WidthStop { t: n(t)?, width: n(w)? })).collect::<Result<Vec<_>, DispatchErrorCode>>()?;
+    if let Presence::Present(ext) = &mut ribbon.vector_ext {
+        if let Presence::Present(p) = &mut ext.pressure {
+            p.center_segments = Presence::Present(centre_out);
+            p.width_profile = Presence::Present(profile_out);
+        }
+    }
+    ribbon.geometry.segments = outline;
+    ribbon.geometry.closed = true;
+    // applyBrushKeyline: a pressure ribbon never keeps a stroke of its own.
+    if let Presence::Present(v) = &mut ribbon.vector {
+        if v.stroke.value().is_some_and(Option::is_some) {
+            v.stroke = Presence::Present(None);
+            v.has_real_stroke = false;
+        }
+    }
+    if let Some(fill) = fill {
+        fill.geometry.segments = kept_segments;
+        fill.geometry.closed = true;
+    }
+    Ok(())
 }

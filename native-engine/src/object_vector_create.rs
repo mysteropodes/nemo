@@ -106,15 +106,15 @@ fn create_many_or_one(
 /// same anchors. Nothing is trimmed when any record could not take the cut.
 pub(super) fn trim_records(source: &ObjectDocument, records: &mut [ObjectRecord], max: f64) -> Result<(), DispatchErrorCode> {
     let first = records.first().ok_or(DispatchErrorCode::InvalidRequest)?.target.clone();
-    // A vector-brush trim rebuilds its outline from the trimmed centreline; that rebuild is not native yet.
-    if records.iter().any(trim::is_vector_brush) {
-        return Err(DispatchErrorCode::Unavailable);
-    }
     let walls = source.objects.iter().filter(|r| {
         r.target.context_id == first.context_id
             && r.target.layer_uid == first.layer_uid
             && r.target.frame_scope == first.frame_scope
     });
+    // A pressure ribbon trims its centreline and rebuilds its outline and its linked fill's.
+    if records.iter().any(trim::is_vector_brush) {
+        return trim::ribbon(records, walls, max);
+    }
     // The baseline trims nothing when a cut would leave fewer than two anchors; neither do the copies.
     let cut = trim::cuts(&records[0], walls, max);
     let trimmed: Option<Vec<_>> = cut.and_then(|cut| records.iter().map(|r| trim::apply(r, cut)).collect());

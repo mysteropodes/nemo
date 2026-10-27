@@ -27,6 +27,10 @@ const ROUTED_ELSEWHERE: &[(&str, &str)] = &[
         "command.document.object.brush.bitmap.publish",
         "object_brush_read.rs and read_queries.rs (brush store publication route)",
     ),
+    (
+        "command.document.object.brush.bitmap.stroke",
+        "object_brush_bitmap_stroke_history.rs (image byte-port route: the host reads the staged PNG)",
+    ),
 ];
 
 fn probe(operation: &str) -> OpacityRequest {
