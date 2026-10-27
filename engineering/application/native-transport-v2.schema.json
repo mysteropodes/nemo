@@ -18248,6 +18248,23 @@
             },
             "breakPair": {
               "type": "boolean"
+            },
+            "pairedPoint": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "dependentSchemas": {
+            "pairedPoint": {
+              "properties": {
+                "breakPair": {
+                  "const": true
+                }
+              }
             }
           }
         },
