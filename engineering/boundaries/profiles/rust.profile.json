@@ -717,6 +717,7 @@
         "object_raster_paint_join.rs",
         "object_raster_scene_join.rs",
         "object_text_scene_join.rs",
+        "object_text_scene_placed.rs",
         "object_text_scene_fonts.rs",
         "object_text_scene_bundled.rs",
         "object_scene_parent_chain.rs",
