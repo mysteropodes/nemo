@@ -809,6 +809,7 @@
         "native_vector_export_core.rs",
         "native_vector_export_svg.rs",
         "native_vector_export_lottie.rs",
+        "native_vector_export_lottie_shapes.rs",
         "native_vector_export_rive.rs",
         "native_vector_export_rive_driver.rs",
         "native_vector_export_rive_shapes.rs",
