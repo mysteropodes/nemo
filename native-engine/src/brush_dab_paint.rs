@@ -42,7 +42,10 @@ pub(crate) fn is_seeded_anchor(record: &ObjectRecord) -> bool {
 pub(crate) fn texture_group(record: &ObjectRecord) -> Option<(&str, bool)> {
     let texture = record.vector_ext.value()?.brush_texture.value()?;
     let group = texture.brush_group_id.value()?;
-    Some((group.as_str(), texture.is_brush_texture_copy.value() == Some(&true)))
+    Some((
+        group.as_str(),
+        texture.is_brush_texture_copy.value() == Some(&true),
+    ))
 }
 
 fn hex_rgba(hex: &str) -> Option<[f64; 4]> {
@@ -65,6 +68,76 @@ fn hex_rgba(hex: &str) -> Option<[f64; 4]> {
     ])
 }
 
+/// The centreline and width profile a pressure ribbon stamps along, or `None` for any other anchor. The stored
+/// centreline is unposed: a ribbon whose drawn outline is not its stored one (motion, a pose) awaits native centreline
+/// posing and is refused rather than textured in the wrong place.
+#[allow(clippy::type_complexity)]
+fn ribbon_walk(
+    record: &ObjectRecord,
+    drawn: &[[f64; 6]],
+) -> Result<Option<(Vec<[f64; 6]>, Vec<(f64, f64)>)>, &'static str> {
+    let Some(pressure) = record
+        .vector_ext
+        .value()
+        .and_then(|ext| ext.pressure.value())
+    else {
+        return Ok(None);
+    };
+    let (Some(centre), Some(profile)) = (
+        pressure.center_segments.value(),
+        pressure.width_profile.value(),
+    ) else {
+        return Ok(None);
+    };
+    if centre.len() < 2 || profile.is_empty() {
+        return Ok(None);
+    }
+    let f = |n: &Number| {
+        n.as_f64()
+            .filter(|v| v.is_finite())
+            .ok_or("non-finite ribbon geometry")
+    };
+    let stored = &record.geometry.segments;
+    let near = |a: f64, b: f64| (a - b).abs() <= 1e-9 * (1.0 + b.abs());
+    let unposed = stored.len() == drawn.len()
+        && stored.iter().zip(drawn).all(|(s, d)| {
+            [
+                &s.point.x,
+                &s.point.y,
+                &s.handle_in.x,
+                &s.handle_in.y,
+                &s.handle_out.x,
+                &s.handle_out.y,
+            ]
+            .iter()
+            .zip(d)
+            .enumerate()
+            // An open outline's end handles never reach the drawn path; a ribbon outline is closed.
+            .all(|(_, (s, d))| s.as_f64().is_some_and(|s| near(*d, s)))
+        });
+    if !unposed {
+        return Err("a posed textured pressure ribbon awaits native centreline posing");
+    }
+    let centre = centre
+        .iter()
+        .map(|s| {
+            Ok([
+                f(&s.point.x)?,
+                f(&s.point.y)?,
+                f(&s.handle_in.x)?,
+                f(&s.handle_in.y)?,
+                f(&s.handle_out.x)?,
+                f(&s.handle_out.y)?,
+            ])
+        })
+        .collect::<Result<Vec<_>, &'static str>>()?;
+    let profile = profile
+        .iter()
+        .map(|stop| Ok((f(&stop.t)?, f(&stop.width)?)))
+        .collect::<Result<Vec<_>, &'static str>>()?;
+    Ok(Some((centre, profile)))
+}
+
 /// The dabs of a seeded anchor over its drawn path (`[x, y, inX, inY, outX, outY]` segments), in paint order.
 pub(crate) fn anchor_dab_items(
     record: &ObjectRecord,
@@ -77,9 +150,6 @@ pub(crate) fn anchor_dab_items(
         .vector_ext
         .value()
         .ok_or("not a seeded brush-texture anchor")?;
-    if ext.pressure.value().is_some() {
-        return Err("a textured pressure ribbon awaits native centreline stamping");
-    }
     let preset = builtin(key).ok_or("custom brush presets await native stamping")?;
     let body = record
         .vector()
@@ -93,29 +163,40 @@ pub(crate) fn anchor_dab_items(
         .brush_texture
         .value()
         .ok_or("not a seeded brush-texture anchor")?;
-    let base = match body.stroke.value().and_then(Option::as_ref) {
-        Some(paint) => match [&paint.r, &paint.g, &paint.b, &paint.a].map(|n| n.as_f64()) {
+    // A pressure ribbon (`isVectorBrush` with a centreline and a width profile) stamps along its centreline at the
+    // mean profile width, through the profile; anything else stamps along its own drawn path at its stroke width.
+    let ribbon = ribbon_walk(record, drawn)?;
+    let channels =
+        |paint: &SolidFill| match [&paint.r, &paint.g, &paint.b, &paint.a].map(|n| n.as_f64()) {
             [Some(r), Some(g), Some(b), Some(a)] => Some([r, g, b, a]),
             _ => None,
-        },
+        };
+    // `strokeColor || preTextureStroke || (isPressure ? fillColor : null)`.
+    let base = match body.stroke.value().and_then(Option::as_ref) {
+        Some(paint) => channels(paint),
         None => texture
             .pre_texture_stroke
             .value()
             .and_then(Option::as_ref)
-            .and_then(|hex| hex_rgba(hex)),
+            .and_then(|hex| hex_rgba(hex))
+            .or_else(|| {
+                ribbon
+                    .as_ref()
+                    .and_then(|_| record.solid_fill().and_then(channels))
+            }),
     };
     // `jitterColorValue(null)` stays null: dabs without a colour paint nothing.
     let Some(base) = base else {
         return Ok(Vec::new());
     };
-    let dabs = build_brush_dabs(
-        drawn,
-        closed,
-        &preset,
-        width,
-        &mut SeededRng::new(seed),
-        None,
-    )
+    let mut rng = SeededRng::new(seed);
+    let dabs = match &ribbon {
+        Some((centre, profile)) => {
+            let base_width = profile.iter().map(|stop| stop.1).sum::<f64>() / profile.len() as f64;
+            build_brush_dabs(centre, false, &preset, base_width, &mut rng, Some(profile))
+        }
+        None => build_brush_dabs(drawn, closed, &preset, width, &mut rng, None),
+    }
     .map_err(|_| "the anchor's drawn path is unavailable")?;
     let number = |v: f64| Number::from_f64(v).ok_or("non-finite dab paint");
     dabs.into_iter()
