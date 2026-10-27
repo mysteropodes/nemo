@@ -32,9 +32,6 @@
   // leaves them (the stroke, then copy n-1 down to copy 1). `companion` is the stroke's linked fill, which lies below it.
   function copies(root,dict,pin,companion){
     var s=root.state,base=companion?[companion,dict]:[dict];if(!s.symmetryEnabled)return base;
-    var ribbon=!!(dict.centerSegments||dict.isVectorBrush);
-    // clipPathAtAxis clips a ribbon's outline but not its centreline, which the native record carries: refuse that one.
-    if(ribbon&&s.symmetryMode!=='radial'&&!s.symmetryExtend)fail('Stop-at-axis symmetry with pressure brushes is unavailable in native Drawing.');
     function map(d,fp,fv){return Object.assign({},d,{segments:d.segments.map(function(x){
       return {point:fp(x.point[0],x.point[1]),handleIn:fv(x.handleIn[0],x.handleIn[1]),handleOut:fv(x.handleOut[0],x.handleOut[1])};})});}
     var w=pin.canvasW,h=pin.canvasH,out=base.slice();
@@ -52,6 +49,8 @@
     function vector(x,y){var t=x*ux+y*uy;return [2*t*ux-x,2*t*uy-y];}
     function point(x,y){var t=(x-axis.x1)*ux+(y-axis.y1)*uy;return [2*(axis.x1+t*ux)-x,2*(axis.y1+t*uy)-y];}
     var stroke=dict;
+    // clipPathAtAxis clips the drawn path's segments: a ribbon's outline, never its centreline, which the stroke keeps whole
+    // (the codec stores it as authored); the mirror then maps that whole centreline (adopt).
     if(!s.symmetryExtend&&dict.segments.length){
       var first=side(dict.segments[0].point),cut=dict.segments.length;
       for(var i=1;i<dict.segments.length;i++)if(side(dict.segments[i].point)!==first){cut=i;break;}

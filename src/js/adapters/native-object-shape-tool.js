@@ -304,6 +304,10 @@
       // hooks on the placed path: predictive skips a fill shape, multi-frame stamps the merged result (native, at commit).
       if (fb && (['above','below','merge'].indexOf(state.fillBrushMode) < 0 || root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
           ? root.SMLabs.unmigratedDrawHooks().length > 0 : root.SMLabs.list().some(function(p){return p.on;})))) throw new Error('This Fill Brush combination is unavailable in native Drawing.');
+      // A key a confirmed, settled native catalog lacks draws plain, as the baseline's resolveBrushPreset null does (applyBrushTexture
+      // returns the path untouched). An unknown or changing catalog cannot tell a deleted key from a new one: unavailable.
+      var CB=root.NemoNativeCustomBrushUI,cbc=CB&&CB.controller(root),key=state.brushPreset,absent=!fb&&!state.shadowMode&&!!key&&key!=='none'&&
+        !(root.BRUSH_PRESETS&&Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS,key))&&!!cbc&&!cbc.isPending()&&CB.exists(root,key)===false;
       // Trim measures the whole stroke before the stop-at-axis clip (draw-bridge then symmetry-bridge); native would trim the clipped one.
       // A pressure ribbon trims natively alone, with its linked fill, its symmetry copies and its multi-frame stamps. Only a
       // mirror clips at its axis (symmetry-bridge.js clipPathAtAxis); a radial copy never does.
@@ -311,7 +315,7 @@
           state.drawMode !== 'front' && state.drawMode !== 'behind' ||
           // G16 option C (#2361): one seeded anchor whose dabs native stamps; the key resolves as resolveBrushPreset (a built-in,
           // else a confirmed native catalog record). A key neither holds, and texture with symmetry or Trim, stay unavailable.
-          !state.shadowMode && state.brushPreset && state.brushPreset !== 'none' && (!(root.BRUSH_PRESETS && Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS, state.brushPreset) ||
+          !state.shadowMode && state.brushPreset && state.brushPreset !== 'none' && !absent && (!(root.BRUSH_PRESETS && Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS, state.brushPreset) ||
             root.NemoNativeCustomBrushUI && root.NemoNativeCustomBrushUI.record(root, state.brushPreset)) ||
             state.strokeEnabled && (state.symmetryEnabled || state.trimStrokeEnds)) ||
           root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
@@ -323,7 +327,7 @@
       var keys = ['vectorBrush','strokeEnabled','fillEnabled','strokeColor','fillColor','brushSize','opacity','strokeCap','strokeJoin','brushPreset',
         'strokeStyle','miterLimit','dashOffset','paintOrder','smoothing','stabilizer','taperEnds','pressureMin','pressureMax',
         'pressureInvert','pressureCurve','pressureCurvePoints','brushAngle','brushAngleFactor','tool','fillBrushMode'];
-      var out = {}; keys.forEach(function(k){if(state[k] !== undefined)out[k]=state[k];});
+      var out = {}; keys.forEach(function(k){if(state[k] !== undefined)out[k]=state[k];});if(absent)out.brushPreset='none';
       var hex = /^#(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/;Paint.shadowStyle(root, state, out);
       if (state.strokeEnabled && !hex.test(state.strokeColor) || (state.fillEnabled || fb) && !hex.test(state.fillColor) ||
           !Number.isFinite(state.brushSize) || state.brushSize <= 0 || !Number.isFinite(state.opacity) || state.opacity < 0 || state.opacity > 100 ||

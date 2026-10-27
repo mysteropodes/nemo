@@ -39,6 +39,26 @@ mod export;
 #[path = "native_object_preview.rs"]
 mod preview;
 
+/// Brackets one object preview's present for the desktop's occlusion diagnostics: before register
+/// the host reports its request pins and composed work, and the caller closes the scope with the
+/// receipt. The host seam itself never reaches a viewport adapter.
+pub(crate) trait ObjectPreviewObserver {
+    fn begin(&mut self, preview: ObservedObjectPreview<'_>);
+}
+
+impl ObjectPreviewObserver for () {
+    fn begin(&mut self, _: ObservedObjectPreview<'_>) {}
+}
+
+pub(crate) struct ObservedObjectPreview<'a> {
+    pub(crate) instance_id: &'a str,
+    pub(crate) document_id: &'a str,
+    pub(crate) content_revision: u64,
+    pub(crate) frame: u32,
+    pub(crate) work_id: u64,
+    pub(crate) view_generation: u64,
+}
+
 fn envelope_identity(value: &str) -> bool {
     let bytes = value.as_bytes();
     !bytes.is_empty()

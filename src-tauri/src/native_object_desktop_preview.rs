@@ -5,7 +5,7 @@ use crate::native_application_contract::{
     NativePreviewReceipt, OutputSpecInput, ViewportInput,
 };
 use crate::native_application_viewport::{self as viewport_host, NativeViewportConsumer};
-use crate::native_dispatch::NativeObjectHost;
+use crate::native_dispatch::{NativeObjectHost, ObjectPreviewObserver, ObservedObjectPreview};
 use native_engine::{
     compositor::Compositor,
     desktop_viewport::{
@@ -173,12 +173,30 @@ impl ObjectPreviewConsumer<'_> {
         compositor: &mut Compositor,
         viewport: &mut DesktopViewportHost<P>,
     ) -> Result<ObjectPresentedFrame, String> {
-        self.owner.present_prepared_object_preview_filtered(
+        let mut diagnostic = viewport_host::ObjectPreviewDiagnostic::default();
+        let presented = self.owner.present_prepared_object_preview_filtered(
             &self.selector,
             compositor,
             viewport,
             self.display_filter,
-        )
+            &mut diagnostic,
+        )?;
+        diagnostic.finish(presented.receipt.status());
+        Ok(presented)
+    }
+}
+impl ObjectPreviewObserver for viewport_host::ObjectPreviewDiagnostic {
+    fn begin(&mut self, preview: ObservedObjectPreview<'_>) {
+        self.open(
+            preview.instance_id,
+            &viewport_host::ScheduledPreview {
+                document_id: preview.document_id,
+                content_revision: preview.content_revision,
+                frame: preview.frame,
+                work_id: preview.work_id,
+                view_generation: preview.view_generation,
+            },
+        );
     }
 }
 impl NativeViewportConsumer for ObjectPreviewConsumer<'_> {

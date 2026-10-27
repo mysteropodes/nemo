@@ -41,11 +41,20 @@
     function quiet() { return !held && !queue.length && !draining; }
     // The fallback is the last confirmed read of THIS document lifetime, never another document's.
     function owner(info) { return info ? [info.instanceId, info.documentId, info.lifecycleGeneration].join('|') : null; }
+    // Whether the guide fields already show these confirmed values.
+    function shown(e) {
+      var s = root.state, a = s && s.symmetryAxis, c = s && s.symmetryRadialCenter;
+      return !!s && s.symmetryEnabled === e.enabled && s.symmetryMode === e.mode && !!a && a.x1 === e.axis.x1 && a.y1 === e.axis.y1 &&
+        a.x2 === e.axis.x2 && a.y2 === e.axis.y2 && !!c && c.x === e.radialCenter.x && c.y === e.radialCenter.y &&
+        s.symmetryRadialSectors === e.radialSectors && s.symmetryExtend === e.extend;
+    }
+    // Every native presentation calls presented(), and a repaint asks native for another preview: values already on
+    // screen are not repainted, or presentation never settles (#2343 B1). Initial, changed and restored values are.
     function project() {
       var value = model.read(), session = current(), now = owner(session && session.info());
       if (value) confirmed = { owner: owner(value.info), effective: value.symmetry.settings.effective };
       var e = confirmed && confirmed.owner === now ? confirmed.effective : null;
-      if (e && quiet()) { write(e); repaint(); }
+      if (e && quiet() && !shown(e)) { write(e); repaint(); }
     }
     function identity() {
       try {
