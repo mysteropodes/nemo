@@ -2044,6 +2044,8 @@
         "src/native_project_placement_contract_tests.rs",
         "src/native_layer_playhead_cut_contract.rs",
         "src/native_layer_playhead_cut_contract_tests.rs",
+        "src/native_brush_bitmap_stroke_contract.rs",
+        "src/native_brush_bitmap_stroke_contract_tests.rs",
         "src/native_layer_playhead_cut_wire_tests.rs",
         "src/native_audio_track_contract.rs",
         "src/native_audio_track_contract_tests.rs",

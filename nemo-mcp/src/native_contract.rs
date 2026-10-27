@@ -220,7 +220,7 @@ fn request_check(operation: &str, payload: &Value) -> Option<bool> {
         op if object_component::admitted(op) => object_component::request(op, payload),
         op if object_rig::admitted(op) => object_rig::request(op, payload),
         op if object_edit::admitted(op) => object_edit::request(op, payload),
-        item::ITEM | item::ATTACH | item::REMOVE => item::request(operation, payload),
+        op if item::owns(op) => item::request(op, payload),
         vector::VECTOR | vector::PARAMETRIC | vector::EFFECTS => {
             vector::request(operation, payload)
         }

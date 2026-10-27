@@ -255,3 +255,66 @@ async fn wrong_owner_and_changed_body_return_typed_terminal_envelopes_before_sou
     );
     assert_eq!(save(&state), committed);
 }
+/// #2361: a bitmap-brush Draw stroke rides the same byte port: the anchor, its companion and the PNG land in one
+/// revision, survive save/reload, and a replay never reads the source again.
+#[tokio::test]
+async fn bitmap_brush_stroke_lands_anchor_companion_and_png_through_the_byte_port() {
+    let state = state();
+    let native = state.native_state();
+    let pin = info(&state);
+    let file: Value = serde_json::from_slice(&save(&state)).unwrap();
+    let layer = file["drawing"]["layers"][0]["layerUid"].clone();
+    let point = |x: f64, y: f64| json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}});
+    let record = json!({"schemaVersion":1,"family":"editable-vector-path",
+        "target":{"contextId":"scene-root","layerUid":layer,"strokeId":"","frameScope":{"kind":"authored","frame":0}},
+        "geometry":{"kind":"cubic-path","closed":false,"coordinateSpace":"document-world","handleSpace":"relative",
+            "segments":[point(10.0, 10.0), point(60.0, 20.0)]},
+        "fill":null,
+        "vector":{"stroke":{"kind":"solid","r":0,"g":0,"b":1,"a":1},"hasRealStroke":true,"strokeWidth":8,"strokeCap":"round",
+            "strokeJoin":"round","miterLimit":10,"dashOffset":0,"opacity":0},
+        "vectorExt":{"bitmapBrush":{"bitmapBrushSpec":{"tip":"soft","size":8,"spacing":15,"scatter":20,"opacity":1,
+            "color":"#0000ffff","pressure":false,"seed":7},"brushGroupId":"bmb_host_1","preTextureOpacity":1}}});
+    let request: NativeApplicationRequest = serde_json::from_value(json!({"apiVersion":2,"requestId":"host-bitmap",
+        "instanceId":state.instance_id(),"documentId":pin["documentId"],"expectedRevision":pin["contentRevision"],
+        "operation":"command.document.object.brush.bitmap.stroke",
+        "payload":{"documentSnapshotId":pin["documentSnapshotId"],"lifecycleGeneration":pin["lifecycleGeneration"],
+            "record":record,"companion":{"x":35,"y":15,"width":58,"height":18,"opacity":1},
+            "source":{"kind":"file","path":"/admitted/brush.png"}}}))
+    .unwrap();
+    let first = state
+        .revisions
+        .dispatch_image_using(state.instance_id(), &native, request.clone(), false, |_| {
+            assert!(native.try_lock().is_ok());
+            async { Ok(png()) }
+        })
+        .await
+        .unwrap()
+        .response;
+    assert!(first.ok, "{}", serde_json::to_value(&first).unwrap());
+    let bytes = save(&state);
+    let file: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(file["assets"].as_array().unwrap().len(), 1);
+    assert_eq!(file["drawing"]["objects"].as_array().unwrap().len(), 1);
+    let companion = &file["drawing"]["items"]["raster"][0]["item"];
+    assert_eq!(
+        (&companion["isBrushTextureCopy"], &companion["brushGroupId"]),
+        (&json!(true), &json!("bmb_host_1"))
+    );
+    let again = state
+        .revisions
+        .dispatch_image_using(state.instance_id(), &native, request, false, |_| async {
+            panic!("replay must not access source");
+            #[allow(unreachable_code)]
+            Ok(Vec::new())
+        })
+        .await
+        .unwrap()
+        .response;
+    assert_eq!(
+        serde_json::to_value(again).unwrap(),
+        serde_json::to_value(first).unwrap()
+    );
+    let reopened = ApplicationMcp::default();
+    reopened.install_native_project_file(&bytes).unwrap();
+    assert_eq!(save(&reopened), bytes);
+}

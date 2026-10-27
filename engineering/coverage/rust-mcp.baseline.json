@@ -336,6 +336,17 @@
       "reason": "no executable regions in the coverage report",
       "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
     },
+    "nemo-mcp/src/native_brush_bitmap_stroke_contract.rs": {
+      "lines": 98.71,
+      "regions": 99.08,
+      "functions": 100,
+      "note": "Measured with the full unfiltered nemo-mcp suites on claude/cs8-bitmap-stroke-host (#2361 bitmap-brush stroke host route). Only the two new entries are added; every pre-existing floor, exclusion, tool and recorded provenance is retained."
+    },
+    "nemo-mcp/src/native_brush_bitmap_stroke_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured with the full unfiltered nemo-mcp suites on claude/cs8-bitmap-stroke-host (#2361 bitmap-brush stroke host route). Only the two new entries are added; every pre-existing floor, exclusion, tool and recorded provenance is retained."
+    },
     "nemo-mcp/src/native_layer_playhead_cut_wire_tests.rs": {
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
