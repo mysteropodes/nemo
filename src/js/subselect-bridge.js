@@ -9,6 +9,7 @@
   const same=(a,b)=>!!a&&!!b&&pins.every(k=>a[k]===b[k]);
   const map=(m,p)=>[m[0]*p[0]+m[2]*p[1]+m[4],m[1]*p[0]+m[3]*p[1]+m[5]];
   function inverse(m,p){const d=m[0]*m[3]-m[1]*m[2];if(!Number.isFinite(d)||Math.abs(d)<1e-12)throw new Error('Subselect transform is singular');const x=p[0]-m[4],y=p[1]-m[5];return [(m[3]*x-m[2]*y)/d,(-m[1]*x+m[0]*y)/d];}
+  function snap(start,p){const x=p[0]-start[0],y=p[1]-start[1],distance=Math.sqrt(x*x+y*y),angle=Math.round(Math.atan2(y,x)/(Math.PI/4))*(Math.PI/4);return [start[0]+Math.cos(angle)*distance,start[1]+Math.sin(angle)*distance];}
   const consume=e=>{if(e.stopImmediatePropagation)e.stopImmediatePropagation();if(e.preventDefault)e.preventDefault();};
   function create(root){
     let selection=null,drag=null,marquee=null,overlay=null,pending=null,uncertain=null,recovering=false,readToken=0,previewToken=0,previewBusy=false,previewNext=null,retired=false;
@@ -97,18 +98,19 @@
       }catch(e){if(job.token===previewToken){cancel(false);notice(e);}}}previewBusy=false;})();}
     function admitted(t,lease){if(!recovering)return current(t,lease);const s=session(),p=s&&s.info();return !retired&&s===t.session&&s.isActive()&&p&&['instanceId','documentId','lifecycleGeneration'].every(k=>p[k]===t.pin[k]);}
     function commit(t,intent){if(uncertain)throw new Error('Resolve the previous subselect command before another edit.');if(pending)throw new Error('A native subselect command is still pending.');
-      if(!current(t)||t.item.stableTarget.frameScope.frame!==t.selector.frame)throw new Error('Subselect target or frame changed.');
+      if(!current(t))throw new Error('Subselect target or frame changed.');
       const s=t.session,guarded={info:s.info,isActive:s.isActive,requestId:s.requestId,runResourceCommand:action=>s.runResourceCommand(ctx=>{
         if(!admitted(t,ctx))throw new Error('Subselect intent changed before dispatch.');return action({reconcile:ctx.reconcile,dispatch:q=>{if(!admitted(t,ctx))throw new Error('Subselect intent changed before dispatch.');return ctx.dispatch(q);}});
       })};
       const command=root.NemoNativeObjectVectorCommand.create(guarded,'subselect',root.NemoNativeSubselectContract);
       clear();++previewToken;previewNext=null;
-      pending=command.execute(root.NemoNativeSubselectContract.EDIT,pin=>{if(!same(pin,t.pin))throw new Error('Subselect revision changed.');return {command:'object.subselect.edit',stableTarget:t.item.stableTarget,intent:intent};});
+      pending=command.execute(root.NemoNativeSubselectContract.EDIT,pin=>{if(!same(pin,t.pin))throw new Error('Subselect revision changed.');return {command:'object.subselect.edit',stableTarget:t.item.stableTarget,atFrame:t.selector.frame,intent:intent};});
       settled=pending.then(receipt=>{cancel(true);return {status:receipt.applied?'applied':'noop',receipt};},error=>{cancel(true);notice(error);if(error&&error.code==='subselect_command_indeterminate'){uncertain=error;return {status:'indeterminate',error};}return {status:'refused',error};}).finally(()=>{pending=null;});return settled;
     }
-    function start(e,t,hit){if(t.item.stableTarget.frameScope.frame!==t.selector.frame)throw new Error('Subselect held-frame key promotion is unavailable.');
-      if(e.shiftKey&&hit.key==='point'){const pos=t.indices.indexOf(hit.index);if(pos<0)t.indices.push(hit.index);else t.indices.splice(pos,1);draw(t,t.item.segments);return;}
-      if(hit.key==='point'&&!t.indices.includes(hit.index))t.indices=[hit.index];
+    function start(e,t,hit){
+      const group=hit.key==='point'&&t.indices.includes(hit.index)&&t.indices.length>1;
+      t.dragIndices=group?t.indices.slice():[hit.index];t.pairedPoint=null;
+      if(hit.key==='point'&&!group)t.indices=e.shiftKey?Array.from(new Set(t.indices.concat(hit.index))):[hit.index];
       t.hit=hit;t.start=inverse(t.item.matrix,point(e,t));t.clientStart=[e.clientX,e.clientY];t.pointer=e.pointerId;t.alt=e.altKey;t.intent=null;drag=t;t.capture=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(t.capture.setPointerCapture)t.capture.setPointerCapture(t.pointer);draw(t,t.item.segments);
     }
     function down(e){if(pending||drag)return;
@@ -128,12 +130,16 @@
     }
     function move(e){if(marquee&&marquee.pointer===e.pointerId){const t=marquee;if(!current(t)){cancel(true);return;}t.end=point(e,t);t.moved=true;if(t.items)drawMarquee(t);return;}
       const t=drag;if(!t||t.pointer!==e.pointerId)return;if(!current(t)){cancel(true);return;}
-      const p=inverse(t.item.matrix,point(e,t));t.intent=t.hit.key==='point'?{kind:'move',indices:t.indices.slice(),delta:[p[0]-t.start[0],p[1]-t.start[1]]}:
-        {kind:'handle',index:t.hit.index,handle:t.hit.key,point:p,breakPair:!!e.altKey};preview(t,t.intent);}
+      let p=inverse(t.item.matrix,point(e,t));if(e.shiftKey)p=snap(t.hit.key==='point'?t.start:t.item.segments[t.hit.index].point,p);
+      if(t.hit.key==='point')t.intent={kind:'move',indices:t.dragIndices.slice(),delta:[p[0]-t.start[0],p[1]-t.start[1]]};
+      else {if(!e.altKey)t.pairedPoint=p;t.intent={kind:'handle',index:t.hit.index,handle:t.hit.key,point:p,breakPair:!!e.altKey};
+        if(e.altKey&&t.pairedPoint)t.intent.pairedPoint=t.pairedPoint;}
+      preview(t,t.intent);}
     function up(e){if(marquee&&marquee.pointer===e.pointerId){const t=marquee;t.ended=true;if(t.items)settled=Promise.resolve(finishMarquee(t));return;}
       const t=drag;if(!t||t.pointer!==e.pointerId)return;drag=null;release(t);++previewToken;previewNext=null;
       if(!current(t)){cancel(true);return;}const click=Math.hypot(e.clientX-t.clientStart[0],e.clientY-t.clientStart[1])<3;
-      if(click&&t.alt&&t.hit.key==='point')commit(t,{kind:'toggle',index:t.hit.index});else if(t.intent&&!click)commit(t,t.intent);else draw(t,t.item.segments);}
+      if(click&&t.alt&&t.hit.key==='point')commit(t,{kind:'toggle',index:t.hit.index});else if(t.intent&&!click)commit(t,t.intent);
+      else if(t.item.stableTarget.frameScope.frame!==t.selector.frame)commit(t,{kind:'move',indices:[t.hit.index],delta:[0,0]});else draw(t,t.item.segments);}
     function action(intent){if(!selection||!current(selection)||!selection.indices.length){notice(new Error('Select one or more native path points.'));return Promise.resolve({status:'refused'});}
       try{return commit(selection,Object.assign({indices:selection.indices.slice()},intent));}catch(error){notice(error);return Promise.resolve({status:'refused',error});}}
     function handle(kind,e){if(!native()||root.state.tool!=='subselect')return false;

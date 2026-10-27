@@ -158,7 +158,9 @@ pub(super) fn intent(v: &Value) -> bool {
             index(&v["index"])
                 && matches!(v["handle"].as_str(), Some("handleIn" | "handleOut"))
                 && point(&v["point"])
-                && v["breakPair"].is_boolean(),
+                && v["breakPair"].is_boolean()
+                && v.get("pairedPoint")
+                    .is_none_or(|p| v["breakPair"] == true && point(p)),
         ),
         Some("toggle") => (&["kind", "index"], index(&v["index"])),
         Some("insert") => (
@@ -171,13 +173,20 @@ pub(super) fn intent(v: &Value) -> bool {
         Some("delete") => (&["kind", "indices"], indices(&v["indices"])),
         _ => return false,
     };
-    valid && exact(v, required, &[]).is_some()
+    let optional: &[&str] = if v["kind"] == "handle" {
+        &["pairedPoint"]
+    } else {
+        &[]
+    };
+    valid && exact(v, required, optional).is_some()
 }
 pub(crate) fn edit_request(v: &Value) -> bool {
-    exact(v, &["command", "stableTarget", "intent"], &[]).is_some()
+    exact(v, &["command", "stableTarget", "intent"], &["atFrame"]).is_some()
         && v["command"] == "object.subselect.edit"
         && super::target(&v["stableTarget"])
         && intent(&v["intent"])
+        && v.get("atFrame")
+            .is_none_or(|n| n.as_u64().is_some_and(|n| n <= u64::from(u32::MAX)))
 }
 pub(super) fn request(v: &Value) -> bool {
     exact(

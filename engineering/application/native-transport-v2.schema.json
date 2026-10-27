@@ -807,6 +807,9 @@
               "maxLength": 256
             }
           }
+        },
+        "isFillShape": {
+          "const": true
         }
       },
       "minProperties": 1,
@@ -18007,6 +18010,9 @@
               "maxLength": 256
             }
           }
+        },
+        "isFillShape": {
+          "const": true
         }
       },
       "minProperties": 1,
@@ -18216,6 +18222,9 @@
               "maxLength": 256
             }
           }
+        },
+        "isFillShape": {
+          "const": true
         }
       },
       "minProperties": 1,
@@ -18444,6 +18453,23 @@
             },
             "breakPair": {
               "type": "boolean"
+            },
+            "pairedPoint": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "dependentSchemas": {
+            "pairedPoint": {
+              "properties": {
+                "breakPair": {
+                  "const": true
+                }
+              }
             }
           }
         },
@@ -18532,6 +18558,11 @@
         },
         "intent": {
           "$ref": "#/$defs/ObjectSubselectIntent"
+        },
+        "atFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
         }
       }
     },

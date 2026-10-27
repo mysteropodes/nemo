@@ -12,21 +12,21 @@
     ['layerUid','strokeId'].every(k=>typeof v[k]==='string'&&v[k].length>0)&&exact(v.frameScope,['kind','frame'])&&
     ['authored','reference'].includes(v.frameScope.kind)&&integer(v.frameScope.frame,4294967295);}
   function intent(v){
-    if(!object(v))return false;let keys,valid;
+    if(!object(v))return false;let keys,valid,optional=[];
     switch(v.kind){
       case 'move':keys=['kind','indices','delta'];valid=indices(v.indices)&&point(v.delta);break;
       case 'scale':keys=['kind','indices','scale','anchor'];valid=indices(v.indices)&&point(v.scale)&&point(v.anchor);break;
       case 'rotate':keys=['kind','indices','degrees','center'];valid=indices(v.indices)&&Number.isFinite(v.degrees)&&point(v.center);break;
       case 'pointType':keys=['kind','indices','pointType'];valid=indices(v.indices)&&['corner','smooth','symmetric'].includes(v.pointType);break;
-      case 'handle':keys=['kind','index','handle','point','breakPair'];valid=integer(v.index,255)&&['handleIn','handleOut'].includes(v.handle)&&point(v.point)&&typeof v.breakPair==='boolean';break;
+      case 'handle':keys=['kind','index','handle','point','breakPair'];optional=['pairedPoint'];valid=(!own(v,'pairedPoint')||v.breakPair===true&&point(v.pairedPoint))&&integer(v.index,255)&&['handleIn','handleOut'].includes(v.handle)&&point(v.point)&&typeof v.breakPair==='boolean';break;
       case 'toggle':keys=['kind','index'];valid=integer(v.index,255);break;
       case 'insert':keys=['kind','curve','time'];valid=integer(v.curve,255)&&Number.isFinite(v.time)&&v.time>=1e-8&&v.time<=1-1e-8;break;
       case 'delete':keys=['kind','indices'];valid=indices(v.indices);break;
       default:return false;
     }
-    return valid&&exact(v,keys);
+    return valid&&exact(v,keys,optional);
   }
-  function payload(op,v){if(op!==EDIT||!exact(v,['command','stableTarget','intent'])||v.command!=='object.subselect.edit'||!target(v.stableTarget)||!intent(v.intent))fail('Invalid native subselect intent');}
+  function payload(op,v){if(op!==EDIT||!exact(v,['command','stableTarget','intent'],['atFrame'])||v.command!=='object.subselect.edit'||!target(v.stableTarget)||!intent(v.intent)||own(v,'atFrame')&&!integer(v.atFrame,4294967295))fail('Invalid native subselect intent');}
   function result(op,v){if(op!==EDIT||!exact(v,['applied','historyEntriesAdded'])||typeof v.applied!=='boolean'||v.historyEntriesAdded!==Number(v.applied))fail('Invalid subselect receipt');}
   function correlate(q,r){result(q.operation,r.result);if(q.instanceId!==r.instanceId||q.documentId!==r.documentId||q.expectedRevision+Number(r.result.applied)!==r.contentRevision)fail('Subselect receipt origin mismatch');}
   function readPayload(v){if(!exact(v,['atRevision','documentSnapshotId','stableTarget','subselect'])||!integer(v.atRevision)||typeof v.documentSnapshotId!=='string'||!v.documentSnapshotId||!target(v.stableTarget)||

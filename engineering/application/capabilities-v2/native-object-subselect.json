@@ -29,7 +29,7 @@
     "maxReadResponseBytes": 4096,
     "policy": "Complete requests and replies remain bounded at 4096 bytes; no chunked command or optimistic publication."
   },
-  "semantics": "Revision-pinned native vertex and tangent intents on editable vector paths. One atomic edit and one undo entry, or a byte-preserving no-op. Detached paged geometry and preview use query.document.object with the closed subselect selector. Unsupported geometry consumers return unavailable; no JavaScript or Paper writer fallback. Installed acceptance remains pending.",
+  "semantics": "Revision-pinned native vertex and tangent intents on editable vector paths. Optional atFrame promotes a held vector-only cell and copies its siblings before editing, preserving the source key; identity geometry still creates that key. A tangent pairedPoint retains the last mirrored endpoint when Alt is pressed during a drag; it is valid only with breakPair. Other identity edits preserve bytes and history. One atomic transaction and one undo entry. Detached paged geometry and preview use query.document.object with the closed subselect selector and retain the source target identity. Unsupported geometry consumers return unavailable; no JavaScript or Paper writer fallback. Installed acceptance remains pending.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",

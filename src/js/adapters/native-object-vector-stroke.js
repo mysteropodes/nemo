@@ -288,6 +288,9 @@
     for (const key of ['isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion']) if (has(x, key)) out[key] = x[key];
     if (x.brushTexture) Object.assign(out, x.brushTexture);
     if (x.shadow) Object.assign(out, x.shadow);
+    // A Fill Brush shape native created carries isFillShape, which serP writes. Importing a dictionary drops it, as
+    // the baseline reload does (desP never restores data.isFillShape), and reports it.
+    if (x.isFillShape) out.isFillShape = true;
     if (x.paramShape) out.paramShape = JSON.parse(JSON.stringify(x.paramShape));
     if (x.fillGradient) out.fillGradient = gradient(x.fillGradient);
     if(x.fillTrace)[['seed','fillSeed'],['seeds','fillSeeds'],['walls','fillWalls'],['gapPx','fillGapPx']].forEach(([stored,key])=>{

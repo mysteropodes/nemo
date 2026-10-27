@@ -5,7 +5,7 @@ const Command=require('../src/js/adapters/native-object-vector-command.js'),Pape
 function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
 function fixture(){
   const paper=Paper.load(),rect={left:0,top:0,right:200,bottom:200,width:200,height:200},stage={getBoundingClientRect:()=>rect,setPointerCapture(){},releasePointerCapture(){}};
-  const dom=()=>({style:{},setAttribute(){},appendChild(){},remove(){}}),notices=[],sent=[];
+  const dom=()=>({style:{},setAttribute(){},appendChild(){},remove(){}}),notices=[],sent=[],previews=[];
   let pin={instanceId:'i',documentId:'d',lifecycleGeneration:1,contentRevision:0,documentSnapshotId:'native-object:d:0',canvasW:200,canvasH:200,layers:[{layerUid:'L'}]};
   let presentation={...pin,owner:'native',status:'presented',contextId:'scene-root',frame:0,workId:'native-work-1',viewGeneration:1};
   let queued=false,gate=null,readGate=null,transportFailures=0,reconcileFailure=false;
@@ -13,7 +13,7 @@ function fixture(){
   let items=[item];
   const shown=()=>({...pin,presentation}),s={info:()=>pin,isActive:()=>true,blocksLegacy:()=>true,requestId:()=>`q-${sent.length}`,readPresentedObjectSession:()=>queued?null:shown(),
     readSubselect:async()=>{const data={info:pin,presentation,items};if(readGate)await readGate.promise;return data;},
-    previewSubselect:async()=>({info:pin,presentation,segments:item.segments,matrix:item.matrix}),
+    previewSubselect:async(selector,target,intent)=>{previews.push(intent);return {info:pin,presentation,segments:item.segments,matrix:item.matrix};},
     runResourceCommand:async action=>{const origin=shown();queued=true;try{if(gate)await gate.promise;return await action({readPresentedObjectSession:()=>origin,
       dispatch:async q=>{sent.push(q);if(transportFailures>0){transportFailures--;throw Error('Transport lost');}return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:q.expectedRevision+1,ok:true,result:{applied:true,historyEntriesAdded:1}};},
       reconcile:async revision=>{if(reconcileFailure)throw Error('Owner read unavailable');pin={...pin,contentRevision:revision,documentSnapshotId:`native-object:d:${revision}`};presentation={...presentation,...pin};}});}finally{queued=false;}}};
@@ -24,7 +24,7 @@ function fixture(){
   const controller=Bridge.create(root),event=(x,y,extra={})=>({clientX:x,clientY:y,pointerId:1,target:stage,preventDefault(){},stopImmediatePropagation(){},...extra});
   async function select(){controller.handle('down',event(100,60));await controller.settled();assert.equal(paper.project.activeLayer.children.length,0);}
   function drag(){controller.handle('down',event(40,24));controller.handle('move',event(52,34));}
-  return {root,s,controller,event,select,drag,sent,notices,item,paper,setItems:v=>items=v,setGate:g=>gate=g,failTransport:count=>{transportFailures=count;reconcileFailure=true;},allowRecovery:()=>{reconcileFailure=false;},setReadGate:g=>readGate=g,replace:()=>{pin={...pin,documentId:'replacement',documentSnapshotId:'native-object:replacement:0'};presentation={...presentation,...pin};}};
+  return {root,s,controller,event,select,drag,sent,previews,notices,item,paper,setFrame:n=>{root.state.currentFrame=n;presentation={...presentation,frame:n};},setItems:v=>items=v,setGate:g=>gate=g,failTransport:count=>{transportFailures=count;reconcileFailure=true;},allowRecovery:()=>{reconcileFailure=false;},setReadGate:g=>readGate=g,replace:()=>{pin={...pin,documentId:'replacement',documentSnapshotId:'native-object:replacement:0'};presentation={...presentation,...pin};}};
 }
 test('subselect dispatches through a lease while the public presentation is hidden by the real command adapter',async()=>{
   const f=fixture();await f.select();f.drag();f.controller.handle('up',f.event(52,34));const result=await f.controller.settled();
@@ -85,6 +85,17 @@ test('a new vertex drag or Alt-insert supersedes an unresolved earlier marquee',
     if(!insert)assert.deepEqual(f.sent[0].payload.intent.indices,[0]);
   }
 });
+test('held gestures retain the source target and commit promotion only at pointerup',async()=>{
+  for(const gesture of ['drag','click','cancel']){const f=fixture();f.setFrame(5);await f.select();
+    f.controller.handle('down',f.event(40,24));assert.equal(f.sent.length,0);
+    if(gesture==='drag')f.controller.handle('move',f.event(52,34));
+    if(gesture==='cancel')f.controller.handle('cancel',f.event(40,24));
+    f.controller.handle('up',f.event(...(gesture==='drag'?[52,34]:[40,24])));await f.controller.settled();
+    assert.equal(f.sent.length,gesture==='cancel'?0:1,f.notices.join(';'));
+    if(f.sent.length){assert.equal(f.sent[0].payload.atFrame,5);assert.equal(f.sent[0].payload.stableTarget.frameScope.frame,0);
+      if(gesture==='click')assert.deepEqual(f.sent[0].payload.intent.delta,[0,0]);}
+  }
+});
 
 test('subselect preserves an indeterminate outcome and replays the original request after retiring the gesture',async()=>{
   const f=fixture();await f.select();f.drag();f.failTransport(2);f.controller.handle('up',f.event(52,34));
@@ -113,4 +124,23 @@ test('subselect completes through the actual Project queue and its action-local 
   await s.openPath('/subselect-fixture.nemo');f.root.NemoNativeObjectProject.desktop=()=>s;
   f.root.NemoNativeViewportUnderlay.canvasMapping.matchesView=()=>!!s.readPresentedObjectSession();
   await f.select();f.drag();f.controller.handle('up',f.event(52,34));assert.equal((await f.controller.settled()).status,'applied',f.notices.join(';'));assert.equal(sent.length,1);assert.equal(s.info().contentRevision,1);
+});
+
+test('native pointer modifiers match frozen point, group, Shift and Alt transition traces',async()=>{
+  const oracle=require('../native-engine/tests/fixtures/subselect-baseline/modifiers.json');
+  function close(actual,expected,label){
+    if(typeof expected==='number'){assert.ok(Math.abs(actual-expected)<1e-9,`${label}: ${actual} != ${expected}`);return;}
+    if(expected&&typeof expected==='object'){assert.deepEqual(Object.keys(actual),Object.keys(expected),label);for(const k of Object.keys(expected))close(actual[k],expected[k],label+'.'+k);return;}
+    assert.equal(actual,expected,label);
+  }
+  for(const row of oracle.cases){const f=fixture();f.item.matrix=row.matrix;f.item.segments=structuredClone(row.segments);
+    const event=(p,extra={})=>f.event(...Bridge.map(row.matrix,p),extra);
+    f.controller.handle('down',event([50,50]));await f.controller.settled();
+    for(const index of row.indices){const p=row.segments[index].point;f.controller.handle('down',event(p,{shiftKey:true}));f.controller.handle('up',event(p,{shiftKey:true}));}
+    f.controller.handle('down',event(row.start,{shiftKey:row.downShift,altKey:row.altKey}));
+    for(const step of row.steps){f.controller.handle('move',event(step.point,{shiftKey:step.shiftKey,altKey:step.altKey}));await new Promise(setImmediate);
+      assert.ok(f.previews.length,row.name+': '+f.notices.join(';'));close(f.previews.at(-1),step.intent,row.name);assert.equal(f.sent.length,0);}
+    const last=row.steps.at(-1);f.controller.handle('up',event(last.point,{shiftKey:last.shiftKey,altKey:last.altKey}));
+    assert.equal((await f.controller.settled()).status,'applied',row.name+': '+f.notices.join(';'));assert.equal(f.sent.length,1);close(f.sent[0].payload.intent,last.intent,row.name);
+  }
 });

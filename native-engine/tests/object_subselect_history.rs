@@ -299,3 +299,98 @@ fn subselect_static_parametric_paths_match_original_geometry_and_saved_metadata(
         }
     }
 }
+
+#[test]
+fn subselect_alt_transition_preserves_both_tangents_through_preview_history_and_reopen() {
+    let oracle: Value =
+        serde_json::from_str(include_str!("fixtures/subselect-baseline/modifiers.json")).unwrap();
+    for version in [1, 2] {
+        for row in oracle["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|r| r["name"] == "handleOut-011" || r["name"] == "handleIn-101")
+        {
+            let mut input = doc(version);
+            input["objects"][0]["geometry"]["segments"] = Value::Array(
+                row["segments"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|s| {
+                        let mut segment = json!({});
+                        for key in ["point", "handleIn", "handleOut"] {
+                            segment[key] = json!({"x":s[key][0],"y":s[key][1]});
+                        }
+                        segment
+                    })
+                    .collect(),
+            );
+            let mut owner = owner_of(&input);
+            let before = bytes(&owner);
+            let step = &row["steps"][2];
+            let snapshot = owner.acquire_snapshot(0).unwrap();
+            let q = json!({"apiVersion":2,"requestId":"paired-preview","instanceId":owner.instance_id(),"documentId":owner.document_id(),"operation":"query.document.object","payload":{"atRevision":0,"documentSnapshotId":snapshot.snapshot_id(),"stableTarget":target("L1",0,"s-a"),"subselect":{"cursor":0,"limit":16,"preview":step["intent"]}}});
+            let preview = serde_json::to_value(
+                snapshot
+                    .dispatch(serde_json::from_value(q).unwrap())
+                    .unwrap(),
+            )
+            .unwrap();
+            assert_eq!(preview["ok"], true, "{preview}");
+            assert_eq!(bytes(&owner), before);
+            for (invalid, paired) in [Value::Null, json!([1]), json!(["x", 2])]
+                .into_iter()
+                .enumerate()
+            {
+                let mut bad = step["intent"].clone();
+                bad["pairedPoint"] = paired;
+                let q = req(&owner, &format!("paired-invalid-{invalid}"), bad);
+                assert_eq!(dispatch(&mut owner, &q)["ok"], false);
+                assert_eq!(bytes(&owner), before);
+            }
+            let request = req(&owner, "paired-commit", step["intent"].clone());
+            let response = dispatch(&mut owner, &request);
+            assert_eq!(
+                response["result"],
+                json!({"applied":true,"historyEntriesAdded":1}),
+                "{response}"
+            );
+            let after = bytes(&owner);
+            let actual = state(&owner);
+            for (i, expected) in step["expected"].as_array().unwrap().iter().enumerate() {
+                for key in ["point", "handleIn", "handleOut"] {
+                    for (axis, n) in [("x", 0), ("y", 1)] {
+                        let value = expected[key][n].as_f64().unwrap();
+                        assert!(
+                            (actual["objects"][0]["geometry"]["segments"][i][key][axis]
+                                .as_f64()
+                                .unwrap()
+                                - value)
+                                .abs()
+                                < 1e-9
+                        );
+                        assert!(
+                            (preview["result"]["subselect"]["segments"][i][key][n]
+                                .as_f64()
+                                .unwrap()
+                                - value)
+                                .abs()
+                                < 1e-9
+                        );
+                    }
+                }
+            }
+            assert_eq!(dispatch(&mut owner, &request), response);
+            assert_eq!(owner.history_depths(), (1, 0));
+            assert_eq!(owner.undo(1), Ok(2));
+            assert_eq!(bytes(&owner), before);
+            assert_eq!(owner.redo(2), Ok(3));
+            assert_eq!(bytes(&owner), after);
+            let reopened =
+                NativeObjectHistory::new("paired-reopen", decode_storage_project(&after).unwrap())
+                    .unwrap();
+            assert_eq!(bytes(&reopened), after);
+        }
+    }
+}

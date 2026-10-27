@@ -143,3 +143,13 @@ fn shadow_channel_members_are_admitted_as_serp_writes_them_and_nothing_else() {
         assert_eq!(request(VECTOR, &payload), ok, "{shadow}");
     }
 }
+
+#[test]
+fn the_fill_brush_flag_is_admitted_only_as_serp_writes_it() {
+    for (flag, ok) in [(json!(true), true), (json!(false), false), (json!("true"), false), (json!(null), false)] {
+        let mut r = record();
+        r["vectorExt"] = json!({"isFillShape":flag});
+        let payload = json!({"command":"object.vector.create","record":r});
+        assert_eq!(request(VECTOR, &payload), ok, "{flag}");
+    }
+}
