@@ -381,6 +381,18 @@
         samples.push([w[0],w[1],filters.width(pressure)]);
       }
     }
+    // A native vector record holds 2..256 anchors (native-object-vector-stroke.js); the baseline Path has no cap, and a
+    // pressure ribbon across 40% of an HD frame already samples past it (#2343 B1). A longer freehand outline is refitted:
+    // Paper's simplify within a quarter document unit, widened only until it fits. A stroke that fits keeps every anchor.
+    function fitRecord(path){
+      if(path.segments.length<=256)return;
+      var source=path.segments.map(function(s){return s.clone();});
+      for(var tolerance=.25;tolerance<=64;tolerance*=2){
+        path.removeSegments();path.addSegments(source.map(function(s){return s.clone();}));path.simplify(tolerance);
+        if(path.segments.length<=256)return;
+      }
+      throw new Error('This stroke is too long for a native vector record.');
+    }
     function nativeDictionary(raw,style) {
       if(raw.length<2)return null;
       if(raw.some(function(s){return !s.every(Number.isFinite);}))throw new Error('Brush samples must stay finite.');
@@ -415,7 +427,11 @@
           // ribbon, under a fresh link id of its own (ensureStrokeId shape), with no stroke of its own.
           var link='s'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e9)+'_lf';
           out.linkedFillId=link;
-          linkedCompanions.set(out,{segments:sampled.centerSegments.map(function(s){return {point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};}),
+          var fill=new Path({insert:false});
+          sampled.centerSegments.forEach(function(s){fill.add(new root.Segment(new Point(s.point.x,s.point.y),new Point(s.handleIn.x,s.handleIn.y),new Point(s.handleOut.x,s.handleOut.y)));});
+          fill.closed=true;
+          try{fitRecord(fill);var fillSegments=segments(fill);}finally{fill.remove();}
+          linkedCompanions.set(out,{segments:fillSegments,
             closed:true,strokeColor:null,hasRealStroke:false,strokeWidth:1,strokeCap:'butt',strokeJoin:'miter',miterLimit:10,dashOffset:0,
             fillColor:style.fillColor,opacity:style.opacity/100,isLinkedFillCompanion:true,linkedFillId:link});
         }
@@ -428,7 +444,7 @@
         // applyBrushTexture on a plain stroke drawn with Stroke on: the path becomes its texture's invisible anchor.
         if(!style.shadowSwatch&&!style.bitmap&&style.brushPreset&&style.brushPreset!=='none'&&style.strokeEnabled)Paint.texturePlain(out,style.brushPreset);
       }
-      try{out.segments=segments(path);out.closed=path.closed;
+      try{fitRecord(path);out.segments=segments(path);out.closed=path.closed;
         if(style.shadowSwatch)Paint.shadow(out,style.shadowSwatch,style.vectorBrush&&!style.strokeEnabled,style.brushSize);
         if(out.segments.some(function(s){return !['point','handleIn','handleOut'].every(function(k){return s[k].every(Number.isFinite);});}))throw new Error('Brush geometry must stay finite.');
         return out;}finally{path.remove();}
