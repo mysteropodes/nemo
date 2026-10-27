@@ -12,10 +12,12 @@
  * Timing uses the Project session's pinned SDK reader; installed acceptance stays open.
  */
 (function(root,factory){
-  var api=factory();
-  if(typeof module==='object'&&module.exports)module.exports=api;
+  // In the page the seam and presenter load after this file; render resolves them from root.
+  var cjs=typeof module==='object'&&module.exports;
+  var api=cjs?factory(require('../application/presenter-seam.js'),require('./native-layer-list-presenter.js')):factory(null,null);
+  if(cjs)module.exports=api;
   else root.NemoNativeObjectUI=api;
-}(typeof globalThis==='object'?globalThis:this,function(){
+}(typeof globalThis==='object'?globalThis:this,function(Seam,LayerList){
   'use strict';
   var inspectors=new WeakMap(),views=new WeakMap(),timings=new WeakMap(),policyTasks=new WeakMap(),policyEpochs=new WeakMap(),policyBindings=new WeakMap(),motionBindings=new WeakMap();
   function retireMotion(root){var hooks=motionBindings.get(root);if(hooks)hooks.retire();var prior=inspectors.get(root);if(prior&&prior.motion){var saved=prior.motion;saved.body.replaceChildren.apply(saved.body,saved.children);saved.section.hidden=saved.hidden;saved.section.style.display=saved.display;prior.motion=null;}}
@@ -255,6 +257,9 @@
   function renderNativeObjectUiMetadata(root,info,frameOnly,ports){
     checked(root,info,ports);
     if(info.layers.some(function(l){return ['locked','shy'].some(function(k){return l[k]!==undefined&&typeof l[k]!=='boolean';});}))throw new Error('Invalid native layer flags');
+    // Publish the validated read model before any DOM change: a failing subscriber or a
+    // missing seam refuses the paint instead of leaving it half-applied.
+    seam(root).publish(root,info);
     var shyMode=typeof ports.readShyMode==='function'&&ports.readShyMode()===true,policyOwner=policyPort(ports);
     var list=node(root,'layer-list'),header=node(root,'frame-hdr'),grid=node(root,'frame-grid');
     var previous=views.get(root),selection=root._layerSel||[];
@@ -269,33 +274,20 @@
     var rows,caption,unavailable;
     if(reuse){rows=previous.rows;caption=previous.caption;unavailable=previous.unavailable;}
     else{
-      rows=info.layers.map(function(layer,i){
-        var label=layer.name===undefined?layer.layerUid:layer.name;
-        var row=createNativeObjectUiText(root,'div',''),pick=createNativeObjectUiText(root,'button',label+' — '+(layer.visible===false?'Hidden':'Visible'));
-        row.className='native-object-layer';row.dataset.layerUid=layer.layerUid;row.style.display='flex';
-        pick.type='button';pick.style.flex='1';pick.style.textAlign='left';
-        pick.setAttribute('aria-pressed',String(selection.indexOf(i)>=0));
-        pick.setAttribute('aria-label',label+' ('+layer.layerUid+')');
-        pick.addEventListener('click',function(event){
+      // CS5 pilot surface: the rows come from the presenter mounted on the seam.
+      rows=layerListRows(root,{document:root.document,info:info,selection:selection,shyMode:shyMode,policyOwner:policyOwner,
+        onPick:function(i,layer,event,row){
           var view=views.get(root);
           if(!nativeObjectUiPortsReady(ports)||row.parentNode!==list||!view||view.rows[i]!==row)return false;
           if(root._layerDragJustEnded){root._layerDragJustEnded=false;return false;}
           var mode=event&&(event.metaKey||event.ctrlKey)?'toggle':event&&event.shiftKey?'range':null;
           return ports.selectLayer(i,mode?{mode:mode}:false,layer.layerUid,info);
-        });
-        var eye=createNativeObjectUiText(root,'button',layer.visible===false?'Show':'Hide');eye.type='button';
-        eye.setAttribute('aria-label',(layer.visible===false?'Show ':'Hide ')+label+' ('+layer.layerUid+')');
-        // Availability is checked at CLICK time: this render can precede preview/ACK.
-        eye.addEventListener('click',function(){return toggleVisibility(root,layer.layerUid,info,ports);});
-        var flags=['locked','shy'].map(function(flag){
-          var on=layer[flag]===true,label=flag==='locked'?(on?'Unlock':'Lock'):(on?'Unmark shy':'Mark shy');
-          var button=createNativeObjectUiText(root,'button',label);button.type='button';button.dataset.policyFlag=flag;
-          button.setAttribute('aria-pressed',String(on));button.setAttribute('aria-label',label+' '+(layer.name===undefined?layer.layerUid:layer.name));
-          button.disabled=!policyOwner;button.addEventListener('click',function(){if(row.parentNode!==list||!views.get(root)||!views.get(root).rows.includes(row))return false;return setLayerPolicy(root,layer.layerUid,flag,!on,info,ports);});return button;
-        });
-        row.hidden=shyMode&&layer.shy===true;row.style.display=row.hidden?'none':'flex';row.replaceChildren(pick,eye,flags[0],flags[1]);
-        return row;
-      });
+        },
+        onVisibility:function(layer){return toggleVisibility(root,layer.layerUid,info,ports);},
+        onPolicy:function(layer,flag,value,row){
+          if(row.parentNode!==list||!views.get(root)||!views.get(root).rows.includes(row))return false;
+          return setLayerPolicy(root,layer.layerUid,flag,value,info,ports);
+        }});
       caption=createNativeObjectUiText(root,'div','');
       unavailable=createNativeObjectUiText(root,'div','Native keyframe, held-frame and tween timing is unavailable.');
       unavailable.setAttribute('role','status');unavailable.className='native-object-timing-unavailable';
@@ -333,6 +325,11 @@
     if(root.SMImageMeshUI&&typeof root.SMImageMeshUI.refresh==='function')root.SMImageMeshUI.refresh();
     return true;
   }
+  // The default layer-list presenter mounts lazily; a replacement registered first wins.
+  function seam(root){var api=Seam||root.NemoPresenterSeam;if(!api)throw new Error('Native document UI is unavailable: presenter seam');return api;}
+  // A replacement presenter registered before the first paint of its root wins; otherwise the default mounts (mountRows).
+  function layerListRows(root,context){var presenter=LayerList||root.NemoNativeLayerListPresenter;
+    if(!presenter)throw new Error('Native document UI is unavailable: layer-list presenter');return presenter.mountRows(root,seam(root),context);}
   // Ordinary native policy entries bind on paint and dispose when the UI retires.
   function bindLayerPolicy(root,ports){
     if(policyBindings.has(root))throw new Error('Layer policy entry is already bound');

@@ -11,3 +11,6 @@ pub(crate) mod native_vector_export_svg;
 
 #[path = "native_vector_export_lottie.rs"]
 pub(crate) mod native_vector_export_lottie;
+
+#[path = "native_vector_export_rive.rs"]
+pub(crate) mod native_vector_export_rive;
