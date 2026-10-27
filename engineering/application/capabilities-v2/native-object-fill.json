@@ -10,12 +10,16 @@
   },
   "transportSchema": "../native-transport-v2.schema.json",
   "operations": [
-    "command.document.object.fill.trace"
+    "command.document.object.fill.trace",
+    "command.document.object.fill.brush"
   ],
   "input": {
     "oneOf": [
       {
         "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFillTracePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFillBrushPayload"
       }
     ]
   },
@@ -25,11 +29,11 @@
     "fallback": "none"
   },
   "resourceBoundary": {
-    "maxRequestBytes": 4096,
+    "maxRequestBytes": 65536,
     "maxReadResponseBytes": 4096,
-    "policy": "Complete correlated retained receipt or typed refusal; no document or resource payload. Requests above 4096 encoded bytes are refused, never split."
+    "policy": "Complete correlated retained receipt or typed refusal; no document or resource payload. Requests above 65536 encoded bytes (the engine payload bound; a Fill Brush outline carries up to 256 segments) are refused, never split."
   },
-  "semantics": "Trace real stored-vector walls at the pointer, recolour/remove the selected fill, and commit curved same-colour union plus persistent fill provenance in one native revision/history transaction. Stored wall edits regenerate linked fills inside that same candidate. No JS/Paper document fallback. Manual Close Gap gesture and later component mounts retain their original acceptance holds.",
+  "semantics": "Trace real stored-vector walls at the pointer, recolour/remove the selected fill, and commit curved same-colour union plus persistent fill provenance in one native revision/history transaction. Stored wall edits regenerate linked fills inside that same candidate. No JS/Paper document fallback. Manual Close Gap gesture and later component mounts retain their original acceptance holds. The Fill Brush commits its stroke outline as one isFillShape fill placed above, below or merged into the topmost overlapping fill (applyFillBrushPlacement), then the same-colour union that may absorb other Fill Brush shapes, in the same one transaction.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",
@@ -80,6 +84,99 @@
         "instanceId": "instance-A",
         "documentId": "document-A",
         "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Native Fill Brush commit; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "fill-brush-8",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 8,
+        "operation": "command.document.object.fill.brush",
+        "payload": {
+          "command": "object.fill.brush",
+          "layerUid": "layer-a",
+          "contextId": "scene-root",
+          "frame": 0,
+          "outline": [
+            {
+              "point": [
+                10,
+                10
+              ],
+              "handleIn": [
+                0,
+                0
+              ],
+              "handleOut": [
+                0,
+                0
+              ]
+            },
+            {
+              "point": [
+                60,
+                10
+              ],
+              "handleIn": [
+                0,
+                0
+              ],
+              "handleOut": [
+                0,
+                0
+              ]
+            },
+            {
+              "point": [
+                60,
+                40
+              ],
+              "handleIn": [
+                0,
+                0
+              ],
+              "handleOut": [
+                0,
+                0
+              ]
+            },
+            {
+              "point": [
+                10,
+                40
+              ],
+              "handleIn": [
+                0,
+                0
+              ],
+              "handleOut": [
+                0,
+                0
+              ]
+            }
+          ],
+          "color": "#336699ff",
+          "opacity": 1,
+          "placement": "below",
+          "mask": false,
+          "copies": [],
+          "stamps": []
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "fill-brush-8",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 9,
         "ok": true,
         "result": {
           "applied": true,

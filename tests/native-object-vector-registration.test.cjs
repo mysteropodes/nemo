@@ -73,7 +73,8 @@ test('the shared schema carries the definitions, one Request branch per operatio
   }
   const results = schema.$defs.ResponseBase.properties.result.oneOf.map((entry) => entry.$ref);
   assert.equal(results.filter((ref) => ref === '#/$defs/ObjectVectorEditResult').length, 1);
-  assert.deepEqual(schema.$defs.ObjectQueryResult.properties.object.oneOf.map((entry) => entry.$ref), ['#/$defs/ObjectRecord', '#/$defs/ObjectVectorReadRecord']);
+  assert.deepEqual(schema.$defs.ObjectQueryResult.oneOf[0], { $ref: '#/$defs/ObjectStableTargetQueryResult' });
+  assert.deepEqual(schema.$defs.ObjectStableTargetQueryResult.properties.object.oneOf.map((entry) => entry.$ref), ['#/$defs/ObjectRecord', '#/$defs/ObjectVectorReadRecord']);
   assert.equal(schema.$defs.ObjectVectorReadRecord.properties.vectorExt.$ref, '#/$defs/ObjectVectorReadExt');
   assert.equal(schema.$defs.ObjectVectorReadExt.properties.bitmapBrush.$ref, '#/$defs/ObjectClipboardBitmapBrush');
   assert.equal(schema.$defs.ObjectVectorRecord.properties.vectorExt.$ref, '#/$defs/ObjectVectorExt');

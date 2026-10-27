@@ -1,4 +1,4 @@
-use super::tests::{corpus, envelope, OPERATIONS, P};
+use super::tests::{corpus, envelope, LABS, OPERATIONS, P};
 use super::*;
 use crate::contract::{NativeApplicationRequest, NativeApplicationResponse};
 use serde_json::{json, Value};
@@ -9,7 +9,7 @@ fn response(value: Value) -> NativeApplicationResponse {
 
 #[test]
 fn receipts_are_the_compact_command_result_and_a_creation_names_its_minted_layer() {
-    for suffix in OPERATIONS {
+    for &suffix in OPERATIONS.iter().chain(&LABS) {
         let operation = format!("{P}{suffix}");
         if suffix == "widget.create" {
             assert!(result(
@@ -122,13 +122,14 @@ fn responses_must_name_the_same_owner_and_document_and_advance_exactly() {
 }
 
 #[test]
-fn the_catalog_declares_each_operation_once_under_three_owner_descriptors() {
+fn the_catalog_declares_each_operation_once_under_four_owner_descriptors() {
     let family = |suffix: &str| match suffix {
         "image.mesh.edit" => "native.object.image-mesh",
         s if s.starts_with("widget.") => "native.object.widget",
+        s if s.starts_with("labs.") => "native.object.labs",
         _ => "native.object.rig",
     };
-    for suffix in OPERATIONS {
+    for &suffix in OPERATIONS.iter().chain(&LABS) {
         let operation = format!("{P}{suffix}");
         let descriptor = crate::capabilities::native_catalog()
             .capability_for_operation(&operation)

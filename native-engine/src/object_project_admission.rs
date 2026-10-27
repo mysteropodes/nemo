@@ -261,6 +261,8 @@ mod guide_read;
 mod palette_read;
 #[path = "object_project_perspective_read.rs"]
 mod perspective_read;
+#[path = "object_project_symmetry_read.rs"]
+mod symmetry_read;
 #[path = "object_project_shadow_read.rs"]
 mod shadow_read;
 #[path = "object_project_workspace_read.rs"]

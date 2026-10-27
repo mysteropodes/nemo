@@ -1,4 +1,4 @@
-// UI32 validation policy: closed semantic operations, never an arbitrary AX setter.
+// Closed UI32 semantic operations.
 import Foundation
 import ApplicationServices
 
@@ -111,6 +111,7 @@ func ui32SelfTest() throws {
   let profileFocusCases=try ui32ProfileFocusSelfTest()
   let f03Cases=try f03SelfTests()
   try check(try ui32CameraSelfTest()==37)
+  try check(try cs7InputSelfTest()==19)
   try ui32IdentityPhaseSelfTest();try ui32Phase2ReadSelfTest()
   try ui32EntrySelfTest();try ui32NewSemanticSelfTest()
   try ui32AttachedRootCertificateSelfTest()

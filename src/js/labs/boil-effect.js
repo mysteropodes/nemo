@@ -21,8 +21,25 @@
     };
   }
 
+  function nativeBoil(native, opts) {
+    var toast = function (key) { if (typeof showToast === 'function') showToast(SM.t(key)); };
+    var layerUid = native.layerUid(state.activeLayerIdx);
+    if (!layerUid) { toast('labsToastLayerInvalidLocked'); return Promise.resolve(0); }
+    var nFrames = Math.max(1, Math.min(24, opts.frames || 3));
+    var cf = state.currentFrame;
+    return native.boil({ layerUid: layerUid, frame: cf, frames: nFrames,
+      amplitude: opts.amplitude !== undefined ? Math.max(0.2, +opts.amplitude) : 2.5, seedStep: opts.seedStep || 1 }).then(function () {
+      if (typeof showToast === 'function') showToast(SM.t('labsToastBoilPrefix') + nFrames + SM.t('labsToastBoilSuffix') + (cf + 1));
+      return nFrames;
+    }, function (error) { toast(error && error.code === 'not_found' ? 'labsToastNothingToBoil' : 'labsToastLayerInvalidLocked'); return 0; });
+  }
+
   window.SMLabs.boil = function (opts) {
     opts = opts || {};
+    // Native authority (U36, #2362): the engine runs this generator over the shown cell as one history entry and
+    // the call returns a Promise of the same count; the code below is the baseline path.
+    var native = window.NemoNativeObjectLabs && NemoNativeObjectLabs.desktop(window);
+    if (native) return nativeBoil(native, opts);
     var li = state.activeLayerIdx;
     var ld = state.layers[li];
     if (!ld || ld.locked || ld.symbolId) { if (typeof showToast === 'function') showToast(SM.t('labsToastLayerInvalidLocked')); return 0; }

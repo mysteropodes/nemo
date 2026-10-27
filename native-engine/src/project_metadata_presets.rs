@@ -9,24 +9,24 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct StampSegment {
-    point: [f64; 2],
+pub(crate) struct StampSegment {
+    pub(crate) point: [f64; 2],
     #[serde(skip_serializing_if = "Presence::missing")]
-    handle_in: Presence<[f64; 2]>,
+    pub(crate) handle_in: Presence<[f64; 2]>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    handle_out: Presence<[f64; 2]>,
+    pub(crate) handle_out: Presence<[f64; 2]>,
 }
 object_deserialize!(StampSegment {
     point:[f64;2],#[serde(default)] handle_in:Presence<[f64;2]>,#[serde(default)] handle_out:Presence<[f64;2]>
 });
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct CustomStamp {
-    segments: Vec<StampSegment>,
+pub(crate) struct CustomStamp {
+    pub(crate) segments: Vec<StampSegment>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    closed: Presence<bool>,
+    pub(crate) closed: Presence<bool>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    point_count: Presence<f64>,
+    pub(crate) point_count: Presence<f64>,
 }
 object_deserialize!(CustomStamp {
     segments:Vec<StampSegment>,#[serde(default)] closed:Presence<bool>,#[serde(default)] point_count:Presence<f64>
@@ -35,77 +35,77 @@ object_deserialize!(CustomStamp {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BrushPresetRecord {
     #[serde(skip_serializing_if = "Presence::missing")]
-    bristle_count: Presence<f64>,
+    pub(crate) bristle_count: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    dash_gap: Presence<f64>,
+    pub(crate) dash_gap: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    edge_noise: Presence<f64>,
+    pub(crate) edge_noise: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    fixed_angle: Presence<f64>,
+    pub(crate) fixed_angle: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    grain: Presence<f64>,
+    pub(crate) grain: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    nib_size: Presence<f64>,
+    pub(crate) nib_size: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    noise: Presence<f64>,
+    pub(crate) noise: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    opacity: Presence<f64>,
+    pub(crate) opacity: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    opacity_jitter: Presence<f64>,
+    pub(crate) opacity_jitter: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    poly_sides: Presence<f64>,
+    pub(crate) poly_sides: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    pressure_end: Presence<f64>,
+    pub(crate) pressure_end: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    pressure_mid: Presence<f64>,
+    pub(crate) pressure_mid: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    pressure_start: Presence<f64>,
+    pub(crate) pressure_start: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    rotation_jitter: Presence<f64>,
+    pub(crate) rotation_jitter: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    roughness: Presence<f64>,
+    pub(crate) roughness: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    roundness: Presence<f64>,
+    pub(crate) roundness: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    scatter: Presence<f64>,
+    pub(crate) scatter: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    scribble_angle_spread: Presence<f64>,
+    pub(crate) scribble_angle_spread: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    scribble_count: Presence<f64>,
+    pub(crate) scribble_count: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    scribble_len: Presence<f64>,
+    pub(crate) scribble_len: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    scribble_len_jitter: Presence<f64>,
+    pub(crate) scribble_len_jitter: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    scribble_spread: Presence<f64>,
+    pub(crate) scribble_spread: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    scribble_width: Presence<f64>,
+    pub(crate) scribble_width: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    sharpness: Presence<f64>,
+    pub(crate) sharpness: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    size_jitter: Presence<f64>,
+    pub(crate) size_jitter: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    space_jitter: Presence<f64>,
+    pub(crate) space_jitter: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    spacing: Presence<f64>,
+    pub(crate) spacing: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    tip_corner: Presence<f64>,
+    pub(crate) tip_corner: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    value_jitter: Presence<f64>,
+    pub(crate) value_jitter: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    saved_brush_size: Presence<f64>,
+    pub(crate) saved_brush_size: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    rotation_mode: Presence<String>,
+    pub(crate) rotation_mode: Presence<String>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    scatter_distribution: Presence<String>,
+    pub(crate) scatter_distribution: Presence<String>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    tip_shape: Presence<String>,
+    pub(crate) tip_shape: Presence<String>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    label: Presence<String>,
+    pub(crate) label: Presence<String>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    marker_tip: Presence<bool>,
+    pub(crate) marker_tip: Presence<bool>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    custom_stamp: Presence<CustomStamp>,
+    pub(crate) custom_stamp: Presence<CustomStamp>,
 }
 object_deserialize!(BrushPresetRecord {
     #[serde(default)] bristle_count:Presence<f64>,

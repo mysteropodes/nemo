@@ -181,6 +181,22 @@ pub(crate) fn anchor_draw(
     })
 }
 
+/// Native interpolation leaves an independently visible anchor. No remembered values are fabricated.
+pub(crate) fn tween_anchor_draw(
+    fill: Option<&SolidFill>,
+    stroke: Option<&SolidFill>,
+    opacity: &Number,
+) -> Result<AnchorDraw, AnchorError> {
+    Ok(AnchorDraw {
+        fill: paint(fill)?,
+        stroke: paint(stroke)?,
+        opacity: opacity
+            .as_f64()
+            .filter(|v| v.is_finite())
+            .ok_or(AnchorError::OpacityNotFinite)?,
+    })
+}
+
 #[cfg(test)]
 #[path = "../tests/object_scene_producer_brush_anchor.rs"]
 mod tests;

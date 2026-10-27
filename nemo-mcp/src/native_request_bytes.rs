@@ -16,7 +16,10 @@ pub(super) const MAX_REQUEST_BYTES: usize = 65_536;
 pub(super) fn request_limit(operation: &str) -> usize {
     if super::native_clipboard_transport::owns(operation) {
         super::native_clipboard_transport::MESSAGE_BYTES
-    } else if operation == "command.document.object.vector.edit" {
+    } else if operation == "command.document.object.vector.edit"
+        || operation == "command.document.object.fill.brush"
+        || operation == "command.document.object.brush.bitmap.stroke"
+    {
         MAX_REQUEST_BYTES
     } else {
         crate::contract::NATIVE_MAX_MESSAGE_BYTES

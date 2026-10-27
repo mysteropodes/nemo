@@ -19,12 +19,13 @@ pub(crate) use font_assets::{
 };
 
 pub(crate) use crate::object_document::object_raster_asset_kernels::object_raster_asset_item::RasterItem;
-#[cfg(feature = "font_asset_wire")]
+#[cfg(any(feature = "font_asset_wire", feature = "application"))]
 pub(crate) use crate::object_document::AssetRecord;
+pub(crate) use crate::object_document::{subselect, OrderCurvePoint};
+pub(crate) use crate::object_document::{item_asset_issue, ObjectLayer, Presence, PropertyHolder};
 #[cfg(all(feature = "font_asset_wire", not(feature = "history")))]
 pub(crate) use crate::object_document::{AssetId, AssetKind};
-pub(crate) use crate::object_document::{ImageMesh, ImageMeshStore, MeshIdSequence};
-pub(crate) use crate::object_document::{ObjectLayer, Presence, PropertyHolder};
+pub(crate) use crate::object_document::{ImageMesh, ImageMeshStore, ItemRecords, MeshIdSequence};
 use crate::object_document::{OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION};
 #[path = "object_property_codec.rs"]
 mod property_codec;
@@ -47,7 +48,7 @@ mod project;
 pub(crate) mod project_settings_test_codec {
     pub(crate) use super::project::{decode_project, encode_project, ProjectWireLimits};
 }
-#[cfg(all(feature = "history", feature = "project_media_codec"))]
+#[cfg(feature = "history")]
 pub(crate) use crate::object_document::{ProjectEnvelope, ProjectReferenceState};
 // L06-H (lane #2112): the lane-6 document kernels the read-queries preparation consumes.
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
@@ -181,6 +182,7 @@ pub fn decode_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCodecError> 
         component_tables: Presence::Missing,
         motion_arcs: wire.motion_arcs,
         audio_tracks: wire.audio_tracks,
+        tweens: wire.tweens,
     };
     validate(&document)?;
     Ok(document)
@@ -199,6 +201,7 @@ struct LegacyDocument {
     items: Presence<crate::object_document::ItemRecords>,
     motion_arcs: Presence<Option<crate::object_document::MotionArcs>>,
     audio_tracks: Presence<crate::object_document::AudioTracks>,
+    tweens: Presence<crate::object_document::tween::TweenStore>,
 }
 crate::object_document::object_deserialize!(LegacyDocument {
     format: String, format_version: u32, total_frames: u32,
@@ -208,7 +211,8 @@ crate::object_document::object_deserialize!(LegacyDocument {
     #[serde(default)] image_meshes: Presence<ImageMeshStore>,
     #[serde(default)] items: Presence<crate::object_document::ItemRecords>,
     #[serde(default)] motion_arcs: Presence<Option<crate::object_document::MotionArcs>>,
-    #[serde(default)] audio_tracks: Presence<crate::object_document::AudioTracks>
+    #[serde(default)] audio_tracks: Presence<crate::object_document::AudioTracks>,
+    #[serde(default)] tweens: Presence<crate::object_document::tween::TweenStore>
 });
 
 /// Route canonical v2 to its strict codec so its typed refusal is not masked by v1.
@@ -234,6 +238,7 @@ pub fn encode_storage_project(document: &ObjectDocument) -> Result<Vec<u8>, Obje
 }
 
 pub(crate) fn validate_storage(document: &ObjectDocument) -> Result<(), ObjectCodecError> {
+    order::validate_tweens(document.tweens.value())?;
     object_vector_ext_codec::validate_linked_pairs(document)?;
     if document.format_version == 1 {
         return validate(document);
@@ -270,6 +275,7 @@ pub fn encode_project(document: &ObjectDocument) -> Result<Vec<u8>, ObjectCodecE
 pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError> {
     object_vector_ext_codec::validate_linked_pairs(document)?;
     order::validate_audio_tracks(document.audio_tracks.value())?;
+    order::validate_tweens(document.tweens.value())?;
     use ObjectCodecErrorKind::Unsupported;
     let reject = |kind, message: &str| ObjectCodecError::new(kind, message);
     if document.format != OBJECT_DOCUMENT_FORMAT
@@ -510,3 +516,6 @@ fn validate_content_inner(
     }
     Ok(())
 }
+
+#[cfg(feature = "application")]
+pub(crate) use crate::object_document::tween::{BitmapTweenBake, MAX_TWEEN_BAKES};

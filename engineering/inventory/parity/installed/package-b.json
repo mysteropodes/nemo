@@ -1,0 +1,283 @@
+{
+  "schema": "nemo.installed-parity/1",
+  "contract": "https://github.com/mysteropodes/nemo/issues/2348#issuecomment-6415465173",
+  "rows": [
+    {
+      "id": "f03-clients",
+      "issue": 1049,
+      "status": "Blocked",
+      "reason": "Client MCP route not configured in the actual Codex and Claude clients; human setup escalated by the orchestrator. No generic SDK substitute. Scenario review and current package/operator qualification remain outstanding.",
+      "tasks": [
+        "X15"
+      ],
+      "surfaces": [],
+      "dependsOn": [],
+      "scenario": "f03-clients",
+      "acceptanceReference": "https://github.com/mysteropodes/nemo/issues/1049#issuecomment-6403867728",
+      "checks": [
+        {
+          "id": "codex-opacity-workflow",
+          "clause": "Original Codex opacity Read \u2192 edit/history/save-reopen: static25 \u219240/60 Undo \u2192 replacement/stale \u2192 keyed0/20.",
+          "covers": [
+            "positive",
+            "oracle",
+            "undo-redo",
+            "save-reopen"
+          ]
+        },
+        {
+          "id": "claude-opacity-workflow",
+          "clause": "The same original workflow through actual Claude; actual client identities and advertised schema, with no handwritten payload oracle replacing usability.",
+          "covers": [
+            "positive",
+            "oracle",
+            "undo-redo",
+            "save-reopen"
+          ]
+        }
+      ],
+      "taskEvidence": "https://github.com/mysteropodes/nemo/pull/2403#issuecomment-6416918418 \u2014 reviewer disposition from matrix task owners; original issue F03 tag is not the older-format import task.",
+      "runtimeDisposition": "https://github.com/mysteropodes/nemo/issues/2348#issuecomment-6418087338"
+    },
+    {
+      "id": "play-resume",
+      "issue": 1573,
+      "status": "Ready",
+      "tasks": [
+        "X12"
+      ],
+      "surfaces": [],
+      "dependsOn": [],
+      "scenario": "play-resume",
+      "acceptanceReference": "https://github.com/mysteropodes/nemo/issues/1573#issuecomment-6403867878",
+      "checks": [
+        {
+          "id": "visible-recovery",
+          "clause": "Visible Play \u2192 minimize \u2192 restore \u2192 Play/Stop recovers without stale-frame publication.",
+          "covers": [
+            "positive"
+          ]
+        },
+        {
+          "id": "ordered-telemetry",
+          "clause": "Ordered same-owner native and JS telemetry proves accepted/rejected publications through the recovery.",
+          "covers": [
+            "oracle"
+          ]
+        },
+        {
+          "id": "visible-frames",
+          "clause": "Independent visible-frame evidence at0/10/20.",
+          "covers": [
+            "pixels"
+          ]
+        }
+      ],
+      "taskEvidence": "https://github.com/mysteropodes/nemo/pull/2403#issuecomment-6416918418 \u2014 reviewer disposition from matrix task owners.",
+      "runtimePrerequisites": "One unsigned test-play-publication-observer package at the batch source; original keyed fixture de1c3782038c51ea04f59978808be895479986d95d9655d9b79e6556f324cf32; actual owned window, native exposure trace and terminal collector copy.",
+      "evidence": "N20R source: https://github.com/mysteropodes/nemo/pull/1583 merged at c9a53b8b520a4d7d0d31a394929debcc89833f53; source-complete reconciliation https://github.com/mysteropodes/nemo/issues/1573#issuecomment-6403867878. Original Play scenario approved at 4216183f08670b6e4f781e15230bdab75451626d by https://github.com/mysteropodes/nemo/pull/2403#issuecomment-6417925639."
+    },
+    {
+      "id": "play-publication",
+      "issue": 1706,
+      "status": "Blocked",
+      "reason": "No original task owner; curation #2349. Original installed clauses remain required as issue-level receipts outside the CS7 Ready census; scenario implementation/review and runtime qualification remain outstanding.",
+      "tasks": [],
+      "surfaces": [],
+      "dependsOn": [],
+      "scenario": "play-publication",
+      "acceptanceReference": "https://github.com/mysteropodes/nemo/issues/1706#issuecomment-6403868021",
+      "checks": [
+        {
+          "id": "bounded-trace",
+          "clause": "Installed opt-in bounded trace collection in the same installed lifetime; complete retained output survives official owner stop. Verify current-package collection; the historical O1/#1708 readiness smoke was accepted separately.",
+          "covers": [
+            "oracle"
+          ]
+        }
+      ],
+      "collectorPrerequisiteEvidence": "O1/#1708 CLOSED; bounded installed collector acceptance https://github.com/mysteropodes/nemo/issues/1708#issuecomment-6129395003. This does not establish current-package collection or Play publication."
+    },
+    {
+      "id": "opacity-consumption",
+      "issue": 2268,
+      "status": "Blocked",
+      "reason": "No original task owner; curation #2349. Original installed clauses remain required as issue-level receipts outside the CS7 Ready census; scenario implementation/review and runtime qualification remain outstanding.",
+      "tasks": [],
+      "surfaces": [],
+      "dependsOn": [],
+      "scenario": "opacity-consumption",
+      "acceptanceReference": "https://github.com/mysteropodes/nemo/issues/2268#issuecomment-6403867158",
+      "checks": [
+        {
+          "id": "motion-history",
+          "clause": "Ordinary installed Motion opacity editing and Undo/Redo.",
+          "covers": [
+            "positive",
+            "undo-redo"
+          ]
+        },
+        {
+          "id": "save-reopen",
+          "clause": "Ordinary save and reopen preserves raw layer opacity.",
+          "covers": [
+            "save-reopen"
+          ]
+        },
+        {
+          "id": "preview-export",
+          "clause": "Installed preview and export consume raw opacity per the original task.",
+          "covers": [
+            "pixels",
+            "oracle"
+          ]
+        }
+      ],
+      "runtimeDisposition": "https://github.com/mysteropodes/nemo/issues/2348#issuecomment-6418087338 approves the unchanged original three cold app lifetimes, each with a separate receipt and evidenced cleanup, at identical source/tree/package/executable. Issue-level continuation outside this Ready census; any identity drift voids the continuation without replay."
+    },
+    {
+      "id": "text-scene",
+      "issue": 2269,
+      "status": "Blocked",
+      "reason": "No original task owner; curation #2349. Original installed clauses remain required as issue-level receipts outside the CS7 Ready census; scenario implementation/review and runtime qualification remain outstanding.",
+      "tasks": [],
+      "surfaces": [],
+      "dependsOn": [],
+      "scenario": "text-scene",
+      "acceptanceReference": "https://github.com/mysteropodes/nemo/issues/2269#issuecomment-6403867337",
+      "checks": [
+        {
+          "id": "font-edit",
+          "clause": "Installed retained Text font and edit workflow.",
+          "covers": [
+            "positive"
+          ]
+        },
+        {
+          "id": "save-reopen",
+          "clause": "Installed Text save/reopen with retained font and text.",
+          "covers": [
+            "save-reopen"
+          ]
+        },
+        {
+          "id": "preview-export",
+          "clause": "Installed Text preview/export consumes retained Text and raw layer alpha once.",
+          "covers": [
+            "pixels",
+            "oracle"
+          ]
+        },
+        {
+          "id": "recovery",
+          "clause": "Installed Text recovery from the original task.",
+          "covers": [
+            "positive",
+            "oracle"
+          ]
+        },
+        {
+          "id": "sdk-client",
+          "clause": "Original SDK/client exit, depending on the unchanged #2267 Text workflow.",
+          "covers": [
+            "oracle"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "text-targets",
+      "issue": 2264,
+      "status": "Ready",
+      "tasks": [
+        "G38a",
+        "G41"
+      ],
+      "surfaces": [],
+      "dependsOn": [],
+      "scenario": "text-targets",
+      "acceptanceReference": "https://github.com/mysteropodes/nemo/issues/2264#issuecomment-6403866784",
+      "checks": [
+        {
+          "id": "text-edit",
+          "clause": "Original clause4: installed Text edit through pinned native target list/read.",
+          "covers": [
+            "positive",
+            "oracle"
+          ]
+        },
+        {
+          "id": "font-bind",
+          "clause": "Original clause4: installed font binding via #2267.",
+          "covers": [
+            "positive",
+            "oracle"
+          ]
+        },
+        {
+          "id": "reopen",
+          "clause": "Original clause4: installed reopen via #2267; prior installed Text failure remains open until the real rerun.",
+          "covers": [
+            "save-reopen"
+          ]
+        }
+      ],
+      "taskEvidence": "https://github.com/mysteropodes/nemo/issues/2264 \u2014 body: existing agreed baseline G38a/G41.",
+      "phaseEvidence": {
+        "text-edit": [
+          "point-create",
+          "point-edit",
+          "undo-edit",
+          "redo-edit",
+          "edit-reopened",
+          "undo-reopened",
+          "redo-reopened"
+        ],
+        "font-bind": [
+          "font-import",
+          "font-bind",
+          "undo-font",
+          "redo-font"
+        ],
+        "reopen": [
+          "save-as",
+          "replace-initial",
+          "reopen-saved",
+          "save-after",
+          "stale-read"
+        ]
+      },
+      "evidence": "Pinned native Text target provider: https://github.com/mysteropodes/nemo/pull/2187 merged at b62396a533e4720301c2b93d45f1ab42717bbc97; protected-provider reconciliation https://github.com/mysteropodes/nemo/issues/2264#issuecomment-6403866784. Shared original Text20 scenario approved at 16a7ded6adfc39610dc708ee4bcc693bbb0c6db4 by https://github.com/mysteropodes/nemo/pull/2403#issuecomment-6428865050.",
+      "runtimePrerequisites": "Same qualified original Text20 packet, standard package and owned session as #2267. Earned provider clauses and original Text20 result remain separate, with no replay; all passing credit waits for verified owner cleanup. Ready does not establish installed acceptance."
+    },
+    {
+      "id": "text20",
+      "issue": 2267,
+      "status": "Ready",
+      "tasks": [
+        "U21",
+        "U22"
+      ],
+      "surfaces": [],
+      "dependsOn": [],
+      "scenario": "text20",
+      "acceptanceReference": "https://github.com/mysteropodes/nemo/issues/2267#issuecomment-6403866970",
+      "checks": [
+        {
+          "id": "original-text20",
+          "clause": "Build the final candidate and run the unchanged ordinary20-phase Text workflow, including bind/history/reopen/preview; preserve every original phase and oracle.",
+          "covers": [
+            "positive",
+            "oracle",
+            "undo-redo",
+            "save-reopen",
+            "pixels"
+          ]
+        }
+      ],
+      "taskEvidence": "https://github.com/mysteropodes/nemo/pull/2403#issuecomment-6416918418 \u2014 reviewer disposition from matrix task owners.",
+      "evidence": "Text Hex source: https://github.com/mysteropodes/nemo/pull/2286 merged at 407a5089e8439387156727cf90d5251f77109a5e; current source-complete reconciliation https://github.com/mysteropodes/nemo/issues/2267#issuecomment-6403866970. Original Text20/operator scenario approved at 765582b2e52a98bf0d1d93eceb78ae5e2c5b0dc2 by https://github.com/mysteropodes/nemo/pull/2403#issuecomment-6416918418.",
+      "runtimePrerequisites": "Qualify the original private packet against the final standard package and current source; obtain normal owned native window/input admission. Ready is source/scenario readiness, not installed acceptance."
+    }
+  ]
+}

@@ -16,8 +16,8 @@ use crate::object_document::object_group_kernels::object_boolean_ops::{Point, Ri
 use crate::object_document::object_group_kernels::object_boolean_topology::IslandBuild;
 use crate::object_document::{
     AuthoredOrder, FrameScope, FrameScopeKind, ObjectDocument, ObjectGeometry, ObjectPoint,
-    ObjectRecord, ObjectSegment, ObjectTarget, OrderElement, Presence, SolidFill, VectorBody,
-    VectorExt, VECTOR_FAMILY,
+    ObjectRecord, ObjectSegment, ObjectTarget, OrderElement, OrderScope, Presence, SolidFill,
+    VectorBody, VectorExt, VECTOR_FAMILY,
 };
 
 pub(crate) const MAX_SAFE_REVISION: u64 = 9_007_199_254_740_991;
@@ -231,8 +231,26 @@ pub(crate) fn island_record(
         .value()
         .and_then(|ext| ext.fill_trace.value())
         .cloned();
+    // ... and its Shadow Brush channel (`channelTag`, `shadowSwatchId`) and Fill Brush flag (`isFillShape`).
+    let shadow = style
+        .source
+        .vector_ext
+        .value()
+        .and_then(|ext| ext.shadow.value())
+        .cloned();
+    let fill_shape = style
+        .source
+        .vector_ext
+        .value()
+        .is_some_and(|ext| ext.is_fill_shape.value() == Some(&true));
     let ext = match (&style.box_angle, gradient) {
-        (angle, gradient) if angle.is_some() || gradient.is_some() || trace.is_some() => {
+        (angle, gradient)
+            if angle.is_some()
+                || gradient.is_some()
+                || trace.is_some()
+                || shadow.is_some()
+                || fill_shape =>
+        {
             Presence::Present(VectorExt {
                 pressure: Presence::Missing,
                 param_shape: Presence::Missing,
@@ -244,6 +262,13 @@ pub(crate) fn island_record(
                 mask_mode: Presence::Missing,
                 mask_feather: Presence::Missing,
                 bitmap_brush: Presence::Missing,
+                brush_texture: Presence::Missing,
+                shadow: shadow.map_or(Presence::Missing, Presence::Present),
+                is_fill_shape: if fill_shape {
+                    Presence::Present(true)
+                } else {
+                    Presence::Missing
+                },
                 linked_fill_id: Presence::Missing,
                 is_linked_fill_companion: Presence::Missing,
             })
@@ -307,9 +332,32 @@ pub(crate) fn apply_stack(
             .iter_mut()
             .find(|c| c.context_id == scope.context_id)
             .ok_or(StackError::ContextAbsent)?;
-        let found = context.scopes.iter_mut().find(|s| {
+        let is_scope = |s: &OrderScope| {
             s.frame_scope.kind == FrameScopeKind::Authored && s.frame_scope.frame == scope.frame
-        });
+        };
+        // A cell with no records yet has no scope (a U36 reference fill paints such a cell): create it in frame order,
+        // the way the ordinary vector create does (`insert_element`).
+        if !stack.is_empty() && !context.scopes.iter().any(is_scope) {
+            let at = context
+                .scopes
+                .iter()
+                .position(|s| {
+                    s.frame_scope.kind == FrameScopeKind::Authored
+                        && s.frame_scope.frame > scope.frame
+                })
+                .unwrap_or(context.scopes.len());
+            context.scopes.insert(
+                at,
+                OrderScope {
+                    frame_scope: FrameScope {
+                        kind: FrameScopeKind::Authored,
+                        frame: scope.frame,
+                    },
+                    elements: Vec::new(),
+                },
+            );
+        }
+        let found = context.scopes.iter_mut().find(|s| is_scope(s));
         if let Some(found) = found {
             let old: Vec<OrderElement> = found
                 .elements

@@ -20,6 +20,8 @@ pub(crate) enum PaintIndex {
     Duplicator(usize),
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     Brush(usize),
+    /// A produced brush-texture dab: its paint and the layer of its anchor.
+    Dab(usize, usize),
 }
 pub(crate) enum PaintEntry<'a> {
     Contour(ObjectPaintCommand<'a>),
@@ -28,6 +30,7 @@ pub(crate) enum PaintEntry<'a> {
     Component(&'a crate::object_render_scene::component_scene::ComponentPaint),
     Video(usize),
     Duplicator(&'a crate::object_render_scene::duplicator_scene::DuplicatorPaint),
+    Dab(&'a crate::object_render_scene::paint::dab_paint::DabPaint),
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     Brush(usize),
 }
@@ -103,6 +106,7 @@ pub(crate) fn ordered_entries(plan: &ObjectPaintPlan) -> impl Iterator<Item = Pa
         PaintIndex::Duplicator(index) => {
             PaintEntry::Duplicator(&plan.scene.duplicators.paints[*index])
         }
+        PaintIndex::Dab(index, _) => PaintEntry::Dab(&plan.dabs[*index]),
     })
 }
 pub(super) fn prepare(

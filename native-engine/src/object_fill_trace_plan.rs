@@ -83,6 +83,9 @@ pub(crate) fn fill_record(
             box_angle: Presence::Missing,
             fill_gradient: Presence::Missing,
             bitmap_brush: Presence::Missing,
+            brush_texture: Presence::Missing,
+            shadow: Presence::Missing,
+            is_fill_shape: Presence::Missing,
             linked_fill_id: Presence::Missing,
             is_linked_fill_companion: Presence::Missing,
             is_mask: Presence::Missing,
@@ -145,6 +148,18 @@ fn recolor(
     }
 }
 
+fn companion(r: &ObjectRecord) -> bool {
+    r.vector_ext
+        .value()
+        .is_some_and(|e| e.is_linked_fill_companion.value() == Some(&true))
+}
+/// A brush-texture dab (G16): the baseline fill and merge kernels skip `isBrushTextureCopy`.
+fn dab(r: &ObjectRecord) -> bool {
+    r.vector_ext
+        .value()
+        .and_then(|e| e.brush_texture.value())
+        .is_some_and(|t| t.is_brush_texture_copy.value() == Some(&true))
+}
 pub(crate) fn plan_trace(
     document: &ObjectDocument,
     scope: &Scope,
@@ -153,6 +168,7 @@ pub(crate) fn plan_trace(
     opacity: f64,
     remove: bool,
     revision: u64,
+    reference: Option<&[&ObjectRecord]>,
 ) -> Result<BooleanPlan, PlanError> {
     check_scope(document, scope)?;
     let ids = stack_of(document, scope);
@@ -176,9 +192,21 @@ pub(crate) fn plan_trace(
         ));
     }
     let mut tracer = NativeTrace::new(document, scope, click, None, None)
+        .and_then(|tracer| tracer.with_walls(reference.into_iter().flatten().copied()))
         .map_err(|_| PlanError::FillUnavailable)?;
     let hit = find_fill_region(&mut tracer, None).map_err(|_| PlanError::FillUnavailable)?;
+    // U36 reference fill: walls from other layers are not this layer's to regenerate against, so the fill keeps
+    // its seed and gap but no wall ids, and a miss recolors nothing (the baseline only toasts).
+    let hit = hit.map(|mut hit| {
+        if reference.is_some() {
+            hit.wall_ids.clear();
+        }
+        hit
+    });
     let Some(hit) = hit else {
+        if reference.is_some() {
+            return Ok(unchanged(document));
+        }
         return Ok(fallback.map_or_else(
             || unchanged(document),
             |i| recolor(document, i, paint, opacity, false),
@@ -190,7 +218,8 @@ pub(crate) fn plan_trace(
         .zip(&rings)
         .map(|(r, ring)| ChildFacts {
             filled_shape: r.solid_fill().is_some(),
-            excluded: false,
+            // fillFindExistingMatch skips `isLinkedFillCompanion || isBrushTextureCopy` children.
+            excluded: companion(r) || dab(r),
             bounds: native::bounds(ring),
             area: native::area(ring),
             covers_click: native::contains(ring, click),
@@ -204,6 +233,12 @@ pub(crate) fn plan_trace(
             fill_hex8: r.solid_fill().map(hex8),
             stroked: r.vector().is_some_and(|v| v.solid_stroke().is_some()),
             is_vector_brush: r.is_pressure_ribbon(),
+            is_linked_fill_companion: companion(r),
+            is_brush_texture_copy: dab(r),
+            is_fill_shape: r
+                .vector_ext
+                .value()
+                .is_some_and(|e| e.is_fill_shape.value() == Some(&true)),
             stroke_id: Some(r.target.stroke_id.clone()),
             fill_walls: r
                 .vector_ext

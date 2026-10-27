@@ -183,8 +183,8 @@
     }
   },
   "permittedEdges": {
-    "note": "Observed from use and inline crate paths, recomputed for N19A and extended by T10A1's verified embedded-fixture decode. T10A2 private capture and T10A3 private isolated replay children preserve that graph. P37C1A/#1702's private default-off root declaration adds exactly root-to-native-codec for the immutable PNG helper. N25F3D3C2B/#1832 adds exactly export-job-to-compositor for a caller-owned one-frame object export bridge. N25F3C2A1P/#1700 adds only root-to-application for its private default-off expression-pin declaration and application-to-evaluation for the read-only packet helper. P37C1-DESKTOP/#1864 adds exactly render-scene-to-read-queries for charged immutable reference pixels; no exception or public port is added. Layer rules remain enforced; the test suite pins the exact observed 49-edge graph so further additions require a reviewed policy change.",
-    "edgeCount": 49
+    "note": "Observed from use and inline crate paths, recomputed for N19A and extended by T10A1's verified embedded-fixture decode. T10A2 private capture and T10A3 private isolated replay children preserve that graph. P37C1A/#1702's private default-off root declaration adds exactly root-to-native-codec for the immutable PNG helper. N25F3D3C2B/#1832 adds exactly export-job-to-compositor for a caller-owned one-frame object export bridge. N25F3C2A1P/#1700 adds only root-to-application for its private default-off expression-pin declaration and application-to-evaluation for the read-only packet helper. P37C1-DESKTOP/#1864 adds exactly render-scene-to-read-queries for charged immutable reference pixels; no exception or public port is added. CS8/#2358 adds root-to-commands for the private application-gated tween module; the public root port and layer rules are unchanged. Layer rules remain enforced; the test suite pins the exact observed 50-edge graph so further additions require a reviewed policy change.",
+    "edgeCount": 50
   },
   "exportedPort": {
     "source": "native-engine/src/lib.rs exposes modules through a declaration macro rather than pub use; N19 tests pin that macro and its Cargo mapping separately.",

@@ -316,6 +316,14 @@ impl NativeDispatch for NativeObjectHost {
             .history
             .acquire_snapshot(self.content_revision())
             .ok_or("native object snapshot is unavailable")?;
+        if request.operation() == "query.document.object"
+            && serde_json::to_value(&request)
+                .ok()
+                .is_some_and(|wire| wire["payload"].get("view").is_some())
+        {
+            if serde_json::to_value(&request).ok().is_some_and(|wire| wire["payload"]["view"]["kind"] == "subselect") { return self.dispatch_subselect_view(&snapshot, request); }
+            return self.dispatch_image_mesh_view(&snapshot, request);
+        }
         let expression_state = request.operation() == "query.document.object.property.read"
             && serde_json::to_value(&request)
                 .ok()

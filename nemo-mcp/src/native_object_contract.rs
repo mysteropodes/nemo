@@ -29,6 +29,18 @@ fn target(value: &Value) -> bool {
 }
 
 pub(super) fn request(value: &Value) -> bool {
+    if value.get("subselect").is_some() {
+        return subselect::request(value);
+    }
+    if value["view"]["kind"] == "subselect" {
+        return subselect::view_request(value);
+    }
+    if image_mesh::presentation_view(value) {
+        return image_mesh::presentation_request(value);
+    }
+    if image_mesh::image_mesh_view(value) {
+        return image_mesh::image_mesh_request(value);
+    }
     exact(value, &["atRevision", "stableTarget"], &[]).is_some_and(|value| {
         revision(value.get("atRevision")).is_some() && value.get("stableTarget").is_some_and(target)
     })
@@ -65,6 +77,9 @@ pub(super) fn timing_request(value: &Value) -> bool {
     if value.get("view").is_some_and(|view| view == "placement") {
         return layer_placement::request(value);
     }
+    if value.get("view").is_some_and(|view| view == "cells") {
+        return layer_cells::request(value);
+    }
     if value.get("view").is_some() {
         return layer_range::request(value);
     }
@@ -74,6 +89,9 @@ pub(super) fn timing_request(value: &Value) -> bool {
 pub(super) fn timing_result(document_id: &str, payload: &Value, result: &Value) -> bool {
     if payload.get("view").is_some_and(|view| view == "placement") {
         return layer_placement::result(document_id, payload, result);
+    }
+    if payload.get("view").is_some_and(|view| view == "cells") {
+        return layer_cells::result(document_id, payload, result);
     }
     if payload.get("view").is_some() {
         return layer_range::result(document_id, payload, result);
@@ -268,6 +286,18 @@ fn record(value: &Value) -> bool {
 }
 
 pub(super) fn result(document_id: &str, payload: &Value, result: &Value) -> bool {
+    if payload.get("subselect").is_some() {
+        return subselect::result(document_id, payload, result);
+    }
+    if payload["view"]["kind"] == "subselect" {
+        return subselect::view_result(document_id, payload, result);
+    }
+    if image_mesh::presentation_view(payload) {
+        return image_mesh::presentation_result(document_id, payload, result);
+    }
+    if image_mesh::image_mesh_view(payload) {
+        return image_mesh::image_mesh_result(document_id, payload, result);
+    }
     request(payload)
         && exact(result, &["atRevision", "documentSnapshotId", "object"], &[]).is_some_and(
             |value| {
@@ -288,7 +318,23 @@ pub(super) fn result(document_id: &str, payload: &Value, result: &Value) -> bool
 #[path = "native_object_contract_tests.rs"]
 mod tests;
 
+#[path = "native_layer_cells_contract.rs"]
+mod layer_cells;
 #[path = "native_layer_placement_contract.rs"]
 mod layer_placement;
 #[path = "native_layer_range_contract.rs"]
 mod layer_range;
+
+#[path = "native_image_mesh_read_contract.rs"]
+mod image_mesh;
+
+#[cfg(test)]
+#[path = "native_image_mesh_read_contract_tests.rs"]
+mod image_mesh_tests;
+
+#[cfg(test)]
+#[path = "native_presentation_read_contract_tests.rs"]
+mod presentation_transport_tests;
+
+#[path = "native_subselect_contract.rs"]
+pub(crate) mod subselect;

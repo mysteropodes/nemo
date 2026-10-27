@@ -13,6 +13,9 @@
 use crate::object_document::object_group_kernels::object_boolean_ops::RingSeg;
 #[path = "object_fill_trace_plan.rs"]
 pub(crate) mod document;
+// #2361: the Fill Brush commit (placement, then the same-colour merge with Fill Brush absorb).
+#[path = "object_fill_brush_plan.rs"]
+pub(crate) mod brush;
 #[path = "object_fill_geometry.rs"]
 mod geometry;
 #[path = "object_fill_native_provider.rs"]

@@ -49,7 +49,28 @@
     return loc ? loc.point : worldPt;
   }
 
+  // Native authority (U33, #2362): the same guided path committed through the native vector create, keyed with what a held
+  // cell showed (the baseline ensureKeyframe()). One native history entry.
+  function nativeCommit(native) {
+    var layerUid = native.layerUid(state.activeLayerIdx);
+    var path = new Path({ insert: false });
+    pts.forEach(function (p) { path.add(p); });
+    path.simplify(state.smoothing || 1);
+    var dict = { closed: false, strokeColor: state.strokeEnabled ? state.strokeColor : null, strokeWidth: state.brushSize,
+      strokeCap: state.strokeCap, strokeJoin: state.strokeJoin, fillColor: state.fillEnabled ? state.fillColor : null,
+      segments: path.segments.map(function (s) {
+        return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] };
+      }) };
+    pts = []; lastScreen = null;
+    if (!layerUid) return Promise.resolve();
+    return native.createStroke(layerUid, state.currentFrame, dict, state.opacity / 100).then(function () {
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    });
+  }
+
   function commit() {
+    var native = window.NemoNativeObjectLabs && NemoNativeObjectLabs.desktop(window);
+    if (native && pts.length >= 2) return nativeCommit(native);
     if (pts.length >= 2) {
       pushUndo();
       ensureKeyframe();
