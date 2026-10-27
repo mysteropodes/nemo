@@ -101,9 +101,9 @@ pub(crate) enum SetupError {
     ObjectScope {
         layer_uid: String,
     },
-    /// Text blocks, bitmap-brush or brush-texture rasters and mesh-bound images of the layer: the
-    /// baseline moves them with the frames it clones, but no placed component paints them yet
-    /// (stable code `component-convert-items`). Plain images move.
+    /// Text on a layer with text animators, bitmap-brush or brush-texture rasters and mesh-bound
+    /// images of the layer: the baseline moves them with the frames it clones, but no placed
+    /// component paints them yet (stable code `component-convert-items`). Plain items move.
     ItemsUnavailable {
         layer_uid: String,
     },
