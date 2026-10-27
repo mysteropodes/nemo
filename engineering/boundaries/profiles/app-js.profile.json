@@ -3766,6 +3766,18 @@
       "publicApi": [
         "native-settings-validation-gate.js"
       ]
+    },
+    {
+      "id": "app.native.subselect.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-subselect-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-subselect-contract.js"
+      ]
     }
   ],
   "layerRules": {

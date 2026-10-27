@@ -82,8 +82,12 @@
       const view = { kind: 'imageMesh', contextId: selector.contextId, layerUid: selector.layerUid, frame: selector.frame,
         workId: o.workId, viewGeneration: o.viewGeneration, page: page };
       const body = { atRevision: o.info.contentRevision, documentSnapshotId: o.info.documentSnapshotId, view: view };
+      return queryBody(o, body);
+    }
+    async function queryBody(o, body) {
+      requireCurrent(o);
       payload(body);
-      const request = { apiVersion: 2, requestId: ports.requestId('image-mesh-read'), instanceId: o.info.instanceId,
+      const request = { apiVersion: 2, requestId: ports.requestId('object-geometry-read'), instanceId: o.info.instanceId,
         documentId: o.info.documentId, operation: OP, payload: body };
       if (bytes(request) > 4096) throw fault('invalid_request', 'Native image-mesh query exceeds 4096 bytes', 'request_size');
       requireCurrent(o);
@@ -103,7 +107,7 @@
       if (response.ok !== true || response.contentRevision !== o.info.contentRevision || !own(response, 'result'))
         throw fault('uncorrelated', 'Native image-mesh query revision changed', 'response_revision');
       if (bytes(response) > 4096) throw fault('invalid_request', 'Native image-mesh response exceeds 4096 bytes', 'response_size');
-      try { result(response.result); correlate(body, response.result); }
+      try { result(response.result); correlate(body, response.result, null, o.info.documentId); }
       catch (e) { throw fault('uncorrelated', 'Native image-mesh query result is invalid: ' + e.message, 'response_shape'); }
       requireCurrent(o);
       const v = response.result;
@@ -171,6 +175,48 @@
         throw fault('unavailable', 'Native image-mesh read failed: ' + (e && e.message || e), 'native_read_failed');
       }
     }
+    async function subselectGeometry(o, stableTarget, intent) {
+      let cursor=0,segments=[],total=null,closed=null;
+      for(;;){
+        const page={cursor:cursor,limit:16};if(intent!==undefined)page.preview=intent;
+        const r=(await queryBody(o,{atRevision:o.info.contentRevision,documentSnapshotId:o.info.documentSnapshotId,stableTarget:stableTarget,subselect:page})).subselect;
+        if(total!==null&&(r.total!==total||r.closed!==closed))throw fault('uncorrelated','Subselect geometry changed between pages');
+        total=r.total;closed=r.closed;segments=segments.concat(r.segments);
+        if(r.nextCursor===null)break;cursor=r.nextCursor;
+      }
+      requireCurrent(o);return {closed:closed,segments:segments};
+    }
+    async function readSubselect(selector,pin) {
+      if(!exact(selector,['contextId','layerUid','frame'],[])||selector.contextId!=='scene-root'||!text(selector.layerUid)||!integer(selector.frame,0,4294967295)||!pins(pin))throw fault('invalid_request','Invalid subselect selection');
+      const o=origin(selector,pin);if(!o)throw fault('unavailable','Subselect needs a current native presentation');
+      await settle(o);let cursor=0,total=null,items=[];
+      for(;;){
+        const view=Object.assign({kind:'subselect',workId:o.workId,viewGeneration:o.viewGeneration,cursor:cursor,limit:8},selector);
+        const r=await queryBody(o,{atRevision:o.info.contentRevision,documentSnapshotId:o.info.documentSnapshotId,view:view});
+        if(total!==null&&total!==r.total)throw fault('uncorrelated','Subselect selection changed between pages');
+        total=r.total;items=items.concat(r.items);if(r.nextCursor===null)break;cursor=r.nextCursor;
+      }
+      const ids=new Set();
+      for(const item of items){
+        const key=stable(item.stableTarget);if(ids.has(key)||item.stableTarget.frameScope.kind!=='authored'||item.stableTarget.frameScope.frame>selector.frame)throw fault('uncorrelated','Subselect selection has invalid source identities');ids.add(key);
+        const geometry=await subselectGeometry(o,item.stableTarget);
+        if(geometry.closed!==item.closed||geometry.segments.length!==item.count)throw fault('uncorrelated','Subselect geometry differs from its native presentation');
+        item.segments=geometry.segments;
+      }
+      requireCurrent(o);return freeze({info:copyPins(o.info),presentation:o.presentation,items:items});
+    }
+    async function previewSubselect(selector,stableTarget,intent,pin){
+      const o=origin(selector,pin);if(!o||!target(stableTarget)||stableTarget.contextId!==selector.contextId||stableTarget.layerUid!==selector.layerUid)throw fault('unavailable','Subselect preview origin changed');
+      await settle(o);const geometry=await subselectGeometry(o,stableTarget,intent);requireCurrent(o);
+      let cursor=0,matrix=null;
+      for(;;){const view=Object.assign({kind:'subselect',workId:o.workId,viewGeneration:o.viewGeneration,cursor:cursor,limit:8,preview:{stableTarget:stableTarget,intent:intent}},selector);
+        const r=await queryBody(o,{atRevision:o.info.contentRevision,documentSnapshotId:o.info.documentSnapshotId,view:view});
+        const item=r.items.find(item=>stable(item.stableTarget)===stable(stableTarget));
+        if(item){if(item.closed!==geometry.closed||item.count!==geometry.segments.length)throw fault('uncorrelated','Subselect preview geometry and transform differ');matrix=item.matrix;break;}
+        if(r.nextCursor===null)throw fault('uncorrelated','Subselect preview target is absent');cursor=r.nextCursor;
+      }
+      requireCurrent(o);return freeze({info:copyPins(o.info),presentation:o.presentation,closed:geometry.closed,segments:geometry.segments,matrix:matrix});
+    }
     async function readLegacy(layerUid, frame, pin, view) {
       function ready() {
         const s = ports.state(), p = s && s.presented;
@@ -222,7 +268,7 @@
       return freeze(runs.map((run) => freeze(run.slice())));
     }
     return Object.freeze({ readLayerTiming: (l, f, p) => readLegacy(l, f, p), readLayerRange: (l, f, p) => readLegacy(l, f, p, 'range'),
-      readLayerPlacement: (l, f, p) => readLegacy(l, f, p, 'placement'), readLayerCells: readLayerCells, readImageMesh: readImageMesh });
+      readLayerPlacement: (l, f, p) => readLegacy(l, f, p, 'placement'), readLayerCells: readLayerCells, readImageMesh: readImageMesh, readSubselect: readSubselect, previewSubselect: previewSubselect });
   }
   function expectedCount(kind, m) { return kind === 'outline' ? m.outlineCount : kind === 'verts' ? m.vertexCount : kind === 'tris' ? m.triangleIndexCount : m.vertexCount; }
   function copyTarget(t) { return { contextId: t.contextId, layerUid: t.layerUid, frameScope: { kind: t.frameScope.kind, frame: t.frameScope.frame }, strokeId: t.strokeId }; }

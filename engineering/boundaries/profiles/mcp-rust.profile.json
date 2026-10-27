@@ -17,6 +17,8 @@
         "src/main_trace_tests.rs",
         "src/native_contract.rs",
         "src/native_object_contract.rs",
+        "src/native_subselect_contract.rs",
+        "src/native_subselect_contract_tests.rs",
         "src/native_object_contract_tests.rs",
         "src/native_image_mesh_read_contract.rs",
         "src/native_image_mesh_read_contract_tests.rs",

@@ -21,7 +21,7 @@ pub(crate) use font_assets::{
 pub(crate) use crate::object_document::object_raster_asset_kernels::object_raster_asset_item::RasterItem;
 #[cfg(any(feature = "font_asset_wire", feature = "application"))]
 pub(crate) use crate::object_document::AssetRecord;
-pub(crate) use crate::object_document::OrderCurvePoint;
+pub(crate) use crate::object_document::{subselect, OrderCurvePoint};
 pub(crate) use crate::object_document::{item_asset_issue, ObjectLayer, Presence, PropertyHolder};
 #[cfg(all(feature = "font_asset_wire", not(feature = "history")))]
 pub(crate) use crate::object_document::{AssetId, AssetKind};

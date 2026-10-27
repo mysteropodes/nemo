@@ -12,6 +12,7 @@ const at = { layerUid: 'layer-a', contextId: 'scene-root' };
 const cell = { contextId: 'scene-root', layerUid: 'layer-a', frame: 0 };
 // [suffix, literal payload]. Independent of the contract table: command strings and members are spelled out here.
 const VALID = [
+  ['subselect.edit', {command:'object.subselect.edit',stableTarget:{contextId:'scene-root',layerUid:'layer-a',frameScope:{kind:'authored',frame:0},strokeId:'stroke-a'},intent:{kind:'move',indices:[0],delta:[5,2]}}],
   ['layer.delete', { command: 'object.layer.delete', selection: sel }],
   ['layer.duplicate', { command: 'object.layer.duplicate', layerUid: 'layer-b' }],
   ['layer.rename', { command: 'object.layer.rename', layerUid: 'layer-b', name: 'Ink' }],
@@ -36,10 +37,10 @@ const VALID = [
 const envelope = (suffix, payload, extra) => Object.assign({ apiVersion: 2, requestId: 'edit-1', instanceId: 'instance-A', documentId: 'document-A',
   operation: P + suffix, expectedRevision: 7, payload }, extra);
 
-test('the contract admits exactly the 20 declared operations, all revisioned commands', () => {
+test('the contract admits exactly the 21 declared operations, all revisioned commands', () => {
   const edit = contract;
   assert.deepEqual(edit.OPERATIONS, VALID.map(([s]) => P + s));
-  assert.equal(edit.OPERATIONS.length, 20);
+  assert.equal(edit.OPERATIONS.length, 21);
   for (const op of edit.OPERATIONS) { assert.equal(edit.admitted(op), true); assert.equal(edit.requiresRevision(op), true); assert.equal(seam.admitted(op), true); }
   for (const op of ['command.document.object.layer.create', 'command.document.object.layer.policy.edit', 'command.document.object.fill.unknown', 'query.document.object', P + 'group', P + 'toString', '', null, undefined]) {
     assert.equal(edit.admitted(op), false, String(op));
@@ -58,7 +59,7 @@ test('every literal payload is accepted and every one-member mutation is refused
     assert.throws(() => contract.payload(P + suffix, Object.keys(payload).map((k) => payload[k])), TypeError, suffix + ' positional');
     assert.throws(() => contract.payload(P + suffix, { ...payload, command: 'object.layer.policy.edit' }), TypeError, suffix + ' foreign command');
   }
-  assert.throws(() => contract.payload(P + 'layer.delete', VALID[1][1]), TypeError, 'a payload of another operation');
+  assert.throws(() => contract.payload(P + 'layer.delete', VALID.find(([s])=>s==='layer.duplicate')[1]), TypeError, 'a payload of another operation');
 });
 
 test('bounds mirror the owner: ids 128 bytes, names 256, labels 64, selections 1024, footprint 3..1024, frame u32', () => {
@@ -162,7 +163,7 @@ test('the injected seam is the font contract composed with the edit contract and
 
 test('capability descriptors and the closed transport schema declare exactly the contract operations', () => {
   const dir = path.join(ROOT, 'engineering/application/capabilities-v2');
-  const files = ['layer-lifecycle', 'group', 'selection-edit', 'boolean', 'fill'].map((k) => path.join(dir, 'native-object-' + k + '.json'));
+  const files = ['layer-lifecycle', 'group', 'selection-edit', 'boolean', 'fill', 'subselect'].map((k) => path.join(dir, 'native-object-' + k + '.json'));
   const schema = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/native-transport-v2.schema.json'), 'utf8'));
   const declared = [];
   const ids = new Set();
@@ -182,8 +183,8 @@ test('capability descriptors and the closed transport schema declare exactly the
     declared.push(...d.operations);
   }
   assert.deepEqual(declared.slice().sort(), contract.OPERATIONS.slice().sort());
-  assert.equal(new Set(declared).size, 20);
-  assert.deepEqual([...ids].sort(), ['native.object.boolean', 'native.object.fill', 'native.object.group', 'native.object.layer-lifecycle', 'native.object.selection-edit']);
+  assert.equal(new Set(declared).size, 21);
+  assert.deepEqual([...ids].sort(), ['native.object.boolean', 'native.object.fill', 'native.object.group', 'native.object.layer-lifecycle', 'native.object.selection-edit', 'native.object.subselect']);
   for (const [suffix, payload] of VALID) {
     const branches = schema.$defs.Request.oneOf.filter((b) => b.allOf[1].properties.operation.const === P + suffix);
     assert.equal(branches.length, 1, suffix);

@@ -5671,6 +5671,9 @@ function _ptHandleOut(isVB,seg){return isVB?new Point(seg.handleOut?seg.handleOu
 function _ptSetHandleIn(isVB,seg,pt){if(isVB)seg.handleIn=[pt.x,pt.y];else seg.handleIn=pt;}
 function _ptSetHandleOut(isVB,seg,pt){if(isVB)seg.handleOut=[pt.x,pt.y];else seg.handleOut=pt;}
 function setPointType(type){
+  var nativeOwner=window.NemoNativeObjectProject&&window.NemoNativeObjectProject.desktop(window);
+  if(nativeOwner&&nativeOwner.blocksLegacy()){if(window.NemoNativeSubselectController)return window.NemoNativeSubselectController.setPointType(type);showToast('Native subselect is unavailable.');return;}
+
   var path=nodeEditTargetPath();
   if(!path||!_nodeSel.length){showToast(SM.t('toastSelectOneOrMorePointsSubselect'));return;}
   pushUndo();

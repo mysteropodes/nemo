@@ -138,7 +138,7 @@ fn spec(operation: &str) -> Option<(&'static str, &'static str)> {
 }
 
 pub(crate) fn admitted(operation: &str) -> bool {
-    spec(operation).is_some()
+    operation == object::subselect::EDIT || spec(operation).is_some()
 }
 
 /// Rust `char::is_control` is the Unicode Cc class, the same set the owner refuses.
@@ -268,6 +268,9 @@ fn check(kind: K, value: &Value) -> bool {
 }
 
 pub(super) fn request(operation: &str, payload: &Value) -> bool {
+    if operation == object::subselect::EDIT {
+        return object::subselect::edit_request(payload);
+    }
     let Some((command, members)) = spec(operation) else {
         return false;
     };
