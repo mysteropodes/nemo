@@ -49,8 +49,8 @@ fn spec_of(case: &Value) -> LottieSpec {
 }
 fn export(case: &Value) -> Result<Value, LottieExportError> {
     let spec = spec_of(case);
-    // A camera case is a whole native project file: the stored camera lives in the project, which only the
-    // project-file codec loads (the application target runs these rows; export_job runs the drawing-only ones).
+    // Camera and duplicator cases are whole native project files (the stored camera and the duplicator's canvas live
+    // in the project), which only the project-file codec loads (the application target runs these rows; export_job runs the drawing-only ones).
     #[cfg(feature = "project_media_codec")]
     let history = if case["project"].is_null() {
         owner(&case["document"])
@@ -110,14 +110,14 @@ fn every_oracle_case_matches_the_baseline_writer() {
     let oracle: Value = serde_json::from_str(ORACLE).unwrap();
     assert_eq!(oracle["commit"].as_str().unwrap().len(), 40);
     let cases = oracle["cases"].as_array().unwrap();
-    assert_eq!(cases.len(), 8);
+    assert_eq!(cases.len(), 10);
     let runs = |case: &&Value| cfg!(feature = "project_media_codec") || case["project"].is_null();
     assert_eq!(
         cases.iter().filter(runs).count(),
         if cfg!(feature = "project_media_codec") {
-            8
+            10
         } else {
-            6
+            7
         }
     );
     for case in cases.iter().filter(runs) {
