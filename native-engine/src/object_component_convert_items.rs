@@ -1,10 +1,12 @@
-//! The items of converted layers (`component-convert-items`). The baseline carries a raster with
-//! the frame's `strokes` array, so it keeps its stack position among the strokes inside the
-//! component. Native images are re-keyed to the component context and their inner layer. When any
-//! image moves and the document carries an order plan, the component declares its own order context:
-//! the scene's elements of the converted layers, re-keyed. Natural component order would lift every
-//! image above the layer's contours. Text blocks (holder ids name the context), bitmap-brush or
-//! brush-texture rasters and mesh-bound images have no placed paint and stay refused.
+//! The items of converted layers (`component-convert-items`). The baseline carries a raster (and a
+//! vector-text glyph path) with the frame's `strokes` array, so it keeps its stack position among
+//! the strokes inside the component. Native images and text blocks are re-keyed to the component
+//! context and their inner layer; a block's holder id follows its target. When any item moves and
+//! the document carries an order plan, the component declares its own order context: the scene's
+//! elements of the converted layers, re-keyed. Natural component order would lift every item above
+//! the layer's contours. Still refused: text on a layer with text animators (a placed component
+//! paints none, and a one-layer convert leaves the layer's animators on the instance),
+//! bitmap-brush or brush-texture rasters, and mesh-bound images.
 use crate::commands::object_fill_owner::component_owner::object_component_convert_support::SetupError;
 use crate::commands::remove_order_element;
 use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
@@ -19,11 +21,19 @@ fn scene_on(target: &crate::object_document::ObjectTarget, layer_uid: &str) -> b
 
 /// Whether the layer holds an item no component can paint yet.
 pub(crate) fn refused_on(document: &ObjectDocument, layer_uid: &str) -> bool {
+    let animated = document.layers.iter().any(|layer| {
+        layer.layer_uid == layer_uid
+            && layer
+                .text_animators
+                .value()
+                .is_some_and(|animators| !animators.0.is_empty())
+    });
     document.item_records().is_some_and(|items| {
-        items
-            .text_entries()
-            .iter()
-            .any(|entry| scene_on(&entry.target, layer_uid))
+        (animated
+            && items
+                .text_entries()
+                .iter()
+                .any(|entry| scene_on(&entry.target, layer_uid)))
             || items.raster_entries().iter().any(|entry| {
                 let item = &entry.item;
                 scene_on(&entry.target, layer_uid)
@@ -35,7 +45,7 @@ pub(crate) fn refused_on(document: &ObjectDocument, layer_uid: &str) -> bool {
     })
 }
 
-/// Move the images of each `(scene layer, inner layer)` into `symbol`, in `candidate` (a clone of
+/// Move the items of each `(scene layer, inner layer)` into `symbol`, in `candidate` (a clone of
 /// `document`, whose scene order is read before any of the converted layers' elements are removed).
 /// Returns the component's order context for [`declare`] once the layer lifecycle edits are done:
 /// they match layers by uid in every context, and a merge keeps the source uids inside.
@@ -55,27 +65,35 @@ pub(crate) fn move_images(
             .map(|(_, inner)| inner.clone())
     };
     let mut moved = Vec::new();
-    let mut rasters = items.raster_entries().to_vec();
-    for entry in &mut rasters {
-        if entry.target.context_id != SCENE_CONTEXT {
-            continue;
+    let mut retarget = |target: &mut crate::object_document::ObjectTarget| {
+        if target.context_id != SCENE_CONTEXT {
+            return Ok(());
         }
-        if let Some(inner) = inner_of(&entry.target.layer_uid) {
+        if let Some(inner) = inner_of(&target.layer_uid) {
             // As `retarget_objects`: only authored frames can enter a component.
-            if entry.target.frame_scope.kind != FrameScopeKind::Authored {
+            if target.frame_scope.kind != FrameScopeKind::Authored {
                 return Err(SetupError::ObjectScope {
-                    layer_uid: entry.target.layer_uid.clone(),
+                    layer_uid: target.layer_uid.clone(),
                 });
             }
-            moved.push(entry.target.clone());
-            entry.target.context_id = symbol.to_string();
-            entry.target.layer_uid = inner;
+            moved.push(target.clone());
+            target.context_id = symbol.to_string();
+            target.layer_uid = inner;
         }
+        Ok(())
+    };
+    let mut rasters = items.raster_entries().to_vec();
+    for entry in &mut rasters {
+        retarget(&mut entry.target)?;
+    }
+    let mut texts = items.text_entries().to_vec();
+    for entry in &mut texts {
+        retarget(&mut entry.target)?;
     }
     if moved.is_empty() {
         return Ok(None);
     }
-    candidate.items = ItemRecords::normalized(rasters, items.text_entries().to_vec());
+    candidate.items = ItemRecords::normalized(rasters, texts);
     let Presence::Present(plan) = &document.composition_order else {
         return Ok(None);
     };

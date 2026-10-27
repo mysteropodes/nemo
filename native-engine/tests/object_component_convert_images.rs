@@ -107,6 +107,8 @@ fn order(plan: &ObjectPaintPlan) -> String {
             PaintEntry::Raster(_) => 'I',
             PaintEntry::Contour(_) => 'C',
             PaintEntry::Component(_) => 'c',
+            PaintEntry::Text(text) if text.placed => 't',
+            PaintEntry::Text(_) => 'T',
             _ => '?',
         })
         .collect()
@@ -254,7 +256,7 @@ fn text_brush_and_mesh_bound_items_still_refuse_the_conversion() {
         assert_eq!(reply["error"]["code"], "unavailable", "{name}: {reply}");
         assert_eq!(
             reply["error"]["message"],
-            "component-convert-items: text, brush and mesh-bound items cannot enter a component yet.",
+            "component-convert-items: animated text, brush and mesh-bound items cannot enter a component yet.",
             "{name}"
         );
         assert_eq!(owner.content_revision(), 0, "{name}");
@@ -323,4 +325,56 @@ fn gpu_converting_a_layer_with_an_image_leaves_the_frame_pixel_identical() {
         assert!(render(&converted) == before, "{layers:?} changed the frame");
     }
     assert_eq!(convert(&mut owner, &["ly"])["ok"], true);
+}
+
+#[test]
+#[cfg(feature = "font_asset_admission")]
+fn a_converted_text_block_moves_into_the_component_with_its_glyphs_and_stack_position() {
+    let mut doc = drawing();
+    doc["items"]["text"] = json!([{"target":target("ly","words"),"block":{"text":"Hi",
+        "font":{"kind":"bundled","fontKey":"Roboto-Regular"},"size":24,"color":"#112233",
+        "align":"left","anchorTopLeft":{"x":4,"y":4}}}]);
+    doc["compositionOrder"]["contexts"][0]["scopes"][0]["elements"]
+        .as_array_mut()
+        .unwrap()
+        .insert(
+            2,
+            json!({"layerUid":"ly","strokeId":"words","naturalPosition":2,"order":{}}),
+        );
+    let document = decode_storage_project(doc.to_string().as_bytes()).unwrap();
+    let project = ProjectEnvelope::no_media(ProjectMetadata::new(64, 64, 24.).unwrap(), document)
+        .with_asset_inventory(Some(inventory()));
+    let mut owner = NativeObjectHistory::from_admitted_project("text", project).unwrap();
+    let glyphs = |plan: &ObjectPaintPlan| -> Vec<Vec<[f64; 2]>> {
+        ordered_entries(plan)
+            .filter_map(|entry| match entry {
+                PaintEntry::Text(text) => Some(
+                    text.item
+                        .painted()
+                        .map(|(c, _)| c.contour.segments()[0].point)
+                        .collect(),
+                ),
+                _ => None,
+            })
+            .collect()
+    };
+    let before = plan(&owner);
+    assert_eq!(order(&before), "ICTC");
+    assert_eq!(convert(&mut owner, &["ly"])["ok"], true);
+    let after_doc = stored(&owner);
+    assert_eq!(
+        after_doc["items"]["text"][0]["target"]["contextId"],
+        after_doc["componentTables"]["components"]["components"][0]["symbolId"]
+    );
+    let after = plan(&owner);
+    assert_eq!(
+        order(&after),
+        "ictC",
+        "the text keeps its place above its square"
+    );
+    assert_eq!(
+        glyphs(&after),
+        glyphs(&before),
+        "no matrix: the same glyph paths"
+    );
 }
