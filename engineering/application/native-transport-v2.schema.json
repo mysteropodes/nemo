@@ -13249,6 +13249,10 @@
               "maxLength": 4096
             }
           }
+        },
+        "placement": {
+          "const": "behind",
+          "description": "drawMode 'behind': the anchor at the bottom of the layer's natural stack, its companion directly above it."
         }
       }
     },

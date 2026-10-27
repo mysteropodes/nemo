@@ -150,3 +150,33 @@ fn a_stale_snapshot_a_named_anchor_or_a_missing_brush_group_is_refused_before_an
     );
     let _ = DispatchErrorCode::InvalidRequest;
 }
+
+#[test]
+fn behind_places_the_anchor_under_the_layer_artwork_with_its_companion_directly_above_it() {
+    let mut owner = NativeObjectHistory::from_project_file("desktop", &project()).unwrap();
+    let png = oracle_bytes("blue-2x1");
+    assert!(owner.dispatch_bitmap_stroke(&request(&owner, "front", anchor(0)), &png).unwrap().is_ok());
+    let one = state(&owner);
+    let mut behind = request(&owner, "behind", anchor(0));
+    behind.payload["placement"] = json!("behind");
+    let reply = owner.dispatch_bitmap_stroke(&behind, &png).unwrap();
+    assert!(reply.is_ok(), "{}", serde_json::to_value(&reply).unwrap());
+    let after = state(&owner);
+    // The layer's natural stack, bottom to top (naturalPosition, not the element array's order).
+    let mut elements: Vec<&Value> = after["drawing"]["compositionOrder"]["contexts"][0]["scopes"][0]["elements"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .collect();
+    elements.sort_by_key(|e| e["naturalPosition"].as_u64().unwrap());
+    let order: Vec<&str> = elements.iter().map(|e| e["strokeId"].as_str().unwrap()).collect();
+    // native-stroke/raster :1: is the front stroke, :2: the one drawn behind it.
+    assert_eq!(order.len(), 4);
+    assert!(order[0].starts_with("native-stroke:2:") && order[1].starts_with("native-raster:2:"), "{order:?}");
+    assert!(order[2].starts_with("native-stroke:1:") && order[3].starts_with("native-raster:1:"), "{order:?}");
+    owner.undo(2).unwrap();
+    assert_eq!(state(&owner), one, "one undo step removes the behind stroke, its companion and its PNG");
+    let mut sideways = request(&owner, "sideways", anchor(0));
+    sideways.payload["placement"] = json!("front");
+    assert!(!owner.dispatch_bitmap_stroke(&sideways, &png).unwrap().is_ok(), "only behind is a placement");
+}
