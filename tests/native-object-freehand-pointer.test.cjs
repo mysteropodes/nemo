@@ -22,9 +22,9 @@ class Element{
 
 }
 function baselineFunction(text,name){const start=text.indexOf('function '+name+'(');assert.ok(start>=0,name);let at=text.indexOf('{',start),depth=1,end=at+1;while(depth){if(text[end]==='{')depth++;if(text[end]==='}')depth--;end++;}return text.slice(start,end);}
-async function fixture(tool='draw',native=true){
+async function fixture(tool='draw',native=true,options={}){
  let clock=1000;let installed=false,generation=0,revision=0,hold=null,refusal=null,replyChange=null,wrongOwner=false,ack=null,binding=null;
- let rect={left:40,top:50,width:640,height:360};const records=new Map(),receipts=new Map(),calls=[],events=new Map(),log=[];
+ let rect=options.rect||{left:40,top:50,width:640,height:360};const records=new Map(),receipts=new Map(),calls=[],events=new Map(),log=[];
  const canvas=new Element(),area=new Element(),body=new Element(),doc=new Element();canvas.getBoundingClientRect=()=>rect;
  const pills=new Element(),pill=new Element(),zoom=new Element(),fit=new Element(),ruler=new Element();
  zoom.id='zoom-scrub';zoom.tagName='INPUT';zoom.value='100';fit.id='canvas-fit-btn';ruler.id='ruler-h';
@@ -46,7 +46,7 @@ async function fixture(tool='draw',native=true){
   if(command==='nemo_native_status'||command==='nemo_native_object_client_status')return {...info(),available:installed};
   if(command==='nemo_native_object_bootstrap'){installed=true;generation++;revision=0;records.clear();return {...info(),requestId:q.requestId,resourceCount:0,viewportAvailable:false};}
   if(command==='nemo_native_object_reference')return {...info(),requestId:q.requestId};
-  if(command==='nemo_native_object_preview'){log.push('present-'+q.contentRevision);return {status:'presented',workId:'work-'+generation+'-'+revision,viewGeneration:1,...(q.viewMode==='stored-camera'?{view:{mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]}}:{})};}
+  if(command==='nemo_native_object_preview'){log.push('present-'+q.contentRevision);return {status:'presented',workId:'work-'+generation+'-'+revision,viewGeneration:1,...(q.viewMode==='stored-camera'?{view:{mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]}}:options.canvasView?{view:options.canvasView}:{})};}
   if(command==='nemo_native_revision_sync'){
    if(q.action==='binding')return {...info(),subscriptionId:'subscription-'+generation};
    if(q.action==='subscribe'){binding=q.binding;return q.binding;}
@@ -140,6 +140,25 @@ test('smoothing keeps baseline detached geometry while the dense pressure sequen
  assert.equal((await settled(f)).status,'applied');const p=f.calls[0].payload.record.vectorExt.pressure;
  assert.equal(p.widthProfile.length,22,'no coalesced pressure samples dropped');assert.ok(p.centerSegments.length<22,'baseline explicit Smooth fits centerline');
  assert.equal(p.widthProfile[0].width,.6);assert.equal(p.widthProfile.at(-1).width,.6);assert.ok(p.widthProfile.some(s=>s.width>.6));assert.equal(f.paper.project.activeLayer.children.length,0);
+});
+test('the Ready modeler takes the presented scale; a stretched canvas still refuses (#2343 B1)',async()=>{
+ async function stroke(options,camera){const f=await fixture('draw',true,options),scales=[],create=f.root.SMStrokeModeler.create;
+  if(camera){f.root.state.cameraView=true;await f.session.presentPreview(0);}
+  f.root.SMStrokeModeler.create=(level,scale)=>{scales.push(scale);return create(level,scale);};
+  Object.assign(f.root.state,{stabilizer:4,smoothing:2,fillEnabled:false});
+  send(f,'pointerdown',20,20);f.advance();send(f,'pointermove',40,40);f.advance();send(f,'pointermove',60,30);f.advance();send(f,'pointerup',80,50);
+  return {f,scales,status:(await settled(f)).status};}
+ // The canvas has the document's aspect (2 CSS px per unit); the locked camera view presents the document at 2x within
+ // it, so the modeler's scale is 4 CSS px per document unit, the baseline's view.zoom. The element box alone gives 2.
+ const plain=await stroke({}),camera=await stroke({},true);
+ assert.equal(plain.status,'applied');assert.deepEqual(plain.scales,[2]);
+ assert.equal(camera.status,'applied');assert.equal(camera.f.calls.length,1);assert.deepEqual(camera.scales,[4]);
+ // CSS layout rounding of the fitted canvas is not a stretch.
+ const rounded=await stroke({rect:{left:40,top:50,width:640,height:360.25}});
+ assert.equal(rounded.status,'applied');assert.equal(rounded.f.calls.length,1);
+ // A canvas stretched to another shape (B1: 1038x504 for 1920x1080) is presented non-uniformly and refuses before dispatch.
+ const stretched=await stroke({rect:{left:40,top:50,width:640,height:270}});
+ assert.notEqual(stretched.status,'applied');assert.equal(stretched.f.calls.length,0,'nothing dispatched');assert.deepEqual(stretched.scales,[]);
 });
 test('both existing moving-average and Ready modeler input paths retain the actual release endpoint and one transaction',async()=>{
  for(const stabilizer of [2,4]){const f=await fixture();Object.assign(f.root.state,{stabilizer,smoothing:2,fillEnabled:false});

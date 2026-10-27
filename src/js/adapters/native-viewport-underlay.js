@@ -124,12 +124,26 @@
         previous.stage.visible = previous.visible; previous.view.update();
       }
     }
+    // The host draws a document-sized composition into the surface framed at the canvas element, so the element takes
+    // the document's aspect (native-viewport-underlay.css) before it is measured: one uniform presented scale whatever
+    // the window's shape (#2343 B1). Ending the presentation restores the ordinary canvas.
+    function fit(info) {
+      var html = root.document.documentElement, aspect = info.canvasW / info.canvasH;
+      if (!(aspect > 0) || !Number.isFinite(aspect)) throw new Error('Native canvas aspect is unavailable');
+      html.style.setProperty('--nemo-native-aspect', String(aspect));
+      html.classList.add('nemo-native-fit');
+    }
+    function unfit() {
+      var html = root.document.documentElement;
+      html.classList.remove('nemo-native-fit'); html.style.removeProperty('--nemo-native-aspect');
+    }
     return Object.freeze({
       projectionReady: function (info) {
         return !!root.NemoNativeObjectProjectFile && root.NemoNativeObjectProjectFile.projectionMatches(root, info);
       },
       frame: function () { return root.state.currentFrame; },
       mapping: function (info) {
+        fit(info);
         var rect = root.document.getElementById('drawing-canvas').getBoundingClientRect();
         var dpr = root.devicePixelRatio || 1;
         return { cssBounds: { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
@@ -137,7 +151,7 @@
           compositionExtent: { width: info.canvasW, height: info.canvasH }, reportedDpr: dpr };
       },
       surfaceChanged: function (presentation, mapping) {
-        if (!presentation) { if (underlay) underlay.clear(); bounds = null; return; }
+        if (!presentation) { if (underlay) underlay.clear(); bounds = null; unfit(); return; }
         if (!underlay) underlay = create({ document: root.document, measure: function () { return bounds; }, setBackdropHidden: setBackdropHidden });
         bounds = { left: mapping.x, top: mapping.y, width: mapping.width, height: mapping.height };
         underlay.present(presentation);
