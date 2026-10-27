@@ -407,6 +407,20 @@ test('a pressure stroke with Stroke off is one closed fill of its centreline',as
  assert.deepEqual(r.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,20],[50,30],[80,45]]);
 });
 
+// A preset key the confirmed native catalog lacks (a deleted custom preset) draws plain, as the baseline's resolveBrushPreset
+// null leaves applyBrushTexture a no-op. An unknown, changing or unreadable catalog keeps the key unavailable.
+test('a preset key absent from the settled native catalog draws a plain stroke; an unconfirmed catalog refuses',async()=>{
+ const draw=async(catalog)=>{const f=await fixture();f.root.NemoNativeCustomBrushUI={controller:()=>catalog.controller,exists:()=>catalog.exists,record:()=>null};
+  f.root.state.brushPreset='deleted-custom';send(f,'pointerdown',10,40);send(f,'pointermove',40,41);send(f,'pointerup',100,40);await settled(f);return f;};
+ const plainDraw=await draw({controller:{isPending:()=>false},exists:false});assert.equal(plainDraw.calls.length,1,plainDraw.log.join(','));
+ const r=plain(plainDraw.calls[0].payload).record;
+ assert.equal(r.vectorExt&&r.vectorExt.brushTexture,undefined,'no texture fields, as the baseline writes none');
+ assert.deepEqual([r.vector.opacity,r.vector.stroke.r],[0.5,0x11/255],'the stroke is not camouflaged');
+ for(const catalog of [{controller:null,exists:null},{controller:{isPending:()=>true},exists:false},{controller:{isPending:()=>false},exists:null},
+  {controller:{isPending:()=>false},exists:true}]){
+  const f=await draw(catalog);assert.equal(f.calls.length,0,JSON.stringify(catalog.exists));assert.ok(f.log.some(s=>/unavailable/.test(s)),f.log.join(','));
+ }
+});
 // #2361 G16 option C: a built-in preset on a plain stroke commits one seeded, camouflaged anchor (applyBrushTexture
 // @1065e9d8); native stamps its dabs from the preset and seed. No dab is sent.
 test('a textured plain stroke commits one seeded anchor, camouflaged as the baseline hides it',async()=>{
