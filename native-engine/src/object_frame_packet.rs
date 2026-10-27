@@ -288,6 +288,10 @@ impl ObjectFramePacket {
         self.frame
     }
     /// Same stored camera provider for trusted export and locked-view consumers.
+    /// The project's custom brush catalog (`state.customBrushPresets`), when the snapshot carries a project.
+    pub(crate) fn custom_brush_presets(&self) -> Option<&crate::object_document::ProjectPresetCatalog> {
+        self.snapshot.project().and_then(|p| p.project().custom_brush_presets())
+    }
     pub(crate) fn stored_camera_matrix(&self) -> Result<Option<[f64; 6]>, ObjectFrameError> {
         self.snapshot
             .sampled_camera_matrix(f64::from(self.frame))

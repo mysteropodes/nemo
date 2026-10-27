@@ -324,9 +324,10 @@
       // Trim measures the whole stroke before the stop-at-axis clip (draw-bridge then symmetry-bridge); native would trim the clipped one.
       if (state.tool !== 'draw' || state.bitmapBrushOn || state.trimStrokeEnds && (state.vectorBrush || state.symmetryEnabled && !state.symmetryExtend) ||
           state.drawMode !== 'front' && state.drawMode !== 'behind' ||
-          // G16 option C (#2361): only a built-in vector-brush preset commits natively (one seeded anchor, plain or
-          // pressure ribbon; native stamps its dabs). Custom presets and texture with symmetry or Trim stay unavailable.
-          state.brushPreset && state.brushPreset !== 'none' && (!root.BRUSH_PRESETS || !Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS, state.brushPreset) ||
+          // G16 option C (#2361): one seeded anchor whose dabs native stamps; the key resolves as resolveBrushPreset (a built-in,
+          // else a confirmed native catalog record). A key neither holds, and texture with symmetry or Trim, stay unavailable.
+          state.brushPreset && state.brushPreset !== 'none' && (!(root.BRUSH_PRESETS && Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS, state.brushPreset) ||
+            root.NemoNativeCustomBrushUI && root.NemoNativeCustomBrushUI.record(root, state.brushPreset)) ||
             state.strokeEnabled && (state.symmetryEnabled || state.trimStrokeEnds)) ||
           root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
             ? root.SMLabs.unmigratedDrawHooks().length > 0 : root.SMLabs.list().some(function(p){return p.on;})))
