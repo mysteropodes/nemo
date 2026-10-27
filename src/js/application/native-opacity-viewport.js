@@ -86,19 +86,26 @@
       watcher.dispose = unsubscribe;
       return watcher;
     }
+    // A busy owner (an edit or cache synchronization) keeps waiting; a retired session or a changed
+    // document supersedes the wait without fencing, as a newer presentation would.
     function exposedAfter(watcher, seen, observed, current) {
       return new Promise(function (resolve, reject) {
         var timer = null, settled = false;
         function check() {
           if (settled) return;
-          var valid = stillCurrent(observed, current);
-          if (!valid || watcher.epoch !== seen) {
-            settled = true;
-            if (timer !== null) ports.surface.cancel(timer);
-            watcher.wake = null;
-            if (valid) resolve();
-            else reject(new Error('native opacity document changed while waiting for a visible viewport'));
-          }
+          var latest = lifecycle.inspect();
+          var retired = latest.phase !== 'native' || latest.session !== observed.session ||
+            latest.generation !== observed.generation || !latest.identity ||
+            latest.identity.instanceId !== current.instanceId || latest.identity.documentId !== current.documentId ||
+            latest.identity.contentRevision !== current.contentRevision;
+          if (!retired && (latest.busy || watcher.epoch === seen)) return;
+          settled = true;
+          if (timer !== null) ports.surface.cancel(timer);
+          watcher.wake = null;
+          if (!retired) return resolve();
+          var superseded = new Error('native opacity document changed while waiting for a visible viewport');
+          superseded.code = 'native_preview_superseded';
+          reject(superseded);
         }
         function observe() {
           timer = null;
@@ -107,8 +114,8 @@
         }
         watcher.wake = check;
         check();
-        // Timers only observe cancellation/fences; only exposure hints retry.
-        if (!settled && ports.surface && ports.surface.defer) timer = ports.surface.defer(observe, 100);
+        // Timers only observe cancellation/fences and a busy owner settling; only exposure hints retry.
+        if (!settled) timer = ports.surface.defer(observe, 100);
       });
     }
 
@@ -199,7 +206,9 @@
       }
     }
 
-    async function presentPreview(frame, waitOpenOcclusion) {
+    // `waitExposure === false` (the resize repaint) keeps the prompt deferred rejection: a parked
+    // repaint must never present a frame a later navigation has replaced.
+    async function presentPreview(frame, waitOpenOcclusion, waitExposure) {
       if (!lifecycle.isActive()) throw new Error('native opacity authority is not active');
       var observed = lifecycle.inspect(), current = lifecycle.identity();
       var token = waitOpenOcclusion === true ? open : null;
@@ -255,12 +264,23 @@
             await waitForExposure(token, epoch, observed, current);
             continue;
           }
-          if (presented.status === 'deferred-occluded' && !token &&
-              typeof ports.subscribeWindowOcclusion === 'function') {
-            if (exposure) await exposedAfter(exposure, seen, observed, current);
-            else exposure = await watchExposure();
-            seen = exposure.epoch;
-            continue;
+          if (presented.status === 'deferred-occluded' && !token && waitExposure !== false &&
+              !(typeof isOpening === 'function' && isOpening()) && !(exposure && exposure.failed) &&
+              typeof ports.subscribeWindowOcclusion === 'function' && ports.surface &&
+              typeof ports.surface.defer === 'function') {
+            if (exposure) {
+              await exposedAfter(exposure, seen, observed, current);
+              seen = exposure.epoch;
+              continue;
+            }
+            try {
+              exposure = await watchExposure();
+              seen = exposure.epoch;
+              continue;
+            } catch (_) {
+              // No exposure hints: the deferral is reported below as before.
+              exposure = { failed: true, epoch: 0, dispose: null };
+            }
           }
           if (presented.status !== 'presented') {
             if (typeof isPublished === 'function' && isPublished(observed.session)) {
@@ -287,7 +307,9 @@
             failed.phase === 'native' && failed.session === observed.session) lifecycle.fence(error);
         throw error;
       } finally {
-        if (exposure && exposure.dispose) exposure.dispose();
+        if (exposure && exposure.dispose) {
+          try { exposure.dispose(); } catch (_) { /* The listener is already gone; keep the original outcome. */ }
+        }
       }
     }
 
@@ -303,7 +325,7 @@
         try {
           if (await applyResize(job) && !job.joined &&
               !isOpening() && lifecycle.inspect().session === job.session && lastPresentedFrame !== null) {
-            await presentPreview(lastPresentedFrame);
+            await presentPreview(lastPresentedFrame, false, false);
           }
         } catch (_) { /* The current session was fenced by the failing operation. */ }
       }, 50);

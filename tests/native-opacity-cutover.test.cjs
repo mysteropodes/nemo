@@ -3633,3 +3633,57 @@ test('a post-Open exposure wait stops when the document is released', async () =
   assert.equal(harness.state.previews.length, 3, 'no presentation after the release');
   assert.equal(ports.disposed, 1);
 });
+
+test('a busy owner keeps a post-Open exposure wait alive and an identity change supersedes it without a fence', async () => {
+  let exposed = false, busy = false, revision = null;
+  const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+    return state.previews.length === 1 || exposed ? receipt : { ...receipt, status: 'deferred-occluded' };
+  } });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const real = harness.state.lifecycle;
+  const lifecycle = Object.assign(Object.create(null), real, { inspect() {
+    const value = real.inspect();
+    const identity = value.identity && revision !== null ? { ...value.identity, contentRevision: revision } : value.identity;
+    return { ...value, busy: busy || value.busy, identity };
+  } });
+  const ports = occlusionPorts();
+  const viewport = NativeOpacityViewport.create(lifecycle, ports, () => false, () => true);
+  await viewport.presentPreview(0);
+  let settled = false;
+  const pending = viewport.presentPreview(10).finally(() => { settled = true; });
+  await turn(); await turn();
+  busy = true;
+  exposed = true;
+  ports.hint({ visible: true });
+  for (let i = 0; i < 3; i++) ports.tick();
+  await turn();
+  assert.equal(settled, false, 'a busy owner never retries and never rejects');
+  busy = false;
+  ports.tick();
+  assert.equal((await pending).status, 'presented');
+  exposed = false;
+  const parked = viewport.presentPreview(12);
+  await turn(); await turn();
+  revision = 99;
+  ports.tick();
+  await assert.rejects(parked, error => error && error.code === 'native_preview_superseded');
+  assert.equal(harness.controller.status(), 'native', 'a superseded wait never fences');
+});
+
+test('a failed occlusion subscription and an in-progress Open keep the prompt deferral', async () => {
+  for (const variant of ['subscription', 'opening']) {
+    const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+      return state.previews.length === 1 ? receipt : { ...receipt, status: 'deferred-occluded' };
+    } });
+    assert.equal(await harness.controller.activate(harness.prepared), true);
+    const ports = occlusionPorts();
+    if (variant === 'subscription') ports.subscribeWindowOcclusion = async () => { throw new Error('no events'); };
+    let opening = false;
+    const viewport = NativeOpacityViewport.create(harness.state.lifecycle, ports, () => opening, () => true);
+    await viewport.presentPreview(0);
+    opening = variant === 'opening';
+    await assert.rejects(viewport.presentPreview(10), error =>
+      error && error.code === 'native_preview_deferred', variant);
+    assert.equal(harness.controller.status(), 'native', variant);
+  }
+});
