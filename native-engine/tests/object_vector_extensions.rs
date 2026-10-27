@@ -13,6 +13,8 @@ use serde_json::{json, Number, Value};
 mod brush_texture;
 #[path = "object_vector_shadow_channel.rs"]
 mod shadow_channel;
+#[path = "object_vector_fill_shape.rs"]
+mod fill_shape;
 #[path = "object_vector_extensions_controls.rs"]
 mod controls;
 #[path = "object_vector_extensions_data.rs"]

@@ -405,3 +405,26 @@ fn a_held_no_region_keeps_its_original_undoable_key_promotion() {
     owner.undo(1).unwrap();
     assert_eq!(f::bytes(&owner), before);
 }
+
+#[test]
+fn a_same_colour_fill_brush_shape_the_trace_did_not_use_is_kept_apart() {
+    // The same wall and island as the absorbed case above, but the island is a Fill Brush shape (serP's
+    // isFillShape): fillMergeSameColor(layer, fill, false) skips it unless its stroke id is one of the fill's walls,
+    // and the traced walls are only ["wall"]. Two fills stay side by side.
+    let wall = f::vector("L0", "wall", 0, &f::rect(0.0, 0.0, 60.0, 40.0),
+        &f::VectorSpec { fill: None, stroke: Some(f::BLUE), ..Default::default() });
+    let mut island = f::vector("L0", "island", 0, &f::rect(30.0, 10.0, 20.0, 20.0),
+        &f::VectorSpec { fill: Some([0.2, 0.4, 0.6, 1.0]), ..Default::default() });
+    island["vectorExt"] = json!({"isFillShape": true});
+    let mut owner = f::owner_of(&f::document(2, vec![wall, island], None, None));
+    let mut click = payload();
+    click["point"] = json!([10, 10]);
+    paint(&mut owner, &click);
+    let state = f::state(&owner);
+    let objects = state["objects"].as_array().unwrap();
+    let ids: Vec<&Value> = objects.iter().map(|r| &r["target"]["strokeId"]).collect();
+    assert_eq!(ids.len(), 3, "wall, the kept Fill Brush shape and the new fill: {ids:?}");
+    let kept = objects.iter().find(|r| r["target"]["strokeId"] == "island").unwrap();
+    assert_eq!(kept["vectorExt"], json!({"isFillShape": true}), "the shape keeps its flag");
+    assert_eq!(fill(&state)["vectorExt"]["fillTrace"]["walls"], json!(["wall"]));
+}

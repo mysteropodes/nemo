@@ -807,6 +807,9 @@
               "maxLength": 256
             }
           }
+        },
+        "isFillShape": {
+          "const": true
         }
       },
       "minProperties": 1,
@@ -17802,6 +17805,9 @@
               "maxLength": 256
             }
           }
+        },
+        "isFillShape": {
+          "const": true
         }
       },
       "minProperties": 1,
@@ -18011,6 +18017,9 @@
               "maxLength": 256
             }
           }
+        },
+        "isFillShape": {
+          "const": true
         }
       },
       "minProperties": 1,
