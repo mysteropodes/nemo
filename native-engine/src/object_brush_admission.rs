@@ -27,8 +27,8 @@ impl ObjectBrushAdmission {
         let duplicators = Arc::new(duplicator_scene::prepare(packet)?);
         let contours = object_scene_producer_contour::produce(packet).into_admitted()?;
         let mut rasters = raster_scene::sources_excluding(packet, &claimed)?;
-        let texts = text_scene::prepare(packet)?;
-        let components = component_scene::prepare(packet, expected, &mut rasters)?;
+        let mut texts = text_scene::prepare(packet)?;
+        let components = component_scene::prepare(packet, expected, &mut rasters, &mut texts)?;
         let scene = ObjectRenderScene {
             packet: packet.clone(),
             duplicators,

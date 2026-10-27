@@ -200,11 +200,92 @@ fn component_text_and_unplaced_meshes_stay_unavailable() {
         placed(&plan(&owner(&placed_mesh)).unwrap()),
         vec![(true, rect(12., 12., 8., 8., 0.), 1.)]
     );
-    let mut text = drawing(Some([1., 0., 0., 1., 0., 0.]), image());
-    text["items"]["text"] = json!([{"target":target("comp","inner","words"),"block":{"text":"Hi",
+}
+
+fn with_text(mut doc: Value, context: &str, layer: &str) -> Value {
+    doc["items"]["text"] = json!([{"target":target(context,layer,"words"),"block":{"text":"Hi",
         "font":{"kind":"bundled","fontKey":"Roboto-Regular"},"size":48,
         "color":"#112233","align":"left","anchorTopLeft":{"x":10,"y":20}}}]);
-    refused(text, "component text paint is unavailable");
+    doc
+}
+
+#[test]
+#[cfg(not(feature = "font_asset_admission"))]
+fn held_component_text_needs_the_font_parser() {
+    let doc = with_text(drawing(Some([1., 0., 0., 1., 0., 0.]), image()), "comp", "inner");
+    assert!(matches!(
+        plan(&owner(&doc)),
+        Err(ObjectSceneError::UnsupportedGeometry { reason: "native font parser is unavailable", .. })
+    ));
+}
+
+#[test]
+#[cfg(feature = "font_asset_admission")]
+fn held_component_text_paints_at_the_host_slot_through_the_full_instance_affine() {
+    // Native text is the baseline's vector text: glyph paths, mapped as any path by
+    // applyMatrixToStrokeData (points through the matrix, handles through its linear part).
+    let matrix = [0., 2., -1., 0., 40., 8.];
+    let placed = plan(&owner(&with_text(drawing(Some(matrix), image()), "comp", "inner"))).unwrap();
+    let order: String = ordered_entries(&placed)
+        .map(|entry| match entry {
+            PaintEntry::Component(_) => 'c',
+            PaintEntry::Raster(_) => 'i',
+            PaintEntry::Text(_) => 't',
+            _ => '?',
+        })
+        .collect();
+    assert_eq!(order, "cit", "inner order: contour, image, text");
+    let texts = |plan: &ObjectPaintPlan| -> Vec<crate::object_render_scene::text_scene::TextSource> {
+        ordered_entries(plan)
+            .filter_map(|entry| match entry {
+                PaintEntry::Text(text) => Some(text.clone()),
+                _ => None,
+            })
+            .collect()
+    };
+    let painted = texts(&placed);
+    assert_eq!(painted.len(), 1);
+    assert!(painted[0].placed && painted[0].layer_index == 0);
+    // The same block laid out in the scene, unplaced, is the reference the matrix maps.
+    let mut bare = with_text(drawing(None, image()), "scene-root", "host");
+    bare["items"].as_object_mut().unwrap().remove("raster");
+    bare["componentTables"]["components"]["instances"] = json!([]);
+    bare["compositionOrder"]["contexts"][0]["scopes"][0]["elements"] =
+        json!([{"layerUid":"host","strokeId":"words","naturalPosition":0,"order":{}}]);
+    let reference = texts(&plan(&owner(&bare)).unwrap()).remove(0);
+    let [a, b, c, d, tx, ty] = matrix;
+    let mut contours = 0;
+    for ((got, rgba), (want, want_rgba)) in painted[0].item.painted().zip(reference.item.painted()) {
+        assert_eq!(rgba, want_rgba);
+        for (g, w) in got.contour.segments().iter().zip(want.contour.segments()) {
+            let [x, y] = w.point;
+            let lin = |[u, v]: [f64; 2]| [u * a + v * c, u * b + v * d];
+            for (got, want) in [
+                (g.point, [x * a + y * c + tx, x * b + y * d + ty]),
+                (g.handle_in, lin(w.handle_in)),
+                (g.handle_out, lin(w.handle_out)),
+            ] {
+                assert!((got[0] - want[0]).abs() < 1e-9 && (got[1] - want[1]).abs() < 1e-9);
+            }
+        }
+        contours += 1;
+    }
+    assert!(contours > 1, "the block really has glyph contours");
+    // The placed block's retained font is a declared scene resource of the viewport witness.
+    let owner = owner(&with_text(drawing(Some(matrix), image()), "comp", "inner"));
+    let snapshot = owner.acquire_snapshot(owner.content_revision()).unwrap();
+    let witness = crate::object_render_scene::prepare_object_viewport_composition(
+        &plan(&owner).unwrap(),
+        &selector(&snapshot),
+        None,
+    )
+    .unwrap();
+    assert!(witness
+        .scene_resources()
+        .unwrap()
+        .declared_versions()
+        .keys()
+        .any(|id| id.starts_with("font:")));
 }
 
 #[test]

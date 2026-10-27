@@ -148,9 +148,19 @@ pub(crate) fn compile(
         stroke_id: Presence::Present(target.stroke_id().to_owned()),
         ..layer_target.clone()
     };
-    let factor = host_factor
-        * raw_opacity(packet, &layer_target, inner_frame, host)?
+    let inner = raw_opacity(packet, &layer_target, inner_frame, host)?
         * raw_opacity(packet, &element_target, inner_frame, host)?;
+    let factor = host_factor * inner;
+    // The dict `getEffectiveStrokes` returns: inner layer and element Motion opacity folded in, the
+    // host's own opacity not (it applies when the scene is drawn).
+    let mut record = source.clone();
+    if let Presence::Present(body) = &mut record.vector {
+        body.opacity = body
+            .opacity
+            .as_f64()
+            .and_then(|opacity| serde_json::Number::from_f64(opacity * inner))
+            .ok_or_else(|| unavailable(host, "component opacity is not finite"))?;
+    }
     let style = style_of_record_with_opacity(source, factor)
         .map_err(|error| unavailable(host, error.message()))?;
     let prepared = prepare_item(&style).map_err(|error| unavailable(host, error.message()))?;
@@ -213,6 +223,7 @@ pub(crate) fn compile(
         None
     };
     Ok(ComponentPaint {
+        record,
         host_layer_index: host,
         target: target.clone(),
         contour,

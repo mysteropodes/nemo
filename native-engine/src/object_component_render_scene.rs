@@ -23,6 +23,7 @@ use crate::object_frame_packet::{FrameScopeKind, ObjectTarget};
 use crate::object_render_scene::component_scene::contour::{compile, layer_supported};
 use crate::object_render_scene::object_scene_style_emit::PreparedItem;
 use crate::object_render_scene::raster_scene::RasterSource;
+use crate::object_render_scene::text_scene::TextSources;
 use crate::object_render_scene::{validate_pins, ObjectSceneError, PaintIndex};
 use crate::render_geometry::ClosedCubicPath;
 use std::collections::{HashMap, HashSet};
@@ -53,6 +54,8 @@ pub(crate) struct ComponentPaint {
     pub(crate) prepared: PreparedItem,
     /// SVG's currently admitted legacy closed-solid subset, straight and unquantized.
     pub(crate) svg_rgba: Option<[f64; 4]>,
+    /// The post-override inner record as the baseline's dict holds it (untransformed geometry).
+    pub(crate) record: crate::object_frame_packet::ObjectRecord,
 }
 
 pub(crate) fn unavailable(index: usize, reason: &'static str) -> ObjectSceneError {
@@ -74,11 +77,12 @@ fn provider_reason(reason: &ComponentUnavailable) -> &'static str {
     }
 }
 
-/// `rasters` is the scene's raster sources; each placed image is appended to it.
+/// `rasters` and `texts` are the scene's sources; each placed image and text block is appended.
 pub(crate) fn prepare(
     packet: &ObjectFramePacket,
     expected: &ObjectFrameSelector<'_>,
     rasters: &mut Vec<RasterSource>,
+    texts: &mut TextSources,
 ) -> Result<ComponentSources, ObjectSceneError> {
     validate_pins(packet, expected)?;
     let empty = || ComponentSources {
@@ -267,7 +271,7 @@ pub(crate) fn prepare(
                 for layer in order.layers() {
                     for element in layer.elements() {
                         let index = element.source_object_index();
-                        if let Some(&(at, item)) = images.get(&index) {
+                        if let Some(&(at, item, is_text)) = images.get(&index) {
                             if at != layer.source_layer_index() || !seen_images.insert(index) {
                                 return Err(unavailable(
                                     entry.source_layer_index,
@@ -280,9 +284,24 @@ pub(crate) fn prepare(
                                     "component placement is unavailable",
                                 )
                             })?;
+                            let inner = &component.layers()[at];
+                            if is_text {
+                                let painted = image::text(
+                                    packet,
+                                    inner,
+                                    placement,
+                                    item,
+                                    entry.source_layer_index,
+                                    host_factor,
+                                    frame,
+                                    texts,
+                                )?;
+                                sequence.push((entry.source_layer_index, PaintIndex::Text(painted)));
+                                continue;
+                            }
                             rasters.push(image::raster(
                                 packet,
-                                &component.layers()[at],
+                                inner,
                                 placement,
                                 item,
                                 entry.source_layer_index,

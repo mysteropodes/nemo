@@ -15,10 +15,15 @@
 //! stay out (`isBrushTextureCopy`), and its own path wobbles by the preset's nib, scatter and spacing (`riveApplyWobble`,
 //! seeded by its stroke id), painted at its remembered opacity. A stored camera becomes, as in the baseline, a component
 //! artboard holding the drawing that the main artboard instances and moves by the inverse camera on every frame.
+//! Duplicator copies are the dicts `applyLayerDuplicator` returns (clone-outer, source-inner, each keeping its source's
+//! stroke id, so repeats take the `+` lanes), with the copy's factored opacity and hue-turned fill and stroke. A placed
+//! component is its `symbolId` branch's dicts on the host layer: inner strokes in inner order under camera then
+//! symMatrix, inner layer opacity folded in, stroke widths as stored.
 //! Dropped as the baseline drops them: zero-opacity strokes without a texture. Refused, until later increments admit
-//! them with oracle rows: rasters (the baseline throws on them), text, components, duplicators, bitmap brush, video,
-//! legacy fill records and a layer opacity factor other than one (the baseline reads no layer opacity).
+//! them with oracle rows: rasters (the baseline throws on them), text, bitmap brush, video, legacy fill records and a
+//! layer opacity factor other than one (the baseline reads no layer opacity).
 use crate::object_render_scene::{ordered_entries, ObjectPaintPlan, PaintEntry};
+use kurbo::BezPath;
 use serde_json::{Number, Value};
 use std::collections::HashMap;
 
@@ -103,6 +108,67 @@ fn same(a: &Stroke, b: &Stroke) -> bool {
         && a.opacity == b.opacity
 }
 
+/// One drawn stroke dict, or `None` when the baseline filter drops it. A macro, not a function: the
+/// record type belongs to the evaluation layer, which this export layer may read but not name.
+macro_rules! stroke_of {
+    ($record:expr, $path:expr, $index:expr) => {{
+        let (record, path, index): (_, &BezPath, usize) = ($record, $path, $index);
+        let stroke: Result<Option<Stroke>, RiveExportError> = 'stroke: {
+            if record.family != VECTOR_FAMILY {
+                break 'stroke Err(RiveExportError::Unsupported {
+                    source_object_index: index,
+                    reason: "legacy fill records have no admitted Rive representation yet",
+                });
+            }
+            let texture = record
+                .vector_ext
+                .value()
+                .and_then(|e| e.brush_texture.value());
+            let preset = texture
+                .and_then(|t| t.brush_texture_preset.value())
+                .filter(|k| !k.is_empty())
+                .cloned();
+            let pre_texture_opacity = match texture.and_then(|t| t.pre_texture_opacity.value()) {
+                Some(n) => Some(float(n)?),
+                None => None,
+            };
+            let body = record.vector().ok_or(RiveExportError::Unsupported {
+                source_object_index: index,
+                reason: "vector body missing",
+            })?;
+            // `sd.opacity !== 0 || sd.brushTexturePreset`: a camouflaged brush-texture anchor stays.
+            let opacity = float(&body.opacity)?;
+            if opacity == 0.0 && preset.is_none() {
+                break 'stroke Ok(None);
+            }
+            let stroke = match body.stroke.value().and_then(|paint| paint.as_ref()) {
+                Some(p) => Some(rgba(&p.r, &p.g, &p.b, &p.a)?),
+                None => None,
+            };
+            let fill = match record.solid_fill() {
+                Some(p) => Some(rgba(&p.r, &p.g, &p.b, &p.a)?),
+                None => None,
+            };
+            let (v, i, o, closed) = geometry(path, index)?;
+            Ok(Some(Stroke {
+                id: record.target.stroke_id.clone(),
+                v,
+                i,
+                o,
+                closed,
+                fill,
+                stroke,
+                width: float(&body.stroke_width)?,
+                real: body.has_real_stroke,
+                opacity,
+                texture: preset,
+                pre_texture_opacity,
+            }))
+        };
+        stroke
+    }};
+}
+
 /// The strokes one frame shows, per source layer, in stack order: the post-filter `getEffectiveStrokesRendered` list.
 fn strokes_by_layer(
     plan: &ObjectPaintPlan,
@@ -130,17 +196,32 @@ fn strokes_by_layer(
                     "text has no admitted Rive representation yet",
                 )
             }
+            // The `symbolId` branch's dicts: inner strokes under camera then symMatrix, inner order.
             PaintEntry::Component(component) => {
-                return Err(RiveExportError::UnsupportedLayer {
-                    source_layer_index: component.host_layer_index,
-                    reason: "a placed component has no admitted Rive representation yet",
-                })
+                let host = component.host_layer_index;
+                if let Some(stroke) = stroke_of!(&component.record, &component.path, host)? {
+                    let opacity = plan.packet().layer_opacity(host).map_err(|_| {
+                        RiveExportError::UnsupportedLayer {
+                            source_layer_index: host,
+                            reason: "component host opacity is unavailable",
+                        }
+                    })?;
+                    push(&mut out, host, opacity, stroke)?;
+                }
+                continue;
             }
+            // `applyLayerDuplicator`'s dicts: clone-outer/source-inner, each keeping its source's stroke id.
             PaintEntry::Duplicator(copy) => {
-                return refuse(
-                    copy.source_index,
-                    "duplicator copies have no admitted Rive representation yet",
-                )
+                if let Some(stroke) = stroke_of!(&copy.record, &copy.path, copy.source_index)? {
+                    let host = plan.packet().layer_opacity(copy.layer_index).map_err(|_| {
+                        RiveExportError::UnsupportedLayer {
+                            source_layer_index: copy.layer_index,
+                            reason: "duplicator host opacity is unavailable",
+                        }
+                    })?;
+                    push(&mut out, copy.layer_index, host, stroke)?;
+                }
+                continue;
             }
             // `!sd.isBrushTextureCopy`: the dabs stay out; the anchor is written with its own wobble.
             PaintEntry::Dab(_) => continue,
@@ -159,67 +240,30 @@ fn strokes_by_layer(
             }
         };
         let source = command.source();
-        let (record, index) = (source.record(), source.source_object_index());
-        if record.family != VECTOR_FAMILY {
-            return refuse(
-                index,
-                "legacy fill records have no admitted Rive representation yet",
-            );
+        let layer = source.source_layer_index();
+        if let Some(stroke) = stroke_of!(source.record(), command.path(), source.source_object_index())? {
+            push(&mut out, layer, command.layer_opacity(), stroke)?;
         }
-        let texture = record
-            .vector_ext
-            .value()
-            .and_then(|e| e.brush_texture.value());
-        let preset = texture
-            .and_then(|t| t.brush_texture_preset.value())
-            .filter(|k| !k.is_empty())
-            .cloned();
-        let pre_texture_opacity = match texture.and_then(|t| t.pre_texture_opacity.value()) {
-            Some(n) => Some(float(n)?),
-            None => None,
-        };
-        let body = record.vector().ok_or(RiveExportError::Unsupported {
-            source_object_index: index,
-            reason: "vector body missing",
-        })?;
-        // `sd.opacity !== 0 || sd.brushTexturePreset`: a camouflaged brush-texture anchor stays.
-        let opacity = float(&body.opacity)?;
-        if opacity == 0.0 && preset.is_none() {
-            continue;
-        }
-        if command.layer_opacity() != 1.0 {
-            return Err(RiveExportError::UnsupportedLayer {
-                source_layer_index: source.source_layer_index(),
-                reason: "a layer opacity factor has no admitted Rive representation yet",
-            });
-        }
-        let stroke = match body.stroke.value().and_then(|paint| paint.as_ref()) {
-            Some(p) => Some(rgba(&p.r, &p.g, &p.b, &p.a)?),
-            None => None,
-        };
-        let fill = match record.solid_fill() {
-            Some(p) => Some(rgba(&p.r, &p.g, &p.b, &p.a)?),
-            None => None,
-        };
-        let (v, i, o, closed) = geometry(command.path(), index)?;
-        out.get_mut(source.source_layer_index())
-            .ok_or(RiveExportError::InvalidRange)?
-            .push(Stroke {
-                id: record.target.stroke_id.clone(),
-                v,
-                i,
-                o,
-                closed,
-                fill,
-                stroke,
-                width: float(&body.stroke_width)?,
-                real: body.has_real_stroke,
-                opacity,
-                texture: preset,
-                pre_texture_opacity,
-            });
     }
     Ok(out)
+}
+
+fn push(
+    out: &mut [Vec<Stroke>],
+    layer: usize,
+    layer_opacity: f64,
+    stroke: Stroke,
+) -> Result<(), RiveExportError> {
+    if layer_opacity != 1.0 {
+        return Err(RiveExportError::UnsupportedLayer {
+            source_layer_index: layer,
+            reason: "a layer opacity factor has no admitted Rive representation yet",
+        });
+    }
+    out.get_mut(layer)
+        .ok_or(RiveExportError::InvalidRange)?
+        .push(stroke);
+    Ok(())
 }
 
 /// What the editor must do with one planned shape after it exists.

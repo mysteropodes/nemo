@@ -176,6 +176,10 @@ pub(crate) fn prepare_with_brush_indices(
     }
     let mut texts = ProducerOutput::new("text-block", pin);
     for (index, source) in scene.texts.entries.iter().enumerate() {
+        // A placed component's text paints at its host slot.
+        if source.placed {
+            continue;
+        }
         if selected.get(&source.source_index) != Some(&source.layer_index) {
             return Err(ObjectPaintPlanError::InvalidOrder);
         }

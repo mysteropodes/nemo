@@ -49,8 +49,8 @@ fn spec_of(case: &Value) -> LottieSpec {
 }
 fn export(case: &Value) -> Result<Value, LottieExportError> {
     let spec = spec_of(case);
-    // A camera case is a whole native project file: the stored camera lives in the project, which only the
-    // project-file codec loads (the application target runs these rows; export_job runs the drawing-only ones).
+    // Camera and duplicator cases are whole native project files (the stored camera and the duplicator's canvas live
+    // in the project), which only the project-file codec loads (the application target runs these rows; export_job runs the drawing-only ones).
     #[cfg(feature = "project_media_codec")]
     let history = if case["project"].is_null() {
         owner(&case["document"])
@@ -110,14 +110,14 @@ fn every_oracle_case_matches_the_baseline_writer() {
     let oracle: Value = serde_json::from_str(ORACLE).unwrap();
     assert_eq!(oracle["commit"].as_str().unwrap().len(), 40);
     let cases = oracle["cases"].as_array().unwrap();
-    assert_eq!(cases.len(), 8);
+    assert_eq!(cases.len(), 10);
     let runs = |case: &&Value| cfg!(feature = "project_media_codec") || case["project"].is_null();
     assert_eq!(
         cases.iter().filter(runs).count(),
         if cfg!(feature = "project_media_codec") {
-            8
+            10
         } else {
-            6
+            7
         }
     );
     for case in cases.iter().filter(runs) {
@@ -232,4 +232,35 @@ fn a_stored_camera_moves_every_anchor_and_turns_every_handle() {
     assert!(same(&key(&with, 0), &key(&without, 0), "identity").is_ok());
     assert!(same(&key(&with, 4)["v"], &key(&without, 4)["v"], "v").is_err());
     assert!(same(&key(&with, 4)["i"], &key(&without, 4)["i"], "i").is_err());
+}
+
+#[test]
+#[cfg(feature = "font_asset_admission")]
+fn a_text_block_is_dropped_as_the_baselines_baked_text_raster_is() {
+    // `lottieBuild` filters `!sd.isRaster`, and the baseline's text is a raster (`commitText` bakes it to a PNG).
+    let oracle: Value = serde_json::from_str(ORACLE).unwrap();
+    let case = &oracle["cases"][0];
+    let mut with_text = case.clone();
+    let document = &mut with_text["document"];
+    document["items"] = serde_json::json!({"text":[{"target":{"contextId":"scene-root","layerUid":"L0",
+        "strokeId":"words","frameScope":{"kind":"authored","frame":0}},"block":{"text":"Hi",
+        "font":{"kind":"bundled","fontKey":"Roboto-Regular"},"size":48,"color":"#112233","align":"left",
+        "anchorTopLeft":{"x":10,"y":20}}}]});
+    let scope = &mut document["compositionOrder"]["contexts"][0]["scopes"][0]["elements"];
+    let next = scope
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|element| element["layerUid"] == "L0")
+        .count();
+    scope.as_array_mut().unwrap().push(serde_json::json!(
+        {"layerUid":"L0","strokeId":"words","naturalPosition":next,"order":{}}));
+    let history = owner(&with_text["document"]);
+    let snapshot = history.acquire_snapshot(history.content_revision()).unwrap();
+    assert!(
+        crate::object_render_scene::ordered_entries(&plan(&snapshot, 0))
+            .any(|entry| matches!(entry, crate::object_render_scene::PaintEntry::Text(_))),
+        "the frame really paints the text block"
+    );
+    assert_eq!(export(&with_text).unwrap(), export(case).unwrap());
 }
