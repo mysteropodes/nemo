@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "2b7fa5780ec7be711af79686f9c29c525a2400b3",
-  "describe": "v0.7.0-alpha.4-3373-g2b7fa578"
+  "head": "cf910109c00e6ac66a11268cb33025eb325dcddc",
+  "describe": "v0.7.0-alpha.4-3375-gcf910109"
  },
- "inputsDigest": "e816fe6fa90ee2257f3931033b4b41703ddc6c49b74685ef76426ead4db7020d",
+ "inputsDigest": "a7ac3900b5cd314b4900f67fdaf436bd9bd5d5d22d6463d5ad1c9e38fe39b91a",
  "states": [
   "inventoried",
   "characterized",
@@ -4893,7 +4893,7 @@
     "container": "p-textanim-add-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 92,
+    "functionsVisited": 93,
     "via": "variable animBtn",
     "references": []
    },
@@ -23462,7 +23462,7 @@
    "source": "src/js/layer-inout.js:1555",
    "meta": {
     "i18n": null,
-    "functionsVisited": 379
+    "functionsVisited": 387
    },
    "fixtures": [
     "static-props",
@@ -25443,7 +25443,7 @@
    "source": "src/js/motion.js:8257",
    "meta": {
     "i18n": "menuRemoveThisParent",
-    "functionsVisited": 507
+    "functionsVisited": 514
    },
    "fixtures": [
     "static-props",
@@ -25675,7 +25675,7 @@
    "source": "src/js/motion.js:10522",
    "meta": {
     "i18n": "ctxDeleteThisKey",
-    "functionsVisited": 515
+    "functionsVisited": 522
    },
    "fixtures": [
     "static-props",
@@ -25717,7 +25717,7 @@
    "source": "src/js/motion.js:9866",
    "meta": {
     "i18n": "elementsDelete",
-    "functionsVisited": 566
+    "functionsVisited": 573
    },
    "fixtures": [
     "static-props",
@@ -25798,7 +25798,7 @@
    "source": "src/js/motion.js:9864",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 432
+    "functionsVisited": 439
    },
    "fixtures": [
     "static-props",
@@ -25920,7 +25920,7 @@
    "source": "src/js/motion.js:9821",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 526
+    "functionsVisited": 533
    },
    "fixtures": [
     "static-props",
@@ -26359,7 +26359,7 @@
    "source": "src/js/motion.js:7307",
    "meta": {
     "i18n": "ctxParentInTimeLinkTimeEllipsis",
-    "functionsVisited": 379
+    "functionsVisited": 387
    },
    "fixtures": [
     "static-props",
@@ -26600,7 +26600,7 @@
    "source": "src/js/motion.js:8334",
    "meta": {
     "i18n": "ctxUnlinkTime",
-    "functionsVisited": 524
+    "functionsVisited": 531
    },
    "fixtures": [
     "static-props",
@@ -26642,7 +26642,7 @@
    "source": "src/js/motion.js:10957",
    "meta": {
     "i18n": "ctxAddKeyHere",
-    "functionsVisited": 514
+    "functionsVisited": 521
    },
    "fixtures": [
     "static-props",
@@ -27117,7 +27117,7 @@
    "source": "src/js/motion.js:11020",
    "meta": {
     "i18n": "ctxParentInTimeLinkTimeEllipsis",
-    "functionsVisited": 379
+    "functionsVisited": 387
    },
    "fixtures": [
     "static-props",
@@ -27235,7 +27235,7 @@
    "source": "src/js/motion.js:10992",
    "meta": {
     "i18n": "ctxSubdivideMidpoint",
-    "functionsVisited": 524
+    "functionsVisited": 531
    },
    "fixtures": [
     "static-props",
@@ -27637,7 +27637,7 @@
    "source": "src/js/select-bridge.js:3248",
    "meta": {
     "i18n": null,
-    "functionsVisited": 92
+    "functionsVisited": 93
    },
    "fixtures": [
     "static-props",
@@ -30266,7 +30266,7 @@
    "source": "src/js/timeline.js:6878",
    "meta": {
     "i18n": "ctxMatteSource",
-    "functionsVisited": 376
+    "functionsVisited": 384
    },
    "fixtures": [
     "keyed-props",
@@ -30610,7 +30610,7 @@
    "source": "src/js/timeline.js:6833",
    "meta": {
     "i18n": "ctxRemoveFromFolder",
-    "functionsVisited": 376
+    "functionsVisited": 384
    },
    "fixtures": [
     "keyed-props",
@@ -30761,7 +30761,7 @@
    "source": "src/js/timeline.js:6841",
    "meta": {
     "i18n": "ctxUnlinkFromLFSGroup",
-    "functionsVisited": 377
+    "functionsVisited": 385
    },
    "fixtures": [
     "keyed-props",
@@ -30981,7 +30981,7 @@
    "source": "src/js/timeline.js:5636",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 432
+    "functionsVisited": 439
    },
    "fixtures": [
     "keyed-props",
@@ -31094,7 +31094,7 @@
    "source": "src/js/timeline.js:5607",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 526
+    "functionsVisited": 533
    },
    "fixtures": [
     "keyed-props",
@@ -31133,7 +31133,7 @@
    "source": "src/js/timeline.js:5638",
    "meta": {
     "i18n": "fxDelete",
-    "functionsVisited": 566
+    "functionsVisited": 573
    },
    "fixtures": [
     "keyed-props",
@@ -32137,7 +32137,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:433",
    "meta": {
-    "functionsVisited": 340
+    "functionsVisited": 348
    },
    "fixtures": [
     "media",
@@ -32172,7 +32172,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:442",
    "meta": {
-    "functionsVisited": 370
+    "functionsVisited": 378
    },
    "fixtures": [
     "media",
@@ -32818,7 +32818,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:286",
    "meta": {
-    "functionsVisited": 341
+    "functionsVisited": 349
    },
    "fixtures": [
     "media",
@@ -33224,7 +33224,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:60",
    "meta": {
-    "functionsVisited": 341
+    "functionsVisited": 349
    },
    "fixtures": [
     "media",
@@ -33387,7 +33387,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:52",
    "meta": {
-    "functionsVisited": 341
+    "functionsVisited": 349
    },
    "fixtures": [
     "media",
@@ -33455,7 +33455,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:64",
    "meta": {
-    "functionsVisited": 358
+    "functionsVisited": 366
    },
    "fixtures": [
     "media",
@@ -33800,7 +33800,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:56",
    "meta": {
-    "functionsVisited": 341
+    "functionsVisited": 349
    },
    "fixtures": [
     "media",
@@ -34130,7 +34130,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:603",
    "meta": {
-    "functionsVisited": 340
+    "functionsVisited": 348
    },
    "fixtures": [
     "media",
@@ -34193,7 +34193,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:590",
    "meta": {
-    "functionsVisited": 422
+    "functionsVisited": 430
    },
    "fixtures": [
     "media",
