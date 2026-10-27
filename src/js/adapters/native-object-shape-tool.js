@@ -35,10 +35,11 @@
     function style(tool,proof){
       var s=root.state,current=session(),ownerInfo=current&&current.info(),port=root.NemoNativePerspectiveController;
       var perspective=port&&(proof?typeof port.readForCommand==='function'&&port.readForCommand(proof):port.read());
-      if(s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||s.shadowMode&&!ports.freehand||!perspective||!same(perspective.info,ownerInfo)||perspective.perspective.settings.perspectiveEnabled||s.activeSymbolId)fail('This drawing mode is unavailable in native shape tools.');
+      if(s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||!perspective||!same(perspective.info,ownerInfo)||perspective.perspective.settings.perspectiveEnabled||s.activeSymbolId)fail('This drawing mode is unavailable in native shape tools.');
       if(ports.freehand)return ports.style();
-      if(ports.pen)return penStyle(s);
-      if(typeof s.strokeEnabled!=='boolean'||typeof s.fillEnabled!=='boolean'||(!s.strokeEnabled&&(tool==='line'||!s.fillEnabled)))fail('Enable a supported stroke or fill to draw.');
+      if(ports.pen)return shadowStyle(s,penStyle(s));
+      // Shadow mode inks the shape in the swatch whatever Stroke/Fill say (applyShadowBrushTag).
+      if(typeof s.strokeEnabled!=='boolean'||typeof s.fillEnabled!=='boolean'||!s.shadowMode&&!s.strokeEnabled&&(tool==='line'||!s.fillEnabled))fail('Enable a supported stroke or fill to draw.');
       if(!Number.isFinite(s.brushSize)||s.brushSize<=0||!Number.isFinite(s.opacity)||s.opacity<0||s.opacity>100)fail('Native shape style is unavailable.');
       var hex=/^#(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/;
       if(s.strokeEnabled&&!hex.test(s.strokeColor)||tool!=='line'&&s.fillEnabled&&!hex.test(s.fillColor))fail('Native shapes require solid colours.');
@@ -49,8 +50,17 @@
       // Reuse applyStrokeStyle on a detached plain style, never a Paper item.
       if(tool==='line')Object.assign(out,ports.lineStyle());
       if(!['butt','round','square'].includes(out.strokeCap))fail('Native stroke cap is unavailable.');
-      return out;
+      return shadowStyle(s,out);
     }
+    // tools.js Pen/Shape commit @1065e9d8 runs applyShadowBrushTag on the committed path in Shadow mode: the active
+    // native swatch travels with the style to the commit (dictionary's final pass), never into the live preview.
+    function shadowStyle(s,out){
+      if(!s.shadowMode)return out;
+      var sw=root.SMShadowBrush&&root.SMShadowBrush.activeSwatch();
+      if(!(sw&&typeof sw.id==='string'&&sw.id&&/^#(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/.test(sw.color)))fail('The Shadow Brush swatch is unavailable.');
+      out.shadowSwatch={id:sw.id,color:sw.color};return out;
+    }
+    function shade(out,final){var sw=out.shadowSwatch;delete out.shadowSwatch;return sw&&final?Paint.shadow(out,sw,false):out;}
     // tools.js Pen @1065e9d8: strokeColor/brushSize/cap/join/opacity, no fill, applyStrokeStyle dashes.
     function penStyle(s){
       if(s.taperEnds)fail('Tapered Pen strokes are unavailable in native Drawing.');
@@ -95,17 +105,17 @@
     function release(t){try{var el=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(el.releasePointerCapture)el.releasePointerCapture(t.pointer);}catch(_){} }
     function cancel(){if(drag){var t=drag;drag=null;t.cancelled=true;clear();release(t);}return {status:'cancelled'};}
     function endpoint(t,e){var end=point(e,t);return !ports.freehand&&e.shiftKey?ports.constrain(t.tool,t.start,end):end;}
-    function dictionary(t,end){
+    function dictionary(t,end,final){
       if(ports.pen){
         var anchors=t.anchors.concat(end&&!t.handleDrag?[{point:end}]:[]);
-        return Object.assign({},t.style,{closed:!!t.closed,segments:anchors.map(function(a){
-          return {point:a.point.slice(),handleIn:(a.handleIn||[0,0]).slice(),handleOut:(a.handleOut||[0,0]).slice()};})});
+        return shade(Object.assign({},t.style,{closed:!!t.closed,segments:anchors.map(function(a){
+          return {point:a.point.slice(),handleIn:(a.handleIn||[0,0]).slice(),handleOut:(a.handleOut||[0,0]).slice()};})}),final);
       }
       if(ports.freehand)return ports.dictionary(t.samples,t.style);
       var g=ports.geometry(t.tool,t.start[0],t.start[1],end[0],end[1]);
       var out=Object.assign({},t.style,{closed:g.closed,segments:g.segments.map(function(s){return {point:s.point.slice(),handleIn:(s.handleIn||[0,0]).slice(),handleOut:(s.handleOut||[0,0]).slice()};})});
       if(t.tool==='rect')out.paramShape={kind:'rect',tl:0,tr:0,br:0,bl:0,box:{x1:Math.min(t.start[0],end[0]),y1:Math.min(t.start[1],end[1]),x2:Math.max(t.start[0],end[0]),y2:Math.max(t.start[1],end[1])}};
-      return out;
+      return shade(out,final);
     }
     // The live preview shows the stroke and, with symmetry on, every copy the commit will create
     // (symmetry-bridge.js onPreview @1065e9d8); a refused symmetry previews only the stroke itself.
@@ -164,7 +174,7 @@
       if(!current(t,true))return Promise.resolve({status:'cancelled'});
       if(ports.pen&&t.anchors.length<2)return Promise.resolve({status:'cancelled'});
       if(!ports.freehand&&!ports.pen&&Math.hypot(end[0]-t.start[0],end[1]-t.start[1])<2)return Promise.resolve({status:'cancelled'});
-      var dict=dictionary(t,end),s=t.session,companion=linkedCompanions.get(dict)||null;
+      var dict=dictionary(t,end,true),s=t.session,companion=linkedCompanions.get(dict)||null;
       if(companion&&root.state.maskMode)fail('Mask mode with a pressure fill is unavailable in native Drawing.');
       // Labs predictive stroke (draw-bridge.js onStrokeCommitted @1065e9d8) reshapes a freehand stroke before it is committed.
       if(ports.freehand&&root.SMLabs&&typeof root.SMLabs.predictStrokeDict==='function')dict=root.SMLabs.predictStrokeDict(dict)||dict;
