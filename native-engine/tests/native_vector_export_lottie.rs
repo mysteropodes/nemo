@@ -233,3 +233,34 @@ fn a_stored_camera_moves_every_anchor_and_turns_every_handle() {
     assert!(same(&key(&with, 4)["v"], &key(&without, 4)["v"], "v").is_err());
     assert!(same(&key(&with, 4)["i"], &key(&without, 4)["i"], "i").is_err());
 }
+
+#[test]
+#[cfg(feature = "font_asset_admission")]
+fn a_text_block_is_dropped_as_the_baselines_baked_text_raster_is() {
+    // `lottieBuild` filters `!sd.isRaster`, and the baseline's text is a raster (`commitText` bakes it to a PNG).
+    let oracle: Value = serde_json::from_str(ORACLE).unwrap();
+    let case = &oracle["cases"][0];
+    let mut with_text = case.clone();
+    let document = &mut with_text["document"];
+    document["items"] = serde_json::json!({"text":[{"target":{"contextId":"scene-root","layerUid":"L0",
+        "strokeId":"words","frameScope":{"kind":"authored","frame":0}},"block":{"text":"Hi",
+        "font":{"kind":"bundled","fontKey":"Roboto-Regular"},"size":48,"color":"#112233","align":"left",
+        "anchorTopLeft":{"x":10,"y":20}}}]});
+    let scope = &mut document["compositionOrder"]["contexts"][0]["scopes"][0]["elements"];
+    let next = scope
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|element| element["layerUid"] == "L0")
+        .count();
+    scope.as_array_mut().unwrap().push(serde_json::json!(
+        {"layerUid":"L0","strokeId":"words","naturalPosition":next,"order":{}}));
+    let history = owner(&with_text["document"]);
+    let snapshot = history.acquire_snapshot(history.content_revision()).unwrap();
+    assert!(
+        crate::object_render_scene::ordered_entries(&plan(&snapshot, 0))
+            .any(|entry| matches!(entry, crate::object_render_scene::PaintEntry::Text(_))),
+        "the frame really paints the text block"
+    );
+    assert_eq!(export(&with_text).unwrap(), export(case).unwrap());
+}
