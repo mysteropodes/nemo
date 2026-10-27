@@ -349,3 +349,28 @@ test('the adapter holds no cache, no byte budget and no engine access: its sourc
     assert.equal(source.includes(name), false, name);
   }
 });
+
+test('#2361 bitmap stroke: the closed request, its one-entry disposition and the revision accounting', () => {
+  const C = require('../src/js/adapters/native-bitmap-brush-resources-contract.js');
+  const SDK = require('../src/js/adapters/native-application.js');
+  const V = require('../src/js/adapters/native-object-vector-contract.js');
+  const good = () => ({ documentSnapshotId: 'native-object:doc:3', lifecycleGeneration: 1,
+    record: { family: 'editable-vector-path', target: { contextId: 'scene-root', layerUid: 'L', strokeId: '', frameScope: { kind: 'authored', frame: 0 } },
+      vectorExt: { bitmapBrush: { bitmapBrushSpec: { tip: 'soft' }, brushGroupId: 'bmb_1' } } },
+    companion: { x: 5, y: 0, width: 24, height: 14, opacity: 1 }, source: { kind: 'file', path: '/tmp/nemo-native-import-1/source-0000.png' } });
+  assert.equal(C.admitted(C.STROKE), true); assert.equal(C.requiresRevision(C.STROKE), true);
+  assert.equal(V.requestByteLimit(C.STROKE), C.STROKE_REQUEST_BYTES);
+  C.payload(C.STROKE, good());
+  const bad = [p => { p.extra = 1; }, p => { p.record.target.strokeId = 'named'; }, p => { p.record.target.contextId = 'component-1'; },
+    p => { delete p.record.vectorExt; }, p => { p.record.vectorExt.bitmapBrush.brushGroupId = ''; }, p => { p.companion.width = 0; },
+    p => { p.companion.opacity = 2; }, p => { p.companion.x = '5'; }, p => { p.source.kind = 'bytes'; }, p => { p.source.path = ''; },
+    p => { p.lifecycleGeneration = 0; }];
+  for (const change of bad) { const p = good(); change(p); assert.throws(() => C.payload(C.STROKE, p), TypeError, String(change)); }
+  C.result(C.STROKE, { applied: true, historyEntriesAdded: 1 }); C.result(C.STROKE, { applied: false, historyEntriesAdded: 0 });
+  assert.throws(() => C.result(C.STROKE, { applied: true, historyEntriesAdded: 0 }), TypeError);
+  const q = { requestId: 'r', instanceId: 'i', documentId: 'd', expectedRevision: 3, operation: C.STROKE, payload: good() };
+  C.correlate(q, { instanceId: 'i', documentId: 'd', ok: true, contentRevision: 4, result: { applied: true, historyEntriesAdded: 1 } });
+  assert.throws(() => C.correlate(q, { instanceId: 'i', documentId: 'd', ok: true, contentRevision: 3, result: { applied: true, historyEntriesAdded: 1 } }), TypeError);
+  // The common SDK admits the stroke through the composed lane contract.
+  SDK.validateRequest(Object.assign({ apiVersion: 2 }, q));
+});
