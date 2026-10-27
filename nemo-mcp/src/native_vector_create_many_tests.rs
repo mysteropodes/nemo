@@ -125,3 +125,21 @@ fn brush_texture_members_are_admitted_as_serp_writes_them_and_nothing_else() {
         assert_eq!(request(VECTOR, &payload), ok, "{tags}");
     }
 }
+
+#[test]
+fn shadow_channel_members_are_admitted_as_serp_writes_them_and_nothing_else() {
+    for (shadow, ok) in [
+        (json!({"channelTag":"shadow","shadowSwatchId":"sh1"}), true),
+        (json!({"channelTag":"shadow"}), true),
+        (json!({"channelTag":"fill"}), false),
+        (json!({"shadowSwatchId":"sh1"}), false),
+        (json!({"channelTag":"shadow","shadowSwatchId":""}), false),
+        (json!({"channelTag":"shadow","shadowSwatchId":7}), false),
+        (json!({"channelTag":"shadow","extra":1}), false),
+    ] {
+        let mut r = record();
+        r["vectorExt"] = json!({"shadow":shadow});
+        let payload = json!({"command":"object.vector.create","record":r});
+        assert_eq!(request(VECTOR, &payload), ok, "{shadow}");
+    }
+}

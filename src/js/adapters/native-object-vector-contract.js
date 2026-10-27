@@ -158,8 +158,11 @@
     if (has(value, 'strokeSeed') && !(Number.isInteger(value.strokeSeed) && value.strokeSeed >= 0 && value.strokeSeed <= 0xFFFFFFFF && has(value, 'brushTexturePreset'))) fail(`${label}.strokeSeed is invalid`);
   }
   function ext(value, label, hasStroke) {
-    exact(value, [], ['pressure', 'paramShape', 'boxAngle', 'fillGradient', 'fillTrace', 'isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion', 'brushTexture'], label);
+    exact(value, [], ['pressure', 'paramShape', 'boxAngle', 'fillGradient', 'fillTrace', 'isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion', 'brushTexture', 'shadow'], label);
     if (has(value, 'brushTexture')) brushTexture(value.brushTexture, `${label}.brushTexture`);
+    // Shadow Brush (applyShadowBrushTag): channelTag is only ever 'shadow'; the swatch id is non-empty.
+    if (has(value, 'shadow')) { exact(value.shadow, ['channelTag'], ['shadowSwatchId'], `${label}.shadow`);
+      if (value.shadow.channelTag !== 'shadow' || has(value.shadow, 'shadowSwatchId') && !(typeof value.shadow.shadowSwatchId === 'string' && value.shadow.shadowSwatchId.length > 0 && bytes(value.shadow.shadowSwatchId) <= 256)) fail(`${label}.shadow is invalid`); }
     if (!Object.keys(value).length) fail(`${label} must be omitted when empty`);
     if (has(value, 'pressure')) {
       pressure(value.pressure, `${label}.pressure`);

@@ -1,8 +1,8 @@
 /* Ordinary native shape, Pen and bounded freehand gestures. Only pointer-local data and SVG preview live here;
  * the existing vector client and Project resource queue own every committed command. */
-(function(root,factory){var api=factory();if(typeof module==='object'&&module.exports)module.exports=api;
-  else root.NemoNativeObjectShapeTool=api;
-}(typeof globalThis==='object'?globalThis:this,function(){
+(function(root,factory){var node=typeof module==='object'&&module.exports;
+  var api=factory(node?require('./native-object-draw-paint.js'):root.NemoNativeDrawPaint);if(node)module.exports=api;else root.NemoNativeObjectShapeTool=api;
+}(typeof globalThis==='object'?globalThis:this,function(Paint){
   'use strict';
   var tools=['line','rect','ellipse'],shapeTools=tools.concat(['star','speechbubble']);
   var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
@@ -35,7 +35,7 @@
     function style(tool,proof){
       var s=root.state,current=session(),ownerInfo=current&&current.info(),port=root.NemoNativePerspectiveController;
       var perspective=port&&(proof?typeof port.readForCommand==='function'&&port.readForCommand(proof):port.read());
-      if(s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||s.shadowMode||!perspective||!same(perspective.info,ownerInfo)||perspective.perspective.settings.perspectiveEnabled||s.activeSymbolId)fail('This drawing mode is unavailable in native shape tools.');
+      if(s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||s.shadowMode&&!ports.freehand||!perspective||!same(perspective.info,ownerInfo)||perspective.perspective.settings.perspectiveEnabled||s.activeSymbolId)fail('This drawing mode is unavailable in native shape tools.');
       if(ports.freehand)return ports.style();
       if(ports.pen)return penStyle(s);
       if(typeof s.strokeEnabled!=='boolean'||typeof s.fillEnabled!=='boolean'||(!s.strokeEnabled&&(tool==='line'||!s.fillEnabled)))fail('Enable a supported stroke or fill to draw.');
@@ -322,11 +322,11 @@
     function nativeDrawStyle() {
       var state=root.state;
       // Trim measures the whole stroke before the stop-at-axis clip (draw-bridge then symmetry-bridge); native would trim the clipped one.
-      if (state.tool !== 'draw' || state.bitmapBrushOn || state.trimStrokeEnds && (state.vectorBrush || state.symmetryEnabled && !state.symmetryExtend) ||
+      if (state.tool !== 'draw' || state.bitmapBrushOn && !state.shadowMode || state.trimStrokeEnds && (state.vectorBrush || state.symmetryEnabled && !state.symmetryExtend) ||
           state.drawMode !== 'front' && state.drawMode !== 'behind' ||
           // G16 option C (#2361): one seeded anchor whose dabs native stamps; the key resolves as resolveBrushPreset (a built-in,
           // else a confirmed native catalog record). A key neither holds, and texture with symmetry or Trim, stay unavailable.
-          state.brushPreset && state.brushPreset !== 'none' && (!(root.BRUSH_PRESETS && Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS, state.brushPreset) ||
+          !state.shadowMode && state.brushPreset && state.brushPreset !== 'none' && (!(root.BRUSH_PRESETS && Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS, state.brushPreset) ||
             root.NemoNativeCustomBrushUI && root.NemoNativeCustomBrushUI.record(root, state.brushPreset)) ||
             state.strokeEnabled && (state.symmetryEnabled || state.trimStrokeEnds)) ||
           root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
@@ -339,7 +339,9 @@
         'strokeStyle','miterLimit','dashOffset','paintOrder','smoothing','stabilizer','taperEnds','pressureMin','pressureMax',
         'pressureInvert','pressureCurve','pressureCurvePoints','brushAngle','brushAngleFactor'];
       var out = {}; keys.forEach(function(k){if(state[k] !== undefined)out[k]=state[k];});
-      var hex = /^#(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/;
+      var hex = /^#(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/, sw = state.shadowMode && root.SMShadowBrush && root.SMShadowBrush.activeSwatch();
+      if (state.shadowMode && !(sw && typeof sw.id === 'string' && sw.id && hex.test(sw.color))) throw new Error('The Shadow Brush swatch is unavailable.');
+      if (sw) out.shadowSwatch = { id: sw.id, color: sw.color };
       if (state.strokeEnabled && !hex.test(state.strokeColor) || state.fillEnabled && !hex.test(state.fillColor) ||
           !Number.isFinite(state.brushSize) || state.brushSize <= 0 || !Number.isFinite(state.opacity) || state.opacity < 0 || state.opacity > 100 ||
           !Number.isFinite(state.smoothing) || state.smoothing < 0 || !Number.isInteger(state.stabilizer) || state.stabilizer < 0 || state.stabilizer > 6 ||
@@ -410,15 +412,9 @@
         // Matches a new baseline pressure Path: no actual stroke, Paper default
         // stroke width/cap/join, and applyBrushKeyline has no width to paint.
         out.strokeWidth=1;out.strokeCap='butt';out.strokeJoin='miter';out.miterLimit=10;out.dashOffset=0;
-        // applyBrushTexture on a pressure ribbon (draw-bridge.js ribbon branch @1065e9d8): the ribbon becomes the
-        // invisible anchor (preTextureOpacity, opacity 0); its linked fill stays visible.
-        if(style.brushPreset&&style.brushPreset!=='none'){
-          out.brushTexturePreset=style.brushPreset;
-          out.brushGroupId='bg'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);
-          out.strokeSeed=(Math.random()*0xFFFFFFFF)>>>0;
-          out.preTextureOpacity=out.opacity;out.opacity=0;
-        }
-        if(style.fillEnabled){
+        // Shadow mode draws neither texture nor linked fill (draw-bridge.js ribbon branch @1065e9d8).
+        if(!style.shadowSwatch&&style.brushPreset&&style.brushPreset!=='none')Paint.textureRibbon(out,style.brushPreset);
+        if(style.fillEnabled&&!style.shadowSwatch){
           // The companion is the ribbon's sampled centreline, closed and filled (rebuildVectorBrushOutline), below the
           // ribbon, under a fresh link id of its own (ensureStrokeId shape), with no stroke of its own.
           var link='s'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e9)+'_lf';
@@ -433,20 +429,11 @@
         out.miterLimit=stroke.miterLimit;out.dashOffset=stroke.dashOffset;
         if(stroke.dashArray.length)out.dashArray=stroke.dashArray.slice();
         if(stroke.data.paintOrder!==undefined)out.paintOrder=stroke.data.paintOrder;
-        // applyBrushTexture (tools.js @1065e9d8) on a plain stroke drawn with Stroke on: the path becomes the invisible
-        // anchor of its texture. A filled anchor hides only its stroke (preTextureStroke, colorHex8); an unfilled one
-        // hides itself (preTextureOpacity, opacity 0). The seed is draw-bridge's strokeSeed (a fresh uint32 per stroke).
-        if(style.brushPreset&&style.brushPreset!=='none'&&style.strokeEnabled){
-          out.brushTexturePreset=style.brushPreset;
-          out.brushGroupId='bg'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);
-          out.strokeSeed=(Math.random()*0xFFFFFFFF)>>>0;
-          if(out.fillColor){
-            var h=out.strokeColor.slice(1),full=h.length===3?h.replace(/./g,function(c){return c+c;}):h;
-            out.preTextureStroke='#'+(full.length===6?full+'ff':full).toLowerCase();out.strokeColor=null;
-          }else{out.preTextureOpacity=out.opacity;out.opacity=0;}
-        }
+        // applyBrushTexture on a plain stroke drawn with Stroke on: the path becomes its texture's invisible anchor.
+        if(!style.shadowSwatch&&style.brushPreset&&style.brushPreset!=='none'&&style.strokeEnabled)Paint.texturePlain(out,style.brushPreset);
       }
       try{out.segments=segments(path);out.closed=path.closed;
+        if(style.shadowSwatch)Paint.shadow(out,style.shadowSwatch,style.vectorBrush&&!style.strokeEnabled,style.brushSize);
         if(out.segments.some(function(s){return !['point','handleIn','handleOut'].every(function(k){return s[k].every(Number.isFinite);});}))throw new Error('Brush geometry must stay finite.');
         return out;}finally{path.remove();}
     }
