@@ -230,8 +230,11 @@
       var receipt;
       function inspect(value,allowDeferred){try{return Exposure.inspectReceipt(value,['opening','native'].includes(phase)&&same(info,request)&&(allowSuperseded||Exposure.sameView(selected,view.read(info))),allowDeferred,mode,selected.navigation,selected.displayFilter);}
         catch(error){throw previewFailure('receipt-access',error);}}
-      try{receipt=exposure?await exposure.run(function(){return raw('nemo_native_object_preview',request);},function(){return verifyOwner(pin);},inspect):inspect(await raw('nemo_native_object_preview',request),false);}
+      try{receipt=exposure?await exposure.run(function(){return raw('nemo_native_object_preview',request);},function(){return verifyOwner(pin);},inspect):inspect(await raw('nemo_native_object_preview',request),!!occlusion&&!revisionSync);}
       catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw error;}
+      // An edit, Undo/Redo or a navigation presented while the window is not visible waits for its exposure. A revision
+      // synchronization keeps its own contract: an unpresented sync refuses and the session becomes indeterminate.
+      if(!exposure&&!revisionSync&&receipt.status==='deferred-occluded'){presentation=null;if(ports.surfaceChanged)ports.surfaceChanged(null);occlusion.arm();return null;}
       if(receipt.failure){
         presentation=null;if(ports.surfaceChanged)ports.surfaceChanged(null);throw previewFailure(receipt.failure,new Error('Native project frame was not presented ('+receipt.failure+')'));
       }
@@ -252,6 +255,8 @@
       notice: function(error){if(ports.notice)ports.notice(error.message);}
     });
     var presentPreview = previewScheduling.presentPreview;
+    var occlusion=typeof ports.subscribeWindowOcclusion==='function'?Exposure.occlusionWake(ports.subscribeWindowOcclusion,function(){
+      if(active()&&!openingRequested)renderPreview(ports.frame?ports.frame():0);}):null;
     var renderPreview = previewScheduling.renderPreview;
     function changed(){if(ports.changed)ports.changed(info);}
     function mutation(makeRequest,command,needsPresentation,historyAction){
