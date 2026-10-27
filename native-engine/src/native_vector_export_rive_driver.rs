@@ -62,8 +62,17 @@ pub(crate) fn export_rive(
     let mut timing = Map::new();
     timing.insert(key(&animation), json!({"56":spec.fps,"57":frames}));
     editor.call("set_property_values", json!({"propertyValues":timing}))?;
-    // No camera in this increment: the content is the artboard itself.
-    let content = artboard.clone();
+    // With the camera, the drawing lives in a component artboard that the main artboard instances and moves;
+    // without it, the content is the artboard itself.
+    let content = match &plan.camera {
+        Some(_) => {
+            let made = editor.call("open_file_editor", json!({"command":"createArtboard","data":{"createArtboard":[
+                {"name":format!("{} \u{2014} Content", spec.artboard_name),"width":spec.width,"height":spec.height,
+                 "x":spec.width + 200,"y":0,"isComponent":true}]}}))?;
+            id_at(&made, "artboards")?
+        }
+        None => artboard.clone(),
+    };
     let mut container_ids: HashMap<String, Value> = HashMap::new();
     if !plan.containers.is_empty() {
         let defs: Vec<Value> = plan
@@ -109,13 +118,21 @@ pub(crate) fn export_rive(
             json!({"command":"createShapes","data":{"shapes":chunk}}),
         )?;
     }
-    let tree = editor.call(
-        "get_artboard_hierarchy",
-        json!({"artboardId":artboard,"depth":3}),
-    )?;
+    let mut objects = vec![];
+    for board in if plan.camera.is_some() {
+        vec![&artboard, &content]
+    } else {
+        vec![&artboard]
+    } {
+        let tree = editor.call(
+            "get_artboard_hierarchy",
+            json!({"artboardId":board,"depth":3}),
+        )?;
+        objects.extend(tree["objects"].as_array().cloned().unwrap_or_default());
+    }
     let mut by_id: HashMap<String, Value> = HashMap::new();
     let mut shape_by_name: HashMap<String, Value> = HashMap::new();
-    for o in tree["objects"].as_array().into_iter().flatten() {
+    for o in &objects {
         if let Some(id) = o.get("id") {
             by_id.insert(key(id), o.clone());
         }
@@ -253,9 +270,36 @@ pub(crate) fn export_rive(
             json!({"command":"modifyKeyFrames","data":{"animationId":animation,"add":chunk}}),
         )?;
     }
+    let mut camera_keys = vec![];
+    if let Some(poses) = &plan.camera {
+        let placed = editor.call(
+            "component_editor",
+            json!({"command":"addComponents","data":{"addComponents":[
+            {"componentId":content,"artboardId":artboard,"parentId":artboard,"x":0,"y":0}]}}),
+        )?;
+        let instance = id_at(&placed, "components")?;
+        for (k, pose) in poses.iter().enumerate() {
+            // `riveCameraInstanceTransform`: the inverse camera as the instance's node transform.
+            let [px, py, pw, prot] = *pose;
+            let rot = -prot * std::f64::consts::PI / 180.0;
+            let (cos, sin) = (rot.cos(), rot.sin());
+            let s = w / pw;
+            let x = w / 2.0 - (s * cos * px - s * sin * py);
+            let y = h / 2.0 - (s * sin * px + s * cos * py);
+            for (property, value) in [(13, x), (14, y), (16, s), (17, s), (15, rot)] {
+                camera_keys.push(json!({"objectId":instance,"propertyKey":property,"frame":k,"value":num(value),"interpolationType":"linear"}));
+            }
+        }
+        for chunk in camera_keys.chunks(KEYS_PER_CALL) {
+            editor.call(
+                "animation_editor",
+                json!({"command":"modifyKeyFrames","data":{"animationId":animation,"add":chunk}}),
+            )?;
+        }
+    }
     Ok(
         json!({"ok":true,"artboardId":artboard,"artboardName":spec.artboard_name,"animationId":animation,"shapeCount":defs.len(),
-        "keyframeCount":keys.len(),"cameraNested":false}),
+        "keyframeCount":keys.len() + camera_keys.len(),"cameraNested":plan.camera.is_some()}),
     )
 }
 
