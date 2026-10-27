@@ -60,12 +60,56 @@
       } catch (error) { if (open === token) endOpen(); throw error; }
     }
 
-    function sameOpen(observed, current, token) {
+    function stillCurrent(observed, current) {
       var latest = lifecycle.inspect();
-      return open === token && token.active && latest.phase === 'native' && !latest.busy &&
+      return latest.phase === 'native' && !latest.busy &&
         latest.session === observed.session && latest.generation === observed.generation && latest.identity &&
         latest.identity.instanceId === current.instanceId && latest.identity.documentId === current.documentId &&
         latest.identity.contentRevision === current.contentRevision;
+    }
+    function sameOpen(observed, current, token) {
+      return open === token && token.active && stillCurrent(observed, current);
+    }
+
+    // After Open, a present the window's occlusion deferred waits for its next visible exposure
+    // and presents again, instead of failing a navigation or fencing an unpublished session. The
+    // subscription is registered first and the present retried once, so an exposure between the
+    // deferral and the registration is not lost; later retries follow visible hints only.
+    async function watchExposure() {
+      var watcher = { epoch: 0, wake: null, dispose: null };
+      var unsubscribe = await ports.subscribeWindowOcclusion(function (hint) {
+        if (!hint || hint.visible !== true || Object.keys(hint).length !== 1) return;
+        watcher.epoch++;
+        if (watcher.wake) watcher.wake();
+      });
+      if (typeof unsubscribe !== 'function') throw new Error('native window occlusion subscription is unavailable');
+      watcher.dispose = unsubscribe;
+      return watcher;
+    }
+    function exposedAfter(watcher, seen, observed, current) {
+      return new Promise(function (resolve, reject) {
+        var timer = null, settled = false;
+        function check() {
+          if (settled) return;
+          var valid = stillCurrent(observed, current);
+          if (!valid || watcher.epoch !== seen) {
+            settled = true;
+            if (timer !== null) ports.surface.cancel(timer);
+            watcher.wake = null;
+            if (valid) resolve();
+            else reject(new Error('native opacity document changed while waiting for a visible viewport'));
+          }
+        }
+        function observe() {
+          timer = null;
+          check();
+          if (!settled) timer = ports.surface.defer(observe, 100);
+        }
+        watcher.wake = check;
+        check();
+        // Timers only observe cancellation/fences; only exposure hints retry.
+        if (!settled && ports.surface && ports.surface.defer) timer = ports.surface.defer(observe, 100);
+      });
     }
 
     function waitForExposure(token, epoch, observed, current) {
@@ -160,7 +204,7 @@
       var observed = lifecycle.inspect(), current = lifecycle.identity();
       var token = waitOpenOcclusion === true ? open : null;
       if (token) token.session = observed.session;
-      var retryable = false;
+      var retryable = false, exposure = null, seen = 0;
       try {
         var staleRetries = 0;
         for (;;) {
@@ -211,6 +255,13 @@
             await waitForExposure(token, epoch, observed, current);
             continue;
           }
+          if (presented.status === 'deferred-occluded' && !token &&
+              typeof ports.subscribeWindowOcclusion === 'function') {
+            if (exposure) await exposedAfter(exposure, seen, observed, current);
+            else exposure = await watchExposure();
+            seen = exposure.epoch;
+            continue;
+          }
           if (presented.status !== 'presented') {
             if (typeof isPublished === 'function' && isPublished(observed.session)) {
               var deferred = new Error('native opacity frame presentation is deferred');
@@ -235,6 +286,8 @@
         if (!retryable && (!error || error.code !== 'native_preview_superseded') &&
             failed.phase === 'native' && failed.session === observed.session) lifecycle.fence(error);
         throw error;
+      } finally {
+        if (exposure && exposure.dispose) exposure.dispose();
       }
     }
 
