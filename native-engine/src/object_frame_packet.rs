@@ -294,6 +294,15 @@ impl ObjectFramePacket {
     pub(crate) fn custom_brush_presets(&self) -> Option<&crate::object_document::ProjectPresetCatalog> {
         self.snapshot.project().and_then(|p| p.project().custom_brush_presets())
     }
+    /// `resolveBrushPreset(key)` (a built-in first, then the custom catalog) for an exporter that needs only the
+    /// preset's nib size, scatter and spacing (the Rive brush wobble).
+    pub(crate) fn brush_wobble_inputs(&self, key: &str) -> Option<(Option<f64>, Option<f64>, Option<f64>)> {
+        use crate::evaluation::brush_dab::presets::{builtin, from_catalog};
+        let preset = builtin(key).or_else(|| {
+            self.custom_brush_presets()?.entries().iter().find(|(id, _)| id == key).and_then(|(_, p)| from_catalog(p))
+        })?;
+        Some((preset.nib_size, preset.scatter, preset.spacing))
+    }
     pub(crate) fn stored_camera_matrix(&self) -> Result<Option<[f64; 6]>, ObjectFrameError> {
         self.snapshot
             .sampled_camera_matrix(f64::from(self.frame))
