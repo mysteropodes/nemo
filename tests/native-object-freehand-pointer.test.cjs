@@ -173,8 +173,8 @@ test('chrome, cancellation, Escape and lost capture remain usable or abort witho
 });
 test('unsupported brush cells are explicit without native or legacy fallback',async()=>{
  const cases=[s=>Object.assign(s,{tool:'fillbrush',fillBrushMode:'front',fillBrushSize:40}),s=>s.bitmapBrushOn=true,s=>s.brushPreset='my-custom-brush',s=>Object.assign(s,{brushPreset:'charcoal-smooth',symmetryEnabled:true}),
-  // Trim Stroke Ends commits natively for a plain stroke; a pressure-brush trim rebuilds its outline and stays refused.
-  s=>Object.assign(s,{trimStrokeEnds:true,vectorBrush:true,fillEnabled:false}),
+  // Trim Stroke Ends commits natively for a plain stroke and a lone pressure ribbon; a trimmed ribbon's symmetry copies stay refused.
+  s=>Object.assign(s,{trimStrokeEnds:true,vectorBrush:true,fillEnabled:false,symmetryEnabled:true,symmetryExtend:true}),
   // With stop-at-axis symmetry the original trims the whole stroke before clipping; native would trim the clipped one.
   s=>Object.assign(s,{trimStrokeEnds:true,symmetryEnabled:true,symmetryExtend:false}),
   // Plain-stroke symmetry commits natively since G23 (#2361); with a pressure brush it stays refused.
@@ -323,6 +323,14 @@ function predictive(f,on){
  f.root.Path.Ellipse=function(options){assert.equal(options.insert,false);return new f.paper.Path.Ellipse(options);};
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/labs/predictive-stroke.js'),'utf8'),f.context,{filename:'predictive-stroke.js'});
 }
+test('a pressure ribbon asks native to trim it with its linked fill in the one createMany',async()=>{
+ const f=await fixture();Object.assign(f.root.state,{trimStrokeEnds:true,trimStrokeEndsMax:24,vectorBrush:true});
+ send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:.4});
+ // The simulated host answers single creates only; the request is what is under test (see the createMany test below).
+ await settled(f);assert.equal(f.calls.length,1);const p=plain(f.calls[0].payload);
+ assert.deepEqual([p.command,p.trimEnds,p.records.length],['object.vector.createMany',24,2]);
+ assert.equal(p.records[0].vectorExt.isLinkedFillCompanion,true);assert.ok(p.records[1].vectorExt.pressure,'the ribbon, above its fill');
+});
 test('Labs predictive stroke snaps a near-line and a near-circle in the one native commit, and is inert when off',async()=>{
  const line=await fixture();predictive(line,true);
  send(line,'pointerdown',10,40);for(const [x,y] of [[40,41],[70,40],[100,39],[130,40]])send(line,'pointermove',x,y);send(line,'pointerup',160,40);

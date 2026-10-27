@@ -87,6 +87,9 @@ use texture_emit::*;
 #[path = "tween_pressure_outline.rs"]
 mod pressure_outline;
 use pressure_outline::*;
+// Trim Stroke Ends rebuilds a trimmed ribbon with the same outline kernel (object_vector_trim.rs).
+pub(crate) use pressure_outline::{profiled_outline, width_at_frac};
+pub(crate) use resample::SegOut;
 
 #[path = "tween_outline_cleanup.rs"]
 mod outline_cleanup;
