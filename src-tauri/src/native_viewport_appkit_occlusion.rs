@@ -1,8 +1,8 @@
 //! Exact-window visibility hints; presentation remains the surface host's decision.
 
-use crate::native_viewport::NativeViewportError;
+use crate::native_viewport::{NativeViewportError, PreviewSubject};
 use block::ConcreteBlock;
-use native_engine::{compositor::CompositionResult, desktop_viewport::ViewportMapping};
+use native_engine::desktop_viewport::ViewportMapping;
 use objc::runtime::Object;
 use objc::{class, msg_send, sel, sel_impl};
 use serde_json::{json, Value};
@@ -100,7 +100,7 @@ pub(crate) struct PreviewObservation {
     _main_thread: PhantomData<Rc<()>>,
 }
 
-pub(crate) fn observe_preview(instance: &str, result: &CompositionResult) -> PreviewObservation {
+pub(crate) fn observe_preview(instance: &str, result: &impl PreviewSubject) -> PreviewObservation {
     let mut observation = PreviewObservation {
         active: false,
         finished: Cell::new(false),
@@ -114,12 +114,11 @@ pub(crate) fn observe_preview(instance: &str, result: &CompositionResult) -> Pre
         if !state.enabled || state.records >= RECORD_LIMIT {
             return;
         }
-        let identity = result.scheduled_identity();
         observation.previous = state.active.take();
         state.active = Some(json!({"instanceId":identifier(instance),
             "documentId":identifier(result.document_id()),"revision":result.content_revision(),
-            "frame":identity.evaluation_key().frame(),"workId":identity.work_id().value(),
-            "viewGeneration":identity.view_generation().value(),"jsLifecycleGeneration":"MISSING",
+            "frame":result.frame(),"workId":result.work_id(),
+            "viewGeneration":result.view_generation(),"jsLifecycleGeneration":"MISSING",
             "correlation":state.records + 1}));
         observation.active = true;
         state.emit("preview-begin", Value::Null);

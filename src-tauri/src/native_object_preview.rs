@@ -274,6 +274,7 @@ impl NativeObjectHost {
             compositor,
             viewport,
             ViewportDisplayFilter::None,
+            &mut (),
         )
     }
 
@@ -283,6 +284,7 @@ impl NativeObjectHost {
         compositor: &mut Compositor,
         viewport: &mut DesktopViewportHost<P>,
         display_filter: ViewportDisplayFilter,
+        observer: &mut dyn crate::native_dispatch::ObjectPreviewObserver,
     ) -> Result<ObjectPresentedFrame, String> {
         let prepared = self
             .preview
@@ -436,6 +438,15 @@ impl NativeObjectHost {
             .map_err(|e| format!("preview admission: {e:?}"))?;
             let frame =
                 ObjectViewportFrame::compose(compositor, &live).map_err(|e| e.to_string())?;
+            let identity = frame.identity();
+            observer.begin(crate::native_dispatch::ObservedObjectPreview {
+                instance_id: expected.instance_id,
+                document_id: expected.document_id,
+                content_revision: expected.content_revision,
+                frame: identity.evaluation_key().frame(),
+                work_id: identity.work_id().value(),
+                view_generation: identity.view_generation().value(),
+            });
             viewport
                 .register_with_display_filter(frame.identity().clone(), display_filter)
                 .map_err(|e| format!("preview register: {e:?}"))?;

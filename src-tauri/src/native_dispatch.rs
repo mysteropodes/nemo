@@ -24,6 +24,7 @@ mod object_host;
 #[path = "native_object_video.rs"]
 pub(crate) mod video;
 pub(crate) use object_host::{NativeObjectHost, PreparedRetainedActivation};
+pub(crate) use object_host::{ObjectPreviewObserver, ObservedObjectPreview};
 #[cfg(test)]
 pub(crate) use object_host::{finalizer_fixture, finalizer_svg};
 

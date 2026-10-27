@@ -16,9 +16,9 @@
 //! `getEffectiveStrokesRendered` returns them, a placed component is its inner strokes on the host
 //! layer under camera then symMatrix, and a duplicator its copies (factored opacity, hue-turned
 //! paints). A text block is the baseline's vector text: each painted contour a closed fill-only shape
-//! in the block colour (`buildGlyphPaths`). Refused, until later increments admit them with oracle
-//! rows: legacy fill records. A layer's own opacity is not written: the baseline writes every
-//! layer at full opacity (`ks.o` 100) and each shape at its stroke's own opacity. A seeded brush-texture anchor's dabs are written as
+//! in the block colour (`buildGlyphPaths`), and a v1 closed solid fill the dict of a fill-only path. A
+//! layer's own opacity is not written: the baseline writes every layer at full opacity (`ks.o` 100)
+//! and each shape at its stroke's own opacity. A seeded brush-texture anchor's dabs are written as
 //! the dabs the baseline stores for it: each a fill-only shape at the dab opacity, its colour through
 //! the hex Paper stores (`toCSS(true)`) and its outline through the three-decimal rounding `serP`
 //! stores (`_r3`), right after the anchor's own slot.
@@ -65,6 +65,7 @@ pub(crate) enum LottieExportError {
 
 /// The vector record family the exporter admits (the export layer reads record fields, not document types).
 const VECTOR_FAMILY: &str = "editable-vector-path";
+const LEGACY_FAMILY: &str = "closed-solid-fill-cubic-path";
 
 /// One stroke shown on one frame: its keyed path value and its paint, as `lottiePathLayer` reads them.
 struct Shown {
@@ -121,10 +122,25 @@ macro_rules! shown_of {
     ($record:expr, $path:expr, $index:expr, $camera:expr, $shadows:expr) => {{
         let (record, path, index, camera): (_, &BezPath, usize, _) = ($record, $path, $index, $camera);
         let shown: Result<Option<Shown>, LottieExportError> = 'shown: {
+                // A v1 closed solid fill is the dict of a fill-only path: its fill, no stroke, opacity one.
+                if record.family == LEGACY_FAMILY {
+                    let Some(p) = record.solid_fill() else {
+                        break 'shown Err(LottieExportError::Unsupported {
+                            source_object_index: index,
+                            reason: "a legacy fill record without a solid fill has no Lottie representation",
+                        });
+                    };
+                    break 'shown Ok(Some(Shown {
+                        shape: shape_value(path, camera, index)?,
+                        stroke: None,
+                        fill: Some(rgb(&p.r, &p.g, &p.b)?),
+                        opacity: 1.0,
+                    }));
+                }
                 if record.family != VECTOR_FAMILY {
                     break 'shown Err(LottieExportError::Unsupported {
                         source_object_index: index,
-                        reason: "legacy fill records have no admitted Lottie representation yet",
+                        reason: "this record family has no admitted Lottie representation",
                     });
                 }
                 // `state.exportIncludeShadowGuides || sd.channelTag !== 'shadow'`.

@@ -22,7 +22,7 @@
 //! A text block is the baseline's vector text (`buildGlyphPaths`): each painted contour a closed fill-only path in the
 //! block colour, on the lane of its glyph key.
 //! Dropped as the baseline drops them: zero-opacity strokes without a texture. Refused, until later increments admit
-//! them with oracle rows: rasters and bitmap brush (the baseline throws on them) and legacy fill records. A layer's
+//! them with oracle rows: rasters and bitmap brush (the baseline throws on them); a v1 closed solid fill is a fill-only path. A layer's
 //! own opacity is not written (the baseline reads none); video frames write nothing (they are never stroke dicts).
 use crate::object_render_scene::{ordered_entries, ObjectPaintPlan, PaintEntry};
 use kurbo::BezPath;
@@ -78,6 +78,7 @@ pub(crate) enum RiveExportError {
 }
 
 const VECTOR_FAMILY: &str = "editable-vector-path";
+const LEGACY_FAMILY: &str = "closed-solid-fill-cubic-path";
 
 /// One shown stroke as the baseline reads its stored dictionary: anchors, relative handles and paint.
 #[derive(Debug, Clone, PartialEq)]
@@ -116,10 +117,34 @@ macro_rules! stroke_of {
     ($record:expr, $path:expr, $index:expr) => {{
         let (record, path, index): (_, &BezPath, usize) = ($record, $path, $index);
         let stroke: Result<Option<Stroke>, RiveExportError> = 'stroke: {
+            // A v1 closed solid fill is the dict of a fill-only path: its fill, no stroke, opacity one.
+            if record.family == LEGACY_FAMILY {
+                let Some(p) = record.solid_fill() else {
+                    break 'stroke Err(RiveExportError::Unsupported {
+                        source_object_index: index,
+                        reason: "a legacy fill record without a solid fill has no Rive representation",
+                    });
+                };
+                let (v, i, o, closed) = geometry(path, index)?;
+                break 'stroke Ok(Some(Stroke {
+                    id: record.target.stroke_id.clone(),
+                    v,
+                    i,
+                    o,
+                    closed,
+                    fill: Some(rgba(&p.r, &p.g, &p.b, &p.a)?),
+                    stroke: None,
+                    width: 1.0,
+                    real: false,
+                    opacity: 1.0,
+                    texture: None,
+                    pre_texture_opacity: None,
+                }));
+            }
             if record.family != VECTOR_FAMILY {
                 break 'stroke Err(RiveExportError::Unsupported {
                     source_object_index: index,
-                    reason: "legacy fill records have no admitted Rive representation yet",
+                    reason: "this record family has no admitted Rive representation",
                 });
             }
             let texture = record

@@ -238,17 +238,21 @@
   }
   // After Open, a preview the host defers because the window is not visible (NSWindow occlusion) is no failure: the
   // session re-presents on the next actual visible exposure. One subscription, armed lazily and kept while it lives;
-  // a closed one is re-armed by the next deferral. No timer retries.
+  // a closed one is re-armed by the next deferral. No timer retries. The port replays no current visibility, so an
+  // exposure between the deferral and a new registration would be lost: a still-armed wake presents once as soon as
+  // its listener is registered (a window still occluded defers again and waits on the live listener).
   function occlusionWake(subscribe,onVisible){
     var binding=null,connecting=false,armed=false;
+    function wake(){if(!armed)return;armed=false;try{onVisible();}catch(_){}}
     function hint(value){
-      if(!armed||!value||value.visible!==true||Object.keys(value).length!==1)return;
-      armed=false;try{onVisible();}catch(_){}
+      if(!value||value.visible!==true||Object.keys(value).length!==1)return;
+      wake();
     }
     function arm(){
       armed=true;if(binding||connecting)return;connecting=true;
       Promise.resolve().then(function(){return subscribe(hint,function(){binding=null;});}).then(function(value){
-        connecting=false;if(value&&typeof value.close==='function')binding=value;
+        connecting=false;if(!value||typeof value.close!=='function')return;
+        binding=value;wake();
       },function(){connecting=false;});
     }
     return Object.freeze({arm:arm,isArmed:function(){return armed;}});

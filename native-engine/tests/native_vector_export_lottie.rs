@@ -363,3 +363,34 @@ fn a_video_frame_writes_nothing_as_lottiebuild_never_sees_it() {
     };
     assert_eq!(lottie(true), lottie(false));
 }
+
+/// Case 0 with a v1 closed solid fill on `L0` frame 0 (`legacy`) or the fill-only vector record it is (`!legacy`).
+pub(super) fn with_closed_fill(case: &Value, legacy: bool) -> Value {
+    let mut doc = case.clone();
+    let point = |x: f64, y: f64| json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":-4,"y":2}});
+    let geometry = json!({"kind":"cubic-path","closed":true,"coordinateSpace":"document-world","handleSpace":"relative",
+        "segments":[point(30.0, 30.0), point(90.0, 40.0), point(50.0, 100.0)]});
+    let target = json!({"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},"layerUid":"L0","strokeId":"v1"});
+    let fill = json!({"kind":"solid","r":1,"g":0.25,"b":0,"a":0.75});
+    let record = if legacy {
+        json!({"schemaVersion":1,"family":"closed-solid-fill-cubic-path","target":target,"geometry":geometry,"fill":fill})
+    } else {
+        json!({"schemaVersion":1,"family":"editable-vector-path","target":target,"geometry":geometry,"fill":fill,
+            "vector":{"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"butt","strokeJoin":"miter","opacity":1}})
+    };
+    doc["document"]["objects"].as_array_mut().unwrap().push(record);
+    let scope = &mut doc["document"]["compositionOrder"]["contexts"][0]["scopes"][0]["elements"];
+    let next = scope.as_array().unwrap().iter().filter(|e| e["layerUid"] == "L0").count();
+    scope.as_array_mut().unwrap().push(json!({"layerUid":"L0","strokeId":"v1","naturalPosition":next,"order":{}}));
+    doc
+}
+
+#[test]
+fn a_v1_closed_solid_fill_writes_as_its_fill_only_vector_record() {
+    // A v1 record is one solid fill, no stroke: the dict of a fill-only path at opacity one, the row the oracle pins.
+    let oracle: Value = serde_json::from_str(ORACLE).unwrap();
+    let case = &oracle["cases"][0];
+    let legacy = export(&with_closed_fill(case, true)).unwrap();
+    assert_eq!(legacy, export(&with_closed_fill(case, false)).unwrap());
+    assert_ne!(legacy, export(case).unwrap(), "the fill really reaches the Lottie");
+}
