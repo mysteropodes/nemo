@@ -13049,7 +13049,8 @@
         "opacity",
         "placement",
         "mask",
-        "copies"
+        "copies",
+        "stamps"
       ],
       "properties": {
         "command": {
@@ -13150,6 +13151,17 @@
               "minimum": -1000000000000,
               "maximum": 1000000000000
             }
+          }
+        },
+        "stamps": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "description": "Labs multi-frame draw: the other selected frames of the layer the committed shape is also stamped on.",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
           }
         }
       }
@@ -13309,6 +13321,10 @@
               "maxLength": 4096
             }
           }
+        },
+        "placement": {
+          "const": "behind",
+          "description": "drawMode 'behind': the anchor at the bottom of the layer's natural stack, its companion directly above it."
         }
       }
     },

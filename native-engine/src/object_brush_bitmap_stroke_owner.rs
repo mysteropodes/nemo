@@ -11,7 +11,7 @@ use crate::commands::object_fill_owner::object_frame_edit_document::{promote_cel
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_raster_asset_kernels::object_raster_asset_item::RasterItem;
 use crate::object_document::{
-    AssetInventory, AssetRecord, FrameScopeKind, ObjectTarget, ProjectEnvelope, RasterEntry,
+    AssetInventory, AssetRecord, FrameScopeKind, ObjectDocument, ObjectTarget, Presence, ProjectEnvelope, RasterEntry,
 };
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
@@ -31,6 +31,24 @@ pub(crate) struct PreparedBitmapStroke {
 
 fn refusal() -> DispatchErrorCode {
     DispatchErrorCode::Unavailable
+}
+
+/// Front: the top of the layer's natural stack. Behind (draw-bridge.js insertChild(0, path), then the companion
+/// re-anchored above its anchor @1065e9d8): natural positions 0 and 1, which only an order plan can express.
+fn place(
+    drawing: &mut ObjectDocument,
+    target: &ObjectTarget,
+    behind: bool,
+    position: usize,
+) -> Result<(), DispatchErrorCode> {
+    if !behind {
+        return order_insert(drawing, target);
+    }
+    let Presence::Present(plan) = &mut drawing.composition_order else {
+        return Err(refusal());
+    };
+    crate::commands::object_fill_owner::vector_edit::order::insert_element_at(plan, target, position)
+        .map_err(crate::commands::object_fill_owner::vector_edit::order_code)
 }
 
 impl ObjectFillOwner {
@@ -98,11 +116,12 @@ impl ObjectFillOwner {
                 drawing = next;
             }
         }
+        let behind = payload.placement.is_some();
         let mut anchor = payload.record.clone();
         anchor.target.stroke_id = allocate_id(&drawing, revision, "native-stroke")?;
         check_target(&drawing, &anchor.target)?;
         check_layer(&drawing, &anchor.target)?;
-        order_insert(&mut drawing, &anchor.target)?;
+        place(&mut drawing, &anchor.target, behind, 0)?;
         drawing.objects.push(anchor.clone());
         let group = brush_group(&anchor).ok_or(DispatchErrorCode::InvalidRequest)?;
         let at = ObjectTarget {
@@ -115,7 +134,7 @@ impl ObjectFillOwner {
             "brushGroupId":group}))
         .map_err(|_| DispatchErrorCode::InvalidRequest)?;
         let (mut raster, text) = lists(&drawing);
-        order_insert(&mut drawing, &at)?;
+        place(&mut drawing, &at, behind, 1)?;
         raster.push(RasterEntry {
             target: at.clone(),
             item,

@@ -126,7 +126,7 @@ pub(crate) fn plan_brush(
     mask: Option<&str>,
     copies: &[[f64; 6]],
     revision: u64,
-) -> Result<BooleanPlan, PlanError> {
+) -> Result<(BooleanPlan, String), PlanError> {
     check_scope(document, scope)?;
     if outline.len() < 3 {
         return Err(PlanError::Degenerate("fill brush outline".to_string()));
@@ -193,7 +193,8 @@ pub(crate) fn plan_brush(
     plan.created = after.iter().filter(|id| !ids.contains(id)).cloned().collect();
     plan.removed = ids.iter().filter(|id| !after.contains(id)).cloned().collect();
     plan.changed = plan.document != *document;
-    Ok(plan)
+    // `shown`: the path the commit hands back, mask tag included and symmetry copies aside (what Labs stamps).
+    Ok((plan, shown))
 }
 
 /// symmetry-bridge.js onStrokeCommitted over the path the commit hands back: each copy directly above it, in the given

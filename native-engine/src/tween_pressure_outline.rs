@@ -157,3 +157,46 @@ fn reverse_outline(s: &mut Vec<SegOut>) {
         std::mem::swap(&mut s.handle_in, &mut s.handle_out);
     }
 }
+
+/// The baseline `widthAtFrac` (tools.js @1065e9d8): a width profile's value at an arc-length fraction, held at its ends.
+pub(crate) fn width_at_frac(profile: &[(f64, f64)], frac: f64) -> Option<f64> {
+    let (first, last) = (profile.first()?, profile.last()?);
+    if frac <= first.0 {
+        return Some(first.1);
+    }
+    if frac >= last.0 {
+        return Some(last.1);
+    }
+    let (mut lo, mut hi) = (0, profile.len() - 1);
+    while hi - lo > 1 {
+        let mid = (lo + hi) >> 1;
+        if profile[mid].0 < frac {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    let (a, b) = (profile[lo], profile[hi]);
+    Some(a.1 + (b.1 - a.1) * ((frac - a.0) / (b.0 - a.0).max(0.0000001)))
+}
+
+/// rebuildVectorBrushOutline's `sampleVectorBrushCenterline(cs, profile)` with a profile: the samples of
+/// `pressure_outline`, each width read from the arc-length profile instead of between the anchors.
+pub(crate) fn profiled_outline(center: &[SegOut], profile: &[(f64, f64)]) -> R<Vec<SegOut>> {
+    if center.len() < 2 || profile.is_empty() {
+        return Err(DispatchErrorCode::InvalidRequest);
+    }
+    let sampler = PathSampler::new(&path_of(center, false));
+    let steps = (sampler.total / 6.).round().max(8.) as usize;
+    if steps > 8192 {
+        return Err(DispatchErrorCode::Unavailable);
+    }
+    let (mut pts, mut ws) = (vec![], vec![]);
+    for i in 0..=steps {
+        let d = sampler.total * i as f64 / steps as f64;
+        let p = sampler.point_at(d);
+        pts.push([p.x, p.y]);
+        ws.push(width_at_frac(profile, d / sampler.total.max(0.0001)).ok_or(DispatchErrorCode::InvalidRequest)?);
+    }
+    outline_samples(&pts, &ws)
+}

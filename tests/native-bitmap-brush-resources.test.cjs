@@ -366,6 +366,8 @@ test('#2361 bitmap stroke: the closed request, its one-entry disposition and the
     p => { p.companion.opacity = 2; }, p => { p.companion.x = '5'; }, p => { p.source.kind = 'bytes'; }, p => { p.source.path = ''; },
     p => { p.lifecycleGeneration = 0; }];
   for (const change of bad) { const p = good(); change(p); assert.throws(() => C.payload(C.STROKE, p), TypeError, String(change)); }
+  C.payload(C.STROKE, Object.assign(good(), { placement: 'behind' }));
+  assert.throws(() => C.payload(C.STROKE, Object.assign(good(), { placement: 'front' })), TypeError);
   C.result(C.STROKE, { applied: true, historyEntriesAdded: 1 }); C.result(C.STROKE, { applied: false, historyEntriesAdded: 0 });
   assert.throws(() => C.result(C.STROKE, { applied: true, historyEntriesAdded: 0 }), TypeError);
   const q = { requestId: 'r', instanceId: 'i', documentId: 'd', expectedRevision: 3, operation: C.STROKE, payload: good() };

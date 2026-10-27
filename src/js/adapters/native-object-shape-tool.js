@@ -135,11 +135,11 @@
       if(ports.pen&&t.anchors.length<2)return Promise.resolve({status:'cancelled'});
       if(!ports.freehand&&!ports.pen&&Math.hypot(end[0]-t.start[0],end[1]-t.start[1])<2)return Promise.resolve({status:'cancelled'});
       var dict=dictionary(t,end,true),s=t.session,companion=linkedCompanions.get(dict)||null;
-      if(companion&&root.state.maskMode)fail('Mask mode with a pressure fill is unavailable in native Drawing.');
       // Labs predictive stroke (draw-bridge.js onStrokeCommitted @1065e9d8) reshapes a freehand stroke before it is committed.
       if(ports.freehand&&root.SMLabs&&typeof root.SMLabs.predictStrokeDict==='function')dict=root.SMLabs.predictStrokeDict(dict)||dict;
       // Mask mode (tools.js tagOwner @1065e9d8, on every Draw/Pen/shape commit): the shape becomes a mask of the layer
-      // with the chosen combine mode; its symmetry copies and multi-frame stamps carry the same tags.
+      // with the chosen combine mode; its symmetry copies and multi-frame stamps carry the same tags. tagOwner tags the
+      // committed path only, so a pressure ribbon's linked fill stays an ordinary fill.
       if(root.state.maskMode)dict=Object.assign({},dict,{isMask:true,maskMode:root.state.maskModeType||'add'});
       // No second queue: only add a current-intent check to the real Project
       // resource action. While that action runs, its own pending count hides presentation.
@@ -148,10 +148,12 @@
         return action({reconcile:ctx.reconcile,dispatch:function(q){if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});return ctx.dispatch(q);}});
       });}};
       // draw-bridge.js Fill Brush: one native command places the shape (fillBrushMode) and merges same-colour fills.
-      if(dict.isFillShape&&root.SMLabs&&typeof root.SMLabs.multiframeTargets==='function'&&root.SMLabs.multiframeTargets(t.frame).length)fail('Multi-frame Fill Brush is unavailable in native Drawing.');
+      // Labs multi-frame draw stamps the path the merge hands back on the other selected frames, in the same commit.
+      var fbStamps=dict.isFillShape&&root.SMLabs&&typeof root.SMLabs.multiframeTargets==='function'?root.SMLabs.multiframeTargets(t.frame):[];
       if(dict.isFillShape)return root.NemoNativeFillDesktop.create({current:function(){return guarded;},ready:function(){return true;},
-        target:function(){return {layerUid:t.layerUid,frame:t.frame,contextId:'scene-root'};}}).brush({outline:dict.segments,color:dict.fillColor,opacity:dict.opacity,placement:root.state.fillBrushMode,mask:root.state.maskMode?root.state.maskModeType||'add':false,copies:Symmetry.matrices(root,t.pin)})
-        .then(function(r){return {status:r&&r.applied?'applied':'noop'};},root.NemoNativeObjectVector.statusOf);
+        target:function(){return {layerUid:t.layerUid,frame:t.frame,contextId:'scene-root'};}}).brush({outline:dict.segments,color:dict.fillColor,opacity:dict.opacity,placement:root.state.fillBrushMode,mask:root.state.maskMode?root.state.maskModeType||'add':false,copies:Symmetry.matrices(root,t.pin),stamps:fbStamps})
+        .then(function(r){if(r&&r.applied&&fbStamps.length&&typeof root.SMLabs.multiframeStamped==='function')root.SMLabs.multiframeStamped(fbStamps.length);
+          return {status:r&&r.applied?'applied':'noop'};},root.NemoNativeObjectVector.statusOf);
       // draw-bridge.js Bitmap Brush: the anchor, its baked companion and the PNG in one native command.
       if(t.style&&t.style.bitmap)return Bitmap.commit(root,guarded,t,dict,root.NemoNativeObjectVector.statusOf);
       // tools.js @1065e9d8 Draw commit: drawMode 'behind' slips the stroke under the layer's artwork.
@@ -299,12 +301,12 @@
     function nativeDrawStyle() {
       var state=root.state,fb=state.tool==='fillbrush';
       // Fill Brush (draw-bridge's isFillBrush branch) draws no texture, bitmap or Trim and ignores drawMode. Labs runs its
-      // hooks on the placed path: predictive skips a fill shape, multi-frame would stamp the merged result (not native yet).
+      // hooks on the placed path: predictive skips a fill shape, multi-frame stamps the merged result (native, at commit).
       if (fb && (['above','below','merge'].indexOf(state.fillBrushMode) < 0 || root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
-          ? root.SMLabs.unmigratedDrawHooks().length > 0 || typeof root.SMLabs.multiframeTargets === 'function' && root.SMLabs.multiframeTargets(state.currentFrame).length > 0
-          : root.SMLabs.list().some(function(p){return p.on;})))) throw new Error('This Fill Brush combination is unavailable in native Drawing.');
+          ? root.SMLabs.unmigratedDrawHooks().length > 0 : root.SMLabs.list().some(function(p){return p.on;})))) throw new Error('This Fill Brush combination is unavailable in native Drawing.');
       // Trim measures the whole stroke before the stop-at-axis clip (draw-bridge then symmetry-bridge); native would trim the clipped one.
-      if (!fb && (state.tool !== 'draw' || state.trimStrokeEnds && (state.vectorBrush || state.symmetryEnabled && !state.symmetryExtend) ||
+      // A pressure ribbon trims natively alone, with its linked fill and with its multi-frame stamps; its symmetry copies do not yet.
+      if (!fb && (state.tool !== 'draw' || state.trimStrokeEnds && (state.vectorBrush && state.symmetryEnabled || state.symmetryEnabled && !state.symmetryExtend) ||
           state.drawMode !== 'front' && state.drawMode !== 'behind' ||
           // G16 option C (#2361): one seeded anchor whose dabs native stamps; the key resolves as resolveBrushPreset (a built-in,
           // else a confirmed native catalog record). A key neither holds, and texture with symmetry or Trim, stay unavailable.

@@ -11,7 +11,7 @@ fn outline(x: f64, y: f64, w: f64, h: f64) -> Value {
 }
 fn payload(outline: Value, placement: &str) -> Value {
     json!({"command":"object.fill.brush","layerUid":"L0","contextId":"scene-root","frame":0,
-        "outline":outline,"color":"#0000ffff","opacity":0.75,"placement":placement,"mask":false,"copies":[]})
+        "outline":outline,"color":"#0000ffff","opacity":0.75,"placement":placement,"mask":false,"copies":[],"stamps":[]})
 }
 fn fill(id: &str, x: f64, y: f64, w: f64, h: f64, paint: [f64; 4]) -> Value {
     f::vector(
@@ -282,4 +282,38 @@ fn symmetry_copies_of_the_returned_path_land_directly_above_it_mapped_and_reorie
         "a quarter turn"
     );
     assert_eq!(extent(&records[2]), [-10.0, -10.0, 0.0, 0.0], "a half turn");
+}
+
+#[test]
+fn multi_frame_stamps_the_returned_path_on_each_selected_frame_keyed_with_what_it_showed_before_the_stroke() {
+    // Frame 0 is the layer's only key; frames 1..3 hold it. multiframe-draw keys frame 2 with what it showed before
+    // this stroke (only "s-x"), then stamps the path the commit hands back (mask tag included, symmetry copy not).
+    let mut doc = f::document(1, vec![fill("s-x", 200.0, 100.0, 20.0, 20.0, [1.0, 0.0, 0.0, 1.0])], None, None);
+    doc["layers"][0]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+        "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+    let mut owner = f::owner_of(&doc);
+    let mut p = payload(outline(10.0, 10.0, 40.0, 30.0), "above");
+    p["mask"] = json!("add");
+    p["copies"] = json!([[-1, 0, 0, 1, 320, 0]]);
+    p["stamps"] = json!([2]);
+    let drawn = brush(&mut owner, &p);
+    assert_eq!(drawn.len(), 3, "s-x, the shape, its mirror copy");
+    let stamped = f::frame_records(&f::state(&owner), "L0", 2);
+    assert_eq!(stamped.len(), 2, "the key copy of what frame 2 showed, then the stamp: {stamped:#?}");
+    assert_eq!(extent(&stamped[0]), extent(&drawn[0]), "frame 2 keyed with s-x, not with the new stroke");
+    assert_eq!(extent(&stamped[1]), extent(&drawn[1]), "the stamp is the committed shape");
+    assert_eq!(stamped[1]["vectorExt"]["isMask"], true);
+    assert_eq!(stamped[1]["vectorExt"]["maskMode"], "add");
+    assert_ne!(stamped[1]["target"]["strokeId"], drawn[1]["target"]["strokeId"], "a fresh identity");
+    assert!(f::frame_records(&f::state(&owner), "L0", 1).is_empty(), "an unselected held frame stays held");
+}
+
+#[test]
+fn stamps_naming_the_drawn_frame_a_repeat_or_a_frame_past_the_end_are_refused() {
+    for stamps in [json!([0]), json!([2, 2]), json!([4]), json!([-1]), json!(null)] {
+        let mut owner = owner(vec![]);
+        let mut p = payload(outline(10.0, 10.0, 40.0, 30.0), "above");
+        p["stamps"] = stamps.clone();
+        assert!(owner.prepare_fill_brush_json(p.to_string().as_bytes()).is_err(), "{stamps}");
+    }
 }

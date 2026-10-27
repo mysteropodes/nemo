@@ -173,8 +173,8 @@ test('chrome, cancellation, Escape and lost capture remain usable or abort witho
 });
 test('unsupported brush cells are explicit without native or legacy fallback',async()=>{
  const cases=[s=>Object.assign(s,{tool:'fillbrush',fillBrushMode:'front',fillBrushSize:40}),s=>s.bitmapBrushOn=true,s=>s.brushPreset='my-custom-brush',s=>Object.assign(s,{brushPreset:'charcoal-smooth',symmetryEnabled:true}),
-  // Trim Stroke Ends commits natively for a plain stroke; a pressure-brush trim rebuilds its outline and stays refused.
-  s=>Object.assign(s,{trimStrokeEnds:true,vectorBrush:true,fillEnabled:false}),
+  // Trim Stroke Ends commits natively for a plain stroke and a lone pressure ribbon; a trimmed ribbon's symmetry copies stay refused.
+  s=>Object.assign(s,{trimStrokeEnds:true,vectorBrush:true,fillEnabled:false,symmetryEnabled:true,symmetryExtend:true}),
   // With stop-at-axis symmetry the original trims the whole stroke before clipping; native would trim the clipped one.
   s=>Object.assign(s,{trimStrokeEnds:true,symmetryEnabled:true,symmetryExtend:false}),
   // Plain-stroke symmetry commits natively since G23 (#2361); with a pressure brush it stays refused.
@@ -323,6 +323,14 @@ function predictive(f,on){
  f.root.Path.Ellipse=function(options){assert.equal(options.insert,false);return new f.paper.Path.Ellipse(options);};
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/labs/predictive-stroke.js'),'utf8'),f.context,{filename:'predictive-stroke.js'});
 }
+test('a pressure ribbon asks native to trim it with its linked fill in the one createMany',async()=>{
+ const f=await fixture();Object.assign(f.root.state,{trimStrokeEnds:true,trimStrokeEndsMax:24,vectorBrush:true});
+ send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:.4});
+ // The simulated host answers single creates only; the request is what is under test (see the createMany test below).
+ await settled(f);assert.equal(f.calls.length,1);const p=plain(f.calls[0].payload);
+ assert.deepEqual([p.command,p.trimEnds,p.records.length],['object.vector.createMany',24,2]);
+ assert.equal(p.records[0].vectorExt.isLinkedFillCompanion,true);assert.ok(p.records[1].vectorExt.pressure,'the ribbon, above its fill');
+});
 test('Labs predictive stroke snaps a near-line and a near-circle in the one native commit, and is inert when off',async()=>{
  const line=await fixture();predictive(line,true);
  send(line,'pointerdown',10,40);for(const [x,y] of [[40,41],[70,40],[100,39],[130,40]])send(line,'pointermove',x,y);send(line,'pointerup',160,40);
@@ -385,9 +393,12 @@ test('a pressure stroke with Fill on commits its ribbon and linked fill in one c
  assert.deepEqual(fill.geometry.segments.map(s=>[s.point.x,s.point.y,s.handleIn.x,s.handleIn.y,s.handleOut.x,s.handleOut.y]),
    plain(sampled.map(s=>[s.point.x,s.point.y,s.handleIn.x,s.handleIn.y,s.handleOut.x,s.handleOut.y])),'the companion follows the sampled centreline');
  assert.equal(ribbon.fill.r,0x11/255,'the ribbon is painted in the stroke colour');
- const masked=await fixture();Object.assign(masked.root.state,{vectorBrush:true,maskMode:true});
+ // Mask mode: tagOwner tags the ribbon (the committed path); its linked fill stays an ordinary fill.
+ const masked=await fixture();Object.assign(masked.root.state,{vectorBrush:true,maskMode:true,maskModeType:'subtract'});
  send(masked,'pointerdown',20,20);send(masked,'pointermove',50,30);send(masked,'pointerup',80,45);await settled(masked);
- assert.equal(masked.calls.length,0);assert.ok(masked.log.some(s=>/Mask mode with a pressure fill/.test(s)),masked.log.join(','));
+ assert.equal(masked.calls.length,1,masked.log.join(','));const [mfill,mribbon]=plain(masked.calls[0].payload.records);
+ assert.deepEqual([mribbon.vectorExt.isMask,mribbon.vectorExt.maskMode],[true,'subtract']);
+ assert.deepEqual([mfill.vectorExt.isMask,mfill.vectorExt.isLinkedFillCompanion],[undefined,true]);
 });
 test('a pressure stroke with Stroke off is one closed fill of its centreline',async()=>{
  const f=await fixture();Object.assign(f.root.state,{vectorBrush:true,strokeEnabled:false});
@@ -469,6 +480,14 @@ test('a bitmap-brush Draw stroke commits its camouflaged anchor, baked companion
  assert.ok(removed.includes(p.source.path),'a confirmed stroke cleans its staged PNG');
  assert.equal(f.paper.project.activeLayer.children.length,0,'no Raster or path is inserted');
 });
+test('a bitmap stroke drawn behind asks native for the bottom of the layer, its companion above it',async()=>{
+ const f=await fixture();bitmapPorts(f);Object.assign(f.root.state,{bitmapBrushOn:true,drawMode:'behind'});
+ send(f,'pointerdown',20,20);send(f,'pointermove',50,30);send(f,'pointerup',80,45);
+ assert.equal((await settled(f)).status,'applied');assert.equal(f.calls[0].payload.placement,'behind');
+ const front=await fixture();bitmapPorts(front);Object.assign(front.root.state,{bitmapBrushOn:true});
+ send(front,'pointerdown',20,20);send(front,'pointermove',50,30);send(front,'pointerup',80,45);
+ await settled(front);assert.equal(Object.prototype.hasOwnProperty.call(front.calls[0].payload,'placement'),false,'front is the absent default');
+});
 test('an unfilled bitmap stroke hides its anchor and carries its pressure profile; unsupported bitmap combinations stay refused',async()=>{
  const f=await fixture(),{baked}=bitmapPorts(f);
  Object.assign(f.root.state,{bitmapBrushOn:true,bitmapPressure:true,fillEnabled:false});
@@ -478,7 +497,7 @@ test('an unfilled bitmap stroke hides its anchor and carries its pressure profil
  assert.equal(r.vector.opacity,0);assert.equal(ext.preTextureOpacity,.5);assert.equal(ext.preTextureStroke,undefined);assert.notEqual(r.vector.stroke,null);assert.equal(r.vector.hasRealStroke,true);
  assert.equal(ext.bitmapBrushSpec.pressure,true);assert.ok(ext.bitmapPressureProfile.length>=2);assert.deepEqual(plain(baked[0].profile),ext.bitmapPressureProfile);
  assert.ok(ext.bitmapPressureProfile.every(([x,y,m])=>Number.isFinite(x)&&Number.isFinite(y)&&m>=.2&&m<=2.5));
- for(const change of [s=>s.symmetryEnabled=true,s=>s.drawMode='behind',s=>s.trimStrokeEnds=true,s=>s.maskMode=true]){
+ for(const change of [s=>s.symmetryEnabled=true,s=>s.trimStrokeEnds=true,s=>s.maskMode=true]){
   const g=await fixture();bitmapPorts(g);Object.assign(g.root.state,{bitmapBrushOn:true});change(g.root.state);
   const e=send(g,'pointerdown',20,20);send(g,'pointerup',60,50);assert.equal(e.prevented,true);assert.equal(g.calls.length,0);assert.ok(g.log.some(x=>/unavailable/.test(x)),g.log.join(','));
  }
@@ -547,7 +566,7 @@ test('Fill Brush commits its outline through the native Fill Brush command with 
 
 // #2361 G23: symmetry-bridge.js onStrokeCommitted @1065e9d8 over a pressure ribbon. Each copy carries its mapped centreline;
 // a ribbon with a linked fill gets a fresh fill of its own, its outline rebuilt from that centreline (adoptFreshIdentity).
-test('Fill Brush with Labs on: predictive leaves the fill shape alone, multi-frame stays refused, an unrelated prototype is no refusal',async()=>{
+test('Fill Brush with Labs on: predictive leaves the fill shape alone, multi-frame stamps it, an unrelated prototype is no refusal',async()=>{
  const stroke=f=>{send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:0});};
  const off=await fixture('fillbrush');Object.assign(off.root.state,{fillBrushMode:'above',fillBrushSize:40});stroke(off);await settled(off);
  const on=await fixture('fillbrush');Object.assign(on.root.state,{fillBrushMode:'above',fillBrushSize:40});predictive(on,true);stroke(on);await settled(on);
@@ -555,8 +574,18 @@ test('Fill Brush with Labs on: predictive leaves the fill shape alone, multi-fra
  const grid=await fixture('fillbrush');Object.assign(grid.root.state,{fillBrushMode:'above',fillBrushSize:40});
  grid.root.SMLabs={list:()=>[{name:'canvas-grid',on:true}],unmigratedDrawHooks:()=>[]};stroke(grid);await settled(grid);assert.equal(grid.calls.length,1,grid.log.join(','));
  const many=await fixture('fillbrush');Object.assign(many.root.state,{fillBrushMode:'above',fillBrushSize:40});const toasts=multiframe(many,true);
- const e=send(many,'pointerdown',20,20);send(many,'pointerup',60,50);assert.equal(e.prevented,true);assert.equal(many.calls.length,0);
- assert.ok(toasts.some(x=>/unavailable/.test(x)),toasts.join(','));
+ stroke(many);assert.equal((await settled(many)).status,'applied',toasts.join(','));assert.equal(many.calls.length,1);
+ // multiframeTargets: the other selected frames of the drawn one (3 and 5; 0 is the drawn frame, 99 is out of range).
+ assert.deepEqual(plain(many.calls[0].payload.stamps),[3,5]);assert.deepEqual(plain(off.calls[0].payload.stamps),[]);
+ assert.deepEqual(toasts,['labsToastMultiframePrefix2labsToastMultiframeSuffix']);
+});
+test('a trimmed pressure ribbon with multi-frame draw sends one trimmed batch: its cell, then each stamp',async()=>{
+ const f=await fixture();multiframe(f,true);Object.assign(f.root.state,{trimStrokeEnds:true,trimStrokeEndsMax:24,vectorBrush:true});
+ send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:.4});
+ await settled(f);assert.equal(f.calls.length,1);const p=plain(f.calls[0].payload);
+ assert.deepEqual([p.command,p.trimEnds],['object.vector.batch',24]);
+ const frames=p.ops.map(o=>o.record.target.frameScope.frame);assert.deepEqual(frames,[0,0,3,3,5,5]);
+ assert.ok(p.ops.every((o,i)=>i%2?o.record.vectorExt.pressure:o.record.vectorExt.isLinkedFillCompanion),'each cell: the fill, then its ribbon');
 });
 test('a mirrored or rotated pressure ribbon commits each copy with its own centreline and linked fill',async()=>{
  const pen=(f)=>{send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();

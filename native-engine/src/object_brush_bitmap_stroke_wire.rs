@@ -25,6 +25,9 @@ pub(crate) struct BitmapStroke {
     pub(crate) record: ObjectRecord,
     pub(crate) companion: Companion,
     pub(crate) source: ImageSource,
+    /// `drawMode === 'behind'`: the anchor enters under the layer's artwork, its companion directly above it.
+    #[serde(default)]
+    pub(crate) placement: Option<String>,
 }
 
 /// The anchor's brush group, which pairs it with its companion.
@@ -62,6 +65,7 @@ impl BitmapStroke {
             || c.width <= 0.0
             || c.height <= 0.0
             || !(0.0..=1.0).contains(&c.opacity)
+            || parsed.placement.as_deref().is_some_and(|p| p != "behind")
         {
             return Err(DispatchErrorCode::InvalidRequest);
         }
