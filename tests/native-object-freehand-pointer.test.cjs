@@ -97,6 +97,7 @@ async function fixture(tool='draw',native=true){
   'buildVariableWidthPath','buildClosedRingOutline','_polyClosestPair'])vm.runInContext(baselineFunction(tools,name),context,{filename:'tools.js:'+name});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/stroke-modeler.js'),'utf8'),context,{filename:'stroke-modeler.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-paint.js'),'utf8'),context,{filename:'native-object-draw-paint.js'});
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-symmetry.js'),'utf8'),context,{filename:'native-object-draw-symmetry.js'});
  root.NemoNativeFillDesktop=require('../src/js/adapters/native-fill-desktop.js');
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-shape-tool.js'),'utf8'),context,{filename:'native-object-shape-tool.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/draw-bridge.js'),'utf8'),context,{filename:'draw-bridge.js'});
@@ -169,7 +170,7 @@ test('chrome, cancellation, Escape and lost capture remain usable or abort witho
   send(f,'pointerup',60,50);assert.equal(f.calls.length,0,action);assert.equal(f.body.children.length,0,action);assert.equal(f.paper.project.activeLayer.children.length,0);}
 });
 test('unsupported brush cells are explicit without native or legacy fallback',async()=>{
- const cases=[s=>s.tool='fillbrush',s=>s.bitmapBrushOn=true,s=>s.brushPreset='my-custom-brush',s=>Object.assign(s,{brushPreset:'charcoal-smooth',symmetryEnabled:true}),
+ const cases=[s=>Object.assign(s,{tool:'fillbrush',fillBrushMode:'below',fillBrushSize:40,symmetryEnabled:true,symmetryExtend:true}),s=>s.bitmapBrushOn=true,s=>s.brushPreset='my-custom-brush',s=>Object.assign(s,{brushPreset:'charcoal-smooth',symmetryEnabled:true}),
   // Trim Stroke Ends commits natively for a plain stroke; a pressure-brush trim rebuilds its outline and stays refused.
   s=>Object.assign(s,{trimStrokeEnds:true,vectorBrush:true,fillEnabled:false}),
   // With stop-at-axis symmetry the original trims the whole stroke before clipping; native would trim the clipped one.
@@ -481,4 +482,33 @@ test('Fill Brush commits its outline through the native Fill Brush command with 
   const e=send(f,'pointerdown',20,20);send(f,'pointerup',60,50);assert.equal(e.prevented,true);assert.equal(f.calls.length,0);
   assert.ok(f.log.some((s)=>/Fill Brush combination is unavailable/.test(s)),f.log.join(','));
  }
+});
+
+// #2361 G23: symmetry-bridge.js onStrokeCommitted @1065e9d8 over a pressure ribbon. Each copy carries its mapped centreline;
+// a ribbon with a linked fill gets a fresh fill of its own, its outline rebuilt from that centreline (adoptFreshIdentity).
+test('a mirrored or rotated pressure ribbon commits each copy with its own centreline and linked fill',async()=>{
+ const pen=(f)=>{send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();
+  send(f,'pointerup',80,45,{pointerType:'pen',pressure:0});};
+ const f=await fixture();Object.assign(f.root.state,{vectorBrush:true,symmetryEnabled:true,symmetryMode:'y',symmetryExtend:true});
+ pen(f);await settled(f);assert.equal(f.calls.length,1,f.log.join(','));const q=plain(f.calls[0].payload);
+ assert.equal(q.command,'object.vector.createMany');assert.equal(q.records.length,4,'fill, ribbon, mirrored fill, mirrored ribbon');
+ const [fill0,ribbon0,fill1,ribbon1]=q.records;
+ assert.deepEqual([fill0.vectorExt.isLinkedFillCompanion,fill1.vectorExt.isLinkedFillCompanion,ribbon0.vectorExt.isLinkedFillCompanion,ribbon1.vectorExt.isLinkedFillCompanion],[true,true,undefined,undefined]);
+ assert.equal(fill0.vectorExt.linkedFillId,ribbon0.vectorExt.linkedFillId);assert.equal(fill1.vectorExt.linkedFillId,ribbon1.vectorExt.linkedFillId);
+ assert.notEqual(ribbon0.vectorExt.linkedFillId,ribbon1.vectorExt.linkedFillId,'the copy has a fill of its own');
+ // The y axis of the 320-wide canvas is x = 160: every centreline point is reflected, widths kept.
+ const c0=ribbon0.vectorExt.pressure.centerSegments,c1=ribbon1.vectorExt.pressure.centerSegments;
+ assert.equal(c1.length,c0.length);
+ c0.forEach((a,i)=>{assert.ok(Math.abs(c1[i].point.x-(320-a.point.x))<1e-6&&Math.abs(c1[i].point.y-a.point.y)<1e-6,'reflected '+i);assert.equal(c1[i].width,a.width);});
+ const xs=(r)=>r.geometry.segments.map((s)=>s.point.x);
+ assert.ok(Math.min(...xs(ribbon1))>160&&Math.max(...xs(ribbon0))<160,'the copy outline lies across the axis');
+ // Radial without a fill: the ribbon then copy n-1 down to copy 1, each rotated about the centre.
+ const r=await fixture();Object.assign(r.root.state,{vectorBrush:true,fillEnabled:false,symmetryEnabled:true,symmetryMode:'radial',symmetryRadialSectors:3,symmetryRadialCenter:{x:160,y:90}});
+ pen(r);await settled(r);const rq=plain(r.calls[0].payload);assert.equal(rq.records.length,3);
+ const at=(rec)=>rec.vectorExt.pressure.centerSegments[0].point,o=at(rq.records[0]);
+ [[2,4*Math.PI/3],[1,2*Math.PI/3]].forEach(([k,a],i)=>{const p=at(rq.records[i+1]),dx=o.x-160,dy=o.y-90;
+  assert.ok(Math.abs(p.x-(160+dx*Math.cos(a)-dy*Math.sin(a)))<1e-6&&Math.abs(p.y-(90+dx*Math.sin(a)+dy*Math.cos(a)))<1e-6,'copy '+k);});
+ // Stop-at-axis clips only a ribbon's outline in the baseline, never its centreline: refused rather than inconsistent.
+ const stop=await fixture();Object.assign(stop.root.state,{vectorBrush:true,symmetryEnabled:true,symmetryMode:'y',symmetryExtend:false});
+ pen(stop);await settled(stop);assert.equal(stop.calls.length,0);assert.ok(stop.log.some((s)=>/Stop-at-axis symmetry with pressure brushes/.test(s)),stop.log.join(','));
 });

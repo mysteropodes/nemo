@@ -188,3 +188,31 @@ fn a_pressure_ribbon_and_its_linked_fill_land_as_one_pair() {
     assert_eq!(state(&owner), after);
     assert_eq!(state(&owner_of(&after)), after, "the saved pair reopens unchanged");
 }
+
+#[test]
+fn a_mirrored_ribbon_pair_lands_beside_the_drawn_pair_in_one_create_many() {
+    // G23 symmetry over a pressure ribbon with Fill on: each copy has its own linked fill (a fresh link), so one
+    // createMany carries two pairs in the same cell, each companion directly below its ribbon.
+    let mut owner = owner_of(&document(1, seeds(), None));
+    let before = state(&owner);
+    let ribbon = |link: &str, x: f64| {
+        pressure_record([0.1, 0.1, 0.1], json!({"linkedFillId":link,"pressure":{"centerSegments":[
+            {"point":{"x":x,"y":10},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":2},
+            {"point":{"x":x + 40.0,"y":10},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":4}],
+            "widthProfile":[{"t":0,"width":2},{"t":1,"width":4}]}}))
+    };
+    let fill = |link: &str| pressure_record([0.2, 0.4, 0.6], json!({"linkedFillId":link,"isLinkedFillCompanion":true}));
+    let records = vec![fill("lf-a"), ribbon("lf-a", 0.0), fill("lf-b"), ribbon("lf-b", 200.0)];
+    let response = send(&mut owner, "pairs", many(records));
+    assert_eq!(response["ok"], true, "{response}");
+    let after = state(&owner);
+    let links: Vec<(&Value, bool)> = objects(&after)
+        .iter()
+        .filter(|r| r["vectorExt"]["linkedFillId"].is_string())
+        .map(|r| (&r["vectorExt"]["linkedFillId"], r["vectorExt"]["isLinkedFillCompanion"] == true))
+        .collect();
+    assert_eq!(links, [(&json!("lf-a"), true), (&json!("lf-a"), false), (&json!("lf-b"), true), (&json!("lf-b"), false)]);
+    owner.undo(1).unwrap();
+    assert_eq!(state(&owner), before, "one undo removes both pairs");
+    assert_eq!(state(&owner_of(&after)), after, "both pairs reopen unchanged");
+}
