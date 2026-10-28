@@ -18,6 +18,7 @@ func ui32FixedFixture(_ raw:String?) throws -> (name:String,size:Int,hash:String
 }
 func ui32UsesF03Fixture(_ raw:String?) throws -> Bool {try ui32FixedFixture(raw).f03}
 func ui32FixedFixtureSelfTest() throws {
+  try ui32ContentWindowsSelfTest()
   try check(try ui32UsesF03Fixture(nil) == false)
   try check(try ui32UsesF03Fixture("initial-text") == false)
   try check(try ui32UsesF03Fixture("f03-original") == true)
