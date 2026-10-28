@@ -52,9 +52,7 @@ pub(crate) mod property_expression_runtime;
 #[allow(dead_code)]
 pub(crate) mod property_expression_views;
 // D28-K1: private contribution kernel over explicit resolved selector inputs.
-#[path = "property_follow_path_sample.rs"]
-#[allow(dead_code)]
-pub(crate) mod property_follow_path_sample;
+pub(crate) use crate::object_document::property_follow_path_sample;
 // G16 option C (#2361): the baseline vector-brush dab stamper (presets, Paper dab geometry, seeded stamping walk).
 #[path = "brush_dab_core.rs"]
 #[allow(dead_code)]
