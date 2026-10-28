@@ -398,7 +398,7 @@
     }catch(_){}
     showStartScreen();return false;
   }
-  var newProjectGeneration=0;window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg,isCurrent,onCreationFailure){
+  var newProjectGeneration=0;window.SMProject={nativeTabs:nativeInactiveTabs,nativeObjectProject:function(){return nativeSavedUI&&nativeSavedUI.nativeObject||null;},save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg,isCurrent,onCreationFailure){
     if(nativeSavedUI&&nativeSavedUI.nativeObject){
       if(!nativeNewAllowed())return tabAddNotice('New project unavailable — close the inactive project or finish the pending project operation first.');
       return typeof nativeSavedUI.nativeObject.newProject==='function'?nativeSavedUI.nativeObject.newProject(cfg,isCurrent,onCreationFailure):false;

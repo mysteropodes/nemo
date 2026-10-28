@@ -450,7 +450,7 @@ impl NemoServer {
     }
 
     #[tool(
-        description = "Call the same application command/history service as Nemo UI. Use the latest snapshot instanceId, documentId, expectedRevision and a unique requestId. Identical retries reuse their result; changed-body retries fail. Supports editing/keying a registered property capability, undo/redo and diagnostic replay. The payload schema carries one copyable template per operation: send it as a JSON object, not as a JSON-encoded string."
+        description = "Call the same application command/history service as Nemo UI. Use the latest snapshot instanceId, documentId, expectedRevision and a unique requestId. Identical retries reuse their result; changed-body retries fail. Supports editing/keying a registered property capability, undo/redo, diagnostic replay and project open/new/saveAs/export. The payload schema carries one copyable template per operation: send it as a JSON object, not as a JSON-encoded string."
     )]
     async fn nemo_command(
         &self,

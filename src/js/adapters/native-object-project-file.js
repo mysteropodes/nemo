@@ -181,8 +181,10 @@
         baseline=null;ports.failed(error);ports.repaint();return false;
       }finally{opening=false;}
     }
-    async function saveAs(){
+    // destination: an application request's path (#2510) in place of the picker; the same workflow otherwise.
+    async function saveAs(destination){
       if(saving||opening)return {status:saving?'save-in-progress':'open-in-progress',acknowledged:false};
+      var pick=typeof destination==='string'&&destination?function(){return Promise.resolve(destination);}:ports.pick;
       saving=true;
       try{
         var options={requestId:session.requestId('save'),pinRequestId:session.requestId('save-pin'),project:true};
@@ -190,10 +192,10 @@
         options.isCurrent=function(){return saved.isCurrent(ticket);};
         var written=await workflow.run({readPresentedObjectSession:session.captureSaveSession(),
           acquirePin:async function(request){serialization=await session.acquirePin(request);return serialization;},
-          pickDestination:ports.pick,savePinned:session.savePinned},options);
+          pickDestination:pick,savePinned:session.savePinned},options);
         var result=await saved.acknowledge(ticket,{written:written,serialization:serialization},options);
-        ports.notice(result,written);return result;
-      }catch(error){ports.notice({status:'refused'},null,error);return {status:'refused'};}
+        ports.notice(result,written);return written&&written.reason&&!result.acknowledged?Object.assign({},result,{reason:written.reason}):result;
+      }catch(error){ports.notice({status:'refused'},null,error);return {status:'refused',reason:error&&error.message||'save-failed'};}
       finally{saving=false;}
     }
     return Object.freeze({openPath:openPath,newProject:newProject,activateProject:activateProject,saveAs:saveAs,

@@ -2093,7 +2093,9 @@
         "src/native_import_asset_contract.rs",
         "src/native_import_asset_contract_tests.rs",
         "src/native_history_read_contract.rs",
-        "src/native_history_read_contract_tests.rs"
+        "src/native_history_read_contract_tests.rs",
+        "src/project_contract.rs",
+        "src/project_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
@@ -2153,7 +2155,8 @@
         "native_raster_image_dispatch.rs",
         "native_video_link_source.rs",
         "native_video_link_dispatch.rs",
-        "native_import_batch_dispatch.rs"
+        "native_import_batch_dispatch.rs",
+        "native_mcp_project_scope.rs"
       ],
       "publicApi": [
         "application_mcp.rs"
@@ -2170,7 +2173,8 @@
         "application_mcp_reproduction_tests.rs",
         "native_revision_sync_tests.rs",
         "native_font_dispatch_tests.rs",
-        "native_font_source_tests.rs"
+        "native_font_source_tests.rs",
+        "native_mcp_project_scope_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
