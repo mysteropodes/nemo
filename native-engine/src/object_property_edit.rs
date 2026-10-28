@@ -1,8 +1,8 @@
 //! Sealed generic property edits through the existing revision owner.
 use crate::commands::ObjectFillOwner;
 use crate::object_document::{
-    object_deserialize, ObjectDocument, OrderCurvePoint, OrderKey, OrderTrack, Presence,
-    PropertyHolder, PropertyHolderTarget, PropertyRecord,
+    object_deserialize, ObjectDocument, OrderCurvePoint, OrderExpression, OrderKey, OrderTrack,
+    Presence, PropertyHolder, PropertyHolderTarget, PropertyRecord,
 };
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
@@ -19,6 +19,11 @@ mod track_edit;
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 enum PropertyAction {
+    // Private producer only. Public property intents keep refusing expression edits.
+    #[serde(skip_deserializing)]
+    SetExpression {
+        expression: Option<OrderExpression>,
+    },
     SetValue {
         frame: Number,
         values: Vec<Number>,
@@ -50,6 +55,18 @@ object_deserialize!(PropertyPayload {
     property: String,
     #[serde(deserialize_with = "deserialize_action")]
     action: PropertyAction
+});
+
+#[derive(Debug)]
+struct ExpressionPayload {
+    target: PropertyHolderTarget,
+    property: String,
+    expression: Presence<Option<OrderExpression>>,
+}
+object_deserialize!(ExpressionPayload {
+    target: PropertyHolderTarget,
+    property: String,
+    #[serde(default)] expression: Presence<Option<OrderExpression>>
 });
 
 // Internally tagged enum derives also admit positional sequences. Require a
@@ -183,6 +200,36 @@ impl OrderTrack {
     }
 }
 impl ObjectFillOwner {
+    /// Private authoring producer over a retained origin; the existing history
+    /// owner commits the sealed candidate. No public expression writer is admitted.
+    /// Null removes the expression; an empty string preserves its authored presence.
+    #[allow(dead_code)]
+    pub(crate) fn prepare_property_expression_edit_json(
+        origin: ObjectSnapshot,
+        bytes: &[u8],
+    ) -> Result<PreparedPropertyEdit, DispatchErrorCode> {
+        // The private envelope can carry every admitted 4096-byte code string,
+        // even when JSON escapes it. Public transport keeps its own 4096-byte cap.
+        if bytes.len() > 32768 {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        let payload: ExpressionPayload =
+            serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        let Presence::Present(expression) = payload.expression else {
+            return Err(DispatchErrorCode::InvalidRequest);
+        };
+        let document = origin.document().clone();
+        Self::apply_property_edit(
+            origin,
+            document,
+            PropertyPayload {
+                command: "object.property.edit".into(),
+                target: payload.target,
+                property: payload.property,
+                action: PropertyAction::SetExpression { expression },
+            },
+        )
+    }
     pub(crate) fn prepare_property_edit_json(
         &self,
         bytes: &[u8],
@@ -195,7 +242,7 @@ impl ObjectFillOwner {
     /// candidate is sealed to), so a chain of edits stays one atomic candidate.
     pub(super) fn apply_property_edit_json(
         origin: ObjectSnapshot,
-        mut document: ObjectDocument,
+        document: ObjectDocument,
         bytes: &[u8],
     ) -> Result<PreparedPropertyEdit, DispatchErrorCode> {
         if bytes.len() > 4096 {
@@ -203,6 +250,13 @@ impl ObjectFillOwner {
         }
         let payload: PropertyPayload =
             serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        Self::apply_property_edit(origin, document, payload)
+    }
+    fn apply_property_edit(
+        origin: ObjectSnapshot,
+        mut document: ObjectDocument,
+        payload: PropertyPayload,
+    ) -> Result<PreparedPropertyEdit, DispatchErrorCode> {
         if payload.command != "object.property.edit" {
             return Err(DispatchErrorCode::InvalidRequest);
         }
@@ -254,6 +308,9 @@ impl ObjectFillOwner {
             });
         let before = record.clone();
         match payload.action {
+            PropertyAction::SetExpression { expression } => {
+                record.expression = expression.map_or(Presence::Missing, Presence::Present);
+            }
             PropertyAction::SetValue { frame, mut values } => {
                 finite(&frame)?;
                 if values.len() != metadata.dimension() {
