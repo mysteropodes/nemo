@@ -144,6 +144,19 @@ fn pressure_center_edit_undo_redo_reopen_preserve_literal_interior_pixels() {
             layer["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
         }
         let mut owner = support::owner_of(&document);
+        // Legacy format 1 retains edit/history/persistence coverage in the
+        // frozen corpus, but intentionally has no admitted paint-order plan.
+        if format == 1 {
+            let snapshot = owner.acquire_snapshot(owner.content_revision()).unwrap();
+            let pins = selector(&snapshot, 0);
+            let packet = prepare_object_exposure_frame(&snapshot, &pins).unwrap();
+            let scene = prepare_object_render_scene(&packet, &pins).unwrap();
+            assert!(matches!(
+                prepare_object_paint_plan(&scene, &pins),
+                Err(crate::object_render_scene::ObjectPaintPlanError::Unavailable)
+            ));
+            continue;
+        }
         let before = pixels(&mut gpu, &owner);
         assert_eq!(at(&before, 52, 20), vec![255, 0, 0, 255]);
         assert_eq!(at(&before, 52, 44), vec![255, 255, 255, 255]);
