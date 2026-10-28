@@ -123,12 +123,7 @@ pub(crate) fn cleanup_outline(original: Vec<SegOut>) -> R<Vec<SegOut>> {
     }
     let mut chosen = loops
         .into_iter()
-        .max_by(|a, b| {
-            path_of(a, true)
-                .area()
-                .abs()
-                .total_cmp(&outline_area(b).abs())
-        })
+        .max_by(|a, b| outline_area(a).abs().total_cmp(&outline_area(b).abs()))
         .ok_or(Error::Unavailable)?;
     if outline_area(&chosen) < 0. {
         chosen.reverse();
