@@ -139,7 +139,11 @@ fn pressure_center_edit_undo_redo_reopen_preserve_literal_interior_pixels() {
     let at =
         |bytes: &[u8], x: usize, y: usize| bytes[(y * 128 + x) * 4..(y * 128 + x) * 4 + 4].to_vec();
     for format in [1, 2] {
-        let mut owner = support::owner_of(&support::document(format, vec![record.clone()], None));
+        let mut document = support::document(format, vec![record.clone()], None);
+        for layer in document["layers"].as_array_mut().unwrap() {
+            layer["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+        }
+        let mut owner = support::owner_of(&document);
         let before = pixels(&mut gpu, &owner);
         assert_eq!(at(&before, 52, 20), vec![255, 0, 0, 255]);
         assert_eq!(at(&before, 52, 44), vec![255, 255, 255, 255]);
