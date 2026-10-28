@@ -5,17 +5,21 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const UI=require('../src/js/adapters/native-object-ui.js'),Files=require('../src/js/adapters/native-object-project-file.js');
 const FIXTURE=path.join(__dirname,'fixtures','native-layer-list-dom.json');
 const A={layerUid:'opaque A:雪',name:'<b>A</b>',visible:true},B={layerUid:'B',name:'B',visible:false},C={layerUid:'C',visible:true};
+// Element.children is a live HTMLCollection, never an Array: index access, length and item() only.
+function collection(kids){const out=Object.create({item(i){return kids[i]||null;}});kids.forEach((k,i)=>{out[i]=k;});
+  Object.defineProperty(out,'length',{value:kids.length});return Object.freeze(out);}
 function element(tagName){
-  const classes=new Set(),listeners={};
-  const el={tagName,children:[],style:{},dataset:{},attributes:{},textContent:'',type:'',value:'',hidden:false,disabled:false,
+  const classes=new Set(),listeners={},kids=[];
+  const el={tagName,style:{},dataset:{},attributes:{},textContent:'',type:'',value:'',hidden:false,disabled:false,
     classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x),toggle(x,on){if(on===undefined)on=!classes.has(x);if(on)classes.add(x);else classes.delete(x);return on;}},
     setAttribute(k,v){this.attributes[k]=String(v);},addEventListener(k,f){listeners[k]=f;},removeEventListener(){},
-    replaceChildren(...kids){this.children.forEach(k=>{k.parentNode=null;});this.children=[];kids.forEach(k=>this.appendChild(k));},
-    appendChild(k){if(k.parentNode)k.parentNode.removeChild(k);this.children.push(k);k.parentNode=this;return k;},
-    removeChild(k){this.children.splice(this.children.indexOf(k),1);k.parentNode=null;},
+    replaceChildren(...next){kids.splice(0).forEach(k=>{k.parentNode=null;});next.forEach(k=>this.appendChild(k));},
+    appendChild(k){if(k.parentNode)k.parentNode.removeChild(k);kids.push(k);k.parentNode=this;return k;},
+    removeChild(k){kids.splice(kids.indexOf(k),1);k.parentNode=null;},
     querySelector:()=>null,contains(k){while(k){if(k===this)return true;k=k.parentNode;}return false;},
     click(){return listeners.click&&listeners.click({target:this,preventDefault(){},stopPropagation(){}});}};
   Object.defineProperty(el,'className',{get:()=>[...classes].join(' '),set(v){classes.clear();String(v).split(/\s+/).filter(Boolean).forEach(x=>classes.add(x));}});
+  Object.defineProperty(el,'children',{get:()=>collection(kids)});
   Object.defineProperty(el,'innerHTML',{set(){this.replaceChildren();}});
   return el;
 }
@@ -31,7 +35,7 @@ function serialize(node){
   const sorted=o=>Object.fromEntries(Object.entries(o).sort(([a],[b])=>a<b?-1:1));
   if(Object.keys(node.attributes).length)out.attributes=sorted(node.attributes);
   if(Object.keys(node.dataset).length)out.dataset=sorted(node.dataset);
-  if(node.children.length)out.children=node.children.map(serialize);
+  if(node.children.length)out.children=Array.from(node.children,serialize);
   return out;
 }
 const CASES=[

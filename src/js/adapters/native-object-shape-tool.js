@@ -32,6 +32,15 @@
     }
     // Confirmed CSS -> native composition pixels -> the painted receipt's inverse.
     // Canvas uses identity; Paper pan/zoom never supplies a native coordinate proof.
+    // CSS pixels per document unit as presented: the painted document-to-composition transform composed with the
+    // element box, the same affine point() inverts. A fitted view letterboxes the document, so the element's own
+    // width/canvasW and height/canvasH differ while the presentation stays uniform (#2343 B1). The brush modeler takes
+    // this one scale (the baseline's view.zoom); null when the presentation is not uniform beyond CSS layout rounding.
+    function presentedScale(t){
+      var m=Mapping.transform({presentation:t.presentation},false),kx=t.bounds.width/t.pin.canvasW,ky=t.bounds.height/t.pin.canvasH,
+        a=m[0]*kx,b=m[1]*ky,c=m[2]*kx,d=m[3]*ky,det=a*d-b*c,scale=Math.sqrt(det),tolerance=scale/1024;
+      return det>0&&Number.isFinite(scale)&&Math.abs(a-d)<=tolerance&&Math.abs(b+c)<=tolerance?scale:null;
+    }
     function point(e,t){if(!Number.isFinite(e.clientX)||!Number.isFinite(e.clientY))fail('Pointer position is unavailable.');
       var p=Mapping.point(e,{bounds:t.bounds,canvasW:t.pin.canvasW,canvasH:t.pin.canvasH,presentation:t.presentation});return [p.x,p.y];}
     function style(tool,proof){
@@ -83,7 +92,7 @@
           !root.NemoNativeObjectProjectFile||root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||!root.NemoNativeObjectVector)fail('Native Drawing is not ready.');
       var perspective=root.NemoNativePerspectiveController&&root.NemoNativePerspectiveController.read();
       var t={perspective:perspective,session:s,pin:pin,presentation:shown.presentation,frame:frame,tool:state.tool,layerUid:selection(pin),style:style(state.tool,perspective),bounds:bounds(pin),pointer:e.pointerId,cancelled:false};
-      t.behind=root.state.drawMode==='behind';t.start=point(e,t);if(ports.freehand)t.samples=ports.begin(t.start,e,t);return t;
+      t.behind=root.state.drawMode==='behind';t.start=point(e,t);t.scale=presentedScale(t);if(ports.freehand)t.samples=ports.begin(t.start,e,t);return t;
     }
     function current(t,requirePresentation,lease){
       try{var s=session(),pin=s&&s.info();
@@ -304,6 +313,10 @@
       // hooks on the placed path: predictive skips a fill shape, multi-frame stamps the merged result (native, at commit).
       if (fb && (['above','below','merge'].indexOf(state.fillBrushMode) < 0 || root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
           ? root.SMLabs.unmigratedDrawHooks().length > 0 : root.SMLabs.list().some(function(p){return p.on;})))) throw new Error('This Fill Brush combination is unavailable in native Drawing.');
+      // A key a confirmed, settled native catalog lacks draws plain, as the baseline's resolveBrushPreset null does (applyBrushTexture
+      // returns the path untouched). An unknown or changing catalog cannot tell a deleted key from a new one: unavailable.
+      var CB=root.NemoNativeCustomBrushUI,cbc=CB&&CB.controller(root),key=state.brushPreset,absent=!fb&&!state.shadowMode&&!!key&&key!=='none'&&
+        !(root.BRUSH_PRESETS&&Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS,key))&&!!cbc&&!cbc.isPending()&&CB.exists(root,key)===false;
       // Trim measures the whole stroke before the stop-at-axis clip (draw-bridge then symmetry-bridge); native would trim the clipped one.
       // A pressure ribbon trims natively alone, with its linked fill, its symmetry copies and its multi-frame stamps. Only a
       // mirror clips at its axis (symmetry-bridge.js clipPathAtAxis); a radial copy never does.
@@ -311,7 +324,7 @@
           state.drawMode !== 'front' && state.drawMode !== 'behind' ||
           // G16 option C (#2361): one seeded anchor whose dabs native stamps; the key resolves as resolveBrushPreset (a built-in,
           // else a confirmed native catalog record). A key neither holds, and texture with symmetry or Trim, stay unavailable.
-          !state.shadowMode && state.brushPreset && state.brushPreset !== 'none' && (!(root.BRUSH_PRESETS && Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS, state.brushPreset) ||
+          !state.shadowMode && state.brushPreset && state.brushPreset !== 'none' && !absent && (!(root.BRUSH_PRESETS && Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS, state.brushPreset) ||
             root.NemoNativeCustomBrushUI && root.NemoNativeCustomBrushUI.record(root, state.brushPreset)) ||
             state.strokeEnabled && (state.symmetryEnabled || state.trimStrokeEnds)) ||
           root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
@@ -323,7 +336,7 @@
       var keys = ['vectorBrush','strokeEnabled','fillEnabled','strokeColor','fillColor','brushSize','opacity','strokeCap','strokeJoin','brushPreset',
         'strokeStyle','miterLimit','dashOffset','paintOrder','smoothing','stabilizer','taperEnds','pressureMin','pressureMax',
         'pressureInvert','pressureCurve','pressureCurvePoints','brushAngle','brushAngleFactor','tool','fillBrushMode'];
-      var out = {}; keys.forEach(function(k){if(state[k] !== undefined)out[k]=state[k];});
+      var out = {}; keys.forEach(function(k){if(state[k] !== undefined)out[k]=state[k];});if(absent)out.brushPreset='none';
       var hex = /^#(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/;Paint.shadowStyle(root, state, out);
       if (state.strokeEnabled && !hex.test(state.strokeColor) || (state.fillEnabled || fb) && !hex.test(state.fillColor) ||
           !Number.isFinite(state.brushSize) || state.brushSize <= 0 || !Number.isFinite(state.opacity) || state.opacity < 0 || state.opacity > 100 ||
@@ -351,9 +364,8 @@
       filters.reset();
       var pressure = filters.pressure(e,w);
       if ((state.stabilizer>=4?state.stabilizer-3:0)) {
-        var sx=intent.bounds.width/intent.pin.canvasW,sy=intent.bounds.height/intent.pin.canvasH;
-        if (sx !== sy) throw new Error('Native brush stabilizer needs a uniform presented scale.');
-        intent.modeler=root.SMStrokeModeler.create((state.stabilizer>=4?state.stabilizer-3:0),sx);
+        if (!(intent.scale>0)) throw new Error('Native brush stabilizer needs a uniform presented scale.');
+        intent.modeler=root.SMStrokeModeler.create((state.stabilizer>=4?state.stabilizer-3:0),intent.scale);
         intent.modeler.down(w[0],w[1],root.performance.now()/1000,pressure);
       }
       return [[w[0],w[1],filters.width(pressure)]];
@@ -368,6 +380,18 @@
         if(kind==='move')w=filters.stabilize(w);
         samples.push([w[0],w[1],filters.width(pressure)]);
       }
+    }
+    // A native vector record holds 2..256 anchors (native-object-vector-stroke.js); the baseline Path has no cap, and a
+    // pressure ribbon across 40% of an HD frame already samples past it (#2343 B1). A longer freehand outline is refitted:
+    // Paper's simplify within a quarter document unit, widened only until it fits. A stroke that fits keeps every anchor.
+    function fitRecord(path){
+      if(path.segments.length<=256)return;
+      var source=path.segments.map(function(s){return s.clone();});
+      for(var tolerance=.25;tolerance<=64;tolerance*=2){
+        path.removeSegments();path.addSegments(source.map(function(s){return s.clone();}));path.simplify(tolerance);
+        if(path.segments.length<=256)return;
+      }
+      throw new Error('This stroke is too long for a native vector record.');
     }
     function nativeDictionary(raw,style) {
       if(raw.length<2)return null;
@@ -403,7 +427,11 @@
           // ribbon, under a fresh link id of its own (ensureStrokeId shape), with no stroke of its own.
           var link='s'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e9)+'_lf';
           out.linkedFillId=link;
-          linkedCompanions.set(out,{segments:sampled.centerSegments.map(function(s){return {point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};}),
+          var fill=new Path({insert:false});
+          sampled.centerSegments.forEach(function(s){fill.add(new root.Segment(new Point(s.point.x,s.point.y),new Point(s.handleIn.x,s.handleIn.y),new Point(s.handleOut.x,s.handleOut.y)));});
+          fill.closed=true;
+          try{fitRecord(fill);var fillSegments=segments(fill);}finally{fill.remove();}
+          linkedCompanions.set(out,{segments:fillSegments,
             closed:true,strokeColor:null,hasRealStroke:false,strokeWidth:1,strokeCap:'butt',strokeJoin:'miter',miterLimit:10,dashOffset:0,
             fillColor:style.fillColor,opacity:style.opacity/100,isLinkedFillCompanion:true,linkedFillId:link});
         }
@@ -416,7 +444,7 @@
         // applyBrushTexture on a plain stroke drawn with Stroke on: the path becomes its texture's invisible anchor.
         if(!style.shadowSwatch&&!style.bitmap&&style.brushPreset&&style.brushPreset!=='none'&&style.strokeEnabled)Paint.texturePlain(out,style.brushPreset);
       }
-      try{out.segments=segments(path);out.closed=path.closed;
+      try{fitRecord(path);out.segments=segments(path);out.closed=path.closed;
         if(style.shadowSwatch)Paint.shadow(out,style.shadowSwatch,style.vectorBrush&&!style.strokeEnabled,style.brushSize);
         if(out.segments.some(function(s){return !['point','handleIn','handleOut'].every(function(k){return s[k].every(Number.isFinite);});}))throw new Error('Brush geometry must stay finite.');
         return out;}finally{path.remove();}

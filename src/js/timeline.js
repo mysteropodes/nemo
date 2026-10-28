@@ -7563,13 +7563,19 @@ var shortcutRegistry=NemoShortcutRegistry.create({storage:window.localStorage,on
 // COMMAND_SHORTCUTS is pure {action,key,cat,label} data (P30/#1032, review on
 // #1114); dispatch by action lives here, same pattern as runToolShortcut below.
 function runCommandShortcutAction(action,e){if(window.NemoNativeFrameEditDesktop&&window.NemoNativeFrameEditDesktop.install(window).shortcut(action,e))return;switch(action){case'cmdPrevKey':if(state.playing)stopPlay();goToFrame(prevKeyframeFrame(state.activeLayerIdx,state.currentFrame));return;case'cmdNextKey':if(state.playing)stopPlay();goToFrame(nextKeyframeFrame(state.activeLayerIdx,state.currentFrame));return;case'cmdPrevFrame':if(state.playing)stopPlay();goToFrame(state.currentFrame-1);return;case'cmdNextFrame':if(state.playing)stopPlay();goToFrame(state.currentFrame+1);return;case'cmdGoStart':if(state.playing)stopPlay();goToFrame(0);return;case'cmdGoEnd':if(state.playing)stopPlay();goToFrame(state.totalFrames-1);return;case'cmdInsertFrame':e.preventDefault();insertFrame();return;case'cmdInsertKey':e.preventDefault();insertKeyframe();return;case'cmdInsertBlankKey':e.preventDefault();insertBlankKeyframe();return;case'cmdDuplicateKey':window.SM.duplicateKeyframe();return;case'cmdExtendExposure':window.SM.extendExposure(1);return;case'cmdTween':window.SM.generateTweens();return;case'cmdFlipPreview':if(!e.shiftKey)window.SM.flipPreview();return;case'cmdResetView':e.preventDefault();window.SM.resetView();return;case'cmdRenameLayer':e.preventDefault();if(state.layers[state.activeLayerIdx])startLayerRename(state.activeLayerIdx);return;}}
+// U04 (#2370): on desktop every rebindable shortcut has a declared target; an unavailable one shows its reason (shortcut-targets.js).
+function shortcutAllowed(action){
+  var Targets=window.NemoShortcutTargets;if(Targets)return Targets.allow(window,action);
+  if(window.__TAURI__&&window.__TAURI__.core){showToast('Keyboard shortcuts are unavailable.');return false;}
+  return true;
+}
 function runCommandShortcut(k,event){
   var lk=(k||'').toLowerCase();
   if(!lk)return false;
   var commands=shortcutRegistry.commandShortcuts();
   for(var i=0;i<commands.length;i++){
     var c=commands[i];
-    if((shortcutRegistry.keyFor(c.action)||'').toLowerCase()===lk){runCommandShortcutAction(c.action,event);return true;}
+    if((shortcutRegistry.keyFor(c.action)||'').toLowerCase()===lk){if(shortcutAllowed(c.action))runCommandShortcutAction(c.action,event);return true;}
   }
   return false;
 }
@@ -7599,6 +7605,7 @@ function runToolShortcut(k){
   var tools=shortcutRegistry.toolShortcuts();
   for(var i=0;i<tools.length;i++){
     if(shortcutRegistry.keyFor(tools[i].action)===lk){
+      if(!shortcutAllowed(tools[i].action))return true;
       if(tools[i].action==='toggleOnion')window.SM.toggleOnion();
       else window.SM.setTool(tools[i].action);
       return true;
@@ -9091,10 +9098,10 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       // thing in that section with no action of its own.
       {label:(window.SMProject&&window.SMProject.getCurrentLabel)?window.SMProject.getCurrentLabel():tt('menuUntitledNotSaved'),disabled:true},
       {sep:true},
-      {label:tt('menuNewProject'),shortcut:'⌘N',action:function(){clickEl('project-tab-add');}},
-      {label:tt('menuOpen'),shortcut:'⌘O',action:function(){if(window.SMProject)window.SMProject.open();}},
-      {label:tt('menuSave'),shortcut:'⌘S',action:function(){if(window.SMProject)window.SMProject.save();}},
-      {label:tt('menuSaveAs'),shortcut:'⇧⌘S',action:function(){if(window.SMProject)window.SMProject.saveAs();}},
+      {label:tt('menuNewProject'),id:'ctx-new-project',shortcut:'⌘N',action:function(){clickEl('project-tab-add');}},
+      {label:tt('menuOpen'),id:'ctx-open',shortcut:'⌘O',action:function(){if(window.SMProject)window.SMProject.open();}},
+      {label:tt('menuSave'),id:'ctx-save',shortcut:'⌘S',action:function(){if(window.SMProject)window.SMProject.save();}},
+      {label:tt('menuSaveAs'),id:'ctx-save-as',shortcut:'⇧⌘S',action:function(){if(window.SMProject)window.SMProject.saveAs();}},
       {label:tt('menuFromKitsu'),id:'ctx-kitsu-open',action:function(){clickEl('btn-kitsu-open');}},
       // Nemo's own extensibility (nemo-script.js / nemo-plugin.js) — this
       // app's model in this app's vocabulary, so it ships.
@@ -9105,11 +9112,11 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       // Duplicate canvas viewer (2026-08, AE feature audit 8.4 "New
       // Viewer") — a second panel on the same comp, independently panned/
       // zoomed and optionally locked to a frame.
-      {label:tt('menuNewView'),action:function(){if(window.SMSecondViewer)SMSecondViewer.open();}},
+      {label:tt('menuNewView'),id:'ctx-new-view',action:function(){if(window.SMSecondViewer)SMSecondViewer.open();}},
       {label:tt('menuVersionHistory'),id:'ctx-history',action:function(){clickEl('btn-history');}},
       {sep:true},
-      {label:tt('menuImportImg'),action:function(){clickEl('btn-import-img');}},
-      {label:tt('menuImportVideo'),action:function(){clickEl('btn-import-video');}},
+      {label:tt('menuImportImg'),id:'ctx-import-img',action:function(){clickEl('btn-import-img');}},
+      {label:tt('menuImportVideo'),id:'ctx-import-video',action:function(){clickEl('btn-import-video');}},
       {label:tt('menuImportPsd'),id:'ctx-import-psd',action:function(){clickEl('btn-import-psd');}},
       // SVG sits with the other importers now, not behind a Labs flag and a
       // floating button (2026-07-27): it is the only import path that yields
@@ -9138,13 +9145,13 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       {label:tt('menuExport'),id:'ctx-export',action:function(){clickEl('btn-export');}},
       {label:tt('menuRenderManager'),id:'ctx-render-manager',action:function(){if(window.SMRenderManager)SMRenderManager.open();}},
       {sep:true},
-      {label:tt('menuSettings'),action:function(){clickEl('btn-settings');}},
-      {label:tt('menuKeyboardShortcuts'),action:function(){
+      {label:tt('menuSettings'),id:'ctx-settings',action:function(){clickEl('btn-settings');}},
+      {label:tt('menuKeyboardShortcuts'),id:'ctx-shortcuts',action:function(){
         clickEl('btn-settings');
         var t=document.querySelector('#settings-tabs .settings-tab[data-tab="shortcuts"]');
         if(t)t.click();
       }},
-      {label:tt('menuAboutNemo'),action:function(){
+      {label:tt('menuAboutNemo'),id:'ctx-about',action:function(){
         clickEl('btn-settings');
         var t=document.querySelector('#settings-tabs .settings-tab[data-tab="about"]');
         if(t)t.click();
@@ -9159,7 +9166,10 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       items.splice(1,0,{label:'Kitsu: '+ks.projectName+(ks.sequenceName?' / '+ks.sequenceName:'')+' / '+ks.shotName+(ks.taskName?' ('+ks.taskName+')':''),disabled:true});
       items.splice(2,0,{label:tt('menuPublishToKitsu'),id:'ctx-kitsu-publish',action:function(){clickEl('btn-kitsu-publish');}});
     }
-    window.showContextMenu(r.left,r.bottom+4,items);
+    // U04 (#2370): on desktop every action has a declared target; unavailable ones show their reason (app-menu-targets.js).
+    var Targets=window.NemoAppMenuTargets,desktop=!!(window.__TAURI__&&window.__TAURI__.core);
+    if(desktop&&!Targets){showToast('The app menu is unavailable.');return;}
+    window.showContextMenu(r.left,r.bottom+4,Targets?Targets.guard(window,items):items);
   });
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initAppMenu);else initAppMenu();
@@ -11601,14 +11611,17 @@ window.updateCombinePanel=updateCombinePanel;
       onFfmpeg:function(line){progEl.style.display='block';progEl.textContent=line.substring(0,80);},
       onRiveProgress:function(msg){progEl.style.display='block';progEl.textContent=msg;}};
     var nativeAuthority=window.NemoNativeOpacityCutover;
-    var nativeExport=(fmtSel.value==='png'||fmtSel.value==='svg')&&nativeAuthority&&nativeAuthority.blocksLegacy();
+    var nativeHeld=!!(nativeAuthority&&nativeAuthority.blocksLegacy());
+    var nativeExport=(fmtSel.value==='png'||fmtSel.value==='svg')&&nativeHeld;
     var nativePng=fmtSel.value==='png'&&nativeExport;
     nativePngAbort=nativePng?new AbortController():null;if(nativePngAbort)opts.signal=nativePngAbort.signal;
     runBtn.disabled=true;progEl.style.display='block';progEl.textContent=SM.t('exportPreparing');cancelBtn.disabled=false;cancelBtn.style.display=(nativePng||fmtSel.value==='svg'&&!nativeExport&&window.SMExport.isAvailable())?'':'none';
     try{
       // Native PNG/SVG read a pinned Rust revision. Saving Paper frames
-      // here would either be denied or create a second document writer.
-      if(!nativeExport)saveAllLayerFrames();
+      // here would either be denied or create a second document writer, so
+      // no format saves them while native authority holds the document: one
+      // with no native exporter (Lottie) refuses typed in export.js (#2343 B1).
+      if(!nativeHeld)saveAllLayerFrames();
       var fn={svg:'exportSVGSequence',png:'exportPNGSequence',tiff:'exportTIFFSequence',gif:'exportGIF',mp4:'exportMP4',prores:'exportProRes',lottie:'exportLottie',rive:'exportRive','ae-camera':'exportAECamera'}[fmtSel.value];
       var res=await window.SMExport[fn](opts);
       if(res.cancelled){progEl.textContent=SM.t('exportCancelled');}

@@ -245,6 +245,7 @@
     {"src":"js/group-bridge.js"},
     {"src":"js/adapters/select-canvas-intent.js"},
     {"src":"js/select-bridge.js"},
+    {"src":"js/adapters/native-subselect-ui.js"},
     {"src":"js/subselect-bridge.js"},
     {"src":"js/adapters/native-object-draw-paint.js"},
     {"src":"js/adapters/native-object-draw-symmetry.js"},
@@ -341,6 +342,8 @@
     {"src":"js/adapters/native-frame-cell-selection.js"},
     {"src":"js/application/script-native-api.js"},
     {"src":"js/application/presenter-seam.js"},
+    {"src":"js/application/app-menu-targets.js"},
+    {"src":"js/application/shortcut-targets.js"},
     {"src":"js/adapters/native-layer-list-presenter.js"},
     {"src":"js/adapters/native-symmetry-desktop.js"},
     {"src":"js/adapters/native-symmetry-ui.js"}

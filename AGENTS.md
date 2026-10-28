@@ -31,6 +31,9 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
   pushes and issue handoffs. Use [testing and debugging](engineering/remediation/reference/03_TESTING_AND_DEBUGGING.md)
   and [modularity policy](engineering/remediation/reference/04_MODULARITY_POLICY.md) as supporting
   references; planned tooling is not implemented merely because a document names it.
+- The module contract is the [modularity policy](engineering/remediation/reference/04_MODULARITY_POLICY.md)
+  together with its enforced form, the [boundary profiles](engineering/boundaries/README.md),
+  which `node scripts/nemo/ci.cjs boundaries` checks.
 - Work through Ilya's or Cyrill's named local team. By default, use at most one
   orchestrator and two delegates per human and two writable task worktrees plus the
   primary checkout per machine. The execution checklist's conditional four-outcome

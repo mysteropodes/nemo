@@ -2019,6 +2019,30 @@
       ]
     },
     {
+      "id": "app.menu.targets",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "app-menu-targets.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "app-menu-targets.js"
+      ]
+    },
+    {
+      "id": "app.shortcut.targets",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "shortcut-targets.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "shortcut-targets.js"
+      ]
+    },
+    {
       "id": "app.opacity.capability",
       "layer": "application",
       "dir": "src/js/application",
@@ -2694,6 +2718,7 @@
       "dir": "src/js/adapters",
       "files": [
         "native-frame-cell-selection.js",
+        "native-subselect-ui.js",
         "native-layer-list-presenter.js",
         "native-object-ui.js",
         "native-layer-range-desktop.js",

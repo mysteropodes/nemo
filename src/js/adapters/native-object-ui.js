@@ -105,6 +105,7 @@
     if(prior.fonts)prior.fonts.retire();
     if(prior.text)prior.text.retire();
     if(prior.footage)prior.footage.retire();
+    if(prior.subselect)prior.subselect.retire();
     prior.children.forEach(function(saved){saved.node.hidden=saved.hidden;saved.node.style.display=saved.display;});
     if(prior.trigger&&prior.trigger.node.parentNode===prior.reference){
       var next=prior.trigger.next;
@@ -198,6 +199,7 @@
     if(prior.fonts)prior.fonts.refresh();
     if(root.NemoNativeTextToolDesktop)prior.text=root.NemoNativeTextToolDesktop.mount(root,prior.section,{currentSession:ports.currentSession,fontResources:ports.fontResources});
     if(root.NemoNativeTimeRemapUI&&root.NemoNativeTimeRemapUI.mountInspector)prior.footage=root.NemoNativeTimeRemapUI.mountInspector(root,prior.section,{currentSession:ports.currentSession});
+    if(root.NemoNativeSubselectUI)prior.subselect=root.NemoNativeSubselectUI.mount(root,prior.section);
     prior.children.forEach(function(saved){saved.node.hidden=true;saved.node.style.display='none';});
     paintMotion(root,ports,prior);
   }

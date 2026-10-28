@@ -93,7 +93,8 @@ test('native CSS inversion retains inverse-pair, finite and nonzero-determinant 
 function navigationSourceHarness(native=true){
  const fs=require('node:fs'),vm=require('node:vm'),{extractFunction}=require('./fixtures/lib/sandbox.cjs');
  const calls=[],listeners={},blur={},state={tool:'hand',spaceDown:false,playing:false,isPanning:false};
- const target={addEventListener(name,fn){listeners[name]=fn;}},document={readyState:'complete',activeElement:null,getElementById:()=>target};
+ const target={addEventListener(name,fn){listeners[name]=fn;}},document={readyState:'complete',activeElement:null,getElementById:()=>target,
+  documentElement:{classList:{add(){},remove(){}},style:{setProperty(){},removeProperty(){}}}};
  const session={blocksLegacy:()=>native,isActive:()=>true,readPresentedObjectSession:()=>null,
   beginViewportNavigation(kind,point){calls.push(['begin',kind,point]);return {kind};},
   updateViewportNavigation(token,point,factor,aim){calls.push(['update',token.kind,point,factor,aim]);return Promise.resolve();}};
@@ -387,4 +388,17 @@ test('a throwing diagnostic getter cannot change native navigation refusal or re
  await assert.rejects(session.updateViewportNavigation(null,{x:466,y:327},1.25),
   error=>error.message==='Native navigation owner is unavailable');
  assert.equal(reads,2);
+});
+
+test('desktop mapping fits the canvas to the document aspect before measuring; ending the presentation restores it (#2343 B1)',()=>{
+ const f=fixture(),seen=[];
+ const canvas={getBoundingClientRect(){seen.push([f.classes.has('nemo-native-fit'),f.styles.get('--nemo-native-aspect')]);return {left:40,top:60,width:640,height:360};}};
+ const root={document:{...f.document,getElementById:id=>id==='drawing-canvas'?canvas:null},stageLayer:{visible:true},paper:{view:{update(){}}},devicePixelRatio:2};
+ const ports=desktop(root),viewport=ports.mapping({canvasW:1920,canvasH:1080});
+ assert.deepEqual(seen,[[true,String(1920/1080)]],'the document aspect applies before the one measurement');
+ assert.deepEqual(viewport.cssBounds,{x:40,y:60,width:640,height:360});
+ assert.deepEqual(viewport.compositionExtent,{width:1920,height:1080});
+ assert.throws(()=>ports.mapping({canvasW:0,canvasH:1080}),/aspect/);
+ ports.surfaceChanged(null);
+ assert.equal(f.classes.has('nemo-native-fit'),false);assert.equal(f.styles.has('--nemo-native-aspect'),false);
 });

@@ -161,3 +161,18 @@ fn preview_project_size_and_bare_drawing_compatibility_refuse_before_target() {
 
 #[path = "native_object_desktop_preview_camera_return_tests.rs"]
 mod camera_return_tests;
+
+// The object path enters the occlusion diagnostics' preview scope per request, closed with the
+// receipt's status (before this, every object acquisition recorded preview=null).
+#[cfg(target_os = "macos")]
+#[test]
+fn gpu_object_preview_correlates_occlusion_diagnostics_per_request() {
+    let diagnostics = crate::native_application_viewport::test_observations();
+    let f = Fixture::new();
+    f.trace.borrow_mut().mode = 1;
+    assert_eq!(f.run(&f.raw.to_string()).unwrap().status, "deferred-timeout");
+    diagnostics.validate_last("deferred-timeout");
+    f.trace.borrow_mut().mode = 0;
+    assert_eq!(f.run(&f.raw.to_string()).unwrap().status, "presented");
+    diagnostics.validate_last("presented");
+}

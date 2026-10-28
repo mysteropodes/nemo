@@ -18,6 +18,8 @@
     const session=()=>root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);
     const mapping=()=>root.NemoNativeViewportUnderlay&&root.NemoNativeViewportUnderlay.canvasMapping;
     function native(){const s=session();return !!s&&s.blocksLegacy();}
+    function refreshUI(){if(root.NemoNativeSubselectUI)root.NemoNativeSubselectUI.refresh(root);}
+    function selectionState(){return !pending&&!uncertain&&!drag&&!marquee&&selection&&current(selection)&&selection.indices.length?Object.freeze({count:selection.indices.length}):null;}
     function notice(error){if(root.showToast)root.showToast(error&&error.message||String(error));}
     function layer(pin){const st=root.state,row=st.layers&&st.layers[st.activeLayerIdx],sel=root._layerSel;
       if(!row||!Array.isArray(sel)||sel.length!==1||sel[0]!==st.activeLayerIdx)throw new Error('Select one native Drawing layer.');
@@ -42,7 +44,7 @@
     function client(p,t){const q=map(mapping().transform({presentation:t.presentation},false),p);return [t.bounds.left+q[0]*t.bounds.width/t.pin.canvasW,t.bounds.top+q[1]*t.bounds.height/t.pin.canvasH];}
     function clear(){if(overlay){overlay.remove();overlay=null;}}
     function release(t){try{if(t&&t.capture&&t.capture.releasePointerCapture)t.capture.releasePointerCapture(t.pointer);}catch(_){}}
-    function cancel(clearSelection){if(drag)drag.cancelled=true;if(marquee)marquee.cancelled=true;if(selection)selection.cancelled=true;release(drag);release(marquee);++readToken;++previewToken;previewNext=null;drag=null;marquee=null;clear();if(clearSelection)selection=null;return {status:'cancelled'};}
+    function cancel(clearSelection){if(drag)drag.cancelled=true;if(marquee)marquee.cancelled=true;if(selection)selection.cancelled=true;release(drag);release(marquee);++readToken;++previewToken;previewNext=null;drag=null;marquee=null;clear();if(clearSelection)selection=null;refreshUI();return {status:'cancelled'};}
     function node(tag,attrs){const n=root.document.createElementNS('http://www.w3.org/2000/svg',tag);Object.keys(attrs).forEach(k=>n.setAttribute(k,attrs[k]));return n;}
     function watch(){if(watching||!root.requestAnimationFrame)return;watching=true;root.requestAnimationFrame(()=>{watching=false;if(pending)return;if((selection&&!current(selection))||(marquee&&!current(marquee))){cancel(true);return;}if(selection||marquee)watch();});}
     function draw(t,segments,previewMatrix){clear();if(!current(t))return;watch();
@@ -58,6 +60,7 @@
           overlay.appendChild(node('line',{x1:p[0],y1:p[1],x2:q[0],y2:q[1],stroke:'#4b9bff','vector-effect':'non-scaling-stroke'}));
           overlay.appendChild(node('circle',{cx:q[0],cy:q[1],r:3*t.pin.canvasW/t.bounds.width,fill:'white',stroke:'#4b9bff','vector-effect':'non-scaling-stroke'}));}
         const r=3*t.pin.canvasW/t.bounds.width;overlay.appendChild(node('rect',{x:p[0]-r,y:p[1]-r,width:2*r,height:2*r,fill:selected?'#4b9bff':'white',stroke:'#4b9bff','vector-effect':'non-scaling-stroke'}));});
+      refreshUI();
     }
     function hitAnchor(e,t){let best=null,distance=10;
       t.item.segments.forEach((a,index)=>{for(const key of ['point','handleIn','handleOut']){if(key!=='point'&&(!t.indices.includes(index)||!a[key].some(Boolean)))continue;
@@ -105,7 +108,7 @@
       const command=root.NemoNativeObjectVectorCommand.create(guarded,'subselect',root.NemoNativeSubselectContract);
       clear();++previewToken;previewNext=null;
       pending=command.execute(root.NemoNativeSubselectContract.EDIT,pin=>{if(!same(pin,t.pin))throw new Error('Subselect revision changed.');return {command:'object.subselect.edit',stableTarget:t.item.stableTarget,atFrame:t.selector.frame,intent:intent};});
-      settled=pending.then(receipt=>{cancel(true);return {status:receipt.applied?'applied':'noop',receipt};},error=>{cancel(true);notice(error);if(error&&error.code==='subselect_command_indeterminate'){uncertain=error;return {status:'indeterminate',error};}return {status:'refused',error};}).finally(()=>{pending=null;});return settled;
+      refreshUI();settled=pending.then(receipt=>{cancel(true);return {status:receipt.applied?'applied':'noop',receipt};},error=>{cancel(true);notice(error);if(error&&error.code==='subselect_command_indeterminate'){uncertain=error;return {status:'indeterminate',error};}return {status:'refused',error};}).finally(()=>{pending=null;refreshUI();});return settled;
     }
     function start(e,t,hit){
       const group=hit.key==='point'&&t.indices.includes(hit.index)&&t.indices.length>1;
@@ -122,7 +125,7 @@
         if(e.altKey){const hit=hitItem(e,selection,selection.item);if(hit&&hit.time!==undefined){commit(selection,{kind:'insert',curve:hit.curve,time:hit.time});return;}}}
       const token=++readToken;const origin={...e,clientX:e.clientX,clientY:e.clientY,pointerId:e.pointerId,altKey:e.altKey,shiftKey:e.shiftKey};
       const box={...t,start:point(e,t),end:point(e,t),pointer:e.pointerId,target:selection&&current(selection)?selection:null,items:null,moved:false,ended:false};marquee=box;
-      box.capture=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(box.capture.setPointerCapture)box.capture.setPointerCapture(box.pointer);watch();
+      box.capture=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(box.capture.setPointerCapture)box.capture.setPointerCapture(box.pointer);watch();refreshUI();
       settled=load(t,token).then(items=>{if(!items||marquee!==box)return {status:'cancelled'};let chosen=null;for(const item of items)if(hitItem(origin,t,item))chosen=item;
         if(!chosen){box.items=items;if(box.ended)return finishMarquee(box);if(box.moved)drawMarquee(box);return {status:'marquee'};}
         marquee=null;release(box);selection={...t,item:chosen,indices:[]};draw(selection,chosen.segments);return {status:'selected'};
@@ -145,10 +148,24 @@
     function handle(kind,e){if(!native()||root.state.tool!=='subselect')return false;
       const d=root.document,canvas=e.target===d.getElementById('drawing-canvas')||e.target===d.getElementById('canvas-area');if(!canvas&&!drag&&!marquee)return false;consume(e);
       try{if(kind==='lost'){if(drag||marquee&&!marquee.ended)cancel(false);}else if(kind==='cancel')cancel(false);else if(kind==='down')down(e);else if(kind==='move')move(e);else if(kind==='up')up(e);}catch(error){cancel(true);notice(error);}return true;}
-    function key(e){if(!native()||root.state.tool!=='subselect'||e.target&&(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)||e.target.isContentEditable))return false;
-      if(e.key==='Escape'){consume(e);cancel(true);return true;}if(e.key==='Delete'||e.key==='Backspace'){consume(e);action({kind:'delete'});return true;}return false;}
+    function deleteFrames(){
+      if(pending||uncertain){notice(new Error('Resolve the previous subselect command before another edit.'));return;}
+      cancel(true);
+      const frames=root.NemoNativeFrameEditController;
+      if(!frames||typeof frames.run!=='function'){notice(new Error('Native frame editing is unavailable.'));settled=Promise.resolve({status:'unavailable'});return;}
+      // The original timeline gives selected cells priority over path points.
+      // Use the native owner directly: releasing this capture must never reach a legacy writer.
+      try{pending=Promise.resolve(frames.run({kind:'deleteFrames'}));}
+      catch(error){notice(error);settled=Promise.resolve({status:'refused',error});return;}
+      settled=pending.catch(error=>{notice(error);return {status:'refused',error};}).finally(()=>{pending=null;refreshUI();});
+    }
+    function key(e){if(retired||!native()||root.state.tool!=='subselect'||e.target&&(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)||e.target.isContentEditable))return false;
+      if(e.key==='Escape'){consume(e);cancel(true);return true;}
+      if(e.key==='Delete'||e.key==='Backspace'){consume(e);
+        if(root.state.appMode==='anim2d'&&root._sel&&Array.isArray(root._sel.frames)&&root._sel.frames.length)deleteFrames();
+        else action({kind:'delete'});return true;}return false;}
     function recover(){if(!uncertain||pending)return Promise.resolve({status:'unavailable'});const prior=uncertain;recovering=true;pending=Promise.resolve().then(()=>prior.replay());settled=pending.then(receipt=>{uncertain=null;return {status:'reconciled',receipt};},error=>{notice(error);return {status:'indeterminate',error};}).finally(()=>{pending=null;recovering=false;});return settled;}
-    return Object.freeze({handle,key,recover,cancel:()=>cancel(true),setPointType:type=>action({kind:'pointType',pointType:type}),scale:(scale,anchor)=>action({kind:'scale',scale,anchor}),rotate:(degrees,center)=>action({kind:'rotate',degrees,center}),settled:()=>settled,
+    return Object.freeze({handle,key,recover,selectionState,cancel:()=>cancel(true),setPointType:type=>action({kind:'pointType',pointType:type}),scale:(scale,anchor)=>action({kind:'scale',scale,anchor}),rotate:(degrees,center)=>action({kind:'rotate',degrees,center}),settled:()=>settled,
       dispose:()=>{retired=true;cancel(true);}});
   }
   function install(root){const init=()=>{const controller=create(root);root.NemoNativeSubselectController=controller;const d=root.document,target=d.getElementById('canvas-area')||d.getElementById('drawing-canvas');if(!target)return;

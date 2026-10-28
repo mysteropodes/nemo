@@ -12,6 +12,8 @@ use native_engine::{
 };
 use std::cell::RefCell;
 
+pub(crate) use crate::native_viewport::ScheduledPreview;
+
 #[cfg(test)]
 pub(crate) use crate::native_viewport::replacement_test_support::{
     test_observations, FakeOutcome, FakeViewport, SurfaceState,
@@ -315,6 +317,26 @@ fn with_retained_target<V, T>(
         ));
     }
     operation(&mut retained.viewport)
+}
+
+/// One native object preview's occlusion-diagnostic scope, the object path's counterpart of the
+/// scope `present` opens: opened from the request pins and composed work before register, closed
+/// with the receipt's status. Dropped unclosed, it records that no receipt arrived.
+#[derive(Default)]
+pub(crate) struct ObjectPreviewDiagnostic(Option<crate::native_viewport::PreviewObservation>);
+
+impl ObjectPreviewDiagnostic {
+    pub(crate) fn open(&mut self, instance: &str, preview: &ScheduledPreview<'_>) {
+        // An earlier scope closes first, so it cannot restore over this one.
+        drop(self.0.take());
+        self.0 = Some(crate::native_viewport::observe_preview(instance, preview));
+    }
+
+    pub(crate) fn finish(&self, status: &ViewportStatus) {
+        if let Some(observation) = &self.0 {
+            observation.finish(status_label(status));
+        }
+    }
 }
 
 pub(crate) fn status_label(status: &ViewportStatus) -> &'static str {

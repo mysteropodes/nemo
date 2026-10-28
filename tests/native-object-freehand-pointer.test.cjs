@@ -22,9 +22,9 @@ class Element{
 
 }
 function baselineFunction(text,name){const start=text.indexOf('function '+name+'(');assert.ok(start>=0,name);let at=text.indexOf('{',start),depth=1,end=at+1;while(depth){if(text[end]==='{')depth++;if(text[end]==='}')depth--;end++;}return text.slice(start,end);}
-async function fixture(tool='draw',native=true){
+async function fixture(tool='draw',native=true,options={}){
  let clock=1000;let installed=false,generation=0,revision=0,hold=null,refusal=null,replyChange=null,wrongOwner=false,ack=null,binding=null;
- let rect={left:40,top:50,width:640,height:360};const records=new Map(),receipts=new Map(),calls=[],events=new Map(),log=[];
+ let rect=options.rect||{left:40,top:50,width:640,height:360};const records=new Map(),receipts=new Map(),calls=[],events=new Map(),log=[];
  const canvas=new Element(),area=new Element(),body=new Element(),doc=new Element();canvas.getBoundingClientRect=()=>rect;
  const pills=new Element(),pill=new Element(),zoom=new Element(),fit=new Element(),ruler=new Element();
  zoom.id='zoom-scrub';zoom.tagName='INPUT';zoom.value='100';fit.id='canvas-fit-btn';ruler.id='ruler-h';
@@ -46,7 +46,7 @@ async function fixture(tool='draw',native=true){
   if(command==='nemo_native_status'||command==='nemo_native_object_client_status')return {...info(),available:installed};
   if(command==='nemo_native_object_bootstrap'){installed=true;generation++;revision=0;records.clear();return {...info(),requestId:q.requestId,resourceCount:0,viewportAvailable:false};}
   if(command==='nemo_native_object_reference')return {...info(),requestId:q.requestId};
-  if(command==='nemo_native_object_preview'){log.push('present-'+q.contentRevision);return {status:'presented',workId:'work-'+generation+'-'+revision,viewGeneration:1,...(q.viewMode==='stored-camera'?{view:{mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]}}:{})};}
+  if(command==='nemo_native_object_preview'){log.push('present-'+q.contentRevision);return {status:'presented',workId:'work-'+generation+'-'+revision,viewGeneration:1,...(q.viewMode==='stored-camera'?{view:{mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]}}:options.canvasView?{view:options.canvasView}:{})};}
   if(command==='nemo_native_revision_sync'){
    if(q.action==='binding')return {...info(),subscriptionId:'subscription-'+generation};
    if(q.action==='subscribe'){binding=q.binding;return q.binding;}
@@ -141,6 +141,25 @@ test('smoothing keeps baseline detached geometry while the dense pressure sequen
  assert.equal(p.widthProfile.length,22,'no coalesced pressure samples dropped');assert.ok(p.centerSegments.length<22,'baseline explicit Smooth fits centerline');
  assert.equal(p.widthProfile[0].width,.6);assert.equal(p.widthProfile.at(-1).width,.6);assert.ok(p.widthProfile.some(s=>s.width>.6));assert.equal(f.paper.project.activeLayer.children.length,0);
 });
+test('the Ready modeler takes the presented scale; a stretched canvas still refuses (#2343 B1)',async()=>{
+ async function stroke(options,camera){const f=await fixture('draw',true,options),scales=[],create=f.root.SMStrokeModeler.create;
+  if(camera){f.root.state.cameraView=true;await f.session.presentPreview(0);}
+  f.root.SMStrokeModeler.create=(level,scale)=>{scales.push(scale);return create(level,scale);};
+  Object.assign(f.root.state,{stabilizer:4,smoothing:2,fillEnabled:false});
+  send(f,'pointerdown',20,20);f.advance();send(f,'pointermove',40,40);f.advance();send(f,'pointermove',60,30);f.advance();send(f,'pointerup',80,50);
+  return {f,scales,status:(await settled(f)).status};}
+ // The canvas has the document's aspect (2 CSS px per unit); the locked camera view presents the document at 2x within
+ // it, so the modeler's scale is 4 CSS px per document unit, the baseline's view.zoom. The element box alone gives 2.
+ const plain=await stroke({}),camera=await stroke({},true);
+ assert.equal(plain.status,'applied');assert.deepEqual(plain.scales,[2]);
+ assert.equal(camera.status,'applied');assert.equal(camera.f.calls.length,1);assert.deepEqual(camera.scales,[4]);
+ // CSS layout rounding of the fitted canvas is not a stretch.
+ const rounded=await stroke({rect:{left:40,top:50,width:640,height:360.25}});
+ assert.equal(rounded.status,'applied');assert.equal(rounded.f.calls.length,1);
+ // A canvas stretched to another shape (B1: 1038x504 for 1920x1080) is presented non-uniformly and refuses before dispatch.
+ const stretched=await stroke({rect:{left:40,top:50,width:640,height:270}});
+ assert.notEqual(stretched.status,'applied');assert.equal(stretched.f.calls.length,0,'nothing dispatched');assert.deepEqual(stretched.scales,[]);
+});
 test('both existing moving-average and Ready modeler input paths retain the actual release endpoint and one transaction',async()=>{
  for(const stabilizer of [2,4]){const f=await fixture();Object.assign(f.root.state,{stabilizer,smoothing:2,fillEnabled:false});
   send(f,'pointerdown',20,20);f.advance();send(f,'pointermove',40,40);f.advance();send(f,'pointermove',60,30);f.advance();send(f,'pointerup',80,50);
@@ -149,10 +168,13 @@ test('both existing moving-average and Ready modeler input paths retain the actu
   assert.equal(f.paper.project.activeLayer.children.length,0);
  }
 });
-test('256 outline anchors and 65536 full envelope are hard refusals with no trimming, split commit or local writer',async()=>{
+test('an outline past 256 anchors is refitted into one record; the 65536 full envelope stays a hard refusal with no split commit or local writer',async()=>{
  const anchors=await fixture();send(anchors,'pointerdown',20,20);
  const many=Array.from({length:256},(_,i)=>({clientX:40+(21+i)*2,clientY:100+i%2}));send(anchors,'pointermove',276,25,{getCoalescedEvents:()=>many});send(anchors,'pointerup',278,25);
- assert.equal((await settled(anchors)).status,'unmapped');assert.equal(anchors.calls.length,0);assert.equal(anchors.records.size,0);
+ assert.equal((await settled(anchors)).status,'applied');assert.equal(anchors.calls.length,1);
+ const fitted=anchors.calls[0].payload.record.geometry.segments;assert.ok(fitted.length>=2&&fitted.length<=256,String(fitted.length));
+ assert.deepEqual([plain(fitted[0].point),plain(fitted[fitted.length-1].point)],[{x:20,y:20},{x:278,y:25}],'the refit keeps both ends');
+ assert.equal(anchors.paper.project.activeLayer.children.length,0);
  const bytes=await fixture();Object.assign(bytes.root.state,{vectorBrush:true,fillEnabled:false});send(bytes,'pointerdown',20,20,{pointerType:'pen',pressure:.5});
  const dense=Array.from({length:900},(_,i)=>({clientX:80+i/20,clientY:90+i%2/100,pointerType:'pen',pressure:.3+i%10/20}));
  send(bytes,'pointermove',42,21,{getCoalescedEvents:()=>dense});send(bytes,'pointerup',43,21,{pointerType:'pen',pressure:.5});const result=await settled(bytes);
@@ -227,6 +249,14 @@ test('a whole freehand loop remains one transaction even when its release return
  assert.equal((await settled(f)).status,'applied');assert.equal(f.calls.length,1);assert.equal(f.calls[0].payload.record.geometry.segments.length,5);assert.equal(f.calls[0].payload.record.geometry.closed,false);
 });
 
+test('a closed pressure fill past 256 anchors commits one closed refitted record (#2343 B1)',async()=>{
+ const f=await fixture();Object.assign(f.root.state,{vectorBrush:true,strokeEnabled:false,fillEnabled:true,smoothing:0});
+ const at=(i)=>[20+i*.9,90+40*Math.sin(i/12)];send(f,'pointerdown',...at(0),{pointerType:'pen',pressure:.5});
+ const dense=Array.from({length:300},(_,i)=>{const [x,y]=at(i+1);return {clientX:40+x*2,clientY:50+y*2,pointerType:'pen',pressure:.5};});
+ send(f,'pointermove',...at(300),{getCoalescedEvents:()=>dense});send(f,'pointerup',...at(301),{pointerType:'pen',pressure:.5});
+ const result=await settled(f);assert.equal(result.status,'applied',JSON.stringify(result).slice(0,300));assert.equal(f.calls.length,1);
+ const g=plain(f.calls[0].payload).record.geometry;assert.equal(g.closed,true);assert.ok(g.segments.length>=2&&g.segments.length<=256,String(g.segments.length));
+});
 test('exactly256 ordinary polyline anchors are admitted as one full record without a size-driven fit',async()=>{
  const f=await fixture();send(f,'pointerdown',20,20);const points=Array.from({length:254},(_,i)=>({clientX:82+i*2,clientY:90+i%3}));
  send(f,'pointermove',274,21,{getCoalescedEvents:()=>points});send(f,'pointerup',276,21);assert.equal((await settled(f)).status,'applied');
@@ -407,6 +437,20 @@ test('a pressure stroke with Stroke off is one closed fill of its centreline',as
  assert.deepEqual(r.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,20],[50,30],[80,45]]);
 });
 
+// A preset key the confirmed native catalog lacks (a deleted custom preset) draws plain, as the baseline's resolveBrushPreset
+// null leaves applyBrushTexture a no-op. An unknown, changing or unreadable catalog keeps the key unavailable.
+test('a preset key absent from the settled native catalog draws a plain stroke; an unconfirmed catalog refuses',async()=>{
+ const draw=async(catalog)=>{const f=await fixture();f.root.NemoNativeCustomBrushUI={controller:()=>catalog.controller,exists:()=>catalog.exists,record:()=>null};
+  f.root.state.brushPreset='deleted-custom';send(f,'pointerdown',10,40);send(f,'pointermove',40,41);send(f,'pointerup',100,40);await settled(f);return f;};
+ const plainDraw=await draw({controller:{isPending:()=>false},exists:false});assert.equal(plainDraw.calls.length,1,plainDraw.log.join(','));
+ const r=plain(plainDraw.calls[0].payload).record;
+ assert.equal(r.vectorExt&&r.vectorExt.brushTexture,undefined,'no texture fields, as the baseline writes none');
+ assert.deepEqual([r.vector.opacity,r.vector.stroke.r],[0.5,0x11/255],'the stroke is not camouflaged');
+ for(const catalog of [{controller:null,exists:null},{controller:{isPending:()=>true},exists:false},{controller:{isPending:()=>false},exists:null},
+  {controller:{isPending:()=>false},exists:true}]){
+  const f=await draw(catalog);assert.equal(f.calls.length,0,JSON.stringify(catalog.exists));assert.ok(f.log.some(s=>/unavailable/.test(s)),f.log.join(','));
+ }
+});
 // #2361 G16 option C: a built-in preset on a plain stroke commits one seeded, camouflaged anchor (applyBrushTexture
 // @1065e9d8); native stamps its dabs from the preset and seed. No dab is sent.
 test('a textured plain stroke commits one seeded anchor, camouflaged as the baseline hides it',async()=>{
@@ -615,7 +659,10 @@ test('a mirrored or rotated pressure ribbon commits each copy with its own centr
  const at=(rec)=>rec.vectorExt.pressure.centerSegments[0].point,o=at(rq.records[0]);
  [[2,4*Math.PI/3],[1,2*Math.PI/3]].forEach(([k,a],i)=>{const p=at(rq.records[i+1]),dx=o.x-160,dy=o.y-90;
   assert.ok(Math.abs(p.x-(160+dx*Math.cos(a)-dy*Math.sin(a)))<1e-6&&Math.abs(p.y-(90+dx*Math.sin(a)+dy*Math.cos(a)))<1e-6,'copy '+k);});
- // Stop-at-axis clips only a ribbon's outline in the baseline, never its centreline: refused rather than inconsistent.
+ // Stop-at-axis clips only a ribbon's outline, never its centreline (live against the baseline in
+ // native-object-draw-symmetry-stop-axis.test.cjs). This stroke stays left of x = 160, so it commits as with Extend.
  const stop=await fixture();Object.assign(stop.root.state,{vectorBrush:true,symmetryEnabled:true,symmetryMode:'y',symmetryExtend:false});
- pen(stop);await settled(stop);assert.equal(stop.calls.length,0);assert.ok(stop.log.some((s)=>/Stop-at-axis symmetry with pressure brushes/.test(s)),stop.log.join(','));
+ pen(stop);await settled(stop);assert.equal(stop.calls.length,1,stop.log.join(','));const sq=plain(stop.calls[0].payload);
+ assert.equal(sq.records.length,4);assert.deepEqual(sq.records[1].geometry,ribbon0.geometry);
+ assert.deepEqual(sq.records[1].vectorExt.pressure.centerSegments,c0);
 });
