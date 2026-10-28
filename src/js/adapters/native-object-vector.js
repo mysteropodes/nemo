@@ -91,7 +91,7 @@
         (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds, unmapped: maps.map((map) => map.unmapped) }));
     }
     // #2361/#2362: ordered create/replace/delete steps on one layer as one native revision and one undo entry. Each step
-    // is {create: dict} | {replace: {strokeId, dict}} | {delete: strokeId} at `frame` (or the step's own `frame`); a create
+    // is {create: dict} | {copy: earlierStepIndex} | {replace: {strokeId, dict}} | {delete: strokeId} at `frame` (or the step's own `frame`); a create
     // step's own `keyframe: 'copy'` keys its held cell with a copy when the batch's options do not.
     function batchStrokes(layerUid, frame, steps, options) {
       if (!Array.isArray(steps) || !steps.length) return Promise.resolve(Object.freeze({ status: 'invalid', reason: 'a batch needs at least one step' }));
@@ -99,6 +99,9 @@
       for (const step of steps) {
         const at = step.frame === undefined ? frame : step.frame;
         if (step.delete !== undefined) { ops.push({ op: 'delete', stableTarget: stableTarget(layerUid, at, step.delete) }); continue; }
+        // {copy: i, frame}: step i's stroke again on `frame`, sent once (#2362 multiframe stamps stay under the 64 KiB budget).
+        if (step.copy !== undefined) { ops.push(Object.assign({ op: 'copy', fromStep: step.copy, frame: at }, step.placement ? { placement: step.placement } : {},
+          step.keyframe === 'copy' ? { keyframe: 'copy' } : {})); continue; }
         const replacing = step.replace !== undefined;
         const map = Stroke.toRecord(replacing ? step.replace.dict : step.create, { layerUid, frame: at, strokeId: replacing ? step.replace.strokeId : '' },
           { opacity: step.opacity !== undefined ? step.opacity : options && options.opacity });

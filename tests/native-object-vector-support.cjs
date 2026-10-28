@@ -31,7 +31,14 @@ function ownerDouble(state, options) {
       if (kind === 'batch') {
         // Every step or none, as the native owner applies a batch.
         const next = new Map(records), ids = [];
+        // A copy is an earlier create's record retargeted to its frame, then a create (as the native owner expands it).
+        const ops = [];
         for (const op of p.ops) {
+          if (op.op !== 'copy') { ops.push(op); continue; }
+          const record = clone(ops[op.fromStep].record); record.target.frameScope.frame = op.frame;
+          ops.push(Object.assign({}, op, { op: 'create', record }));
+        }
+        for (const op of ops) {
           const id = op.op === 'create' ? null : (op.op === 'replace' ? op.record.target.strokeId : op.stableTarget.strokeId);
           if (id !== null && !next.has(id)) return reply(request, false, refusal('not_found'));
           if (op.op === 'create') {

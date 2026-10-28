@@ -2,7 +2,8 @@
 //! through the single-command kernels to the document as it grows, as one candidate, one revision and one undo entry. It
 //! carries the Labs edits that the baseline makes inside one undo step: the knife's cut pieces, sculpt's rewritten
 //! strokes, pose stamps and multiframe copies. Ids are allocated from the origin revision, as single creates are, and
-//! fill traces regenerate after each step exactly as after the single command. A refused step refuses the batch.
+//! fill traces regenerate after each step exactly as after the single command. A refused step refuses the batch. A `copy`
+//! step creates an earlier create's record again on another frame, so a multiframe stamp does not resend the stroke.
 use crate::commands::object_fill_owner::vector_edit::create_ops::{copy_key as keyframe_copy, create_in, trim_records, Placement};
 use crate::commands::object_fill_owner::vector_edit::{delete_in, replace_in, Edit, VectorEditKind};
 use crate::commands::object_fill_owner::object_frame_edit_document::{promote_cells, DocumentEdit};
@@ -24,13 +25,17 @@ pub(super) struct BatchOp {
     stable_target: Presence<ObjectTarget>,
     placement: Presence<String>,
     keyframe: Presence<String>,
+    from_step: Presence<serde_json::Number>,
+    frame: Presence<serde_json::Number>,
 }
 object_deserialize!(BatchOp {
     op: String,
     #[serde(default)] record: Presence<ObjectRecord>,
     #[serde(default)] stable_target: Presence<ObjectTarget>,
     #[serde(default)] placement: Presence<String>,
-    #[serde(default)] keyframe: Presence<String>
+    #[serde(default)] keyframe: Presence<String>,
+    #[serde(default)] from_step: Presence<serde_json::Number>,
+    #[serde(default)] frame: Presence<serde_json::Number>
 });
 
 fn target_of(op: &BatchOp) -> Option<ObjectTarget> {
@@ -41,6 +46,29 @@ pub(super) fn batch(origin: &ObjectSnapshot, mut ops: Vec<BatchOp>, copy_key: bo
     use DispatchErrorCode::InvalidRequest;
     if !(1..=MAX_BATCH_OPS).contains(&ops.len()) {
         return Err(InvalidRequest);
+    }
+    // `copy` {fromStep, frame}: the record of an EARLIER create (or copy) step, retargeted to `frame` and then a create in
+    // every respect; a stroke and its companion stamped on n frames cost one record each, not n.
+    for at in 0..ops.len() {
+        let copy = ops[at].op == "copy";
+        if copy != !ops[at].from_step.missing() || copy != !ops[at].frame.missing() {
+            return Err(InvalidRequest);
+        }
+        if !copy {
+            continue;
+        }
+        let from = ops[at].from_step.value().and_then(serde_json::Number::as_u64).and_then(|n| usize::try_from(n).ok());
+        let frame = ops[at].frame.value().and_then(serde_json::Number::as_u64).and_then(|n| u32::try_from(n).ok());
+        let (Some(from), Some(frame)) = (from.filter(|&n| n < at), frame) else {
+            return Err(InvalidRequest);
+        };
+        if !ops[at].record.missing() || !ops[at].stable_target.missing() || ops[from].op != "create" {
+            return Err(InvalidRequest);
+        }
+        let mut record = ops[from].record.value().cloned().ok_or(InvalidRequest)?;
+        record.target.frame_scope.frame = frame;
+        let op = &mut ops[at];
+        (op.op, op.record, op.from_step, op.frame) = ("create".into(), Presence::Present(record), Presence::Missing, Presence::Missing);
     }
     let first = target_of(&ops[0]).ok_or(InvalidRequest)?;
     if first.context_id != "scene-root" {

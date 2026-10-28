@@ -277,9 +277,20 @@
     else if (key === 'ops') {
       // #2361/#2362: 1..64 ordered create/replace/delete steps on one scene-root layer, one revision and one undo entry.
       if (!Array.isArray(payloadValue) || payloadValue.length < 1 || payloadValue.length > 64) fail(`${label} must hold 1 to 64 steps`);
-      const targets = payloadValue.map((op, at) => {
+      const targets = [];
+      payloadValue.forEach((op, at) => targets.push((() => {
         const where = `${label}[${at}]`;
         if (!plain(op)) fail(`${where} must be an object`);
+        // #2362 multiframe: an earlier create's (or copy's) record again on another frame, without resending it.
+        if (op.op === 'copy') {
+          exact(op, ['op', 'fromStep', 'frame'], ['placement', 'keyframe'], where);
+          if (!Number.isSafeInteger(op.fromStep) || op.fromStep < 0 || op.fromStep >= at) fail(`${where}.fromStep must name an earlier step`);
+          if (payloadValue[op.fromStep].op !== 'create' && payloadValue[op.fromStep].op !== 'copy') fail(`${where}.fromStep must name a create`);
+          if (!Number.isSafeInteger(op.frame) || op.frame < 0 || op.frame > 4294967295) fail(`${where}.frame must be a frame`);
+          if (has(op, 'placement')) oneOf(op.placement, ['front', 'behind'], `${where}.placement`);
+          if (has(op, 'keyframe')) oneOf(op.keyframe, ['copy'], `${where}.keyframe`);
+          return targets[op.fromStep];
+        }
         if (op.op === 'create') {
           exact(op, ['op', 'record'], ['placement', 'keyframe'], where); record(op.record, true);
           if (has(op, 'placement')) oneOf(op.placement, ['front', 'behind'], `${where}.placement`);
@@ -293,8 +304,8 @@
           return op.record.target;
         }
         if (op.op === 'delete') { exact(op, ['op', 'stableTarget'], [], where); target(op.stableTarget, `${where}.stableTarget`, false); return op.stableTarget; }
-        return fail(`${where}.op must be create, replace or delete`);
-      });
+        return fail(`${where}.op must be create, copy, replace or delete`);
+      })()));
       if (targets.some((t) => t.contextId !== 'scene-root' || t.layerUid !== targets[0].layerUid)) fail(`${label} must stay on one scene-root layer`);
     }
     else if (key === 'maskEdit') {
@@ -327,7 +338,7 @@
     if (has(value, 'placement')) oneOf(value.placement, ['front', 'behind'], `${value.command}.placement`);
     if (has(value, 'trimEnds') && !(typeof value.trimEnds === 'number' && Number.isFinite(value.trimEnds) && value.trimEnds > 0)) fail(`${value.command}.trimEnds is invalid`);
     // A batch trims only when every step creates (the drawn stroke, its copies and its multi-frame stamps share one cut).
-    if (has(value, 'trimEnds') && value.command === 'object.vector.batch' && Array.isArray(value.ops) && value.ops.some((op) => !plain(op) || op.op !== 'create')) fail('object.vector.batch.trimEnds needs create steps only');
+    if (has(value, 'trimEnds') && value.command === 'object.vector.batch' && Array.isArray(value.ops) && value.ops.some((op) => !plain(op) || (op.op !== 'create' && op.op !== 'copy'))) fail('object.vector.batch.trimEnds needs create steps only');
     // keyframe: 'copy' keys a held cell with what it showed (the Labs creators' ensureKeyframe()); absent is Draw's empty key.
     if (has(value, 'keyframe') && value.keyframe !== 'copy') fail(`${value.command} keyframe must be 'copy'`);
     entry[1].forEach((key) => member(value.command, key, value[key]));
@@ -364,7 +375,7 @@
     if (command === 'object.vector.batch') {
       // One id per step, in order: allocated for a create, the named target for a replace or delete.
       const ids = response.result.strokeIds, ops = request.payload.ops;
-      if (!(ids.length === ops.length && ids[0] === stroke && ops.every((op, at) => (op.op === 'create' ? allocated(ids[at])
+      if (!(ids.length === ops.length && ids[0] === stroke && ops.every((op, at) => (op.op === 'create' || op.op === 'copy' ? allocated(ids[at])
         : ids[at] === (op.op === 'replace' ? op.record.target.strokeId : op.stableTarget.strokeId))))) fail('vector receipt stroke mismatch');
       return;
     }

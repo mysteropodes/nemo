@@ -389,8 +389,8 @@ test('Labs multi-frame draw stamps the native stroke on the other selected frame
  await settled(f);assert.equal(f.calls.length,1,'the native Drawing guard leaves a migrated hook available');
  const payload=plain(f.calls[0].payload);
  assert.equal(payload.command,'object.vector.batch');assert.equal(payload.keyframe,undefined,'the drawn frame keeps Draw\'s key');
- assert.deepEqual(payload.ops.map(op=>[op.op,op.record.target.frameScope.frame,op.keyframe||null]),[['create',0,null],['create',3,'copy'],['create',5,'copy']]);
- assert.deepEqual(payload.ops[1].record.geometry,payload.ops[0].record.geometry,'every stamp is the drawn stroke');
+ assert.deepEqual(payload.ops.map(op=>[op.op,op.op==='copy'?op.frame:op.record.target.frameScope.frame,op.keyframe||null]),[['create',0,null],['copy',3,'copy'],['copy',5,'copy']]);
+ assert.deepEqual(payload.ops.slice(1).map(op=>[op.fromStep,op.record]),[[0,undefined],[0,undefined]],'every stamp copies the drawn step instead of resending it');
  const trim=await fixture();multiframe(trim,true);trim.root.state.trimStrokeEnds=true;trim.root.state.trimStrokeEndsMax=24;
  send(trim,'pointerdown',10,40);send(trim,'pointermove',40,41);send(trim,'pointerup',100,40);
  await settled(trim);assert.equal(trim.calls[0].payload.trimEnds,24,'the drawn stroke and its stamps share one native cut');
@@ -634,8 +634,10 @@ test('a trimmed pressure ribbon with multi-frame draw sends one trimmed batch: i
  send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:.4});
  await settled(f);assert.equal(f.calls.length,1);const p=plain(f.calls[0].payload);
  assert.deepEqual([p.command,p.trimEnds],['object.vector.batch',24]);
- const frames=p.ops.map(o=>o.record.target.frameScope.frame);assert.deepEqual(frames,[0,0,3,3,5,5]);
- assert.ok(p.ops.every((o,i)=>i%2?o.record.vectorExt.pressure:o.record.vectorExt.isLinkedFillCompanion),'each cell: the fill, then its ribbon');
+ const frames=p.ops.map(o=>o.op==='copy'?o.frame:o.record.target.frameScope.frame);assert.deepEqual(frames,[0,0,3,3,5,5]);
+ const rec=(o)=>o.op==='copy'?p.ops[o.fromStep].record:o.record;
+ assert.ok(p.ops.every((o,i)=>i%2?rec(o).vectorExt.pressure:rec(o).vectorExt.isLinkedFillCompanion),'each cell: the fill, then its ribbon');
+ assert.deepEqual(p.ops.slice(2).map(o=>[o.op,o.fromStep]),[['copy',0],['copy',1],['copy',0],['copy',1]],'each stamp copies its drawn step');
 });
 test('a mirrored or rotated pressure ribbon commits each copy with its own centreline and linked fill',async()=>{
  const pen=(f)=>{send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();
