@@ -30,7 +30,7 @@ async function fixture(options={}){
  if(options.readonly)delete ui.editPropertyTrack;
  const ordinary=Binding.createOrdinary(root,{readContextId:()=>target.contextId,acceptsTarget:()=>true,keyTimelineChanged:reason=>events.push(reason)});
  let latest=null,notifications=0;ordinary.setKeyTimelineListener(()=>{notifications++;latest=ordinary.readKeyTimeline();});
- assert.equal(ordinary.paint(ui,container,header),true);
+ assert.ok(ordinary.render(container,{ports:ui,header,isCurrent:()=>true}));
  async function settle(){for(let i=0;i<8;i++)await tick();}
  await settle();const keyButton=tree(container).find(n=>n.tagName==='BUTTON'&&n.textContent==='Keys');assert.ok(keyButton);
  return {root,doc,container,ordinary,events,calls,writes,session,target,settle,get latest(){return latest;},get notifications(){return notifications;},
@@ -90,7 +90,7 @@ async function multiFixture(options={}){
   async editPropertyTrack(payload){writes.push(copy(payload));throw Error('Selection must not write native state');}};
  if(options.readonly)delete ui.editPropertyTrack;
  const ordinary=Binding.createOrdinary(root,{readContextId:()=>layer.contextId,readTargetSelection:()=>({primary:layer,selected:targets}),acceptsTarget:()=>true,keyTimelineChanged:reason=>events.push(reason)});
- let notices=0;ordinary.setKeyTimelineListener(()=>{notices++;ordinary.readKeyTimelines();});assert.equal(ordinary.paint(ui,container,header),true);
+ let notices=0;ordinary.setKeyTimelineListener(()=>{notices++;ordinary.readKeyTimelines();});assert.ok(ordinary.render(container,{ports:ui,header,isCurrent:()=>true}));
  async function settle(){for(let i=0;i<8;i++)await tick();}await settle();
  function row(target,property){return tree(container).find(n=>n.className==='native-motion-property-row'&&n.dataset.property===property&&n.dataset.targetKey===JSON.stringify([target.contextId,target.layerUid,target.strokeId===undefined?null:target.strokeId]));}
  return {doc,root,container,ordinary,layer,element,targets,writes,events,reads,settle,get notices(){return notices;},
@@ -102,7 +102,7 @@ async function multiFixture(options={}){
    return {lease:Object.freeze({readPresentedObjectSession:()=>running&&pending&&ready?origin:null}),retire(){running=false;pending=false;}};},
   publicPresentation:()=>session.readPresentedObjectSession(),
   ready(value){ready=value;},replace(){info={...info,lifecycleGeneration:info.lifecycleGeneration+1};},
-  refresh(){ordinary.retire();assert.equal(ordinary.paint(ui,container,header),true);return settle();},retire(){ordinary.dispose();}};
+  refresh(){ordinary.retire();assert.ok(ordinary.render(container,{ports:ui,header,isCurrent:()=>true}));return settle();},retire(){ordinary.dispose();}};
 }
 function address(target,property,frame){return {target:{kind:'property',target,property},frame};}
 function selected(view){return view.tracks.flatMap(track=>track.items.filter(item=>item.selected).map(item=>address(copy(track.target),track.property,item.frame)));}

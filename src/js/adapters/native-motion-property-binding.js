@@ -18,7 +18,7 @@
     var retired=false,generation=0,lastSession=null,lastSignature=null,contextCache=null,pending=null,resolveSerial=0,updateSerial=0,waiting=null;
     function invalidate(){if(lastSession!==null||lastSignature!==null)generation++;lastSession=null;lastSignature=null;return null;}
     function baseScope(lease){try{
-      if(retired||root.state.appMode!=='motion')return invalidate();
+      if(retired||root.state.appMode!=='motion'||options.isCurrent&&options.isCurrent()!==true)return invalidate();
       var session=ui.currentSession();if(!session||!session.isActive||!session.isActive()||!session.info||!session.readPresentedObjectSession)return invalidate();
       var info=session.info(),presented=lease&&typeof lease.readPresentedObjectSession==='function'?lease.readPresentedObjectSession():session.readPresentedObjectSession();
       if(!info||!presented||presented.kind!=='native-object'||ui.projectionReady(info)!==true||!Array.isArray(info.layers))return invalidate();
@@ -103,7 +103,7 @@
       }
       var submittedSignature=intentSignature();
       function current(){
-        try{return !retired&&root.state.appMode==='motion'&&ui.currentSession()===before.session&&
+        try{return !retired&&(!options.isCurrent||options.isCurrent()===true)&&root.state.appMode==='motion'&&ui.currentSession()===before.session&&
           before.session.isActive()&&same(before.identity,before.session.info())&&
           ui.projectionReady(before.session.info())===true&&intentSignature()===submittedSignature&&isCurrent()===true;
         }catch(_){return false;}
@@ -124,7 +124,7 @@
         try{
           function sameOwner(){
             var info=before.session.info();
-            return !retired&&root.state.appMode==='motion'&&ui.currentSession()===before.session&&
+            return !retired&&(!options.isCurrent||options.isCurrent()===true)&&root.state.appMode==='motion'&&ui.currentSession()===before.session&&
               before.session.isActive()&&['instanceId','documentId','lifecycleGeneration'].every(function(k){return info[k]===before.identity[k];});
           }
           if(sameOwner()){
@@ -151,7 +151,7 @@
       get editProperty(){return typeof ui.editProperty==='function'?editProperty:undefined;},
       selectTarget:selectTarget,labelTarget:labelTarget,labelProperty:options.labelProperty,readPreference:options.readPreference,writePreference:options.writePreference});
     async function update(force){var ticket=++updateSerial,base=baseScope();if(base&&!base.explicit&&!cacheMatches(base)&&uniqueContextAllowed())showWait('Loading properties…',true);
-      if(base)await resolveContext(base,!!force);if(retired||ticket!==updateSerial)return false;clearWait();return caller.update(force);}
+      if(base)await resolveContext(base,!!force);if(retired||ticket!==updateSerial||options.isCurrent&&options.isCurrent()!==true)return false;clearWait();return caller.update(force);}
     function cancel(){var wasPending=!!pending;updateSerial++;resolveSerial++;pending=null;clearWait();var stopped=caller.cancel();if(wasPending&&!retired)showWait('Property read cancelled.',false);return wasPending||stopped;}
     function dispose(){if(retired)return;retired=true;updateSerial++;resolveSerial++;pending=null;clearWait();invalidate();caller.dispose();}
     async function shortcut(k,shift){var before=baseScope();if(!before||!await update(false))return false;var after=baseScope();if(!after||before.session!==after.session||before.uiSignature!==after.uiSignature||before.context.frame!==after.context.frame)return false;return caller.shortcut(k,shift);}
@@ -199,16 +199,24 @@
     }
     function retire(){var old=active;active=null;if(!old)return;old.keyboard.dispose();old.header.removeEventListener('contextmenu',old.menu);old.binding.dispose();}
     function unavailable(){if(active&&options.unavailable)options.unavailable();}
-    function paint(ports,container,header){
+    function paint(ports,container,header,isCurrent){
       if(retired||!root.state||root.state.appMode!=='motion'){retire();return false;}
       if(!ports||typeof ports.readPropertyMetadata!=='function'||!container||!header){retire();return false;}
       if(active&&(active.ports!==ports||active.container!==container||active.header!==header||!active.binding.isMounted()))retire();
       if(!active){
-        var binding=create(root,ports,function(selector){return ports.readPropertyMetadata(selector);},Object.assign({},options,{container:container,readTransportGeneration:ports.readTransportGeneration,keyTimelineChanged:keyTimelineChanged}));
+        var binding=create(root,ports,function(selector){return ports.readPropertyMetadata(selector);},Object.assign({},options,{container:container,readTransportGeneration:ports.readTransportGeneration,keyTimelineChanged:keyTimelineChanged,isCurrent:isCurrent}));
         var menu=function(event){event.preventDefault();event.stopPropagation();var scope=binding.captureShortcutScope();if(active&&active.binding===binding&&scope&&options.openFilterMenu)options.openFilterMenu(event,function(mode){if(active&&active.binding===binding&&binding.isShortcutScopeCurrent(scope))return binding.setFilter(mode);return false;});};
         header.addEventListener('contextmenu',menu);
         var keyboard=installForBinding(root.document,root,ports,binding,{acceptsTarget:options.acceptsTarget,modalOpen:options.modalOpen,unavailable:unavailable});
-        active={ports:ports,container:container,header:header,binding:binding,menu:menu,keyboard:keyboard};
+        var entry={ports:ports,container:container,header:header,binding:binding,menu:menu,keyboard:keyboard};
+        function current(){return active===entry&&(!isCurrent||isCurrent()===true);}
+        entry.handle=Object.freeze({retire:function(){if(active===entry)retire();},
+          shortcut:function(key,shift){return current()?binding.shortcut(key,shift):Promise.resolve(false);},
+          readKeyTimeline:function(){return current()?binding.readKeyTimeline():null;},
+          readKeyTimelines:function(){return current()?binding.readKeyTimelines():null;},
+          captureSelectedKeys:function(){return current()?binding.captureSelectedKeys():null;},
+          setKeyTimelineListener:function(fn){if(active!==entry||fn!==null&&(!current()||typeof fn!=='function'))return false;keyTimelineListener=fn;keyTimelineChanged('listener');return true;}});
+        active=entry;
       }
       Promise.resolve(active.binding.update(false)).catch(unavailable);return true;
     }
@@ -220,7 +228,68 @@
       if(!info||!root.state||root.state.appMode==='motion')return null;
       var value={pin:clonePin(info),frame:root.state.currentFrame,viewGeneration:0,keys:Object.freeze([])};
       var current=function(){return !retired&&!active&&root.state.appMode!=='motion';};Object.defineProperties(value,{isCurrent:{value:current},isSelectionCurrent:{value:current}});return Object.freeze(value);
-    },paint:paint,retire:retire,shortcut:function(key,shift){return active?active.binding.shortcut(key,shift):Promise.resolve(false);},dispose:function(){if(retired)return;retire();retired=true;keyTimelineChanged('dispose');keyTimelineListener=null;}});
+    },render:function(container,context){
+      if(!context||typeof context.isCurrent!=='function'||context.isCurrent()!==true)return null;
+      return paint(context.ports,container,context.header,context.isCurrent)?active.handle:null;
+    },retire:retire,shortcut:function(key,shift){return active?active.binding.shortcut(key,shift):Promise.resolve(false);},dispose:function(){if(retired)return;retire();retired=true;keyTimelineChanged('dispose');keyTimelineListener=null;}});
   }
-  return Object.freeze({create:create,createOrdinary:createOrdinary});
+  // Stateful Motion surface: a provider owns DOM/read work, while this lease
+  // routes actions only to its admitted handle. It owns no document state.
+  function createSurface(root,seam,defaultProvider){
+    if(!root||!seam||typeof seam.getPresenter!=='function')throw TypeError('Motion presenter seam unavailable');
+    var owner=null,unregister=null,disposed=false;
+    var methods=['shortcut','readKeyTimeline','readKeyTimelines','captureSelectedKeys','setKeyTimelineListener'];
+    function lifetime(info){return info&&JSON.stringify([info.instanceId,info.documentId,info.lifecycleGeneration]);}
+    function current(entry){try{
+      return !disposed&&owner===entry&&root.state.appMode==='motion'&&
+        seam.getPresenter(root,'motion-properties')===entry.provider&&
+        seam.mountPoint(root,'motion-properties')===entry.body&&
+        root.document.getElementById('motion-props-sec').querySelector('.phdr')===entry.header&&
+        entry.ports.currentSession()===entry.session&&lifetime(entry.session.info())===entry.lifetime;
+    }catch(_){return false;}}
+    function release(failed){
+      var old=owner;owner=null;if(!old)return;
+      var handle=old.handle;
+      try{if(handle&&typeof handle.setKeyTimelineListener==='function')handle.setKeyTimelineListener(null);}catch(_){}
+      try{if(handle)handle.retire();else if(typeof old.provider.retire==='function')old.provider.retire();}catch(_){}
+      // A throwing/rejected render can have allocated a new lifetime without
+      // returning its handle. Retire that provider as well as the prior handle.
+      if(failed&&handle)try{old.provider.retire();}catch(_){}
+    }
+    function retire(failed){release(failed);if(unregister){var off=unregister;unregister=null;off();}}
+    function validHandle(value){return !!value&&typeof value==='object'&&!Array.isArray(value)&&typeof value.retire==='function'&&methods.every(function(k){return value[k]===undefined||typeof value[k]==='function';});}
+    function paint(ports,body,header){
+      if(disposed)return false;
+      try{
+        if(!seam.isMounted(root,'motion-properties')&&defaultProvider)unregister=seam.register(root,'motion-properties',defaultProvider);
+        var provider=seam.getPresenter(root,'motion-properties'),session=ports.currentSession();
+        if(!provider||typeof provider.retire!=='function'||!session||!body||!header)throw Error('Motion presenter unavailable');
+        if(owner&&(owner.provider!==provider||owner.ports!==ports||owner.session!==session||owner.body!==body||owner.header!==header||owner.lifetime!==lifetime(session.info())))release();
+        if(!owner)owner={provider:provider,ports:ports,session:session,body:body,header:header,lifetime:lifetime(session.info()),handle:null};
+        var entry=owner,previous=entry.handle;
+        var handle=seam.present(root,'motion-properties',Object.freeze({ports:ports,header:header,isCurrent:function(){return current(entry);}}));
+        if(!validHandle(handle)||!current(entry)){
+          if(validHandle(handle)&&handle!==previous)handle.retire();
+          throw Error('Motion presenter handle unavailable');
+        }
+        if(previous!==handle){
+          if(previous)previous.retire();entry.handle=handle;
+          if(handle.setKeyTimelineListener)handle.setKeyTimelineListener(function(){
+            if(!current(entry)||entry.handle!==handle)return;
+            var range=root.NemoNativeLayerRangeDesktop;if(range&&typeof range.refreshKeys==='function')range.refreshKeys(root);
+          });
+        }
+        return true;
+      }catch(_){retire(true);return false;}
+    }
+    function call(method,args){var entry=owner;if(!entry||!current(entry)){release();return null;}var fn=entry.handle&&entry.handle[method];return typeof fn==='function'?fn.apply(entry.handle,args):null;}
+    return Object.freeze({paint:paint,retire:retire,
+      shortcut:function(key,shift){return call('shortcut',[key,shift]);},
+      readKeyTimeline:function(){return call('readKeyTimeline',[]);},readKeyTimelines:function(){return call('readKeyTimelines',[]);},
+      captureSelectedKeys:function(info){
+        if(!disposed&&!owner&&root.state.appMode!=='motion'&&defaultProvider&&typeof defaultProvider.captureSelectedKeys==='function')return defaultProvider.captureSelectedKeys(info);
+        return call('captureSelectedKeys',[info]);
+      },dispose:function(){if(disposed)return;retire();disposed=true;}});
+  }
+  return Object.freeze({create:create,createOrdinary:createOrdinary,createSurface:createSurface});
 }));

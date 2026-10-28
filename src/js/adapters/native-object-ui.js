@@ -14,61 +14,54 @@
 (function(root,factory){
   // In the page the seam and presenter load after this file; render resolves them from root.
   var cjs=typeof module==='object'&&module.exports;
-  var api=cjs?factory(require('../application/presenter-seam.js'),require('./native-layer-list-presenter.js')):factory(null,null);
+  var api=cjs?factory(require('../application/presenter-seam.js'),require('./native-layer-list-presenter.js'),require('./native-motion-property-binding.js')):factory(null,null,null);
   if(cjs)module.exports=api;
   else root.NemoNativeObjectUI=api;
-}(typeof globalThis==='object'?globalThis:this,function(Seam,LayerList){
+}(typeof globalThis==='object'?globalThis:this,function(Seam,LayerList,Motion){
   'use strict';
-  var inspectors=new WeakMap(),views=new WeakMap(),timings=new WeakMap(),policyTasks=new WeakMap(),policyEpochs=new WeakMap(),policyBindings=new WeakMap(),motionBindings=new WeakMap();
-  function retireMotion(root){var hooks=motionBindings.get(root);if(hooks)hooks.retire();var prior=inspectors.get(root);if(prior&&prior.motion){var saved=prior.motion;saved.body.replaceChildren.apply(saved.body,saved.children);saved.section.hidden=saved.hidden;saved.section.style.display=saved.display;prior.motion=null;}}
+  var inspectors=new WeakMap(),views=new WeakMap(),timings=new WeakMap(),policyTasks=new WeakMap(),policyEpochs=new WeakMap(),policyBindings=new WeakMap(),motionBindings=new WeakMap(),motionSurfaces=new WeakMap();
+  function motionSurface(root){
+    var surface=motionSurfaces.get(root),api=Motion||root.NemoNativeMotionBinding;
+    if(!surface&&api&&typeof api.createSurface==='function'){surface=api.createSurface(root,seam(root),motionBindings.get(root));motionSurfaces.set(root,surface);}
+    return surface;
+  }
+  function retireMotion(root){var surface=motionSurfaces.get(root);if(surface)surface.retire();var prior=inspectors.get(root);if(prior&&prior.motion){var saved=prior.motion;saved.body.replaceChildren.apply(saved.body,saved.children);saved.section.hidden=saved.hidden;saved.section.style.display=saved.display;prior.motion=null;}}
   function bindMotion(root,hooks){
-    if(!root||!hooks||typeof hooks.paint!=='function'||typeof hooks.retire!=='function')throw new TypeError('Native Motion UI hooks unavailable');
+    if(!root||!hooks||typeof hooks.render!=='function'||typeof hooks.retire!=='function')throw new TypeError('Native Motion UI hooks unavailable');
     if(motionBindings.has(root))throw new Error('Native Motion UI already bound');motionBindings.set(root,hooks);
-    if(typeof hooks.setKeyTimelineListener==='function')hooks.setKeyTimelineListener(function(){
-      var range=root.NemoNativeLayerRangeDesktop;if(range&&typeof range.refreshKeys==='function')range.refreshKeys(root);
-    });
+    var previous=motionSurfaces.get(root);if(previous){previous.dispose();motionSurfaces.delete(root);}
     return Object.freeze({dispose:function(){if(motionBindings.get(root)!==hooks)return;retireMotion(root);
-      if(typeof hooks.setKeyTimelineListener==='function')hooks.setKeyTimelineListener(null);motionBindings.delete(root);}});
+      var surface=motionSurfaces.get(root);if(surface)surface.dispose();motionSurfaces.delete(root);
+      if(typeof hooks.dispose==='function')hooks.dispose();motionBindings.delete(root);}});
   }
   function paintMotion(root,ports,prior){
     if(!root.state||root.state.appMode!=='motion'){retireMotion(root);prior.notice.textContent='Native drawing property inspectors are unavailable.';return;}
-    var hooks=motionBindings.get(root),section=root.document.getElementById('motion-props-sec'),body=root.document.getElementById('motion-props-body');
+    var section=root.document.getElementById('motion-props-sec'),body=root.document.getElementById('motion-props-body');
     var header=section&&section.querySelector('.phdr');
     prior.notice.textContent='Native Motion property values and edits are unavailable.';
-    if(!hooks||!section||!body||!header)return;
+    if(!section||!body||!header){retireMotion(root);return;}
+    if(!motionBindings.has(root)&&!seam(root).isMounted(root,'motion-properties'))return;
+    var surface=motionSurface(root);if(!surface){retireMotion(root);return;}
     if(prior.motion&&(prior.motion.section!==section||prior.motion.body!==body||prior.motion.header!==header))retireMotion(root);
     if(!prior.motion){prior.motion={section:section,body:body,header:header,children:Array.from(body.childNodes||body.children),hidden:section.hidden,display:section.style.display};body.replaceChildren();}
     section.hidden=false;section.style.display='';
-    if(hooks.paint(ports,body,header)!==true){retireMotion(root);prior.notice.textContent='Native Motion property metadata is unavailable.';}
+    if(surface.paint(ports,body,header)!==true){retireMotion(root);prior.notice.textContent='Native Motion property metadata is unavailable.';}
   }
   function routeMotionShortcut(root,key,shift){
-    var hooks=motionBindings.get(root);if(!hooks||typeof hooks.shortcut!=='function'||!paintMotionInspector(root))return false;
-    Promise.resolve(hooks.shortcut(key,shift)).catch(function(){});return true;
+    if(!paintMotionInspector(root))return false;var surface=motionSurfaces.get(root);if(!surface)return false;
+    var result=surface.shortcut(key,shift);if(result===null)return false;Promise.resolve(result).catch(function(){});return true;
   }
-  function readSelectedMotionKeys(root,info){
+  function readMotion(root,info,method){
     try{
-      var view=views.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),hooks=motionBindings.get(root);
+      var view=views.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),surface=motionSurface(root);
       if(!info||!session||!session.isActive()||!sameTimingPin(session.info(),info)||ports.projectionReady(info)!==true||
-         !confirmed(root,info,session.readPresentedObjectSession())||!hooks||typeof hooks.captureSelectedKeys!=='function')return null;
-      return hooks.captureSelectedKeys(info);
+         !confirmed(root,info,session.readPresentedObjectSession())||!surface)return null;
+      return surface[method](info);
     }catch(_){return null;}
   }
-  function readMotionKeyTimeline(root,info){
-    try{
-      var view=views.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),hooks=motionBindings.get(root);
-      if(!info||!session||!session.isActive()||!sameTimingPin(session.info(),info)||ports.projectionReady(info)!==true||
-         !confirmed(root,info,session.readPresentedObjectSession())||!hooks||typeof hooks.readKeyTimeline!=='function')return null;
-      return hooks.readKeyTimeline();
-    }catch(_){return null;}
-  }
-  function readMotionKeyTimelines(root,info){
-    try{
-      var view=views.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),hooks=motionBindings.get(root);
-      if(!info||!session||!session.isActive()||!sameTimingPin(session.info(),info)||ports.projectionReady(info)!==true||
-         !confirmed(root,info,session.readPresentedObjectSession())||!hooks||typeof hooks.readKeyTimelines!=='function')return null;
-      return hooks.readKeyTimelines();
-    }catch(_){return null;}
-  }
+  function readSelectedMotionKeys(root,info){return readMotion(root,info,'captureSelectedKeys');}
+  function readMotionKeyTimeline(root,info){return readMotion(root,info,'readKeyTimeline');}
+  function readMotionKeyTimelines(root,info){return readMotion(root,info,'readKeyTimelines');}
   function setKeyTimelineRows(root,layout,info){
     var view=views.get(root);
     if(!view||!sameTimingPin(view.pin,info)||!Array.isArray(layout)||!view.rows.every(function(row,i){return row.parentNode===view.list&&row.children.length===4&&view.controls[i].every(function(n,k){return row.children[k]===n;});}))return false;
