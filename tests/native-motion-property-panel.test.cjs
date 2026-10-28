@@ -86,7 +86,7 @@ test('unselected reveal uses all native layers and preserves multiple selected t
 
 test('actual A S T reveal routes and E M remain explicitly unavailable',async()=>{const h=host();h.paint();await h.settle();for(const [key,property] of [['a','anchor'],['s','scale'],['t','opacity']]){await h.doc.body.fire('keydown',{key});await h.settle();assert.equal(h.rows().length,1);assert.equal(h.rows()[0].dataset.property,property);}for(const key of ['e','m']){await h.doc.body.fire('keydown',{key});await h.settle();assert.equal(h.status(),'This Motion reveal is unavailable.');}h.retire();});
 test('module absence leaves the native inspector unavailable and never activates legacy metadata',async()=>{const h=host({omitBinding:true});h.paint();await h.settle();assert.equal(h.calls.length,0);assert.equal(h.rows().length,0);assert.equal(h.nodes['motion-props-sec'].hidden,true);assert.match(h.nodes['props-panel'].textContent,/Native Motion property values and edits are unavailable/);const a=motion.indexOf('  function renderMotionPropsPanel() {'),b=motion.indexOf("    body.innerHTML = '';",a),context=vm.createContext({window:h.root,document:h.doc,n20AllowLegacyWrite:()=>false});vm.runInContext(motion.slice(a,b)+"throw Error('LEGACY FALLTHROUGH');};renderMotionPropsPanel();",context);assert.equal(h.calls.length,0);h.retire();});
-test('duplicate native Motion registration is rejected',()=>{const h=host();assert.throws(()=>UI.bindMotion(h.root,{paint(){return true;},retire(){}}),/already bound/);h.retire();});
+test('duplicate native Motion registration is rejected',()=>{const h=host();assert.throws(()=>UI.bindMotion(h.root,{render(){return {retire(){}};},retire(){}}),/already bound/);h.retire();});
 
 test('direct public reveal entrypoints consume native ownership even with missing binding',async()=>{const h=host({omitBinding:true}),a=motion.indexOf('  function routeNativeMotionRead('),b=motion.indexOf('  function handlePropShortcut(',a),helper=motion.slice(a,b);const ctx=vm.createContext({window:h.root,state:h.root.state,PROP_SHORTCUT:{p:'position'},n20AllowLegacyWrite:()=>false});for(const [name,end] of [['handlePropShortcut','    // Filtering'],['handleRevealAnimatedShortcut','    // U is a TOGGLE'],['handleRevealEffectsShortcut','    return revealByLayerPredicate'],['handleRevealMattesShortcut','    return revealByLayerPredicate']]){const start=motion.indexOf('  function '+name+'('),finish=motion.indexOf(end,start);assert.ok(start>0&&finish>start);vm.runInContext(helper+motion.slice(start,finish)+"throw Error('LEGACY FALLTHROUGH');}",ctx);let consumed;assert.doesNotThrow(()=>{consumed=vm.runInContext(name+"('p',false)",ctx);});assert.equal(consumed,true);}h.retire();});
 async function ordinaryProjectHost(){
@@ -224,4 +224,121 @@ test('real Order inspector exposes its bake and reads without granting unavailab
  const checks=tree(container).filter(n=>n.type==='checkbox');assert.equal(checks.length,2);assert.ok(checks.every(n=>n.disabled));
  const keyPanel=tree(container).find(n=>n.className==='native-motion-property-keys');assert.ok(tree(keyPanel).filter(n=>n.tagName==='INPUT').every(n=>n.disabled));
  assert.equal(panel.readKeyTimeline().selectFrames([0]),false);assert.equal(writes.length,1);panel.dispose();
+});
+
+// #2377 first presenter slice: exercise the ordinary native UI caller, not a
+// parallel mount harness. The fixed row order below comes from the pre-slice
+// metadata fixture, independently of whichever presenter is registered.
+const Seam=require('../src/js/application/presenter-seam.js');
+function replacement(h,label){
+ const events=[],contexts=[],marker=h.doc.createElement('button');marker.textContent=label;
+ const timeline={source:label},selected={keys:[{source:label}],isCurrent:()=>contexts.at(-1)?.isCurrent()===true};
+ let handleRetired=0,providerRetired=0,listener=null;
+ const handle={retire(){handleRetired++;},shortcut(key,shift){events.push(['shortcut',key,shift]);return Promise.resolve(true);},
+  readKeyTimeline(){events.push(['timeline']);return timeline;},readKeyTimelines(){events.push(['timelines']);return timeline;},
+  captureSelectedKeys(){events.push(['selected']);return selected;},setKeyTimelineListener(fn){listener=fn;events.push(['listener',typeof fn]);}};
+ const provider={render(mount,context){contexts.push(context);events.push(['render']);if(marker.parentNode!==mount)mount.replaceChildren(marker);return handle;},retire(){providerRetired++;events.push(['provider-retire']);}};
+ return {provider,handle,events,contexts,marker,timeline,selected,notify(){if(listener)listener('test');},get handleRetired(){return handleRetired;},get providerRetired(){return providerRetired;}};
+}
+test('registered Motion presenter owns actual UI paint and all returned-handle action/read routes',async()=>{
+ const h=host(),p=replacement(h,'replacement'),unregister=Seam.register(h.root,'motion-properties',p.provider);let rangePorts=null;
+ h.root.NemoNativeLayerRangeDesktop={mount(root,grid,info,ports){rangePorts=ports;},refreshKeys(){},retire(){}};
+ try{
+  h.paint();await h.settle();
+  assert.ok(h.nodes['motion-props-body'].children.length===1&&h.nodes['motion-props-body'].children[0]===p.marker);assert.equal(h.calls.length,0,'default metadata binding must not mount');assert.equal(Seam.getPresenter(h.root,'motion-properties'),p.provider);
+  assert.equal(UI.routeMotionShortcut(h.root,'p',true),true);await tick();
+  assert.deepEqual(p.events.find(e=>e[0]==='shortcut'),['shortcut','p',true]);
+  assert.strictEqual(UI.readSelectedMotionKeys(h.root,h.ports.currentSession().info()),p.selected);
+  assert.ok(rangePorts,'ordinary native layer consumer receives the presenter read ports');
+  assert.strictEqual(rangePorts.readMotionKeyTimeline(h.ports.currentSession().info()),p.timeline);
+  assert.strictEqual(rangePorts.readMotionKeyTimelines(h.ports.currentSession().info()),p.timeline);
+  assert.equal(h.header.listeners.get('contextmenu')?.length||0,0,'default header handler never mounts');
+ }finally{h.retire();unregister();}
+ assert.equal(p.handleRetired,1);assert.ok(h.nodes['motion-props-body'].children.length===1&&h.nodes['motion-props-body'].children[0]===h.old);
+});
+test('Motion presenter replacement invalidates retained context and retires prior handle before the new render',async()=>{
+ const h=host(),a=replacement(h,'first'),b=replacement(h,'second');let remove=Seam.register(h.root,'motion-properties',a.provider);
+ try{
+  h.paint();const context=a.contexts[0];assert.equal(context.isCurrent(),true);
+  h.root.state.currentFrame=5;h.paint();assert.equal(context.isCurrent(),true,'surface lifetime does not replace existing frame/revision fences');
+  await a.marker.focus();h.paint();assert.strictEqual(h.doc.activeElement,a.marker);assert.equal(a.handleRetired,0);
+  remove();assert.equal(context.isCurrent(),false,'unregistration immediately fences retained work');
+  const render=b.provider.render;b.provider.render=function(mount,ctx){assert.equal(a.handleRetired,1);return render(mount,ctx);};
+  remove=Seam.register(h.root,'motion-properties',b.provider);h.paint();
+  assert.ok(h.nodes['motion-props-body'].children.length===1&&h.nodes['motion-props-body'].children[0]===b.marker);assert.equal(a.handleRetired,1);assert.equal(h.calls.length,0);
+  h.retire();assert.equal(b.contexts.at(-1).isCurrent(),false);assert.equal(b.handleRetired,1);
+  h.retire();assert.equal(b.handleRetired,1,'retirement is idempotent');
+ }finally{h.retire();remove();}
+});
+test('Motion presenter session, mount and mode replacement invalidate previously captured surface guards',async()=>{
+ for(const change of [h=>h.replace(),h=>{h.nodes['motion-props-body'].id='retired-body';const body=h.doc.createElement('div');body.id='motion-props-body';h.nodes['motion-props-sec'].appendChild(body);},h=>{h.root.state.appMode='drawing';}]){
+  const h=host(),p=replacement(h,'guarded'),unregister=Seam.register(h.root,'motion-properties',p.provider);
+  try{h.paint();const context=p.contexts[0];assert.equal(context.isCurrent(),true);change(h);assert.equal(context.isCurrent(),false);h.paint();assert.equal(p.handleRetired,1);}
+  finally{h.retire();unregister();}
+ }
+});
+test('Motion presenter failure or malformed handle fails closed and restores the original inspector',async()=>{
+ for(const variant of ['throw','null','missing-retire','bad-optional','missing-provider-retire']){
+  const h=host();let context;const provider={render(mount,ctx){context=ctx;mount.replaceChildren(h.doc.createElement('div'));
+   if(variant==='throw')throw Error('renderer failed');if(variant==='null')return null;if(variant==='missing-retire')return {};
+   return {retire(){},...(variant==='bad-optional'?{shortcut:3}:{})};},retire(){}};
+  if(variant==='missing-provider-retire')delete provider.retire;
+  const unregister=Seam.register(h.root,'motion-properties',provider);
+  try{assert.doesNotThrow(()=>h.paint());assert.deepEqual(h.nodes['motion-props-body'].children,[h.old],variant);
+   assert.equal(UI.routeMotionShortcut(h.root,'p',false),false);if(context)assert.equal(context.isCurrent(),false);assert.equal(h.calls.length,0);}
+  finally{h.retire();unregister();}
+ }
+});
+test('default Motion surface preserves the fixed native row sequence, focus and single listeners',async()=>{
+ const h=host();try{
+  h.paint();await h.settle();assert.deepEqual(h.rows().map(row=>row.dataset.property),['position','anchor','rotation','scale','opacity','order','xc_number','xc_angle','xc_point','xc_color','xc_on']);
+  const search=tree(h.nodes['motion-props-body']).find(n=>n.tagName==='INPUT'),count=h.calls.length,keyListeners=h.doc.listeners.get('keydown').length;
+  await search.focus();h.root.state.currentFrame=4;h.paint();await h.settle();
+  assert.strictEqual(h.doc.activeElement,search);assert.equal(h.calls.length,count);assert.equal(h.header.listeners.get('contextmenu').length,1);assert.equal(h.doc.listeners.get('keydown').length,keyListeners);
+ }finally{h.retire();}
+});
+test('retired default Motion surface cannot accept delayed metadata or a retained filter-menu action',async()=>{
+ const h=host();h.paint();await h.settle();await h.header.fire('contextmenu');const action=h.menus[0].find(i=>i.label==='expressions').action;
+ h.hold=true;h.replace();h.paint();await tick();assert.ok(h.waiting.length);h.retire();const calls=h.calls.length;
+ action();h.hold=false;while(h.waiting.length)h.release();await tick();await tick();
+ assert.equal(h.calls.length,calls);assert.ok(h.nodes['motion-props-body'].children.length===1&&h.nodes['motion-props-body'].children[0]===h.old);assert.equal(h.header.listeners.get('contextmenu').length,0);
+});
+test('retired Motion surface fences an already queued native bake before dispatch',async()=>{
+ const h=host(),read=h.ports.readPropertyMetadata;let entered,release;const started=new Promise(r=>entered=r),gate=new Promise(r=>release=r),writes=[];
+ h.ports.readPropertyMetadata=async selector=>{const result=await read(selector);if(result.kind==='properties')result.items.forEach(row=>{if(row.authored?.availability==='available')row.authored.expressionEnabled=true;});return result;};
+ h.ports.editProperty=async(payload,pin,current)=>{entered();await gate;if(!current())throw Error('retired before dispatch');writes.push(payload);return {applied:true,historyEntriesAdded:1};};
+ h.paint();await h.settle();const button=h.button('Bake expression');assert.ok(button);const click=button.fire('click');await started;
+ h.retire();release();await click;await tick();assert.equal(writes.length,0);assert.ok(h.nodes['motion-props-body'].children.length===1&&h.nodes['motion-props-body'].children[0]===h.old);
+});
+
+test('failed replacement render retires both the prior handle and newly allocated provider lifetime',()=>{
+ const h=host(),p=replacement(h,'prior'),off=Seam.register(h.root,'motion-properties',p.provider);
+ try{
+  h.paint();const prior=p.contexts[0];
+  p.provider.render=(mount)=>{mount.replaceChildren(h.doc.createElement('div'));return {retire(){},shortcut:0};};
+  h.paint();assert.equal(p.handleRetired,1);assert.equal(p.providerRetired,1);
+  assert.equal(prior.isCurrent(),false);assert.deepEqual(h.nodes['motion-props-body'].children,[h.old]);
+ }finally{h.retire();off();}
+});
+test('inactive native session immediately fences a retained replacement presenter context',()=>{
+ const h=host(),p=replacement(h,'active'),off=Seam.register(h.root,'motion-properties',p.provider);let refreshes=0;
+ h.root.NemoNativeLayerRangeDesktop={mount(){},retire(){},owns(){return false;},refreshKeys(){refreshes++;}};
+ try{
+  h.paint();const context=p.contexts[0];assert.equal(context.isCurrent(),true);p.notify();assert.equal(refreshes,1);
+  h.active=false;assert.equal(context.isCurrent(),false);p.notify();assert.equal(refreshes,1);
+  assert.equal(UI.readSelectedMotionKeys(h.root,h.ports.currentSession().info()),null);h.paint();assert.equal(p.handleRetired,1);
+ }finally{h.retire();off();}
+});
+test('unregistering the default native provider fences queued writes without requiring another UI paint',async()=>{
+ const h=host({omitBinding:true}),provider=Binding.createOrdinary(h.root,{acceptsTarget:()=>true}),off=Seam.register(h.root,'motion-properties',provider);
+ h.root.NemoNativeMotionBinding=Binding; // Module loads after the ordinary installer; the explicit seam provider owns this mount.
+ const read=h.ports.readPropertyMetadata;let entered,release;
+ const started=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve),writes=[];
+ h.ports.readPropertyMetadata=async selector=>{const result=await read(selector);if(result.kind==='properties')result.items.forEach(row=>{if(row.authored?.availability==='available')row.authored.expressionEnabled=true;});return result;};
+ h.ports.editProperty=async(payload,pin,current)=>{entered();await gate;if(!current())throw Error('provider replaced');writes.push(payload);return {ok:true,result:{applied:true,historyEntriesAdded:1}};};
+ try{
+  h.paint();await h.settle();const bake=h.button('Bake expression');assert.ok(bake);
+  const click=bake.fire('click');await started;off();const reads=h.calls.length;release();await click;await tick();
+  assert.equal(writes.length,0);assert.equal(h.calls.length,reads,'retired provider cannot refresh the replacement');
+ }finally{release();h.retire();off();provider.dispose();}
 });
