@@ -1,0 +1,389 @@
+{
+  "schema": "nemo.legacy-writer-families/1",
+  "purpose": "CS4b (#2364): the single declaration of legacy JavaScript/Paper writer entry points. scripts/nemo/legacy-writers.cjs generates the wrap lists (native-opacity-operations.js) and the desktop-admitted kinds (native-opacity-legacy-surface.js) from it. On the desktop host a write is admitted only when its family is legacy-owned; migrating a family flips its authority here.",
+  "authorities": {
+    "legacy-owned": "still owned by the JavaScript/Paper writer on desktop; admitted",
+    "native": "owned by the native engine through the named capability; legacy entry refused",
+    "unavailable": "not yet migrated; legacy entry refused and reported unavailable (EXECUTION_PLAN \u00a70)"
+  },
+  "prefixes": {
+    "global": "app-",
+    "timeline": "timeline-",
+    "motion": "motion-",
+    "script": "script-",
+    "plugin": "plugin-"
+  },
+  "families": [
+    {
+      "family": "frames",
+      "authority": "native",
+      "capability": "native-frame-edit",
+      "entries": {
+        "global": [
+          "insertFrame",
+          "insertKeyframe",
+          "insertKeyframeAt",
+          "insertBlankKeyframe",
+          "clearKeyframe",
+          "convertToKeyframes",
+          "removeFrameSpan"
+        ],
+        "timeline": [
+          "insertFrame",
+          "insertKeyframe",
+          "insertBlankKeyframe",
+          "removeFrame",
+          "clearKeyframe",
+          "convertToKeyframes",
+          "removeFrameSpan",
+          "duplicateSelectedFrames",
+          "moveFrames",
+          "cutFrames",
+          "pasteFrames",
+          "deleteSelectedFrames",
+          "moveKeyframe",
+          "shiftLayerFrames",
+          "duplicateKeyframe",
+          "extendExposure"
+        ]
+      },
+      "kinds": [
+        "timeline-duplicate-frames",
+        "timeline-remove-frame"
+      ]
+    },
+    {
+      "family": "tween",
+      "authority": "unavailable",
+      "entries": {
+        "global": [
+          "removeTweenSpan"
+        ],
+        "timeline": [
+          "generateTweens",
+          "harmonizeAfterEdit",
+          "removeTweenSpan",
+          "setCurve",
+          "setResamplePts",
+          "setTweenStep"
+        ]
+      },
+      "kinds": [
+        "timeline-generate-tweens",
+        "timeline-harmonize-edit"
+      ]
+    },
+    {
+      "family": "components",
+      "authority": "native",
+      "capability": "native-object-component",
+      "entries": {
+        "global": [
+          "convertLayerToComponent",
+          "convertLayersToComponent",
+          "convertComponentToLayer"
+        ],
+        "timeline": [
+          "convertActiveLayerToComponent",
+          "convertComponentToLayer",
+          "setSymbolPlayMode",
+          "setSymbolSpeed",
+          "setSymbolSingleFrame",
+          "setSymbolPlacedAt",
+          "enterSymbol",
+          "exitToScene",
+          "closeSymbolTab"
+        ]
+      },
+      "kinds": [
+        "symbol-expose-property"
+      ]
+    },
+    {
+      "family": "duplicator",
+      "authority": "native",
+      "capability": "native-object-duplicator",
+      "entries": {
+        "global": [
+          "convertSelectionToObjectDuplicator"
+        ],
+        "timeline": [
+          "convertSelectionToObjectDuplicator"
+        ]
+      },
+      "kinds": []
+    },
+    {
+      "family": "elements",
+      "authority": "unavailable",
+      "entries": {
+        "global": [
+          "splitLayerIntoElements",
+          "setElemHidden"
+        ],
+        "timeline": [
+          "splitLayerIntoElementsCore",
+          "splitLayerIntoElements"
+        ]
+      },
+      "kinds": [
+        "split-layer-elements-core"
+      ]
+    },
+    {
+      "family": "lfs-groups",
+      "authority": "unavailable",
+      "entries": {
+        "global": [
+          "convertLayerToLFSGroup",
+          "convertLFSGroupToLayer"
+        ],
+        "timeline": [
+          "convertActiveLayerToLFSGroup",
+          "convertActiveLayerToStrokeFillShadow",
+          "convertLFSGroupToLayer",
+          "propagateLFSFill"
+        ]
+      },
+      "kinds": [
+        "lfs-fill-propagation",
+        "stroke-fill-shadow-split"
+      ]
+    },
+    {
+      "family": "layer-policy",
+      "authority": "native",
+      "capability": "native-layer-policy",
+      "entries": {
+        "timeline": [
+          "setLayerKeyLock",
+          "toggleLayerShy",
+          "toggleShyMode",
+          "toggleLayerLock",
+          "toggleLayerSolo"
+        ]
+      },
+      "kinds": []
+    },
+    {
+      "family": "layer-structure",
+      "authority": "unavailable",
+      "entries": {
+        "timeline": [
+          "toggleFolderLayerCollapsed",
+          "addNullLayer",
+          "reparentLayersIntoFolder",
+          "removeLayerFromFolder",
+          "addEffectLayer",
+          "addGuideLayer",
+          "addJoystickLayer",
+          "addSliderLayer",
+          "addFolderLayer",
+          "deleteLayer",
+          "splitLayerAtPlayhead",
+          "duplicateLayer",
+          "renameLayer",
+          "reorderLayer",
+          "reorderLayersAtGap",
+          "reorderLayersBatch",
+          "mergeLayersIntoOne"
+        ]
+      },
+      "kinds": [
+        "create-layer",
+        "layer-reorder",
+        "merge-layers"
+      ]
+    },
+    {
+      "family": "vector-edit",
+      "authority": "unavailable",
+      "entries": {
+        "timeline": [
+          "setPointType",
+          "booleanOp",
+          "applyStrokeProfile",
+          "deleteSelStrokes",
+          "flipHorizontal",
+          "flipVertical"
+        ]
+      },
+      "kinds": []
+    },
+    {
+      "family": "selection-style",
+      "authority": "unavailable",
+      "entries": {},
+      "kinds": [
+        "timeline-mask-feather",
+        "timeline-selection-brush-preset",
+        "timeline-selection-brush-size",
+        "timeline-selection-dash-offset",
+        "timeline-selection-fill-color",
+        "timeline-selection-fill-enabled",
+        "timeline-selection-miter-limit",
+        "timeline-selection-opacity",
+        "timeline-selection-paint-order",
+        "timeline-selection-smooth-stroke",
+        "timeline-selection-stroke-cap",
+        "timeline-selection-stroke-color",
+        "timeline-selection-stroke-enabled",
+        "timeline-selection-stroke-join",
+        "timeline-selection-stroke-style",
+        "timeline-selection-swap-paint"
+      ]
+    },
+    {
+      "family": "composition-settings",
+      "authority": "unavailable",
+      "entries": {
+        "timeline": [
+          "setCanvasClip",
+          "setSafetyZones",
+          "setTotalFrames",
+          "trimToWorkArea",
+          "toggleLayerMotionBlur",
+          "toggleMotionBlurComp",
+          "setMotionBlurSettings"
+        ]
+      },
+      "kinds": []
+    },
+    {
+      "family": "montage",
+      "authority": "unavailable",
+      "entries": {
+        "timeline": [
+          "enterMontageView",
+          "exitMontageView"
+        ]
+      },
+      "kinds": []
+    },
+    {
+      "family": "motion",
+      "authority": "unavailable",
+      "entries": {
+        "motion": [
+          "toggleAnimated",
+          "setValue",
+          "setKeyAtCurrentFrame",
+          "setKeyAtFrame",
+          "removeKeyAtCurrentFrame",
+          "applyCurveToSelection",
+          "nudgeSelectedKeys",
+          "deleteSelectedKeys",
+          "pasteKeys",
+          "setLayerValue",
+          "setExpressionCode",
+          "applyExprCode",
+          "setExprEnabled",
+          "setExprGlobals",
+          "addTextAnimator",
+          "removeTextAnimator",
+          "writeColorToHolder",
+          "writeElementColorFromPicker",
+          "setLayerParent",
+          "setLayerParentB",
+          "setLayerFollowPath",
+          "upsertBlendKeyAt",
+          "removeBlendKeyAt",
+          "upsertParentKeyAt",
+          "removeParentKeyAt",
+          "shiftLayerMotionKeys",
+          "enableTimeRemap",
+          "disableTimeRemap",
+          "setPathVertexOffset",
+          "setMeshVertexOffset",
+          "distributeKeys",
+          "flipKeys",
+          "shiftKeySelection",
+          "onEaseSegChanged",
+          "setKeyInterp",
+          "applyEasyEase"
+        ]
+      },
+      "kinds": [
+        "motion-canvas",
+        "motion-element-holder-create",
+        "motion-expression-bake",
+        "motion-expression-create",
+        "motion-expression-editor-height",
+        "motion-key-current",
+        "motion-remove-key",
+        "motion-set-value",
+        "motion-toggle-animated",
+        "motion-upsert-parent-key"
+      ]
+    },
+    {
+      "family": "rig",
+      "authority": "unavailable",
+      "entries": {},
+      "kinds": [
+        "rig-commit-frame",
+        "rig-reset-pose",
+        "rig-set-ik"
+      ]
+    },
+    {
+      "family": "document-persistence",
+      "authority": "unavailable",
+      "entries": {},
+      "kinds": [
+        "document-import",
+        "frame-history-checkpoint",
+        "history-checkpoint",
+        "layers-history-checkpoint",
+        "remote-snapshot-merge",
+        "save-active-layer-frame",
+        "save-all-layer-frames"
+      ]
+    },
+    {
+      "family": "layer-visibility",
+      "authority": "native",
+      "capability": "native-object",
+      "entries": {
+        "timeline": [
+          "toggleLayerVis"
+        ]
+      },
+      "kinds": []
+    },
+    {
+      "family": "opacity",
+      "authority": "native",
+      "capability": "native-opacity",
+      "entries": {},
+      "kinds": [
+        "opacity-application-write"
+      ],
+      "kindPrefixes": [
+        "opacity-"
+      ],
+      "note": "bootstrap/opacity-application.js also guards 'opacity-' + kind (set, key-current, key-frame, remove); a prefix family cannot be legacy-owned until its kinds are listed exactly."
+    },
+    {
+      "family": "extensions",
+      "authority": "unavailable",
+      "entries": {
+        "script": [
+          "run",
+          "openFile",
+          "api"
+        ],
+        "plugin": [
+          "openFile",
+          "loadArchive",
+          "loadFiles"
+        ]
+      },
+      "kinds": []
+    }
+  ],
+  "guardFunctions": [
+    "n20*",
+    "allowLegacyOpacity"
+  ]
+}
