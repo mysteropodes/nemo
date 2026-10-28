@@ -66,8 +66,9 @@
       t.item.segments.forEach((a,index)=>{for(const key of ['point','handleIn','handleOut']){if(key!=='point'&&(!t.indices.includes(index)||!a[key].some(Boolean)))continue;
         const p=key==='point'?a.point:[a.point[0]+a[key][0],a.point[1]+a[key][1]],q=client(map(t.item.matrix,p),t),dist=Math.hypot(q[0]-e.clientX,q[1]-e.clientY);
         if(dist<distance){distance=dist;best={index:index,key:key};}}});return best;}
-    function path(item){const Path=root.Path||(root.paper&&root.paper.Path);if(!Path)throw new Error('Subselect geometry hit testing is unavailable.');
-      return new Path({insert:false,closed:item.closed,segments:item.segments.map(a=>[a.point,a.handleIn,a.handleOut])});}
+    function path(item,editable){const Path=root.Path||(root.paper&&root.paper.Path);if(!Path)throw new Error('Subselect geometry hit testing is unavailable.');
+      const geometry=!editable&&item.paint?item.paint:item;
+      return new Path({insert:false,closed:geometry.closed,segments:geometry.segments.map(a=>[a.point,a.handleIn,a.handleOut])});}
     function rectangle(t){const Rectangle=root.Rectangle||(root.paper&&root.paper.Rectangle),Point=root.Point||(root.paper&&root.paper.Point);return new Rectangle(new Point(t.start),new Point(t.end));}
     function drawMarquee(t){clear();if(!current(t))return;watch();
       if(t.target)draw(t.target,t.target.item.segments);
@@ -89,10 +90,10 @@
       if(!indices.length){cancel(true);return {status:'cleared'};}
       selection={session:t.session,pin:t.pin,presentation:t.presentation,selector:t.selector,bounds:t.bounds,item,indices};draw(selection,item.segments);return {status:'selected'};
     }
-    function hitItem(e,t,item){const p=inverse(item.matrix,point(e,t)),curve=path(item);try{
+    function hitItem(e,t,item,editable){const p=inverse(item.matrix,point(e,t)),curve=path(item,editable);try{
       const P=root.Point||(root.paper&&root.paper.Point),local=new P(p[0],p[1]),near=curve.getNearestLocation(local);
       if(near){const q=client(map(item.matrix,[near.point.x,near.point.y]),t);if(Math.hypot(q[0]-e.clientX,q[1]-e.clientY)<10)return {curve:near.index,time:near.curve.getTimeAt(near.curveOffset)};}
-      return item.closed&&curve.contains(local)?{}:null;
+      return curve.closed&&curve.contains(local)?{}:null;
     }finally{curve.remove();}}
     async function load(t,token){const data=await t.session.readSubselect(t.selector,t.pin);if(token!==readToken||!current(t)||data.presentation!==t.presentation||!same(data.info,t.pin))return null;return data.items;}
     function preview(t,intent){previewNext={t,intent,token:++previewToken};if(previewBusy)return;previewBusy=true;
@@ -122,7 +123,7 @@
       if(marquee){const prior=marquee;marquee=null;prior.cancelled=true;++readToken;release(prior);clear();}
       if(selection&&!current(selection))cancel(true);
       const t=capture();if(selection&&current(selection)&&selection.presentation===t.presentation){const hit=hitAnchor(e,selection);if(hit){start(e,selection,hit);return;}
-        if(e.altKey){const hit=hitItem(e,selection,selection.item);if(hit&&hit.time!==undefined){commit(selection,{kind:'insert',curve:hit.curve,time:hit.time});return;}}}
+        if(e.altKey){const hit=hitItem(e,selection,selection.item,true);if(hit&&hit.time!==undefined){commit(selection,{kind:'insert',curve:hit.curve,time:hit.time});return;}}}
       const token=++readToken;const origin={...e,clientX:e.clientX,clientY:e.clientY,pointerId:e.pointerId,altKey:e.altKey,shiftKey:e.shiftKey};
       const box={...t,start:point(e,t),end:point(e,t),pointer:e.pointerId,target:selection&&current(selection)?selection:null,items:null,moved:false,ended:false};marquee=box;
       box.capture=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(box.capture.setPointerCapture)box.capture.setPointerCapture(box.pointer);watch();refreshUI();

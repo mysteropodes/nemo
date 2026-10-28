@@ -13,13 +13,6 @@ pub struct ResampledOut {
     pub stroke_color: Option<String>,
     pub fill_color: Option<String>,
 }
-#[derive(Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct SegOut {
-    pub point: [f64; 2],
-    pub handle_in: [f64; 2],
-    pub handle_out: [f64; 2],
-}
 
 pub(super) fn resample_stroke_inner(s: &StrokeIn, n: usize) -> ResampledOut {
     let vb = is_vb(s);

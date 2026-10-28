@@ -99,12 +99,20 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
             r["nextCursor"].as_u64() == Some(end)
         })
         && items.iter().all(|i| {
-            exact(i, &["stableTarget", "closed", "count", "matrix"], &[]).is_some()
+            exact(
+                i,
+                &["stableTarget", "closed", "count", "matrix"],
+                &["paintCount"],
+            )
+            .is_some()
                 && super::target(&i["stableTarget"])
                 && i["stableTarget"]["contextId"] == r["contextId"]
                 && i["stableTarget"]["layerUid"] == r["layerUid"]
                 && i["closed"].is_boolean()
                 && i["count"].as_u64().is_some_and(|n| n <= 256)
+                && i.get("paintCount").is_none_or(|n| {
+                    i["closed"] == false && n.as_u64().is_some_and(|n| (2..=256).contains(&n))
+                })
                 && i["matrix"].as_array().is_some_and(|m| {
                     m.len() == 6 && m.iter().all(|v| v.as_f64().is_some_and(f64::is_finite)) && {
                         let det = m[0].as_f64().unwrap() * m[3].as_f64().unwrap()
@@ -205,12 +213,15 @@ pub(super) fn request(v: &Value) -> bool {
             .as_str()
             .is_some_and(|s| !s.is_empty())
         && super::target(&v["stableTarget"])
-        && exact(&v["subselect"], &["cursor", "limit"], &["preview"]).is_some()
+        && exact(&v["subselect"], &["cursor", "limit"], &["preview", "paint"]).is_some()
         && v["subselect"]["cursor"].as_u64().is_some_and(|n| n <= 256)
         && v["subselect"]["limit"]
             .as_u64()
             .is_some_and(|n| (1..=16).contains(&n))
         && v["subselect"].get("preview").is_none_or(intent)
+        && v["subselect"]
+            .get("paint")
+            .is_none_or(|p| p.as_bool() == Some(true))
 }
 pub(super) fn result(document_id: &str, p: &Value, r: &Value) -> bool {
     if !request(p)
@@ -234,11 +245,14 @@ pub(super) fn result(document_id: &str, p: &Value, r: &Value) -> bool {
             "segments",
             "preview",
         ],
-        &[],
+        &["paint"],
     )
     .is_none()
         || s["stableTarget"] != p["stableTarget"]
         || !s["closed"].is_boolean()
+        || s.get("paint").is_some() != p["subselect"].get("paint").is_some()
+        || s.get("paint")
+            .is_some_and(|paint| paint.as_bool() != Some(true) || s["closed"] != true)
         || s["cursor"] != p["subselect"]["cursor"]
         || s["preview"].as_bool() != Some(p["subselect"].get("preview").is_some())
     {

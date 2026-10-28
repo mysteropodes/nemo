@@ -119,3 +119,75 @@ fn subselect_view_is_correlated_to_native_presentation_and_preview() {
     r["items"][0]["matrix"] = json!([1, 2, 2, 4, 0, 0]);
     assert!(!public_read(&q, &r));
 }
+
+#[test]
+fn subselect_paint_pages_require_exact_opt_in_marker_and_closed_geometry() {
+    let mut q = query();
+    q["subselect"]["paint"] = json!(true);
+    let mut r = page();
+    r["subselect"]["paint"] = json!(true);
+    r["subselect"]["closed"] = json!(true);
+    assert!(request(&q));
+    assert!(crate::native_contract::validate_request(
+        "query.document.object",
+        &q
+    ));
+    assert!(public_read(&q, &r));
+    q["subselect"]["preview"] = json!({"kind":"move","indices":[0],"delta":[1,2]});
+    r["subselect"]["preview"] = json!(true);
+    assert!(public_read(&q, &r));
+    for value in [json!(false), Value::Null, json!("true"), json!(1)] {
+        let mut bad = q.clone();
+        bad["subselect"]["paint"] = value;
+        assert!(!request(&bad));
+    }
+    let mut missing = r.clone();
+    missing["subselect"]
+        .as_object_mut()
+        .unwrap()
+        .remove("paint");
+    assert!(!public_read(&q, &missing));
+    let mut no_opt_in = q.clone();
+    no_opt_in["subselect"]
+        .as_object_mut()
+        .unwrap()
+        .remove("paint");
+    assert!(!public_read(&no_opt_in, &r));
+    for (key, value) in [
+        ("paint", json!(false)),
+        ("paint", Value::Null),
+        ("closed", json!(false)),
+    ] {
+        let mut bad = r.clone();
+        bad["subselect"][key] = value;
+        assert!(!public_read(&q, &bad));
+    }
+}
+
+#[test]
+fn subselect_pressure_view_paint_count_is_optional_bounded_and_centerline_only() {
+    let q = json!({"atRevision":7,"documentSnapshotId":"native-object:document:7","view":{"kind":"subselect","contextId":"scene-root","layerUid":"layer-a","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"limit":8}});
+    let mut r = json!({"kind":"subselect","atRevision":7,"documentSnapshotId":"native-object:document:7","contextId":"scene-root","layerUid":"layer-a","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"total":1,"nextCursor":null,"preview":false,"items":[{"stableTarget":target(),"closed":false,"count":2,"paintCount":20,"matrix":[1,0,0,1,0,0]}]});
+    assert!(public_read(&q, &r));
+    for value in [
+        json!(0),
+        json!(1),
+        json!(257),
+        json!(-1),
+        json!(2.5),
+        Value::Null,
+        json!(false),
+        json!("20"),
+    ] {
+        let mut bad = r.clone();
+        bad["items"][0]["paintCount"] = value;
+        assert!(!public_read(&q, &bad));
+    }
+    r["items"][0]["closed"] = json!(true);
+    assert!(!public_read(&q, &r));
+    r["items"][0].as_object_mut().unwrap().remove("paintCount");
+    assert!(
+        public_read(&q, &r),
+        "ordinary closed paths keep their old response shape"
+    );
+}

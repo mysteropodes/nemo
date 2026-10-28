@@ -189,10 +189,10 @@ pub use object_record::{
 
 #[path = "object_motion_arcs.rs"]
 mod object_motion_arcs;
-#[path = "object_tween_record.rs"]
-pub(crate) mod tween;
 #[path = "object_subselect_geometry.rs"]
 pub(crate) mod subselect;
+#[path = "object_tween_record.rs"]
+pub(crate) mod tween;
 #[allow(unused_imports)]
 pub(crate) use object_motion_arcs::{KeyLockMode, MotionArcError, MotionArcHandles, MotionArcs};
 
@@ -516,3 +516,7 @@ pub(crate) mod brush_dab;
 #[path = "property_follow_path_sample.rs"]
 #[allow(dead_code)]
 pub(crate) mod property_follow_path_sample;
+
+#[path = "pressure_geometry.rs"]
+#[allow(dead_code)]
+pub(crate) mod pressure_geometry;

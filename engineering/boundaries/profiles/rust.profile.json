@@ -19,6 +19,13 @@
       "files": [
         "document.rs",
         "object_document.rs",
+        "pressure_geometry.rs",
+        "pressure_path_sampling.rs",
+        "tween_pressure_outline.rs",
+        "tween_outline_cleanup.rs",
+        "tween_curve_crossings.rs",
+        "tween_curve_clip.rs",
+        "tween_path_geometry.rs",
         "brush_dab_kernels.rs",
         "brush_dab_path.rs",
         "brush_dab_presets.rs",
@@ -157,7 +164,13 @@
         "object_tween_record.rs",
         "object_tween_timing.rs",
         "object_subselect_geometry.rs",
-        "object_subselect_record.rs"
+        "object_subselect_record.rs",
+        "pressure_curve_topology.rs",
+        "pressure_arc.rs",
+        "pressure_graph.rs",
+        "pressure_boolean.rs",
+        "pressure_contours.rs",
+        "object_subselect_pressure.rs"
       ],
       "publicApi": [
         "document.rs",
@@ -365,8 +378,6 @@
         "tween_backdrop.rs",
         "tween_bitmap_plan.rs",
         "tween_cost.rs",
-        "tween_curve_clip.rs",
-        "tween_curve_crossings.rs",
         "tween_dabs.rs",
         "tween_document_geometry.rs",
         "tween_document_plan.rs",
@@ -383,14 +394,11 @@
         "tween_kernels.rs",
         "tween_landmarks.rs",
         "tween_matching.rs",
-        "tween_outline_cleanup.rs",
         "tween_pair.rs",
         "tween_pair_plan.rs",
         "tween_pair_sampling.rs",
         "tween_partition.rs",
-        "tween_path_geometry.rs",
         "tween_piece.rs",
-        "tween_pressure_outline.rs",
         "tween_pressure_record.rs",
         "tween_relational.rs",
         "tween_resample.rs",
@@ -1908,7 +1916,9 @@
         "object_subselect_held.rs",
         "object_subselect_read.rs",
         "object_subselect_projection.rs",
-        "object_subselect_pixels.rs"
+        "object_subselect_pixels.rs",
+        "pressure_geometry.rs",
+        "object_subselect_pressure.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
