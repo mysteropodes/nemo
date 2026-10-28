@@ -21,7 +21,12 @@ function root(options = {}) {
   let pin = { ...PIN };
   const session = {
     isActive: () => true, blocksLegacy: () => options.legacy !== true, info: () => pin, readPresentedObjectSession: () => ({ presentation: { ...pin, frame: 0 } }),
-    async readSubselect(selector, at) { reads.push(selector); if (options.changeDuringRead) pin = { ...pin, contentRevision: 5 }; return { items: ITEMS }; },
+    async readSubselect(selector, at) {
+      reads.push(selector);
+      if (options.stale && reads.length <= options.stale) throw Object.assign(new Error('Native image-mesh view changed'), { code: 'stale_revision' });
+      if (options.changeDuringRead) pin = { ...pin, contentRevision: 5 };
+      return { items: ITEMS };
+    },
   };
   return { reads, selectedPaths: [], state: { activeLayerIdx: 0, selectedStrokeIndices: [1] }, Path: paper.Path, Matrix: paper.Matrix, Point: paper.Point,
     NemoNativeObjectProject: { desktop: () => session },
@@ -61,4 +66,20 @@ test('applyPick selects, Shift toggles by native stroke id, and an empty click c
   Intent.applyPick(r, null, false);
   assert.equal(r.selectedPaths.length, 0);
   assert.equal(r.updated, 5);
+});
+
+test('a read refused as stale by a repaint is retried on the fresh presentation, a bounded number of times', async () => {
+  const twice = root({ stale: 2 });
+  assert.equal((await Intent.pick(twice, 150, 50)).data.strokeId, 'line');
+  assert.equal(twice.reads.length, 3);
+  const always = root({ stale: 99 });
+  await assert.rejects(Intent.pick(always, 150, 50), (e) => e.code === 'stale_revision');
+  assert.equal(always.reads.length, 4);
+});
+
+test('a pick stands across a repaint but not across a frame, tool or revision change', () => {
+  const r = root(), before = Intent.pickContext(r);
+  assert.equal(Intent.pickContext(r), before);
+  r.state.currentFrame = 2;
+  assert.notEqual(Intent.pickContext(r), before);
 });

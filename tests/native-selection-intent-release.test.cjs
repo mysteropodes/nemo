@@ -125,7 +125,7 @@ test('native click, reselect, deselect and Shift selection preserve identity and
 test('a native object project picks at pointer-up from the presented geometry and drops a stale pick (#2362)', async () => {
   const f = fixture({ mode: 'anim2d' }), picks = [], applied = [];
   let resolve;
-  f.scope.NemoSelectCanvasIntent = { ...SelectCanvasIntent, objectProject: () => ({}),
+  f.scope.NemoSelectCanvasIntent = { ...SelectCanvasIntent, objectProject: () => ({}), pickContext: () => JSON.stringify([f.state.tool, f.state.currentFrame]),
     pick: (_root, x, y) => { picks.push([x, y]); return new Promise((r) => { resolve = r; }); },
     applyPick: (_root, item, shift) => applied.push([item, shift]) };
   f.send('pointerdown', 100, 60); f.send('pointerup', 100, 60);

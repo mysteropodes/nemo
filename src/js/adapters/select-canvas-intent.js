@@ -161,10 +161,18 @@
     var pin = session && session.isActive() && session.info(), shown = pin && session.readPresentedObjectSession();
     return shown && shown.presentation && samePin(pin, shown.presentation) ? { session: session, pin: pin, presentation: shown.presentation } : null;
   }
-  async function presented(root, layerIndex) {
-    var s = presentedSession(root), layer = s && s.pin.layers[layerIndex];
+  // A gesture's own repaint (the knife resumes rendering as it commits) can re-present the canvas while the read is in
+  // flight, which the reader refuses as stale; the read is retried on the fresh presentation of the same revision.
+  async function presented(root, layerIndex, attempt) {
+    var s = presentedSession(root), layer = s && s.pin.layers[layerIndex], data;
     if (!layer) return null;
-    var data = await s.session.readSubselect({ contextId: 'scene-root', layerUid: layer.layerUid, frame: s.presentation.frame }, s.pin);
+    try { data = await s.session.readSubselect({ contextId: 'scene-root', layerUid: layer.layerUid, frame: s.presentation.frame }, s.pin); }
+    catch (error) {
+      if (!error || error.code !== 'stale_revision' || (attempt || 0) >= 3) throw error;
+      await new Promise(function (done) { (root.setTimeout || setTimeout)(done, 30); });
+      var next = presentedSession(root);
+      return next && samePin(next.pin, s.pin) && next.presentation.frame === s.presentation.frame ? presented(root, layerIndex, (attempt || 0) + 1) : null;
+    }
     var now = presentedSession(root);
     if (!now || !samePin(now.pin, s.pin) || now.presentation.frame !== s.presentation.frame) return null;
     var Path = root.Path || root.paper.Path, Matrix = root.Matrix || root.paper.Matrix;
@@ -202,6 +210,13 @@
     return null;
   }
 
+  // What a pick depends on: a repaint may re-project the layer rows (the pointer context counts those) but a pick still
+  // stands while the tool, mode, frame, layer and document revision are unchanged.
+  function pickContext(root) {
+    var st = root.state, s = objectProject(root), pin = s && s.info();
+    return JSON.stringify([st.tool, st.appMode, st.currentFrame, st.activeLayerIdx, st.activeSymbolId || null,
+      pin ? PINS.map(function (k) { return pin[k]; }) : null]);
+  }
   // Select's own rule on a picked stroke: a click selects it, Shift toggles it, an empty click clears unless Shift is held.
   // Picks are fresh objects, so identity is the native stroke id.
   function applyPick(root, item, shift) {
@@ -215,5 +230,5 @@
   }
 
   return Object.freeze({ create: create, hitHandles: hitHandles, objectProject: objectProject, presented: presented,
-    worldPoint: worldPoint, recordGeometry: recordGeometry, pick: pick, applyPick: applyPick });
+    worldPoint: worldPoint, recordGeometry: recordGeometry, pick: pick, pickContext: pickContext, applyPick: applyPick });
 }));
