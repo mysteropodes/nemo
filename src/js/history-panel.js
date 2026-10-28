@@ -22,9 +22,7 @@ function _histAllowLegacy(){
   try {
     var cutover=window.NemoNativeOpacityCutover;
     if(cutover!==undefined&&(!cutover||typeof cutover.blocksLegacy!=='function'||cutover.blocksLegacy()!==false))return false;
-    var bridge=window.SMEngineBridge;
-    if(!bridge||!Object.prototype.hasOwnProperty.call(bridge,'nativeEditGuard'))return true;
-    return !!bridge.nativeEditGuard&&typeof bridge.nativeEditGuard.allow==='function'&&bridge.nativeEditGuard.allow('history-panel')===true;
+    return typeof window.n20AllowLegacyWrite==='function'&&window.n20AllowLegacyWrite('history-panel')===true;
   }catch(_){return false;}
 }
 function _histRequireLegacy(){

@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const Surface = require('../src/js/adapters/native-opacity-legacy-surface.js');
 const source = name => fs.readFileSync(path.join(__dirname, '../src/js', name), 'utf8');
 const copy = value => JSON.parse(JSON.stringify(value));
 const preset = { label: 'Move', categoryId: 'default', motion: { pos: [{ frame: 0, v: [2, 7] }] }, motionStatic: { opacity: [75] } };
@@ -42,7 +43,8 @@ function boot(file, guard) {
     saveAllLayerFrames() { calls.push('save'); }, pushUndoLayers() { calls.push('checkpoint'); },
     loadFrame() { calls.push('load'); }, updateUI() { calls.push('ui'); },
     undo() { calls.push('undo'); }, redo() { calls.push('redo'); },
-    SMEngineBridge: guard === undefined ? {} : { nativeEditGuard: guard },
+    NemoNativeOpacityLegacyAdmission: guard === undefined ? { allow: () => true } : guard,
+    n20AllowLegacyWrite: kind => Surface.allowLegacyWrite(context, kind),
   };
   context.window = context;
   vm.runInNewContext(source(file), context, { filename: file });
@@ -74,10 +76,12 @@ test('native preset callbacks refuse before reading legacy state or modifying th
 
 test('preset admission fails closed for malformed guards, throwing accessors and native cutover', () => {
   const setups = [
-    root => { root.SMEngineBridge.nativeEditGuard = null; },
-    root => { root.SMEngineBridge.nativeEditGuard = {}; },
-    root => { root.SMEngineBridge.nativeEditGuard = { allow() { throw new Error('lost'); } }; },
-    root => { Object.defineProperty(root.SMEngineBridge, 'nativeEditGuard', { get() { throw new Error('lost'); } }); },
+    root => { root.NemoNativeOpacityLegacyAdmission = null; },
+    root => { root.NemoNativeOpacityLegacyAdmission = {}; },
+    root => { root.NemoNativeOpacityLegacyAdmission = { allow() { throw new Error('lost'); } }; },
+    root => { Object.defineProperty(root, 'n20AllowLegacyWrite', { get() { throw new Error('lost'); } }); },
+    root => { delete root.n20AllowLegacyWrite; },
+    root => { root.n20AllowLegacyWrite = null; },
     root => { root.NemoNativeOpacityCutover = { blocksLegacy: () => true }; },
     root => { root.NemoNativeOpacityCutover = null; },
   ];
@@ -137,6 +141,17 @@ test('native History renders explicit unavailability without reading legacy stac
     assert.equal(pop.children.length, 1);
     assert.equal(pop.children[0].role, 'status');
     assert.match(pop.children[0].textContent, /unavailable/i);
+    assert.deepEqual(app.calls, []);
+  }
+});
+
+test('History refuses missing admission or an active native cutover before legacy state', () => {
+  for (const setup of [root => { delete root.n20AllowLegacyWrite; },
+    root => { root.n20AllowLegacyWrite = {}; },
+    root => { root.NemoNativeOpacityCutover = { blocksLegacy: () => true }; }]) {
+    const app = boot('history-panel.js'); setup(app.context); forbidLegacyState(app.context);
+    click(app.nodes.get('history-btn'));
+    assert.match(app.nodes.get('history-pop').children[0].textContent, /unavailable/i);
     assert.deepEqual(app.calls, []);
   }
 });
