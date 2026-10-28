@@ -120,6 +120,7 @@ fn ring_outline(pts: &[[f64; 2]], widths: &[f64], avg: f64) -> R<Vec<SegOut>> {
     let index = result
         .iter()
         .enumerate()
+        .rev() // >= in the baseline keeps the first child on an equal-area tie.
         .max_by(|(_, a), (_, b)| outline_area(a).abs().total_cmp(&outline_area(b).abs()))
         .unwrap()
         .0;

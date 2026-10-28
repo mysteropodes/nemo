@@ -123,6 +123,8 @@ pub(crate) fn cleanup_outline(original: Vec<SegOut>) -> R<Vec<SegOut>> {
     }
     let mut chosen = loops
         .into_iter()
+        // The baseline's >= reduction keeps the first contour on equal areas.
+        .rev()
         .max_by(|a, b| outline_area(a).abs().total_cmp(&outline_area(b).abs()))
         .ok_or(Error::Unavailable)?;
     if outline_area(&chosen) < 0. {
