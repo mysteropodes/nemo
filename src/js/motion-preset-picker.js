@@ -22,6 +22,21 @@
   var _categories = [{ id: 'default', name: 'Général' }];
   var _activeCatIdx = 0;
 
+  // The catalog stays local. Document capture/apply must never use the legacy
+  // projection while native authority owns the project, including after a prompt.
+  function allowLegacyDocument() {
+    try {
+      var cutover = window.NemoNativeOpacityCutover;
+      if (cutover !== undefined && (!cutover || typeof cutover.blocksLegacy !== 'function' || cutover.blocksLegacy() !== false)) return false;
+      return typeof window.n20AllowLegacyWrite === 'function' && window.n20AllowLegacyWrite('motion-preset') === true;
+    } catch (_) { return false; }
+  }
+  function documentAvailable() {
+    if (allowLegacyDocument()) return true;
+    if (window.showToast) showToast('Native Motion preset capture and apply are unavailable.');
+    return false;
+  }
+
   function load() {
     try { _presets = JSON.parse(localStorage.getItem(LS_PRESETS) || '{}') || {}; } catch (e) { _presets = {}; }
     try {
@@ -121,11 +136,13 @@
   window.renderMotionPresetPanel = render;
 
   function savePreset() {
+    if (!documentAvailable()) return;
     var ld = state.layers[state.activeLayerIdx];
     if (!ld) { if (window.showToast) showToast(SM.t('hsSelectLayerFirst')); return; }
     if (!ld.motion && !ld.motionStatic) { if (window.showToast) showToast(SM.t('hsLayerNoTransform')); return; }
     var name = prompt('Nom du preset', ld.name || 'Preset');
     if (!name || !name.trim()) return;
+    if (!documentAvailable()) return;
     var id = newId();
     _presets[id] = {
       label: name.trim(),
@@ -139,6 +156,7 @@
   }
 
   function applyPreset(id) {
+    if (!documentAvailable()) return;
     var p = _presets[id];
     if (!p) return;
     var ld = state.layers[state.activeLayerIdx];

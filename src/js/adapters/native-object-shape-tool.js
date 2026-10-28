@@ -180,7 +180,7 @@
         // Behind, the k-th record of one create lies k-th from the bottom; one create per step lands each at the bottom.
         var here=dicts.map(function(d){return {create:d,placement:options.placement};});if(options.placement==='behind')here.reverse();
         var steps=here.concat([].concat.apply([],stamps.map(function(frame){
-          var cell=group.map(function(d){return {create:d,frame:frame,keyframe:'copy',placement:options.placement};});
+          var cell=group.map(function(d){var i=here.findIndex(function(s){return s.create===d;});return Object.assign(i<0?{create:d}:{copy:i},{frame:frame,keyframe:'copy',placement:options.placement});});// a stamp copies its drawn step: sent once (64 KiB)
           return options.placement==='behind'?cell.reverse():cell;})));
         return vector.batchStrokes(t.layerUid,t.frame,steps,Object.assign({origin:t.pin},options.trimEnds?{trimEnds:options.trimEnds}:{})).then(function(result){
           if(result&&result.status==='applied'&&typeof root.SMLabs.multiframeStamped==='function')root.SMLabs.multiframeStamped(stamps.length);return result;});

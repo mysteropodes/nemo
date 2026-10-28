@@ -1,6 +1,7 @@
 //! `object.vector.batch` (#2361, #2362): ordered create, replace and delete steps on ONE scene-root layer, applied by the
 //! native owner as one revision and one undo entry. Shapes are the single commands' own; the receipt lists one stroke id
-//! per step, in order: an owner-allocated id for a create, the step's named target for a replace or delete.
+//! per step, in order: an owner-allocated id for a create, the step's named target for a replace or delete. A `copy` step
+//! (multiframe stamps) is an earlier create's record again on another frame: a create in every respect but its size.
 use super::shapes::record_shape;
 use super::target;
 use crate::native_contract::exact;
@@ -26,16 +27,37 @@ fn step(op: &Value) -> Option<&Value> {
     }
 }
 
+/// Every step's addressed target; a copy addresses its source's layer and must name an earlier create or copy.
+fn targets(ops: &[Value]) -> Option<Vec<&Value>> {
+    let mut out: Vec<&Value> = Vec::with_capacity(ops.len());
+    for (at, op) in ops.iter().enumerate() {
+        if op["op"] != "copy" {
+            out.push(step(op)?);
+            continue;
+        }
+        let from = op["fromStep"].as_u64().and_then(|n| usize::try_from(n).ok()).filter(|&n| n < at)?;
+        let creates = |o: &Value| o["op"] == "create" || o["op"] == "copy";
+        (exact(op, &["op", "fromStep", "frame"], &["placement", "keyframe"]).is_some()
+            && creates(&ops[from])
+            && op["frame"].as_u64().is_some_and(|f| u32::try_from(f).is_ok())
+            && op.get("placement").is_none_or(|p| p == "front" || p == "behind")
+            && op.get("keyframe").is_none_or(|k| k == "copy"))
+        .then_some(())?;
+        out.push(out[from]);
+    }
+    Some(out)
+}
+
 pub(super) fn request(payload: &Value) -> bool {
     exact(payload, &["command", "ops"], &["keyframe", "trimEnds"]).is_some()
         && payload.get("keyframe").is_none_or(|k| k == "copy")
         // A batch trims only when every step creates: the drawn stroke, its copies and its multi-frame stamps.
         && payload.get("trimEnds").is_none_or(|t| {
             t.as_f64().is_some_and(|v| v.is_finite() && v > 0.)
-                && payload["ops"].as_array().is_some_and(|ops| ops.iter().all(|op| op["op"] == "create"))
+                && payload["ops"].as_array().is_some_and(|ops| ops.iter().all(|op| op["op"] == "create" || op["op"] == "copy"))
         })
         && payload["ops"].as_array().is_some_and(|ops| {
-            let targets: Option<Vec<&Value>> = ops.iter().map(step).collect();
+            let targets = targets(ops);
             (1..=MAX_OPS).contains(&ops.len())
                 && targets.is_some_and(|targets| {
                     targets.iter().all(|t| t["contextId"] == "scene-root" && t["layerUid"] == targets[0]["layerUid"])
@@ -54,7 +76,7 @@ pub(super) fn result(payload: &Value, value: &Value) -> bool {
         && ids.len() == ops.len()
         && ids.first() == Some(&value["strokeId"])
         && ops.iter().zip(ids).all(|(op, id)| match op["op"].as_str() {
-            Some("create") => id.as_str().is_some_and(|s| s.starts_with("native-stroke:")),
+            Some("create" | "copy") => id.as_str().is_some_and(|s| s.starts_with("native-stroke:")),
             Some("replace") => *id == op["record"]["target"]["strokeId"],
             Some("delete") => *id == op["stableTarget"]["strokeId"],
             _ => false,
