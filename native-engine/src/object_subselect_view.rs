@@ -16,6 +16,12 @@ pub(crate) struct SubselectReadItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) paint_count: Option<usize>,
     pub(crate) matrix: [f64; 6],
+    /// Hit-test listing only (#2362): control-point bounds of the painted geometry, in record space.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) bounds: Option<[f64; 4]>,
+    /// Hit-test listing only: plain | ribbon | fill (a ribbon's linked fill) | shape | brush.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) role: Option<&'static str>,
 }
 #[derive(Debug, Clone)]
 pub struct SubselectReadProjection {
@@ -29,6 +35,7 @@ pub struct SubselectReadProjection {
     generation: u64,
     items: Vec<SubselectReadItem>,
     preview: Option<Preview>,
+    hit_test: bool,
 }
 impl SubselectReadProjection {
     pub(crate) fn new(
@@ -49,7 +56,13 @@ impl SubselectReadProjection {
             generation: 0,
             items,
             preview,
+            hit_test: false,
         }
+    }
+    /// A hit-test listing (every painted record, with bounds and role) instead of the editable selection.
+    pub(crate) fn with_hit_test(mut self, hit_test: bool) -> Self {
+        self.hit_test = hit_test;
+        self
     }
     pub fn with_presentation(
         mut self,
@@ -86,6 +99,7 @@ struct View {
     cursor: usize,
     limit: usize,
     preview: Presence<Preview>,
+    hit_test: Presence<bool>,
 }
 object_deserialize!(View {
     kind: String,
@@ -96,7 +110,8 @@ object_deserialize!(View {
     view_generation: u64,
     cursor: usize,
     limit: usize,
-    #[serde(default)] preview: Presence<Preview>
+    #[serde(default)] preview: Presence<Preview>,
+    #[serde(default)] hit_test: Presence<bool>
 });
 impl ObjectSnapshot {
     pub fn dispatch_with_subselect_view(
@@ -118,7 +133,9 @@ impl ObjectSnapshot {
             return refused(DispatchErrorCode::InvalidRequest, "Invalid subselect view");
         };
         let v = p.view;
+        let hit_test = v.hit_test.value() == Some(&true);
         if v.kind != "subselect"
+            || (!v.hit_test.missing() && (!hit_test || !v.preview.missing()))
             || v.context_id != "scene-root"
             || v.limit == 0
             || v.limit > 8
@@ -150,6 +167,7 @@ impl ObjectSnapshot {
             || projection.generation != v.view_generation
             || projection.work.is_empty()
             || projection.preview.as_ref() != v.preview.value()
+            || projection.hit_test != hit_test
         {
             return refused(
                 DispatchErrorCode::StaleRevision,
@@ -175,6 +193,12 @@ impl ObjectSnapshot {
                 json!({"kind":"subselect","atRevision":p.at_revision,"documentSnapshotId":p.document_snapshot_id,"contextId":v.context_id,"layerUid":v.layer_uid,"frame":v.frame,"workId":v.work_id,"viewGeneration":v.view_generation,"cursor":v.cursor,"total":projection.items.len(),"nextCursor":(end<projection.items.len()).then_some(end),"preview":projection.preview.is_some(),"items":projection.items[v.cursor..end]}),
             ),
         };
+        let mut response = response;
+        if hit_test {
+            if let Some(result) = response.result.as_mut() {
+                result["hitTest"] = json!(true);
+            }
+        }
         if serde_json::to_vec(&response)
             .map_err(|_| DispatchErrorCode::Internal)?
             .len()

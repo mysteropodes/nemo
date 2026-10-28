@@ -27,6 +27,7 @@ impl NativeObjectHost {
                 .subselect_read_projection(
                     view["layerUid"].as_str().ok_or("Subselect layer missing")?,
                     view.get("preview"),
+                    view["hitTest"] == serde_json::Value::Bool(true),
                 )?
                 .with_presentation(work, receipt.identity().view_generation().value())
                 .map_err(|_| "Invalid subselect presentation identity")

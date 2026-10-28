@@ -9,6 +9,7 @@ impl ObjectCompositionWitness {
         &self,
         layer_uid: &str,
         preview: Option<&serde_json::Value>,
+        hit_test: bool,
     ) -> Result<SubselectReadProjection, &'static str> {
         if !self.is_viewport() {
             return Err("Subselect requires a native viewport presentation");
@@ -48,17 +49,24 @@ impl ObjectCompositionWitness {
                 .as_ref()
                 .filter(|r| r.target == source.record().target)
                 .unwrap_or_else(|| source.record());
-            let anchors =
-                record::anchors(r).map_err(|_| "Subselect target geometry is unavailable")?;
+            // #2362 hit-test listing: every painted record, counted on its painted geometry, never refused for
+            // being outside the editable scope (Select and the Labs knife only read it).
+            let count = if hit_test {
+                r.geometry.segments.len()
+            } else {
+                record::anchors(r).map_err(|_| "Subselect target geometry is unavailable")?.len()
+            };
             let matrix = *matrices
                 .get(&source.source_object_index())
                 .ok_or("Subselect transform is absent")?;
             items.push(SubselectReadItem {
                 stable_target: r.target.clone(),
-                closed: record::closed(r),
-                count: anchors.len(),
-                paint_count: record::has_pressure(r).then_some(r.geometry.segments.len()),
+                closed: if hit_test { r.geometry.closed } else { record::closed(r) },
+                count,
+                paint_count: (!hit_test && record::has_pressure(r)).then_some(r.geometry.segments.len()),
                 matrix,
+                bounds: hit_test.then(|| record::painted_bounds(r)),
+                role: hit_test.then(|| record::hit_role(r)),
             });
         }
         if items.len() > 1024 {
@@ -70,6 +78,7 @@ impl ObjectCompositionWitness {
             layer_uid,
             items,
             preview,
-        ))
+        )
+        .with_hit_test(hit_test))
     }
 }

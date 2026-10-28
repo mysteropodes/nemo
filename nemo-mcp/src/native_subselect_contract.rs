@@ -21,9 +21,11 @@ pub(super) fn view_request(p: &Value) -> bool {
                 "cursor",
                 "limit",
             ],
-            &["preview"],
+            &["preview", "hitTest"],
         )
         .is_some()
+        // #2362: a hit-test listing (every painted record with bounds and role) never carries a preview.
+        && v.get("hitTest").is_none_or(|h| h == true && v.get("preview").is_none())
         && v.get("preview").is_none_or(|p| {
             exact(p, &["stableTarget", "intent"], &[]).is_some()
                 && super::target(&p["stableTarget"])
@@ -61,10 +63,12 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
                 "items",
                 "preview",
             ],
-            &[],
+            &["hitTest"],
         )
         .is_none()
         || r["preview"].as_bool() != Some(p["view"].get("preview").is_some())
+        || r.get("hitTest").is_some() != p["view"].get("hitTest").is_some()
+        || r.get("hitTest").is_some_and(|h| h != true)
         || r["atRevision"] != p["atRevision"]
         || r["documentSnapshotId"] != p["documentSnapshotId"]
         || r["documentSnapshotId"].as_str()
@@ -99,12 +103,17 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
             r["nextCursor"].as_u64() == Some(end)
         })
         && items.iter().all(|i| {
+            let hit = r.get("hitTest").is_some();
             exact(
                 i,
                 &["stableTarget", "closed", "count", "matrix"],
-                &["paintCount"],
+                if hit { &["bounds", "role"] } else { &["paintCount"] },
             )
             .is_some()
+                && (!hit
+                    || (i["bounds"].as_array().is_some_and(|b| {
+                        b.len() == 4 && b.iter().all(|v| v.as_f64().is_some_and(f64::is_finite))
+                    }) && ["plain", "ribbon", "fill", "shape", "brush"].contains(&i["role"].as_str().unwrap_or(""))))
                 && super::target(&i["stableTarget"])
                 && i["stableTarget"]["contextId"] == r["contextId"]
                 && i["stableTarget"]["layerUid"] == r["layerUid"]
@@ -213,7 +222,11 @@ pub(super) fn request(v: &Value) -> bool {
             .as_str()
             .is_some_and(|s| !s.is_empty())
         && super::target(&v["stableTarget"])
-        && exact(&v["subselect"], &["cursor", "limit"], &["preview", "paint"]).is_some()
+        && exact(&v["subselect"], &["cursor", "limit"], &["preview", "paint", "hitTest"]).is_some()
+        // #2362: hit-test geometry is the painted outline of any record, never with a preview or the paint mode.
+        && v["subselect"].get("hitTest").is_none_or(|h| {
+            h == true && v["subselect"].get("preview").is_none() && v["subselect"].get("paint").is_none()
+        })
         && v["subselect"]["cursor"].as_u64().is_some_and(|n| n <= 256)
         && v["subselect"]["limit"]
             .as_u64()
@@ -245,9 +258,11 @@ pub(super) fn result(document_id: &str, p: &Value, r: &Value) -> bool {
             "segments",
             "preview",
         ],
-        &["paint"],
+        &["paint", "hitTest"],
     )
     .is_none()
+        || s.get("hitTest").is_some() != p["subselect"].get("hitTest").is_some()
+        || s.get("hitTest").is_some_and(|h| h != true)
         || s["stableTarget"] != p["stableTarget"]
         || !s["closed"].is_boolean()
         || s.get("paint").is_some() != p["subselect"].get("paint").is_some()

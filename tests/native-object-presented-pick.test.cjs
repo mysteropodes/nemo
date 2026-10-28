@@ -11,24 +11,25 @@ const PIN = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentR
 const seg = (x, y) => ({ point: [x, y], handleIn: [0, 0], handleOut: [0, 0] });
 const target = (id) => ({ contextId: 'scene-root', layerUid: 'L1', frameScope: { kind: 'authored', frame: 0 }, strokeId: id });
 const ITEMS = [
-  { stableTarget: target('line'), closed: false, count: 2, segments: [seg(100, 100), seg(500, 100)], matrix: [1, 0, 0, 1, 0, 0] },
-  // A ribbon is hit on its painted outline; this one is moved 300 down by its presented transform.
-  { stableTarget: target('ribbon'), closed: false, count: 2, segments: [seg(100, 0), seg(500, 0)], matrix: [1, 0, 0, 1, 0, 300],
-    paint: { closed: true, segments: [seg(100, -20), seg(500, -20), seg(500, 20), seg(100, 20)] } },
+  { stableTarget: target('line'), closed: false, count: 2, role: 'plain', bounds: [100, 100, 500, 100], segments: [seg(100, 100), seg(500, 100)], matrix: [1, 0, 0, 1, 0, 0] },
+  // A ribbon is listed with its painted outline (hit inside); this one is moved 300 down by its presented transform.
+  { stableTarget: target('ribbon'), closed: true, count: 4, role: 'ribbon', bounds: [100, -20, 500, 20], matrix: [1, 0, 0, 1, 0, 300],
+    segments: [seg(100, -20), seg(500, -20), seg(500, 20), seg(100, 20)] },
 ];
 function root(options = {}) {
-  const reads = [];
+  const reads = [], fetched = [];
   let pin = { ...PIN };
   const session = {
     isActive: () => true, blocksLegacy: () => options.legacy !== true, info: () => pin, readPresentedObjectSession: () => ({ presentation: { ...pin, frame: 0 } }),
-    async readSubselect(selector, at) {
+    async readPresentedStrokes(selector, at, wanted) {
       reads.push(selector);
       if (options.stale && reads.length <= options.stale) throw Object.assign(new Error('Native image-mesh view changed'), { code: 'stale_revision' });
       if (options.changeDuringRead) pin = { ...pin, contentRevision: 5 };
-      return { items: ITEMS };
+      // As the reader does: every record listed, geometry only for the ones `wanted` keeps.
+      return { items: ITEMS.map(({ segments, ...item }) => { const kept = wanted(item); fetched.push([item.stableTarget.strokeId, kept]); return kept ? { ...item, segments } : item; }) };
     },
   };
-  return { reads, selectedPaths: [], state: { activeLayerIdx: 0, selectedStrokeIndices: [1] }, Path: paper.Path, Matrix: paper.Matrix, Point: paper.Point,
+  return { reads, fetched, selectedPaths: [], state: { activeLayerIdx: 0, selectedStrokeIndices: [1] }, Path: paper.Path, Matrix: paper.Matrix, Point: paper.Point,
     NemoNativeObjectProject: { desktop: () => session },
     document: { getElementById: () => ({ getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 540 }) }) },
     // The underlay maps a client point at half scale.
@@ -39,9 +40,10 @@ function root(options = {}) {
 test('a click picks the top-most presented stroke of the active layer in world space', async () => {
   const r = root();
   assert.equal((await Intent.pick(r, 150, 50)).data.strokeId, 'line', 'world (300,100) lies on the line');
+  assert.deepEqual(r.fetched, [['line', true], ['ribbon', false]], 'only geometry whose world bounds reach the click is read');
   assert.deepEqual(r.reads[0], { contextId: 'scene-root', layerUid: 'L1', frame: 0 });
   const ribbon = await Intent.pick(r, 150, 155);
-  assert.deepEqual([ribbon.data.strokeId, ribbon.data.nativeRibbon, ribbon.data.nativeStableTarget], ['ribbon', true, target('ribbon')],
+  assert.deepEqual([ribbon.data.strokeId, ribbon.data.nativeRole, ribbon.data.nativeStableTarget], ['ribbon', 'ribbon', target('ribbon')],
     'world (300,310) is inside the transformed outline');
   assert.equal(await Intent.pick(r, 150, 100), null, 'empty canvas picks nothing');
   assert.ok(await Intent.pick(r, 150, 53), 'within 8 screen pixels (16 world) still hits');

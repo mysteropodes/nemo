@@ -42,11 +42,15 @@ object_deserialize!(BatchOp {
     #[serde(default)] geometry: Presence<ObjectGeometry>
 });
 
-/// The plain vector stroke at `target` with `geometry` in its own spaces; a pressure ribbon's outline is derived from its
-/// centreline, so it is never reshaped here.
+/// The plain vector stroke at `target` with `geometry` in its own spaces; a stroke whose outline is derived (a pressure
+/// ribbon from its centreline, a shape from its parameters, a texture from its anchor) is never reshaped here.
 fn with_geometry(source: &ObjectDocument, target: &ObjectTarget, geometry: ObjectGeometry) -> Result<ObjectRecord, DispatchErrorCode> {
     let existing = source.objects.iter().find(|r| &r.target == target).ok_or(DispatchErrorCode::NotFound)?;
-    let ribbon = existing.vector_ext.value().is_some_and(|ext| !ext.pressure.missing() || !ext.is_linked_fill_companion.missing());
+    // Ribbons, linked fills, fill/parametric shapes and textured or bitmap strokes derive their outline elsewhere.
+    let ribbon = existing.vector_ext.value().is_some_and(|ext| {
+        !ext.pressure.missing() || !ext.is_linked_fill_companion.missing() || ext.is_fill_shape.value() == Some(&true)
+            || !ext.param_shape.missing() || !ext.bitmap_brush.missing() || !ext.brush_texture.missing()
+    });
     let old = &existing.geometry;
     if !is_vector_record(existing) || ribbon || geometry.segments.len() < 2
         || (old.kind.as_str(), old.coordinate_space.as_str(), old.handle_space.as_str())

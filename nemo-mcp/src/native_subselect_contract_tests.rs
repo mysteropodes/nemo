@@ -191,3 +191,33 @@ fn subselect_pressure_view_paint_count_is_optional_bounded_and_centerline_only()
         "ordinary closed paths keep their old response shape"
     );
 }
+
+#[test]
+fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
+    let view = json!({"kind":"subselect","contextId":"scene-root","layerUid":"layer-a","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"limit":8,"hitTest":true});
+    let q = json!({"atRevision":7,"documentSnapshotId":"native-object:document:7","view":view});
+    let r = json!({"kind":"subselect","atRevision":7,"documentSnapshotId":"native-object:document:7","contextId":"scene-root","layerUid":"layer-a","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"total":1,"nextCursor":null,"preview":false,"hitTest":true,
+        "items":[{"stableTarget":target(),"closed":true,"count":4,"matrix":[1,0,0,1,0,0],"bounds":[0.0,0.0,10.0,10.0],"role":"fill"}]});
+    assert!(view_request(&q));
+    assert!(public_read(&q, &r), "a listed linked fill is legal in a hit-test listing");
+    for (key, value) in [("role", json!("ink")), ("bounds", json!([0, 0, 1])), ("paintCount", json!(4))] {
+        let mut bad = r.clone();
+        bad["items"][0][key] = value;
+        assert!(!public_read(&q, &bad), "{key}");
+    }
+    let mut plain = r.clone();
+    plain.as_object_mut().unwrap().remove("hitTest");
+    assert!(!public_read(&q, &plain), "the listing must say it is a hit-test listing");
+    let mut with_preview = q.clone();
+    with_preview["view"]["preview"] = json!({"stableTarget":target(),"intent":{"kind":"move","indices":[0],"delta":[1,2]}});
+    assert!(!view_request(&with_preview));
+    let mut geometry = query();
+    geometry["subselect"]["hitTest"] = json!(true);
+    assert!(request(&geometry));
+    let mut answer = page();
+    answer["subselect"]["hitTest"] = json!(true);
+    assert!(public_read(&geometry, &answer));
+    assert!(!public_read(&geometry, &page()), "hit-test geometry is marked");
+    geometry["subselect"]["paint"] = json!(true);
+    assert!(!request(&geometry), "never with the paint mode");
+}

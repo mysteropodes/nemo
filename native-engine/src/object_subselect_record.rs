@@ -236,3 +236,33 @@ pub(crate) fn has_pressure(record: &ObjectRecord) -> bool {
 pub(crate) fn closed(record: &ObjectRecord) -> bool {
     record.geometry.closed && !has_pressure(record)
 }
+/// #2362 hit-test listing: control-point bounds of the painted geometry in record space (handles are relative, and a
+/// cubic lies inside its control polygon); a non-finite point leaves the bounds as they were.
+pub(crate) fn painted_bounds(record: &ObjectRecord) -> [f64; 4] {
+    let mut b = [f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY];
+    for s in &record.geometry.segments {
+        let (Ok(p), Ok(i), Ok(o)) = (pair(&s.point), pair(&s.handle_in), pair(&s.handle_out)) else {
+            continue;
+        };
+        for [x, y] in [p, [p[0] + i[0], p[1] + i[1]], [p[0] + o[0], p[1] + o[1]]] {
+            b = [b[0].min(x), b[1].min(y), b[2].max(x), b[3].max(y)];
+        }
+    }
+    if b.iter().all(|v| v.is_finite()) { b } else { [0.0; 4] }
+}
+/// #2362 hit-test listing: what a painted record is, so a reader can tell a ribbon's linked fill or a derived shape
+/// from a plain stroke without the record itself.
+pub(crate) fn hit_role(record: &ObjectRecord) -> &'static str {
+    let ext = record.vector_ext.value();
+    if has_pressure(record) {
+        "ribbon"
+    } else if ext.is_some_and(|e| e.is_linked_fill_companion.value() == Some(&true)) {
+        "fill"
+    } else if ext.is_some_and(|e| e.is_fill_shape.value() == Some(&true) || !e.param_shape.missing()) {
+        "shape"
+    } else if ext.is_some_and(|e| !e.bitmap_brush.missing() || !e.brush_texture.missing()) {
+        "brush"
+    } else {
+        "plain"
+    }
+}
