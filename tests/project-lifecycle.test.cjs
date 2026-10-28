@@ -24,7 +24,10 @@ function app(options = {}) {
     objectProject: () => objectProject,
     info,
     tabs: () => tabs,
-    openPath: async (path) => { calls.push(['openPath', path]); active = true; },
+    openPath: (path) => { calls.push(['openPath', path]); if (options.openHangs) return new Promise(() => {});
+      if (!options.openFails) active = true; return Promise.resolve(); },
+    lastNotice: () => options.notice || '',
+    timeoutMs: options.timeoutMs,
     newProject: async (config, isCurrent, onFailure) => {
       calls.push(['newProject', config, isCurrent()]); active = true; doc++;
       if (options.newFails) { onFailure(new Error('admission refused')); return false; }
@@ -149,4 +152,13 @@ test('a request that did not read the open project refuses as stale before any f
     assert.deepEqual([response.ok, response.error.code], [false, 'stale_revision']);
   }
   assert.deepEqual(calls, []);
+});
+
+test('a refused or stuck Open answers with the app notice instead of waiting out the transport', async () => {
+  const refused = await app({ active: false, openFails: true, notice: 'Could not open native project: scope' }).lifecycle
+    .handle(request('project.open', { path: '/tmp/A.json' }));
+  assert.deepEqual([refused.ok, refused.error.code, refused.error.message],
+    [false, 'unavailable', 'The project could not be opened. App notice: Could not open native project: scope']);
+  const stuck = await app({ active: false, openHangs: true, timeoutMs: 20 }).lifecycle.handle(request('project.open', { path: '/tmp/A.json' }));
+  assert.deepEqual([stuck.ok, stuck.error.code, stuck.error.message], [false, 'indeterminate', 'The Open did not settle.']);
 });

@@ -50,3 +50,12 @@ test('before a document opens, a v1 request answers a typed refusal echoing only
       error: { code: 'unavailable', message: 'No native project is open.' } });
   assert.deepEqual(handled, []);
 });
+
+test('project.* returns null so the published wrapper hands it to the bootstrap lifecycle', () => {
+  for (const candidate of [project, { blocksLegacy: () => false }]) {
+    const { ops, handled } = operations(candidate);
+    for (const operation of ['project.open', 'project.new', 'project.saveAs', 'project.export'])
+      assert.strictEqual(ops.handleV1({ apiVersion: 1, requestId: 'r', operation, payload: {} }), null, operation);
+    assert.deepEqual(handled, []);
+  }
+});

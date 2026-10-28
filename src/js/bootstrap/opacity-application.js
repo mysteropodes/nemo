@@ -81,6 +81,7 @@
     active: function () { var s = root.NemoNativeObjectProject.desktop(root); return !!(s && s.isActive()); },
     info: function () { var s = root.NemoNativeObjectProject.desktop(root); return s && s.info(); },
     tabs: function () { return root.SMProject && root.SMProject.nativeTabs; },
+    lastNotice: function () { var toast = root.document && root.document.getElementById('toast'); return toast ? toast.textContent : ''; },
     openPath: function (path) { return root.SMProject.openPath(path); },
     newProject: function (config, isCurrent, onFailure) { return root.SMProject.newProject(config, isCurrent, onFailure); },
     exporters: {

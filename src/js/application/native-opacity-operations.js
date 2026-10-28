@@ -107,7 +107,9 @@
     // A native object project answers v1 with a typed refusal carrying its own identity. The MCP transport only replies
     // to a returned response, so a throw here left every v1 read waiting out the host's 30 s timeout (#2510).
     // snapshot answers the owner's own layer state, so a client can verify a native edit; other v1 reads refuse.
-    var handleV1 = function(request){var p=objectProject();if(!p)return v1.handle(request);var current=p.isActive()&&p.info();
+    // project.* belongs to the bootstrap's lifecycle: null hands the request back to the published original (#2510).
+    var handleV1 = function(request){if(request&&typeof request.operation==='string'&&request.operation.indexOf('project.')===0)return null;
+      var p=objectProject();if(!p)return v1.handle(request);var current=p.isActive()&&p.info();
       var out={apiVersion:1,requestId:request&&typeof request.requestId==='string'?request.requestId:''};
       // Before a document opens there is no identity to report; the request's own instance is echoed, nothing invented.
       if(!current||!current.documentId)return Object.assign(out,{instanceId:request&&typeof request.instanceId==='string'?request.instanceId:'',

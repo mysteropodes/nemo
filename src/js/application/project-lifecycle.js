@@ -11,6 +11,7 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
   var OPERATIONS = ['project.open', 'project.new', 'project.saveAs', 'project.export'];
+  var TIMED_OUT = {};
   var FORMATS = ['png', 'svg', 'lottie'];
 
   function plain(value) { return !!value && typeof value === 'object' && !Array.isArray(value); }
@@ -45,6 +46,14 @@
       return out;
     }
     function fail(request, code, message) { return response(request, false, { code: code, message: message }); }
+    // The app reports an Open/New refusal only as a notice; the failure carries it so a client sees the actual reason.
+    function noticed(message) { var last = ports.lastNotice && ports.lastNotice(); return last ? message + ' App notice: ' + last : message; }
+    // A flow that never settles answers before the host's 30 s transport limit.
+    function settle(promise) {
+      var timer;
+      var limit = new Promise(function (resolve) { timer = setTimeout(function () { resolve(TIMED_OUT); }, ports.timeoutMs || 25000); });
+      return Promise.race([promise, limit]).finally(function () { clearTimeout(timer); });
+    }
     // What a client needs to continue: the open document and its layer state.
     function summary() {
       var info = current();
@@ -66,8 +75,8 @@
       var refused = replaceable(request); if (refused) return refused;
       var path = request.payload.path;
       if (!project()) {
-        await ports.openPath(path);
-        return project() ? response(request, true, summary()) : fail(request, 'unavailable', 'The project could not be opened.');
+        if ((await settle(ports.openPath(path))) === TIMED_OUT) return fail(request, 'indeterminate', noticed('The Open did not settle.'));
+        return project() ? response(request, true, summary()) : fail(request, 'unavailable', noticed('The project could not be opened.'));
       }
       var tabs = ports.tabs();
       var prepared = await tabs.openPath(path);
@@ -82,11 +91,12 @@
     async function createProject(request) {
       var refused = replaceable(request); if (refused) return refused;
       var payload = request.payload, failed = null;
-      var created = await ports.newProject({ w: payload.canvasW, h: payload.canvasH, fps: payload.fps, name: 'Untitled' },
-        function () { return true; }, function (error) { failed = error; });
+      var created = await settle(ports.newProject({ w: payload.canvasW, h: payload.canvasH, fps: payload.fps, name: 'Untitled' },
+        function () { return true; }, function (error) { failed = error; }));
+      if (created === TIMED_OUT) return fail(request, 'indeterminate', noticed('The New Project did not settle.'));
       var info = current();
       if (failed || created === false || !info || info.canvasW !== payload.canvasW || info.canvasH !== payload.canvasH)
-        return fail(request, 'unavailable', 'The new project was not created' + (failed && failed.message ? ': ' + failed.message : '.'));
+        return fail(request, 'unavailable', noticed('The new project was not created' + (failed && failed.message ? ': ' + failed.message : '.')));
       return response(request, true, summary());
     }
     async function saveAs(request) {
