@@ -103,11 +103,16 @@ fn reshape_and_clone_name_a_stroke_and_new_geometry() {
     assert!(vector_request(VECTOR, &payload));
     let receipt = json!({"applied":true,"historyEntriesAdded":1,"operation":"batch","strokeId":"s-a","strokeIds":["s-a","native-stroke:8:0"]});
     assert!(vector_result(VECTOR, &payload, &receipt), "a reshape keeps its id, a clone is owner-allocated");
+    let mut stamp = payload.clone();
+    stamp["ops"][1] = json!({"op":"clone","stableTarget":target("L1","s-a"),"frame":3,"offset":[5,-7]});
+    assert!(vector_request(VECTOR, &stamp), "a pose stamp clones any stroke shifted, without geometry");
     for bad in [
         json!({"op":"reshape","stableTarget":target("L1","s-a")}),
         json!({"op":"reshape","stableTarget":target("L1","s-a"),"geometry":geometry,"frame":-3}),
         json!({"op":"reshape","stableTarget":target("L1","s-a"),"geometry":geometry,"placement":"front"}),
         json!({"op":"clone","stableTarget":target("L1","s-a"),"geometry":geometry}),
+        json!({"op":"clone","stableTarget":target("L1","s-a"),"geometry":geometry,"frame":3,"offset":[1,2]}),
+        json!({"op":"clone","stableTarget":target("L1","s-a"),"frame":3,"offset":[1]}),
         json!({"op":"clone","stableTarget":target("L1","s-a"),"geometry":{"kind":"cubic-path"},"frame":3}),
         json!({"op":"clone","stableTarget":target("L2","s-a"),"geometry":geometry,"frame":3}),
     ] {

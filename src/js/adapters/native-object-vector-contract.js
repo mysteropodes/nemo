@@ -291,7 +291,8 @@
         }
         if (op.op === 'replace') { exact(op, ['op', 'record'], [], where); record(op.record, false); if (op.record.target.frameScope.kind !== 'authored') fail(`${where} replace targets an authored frame`); return op.record.target; }
         // #2362 knife: reshape gives a named stroke new geometry, clone creates one from it on `frame`; the style stays native.
-        if (op.op === 'reshape' || op.op === 'clone') { const clone = op.op === 'clone'; exact(op, ['op', 'stableTarget', 'geometry'].concat(clone ? ['frame'] : []), clone ? ['placement', 'keyframe'] : ['frame'], where); target(op.stableTarget, `${where}.stableTarget`, false); geometry(op.geometry, `${where}.geometry`);
+        // A geometry-less clone copies any stroke shifted by `offset` (a pose stamp); never with geometry.
+        if (op.op === 'reshape' || op.op === 'clone') { const clone = op.op === 'clone'; exact(op, ['op', 'stableTarget'].concat(clone ? ['frame'] : ['geometry']), clone ? ['geometry', 'offset', 'placement', 'keyframe'] : ['frame'], where); target(op.stableTarget, `${where}.stableTarget`, false); if (has(op, 'geometry')) geometry(op.geometry, `${where}.geometry`); if (has(op, 'offset') && (has(op, 'geometry') || !Array.isArray(op.offset) || op.offset.length !== 2 || !op.offset.every(Number.isFinite))) fail(`${where}.offset is invalid`);
           if (has(op, 'frame') && !(Number.isSafeInteger(op.frame) && op.frame >= 0 && op.frame <= 4294967295)) fail(`${where}.frame must be a frame`); if (has(op, 'placement')) oneOf(op.placement, ['front', 'behind'], `${where}.placement`); if (has(op, 'keyframe')) oneOf(op.keyframe, ['copy'], `${where}.keyframe`); return op.stableTarget; }
         if (op.op === 'delete') { exact(op, ['op', 'stableTarget'], [], where); target(op.stableTarget, `${where}.stableTarget`, false); return op.stableTarget; }
         return fail(`${where}.op must be create, copy, replace, reshape, clone or delete`);

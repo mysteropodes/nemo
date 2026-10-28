@@ -29,7 +29,7 @@ function harness(options = {}) {
           contentRevision: pin.contentRevision, ok: false, error: { code: options.refuse, message: 'refused' } };
         if (request.operation === 'command.document.object.vector.edit') {
           // The native owner's batch receipt: allocated ids for the creates, in step order.
-          const ids = request.payload.ops.map((op, i) => (op.op === 'create' ? 'native-stroke:' + (pin.contentRevision + 1) + ':' + i
+          const ids = request.payload.ops.map((op, i) => (op.op === 'create' || op.op === 'clone' ? 'native-stroke:' + (pin.contentRevision + 1) + ':' + i
             : op.op === 'replace' ? op.record.target.strokeId : op.stableTarget.strokeId));
           return { apiVersion: 2, requestId: request.requestId, instanceId: pin.instanceId, documentId: pin.documentId,
             contentRevision: pin.contentRevision + 1, ok: true, result: { applied: true, historyEntriesAdded: 1, operation: 'batch', strokeId: ids[0], strokeIds: ids } };
@@ -236,4 +236,19 @@ test('without a native session the baseline path runs unchanged', () => {
   assert.equal(lines.length, 5);
   assert.equal(h.sent.length, 0);
   assert.equal(Labs.desktop({ NemoNativeObjectProject: { desktop: () => ({ blocksLegacy: () => false }) } }), null);
+});
+
+test('on a native object project a pose names its presented strokes and the stamp copies them natively, shifted (#2362)', async () => {
+  const target = (id) => ({ contextId: 'scene-root', layerUid: 'native-layer:2:0', frameScope: { kind: 'authored', frame: 2 }, strokeId: id });
+  // A Select pick: presented geometry only, no parent, no style; a ribbon carries its linked fill as data.linkedFill.
+  const picked = { data: { strokeId: 'rib', nativeStableTarget: target('rib'), linkedFill: { data: { strokeId: 'fill' } } } };
+  const h = harness({ selected: [picked] });
+  assert.equal(h.labs.savePose('wave'), 2, 'the ribbon and its fill');
+  assert.deepEqual(JSON.parse(h.root.localStorage.getItem('nemo-labs-poses-p1')).wave, [{ nativeRef: target('fill') }, { nativeRef: target('rib') }]);
+  assert.equal(await h.labs.stampPose('wave', { dx: 7, dy: -2 }), 2);
+  const { payload } = h.sent[0];
+  assert.deepEqual(plain(payload.ops), [
+    { op: 'clone', stableTarget: target('fill'), frame: 6, offset: [7, -2] },
+    { op: 'clone', stableTarget: target('rib'), frame: 6, offset: [7, -2] }], 'fill first, below its ribbon; style stays native');
+  assert.equal(payload.keyframe, 'copy');
 });
