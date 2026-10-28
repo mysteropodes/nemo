@@ -53,7 +53,7 @@ function buildUI32Helper(output,proofFile){
     const after=identity.sourceIdentity();requireValid(!after.dirty&&after.head===source.head&&manifest().sourceSha256===frozen.sourceSha256);
     fresh(output);fresh(proofFile);fs.copyFileSync(executable,output,fs.constants.COPYFILE_EXCL);published=true;fs.chmodSync(output,0o700);
     const proof={schema:'nemo.ui32-window-helper/1',purpose:'UI32',sourceHead:source.head,sourceSha256:frozen.sourceSha256,
-      inputs:frozen.inputs,executableSha256:hash(fs.readFileSync(output)),compiler:'swiftc -parse-as-library -D UI32_VALIDATION (twenty frozen inputs)',
+      inputs:frozen.inputs,executableSha256:hash(fs.readFileSync(output)),compiler:'swiftc -parse-as-library -D UI32_VALIDATION (twenty-one frozen inputs)',
       runtimeAX:false,foreignReads:0,controls};
     fs.writeFileSync(proofFile,JSON.stringify(proof,null,2)+'\n',{flag:'wx',mode:0o600});return proof;
   }catch(e){if(published)fs.rmSync(output,{force:true});throw e;}
