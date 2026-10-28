@@ -192,7 +192,8 @@
       path.transform(new Matrix(item.matrix[0], item.matrix[1], item.matrix[2], item.matrix[3], item.matrix[4], item.matrix[5]));
       // Painted outlines (a ribbon, its fill, a shape) are hit inside; a plain stroke on its line.
       path.strokeColor = [0, 0, 0]; path.strokeWidth = 1; if (item.closed && item.role !== 'plain') path.fillColor = [0, 0, 0];
-      path.data = { strokeId: item.stableTarget.strokeId, nativeStableTarget: item.stableTarget, nativeRole: item.role, nativeRibbon: item.role === 'ribbon', nativeMatrix: item.matrix };
+      path.data = { strokeId: item.stableTarget.strokeId, nativeStableTarget: item.stableTarget, nativeRole: item.role, nativeRibbon: item.role === 'ribbon', nativeMatrix: item.matrix,
+        nativeOwner: item.owner };
       return path;
     }) };
   }
@@ -211,6 +212,15 @@
       canvasW: pin.canvasW, canvasH: pin.canvasH, presentation: presentation });
     return { x: p.x, y: p.y, perPixel: pin.canvasW / r.width };
   }
+  // A linked fill is selected as its ribbon, as the baseline's resolveBrushAnchor did (the native listing names it).
+  function owned(path) {
+    var id = path.data.nativeOwner;
+    if (path.data.nativeRole !== 'fill' || !id) return path;
+    var ribbon = path.clone({ insert: false });
+    ribbon.data = Object.assign({}, path.data, { strokeId: id, nativeRole: 'ribbon', nativeRibbon: true, nativeOwner: undefined,
+      nativeStableTarget: Object.assign({}, path.data.nativeStableTarget, { strokeId: id }) });
+    return ribbon;
+  }
   // The top-most presented stroke of the active layer within 8 screen pixels of the click, or null. Only records whose
   // bounds reach the click have their geometry read.
   async function pick(root, clientX, clientY) {
@@ -221,7 +231,7 @@
     if (!layers) return undefined;
     var Point = root.Point || root.paper.Point, at = new Point(w.x, w.y);
     for (var i = layers.paths.length - 1; i >= 0; i--)
-      if (layers.paths[i].hitTest(at, { fill: true, stroke: true, tolerance: t })) return layers.paths[i];
+      if (layers.paths[i].hitTest(at, { fill: true, stroke: true, tolerance: t })) return owned(layers.paths[i]);
     return null;
   }
 

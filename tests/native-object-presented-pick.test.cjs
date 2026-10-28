@@ -11,6 +11,9 @@ const PIN = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentR
 const seg = (x, y) => ({ point: [x, y], handleIn: [0, 0], handleOut: [0, 0] });
 const target = (id) => ({ contextId: 'scene-root', layerUid: 'L1', frameScope: { kind: 'authored', frame: 0 }, strokeId: id });
 const ITEMS = [
+  // A ribbon's linked fill below everything else, far from the line: a click on it selects its ribbon.
+  { stableTarget: target('fill'), closed: true, count: 4, role: 'fill', owner: 'ribbon', bounds: [600, 0, 700, 100], matrix: [1, 0, 0, 1, 0, 0],
+    segments: [seg(600, 0), seg(700, 0), seg(700, 100), seg(600, 100)] },
   { stableTarget: target('line'), closed: false, count: 2, role: 'plain', bounds: [100, 100, 500, 100], segments: [seg(100, 100), seg(500, 100)], matrix: [1, 0, 0, 1, 0, 0] },
   // A ribbon is listed with its painted outline (hit inside); this one is moved 300 down by its presented transform.
   { stableTarget: target('ribbon'), closed: true, count: 4, role: 'ribbon', bounds: [100, -20, 500, 20], matrix: [1, 0, 0, 1, 0, 300],
@@ -40,12 +43,14 @@ function root(options = {}) {
 test('a click picks the top-most presented stroke of the active layer in world space', async () => {
   const r = root();
   assert.equal((await Intent.pick(r, 150, 50)).data.strokeId, 'line', 'world (300,100) lies on the line');
-  assert.deepEqual(r.fetched, [['line', true], ['ribbon', false]], 'only geometry whose world bounds reach the click is read');
+  assert.deepEqual(r.fetched, [['fill', false], ['line', true], ['ribbon', false]], 'only geometry whose world bounds reach the click is read');
   assert.deepEqual(r.reads[0], { contextId: 'scene-root', layerUid: 'L1', frame: 0 });
   const ribbon = await Intent.pick(r, 150, 155);
   assert.deepEqual([ribbon.data.strokeId, ribbon.data.nativeRole, ribbon.data.nativeStableTarget], ['ribbon', 'ribbon', target('ribbon')],
     'world (300,310) is inside the transformed outline');
   assert.equal(await Intent.pick(r, 150, 100), null, 'empty canvas picks nothing');
+  const fill = await Intent.pick(r, 325, 25);
+  assert.deepEqual([fill.data.strokeId, fill.data.nativeRole, fill.data.nativeStableTarget.strokeId], ['ribbon', 'ribbon', 'ribbon'], 'a linked fill selects its ribbon');
   assert.ok(await Intent.pick(r, 150, 53), 'within 8 screen pixels (16 world) still hits');
 });
 

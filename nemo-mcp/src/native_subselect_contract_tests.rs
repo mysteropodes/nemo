@@ -200,6 +200,12 @@ fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
         "items":[{"stableTarget":target(),"closed":true,"count":4,"matrix":[1,0,0,1,0,0],"bounds":[0.0,0.0,10.0,10.0],"role":"fill"}]});
     assert!(view_request(&q));
     assert!(public_read(&q, &r), "a listed linked fill is legal in a hit-test listing");
+    let mut owned = r.clone();
+    owned["items"][0]["owner"] = json!("ribbon-a");
+    assert!(public_read(&q, &owned), "a linked fill names its ribbon");
+    let mut stray = owned.clone();
+    stray["items"][0]["role"] = json!("plain");
+    assert!(!public_read(&q, &stray), "only a fill has an owner");
     for (key, value) in [("role", json!("ink")), ("bounds", json!([0, 0, 1])), ("paintCount", json!(4))] {
         let mut bad = r.clone();
         bad["items"][0][key] = value;

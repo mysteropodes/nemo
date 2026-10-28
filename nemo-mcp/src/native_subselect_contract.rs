@@ -107,13 +107,16 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
             exact(
                 i,
                 &["stableTarget", "closed", "count", "matrix"],
-                if hit { &["bounds", "role"] } else { &["paintCount"] },
+                if hit { &["bounds", "role", "owner"] } else { &["paintCount"] },
             )
             .is_some()
                 && (!hit
                     || (i["bounds"].as_array().is_some_and(|b| {
                         b.len() == 4 && b.iter().all(|v| v.as_f64().is_some_and(f64::is_finite))
-                    }) && ["plain", "ribbon", "fill", "shape", "brush"].contains(&i["role"].as_str().unwrap_or(""))))
+                    }) && ["plain", "ribbon", "fill", "shape", "brush"].contains(&i["role"].as_str().unwrap_or(""))
+                        && i.get("role").is_some()
+                        && i.get("bounds").is_some()
+                        && i.get("owner").is_none_or(|o| i["role"] == "fill" && o.as_str().is_some_and(|s| !s.is_empty()))))
                 && super::target(&i["stableTarget"])
                 && i["stableTarget"]["contextId"] == r["contextId"]
                 && i["stableTarget"]["layerUid"] == r["layerUid"]

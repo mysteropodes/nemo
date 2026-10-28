@@ -67,6 +67,21 @@ impl ObjectCompositionWitness {
                 matrix,
                 bounds: hit_test.then(|| record::painted_bounds(r)),
                 role: hit_test.then(|| record::hit_role(r)),
+                owner: (hit_test && record::hit_role(r) == "fill")
+                    .then(|| record::linked_fill(r))
+                    .flatten()
+                    .and_then(|link| {
+                        packet
+                            .records()
+                            .filter(|s| s.source_layer_index() == index)
+                            .map(|s| s.record())
+                            .find(|o| {
+                                record::has_pressure(o)
+                                    && record::linked_fill(o) == Some(link)
+                                    && o.target.frame_scope == r.target.frame_scope
+                            })
+                            .map(|o| o.target.stroke_id.clone())
+                    }),
             });
         }
         if items.len() > 1024 {

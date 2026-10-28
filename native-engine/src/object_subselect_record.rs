@@ -266,3 +266,7 @@ pub(crate) fn hit_role(record: &ObjectRecord) -> &'static str {
         "plain"
     }
 }
+/// The linked-fill identity a ribbon and its fill share.
+pub(crate) fn linked_fill(record: &ObjectRecord) -> Option<&String> {
+    record.vector_ext.value().and_then(|e| e.linked_fill_id.value())
+}
