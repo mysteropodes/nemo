@@ -21,6 +21,10 @@
 
   window.SMLabs.referenceFillAtPointer = function () {
     if (!lastPtr || !window.SMEngineBridge) return false;
+    // #2362: a native object project maps the pointer through its own presentation, as Select and the knife do; the
+    // legacy view transform can disagree with what is on screen.
+    var Intent = window.NemoSelectCanvasIntent, shown = Intent && typeof Intent.presentedState === 'function' && Intent.presentedState(window);
+    if (shown) { var p = Intent.worldPoint(window, lastPtr[0], lastPtr[1], shown.pin, shown.presentation); return window.SMLabs.referenceFill(p.x, p.y); }
     var w = SMEngineBridge.screenToWorld(lastPtr[0], lastPtr[1]);
     return window.SMLabs.referenceFill(w[0], w[1]);
   };

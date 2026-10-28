@@ -51,6 +51,8 @@ test('a click picks the top-most presented stroke of the active layer in world s
   assert.equal(await Intent.pick(r, 150, 100), null, 'empty canvas picks nothing');
   const fill = await Intent.pick(r, 325, 25);
   assert.deepEqual([fill.data.strokeId, fill.data.nativeRole, fill.data.nativeStableTarget.strokeId], ['ribbon', 'ribbon', 'ribbon'], 'a linked fill selects its ribbon');
+  assert.equal(fill.data.linkedFill.data.strokeId, 'fill', 'and the ribbon carries its fill, as a baseline Paper item did');
+  assert.equal((await Intent.pick(r, 150, 155)).data.linkedFill.data.strokeId, 'fill', 'a ribbon hit directly carries it too');
   assert.ok(await Intent.pick(r, 150, 53), 'within 8 screen pixels (16 world) still hits');
 });
 
