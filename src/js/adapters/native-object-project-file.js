@@ -87,17 +87,17 @@
     if(!Number.isSafeInteger(pin.contentRevision)||!Number.isSafeInteger(info.contentRevision)||info.contentRevision<pin.contentRevision||
       typeof info.documentSnapshotId!=='string'||!info.documentSnapshotId||
       info.contentRevision===pin.contentRevision&&(info.documentSnapshotId!==pin.documentSnapshotId||!settingsMatch(pin,info)))return false;
-    var next=layerTable(info.layers),delta=next.length-rows.length;
+    var next=layerTable(info.layers);
     if(info.contentRevision===pin.contentRevision&&next.some(function(l,i){return rows[i]&&
       (parentValue(l)!==pin.layerParents[i]||['locked','shy'].some(function(k){return rows[i][k]!== (l[k]===true);}));}))return false;
-    if(!Splice||typeof Splice.plan!=='function'||delta!==0&&info.contentRevision===pin.contentRevision)return false;
+    if(!Splice||typeof Splice.plan!=='function')return false;
     var splice=Splice.plan(pin.layerUids,rows,next,s.activeLayerIdx,root._layerSel,root._layerSelAnchor);
-    if(!splice)return false;
+    var changed=!!splice&&(splice.removed>0||splice.addedRows.length>0);
+    if(!splice||changed&&info.contentRevision===pin.contentRevision)return false;
     // Prepare the detached UID plan before changing this read-side table.
-    if(delta>0)rows.splice.apply(rows,[splice.at,0].concat(splice.addedRows));
-    else if(delta<0)rows.splice(splice.at,-delta);
+    if(changed)rows.splice.apply(rows,[splice.at,splice.removed].concat(splice.addedRows));
     next.forEach(function(layer,i){if(layer.name!==undefined)rows[i].name=layer.name;rows[i].visible=layer.visible;projectFields(rows[i],layer);});
-    if(delta!==0){s.activeLayerIdx=splice.active;root._layerSel=splice.selection;root._layerSelAnchor=splice.anchor;}
+    if(changed){s.activeLayerIdx=splice.active;root._layerSel=splice.selection;root._layerSelAnchor=splice.anchor;}
     projectSettings(root,info,pin);
     // Duration edits and their Undo can shorten the timeline. Keep the UI playhead valid
     // before the native session requests the next presentation; drawing bytes stay native.
