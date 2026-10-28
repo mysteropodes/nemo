@@ -117,7 +117,7 @@
       Object.assign(out,{instanceId:current.instanceId,documentId:current.documentId,revision:current.contentRevision});
       if(request&&request.operation==='snapshot')return Object.assign(out,{ok:true,result:{frame:ports.currentFrame(),
         totalFrames:current.totalFrames,canvasW:current.canvasW,canvasH:current.canvasH,fps:current.fps,
-        layers:(current.layers||[]).map(function(layer){return {id:layer.layerUid,name:layer.name,visible:layer.visible,locked:layer.locked,shy:layer.shy};})}});
+        layers:(current.layers||[]).map(function(layer){return {id:layer.layerUid,name:layer.name,visible:layer.visible!==false,locked:layer.locked===true,shy:layer.shy===true};})}});
       return Object.assign(out,{ok:false,error:{code:'unavailable',message:'Native object projects answer only snapshot and native operations (apiVersion 2).'}});};
 
     function reenterLegacy() { return false; }

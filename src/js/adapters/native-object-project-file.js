@@ -194,8 +194,8 @@
           acquirePin:async function(request){serialization=await session.acquirePin(request);return serialization;},
           pickDestination:pick,savePinned:session.savePinned},options);
         var result=await saved.acknowledge(ticket,{written:written,serialization:serialization},options);
-        ports.notice(result,written);return result;
-      }catch(error){ports.notice({status:'refused'},null,error);return {status:'refused'};}
+        ports.notice(result,written);return written&&written.reason&&!result.acknowledged?Object.assign({},result,{reason:written.reason}):result;
+      }catch(error){ports.notice({status:'refused'},null,error);return {status:'refused',reason:error&&error.message||'save-failed'};}
       finally{saving=false;}
     }
     return Object.freeze({openPath:openPath,newProject:newProject,activateProject:activateProject,saveAs:saveAs,

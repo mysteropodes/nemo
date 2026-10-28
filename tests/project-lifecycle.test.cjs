@@ -94,8 +94,10 @@ test('saveAs runs the Save As workflow at the given path and succeeds only when 
   const response = await saved.lifecycle.handle(request('project.saveAs', { path: '/tmp/A-copy.json' }));
   assert.deepEqual(saved.calls, [['saveAs', '/tmp/A-copy.json']]);
   assert.deepEqual([response.ok, response.result.path], [true, '/tmp/A-copy.json']);
-  const refused = await app({ saveResult: { status: 'refused' } }).lifecycle.handle(request('project.saveAs', { path: '/tmp/x.json' }));
-  assert.deepEqual([refused.ok, refused.error.code], [false, 'unavailable']);
+  const refused = await app({ saveResult: { status: 'refused', reason: 'native-pin-refused' }, notice: 'Save failed: pin' }).lifecycle
+    .handle(request('project.saveAs', { path: '/tmp/x.json' }));
+  assert.deepEqual([refused.ok, refused.error.code, refused.error.message],
+    [false, 'unavailable', 'The project was not saved (refused: native-pin-refused). App notice: Save failed: pin']);
 });
 
 test('export uses the path exporters over the whole timeline by default; native Lottie stays a typed refusal', async () => {

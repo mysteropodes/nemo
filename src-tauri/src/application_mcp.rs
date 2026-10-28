@@ -457,7 +457,7 @@ async fn serve_legacy(
     pending: Pending,
     message: wire::WireRequest,
 ) -> Result<(), String> {
-    project_scope::validate_and_admit(&app, &message.request)?;
+    if let Some(refusal) = project_scope::validate_and_admit(&app, &message.request)? { return wire::write_json(&mut stream, &refusal).await.map_err(|e| e.to_string()); }
     if message.request.instance_id.as_deref() != Some(endpoint.instance_id.as_str()) {
         return Err("request instance mismatch".into());
     }

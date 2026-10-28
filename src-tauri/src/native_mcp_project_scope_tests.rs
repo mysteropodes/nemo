@@ -1,5 +1,5 @@
 //! #2510: which path a project request admits, and where it must lie.
-use crate::application_mcp::project_scope::{inside, target, ApplicationRequest, Target};
+use crate::application_mcp::project_scope::{inside, refusal, target, ApplicationRequest, Target};
 use serde_json::json;
 use std::path::PathBuf;
 
@@ -100,5 +100,22 @@ fn only_paths_strictly_inside_a_root_are_admitted() {
             &roots
         ),
         "a sibling prefix is not inside"
+    );
+}
+
+#[test]
+fn a_refused_path_answers_a_typed_reply_with_the_request_identity() {
+    let reply = refusal(
+        &request("project.open", json!({"path": "/a.json"})),
+        "outside".into(),
+    );
+    let value = serde_json::to_value(&reply).unwrap();
+    assert_eq!(value["requestId"], "r");
+    assert_eq!(value["instanceId"], "i");
+    assert_eq!(value["documentId"], "d");
+    assert_eq!(value["ok"], false);
+    assert_eq!(
+        value["error"],
+        json!({"code": "invalid_request", "message": "outside"})
     );
 }

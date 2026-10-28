@@ -59,3 +59,11 @@ test('project.* returns null so the published wrapper hands it to the bootstrap 
     assert.deepEqual(handled, []);
   }
 });
+
+test('a layer with default flags reports explicit booleans', () => {
+  const bare = { blocksLegacy: () => true, isActive: () => true, info: () => ({ instanceId: 'instance-A', documentId: 'doc', contentRevision: 0,
+    totalFrames: 1, canvasW: 1, canvasH: 1, fps: 24, layers: [{ layerUid: 'layer-1' }] }) };
+  const { ops } = operations(bare);
+  assert.deepEqual(ops.handleV1({ apiVersion: 1, requestId: 'r', operation: 'snapshot', payload: {} }).result.layers,
+    [{ id: 'layer-1', name: undefined, visible: true, locked: false, shy: false }]);
+});

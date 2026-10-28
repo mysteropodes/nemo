@@ -3,7 +3,7 @@
 //! path inside the app's own static roots (`$HOME`, `$DOCUMENT`, `$DESKTOP`, `$DOWNLOAD`, `$TEMP`) is admitted exactly
 //! here: the file, or the export folder. Anything else is refused before the request reaches the app.
 pub(crate) use nemo_mcp::contract::ApplicationRequest;
-use nemo_mcp::contract::Operation;
+use nemo_mcp::contract::{ApplicationResponse, Operation};
 use std::path::{Component, Path, PathBuf};
 use tauri::Manager;
 use tauri_plugin_fs::FsExt;
@@ -80,25 +80,43 @@ fn roots<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Vec<PathBuf> {
     .collect()
 }
 
-/// Validates the request as before, then admits a project request's own path into the fs scope.
+/// Validates the request as before (an invalid request still fails the connection), then admits a project request's
+/// own path into the fs scope. A path that cannot be admitted answers a typed refusal the caller writes back, so the
+/// client sees why instead of a dropped connection.
 pub(crate) fn validate_and_admit<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     request: &ApplicationRequest,
-) -> Result<(), String> {
+) -> Result<Option<ApplicationResponse>, String> {
     request.validate().map_err(|error| error.to_string())?;
     let Some(target) = target(request) else {
-        return Ok(());
+        return Ok(None);
     };
-    let target = target?;
-    if !inside(&target, &roots(app)) {
-        return Err("project path is outside the app's file roots".into());
-    }
-    let scope = app.fs_scope();
-    match &target {
-        Target::File(path) => scope.allow_file(path),
-        Target::Directory(path) => scope.allow_directory(path, true),
-    }
-    .map_err(|error| error.to_string())
+    let admitted = target.and_then(|target| {
+        if !inside(&target, &roots(app)) {
+            return Err("project path is outside the app's file roots".into());
+        }
+        let scope = app.fs_scope();
+        match &target {
+            Target::File(path) => scope.allow_file(path),
+            Target::Directory(path) => scope.allow_directory(path, true),
+        }
+        .map_err(|error| error.to_string())
+    });
+    Ok(admitted.err().map(|message| refusal(request, message)))
+}
+
+/// A typed refusal for a project request whose path was not admitted, echoing only the request's own identity.
+pub(crate) fn refusal(request: &ApplicationRequest, message: String) -> ApplicationResponse {
+    serde_json::from_value(serde_json::json!({
+        "apiVersion": request.api_version,
+        "requestId": request.request_id,
+        "instanceId": request.instance_id.clone().unwrap_or_default(),
+        "documentId": request.document_id.clone().unwrap_or_default(),
+        "revision": request.expected_revision.unwrap_or(0),
+        "ok": false,
+        "error": {"code": "invalid_request", "message": message},
+    }))
+    .expect("a refusal is a well-formed application response")
 }
 
 #[cfg(test)]

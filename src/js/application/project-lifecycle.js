@@ -61,7 +61,7 @@
       return { documentId: info.documentId, contentRevision: info.contentRevision, canvasW: info.canvasW,
         canvasH: info.canvasH, fps: info.fps, totalFrames: info.totalFrames,
         layers: (info.layers || []).map(function (layer) {
-          return { layerUid: layer.layerUid, name: layer.name, visible: layer.visible, locked: layer.locked, shy: layer.shy };
+          return { layerUid: layer.layerUid, name: layer.name, visible: layer.visible !== false, locked: layer.locked === true, shy: layer.shy === true };
         }) };
     }
     function replaceable(request) {
@@ -102,7 +102,8 @@
     async function saveAs(request) {
       var p = project(); if (!p) return fail(request, 'unavailable', 'No native project is open.');
       var saved = await p.saveAs(request.payload.path);
-      if (!saved || saved.acknowledged !== true) return fail(request, 'unavailable', 'The project was not saved (' + (saved && saved.status) + ').');
+      if (!saved || saved.acknowledged !== true) return fail(request, 'unavailable',
+        noticed('The project was not saved (' + (saved && saved.status) + (saved && saved.reason ? ': ' + saved.reason : '') + ').'));
       return response(request, true, Object.assign({ path: request.payload.path }, summary()));
     }
     async function exportFrames(request) {
