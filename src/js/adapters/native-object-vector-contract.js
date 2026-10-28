@@ -277,26 +277,17 @@
     else if (key === 'ops') {
       // #2361/#2362: 1..64 ordered create/replace/delete steps on one scene-root layer, one revision and one undo entry.
       if (!Array.isArray(payloadValue) || payloadValue.length < 1 || payloadValue.length > 64) fail(`${label} must hold 1 to 64 steps`);
-      const targets = [];
-      payloadValue.forEach((op, at) => targets.push((() => {
+      const targets = payloadValue.map((op, at) => {
         const where = `${label}[${at}]`;
         if (!plain(op)) fail(`${where} must be an object`);
-        // #2362 multiframe: an earlier create's (or copy's) record again on another frame, without resending it.
-        if (op.op === 'copy') {
-          exact(op, ['op', 'fromStep', 'frame'], ['placement', 'keyframe'], where);
-          if (!Number.isSafeInteger(op.fromStep) || op.fromStep < 0 || op.fromStep >= at) fail(`${where}.fromStep must name an earlier step`);
-          if (payloadValue[op.fromStep].op !== 'create' && payloadValue[op.fromStep].op !== 'copy') fail(`${where}.fromStep must name a create`);
-          if (!Number.isSafeInteger(op.frame) || op.frame < 0 || op.frame > 4294967295) fail(`${where}.frame must be a frame`);
-          if (has(op, 'placement')) oneOf(op.placement, ['front', 'behind'], `${where}.placement`);
-          if (has(op, 'keyframe')) oneOf(op.keyframe, ['copy'], `${where}.keyframe`);
-          return targets[op.fromStep];
-        }
-        if (op.op === 'create') {
-          exact(op, ['op', 'record'], ['placement', 'keyframe'], where); record(op.record, true);
+        if (op.op === 'create' || op.op === 'copy') {
+          const copy = op.op === 'copy'; exact(op, copy ? ['op', 'fromStep', 'frame'] : ['op', 'record'], ['placement', 'keyframe'], where); if (!copy) record(op.record, true);
+          // #2362 multiframe: a copy is an earlier create's (or copy's) record again on `frame`, without resending it.
+          if (copy && !(Number.isSafeInteger(op.fromStep) && op.fromStep >= 0 && op.fromStep < at && ['create', 'copy'].includes(payloadValue[op.fromStep].op) && Number.isSafeInteger(op.frame) && op.frame >= 0 && op.frame <= 4294967295)) fail(`${where} must copy an earlier create to a frame`);
           if (has(op, 'placement')) oneOf(op.placement, ['front', 'behind'], `${where}.placement`);
           // A create's own keyframe: 'copy' keys its held cell with a copy even when the batch's does not (multiframe draw).
           if (has(op, 'keyframe')) oneOf(op.keyframe, ['copy'], `${where}.keyframe`);
-          return op.record.target;
+          return copy ? null : op.record.target;
         }
         if (op.op === 'replace') {
           exact(op, ['op', 'record'], [], where); record(op.record, false);
@@ -305,7 +296,8 @@
         }
         if (op.op === 'delete') { exact(op, ['op', 'stableTarget'], [], where); target(op.stableTarget, `${where}.stableTarget`, false); return op.stableTarget; }
         return fail(`${where}.op must be create, copy, replace or delete`);
-      })()));
+      });
+      targets.forEach((t, at) => { if (!t) targets[at] = targets[payloadValue[at].fromStep]; });
       if (targets.some((t) => t.contextId !== 'scene-root' || t.layerUid !== targets[0].layerUid)) fail(`${label} must stay on one scene-root layer`);
     }
     else if (key === 'maskEdit') {
