@@ -95,6 +95,18 @@ test('contiguous two appends and inverse two removals project complete metadata 
   assert.strictEqual(root.selectedPaths,paths);assert.strictEqual(root.state.refMedia,reference);
   assert.equal(Files.projectionReadyForUI(root,info([A,B],2)),true);
 });
+test('a merge revision replaces its source rows with the minted instance row and its undo restores them (#2244)',()=>{
+  const root=view(),rows=root.state.layers,first=rows[0],second=rows[1],M={layerUid:'native-layer:9:0',name:'Component 1',visible:true};
+  root._layerSel=[0,1];root.state.activeLayerIdx=1;root._layerSelAnchor=0;
+  assert.equal(Files.refreshLayerTable(root,info([M],1)),true);
+  assert.strictEqual(root.state.layers,rows);assert.deepEqual(rows.map(row=>row.layerUid),[M.layerUid]);assert.equal(rows[0].name,'Component 1');
+  assert.deepEqual(root._layerSel,[0]);assert.equal(root.state.activeLayerIdx,0);assert.equal(root._layerSelAnchor,0);
+  assert.equal(Files.projectionReadyForUI(root,info([M],1)),true);
+  assert.equal(Files.refreshLayerTable(root,info([A,B],2)),true);
+  assert.deepEqual(rows.map(row=>row.layerUid),[A.layerUid,B.layerUid]);assert.notStrictEqual(rows[0],first);assert.notStrictEqual(rows[1],second);
+  assert.equal(root.state.activeLayerIdx,0);assert.deepEqual(root._layerSel,[0]);
+  assert.equal(Files.projectionReadyForUI(root,info([A,B],2)),true);
+});
 test('contiguous removal of both rows projects the empty native table without replacing its array',()=>{
   const root=view(),rows=root.state.layers;root._layerSelAnchor=1;
   assert.equal(Files.refreshLayerTable(root,info([],1)),true);
@@ -103,7 +115,7 @@ test('contiguous removal of both rows projects the empty native table without re
   assert.equal(Files.projectionReadyForUI(root,info([],1)),true);
 });
 for(const [name,layers,revision=1] of [
-  ['reordered',[B,A]],['same-revision single removal',[B],0],['replaced',[A,C]],
+  ['reordered',[B,A]],['same-revision single removal',[B],0],['same-revision replacement',[A,C],0],['replacement re-adding a UID',[C,A]],
   ['noncontiguous inserts',[{layerUid:'X'},A,{layerUid:'Y'},B]],
   ['same-revision two appends',[A,B,C,{layerUid:'D'}],0],['same-revision two removals',[],0],['duplicate',[A,B,A]],['empty UID',[A,B,{layerUid:''}]],
   ['late malformed visibility',[{...A,visible:false},{...B,visible:'false'}]],

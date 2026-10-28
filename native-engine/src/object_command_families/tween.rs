@@ -1,4 +1,5 @@
 //! Native tween command family; shared envelope/replay/revision checks run before dispatch.
+//! nemo-command-feature: application
 use super::CommandFamily;
 use crate::request_receipts::DispatchErrorCode;
 const OP_TWEEN_GENERATE: &str = "command.document.object.tween.generate";
