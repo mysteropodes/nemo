@@ -4,6 +4,8 @@ use crate::object_document::{
     ObjectDocument, ObjectPoint, ObjectRecord, ObjectSegment, VECTOR_FAMILY,
 };
 use serde_json::Number;
+#[path = "object_subselect_pressure.rs"]
+mod pressure;
 
 /// The displayed frame may hold an earlier key. Admit promotion only when its
 /// source and complete copied cell are representable by the native frame owner.
@@ -126,15 +128,24 @@ pub(crate) fn anchors(record: &ObjectRecord) -> Result<Vec<Anchor>, Refusal> {
     if record.family != VECTOR_FAMILY {
         return Err(Refusal::Unsupported);
     }
+    if has_pressure(record) {
+        return pressure::anchors(record);
+    }
     if !(2..=256).contains(&record.geometry.segments.len()) {
         return Err(Refusal::Limit);
     }
     // These consumers require their own geometry/companion projection before a commit can be admitted.
-    if record.vector_ext.value().is_some_and(|e| {
-        !e.pressure.missing() || !e.bitmap_brush.missing() || !e.brush_texture.missing()
-    }) {
+    if record
+        .vector_ext
+        .value()
+        .is_some_and(|e| !e.bitmap_brush.missing() || !e.brush_texture.missing())
+    {
         return Err(Refusal::Unsupported);
     }
+    paint_anchors(record)
+}
+/// Paint pivots use the rendered ribbon, while editable anchors use its centerline.
+pub(crate) fn paint_anchors(record: &ObjectRecord) -> Result<Vec<Anchor>, Refusal> {
     record
         .geometry
         .segments
@@ -149,6 +160,9 @@ pub(crate) fn anchors(record: &ObjectRecord) -> Result<Vec<Anchor>, Refusal> {
         .collect()
 }
 pub(crate) fn plan(record: &ObjectRecord, intent: &Intent) -> Result<ObjectRecord, Refusal> {
+    if has_pressure(record) {
+        return pressure::plan(record, intent);
+    }
     let edited = edit(&anchors(record)?, record.geometry.closed, false, intent)?;
     let mut next = record.clone();
     let mut origins: Vec<Option<usize>> = (0..record.geometry.segments.len()).map(Some).collect();
@@ -157,26 +171,6 @@ pub(crate) fn plan(record: &ObjectRecord, intent: &Intent) -> Result<ObjectRecor
         Intent::Delete { indices } => origins.retain(|i| !indices.contains(&i.unwrap())),
         _ => {}
     }
-    // A float geometry calculation must not round untouched canonical JSON integers.
-    // Also preserve absent edits and original numeric representation on surviving anchors.
-    let keep = |old: &ObjectPoint, value: [f64; 2]| -> Result<ObjectPoint, Refusal> {
-        let mut p = point(value)?;
-        if old
-            .x
-            .as_f64()
-            .is_some_and(|n| n.to_bits() == value[0].to_bits())
-        {
-            p.x = old.x.clone();
-        }
-        if old
-            .y
-            .as_f64()
-            .is_some_and(|n| n.to_bits() == value[1].to_bits())
-        {
-            p.y = old.y.clone();
-        }
-        Ok(p)
-    };
     next.geometry.segments = edited
         .into_iter()
         .zip(origins)
@@ -211,3 +205,34 @@ object_deserialize!(Preview {
     stable_target: ObjectTarget,
     intent: Intent
 });
+
+// A float geometry calculation must not round untouched canonical JSON integers.
+// Also preserve absent edits and original numeric representation on surviving anchors.
+fn keep(old: &ObjectPoint, value: [f64; 2]) -> Result<ObjectPoint, Refusal> {
+    let mut p = point(value)?;
+    if old
+        .x
+        .as_f64()
+        .is_some_and(|n| n.to_bits() == value[0].to_bits())
+    {
+        p.x = old.x.clone();
+    }
+    if old
+        .y
+        .as_f64()
+        .is_some_and(|n| n.to_bits() == value[1].to_bits())
+    {
+        p.y = old.y.clone();
+    }
+    Ok(p)
+}
+
+pub(crate) fn has_pressure(record: &ObjectRecord) -> bool {
+    record
+        .vector_ext
+        .value()
+        .is_some_and(|e| !e.pressure.missing())
+}
+pub(crate) fn closed(record: &ObjectRecord) -> bool {
+    record.geometry.closed && !has_pressure(record)
+}

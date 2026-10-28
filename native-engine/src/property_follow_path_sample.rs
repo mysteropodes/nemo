@@ -189,7 +189,7 @@ fn integrate(f: &mut impl FnMut(f64) -> f64, a: f64, b: f64, n: usize) -> f64 {
 }
 
 /// `Curve.getLength(v, a, b)`.
-fn range_length(v: &Values, a: f64, b: f64) -> f64 {
+pub(crate) fn range_length(v: &Values, a: f64, b: f64) -> f64 {
     if is_straight(v) {
         let (mut c, mut a) = (*v, a);
         if b < 1.0 {
@@ -282,7 +282,7 @@ fn time_at(v: &Values, offset: f64) -> Option<f64> {
 /// `Curve.getPoint`/`getTangent` (`evaluate` type 0/1): `None` outside `[0, 1]`.
 #[rustfmt::skip]
 #[allow(clippy::manual_range_contains)]
-fn evaluate(v: &Values, t: f64, tangent: bool) -> Option<[f64; 2]> {
+pub(crate) fn evaluate(v: &Values, t: f64, tangent: bool) -> Option<[f64; 2]> {
     if t < 0.0 || t > 1.0 {
         return None;
     }

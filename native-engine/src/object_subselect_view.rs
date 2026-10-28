@@ -13,6 +13,8 @@ pub(crate) struct SubselectReadItem {
     pub(crate) stable_target: ObjectTarget,
     pub(crate) closed: bool,
     pub(crate) count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) paint_count: Option<usize>,
     pub(crate) matrix: [f64; 6],
 }
 #[derive(Debug, Clone)]

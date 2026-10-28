@@ -52,3 +52,18 @@ test('paired tangent endpoint stays closed, finite and limited to broken pairs',
   assert.equal(C.intent({kind:'toggle',index:0,pairedPoint:[1,2]}),false);
   for(const row of require('../native-engine/tests/fixtures/subselect-baseline/modifiers.json').cases)for(const step of row.steps)assert.equal(C.intent(step.intent),true,row.name);
 });
+
+test('paint pages require explicit correlated opt-in and pressure paint counts stay bounded',()=>{
+  const painted={...r,subselect:{...r.subselect,closed:true,paint:true}};
+  const query={...p,subselect:{...p.subselect,paint:true}};
+  C.readCorrelate(query,painted,'document');
+  assert.throws(()=>C.readPayload({...p,subselect:{...p.subselect,paint:false}}));
+  assert.throws(()=>C.readCorrelate(p,painted,'document'));
+  assert.throws(()=>C.readCorrelate(query,r,'document'));
+  for(const patch of [{paint:false},{paint:null},{closed:false}])assert.throws(()=>C.readResult({...painted,subselect:{...painted.subselect,...patch}}));
+  const view={kind:'subselect',contextId:'scene-root',layerUid:'layer-a',frame:0,workId:'native-work-1',viewGeneration:1,cursor:0,total:1,nextCursor:null,preview:false,atRevision:7,documentSnapshotId:p.documentSnapshotId,
+    items:[{stableTarget:target,closed:false,count:2,paintCount:20,matrix:[1,0,0,1,0,0]}]};
+  C.viewResult(view);
+  for(const paintCount of [null,false,0,1,-1,257,1.5,Number.MAX_SAFE_INTEGER+1])assert.throws(()=>C.viewResult({...view,items:[{...view.items[0],paintCount}]}));
+  assert.throws(()=>C.viewResult({...view,items:[{...view.items[0],closed:true}]}));
+});

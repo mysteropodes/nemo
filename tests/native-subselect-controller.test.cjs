@@ -121,3 +121,31 @@ test('native pointer modifiers match frozen point, group, Shift and Alt transiti
     assert.equal((await f.controller.settled()).status,'applied',row.name+': '+f.notices.join(';'));assert.equal(f.sent.length,1);close(f.sent[0].payload.intent,last.intent,row.name);
   }
 });
+
+function pressureItem(f,id='pressure'){
+  const segment=point=>({point,handleIn:[0,0],handleOut:[0,0]});
+  return {...f.item,stableTarget:{...f.item.stableTarget,strokeId:id},closed:false,count:2,matrix:[1,0,0,1,0,0],
+    segments:[[20,100],[160,100]].map(segment),paintCount:4,paint:{closed:true,segments:[[20,60],[160,60],[160,140],[20,140]].map(segment)}};
+}
+test('pressure selects thick painted interiors and topmost targets while handles remain on centers',async()=>{
+  const f=fixture(),pressure=pressureItem(f),under={...f.item,matrix:[1,0,0,1,0,0]};f.setItems([under,pressure]);
+  f.controller.handle('down',f.event(80,80));await f.controller.settled();
+  f.controller.handle('down',f.event(20,100));f.controller.handle('move',f.event(20,112));f.controller.handle('up',f.event(20,112));
+  await f.controller.settled();assert.equal(f.sent.length,1,f.notices.join(';'));
+  assert.equal(f.sent[0].payload.stableTarget.strokeId,'pressure');
+  assert.deepEqual(f.sent[0].payload.intent,{kind:'move',indices:[0],delta:[0,12]});
+});
+test('pressure Alt insertion measures editable centerline rather than painted curve indices',async()=>{
+  const f=fixture();f.setItems([pressureItem(f)]);
+  f.controller.handle('down',f.event(80,80));await f.controller.settled();
+  f.controller.handle('down',f.event(80,60,{altKey:true}));await f.controller.settled();
+  assert.equal(f.sent.length,0,'the painted upper edge is not an editable center curve');
+  f.controller.handle('down',f.event(80,100,{altKey:true}));await f.controller.settled();
+  assert.equal(f.sent.length,1);assert.equal(f.sent[0].payload.intent.kind,'insert');assert.equal(f.sent[0].payload.intent.curve,0);
+});
+test('marquee topmost arbitration uses the pressure paint bounds and keeps center selection empty',async()=>{
+  const f=fixture();f.setItems([{...f.item,matrix:[1,0,0,1,0,0]},pressureItem(f)]);
+  f.controller.handle('down',f.event(0,50));await f.controller.settled();
+  f.controller.handle('move',f.event(170,90));f.controller.handle('up',f.event(170,90));await f.controller.settled();
+  assert.equal((await f.controller.setPointType('smooth')).status,'refused');assert.equal(f.sent.length,0);
+});
