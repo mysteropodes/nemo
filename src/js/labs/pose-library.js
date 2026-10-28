@@ -35,6 +35,10 @@
     }
     var snap = [];
     selectedPaths.forEach(function (p) {
+      // #2362: on a native object project the selection is presented geometry only (no Paper item, no style), so the
+      // pose names its strokes and the stamp copies them natively; a linked fill goes first, below its ribbon.
+      var ref = p && p.data && p.data.nativeStableTarget, fill = ref && p.data.linkedFill && p.data.linkedFill.data && p.data.linkedFill.data.strokeId;
+      if (ref) { if (fill) snap.push({ nativeRef: Object.assign({}, ref, { strokeId: fill }) }); snap.push({ nativeRef: ref }); return; }
       if (!p || !p.parent) return;
       snap.push(serP(p));
       if (p.data && p.data.linkedFill && p.data.linkedFill.parent) snap.push(serP(p.data.linkedFill));
@@ -57,6 +61,7 @@
       (list || []).forEach(function (s) { if (s && Array.isArray(s.point)) { s.point[0] += dx; s.point[1] += dy; } });
     };
     var steps = snap.map(function (sd) {
+      if (sd && sd.nativeRef) return { clone: { stableTarget: sd.nativeRef, offset: [dx, dy] } };
       var copy = JSON.parse(JSON.stringify(sd));
       delete copy.strokeId; delete copy.brushGroupId;
       move(copy.segments); move(copy.centerSegments);
