@@ -69,9 +69,8 @@ use span_generate::*;
 mod document_plan;
 pub(crate) use document_plan::{plan_tween, TweenRequest};
 
-#[path = "tween_path_geometry.rs"]
-mod path_geometry;
-use path_geometry::*;
+pub(crate) use crate::object_document::pressure_geometry::{add_segs, PathSampler, SegOut};
+use crate::object_document::pressure_geometry::{path_of, pressure_outline};
 
 #[path = "tween_dabs.rs"]
 mod dabs;
@@ -80,17 +79,6 @@ use dabs::*;
 #[path = "tween_texture_emit.rs"]
 mod texture_emit;
 use texture_emit::*;
-
-#[path = "tween_pressure_outline.rs"]
-mod pressure_outline;
-use pressure_outline::*;
-// Trim Stroke Ends rebuilds a trimmed ribbon with the same outline kernel (object_vector_trim.rs).
-pub(crate) use pressure_outline::{profiled_outline, width_at_frac};
-pub(crate) use resample::SegOut;
-
-#[path = "tween_outline_cleanup.rs"]
-mod outline_cleanup;
-use outline_cleanup::*;
 
 #[path = "tween_split_plan.rs"]
 mod split_plan;

@@ -175,10 +175,10 @@
         throw fault('unavailable', 'Native image-mesh read failed: ' + (e && e.message || e), 'native_read_failed');
       }
     }
-    async function subselectGeometry(o, stableTarget, intent) {
+    async function subselectGeometry(o, stableTarget, intent, paint) {
       let cursor=0,segments=[],total=null,closed=null;
       for(;;){
-        const page={cursor:cursor,limit:16};if(intent!==undefined)page.preview=intent;
+        const page={cursor:cursor,limit:16};if(intent!==undefined)page.preview=intent;if(paint)page.paint=true;
         const r=(await queryBody(o,{atRevision:o.info.contentRevision,documentSnapshotId:o.info.documentSnapshotId,stableTarget:stableTarget,subselect:page})).subselect;
         if(total!==null&&(r.total!==total||r.closed!==closed))throw fault('uncorrelated','Subselect geometry changed between pages');
         total=r.total;closed=r.closed;segments=segments.concat(r.segments);
@@ -202,6 +202,11 @@
         const geometry=await subselectGeometry(o,item.stableTarget);
         if(geometry.closed!==item.closed||geometry.segments.length!==item.count)throw fault('uncorrelated','Subselect geometry differs from its native presentation');
         item.segments=geometry.segments;
+        if(own(item,'paintCount')){
+          const paint=await subselectGeometry(o,item.stableTarget,undefined,true);
+          if(!paint.closed||paint.segments.length!==item.paintCount)throw fault('uncorrelated','Subselect paint differs from its native presentation');
+          item.paint=paint;
+        }
       }
       requireCurrent(o);return freeze({info:copyPins(o.info),presentation:o.presentation,items:items});
     }

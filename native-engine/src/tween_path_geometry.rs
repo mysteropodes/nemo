@@ -1,6 +1,6 @@
 //! Paper-compatible path smoothing and bounds used by the original vector dab/ribbon producer.
-use crate::tween_kernels::*;
-pub(super) fn path_of(s: &[SegOut], closed: bool) -> BezPath {
+use crate::object_document::pressure_geometry::*;
+pub(crate) fn path_of(s: &[SegOut], closed: bool) -> BezPath {
     let mut path = BezPath::new();
     add_segs(
         &mut path,
@@ -18,7 +18,7 @@ pub(super) fn path_of(s: &[SegOut], closed: bool) -> BezPath {
     }
     path
 }
-pub(super) fn smooth_continuous(segs: &mut [SegOut], closed: bool) {
+pub(crate) fn smooth_continuous(segs: &mut [SegOut], closed: bool) {
     let n = segs.len();
     if n < 2 {
         return;
@@ -70,7 +70,7 @@ pub(super) fn smooth_continuous(segs: &mut [SegOut], closed: bool) {
         }
     }
 }
-pub(super) fn smooth_catmull(segs: &mut [SegOut]) {
+pub(crate) fn smooth_catmull(segs: &mut [SegOut]) {
     let n = segs.len();
     if n < 2 {
         return;
@@ -103,7 +103,7 @@ pub(super) fn smooth_catmull(segs: &mut [SegOut]) {
         }
     }
 }
-pub(super) fn position_shape(segs: &mut [SegOut], closed: bool, angle: f64, center: [f64; 2]) {
+pub(crate) fn position_shape(segs: &mut [SegOut], closed: bool, angle: f64, center: [f64; 2]) {
     let r = angle * std::f64::consts::PI / 180.;
     let (c, s) = (r.cos(), r.sin());
     let rot = |p: [f64; 2]| [p[0] * c - p[1] * s, p[0] * s + p[1] * c];
@@ -122,10 +122,29 @@ pub(super) fn position_shape(segs: &mut [SegOut], closed: bool, angle: f64, cent
         p.point[1] += offset[1];
     }
 }
-pub(super) fn zero_segment(point: [f64; 2]) -> SegOut {
+pub(crate) fn zero_segment(point: [f64; 2]) -> SegOut {
     SegOut {
         point,
         handle_in: [0.; 2],
         handle_out: [0.; 2],
     }
+}
+
+/// Paper's cubic area accumulation order is observable when mirrored offset loops tie.
+pub(crate) fn outline_area(s: &[SegOut]) -> f64 {
+    let mut total = 0.;
+    for i in 0..s.len() {
+        let a = &s[i];
+        let b = &s[(i + 1) % s.len()];
+        let (x0, y0) = (a.point[0], a.point[1]);
+        let (x1, y1) = (x0 + a.handle_out[0], y0 + a.handle_out[1]);
+        let (x3, y3) = (b.point[0], b.point[1]);
+        let (x2, y2) = (x3 + b.handle_in[0], y3 + b.handle_in[1]);
+        total += 3.
+            * ((y3 - y0) * (x1 + x2) - (x3 - x0) * (y1 + y2) + y1 * (x0 - x2) - x1 * (y0 - y2)
+                + y3 * (x2 + x0 / 3.)
+                - x3 * (y2 + y0 / 3.))
+            / 20.;
+    }
+    total
 }

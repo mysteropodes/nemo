@@ -30,11 +30,11 @@
   function result(op,v){if(op!==EDIT||!exact(v,['applied','historyEntriesAdded'])||typeof v.applied!=='boolean'||v.historyEntriesAdded!==Number(v.applied))fail('Invalid subselect receipt');}
   function correlate(q,r){result(q.operation,r.result);if(q.instanceId!==r.instanceId||q.documentId!==r.documentId||q.expectedRevision+Number(r.result.applied)!==r.contentRevision)fail('Subselect receipt origin mismatch');}
   function readPayload(v){if(!exact(v,['atRevision','documentSnapshotId','stableTarget','subselect'])||!integer(v.atRevision)||typeof v.documentSnapshotId!=='string'||!v.documentSnapshotId||!target(v.stableTarget)||
-    !exact(v.subselect,['cursor','limit'],['preview'])||!integer(v.subselect.cursor,256)||!integer(v.subselect.limit,16)||!v.subselect.limit||own(v.subselect,'preview')&&!intent(v.subselect.preview))fail('Invalid subselect read selector');}
+    !exact(v.subselect,['cursor','limit'],['preview','paint'])||!integer(v.subselect.cursor,256)||!integer(v.subselect.limit,16)||!v.subselect.limit||own(v.subselect,'preview')&&!intent(v.subselect.preview)||own(v.subselect,'paint')&&v.subselect.paint!==true)fail('Invalid subselect read selector');}
   function readResult(v){
     if(!exact(v,['atRevision','documentSnapshotId','subselect'])||!integer(v.atRevision)||typeof v.documentSnapshotId!=='string'||!v.documentSnapshotId)fail('Invalid subselect read result');
     const s=v.subselect;
-    if(!exact(s,['stableTarget','closed','total','cursor','nextCursor','segments','preview'])||!target(s.stableTarget)||typeof s.closed!=='boolean'||typeof s.preview!=='boolean'||
+    if(!exact(s,['stableTarget','closed','total','cursor','nextCursor','segments','preview'],['paint'])||!target(s.stableTarget)||typeof s.closed!=='boolean'||typeof s.preview!=='boolean'||own(s,'paint')&&(s.paint!==true||s.closed!==true)||
       !integer(s.total,256)||!integer(s.cursor,s.total)||!Array.isArray(s.segments)||s.segments.length>16||s.cursor+s.segments.length>s.total||
       !s.segments.every(a=>exact(a,['point','handleIn','handleOut'])&&point(a.point)&&point(a.handleIn)&&point(a.handleOut)))fail('Invalid subselect geometry page');
     const end=s.cursor+s.segments.length;
@@ -43,7 +43,7 @@
   const sameTarget=(a,b)=>['contextId','layerUid','strokeId'].every(k=>a[k]===b[k])&&['kind','frame'].every(k=>a.frameScope[k]===b.frameScope[k]);
   function readCorrelate(p,r,documentId){readPayload(p);readResult(r);const s=r.subselect;
     if(p.atRevision!==r.atRevision||p.documentSnapshotId!==r.documentSnapshotId||!sameTarget(p.stableTarget,s.stableTarget)||s.cursor!==p.subselect.cursor||
-      s.segments.length!==Math.min(p.subselect.limit,s.total-s.cursor)||s.preview!==own(p.subselect,'preview')||
+      s.segments.length!==Math.min(p.subselect.limit,s.total-s.cursor)||s.preview!==own(p.subselect,'preview')||own(s,'paint')!==own(p.subselect,'paint')||
       documentId!==undefined&&r.documentSnapshotId!==`native-object:${documentId}:${p.atRevision}`)fail('Subselect read origin mismatch');return true;
   }
   const bytes=s=>new TextEncoder().encode(s).length;
@@ -59,8 +59,8 @@
       typeof r.preview!=='boolean'||!integer(r.total,1024)||!integer(r.cursor,r.total)||!Array.isArray(r.items)||r.items.length>8||r.cursor+r.items.length>r.total)fail('Invalid subselect selection page');
     viewPayload({atRevision:r.atRevision,documentSnapshotId:r.documentSnapshotId,view:{kind:r.kind,contextId:r.contextId,layerUid:r.layerUid,frame:r.frame,workId:r.workId,viewGeneration:r.viewGeneration,cursor:r.cursor,limit:8}});
     for(const item of r.items){
-      if(!exact(item,['stableTarget','closed','count','matrix'])||!target(item.stableTarget)||item.stableTarget.contextId!==r.contextId||item.stableTarget.layerUid!==r.layerUid||typeof item.closed!=='boolean'||
-        !integer(item.count,256)||!Array.isArray(item.matrix)||item.matrix.length!==6||!item.matrix.every(Number.isFinite))fail('Invalid native subselect transform');
+      if(!exact(item,['stableTarget','closed','count','matrix'],['paintCount'])||!target(item.stableTarget)||item.stableTarget.contextId!==r.contextId||item.stableTarget.layerUid!==r.layerUid||typeof item.closed!=='boolean'||
+        !integer(item.count,256)||own(item,'paintCount')&&(!integer(item.paintCount,256)||item.paintCount<2||item.closed!==false)||!Array.isArray(item.matrix)||item.matrix.length!==6||!item.matrix.every(Number.isFinite))fail('Invalid native subselect transform');
       const m=item.matrix,det=m[0]*m[3]-m[1]*m[2];if(!Number.isFinite(det)||Math.abs(det)<1e-12)fail('Singular native subselect transform');
     }
     const end=r.cursor+r.items.length;if(end===r.total?r.nextCursor!==null:r.nextCursor!==end||!r.items.length)fail('Invalid subselect selection progress');

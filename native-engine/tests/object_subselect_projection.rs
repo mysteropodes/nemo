@@ -183,3 +183,128 @@ fn subselect_singular_transform_refuses_without_geometry_fallback() {
     assert!(matrices(&packet, 0).is_err());
     assert_eq!(owner.history_depths(), (0, 0));
 }
+
+#[test]
+fn pressure_preview_and_commit_use_the_painted_pivot_under_scaled_rotated_parent() {
+    let frozen: Value =
+        serde_json::from_str(include_str!("fixtures/subselect-baseline/pressure.json")).unwrap();
+    let case = &frozen["cases"][15];
+    assert_eq!(case["name"], "line");
+    assert_eq!(case["intent"]["kind"], "move");
+    assert!(case["profile"].is_array());
+    let segment = |s: &Value, width: bool| {
+        let p = |key: &str| json!({"x":s[key][0],"y":s[key][1]});
+        let mut out =
+            json!({"point":p("point"),"handleIn":p("handleIn"),"handleOut":p("handleOut")});
+        if width {
+            out["width"] = s["width"].clone();
+        }
+        out
+    };
+    let mut input = source();
+    let record = &mut input["objects"][0];
+    record["geometry"]["segments"] = json!(case["before"]["outline"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| segment(s, false))
+        .collect::<Vec<_>>());
+    record["vectorExt"] = json!({"pressure":{
+        "centerSegments":case["before"]["center"].as_array().unwrap().iter().map(|s| segment(s, true)).collect::<Vec<_>>(),
+        "widthProfile":case["profile"],"strokeProfile":"bulge","profileBase":8
+    }});
+    let mut owner = support::owner_of(&input);
+    let before = support::bytes(&owner);
+    let snapshot = owner.acquire_snapshot(0).unwrap();
+    let selector = ObjectFrameSelector {
+        instance_id: snapshot.instance_id(),
+        document_id: snapshot.document_id(),
+        content_revision: 0,
+        document_snapshot_id: snapshot.snapshot_id(),
+        context_id: "scene-root",
+        scope_kind: FrameScopeKind::Authored,
+        frame: 0,
+    };
+    let packet = prepare_object_frame(&snapshot, &selector).unwrap();
+    let intent = serde_json::from_value(case["intent"].clone()).unwrap();
+    let candidate =
+        crate::object_codec::subselect::record::plan(&snapshot.document().objects()[0], &intent)
+            .unwrap();
+    let preview = super::matrices_with_preview(&packet, 0, Some(&candidate)).unwrap()[&0];
+    // Negative control: substituting the editable centerline for the painted
+    // ribbon changes both the layer rest bounds and the element Motion pivot.
+    let mut center_pivot = candidate.clone();
+    center_pivot.geometry.segments = candidate
+        .vector_ext
+        .value()
+        .unwrap()
+        .pressure
+        .value()
+        .unwrap()
+        .center_segments
+        .value()
+        .unwrap()
+        .iter()
+        .map(|s| crate::object_document::ObjectSegment {
+            point: s.point.clone(),
+            handle_in: s.handle_in.clone(),
+            handle_out: s.handle_out.clone(),
+        })
+        .collect();
+    let wrong = super::matrices_with_preview(&packet, 0, Some(&center_pivot)).unwrap()[&0];
+    assert!(preview.iter().zip(wrong).any(|(a, b)| (a - b).abs() > 1e-3));
+    assert_eq!(support::bytes(&owner), before, "preview is detached");
+    let q = json!({"apiVersion":2,"requestId":"pressure-parent","instanceId":owner.instance_id(),"documentId":owner.document_id(),"operation":"command.document.object.subselect.edit","expectedRevision":0,"payload":{"command":"object.subselect.edit","stableTarget":support::target("L1",0,"s-0"),"intent":case["intent"]}});
+    assert!(
+        owner
+            .try_dispatch_object_command(&serde_json::from_value(q).unwrap())
+            .unwrap()
+            .unwrap()
+            .ok
+    );
+    let after = owner.acquire_snapshot(owner.content_revision()).unwrap();
+    let selector = ObjectFrameSelector {
+        instance_id: after.instance_id(),
+        document_id: after.document_id(),
+        content_revision: after.content_revision(),
+        document_snapshot_id: after.snapshot_id(),
+        context_id: "scene-root",
+        scope_kind: FrameScopeKind::Authored,
+        frame: 0,
+    };
+    let packet = prepare_object_frame(&after, &selector).unwrap();
+    for (a, b) in preview.into_iter().zip(matrices(&packet, 0).unwrap()[&0]) {
+        near(a, b);
+    }
+    let scene = prepare_object_render_scene(&packet, &selector).unwrap();
+    let entry = scene
+        .entries()
+        .find(|e| e.source().source_object_index() == 0)
+        .unwrap();
+    let rendered: Vec<_> = entry
+        .path()
+        .elements()
+        .iter()
+        .filter_map(|e| match e {
+            PathEl::MoveTo(p) | PathEl::LineTo(p) | PathEl::CurveTo(_, _, p) => Some(*p),
+            _ => None,
+        })
+        .collect();
+    assert!(rendered.len() >= candidate.geometry.segments.len());
+    // This joins the subselect matrix with the actual native paint consumer,
+    // so two equally wrong centerline-based read matrices cannot pass.
+    for (s, p) in candidate.geometry.segments.iter().zip(rendered) {
+        let projected = Affine::new(preview)
+            * Point::new(s.point.x.as_f64().unwrap(), s.point.y.as_f64().unwrap());
+        near(projected.x, p.x);
+        near(projected.y, p.y);
+    }
+    let saved = serde_json::to_value(&after.document().objects()[0]).unwrap();
+    for field in ["widthProfile", "strokeProfile", "profileBase"] {
+        assert_eq!(
+            saved["vectorExt"]["pressure"][field],
+            input["objects"][0]["vectorExt"]["pressure"][field]
+        );
+    }
+    assert_eq!(owner.history_depths(), (1, 0));
+}

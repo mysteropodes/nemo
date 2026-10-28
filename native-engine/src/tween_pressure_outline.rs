@@ -1,14 +1,13 @@
 //! Pressure outline reconstruction from the interpolated centerline and widths.
-use crate::request_receipts::DispatchErrorCode;
-use crate::tween_kernels::*;
-pub(super) fn pressure_outline(center: &[SegOut], widths: &[f64]) -> R<Vec<SegOut>> {
+use crate::object_document::pressure_geometry::*;
+pub(crate) fn pressure_outline(center: &[SegOut], widths: &[f64]) -> R<Vec<SegOut>> {
     if center.len() < 2 || center.len() != widths.len() {
-        return Err(DispatchErrorCode::InvalidRequest);
+        return Err(Error::InvalidRequest);
     }
     let sampler = PathSampler::new(&path_of(center, false));
     let steps = (sampler.total / 6.).round().max(8.) as usize;
     if steps > 8192 {
-        return Err(DispatchErrorCode::Unavailable);
+        return Err(Error::Unavailable);
     }
     let mut lens = vec![0.];
     for w in center.windows(2) {
@@ -35,26 +34,16 @@ pub(super) fn pressure_outline(center: &[SegOut], widths: &[f64]) -> R<Vec<SegOu
 }
 fn tangent(a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
     let d = [b[0] - a[0], b[1] - a[1]];
-    let l = d[0].hypot(d[1]);
+    let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
     if l < 0.0001 {
         [1., 0.]
     } else {
-        [d[0] / l, d[1] / l]
+        [d[0] * (1. / l), d[1] * (1. / l)]
     }
 }
-fn cap(prev: &mut SegOut, next: &mut SegOut, center: [f64; 2], dir: [f64; 2], hw: f64) -> SegOut {
-    let k = hw * 0.5522847498307936;
-    prev.handle_out = [dir[0] * k, dir[1] * k];
-    next.handle_in = [dir[0] * k, dir[1] * k];
-    SegOut {
-        point: [center[0] + dir[0] * hw, center[1] + dir[1] * hw],
-        handle_in: [-dir[1] * k, dir[0] * k],
-        handle_out: [dir[1] * k, -dir[0] * k],
-    }
-}
-pub(super) fn outline_samples(pts: &[[f64; 2]], widths: &[f64]) -> R<Vec<SegOut>> {
+pub(crate) fn outline_samples(pts: &[[f64; 2]], widths: &[f64]) -> R<Vec<SegOut>> {
     if pts.len() < 2 || pts.len() != widths.len() {
-        return Err(DispatchErrorCode::InvalidRequest);
+        return Err(Error::InvalidRequest);
     }
     let n = pts.len();
     let avg = widths.iter().sum::<f64>() / n as f64;
@@ -81,23 +70,23 @@ pub(super) fn outline_samples(pts: &[[f64; 2]], widths: &[f64]) -> R<Vec<SegOut>
     for s in &mut right {
         std::mem::swap(&mut s.handle_in, &mut s.handle_out);
     }
-    let end = cap(
+    let end = arc::cap(
         &mut left[n - 1],
         &mut right[0],
         pts[n - 1],
         tangents[n - 1],
         (widths[n - 1] / 2.).max(0.3),
     );
-    let start = cap(
+    let start = arc::cap(
         &mut right[n - 1],
         &mut left[0],
         pts[0],
         [-tangents[0][0], -tangents[0][1]],
         (widths[0] / 2.).max(0.3),
     );
-    left.push(end);
+    left.extend(end);
     left.extend(right);
-    left.push(start);
+    left.extend(start);
     cleanup_outline(left)
 }
 
@@ -116,23 +105,26 @@ fn ring_outline(pts: &[[f64; 2]], widths: &[f64], avg: f64) -> R<Vec<SegOut>> {
     }
     smooth_continuous(&mut left, true);
     smooth_continuous(&mut right, true);
-    let la = path_of(&left, true).area();
-    let ra = path_of(&right, true).area();
-    let (mut outer, mut inner, oa, ia) = if la.abs() >= ra.abs() {
-        (left, right, la, ra)
+    let la = outline_area(&left);
+    let ra = outline_area(&right);
+    let (outer, inner) = if la.abs() >= ra.abs() {
+        (left, right)
     } else {
-        (right, left, ra, la)
+        (right, left)
     };
-    // The baseline boolean has no hole for collapsed/degenerate offset loops.
-    if oa * ia <= 0. {
+    let mut result = boolean::subtract(&outer, &inner)?;
+    // The original producer falls back to its untouched offset if the boolean has no hole.
+    if result.len() < 2 {
         return Ok(outer);
     }
-    if oa < 0. {
-        reverse_outline(&mut outer);
-    }
-    if ia > 0. {
-        reverse_outline(&mut inner);
-    }
+    let index = result
+        .iter()
+        .enumerate()
+        .max_by(|(_, a), (_, b)| outline_area(a).abs().total_cmp(&outline_area(b).abs()))
+        .unwrap()
+        .0;
+    let outer = result.remove(index);
+    let inner = result.remove(0);
     let (mut best, mut ai, mut bi) = (f64::INFINITY, 0, 0);
     for (i, a) in outer.iter().enumerate() {
         for (j, b) in inner.iter().enumerate() {
@@ -151,13 +143,6 @@ fn ring_outline(pts: &[[f64; 2]], widths: &[f64], avg: f64) -> R<Vec<SegOut>> {
     out.extend_from_slice(&outer[ai..]);
     Ok(out)
 }
-fn reverse_outline(s: &mut Vec<SegOut>) {
-    s.reverse();
-    for s in s {
-        std::mem::swap(&mut s.handle_in, &mut s.handle_out);
-    }
-}
-
 /// The baseline `widthAtFrac` (tools.js @1065e9d8): a width profile's value at an arc-length fraction, held at its ends.
 pub(crate) fn width_at_frac(profile: &[(f64, f64)], frac: f64) -> Option<f64> {
     let (first, last) = (profile.first()?, profile.last()?);
@@ -184,19 +169,21 @@ pub(crate) fn width_at_frac(profile: &[(f64, f64)], frac: f64) -> Option<f64> {
 /// `pressure_outline`, each width read from the arc-length profile instead of between the anchors.
 pub(crate) fn profiled_outline(center: &[SegOut], profile: &[(f64, f64)]) -> R<Vec<SegOut>> {
     if center.len() < 2 || profile.is_empty() {
-        return Err(DispatchErrorCode::InvalidRequest);
+        return Err(Error::InvalidRequest);
     }
     let sampler = PathSampler::new(&path_of(center, false));
     let steps = (sampler.total / 6.).round().max(8.) as usize;
     if steps > 8192 {
-        return Err(DispatchErrorCode::Unavailable);
+        return Err(Error::Unavailable);
     }
     let (mut pts, mut ws) = (vec![], vec![]);
     for i in 0..=steps {
         let d = sampler.total * i as f64 / steps as f64;
         let p = sampler.point_at(d);
         pts.push([p.x, p.y]);
-        ws.push(width_at_frac(profile, d / sampler.total.max(0.0001)).ok_or(DispatchErrorCode::InvalidRequest)?);
+        ws.push(
+            width_at_frac(profile, d / sampler.total.max(0.0001)).ok_or(Error::InvalidRequest)?,
+        );
     }
     outline_samples(&pts, &ws)
 }

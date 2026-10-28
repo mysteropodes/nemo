@@ -55,8 +55,9 @@ impl ObjectCompositionWitness {
                 .ok_or("Subselect transform is absent")?;
             items.push(SubselectReadItem {
                 stable_target: r.target.clone(),
-                closed: r.geometry.closed,
+                closed: record::closed(r),
                 count: anchors.len(),
+                paint_count: record::has_pressure(r).then_some(r.geometry.segments.len()),
                 matrix,
             });
         }

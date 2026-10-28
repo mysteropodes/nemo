@@ -1,6 +1,7 @@
 //! Pressure records use the same native centreline fields as editing and rendering.
 use crate::object_document::{ObjectRecord, Presence, PressureFields, VectorExt};
 use crate::tween_kernels::*;
+use crate::request_receipts::DispatchErrorCode;
 
 pub(super) fn set_pressure(record: &mut ObjectRecord, center: &[SegOut], widths: &[f64]) -> R<()> {
     let segments = native_segments(center)?;
@@ -28,7 +29,14 @@ pub(super) fn set_pressure(record: &mut ObjectRecord, center: &[SegOut], widths:
         profile_base: Presence::Missing,
     });
     record.vector_ext = Presence::Present(ext);
-    let outline = pressure_outline(center, widths)?;
+    let outline = pressure_outline(center, widths).map_err(|error| match error {
+        crate::object_document::pressure_geometry::Error::InvalidRequest => {
+            DispatchErrorCode::InvalidRequest
+        }
+        crate::object_document::pressure_geometry::Error::Unavailable => {
+            DispatchErrorCode::Unavailable
+        }
+    })?;
     if outline.len()
         > crate::object_document::object_group_kernels::object_boolean_ops::stack::MAX_SEGMENTS
     {

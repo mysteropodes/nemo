@@ -1,7 +1,7 @@
 //! Paper.js 0.12.18 fat-line cubic clipping, retained for baseline pressure crossing parity.
 //! Adapted from https://github.com/paperjs/paper.js/blob/v0.12.18/src/path/Curve.js
 //! Copyright (c) 2011–2020 Jürg Lehni & Jonathan Puckey. MIT license (see tween_paper_license.txt).
-use crate::tween_kernels::outline_cleanup::crossings::*;
+use crate::object_document::pressure_geometry::outline_cleanup::crossings::*;
 type V = [f64; 8];
 type Hull = Vec<[f64; 2]>;
 fn signed(v: V, x: f64, y: f64) -> f64 {
@@ -27,7 +27,7 @@ fn signed(v: V, x: f64, y: f64) -> f64 {
             }
     }
 }
-pub(super) fn split(v: V, t: f64) -> (V, V) {
+pub(crate) fn split(v: V, t: f64) -> (V, V) {
     let u = 1. - t;
     let l = [u * v[0] + t * v[2], u * v[1] + t * v[3]];
     let m = [u * v[2] + t * v[4], u * v[3] + t * v[5]];
@@ -170,7 +170,7 @@ fn visit(
         visit(a, b, flip, depth, calls, tn, tx, u0, u1, out)
     }
 }
-pub(super) fn paper_crossings(a: kurbo::CubicBez, b: kurbo::CubicBez) -> R<Vec<(f64, f64)>> {
+pub(crate) fn paper_crossings(a: kurbo::CubicBez, b: kurbo::CubicBez) -> R<Vec<(f64, f64)>> {
     let values = |c: kurbo::CubicBez| {
         [
             c.p0.x, c.p0.y, c.p1.x, c.p1.y, c.p2.x, c.p2.y, c.p3.x, c.p3.y,
@@ -191,7 +191,7 @@ pub(super) fn paper_crossings(a: kurbo::CubicBez, b: kurbo::CubicBez) -> R<Vec<(
         &mut out,
     );
     if calls >= 4096 {
-        return Err(crate::request_receipts::DispatchErrorCode::Unavailable);
+        return Err(Error::Unavailable);
     }
     for (t, p) in [(0., a.p0), (1., a.p3)] {
         for (u, q) in [(0., b.p0), (1., b.p3)] {
