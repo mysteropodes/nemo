@@ -197,10 +197,8 @@ async fn advertised_payload_schema_names_every_key_and_operation_template() {
         "history.undo",
         "history.redo",
         "diagnostics.replay",
-        "project.open",
-        "project.new",
-        "project.saveAs",
-        "project.export",
+        // #2510 project lifecycle writes.
+        "project.open", "project.new", "project.saveAs", "project.export",
     ] {
         assert!(description.contains(operation), "{operation} is templated");
     }

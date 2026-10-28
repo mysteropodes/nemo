@@ -117,6 +117,10 @@
       if (!payloadValid(request.operation, request.payload)) return fail(request, 'invalid_request', 'Operation payload is invalid.');
       if (!ports.available()) return fail(request, 'unavailable', 'Project operations need the desktop app.');
       if (busy) return fail(request, 'unavailable', 'A project operation is already in progress.');
+      // The sidecar requires documentId and expectedRevision on writes; an open project must be the one the client read.
+      var read = current();
+      if (read && (request.documentId !== read.documentId || request.expectedRevision !== read.contentRevision))
+        return fail(request, 'stale_revision', 'Read a current snapshot before changing the project.');
       busy = true;
       var result = (async function () {
         try { return await RUN[request.operation](request); }

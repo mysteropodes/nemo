@@ -800,6 +800,17 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "D35/#2099 transport controls: exact clean measured source 981b6ffae9698e4f286cb6f9e392d98455229ee3, MCP tree bc8d26bf665971ac1f3fdcabf8ab775afc755d02, cargo-llvm-cov 0.9.1; full 155 tests/0 failed across 20 binaries. Report reports/d35-coverage-20261016T195110Z/coverage.json SHA256 7ee0c9ee65f2ff158d75f077057890bf6b353ddb8321c428fbf1eba0f35f669d. Normal full producer emitted no executable file record; noRegions and its reason are derived by the existing baseline builder. Current 5622649613c6d03199d4d96af3bd5327c9d296bb has byte-identical complete MCP source. Only this new entry is added; every existing file/aggregate floor, exclusion and prior metadata is preserved. Not whole-crate coverage acceptance."
+    },
+    "nemo-mcp/src/project_contract.rs": {
+      "lines": 100,
+      "regions": 100,
+      "functions": 100,
+      "note": "#2510: measured working tree on d76a4cb3 (nemo-mcp crate with the project.* contract); pinned cargo-llvm-cov via coverage-rust.cjs, report reports/cov2510b/coverage.json SHA256 ce01c0dacbd43dbe445d6b9ddf94490df8beb0c0fef6131a4e8c6722cca48d2a. Entry derived by the existing buildBaseline from the actual export. Only these two new source entries are added; all prior file and aggregate floors, exclusions, tool pin and historical metadata are preserved. All existing floors held."
+    },
+    "nemo-mcp/src/project_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "#2510: measured working tree on d76a4cb3 (nemo-mcp crate with the project.* contract); pinned cargo-llvm-cov via coverage-rust.cjs, report reports/cov2510b/coverage.json SHA256 ce01c0dacbd43dbe445d6b9ddf94490df8beb0c0fef6131a4e8c6722cca48d2a. Entry derived by the existing buildBaseline from the actual export. Only these two new source entries are added; all prior file and aggregate floors, exclusions, tool pin and historical metadata are preserved. All existing floors held."
     }
   }
 }

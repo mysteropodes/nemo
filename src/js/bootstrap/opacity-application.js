@@ -72,8 +72,10 @@
     });
     return found || NemoOpacityCapability.DESCRIPTOR.id;
   }
-  // #2510: project.* runs the app's own lifecycle flows; ports resolve at call time (SMProject loads later).
-  var projectLifecycle = root.NemoProjectLifecycle && root.NemoProjectLifecycle.create({
+  // #2510: project.* runs the app's own lifecycle flows. It is created on first use, since the lifecycle module and
+  // SMProject both load after this bootstrap, and its ports resolve at call time.
+  var projectLifecycle = null;
+  function lifecycle() { return projectLifecycle || (projectLifecycle = root.NemoProjectLifecycle.create({
     available: function () { return !!(root.__TAURI__ && root.__TAURI__.core && root.SMProject && root.NemoNativeObjectProject); },
     objectProject: function () { return root.SMProject && root.SMProject.nativeObjectProject(); },
     info: function () { var s = root.NemoNativeObjectProject.desktop(root); return s && s.info(); },
@@ -85,10 +87,10 @@
       svg: function (dir, range) { return root.SMExport.exportSVGSequenceToDir(dir, range); },
       lottie: function (path, range) { return root.SMExport.exportLottieToPath(path, range); },
     },
-  });
+  })); }
   root.NemoApplication = {
     handle: function (request) {
-      if (projectLifecycle && request && projectLifecycle.operations.indexOf(request.operation) >= 0) return projectLifecycle.handle(request);
+      if (root.NemoProjectLifecycle && request && root.NemoProjectLifecycle.OPERATIONS.indexOf(request.operation) >= 0) return lifecycle().handle(request);
       return registry.handlerFor(capabilityFor(request && request.operation))(request);
     },
     setInstanceId: app.setInstanceId,

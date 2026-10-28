@@ -257,7 +257,7 @@
             "type": "object"
           }
         ],
-        "description": "Operation body. Always a JSON object, never a JSON-encoded string. Copy the template for the chosen operation:\n  property.set           {\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.key.set       {\"frame\":12,\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.key.remove    {\"frame\":12,\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.animation.set {\"animated\":true,\"layerId\":\"layer-1\",\"property\":\"opacity\"}\n  history.undo           {}\n  history.redo           {}\n  diagnostics.replay     {\"request\":{\"operation\":\"property.set\",\"payload\":{\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}}}\n  project.open           {\"path\":\"/Users/me/Documents/project.nemo\"}\n  project.new            {\"canvasH\":1080,\"canvasW\":1920,\"fps\":24}\n  project.saveAs         {\"path\":\"/Users/me/Documents/project.nemo\"}\n  project.export         {\"destination\":\"/Users/me/Documents/frame.png\",\"end\":0,\"format\":\"png\",\"start\":0}\n`property` selects a registered capability. The matching branch projects its exact input fields and JSON types; each full input/output descriptor is also exposed in `x-nemo-registeredCapabilities` for discovery clients.",
+        "description": "Operation body. Always a JSON object, never a JSON-encoded string. Copy the template for the chosen operation:\n  property.set           {\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.key.set       {\"frame\":12,\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.key.remove    {\"frame\":12,\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.animation.set {\"animated\":true,\"layerId\":\"layer-1\",\"property\":\"opacity\"}\n  history.undo           {}\n  history.redo           {}\n  diagnostics.replay     {\"request\":{\"operation\":\"property.set\",\"payload\":{\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}}}\n  project.open           {\"path\":\"/Users/example/Documents/project.json\"}\n  project.new            {\"canvasH\":1080,\"canvasW\":1920,\"fps\":24}\n  project.saveAs         {\"path\":\"/Users/example/Documents/project.json\"}\n  project.export         {\"destination\":\"/Users/example/Documents/export\",\"end\":0,\"format\":\"png\",\"start\":0}\n`property` selects a registered capability. The matching branch projects its exact input fields and JSON types; each full input/output descriptor is also exposed in `x-nemo-registeredCapabilities` for discovery clients.",
         "examples": [
           {
             "layerId": "layer-1",
@@ -294,7 +294,7 @@
             }
           },
           {
-            "path": "/Users/me/Documents/project.nemo"
+            "path": "/Users/example/Documents/project.json"
           },
           {
             "canvasH": 1080,
@@ -302,10 +302,10 @@
             "fps": 24
           },
           {
-            "path": "/Users/me/Documents/project.nemo"
+            "path": "/Users/example/Documents/project.json"
           },
           {
-            "destination": "/Users/me/Documents/frame.png",
+            "destination": "/Users/example/Documents/export",
             "end": 0,
             "format": "png",
             "start": 0

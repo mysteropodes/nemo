@@ -38,8 +38,8 @@ function app(options = {}) {
   };
   return { calls, lifecycle: Lifecycle.create(ports), setDirty: (value) => { dirty = value; } };
 }
-const request = (operation, payload, requestId = 'r-' + operation) =>
-  ({ apiVersion: 1, requestId, instanceId: 'instance-A', operation, payload });
+const request = (operation, payload, requestId = 'r-' + operation, documentId = 'doc-1', expectedRevision = 2) =>
+  ({ apiVersion: 1, requestId, instanceId: 'instance-A', documentId, expectedRevision, operation, payload });
 
 test('open with no project runs the ordinary Open path and answers the opened document', async () => {
   const { calls, lifecycle } = app({ active: false });
@@ -139,4 +139,13 @@ test('one project operation runs at a time', async () => {
   const second = await lifecycle.handle(request('project.saveAs', { path: '/tmp/B.json' }, 'two'));
   assert.deepEqual([second.ok, second.error.code], [false, 'unavailable']);
   assert.equal((await first).ok, true);
+});
+
+test('a request that did not read the open project refuses as stale before any flow runs', async () => {
+  const { calls, lifecycle } = app();
+  for (const [documentId, revision] of [['doc-0', 2], ['doc-1', 1]]) {
+    const response = await lifecycle.handle(request('project.saveAs', { path: '/tmp/A.json' }, 'stale-' + documentId + revision, documentId, revision));
+    assert.deepEqual([response.ok, response.error.code], [false, 'stale_revision']);
+  }
+  assert.deepEqual(calls, []);
 });

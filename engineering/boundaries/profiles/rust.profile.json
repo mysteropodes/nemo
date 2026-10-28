@@ -2087,7 +2087,9 @@
         "src/native_import_asset_contract.rs",
         "src/native_import_asset_contract_tests.rs",
         "src/native_history_read_contract.rs",
-        "src/native_history_read_contract_tests.rs"
+        "src/native_history_read_contract_tests.rs",
+        "src/project_contract.rs",
+        "src/project_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

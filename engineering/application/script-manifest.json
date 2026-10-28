@@ -325,7 +325,6 @@
     {"src":"js/adapters/native-vector-export-adapter.js"},
     {"src":"js/adapters/native-media-export-adapter.js"},
     {"src":"js/application/native-edit-guard.js"},
-    {"src":"js/application/project-lifecycle.js"},
     {"src":"js/bootstrap/opacity-application.js"},
     {"src":"js/bootstrap/native-opacity-application.js"},
     {"src":"js/adapters/application-mcp.js"},
@@ -345,6 +344,7 @@
     {"src":"js/application/presenter-seam.js"},
     {"src":"js/application/app-menu-targets.js"},
     {"src":"js/application/shortcut-targets.js"},
+    {"src":"js/application/project-lifecycle.js"},
     {"src":"js/adapters/native-layer-list-presenter.js"},
     {"src":"js/adapters/native-symmetry-desktop.js"},
     {"src":"js/adapters/native-symmetry-ui.js"}

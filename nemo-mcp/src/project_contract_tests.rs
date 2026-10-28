@@ -142,3 +142,22 @@ fn command_schema_advertises_project_templates() {
         .iter()
         .any(|branch| branch["required"] == json!(["canvasW", "canvasH", "fps"])));
 }
+
+#[test]
+fn a_project_only_schema_carries_only_the_project_branches() {
+    let mut generator = schemars::SchemaGenerator::default();
+    let schema = serde_json::to_value(crate::capability_contract::payload_schema(
+        &mut generator,
+        &PROJECT,
+    ))
+    .unwrap();
+    let branches = schema["anyOf"].as_array().unwrap();
+    assert_eq!(branches.len(), PROJECT.len(), "one branch per project operation, no legacy or property branch");
+}
+
+#[test]
+fn a_frame_beyond_i64_is_still_structurally_an_integer() {
+    // Range belongs to the document owner; admission only checks the JSON type.
+    let payload = json!({"property": "opacity", "layerId": "layer-1", "value": 40, "frame": u64::MAX});
+    assert!(Operation::PropertyKeySet.check_payload(&payload).is_ok());
+}

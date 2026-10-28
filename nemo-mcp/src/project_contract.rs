@@ -92,11 +92,11 @@ fn integer_problem(value: &Value, min: u64, max: u64) -> Option<String> {
 
 pub(crate) fn payload_example(operation: &Operation) -> Value {
     match operation {
-        Operation::ProjectOpen => json!({"path": "/Users/me/Documents/project.nemo"}),
+        Operation::ProjectOpen => json!({"path": "/Users/example/Documents/project.json"}),
         Operation::ProjectNew => json!({"canvasW": 1920, "canvasH": 1080, "fps": 24}),
-        Operation::ProjectSaveAs => json!({"path": "/Users/me/Documents/project.nemo"}),
+        Operation::ProjectSaveAs => json!({"path": "/Users/example/Documents/project.json"}),
         _ => {
-            json!({"format": "png", "destination": "/Users/me/Documents/frame.png", "start": 0, "end": 0})
+            json!({"format": "png", "destination": "/Users/example/Documents/export", "start": 0, "end": 0})
         }
     }
 }
