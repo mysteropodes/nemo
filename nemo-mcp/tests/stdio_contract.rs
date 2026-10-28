@@ -197,6 +197,10 @@ async fn advertised_payload_schema_names_every_key_and_operation_template() {
         "history.undo",
         "history.redo",
         "diagnostics.replay",
+        "project.open",
+        "project.new",
+        "project.saveAs",
+        "project.export",
     ] {
         assert!(description.contains(operation), "{operation} is templated");
     }
@@ -206,7 +210,7 @@ async fn advertised_payload_schema_names_every_key_and_operation_template() {
     assert!(description.contains("x-nemo-registeredCapabilities"));
     assert!(description.contains("never a JSON-encoded string"));
     let examples = payload["examples"].as_array().unwrap();
-    assert_eq!(examples.len(), 7, "one example per write operation");
+    assert_eq!(examples.len(), 11, "one example per write operation");
     assert_eq!(examples[0]["property"], "opacity");
 
     // Both tools spell instance identity the same way.

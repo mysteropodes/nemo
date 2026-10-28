@@ -134,6 +134,9 @@ fn validate_fixed_payload(
     catalog: &CapabilityCatalog,
     expected: &str,
 ) -> Result<(), RequestError> {
+    if crate::project_contract::is_project_operation(operation) {
+        return crate::project_contract::validate(operation, payload, expected);
+    }
     if *operation != Operation::DiagnosticsReplay {
         return validate_legacy_fixed_fields(payload, expected);
     }
@@ -153,8 +156,8 @@ fn validate_fixed_payload(
         )));
     }
     let recorded: Operation = match serde_json::from_value(request["operation"].clone()) {
-        Ok(operation) => operation,
-        Err(_) => {
+        Ok(operation) if !crate::project_contract::is_project_operation(&operation) => operation,
+        _ => {
             return Err(RequestError::MalformedPayload(format!(
                 "payload.request.operation is not a registered transport operation; {expected}"
             )));
@@ -240,7 +243,9 @@ pub(crate) fn payload_schema(generator: &mut SchemaGenerator, operations: &[Oper
     let has_property_operation = operations.iter().any(Operation::is_property_operation);
     let mut branches = Vec::new();
     if operations.iter().any(|operation| {
-        !operation.is_property_operation() && *operation != Operation::DiagnosticsReplay
+        !operation.is_property_operation()
+            && *operation != Operation::DiagnosticsReplay
+            && !crate::project_contract::is_project_operation(operation)
     }) {
         branches.push(legacy_fixed_payload_schema());
     }
@@ -260,6 +265,7 @@ pub(crate) fn payload_schema(generator: &mut SchemaGenerator, operations: &[Oper
     if operations.contains(&Operation::DiagnosticsReplay) {
         branches.push(replay_payload_schema());
     }
+    branches.extend(crate::project_contract::payload_schemas(operations));
     serde_json::from_value(json!({
         "type": "object",
         "description": format!(
@@ -319,7 +325,8 @@ fn replay_payload_schema() -> Value {
                 "type": "object",
                 "required": ["operation", "payload"],
                 "properties": {
-                    "operation": {"enum": Operation::labels()},
+                    "operation": {"enum": Operation::labels().iter()
+                        .filter(|label| !label.starts_with("project.")).collect::<Vec<_>>()},
                     "payload": true
                 }
             }

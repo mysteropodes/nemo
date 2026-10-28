@@ -106,10 +106,14 @@
     }
     // A native object project answers v1 with a typed refusal carrying its own identity. The MCP transport only replies
     // to a returned response, so a throw here left every v1 read waiting out the host's 30 s timeout (#2510).
+    // snapshot answers the owner's own layer state, so a client can verify a native edit; other v1 reads refuse.
     var handleV1 = function(request){var p=objectProject();if(!p)return v1.handle(request);var current=p.info();
-      return {apiVersion:1,requestId:request&&typeof request.requestId==='string'?request.requestId:'',
-        instanceId:current.instanceId,documentId:current.documentId,revision:current.contentRevision,ok:false,
-        error:{code:'unavailable',message:'Native object projects answer only native operations (apiVersion 2).'}};};
+      var out={apiVersion:1,requestId:request&&typeof request.requestId==='string'?request.requestId:'',
+        instanceId:current.instanceId,documentId:current.documentId,revision:current.contentRevision};
+      if(request&&request.operation==='snapshot')return Object.assign(out,{ok:true,result:{frame:ports.currentFrame(),
+        totalFrames:current.totalFrames,canvasW:current.canvasW,canvasH:current.canvasH,fps:current.fps,
+        layers:(current.layers||[]).map(function(layer){return {id:layer.layerUid,name:layer.name,visible:layer.visible,locked:layer.locked,shy:layer.shy};})}});
+      return Object.assign(out,{ok:false,error:{code:'unavailable',message:'Native object projects answer only snapshot and native operations (apiVersion 2).'}});};
 
     function reenterLegacy() { return false; }
     function disposeSession(session) {

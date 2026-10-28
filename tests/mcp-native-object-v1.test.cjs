@@ -7,20 +7,30 @@ const Operations = require('../src/js/application/native-opacity-operations.js')
 
 function operations(project) {
   const handled = [];
-  const ops = Operations.create({ blocksLegacy: () => false }, { objectProject: () => project }, {},
+  const ops = Operations.create({ blocksLegacy: () => false }, { objectProject: () => project, currentFrame: () => 3 }, {},
     { create: () => ({}) }, { create: () => ({ handle(request) { handled.push(request.operation); return { legacy: true }; } }) });
   return { ops, handled };
 }
+const project = { blocksLegacy: () => true, info: () => ({ instanceId: 'instance-A', documentId: 'native-object-document-1',
+  contentRevision: 4, totalFrames: 21, canvasW: 320, canvasH: 180, fps: 24, layers: [
+    { layerUid: 'layer-1', name: 'Ink', visible: false, locked: true, shy: false, color: '#5FA875', parentLayerUid: null }] }) };
+const envelope = (operation) => ({ apiVersion: 1, requestId: 'r-' + operation, instanceId: 'instance-A',
+  documentId: 'native-object-document-1', revision: 4 });
 
-test('a v1 request on a native object project answers a typed refusal with the project identity', () => {
-  const project = { blocksLegacy: () => true,
-    info: () => ({ instanceId: 'instance-A', documentId: 'native-object-document-1', contentRevision: 4 }) };
+test('a v1 snapshot on a native object project answers the owner layer state', () => {
   const { ops, handled } = operations(project);
-  for (const operation of ['snapshot', 'capabilities', 'property.set']) {
-    const response = ops.handleV1({ apiVersion: 1, requestId: 'r-' + operation, operation, payload: {} });
-    assert.deepEqual(response, { apiVersion: 1, requestId: 'r-' + operation, instanceId: 'instance-A',
-      documentId: 'native-object-document-1', revision: 4, ok: false,
-      error: { code: 'unavailable', message: 'Native object projects answer only native operations (apiVersion 2).' } });
+  assert.deepEqual(ops.handleV1({ apiVersion: 1, requestId: 'r-snapshot', operation: 'snapshot', payload: {} }),
+    Object.assign(envelope('snapshot'), { ok: true, result: { frame: 3, totalFrames: 21, canvasW: 320, canvasH: 180, fps: 24,
+      layers: [{ id: 'layer-1', name: 'Ink', visible: false, locked: true, shy: false }] } }));
+  assert.deepEqual(handled, []);
+});
+
+test('other v1 requests on a native object project answer a typed refusal with the project identity', () => {
+  const { ops, handled } = operations(project);
+  for (const operation of ['capabilities', 'property.get', 'property.set', 'history.undo']) {
+    assert.deepEqual(ops.handleV1({ apiVersion: 1, requestId: 'r-' + operation, operation, payload: {} }),
+      Object.assign(envelope(operation), { ok: false, error: { code: 'unavailable',
+        message: 'Native object projects answer only snapshot and native operations (apiVersion 2).' } }));
   }
   assert.deepEqual(handled, [], 'the v1 opacity handler never sees an object-project request');
 });

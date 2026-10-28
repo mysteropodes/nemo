@@ -14,7 +14,11 @@
           "history.undo",
           "history.redo",
           "diagnostics.trace",
-          "diagnostics.replay"
+          "diagnostics.replay",
+          "project.open",
+          "project.new",
+          "project.saveAs",
+          "project.export"
         ],
         "type": "string"
       }
@@ -162,9 +166,98 @@
               "request"
             ],
             "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "maxLength": 4096,
+                "minLength": 1,
+                "pattern": "^/",
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "canvasH": {
+                "maximum": 16384,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "canvasW": {
+                "maximum": 16384,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "fps": {
+                "maximum": 240,
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "canvasW",
+              "canvasH",
+              "fps"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "maxLength": 4096,
+                "minLength": 1,
+                "pattern": "^/",
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "destination": {
+                "maxLength": 4096,
+                "minLength": 1,
+                "pattern": "^/",
+                "type": "string"
+              },
+              "end": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "format": {
+                "enum": [
+                  "png",
+                  "svg",
+                  "lottie"
+                ]
+              },
+              "start": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "format",
+              "destination"
+            ],
+            "type": "object"
           }
         ],
-        "description": "Operation body. Always a JSON object, never a JSON-encoded string. Copy the template for the chosen operation:\n  property.set           {\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.key.set       {\"frame\":12,\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.key.remove    {\"frame\":12,\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.animation.set {\"animated\":true,\"layerId\":\"layer-1\",\"property\":\"opacity\"}\n  history.undo           {}\n  history.redo           {}\n  diagnostics.replay     {\"request\":{\"operation\":\"property.set\",\"payload\":{\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}}}\n`property` selects a registered capability. The matching branch projects its exact input fields and JSON types; each full input/output descriptor is also exposed in `x-nemo-registeredCapabilities` for discovery clients.",
+        "description": "Operation body. Always a JSON object, never a JSON-encoded string. Copy the template for the chosen operation:\n  property.set           {\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.key.set       {\"frame\":12,\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.key.remove    {\"frame\":12,\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.animation.set {\"animated\":true,\"layerId\":\"layer-1\",\"property\":\"opacity\"}\n  history.undo           {}\n  history.redo           {}\n  diagnostics.replay     {\"request\":{\"operation\":\"property.set\",\"payload\":{\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}}}\n  project.open           {\"path\":\"/Users/me/Documents/project.nemo\"}\n  project.new            {\"canvasH\":1080,\"canvasW\":1920,\"fps\":24}\n  project.saveAs         {\"path\":\"/Users/me/Documents/project.nemo\"}\n  project.export         {\"destination\":\"/Users/me/Documents/frame.png\",\"end\":0,\"format\":\"png\",\"start\":0}\n`property` selects a registered capability. The matching branch projects its exact input fields and JSON types; each full input/output descriptor is also exposed in `x-nemo-registeredCapabilities` for discovery clients.",
         "examples": [
           {
             "layerId": "layer-1",
@@ -199,6 +292,23 @@
                 "value": 40
               }
             }
+          },
+          {
+            "path": "/Users/me/Documents/project.nemo"
+          },
+          {
+            "canvasH": 1080,
+            "canvasW": 1920,
+            "fps": 24
+          },
+          {
+            "path": "/Users/me/Documents/project.nemo"
+          },
+          {
+            "destination": "/Users/me/Documents/frame.png",
+            "end": 0,
+            "format": "png",
+            "start": 0
           }
         ],
         "type": "object",
