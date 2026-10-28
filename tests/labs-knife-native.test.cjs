@@ -25,7 +25,7 @@ function harness(options = {}) {
         sent.push(request);
         const base = { apiVersion: 2, requestId: request.requestId, instanceId: pin.instanceId, documentId: pin.documentId };
         if (options.refuse) return { ...base, contentRevision: 4, ok: false, error: { code: options.refuse, message: 'refused' } };
-        const ids = request.payload.ops.map((op, i) => (op.op === 'create' ? 'native-stroke:5:' + i
+        const ids = request.payload.ops.map((op, i) => (op.op === 'create' || op.op === 'clone' ? 'native-stroke:5:' + i
           : op.op === 'replace' ? op.record.target.strokeId : op.stableTarget.strokeId));
         return { ...base, contentRevision: 5, ok: true, result: { applied: true, historyEntriesAdded: 1, operation: 'batch', strokeId: ids[0], strokeIds: ids } };
       },
@@ -46,6 +46,18 @@ function harness(options = {}) {
     serP: (p) => ({ strokeId: p.data.strokeId, brushGroupId: p.data.brushGroupId, segments: p.segments.map((s) => ({ point: [s.point.x, s.point.y],
       handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] })), strokeColor: '#000000', strokeWidth: p.strokeWidth, closed: p.closed }),
     pushUndo: poisoned, saveActiveLayerFrame: poisoned, updateUI: poisoned };
+  if (options.object) {
+    // #2362: a native object project has no Paper items; the presented lines come from the native subselect read.
+    const items = layer.children.map((p) => ({ stableTarget: { contextId: 'scene-root', layerUid: 'native-layer:1:0', frameScope: { kind: 'authored', frame: 3 }, strokeId: p.data.strokeId },
+      closed: false, count: 2, matrix: [1, 0, 0, 1, 0, 0], segments: p.segments.map((g) => ({ point: [g.point.x, g.point.y], handleIn: [0, 0], handleOut: [0, 0] })) }));
+    Object.assign(pin, { canvasW: 1920, canvasH: 1080 });
+    Object.assign(session, { readPresentedObjectSession: () => ({ presentation: { ...pin, frame: 3 } }), readSubselect: async () => ({ items }) });
+    Object.assign(root, { userLayers: [new paper.Layer()], Matrix: paper.Matrix, NemoSelectCanvasIntent: require('../src/js/adapters/select-canvas-intent.js'),
+      SMProject: { nativeObjectProject: () => ({ blocksLegacy: () => true }) },
+      NemoNativeViewportUnderlay: { canvasMapping: { point: (e) => ({ x: e.clientX, y: e.clientY }) } } });
+    root.document.getElementById = (id) => (id === 'canvas-area' ? area : id === 'drawing-canvas' ? { getBoundingClientRect: () => ({ left: 0, top: 0, width: 1920, height: 1080 }) } : null);
+    layer.remove();
+  }
   root.window = root;
   vm.createContext(root);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src/js/labs/vector-trim.js'), 'utf8'), root, { filename: 'vector-trim.js' });
@@ -86,6 +98,23 @@ test('a refused cut keeps the baseline toast and a missed drag sends nothing', a
   assert.deepEqual(plain(h.sent[0].payload.ops.map((op) => op.op)), ['delete']);
   assert.deepEqual(h.toasts.slice(-1), ['labsToastLayerInvalidLocked']);
   await h.cut([200, 200], [220, 220]);
+  assert.equal(h.sent.length, 1);
+  assert.deepEqual(h.toasts.slice(-1), ['labsToastNoStrokeUnderKnife']);
+});
+
+test('on a native object project the knife plans on the presented geometry and keeps native style with reshape/clone (#2362)', async () => {
+  const h = harness({ object: true });
+  h.labs.setKnifeTrimActive(true);
+  await h.cut([50, -20], [50, 120]);
+  assert.equal(h.sent.length, 1, h.toasts.join());
+  const { payload } = h.sent[0];
+  assert.deepEqual([payload.command, payload.keyframe, payload.ops.map((op) => op.op)], ['object.vector.batch', 'copy', ['reshape', 'clone', 'delete']]);
+  const [head, tail, lone] = payload.ops;
+  assert.deepEqual([head.stableTarget.strokeId, tail.stableTarget.strokeId, lone.stableTarget.strokeId, head.frame, tail.frame], ['a', 'a', 'd', 3, 3]);
+  const xs = (op) => plain(op.geometry.segments).map((g) => [Math.round(g.point.x), Math.round(g.point.y)]);
+  assert.deepEqual([xs(head), xs(tail)], [[[0, 0], [30, 0]], [[70, 0], [100, 0]]], 'the pieces carry geometry only; style stays native');
+  assert.deepEqual(h.toasts.slice(-1), ['2labsToastStrokesCutSuffix']);
+  await h.cut([50, 200], [50, 300]);
   assert.equal(h.sent.length, 1);
   assert.deepEqual(h.toasts.slice(-1), ['labsToastNoStrokeUnderKnife']);
 });

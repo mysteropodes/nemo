@@ -3,14 +3,16 @@
 //! carries the Labs edits that the baseline makes inside one undo step: the knife's cut pieces, sculpt's rewritten
 //! strokes, pose stamps and multiframe copies. Ids are allocated from the origin revision, as single creates are, and
 //! fill traces regenerate after each step exactly as after the single command. A refused step refuses the batch. A `copy`
-//! step creates an earlier create's record again on another frame, so a multiframe stamp does not resend the stroke.
+//! step creates an earlier create's record again on another frame, so a multiframe stamp does not resend the stroke. A
+//! `reshape` gives an existing plain stroke new geometry and a `clone` creates a new stroke from one with new geometry:
+//! style stays with the native record, so a client that only reads presented geometry (the Labs knife) can cut.
 use crate::commands::object_fill_owner::vector_edit::create_ops::{copy_key as keyframe_copy, create_in, trim_records, Placement};
-use crate::commands::object_fill_owner::vector_edit::{delete_in, replace_in, Edit, VectorEditKind};
+use crate::commands::object_fill_owner::vector_edit::{delete_in, is_vector_record, replace_in, Edit, VectorEditKind};
 use crate::commands::object_fill_owner::object_frame_edit_document::{promote_cells, DocumentEdit};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_boolean_ops::stack::Scope;
 use crate::object_document::object_group_kernels::object_fill_trace_ops::regenerate::regenerate;
-use crate::object_document::{object_deserialize, ObjectRecord, ObjectTarget, Presence};
+use crate::object_document::{object_deserialize, ObjectDocument, ObjectGeometry, ObjectRecord, ObjectTarget, Presence};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
@@ -27,6 +29,7 @@ pub(super) struct BatchOp {
     keyframe: Presence<String>,
     from_step: Presence<serde_json::Number>,
     frame: Presence<serde_json::Number>,
+    geometry: Presence<ObjectGeometry>,
 }
 object_deserialize!(BatchOp {
     op: String,
@@ -35,8 +38,26 @@ object_deserialize!(BatchOp {
     #[serde(default)] placement: Presence<String>,
     #[serde(default)] keyframe: Presence<String>,
     #[serde(default)] from_step: Presence<serde_json::Number>,
-    #[serde(default)] frame: Presence<serde_json::Number>
+    #[serde(default)] frame: Presence<serde_json::Number>,
+    #[serde(default)] geometry: Presence<ObjectGeometry>
 });
+
+/// The plain vector stroke at `target` with `geometry` in its own spaces; a pressure ribbon's outline is derived from its
+/// centreline, so it is never reshaped here.
+fn with_geometry(source: &ObjectDocument, target: &ObjectTarget, geometry: ObjectGeometry) -> Result<ObjectRecord, DispatchErrorCode> {
+    let existing = source.objects.iter().find(|r| &r.target == target).ok_or(DispatchErrorCode::NotFound)?;
+    let ribbon = existing.vector_ext.value().is_some_and(|ext| !ext.pressure.missing() || !ext.is_linked_fill_companion.missing());
+    let old = &existing.geometry;
+    if !is_vector_record(existing) || ribbon || geometry.segments.len() < 2
+        || (old.kind.as_str(), old.coordinate_space.as_str(), old.handle_space.as_str())
+            != (geometry.kind.as_str(), geometry.coordinate_space.as_str(), geometry.handle_space.as_str())
+    {
+        return Err(DispatchErrorCode::InvalidRequest);
+    }
+    let mut record = existing.clone();
+    record.geometry = geometry;
+    Ok(record)
+}
 
 fn target_of(op: &BatchOp) -> Option<ObjectTarget> {
     op.record.value().map(|r| r.target.clone()).or_else(|| op.stable_target.value().cloned())
@@ -50,8 +71,33 @@ pub(super) fn batch(origin: &ObjectSnapshot, mut ops: Vec<BatchOp>, copy_key: bo
     // `copy` {fromStep, frame}: the record of an EARLIER create (or copy) step, retargeted to `frame` and then a create in
     // every respect; a stroke and its companion stamped on n frames cost one record each, not n.
     for at in 0..ops.len() {
-        let copy = ops[at].op == "copy";
-        if copy != !ops[at].from_step.missing() || copy != !ops[at].frame.missing() {
+        let op = &mut ops[at];
+        let (reshape, clone) = (op.op == "reshape", op.op == "clone");
+        if (reshape || clone) != !op.geometry.missing() {
+            return Err(InvalidRequest);
+        }
+        if reshape || clone {
+            let frame = op.frame.value().and_then(serde_json::Number::as_u64).and_then(|n| u32::try_from(n).ok());
+            let (Presence::Present(target), Presence::Present(geometry)) = (op.stable_target.clone(), std::mem::take(&mut op.geometry)) else {
+                return Err(InvalidRequest);
+            };
+            if !op.record.missing() || !op.from_step.missing() || (!op.frame.missing() && frame.is_none()) || (clone && frame.is_none())
+                || (reshape && !(op.placement.missing() && op.keyframe.missing()))
+            {
+                return Err(InvalidRequest);
+            }
+            // A reshape's `frame` is the held cell it edits (its copy-keyed copy keeps the stroke id); a clone is new there.
+            let mut record = with_geometry(origin.document(), &target, geometry)?;
+            record.target.frame_scope.frame = frame.unwrap_or(target.frame_scope.frame);
+            if clone {
+                record.target.stroke_id = String::new();
+            }
+            (op.op, op.record, op.stable_target, op.frame) =
+                ((if clone { "create" } else { "replace" }).into(), Presence::Present(record), Presence::Missing, Presence::Missing);
+            continue;
+        }
+        let copy = op.op == "copy";
+        if copy != !op.from_step.missing() || copy != !op.frame.missing() {
             return Err(InvalidRequest);
         }
         if !copy {

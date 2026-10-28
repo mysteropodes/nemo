@@ -21,6 +21,7 @@
   var armed = false;
   var dragging = false;
   var pts = []; // world-space [x,y] samples of the temp knife line
+  var clients = []; // the same samples in client pixels (a native object project maps them through its own presentation)
   var target = null; // canvas element pointer listeners are bound to
 
   function freshId() { return 'labs_' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e6); }
@@ -184,7 +185,43 @@
     });
   }
 
+  // #2362: a native object project builds no Paper items. The cut is planned on the presented geometry (the native
+  // subselect read) and committed with reshape/clone steps, so every piece keeps its stroke's native style. Pressure
+  // ribbons and their linked fills stay out, as in the baseline: a ribbon is the item with a painted outline and its
+  // fill is created directly below it.
+  function objectCut(native, Intent, knife) {
+    var toast = function (key) { if (typeof showToast === 'function') showToast(SM.t(key)); };
+    var frame = state.currentFrame, layerUid = native.layerUid(state.activeLayerIdx);
+    return Intent.presented(window, state.activeLayerIdx).then(function (shown) {
+      if (!shown || !layerUid || shown.frame !== frame) { toast('labsToastLayerInvalidLocked'); return 0; }
+      var world = knife.map(function (c) { var w = Intent.worldPoint(window, c[0], c[1], shown.pin, shown.presentation); return new Point(w.x, w.y); });
+      var plain = shown.paths.filter(function (p, i) { var next = shown.paths[i + 1]; return !p.data.nativeRibbon && !(p.closed && next && next.data.nativeRibbon); });
+      var plan = buildPlan({ children: plain }, new Path({ insert: false, segments: world }));
+      if (!plan.length) { toast('labsToastNoStrokeUnderKnife'); return 0; }
+      var steps = [];
+      plan.forEach(function (p) {
+        var t = p.target.data.nativeStableTarget, m = p.target.data.nativeMatrix;
+        if (p.removeWhole) { steps.push({ delete: t.strokeId }); return; }
+        var cut = piecesOf(p);
+        steps.push(cut.head ? { reshape: { stableTarget: t, geometry: Intent.recordGeometry(cut.head, m) } } : { delete: t.strokeId });
+        cut.tails.forEach(function (piece) { steps.push({ clone: { stableTarget: t, geometry: Intent.recordGeometry(piece, m) } }); });
+      });
+      if (steps.length > MAX_NATIVE_STEPS) { toast('labsToastLayerInvalidLocked'); return 0; }
+      return native.batchStrokes(layerUid, frame, steps).then(function (result) {
+        if (!result || result.status !== 'applied') { toast('labsToastLayerInvalidLocked'); return 0; }
+        if (typeof showToast === 'function') showToast(plan.length === 1 ? SM.t('labsToastStrokeCutSingular') : plan.length + SM.t('labsToastStrokesCutSuffix'));
+        return plan.length;
+      });
+    }).catch(function () { toast('labsToastLayerInvalidLocked'); return 0; });
+  }
+
   function commitCut() {
+    var Intent = window.NemoSelectCanvasIntent, objectNative = window.NemoNativeObjectLabs && NemoNativeObjectLabs.desktop(window);
+    var reach = clients.reduce(function (sum, c, i) { return i ? sum + Math.hypot(c[0] - clients[i - 1][0], c[1] - clients[i - 1][1]) : 0; }, 0);
+    if (objectNative && Intent && typeof Intent.objectProject === 'function' && Intent.objectProject(window)) {
+      if (reach < 4) return false; // a near-tap is not a cut
+      objectCut(objectNative, Intent, clients.slice()); return true;
+    }
     var layer = userLayers[state.activeLayerIdx];
     if (!layer || pts.length < 2) return false;
     // Reject a near-tap: a real cut needs an actual drag across a line, not
@@ -249,7 +286,7 @@
     e.stopImmediatePropagation();
     e.preventDefault();
     dragging = true;
-    pts = [];
+    pts = []; clients = [[e.clientX, e.clientY]];
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     pts.push(w);
     window.SMEngineBridge.suspend();
@@ -261,7 +298,7 @@
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var last = pts[pts.length - 1];
-    if (!last || Math.hypot(w[0] - last[0], w[1] - last[1]) >= 1 / view.zoom) pts.push(w);
+    if (!last || Math.hypot(w[0] - last[0], w[1] - last[1]) >= 1 / view.zoom) { pts.push(w); clients.push([e.clientX, e.clientY]); }
     window.SMEngineBridge.renderWithOverlayItem(liveOverlay());
   }
   function onUp(e) {
@@ -270,7 +307,7 @@
     e.preventDefault();
     dragging = false;
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    pts.push(w);
+    pts.push(w); clients.push([e.clientX, e.clientY]);
     commitCut();
     window.SMEngineBridge.resume();
     window.SMEngineBridge.renderNow();

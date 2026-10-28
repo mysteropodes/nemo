@@ -165,3 +165,67 @@ fn a_copy_step_stamps_an_earlier_create_on_another_frame_as_that_create_would() 
     let delete_then_copy = batch(vec![json!({"op":"delete","stableTarget":target("L1", 0, "s-a")}), json!({"op":"copy","fromStep":0,"frame":4})]);
     assert_eq!(send(&mut by_copy, "from-delete", delete_then_copy)["ok"], false, "only a create's record is copied");
 }
+
+#[test]
+fn reshape_and_clone_keep_the_native_style_and_take_only_new_geometry() {
+    let doc = document(2, vec![record_at("A", "L1", 0, "s-a")], None);
+    let (mut by_steps, mut by_records) = (owner_of(&doc), owner_of(&doc));
+    let source = objects(&state(&by_steps))[0].clone();
+    let shape = |dx: f64| {
+        let mut g = source["geometry"].clone();
+        for s in g["segments"].as_array_mut().unwrap() { s["point"]["x"] = json!(s["point"]["x"].as_f64().unwrap() + dx); }
+        g
+    };
+    let response = send(&mut by_steps, "cut", batch(vec![
+        json!({"op":"reshape","stableTarget":target("L1", 0, "s-a"),"geometry":shape(5.)}),
+        json!({"op":"clone","stableTarget":target("L1", 0, "s-a"),"frame":0,"geometry":shape(50.)}),
+    ]));
+    assert_eq!(response["ok"], true, "{response}");
+    let (mut head, mut tail) = (source.clone(), source.clone());
+    head["geometry"] = shape(5.);
+    tail["geometry"] = shape(50.);
+    tail["target"]["strokeId"] = json!("");
+    let sent = send(&mut by_records, "records", batch(vec![json!({"op":"replace","record":head}), op_create(tail)]));
+    assert_eq!(response["result"], sent["result"], "the same receipt as sending both records");
+    assert_eq!(state(&by_steps), state(&by_records), "the same document: style from the native record, geometry from the step");
+    let mut other_space = shape(1.);
+    other_space["coordinateSpace"] = json!("layer-local");
+    let mut one_point = shape(1.);
+    one_point["segments"].as_array_mut().unwrap().truncate(1);
+    for (name, op) in [
+        ("missing", json!({"op":"reshape","stableTarget":target("L1", 0, "s-x"),"geometry":shape(1.)})),
+        ("reshape-placement", json!({"op":"reshape","stableTarget":target("L1", 0, "s-a"),"geometry":shape(1.),"placement":"front"})),
+        ("bad-frame", json!({"op":"reshape","stableTarget":target("L1", 0, "s-a"),"geometry":shape(1.),"frame":-1})),
+        ("clone-no-frame", json!({"op":"clone","stableTarget":target("L1", 0, "s-a"),"geometry":shape(1.)})),
+        ("no-geometry", json!({"op":"reshape","stableTarget":target("L1", 0, "s-a")})),
+        ("other-space", json!({"op":"reshape","stableTarget":target("L1", 0, "s-a"),"geometry":other_space})),
+        ("one-point", json!({"op":"clone","stableTarget":target("L1", 0, "s-a"),"frame":0,"geometry":one_point})),
+        ("create-geometry", json!({"op":"create","record":record_at("B", "L1", 0, ""),"geometry":shape(1.)})),
+    ] {
+        assert_eq!(send(&mut by_steps, name, batch(vec![op]))["ok"], false, "{name} is refused");
+    }
+}
+
+#[test]
+fn a_reshape_on_a_held_cell_keys_that_cell_and_leaves_the_key() {
+    let mut doc = document(2, vec![record_at("A", "L1", 0, "s-a")], None);
+    doc["layers"][0]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+        "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+    let mut owner = owner_of(&doc);
+    let key = objects(&state(&owner))[0].clone();
+    let mut moved = key["geometry"].clone();
+    moved["segments"][0]["point"]["x"] = json!(moved["segments"][0]["point"]["x"].as_f64().unwrap() + 7.);
+    let mut payload = batch(vec![
+        json!({"op":"reshape","stableTarget":target("L1", 0, "s-a"),"geometry":moved,"frame":4}),
+        json!({"op":"clone","stableTarget":target("L1", 0, "s-a"),"geometry":moved,"frame":4}),
+    ]);
+    payload["keyframe"] = json!("copy");
+    let response = send(&mut owner, "held-cut", payload);
+    assert_eq!(response["ok"], true, "{response}");
+    let snapshot = state(&owner);
+    let after = objects(&snapshot);
+    let at = |frame: u64, id: &str| after.iter().find(|r| r["target"]["frameScope"]["frame"].as_u64() == Some(frame) && r["target"]["strokeId"] == id).cloned();
+    assert_eq!(at(0, "s-a").unwrap()["geometry"], key["geometry"], "the held key is untouched");
+    assert_eq!(at(4, "s-a").unwrap()["geometry"], moved, "the held cell's copy takes the new geometry under its own id");
+    assert_eq!(ids_at(&owner, "L1", 4).len(), 2, "and the clone lands beside it");
+}

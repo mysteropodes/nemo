@@ -146,6 +146,74 @@
     return found;
   }
 
+  // #2362: a native OBJECT project builds no Paper items (native-object-project-file.js projectView), so a Select click
+  // and the Labs tools found nothing to hit. They read the presented layer's geometry through the native subselect view
+  // instead: transient, never-inserted Paper paths in world space, top-most last, carrying their native identity only
+  // (no style, no writer). A read whose presentation changed before it returned is discarded.
+  var PINS = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
+  function samePin(a, b) { return !!a && !!b && PINS.every(function (k) { return a[k] === b[k]; }); }
+  function objectProject(root) {
+    try { var p = root.SMProject && typeof root.SMProject.nativeObjectProject === 'function' && root.SMProject.nativeObjectProject();
+      return p && p.blocksLegacy() === true ? p : null; } catch (_) { return null; }
+  }
+  function presentedSession(root) {
+    var session = objectProject(root) && root.NemoNativeObjectProject && root.NemoNativeObjectProject.desktop(root);
+    var pin = session && session.isActive() && session.info(), shown = pin && session.readPresentedObjectSession();
+    return shown && shown.presentation && samePin(pin, shown.presentation) ? { session: session, pin: pin, presentation: shown.presentation } : null;
+  }
+  async function presented(root, layerIndex) {
+    var s = presentedSession(root), layer = s && s.pin.layers[layerIndex];
+    if (!layer) return null;
+    var data = await s.session.readSubselect({ contextId: 'scene-root', layerUid: layer.layerUid, frame: s.presentation.frame }, s.pin);
+    var now = presentedSession(root);
+    if (!now || !samePin(now.pin, s.pin) || now.presentation.frame !== s.presentation.frame) return null;
+    var Path = root.Path || root.paper.Path, Matrix = root.Matrix || root.paper.Matrix;
+    return { pin: s.pin, presentation: s.presentation, frame: s.presentation.frame, layerUid: layer.layerUid, paths: data.items.map(function (item) {
+      var geometry = item.paint || item;   // a pressure ribbon is hit on its painted outline
+      var path = new Path({ insert: false, closed: geometry.closed, segments: geometry.segments.map(function (a) { return [a.point, a.handleIn, a.handleOut]; }) });
+      path.transform(new Matrix(item.matrix[0], item.matrix[1], item.matrix[2], item.matrix[3], item.matrix[4], item.matrix[5]));
+      path.strokeColor = [0, 0, 0]; path.strokeWidth = 1; if (item.paint) path.fillColor = [0, 0, 0];
+      path.data = { strokeId: item.stableTarget.strokeId, nativeStableTarget: item.stableTarget, nativeRibbon: !!item.paint, nativeMatrix: item.matrix };
+      return path;
+    }) };
+  }
+  // World-space Paper segments back to a record geometry in the stroke's own space (inverse of its presented matrix).
+  function recordGeometry(path, m) {
+    var d = m[0] * m[3] - m[1] * m[2];
+    if (!Number.isFinite(d) || Math.abs(d) < 1e-12) throw new Error('Presented transform is singular');
+    var lin = function (x, y) { return { x: (m[3] * x - m[2] * y) / d, y: (-m[1] * x + m[0] * y) / d }; };
+    return { kind: 'cubic-path', closed: path.closed, coordinateSpace: 'document-world', handleSpace: 'relative', segments: path.segments.map(function (s) {
+      return { point: lin(s.point.x - m[4], s.point.y - m[5]), handleIn: lin(s.handleIn.x, s.handleIn.y), handleOut: lin(s.handleOut.x, s.handleOut.y) }; }) };
+  }
+  function worldPoint(root, clientX, clientY, pin, presentation) {
+    var mapping = root.NemoNativeViewportUnderlay && root.NemoNativeViewportUnderlay.canvasMapping;
+    var r = root.document.getElementById('drawing-canvas').getBoundingClientRect();
+    var p = mapping.point({ clientX: clientX, clientY: clientY }, { bounds: { left: r.left, top: r.top, width: r.width, height: r.height },
+      canvasW: pin.canvasW, canvasH: pin.canvasH, presentation: presentation });
+    return { x: p.x, y: p.y, perPixel: pin.canvasW / r.width };
+  }
+  // The top-most presented stroke of the active layer within 8 screen pixels of the click, or null.
+  async function pick(root, clientX, clientY) {
+    var s = presentedSession(root), layers = s && await presented(root, root.state.activeLayerIdx);
+    if (!layers) return undefined;
+    var Point = root.Point || root.paper.Point, w = worldPoint(root, clientX, clientY, s.pin, s.presentation), at = new Point(w.x, w.y);
+    for (var i = layers.paths.length - 1; i >= 0; i--)
+      if (layers.paths[i].hitTest(at, { fill: true, stroke: true, tolerance: 8 * w.perPixel })) return layers.paths[i];
+    return null;
+  }
 
-  return Object.freeze({ create: create, hitHandles: hitHandles });
+  // Select's own rule on a picked stroke: a click selects it, Shift toggles it, an empty click clears unless Shift is held.
+  // Picks are fresh objects, so identity is the native stroke id.
+  function applyPick(root, item, shift) {
+    var selected = root.selectedPaths || [], id = item && item.data.strokeId;
+    var held = item ? selected.filter(function (p) { return p && p.data && p.data.strokeId === id; }) : [];
+    root.selectedPaths = item ? (shift ? (held.length ? selected.filter(function (p) { return held.indexOf(p) < 0; }) : selected.concat([item])) : [item])
+      : (shift ? selected : []);
+    root.state.selectedStrokeIndices = [];
+    if (typeof root.updateUI === 'function') root.updateUI();
+    if (root.SMEngineBridge && typeof root.SMEngineBridge.renderNow === 'function') root.SMEngineBridge.renderNow();
+  }
+
+  return Object.freeze({ create: create, hitHandles: hitHandles, objectProject: objectProject, presented: presented,
+    worldPoint: worldPoint, recordGeometry: recordGeometry, pick: pick, applyPick: applyPick });
 }));
