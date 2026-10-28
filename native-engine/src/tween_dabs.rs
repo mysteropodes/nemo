@@ -1,14 +1,17 @@
-//! Deterministic native vector-dab stamping along the interpolated anchor, never independent matching.
+//! Tween-specific pressure/opacity adaptation around the canonical native dab stamper.
+use crate::object_document::brush_dab::{
+    presets::from_catalog, sampling::SeededRng, stamp::build_brush_dabs,
+};
 use crate::object_document::BrushPresetRecord;
 use crate::request_receipts::DispatchErrorCode;
 use crate::tween_kernels::*;
-#[path = "tween_dab_sampling.rs"]
-mod sampling;
-use sampling::*;
-#[path = "tween_dab_emit.rs"]
-mod emit;
-pub(super) use emit::Dab;
-use emit::*;
+
+#[derive(Serialize)]
+pub(super) struct Dab {
+    pub segments: Vec<SegOut>,
+    pub opacity: f64,
+}
+
 pub(super) fn build_dabs(
     s: &StrokeIn,
     p: &BrushPresetRecord,
@@ -16,10 +19,10 @@ pub(super) fn build_dabs(
     seed: u32,
     mul: f64,
 ) -> R<Vec<Dab>> {
-    // Pathological custom loops refuse before consuming any state; built-in budgets match exactly.
-    if val(&p.poly_sides, 5.) > 256.
-        || val(&p.bristle_count, 5.) > 900.
-        || val(&p.scribble_count, 8.) > 900.
+    // Preserve the command's bounded custom-preset admission before stamping.
+    if p.poly_sides.value().copied().unwrap_or(5.) > 256.
+        || p.bristle_count.value().copied().unwrap_or(5.) > 900.
+        || p.scribble_count.value().copied().unwrap_or(8.) > 900.
         || p.custom_stamp
             .value()
             .is_some_and(|s| s.segments.len() > 256)
@@ -28,118 +31,72 @@ pub(super) fn build_dabs(
     }
     let mut base = if base_width == 0. { 3. } else { base_width };
     let mut profile = vec![];
-    if is_vb(s) {
-        let cs = s.center_segments.as_ref().unwrap();
+    let pressure = is_vb(s);
+    let segments: Vec<[f64; 6]> = if pressure {
+        let center = s.center_segments.as_ref().unwrap();
         let mut lengths = vec![0.];
-        for c in cs.windows(2) {
+        for pair in center.windows(2) {
             lengths.push(
                 lengths.last().unwrap()
-                    + (c[1].point[0] - c[0].point[0]).hypot(c[1].point[1] - c[0].point[1]),
+                    + (pair[1].point[0] - pair[0].point[0])
+                        .hypot(pair[1].point[1] - pair[0].point[1]),
             );
         }
-        let total = lengths.last().copied().filter(|&l| l != 0.).unwrap_or(1.);
-        profile = cs
+        let total = lengths.last().copied().filter(|&n| n != 0.).unwrap_or(1.);
+        profile = center
             .iter()
             .zip(lengths)
-            .map(|(s, l)| WidthSample {
-                t: l / total,
-                width: if s.width == 0. { base } else { s.width },
-            })
+            .map(|(s, l)| (l / total, if s.width == 0. { base } else { s.width }))
             .collect();
-        base = profile.iter().map(|p| p.width).sum::<f64>() / profile.len() as f64;
-    }
-    let mut rng = TweenRng::new(seed);
-    let path = DabPath::new(s, p, base, &mut rng);
-    let len = path.sampler.total;
-    if len <= 0. {
-        return Ok(vec![]);
-    }
-    let nib = val(&p.nib_size, 1.);
-    let grain = val(&p.grain, 1.);
-    let spacing = val(&p.spacing, 0.35) * if grain <= 0. { 4. } else { 1. / grain.max(0.1) };
-    let noise = val(&p.noise, 0.);
-    let noise = if noise > 0. {
-        (1. + gaussian(&mut rng) * noise * 0.3).max(0.)
+        base = profile.iter().map(|(_, width)| width).sum::<f64>() / profile.len() as f64;
+        center
+            .iter()
+            .map(|s| {
+                let i = s.handle_in;
+                let o = s.handle_out;
+                [s.point[0], s.point[1], i[0], i[1], o[0], o[1]]
+            })
+            .collect()
     } else {
-        1.
+        s.segments
+            .iter()
+            .map(|s| {
+                let i = s.handle_in;
+                let o = s.handle_out;
+                [s.point[0], s.point[1], i[0], i[1], o[0], o[1]]
+            })
+            .collect()
     };
-    let local = |at: f64| {
-        let width = if profile.is_empty() {
-            base
-        } else {
-            width_at(&profile, at / len)
+    let preset = from_catalog(p).ok_or(DispatchErrorCode::Unavailable)?;
+    let mut rng = SeededRng::new(seed);
+    build_brush_dabs(
+        &segments,
+        s.closed && !pressure,
+        &preset,
+        base,
+        &mut rng,
+        Some(&profile),
+    )
+    .map_err(|_| DispatchErrorCode::Unavailable)?
+    .into_iter()
+    .map(|dab| {
+        // Original dabRecordsForTween uses the anchor colour unchanged; the common stamper
+        // still consumes value-jitter random draws in the original order.
+        let out = Dab {
+            opacity: dab.opacity * mul,
+            segments: dab
+                .path
+                .segments
+                .into_iter()
+                .map(|s| SegOut {
+                    point: s.p,
+                    handle_in: s.h_in,
+                    handle_out: s.h_out,
+                })
+                .collect(),
         };
-        width * pressure_mul(p, at / len)
-    };
-    let min = profile
-        .iter()
-        .map(|p| p.width)
-        .fold(f64::INFINITY, f64::min);
-    let max = profile
-        .iter()
-        .map(|p| p.width)
-        .fold(f64::NEG_INFINITY, f64::max);
-    let signal = !profile.is_empty() && max - min > 1e-6;
-    let min_width = profile.iter().map(|p| p.width).fold(base, f64::min);
-    let min_space = ((min_width * nib).max(0.5) * spacing).max(0.4);
-    let shape = p.tip_shape.value().map(String::as_str);
-    let bristles = if shape == Some("bristle") {
-        truth(&p.bristle_count, 5.).max(1.)
-    } else {
-        1.
-    };
-    let scribbles = if shape == Some("scribble") {
-        truth(&p.scribble_count, 8.).max(1.)
-    } else {
-        1.
-    };
-    let sharpness = val(&p.sharpness, 1.);
-    let soft = if bristles == 1. && scribbles == 1. && sharpness < 1. {
-        3.
-    } else {
-        1.
-    };
-    let max_positions = (900. / bristles.max(scribbles).max(soft)).floor().max(1.);
-    let cap = if len / min_space > max_positions {
-        len / max_positions
-    } else {
-        0.
-    };
-    let mut dabs = vec![];
-    let (mut d, mut guard) = (0., 0usize);
-    while d <= len && (guard as f64) < max_positions + 2. && dabs.len() < 900 {
-        guard += 1;
-        let at = d.min(len);
-        let width = local(at);
-        let gm = if signal {
-            1.5 - ((width_at(&profile, at / len) - min) / (max - min)).clamp(0., 1.)
-        } else {
-            1.
-        };
-        let diam = (width * nib).max(0.5);
-        let spacing = min_space.max((diam * spacing).max(0.4)).max(cap);
-        let gap = truth(&p.dash_gap, 0.);
-        if !(gap != 0. && rng.next() < gap) {
-            emit_dabs(
-                &mut dabs,
-                p,
-                &mut rng,
-                path.point(at),
-                path.tangent(at),
-                diam,
-                gm,
-                noise,
-                bristles,
-                sharpness,
-            );
-        }
-        d += spacing * (1. + (rng.next() * 2. - 1.) * truth(&p.space_jitter, 0.));
-    }
-    emit_marker(&mut dabs, p, &mut rng, &path, local, noise);
-    for dab in &mut dabs {
-        dab.opacity *= mul;
-        if !dab.opacity.is_finite()
-            || dab.segments.iter().any(|s| {
+        if !out.opacity.is_finite()
+            || out.segments.iter().any(|s| {
                 s.point
                     .iter()
                     .chain(&s.handle_in)
@@ -149,6 +106,7 @@ pub(super) fn build_dabs(
         {
             return Err(DispatchErrorCode::InvalidRequest);
         }
-    }
-    Ok(dabs)
+        Ok(out)
+    })
+    .collect()
 }
