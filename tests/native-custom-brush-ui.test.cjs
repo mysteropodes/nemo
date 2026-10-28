@@ -133,7 +133,7 @@ test('equal native upsert after undo retains redo rather than adding another che
   assert.equal(result.status,'unchanged');assert.equal(f.checkpoints(),1);f.history(1);await f.settled();assert.equal(f.catalog()[0][1].label,'After');
 });
 
-test('the actual ordinary native freehand provider commits a confirmed custom catalog preset and refuses a key the catalog lacks',async()=>{
+test('the actual ordinary native freehand provider commits a confirmed custom catalog preset and draws a key the catalog lacks plain',async()=>{
   // G16 option C (#2361): native stamps a catalog preset's dabs from the project catalog, as resolveBrushPreset reads it.
   const f=await fixture([['custom',{label:'Stored'}]]);f.root.BrushPresetPicker.selectPreset('custom');
   Object.assign(f.root.state,{tool:'draw',drawMode:'front',vectorBrush:false,strokeEnabled:true,fillEnabled:false,strokeColor:'#112233',
@@ -141,7 +141,11 @@ test('the actual ordinary native freehand provider commits a confirmed custom ca
   const Shape=require('../src/js/adapters/native-object-shape-tool.js');
   const ports=Shape.freehandPorts(f.root,{});
   assert.equal(ports.style().brushPreset,'custom');
+  // The baseline's resolveBrushPreset returns null for a key no preset holds, and applyBrushTexture then leaves the stroke plain.
   f.root.state.brushPreset='missing';
+  assert.equal(ports.style().brushPreset,'none');
+  // Without a current catalog a deleted key cannot be told from a new one.
+  f.drift();assert.equal(f.root.NemoNativeCustomBrushUI.projection(f.root),null);
   assert.throws(()=>ports.style(),/This brush combination is unavailable in native Drawing/);
   assert.equal(f.edits().length,0);assert.equal(f.checkpoints(),0);
 });

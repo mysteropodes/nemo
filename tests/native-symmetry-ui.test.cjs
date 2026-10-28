@@ -57,6 +57,7 @@ function fixture(options = {}) {
     canvasW: 320, canvasH: 180, fps: 24, totalFrames: 40, layers: [{ layerUid: 'drawing', visible: true }] };
   const metadata = clone(options.metadata || {});
   let revision = 0, serial = 0, active = true, refuse = false, refuseReads = false, staleEdits = 0, block = null, running = 0, tail = Promise.resolve(), controller, context;
+  let renders = 0;
   const calls = [], notices = [];
   const projected = pin => ({ ...pin, presentation: { ...pin, owner: 'native', status: 'presented' } });
   async function dispatch(request) {
@@ -103,7 +104,9 @@ function fixture(options = {}) {
     NemoNativeObjectProject: { desktop: () => session },
     NemoNativeObjectProjectFile: { projectionReadyForUI: (r, value) => active && !running && ProjectFile.projectionReadyForUI(r, value) },
     showToast: text => notices.push(text), renderLabsFloatPanel() {},
-    SMEngineBridge: { isEnabled: () => true, screenToWorld: (x, y) => [x, y], suspend() {}, resume() {}, renderNow() {} } };
+    // renderEdge: a repaint asks native for a preview, whose presentation calls presented() again (settingsNotice).
+    SMEngineBridge: { isEnabled: () => true, screenToWorld: (x, y) => [x, y], suspend() {}, resume() {},
+      renderNow() { renders++; if (options.renderEdge && renders < 200) setImmediate(() => controller.presented(info)); } } };
   root.globalThis = root; root.window = root; context = vm.createContext(root);
   const browserRoot = vm.runInContext('globalThis', context);
   ProjectFile.projectView(browserRoot, info);
@@ -132,7 +135,8 @@ function fixture(options = {}) {
     controller.willProject(info); ProjectFile.projectView(browserRoot, info);
   }
   return { root, state, area, controller, calls, notices, metadata, settled, edits, shown, external, holdNextRead, run,
-    refuse: v => { refuse = v; }, refuseReads: v => { refuseReads = v; }, replaceDocument, staleEdits: n => { staleEdits = n; } };
+    refuse: v => { refuse = v; }, refuseReads: v => { refuseReads = v; }, replaceDocument, staleEdits: n => { staleEdits = n; },
+    renders: () => renders };
 }
 
 test('a confirmed native read projects the original import values into the existing guide fields', async () => {
@@ -260,4 +264,24 @@ test('a confirmed read from a previous document is never shown in a later one', 
   f.state.symmetryMode = 'y';
   f.replaceDocument(); f.refuseReads(true); await f.controller.presented(); await f.settled();
   assert.equal(f.state.symmetryMode, 'y', 'no other document\'s settings are projected');
+});
+
+// #2343 B1: every native presentation calls presented(), and a repaint asks native for another preview. Values already
+// on screen must not repaint, or the queue never settles (4,582 previews in 77 s, installed).
+test('an unchanged confirmed value requests no further native frame; a real change and a refusal each repaint once', async () => {
+  const turns = async n => { for (let i = 0; i < n; i++) await new Promise(resolve => setImmediate(resolve)); };
+  const f = fixture({ renderEdge: true, metadata: { symmetryEnabled: true } });
+  await f.controller.presented(); await f.settled(); await turns(40);
+  assert.equal(f.renders(), 1, 'the first confirmed projection paints once');
+  for (let i = 0; i < 20; i++) { f.controller.presented(); await turns(2); }
+  assert.equal(f.renders(), 1, 'presentations of unchanged values request nothing');
+  f.external(m => { m.symmetryExtend = false; }); await f.settled(); await turns(40);
+  assert.equal(f.renders(), 2, 'a changed confirmed value repaints once, then settles');
+  assert.equal(f.shown().extend, false);
+  // The original writer applies its local effect, then routes it (labs-floating-ui / symmetry-bridge).
+  f.refuse(true); f.state.symmetryExtend = true; f.run('NemoNativeSymmetryController').route({ kind: 'setExtend', extend: true });
+  await f.settled(); await turns(40);
+  assert.equal(f.shown().extend, false, 'the refused intent is restored to native truth');
+  assert.ok(f.renders() >= 3 && f.renders() <= 4, 'the restoration repaints and settles: ' + f.renders());
+  const settledAt = f.renders(); await turns(40); assert.equal(f.renders(), settledAt);
 });

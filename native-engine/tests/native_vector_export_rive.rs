@@ -293,3 +293,40 @@ fn a_video_frame_plans_nothing_as_exportrive_never_sees_it() {
     assert_eq!(with_video[0].len(), 1);
     assert_eq!(with_video, planned(false));
 }
+
+#[test]
+fn a_v1_closed_solid_fill_plans_as_its_fill_only_vector_record() {
+    let oracle: Value = serde_json::from_str(ORACLE).unwrap();
+    let case = &oracle["cases"][0];
+    let planned = |legacy: bool| {
+        let mut doc = case["document"].clone();
+        let point = |x: f64, y: f64| {
+            serde_json::json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":-4,"y":2}})
+        };
+        let geometry = serde_json::json!({"kind":"cubic-path","closed":true,"coordinateSpace":"document-world",
+            "handleSpace":"relative","segments":[point(30.0, 30.0), point(90.0, 40.0), point(50.0, 100.0)]});
+        let target = serde_json::json!({"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},
+            "layerUid":"L0","strokeId":"v1"});
+        let fill = serde_json::json!({"kind":"solid","r":1,"g":0.25,"b":0,"a":0.75});
+        doc["objects"].as_array_mut().unwrap().push(if legacy {
+            serde_json::json!({"schemaVersion":1,"family":"closed-solid-fill-cubic-path","target":target,
+                "geometry":geometry,"fill":fill})
+        } else {
+            serde_json::json!({"schemaVersion":1,"family":"editable-vector-path","target":target,"geometry":geometry,
+                "fill":fill,"vector":{"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"butt",
+                "strokeJoin":"miter","opacity":1}})
+        });
+        let scope = &mut doc["compositionOrder"]["contexts"][0]["scopes"][0]["elements"];
+        let next = scope.as_array().unwrap().iter().filter(|e| e["layerUid"] == "L0").count();
+        scope.as_array_mut().unwrap().push(serde_json::json!(
+            {"layerUid":"L0","strokeId":"v1","naturalPosition":next,"order":{}}));
+        let history =
+            NativeObjectHistory::new("rive", decode_storage_project(&serde_json::to_vec(&doc).unwrap()).unwrap())
+                .unwrap();
+        let painted = plan(&history.acquire_snapshot(history.content_revision()).unwrap(), 0);
+        super::strokes_by_layer(&painted, 1).unwrap()
+    };
+    let legacy = planned(true);
+    assert_eq!(legacy[0].len(), 2);
+    assert_eq!(legacy, planned(false));
+}
