@@ -112,13 +112,16 @@
       var p=objectProject();if(!p)return v1.handle(request);var current=p.isActive()&&p.info();
       var out={apiVersion:1,requestId:request&&typeof request.requestId==='string'?request.requestId:''};
       // Before a document opens there is no identity to report; the request's own instance is echoed, nothing invented.
-      if(!current||!current.documentId)return Object.assign(out,{instanceId:request&&typeof request.instanceId==='string'?request.instanceId:'',
-        documentId:'',revision:0,ok:false,error:{code:'unavailable',message:'No native project is open.'}});
-      Object.assign(out,{instanceId:current.instanceId,documentId:current.documentId,revision:current.contentRevision});
+      if(!current||!current.documentId)Object.assign(out,{instanceId:request&&typeof request.instanceId==='string'?request.instanceId:'',documentId:'',revision:0});
+      else Object.assign(out,{instanceId:current.instanceId,documentId:current.documentId,revision:current.contentRevision});
+      // What a native project serves on this route: the legacy opacity descriptors would advertise writes it refuses.
+      if(request&&request.operation==='capabilities')return Object.assign(out,{ok:true,result:{operations:['capabilities','snapshot'],
+        nativeApiVersion:2,properties:[],descriptors:[],documentIdentity:'open-document-incarnation'}});
+      if(!current||!current.documentId)return Object.assign(out,{ok:false,error:{code:'unavailable',message:'No native project is open.'}});
       if(request&&request.operation==='snapshot')return Object.assign(out,{ok:true,result:{frame:ports.currentFrame(),
         totalFrames:current.totalFrames,canvasW:current.canvasW,canvasH:current.canvasH,fps:current.fps,
         layers:(current.layers||[]).map(function(layer){return {id:layer.layerUid,name:layer.name,visible:layer.visible!==false,locked:layer.locked===true,shy:layer.shy===true};})}});
-      return Object.assign(out,{ok:false,error:{code:'unavailable',message:'Native object projects answer only snapshot and native operations (apiVersion 2).'}});};
+      return Object.assign(out,{ok:false,error:{code:'unavailable',message:'Native object projects answer only capabilities, snapshot and native operations (apiVersion 2).'}});};
 
     function reenterLegacy() { return false; }
     function disposeSession(session) {
