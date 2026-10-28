@@ -7,8 +7,8 @@
  * A presenter is {render(mountNode, context)}; it builds nodes, its caller commits them.
  * Delivery is at most once per revision identity: the pin advances before listeners run,
  * so a failed listener is reported (rethrown) but the same revision is not re-delivered.
- * Only the layer list has a presenter today (the CS5 pilot); the other declared surfaces
- * are mount points for later presenters and refuse to present until one registers.
+ * Layer-list and Motion property presenters use these mount points. Unregistered
+ * surfaces refuse to present. Stateful callers retire their handle when provider identity changes.
  */
 (function(root,factory){
   var api=factory();
@@ -70,6 +70,8 @@
     return function unregister(){if(!live||r.get(surface)!==presenter)return false;live=false;r.delete(surface);return true;};
   }
   function isMounted(root,surface){surfaceId(surface);return registry(root).has(surface);}
+  // Read-only identity for callers that own a stateful presenter's retirement.
+  function getPresenter(root,surface){surfaceId(surface);return registry(root).get(surface)||null;}
   function mountPoint(root,surface){
     var id=surfaceId(surface),node=root&&root.document&&root.document.getElementById(id);
     if(!node)throw new Error('Presenter mount point is unavailable: '+surface);
@@ -82,5 +84,5 @@
     return presenter.render(mountPoint(root,surface),context);
   }
   return Object.freeze({SURFACES:SURFACES,publish:publish,subscribe:subscribe,current:current,query:query,
-    register:register,isMounted:isMounted,mountPoint:mountPoint,present:present});
+    register:register,isMounted:isMounted,getPresenter:getPresenter,mountPoint:mountPoint,present:present});
 }));

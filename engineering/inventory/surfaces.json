@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "c3c9c582c7d6d680c84d5c2c89dfb68b7488555a",
-  "describe": "v0.7.0-alpha.4-3565-gc3c9c582"
+  "head": "6ca4d147a42ebc461476c206f2833983fc56d237",
+  "describe": "v0.7.0-alpha.4-3575-g6ca4d147"
  },
- "inputsDigest": "ab02d61e1830c794e146eef7033f2a668c60cd906999ddf7ff778ef7dd461d1c",
+ "inputsDigest": "32a695f15fbf81a27e5339f899c5dceaac3f8e91904f4e0c828d92f6172f9de6",
  "states": [
   "inventoried",
   "characterized",
@@ -1721,7 +1721,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 164,
+    "functionsVisited": 166,
     "via": "variable cyc",
     "references": [
      "src/js/adapters/native-frame-cell-selection.js:43 cycle()"
@@ -2206,7 +2206,7 @@
     "container": "p-fillpropagate-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 471,
+    "functionsVisited": 472,
     "via": "variable propBtn",
     "references": []
    },
@@ -2557,7 +2557,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 225,
+    "functionsVisited": 227,
     "via": "chain",
     "references": [
      "src/js/timeline.js:9118 action()"
@@ -4277,7 +4277,7 @@
     "container": "rig-assign-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 221,
+    "functionsVisited": 223,
     "via": "chain",
     "references": []
    },
@@ -4810,7 +4810,7 @@
     "functionsVisited": 137,
     "via": "variable b",
     "references": [
-     "src/js/adapters/native-object-ui.js:372 setShyMode()",
+     "src/js/adapters/native-object-ui.js:365 setShyMode()",
      "src/js/motion.js:13204 setAppMode()",
      "src/js/timeline.js:1237 toggleLayerShy()"
     ]
@@ -4979,7 +4979,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 124,
+    "functionsVisited": 125,
     "via": "variable trigger",
     "references": []
    },
@@ -5017,7 +5017,7 @@
     "container": "p-toolpreset-row",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 55,
+    "functionsVisited": 57,
     "via": "variable saveBtn",
     "references": []
    },
@@ -5782,7 +5782,7 @@
     "container": "comment-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 10,
+    "functionsVisited": 13,
     "via": "variable shotInput",
     "references": []
    },
@@ -8300,7 +8300,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 28,
+    "functionsVisited": 31,
     "via": "chain",
     "references": [
      "src/js/images.js:249 importImages()"
@@ -8611,7 +8611,7 @@
     "container": "linked-media-banner",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 37,
+    "functionsVisited": 40,
     "via": "variable reqBtn",
     "references": []
    },
@@ -9917,7 +9917,7 @@
     "functionsVisited": 27,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:318 renderNativeObjectUiMetadata()"
+     "src/js/adapters/native-object-ui.js:311 renderNativeObjectUiMetadata()"
     ]
    },
    "fixtures": [
@@ -12243,7 +12243,7 @@
     "functionsVisited": 37,
     "via": "variable trig",
     "references": [
-     "src/js/adapters/native-object-ui.js:181 unavailableInspector()",
+     "src/js/adapters/native-object-ui.js:174 unavailableInspector()",
      "src/js/reference-bridge.js:362 syncUI()",
      "src/js/reference-bridge.js:431 openOptions()"
     ]
@@ -14801,7 +14801,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 32,
+    "functionsVisited": 35,
     "via": "variable input",
     "references": []
    },
@@ -16334,7 +16334,7 @@
     "functionsVisited": 99,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:309 renderNativeObjectUiMetadata()",
+     "src/js/adapters/native-object-ui.js:302 renderNativeObjectUiMetadata()",
      "src/js/app.js:5100 syncInput()",
      "src/js/timeline.js:229 updatePlayhead()",
      "src/js/timeline.js:2843 updateUI()"
@@ -16796,7 +16796,7 @@
     "container": "tp-font-add-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 132,
+    "functionsVisited": 140,
     "via": "variable fontAddConfirm",
     "references": []
    },
@@ -16840,7 +16840,7 @@
     "container": "tp-font-add-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 40,
+    "functionsVisited": 42,
     "via": "variable fontAddInput",
     "references": []
    },
@@ -17348,7 +17348,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 28,
+    "functionsVisited": 31,
     "via": "chain",
     "references": [
      "src/js/images.js:625 importVideo()",
@@ -23420,7 +23420,7 @@
    "source": "src/js/layer-inout.js:1572",
    "meta": {
     "i18n": null,
-    "functionsVisited": 28
+    "functionsVisited": 31
    },
    "fixtures": [
     "static-props",
@@ -28588,7 +28588,7 @@
    "source": "src/js/shapes-panel.js:869",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 311
+    "functionsVisited": 312
    },
    "fixtures": [
     "static-props",
@@ -32398,7 +32398,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:218",
    "meta": {
-    "functionsVisited": 59
+    "functionsVisited": 62
    },
    "fixtures": [
     "media",
@@ -32603,7 +32603,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 373
+    "functionsVisited": 374
    },
    "fixtures": [
     "media",
@@ -33096,7 +33096,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:146",
    "meta": {
-    "functionsVisited": 61
+    "functionsVisited": 64
    },
    "fixtures": [
     "media",
