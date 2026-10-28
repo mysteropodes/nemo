@@ -137,7 +137,7 @@ fn check_parent_edits(parametric: bool) {
         assert_eq!(support::bytes(&owner), before);
         let q = json!({"apiVersion":2,"requestId":format!("type-{}",edit["intent"]["pointType"].as_str().unwrap()),"instanceId":owner.instance_id(),"documentId":owner.document_id(),"operation":"command.document.object.subselect.edit","expectedRevision":owner.content_revision(),"payload":{"command":"object.subselect.edit","stableTarget":support::target("L1",0,"s-0"),"intent":edit["intent"]}});
         let r = owner
-            .dispatch_object_command(&serde_json::from_value(q).unwrap())
+            .try_dispatch_object_command(&serde_json::from_value(q).unwrap())
             .unwrap()
             .unwrap();
         assert!(r.ok, "{r:?}");

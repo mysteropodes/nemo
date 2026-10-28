@@ -100,3 +100,19 @@ fn registered_families_are_named_once() {
     names.dedup();
     assert_eq!(names.len(), len, "duplicate command family name");
 }
+
+#[test]
+fn tween_family_is_available_only_with_its_application_dependencies() {
+    for operation in ["generate", "regenerate", "split", "reassign"] {
+        let operation = format!("command.document.object.tween.{operation}");
+        let owner = families::owner(&operation);
+        assert_eq!(
+            owner.is_some(),
+            cfg!(feature = "application"),
+            "{operation}"
+        );
+        if let Some(owner) = owner {
+            assert_eq!(owner.name, "tween");
+        }
+    }
+}
