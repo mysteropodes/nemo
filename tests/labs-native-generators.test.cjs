@@ -44,7 +44,8 @@ function harness(options = {}) {
   const state = { activeLayerIdx: 1, currentFrame: 6, canvasW: 1920, canvasH: 1080, strokeEnabled: true, strokeColor: '#ff000080',
     brushSize: 3, opacity: 80, fillColor: '#336699' };
   if (!options.legacy) Object.defineProperty(state, 'layers', { get: poisoned });
-  const root = { state, console, Math, JSON, document: { addEventListener() {} }, SM: { t: (k) => k }, showToast: (t) => toasts.push(t), clearSel: () => cleared.push(1),
+  const docListeners = {};
+  const root = { state, console, Math, JSON, document: { addEventListener: (type, fn) => { docListeners[type] = fn; } }, SM: { t: (k) => k }, showToast: (t) => toasts.push(t), clearSel: () => cleared.push(1),
     selectedPaths: options.selected || [], SMLabs: { register() {} }, selBounds: () => options.bounds || null,
     NemoNativeObjectProject: { desktop: () => (options.legacy ? null : session) }, NemoNativeObjectLabs: Labs,
     NemoNativeObjectVector: require('../src/js/adapters/native-object-vector.js'), SMProject: { getProjectKey: () => 'p1' },
@@ -54,7 +55,7 @@ function harness(options = {}) {
   root.window = root;
   vm.createContext(root);
   for (const file of ['speed-lines.js', 'boil-effect.js', 'follow-path.js', 'reference-fill.js', 'pingpong-cycle.js', 'retime-exposure.js', 'interval-assistant.js', 'move-to-layer.js', 'pose-library.js']) vm.runInContext(read('src/js/labs/' + file), root, { filename: file });
-  return { root, sent, toasts, cleared, reads, labs: root.SMLabs };
+  return { root, sent, toasts, cleared, reads, docListeners, labs: root.SMLabs };
 }
 
 test('speed lines send the baseline defaults, the seed and the resolved colour as one native operation', async () => {
@@ -104,6 +105,20 @@ test('follow-path sends the selection with its linked fills, or explicit ids, an
   const locked = harness({ refuse: 'unavailable' });
   assert.equal(await locked.labs.speedLines({}), 0);
   assert.deepEqual(locked.toasts, ['labsToastLayerInvalidLocked']);
+});
+
+test('fill at cursor maps the last pointer through the native presentation on an object project (#2362)', async () => {
+  const h = harness();
+  h.root.SMEngineBridge = { screenToWorld: () => [999, 999] };
+  h.root.NemoSelectCanvasIntent = { presentedState: () => ({ pin: {}, presentation: {} }), worldPoint: (_r, x, y) => ({ x: x * 2, y: y * 2 }) };
+  h.docListeners.pointermove({ clientX: 30, clientY: 40 });
+  assert.equal(await h.labs.referenceFillAtPointer(), true);
+  assert.deepEqual(plain(h.sent[0].payload).point, [60, 80], 'the presented mapping, not the legacy view transform');
+  const legacy = harness();
+  legacy.root.SMEngineBridge = { screenToWorld: (x, y) => [x + 1, y + 1] };
+  legacy.docListeners.pointermove({ clientX: 30, clientY: 40 });
+  assert.equal(await legacy.labs.referenceFillAtPointer(), true);
+  assert.deepEqual(plain(legacy.sent[0].payload).point, [31, 41], 'without a presented object session the view transform stays');
 });
 
 test('reference fill sends the bucket colour as #rrggbbaa and keeps the baseline outcome toasts', async () => {

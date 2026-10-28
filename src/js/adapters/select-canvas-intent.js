@@ -186,7 +186,7 @@
     var now = presentedSession(root);
     if (!now || !samePin(now.pin, s.pin) || now.presentation.frame !== s.presentation.frame) return null;
     var Path = root.Path || root.paper.Path, Matrix = root.Matrix || root.paper.Matrix;
-    return { pin: s.pin, presentation: s.presentation, frame: s.presentation.frame, layerUid: layer.layerUid, paths: data.items.filter(function (item) {
+    return { pin: s.pin, presentation: s.presentation, frame: s.presentation.frame, layerUid: layer.layerUid, items: data.items, paths: data.items.filter(function (item) {
       return Array.isArray(item.segments); }).map(function (item) {
       var path = new Path({ insert: false, closed: item.closed, segments: item.segments.map(function (a) { return [a.point, a.handleIn, a.handleOut]; }) });
       path.transform(new Matrix(item.matrix[0], item.matrix[1], item.matrix[2], item.matrix[3], item.matrix[4], item.matrix[5]));
@@ -221,6 +221,13 @@
       nativeStableTarget: Object.assign({}, path.data.nativeStableTarget, { strokeId: id }) });
     return ribbon;
   }
+  // A ribbon carries its linked fill as the baseline Paper item did (data.linkedFill), so the Labs routes that move a
+  // selection with its fill (path bake) name both.
+  function withFill(path, items) {
+    var fill = path.data.nativeRole === 'ribbon' && items.find(function (i) { return i.role === 'fill' && i.owner === path.data.strokeId; });
+    if (fill) path.data.linkedFill = { data: { strokeId: fill.stableTarget.strokeId } };
+    return path;
+  }
   // The top-most presented stroke of the active layer within 8 screen pixels of the click, or null. Only records whose
   // bounds reach the click have their geometry read.
   async function pick(root, clientX, clientY) {
@@ -231,7 +238,7 @@
     if (!layers) return undefined;
     var Point = root.Point || root.paper.Point, at = new Point(w.x, w.y);
     for (var i = layers.paths.length - 1; i >= 0; i--)
-      if (layers.paths[i].hitTest(at, { fill: true, stroke: true, tolerance: t })) return owned(layers.paths[i]);
+      if (layers.paths[i].hitTest(at, { fill: true, stroke: true, tolerance: t })) return withFill(owned(layers.paths[i]), layers.items);
     return null;
   }
 
