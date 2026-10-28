@@ -11,7 +11,7 @@ function operations(project) {
     { create: () => ({}) }, { create: () => ({ handle(request) { handled.push(request.operation); return { legacy: true }; } }) });
   return { ops, handled };
 }
-const project = { blocksLegacy: () => true, info: () => ({ instanceId: 'instance-A', documentId: 'native-object-document-1',
+const project = { blocksLegacy: () => true, isActive: () => true, info: () => ({ instanceId: 'instance-A', documentId: 'native-object-document-1',
   contentRevision: 4, totalFrames: 21, canvasW: 320, canvasH: 180, fps: 24, layers: [
     { layerUid: 'layer-1', name: 'Ink', visible: false, locked: true, shy: false, color: '#5FA875', parentLayerUid: null }] }) };
 const envelope = (operation) => ({ apiVersion: 1, requestId: 'r-' + operation, instanceId: 'instance-A',
@@ -39,4 +39,14 @@ test('without a native object project the v1 handler answers as before', () => {
   const { ops, handled } = operations({ blocksLegacy: () => false });
   assert.deepEqual(ops.handleV1({ apiVersion: 1, requestId: 'r', operation: 'snapshot', payload: {} }), { legacy: true });
   assert.deepEqual(handled, ['snapshot']);
+});
+
+test('before a document opens, a v1 request answers a typed refusal echoing only the request instance', () => {
+  // CS4: the native session blocks legacy writes from boot, before any document exists.
+  const booting = { blocksLegacy: () => true, isActive: () => false, info: () => null };
+  const { ops, handled } = operations(booting);
+  assert.deepEqual(ops.handleV1({ apiVersion: 1, requestId: 'r-boot', instanceId: 'instance-A', operation: 'snapshot', payload: {} }),
+    { apiVersion: 1, requestId: 'r-boot', instanceId: 'instance-A', documentId: '', revision: 0, ok: false,
+      error: { code: 'unavailable', message: 'No native project is open.' } });
+  assert.deepEqual(handled, []);
 });

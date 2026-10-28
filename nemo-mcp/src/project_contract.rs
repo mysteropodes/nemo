@@ -10,6 +10,11 @@ const MAX_STRING_BYTES: usize = 4096;
 const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 const FORMATS: [&str; 3] = ["png", "svg", "lottie"];
 
+/// The operations that open or create a project and so may run before any document exists to read.
+pub(crate) const fn enters_project(operation: &Operation) -> bool {
+    matches!(operation, Operation::ProjectOpen | Operation::ProjectNew)
+}
+
 pub(crate) const fn is_project_operation(operation: &Operation) -> bool {
     matches!(
         operation,

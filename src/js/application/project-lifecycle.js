@@ -34,7 +34,8 @@
 
   function create(ports) {
     var busy = false, retained = new Map();
-    function project() { var p = ports.objectProject(); return p && p.isActive() ? p : null; }
+    // A document is open when the native session is active with an identity; blocksLegacy alone holds from boot (CS4).
+    function project() { var info = ports.active() ? ports.info() : null; return info && info.documentId ? ports.objectProject() : null; }
     function current() { return project() ? ports.info() : null; }
     function response(request, ok, value) {
       var info = current();

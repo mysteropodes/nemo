@@ -78,6 +78,7 @@
   function lifecycle() { return projectLifecycle || (projectLifecycle = root.NemoProjectLifecycle.create({
     available: function () { return !!(root.__TAURI__ && root.__TAURI__.core && root.SMProject && root.NemoNativeObjectProject); },
     objectProject: function () { return root.SMProject && root.SMProject.nativeObjectProject(); },
+    active: function () { var s = root.NemoNativeObjectProject.desktop(root); return !!(s && s.isActive()); },
     info: function () { var s = root.NemoNativeObjectProject.desktop(root); return s && s.info(); },
     tabs: function () { return root.SMProject && root.SMProject.nativeTabs; },
     openPath: function (path) { return root.SMProject.openPath(path); },

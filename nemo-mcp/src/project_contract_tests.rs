@@ -161,3 +161,20 @@ fn a_frame_beyond_i64_is_still_structurally_an_integer() {
     let payload = json!({"property": "opacity", "layerId": "layer-1", "value": 40, "frame": u64::MAX});
     assert!(Operation::PropertyKeySet.check_payload(&payload).is_ok());
 }
+
+#[test]
+fn only_open_and_new_may_omit_the_document_pin() {
+    use crate::contract::ApplicationRequest;
+    let request = |operation: &str, payload: Value| -> ApplicationRequest {
+        serde_json::from_value(json!({"apiVersion": 1, "requestId": "r", "instanceId": "instance-A",
+            "operation": operation, "payload": payload}))
+        .unwrap()
+    };
+    assert!(request("project.open", json!({"path": "/a.json"})).validate().is_ok());
+    assert!(request("project.new", json!({"canvasW": 320, "canvasH": 180, "fps": 24})).validate().is_ok());
+    assert!(request("project.saveAs", json!({"path": "/a.json"})).validate().is_err());
+    assert!(request("project.export", json!({"format": "png", "destination": "/out"})).validate().is_err());
+    let anonymous: ApplicationRequest = serde_json::from_value(json!({"apiVersion": 1, "requestId": "r",
+        "operation": "project.open", "payload": {"path": "/a.json"}})).unwrap();
+    assert!(anonymous.validate().is_err(), "every write still names its instance");
+}

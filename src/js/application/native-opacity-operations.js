@@ -107,9 +107,12 @@
     // A native object project answers v1 with a typed refusal carrying its own identity. The MCP transport only replies
     // to a returned response, so a throw here left every v1 read waiting out the host's 30 s timeout (#2510).
     // snapshot answers the owner's own layer state, so a client can verify a native edit; other v1 reads refuse.
-    var handleV1 = function(request){var p=objectProject();if(!p)return v1.handle(request);var current=p.info();
-      var out={apiVersion:1,requestId:request&&typeof request.requestId==='string'?request.requestId:'',
-        instanceId:current.instanceId,documentId:current.documentId,revision:current.contentRevision};
+    var handleV1 = function(request){var p=objectProject();if(!p)return v1.handle(request);var current=p.isActive()&&p.info();
+      var out={apiVersion:1,requestId:request&&typeof request.requestId==='string'?request.requestId:''};
+      // Before a document opens there is no identity to report; the request's own instance is echoed, nothing invented.
+      if(!current||!current.documentId)return Object.assign(out,{instanceId:request&&typeof request.instanceId==='string'?request.instanceId:'',
+        documentId:'',revision:0,ok:false,error:{code:'unavailable',message:'No native project is open.'}});
+      Object.assign(out,{instanceId:current.instanceId,documentId:current.documentId,revision:current.contentRevision});
       if(request&&request.operation==='snapshot')return Object.assign(out,{ok:true,result:{frame:ports.currentFrame(),
         totalFrames:current.totalFrames,canvasW:current.canvasW,canvasH:current.canvasH,fps:current.fps,
         layers:(current.layers||[]).map(function(layer){return {id:layer.layerUid,name:layer.name,visible:layer.visible,locked:layer.locked,shy:layer.shy};})}});

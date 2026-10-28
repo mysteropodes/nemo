@@ -332,10 +332,14 @@ impl ApplicationRequest {
             ));
         }
         self.operation.check_payload(&self.payload)?;
+        // project.open/new may start from the start screen, where no document exists to read; the app still checks a
+        // supplied identity against the open project (#2510).
+        let enters = crate::project_contract::enters_project(&self.operation);
         if !self.operation.is_query()
             && (self.instance_id.as_deref().is_none_or(str::is_empty)
-                || self.document_id.as_deref().is_none_or(str::is_empty)
-                || self.expected_revision.is_none())
+                || !enters
+                    && (self.document_id.as_deref().is_none_or(str::is_empty)
+                        || self.expected_revision.is_none()))
         {
             return Err(RequestError::InvalidRequest(
                 "writes require instanceId, documentId and expectedRevision from snapshot"

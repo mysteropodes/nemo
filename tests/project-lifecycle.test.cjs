@@ -20,6 +20,7 @@ function app(options = {}) {
   };
   const ports = {
     available: () => options.available !== false,
+    active: () => active,
     objectProject: () => objectProject,
     info,
     tabs: () => tabs,
