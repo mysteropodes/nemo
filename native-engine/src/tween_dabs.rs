@@ -1,5 +1,5 @@
 //! Tween-specific pressure/opacity adaptation around the canonical native dab stamper.
-use crate::evaluation::brush_dab::{
+use crate::object_document::brush_dab::{
     presets::from_catalog, sampling::SeededRng, stamp::build_brush_dabs,
 };
 use crate::object_document::BrushPresetRecord;

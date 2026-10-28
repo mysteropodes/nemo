@@ -3,12 +3,12 @@
 //! @1065e9d8), ported line for line: the same random draws in the same order (every `(rand()*2-1)*(x||0)` draws, even
 //! when `x` is zero), the same spacing walk and 900-dab budget, and the same Paper geometry (`brush_dab_shape`) along
 //! the stroke's Paper arc length (`property_follow_path_sample`, bit-exact with Paper 0.12.18).
-use crate::evaluation::brush_dab::path::{PathLike, Rough, StrokePath};
-use crate::evaluation::brush_dab::presets::{or, truthy, DabPreset, BRUSH_MAX_DABS, SHARPNESS_LAYERS};
-use crate::evaluation::brush_dab::sampling::{
+use crate::object_document::brush_dab::path::{PathLike, Rough, StrokePath};
+use crate::object_document::brush_dab::presets::{or, truthy, DabPreset, BRUSH_MAX_DABS, SHARPNESS_LAYERS};
+use crate::object_document::brush_dab::sampling::{
     pressure_curve_mul, sample_across_width, sample_gaussian, width_at_frac, SeededRng,
 };
-use crate::evaluation::brush_dab::shape::{
+use crate::object_document::brush_dab::shape::{
     ellipse, rectangle, rotate, set_position, smooth_catmull_rom, smooth_continuous, DabPath, Seg,
 };
 use std::f64::consts::PI;

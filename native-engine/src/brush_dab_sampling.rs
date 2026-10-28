@@ -1,6 +1,6 @@
 //! The baseline stamper's random and width helpers (`seededRng`, `sampleAcrossWidth`, `sampleGaussian`,
 //! `pressureCurveMul`, `widthAtFrac` and `jitterColorValue` in `src/js/tools.js` @1065e9d8).
-use crate::evaluation::brush_dab::presets::DabPreset;
+use crate::object_document::brush_dab::presets::DabPreset;
 use std::f64::consts::PI;
 
 /// `seededRng(seed)`: mulberry32 over the seed's unsigned 32 bits.

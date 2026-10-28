@@ -1,6 +1,6 @@
 //! What the baseline stamper walks: a Paper path's arc length, point and tangent (`property_follow_path_sample`,
 //! bit-exact with Paper 0.12.18), or `roughenPath`'s seeded displacement of it.
-use crate::evaluation::property_follow_path_sample::{
+use crate::object_document::property_follow_path_sample::{
     path_curves, path_length, point_tangent_at, SegmentIn,
 };
 use std::f64::consts::PI;
