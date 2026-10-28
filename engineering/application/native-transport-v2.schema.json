@@ -18934,6 +18934,9 @@
             },
             "preview": {
               "$ref": "#/$defs/ObjectSubselectIntent"
+            },
+            "paint": {
+              "const": true
             }
           }
         }
@@ -19039,8 +19042,27 @@
             },
             "preview": {
               "type": "boolean"
+            },
+            "paint": {
+              "const": true
             }
-          }
+          },
+          "allOf": [
+            {
+              "if": {
+                "required": [
+                  "paint"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "closed": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          ]
         }
       }
     },
@@ -19235,8 +19257,29 @@
                 "items": {
                   "type": "number"
                 }
+              },
+              "paintCount": {
+                "type": "integer",
+                "minimum": 2,
+                "maximum": 256
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "required": [
+                    "paintCount"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "closed": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            ]
           }
         },
         "preview": {

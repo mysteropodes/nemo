@@ -23,8 +23,9 @@ struct Page {
     cursor: usize,
     limit: usize,
     preview: Presence<Intent>,
+    paint: Presence<bool>,
 }
-object_deserialize!(Page {cursor:usize,limit:usize,#[serde(default)] preview:Presence<Intent>});
+object_deserialize!(Page {cursor:usize,limit:usize,#[serde(default)] preview:Presence<Intent>,#[serde(default)] paint:Presence<bool>});
 impl ObjectSnapshot {
     pub(super) fn dispatch_subselect_read(
         &self,
@@ -54,6 +55,13 @@ impl ObjectSnapshot {
                 "Subselect page limit is outside 1..16.",
             );
         }
+        let paint = !payload.subselect.paint.missing();
+        if paint && payload.subselect.paint.value() != Some(&true) {
+            return refused(
+                DispatchErrorCode::InvalidRequest,
+                "Invalid subselect paint selector.",
+            );
+        }
         let Some(stored) = self
             .document()
             .objects
@@ -68,7 +76,17 @@ impl ObjectSnapshot {
                 None => Ok(stored.clone()),
             }
         });
-        let geometry = planned.and_then(|r| record::anchors(&r).map(|a| (r.geometry.closed, a)));
+        let geometry = planned.and_then(|r| {
+            let anchors = record::anchors(&r)?;
+            if paint {
+                if !record::has_pressure(&r) {
+                    return Err(Refusal::Unsupported);
+                }
+                Ok((r.geometry.closed, record::paint_anchors(&r)?))
+            } else {
+                Ok((record::closed(&r), anchors))
+            }
+        });
         let (closed, anchors): (bool, Vec<Anchor>) = match geometry {
             Ok(v) => v,
             Err(Refusal::Invalid) => {
@@ -92,7 +110,7 @@ impl ObjectSnapshot {
             );
         }
         let end = (cursor + payload.subselect.limit).min(anchors.len());
-        let response = ResponseEnvelope {
+        let mut response = ResponseEnvelope {
             api_version: APPLICATION_API_VERSION,
             request_id: request.request_id.clone(),
             instance_id: self.instance_id().into(),
@@ -107,6 +125,9 @@ impl ObjectSnapshot {
                 }}),
             ),
         };
+        if paint {
+            response.result.as_mut().unwrap()["subselect"]["paint"] = json!(true);
+        }
         if serde_json::to_vec(&response)
             .map_err(|_| DispatchErrorCode::Internal)?
             .len()
