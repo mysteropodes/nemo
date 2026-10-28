@@ -2147,7 +2147,8 @@
         "native_font_source.rs",
         "native_raster_image_source.rs",
         "native_raster_image_dispatch.rs",
-        "native_import_batch_dispatch.rs"
+        "native_import_batch_dispatch.rs",
+        "native_mcp_project_scope.rs"
       ],
       "publicApi": [
         "application_mcp.rs"
@@ -2164,7 +2165,8 @@
         "application_mcp_reproduction_tests.rs",
         "native_revision_sync_tests.rs",
         "native_font_dispatch_tests.rs",
-        "native_font_source_tests.rs"
+        "native_font_source_tests.rs",
+        "native_mcp_project_scope_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

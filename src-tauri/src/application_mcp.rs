@@ -60,6 +60,7 @@ pub(crate) use font_source::fetch_google_font;
 
 #[path = "native_revision_sync.rs"]
 mod revision_sync;
+#[path = "native_mcp_project_scope.rs"] mod project_scope;
 #[cfg(test)]
 use revision_sync::dispatch_native;
 use revision_sync::{RevisionControl, RevisionSync};
@@ -456,7 +457,7 @@ async fn serve_legacy(
     pending: Pending,
     message: wire::WireRequest,
 ) -> Result<(), String> {
-    message.request.validate().map_err(|e| e.to_string())?;
+    project_scope::validate_and_admit(&app, &message.request)?;
     if message.request.instance_id.as_deref() != Some(endpoint.instance_id.as_str()) {
         return Err("request instance mismatch".into());
     }
