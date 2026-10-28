@@ -2,7 +2,56 @@
 use crate::object_codec::PropertyHolderTarget;
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct PropertyExpressionSource {
+    pub(crate) enabled: bool,
+    pub(crate) code: String,
+}
 impl ObjectSnapshot {
+    /// Exact authored code from this retained snapshot. Returning an owned value
+    /// grants neither evaluation nor a writable document mirror. Transport/editor
+    /// admission is separate; existing public reads still expose only their DTOs.
+    #[allow(dead_code)]
+    pub(crate) fn property_expression_source(
+        &self,
+        target: &PropertyHolderTarget,
+        property: &str,
+    ) -> Result<Option<PropertyExpressionSource>, DispatchErrorCode> {
+        use DispatchErrorCode::{InvalidRequest, Unavailable};
+        if target.context_id().is_empty()
+            || target.layer_uid().is_empty()
+            || target.stroke_id().is_some_and(str::is_empty)
+            || property.is_empty()
+        {
+            return Err(InvalidRequest);
+        }
+        if property == "timeRemap" {
+            return Err(Unavailable);
+        }
+        let holder = self.metadata_holder(target)?;
+        if holder
+            .metadata_in_document(self.document(), property)
+            .is_none()
+        {
+            return Err(Unavailable);
+        }
+        let expression = if property == "order" {
+            self.document()
+                .property_order(target)
+                .and_then(|order| order.expression.value())
+        } else {
+            holder
+                .properties()
+                .iter()
+                .find(|record| record.property() == property)
+                .and_then(|record| record.expression.value())
+        };
+        Ok(expression.map(|value| PropertyExpressionSource {
+            enabled: value.enabled,
+            code: value.code.clone(),
+        }))
+    }
     /// Raw values from this exact retained snapshot. Expressions are not evaluated.
     pub fn sample_property_raw(
         &self,

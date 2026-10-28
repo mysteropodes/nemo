@@ -466,6 +466,7 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
       'application_replacement_tests = "../tests/application_replacement.rs"',
       'object_application_read_tests = "../tests/object_read.rs"',
       'object_frame_packet_application_tests = "../tests/object_frame_packet.rs"',
+      'object_property_expression_authoring_tests = "../tests/object_property_expression_authoring.rs"',
       'object_render_scene_application_tests = "../tests/object_render_scene.rs"');
     assert.deepEqual(testMacros[`test-${name}`], [...expected].sort());
     assert.deepEqual(cargo.targets[name], { path: 'src/lib.rs', feature: `test-${name}` });

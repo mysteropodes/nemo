@@ -1292,6 +1292,7 @@
         "object_vector_edit_support.rs",
         "object_property_public_read.rs",
         "object_property_expression_state.rs",
+        "object_property_expression_authoring.rs",
         "rig_pose_deform.rs",
         "rig_pose_deform_mesh.rs",
         "rig_pose_deform_rows.rs",
