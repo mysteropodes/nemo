@@ -30,6 +30,7 @@ pub(super) struct BatchOp {
     from_step: Presence<serde_json::Number>,
     frame: Presence<serde_json::Number>,
     geometry: Presence<ObjectGeometry>,
+    offset: Presence<[f64; 2]>,
 }
 object_deserialize!(BatchOp {
     op: String,
@@ -39,8 +40,45 @@ object_deserialize!(BatchOp {
     #[serde(default)] keyframe: Presence<String>,
     #[serde(default)] from_step: Presence<serde_json::Number>,
     #[serde(default)] frame: Presence<serde_json::Number>,
-    #[serde(default)] geometry: Presence<ObjectGeometry>
+    #[serde(default)] geometry: Presence<ObjectGeometry>,
+    #[serde(default)] offset: Presence<[f64; 2]>
 });
+
+/// A geometry-less `clone` (#2362 pose stamp): any vector record copied as stored, its points shifted by `offset` (the
+/// baseline stamp translated the item, never its stored centreline), its texture group dropped as path bake's copies
+/// are, and its linked-fill identity renamed per batch so a stamped ribbon and its fill stay one pair beside the source.
+fn shifted_copy(source: &ObjectDocument, target: &ObjectTarget, offset: [f64; 2], links: &mut Vec<(String, String)>, revision: u64)
+    -> Result<ObjectRecord, DispatchErrorCode> {
+    let existing = source.objects.iter().find(|r| &r.target == target).ok_or(DispatchErrorCode::NotFound)?;
+    if !is_vector_record(existing) || !offset.iter().all(|v| v.is_finite()) {
+        return Err(DispatchErrorCode::InvalidRequest);
+    }
+    let mut record = existing.clone();
+    if offset != [0.0, 0.0] {
+        for segment in &mut record.geometry.segments {
+            for (n, d) in [(&mut segment.point.x, offset[0]), (&mut segment.point.y, offset[1])] {
+                *n = n.as_f64().and_then(|v| serde_json::Number::from_f64(v + d)).ok_or(DispatchErrorCode::InvalidRequest)?;
+            }
+        }
+    }
+    if let Presence::Present(ext) = &mut record.vector_ext {
+        if let Presence::Present(texture) = &mut ext.brush_texture {
+            texture.brush_group_id = Presence::Missing;
+        }
+        if let Presence::Present(link) = &mut ext.linked_fill_id {
+            let fresh = match links.iter().find(|(old, _)| old == link) {
+                Some((_, fresh)) => fresh.clone(),
+                None => {
+                    let fresh = format!("native-fill:{revision}:{}", links.len());
+                    links.push((link.clone(), fresh.clone()));
+                    fresh
+                }
+            };
+            *link = fresh;
+        }
+    }
+    Ok(record)
+}
 
 /// The plain vector stroke at `target` with `geometry` in its own spaces; a stroke whose outline is derived (a pressure
 /// ribbon from its centreline, a shape from its parameters, a texture from its anchor) is never reshaped here.
@@ -74,11 +112,28 @@ pub(super) fn batch(origin: &ObjectSnapshot, mut ops: Vec<BatchOp>, copy_key: bo
     }
     // `copy` {fromStep, frame}: the record of an EARLIER create (or copy) step, retargeted to `frame` and then a create in
     // every respect; a stroke and its companion stamped on n frames cost one record each, not n.
+    let mut links: Vec<(String, String)> = Vec::new();
     for at in 0..ops.len() {
         let op = &mut ops[at];
         let (reshape, clone) = (op.op == "reshape", op.op == "clone");
-        if (reshape || clone) != !op.geometry.missing() {
+        let shifted = clone && op.geometry.missing();
+        if (reshape && op.geometry.missing()) || (!(reshape || clone) && !op.geometry.missing()) || (!shifted && !op.offset.missing()) {
             return Err(InvalidRequest);
+        }
+        if shifted {
+            let frame = op.frame.value().and_then(serde_json::Number::as_u64).and_then(|n| u32::try_from(n).ok());
+            let (Presence::Present(target), Some(frame)) = (op.stable_target.clone(), frame) else {
+                return Err(InvalidRequest);
+            };
+            if !op.record.missing() || !op.from_step.missing() {
+                return Err(InvalidRequest);
+            }
+            let offset = op.offset.value().copied().unwrap_or([0.0, 0.0]);
+            let mut record = shifted_copy(origin.document(), &target, offset, &mut links, origin.content_revision())?;
+            (record.target.frame_scope.frame, record.target.stroke_id) = (frame, String::new());
+            (op.op, op.record, op.stable_target, op.frame, op.offset) =
+                ("create".into(), Presence::Present(record), Presence::Missing, Presence::Missing, Presence::Missing);
+            continue;
         }
         if reshape || clone {
             let frame = op.frame.value().and_then(serde_json::Number::as_u64).and_then(|n| u32::try_from(n).ok());

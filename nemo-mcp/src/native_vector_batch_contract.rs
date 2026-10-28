@@ -30,9 +30,15 @@ fn step(op: &Value) -> Option<&Value> {
             && geometry(&op["geometry"])
             && op.get("frame").is_none_or(|f| f.as_u64().is_some_and(|f| u32::try_from(f).is_ok())))
         .then(|| &op["stableTarget"]),
-        "clone" => (exact(op, &["op", "stableTarget", "geometry", "frame"], &["placement", "keyframe"]).is_some()
+        // A clone takes new geometry (the knife's plain pieces) or, without it, copies any stroke shifted by `offset`
+        // (a pose stamp), never both.
+        "clone" => (exact(op, &["op", "stableTarget", "frame"], &["geometry", "offset", "placement", "keyframe"]).is_some()
             && target(&op["stableTarget"], false)
-            && geometry(&op["geometry"])
+            && !(op.get("geometry").is_some() && op.get("offset").is_some())
+            && op.get("geometry").is_none_or(geometry)
+            && op.get("offset").is_none_or(|o| {
+                o.as_array().is_some_and(|a| a.len() == 2 && a.iter().all(|v| v.as_f64().is_some_and(f64::is_finite)))
+            })
             && op["frame"].as_u64().is_some_and(|f| u32::try_from(f).is_ok())
             && op.get("placement").is_none_or(|p| p == "front" || p == "behind")
             && op.get("keyframe").is_none_or(|k| k == "copy"))

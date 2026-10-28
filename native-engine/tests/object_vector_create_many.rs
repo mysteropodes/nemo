@@ -151,7 +151,7 @@ fn behind_moves_only_the_target_layer_in_the_target_frame() {
 }
 
 /// A closed, filled vector path with a pressure-ribbon body, as the native Draw adapter maps it (no stroke of its own).
-fn pressure_record(fill: [f64; 3], ext: Value) -> Value {
+pub(super) fn pressure_record(fill: [f64; 3], ext: Value) -> Value {
     let corner = |x: f64, y: f64| json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}});
     json!({"schemaVersion":1,"family":"editable-vector-path",
         "target":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},"layerUid":"L1","strokeId":""},

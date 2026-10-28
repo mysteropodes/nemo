@@ -229,3 +229,41 @@ fn a_reshape_on_a_held_cell_keys_that_cell_and_leaves_the_key() {
     assert_eq!(at(4, "s-a").unwrap()["geometry"], moved, "the held cell's copy takes the new geometry under its own id");
     assert_eq!(ids_at(&owner, "L1", 4).len(), 2, "and the clone lands beside it");
 }
+
+#[test]
+fn a_geometry_less_clone_stamps_any_stroke_shifted_and_renames_its_linked_fill_pair() {
+    use super::create_many::pressure_record;
+    let mut owner = owner_of(&document(1, seeds(), None));
+    let companion = pressure_record([0.2, 0.4, 0.6], json!({"linkedFillId":"lf-pose","isLinkedFillCompanion":true}));
+    let ribbon = pressure_record([0.1, 0.1, 0.1], json!({"linkedFillId":"lf-pose","pressure":{"centerSegments":[
+        {"point":{"x":0,"y":10},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":2},
+        {"point":{"x":40,"y":10},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":4}],
+        "widthProfile":[{"t":0,"width":2},{"t":1,"width":4}]}}));
+    let made = send(&mut owner, "pair", json!({"command":"object.vector.createMany","records":[companion, ribbon]}));
+    assert_eq!(made["ok"], true, "{made}");
+    let before = state(&owner);
+    let stamp = |id: &str| json!({"op":"clone","stableTarget":target("L1", 0, id),"frame":0,"offset":[5,7]});
+    let response = send(&mut owner, "pose", batch(vec![stamp("native-stroke:1:0"), stamp("native-stroke:1:1")]));
+    assert_eq!(response["ok"], true, "{response}");
+    let after = state(&owner);
+    let pair: Vec<&Value> = objects(&after).iter().filter(|r| r["vectorExt"]["linkedFillId"] == "native-fill:1:0").collect();
+    assert_eq!(pair.len(), 2, "the stamped ribbon and fill are one pair under a fresh link beside the source pair");
+    assert_eq!(objects(&after).iter().filter(|r| r["vectorExt"]["linkedFillId"] == "lf-pose").count(), 2, "the source pair is untouched");
+    let source = objects(&before).iter().find(|r| r["target"]["strokeId"] == "native-stroke:1:1").unwrap().clone();
+    let copy = pair.iter().find(|r| r["vectorExt"]["pressure"].is_object()).unwrap();
+    for (a, b) in source["geometry"]["segments"].as_array().unwrap().iter().zip(copy["geometry"]["segments"].as_array().unwrap()) {
+        assert_eq!((b["point"]["x"].as_f64().unwrap() - a["point"]["x"].as_f64().unwrap(), b["point"]["y"].as_f64().unwrap() - a["point"]["y"].as_f64().unwrap()), (5.0, 7.0));
+    }
+    assert_eq!(copy["vectorExt"]["pressure"], source["vectorExt"]["pressure"], "the stored centreline is copied as the baseline stamp did");
+    owner.undo(2).unwrap();
+    assert_eq!(state(&owner), before, "one undo removes the stamp");
+    for (name, ops) in [
+        ("ribbon-alone", vec![stamp("native-stroke:1:1")]),
+        ("offset-and-geometry", vec![json!({"op":"clone","stableTarget":target("L1", 0, "native-stroke:1:1"),"frame":0,"offset":[1,1],"geometry":source["geometry"].clone()})]),
+        ("reshape-offset", vec![json!({"op":"reshape","stableTarget":target("L1", 0, "native-stroke:1:1"),"geometry":source["geometry"].clone(),"offset":[1,1]})]),
+        ("no-frame", vec![json!({"op":"clone","stableTarget":target("L1", 0, "native-stroke:1:1")})]),
+        ("missing", vec![json!({"op":"clone","stableTarget":target("L1", 0, "native-stroke:9:9"),"frame":0})]),
+    ] {
+        assert_eq!(send(&mut owner, name, batch(ops))["ok"], false, "{name} is refused");
+    }
+}
