@@ -322,7 +322,16 @@
   }
   function desktopPorts(root, transport) {
     var tauri = root.__TAURI__, invoke = tauri.core.invoke;
+    var underlay = null, viewportMapping = null;
     return Object.freeze({
+      surfaceChanged: function (presentation) {
+        if (!presentation) { if (underlay) underlay.surfaceChanged(null); return; }
+        if (!viewportMapping || !root.NemoNativeViewportUnderlay) {
+          throw new Error('Native opacity presentation underlay is unavailable');
+        }
+        if (!underlay) underlay = root.NemoNativeViewportUnderlay.desktop(root);
+        underlay.surfaceChanged(presentation, viewportMapping.cssBounds);
+      },
       objectProject: function () { return root.NemoNativeObjectProject ? root.NemoNativeObjectProject.desktop(root) : null; },
       document: root.SMProjectDocument, editor: root.NemoNativeOpacityEditorAdapter,
       selection: root.NemoNativeOpacitySelectionAdapter,
@@ -330,9 +339,12 @@
       createExporter: function () { return root.NemoNativeOpacityExportAdapter.createNativeOpacityExportAdapter(); },
       bootstrap: async function (prepared) {
         var host = await invoke('nemo_mcp_identity');
-        return invoke('nemo_native_bootstrap', { request: { apiVersion: 2,
+        var nextMapping = mapping(root);
+        var receipt = await invoke('nemo_native_bootstrap', { request: { apiVersion: 2,
           instanceId: host.instanceId, projection: prepared.projection,
-          resources: prepared.resources, outputBindings: [], viewport: mapping(root) } });
+          resources: prepared.resources, outputBindings: [], viewport: nextMapping } });
+        viewportMapping = nextMapping;
+        return receipt;
       },
       connect: function () { return transport.connect(); },
       connectionStatus: function () { return transport.status(); },
@@ -412,8 +424,13 @@
         toast: function (message) { if (root.showToast) root.showToast(message); },
         defer: function (callback, ms) { return root.setTimeout(callback, ms); },
         cancel: function (timer) { root.clearTimeout(timer); },
-        resize: function (current) { return invoke('nemo_native_viewport_resize', {
-          request: { apiVersion: 2, instanceId: current.instanceId, viewport: mapping(root) } }); }
+        resize: async function (current) {
+          var nextMapping = mapping(root);
+          var receipt = await invoke('nemo_native_viewport_resize', {
+            request: { apiVersion: 2, instanceId: current.instanceId, viewport: nextMapping } });
+          viewportMapping = nextMapping;
+          return receipt;
+        }
       })
     });
   }

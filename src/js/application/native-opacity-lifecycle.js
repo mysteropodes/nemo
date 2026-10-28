@@ -21,8 +21,6 @@
     var serializeResponse = null, evaluations = new Map(), persistence = null;
     var application = null, pending = Promise.resolve(), releasePromise = null, activationPromise = null;
     var cycle = null, sequence = 0, cacheFences = 0, terminal = null, replacementRequested = false;
-    var output = Object.freeze({ kind: 'frame', format: 'rgba8', width: 320, height: 180,
-      colorInterpretation: 'srgb', alphaMode: 'straight' });
 
     function id(prefix) { sequence++; return prefix + '-' + sequence; }
     function copyIdentity() { return identity && Object.freeze({ instanceId: identity.instanceId,
@@ -32,7 +30,8 @@
       operation: operation, payload: payload }; }
     function enqueue(work) { var next = pending.then(work); pending = next.catch(function () {}); return next; }
     function failLifecycle(target, error) { if (target) target.failure = target.failure || error;
-      if (cycle === target && phase !== 'legacy') phase = 'indeterminate'; return error; }
+      if (cycle === target && phase !== 'legacy') { phase = 'indeterminate'; preview.clear(target, true); }
+      return error; }
     function requireConnected(target) {
       var connected = null;
       try { connected = typeof ports.connectionStatus === 'function' ? ports.connectionStatus() : null; }
@@ -84,6 +83,7 @@
       target.exporter = scoped(ports.createExporter(), ['begin', 'status', 'cancel', 'observe', 'plan']);
     }
     function disposeConsumers(target) { if (!target) return;
+      preview.clear(target);
       if (target.preview) target.preview.dispose(); if (target.exporter) target.exporter.dispose();
       target.preview = null; target.exporter = null; target.active = false; }
     function closeInstalled(target) { disposeConsumers(target);
@@ -345,7 +345,8 @@
       phase: function () { return phase; }, replacementRequested: function () { return replacementRequested; },
       cycle: function () { return cycle; }, identity: copyIdentity, prepared: function () { return prepared; },
       serialized: function () { return serializeResponse; }, generation: function () { return generation; },
-      output: function () { return output; }, host: function () { return ports.previewHost; },
+      host: function () { return ports.previewHost; },
+      surfaceChanged: ports.surfaceChanged,
       busy: function () { return cacheFences || cycle.synchronizing; },
       requireAdmission: requireAdmission, requireAdmitted: requireAdmitted, enqueue: enqueue, fail: failLifecycle,
     });
