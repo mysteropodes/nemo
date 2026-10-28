@@ -146,6 +146,89 @@
     return found;
   }
 
+  // #2362: a native OBJECT project builds no Paper items (native-object-project-file.js projectView), so a Select click
+  // and the Labs tools found nothing to hit. They read the presented layer's geometry through the native subselect view
+  // instead: transient, never-inserted Paper paths in world space, top-most last, carrying their native identity only
+  // (no style, no writer). A read whose presentation changed before it returned is discarded.
+  var PINS = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
+  function samePin(a, b) { return !!a && !!b && PINS.every(function (k) { return a[k] === b[k]; }); }
+  function objectProject(root) {
+    try { var s = root.NemoNativeObjectProject && root.NemoNativeObjectProject.desktop(root);
+      return s && s.blocksLegacy() === true ? s : null; } catch (_) { return null; }
+  }
+  function presentedSession(root) {
+    var session = objectProject(root);
+    var pin = session && session.isActive() && session.info(), shown = pin && session.readPresentedObjectSession();
+    return shown && shown.presentation && samePin(pin, shown.presentation) ? { session: session, pin: pin, presentation: shown.presentation } : null;
+  }
+  // A gesture's own repaint (the knife resumes rendering as it commits) can re-present the canvas while the read is in
+  // flight, which the reader refuses as stale; the read is retried on the fresh presentation of the same revision.
+  async function presented(root, layerIndex, attempt) {
+    var s = presentedSession(root), layer = s && s.pin.layers[layerIndex], data;
+    if (!layer) return null;
+    try { data = await s.session.readSubselect({ contextId: 'scene-root', layerUid: layer.layerUid, frame: s.presentation.frame }, s.pin); }
+    catch (error) {
+      if (!error || error.code !== 'stale_revision' || (attempt || 0) >= 3) throw error;
+      await new Promise(function (done) { (root.setTimeout || setTimeout)(done, 30); });
+      var next = presentedSession(root);
+      return next && samePin(next.pin, s.pin) && next.presentation.frame === s.presentation.frame ? presented(root, layerIndex, (attempt || 0) + 1) : null;
+    }
+    var now = presentedSession(root);
+    if (!now || !samePin(now.pin, s.pin) || now.presentation.frame !== s.presentation.frame) return null;
+    var Path = root.Path || root.paper.Path, Matrix = root.Matrix || root.paper.Matrix;
+    return { pin: s.pin, presentation: s.presentation, frame: s.presentation.frame, layerUid: layer.layerUid, paths: data.items.map(function (item) {
+      var geometry = item.paint || item;   // a pressure ribbon is hit on its painted outline
+      var path = new Path({ insert: false, closed: geometry.closed, segments: geometry.segments.map(function (a) { return [a.point, a.handleIn, a.handleOut]; }) });
+      path.transform(new Matrix(item.matrix[0], item.matrix[1], item.matrix[2], item.matrix[3], item.matrix[4], item.matrix[5]));
+      path.strokeColor = [0, 0, 0]; path.strokeWidth = 1; if (item.paint) path.fillColor = [0, 0, 0];
+      path.data = { strokeId: item.stableTarget.strokeId, nativeStableTarget: item.stableTarget, nativeRibbon: !!item.paint, nativeMatrix: item.matrix };
+      return path;
+    }) };
+  }
+  // World-space Paper segments back to a record geometry in the stroke's own space (inverse of its presented matrix).
+  function recordGeometry(path, m) {
+    var d = m[0] * m[3] - m[1] * m[2];
+    if (!Number.isFinite(d) || Math.abs(d) < 1e-12) throw new Error('Presented transform is singular');
+    var lin = function (x, y) { return { x: (m[3] * x - m[2] * y) / d, y: (-m[1] * x + m[0] * y) / d }; };
+    return { kind: 'cubic-path', closed: path.closed, coordinateSpace: 'document-world', handleSpace: 'relative', segments: path.segments.map(function (s) {
+      return { point: lin(s.point.x - m[4], s.point.y - m[5]), handleIn: lin(s.handleIn.x, s.handleIn.y), handleOut: lin(s.handleOut.x, s.handleOut.y) }; }) };
+  }
+  function worldPoint(root, clientX, clientY, pin, presentation) {
+    var mapping = root.NemoNativeViewportUnderlay && root.NemoNativeViewportUnderlay.canvasMapping;
+    var r = root.document.getElementById('drawing-canvas').getBoundingClientRect();
+    var p = mapping.point({ clientX: clientX, clientY: clientY }, { bounds: { left: r.left, top: r.top, width: r.width, height: r.height },
+      canvasW: pin.canvasW, canvasH: pin.canvasH, presentation: presentation });
+    return { x: p.x, y: p.y, perPixel: pin.canvasW / r.width };
+  }
+  // The top-most presented stroke of the active layer within 8 screen pixels of the click, or null.
+  async function pick(root, clientX, clientY) {
+    var s = presentedSession(root), layers = s && await presented(root, root.state.activeLayerIdx);
+    if (!layers) return undefined;
+    var Point = root.Point || root.paper.Point, w = worldPoint(root, clientX, clientY, s.pin, s.presentation), at = new Point(w.x, w.y);
+    for (var i = layers.paths.length - 1; i >= 0; i--)
+      if (layers.paths[i].hitTest(at, { fill: true, stroke: true, tolerance: 8 * w.perPixel })) return layers.paths[i];
+    return null;
+  }
 
-  return Object.freeze({ create: create, hitHandles: hitHandles });
+  // What a pick depends on: a repaint may re-project the layer rows (the pointer context counts those) but a pick still
+  // stands while the tool, mode, frame, layer and document revision are unchanged.
+  function pickContext(root) {
+    var st = root.state, s = objectProject(root), pin = s && s.info();
+    return JSON.stringify([st.tool, st.appMode, st.currentFrame, st.activeLayerIdx, st.activeSymbolId || null,
+      pin ? PINS.map(function (k) { return pin[k]; }) : null]);
+  }
+  // Select's own rule on a picked stroke: a click selects it, Shift toggles it, an empty click clears unless Shift is held.
+  // Picks are fresh objects, so identity is the native stroke id.
+  function applyPick(root, item, shift) {
+    var selected = root.selectedPaths || [], id = item && item.data.strokeId;
+    var held = item ? selected.filter(function (p) { return p && p.data && p.data.strokeId === id; }) : [];
+    root.selectedPaths = item ? (shift ? (held.length ? selected.filter(function (p) { return held.indexOf(p) < 0; }) : selected.concat([item])) : [item])
+      : (shift ? selected : []);
+    root.state.selectedStrokeIndices = [];
+    if (typeof root.updateUI === 'function') root.updateUI();
+    if (root.SMEngineBridge && typeof root.SMEngineBridge.renderNow === 'function') root.SMEngineBridge.renderNow();
+  }
+
+  return Object.freeze({ create: create, hitHandles: hitHandles, objectProject: objectProject, presented: presented,
+    worldPoint: worldPoint, recordGeometry: recordGeometry, pick: pick, pickContext: pickContext, applyPick: applyPick });
 }));

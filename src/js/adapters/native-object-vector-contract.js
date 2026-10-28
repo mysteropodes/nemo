@@ -289,13 +289,12 @@
           if (has(op, 'keyframe')) oneOf(op.keyframe, ['copy'], `${where}.keyframe`);
           return copy ? null : op.record.target;
         }
-        if (op.op === 'replace') {
-          exact(op, ['op', 'record'], [], where); record(op.record, false);
-          if (op.record.target.frameScope.kind !== 'authored') fail(`${where} replace targets an authored frame`);
-          return op.record.target;
-        }
+        if (op.op === 'replace') { exact(op, ['op', 'record'], [], where); record(op.record, false); if (op.record.target.frameScope.kind !== 'authored') fail(`${where} replace targets an authored frame`); return op.record.target; }
+        // #2362 knife: reshape gives a named stroke new geometry, clone creates one from it on `frame`; the style stays native.
+        if (op.op === 'reshape' || op.op === 'clone') { const clone = op.op === 'clone'; exact(op, ['op', 'stableTarget', 'geometry'].concat(clone ? ['frame'] : []), clone ? ['placement', 'keyframe'] : ['frame'], where); target(op.stableTarget, `${where}.stableTarget`, false); geometry(op.geometry, `${where}.geometry`);
+          if (has(op, 'frame') && !(Number.isSafeInteger(op.frame) && op.frame >= 0 && op.frame <= 4294967295)) fail(`${where}.frame must be a frame`); if (has(op, 'placement')) oneOf(op.placement, ['front', 'behind'], `${where}.placement`); if (has(op, 'keyframe')) oneOf(op.keyframe, ['copy'], `${where}.keyframe`); return op.stableTarget; }
         if (op.op === 'delete') { exact(op, ['op', 'stableTarget'], [], where); target(op.stableTarget, `${where}.stableTarget`, false); return op.stableTarget; }
-        return fail(`${where}.op must be create, copy, replace or delete`);
+        return fail(`${where}.op must be create, copy, replace, reshape, clone or delete`);
       });
       targets.forEach((t, at) => { if (!t) targets[at] = targets[payloadValue[at].fromStep]; });
       if (targets.some((t) => t.contextId !== 'scene-root' || t.layerUid !== targets[0].layerUid)) fail(`${label} must stay on one scene-root layer`);
@@ -367,7 +366,7 @@
     if (command === 'object.vector.batch') {
       // One id per step, in order: allocated for a create, the named target for a replace or delete.
       const ids = response.result.strokeIds, ops = request.payload.ops;
-      if (!(ids.length === ops.length && ids[0] === stroke && ops.every((op, at) => (op.op === 'create' || op.op === 'copy' ? allocated(ids[at])
+      if (!(ids.length === ops.length && ids[0] === stroke && ops.every((op, at) => (['create', 'copy', 'clone'].includes(op.op) ? allocated(ids[at])
         : ids[at] === (op.op === 'replace' ? op.record.target.strokeId : op.stableTarget.strokeId))))) fail('vector receipt stroke mismatch');
       return;
     }

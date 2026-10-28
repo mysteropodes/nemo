@@ -93,3 +93,26 @@ fn a_copy_step_names_an_earlier_create_and_a_frame() {
         {"op":"copy","fromStep":0,"frame":4}]});
     assert!(!vector_request(VECTOR, &from_delete), "only a create's record is copied");
 }
+
+#[test]
+fn reshape_and_clone_name_a_stroke_and_new_geometry() {
+    let geometry = record("L1", "s-a")["geometry"].clone();
+    let payload = json!({"command":"object.vector.batch","ops":[
+        {"op":"reshape","stableTarget":target("L1","s-a"),"geometry":geometry},
+        {"op":"clone","stableTarget":target("L1","s-a"),"geometry":geometry,"frame":3,"placement":"front"}]});
+    assert!(vector_request(VECTOR, &payload));
+    let receipt = json!({"applied":true,"historyEntriesAdded":1,"operation":"batch","strokeId":"s-a","strokeIds":["s-a","native-stroke:8:0"]});
+    assert!(vector_result(VECTOR, &payload, &receipt), "a reshape keeps its id, a clone is owner-allocated");
+    for bad in [
+        json!({"op":"reshape","stableTarget":target("L1","s-a")}),
+        json!({"op":"reshape","stableTarget":target("L1","s-a"),"geometry":geometry,"frame":-3}),
+        json!({"op":"reshape","stableTarget":target("L1","s-a"),"geometry":geometry,"placement":"front"}),
+        json!({"op":"clone","stableTarget":target("L1","s-a"),"geometry":geometry}),
+        json!({"op":"clone","stableTarget":target("L1","s-a"),"geometry":{"kind":"cubic-path"},"frame":3}),
+        json!({"op":"clone","stableTarget":target("L2","s-a"),"geometry":geometry,"frame":3}),
+    ] {
+        let mut p = payload.clone();
+        p["ops"][1] = bad.clone();
+        assert!(!vector_request(VECTOR, &p), "{bad}");
+    }
+}
