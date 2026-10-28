@@ -312,47 +312,6 @@ function nativeHarness(source, options = {}) {
   return { prepared, state, controller, fullReleaseReceipt, externalOpacity, transportBridge };
 }
 
-test('N20 desktop presentation opens the native underlay only after a current presented receipt, then restores it on release', async () => {
-  const root = { devicePixelRatio: 2, SM: { importJSON() {} },
-    document: { getElementById() { return { getBoundingClientRect() {
-      return { left: 40, top: 60, width: 640, height: 360 };
-    } }; } }, __TAURI__: { core: { async invoke() { return { status: 'resized' }; } } } };
-  require('./helpers/native-viewport-underlay.cjs').install(root);
-  const ports = NativeLegacySurface.desktopPorts(root, {});
-  const h = nativeHarness(keyedSource(), { surfaceChanged: ports.surfaceChanged });
-  await h.controller.activate(h.prepared);
-  await ports.surface.resize(h.controller.identity());
-  assert.equal(root.stageLayer.visible, true, 'activation alone cannot expose the underlay');
-  await h.state.lifecycle.presentPreview(0);
-  assert.equal(root.stageLayer.visible, false, 'the Paper stage must not cover the native rectangle');
-  const html = root.document.documentElement;
-  assert.equal(html.classList.contains('nemo-native-underlay'), true);
-  assert.equal(html.style.getPropertyValue('--nemo-native-right'), '680px');
-  h.controller.renderPreview(10); await h.state.lifecycle.flush();
-  assert.equal(root.stageLayer.visible, false, 'ordinary render uses the same presentation seam');
-  await h.controller.releaseCurrent('underlay-complete');
-  assert.equal(root.stageLayer.visible, true);
-  assert.equal(html.classList.contains('nemo-native-underlay'), false);
-});
-
-test('N20 deferred and stale previews cannot expose a fresh underlay; fatal receipts clear an existing one', async () => {
-  for (const status of ['deferred-occluded', 'deferred-timeout', 'stale-discarded']) {
-    const changes = [], h = nativeHarness(keyedSource(), {
-      surfaceChanged: value => changes.push(value), previewReceipt: r => ({ ...r, status }) });
-    await h.controller.activate(h.prepared);
-    assert.equal((await h.state.lifecycle.presentPreview(0)).status, status);
-    assert.deepEqual(changes, [], status);
-  }
-  let fail = false;
-  const changes = [], h = nativeHarness(keyedSource(), { surfaceChanged: value => changes.push(value),
-    previewReceipt: r => fail ? { ...r, viewGeneration: 0 } : r });
-  await h.controller.activate(h.prepared); await h.state.lifecycle.presentPreview(0);
-  assert.equal(changes.length, 1);
-  fail = true; await assert.rejects(h.state.lifecycle.presentPreview(10));
-  assert.equal(changes.at(-1), null);
-  assert.equal(h.controller.status(), 'indeterminate');
-});
-
 test('N20 characterization is pinned to the two approved fixture bytes', () => {
   assert.equal(sha(SHELL_PATH), SHELL_SHA);
   assert.equal(sha(NATIVE_PATH), NATIVE_SHA);
@@ -3729,4 +3688,45 @@ test('a failed occlusion subscription and an in-progress Open keep the prompt de
       error && error.code === 'native_preview_deferred', variant);
     assert.equal(harness.controller.status(), 'native', variant);
   }
+});
+
+test('N20 desktop presentation opens the native underlay only after a current presented receipt, then restores it on release', async () => {
+  const root = { devicePixelRatio: 2, SM: { importJSON() {} },
+    document: { getElementById() { return { getBoundingClientRect() {
+      return { left: 40, top: 60, width: 640, height: 360 };
+    } }; } }, __TAURI__: { core: { async invoke() { return { status: 'resized' }; } } } };
+  require('./helpers/native-viewport-underlay.cjs').install(root);
+  const ports = NativeLegacySurface.desktopPorts(root, {});
+  const h = nativeHarness(keyedSource(), { surfaceChanged: ports.surfaceChanged });
+  await h.controller.activate(h.prepared);
+  await ports.surface.resize(h.controller.identity());
+  assert.equal(root.stageLayer.visible, true, 'activation alone cannot expose the underlay');
+  await h.state.lifecycle.presentPreview(0);
+  assert.equal(root.stageLayer.visible, false, 'the Paper stage must not cover the native rectangle');
+  const html = root.document.documentElement;
+  assert.equal(html.classList.contains('nemo-native-underlay'), true);
+  assert.equal(html.style.getPropertyValue('--nemo-native-right'), '680px');
+  h.controller.renderPreview(10); await h.state.lifecycle.flush();
+  assert.equal(root.stageLayer.visible, false, 'ordinary render uses the same presentation seam');
+  await h.controller.releaseCurrent('underlay-complete');
+  assert.equal(root.stageLayer.visible, true);
+  assert.equal(html.classList.contains('nemo-native-underlay'), false);
+});
+
+test('N20 deferred and stale previews cannot expose a fresh underlay; fatal receipts clear an existing one', async () => {
+  for (const status of ['deferred-occluded', 'deferred-timeout', 'stale-discarded']) {
+    const changes = [], h = nativeHarness(keyedSource(), {
+      surfaceChanged: value => changes.push(value), previewReceipt: r => ({ ...r, status }) });
+    await h.controller.activate(h.prepared);
+    assert.equal((await h.state.lifecycle.presentPreview(0)).status, status);
+    assert.deepEqual(changes, [], status);
+  }
+  let fail = false;
+  const changes = [], h = nativeHarness(keyedSource(), { surfaceChanged: value => changes.push(value),
+    previewReceipt: r => fail ? { ...r, viewGeneration: 0 } : r });
+  await h.controller.activate(h.prepared); await h.state.lifecycle.presentPreview(0);
+  assert.equal(changes.length, 1);
+  fail = true; await assert.rejects(h.state.lifecycle.presentPreview(10));
+  assert.equal(changes.at(-1), null);
+  assert.equal(h.controller.status(), 'indeterminate');
 });

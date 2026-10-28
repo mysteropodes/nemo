@@ -5,13 +5,19 @@
   else root.NemoNativeOpacityPreviewWorkflow = api;
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
+  var output = Object.freeze({ kind: 'frame', format: 'rgba8', width: 320, height: 180,
+    colorInterpretation: 'srgb', alphaMode: 'straight' });
 
   function create(scope) {
     var displayed = null;
-    function clear(target) {
+    function clear(target, preservingFailure) {
       if (displayed !== target) return;
       displayed = null;
-      if (scope.surfaceChanged) scope.surfaceChanged(null);
+      try { if (scope.surfaceChanged) scope.surfaceChanged(null); }
+      catch (error) {
+        // A presentation cleanup error must not replace the original authority failure.
+        if (!preservingFailure) throw error;
+      }
     }
     function present(frame) {
       if (scope.phase() !== 'native' || scope.replacementRequested()) {
@@ -32,7 +38,7 @@
           var receipt = await target.preview.present(current.instanceId, scope.generation(), {
             documentSnapshotId: serialized.result.documentSnapshotId, documentId: current.documentId,
             contentRevision: current.contentRevision, contextId: 'scene-root', frame: frame,
-            quality: 'final', outputSpec: scope.output(), geometryHandle: prepared.frames[frame].geometryHandle,
+            quality: 'final', outputSpec: output, geometryHandle: prepared.frames[frame].geometryHandle,
           }, scope.host(), verify);
           verify();
           if (receipt.status === 'presented' && scope.surfaceChanged) {
