@@ -163,25 +163,37 @@
   }
   // A gesture's own repaint (the knife resumes rendering as it commits) can re-present the canvas while the read is in
   // flight, which the reader refuses as stale; the read is retried on the fresh presentation of the same revision.
-  async function presented(root, layerIndex, attempt) {
+  // A listed record's control-point bounds mapped to world space (a cubic lies inside its control polygon).
+  function worldBounds(item) {
+    var b = item.bounds, m = item.matrix, xs = [], ys = [];
+    [[b[0], b[1]], [b[2], b[1]], [b[0], b[3]], [b[2], b[3]]].forEach(function (p) { xs.push(m[0] * p[0] + m[2] * p[1] + m[4]); ys.push(m[1] * p[0] + m[3] * p[1] + m[5]); });
+    return [Math.min.apply(null, xs), Math.min.apply(null, ys), Math.max.apply(null, xs), Math.max.apply(null, ys)];
+  }
+  // The presented layer through the native hit-test listing: every painted record (role plain | ribbon | fill | shape |
+  // brush), geometry paged only for the records `wanted(item, worldBounds)` keeps.
+  async function presented(root, layerIndex, wanted, attempt) {
     var s = presentedSession(root), layer = s && s.pin.layers[layerIndex], data;
     if (!layer) return null;
-    try { data = await s.session.readSubselect({ contextId: 'scene-root', layerUid: layer.layerUid, frame: s.presentation.frame }, s.pin); }
-    catch (error) {
+    try {
+      data = await s.session.readPresentedStrokes({ contextId: 'scene-root', layerUid: layer.layerUid, frame: s.presentation.frame }, s.pin,
+        function (item) { return !wanted || wanted(item, worldBounds(item)); });
+    } catch (error) {
       if (!error || error.code !== 'stale_revision' || (attempt || 0) >= 3) throw error;
       await new Promise(function (done) { (root.setTimeout || setTimeout)(done, 30); });
       var next = presentedSession(root);
-      return next && samePin(next.pin, s.pin) && next.presentation.frame === s.presentation.frame ? presented(root, layerIndex, (attempt || 0) + 1) : null;
+      return next && samePin(next.pin, s.pin) && next.presentation.frame === s.presentation.frame ? presented(root, layerIndex, wanted, (attempt || 0) + 1) : null;
     }
     var now = presentedSession(root);
     if (!now || !samePin(now.pin, s.pin) || now.presentation.frame !== s.presentation.frame) return null;
     var Path = root.Path || root.paper.Path, Matrix = root.Matrix || root.paper.Matrix;
-    return { pin: s.pin, presentation: s.presentation, frame: s.presentation.frame, layerUid: layer.layerUid, paths: data.items.map(function (item) {
-      var geometry = item.paint || item;   // a pressure ribbon is hit on its painted outline
-      var path = new Path({ insert: false, closed: geometry.closed, segments: geometry.segments.map(function (a) { return [a.point, a.handleIn, a.handleOut]; }) });
+    return { pin: s.pin, presentation: s.presentation, frame: s.presentation.frame, layerUid: layer.layerUid, items: data.items, paths: data.items.filter(function (item) {
+      return Array.isArray(item.segments); }).map(function (item) {
+      var path = new Path({ insert: false, closed: item.closed, segments: item.segments.map(function (a) { return [a.point, a.handleIn, a.handleOut]; }) });
       path.transform(new Matrix(item.matrix[0], item.matrix[1], item.matrix[2], item.matrix[3], item.matrix[4], item.matrix[5]));
-      path.strokeColor = [0, 0, 0]; path.strokeWidth = 1; if (item.paint) path.fillColor = [0, 0, 0];
-      path.data = { strokeId: item.stableTarget.strokeId, nativeStableTarget: item.stableTarget, nativeRibbon: !!item.paint, nativeMatrix: item.matrix };
+      // Painted outlines (a ribbon, its fill, a shape) are hit inside; a plain stroke on its line.
+      path.strokeColor = [0, 0, 0]; path.strokeWidth = 1; if (item.closed && item.role !== 'plain') path.fillColor = [0, 0, 0];
+      path.data = { strokeId: item.stableTarget.strokeId, nativeStableTarget: item.stableTarget, nativeRole: item.role, nativeRibbon: item.role === 'ribbon', nativeMatrix: item.matrix,
+        nativeOwner: item.owner };
       return path;
     }) };
   }
@@ -200,13 +212,33 @@
       canvasW: pin.canvasW, canvasH: pin.canvasH, presentation: presentation });
     return { x: p.x, y: p.y, perPixel: pin.canvasW / r.width };
   }
-  // The top-most presented stroke of the active layer within 8 screen pixels of the click, or null.
+  // A linked fill is selected as its ribbon, as the baseline's resolveBrushAnchor did (the native listing names it).
+  function owned(path) {
+    var id = path.data.nativeOwner;
+    if (path.data.nativeRole !== 'fill' || !id) return path;
+    var ribbon = path.clone({ insert: false });
+    ribbon.data = Object.assign({}, path.data, { strokeId: id, nativeRole: 'ribbon', nativeRibbon: true, nativeOwner: undefined,
+      nativeStableTarget: Object.assign({}, path.data.nativeStableTarget, { strokeId: id }) });
+    return ribbon;
+  }
+  // A ribbon carries its linked fill as the baseline Paper item did (data.linkedFill), so the Labs routes that move a
+  // selection with its fill (path bake) name both.
+  function withFill(path, items) {
+    var fill = path.data.nativeRole === 'ribbon' && items.find(function (i) { return i.role === 'fill' && i.owner === path.data.strokeId; });
+    if (fill) path.data.linkedFill = { data: { strokeId: fill.stableTarget.strokeId } };
+    return path;
+  }
+  // The top-most presented stroke of the active layer within 8 screen pixels of the click, or null. Only records whose
+  // bounds reach the click have their geometry read.
   async function pick(root, clientX, clientY) {
-    var s = presentedSession(root), layers = s && await presented(root, root.state.activeLayerIdx);
+    var s = presentedSession(root);
+    if (!s) return undefined;
+    var w = worldPoint(root, clientX, clientY, s.pin, s.presentation), t = 8 * w.perPixel;
+    var layers = await presented(root, root.state.activeLayerIdx, function (_item, b) { return w.x >= b[0] - t && w.x <= b[2] + t && w.y >= b[1] - t && w.y <= b[3] + t; });
     if (!layers) return undefined;
-    var Point = root.Point || root.paper.Point, w = worldPoint(root, clientX, clientY, s.pin, s.presentation), at = new Point(w.x, w.y);
+    var Point = root.Point || root.paper.Point, at = new Point(w.x, w.y);
     for (var i = layers.paths.length - 1; i >= 0; i--)
-      if (layers.paths[i].hitTest(at, { fill: true, stroke: true, tolerance: 8 * w.perPixel })) return layers.paths[i];
+      if (layers.paths[i].hitTest(at, { fill: true, stroke: true, tolerance: t })) return withFill(owned(layers.paths[i]), layers.items);
     return null;
   }
 
@@ -230,5 +262,5 @@
   }
 
   return Object.freeze({ create: create, hitHandles: hitHandles, objectProject: objectProject, presented: presented,
-    worldPoint: worldPoint, recordGeometry: recordGeometry, pick: pick, pickContext: pickContext, applyPick: applyPick });
+    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, pick: pick, pickContext: pickContext, applyPick: applyPick });
 }));

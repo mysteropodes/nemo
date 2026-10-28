@@ -30,11 +30,13 @@
   function result(op,v){if(op!==EDIT||!exact(v,['applied','historyEntriesAdded'])||typeof v.applied!=='boolean'||v.historyEntriesAdded!==Number(v.applied))fail('Invalid subselect receipt');}
   function correlate(q,r){result(q.operation,r.result);if(q.instanceId!==r.instanceId||q.documentId!==r.documentId||q.expectedRevision+Number(r.result.applied)!==r.contentRevision)fail('Subselect receipt origin mismatch');}
   function readPayload(v){if(!exact(v,['atRevision','documentSnapshotId','stableTarget','subselect'])||!integer(v.atRevision)||typeof v.documentSnapshotId!=='string'||!v.documentSnapshotId||!target(v.stableTarget)||
-    !exact(v.subselect,['cursor','limit'],['preview','paint'])||!integer(v.subselect.cursor,256)||!integer(v.subselect.limit,16)||!v.subselect.limit||own(v.subselect,'preview')&&!intent(v.subselect.preview)||own(v.subselect,'paint')&&v.subselect.paint!==true)fail('Invalid subselect read selector');}
+    !exact(v.subselect,['cursor','limit'],['preview','paint','hitTest'])||!integer(v.subselect.cursor,256)||!integer(v.subselect.limit,16)||!v.subselect.limit||own(v.subselect,'preview')&&!intent(v.subselect.preview)||own(v.subselect,'paint')&&v.subselect.paint!==true||
+    // #2362: hit-test geometry is the painted outline of any record, never with a preview or the paint mode.
+    own(v.subselect,'hitTest')&&(v.subselect.hitTest!==true||own(v.subselect,'preview')||own(v.subselect,'paint')))fail('Invalid subselect read selector');}
   function readResult(v){
     if(!exact(v,['atRevision','documentSnapshotId','subselect'])||!integer(v.atRevision)||typeof v.documentSnapshotId!=='string'||!v.documentSnapshotId)fail('Invalid subselect read result');
     const s=v.subselect;
-    if(!exact(s,['stableTarget','closed','total','cursor','nextCursor','segments','preview'],['paint'])||!target(s.stableTarget)||typeof s.closed!=='boolean'||typeof s.preview!=='boolean'||own(s,'paint')&&(s.paint!==true||s.closed!==true)||
+    if(!exact(s,['stableTarget','closed','total','cursor','nextCursor','segments','preview'],['paint','hitTest'])||own(s,'hitTest')&&s.hitTest!==true||!target(s.stableTarget)||typeof s.closed!=='boolean'||typeof s.preview!=='boolean'||own(s,'paint')&&(s.paint!==true||s.closed!==true)||
       !integer(s.total,256)||!integer(s.cursor,s.total)||!Array.isArray(s.segments)||s.segments.length>16||s.cursor+s.segments.length>s.total||
       !s.segments.every(a=>exact(a,['point','handleIn','handleOut'])&&point(a.point)&&point(a.handleIn)&&point(a.handleOut)))fail('Invalid subselect geometry page');
     const end=s.cursor+s.segments.length;
@@ -43,30 +45,33 @@
   const sameTarget=(a,b)=>['contextId','layerUid','strokeId'].every(k=>a[k]===b[k])&&['kind','frame'].every(k=>a.frameScope[k]===b.frameScope[k]);
   function readCorrelate(p,r,documentId){readPayload(p);readResult(r);const s=r.subselect;
     if(p.atRevision!==r.atRevision||p.documentSnapshotId!==r.documentSnapshotId||!sameTarget(p.stableTarget,s.stableTarget)||s.cursor!==p.subselect.cursor||
-      s.segments.length!==Math.min(p.subselect.limit,s.total-s.cursor)||s.preview!==own(p.subselect,'preview')||own(s,'paint')!==own(p.subselect,'paint')||
+      s.segments.length!==Math.min(p.subselect.limit,s.total-s.cursor)||s.preview!==own(p.subselect,'preview')||own(s,'paint')!==own(p.subselect,'paint')||own(s,'hitTest')!==own(p.subselect,'hitTest')||
       documentId!==undefined&&r.documentSnapshotId!==`native-object:${documentId}:${p.atRevision}`)fail('Subselect read origin mismatch');return true;
   }
   const bytes=s=>new TextEncoder().encode(s).length;
   function viewPayload(p){
     const v=p&&p.view;
     if(!exact(p,['atRevision','documentSnapshotId','view'])||!integer(p.atRevision)||typeof p.documentSnapshotId!=='string'||!p.documentSnapshotId||
-      !exact(v,['kind','contextId','layerUid','frame','workId','viewGeneration','cursor','limit'],['preview'])||v.kind!=='subselect'||v.contextId!=='scene-root'||
+      !exact(v,['kind','contextId','layerUid','frame','workId','viewGeneration','cursor','limit'],['preview','hitTest'])||v.kind!=='subselect'||v.contextId!=='scene-root'||own(v,'hitTest')&&(v.hitTest!==true||own(v,'preview'))||
       typeof v.layerUid!=='string'||!v.layerUid||typeof v.workId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(v.workId)||
       !integer(v.frame,4294967295)||!integer(v.viewGeneration)||!v.viewGeneration||!integer(v.cursor,1024)||!integer(v.limit,8)||!v.limit||own(v,'preview')&&(!exact(v.preview,['stableTarget','intent'])||!target(v.preview.stableTarget)||!intent(v.preview.intent)))fail('Invalid subselect presentation selector');
   }
   function viewResult(r){
-    if(!exact(r,['kind','atRevision','documentSnapshotId','contextId','layerUid','frame','workId','viewGeneration','cursor','total','nextCursor','items','preview'])||
+    if(!exact(r,['kind','atRevision','documentSnapshotId','contextId','layerUid','frame','workId','viewGeneration','cursor','total','nextCursor','items','preview'],['hitTest'])||own(r,'hitTest')&&r.hitTest!==true||
       typeof r.preview!=='boolean'||!integer(r.total,1024)||!integer(r.cursor,r.total)||!Array.isArray(r.items)||r.items.length>8||r.cursor+r.items.length>r.total)fail('Invalid subselect selection page');
     viewPayload({atRevision:r.atRevision,documentSnapshotId:r.documentSnapshotId,view:{kind:r.kind,contextId:r.contextId,layerUid:r.layerUid,frame:r.frame,workId:r.workId,viewGeneration:r.viewGeneration,cursor:r.cursor,limit:8}});
     for(const item of r.items){
-      if(!exact(item,['stableTarget','closed','count','matrix'],['paintCount'])||!target(item.stableTarget)||item.stableTarget.contextId!==r.contextId||item.stableTarget.layerUid!==r.layerUid||typeof item.closed!=='boolean'||
+      // A hit-test listing (#2362) gives every painted record its bounds and role instead of a paint count.
+      if(own(r,'hitTest')?!exact(item,['stableTarget','closed','count','matrix','bounds','role'],['owner'])||!Array.isArray(item.bounds)||item.bounds.length!==4||!item.bounds.every(Number.isFinite)||
+        !['plain','ribbon','fill','shape','brush'].includes(item.role)||own(item,'owner')&&(item.role!=='fill'||typeof item.owner!=='string'||!item.owner):!exact(item,['stableTarget','closed','count','matrix'],['paintCount']))fail('Invalid native subselect item');
+      if(!target(item.stableTarget)||item.stableTarget.contextId!==r.contextId||item.stableTarget.layerUid!==r.layerUid||typeof item.closed!=='boolean'||
         !integer(item.count,256)||own(item,'paintCount')&&(!integer(item.paintCount,256)||item.paintCount<2||item.closed!==false)||!Array.isArray(item.matrix)||item.matrix.length!==6||!item.matrix.every(Number.isFinite))fail('Invalid native subselect transform');
       const m=item.matrix,det=m[0]*m[3]-m[1]*m[2];if(!Number.isFinite(det)||Math.abs(det)<1e-12)fail('Singular native subselect transform');
     }
     const end=r.cursor+r.items.length;if(end===r.total?r.nextCursor!==null:r.nextCursor!==end||!r.items.length)fail('Invalid subselect selection progress');
   }
   function viewCorrelate(p,r,documentId){viewPayload(p);viewResult(r);
-    if(p.atRevision!==r.atRevision||p.documentSnapshotId!==r.documentSnapshotId||r.preview!==own(p.view,'preview')||['kind','contextId','layerUid','frame','workId','viewGeneration','cursor'].some(k=>p.view[k]!==r[k])||
+    if(p.atRevision!==r.atRevision||p.documentSnapshotId!==r.documentSnapshotId||r.preview!==own(p.view,'preview')||own(r,'hitTest')!==own(p.view,'hitTest')||['kind','contextId','layerUid','frame','workId','viewGeneration','cursor'].some(k=>p.view[k]!==r[k])||
       r.items.length!==Math.min(p.view.limit,r.total-r.cursor)||documentId!==undefined&&r.documentSnapshotId!==`native-object:${documentId}:${p.atRevision}`)fail('Subselect presentation origin mismatch');return true;
   }
   return Object.freeze({EDIT,intent,target,payload,result,correlate,readPayload,readResult,readCorrelate,viewPayload,viewResult,viewCorrelate,bytes,sameTarget});

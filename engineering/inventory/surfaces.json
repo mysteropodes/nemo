@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "b9c7ec8df1d97a8bb46b467f45e35149e5a9d0e1",
-  "describe": "b9c7ec8d-dirty"
+  "head": "39c5871f55464e9c5eeddaaaf160c9ade31dc687",
+  "describe": "v0.7.0-alpha.4-3619-g39c5871f"
  },
- "inputsDigest": "a49fa537f7dc9709090cc5d9db2065fb58bbef6b0d33edef9072f9298d897b51",
+ "inputsDigest": "11e6720c1946fce4fe22e16fb1cec8896d6ae1d138a57260c828f12baef0e939",
  "states": [
   "inventoried",
   "characterized",
@@ -1852,7 +1852,7 @@
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 199,
+    "functionsVisited": 198,
     "via": "chain",
     "references": []
    },
@@ -2681,7 +2681,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 20,
+    "functionsVisited": 21,
     "via": "helper el()",
     "references": [
      "src/js/timeline.js:9105 action()"
@@ -5063,7 +5063,7 @@
     "container": "track-apply-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 99,
+    "functionsVisited": 98,
     "via": "helper el()",
     "references": []
    },
@@ -5106,7 +5106,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 23,
+    "functionsVisited": 22,
     "via": "helper el()",
     "references": []
    },
@@ -8018,7 +8018,7 @@
     "container": "footage-blend-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 34,
+    "functionsVisited": 35,
     "via": "variable sel",
     "references": []
    },
@@ -8340,7 +8340,7 @@
     "container": "kitsu-step-browse",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 22,
+    "functionsVisited": 23,
     "via": "helper el()",
     "references": []
    },
@@ -8455,7 +8455,7 @@
     "container": "kitsu-step-login",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 39,
+    "functionsVisited": 40,
     "via": "helper el()",
     "references": []
    },
@@ -17216,7 +17216,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 8,
+    "functionsVisited": 7,
     "via": "callback id",
     "references": [
      "src/js/tracker-panel.js:41 currentPoint()",
@@ -17263,7 +17263,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 8,
+    "functionsVisited": 7,
     "via": "callback id",
     "references": [
      "src/js/tracker-panel.js:42 currentPoint()",
@@ -25756,7 +25756,7 @@
    "source": "src/js/motion.js:9819",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 174
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -25798,7 +25798,7 @@
    "source": "src/js/motion.js:9864",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 439
+    "functionsVisited": 432
    },
    "fixtures": [
     "static-props",
@@ -28358,7 +28358,7 @@
    "source": "src/js/shapes-panel.js:738",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 100
+    "functionsVisited": 92
    },
    "fixtures": [
     "static-props",
@@ -28472,7 +28472,7 @@
    "source": "src/js/shapes-panel.js:860",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 100
+    "functionsVisited": 92
    },
    "fixtures": [
     "static-props",
@@ -30942,7 +30942,7 @@
    "source": "src/js/timeline.js:5605",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 174
+    "functionsVisited": 166
    },
    "fixtures": [
     "keyed-props",
@@ -30981,7 +30981,7 @@
    "source": "src/js/timeline.js:5636",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 439
+    "functionsVisited": 432
    },
    "fixtures": [
     "keyed-props",

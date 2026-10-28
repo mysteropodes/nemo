@@ -61,6 +61,20 @@ fn check_presented_host(parametric: bool, held: bool) {
     let item = &first["result"]["items"][0];
     assert_eq!(item["count"], 4);
     assert_eq!(first["result"]["preview"], false);
+    // #2362 hit-test listing: the same presented records with their bounds and role, never their editability.
+    let mut hit = query.clone();
+    hit["requestId"] = json!("subselect-hit");
+    hit["payload"]["view"]["hitTest"] = json!(true);
+    let listed = host_read(&mut owner, &hit);
+    assert_eq!(listed["ok"], true, "{listed}");
+    assert_eq!(listed["result"]["hitTest"], true);
+    let hit_item = &listed["result"]["items"][0];
+    assert_eq!((hit_item["count"].as_u64(), hit_item["closed"].as_bool()), (Some(4), Some(true)));
+    assert_eq!(hit_item["role"], if parametric { "shape" } else { "plain" });
+    assert_eq!(hit_item["bounds"], json!([4.0, 4.0, 28.0, 28.0]));
+    assert!(item.get("role").is_none() && item.get("bounds").is_none(), "the editable listing is unchanged");
+    hit["payload"]["view"]["preview"] = json!({"stableTarget":item["stableTarget"],"intent":{"kind":"move","indices":[0],"delta":[1,0]}});
+    assert_eq!(host_read(&mut owner, &hit)["ok"], false, "a hit-test listing has no preview");
     let intent = json!({"kind":"move","indices":[0,1,2,3],"delta":[24,0]});
     let target = item["stableTarget"].clone();
     assert_eq!(target["frameScope"]["frame"], 0);

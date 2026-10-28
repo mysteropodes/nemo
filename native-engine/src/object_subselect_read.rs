@@ -24,8 +24,9 @@ struct Page {
     limit: usize,
     preview: Presence<Intent>,
     paint: Presence<bool>,
+    hit_test: Presence<bool>,
 }
-object_deserialize!(Page {cursor:usize,limit:usize,#[serde(default)] preview:Presence<Intent>,#[serde(default)] paint:Presence<bool>});
+object_deserialize!(Page {cursor:usize,limit:usize,#[serde(default)] preview:Presence<Intent>,#[serde(default)] paint:Presence<bool>,#[serde(default)] hit_test:Presence<bool>});
 impl ObjectSnapshot {
     pub(super) fn dispatch_subselect_read(
         &self,
@@ -62,6 +63,11 @@ impl ObjectSnapshot {
                 "Invalid subselect paint selector.",
             );
         }
+        // #2362 hit-test geometry: the painted outline of any record, for reading only (no preview, no paint mode).
+        let hit_test = !payload.subselect.hit_test.missing();
+        if hit_test && (payload.subselect.hit_test.value() != Some(&true) || paint || !payload.subselect.preview.missing()) {
+            return refused(DispatchErrorCode::InvalidRequest, "Invalid subselect hit-test selector.");
+        }
         let Some(stored) = self
             .document()
             .objects
@@ -70,13 +76,16 @@ impl ObjectSnapshot {
         else {
             return refused(DispatchErrorCode::NotFound, "Subselect target is absent.");
         };
-        let planned = record::admit(self.document(), stored).and_then(|_| {
+        let planned = if hit_test { Ok(()) } else { record::admit(self.document(), stored) }.and_then(|_| {
             match payload.subselect.preview.value() {
                 Some(intent) => record::plan(stored, intent),
                 None => Ok(stored.clone()),
             }
         });
         let geometry = planned.and_then(|r| {
+            if hit_test {
+                return Ok((r.geometry.closed, record::paint_anchors(&r)?));
+            }
             let anchors = record::anchors(&r)?;
             if paint {
                 if !record::has_pressure(&r) {
@@ -127,6 +136,9 @@ impl ObjectSnapshot {
         };
         if paint {
             response.result.as_mut().unwrap()["subselect"]["paint"] = json!(true);
+        }
+        if hit_test {
+            response.result.as_mut().unwrap()["subselect"]["hitTest"] = json!(true);
         }
         if serde_json::to_vec(&response)
             .map_err(|_| DispatchErrorCode::Internal)?
