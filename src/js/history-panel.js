@@ -16,6 +16,22 @@
 // #fb-avatars-pop (timeline.js) — see that file's initFbAvatars for the
 // twin implementation this one was modeled on.
 
+// Native history labels/cursor need their own read model. Legacy stack counts
+// must not drive native undo/redo, even through callbacks retained across Open.
+function _histAllowLegacy(){
+  try {
+    var cutover=window.NemoNativeOpacityCutover;
+    if(cutover!==undefined&&(!cutover||typeof cutover.blocksLegacy!=='function'||cutover.blocksLegacy()!==false))return false;
+    var bridge=window.SMEngineBridge;
+    if(!bridge||!Object.prototype.hasOwnProperty.call(bridge,'nativeEditGuard'))return true;
+    return !!bridge.nativeEditGuard&&typeof bridge.nativeEditGuard.allow==='function'&&bridge.nativeEditGuard.allow('history-panel')===true;
+  }catch(_){return false;}
+}
+function _histRequireLegacy(){
+  if(_histAllowLegacy())return true;
+  renderHistoryPanel();
+  return false;
+}
 function _histRelTime(t){
   var d=Date.now()-(t||0);
   if(d<1500)return 'à l\'instant';
@@ -47,6 +63,11 @@ function renderHistoryPanel(){
   var pop=document.getElementById('history-pop');
   if(!pop)return;
   pop.innerHTML='';
+  if(!_histAllowLegacy()){
+    var unavailable=document.createElement('div');unavailable.className='hist-empty';
+    unavailable.setAttribute('role','status');unavailable.textContent='Native history panel is unavailable.';
+    pop.appendChild(unavailable);return;
+  }
   var undoStack=state.undoStack||[],undoLabels=state.undoLabels||[];
   var redoStack=state.redoStack||[],redoLabels=state.redoLabels||[];
 
@@ -56,6 +77,7 @@ function renderHistoryPanel(){
   clear.title=SM.t('hsClearSessionHistory');
   clear.addEventListener('click',function(e){
     e.stopPropagation();
+    if(!_histRequireLegacy())return;
     state.undoStack=[];state.undoLabels=[];state.redoStack=[];state.redoLabels=[];
     renderHistoryPanel();
     showToast(SM.t('toastHistoryCleared'));
@@ -79,8 +101,9 @@ function renderHistoryPanel(){
     (function(i){
       var row=_histRow(undoLabels[i]);
       row.addEventListener('click',function(){
+        if(!_histRequireLegacy())return;
         var steps=undoStack.length-i;
-        for(var k=0;k<steps;k++)undo();
+        for(var k=0;k<steps;k++){if(!_histRequireLegacy())return;undo();}
       });
       pop.appendChild(row);
     })(i);
@@ -100,8 +123,9 @@ function renderHistoryPanel(){
     (function(j){
       var row=_histRow(fwdLabels[j],'future');
       row.addEventListener('click',function(){
+        if(!_histRequireLegacy())return;
         var steps=j+1;
-        for(var k=0;k<steps;k++)redo();
+        for(var k=0;k<steps;k++){if(!_histRequireLegacy())return;redo();}
       });
       pop.appendChild(row);
     })(j);
