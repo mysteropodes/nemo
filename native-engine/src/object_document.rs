@@ -508,3 +508,11 @@ impl ObjectLayer {
 pub(crate) use timing::{
     plan_move_frames, plan_shift_frames, BulkCell, BulkMoveLayer, BulkMovePlan, BulkRetimePair,
 };
+
+// Shared pure geometry; the evaluation layer retains paint composition.
+#[path = "brush_dab_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod brush_dab;
+#[path = "property_follow_path_sample.rs"]
+#[allow(dead_code)]
+pub(crate) mod property_follow_path_sample;
