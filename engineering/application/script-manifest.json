@@ -343,6 +343,7 @@
     {"src":"js/adapters/native-settings-validation-gate.js"},
     {"comment":["<!-- Native frame selection binds on ordinary Open, after parser-loaded adapters exist. -->"]},
     {"src":"js/adapters/native-frame-cell-selection.js"},
+    {"src":"js/application/script-native-api.js"},
     {"src":"js/application/presenter-seam.js"},
     {"src":"js/application/app-menu-targets.js"},
     {"src":"js/application/shortcut-targets.js"},
