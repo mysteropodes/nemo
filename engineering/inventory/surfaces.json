@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "be801722bf2891ea070e56594c2c20a3f97de699",
-  "describe": "be801722-dirty"
+  "head": "a492706b63184f0828d3e66568a0cf7dc676601e",
+  "describe": "a492706b-dirty"
  },
- "inputsDigest": "4e21ae59eb6d4e46a0cdd6c03ed4d958eb4bca39d4188cf514b8842a7edb611a",
+ "inputsDigest": "e7da2a4b20052f40c8ec5747f9776d3771aa025ef4130cf1bd5a0cda5168cefb",
  "states": [
   "inventoried",
   "characterized",
@@ -21762,7 +21762,7 @@
    "capability": "Drawing substitution: savePose('name') on a selection, stampPose('name',{dx,dy}) stamps the pose on the current frame — lip-sync mouths, hand kits",
    "area": "labs",
    "handler": [
-    "src/js/labs/pose-library.js:109"
+    "src/js/labs/pose-library.js:114"
    ],
    "events": [],
    "exposure": [
@@ -21775,7 +21775,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/pose-library.js:109",
+   "source": "src/js/labs/pose-library.js:114",
    "meta": {
     "functionsVisited": 0
    },
