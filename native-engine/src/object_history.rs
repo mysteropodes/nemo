@@ -492,5 +492,6 @@ mod object_frame_bulk_move;
 #[path = "object_layer_shift_history.rs"]
 mod object_layer_shift;
 
+#[cfg(feature = "application")]
 #[path = "object_tween_history.rs"]
 mod tween;
