@@ -3302,7 +3302,9 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
       setTotalFrames() { serializedDocument.totalFrames = 99; paperProject.itemCount = 99; } },
     SMMotion: { setLayerValue() { serializedDocument.layers[0].opacity = 99; paperProject.activeLayer.opacity = 0.99; } },
     SMScript: {
-      run() { activity.scriptRuns++; serializedDocument.layers[0].opacity = 88; paperProject.activeLayer.opacity = 0.88; },
+      // CS8-SDK (#2354): the real runner is no longer wrapped; on desktop without a native
+      // object document it refuses by itself (tests/script-runner-native.test.cjs).
+      run() { activity.scriptRuns++; return { ok: false, error: 'Scripts run on an open native document only.', log: [] }; },
       openFile() { delayedScript = () => { serializedDocument.layers[0].opacity = 77; paperProject.activeLayer.opacity = 0.77; }; },
       api() { return { layer() { return { set(_prop, value) {
         serializedDocument.layers[0].opacity = value[0]; paperProject.activeLayer.opacity = value[0] / 100;
@@ -3402,7 +3404,8 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   const documentBytes = JSON.stringify(serializedDocument);
   const paperBytes = JSON.stringify(paperProject);
   assert.equal(desktop.SMScript.api(), false);
-  assert.equal(desktop.SMScript.run('nemo.layer(0).set("opacity", [99])'), false);
+  // CS8-SDK (#2354): run is no longer a legacy writer; without a native object document it refuses.
+  assert.deepEqual(desktop.SMScript.run('nemo.layer(0).set("opacity", [99])'), { ok: false, error: 'Scripts run on an open native document only.', log: [] });
   assert.equal(desktop.SMScript.openFile(), false);
   assert.equal(desktop.SMPlugin.openFile(), false);
   assert.equal(desktop.SMPlugin.loadArchive({}), false);
@@ -3412,7 +3415,7 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   assert.equal(JSON.stringify(serializedDocument), documentBytes, 'serialized document bytes remain unchanged');
   assert.equal(JSON.stringify(paperProject), paperBytes, 'Paper project bytes remain unchanged');
   assert.equal(delayedScript, null); assert.equal(delayedPlugin, null); assert.equal(delayedArchive, null);
-  assert.deepEqual(deniedEntries, ['script-api', 'script-run', 'script-openFile',
+  assert.deepEqual(deniedEntries, ['script-api', 'script-openFile',
     'plugin-openFile', 'plugin-loadArchive', 'plugin-loadFiles',
     'timeline-setTotalFrames', 'motion-setLayerValue']);
 
@@ -3421,7 +3424,7 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   // schedule nothing and leave both document byte images unchanged.
   nativeBlocked = false;
   assert.equal(desktop.SMScript.api(), false);
-  assert.equal(desktop.SMScript.run('retained timer setup'), false);
+  assert.deepEqual(desktop.SMScript.run('retained timer setup'), { ok: false, error: 'Scripts run on an open native document only.', log: [] });
   assert.equal(desktop.SMScript.openFile(), false);
   assert.equal(desktop.SMPlugin.openFile(), false);
   assert.equal(desktop.SMPlugin.loadArchive({}), false);

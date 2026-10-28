@@ -624,10 +624,10 @@
 
   // ---- runner ----
   function run(source, opts) {
-    opts = opts || {};
-    _log = [];
-    var api = buildApi();
-    var fn;
+    opts = opts || {}; _log = [];
+    // CS8-SDK (#2354): the desktop host never runs a script against state.layers.
+    if (window.__TAURI__ || window.NemoScriptNativeApi && NemoScriptNativeApi.owns(window)) return window.NemoScriptNativeApi ? NemoScriptNativeApi.runOnDesktop(window, source) : { ok: false, error: 'Scripts run on an open native document only.', log: [] };
+    var api = buildApi(), fn;
     try {
       // The last expression is the script's result, which is what a console-
       // style tool wants; eval's completion value gives that, and "use strict"
