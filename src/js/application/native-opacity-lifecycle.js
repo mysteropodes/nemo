@@ -32,7 +32,11 @@
       operation: operation, payload: payload }; }
     function enqueue(work) { var next = pending.then(work); pending = next.catch(function () {}); return next; }
     function failLifecycle(target, error) { if (target) target.failure = target.failure || error;
-      if (cycle === target && phase !== 'legacy') phase = 'indeterminate'; return error; }
+      if (cycle === target && phase !== 'legacy') {
+        phase = 'indeterminate';
+        try { preview.clear(target); } catch (_) { /* Preserve the authority failure if presentation cleanup also fails. */ }
+      }
+      return error; }
     function requireConnected(target) {
       var connected = null;
       try { connected = typeof ports.connectionStatus === 'function' ? ports.connectionStatus() : null; }
@@ -84,6 +88,7 @@
       target.exporter = scoped(ports.createExporter(), ['begin', 'status', 'cancel', 'observe', 'plan']);
     }
     function disposeConsumers(target) { if (!target) return;
+      preview.clear(target);
       if (target.preview) target.preview.dispose(); if (target.exporter) target.exporter.dispose();
       target.preview = null; target.exporter = null; target.active = false; }
     function closeInstalled(target) { disposeConsumers(target);
@@ -346,6 +351,7 @@
       cycle: function () { return cycle; }, identity: copyIdentity, prepared: function () { return prepared; },
       serialized: function () { return serializeResponse; }, generation: function () { return generation; },
       output: function () { return output; }, host: function () { return ports.previewHost; },
+      surfaceChanged: ports.surfaceChanged,
       busy: function () { return cacheFences || cycle.synchronizing; },
       requireAdmission: requireAdmission, requireAdmitted: requireAdmitted, enqueue: enqueue, fail: failLifecycle,
     });

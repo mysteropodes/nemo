@@ -7,6 +7,12 @@
   'use strict';
 
   function create(scope) {
+    var displayed = null;
+    function clear(target) {
+      if (displayed !== target) return;
+      displayed = null;
+      if (scope.surfaceChanged) scope.surfaceChanged(null);
+    }
     function present(frame) {
       if (scope.phase() !== 'native' || scope.replacementRequested()) {
         return Promise.reject(new Error('native opacity authority is not active'));
@@ -23,11 +29,17 @@
         try {
           verify();
           var current = scope.identity(), prepared = scope.prepared(), serialized = scope.serialized();
-          return await target.preview.present(current.instanceId, scope.generation(), {
+          var receipt = await target.preview.present(current.instanceId, scope.generation(), {
             documentSnapshotId: serialized.result.documentSnapshotId, documentId: current.documentId,
             contentRevision: current.contentRevision, contextId: 'scene-root', frame: frame,
             quality: 'final', outputSpec: scope.output(), geometryHandle: prepared.frames[frame].geometryHandle,
           }, scope.host(), verify);
+          verify();
+          if (receipt.status === 'presented' && scope.surfaceChanged) {
+            displayed = target;
+            scope.surfaceChanged(receipt);
+          }
+          return receipt;
         } catch (error) {
           // A prior-frame preview may complete while an external native revision
           // is synchronizing. Its receipt is stale, but the revision must still
@@ -46,7 +58,7 @@
       present(frame).catch(function () {});
       return true;
     }
-    return Object.freeze({ present: present, render: render });
+    return Object.freeze({ present: present, render: render, clear: clear });
   }
 
   return Object.freeze({ create: create });
