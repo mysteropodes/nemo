@@ -320,6 +320,15 @@ test('failed replacement render retires both the prior handle and newly allocate
   assert.equal(prior.isCurrent(),false);assert.deepEqual(h.nodes['motion-props-body'].children,[h.old]);
  }finally{h.retire();off();}
 });
+test('inactive native session immediately fences a retained replacement presenter context',()=>{
+ const h=host(),p=replacement(h,'active'),off=Seam.register(h.root,'motion-properties',p.provider);let refreshes=0;
+ h.root.NemoNativeLayerRangeDesktop={mount(){},retire(){},owns(){return false;},refreshKeys(){refreshes++;}};
+ try{
+  h.paint();const context=p.contexts[0];assert.equal(context.isCurrent(),true);p.notify();assert.equal(refreshes,1);
+  h.active=false;assert.equal(context.isCurrent(),false);p.notify();assert.equal(refreshes,1);
+  assert.equal(UI.readSelectedMotionKeys(h.root,h.ports.currentSession().info()),null);h.paint();assert.equal(p.handleRetired,1);
+ }finally{h.retire();off();}
+});
 test('unregistering the default native provider fences queued writes without requiring another UI paint',async()=>{
  const h=host({omitBinding:true}),provider=Binding.createOrdinary(h.root,{acceptsTarget:()=>true}),off=Seam.register(h.root,'motion-properties',provider);
  const read=h.ports.readPropertyMetadata;let entered,release;

@@ -245,7 +245,7 @@
         seam.getPresenter(root,'motion-properties')===entry.provider&&
         seam.mountPoint(root,'motion-properties')===entry.body&&
         root.document.getElementById('motion-props-sec').querySelector('.phdr')===entry.header&&
-        entry.ports.currentSession()===entry.session&&lifetime(entry.session.info())===entry.lifetime;
+        entry.ports.currentSession()===entry.session&&entry.session.isActive()===true&&lifetime(entry.session.info())===entry.lifetime;
     }catch(_){return false;}}
     function release(failed){
       var old=owner;owner=null;if(!old)return;
