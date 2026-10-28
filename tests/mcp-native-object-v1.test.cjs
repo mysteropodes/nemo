@@ -27,10 +27,10 @@ test('a v1 snapshot on a native object project answers the owner layer state', (
 
 test('other v1 requests on a native object project answer a typed refusal with the project identity', () => {
   const { ops, handled } = operations(project);
-  for (const operation of ['capabilities', 'property.get', 'property.set', 'history.undo']) {
+  for (const operation of ['property.get', 'property.set', 'history.undo']) {
     assert.deepEqual(ops.handleV1({ apiVersion: 1, requestId: 'r-' + operation, operation, payload: {} }),
       Object.assign(envelope(operation), { ok: false, error: { code: 'unavailable',
-        message: 'Native object projects answer only snapshot and native operations (apiVersion 2).' } }));
+        message: 'Native object projects answer only capabilities, snapshot and native operations (apiVersion 2).' } }));
   }
   assert.deepEqual(handled, [], 'the v1 opacity handler never sees an object-project request');
 });
@@ -66,4 +66,17 @@ test('a layer with default flags reports explicit booleans', () => {
   const { ops } = operations(bare);
   assert.deepEqual(ops.handleV1({ apiVersion: 1, requestId: 'r', operation: 'snapshot', payload: {} }).result.layers,
     [{ id: 'layer-1', name: undefined, visible: true, locked: false, shy: false }]);
+});
+
+test('capabilities answer what a native project serves, with or without an open document', () => {
+  const result = { operations: ['capabilities', 'snapshot'], nativeApiVersion: 2, properties: [], descriptors: [],
+    documentIdentity: 'open-document-incarnation' };
+  const { ops, handled } = operations(project);
+  assert.deepEqual(ops.handleV1({ apiVersion: 1, requestId: 'r-capabilities', operation: 'capabilities', payload: {} }),
+    Object.assign(envelope('capabilities'), { ok: true, result }));
+  const booting = operations({ blocksLegacy: () => true, isActive: () => false, info: () => null });
+  assert.deepEqual(booting.ops.handleV1({ apiVersion: 1, requestId: 'r-boot', instanceId: 'instance-A', operation: 'capabilities', payload: {} }),
+    { apiVersion: 1, requestId: 'r-boot', instanceId: 'instance-A', documentId: '', revision: 0, ok: true, result });
+  assert.deepEqual(handled, []);
+  assert.deepEqual(booting.handled, []);
 });
