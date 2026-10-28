@@ -331,6 +331,7 @@ test('inactive native session immediately fences a retained replacement presente
 });
 test('unregistering the default native provider fences queued writes without requiring another UI paint',async()=>{
  const h=host({omitBinding:true}),provider=Binding.createOrdinary(h.root,{acceptsTarget:()=>true}),off=Seam.register(h.root,'motion-properties',provider);
+ h.root.NemoNativeMotionBinding=Binding; // Module loads after the ordinary installer; the explicit seam provider owns this mount.
  const read=h.ports.readPropertyMetadata;let entered,release;
  const started=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve),writes=[];
  h.ports.readPropertyMetadata=async selector=>{const result=await read(selector);if(result.kind==='properties')result.items.forEach(row=>{if(row.authored?.availability==='available')row.authored.expressionEnabled=true;});return result;};

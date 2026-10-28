@@ -14,14 +14,14 @@
 (function(root,factory){
   // In the page the seam and presenter load after this file; render resolves them from root.
   var cjs=typeof module==='object'&&module.exports;
-  var api=cjs?factory(require('../application/presenter-seam.js'),require('./native-layer-list-presenter.js'),require('./native-motion-property-binding.js')):factory(null,null,null);
+  var api=cjs?factory(require('../application/presenter-seam.js'),require('./native-layer-list-presenter.js')):factory(null,null);
   if(cjs)module.exports=api;
   else root.NemoNativeObjectUI=api;
-}(typeof globalThis==='object'?globalThis:this,function(Seam,LayerList,Motion){
+}(typeof globalThis==='object'?globalThis:this,function(Seam,LayerList){
   'use strict';
   var inspectors=new WeakMap(),views=new WeakMap(),timings=new WeakMap(),policyTasks=new WeakMap(),policyEpochs=new WeakMap(),policyBindings=new WeakMap(),motionBindings=new WeakMap(),motionSurfaces=new WeakMap();
   function motionSurface(root){
-    var surface=motionSurfaces.get(root),api=Motion||root.NemoNativeMotionBinding;
+    var surface=motionSurfaces.get(root),api=root.NemoNativeMotionBinding;
     if(!surface&&api&&typeof api.createSurface==='function'){surface=api.createSurface(root,seam(root),motionBindings.get(root));motionSurfaces.set(root,surface);}
     return surface;
   }
