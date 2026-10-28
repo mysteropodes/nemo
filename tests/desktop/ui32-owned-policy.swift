@@ -108,6 +108,7 @@ func ui32GuardedAction(_ identity:() throws -> Void, _ scope:() throws -> Void, 
   try identity(); try scope(); try identity(); try action(); posted(); try identity(); try postScope()
 }
 func ui32SelfTest() throws {
+  try ui32ContentWindowsSelfTest()
   let profileFocusCases=try ui32ProfileFocusSelfTest()
   let f03Cases=try f03SelfTests()
   try check(try ui32CameraSelfTest()==37)

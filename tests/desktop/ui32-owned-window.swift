@@ -89,8 +89,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
     return (0,rows)
   }
   func readContentCertificate(_ suppliedDeadline:UInt64?, _ expected:AXUIElement?) throws -> UI32ContentCertificate<AXUIElement> {
-    guard let windows=attr(pinned.application,kAXWindowsAttribute) as? [AXUIElement],windows.count == 1,
-      owns(windows[0],pid),CFEqual(windows[0],main) else { throw Refusal(code:"sheet-active") }
+    _ = try ui32ContentWindowContext(pinned)
     let deadline=suppliedDeadline ?? (DispatchTime.now().uptimeNanoseconds+750_000_000)
     let certificate=try ui32ContentCertificate(main,pid:Int(pid),retained:expected,deadline:deadline,
       now:{DispatchTime.now().uptimeNanoseconds},equal:{CFEqual($0,$1)},owner:owner,

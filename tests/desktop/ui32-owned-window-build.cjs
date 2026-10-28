@@ -5,7 +5,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {spawnSync}=require('node:child_process');
 const original=require('./p38-owned-window-build.cjs');
-const EXTRA=Object.freeze(['ui32-owned-policy.swift','ui32-owned-window.swift','ui32-owned-fixture.swift','ui32-owned-keys.swift','ui32-owned-picker.swift','ui32-owned-readiness.swift','ui32-owned-profile.swift','ui32-owned-phase2.swift','ui32-owned-content.swift','f03-owned-opacity.swift','f03-owned-opacity-controls.swift','f03-owned-save.swift','f03-owned-save-controls.swift','ui32-owned-fixture-controls.swift','ui32-owned-native-busy.swift','ui32-owned-camera.swift','cs7-input.swift']);
+const EXTRA=Object.freeze(['ui32-owned-policy.swift','ui32-owned-window.swift','ui32-owned-window-context.swift','ui32-owned-fixture.swift','ui32-owned-keys.swift','ui32-owned-picker.swift','ui32-owned-readiness.swift','ui32-owned-profile.swift','ui32-owned-phase2.swift','ui32-owned-content.swift','f03-owned-opacity.swift','f03-owned-opacity-controls.swift','f03-owned-save.swift','f03-owned-save-controls.swift','ui32-owned-fixture-controls.swift','ui32-owned-native-busy.swift','ui32-owned-camera.swift','cs7-input.swift']);
 const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 function requireValid(ok){if(!ok)throw Error('ui32-helper-build-refused');}
 function fresh(file){
