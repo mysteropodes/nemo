@@ -19,6 +19,18 @@
     return !!(root && root.__TAURI__ && root.__TAURI__.core &&
       typeof root.__TAURI__.core.invoke === 'function');
   }
+  // CS4/#2343: on the desktop remediation host a JavaScript/Paper write is never
+  // implicit, whether or not a native document has been observed yet. A kind
+  // passes only if listed here as still legacy-owned on desktop (none today);
+  // an unmigrated operation reports unavailable instead (EXECUTION_PLAN §0).
+  var DESKTOP_LEGACY_KINDS = Object.freeze([]);
+  // The boot scaffold (app.js: the single Paper group and empty layer row the
+  // native UI projection mounts into) is presentation, admitted once per page.
+  var bootScaffolded = new WeakSet();
+  function desktopLegacyKind(root, kind) {
+    if (kind === 'boot-scaffold' && root && !bootScaffolded.has(root)) { bootScaffolded.add(root); return true; }
+    return DESKTOP_LEGACY_KINDS.indexOf(kind) >= 0;
+  }
   function allowLegacyWrite(root, kind, central) {
     try {
       if (central !== undefined) return typeof central === 'function' && central(kind) === true;
@@ -28,8 +40,9 @@
       // Browser/WASM has no admitted native opacity owner. Import may build a
       // read-side fixture, but edits must not revive the JavaScript writer.
       if (!hasNativeHost(root)) return kind === 'document-import' ||
-        kind === 'create-layer' && (!root.NemoApplication || (browserImportDepth.get(root) || 0) > 0);
-      return true;
+        (kind === 'create-layer' || kind === 'boot-scaffold') &&
+        (!root.NemoApplication || (browserImportDepth.get(root) || 0) > 0);
+      return desktopLegacyKind(root, kind);
     } catch (_) { return false; }
   }
   function installBrowserReadOnlyImport(root) {
@@ -368,9 +381,12 @@
         },
         allow: function (kind) {
           var bridge = root.SMEngineBridge;
-          if (!bridge || !Object.prototype.hasOwnProperty.call(bridge, 'nativeEditGuard')) return true;
-          return !!bridge.nativeEditGuard && typeof bridge.nativeEditGuard.allow === 'function' &&
+          var guarded = !bridge || !Object.prototype.hasOwnProperty.call(bridge, 'nativeEditGuard') ||
+            !!bridge.nativeEditGuard && typeof bridge.nativeEditGuard.allow === 'function' &&
             bridge.nativeEditGuard.allow(kind) === true;
+          // The guard decides first; the desktop host then never admits an
+          // implicit legacy write even before native identity is observed.
+          return guarded && (!hasNativeHost(root) || desktopLegacyKind(root, kind));
         },
         wrap: function (target, names, prefix, allow, admitted) {
           var targets = { global: root, timeline: root.SM, motion: root.SMMotion, script: root.SMScript, plugin: root.SMPlugin };

@@ -11611,14 +11611,17 @@ window.updateCombinePanel=updateCombinePanel;
       onFfmpeg:function(line){progEl.style.display='block';progEl.textContent=line.substring(0,80);},
       onRiveProgress:function(msg){progEl.style.display='block';progEl.textContent=msg;}};
     var nativeAuthority=window.NemoNativeOpacityCutover;
-    var nativeExport=(fmtSel.value==='png'||fmtSel.value==='svg')&&nativeAuthority&&nativeAuthority.blocksLegacy();
+    var nativeHeld=!!(nativeAuthority&&nativeAuthority.blocksLegacy());
+    var nativeExport=(fmtSel.value==='png'||fmtSel.value==='svg')&&nativeHeld;
     var nativePng=fmtSel.value==='png'&&nativeExport;
     nativePngAbort=nativePng?new AbortController():null;if(nativePngAbort)opts.signal=nativePngAbort.signal;
     runBtn.disabled=true;progEl.style.display='block';progEl.textContent=SM.t('exportPreparing');cancelBtn.disabled=false;cancelBtn.style.display=(nativePng||fmtSel.value==='svg'&&!nativeExport&&window.SMExport.isAvailable())?'':'none';
     try{
       // Native PNG/SVG read a pinned Rust revision. Saving Paper frames
-      // here would either be denied or create a second document writer.
-      if(!nativeExport)saveAllLayerFrames();
+      // here would either be denied or create a second document writer, so
+      // no format saves them while native authority holds the document: one
+      // with no native exporter (Lottie) refuses typed in export.js (#2343 B1).
+      if(!nativeHeld)saveAllLayerFrames();
       var fn={svg:'exportSVGSequence',png:'exportPNGSequence',tiff:'exportTIFFSequence',gif:'exportGIF',mp4:'exportMP4',prores:'exportProRes',lottie:'exportLottie',rive:'exportRive','ae-camera':'exportAECamera'}[fmtSel.value];
       var res=await window.SMExport[fn](opts);
       if(res.cancelled){progEl.textContent=SM.t('exportCancelled');}
