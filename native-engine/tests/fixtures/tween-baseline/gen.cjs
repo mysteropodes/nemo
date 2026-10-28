@@ -311,6 +311,23 @@ for(const provider of ['paper','wasm']) for(const mode of ['unite','subtract','i
   if(!output.length||!output.every(s=>s.isGroupCombineResult))throw new Error('baseline ghost combine failed '+mode);
   call(provider==='wasm'?'ghost-combine':'ghost-combine-paper',{shapes,groups,provider},()=>output);
 }
+
+// D20 topology fixtures: nested outer/inner contours, reverse winding, and zero-length inputs.
+const outer=stroke([[0,0],[100,0],[100,100],[0,100]],{closed:true,fillColor:'#cc5533'});
+const inner=stroke([[25,25],[25,75],[75,75],[75,25]],{closed:true,fillColor:'#cc5533'});
+const shifted=s=>({...copy(s),segments:s.segments.map(q=>({...copy(q),point:[q.point[0]+17,q.point[1]-9]}))});
+for(const [name,left,right] of [
+ ['nested-outer-inner-contours',[outer,inner],[shifted(inner),shifted(outer)]],
+ ['reversed-nested-contours',[outer,inner],[shifted({...inner,segments:copy(inner.segments).reverse()}),shifted({...outer,segments:copy(outer.segments).reverse()})]],
+ ['collapsed-tie',[stroke([[4,8],[4,8]]),stroke([[4,8],[4,8]])],[stroke([[4,8],[4,8]]),stroke([[4,8],[4,8]])]],
+ ['empty-target',[outer,inner],[]],['empty-source',[],[outer,inner]],
+]) call('match',{name,a:left,b:right},()=>context.autoMatchJS(copy(left),copy(right)));
+for(const [name,s] of [
+ ['reversed-outer-contour',{...outer,segments:copy(outer.segments).reverse()}],
+ ['inner-counterwound-contour',inner],['collapsed',stroke([[4,8],[4,8],[4,8]])],
+ ['single-anchor',stroke([[4,8]])],['empty-path',stroke([])],
+]) call('resample',{name,stroke:s,count:8},()=>context.resamplePJS(copy(s),8));
+
 const hash=s=>crypto.createHash('sha256').update(s).digest('hex');
 const provenance={baseline,sourceSha256:hash(source),toolsSha256:hash(toolsSource),uiSha256:hash(uiSource),bitmapSha256:hash(bitmapSource),groupSha256:hash(groupSource),wasmJsSha256:hash(wasmSource),wasmBinarySha256:hash(wasmBytes),paperSha256:hash(read('src/paper-full.min.js'))};
 process.stdout.write(JSON.stringify(provenance).slice(0,-1)+',"cases":[\n'+cases.map(c=>JSON.stringify(c)).join(',\n')+'\n]}\n');

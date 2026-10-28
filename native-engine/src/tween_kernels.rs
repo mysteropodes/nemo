@@ -72,9 +72,6 @@ pub(crate) use document_plan::{plan_tween, TweenRequest};
 #[path = "tween_path_geometry.rs"]
 mod path_geometry;
 use path_geometry::*;
-#[path = "tween_dab_shape.rs"]
-mod dab_shape;
-use dab_shape::*;
 
 #[path = "tween_dabs.rs"]
 mod dabs;

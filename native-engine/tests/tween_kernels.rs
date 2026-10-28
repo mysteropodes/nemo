@@ -12,7 +12,11 @@ fn cases() -> Vec<Value> {
 fn tween_resampling_matches_independent_baseline() {
     for c in cases().into_iter().filter(|c| c["operation"] == "resample") {
         let s: StrokeIn = serde_json::from_value(c["input"]["stroke"].clone()).unwrap();
-        let out = serde_json::to_value(resample_stroke_inner(&s, 6)).unwrap();
+        let out = serde_json::to_value(resample_stroke_inner(
+            &s,
+            c["input"]["count"].as_u64().unwrap() as usize,
+        ))
+        .unwrap();
         assert_eq!(
             out["segments"].as_array().unwrap().len(),
             c["expected"]["segments"].as_array().unwrap().len()
