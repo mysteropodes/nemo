@@ -46,3 +46,30 @@ fn subselect_read_pages_and_preview_never_publish() {
     assert_eq!(read(&request)["error"]["code"], "wrong_document");
     assert_eq!(bytes(&owner), before);
 }
+
+#[test]
+fn a_hit_test_read_pages_painted_geometry_outside_the_editable_scope() {
+    // A stroke on a 3D layer is outside the editable selection, but Select and the knife must still be able to hit it.
+    let mut doc = document(2, vec![record_at("A", "L1", 0, "s-a")], None);
+    doc["layers"][0]["threeD"] = json!(true);
+    let owner = owner_of(&doc);
+    let snapshot = owner.acquire_snapshot(0).unwrap();
+    let stored = snapshot.document().objects[0].geometry.segments.len();
+    let read = |page: Value| {
+        let v = json!({"apiVersion":2,"requestId":"hit","instanceId":owner.instance_id(),"documentId":owner.document_id(),
+            "operation":"query.document.object","payload":{"atRevision":0,"documentSnapshotId":snapshot.snapshot_id(),
+            "stableTarget":target("L1",0,"s-a"),"subselect":page}});
+        serde_json::to_value(snapshot.dispatch(serde_json::from_value(v).unwrap()).unwrap()).unwrap()
+    };
+    assert_eq!(read(json!({"cursor":0,"limit":4}))["ok"], false, "the editable read refuses it");
+    let hit = read(json!({"cursor":0,"limit":16,"hitTest":true}));
+    assert_eq!(hit["ok"], true, "{hit}");
+    let s = &hit["result"]["subselect"];
+    assert_eq!((s["total"].as_u64(), s["hitTest"].as_bool()), (Some(stored as u64), Some(true)));
+    let first = &snapshot.document().objects[0].geometry.segments[0];
+    assert_eq!((s["segments"][0]["point"][0].as_f64(), s["segments"][0]["point"][1].as_f64()), (first.point.x.as_f64(), first.point.y.as_f64()));
+    for bad in [json!({"cursor":0,"limit":4,"hitTest":false}), json!({"cursor":0,"limit":4,"hitTest":true,"paint":true}),
+        json!({"cursor":0,"limit":4,"hitTest":true,"preview":{"kind":"move","indices":[0],"delta":[1,1]}})] {
+        assert_eq!(read(bad.clone())["ok"], false, "{bad}");
+    }
+}

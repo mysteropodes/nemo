@@ -49,9 +49,14 @@ function harness(options = {}) {
   if (options.object) {
     // #2362: a native object project has no Paper items; the presented lines come from the native subselect read.
     const items = layer.children.map((p) => ({ stableTarget: { contextId: 'scene-root', layerUid: 'native-layer:1:0', frameScope: { kind: 'authored', frame: 3 }, strokeId: p.data.strokeId },
-      closed: false, count: 2, matrix: [1, 0, 0, 1, 0, 0], segments: p.segments.map((g) => ({ point: [g.point.x, g.point.y], handleIn: [0, 0], handleOut: [0, 0] })) }));
+      closed: false, count: 2, role: 'plain', bounds: [p.bounds.x, p.bounds.y, p.bounds.x + p.bounds.width, p.bounds.y + p.bounds.height], matrix: [1, 0, 0, 1, 0, 0],
+      segments: p.segments.map((g) => ({ point: [g.point.x, g.point.y], handleIn: [0, 0], handleOut: [0, 0] })) }));
+    // A ribbon and its linked fill crossing the knife are listed but never cut (and their geometry is never read).
+    items.push({ stableTarget: { ...items[0].stableTarget, strokeId: 'fill' }, closed: true, count: 4, role: 'fill', bounds: [40, -10, 60, 130], matrix: [1, 0, 0, 1, 0, 0],
+      segments: [[40, -10], [60, -10], [60, 130], [40, 130]].map(([x, y]) => ({ point: [x, y], handleIn: [0, 0], handleOut: [0, 0] })) });
     Object.assign(pin, { canvasW: 1920, canvasH: 1080 });
-    Object.assign(session, { readPresentedObjectSession: () => ({ presentation: { ...pin, frame: 3 } }), readSubselect: async () => ({ items }) });
+    Object.assign(session, { readPresentedObjectSession: () => ({ presentation: { ...pin, frame: 3 } }),
+      readPresentedStrokes: async (_selector, _pin, wanted) => ({ items: items.map(({ segments, ...item }) => (wanted(item) ? { ...item, segments } : item)) }) });
     Object.assign(root, { userLayers: [new paper.Layer()], Matrix: paper.Matrix, NemoSelectCanvasIntent: require('../src/js/adapters/select-canvas-intent.js'),
       NemoNativeViewportUnderlay: { canvasMapping: { point: (e) => ({ x: e.clientX, y: e.clientY }) } } });
     root.document.getElementById = (id) => (id === 'canvas-area' ? area : id === 'drawing-canvas' ? { getBoundingClientRect: () => ({ left: 0, top: 0, width: 1920, height: 1080 }) } : null);

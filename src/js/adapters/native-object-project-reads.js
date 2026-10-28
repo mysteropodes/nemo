@@ -175,10 +175,10 @@
         throw fault('unavailable', 'Native image-mesh read failed: ' + (e && e.message || e), 'native_read_failed');
       }
     }
-    async function subselectGeometry(o, stableTarget, intent, paint) {
+    async function subselectGeometry(o, stableTarget, intent, paint, hitTest) {
       let cursor=0,segments=[],total=null,closed=null;
       for(;;){
-        const page={cursor:cursor,limit:16};if(intent!==undefined)page.preview=intent;if(paint)page.paint=true;
+        const page={cursor:cursor,limit:16};if(intent!==undefined)page.preview=intent;if(paint)page.paint=true;if(hitTest)page.hitTest=true;
         const r=(await queryBody(o,{atRevision:o.info.contentRevision,documentSnapshotId:o.info.documentSnapshotId,stableTarget:stableTarget,subselect:page})).subselect;
         if(total!==null&&(r.total!==total||r.closed!==closed))throw fault('uncorrelated','Subselect geometry changed between pages');
         total=r.total;closed=r.closed;segments=segments.concat(r.segments);
@@ -207,6 +207,26 @@
           if(!paint.closed||paint.segments.length!==item.paintCount)throw fault('uncorrelated','Subselect paint differs from its native presentation');
           item.paint=paint;
         }
+      }
+      requireCurrent(o);return freeze({info:copyPins(o.info),presentation:o.presentation,items:items});
+    }
+    // #2362: Select and the Labs knife read every painted record of the presented layer (the hit-test listing: bounds
+    // and role, never refused for being outside the editable scope); geometry is paged only for the records `wanted` keeps.
+    async function readPresentedStrokes(selector,pin,wanted){
+      if(!exact(selector,['contextId','layerUid','frame'],[])||selector.contextId!=='scene-root'||!text(selector.layerUid)||!integer(selector.frame,0,4294967295)||!pins(pin))throw fault('invalid_request','Invalid presented-stroke selection');
+      const o=origin(selector,pin);if(!o)throw fault('unavailable','Presented strokes need a current native presentation');
+      await settle(o);let cursor=0,total=null,items=[];
+      for(;;){
+        const view=Object.assign({kind:'subselect',workId:o.workId,viewGeneration:o.viewGeneration,cursor:cursor,limit:8,hitTest:true},selector);
+        const r=await queryBody(o,{atRevision:o.info.contentRevision,documentSnapshotId:o.info.documentSnapshotId,view:view});
+        if(total!==null&&total!==r.total)throw fault('uncorrelated','Presented strokes changed between pages');
+        total=r.total;items=items.concat(r.items);if(r.nextCursor===null)break;cursor=r.nextCursor;
+      }
+      for(const item of items){
+        if(typeof wanted==='function'&&!wanted(item))continue;
+        const geometry=await subselectGeometry(o,item.stableTarget,undefined,false,true);
+        if(geometry.closed!==item.closed||geometry.segments.length!==item.count)throw fault('uncorrelated','Presented geometry differs from its listing');
+        item.segments=geometry.segments;
       }
       requireCurrent(o);return freeze({info:copyPins(o.info),presentation:o.presentation,items:items});
     }
@@ -273,7 +293,7 @@
       return freeze(runs.map((run) => freeze(run.slice())));
     }
     return Object.freeze({ readLayerTiming: (l, f, p) => readLegacy(l, f, p), readLayerRange: (l, f, p) => readLegacy(l, f, p, 'range'),
-      readLayerPlacement: (l, f, p) => readLegacy(l, f, p, 'placement'), readLayerCells: readLayerCells, readImageMesh: readImageMesh, readSubselect: readSubselect, previewSubselect: previewSubselect });
+      readLayerPlacement: (l, f, p) => readLegacy(l, f, p, 'placement'), readLayerCells: readLayerCells, readImageMesh: readImageMesh, readSubselect: readSubselect, readPresentedStrokes: readPresentedStrokes, previewSubselect: previewSubselect });
   }
   function expectedCount(kind, m) { return kind === 'outline' ? m.outlineCount : kind === 'verts' ? m.vertexCount : kind === 'tris' ? m.triangleIndexCount : m.vertexCount; }
   function copyTarget(t) { return { contextId: t.contextId, layerUid: t.layerUid, frameScope: { kind: t.frameScope.kind, frame: t.frameScope.frame }, strokeId: t.strokeId }; }

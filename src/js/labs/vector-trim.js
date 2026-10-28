@@ -186,16 +186,16 @@
   }
 
   // #2362: a native object project builds no Paper items. The cut is planned on the presented geometry (the native
-  // subselect read) and committed with reshape/clone steps, so every piece keeps its stroke's native style. Pressure
-  // ribbons and their linked fills stay out, as in the baseline: a ribbon is the item with a painted outline and its
-  // fill is created directly below it.
+  // hit-test listing) and committed with reshape/clone steps, so every piece keeps its stroke's native style. Only plain
+  // strokes are cut: ribbons, their linked fills, shapes and textured or bitmap strokes stay out, as in the baseline.
   function objectCut(native, Intent, knife) {
     var toast = function (key) { if (typeof showToast === 'function') showToast(SM.t(key)); };
     var frame = state.currentFrame, layerUid = native.layerUid(state.activeLayerIdx);
-    return Intent.presented(window, state.activeLayerIdx).then(function (shown) {
+    // Only plain strokes are cut (and bracket a cut), so only their geometry is read.
+    return Intent.presented(window, state.activeLayerIdx, function (item) { return item.role === 'plain'; }).then(function (shown) {
       if (!shown || !layerUid || shown.frame !== frame) { toast('labsToastLayerInvalidLocked'); return 0; }
       var world = knife.map(function (c) { var w = Intent.worldPoint(window, c[0], c[1], shown.pin, shown.presentation); return new Point(w.x, w.y); });
-      var plain = shown.paths.filter(function (p, i) { var next = shown.paths[i + 1]; return !p.data.nativeRibbon && !(p.closed && next && next.data.nativeRibbon); });
+      var plain = shown.paths.filter(function (p) { return p.data.nativeRole === 'plain'; });
       var plan = buildPlan({ children: plain }, new Path({ insert: false, segments: world }));
       if (!plan.length) { toast('labsToastNoStrokeUnderKnife'); return 0; }
       var steps = [];
