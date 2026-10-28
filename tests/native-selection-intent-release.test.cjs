@@ -122,6 +122,26 @@ test('native click, reselect, deselect and Shift selection preserve identity and
   assert.deepEqual(writes(f), []);
 });
 
+test('a native object project picks at pointer-up from the presented geometry and drops a stale pick (#2362)', async () => {
+  const f = fixture({ mode: 'anim2d' }), picks = [], applied = [];
+  let resolve;
+  f.scope.NemoSelectCanvasIntent = { ...SelectCanvasIntent, objectProject: () => ({}), pickContext: () => JSON.stringify([f.state.tool, f.state.currentFrame]),
+    pick: (_root, x, y) => { picks.push([x, y]); return new Promise((r) => { resolve = r; }); },
+    applyPick: (_root, item, shift) => applied.push([item, shift]) };
+  f.send('pointerdown', 100, 60); f.send('pointerup', 100, 60);
+  assert.deepEqual(picks, [[100, 60]], 'the click becomes one pick at its client point');
+  resolve({ data: { strokeId: 's-a' } }); await new Promise(setImmediate);
+  assert.deepEqual(applied, [[{ data: { strokeId: 's-a' } }, false]]);
+  f.send('pointerdown', 100, 60, { shiftKey: true }); f.send('pointerup', 100, 60, { shiftKey: true });
+  f.state.currentFrame = 7; resolve(null); await new Promise(setImmediate);
+  assert.equal(applied.length, 1, 'a pick that resolves after the frame moved is dropped');
+  f.send('pointerdown', 100, 60); f.send('pointermove', 140, 60); f.send('pointerup', 140, 60);
+  assert.equal(picks.length, 2, 'a drag still denies at threshold');
+  f.state.appMode = 'motion'; f.send('pointerdown', 100, 60); f.send('pointerup', 100, 60);
+  assert.equal(picks.length, 2, 'Motion keeps its own canvas intent');
+  assert.deepEqual(writes(f), []);
+});
+
 test('native pointer intent is scalar, frozen and has no gesture or writer effects', () => {
   const f = fixture();
   const down = f.send('pointerdown', 100, 60);

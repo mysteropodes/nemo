@@ -1,8 +1,10 @@
 //! `object.vector.batch` (#2361, #2362): ordered create, replace and delete steps on ONE scene-root layer, applied by the
 //! native owner as one revision and one undo entry. Shapes are the single commands' own; the receipt lists one stroke id
 //! per step, in order: an owner-allocated id for a create, the step's named target for a replace or delete. A `copy` step
-//! (multiframe stamps) is an earlier create's record again on another frame: a create in every respect but its size.
-use super::shapes::record_shape;
+//! (multiframe stamps) is an earlier create's record again on another frame: a create in every respect but its size. A
+//! `reshape` (new geometry for a named stroke) or `clone` (a new stroke from a named one, on `frame`) keeps the native
+//! style, so a client that reads presented geometry only (the Labs knife) can cut.
+use super::shapes::{geometry, record_shape};
 use super::target;
 use crate::native_contract::exact;
 use serde_json::Value;
@@ -23,6 +25,18 @@ fn step(op: &Value) -> Option<&Value> {
         .then(|| &op["record"]["target"]),
         "delete" => (exact(op, &["op", "stableTarget"], &[]).is_some() && target(&op["stableTarget"], false))
             .then(|| &op["stableTarget"]),
+        "reshape" => (exact(op, &["op", "stableTarget", "geometry"], &["frame"]).is_some()
+            && target(&op["stableTarget"], false)
+            && geometry(&op["geometry"])
+            && op.get("frame").is_none_or(|f| f.as_u64().is_some_and(|f| u32::try_from(f).is_ok())))
+        .then(|| &op["stableTarget"]),
+        "clone" => (exact(op, &["op", "stableTarget", "geometry", "frame"], &["placement", "keyframe"]).is_some()
+            && target(&op["stableTarget"], false)
+            && geometry(&op["geometry"])
+            && op["frame"].as_u64().is_some_and(|f| u32::try_from(f).is_ok())
+            && op.get("placement").is_none_or(|p| p == "front" || p == "behind")
+            && op.get("keyframe").is_none_or(|k| k == "copy"))
+        .then(|| &op["stableTarget"]),
         _ => None,
     }
 }
@@ -76,8 +90,9 @@ pub(super) fn result(payload: &Value, value: &Value) -> bool {
         && ids.len() == ops.len()
         && ids.first() == Some(&value["strokeId"])
         && ops.iter().zip(ids).all(|(op, id)| match op["op"].as_str() {
-            Some("create" | "copy") => id.as_str().is_some_and(|s| s.starts_with("native-stroke:")),
+            Some("create" | "copy" | "clone") => id.as_str().is_some_and(|s| s.starts_with("native-stroke:")),
             Some("replace") => *id == op["record"]["target"]["strokeId"],
+            Some("reshape") => *id == op["stableTarget"]["strokeId"],
             Some("delete") => *id == op["stableTarget"]["strokeId"],
             _ => false,
         })

@@ -19,7 +19,7 @@ fn solid(value: &Value) -> bool {
         && ["r", "g", "b", "a"].iter().all(|key| unit(&value[*key]))
 }
 
-fn geometry(value: &Value) -> bool {
+pub(super) fn geometry(value: &Value) -> bool {
     exact(
         value,
         &[

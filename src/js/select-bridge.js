@@ -490,8 +490,8 @@
       probe: function (e) {
         var c = window.NemoNativeOpacityCutover, prepared = c.prepared();
         var ld = state.layers[state.activeLayerIdx], layer = userLayers[state.activeLayerIdx];
-        if (!prepared || !ld || !layer || prepared.layerUid !== ld.layerUid)
-          return Object.freeze({ mode: 'unavailable' });
+        if (window.NemoSelectCanvasIntent.objectProject(window)) return Object.freeze(state.tool === 'select' && state.appMode !== 'motion' && ld ? { mode: 'pick', x: e.clientX, y: e.clientY } : { mode: 'unavailable' }); // #2362: no Paper items
+        if (!prepared || !ld || !layer || prepared.layerUid !== ld.layerUid) return Object.freeze({ mode: 'unavailable' });
         var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY), pt = new Point(w[0], w[1]);
         if (state.appMode === 'motion') {
           var motion = window.SMMotion.probeCanvasIntent({ point: pt, altKey: e.altKey });
@@ -507,12 +507,11 @@
       },
       select: function (intent, shift) {
         if (intent.mode === 'unavailable') return;
+        if (intent.mode === 'pick') { var I = window.NemoSelectCanvasIntent, ctx = I.pickContext(window); return void I.pick(window, intent.x, intent.y).then(function (item) { if (item !== undefined && I.pickContext(window) === ctx) I.applyPick(window, item, shift); }).catch(function () {}); }
         var c = window.NemoNativeOpacityCutover, prepared = c.prepared(), identity = c.identity();
         var ld = state.layers[state.activeLayerIdx], layer = userLayers[state.activeLayerIdx];
         if (!prepared || !identity || !ld || !layer || prepared.layerUid !== ld.layerUid) return;
-        var item = intent.mode === 'select' && layer.children.find(function (p) {
-          return p.data && p.data.strokeId === intent.strokeId;
-        });
+        var item = intent.mode === 'select' && layer.children.find(function (p) { return p.data && p.data.strokeId === intent.strokeId; });
         if (intent.mode === 'select' && (!item || intent.layerUid !== ld.layerUid)) return;
         var projected = c.projectSelection({ activeLayerUid: item ? ld.layerUid : null,
           selected: item ? [{ layerUid: ld.layerUid, opacityMode: prepared.opacityMode }] : [] }, state.currentFrame);

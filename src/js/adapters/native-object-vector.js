@@ -99,6 +99,10 @@
       for (const step of steps) {
         const at = step.frame === undefined ? frame : step.frame;
         if (step.delete !== undefined) { ops.push({ op: 'delete', stableTarget: stableTarget(layerUid, at, step.delete) }); continue; }
+        // {reshape|clone: {stableTarget, geometry}}: a presented stroke's new geometry, or a new stroke from it, at `frame`;
+        // the style stays with the native record (#2362 knife on a native project, which reads geometry only).
+        if (step.reshape !== undefined || step.clone !== undefined) { const shape = step.reshape || step.clone;
+          ops.push(Object.assign({ op: step.reshape ? 'reshape' : 'clone', stableTarget: shape.stableTarget, geometry: shape.geometry, frame: at }, step.placement ? { placement: step.placement } : {})); continue; }
         // {copy: i, frame}: step i's stroke again on `frame`, sent once (#2362 multiframe stamps stay under the 64 KiB budget).
         if (step.copy !== undefined) { ops.push(Object.assign({ op: 'copy', fromStep: step.copy, frame: at }, step.placement ? { placement: step.placement } : {},
           step.keyframe === 'copy' ? { keyframe: 'copy' } : {})); continue; }
