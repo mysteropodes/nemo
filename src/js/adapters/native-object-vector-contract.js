@@ -280,12 +280,14 @@
       const targets = payloadValue.map((op, at) => {
         const where = `${label}[${at}]`;
         if (!plain(op)) fail(`${where} must be an object`);
-        if (op.op === 'create') {
-          exact(op, ['op', 'record'], ['placement', 'keyframe'], where); record(op.record, true);
+        if (op.op === 'create' || op.op === 'copy') {
+          const copy = op.op === 'copy'; exact(op, copy ? ['op', 'fromStep', 'frame'] : ['op', 'record'], ['placement', 'keyframe'], where); if (!copy) record(op.record, true);
+          // #2362 multiframe: a copy is an earlier create's (or copy's) record again on `frame`, without resending it.
+          if (copy && !(Number.isSafeInteger(op.fromStep) && op.fromStep >= 0 && op.fromStep < at && ['create', 'copy'].includes(payloadValue[op.fromStep].op) && Number.isSafeInteger(op.frame) && op.frame >= 0 && op.frame <= 4294967295)) fail(`${where} must copy an earlier create to a frame`);
           if (has(op, 'placement')) oneOf(op.placement, ['front', 'behind'], `${where}.placement`);
           // A create's own keyframe: 'copy' keys its held cell with a copy even when the batch's does not (multiframe draw).
           if (has(op, 'keyframe')) oneOf(op.keyframe, ['copy'], `${where}.keyframe`);
-          return op.record.target;
+          return copy ? null : op.record.target;
         }
         if (op.op === 'replace') {
           exact(op, ['op', 'record'], [], where); record(op.record, false);
@@ -293,8 +295,9 @@
           return op.record.target;
         }
         if (op.op === 'delete') { exact(op, ['op', 'stableTarget'], [], where); target(op.stableTarget, `${where}.stableTarget`, false); return op.stableTarget; }
-        return fail(`${where}.op must be create, replace or delete`);
+        return fail(`${where}.op must be create, copy, replace or delete`);
       });
+      targets.forEach((t, at) => { if (!t) targets[at] = targets[payloadValue[at].fromStep]; });
       if (targets.some((t) => t.contextId !== 'scene-root' || t.layerUid !== targets[0].layerUid)) fail(`${label} must stay on one scene-root layer`);
     }
     else if (key === 'maskEdit') {
@@ -327,7 +330,7 @@
     if (has(value, 'placement')) oneOf(value.placement, ['front', 'behind'], `${value.command}.placement`);
     if (has(value, 'trimEnds') && !(typeof value.trimEnds === 'number' && Number.isFinite(value.trimEnds) && value.trimEnds > 0)) fail(`${value.command}.trimEnds is invalid`);
     // A batch trims only when every step creates (the drawn stroke, its copies and its multi-frame stamps share one cut).
-    if (has(value, 'trimEnds') && value.command === 'object.vector.batch' && Array.isArray(value.ops) && value.ops.some((op) => !plain(op) || op.op !== 'create')) fail('object.vector.batch.trimEnds needs create steps only');
+    if (has(value, 'trimEnds') && value.command === 'object.vector.batch' && Array.isArray(value.ops) && value.ops.some((op) => !plain(op) || (op.op !== 'create' && op.op !== 'copy'))) fail('object.vector.batch.trimEnds needs create steps only');
     // keyframe: 'copy' keys a held cell with what it showed (the Labs creators' ensureKeyframe()); absent is Draw's empty key.
     if (has(value, 'keyframe') && value.keyframe !== 'copy') fail(`${value.command} keyframe must be 'copy'`);
     entry[1].forEach((key) => member(value.command, key, value[key]));
@@ -364,7 +367,7 @@
     if (command === 'object.vector.batch') {
       // One id per step, in order: allocated for a create, the named target for a replace or delete.
       const ids = response.result.strokeIds, ops = request.payload.ops;
-      if (!(ids.length === ops.length && ids[0] === stroke && ops.every((op, at) => (op.op === 'create' ? allocated(ids[at])
+      if (!(ids.length === ops.length && ids[0] === stroke && ops.every((op, at) => (op.op === 'create' || op.op === 'copy' ? allocated(ids[at])
         : ids[at] === (op.op === 'replace' ? op.record.target.strokeId : op.stableTarget.strokeId))))) fail('vector receipt stroke mismatch');
       return;
     }

@@ -350,6 +350,10 @@ test('batchStrokes sends ordered steps on one layer as one command and correlate
   assert.equal(result.strokeIds[0], first.strokeId);
   const sent = f.owner.log.received.at(-1).payload;
   assert.deepEqual([sent.command, sent.keyframe, sent.ops.map((op) => op.op), sent.ops[2].record.target.frameScope.frame], ['object.vector.batch', 'copy', ['delete', 'create', 'create'], 5]);
+  const copied = await f.vector.batchStrokes('L1', 3, [{ create: dict(4) }, { copy: 0, frame: 6, keyframe: 'copy', placement: 'behind' }]);
+  assert.equal(copied.status, 'applied', JSON.stringify(copied));
+  assert.deepEqual(f.owner.log.received.at(-1).payload.ops[1], { op: 'copy', fromStep: 0, frame: 6, placement: 'behind', keyframe: 'copy' }, 'a stamp names its drawn step, not its record');
+  assert.equal(f.owner.records.get(copied.strokeIds[1]).target.frameScope.frame, 6);
   const missing = await f.vector.batchStrokes('L1', 3, [{ create: dict(3) }, { delete: 'gone' }]);
   assert.equal(missing.status, 'refused');
   assert.equal((await f.vector.batchStrokes('L1', 3, [])).status, 'invalid');

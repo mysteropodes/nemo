@@ -71,3 +71,25 @@ fn malformed_steps_mixed_layers_bounds_and_members_are_refused() {
         assert!(!vector_request(VECTOR, &payload), "{payload}");
     }
 }
+
+#[test]
+fn a_copy_step_names_an_earlier_create_and_a_frame() {
+    let ops = |copy: Value| json!({"command":"object.vector.batch","trimEnds":24,"ops":[{"op":"create","record":record("L1","")},copy]});
+    let good = ops(json!({"op":"copy","fromStep":0,"frame":4,"keyframe":"copy","placement":"behind"}));
+    assert!(vector_request(VECTOR, &good), "a copy of the drawn stroke, trimmed with it");
+    let receipt = json!({"applied":true,"historyEntriesAdded":1,"operation":"batch","strokeId":"native-stroke:8:0",
+        "strokeIds":["native-stroke:8:0","native-stroke:8:1"]});
+    assert!(vector_result(VECTOR, &good, &receipt), "a copy's id is owner-allocated like a create's");
+    for bad in [
+        json!({"op":"copy","fromStep":1,"frame":4}),
+        json!({"op":"copy","fromStep":0}),
+        json!({"op":"copy","fromStep":0,"frame":-1}),
+        json!({"op":"copy","fromStep":0,"frame":4,"record":record("L1","")}),
+        json!({"op":"copy","fromStep":0,"frame":4,"keyframe":"move"}),
+    ] {
+        assert!(!vector_request(VECTOR, &ops(bad.clone())), "{bad}");
+    }
+    let from_delete = json!({"command":"object.vector.batch","ops":[{"op":"delete","stableTarget":target("L1","s-a")},
+        {"op":"copy","fromStep":0,"frame":4}]});
+    assert!(!vector_request(VECTOR, &from_delete), "only a create's record is copied");
+}

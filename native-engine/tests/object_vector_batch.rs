@@ -135,3 +135,33 @@ fn a_create_keyed_with_its_own_copy_keys_only_its_cell_with_what_it_showed() {
     wrong["keyframe"] = json!("copy");
     assert_eq!(send(&mut owner, "wrong", batch(vec![wrong]))["ok"], false, "only a create carries its own key");
 }
+
+#[test]
+fn a_copy_step_stamps_an_earlier_create_on_another_frame_as_that_create_would() {
+    let mut doc = document(2, vec![record_at("A", "L1", 0, "s-a")], None);
+    doc["layers"][0]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+        "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+    let (mut by_record, mut by_copy) = (owner_of(&doc), owner_of(&doc));
+    let mut stamped = op_create(record_at("B", "L1", 4, ""));
+    stamped["keyframe"] = json!("copy");
+    let sent = send(&mut by_record, "records", batch(vec![op_create(record_at("B", "L1", 2, "")), stamped]));
+    let copied = send(&mut by_copy, "copy", batch(vec![op_create(record_at("B", "L1", 2, "")),
+        json!({"op":"copy","fromStep":0,"frame":4,"keyframe":"copy"})]));
+    assert_eq!(copied["ok"], true, "{copied}");
+    assert_eq!(copied["result"], sent["result"], "the same receipt as the resent record");
+    assert_eq!(state(&by_copy), state(&by_record), "the same document as the resent record");
+    assert_eq!(ids_at(&by_copy, "L1", 4), ["s-a", "native-stroke:1:1"].map(String::from).to_vec());
+    let drawn = || op_create(record_at("B", "L1", 2, ""));
+    for (name, ops) in [
+        ("forward", vec![drawn(), json!({"op":"copy","fromStep":2,"frame":4}), drawn()]),
+        ("self", vec![drawn(), json!({"op":"copy","fromStep":1,"frame":4})]),
+        ("no-frame", vec![drawn(), json!({"op":"copy","fromStep":0})]),
+        ("negative-frame", vec![drawn(), json!({"op":"copy","fromStep":0,"frame":-1})]),
+        ("with-record", vec![drawn(), json!({"op":"copy","fromStep":0,"frame":4,"record":record_at("B", "L1", 4, "")})]),
+        ("create-with-fromstep", vec![drawn(), json!({"op":"create","record":record_at("B", "L1", 4, ""),"fromStep":0})]),
+    ] {
+        assert_eq!(send(&mut by_copy, name, batch(ops))["ok"], false, "{name} is refused");
+    }
+    let delete_then_copy = batch(vec![json!({"op":"delete","stableTarget":target("L1", 0, "s-a")}), json!({"op":"copy","fromStep":0,"frame":4})]);
+    assert_eq!(send(&mut by_copy, "from-delete", delete_then_copy)["ok"], false, "only a create's record is copied");
+}
