@@ -2043,6 +2043,18 @@
       ]
     },
     {
+      "id": "app.project.lifecycle",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "project-lifecycle.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "project-lifecycle.js"
+      ]
+    },
+    {
       "id": "app.opacity.capability",
       "layer": "application",
       "dir": "src/js/application",

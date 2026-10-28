@@ -1,6 +1,7 @@
 //! Versioned boundary shared by the SDK, desktop bridge, and MCP transport.
 use crate::capabilities;
 use crate::capability_contract;
+use crate::project_contract;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -70,6 +71,14 @@ pub enum Operation {
     DiagnosticsTrace,
     #[serde(rename = "diagnostics.replay")]
     DiagnosticsReplay,
+    #[serde(rename = "project.open")]
+    ProjectOpen,
+    #[serde(rename = "project.new")]
+    ProjectNew,
+    #[serde(rename = "project.saveAs")]
+    ProjectSaveAs,
+    #[serde(rename = "project.export")]
+    ProjectExport,
 }
 
 /// The reads `nemo_query` accepts, in the order a client meets them.
@@ -81,7 +90,7 @@ pub const READ_OPERATIONS: [Operation; 4] = [
 ];
 
 /// The writes `nemo_command` accepts, in the order a client meets them.
-pub const WRITE_OPERATIONS: [Operation; 7] = [
+pub const WRITE_OPERATIONS: [Operation; 11] = [
     Operation::PropertySet,
     Operation::PropertyKeySet,
     Operation::PropertyKeyRemove,
@@ -89,6 +98,10 @@ pub const WRITE_OPERATIONS: [Operation; 7] = [
     Operation::HistoryUndo,
     Operation::HistoryRedo,
     Operation::DiagnosticsReplay,
+    Operation::ProjectOpen,
+    Operation::ProjectNew,
+    Operation::ProjectSaveAs,
+    Operation::ProjectExport,
 ];
 
 /// A validation failure, typed so a caller can distinguish a malformed request body
@@ -144,6 +157,10 @@ impl Operation {
             "history.redo",
             "diagnostics.trace",
             "diagnostics.replay",
+            "project.open",
+            "project.new",
+            "project.saveAs",
+            "project.export",
         ]
     }
 
@@ -165,6 +182,10 @@ impl Operation {
             Self::HistoryRedo => "history.redo",
             Self::DiagnosticsTrace => "diagnostics.trace",
             Self::DiagnosticsReplay => "diagnostics.replay",
+            Self::ProjectOpen => "project.open",
+            Self::ProjectNew => "project.new",
+            Self::ProjectSaveAs => "project.saveAs",
+            Self::ProjectExport => "project.export",
         }
     }
 
@@ -202,6 +223,10 @@ impl Operation {
             Self::PropertyKeyRemove => &["frame"],
             Self::PropertyAnimationSet => &["animated"],
             Self::DiagnosticsReplay => &["request"],
+            Self::ProjectOpen
+            | Self::ProjectNew
+            | Self::ProjectSaveAs
+            | Self::ProjectExport => project_contract::required_keys(self),
         }
     }
 
@@ -219,6 +244,10 @@ impl Operation {
                 "operation": Self::PropertySet.label(),
                 "payload": Self::PropertySet.payload_example(),
             }}),
+            Self::ProjectOpen
+            | Self::ProjectNew
+            | Self::ProjectSaveAs
+            | Self::ProjectExport => project_contract::payload_example(self),
             // Every remaining variant answers `is_property_operation`; a wildcard
             // here (rather than naming all five) avoids a structurally-unreachable
             // match arm that a coverage report would only ever see as dead.
@@ -303,10 +332,14 @@ impl ApplicationRequest {
             ));
         }
         self.operation.check_payload(&self.payload)?;
+        // project.open/new may start from the start screen, where no document exists to read; the app still checks a
+        // supplied identity against the open project (#2510).
+        let enters = crate::project_contract::enters_project(&self.operation);
         if !self.operation.is_query()
             && (self.instance_id.as_deref().is_none_or(str::is_empty)
-                || self.document_id.as_deref().is_none_or(str::is_empty)
-                || self.expected_revision.is_none())
+                || !enters
+                    && (self.document_id.as_deref().is_none_or(str::is_empty)
+                        || self.expected_revision.is_none()))
         {
             return Err(RequestError::InvalidRequest(
                 "writes require instanceId, documentId and expectedRevision from snapshot"

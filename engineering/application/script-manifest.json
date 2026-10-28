@@ -344,6 +344,7 @@
     {"src":"js/application/presenter-seam.js"},
     {"src":"js/application/app-menu-targets.js"},
     {"src":"js/application/shortcut-targets.js"},
+    {"src":"js/application/project-lifecycle.js"},
     {"src":"js/adapters/native-layer-list-presenter.js"},
     {"src":"js/adapters/native-symmetry-desktop.js"},
     {"src":"js/adapters/native-symmetry-ui.js"}
