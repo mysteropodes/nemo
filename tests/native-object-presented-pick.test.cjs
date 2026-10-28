@@ -20,11 +20,11 @@ function root(options = {}) {
   const reads = [];
   let pin = { ...PIN };
   const session = {
-    isActive: () => true, info: () => pin, readPresentedObjectSession: () => ({ presentation: { ...pin, frame: 0 } }),
+    isActive: () => true, blocksLegacy: () => options.legacy !== true, info: () => pin, readPresentedObjectSession: () => ({ presentation: { ...pin, frame: 0 } }),
     async readSubselect(selector, at) { reads.push(selector); if (options.changeDuringRead) pin = { ...pin, contentRevision: 5 }; return { items: ITEMS }; },
   };
   return { reads, selectedPaths: [], state: { activeLayerIdx: 0, selectedStrokeIndices: [1] }, Path: paper.Path, Matrix: paper.Matrix, Point: paper.Point,
-    SMProject: { nativeObjectProject: () => ({ blocksLegacy: () => options.legacy !== true }) }, NemoNativeObjectProject: { desktop: () => session },
+    NemoNativeObjectProject: { desktop: () => session },
     document: { getElementById: () => ({ getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 540 }) }) },
     // The underlay maps a client point at half scale.
     NemoNativeViewportUnderlay: { canvasMapping: { point: (e) => ({ x: e.clientX * 2, y: e.clientY * 2 }) } },

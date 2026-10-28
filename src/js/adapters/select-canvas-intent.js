@@ -153,11 +153,11 @@
   var PINS = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
   function samePin(a, b) { return !!a && !!b && PINS.every(function (k) { return a[k] === b[k]; }); }
   function objectProject(root) {
-    try { var p = root.SMProject && typeof root.SMProject.nativeObjectProject === 'function' && root.SMProject.nativeObjectProject();
-      return p && p.blocksLegacy() === true ? p : null; } catch (_) { return null; }
+    try { var s = root.NemoNativeObjectProject && root.NemoNativeObjectProject.desktop(root);
+      return s && s.blocksLegacy() === true ? s : null; } catch (_) { return null; }
   }
   function presentedSession(root) {
-    var session = objectProject(root) && root.NemoNativeObjectProject && root.NemoNativeObjectProject.desktop(root);
+    var session = objectProject(root);
     var pin = session && session.isActive() && session.info(), shown = pin && session.readPresentedObjectSession();
     return shown && shown.presentation && samePin(pin, shown.presentation) ? { session: session, pin: pin, presentation: shown.presentation } : null;
   }

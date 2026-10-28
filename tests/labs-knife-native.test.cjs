@@ -53,7 +53,6 @@ function harness(options = {}) {
     Object.assign(pin, { canvasW: 1920, canvasH: 1080 });
     Object.assign(session, { readPresentedObjectSession: () => ({ presentation: { ...pin, frame: 3 } }), readSubselect: async () => ({ items }) });
     Object.assign(root, { userLayers: [new paper.Layer()], Matrix: paper.Matrix, NemoSelectCanvasIntent: require('../src/js/adapters/select-canvas-intent.js'),
-      SMProject: { nativeObjectProject: () => ({ blocksLegacy: () => true }) },
       NemoNativeViewportUnderlay: { canvasMapping: { point: (e) => ({ x: e.clientX, y: e.clientY }) } } });
     root.document.getElementById = (id) => (id === 'canvas-area' ? area : id === 'drawing-canvas' ? { getBoundingClientRect: () => ({ left: 0, top: 0, width: 1920, height: 1080 }) } : null);
     layer.remove();
