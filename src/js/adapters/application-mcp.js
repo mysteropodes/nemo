@@ -63,12 +63,18 @@
       boundedRevision(identity.lifecycleGeneration, 'lifecycleGeneration');
       if (!identity.lifecycleGeneration) throw new Error('Native revision generation is unavailable');
       var current = { identity: Object.freeze(Object.assign({}, identity)), stops: [], inFlight: false,
-        revision: identity.contentRevision, localAdvances: new Set() };
+        revision: identity.contentRevision, localAdvances: new Set(), acknowledging: null };
       subscription = current;
       async function receive(message) {
         if (subscription !== current) return;
         try {
           var event = exactEvent(message.payload);
+          // The host settles a revision when its ACK arrives and may emit the next one before that ACK's reply
+          // returns here. Only that exact successor waits for the reply; local writes stay fenced until then.
+          if (current.acknowledging && event.fromRevision === current.revision) {
+            try { await current.acknowledging; } catch (_) { return; }
+            if (subscription !== current) return;
+          }
           if (current.inFlight || event.instanceId !== identity.instanceId || event.documentId !== identity.documentId ||
               event.lifecycleGeneration !== identity.lifecycleGeneration) {
             throw new Error('Duplicate, out-of-order or stale native revision event');
@@ -85,9 +91,11 @@
           if (Object.keys(event).some(function (key) { return event[key] !== synchronized[key]; })) throw new Error('Native revision synchronization identity mismatch');
           binding = Object.freeze({ instanceId: identity.instanceId, documentId: identity.documentId, contentRevision: event.toRevision });
           current.revision = event.toRevision;
-          await invoke('nemo_native_revision_sync', { request: {
+          current.acknowledging = invoke('nemo_native_revision_sync', { request: {
             action: 'acknowledge', subscriptionId: identity.subscriptionId, event: event,
           } });
+          await current.acknowledging;
+          current.acknowledging = null;
           current.inFlight = false;
         } catch (error) {
           if (subscription === current) {
