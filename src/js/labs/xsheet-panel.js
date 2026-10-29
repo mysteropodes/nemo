@@ -24,7 +24,7 @@
   // Native authority: each column is the session's whole-row cells read, the same native timing query the
   // inspector uses, so held and blank cells come from the engine and never from the legacy frames (U31, #2374).
   // A refused read leaves its column unavailable instead of inventing blank cells.
-  var nativeRows = null, nativeKey = '', reading = 0;
+  var nativeRows = null, nativeKey = '', reading = 0, retry = { key: '', count: 0 };
   function nativeSession() {
     var P = window.NemoNativeObjectProject, s = P && typeof P.desktop === 'function' && P.desktop(window);
     return s && typeof s.blocksLegacy === 'function' && s.blocksLegacy() && typeof s.readLayerCells === 'function' ? s : null;
@@ -44,6 +44,10 @@
       return Promise.resolve(session.readLayerCells(layer.layerUid, pin)).catch(function () { return null; });
     })).then(function (rows) {
       if (ticket !== reading || session.info() !== pin) return;
+      // A revision change rebuilds the grid at once, so the first read can be refused while the presentation catches up;
+      // it is retried a few times before its column is shown unavailable for that snapshot.
+      if (retry.key !== key) retry = { key: key, count: 0 };
+      if (rows.indexOf(null) >= 0 && retry.count < 3 && typeof setTimeout === 'function') { retry.count++; setTimeout(build, 150); return; }
       nativeKey = key;
       nativeRows = rows.map(function (runs) {
         if (!runs) return null;
