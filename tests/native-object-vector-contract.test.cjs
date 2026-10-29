@@ -269,3 +269,17 @@ test('trimEnds is an optional finite positive limit on the two creates and refus
   }
   assert.equal(accepts(replace[0], { ...replace[1], trimEnds: 24 }), false);
 });
+
+test('a batch reshape takes new geometry or a ribbon centreline (#2362 sculpt), never both or neither', () => {
+  const EDIT = 'command.document.object.vector.edit';
+  const anchor = (x) => ({ point: { x, y: 2 }, handleIn: { x: 0, y: 0 }, handleOut: { x: 3, y: 0 }, width: 6.5 });
+  const sculpt = (op) => ({ command: 'object.vector.batch', ops: [Object.assign({ op: 'reshape', stableTarget: target('s-r') }, op)] });
+  const geometry = record('s-r').geometry;
+  assert.doesNotThrow(() => C.payload(EDIT, sculpt({ center: [anchor(0), anchor(9)] })));
+  assert.doesNotThrow(() => C.payload(EDIT, sculpt({ geometry })));
+  for (const bad of [{}, { center: [anchor(0), anchor(9)], geometry }, { center: [anchor(0)] }, { center: [anchor(0), { ...anchor(9), width: 'wide' }] },
+    { center: [anchor(0), { point: { x: 1, y: 1 }, handleIn: { x: 0, y: 0 }, handleOut: { x: 0, y: 0 } }] }]) {
+    assert.throws(() => C.payload(EDIT, sculpt(bad)), TypeError, JSON.stringify(Object.keys(bad)));
+  }
+  assert.throws(() => C.payload(EDIT, { command: 'object.vector.batch', ops: [{ op: 'clone', stableTarget: target('s-r'), frame: 3, center: [anchor(0), anchor(9)] }] }), TypeError);
+});

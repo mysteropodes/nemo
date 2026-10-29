@@ -224,6 +224,19 @@ fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
     answer["subselect"]["hitTest"] = json!(true);
     assert!(public_read(&geometry, &answer));
     assert!(!public_read(&geometry, &page()), "hit-test geometry is marked");
+    let mut centre = geometry.clone();
+    centre["subselect"]["center"] = json!(true);
+    assert!(request(&centre), "a sculpt reads a ribbon's centreline");
+    let mut widths = answer.clone();
+    widths["subselect"]["center"] = json!(true);
+    widths["subselect"]["widths"] = json!(vec![2.5; widths["subselect"]["segments"].as_array().unwrap().len()]);
+    assert!(public_read(&centre, &widths));
+    assert!(!public_read(&centre, &answer), "a centreline page is marked and carries its widths");
+    widths["subselect"]["widths"].as_array_mut().unwrap().pop();
+    assert!(!public_read(&centre, &widths), "one width per anchor");
+    let mut no_hit = query();
+    no_hit["subselect"]["center"] = json!(true);
+    assert!(!request(&no_hit), "only on a hit-test read");
     geometry["subselect"]["paint"] = json!(true);
     assert!(!request(&geometry), "never with the paint mode");
 }

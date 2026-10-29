@@ -106,6 +106,19 @@ fn reshape_and_clone_name_a_stroke_and_new_geometry() {
     let mut stamp = payload.clone();
     stamp["ops"][1] = json!({"op":"clone","stableTarget":target("L1","s-a"),"frame":3,"offset":[5,-7]});
     assert!(vector_request(VECTOR, &stamp), "a pose stamp clones any stroke shifted, without geometry");
+    let anchor = json!({"point":{"x":1,"y":2},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":3});
+    let mut sculpt = payload.clone();
+    sculpt["ops"][0] = json!({"op":"reshape","stableTarget":target("L1","s-a"),"center":[anchor, anchor]});
+    assert!(vector_request(VECTOR, &sculpt), "a sculpt reshapes a ribbon by its centreline");
+    assert!(vector_result(VECTOR, &sculpt, &receipt));
+    for bad in [json!([anchor]), json!([anchor, {"point":{"x":1,"y":2},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}}])] {
+        let mut p = payload.clone();
+        p["ops"][0] = json!({"op":"reshape","stableTarget":target("L1","s-a"),"center":bad});
+        assert!(!vector_request(VECTOR, &p), "{p}");
+    }
+    let mut both = payload.clone();
+    both["ops"][0]["center"] = json!([anchor, anchor]);
+    assert!(!vector_request(VECTOR, &both), "a reshape takes geometry or a centreline, never both");
     for bad in [
         json!({"op":"reshape","stableTarget":target("L1","s-a")}),
         json!({"op":"reshape","stableTarget":target("L1","s-a"),"geometry":geometry,"frame":-3}),
