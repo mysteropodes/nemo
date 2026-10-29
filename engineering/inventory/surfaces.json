@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "39c5871f55464e9c5eeddaaaf160c9ade31dc687",
-  "describe": "v0.7.0-alpha.4-3619-g39c5871f"
+  "head": "51e75879d6578e83276f0811415841a351c41fa5",
+  "describe": "v0.7.0-alpha.4-3630-g51e75879-dirty"
  },
- "inputsDigest": "11e6720c1946fce4fe22e16fb1cec8896d6ae1d138a57260c828f12baef0e939",
+ "inputsDigest": "dfb3e35f47327773e6fa9d56797e71e15227fff8e5aa37cc0105a5b53033931d",
  "states": [
   "inventoried",
   "characterized",
@@ -13553,7 +13553,7 @@
     "container": "p-widget-xrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 50,
+    "functionsVisited": 48,
     "via": "helper el()",
     "references": []
    },
@@ -13748,7 +13748,7 @@
     "container": "p-widget-yrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 50,
+    "functionsVisited": 48,
     "via": "helper el()",
     "references": []
    },
@@ -21762,7 +21762,7 @@
    "capability": "Drawing substitution: savePose('name') on a selection, stampPose('name',{dx,dy}) stamps the pose on the current frame — lip-sync mouths, hand kits",
    "area": "labs",
    "handler": [
-    "src/js/labs/pose-library.js:109"
+    "src/js/labs/pose-library.js:114"
    ],
    "events": [],
    "exposure": [
@@ -21775,7 +21775,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/pose-library.js:109",
+   "source": "src/js/labs/pose-library.js:114",
    "meta": {
     "functionsVisited": 0
    },
@@ -21840,7 +21840,7 @@
    "capability": "Ink & paint (CSP reference layer): SMLabs.referenceFill(x,y) fills on the active layer, reading the strokes of ALL visible layers as walls",
    "area": "labs",
    "handler": [
-    "src/js/labs/reference-fill.js:96"
+    "src/js/labs/reference-fill.js:100"
    ],
    "events": [],
    "exposure": [
@@ -21853,7 +21853,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/reference-fill.js:96",
+   "source": "src/js/labs/reference-fill.js:100",
    "meta": {
     "functionsVisited": 0
    },
@@ -22100,7 +22100,7 @@
    "capability": "Vector push: drag pushes the points under the brush, Shift smooths, Alt+drag sets the radius",
    "area": "labs",
    "handler": [
-    "src/js/labs/vector-sculpt.js:494"
+    "src/js/labs/vector-sculpt.js:560"
    ],
    "events": [],
    "exposure": [
@@ -22113,9 +22113,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/vector-sculpt.js:494",
+   "source": "src/js/labs/vector-sculpt.js:560",
    "meta": {
-    "functionsVisited": 3
+    "functionsVisited": 4
    },
    "fixtures": []
   },
@@ -24470,7 +24470,7 @@
    "source": "src/js/motion.js:9069",
    "meta": {
     "i18n": "exprExBounce",
-    "functionsVisited": 40
+    "functionsVisited": 34
    },
    "fixtures": [
     "static-props",
@@ -24581,7 +24581,7 @@
    "source": "src/js/motion.js:9097",
    "meta": {
     "i18n": "exprExFirstKey",
-    "functionsVisited": 26
+    "functionsVisited": 20
    },
    "fixtures": [
     "static-props",
