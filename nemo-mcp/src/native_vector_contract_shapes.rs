@@ -79,7 +79,7 @@ fn body(value: &Value) -> bool {
     })
 }
 
-fn anchor(value: &Value) -> bool {
+pub(super) fn anchor(value: &Value) -> bool {
     exact(value, &["point", "handleIn", "handleOut", "width"], &[]).is_some()
         && ["point", "handleIn", "handleOut"]
             .iter()

@@ -270,3 +270,13 @@ pub(crate) fn hit_role(record: &ObjectRecord) -> &'static str {
 pub(crate) fn linked_fill(record: &ObjectRecord) -> Option<&String> {
     record.vector_ext.value().and_then(|e| e.linked_fill_id.value())
 }
+/// #2362 sculpt (hit-test reads only): a ribbon's centreline and its per-anchor widths, the geometry sculpt deforms.
+pub(crate) fn center_anchors(record: &ObjectRecord) -> Result<(Vec<Anchor>, Vec<Number>), Refusal> {
+    let center = record.vector_ext.value().and_then(|e| e.pressure.value()).and_then(|p| p.center_segments.value());
+    let center = center.filter(|c| (2..=256).contains(&c.len())).ok_or(Refusal::Unsupported)?;
+    let anchors = center
+        .iter()
+        .map(|s| Ok(Anchor { point: pair(&s.point)?, handle_in: pair(&s.handle_in)?, handle_out: pair(&s.handle_out)? }))
+        .collect::<Result<_, Refusal>>()?;
+    Ok((anchors, center.iter().map(|s| s.width.clone()).collect()))
+}

@@ -267,3 +267,57 @@ fn a_geometry_less_clone_stamps_any_stroke_shifted_and_renames_its_linked_fill_p
         assert_eq!(send(&mut owner, name, batch(ops))["ok"], false, "{name} is refused");
     }
 }
+
+#[test]
+fn a_centred_reshape_rebuilds_a_ribbon_and_resyncs_its_linked_fill_in_one_step() {
+    use super::create_many::pressure_record;
+    use crate::object_document::pressure_geometry::{profiled_outline, SegOut};
+    let mut owner = owner_of(&document(1, seeds(), None));
+    let companion = pressure_record([0.2, 0.4, 0.6], json!({"linkedFillId":"lf-sculpt","isLinkedFillCompanion":true}));
+    let ribbon = pressure_record([0.1, 0.1, 0.1], json!({"linkedFillId":"lf-sculpt","pressure":{"centerSegments":[
+        {"point":{"x":0,"y":10},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":2},
+        {"point":{"x":40,"y":10},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":4}],
+        "widthProfile":[{"t":0,"width":2},{"t":1,"width":4}]}}));
+    let plain = record_at("A", "L1", 0, "");
+    let made = send(&mut owner, "pair", json!({"command":"object.vector.createMany","records":[companion, ribbon, plain]}));
+    assert_eq!(made["ok"], true, "{made}");
+    let before = state(&owner);
+    // Sculpt densified the centreline under the brush and pushed the new anchor down.
+    let anchor = |x: f64, y: f64, w: f64| json!({"point":{"x":x,"y":y},"handleIn":{"x":-3,"y":0},"handleOut":{"x":3,"y":0},"width":w});
+    let center = json!([anchor(0., 10., 2.), anchor(20., 18., 3.), anchor(40., 10., 4.)]);
+    let sculpt = |c: Value| json!({"op":"reshape","stableTarget":target("L1", 0, "native-stroke:1:1"),"center":c});
+    let response = send(&mut owner, "sculpt", batch(vec![sculpt(center.clone())]));
+    assert_eq!(response["ok"], true, "{response}");
+    assert_eq!(response["result"]["strokeIds"], json!(["native-stroke:1:1"]), "the fill re-sync is not a step of its own");
+    let after = state(&owner);
+    let at = |id: &str| objects(&after).iter().find(|r| r["target"]["strokeId"] == id).unwrap().clone();
+    let (ribbon, fill) = (at("native-stroke:1:1"), at("native-stroke:1:0"));
+    assert_eq!(ribbon["vectorExt"]["pressure"]["centerSegments"], center);
+    assert_eq!(ribbon["vectorExt"]["pressure"]["widthProfile"], json!([{"t":0,"width":2},{"t":1,"width":4}]), "the profile is kept");
+    let f = |v: &Value| [v["x"].as_f64().unwrap(), v["y"].as_f64().unwrap()];
+    let segs: Vec<SegOut> = center.as_array().unwrap().iter()
+        .map(|a| SegOut { point: f(&a["point"]), handle_in: f(&a["handleIn"]), handle_out: f(&a["handleOut"]) }).collect();
+    let outline = profiled_outline(&segs, &[(0., 2.), (1., 4.)]).unwrap();
+    let painted = ribbon["geometry"]["segments"].as_array().unwrap();
+    assert_eq!(painted.len(), outline.len(), "the ribbon is the shared producer's outline");
+    for (p, o) in painted.iter().zip(&outline) {
+        assert_eq!((f(&p["point"]), f(&p["handleIn"]), f(&p["handleOut"])), (o.point, o.handle_in, o.handle_out));
+    }
+    let sides: Vec<Value> = center.as_array().unwrap().iter()
+        .map(|a| json!({"point":a["point"],"handleIn":a["handleIn"],"handleOut":a["handleOut"]})).collect();
+    assert_eq!(fill["geometry"]["segments"], json!(sides), "the linked fill follows the same centreline");
+    assert_eq!(fill["geometry"]["closed"], true);
+    owner.undo(2).unwrap();
+    assert_eq!(state(&owner), before, "one undo restores the ribbon and its fill");
+    let geometry = objects(&before).iter().find(|r| r["target"]["strokeId"] == "native-stroke:1:2").unwrap()["geometry"].clone();
+    for (name, op) in [
+        ("both", json!({"op":"reshape","stableTarget":target("L1", 0, "native-stroke:1:1"),"center":center,"geometry":geometry})),
+        ("fill", json!({"op":"reshape","stableTarget":target("L1", 0, "native-stroke:1:0"),"center":center})),
+        ("plain", json!({"op":"reshape","stableTarget":target("L1", 0, "native-stroke:1:2"),"center":center})),
+        ("one-anchor", sculpt(json!([anchor(0., 10., 2.)]))),
+        ("clone", json!({"op":"clone","stableTarget":target("L1", 0, "native-stroke:1:1"),"frame":0,"center":center})),
+        ("no-width", sculpt(json!([{"point":{"x":0,"y":0},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}}, anchor(9., 9., 1.)]))),
+    ] {
+        assert_eq!(send(&mut owner, name, batch(vec![op]))["ok"], false, "{name} is refused");
+    }
+}

@@ -18,13 +18,14 @@ function fixture(mode){
       result={...view,atRevision:0,documentSnapshotId:pin.documentSnapshotId,total:2,nextCursor:null,preview:false,items:items.map(i=>({...i}))};
       if(mode==='unmarked')delete result.hitTest;
     }else{
-      const page=p.subselect,ribbon=p.stableTarget.strokeId==='ribbon',source=ribbon?outline:outline.slice(0,2),total=mode==='count'&&ribbon?19:source.length;
+      const page=p.subselect,ribbon=p.stableTarget.strokeId==='ribbon',source=page.center?outline.slice(0,18):ribbon?outline:outline.slice(0,2),total=mode==='count'&&ribbon?19:source.length;
       const end=Math.min(page.cursor+page.limit,total);
-      result={atRevision:0,documentSnapshotId:pin.documentSnapshotId,subselect:{stableTarget:p.stableTarget,closed:ribbon,total,cursor:page.cursor,nextCursor:end===total?null:end,preview:false,segments:source.slice(page.cursor,end),hitTest:true}};
+      result={atRevision:0,documentSnapshotId:pin.documentSnapshotId,subselect:{stableTarget:p.stableTarget,closed:ribbon&&!page.center,total,cursor:page.cursor,nextCursor:end===total?null:end,preview:false,segments:source.slice(page.cursor,end),hitTest:true}};
+      if(page.center)Object.assign(result.subselect,{center:true,widths:source.slice(page.cursor,end).map((_,i)=>page.cursor+i+0.5)});
     }
     return {apiVersion:2,requestId:q.requestId,instanceId:'i',documentId:'d',contentRevision:0,ok:true,result};
   }});
-  return {read:wanted=>reads.readPresentedStrokes({contextId:'scene-root',layerUid:'L',frame:0},pin,wanted),sent,outline};
+  return {read:(wanted,centres)=>reads.readPresentedStrokes({contextId:'scene-root',layerUid:'L',frame:0},pin,wanted,centres),sent,outline};
 }
 test('the hit-test listing names every record and pages geometry only for the records kept',async()=>{
   const f=fixture(),r=await f.read(item=>item.role==='plain');
@@ -37,4 +38,12 @@ test('the hit-test listing names every record and pages geometry only for the re
 test('an unmarked listing or geometry that disagrees with it is refused',async()=>{
   await assert.rejects(fixture('unmarked').read(),undefined,'unmarked');
   await assert.rejects(fixture('count').read(),undefined,'count');
+});
+test('with centres a kept ribbon also carries its centreline and widths, paged like its outline',async()=>{
+  const f=fixture(),r=await f.read(undefined,true);
+  assert.equal(r.items[0].center,undefined,'a plain stroke has none');
+  const c=r.items[1].center;
+  assert.deepEqual([c.length,c[0].width,c[17].width,c[17].point],[18,0.5,17.5,[17,10]]);
+  assert.deepEqual(f.sent.filter(q=>q.payload.subselect&&q.payload.subselect.center).map(q=>q.payload.subselect.cursor),[0,16]);
+  assert.equal((await fixture().read()).items[1].center,undefined,'only when asked');
 });

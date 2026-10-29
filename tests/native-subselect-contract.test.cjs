@@ -67,3 +67,13 @@ test('paint pages require explicit correlated opt-in and pressure paint counts s
   for(const paintCount of [null,false,0,1,-1,257,1.5,Number.MAX_SAFE_INTEGER+1])assert.throws(()=>C.viewResult({...view,items:[{...view.items[0],paintCount}]}));
   assert.throws(()=>C.viewResult({...view,items:[{...view.items[0],closed:true}]}));
 });
+test('a centre read (#2362 sculpt) is a hit-test read marked center, with one width per anchor',()=>{
+  const q={...p,subselect:{...p.subselect,hitTest:true,center:true}};
+  const a={...r,subselect:{...r.subselect,hitTest:true,center:true,widths:[2,3]}};
+  C.readPayload(q);assert.equal(C.readCorrelate(q,a,'document'),true);
+  assert.throws(()=>C.readPayload({...p,subselect:{...p.subselect,center:true}}),undefined,'only on a hit-test read');
+  assert.throws(()=>C.readCorrelate(q,{...a,subselect:{...a.subselect,widths:[2]}},'document'),undefined,'one width per anchor');
+  assert.throws(()=>C.readCorrelate(q,{...a,subselect:{...a.subselect,center:undefined}},'document'));
+  const {center,widths,...unmarked}=a.subselect;
+  assert.throws(()=>C.readCorrelate(q,{...a,subselect:unmarked},'document'),undefined,'the page must say it is a centreline');
+});

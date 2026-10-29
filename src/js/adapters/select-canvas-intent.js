@@ -170,18 +170,19 @@
     return [Math.min.apply(null, xs), Math.min.apply(null, ys), Math.max.apply(null, xs), Math.max.apply(null, ys)];
   }
   // The presented layer through the native hit-test listing: every painted record (role plain | ribbon | fill | shape |
-  // brush), geometry paged only for the records `wanted(item, worldBounds)` keeps.
-  async function presented(root, layerIndex, wanted, attempt) {
+  // brush), geometry paged only for the records `wanted(item, worldBounds)` keeps; with `centres` a kept ribbon also carries
+  // its world-space centreline as the baseline item did (data.isVectorBrush, data.centerSegments with record widths).
+  async function presented(root, layerIndex, wanted, attempt, centres) {
     var s = presentedSession(root), layer = s && s.pin.layers[layerIndex], data;
     if (!layer) return null;
     try {
       data = await s.session.readPresentedStrokes({ contextId: 'scene-root', layerUid: layer.layerUid, frame: s.presentation.frame }, s.pin,
-        function (item) { return !wanted || wanted(item, worldBounds(item)); });
+        function (item) { return !wanted || wanted(item, worldBounds(item)); }, centres);
     } catch (error) {
       if (!error || error.code !== 'stale_revision' || (attempt || 0) >= 3) throw error;
       await new Promise(function (done) { (root.setTimeout || setTimeout)(done, 30); });
       var next = presentedSession(root);
-      return next && samePin(next.pin, s.pin) && next.presentation.frame === s.presentation.frame ? presented(root, layerIndex, wanted, (attempt || 0) + 1) : null;
+      return next && samePin(next.pin, s.pin) && next.presentation.frame === s.presentation.frame ? presented(root, layerIndex, wanted, (attempt || 0) + 1, centres) : null;
     }
     var now = presentedSession(root);
     if (!now || !samePin(now.pin, s.pin) || now.presentation.frame !== s.presentation.frame) return null;
@@ -194,14 +195,26 @@
       path.strokeColor = [0, 0, 0]; path.strokeWidth = 1; if (item.closed && item.role !== 'plain') path.fillColor = [0, 0, 0];
       path.data = { strokeId: item.stableTarget.strokeId, nativeStableTarget: item.stableTarget, nativeRole: item.role, nativeRibbon: item.role === 'ribbon', nativeMatrix: item.matrix,
         nativeOwner: item.owner };
+      if (item.center) { var m = item.matrix, at = function (p, d) { return [m[0] * p[0] + m[2] * p[1] + d * m[4], m[1] * p[0] + m[3] * p[1] + d * m[5]]; };
+        path.data.isVectorBrush = true; path.data.centerSegments = item.center.map(function (c) {
+          return { point: at(c.point, 1), handleIn: at(c.handleIn, 0), handleOut: at(c.handleOut, 0), width: c.width }; }); }
       return path;
     }) };
   }
   // World-space Paper segments back to a record geometry in the stroke's own space (inverse of its presented matrix).
-  function recordGeometry(path, m) {
+  function inverse(m) {
     var d = m[0] * m[3] - m[1] * m[2];
     if (!Number.isFinite(d) || Math.abs(d) < 1e-12) throw new Error('Presented transform is singular');
-    var lin = function (x, y) { return { x: (m[3] * x - m[2] * y) / d, y: (-m[1] * x + m[0] * y) / d }; };
+    return function (x, y) { return { x: (m[3] * x - m[2] * y) / d, y: (-m[1] * x + m[0] * y) / d }; };
+  }
+  // A world-space ribbon centreline ([x, y] anchors) back to the record's own space; widths are the record's own.
+  function recordCenter(center, m) {
+    var lin = inverse(m);
+    return center.map(function (c) { return { point: lin(c.point[0] - m[4], c.point[1] - m[5]), handleIn: lin(c.handleIn[0], c.handleIn[1]),
+      handleOut: lin(c.handleOut[0], c.handleOut[1]), width: c.width }; });
+  }
+  function recordGeometry(path, m) {
+    var lin = inverse(m);
     return { kind: 'cubic-path', closed: path.closed, coordinateSpace: 'document-world', handleSpace: 'relative', segments: path.segments.map(function (s) {
       return { point: lin(s.point.x - m[4], s.point.y - m[5]), handleIn: lin(s.handleIn.x, s.handleIn.y), handleOut: lin(s.handleOut.x, s.handleOut.y) }; }) };
   }
@@ -262,5 +275,5 @@
   }
 
   return Object.freeze({ create: create, hitHandles: hitHandles, objectProject: objectProject, presented: presented,
-    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, pick: pick, pickContext: pickContext, applyPick: applyPick });
+    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, pick: pick, pickContext: pickContext, applyPick: applyPick });
 }));
