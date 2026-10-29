@@ -3,8 +3,9 @@
 //! per step, in order: an owner-allocated id for a create, the step's named target for a replace or delete. A `copy` step
 //! (multiframe stamps) is an earlier create's record again on another frame: a create in every respect but its size. A
 //! `reshape` (new geometry for a named stroke) or `clone` (a new stroke from a named one, on `frame`) keeps the native
-//! style, so a client that reads presented geometry only (the Labs knife) can cut.
-use super::shapes::{geometry, record_shape};
+//! style, so a client that reads presented geometry only (the Labs knife) can cut. A `reshape` with a `center` instead of
+//! geometry rebuilds a pressure ribbon on that centreline (sculpt).
+use super::shapes::{anchor, geometry, record_shape};
 use super::target;
 use crate::native_contract::exact;
 use serde_json::Value;
@@ -25,9 +26,11 @@ fn step(op: &Value) -> Option<&Value> {
         .then(|| &op["record"]["target"]),
         "delete" => (exact(op, &["op", "stableTarget"], &[]).is_some() && target(&op["stableTarget"], false))
             .then(|| &op["stableTarget"]),
-        "reshape" => (exact(op, &["op", "stableTarget", "geometry"], &["frame"]).is_some()
+        "reshape" => (exact(op, &["op", "stableTarget"], &["geometry", "center", "frame"]).is_some()
             && target(&op["stableTarget"], false)
-            && geometry(&op["geometry"])
+            && op.get("geometry").is_some() != op.get("center").is_some()
+            && op.get("geometry").is_none_or(geometry)
+            && op.get("center").is_none_or(|c| c.as_array().is_some_and(|a| (2..=256).contains(&a.len()) && a.iter().all(anchor)))
             && op.get("frame").is_none_or(|f| f.as_u64().is_some_and(|f| u32::try_from(f).is_ok())))
         .then(|| &op["stableTarget"]),
         // A clone takes new geometry (the knife's plain pieces) or, without it, copies any stroke shifted by `offset`

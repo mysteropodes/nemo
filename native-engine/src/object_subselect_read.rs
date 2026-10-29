@@ -25,8 +25,9 @@ struct Page {
     preview: Presence<Intent>,
     paint: Presence<bool>,
     hit_test: Presence<bool>,
+    center: Presence<bool>,
 }
-object_deserialize!(Page {cursor:usize,limit:usize,#[serde(default)] preview:Presence<Intent>,#[serde(default)] paint:Presence<bool>,#[serde(default)] hit_test:Presence<bool>});
+object_deserialize!(Page {cursor:usize,limit:usize,#[serde(default)] preview:Presence<Intent>,#[serde(default)] paint:Presence<bool>,#[serde(default)] hit_test:Presence<bool>,#[serde(default)] center:Presence<bool>});
 impl ObjectSnapshot {
     pub(super) fn dispatch_subselect_read(
         &self,
@@ -65,7 +66,11 @@ impl ObjectSnapshot {
         }
         // #2362 hit-test geometry: the painted outline of any record, for reading only (no preview, no paint mode).
         let hit_test = !payload.subselect.hit_test.missing();
-        if hit_test && (payload.subselect.hit_test.value() != Some(&true) || paint || !payload.subselect.preview.missing()) {
+        // With `center` (sculpt): a ribbon's centreline and its widths instead of its painted outline.
+        let center = !payload.subselect.center.missing();
+        if (hit_test && (payload.subselect.hit_test.value() != Some(&true) || paint || !payload.subselect.preview.missing()))
+            || (center && (!hit_test || payload.subselect.center.value() != Some(&true)))
+        {
             return refused(DispatchErrorCode::InvalidRequest, "Invalid subselect hit-test selector.");
         }
         let Some(stored) = self
@@ -82,7 +87,13 @@ impl ObjectSnapshot {
                 None => Ok(stored.clone()),
             }
         });
+        let mut widths = Vec::new();
         let geometry = planned.and_then(|r| {
+            if center {
+                let (anchors, w) = record::center_anchors(&r)?;
+                widths = w;
+                return Ok((false, anchors));
+            }
             if hit_test {
                 return Ok((r.geometry.closed, record::paint_anchors(&r)?));
             }
@@ -139,6 +150,10 @@ impl ObjectSnapshot {
         }
         if hit_test {
             response.result.as_mut().unwrap()["subselect"]["hitTest"] = json!(true);
+        }
+        if center {
+            response.result.as_mut().unwrap()["subselect"]["center"] = json!(true);
+            response.result.as_mut().unwrap()["subselect"]["widths"] = json!(widths[cursor..end]);
         }
         if serde_json::to_vec(&response)
             .map_err(|_| DispatchErrorCode::Internal)?

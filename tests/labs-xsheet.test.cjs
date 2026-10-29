@@ -26,7 +26,7 @@ function element(tag, id) {
     querySelector(sel) { const f = /data-frame="(\d+)"/.exec(sel); return el.rows.find((r) => r.dataset.frame === (f && f[1])) || null; } };
   return el;
 }
-function harness(native) {
+function harness(native, refusals) {
   const on = new Set(), features = {}, observers = [], jumps = [], reads = [];
   const body = element('body'), grid = element('div', 'frame-grid');
   const layers = [{ name: 'Ink', frames: [{ isKeyframe: true, strokes: [1] }, { strokes: [] }, { isInterpolated: true }] }];
@@ -38,10 +38,12 @@ function harness(native) {
     async readLayerCells(uid, p) {
       reads.push([uid, p.documentSnapshotId]);
       if (uid === 'ref') return null;
+      if (refusals && refusals.ink > 0) { refusals.ink--; return null; }
       return [[0, 1, 'key', 0, true, false], [1, 2, 'held', 0, true, false], [3, 1, 'interpolated', 3, false, false],
         [4, 1, 'key', 4, false, false], [5, 1, 'held', 4, false, false]];
     } };
-  const root = { state, SM: { t: (k) => k }, goToFrame: (f) => jumps.push(f),
+  const timers = [];
+  const root = { state, SM: { t: (k) => k }, goToFrame: (f) => jumps.push(f), ...(refusals ? { setTimeout: (fn) => timers.push(fn) } : {}),
     document: { body, createElement: (tag) => element(tag), getElementById: (id) => (id === 'frame-grid' ? grid : null) },
     MutationObserver: function (fn) { this.fn = fn; this.live = false; this.observe = () => { this.live = true; }; this.disconnect = () => { this.live = false; }; observers.push(this); },
     NemoNativeObjectProject: native ? { desktop: () => session } : undefined,
@@ -53,7 +55,7 @@ function harness(native) {
   // Glyph text of every cell, frame by frame: [frame number, column 1, column 2...].
   const cells = () => panel().html.split('<tr data-frame=').slice(1)
     .map((row) => [...row.matchAll(/<td[^>]*>([^<]*)<\/td>/g)].map((m) => m[1]));
-  return { root, state, pin, reads, jumps, observers, panel, cells, grid,
+  return { root, state, pin, reads, jumps, observers, panel, cells, grid, timers,
     enable() { on.add('xsheet'); features.xsheet.onEnable(); }, disable() { on.delete('xsheet'); features.xsheet.onDisable(); } };
 }
 
@@ -98,4 +100,17 @@ test('disable removes the panel and the grid observer and drops a pending native
   h.disable();
   assert.equal(h.panel(), undefined);
   assert.equal(h.observers[1].live, false);
+});
+
+test('a read refused while the presentation catches up is retried before a column is shown unavailable', async () => {
+  const h = harness(true, { ink: 2 });
+  h.enable();
+  for (let i = 0; i < 6; i++) { await turn(); await turn(); const fn = h.timers.shift(); if (fn) fn(); }
+  assert.deepEqual(h.cells()[0], ['1', '●', ''], 'Ink is read on its third try');
+  assert.match(h.panel().html, />Ink<\/th>/);
+  assert.match(h.panel().html, />Ref —<\/th>/, 'a column refused on every try is unavailable');
+  assert.equal(h.reads.filter(([uid]) => uid === 'ref').length, 4, 'the first read and three retries, then the snapshot is settled');
+  h.observers[0].fn();
+  await turn();
+  assert.equal(h.reads.length, 8, 'a rebuild on the settled snapshot reads nothing more');
 });

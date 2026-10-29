@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "a492706b63184f0828d3e66568a0cf7dc676601e",
-  "describe": "a492706b-dirty"
+  "head": "252ee8e97346598774f38a3c17c9e36aec2fa883",
+  "describe": "v0.7.0-alpha.4-3636-g252ee8e9-dirty"
  },
- "inputsDigest": "e7da2a4b20052f40c8ec5747f9776d3771aa025ef4130cf1bd5a0cda5168cefb",
+ "inputsDigest": "f4c558a2fe8ad809df700a98c6c5ff553049b85d9ab3a61387aa95d751b3f5a2",
  "states": [
   "inventoried",
   "characterized",
@@ -1852,7 +1852,7 @@
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 199,
+    "functionsVisited": 198,
     "via": "chain",
     "references": []
    },
@@ -2681,7 +2681,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 20,
+    "functionsVisited": 21,
     "via": "helper el()",
     "references": [
      "src/js/timeline.js:9105 action()"
@@ -5063,7 +5063,7 @@
     "container": "track-apply-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 99,
+    "functionsVisited": 98,
     "via": "helper el()",
     "references": []
    },
@@ -5106,7 +5106,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 23,
+    "functionsVisited": 22,
     "via": "helper el()",
     "references": []
    },
@@ -8018,7 +8018,7 @@
     "container": "footage-blend-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 34,
+    "functionsVisited": 35,
     "via": "variable sel",
     "references": []
    },
@@ -8340,7 +8340,7 @@
     "container": "kitsu-step-browse",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 22,
+    "functionsVisited": 23,
     "via": "helper el()",
     "references": []
    },
@@ -8455,7 +8455,7 @@
     "container": "kitsu-step-login",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 39,
+    "functionsVisited": 40,
     "via": "helper el()",
     "references": []
    },
@@ -13553,7 +13553,7 @@
     "container": "p-widget-xrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 50,
+    "functionsVisited": 48,
     "via": "helper el()",
     "references": []
    },
@@ -13748,7 +13748,7 @@
     "container": "p-widget-yrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 50,
+    "functionsVisited": 48,
     "via": "helper el()",
     "references": []
    },
@@ -17216,7 +17216,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 8,
+    "functionsVisited": 7,
     "via": "callback id",
     "references": [
      "src/js/tracker-panel.js:41 currentPoint()",
@@ -17263,7 +17263,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 8,
+    "functionsVisited": 7,
     "via": "callback id",
     "references": [
      "src/js/tracker-panel.js:42 currentPoint()",
@@ -22100,7 +22100,7 @@
    "capability": "Vector push: drag pushes the points under the brush, Shift smooths, Alt+drag sets the radius",
    "area": "labs",
    "handler": [
-    "src/js/labs/vector-sculpt.js:494"
+    "src/js/labs/vector-sculpt.js:506"
    ],
    "events": [],
    "exposure": [
@@ -22113,9 +22113,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/vector-sculpt.js:494",
+   "source": "src/js/labs/vector-sculpt.js:506",
    "meta": {
-    "functionsVisited": 3
+    "functionsVisited": 8
    },
    "fixtures": []
   },
@@ -22180,7 +22180,7 @@
    "capability": "Floating exposure sheet: frames × layers, ●=key ◆=tween │=held, click = jump to that frame",
    "area": "labs",
    "handler": [
-    "src/js/labs/xsheet-panel.js:118"
+    "src/js/labs/xsheet-panel.js:122"
    ],
    "events": [],
    "exposure": [
@@ -22193,7 +22193,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/xsheet-panel.js:118",
+   "source": "src/js/labs/xsheet-panel.js:122",
    "meta": {
     "functionsVisited": 10
    },
@@ -24470,7 +24470,7 @@
    "source": "src/js/motion.js:9069",
    "meta": {
     "i18n": "exprExBounce",
-    "functionsVisited": 40
+    "functionsVisited": 34
    },
    "fixtures": [
     "static-props",
@@ -24581,7 +24581,7 @@
    "source": "src/js/motion.js:9097",
    "meta": {
     "i18n": "exprExFirstKey",
-    "functionsVisited": 26
+    "functionsVisited": 20
    },
    "fixtures": [
     "static-props",
@@ -25756,7 +25756,7 @@
    "source": "src/js/motion.js:9819",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 174
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -25798,7 +25798,7 @@
    "source": "src/js/motion.js:9864",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 439
+    "functionsVisited": 432
    },
    "fixtures": [
     "static-props",
@@ -28358,7 +28358,7 @@
    "source": "src/js/shapes-panel.js:738",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 100
+    "functionsVisited": 92
    },
    "fixtures": [
     "static-props",
@@ -28472,7 +28472,7 @@
    "source": "src/js/shapes-panel.js:860",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 100
+    "functionsVisited": 92
    },
    "fixtures": [
     "static-props",
@@ -30942,7 +30942,7 @@
    "source": "src/js/timeline.js:5605",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 174
+    "functionsVisited": 166
    },
    "fixtures": [
     "keyed-props",
@@ -30981,7 +30981,7 @@
    "source": "src/js/timeline.js:5636",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 439
+    "functionsVisited": 432
    },
    "fixtures": [
     "keyed-props",

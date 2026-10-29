@@ -50,22 +50,32 @@
   // Ends the native gesture by committing what it sculpted: the baseline saved every move, so a gesture that ends
   // without its pointerup (a missed release, a blur, the prototype disabled) keeps its edit here too.
   function endNative() {
+    if (object) return objectEnd(object);
     if (!native) return null;
     var route = native, items = touched.slice();
     native = null; touched = [];
-    return nativeCommit(route, items);
-  }
-  function nativeCommit(route, items) {
-    var layerUid = route.layerUid(state.activeLayerIdx);
     var steps = items.map(function (p) { return { replace: { strokeId: p.data && p.data.strokeId, dict: serP(p) } }; });
+    return nativeBatch(route, route.layerUid(state.activeLayerIdx), state.currentFrame, steps, steps.some(function (s) { return !s.replace.strokeId; }));
+  }
+  function nativeBatch(route, layerUid, frame, steps, invalid) {
     var refuse = function () { restore(); if (typeof showToast === 'function') showToast(SM.t('labsToastLayerInvalidLocked')); return 0; };
     if (!steps.length) { saved = []; return Promise.resolve(0); }
-    if (!layerUid || steps.length > MAX_NATIVE_STEPS || steps.some(function (s) { return !s.replace.strokeId; })) return Promise.resolve(refuse());
-    return route.batchStrokes(layerUid, state.currentFrame, steps).then(function (result) {
+    if (!layerUid || steps.length > MAX_NATIVE_STEPS || invalid) return Promise.resolve(refuse());
+    return route.batchStrokes(layerUid, frame, steps).then(function (result) {
       if (!result || result.status !== 'applied') return refuse();
       saved = [];
       return steps.length;
     }, refuse);
+  }
+  // A native object project has no Paper item (#2362): sculpt deforms the presented strokes, then reshapes them in one batch.
+  var object = null, finishing = null;
+  function objectStart(e) {
+    object = NemoSelectCanvasIntent.presentedDrag(window, e, { push: applyPush, smooth: applySmooth, radius: radiusScreen, touched: function () { return touched; } });
+  }
+  function objectEnd(g) {
+    var route = native; object = null; native = null;
+    return finishing = g.end().then(function (shown) { var steps = NemoSelectCanvasIntent.reshapeSteps(touched); touched = [];
+      return shown && route ? nativeBatch(route, shown.layerUid, shown.frame, steps) : (saved = [], 0); }).finally(function () { finishing = null; });
   }
   // #122: snapshot BEFORE the gesture whether the current frame is a
   // generated tween in-between — saveActiveLayerFrame (onUp) promotes it to
@@ -379,6 +389,7 @@
     if (native) {
       var info = native.layerInfo(state.activeLayerIdx);
       if (!info || info.locked === true) { dragging = false; native = null; return; }
+      if (window.NemoSelectCanvasIntent && NemoSelectCanvasIntent.objectProject(window)) { if (finishing) { dragging = false; native = null; } else objectStart(e); return; }
       var at = SMEngineBridge.screenToWorld(e.clientX, e.clientY);
       lastW = new Point(at[0], at[1]);
       return;
@@ -419,6 +430,7 @@
     }
     if (!dragging) return;
     e.stopImmediatePropagation(); e.preventDefault();
+    if (object) { object.move(e.clientX, e.clientY, e.shiftKey); return; }
     var w = SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var cur = new Point(w[0], w[1]);
     var layer = userLayers[state.activeLayerIdx];

@@ -5,17 +5,20 @@
 //! fill traces regenerate after each step exactly as after the single command. A refused step refuses the batch. A `copy`
 //! step creates an earlier create's record again on another frame, so a multiframe stamp does not resend the stroke. A
 //! `reshape` gives an existing plain stroke new geometry and a `clone` creates a new stroke from one with new geometry:
-//! style stays with the native record, so a client that only reads presented geometry (the Labs knife) can cut.
+//! style stays with the native record, so a client that only reads presented geometry (the Labs knife) can cut. A
+//! `reshape` with a `center` instead rebuilds a pressure ribbon on a new centreline (sculpt) and re-syncs its linked fill.
 use crate::commands::object_fill_owner::vector_edit::create_ops::{copy_key as keyframe_copy, create_in, trim_records, Placement};
 use crate::commands::object_fill_owner::vector_edit::{delete_in, is_vector_record, replace_in, Edit, VectorEditKind};
 use crate::commands::object_fill_owner::object_frame_edit_document::{promote_cells, DocumentEdit};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_boolean_ops::stack::Scope;
 use crate::object_document::object_group_kernels::object_fill_trace_ops::regenerate::regenerate;
-use crate::object_document::{object_deserialize, ObjectDocument, ObjectGeometry, ObjectRecord, ObjectTarget, Presence};
+use crate::object_document::{object_deserialize, CenterSegment, ObjectDocument, ObjectGeometry, ObjectRecord, ObjectTarget, Presence};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
+#[path = "object_vector_batch_ribbon.rs"]
+mod ribbon;
 
 /// One batch is a bounded gesture, never a document rewrite; the encoded request stays under the vector budget.
 pub(crate) const MAX_BATCH_OPS: usize = 64;
@@ -31,6 +34,7 @@ pub(super) struct BatchOp {
     frame: Presence<serde_json::Number>,
     geometry: Presence<ObjectGeometry>,
     offset: Presence<[f64; 2]>,
+    center: Presence<Vec<CenterSegment>>,
 }
 object_deserialize!(BatchOp {
     op: String,
@@ -41,7 +45,8 @@ object_deserialize!(BatchOp {
     #[serde(default)] from_step: Presence<serde_json::Number>,
     #[serde(default)] frame: Presence<serde_json::Number>,
     #[serde(default)] geometry: Presence<ObjectGeometry>,
-    #[serde(default)] offset: Presence<[f64; 2]>
+    #[serde(default)] offset: Presence<[f64; 2]>,
+    #[serde(default)] center: Presence<Vec<CenterSegment>>
 });
 
 /// A geometry-less `clone` (#2362 pose stamp): any vector record copied as stored, its points shifted by `offset` (the
@@ -113,11 +118,15 @@ pub(super) fn batch(origin: &ObjectSnapshot, mut ops: Vec<BatchOp>, copy_key: bo
     // `copy` {fromStep, frame}: the record of an EARLIER create (or copy) step, retargeted to `frame` and then a create in
     // every respect; a stroke and its companion stamped on n frames cost one record each, not n.
     let mut links: Vec<(String, String)> = Vec::new();
+    // A ribbon reshape's linked fill, re-synced in the same step (a derived change, not a receipt entry).
+    let mut fills: Vec<Option<ObjectRecord>> = vec![None; ops.len()];
     for at in 0..ops.len() {
         let op = &mut ops[at];
         let (reshape, clone) = (op.op == "reshape", op.op == "clone");
         let shifted = clone && op.geometry.missing();
-        if (reshape && op.geometry.missing()) || (!(reshape || clone) && !op.geometry.missing()) || (!shifted && !op.offset.missing()) {
+        if (reshape && op.geometry.missing() == op.center.missing()) || (!(reshape || clone) && !op.geometry.missing())
+            || (!shifted && !op.offset.missing()) || (!reshape && !op.center.missing())
+        {
             return Err(InvalidRequest);
         }
         if shifted {
@@ -137,7 +146,7 @@ pub(super) fn batch(origin: &ObjectSnapshot, mut ops: Vec<BatchOp>, copy_key: bo
         }
         if reshape || clone {
             let frame = op.frame.value().and_then(serde_json::Number::as_u64).and_then(|n| u32::try_from(n).ok());
-            let (Presence::Present(target), Presence::Present(geometry)) = (op.stable_target.clone(), std::mem::take(&mut op.geometry)) else {
+            let Presence::Present(target) = op.stable_target.clone() else {
                 return Err(InvalidRequest);
             };
             if !op.record.missing() || !op.from_step.missing() || (!op.frame.missing() && frame.is_none()) || (clone && frame.is_none())
@@ -146,11 +155,19 @@ pub(super) fn batch(origin: &ObjectSnapshot, mut ops: Vec<BatchOp>, copy_key: bo
                 return Err(InvalidRequest);
             }
             // A reshape's `frame` is the held cell it edits (its copy-keyed copy keeps the stroke id); a clone is new there.
-            let mut record = with_geometry(origin.document(), &target, geometry)?;
+            let (mut record, fill) = match (std::mem::take(&mut op.center), std::mem::take(&mut op.geometry)) {
+                (Presence::Present(center), _) => ribbon::reshape(origin.document(), &target, center)?,
+                (_, Presence::Present(geometry)) => (with_geometry(origin.document(), &target, geometry)?, None),
+                _ => return Err(InvalidRequest),
+            };
             record.target.frame_scope.frame = frame.unwrap_or(target.frame_scope.frame);
             if clone {
                 record.target.stroke_id = String::new();
             }
+            fills[at] = fill.map(|mut fill| {
+                fill.target.frame_scope.frame = record.target.frame_scope.frame;
+                fill
+            });
             (op.op, op.record, op.stable_target, op.frame) =
                 ((if clone { "create" } else { "replace" }).into(), Presence::Present(record), Presence::Missing, Presence::Missing);
             continue;
@@ -225,7 +242,7 @@ pub(super) fn batch(origin: &ObjectSnapshot, mut ops: Vec<BatchOp>, copy_key: bo
         }
     }
     let (mut stroke_ids, mut changed) = (Vec::new(), false);
-    for (op, copy) in ops.into_iter().zip(keyed) {
+    for ((op, copy), fill) in ops.into_iter().zip(keyed).zip(fills) {
         let target = target_of(&op).ok_or(InvalidRequest)?;
         if target.context_id != first.context_id || target.layer_uid != first.layer_uid {
             return Err(InvalidRequest);
@@ -244,18 +261,26 @@ pub(super) fn batch(origin: &ObjectSnapshot, mut ops: Vec<BatchOp>, copy_key: bo
             _ => return Err(InvalidRequest),
         };
         let mut next = edit.document;
-        if edit.changed {
+        let mut regenerated = edit.stroke_ids.clone();
+        let mut step_changed = edit.changed;
+        if let Some(fill) = fill {
+            let synced = replace_in(&next, fill)?;
+            next = synced.document;
+            step_changed |= synced.changed;
+            regenerated.extend(synced.stroke_ids);
+        }
+        if step_changed {
             let scope = Scope {
                 context_id: target.context_id.clone(),
                 layer_uid: target.layer_uid.clone(),
                 frame: target.frame_scope.frame,
             };
-            for stroke_id in &edit.stroke_ids {
+            for stroke_id in &regenerated {
                 next = regenerate(next, &scope, stroke_id, revision).map_err(|error| ObjectFillOwner::fill_plan_error(&error))?;
             }
         }
         document = next;
-        changed |= edit.changed;
+        changed |= step_changed;
         stroke_ids.extend(edit.stroke_ids);
     }
     Ok(Edit {

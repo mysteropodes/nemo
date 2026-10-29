@@ -175,16 +175,16 @@
         throw fault('unavailable', 'Native image-mesh read failed: ' + (e && e.message || e), 'native_read_failed');
       }
     }
-    async function subselectGeometry(o, stableTarget, intent, paint, hitTest) {
-      let cursor=0,segments=[],total=null,closed=null;
+    async function subselectGeometry(o, stableTarget, intent, paint, hitTest, center) {
+      let cursor=0,segments=[],total=null,closed=null,widths=[];
       for(;;){
-        const page={cursor:cursor,limit:16};if(intent!==undefined)page.preview=intent;if(paint)page.paint=true;if(hitTest)page.hitTest=true;
+        const page={cursor:cursor,limit:16};if(intent!==undefined)page.preview=intent;if(paint)page.paint=true;if(hitTest)page.hitTest=true;if(center)page.center=true;
         const r=(await queryBody(o,{atRevision:o.info.contentRevision,documentSnapshotId:o.info.documentSnapshotId,stableTarget:stableTarget,subselect:page})).subselect;
         if(total!==null&&(r.total!==total||r.closed!==closed))throw fault('uncorrelated','Subselect geometry changed between pages');
-        total=r.total;closed=r.closed;segments=segments.concat(r.segments);
+        total=r.total;closed=r.closed;segments=segments.concat(r.segments);if(center)widths=widths.concat(r.widths);
         if(r.nextCursor===null)break;cursor=r.nextCursor;
       }
-      requireCurrent(o);return {closed:closed,segments:segments};
+      requireCurrent(o);return center?{closed:closed,segments:segments,widths:widths}:{closed:closed,segments:segments};
     }
     async function readSubselect(selector,pin) {
       if(!exact(selector,['contextId','layerUid','frame'],[])||selector.contextId!=='scene-root'||!text(selector.layerUid)||!integer(selector.frame,0,4294967295)||!pins(pin))throw fault('invalid_request','Invalid subselect selection');
@@ -211,8 +211,9 @@
       requireCurrent(o);return freeze({info:copyPins(o.info),presentation:o.presentation,items:items});
     }
     // #2362: Select and the Labs knife read every painted record of the presented layer (the hit-test listing: bounds
-    // and role, never refused for being outside the editable scope); geometry is paged only for the records `wanted` keeps.
-    async function readPresentedStrokes(selector,pin,wanted){
+    // and role, never refused for being outside the editable scope); geometry is paged only for the records `wanted` keeps,
+    // and with `centres` a kept ribbon also carries its centreline with widths (`center`, what sculpt deforms).
+    async function readPresentedStrokes(selector,pin,wanted,centres){
       if(!exact(selector,['contextId','layerUid','frame'],[])||selector.contextId!=='scene-root'||!text(selector.layerUid)||!integer(selector.frame,0,4294967295)||!pins(pin))throw fault('invalid_request','Invalid presented-stroke selection');
       const o=origin(selector,pin);if(!o)throw fault('unavailable','Presented strokes need a current native presentation');
       await settle(o);let cursor=0,total=null,items=[];
@@ -227,6 +228,8 @@
         const geometry=await subselectGeometry(o,item.stableTarget,undefined,false,true);
         if(geometry.closed!==item.closed||geometry.segments.length!==item.count)throw fault('uncorrelated','Presented geometry differs from its listing');
         item.segments=geometry.segments;
+        if(centres&&item.role==='ribbon'){const c=await subselectGeometry(o,item.stableTarget,undefined,false,true,true);
+          item.center=c.segments.map((a,i)=>({point:a.point,handleIn:a.handleIn,handleOut:a.handleOut,width:c.widths[i]}));}
       }
       requireCurrent(o);return freeze({info:copyPins(o.info),presentation:o.presentation,items:items});
     }

@@ -170,18 +170,19 @@
     return [Math.min.apply(null, xs), Math.min.apply(null, ys), Math.max.apply(null, xs), Math.max.apply(null, ys)];
   }
   // The presented layer through the native hit-test listing: every painted record (role plain | ribbon | fill | shape |
-  // brush), geometry paged only for the records `wanted(item, worldBounds)` keeps.
-  async function presented(root, layerIndex, wanted, attempt) {
+  // brush), geometry paged only for the records `wanted(item, worldBounds)` keeps; with `centres` a kept ribbon also carries
+  // its world-space centreline as the baseline item did (data.isVectorBrush, data.centerSegments with record widths).
+  async function presented(root, layerIndex, wanted, attempt, centres) {
     var s = presentedSession(root), layer = s && s.pin.layers[layerIndex], data;
     if (!layer) return null;
     try {
       data = await s.session.readPresentedStrokes({ contextId: 'scene-root', layerUid: layer.layerUid, frame: s.presentation.frame }, s.pin,
-        function (item) { return !wanted || wanted(item, worldBounds(item)); });
+        function (item) { return !wanted || wanted(item, worldBounds(item)); }, centres);
     } catch (error) {
       if (!error || error.code !== 'stale_revision' || (attempt || 0) >= 3) throw error;
       await new Promise(function (done) { (root.setTimeout || setTimeout)(done, 30); });
       var next = presentedSession(root);
-      return next && samePin(next.pin, s.pin) && next.presentation.frame === s.presentation.frame ? presented(root, layerIndex, wanted, (attempt || 0) + 1) : null;
+      return next && samePin(next.pin, s.pin) && next.presentation.frame === s.presentation.frame ? presented(root, layerIndex, wanted, (attempt || 0) + 1, centres) : null;
     }
     var now = presentedSession(root);
     if (!now || !samePin(now.pin, s.pin) || now.presentation.frame !== s.presentation.frame) return null;
@@ -194,14 +195,26 @@
       path.strokeColor = [0, 0, 0]; path.strokeWidth = 1; if (item.closed && item.role !== 'plain') path.fillColor = [0, 0, 0];
       path.data = { strokeId: item.stableTarget.strokeId, nativeStableTarget: item.stableTarget, nativeRole: item.role, nativeRibbon: item.role === 'ribbon', nativeMatrix: item.matrix,
         nativeOwner: item.owner };
+      if (item.center) { var m = item.matrix, at = function (p, d) { return [m[0] * p[0] + m[2] * p[1] + d * m[4], m[1] * p[0] + m[3] * p[1] + d * m[5]]; };
+        path.data.isVectorBrush = true; path.data.centerSegments = item.center.map(function (c) {
+          return { point: at(c.point, 1), handleIn: at(c.handleIn, 0), handleOut: at(c.handleOut, 0), width: c.width }; }); }
       return path;
     }) };
   }
   // World-space Paper segments back to a record geometry in the stroke's own space (inverse of its presented matrix).
-  function recordGeometry(path, m) {
+  function inverse(m) {
     var d = m[0] * m[3] - m[1] * m[2];
     if (!Number.isFinite(d) || Math.abs(d) < 1e-12) throw new Error('Presented transform is singular');
-    var lin = function (x, y) { return { x: (m[3] * x - m[2] * y) / d, y: (-m[1] * x + m[0] * y) / d }; };
+    return function (x, y) { return { x: (m[3] * x - m[2] * y) / d, y: (-m[1] * x + m[0] * y) / d }; };
+  }
+  // A world-space ribbon centreline ([x, y] anchors) back to the record's own space; widths are the record's own.
+  function recordCenter(center, m) {
+    var lin = inverse(m);
+    return center.map(function (c) { return { point: lin(c.point[0] - m[4], c.point[1] - m[5]), handleIn: lin(c.handleIn[0], c.handleIn[1]),
+      handleOut: lin(c.handleOut[0], c.handleOut[1]), width: c.width }; });
+  }
+  function recordGeometry(path, m) {
+    var lin = inverse(m);
     return { kind: 'cubic-path', closed: path.closed, coordinateSpace: 'document-world', handleSpace: 'relative', segments: path.segments.map(function (s) {
       return { point: lin(s.point.x - m[4], s.point.y - m[5]), handleIn: lin(s.handleIn.x, s.handleIn.y), handleOut: lin(s.handleOut.x, s.handleOut.y) }; }) };
   }
@@ -242,6 +255,55 @@
     return null;
   }
 
+  // #2362 Labs sculpt: a drag over the active layer's presented strokes (a ribbon with its world centreline). Moves wait
+  // until the read lands; the tool's `push(layer, at, delta, R)` / `smooth(layer, at, R)` (R its `radius()` in screen pixels)
+  // edit the transient paths and the ones `touched()` lists are previewed in an SVG over the canvas, as native Subselect
+  // previews. `end()` resolves to the read, or null.
+  function presentedDrag(root, e, tool) {
+    var Point = root.Point || root.paper.Point, g = { queue: [[e.clientX, e.clientY, e.shiftKey]], shown: null, layer: null, last: null, svg: null };
+    var role = function (r) { return r === 'plain' || r === 'ribbon'; };
+    var ready = presented(root, root.state.activeLayerIdx, function (item) { return role(item.role); }, 0, true).then(function (shown) {
+      if (!shown || shown.frame !== root.state.currentFrame) return null;
+      g.shown = shown; g.layer = { children: shown.paths.filter(function (p) { return role(p.data.nativeRole); }) };
+      g.queue.splice(0).forEach(function (q) { move(q[0], q[1], q[2]); });
+      return shown;
+    }, function () { return null; });
+    function move(x, y, smooth) {
+      if (!g.shown) { g.queue.push([x, y, smooth]); return; }
+      var w = worldPoint(root, x, y, g.shown.pin, g.shown.presentation), cur = new Point(w.x, w.y);
+      var R = tool.radius() * w.perPixel;
+      if (g.last && (smooth ? tool.smooth(g.layer, cur, R) : tool.push(g.layer, cur, cur.subtract(g.last), R))) preview(root, g, tool.touched());
+      g.last = cur;
+    }
+    return { move: move, end: function () { return ready.then(function (shown) { if (g.svg) g.svg.remove(); return shown; }); } };
+  }
+  function preview(root, g, paths) {
+    var mapping = root.NemoNativeViewportUnderlay && root.NemoNativeViewportUnderlay.canvasMapping, el = root.document.getElementById('drawing-canvas');
+    if (!mapping || !el) return;
+    var b = el.getBoundingClientRect(), pin = g.shown.pin, V = mapping.transform({ presentation: g.shown.presentation }, false), NS = 'http://www.w3.org/2000/svg';
+    var at = function (p) { return (V[0] * p.x + V[2] * p.y + V[4]) + ' ' + (V[1] * p.x + V[3] * p.y + V[5]); };
+    if (!g.svg) { g.svg = root.document.createElementNS(NS, 'svg'); g.svg.setAttribute('aria-hidden', 'true'); root.document.body.appendChild(g.svg); }
+    g.svg.setAttribute('viewBox', '0 0 ' + pin.canvasW + ' ' + pin.canvasH); g.svg.setAttribute('preserveAspectRatio', 'none');
+    Object.assign(g.svg.style, { position: 'fixed', pointerEvents: 'none', zIndex: '20', left: b.left + 'px', top: b.top + 'px', width: b.width + 'px', height: b.height + 'px' });
+    g.svg.textContent = '';
+    paths.forEach(function (p) {
+      var segs = p.segments, d = 'M ' + at(segs[0].point), node = root.document.createElementNS(NS, 'path');
+      var curve = function (a, c) { d += ' C ' + at(a.point.add(a.handleOut)) + ' ' + at(c.point.add(c.handleIn)) + ' ' + at(c.point); };
+      for (var i = 1; i < segs.length; i++) curve(segs[i - 1], segs[i]);
+      if (p.closed) { curve(segs[segs.length - 1], segs[0]); d += ' Z'; }
+      [['d', d], ['fill', p.data.isVectorBrush ? 'rgba(255,184,108,0.35)' : 'none'], ['stroke', '#ffb86c'], ['stroke-width', '1.5'], ['vector-effect', 'non-scaling-stroke']]
+        .forEach(function (a) { node.setAttribute(a[0], a[1]); });
+      g.svg.appendChild(node);
+    });
+  }
+  // The deformed transient paths as batch reshapes: a ribbon by its new centreline, a plain stroke by its new geometry.
+  function reshapeSteps(paths) {
+    return paths.map(function (p) {
+      var t = p.data.nativeStableTarget, m = p.data.nativeMatrix;
+      return { reshape: p.data.isVectorBrush && p.data.centerSegments ? { stableTarget: t, center: recordCenter(p.data.centerSegments, m) } : { stableTarget: t, geometry: recordGeometry(p, m) } };
+    });
+  }
+
   // What a pick depends on: a repaint may re-project the layer rows (the pointer context counts those) but a pick still
   // stands while the tool, mode, frame, layer and document revision are unchanged.
   function pickContext(root) {
@@ -262,5 +324,5 @@
   }
 
   return Object.freeze({ create: create, hitHandles: hitHandles, objectProject: objectProject, presented: presented,
-    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, pick: pick, pickContext: pickContext, applyPick: applyPick });
+    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, pick: pick, pickContext: pickContext, applyPick: applyPick });
 }));

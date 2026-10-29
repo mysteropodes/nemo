@@ -225,7 +225,9 @@ pub(super) fn request(v: &Value) -> bool {
             .as_str()
             .is_some_and(|s| !s.is_empty())
         && super::target(&v["stableTarget"])
-        && exact(&v["subselect"], &["cursor", "limit"], &["preview", "paint", "hitTest"]).is_some()
+        && exact(&v["subselect"], &["cursor", "limit"], &["preview", "paint", "hitTest", "center"]).is_some()
+        // #2362 sculpt: `center` reads a ribbon's centreline and widths, on a hit-test read only.
+        && v["subselect"].get("center").is_none_or(|c| c == true && v["subselect"]["hitTest"] == true)
         // #2362: hit-test geometry is the painted outline of any record, never with a preview or the paint mode.
         && v["subselect"].get("hitTest").is_none_or(|h| {
             h == true && v["subselect"].get("preview").is_none() && v["subselect"].get("paint").is_none()
@@ -261,10 +263,17 @@ pub(super) fn result(document_id: &str, p: &Value, r: &Value) -> bool {
             "segments",
             "preview",
         ],
-        &["paint", "hitTest"],
+        &["paint", "hitTest", "center", "widths"],
     )
     .is_none()
         || s.get("hitTest").is_some() != p["subselect"].get("hitTest").is_some()
+        || s.get("center").is_some() != p["subselect"].get("center").is_some()
+        || s.get("center").is_some_and(|c| c != true)
+        || s.get("widths").is_some() != s.get("center").is_some()
+        || s.get("widths").is_some_and(|w| {
+            !w.as_array().is_some_and(|w| w.len() == s["segments"].as_array().map_or(usize::MAX, Vec::len)
+                && w.iter().all(|v| v.as_f64().is_some_and(f64::is_finite)))
+        })
         || s.get("hitTest").is_some_and(|h| h != true)
         || s["stableTarget"] != p["stableTarget"]
         || !s["closed"].is_boolean()

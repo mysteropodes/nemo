@@ -30,13 +30,13 @@
   function result(op,v){if(op!==EDIT||!exact(v,['applied','historyEntriesAdded'])||typeof v.applied!=='boolean'||v.historyEntriesAdded!==Number(v.applied))fail('Invalid subselect receipt');}
   function correlate(q,r){result(q.operation,r.result);if(q.instanceId!==r.instanceId||q.documentId!==r.documentId||q.expectedRevision+Number(r.result.applied)!==r.contentRevision)fail('Subselect receipt origin mismatch');}
   function readPayload(v){if(!exact(v,['atRevision','documentSnapshotId','stableTarget','subselect'])||!integer(v.atRevision)||typeof v.documentSnapshotId!=='string'||!v.documentSnapshotId||!target(v.stableTarget)||
-    !exact(v.subselect,['cursor','limit'],['preview','paint','hitTest'])||!integer(v.subselect.cursor,256)||!integer(v.subselect.limit,16)||!v.subselect.limit||own(v.subselect,'preview')&&!intent(v.subselect.preview)||own(v.subselect,'paint')&&v.subselect.paint!==true||
+    !exact(v.subselect,['cursor','limit'],['preview','paint','hitTest','center'])||!integer(v.subselect.cursor,256)||!integer(v.subselect.limit,16)||!v.subselect.limit||own(v.subselect,'preview')&&!intent(v.subselect.preview)||own(v.subselect,'paint')&&v.subselect.paint!==true||
     // #2362: hit-test geometry is the painted outline of any record, never with a preview or the paint mode.
-    own(v.subselect,'hitTest')&&(v.subselect.hitTest!==true||own(v.subselect,'preview')||own(v.subselect,'paint')))fail('Invalid subselect read selector');}
+    own(v.subselect,'hitTest')&&(v.subselect.hitTest!==true||own(v.subselect,'preview')||own(v.subselect,'paint'))||own(v.subselect,'center')&&(v.subselect.center!==true||v.subselect.hitTest!==true))fail('Invalid subselect read selector');}
   function readResult(v){
     if(!exact(v,['atRevision','documentSnapshotId','subselect'])||!integer(v.atRevision)||typeof v.documentSnapshotId!=='string'||!v.documentSnapshotId)fail('Invalid subselect read result');
     const s=v.subselect;
-    if(!exact(s,['stableTarget','closed','total','cursor','nextCursor','segments','preview'],['paint','hitTest'])||own(s,'hitTest')&&s.hitTest!==true||!target(s.stableTarget)||typeof s.closed!=='boolean'||typeof s.preview!=='boolean'||own(s,'paint')&&(s.paint!==true||s.closed!==true)||
+    if(!exact(s,['stableTarget','closed','total','cursor','nextCursor','segments','preview'],['paint','hitTest','center','widths'])||own(s,'hitTest')&&s.hitTest!==true||own(s,'center')!==own(s,'widths')||own(s,'center')&&(s.center!==true||!Array.isArray(s.widths)||!s.widths.every(Number.isFinite)||s.widths.length!==(Array.isArray(s.segments)?s.segments.length:-1))||!target(s.stableTarget)||typeof s.closed!=='boolean'||typeof s.preview!=='boolean'||own(s,'paint')&&(s.paint!==true||s.closed!==true)||
       !integer(s.total,256)||!integer(s.cursor,s.total)||!Array.isArray(s.segments)||s.segments.length>16||s.cursor+s.segments.length>s.total||
       !s.segments.every(a=>exact(a,['point','handleIn','handleOut'])&&point(a.point)&&point(a.handleIn)&&point(a.handleOut)))fail('Invalid subselect geometry page');
     const end=s.cursor+s.segments.length;
@@ -45,7 +45,7 @@
   const sameTarget=(a,b)=>['contextId','layerUid','strokeId'].every(k=>a[k]===b[k])&&['kind','frame'].every(k=>a.frameScope[k]===b.frameScope[k]);
   function readCorrelate(p,r,documentId){readPayload(p);readResult(r);const s=r.subselect;
     if(p.atRevision!==r.atRevision||p.documentSnapshotId!==r.documentSnapshotId||!sameTarget(p.stableTarget,s.stableTarget)||s.cursor!==p.subselect.cursor||
-      s.segments.length!==Math.min(p.subselect.limit,s.total-s.cursor)||s.preview!==own(p.subselect,'preview')||own(s,'paint')!==own(p.subselect,'paint')||own(s,'hitTest')!==own(p.subselect,'hitTest')||
+      s.segments.length!==Math.min(p.subselect.limit,s.total-s.cursor)||s.preview!==own(p.subselect,'preview')||own(s,'paint')!==own(p.subselect,'paint')||own(s,'hitTest')!==own(p.subselect,'hitTest')||own(s,'center')!==own(p.subselect,'center')||
       documentId!==undefined&&r.documentSnapshotId!==`native-object:${documentId}:${p.atRevision}`)fail('Subselect read origin mismatch');return true;
   }
   const bytes=s=>new TextEncoder().encode(s).length;
