@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "2ea0a6855416af7644857b5ff6fb6a519d8aa2fc",
-  "describe": "v0.7.0-alpha.4-3632-g2ea0a685-dirty"
+  "head": "252ee8e97346598774f38a3c17c9e36aec2fa883",
+  "describe": "v0.7.0-alpha.4-3636-g252ee8e9-dirty"
  },
- "inputsDigest": "6df83d8d642ae05f28da2b0b99cb2d2db802d12636a3ce41512771af75f371e8",
+ "inputsDigest": "f4c558a2fe8ad809df700a98c6c5ff553049b85d9ab3a61387aa95d751b3f5a2",
  "states": [
   "inventoried",
   "characterized",
@@ -22180,7 +22180,7 @@
    "capability": "Floating exposure sheet: frames × layers, ●=key ◆=tween │=held, click = jump to that frame",
    "area": "labs",
    "handler": [
-    "src/js/labs/xsheet-panel.js:118"
+    "src/js/labs/xsheet-panel.js:122"
    ],
    "events": [],
    "exposure": [
@@ -22193,7 +22193,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/xsheet-panel.js:118",
+   "source": "src/js/labs/xsheet-panel.js:122",
    "meta": {
     "functionsVisited": 10
    },
