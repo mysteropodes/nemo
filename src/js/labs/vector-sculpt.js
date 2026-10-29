@@ -50,86 +50,32 @@
   // Ends the native gesture by committing what it sculpted: the baseline saved every move, so a gesture that ends
   // without its pointerup (a missed release, a blur, the prototype disabled) keeps its edit here too.
   function endNative() {
-    if (object) return objectEnd(object, true);
+    if (object) return objectEnd(object);
     if (!native) return null;
     var route = native, items = touched.slice();
     native = null; touched = [];
-    return nativeCommit(route, items);
-  }
-  function nativeCommit(route, items) {
-    var layerUid = route.layerUid(state.activeLayerIdx);
     var steps = items.map(function (p) { return { replace: { strokeId: p.data && p.data.strokeId, dict: serP(p) } }; });
+    return nativeBatch(route, route.layerUid(state.activeLayerIdx), state.currentFrame, steps, steps.some(function (s) { return !s.replace.strokeId; }));
+  }
+  function nativeBatch(route, layerUid, frame, steps, invalid) {
     var refuse = function () { restore(); if (typeof showToast === 'function') showToast(SM.t('labsToastLayerInvalidLocked')); return 0; };
     if (!steps.length) { saved = []; return Promise.resolve(0); }
-    if (!layerUid || steps.length > MAX_NATIVE_STEPS || steps.some(function (s) { return !s.replace.strokeId; })) return Promise.resolve(refuse());
-    return route.batchStrokes(layerUid, state.currentFrame, steps).then(function (result) {
+    if (!layerUid || steps.length > MAX_NATIVE_STEPS || invalid) return Promise.resolve(refuse());
+    return route.batchStrokes(layerUid, frame, steps).then(function (result) {
       if (!result || result.status !== 'applied') return refuse();
       saved = [];
       return steps.length;
     }, refuse);
   }
-  // A native object project builds no Paper item (#2362): the gesture deforms the presented strokes read through the
-  // native hit-test listing (a ribbon with its world centreline, as the baseline item carried it) and commits their net
-  // geometry as one batch of reshapes. Moves wait in `queue` until that read lands; an SVG over the canvas previews the
-  // touched strokes, as native Subselect does.
-  var object = null;
+  // A native object project has no Paper item (#2362): sculpt deforms the presented strokes, then reshapes them in one batch.
+  var object = null, finishing = null;
   function objectStart(e) {
-    var g = object = { queue: [[e.clientX, e.clientY, e.shiftKey]], shown: null, layer: null, last: null, svg: null, ended: false };
-    NemoSelectCanvasIntent.presented(window, state.activeLayerIdx, function (item) { return item.role === 'plain' || item.role === 'ribbon'; }, 0, true).then(function (shown) {
-      if (object !== g) return;
-      if (!shown || shown.frame !== state.currentFrame) { objectEnd(g, false); return; }
-      g.shown = shown;
-      g.layer = { children: shown.paths.filter(function (p) { return p.data.nativeRole === 'plain' || p.data.nativeRole === 'ribbon'; }) };
-      while (g.queue.length) { var q = g.queue.shift(); objectStep(g, q[0], q[1], q[2]); }
-      if (g.ended) objectEnd(g, true);
-    }, function () { if (object === g) objectEnd(g, false); });
+    object = NemoSelectCanvasIntent.presentedDrag(window, e, { push: applyPush, smooth: applySmooth, radius: radiusScreen, touched: function () { return touched; } });
   }
-  function objectStep(g, clientX, clientY, smooth) {
-    var w = NemoSelectCanvasIntent.worldPoint(window, clientX, clientY, g.shown.pin, g.shown.presentation), cur = new Point(w.x, w.y);
-    var R = radiusScreen() * w.perPixel;
-    if (g.last && (smooth ? applySmooth(g.layer, cur, R) : applyPush(g.layer, cur, cur.subtract(g.last), R))) objectPreview(g);
-    g.last = cur;
-  }
-  function objectPreview(g) {
-    var mapping = window.NemoNativeViewportUnderlay && NemoNativeViewportUnderlay.canvasMapping, el = document.getElementById('drawing-canvas');
-    if (!mapping || !el) return;
-    var b = el.getBoundingClientRect(), pin = g.shown.pin, V = mapping.transform({ presentation: g.shown.presentation }, false), NS = 'http://www.w3.org/2000/svg';
-    var at = function (p) { return (V[0] * p.x + V[2] * p.y + V[4]) + ' ' + (V[1] * p.x + V[3] * p.y + V[5]); };
-    if (!g.svg) { g.svg = document.createElementNS(NS, 'svg'); g.svg.setAttribute('aria-hidden', 'true'); document.body.appendChild(g.svg); }
-    g.svg.setAttribute('viewBox', '0 0 ' + pin.canvasW + ' ' + pin.canvasH); g.svg.setAttribute('preserveAspectRatio', 'none');
-    Object.assign(g.svg.style, { position: 'fixed', pointerEvents: 'none', zIndex: '20', left: b.left + 'px', top: b.top + 'px', width: b.width + 'px', height: b.height + 'px' });
-    g.svg.textContent = '';
-    touched.forEach(function (p) {
-      var segs = p.segments, d = 'M ' + at(segs[0].point);
-      var curve = function (a, c) { d += ' C ' + at(a.point.add(a.handleOut)) + ' ' + at(c.point.add(c.handleIn)) + ' ' + at(c.point); };
-      for (var i = 1; i < segs.length; i++) curve(segs[i - 1], segs[i]);
-      if (p.closed) { curve(segs[segs.length - 1], segs[0]); d += ' Z'; }
-      var path = document.createElementNS(NS, 'path'), ribbon = isRibbon(p);
-      [['d', d], ['fill', ribbon ? 'rgba(255,184,108,0.35)' : 'none'], ['stroke', '#ffb86c'], ['stroke-width', '1.5'], ['vector-effect', 'non-scaling-stroke']].forEach(function (a) { path.setAttribute(a[0], a[1]); });
-      g.svg.appendChild(path);
-    });
-  }
-  // Ends the gesture: a release before the read landed commits once it does; plain strokes take their new geometry and
-  // ribbons their new centreline, from which the engine rebuilds the ribbon and its linked fill.
-  function objectEnd(g, commit) {
-    if (object !== g) return null;
-    if (commit && !g.shown) { g.ended = true; return null; }
-    object = null;
-    if (g.svg) g.svg.remove();
-    var route = native, items = touched.slice();
-    native = null; touched = [];
-    if (!commit || !route || !items.length) { saved = []; return Promise.resolve(0); }
-    var Intent = NemoSelectCanvasIntent, refuse = function () { restore(); if (typeof showToast === 'function') showToast(SM.t('labsToastLayerInvalidLocked')); return 0; };
-    if (items.length > MAX_NATIVE_STEPS) return Promise.resolve(refuse());
-    var steps = items.map(function (p) {
-      var t = p.data.nativeStableTarget, m = p.data.nativeMatrix;
-      return { reshape: isRibbon(p) ? { stableTarget: t, center: Intent.recordCenter(p.data.centerSegments, m) } : { stableTarget: t, geometry: Intent.recordGeometry(p, m) } };
-    });
-    return route.batchStrokes(g.shown.layerUid, g.shown.frame, steps).then(function (result) {
-      if (!result || result.status !== 'applied') return refuse();
-      saved = [];
-      return steps.length;
-    }, refuse);
+  function objectEnd(g) {
+    var route = native; object = null; native = null;
+    return finishing = g.end().then(function (shown) { var steps = NemoSelectCanvasIntent.reshapeSteps(touched); touched = [];
+      return shown && route ? nativeBatch(route, shown.layerUid, shown.frame, steps) : (saved = [], 0); }).finally(function () { finishing = null; });
   }
   // #122: snapshot BEFORE the gesture whether the current frame is a
   // generated tween in-between — saveActiveLayerFrame (onUp) promotes it to
@@ -443,7 +389,7 @@
     if (native) {
       var info = native.layerInfo(state.activeLayerIdx);
       if (!info || info.locked === true) { dragging = false; native = null; return; }
-      if (window.NemoSelectCanvasIntent && NemoSelectCanvasIntent.objectProject(window)) { objectStart(e); return; }
+      if (window.NemoSelectCanvasIntent && NemoSelectCanvasIntent.objectProject(window)) { if (finishing) { dragging = false; native = null; } else objectStart(e); return; }
       var at = SMEngineBridge.screenToWorld(e.clientX, e.clientY);
       lastW = new Point(at[0], at[1]);
       return;
@@ -484,7 +430,7 @@
     }
     if (!dragging) return;
     e.stopImmediatePropagation(); e.preventDefault();
-    if (object) { if (object.shown) objectStep(object, e.clientX, e.clientY, e.shiftKey); else object.queue.push([e.clientX, e.clientY, e.shiftKey]); return; }
+    if (object) { object.move(e.clientX, e.clientY, e.shiftKey); return; }
     var w = SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var cur = new Point(w[0], w[1]);
     var layer = userLayers[state.activeLayerIdx];
