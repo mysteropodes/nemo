@@ -252,6 +252,7 @@ pub(super) fn write_request(
             false,
         ));
     }
+    let _store = store::lock();
     effect("snapshot", root).map_err(|_| unavailable())?;
     let entry = Entry {
         slot_key: &request.slot_key,
@@ -290,6 +291,7 @@ pub(super) fn list_request(
         &request.request_id,
         &request.instance_id,
     )?;
+    let _store = store::lock();
     let listing = list_slots(root, now, None, &Limits::DEFAULT).map_err(|_| unavailable())?;
     Ok(RecoveryListReceipt {
         api_version: request.api_version,
@@ -314,6 +316,7 @@ pub(super) fn discard_request(
     if !valid_slot_key(&request.slot_key) {
         return Err(invalid());
     }
+    let _store = store::lock();
     let discarded = discard(root, &request.slot_key).map_err(|_| unavailable())?;
     Ok(RecoveryDiscardReceipt {
         api_version: request.api_version,
@@ -340,6 +343,7 @@ pub(super) fn quarantine_request(
     if !valid_slot_key(&request.slot_key) || !valid_generation_file(&request.file) {
         return Err(invalid());
     }
+    let _store = store::lock();
     let (quarantined, slot_quarantined) =
         quarantine(root, &request.slot_key, &request.file, now).map_err(|_| unavailable())?;
     Ok(RecoveryQuarantineReceipt {

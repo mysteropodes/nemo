@@ -38,6 +38,9 @@ pub(super) fn request(value: &Value) -> bool {
     if widget_read::widget_view(value) {
         return widget_read::request(value);
     }
+    if ghost_read::ghost_view(value) {
+        return ghost_read::request(value);
+    }
     if rig_read::rig_view(value) {
         return rig_read::request(value);
     }
@@ -301,6 +304,9 @@ pub(super) fn result(document_id: &str, payload: &Value, result: &Value) -> bool
     if widget_read::widget_view(payload) {
         return widget_read::result(document_id, payload, result);
     }
+    if ghost_read::ghost_view(payload) {
+        return ghost_read::result(document_id, payload, result);
+    }
     if rig_read::rig_view(payload) {
         return rig_read::result(document_id, payload, result);
     }
@@ -350,6 +356,13 @@ mod presentation_transport_tests;
 
 #[path = "native_widget_read_contract.rs"]
 mod widget_read;
+
+#[path = "native_ghost_read_contract.rs"]
+mod ghost_read;
+
+#[cfg(test)]
+#[path = "native_ghost_read_contract_tests.rs"]
+mod ghost_read_tests;
 
 #[cfg(test)]
 #[path = "native_widget_read_contract_tests.rs"]

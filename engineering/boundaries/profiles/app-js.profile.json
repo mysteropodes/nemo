@@ -2766,12 +2766,14 @@
       "dir": "src/js/adapters",
       "files": [
         "native-object-recovery.js",
-        "native-object-recovery-resume.js"
+        "native-object-recovery-resume.js",
+        "native-object-recovery-cleanup.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-object-recovery.js",
-        "native-object-recovery-resume.js"
+        "native-object-recovery-resume.js",
+        "native-object-recovery-cleanup.js"
       ]
     },
     {
@@ -2841,6 +2843,18 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-opacity-motion-surface.js"
+      ]
+    },
+    {
+      "id": "app.native.flip-preview.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-flip-preview.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-flip-preview.js"
       ]
     },
     {
@@ -3267,6 +3281,18 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-object-widget-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.object.ghost.ui.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-ghost-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-ghost-ui.js"
       ]
     },
     {

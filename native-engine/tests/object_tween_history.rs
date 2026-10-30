@@ -456,6 +456,9 @@ mod assets;
 #[path = "object_tween_ghosts.rs"]
 mod ghosts;
 
+#[path = "object_tween_ghost_view.rs"]
+mod ghost_view;
+
 #[path = "object_tween_bitmap.rs"]
 mod bitmap;
 

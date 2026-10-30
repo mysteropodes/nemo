@@ -188,6 +188,15 @@ test('Reassign start: the key span comes from the native cells read, with every 
   assert.deepEqual([early.legacy, early.sent()], [[], []]);
 });
 
+test('Reassign start: an empty key between drawn keys is skipped (the engine only admits drawn-key spans)', async () => {
+  const h = harness({ keys: { 0: true, 4: false, 8: true } });
+  h.state.currentFrame = 1; h.root.startReassign(); await settle();
+  assert.deepEqual([h.root._reassign.active, h.root._reassign.frameA, h.root._reassign.frameB], [true, 0, 8]);
+  h.root.cancelReassign(true); h.state.currentFrame = 5; h.root.startReassign(); await settle();
+  assert.deepEqual([h.root._reassign.frameA, h.root._reassign.frameB], [0, 8], 'a playhead after an empty key still belongs to the drawn span');
+  assert.deepEqual([h.legacy, h.sent()], [[], []]);
+});
+
 test('Reassign start: a cells read refused while the presentation catches up is retried; a row that stays unavailable is a typed notice', async () => {
   const once = harness({ refuseCells: 2 });
   once.root.startReassign(); await settle();

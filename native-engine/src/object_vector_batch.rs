@@ -151,12 +151,14 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<
         {
             return Err(InvalidRequest);
         }
-        // A stored raster image or text block is mapped in place, in the cell it is stored in (it has no held-cell copy).
-        if let Some(swap) = items::transform(origin.document(), &target, matrix)? {
+        // A stored raster image or text block is mapped like a vector record: retargeted to the held cell's `frame`, where the
+        // copy key has made the same item (promotion copies a cell's images and text with its records).
+        if let Some(swap) = items::transform(origin.document(), &target, frame, matrix)? {
             if swaps.iter().flatten().any(|s| s.target() == &target) {
                 return Err(InvalidRequest);
             }
-            out.push(BatchOp { op: "item".into(), record: Presence::Missing, stable_target: Presence::Present(target), placement: Presence::Missing,
+            // The step names the cell it lands in, so a copy key promotes a held frame for an item as it does for a vector.
+            out.push(BatchOp { op: "item".into(), record: Presence::Missing, stable_target: Presence::Present(swap.target().clone()), placement: Presence::Missing,
                 keyframe: Presence::Missing, from_step: Presence::Missing, frame: Presence::Missing, geometry: Presence::Missing,
                 offset: Presence::Missing, center: Presence::Missing, matrix: Presence::Missing });
             companion.push(false);

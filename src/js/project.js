@@ -155,7 +155,9 @@
     remember:function(json){try{localStorage.setItem('nemo-auto',json);}catch(e){}},
     isDirty:function(){return !savedBaselineReady||dirtyBaseline.isDirty(projectJSON);},
     invalidate:function(){savedBaselineReady=false;try{renderTabBar();}catch(e){}},
-    notice:showToast,hide:hideStartScreen,show:showStartScreen,opened:ensureInitialTab,repaint:renderTabBar
+    notice:showToast,hide:hideStartScreen,show:showStartScreen,opened:ensureInitialTab,repaint:renderTabBar,
+    // Crash-recovery cleanup (#2360 R4); bound below, after the scheduler exists.
+    recoveryDiscard:function(documentId,extra){return nativeRecoveryCleanup?nativeRecoveryCleanup.discardDocument(documentId,extra):null;}
   });
   async function writeProjectTo(path,ticket,mode){projectJSON();return nativeSavedUI.write(path,ticket,mode);}
   // ---- Browser-mode save (2026-07, "ajoute la possibilité de save un
@@ -227,6 +229,9 @@
     var nativeRecovery=window.NemoNativeObjectRecovery.bind(window,{pin:nativeSavedUI.nativeObject.recoveryPin,
       slot:function(){return {path:currentPath,name:currentName};},notice:showToast});
     if(nativeRecovery)nativeRecovery.start();}}catch(e){console.warn('[recovery] scheduler unavailable',e);}
+  var nativeRecoveryCleanup=null;
+  try{if(nativeRecovery&&window.NemoNativeObjectRecoveryCleanup)nativeRecoveryCleanup=window.NemoNativeObjectRecoveryCleanup.bind(window,{scheduler:nativeRecovery});}
+  catch(e){console.warn('[recovery] cleanup unavailable',e);}
   // ---- Version history (v15) — the existing 30s autosave (timeline.js)
   // only ever held ONE slot ('nemo-auto' in localStorage): a crash right
   // after a bad edit overwrote the one good copy with the bad one on the
@@ -460,7 +465,11 @@
         var appWindow=window.__TAURI__.window.getCurrentWindow();
         var allowConfirmedClose=false;
         appWindow.onCloseRequested(async function(event){
-          if(allowConfirmedClose||!isDirty())return; // clean/confirmed → close proceeds normally
+          if(allowConfirmedClose)return; // confirmed quit-without-saving keeps the recovery (parity)
+          if(!isDirty()){ // clean quit: drop the crash recovery first, bounded and best effort
+            if(nativeRecoveryCleanup)try{await nativeRecoveryCleanup.cleanQuit();}catch(_){}
+            return;
+          }
           // Tauri cannot keep the original native close request pending
           // across an awaited dialog. Cancel it synchronously, then issue a
           // fresh close request after positive confirmation.
