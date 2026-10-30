@@ -13,7 +13,7 @@
     if(!target||!descriptor||typeof descriptor.property!=='string'||!descriptor.property||
         !Number.isInteger(descriptor.dimension)||descriptor.dimension<1||descriptor.dimension>4||
         !ports||!ports.document||typeof ports.readContext!=='function'||typeof ports.readProperty!=='function')throw TypeError('Native property value ports are unavailable');
-    var doc=ports.document,serial=0,retired=false,accepted=null,busy=false,inputs=[],bindings=[],pending=null,armed=false,shown=null,keyHere=null,swOk=false;
+    var doc=ports.document,serial=0,retired=false,accepted=null,busy=false,inputs=[],bindings=[],pending=null,armed=false,shown=null,keyHere=null,swOk=false,clickTimer=null,DOUBLE_CLICK_MS=300;
     var element=make('div',''),fields=element,status=make('span',''),sw=make('div',''),unit=unitText(descriptor.unit),dims=dimLabels();
     element.className='native-motion-property-value motion-fields';element.setAttribute('aria-label',descriptor.property+' value');
     status.setAttribute('role','status');status.className='native-motion-property-status';sw.setAttribute('role','button');sw.setAttribute('tabindex','0');
@@ -54,14 +54,23 @@
       swOk=swEnabled(enabled);paintSw(enabled);
     }
     // On-demand keys drawer: Alt/Option-click or double-click opens it for this property (no per-row Keys button).
+    // A double-click must never write: when a drawer can open, a mouse click (detail 1) waits out the
+    // double-click window, and a second click or the dblclick cancels it. Keyboard activation is immediate.
     function openKeys(){var open=ports.openKeys;if(typeof open!=='function')return false;try{return open();}catch(_){return false;}}
+    function timers(){var w=doc&&doc.defaultView;return w&&typeof w.setTimeout==='function'?w:{setTimeout:setTimeout,clearTimeout:clearTimeout};}
+    function cancelClick(){if(clickTimer!==null){timers().clearTimeout(clickTimer);clickTimer=null;}}
+    function toggle(){if(!swOk)return false;var i=swIntent();return apply(i.kind,i.animated);}
     function onSw(event){
       if(event&&event.stopPropagation)event.stopPropagation();
-      if(event&&event.altKey)return openKeys();
-      if(event&&event.detail>1)return false;
-      if(!swOk)return false;var i=swIntent();return apply(i.kind,i.animated);
+      if(event&&event.altKey){cancelClick();return openKeys();}
+      if(event&&event.detail>1){cancelClick();return false;}
+      if(!swOk)return false;
+      if(event&&event.detail===1&&typeof ports.openKeys==='function'){
+        cancelClick();clickTimer=timers().setTimeout(function(){clickTimer=null;if(!retired&&mounted())toggle();},DOUBLE_CLICK_MS);return false;
+      }
+      return toggle();
     }
-    function onSwDouble(event){if(event&&event.stopPropagation)event.stopPropagation();return openKeys();}
+    function onSwDouble(event){if(event&&event.stopPropagation)event.stopPropagation();cancelClick();return openKeys();}
     function onSwKey(event){if(event&&(event.key==='Enter'||event.key===' ')){if(event.preventDefault)event.preventDefault();return onSw(event);}}
     function clear(message){serial++;accepted=null;busy=false;shown=null;keyHere=null;drop();inputs.forEach(function(n){n.value='';});say(message);controls();return false;}
     // ui.js drives a scrub by dispatching change every frame while the document-level
@@ -159,7 +168,7 @@
       }catch(error){if(ticket!==serial||!mounted())return false;return clear('Native property value unavailable: '+String(error&&error.message||error));}
     }
     controls();
-    return Object.freeze({element:element,refresh:refresh,cancel:function(){return clear('Property read cancelled.');},dispose:function(){if(retired)return;retired=true;serial++;accepted=null;drop();bindings.forEach(function(b){b[0].removeEventListener(b[1],b[2]);});if(element.parentNode===container)container.removeChild(element);}});
+    return Object.freeze({element:element,refresh:refresh,cancel:function(){return clear('Property read cancelled.');},dispose:function(){if(retired)return;retired=true;serial++;accepted=null;cancelClick();drop();bindings.forEach(function(b){b[0].removeEventListener(b[1],b[2]);});if(element.parentNode===container)container.removeChild(element);}});
   }
   return Object.freeze({create:create});
 }));

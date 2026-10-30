@@ -5053,9 +5053,14 @@ function cancelReassign(silent){
   if(!silent)showToast(SM.t('toastReassignmentCanceled'));
 }
 function nativeTweenActive(){return !!(window.NemoNativeTweenUI&&window.NemoNativeTweenUI.active(window));}
+function beginReassign(li,fA,fB){
+  _reassign.active=true;_reassign.step=1;_reassign.layer=li;_reassign.frameA=fA;_reassign.frameB=fB;_reassign.aIds=[];
+  reassignSetStatus('1/2 — Cliquez l\'élément de départ (plusieurs si un même trait a été séparé), puis Entrée');showToast(SM.t('toastClickStartElement'));
+}
 function startReassign(){
   if(_reassign.active){cancelReassign();return;}
-  if(!nativeTweenActive())saveAllLayerFrames();
+  if(window.NemoNativeTweenUI&&window.NemoNativeTweenUI.startReassign(window,_reassign,beginReassign))return;
+  saveAllLayerFrames();
   var li=state.activeLayerIdx,ld=state.layers[li],cf=state.currentFrame;
   var fA=-1;
   for(var i=cf;i>=0;i--){if(ld.frames[i].isKeyframe){fA=i;break;}}
@@ -5063,11 +5068,12 @@ function startReassign(){
   var fB=-1;
   for(var j=fA+1;j<state.totalFrames;j++){if(ld.frames[j].isKeyframe){fB=j;break;}}
   if(fB<0){showToast(SM.t('toastNoNextKeyframeToReassign'));return;}
-  _reassign.active=true;_reassign.step=1;_reassign.layer=li;_reassign.frameA=fA;_reassign.frameB=fB;_reassign.aIds=[];
-  reassignSetStatus('1/2 — Cliquez l\'élément de départ (plusieurs si un même trait a été séparé), puis Entrée');
-  showToast(SM.t('toastClickStartElement'));
+  beginReassign(li,fA,fB);
 }
 function confirmReassignStep1(){
+  if(!(window.NemoNativeTweenUI&&window.NemoNativeTweenUI.afterPicks(window,_reassign,confirmReassignStep1Now)))confirmReassignStep1Now();
+}
+function confirmReassignStep1Now(){
   if(!_reassign.active||_reassign.step!==1)return;
   if(!_reassign.aIds.length){showToast(SM.t('toastClickAtLeastOneElement'));return;}
   if(!nativeTweenActive())saveActiveLayerFrame();
@@ -5100,7 +5106,15 @@ function commitReassignOverride(li,sid){
   selClear();
   showToast(SM.t('toastInbetweenReassigned'));
 }
-function reassignHandleClick(pt){
+function applyReassignPick(li,sid){
+  if(!sid){showToast(SM.t('toastNoElementHere'));return;}
+  if(_reassign.step===1){
+    if(_reassign.aIds.indexOf(sid)<0)_reassign.aIds.push(sid);
+    reassignSetStatus('1/2 — '+_reassign.aIds.length+' élément(s) sélectionné(s). Cliquez-en d\'autres si ce trait a été séparé, ou appuyez sur Entrée');return;
+  }
+  if(!nativeTweenActive())saveActiveLayerFrame();commitReassignOverride(li,sid);
+}
+function reassignHandleClick(pt,e){
   if(!_reassign.active)return false;
   var li=_reassign.layer;
   if(li!==state.activeLayerIdx||state.currentFrame!==(_reassign.step===1?_reassign.frameA:_reassign.frameB)){
@@ -5108,31 +5122,22 @@ function reassignHandleClick(pt){
     // the intended keyframe's own content, safer to just cancel than guess
     cancelReassign();return false;
   }
+  if(window.NemoNativeTweenUI&&window.NemoNativeTweenUI.reassignClick(window,_reassign,e,function(sid){applyReassignPick(li,sid);}))return true;
   var layer=userLayers[li];
   var hit=layer.hitTest(pt,{stroke:true,fill:true,tolerance:8/view.zoom});
   if(!hit||!(hit.item instanceof Path)){showToast(SM.t('toastNoElementHere'));return true;}
   var target=resolveBrushAnchor(hit.item,layer);
-  // Native project: the projected stroke identity is the native one; never stamp a new id on a presented item.
-  var sid=nativeTweenActive()?(target.data&&target.data.strokeId):ensureStrokeId(target);
-  if(!sid){showToast(SM.t('toastNoElementHere'));return true;}
-  if(_reassign.step===1){
-    if(_reassign.aIds.indexOf(sid)<0)_reassign.aIds.push(sid);
-    reassignSetStatus('1/2 — '+_reassign.aIds.length+' élément(s) sélectionné(s). Cliquez-en d\'autres si ce trait a été séparé, ou appuyez sur Entrée');
-    return true;
-  }
-  // step 2
-  if(!nativeTweenActive())saveActiveLayerFrame();
-  commitReassignOverride(li,sid);
+  applyReassignPick(li,ensureStrokeId(target));
   return true;
 }
 document.addEventListener('pointerdown',function(e){
   if(!_reassign.active)return;
   var area=document.getElementById('canvas-area');
   if(!area||!area.contains(e.target))return;
-  var w=window.SMEngineBridge?window.SMEngineBridge.screenToWorld(e.clientX,e.clientY):null;
+  var w=window.SMEngineBridge&&!nativeTweenActive()?window.SMEngineBridge.screenToWorld(e.clientX,e.clientY):null;
   var pt=w?new Point(w[0],w[1]):null;
-  if(!pt)return;
-  if(reassignHandleClick(pt)){e.stopImmediatePropagation();e.preventDefault();}
+  if(!pt&&!nativeTweenActive())return;
+  if(reassignHandleClick(pt,e)){e.stopImmediatePropagation();e.preventDefault();}
 },true);
 document.addEventListener('keydown',function(e){
   if(!_reassign.active)return;
