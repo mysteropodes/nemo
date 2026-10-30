@@ -15,6 +15,8 @@ mod history;
 mod support;
 #[path = "object_text_scene_svg.rs"]
 mod svg;
+#[path = "object_text_scene_hit_listing.rs"]
+mod hit_listing;
 #[path = "object_text_scene_font_refusal.rs"]
 mod font_refusal;
 

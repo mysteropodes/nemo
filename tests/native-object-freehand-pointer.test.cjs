@@ -263,19 +263,56 @@ test('exactly256 ordinary polyline anchors are admitted as one full record witho
  assert.equal(f.calls.length,1);assert.equal(f.calls[0].payload.record.geometry.segments.length,256);assert.ok(Buffer.byteLength(JSON.stringify(f.calls[0]))<=65536);
 });
 
-test('pressure taps refuse before dispatch, finalize pending/current UI, and allow the next valid gesture',async()=>{
- for(const smoothing of [2,10,100])for(const stabilizer of [0,4]){
+test('pressure taps draw the baseline dot, never throw, and allow the next gesture (#2361 BRUSH-CLICK)',async()=>{
+ for(const smoothing of [0,2,10,100])for(const stabilizer of [0,4]){
   const f=await fixture();Object.assign(f.root.state,{vectorBrush:true,fillEnabled:false,smoothing,stabilizer});
+  const key=JSON.stringify({smoothing,stabilizer});
   send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});send(f,'pointerup',20,20,{pointerType:'pen',pressure:0});
-  const tap=await settled(f);assert.equal(tap.status,'unavailable',JSON.stringify({smoothing,stabilizer,tap}));assert.equal(tap.reason,'pre_dispatch_failed');
-  assert.equal(f.calls.length,0);assert.equal(f.records.size,0);assert.equal(f.body.children.length,0);assert.equal(f.area.captured.size,0);
+  const tap=await settled(f);assert.equal(tap.status,'applied',key+JSON.stringify(f.log));
+  assert.ok(!f.log.some(m=>/getDistance|not a function/.test(String(m))),key+JSON.stringify(f.log));
+  assert.equal(f.calls.length,1);assert.equal(f.records.size,1);assert.equal(f.body.children.length,0);assert.equal(f.area.captured.size,0);
+  // The closed ribbon outline around the tapped point: where the baseline draws its dot.
+  const dot=f.calls[0].payload.record.geometry;assert.equal(dot.closed,true);
+  const xs=dot.segments.map(g=>g.point.x),ys=dot.segments.map(g=>g.point.y);
+  assert.ok(Math.min(...xs)<20&&Math.max(...xs)>20&&Math.min(...ys)<20&&Math.max(...ys)>20,key);
   assert.equal(f.root.NemoNativeFreehandToolController.isDragging(),false);assert.ok(f.session.readPresentedObjectSession(),'no queue pending remains');
   f.advance();send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.3});f.advance();send(f,'pointermove',60,40,{pointerType:'pen',pressure:.7});f.advance();send(f,'pointerup',100,60,{pointerType:'pen',pressure:0});
-  assert.equal((await settled(f)).status,'applied',JSON.stringify({smoothing,stabilizer}));assert.equal(f.calls.length,1);assert.equal(f.records.size,1);assert.equal(f.session.info().contentRevision,1);
-  assert.ok(f.session.readPresentedObjectSession());assert.equal(f.paper.project.activeLayer.children.length,0);
+  assert.equal((await settled(f)).status,'applied',key);assert.equal(f.session.info().contentRevision,2);
  }
 });
-
+test('a pressure tap with Fill on sends the dot, and its one-anchor linked fill is left out instead of refused (#2361 BRUSH-CLICK)',async()=>{
+ // The fixture's fake host only serves a single create, so the request is read from the recorded call.
+ for(const [smoothing,records] of [[0,2],[2,1]]){
+  const f=await fixture();Object.assign(f.root.state,{vectorBrush:true,fillEnabled:true,smoothing,stabilizer:0});
+  send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});send(f,'pointerup',20,20,{pointerType:'pen',pressure:0});await settled(f);
+  assert.ok(!f.log.some(m=>/getDistance|not a function/.test(String(m))),JSON.stringify(f.log));
+  assert.equal(f.calls.length,1);const q=plain(f.calls[0].payload);
+  assert.equal(q.command,records===2?'object.vector.createMany':'object.vector.create');
+  const ribbon=(q.records||[q.record]).slice(-1)[0];assert.equal(ribbon.geometry.closed,true);assert.equal((q.records||[1]).length,records);
+ }
+});
+test('a mouse click with a plain smoothed brush leaves the document untouched and shows no error (#2361 BRUSH-CLICK)',async()=>{
+ for(const smoothing of [0,2,50]){
+  const f=await fixture();Object.assign(f.root.state,{vectorBrush:false,fillEnabled:false,smoothing});
+  send(f,'pointerdown',20,20);send(f,'pointerup',20,20);const tap=await settled(f);
+  // smoothing 0 keeps the baseline's two coincident anchors; a smoothed tap collapses to one, which has no extent and is dropped.
+  if(smoothing===0)assert.equal(tap.status,'applied');else{assert.equal(tap.status,'cancelled');assert.equal(f.calls.length,0);assert.equal(f.records.size,0);}
+  assert.ok(!f.log.some(m=>typeof m==='string'&&!/^(publish|present)-/.test(m)),JSON.stringify(f.log));
+  f.advance();send(f,'pointerdown',20,20);f.advance();send(f,'pointermove',60,40);f.advance();send(f,'pointerup',100,60);
+  assert.equal((await settled(f)).status,'applied');
+ }
+});
+test('the brush draws on the active layer after the row selection was cleared, and still refuses other or several rows (#2361 BRUSH-CLICK)',async()=>{
+ const f=await fixture();f.root._layerSel=[];
+ send(f,'pointerdown',20,20);send(f,'pointermove',60,40);send(f,'pointerup',100,60);assert.equal((await settled(f)).status,'applied');assert.equal(f.calls.length,1);
+ assert.ok(!f.log.some(m=>/Select one native Drawing layer/.test(String(m))),JSON.stringify(f.log));
+ for(const selection of [[1],[0,1]]){
+  const g=await fixture();g.root._layerSel=selection;send(g,'pointerdown',20,20);
+  assert.ok(g.log.some(m=>/Select one native Drawing layer/.test(String(m))),JSON.stringify(selection));assert.equal(g.root.NemoNativeFreehandToolController.isDragging(),false);
+ }
+ const h=await fixture();h.root._layerSel=[];send(h,'pointerdown',20,20);send(h,'pointermove',60,40);h.root._layerSel=[0];send(h,'pointerup',100,60);
+ assert.equal((await settled(h)).status,'idle');assert.equal(h.calls.length,0);assert.equal(h.root.NemoNativeFreehandToolController.isDragging(),false);
+});
 test('native drawing refuses unavailable, stale and enabled Perspective projections before a document command',async()=>{
  for(const mode of ['unavailable','stale','enabled']){
   const f=await fixture();f.perspectiveMode(mode);

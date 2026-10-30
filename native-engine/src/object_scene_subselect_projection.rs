@@ -100,6 +100,42 @@ pub(crate) fn matrices_with_preview(
     for entry in parents {
         outer = affine(&entry) * outer;
     }
+    element_matrices(packet, sources, preview, outer)
+}
+
+/// #2372 hit-test listing of a layer that also paints Text or raster items: its vectors take the pose of the union of all
+/// of them, the chain those items use (the contour batch's `item_chain`), instead of a pose from the vectors alone.
+pub(crate) fn hit_matrices(
+    packet: &ObjectFramePacket,
+    index: usize,
+    chains: &crate::object_render_scene::text_scene::parent_chain::SceneParentChains,
+) -> Result<BTreeMap<usize, [f64; 6]>, &'static str> {
+    let layer = &packet.source_layers()[index];
+    if layer.three_d.value() == Some(&true)
+        || layer.rig().is_some()
+        || packet.duplicator_outputs().iter().any(|d| d.layer_index == index)
+    {
+        return Err("Subselect requires an ordinary undeformed 2D Drawing layer");
+    }
+    let sources: Vec<_> = packet.records().filter(|s| s.source_layer_index() == index).collect();
+    if sources.iter().any(|s| {
+        s.record().is_mask()
+            || (!is_vector_record(s.record()) && s.record().family != "closed-solid-fill-cubic-path")
+    }) {
+        return Err("Subselect mask or path effect is unavailable");
+    }
+    let chain = chains.chain(index).map_err(|failure| failure.reason())?;
+    let outer = chain.iter().fold(Affine::IDENTITY, |outer, entry| affine(entry) * outer);
+    element_matrices(packet, sources, None, outer)
+}
+
+/// Each record's own element Motion (pivot at its canonical cubic bounds) on top of the layer's `outer` pose.
+fn element_matrices(
+    packet: &ObjectFramePacket,
+    sources: Vec<crate::object_frame_packet::ObjectFrameRecord<'_>>,
+    preview: Option<&ObjectRecord>,
+    outer: Affine,
+) -> Result<BTreeMap<usize, [f64; 6]>, &'static str> {
     let mut result = BTreeMap::new();
     for source in sources {
         let record = preview

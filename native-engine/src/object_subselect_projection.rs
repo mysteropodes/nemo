@@ -1,7 +1,8 @@
 //! Selection identities and affine maps borrowed from the actual retained native paint plan.
 use crate::object_frame_packet::subselect_record as record;
 use crate::object_render_scene::{
-    object_scene_producer_contour::batch::subselect, ObjectCompositionWitness,
+    object_scene_producer_contour::batch::subselect, ordered_entries, ObjectCompositionWitness,
+    PaintEntry,
 };
 use crate::object_snapshot::{SubselectReadItem, SubselectReadProjection};
 impl ObjectCompositionWitness {
@@ -36,14 +37,38 @@ impl ObjectCompositionWitness {
                     .map_err(|_| "Subselect preview intent is unavailable")
             })
             .transpose()?;
-        let matrices = subselect::matrices_with_preview(packet, index, edited.as_ref())?;
+        // A hit-test listing of a layer that also paints images or text poses its vectors with the union chain they share.
+        let shared = hit_test
+            && (packet.raster_records().any(|r| r.layer_index() == index)
+                || packet.text_records().any(|r| r.layer_index() == index));
+        let matrices = if shared {
+            subselect::hit_matrices(packet, index, &self.plan().native_parent_chains())?
+        } else {
+            subselect::matrices_with_preview(packet, index, edited.as_ref())?
+        };
         let mut items = Vec::new();
         // Preserve the native paint order so hit testing can choose the last hit, just like the visible stack.
-        for command in self
-            .plan()
-            .commands()
-            .filter(|c| c.source().source_layer_index() == index)
-        {
+        // The editable listing is contour-only; the hit-test listing is the whole mixed order (#2372), so a raster image
+        // and a text block take their place in the stack.
+        let plan = self.plan();
+        let ordered: Vec<PaintEntry<'_>> = if hit_test {
+            ordered_entries(plan).collect()
+        } else {
+            plan.commands().map(PaintEntry::Contour).collect()
+        };
+        for entry in ordered {
+            let command = match entry {
+                PaintEntry::Contour(command) if command.source().source_layer_index() == index => command,
+                PaintEntry::Raster(at) => {
+                    items.extend(self.raster_hit_item(index, at));
+                    continue;
+                }
+                PaintEntry::Text(source) => {
+                    items.extend(self.text_hit_item(index, source));
+                    continue;
+                }
+                _ => continue,
+            };
             let source = command.source();
             let r = edited
                 .as_ref()
@@ -96,5 +121,78 @@ impl ObjectCompositionWitness {
             preview,
         )
         .with_hit_test(hit_test))
+    }
+}
+
+/// #2372 hit-test listing of the non-stroke scene items: a raster image and a text block, each with its painted world
+/// bounds and its own stable target, in the position the plan paints it. They carry no editable geometry (count 0).
+impl ObjectCompositionWitness {
+    fn raster_hit_item(&self, layer: usize, at: usize) -> Option<SubselectReadItem> {
+        let plan = self.plan();
+        let source = plan.raster_sources().get(at).filter(|s| !s.placed && s.layer_index == layer)?;
+        let target = plan
+            .packet()
+            .raster_records()
+            .find(|r| r.source_index() == source.source_index)?
+            .entry()
+            .target
+            .clone();
+        let rect = self.raster_final_rect(at)?;
+        // The retained draw rotates the display rect about its centre; the listing keeps the unrotated rect and that map.
+        let (cx, cy) = (rect.x + rect.width / 2.0, rect.y + rect.height / 2.0);
+        let (sin, cos) = rect.rotation.to_radians().sin_cos();
+        let matrix = [cos, sin, -sin, cos, cx - cos * cx + sin * cy, cy - sin * cx - cos * cy];
+        let bounds = [rect.x, rect.y, rect.x + rect.width, rect.y + rect.height];
+        (bounds.iter().chain(&matrix).all(|v| v.is_finite()) && rect.width > 0.0 && rect.height > 0.0)
+            .then(|| hit_item(target, bounds, matrix, "raster"))
+    }
+    fn text_hit_item(
+        &self,
+        layer: usize,
+        source: &crate::object_render_scene::text_scene::TextSource,
+    ) -> Option<SubselectReadItem> {
+        if source.placed || source.layer_index != layer {
+            return None;
+        }
+        let target = self
+            .plan()
+            .packet()
+            .text_records()
+            .find(|r| r.source_index() == source.source_index)?
+            .entry()
+            .target
+            .clone();
+        // The block's painted glyph and decoration contours are already in world space.
+        let b = source.item.scene().contours().iter().fold(
+            [f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY],
+            |b, c| [b[0].min(c.envelope[0]), b[1].min(c.envelope[1]), b[2].max(c.envelope[2]), b[3].max(c.envelope[3])],
+        );
+        b.iter().all(|v| v.is_finite()).then(|| hit_item(target, b, [1.0, 0.0, 0.0, 1.0, 0.0, 0.0], "text"))
+    }
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    fn raster_final_rect(&self, at: usize) -> Option<crate::evaluation::motion_parent_chain::ImageRect> {
+        self.rasters.as_ref()?.final_rect(at)
+    }
+    #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
+    fn raster_final_rect(&self, _at: usize) -> Option<crate::evaluation::motion_parent_chain::ImageRect> {
+        None
+    }
+}
+fn hit_item(
+    stable_target: crate::object_frame_packet::text::ObjectTarget,
+    bounds: [f64; 4],
+    matrix: [f64; 6],
+    role: &'static str,
+) -> SubselectReadItem {
+    SubselectReadItem {
+        stable_target,
+        closed: true,
+        count: 0,
+        paint_count: None,
+        matrix,
+        bounds: Some(bounds),
+        role: Some(role),
+        filled: Some(true),
+        owner: None,
     }
 }
