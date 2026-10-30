@@ -25,8 +25,10 @@
       }
       return true;
     }
+    function hover(e) { if (typeof ports.hover === 'function') try { ports.hover(e); } catch (_) {} }
     function down(e) {
       consume(e);
+      hover(null);
       cancel();
       if (e.button !== 0 || !Number.isSafeInteger(e.pointerId) ||
           !Number.isFinite(e.clientX) || !Number.isFinite(e.clientY)) return;
@@ -41,7 +43,7 @@
     }
     function move(e) {
       consume(e);
-      if (!pending) return;
+      if (!pending) return hover(e);
       if (pending.blocked || e.pointerId !== pending.id) return;
       if (!valid() || e.buttons !== 1 || !Number.isFinite(e.clientX) || !Number.isFinite(e.clientY) ||
           Math.hypot(e.clientX - pending.x, e.clientY - pending.y) > 3) pending.blocked = true;
@@ -319,6 +321,7 @@
     root.selectedPaths = item ? (shift ? (held.length ? selected.filter(function (p) { return held.indexOf(p) < 0; }) : selected.concat([item])) : [item])
       : (shift ? selected : []);
     root.state.selectedStrokeIndices = [];
+    if (root.NemoNativeSelectOverlay) root.NemoNativeSelectOverlay.show(root); // #2372: the pick's outline, box and handles
     if (typeof root.updateUI === 'function') root.updateUI();
     if (root.SMEngineBridge && typeof root.SMEngineBridge.renderNow === 'function') root.SMEngineBridge.renderNow();
   }
