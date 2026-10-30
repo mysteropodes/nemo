@@ -61,7 +61,7 @@ function host(options={}){
  const a=motion.indexOf('  (function installNativeMotionMetadata(){'),b=motion.indexOf('  // Workspace continuity, restore half',a);assert.ok(a>0&&b>a);vm.runInContext(motion.slice(a,b),context);
  return {root,doc,nodes,header,old,calls,waiting,menus,notices,storage,ports,
   async settle(){await tick();const until=Date.now()+1500;while(/^Loading/.test(tree(nodes['motion-props-body']).find(n=>n.attrs.role==='status')?.textContent||'')){if(Date.now()>until)throw Error('Metadata did not settle');await new Promise(r=>setTimeout(r,1));}},
-  paint:()=>UI.render(root,info,true,ports),rows:()=>tree(nodes['motion-props-body']).filter(n=>n.className==='native-motion-property-row'),
+  paint:()=>UI.render(root,info,true,ports),rows:()=>tree(nodes['motion-props-body']).filter(n=>n.className==='lrow motion-prop-row'),
   button:label=>tree(nodes['motion-props-body']).find(n=>n.tagName==='BUTTON'&&n.textContent===label),
   status:()=>tree(nodes['motion-props-body']).find(n=>n.attrs.role==='status')?.textContent,
   set hold(v){hold=v;},set ready(v){ready=v;},replace(){info={...info,lifecycleGeneration:info.lifecycleGeneration+1};},transport(){transportGeneration++;},release(){const item=waiting.shift();if(item)item.resolve(reply(item.request));},retire(){UI.restoreInspector(root);},set active(v){active=v;}};
@@ -214,7 +214,7 @@ test('real Order inspector exposes its bake and reads without granting unavailab
   async readProperty(q){return {instanceId:q.instanceId,documentId:q.documentId,atRevision:q.atRevision,documentSnapshotId:q.documentSnapshotId,kind:q.view.kind,target:q.view.target,property:'order',dimension:1,...q.view.kind==='rawSample'?{frame:q.view.frame,value:[20]}:{trackPresent:true,items:[{frame:0,v:[17]},{frame:15,v:[32]}],nextOffset:null}};},
   async editProperty(p){writes.push(p);return {applied:true,historyEntriesAdded:1};},editPropertyTrack(){throw Error('Order generic track writer must remain unavailable');}});
  assert.equal(await panel.refresh(true),true);await tick();await tick();
- const numeric=tree(container).filter(n=>n.tagName==='INPUT'&&n.className==='motion-val');assert.equal(numeric.length,1);assert.ok(numeric.every(n=>n.disabled&&n.readOnly));
+ const numeric=tree(container).filter(n=>n.tagName==='INPUT'&&n.className==='pi scrub motion-val');assert.equal(numeric.length,1);assert.ok(numeric.every(n=>n.disabled&&n.readOnly));
  const bake=tree(container).find(n=>n.tagName==='BUTTON'&&n.textContent==='Bake expression');assert.ok(bake);await bake.fire('click');
  assert.equal(writes.length,1);assert.equal(writes[0].property,'order');assert.deepEqual(writes[0].action,{kind:'bake'});
  await tree(container).find(n=>n.tagName==='BUTTON'&&n.textContent==='Keys').fire('click');await tick();
@@ -387,7 +387,7 @@ test('element targets get the layer-name row plus the element Transform header a
  assert.deepEqual(headers.map(n=>n.textContent),['Transform (element)','Transform (element)','Transform (element)']);
  assert.deepEqual(headers.map(n=>n.children[0].title),['Shape 1','Text 2','Image 3']);
  assert.equal(d.body().filter(n=>n.tagName==='BUTTON'&&/native-|Context/.test(n.textContent)).length,0);
- assert.equal(d.body().filter(n=>n.className==='native-motion-property-row').length,6);
+ assert.equal(d.body().filter(n=>n.className==='lrow motion-prop-row').length,6);
  d.panel.dispose();
 });
 test('layer targets use the layer Transform header and an empty selection shows the no-layer text',async()=>{
@@ -403,7 +403,7 @@ test('layer targets use the layer Transform header and an empty selection shows 
 test('hidden search, filters and reveal keys keep their object and keyboard routes without rendered controls',async()=>{
  const d=directPanel({selected:[directPanel().layer]});assert.equal(await d.panel.refresh(true),true);
  assert.equal(d.body().filter(n=>n.tagName==='BUTTON').length,1,'only the hidden Cancel button exists');
- const rows=()=>d.body().filter(n=>n.className==='native-motion-property-row').map(n=>n.dataset.property);
+ const rows=()=>d.body().filter(n=>n.className==='lrow motion-prop-row').map(n=>n.dataset.property);
  assert.deepEqual(rows(),['position','opacity']);
  assert.equal(d.panel.setSearch('opac'),true);assert.deepEqual(rows(),['opacity']);assert.equal(d.panel.setSearch(''),true);
  for(const [key,property] of [['p','position'],['a','anchor'],['r','rotation'],['s','scale'],['t','opacity']]){await d.container.fire('keydown',{key});await tick();await tick();}
@@ -420,4 +420,27 @@ test('Cancel is visible only while the native read is in flight and cancelling c
  assert.equal(d.panel.cancel(),true);assert.equal(toolbar.hidden,true);assert.match(status.textContent,/cancelled/);
  release();await first;await tick();assert.equal(toolbar.hidden,true);
  d.panel.dispose();
+});
+test('property rows use the baseline row markup: lrow motion-prop-row, name, X/Y labels, unit and styled scrub fields',async()=>{
+ const h=host();try{
+  h.paint();await h.settle();
+  await h.doc.body.fire('keydown',{key:'p'});await h.settle();
+  for(const k of ['a','r','s','t']){await h.doc.body.fire('keydown',{key:k,shiftKey:true});await h.settle();}
+  await tick();await tick();
+  const props=[...new Set(h.rows().map(r=>r.dataset.property))];
+  for(const p of ['position','anchor','rotation','scale','opacity'])assert.ok(props.includes(p),p+' row');
+  const expectUnit={position:'px',anchor:'px',rotation:'°',scale:'%',opacity:'%'},expectDims={position:2,anchor:2,rotation:1,scale:2,opacity:1};
+  for(const row of h.rows()){
+   const p=row.dataset.property;if(!expectDims[p])continue;
+   const kids=tree(row),name=row.children[0];
+   assert.equal(name.className,'lnm motion-prop-name');assert.equal(name.children.length,1);assert.equal(name.children[0].tagName,'SPAN');assert.ok(name.children[0].textContent.length>0);
+   assert.ok(!/Default|Animated \(|Static override|Expression$/.test(row.textContent.replace(name.textContent,'')),'no detail word fused to the label: '+row.textContent);
+   const fields=kids.find(n=>n.className==='native-motion-property-value motion-fields');assert.ok(fields,p+' fields');
+   const inputs=kids.filter(n=>n.tagName==='INPUT');assert.equal(inputs.length,expectDims[p],p+' inputs');
+   inputs.forEach(i=>{assert.equal(i.className,'pi scrub motion-val');assert.equal(i.type,'number');assert.equal(i.dataset.step,'1');assert.equal(i.step,'1');});
+   const dimLabels=kids.filter(n=>n.className==='motion-dim-label').map(n=>n.textContent);assert.deepEqual(dimLabels,expectDims[p]===2?['X','Y']:[]);
+   const units=kids.filter(n=>n.className==='motion-unit').map(n=>n.textContent);assert.deepEqual(units,[expectUnit[p]]);
+   assert.ok(!kids.some(n=>n.tagName==='SPAN'&&/read-only/i.test(n.textContent)),'no read-only sentence');
+  }
+ }finally{h.retire();}
 });

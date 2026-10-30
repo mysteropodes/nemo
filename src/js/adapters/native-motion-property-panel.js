@@ -242,8 +242,10 @@
         if(layerKey!==lastLayer){lastLayer=layerKey;var name=make('div',labelTarget({contextId:target.contextId,layerUid:target.layerUid},accepted.token));name.className='motion-props-layername';name.dataset.layerUid=target.layerUid;fragment.appendChild(name);}
         var isElement=target.strokeId!==undefined,title=make('div',''),label=make('span',isElement?tr('hdrTransformElement','Transform (element)'):tr('hdrTransform','Transform'));
         title.className='lrow motion-group-row';title.dataset.targetKey=key(target);if(isElement)label.title=labelTarget(target,accepted.token);title.appendChild(label);fragment.appendChild(title);
-        filtered.rows.forEach(function(entry){var row=entry.row,line=make('div',''),name=make('span',entry.label);line.className='native-motion-property-row';line.dataset.property=row.property;line.dataset.targetKey=key(group.target);line.appendChild(name);
-          var f=row.authored,detail=f.availability!=='available'?'Property details unavailable':f.keyCount>0?'Animated ('+f.keyCount+' keys)':f.hasStaticOverride?'Static override':f.expressionEnabled?'Expression':'Default';line.appendChild(make('span',detail));
+        filtered.rows.forEach(function(entry){var row=entry.row,line=make('div',''),name=make('div',''),nameText=make('span',entry.label);line.className='lrow motion-prop-row';line.dataset.property=row.property;line.dataset.targetKey=key(group.target);
+          name.className='lnm motion-prop-name';name.appendChild(nameText);line.appendChild(name);
+          var slot=make('div','');slot.className='native-motion-property-slot';line.appendChild(slot);
+          var f=row.authored;
           if(keyEditor){
             var keysButton=make('button','Keys');keysButton.type='button';
             keysButton.setAttribute('aria-label','Edit keys for '+entry.label);
@@ -267,7 +269,7 @@
             };
             bakeButton.addEventListener('click',onBake);nextBindings.push([bakeButton,onBake]);line.appendChild(bakeButton);
           }
-          if(Value&&typeof ports.readProperty==='function'&&row.authored.availability==='available')nextValues.push({container:line,target:group.target,row:row});
+          if(Value&&typeof ports.readProperty==='function'&&row.authored.availability==='available')nextValues.push({container:slot,target:group.target,row:row});
           if(typeof ports.readProperty==='function'&&f.availability==='available'){
             var diagnostic=make('span','');diagnostic.className='motion-expr-error';diagnostic.setAttribute('role','status');diagnostic.hidden=true;line.appendChild(diagnostic);
             nextExpressions.push({node:diagnostic,line:line,target:group.target,property:row.property});
@@ -278,7 +280,7 @@
       if(appendRevealLimits(fragment))unknown=true;
       if(!validAccepted()){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}
       rowBindings.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});rowBindings=nextBindings;clearValues();body.replaceChildren(fragment);
-      nextValues.forEach(function(item){var editor=Value.create(item.container,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,get editProperty(){return item.row.property==='order'?null:ports.editProperty;}},item.target,item.row);valueEditors.push(editor);Promise.resolve(editor.refresh()).catch(function(){editor.cancel();});});
+      nextValues.forEach(function(item){var editor=Value.create(item.container,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,dimLabels:ports.dimLabels,get editProperty(){return item.row.property==='order'?null:ports.editProperty;}},item.target,item.row);valueEditors.push(editor);Promise.resolve(editor.refresh()).catch(function(){editor.cancel();});});
       expressionRows=nextExpressions;refreshExpressionStates();
       notify(collapsed?'':contentOnly&&unknown?'Partial reveal: some property groups are unavailable.':unknown?'Some property filters are unavailable.':'');return true;
     }
