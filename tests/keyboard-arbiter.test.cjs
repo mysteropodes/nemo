@@ -1,13 +1,11 @@
 'use strict';
-// U05 (#2370): keyboard focus and clipboard arbitration. The pure decision (keyboard-arbiter.js), the real onKeyDown
-// from timeline.js running it, and the single keydown/keyup listener pair per document.
+// U05 (#2370): keyboard focus and clipboard arbitration. The pure decision and the single keydown/keyup pair per document
+// (keyboard-arbiter.js). The real onKeyDown running it is tests/keyboard-arbitration-u05.test.cjs.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const Arbiter=require('../src/js/application/keyboard-arbiter.js');
 const Registry=require('../src/js/application/shortcut-registry.js');
 const FrameEdit=require('../src/js/adapters/native-frame-edit-desktop.js');
 const timeline=fs.readFileSync(path.join(__dirname,'../src/js/timeline.js'),'utf8');
-function source(name){const start=timeline.indexOf('function '+name+'(');assert.ok(start>=0,name);let at=timeline.indexOf('{',start),depth=1,end=at+1;
-  while(depth){if(timeline[end]==='{')depth++;if(timeline[end]==='}')depth--;end++;}return timeline.slice(start,end);}
 
 const ev=(key,over)=>Object.assign({key,metaKey:true,ctrlKey:false,shiftKey:false,target:{tagName:'DIV'}},over);
 const FIELD={tagName:'INPUT'};
@@ -28,6 +26,14 @@ test('a field suppresses app undo, redo, copy, cut, paste and convert, while Sav
   assert.equal(kind(ev('Enter',{metaKey:false,target:FIELD})),'blurField','Enter confirms and blurs an input');
   assert.equal(kind(ev('Enter',{metaKey:false,target:{tagName:'TEXTAREA'}})),null,'a textarea keeps Enter');
   assert.equal(kind(ev('z',{metaKey:false})),null,'a bare z is not arbitrated');
+});
+
+test('the selection snapshot is only read for copy, cut and paste outside a field',()=>{
+  let reads=0;const ctx=()=>{reads++;return {shapeSelection:true};};
+  for(const key of ['z','s'])Arbiter.decide(ev(key),ctx);
+  for(const key of ['c','x','v'])Arbiter.decide(ev(key,{target:{tagName:'INPUT'}}),ctx);
+  assert.equal(reads,0);
+  assert.equal(Arbiter.decide(ev('c'),ctx).kind,'copyShapes');assert.equal(reads,1);
 });
 
 test('copy: Motion keys beat shapes beat frame cells; cut: shapes beat frame cells and Motion keys are copy-only',()=>{
@@ -51,58 +57,6 @@ test('paste follows the clipboard filled last; Motion keys win in Motion; an emp
   assert.equal(empty.kind,'pasteSvgFallback');assert.equal(empty.preventDefault,false,'the browser paste event must fire');
   assert.equal(kind(ev('v'),{svgImport:false}),'pasteFrames');
   assert.equal(kind(ev('v'),{svgImport:true,frameClipboard:true}),'pasteFrames','svg only when nothing internal');
-});
-
-// The real onKeyDown, with the arbiter and recording stand-ins for the commands.
-function harness(state,{selected=[],canvasClip=null,frames=[],lastClip,svg=false,motionKeys=false,keyClip=false}={}){
-  const calls=[],timers=[];
-  const rec=(n)=>()=>{calls.push(n);};
-  const win={
-    state:Object.assign({appMode:'anim2d'},state),SMProject:{save:rec('save'),saveAs:rec('saveAs')},
-    SM:{convertActiveLayerToComponent:rec('component'),copyFrames:rec('copyFrames'),cutFrames:rec('cutFrames'),pasteFrames:rec('pasteFrames')},
-    SMMotion:{hasKeySelection:()=>motionKeys,hasKeyClipboard:()=>keyClip,copySelectedKeys:rec('copyKeys'),pasteKeys:rec('pasteKeys')},
-    SMSvgImport:svg?{}:undefined,_lastClipKind:lastClip,_canvasClip:canvasClip,_sel:{clipboard:frames},selectedPaths:selected,
-    undo:rec('undo'),redo:rec('redo'),copySelection:rec('copyShapes'),cutSelection:rec('cutShapes'),pasteSelection:rec('pasteShapes'),
-    setTimeout:(fn)=>{timers.push(fn);return timers.length;},clearTimeout(){},NemoKeyboardArbiter:Arbiter};
-  win.window=win;
-  const ctx=vm.createContext(win);
-  vm.runInContext(source('onKeyDown'),ctx);
-  vm.runInContext('var state=window.state,_sel=window._sel,_canvasClip=window._canvasClip,selectedPaths=window.selectedPaths,'+
-    'undo=window.undo,redo=window.redo,copySelection=window.copySelection,cutSelection=window.cutSelection,pasteSelection=window.pasteSelection,'+
-    'SMMotion=window.SMMotion,setTimeout=window.setTimeout,clearTimeout=window.clearTimeout,NemoKeyboardArbiter=window.NemoKeyboardArbiter;',ctx);
-  const press=(key,over)=>{const e=ev(key,over);let prevented=false;e.preventDefault=()=>{prevented=true;};e.target=e.target||{tagName:'DIV'};
-    e.target.blur=()=>{calls.push('blur');};ctx.onKeyDown(e);return prevented;};
-  return {calls,timers,press};
-}
-
-test('the real onKeyDown: a focused field keeps its own undo and clipboard, global Save still saves',()=>{
-  const h=harness({});
-  for(const key of ['z','c','x','v'])assert.equal(h.press(key,{target:{tagName:'INPUT'}}),false,key);
-  assert.equal(h.press('s',{target:{tagName:'INPUT'}}),true);
-  assert.equal(h.press('s',{target:{tagName:'TEXTAREA'},shiftKey:true}),true);
-  assert.equal(h.press('Enter',{metaKey:false,target:{tagName:'INPUT'}}),false);
-  assert.deepEqual(h.calls,['save','saveAs','blur']);
-});
-
-test('the real onKeyDown: undo, redo and the three-way copy and cut priority',()=>{
-  const h=harness({appMode:'motion'},{selected:[{}],motionKeys:true});
-  h.press('z');h.press('z',{shiftKey:true});h.press('c');h.press('x');
-  assert.deepEqual(h.calls,['undo','redo','copyKeys','cutShapes']);
-  const g=harness({},{selected:[{}]});g.press('c');
-  const f=harness({});f.press('c');f.press('x');f.press('C',{shiftKey:true});
-  assert.deepEqual(g.calls.concat(f.calls),['copyShapes','copyFrames','cutFrames','component']);
-});
-
-test('the real onKeyDown: paste follows the last clipboard kind, and the SVG fallback restores frame paste',()=>{
-  const clip={snaps:[1]},frames=[1];
-  const a=harness({},{canvasClip:clip,frames,lastClip:'canvas'});a.press('v');
-  const b=harness({},{canvasClip:clip,frames,lastClip:'frames'});b.press('v');
-  const k=harness({appMode:'motion'},{canvasClip:clip,frames,lastClip:'canvas',keyClip:true});k.press('v');
-  assert.deepEqual(a.calls.concat(b.calls,k.calls),['pasteShapes','pasteFrames','pasteKeys']);
-  const s=harness({},{svg:true});
-  assert.equal(s.press('v'),false,'default is kept so the paste event can deliver SVG');
-  assert.deepEqual(s.calls,[]);assert.equal(s.timers.length,1);s.timers[0]();
-  assert.deepEqual(s.calls,['pasteFrames']);
 });
 
 test('mounting twice leaves exactly one listener pair, and dispose removes it',()=>{

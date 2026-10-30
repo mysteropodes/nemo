@@ -22,21 +22,21 @@
   var COPY_KEYS=pick('copyKeys',true),COPY_SHAPES=pick('copyShapes',true),COPY_FRAMES=pick('copyFrames',true);
   var CUT_SHAPES=pick('cutShapes',true),CUT_FRAMES=pick('cutFrames',true);
   var PASTE_SVG=pick('pasteSvgFallback'),PASTE_KEYS=pick('pasteKeys',true),PASTE_SHAPES=pick('pasteShapes',true),PASTE_FRAMES=pick('pasteFrames',true);
-  /* ctx: {motionKeySelection, shapeSelection, motionKeyClipboard, canvasClipboard, frameClipboard, lastClipKind, svgImport}
+  /* ctx: an object, or a function returning one that is only called for copy, cut and paste: {motionKeySelection, shapeSelection, motionKeyClipboard, canvasClipboard, frameClipboard, lastClipKind, svgImport}
    * (booleans, with lastClipKind 'canvas'|'frames'|other). Returns a frozen {kind,preventDefault}, or null when the key is
    * not an arbitrated one and onKeyDown carries on with its other shortcuts. */
   function decide(event,ctx){
     var field=inField(event.target),k=event.key;
-    ctx=ctx||{};
     if(k==='Enter'&&event.target&&event.target.tagName==='INPUT')return BLUR;
     if(!cmd(event))return NONE;
     if(k==='z')return field?FIELD:(event.shiftKey?REDO:UNDO);
     if(k==='s')return event.shiftKey?SAVE_AS:SAVE;
     if(event.shiftKey&&(k==='c'||k==='C'))return field?FIELD:COMPONENT;
-    if(k==='c')return field?FIELD:ctx.motionKeySelection?COPY_KEYS:ctx.shapeSelection?COPY_SHAPES:COPY_FRAMES;
-    if(k==='x')return field?FIELD:ctx.shapeSelection?CUT_SHAPES:CUT_FRAMES;
+    if(field&&(k==='c'||k==='x'||k==='v'))return FIELD;
+    if(k==='c'||k==='x'||k==='v')ctx=(typeof ctx==='function'?ctx():ctx)||{};
+    if(k==='c')return ctx.motionKeySelection?COPY_KEYS:ctx.shapeSelection?COPY_SHAPES:COPY_FRAMES;
+    if(k==='x')return ctx.shapeSelection?CUT_SHAPES:CUT_FRAMES;
     if(k==='v'){
-      if(field)return FIELD;
       if(!(ctx.motionKeyClipboard||ctx.canvasClipboard||ctx.frameClipboard)&&ctx.svgImport)return PASTE_SVG;
       if(ctx.motionKeyClipboard)return PASTE_KEYS;
       if(ctx.lastClipKind==='canvas'&&ctx.canvasClipboard)return PASTE_SHAPES;

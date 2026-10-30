@@ -9504,12 +9504,12 @@ function onKeyDown(event){
   // never what anyone wants here.
   // Focus and clipboard arbitration lives in application/keyboard-arbiter.js (U05, #2370); this runs its decision.
   var inField=NemoKeyboardArbiter.inField(event.target);
-  var arb=NemoKeyboardArbiter.decide(event,{
+  var arb=NemoKeyboardArbiter.decide(event,function(){return {
     motionKeySelection:state.appMode==='motion'&&!!(window.SMMotion&&SMMotion.hasKeySelection&&SMMotion.hasKeySelection()),
     shapeSelection:selectedPaths.length>0,
     motionKeyClipboard:state.appMode==='motion'&&!!(window.SMMotion&&SMMotion.hasKeyClipboard&&SMMotion.hasKeyClipboard()),
     canvasClipboard:!!(_canvasClip&&_canvasClip.snaps.length),frameClipboard:!!(_sel.clipboard&&_sel.clipboard.length),
-    lastClipKind:window._lastClipKind,svgImport:!!window.SMSvgImport});
+    lastClipKind:window._lastClipKind,svgImport:!!window.SMSvgImport};});
   if(arb){
     if(arb.preventDefault)event.preventDefault();
     switch(arb.kind){
