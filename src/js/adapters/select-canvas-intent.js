@@ -193,8 +193,9 @@
       return Array.isArray(item.segments); }).map(function (item) {
       var path = new Path({ insert: false, closed: item.closed, segments: item.segments.map(function (a) { return [a.point, a.handleIn, a.handleOut]; }) });
       path.transform(new Matrix(item.matrix[0], item.matrix[1], item.matrix[2], item.matrix[3], item.matrix[4], item.matrix[5]));
-      // Painted outlines (a ribbon, its fill, a shape) are hit inside; a plain stroke on its line.
-      path.strokeColor = [0, 0, 0]; path.strokeWidth = 1; if (item.closed && item.role !== 'plain') path.fillColor = [0, 0, 0];
+      // Painted outlines (a ribbon, its fill, a shape) and any closed record that carries fill paint are hit inside (as the
+      // baseline did a filled Paper item); an unfilled plain stroke only on its line.
+      path.strokeColor = [0, 0, 0]; path.strokeWidth = 1; if (item.closed && (item.role !== 'plain' || item.filled === true)) path.fillColor = [0, 0, 0];
       path.data = { strokeId: item.stableTarget.strokeId, nativeStableTarget: item.stableTarget, nativeRole: item.role, nativeRibbon: item.role === 'ribbon', nativeMatrix: item.matrix,
         nativeOwner: item.owner };
       if (item.center) { var m = item.matrix, at = function (p, d) { return [m[0] * p[0] + m[2] * p[1] + d * m[4], m[1] * p[0] + m[3] * p[1] + d * m[5]]; };
@@ -243,17 +244,28 @@
     if (fill) path.data.linkedFill = { data: { strokeId: fill.stableTarget.strokeId } };
     return path;
   }
-  // The top-most presented stroke of the active layer within 8 screen pixels of the click, or null. Only records whose
-  // bounds reach the click have their geometry read.
+  // The top-most presented stroke within 8 screen pixels of the click, or null, as the baseline did: the active layer is
+  // tested first, then every other visible unlocked layer from the topmost down (#2372). The hit carries its layer
+  // (data.nativeLayerIndex/Uid) so applyPick can activate it. Only records whose bounds reach the click have their geometry
+  // read; a hidden or locked layer (the active one too) is never read.
   async function pick(root, clientX, clientY) {
     var s = presentedSession(root);
     if (!s) return undefined;
-    var w = worldPoint(root, clientX, clientY, s.pin, s.presentation), t = 8 * w.perPixel;
-    var layers = await presented(root, root.state.activeLayerIdx, function (_item, b) { return w.x >= b[0] - t && w.x <= b[2] + t && w.y >= b[1] - t && w.y <= b[3] + t; });
-    if (!layers) return undefined;
-    var Point = root.Point || root.paper.Point, at = new Point(w.x, w.y);
-    for (var i = layers.paths.length - 1; i >= 0; i--)
-      if (layers.paths[i].hitTest(at, { fill: true, stroke: true, tolerance: t })) return withFill(owned(layers.paths[i]), layers.items);
+    var w = worldPoint(root, clientX, clientY, s.pin, s.presentation), t = 8 * w.perPixel, active = root.state.activeLayerIdx;
+    var Point = root.Point || root.paper.Point, at = new Point(w.x, w.y), order = [active], reach = function (_item, b) {
+      return w.x >= b[0] - t && w.x <= b[2] + t && w.y >= b[1] - t && w.y <= b[3] + t; };
+    for (var k = s.pin.layers.length - 1; k >= 0; k--) if (k !== active) order.push(k);
+    for (var n = 0; n < order.length; n++) {
+      var info = s.pin.layers[order[n]];
+      if (!info || info.locked === true || info.visible === false) continue;
+      var layers = await presented(root, order[n], reach);
+      if (!layers) return undefined;
+      for (var i = layers.paths.length - 1; i >= 0; i--) if (layers.paths[i].hitTest(at, { fill: true, stroke: true, tolerance: t })) {
+        var hit = withFill(owned(layers.paths[i]), layers.items);
+        hit.data.nativeLayerIndex = order[n]; hit.data.nativeLayerUid = layers.layerUid;
+        return hit;
+      }
+    }
     return null;
   }
 
@@ -313,9 +325,34 @@
     return JSON.stringify([st.tool, st.appMode, st.currentFrame, st.activeLayerIdx, st.activeSymbolId || null,
       pin ? PINS.map(function (k) { return pin[k]; }) : null]);
   }
+  // #2372: a pick that resolves undefined (the presentation could not be proven current) or throws is not "nothing under the
+  // cursor" (null, which clears): retry once after the presentation settles, then say so instead of dropping the click.
+  // `I` is the intent API in use (its pick/applyPick); `ctx` is the pickContext captured at the click.
+  function resolvePick(root, I, intent, shift, ctx, retried) {
+    var unavailable = function () { if (typeof root.showToast === 'function') root.showToast('Could not read the canvas just now \u2014 click again.'); };
+    return I.pick(root, intent.x, intent.y).then(function (item) {
+      if (I.pickContext(root) !== ctx) return;
+      if (item === undefined) {
+        if (retried) return unavailable();
+        return new Promise(function (done) { (root.setTimeout || setTimeout)(done, 120); }).then(function () { return resolvePick(root, I, intent, shift, ctx, true); });
+      }
+      try { I.applyPick(root, item, shift); } catch (_) {}
+    }, unavailable);
+  }
   // Select's own rule on a picked stroke: a click selects it, Shift toggles it, an empty click clears unless Shift is held.
   // Picks are fresh objects, so identity is the native stroke id.
   function applyPick(root, item, shift) {
+    var data = item && item.data;
+    // #2372: a picked image also makes its layer the one selected layer row, which is what the Mesh panel reads
+    // (readImageMeshSelection); a Shift pick keeps the layer selection it extends.
+    var image = !!data && data.nativeRole === 'raster' && !shift;
+    if (data && Number.isInteger(data.nativeLayerIndex) && (data.nativeLayerIndex !== root.state.activeLayerIdx || image)) {
+      // #2372: a hit on another layer activates it through the native layer-selection route (_layerSel follows); a refused
+      // activation selects nothing rather than a stroke of a layer that is not active.
+      var project = root.NemoNativeObjectProject;
+      if (!project || project.selectLayerUI(root, data.nativeLayerIndex, false, data.nativeLayerUid) !== true ||
+          root.state.activeLayerIdx !== data.nativeLayerIndex) return;
+    }
     var selected = root.selectedPaths || [], id = item && item.data.strokeId;
     var held = item ? selected.filter(function (p) { return p && p.data && p.data.strokeId === id; }) : [];
     root.selectedPaths = item ? (shift ? (held.length ? selected.filter(function (p) { return held.indexOf(p) < 0; }) : selected.concat([item])) : [item])
@@ -327,5 +364,5 @@
   }
 
   return Object.freeze({ create: create, hitHandles: hitHandles, objectProject: objectProject, presented: presented,
-    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, pick: pick, pickContext: pickContext, applyPick: applyPick });
+    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, pick: pick, pickContext: pickContext, applyPick: applyPick, resolvePick: resolvePick });
 }));

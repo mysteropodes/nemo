@@ -304,6 +304,8 @@
     {"src":"js/adapters/native-object-widget.js"},
     {"src":"js/adapters/native-object-labs.js"},
     {"src":"js/adapters/native-object-rig.js"},
+    {"src":"js/adapters/native-object-tween.js"},
+    {"src":"js/adapters/native-object-tween-ui.js"},
     {"src":"js/adapters/native-object-component-intent.js"},
     {"src":"js/adapters/native-object-component.js"},
     {"src":"js/adapters/native-object-duplicator.js"},

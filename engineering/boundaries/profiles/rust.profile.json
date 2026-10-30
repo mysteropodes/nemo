@@ -1797,6 +1797,7 @@
         "object_text_scene_nofont.rs",
         "object_text_scene_font_refusal.rs",
         "object_text_scene_svg.rs",
+        "object_text_scene_hit_listing.rs",
         "object_text_animator_scene.rs",
         "object_text_selector_expressions.rs",
         "object_scene_parent_chain.rs",

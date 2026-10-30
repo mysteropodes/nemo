@@ -508,7 +508,7 @@
       },
       select: function (intent, shift) {
         if (intent.mode === 'unavailable') return;
-        if (intent.mode === 'pick') { var I = window.NemoSelectCanvasIntent, ctx = I.pickContext(window); return void I.pick(window, intent.x, intent.y).then(function (item) { if (item !== undefined && I.pickContext(window) === ctx) I.applyPick(window, item, shift); }).catch(function () {}); }
+        if (intent.mode === 'pick') { var I = window.NemoSelectCanvasIntent; return void I.resolvePick(window, I, intent, shift, I.pickContext(window), false); }
         var c = window.NemoNativeOpacityCutover, prepared = c.prepared(), identity = c.identity();
         var ld = state.layers[state.activeLayerIdx], layer = userLayers[state.activeLayerIdx];
         if (!prepared || !identity || !ld || !layer || prepared.layerUid !== ld.layerUid) return;

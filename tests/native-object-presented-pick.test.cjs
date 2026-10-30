@@ -11,10 +11,15 @@ const PIN = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentR
 const seg = (x, y) => ({ point: [x, y], handleIn: [0, 0], handleOut: [0, 0] });
 const target = (id) => ({ contextId: 'scene-root', layerUid: 'L1', frameScope: { kind: 'authored', frame: 0 }, strokeId: id });
 const ITEMS = [
+  // A filled closed plain record (a drawn rectangle with fill paint) and an unfilled closed outline beside it.
+  { stableTarget: target('filled'), closed: true, count: 4, role: 'plain', filled: true, bounds: [800, 0, 900, 100], matrix: [1, 0, 0, 1, 0, 0],
+    segments: [seg(800, 0), seg(900, 0), seg(900, 100), seg(800, 100)] },
+  { stableTarget: target('outline'), closed: true, count: 4, role: 'plain', filled: false, bounds: [1000, 0, 1100, 100], matrix: [1, 0, 0, 1, 0, 0],
+    segments: [seg(1000, 0), seg(1100, 0), seg(1100, 100), seg(1000, 100)] },
   // A ribbon's linked fill below everything else, far from the line: a click on it selects its ribbon.
   { stableTarget: target('fill'), closed: true, count: 4, role: 'fill', owner: 'ribbon', bounds: [600, 0, 700, 100], matrix: [1, 0, 0, 1, 0, 0],
     segments: [seg(600, 0), seg(700, 0), seg(700, 100), seg(600, 100)] },
-  { stableTarget: target('line'), closed: false, count: 2, role: 'plain', bounds: [100, 100, 500, 100], segments: [seg(100, 100), seg(500, 100)], matrix: [1, 0, 0, 1, 0, 0] },
+  { stableTarget: target('line'), closed: false, count: 2, role: 'plain', filled: false, bounds: [100, 100, 500, 100], segments: [seg(100, 100), seg(500, 100)], matrix: [1, 0, 0, 1, 0, 0] },
   // A ribbon is listed with its painted outline (hit inside); this one is moved 300 down by its presented transform.
   { stableTarget: target('ribbon'), closed: true, count: 4, role: 'ribbon', bounds: [100, -20, 500, 20], matrix: [1, 0, 0, 1, 0, 300],
     segments: [seg(100, -20), seg(500, -20), seg(500, 20), seg(100, 20)] },
@@ -43,7 +48,7 @@ function root(options = {}) {
 test('a click picks the top-most presented stroke of the active layer in world space', async () => {
   const r = root();
   assert.equal((await Intent.pick(r, 150, 50)).data.strokeId, 'line', 'world (300,100) lies on the line');
-  assert.deepEqual(r.fetched, [['fill', false], ['line', true], ['ribbon', false]], 'only geometry whose world bounds reach the click is read');
+  assert.deepEqual(r.fetched, [['filled', false], ['outline', false], ['fill', false], ['line', true], ['ribbon', false]], 'only geometry whose world bounds reach the click is read');
   assert.deepEqual(r.reads[0], { contextId: 'scene-root', layerUid: 'L1', frame: 0 });
   const ribbon = await Intent.pick(r, 150, 155);
   assert.deepEqual([ribbon.data.strokeId, ribbon.data.nativeRole, ribbon.data.nativeStableTarget], ['ribbon', 'ribbon', target('ribbon')],
@@ -91,4 +96,64 @@ test('a pick stands across a repaint but not across a frame, tool or revision ch
   assert.equal(Intent.pickContext(r), before);
   r.state.currentFrame = 2;
   assert.notEqual(Intent.pickContext(r), before);
+});
+
+test('an interior click hits a filled closed record but not an unfilled outline, whose line is still hit within 8 px (#2372)', async () => {
+  const r = root();
+  assert.equal((await Intent.pick(r, 425, 25)).data.strokeId, 'filled', 'world (850,50) is inside the filled quad');
+  assert.equal(await Intent.pick(r, 525, 25), null, 'world (1050,50) is inside the unfilled outline only');
+  assert.equal((await Intent.pick(r, 500, 25)).data.strokeId, 'outline', 'world (1000,50) is on the outline');
+  assert.equal((await Intent.pick(r, 508, 25)).data.strokeId, 'outline', 'world (1016,50) is within 8 screen pixels of the outline');
+  assert.equal(await Intent.pick(r, 512, 25), null, 'world (1024,50) is beyond 8 screen pixels (16 world) of it');
+});
+
+// #2372: baseline tests the active layer first, then every other visible unlocked layer topmost-first, and activates the hit layer.
+function layered(layers, perLayer, active) {
+  const reads = [];
+  let selected = [];
+  const pin = { ...PIN, layers };
+  const session = {
+    isActive: () => true, blocksLegacy: () => true, info: () => pin, readPresentedObjectSession: () => ({ presentation: { ...pin, frame: 0 } }),
+    async readPresentedStrokes(selector, _at, wanted) {
+      reads.push(selector.layerUid);
+      return { items: (perLayer[selector.layerUid] || []).map(({ segments, ...item }) => (wanted(item) ? { ...item, segments } : item)) };
+    },
+  };
+  const r = { reads, selectedPaths: [], state: { activeLayerIdx: active, selectedStrokeIndices: [] }, Path: paper.Path, Matrix: paper.Matrix, Point: paper.Point,
+    NemoNativeObjectProject: { desktop: () => session, selectLayerUI(root, index, preserve, uid) {
+      assert.equal(preserve, false); assert.equal(layers[index].layerUid, uid);
+      root.state.activeLayerIdx = index; root._layerSel = [index]; root.selectedPaths = []; selected.push(index); return true; } },
+    document: { getElementById: () => ({ getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 540 }) }) },
+    NemoNativeViewportUnderlay: { canvasMapping: { point: (e) => ({ x: e.clientX * 2, y: e.clientY * 2 }) } }, updateUI() {} };
+  r.activations = selected;
+  return r;
+}
+const quad = (uid, id) => ({ stableTarget: { ...target(id), layerUid: uid }, closed: true, count: 4, role: 'plain', filled: true, bounds: [800, 0, 900, 100], matrix: [1, 0, 0, 1, 0, 0],
+  segments: [seg(800, 0), seg(900, 0), seg(900, 100), seg(800, 100)] });
+
+test('a click on another layer\'s shape selects it and activates that layer; the active layer wins ties (#2372)', async () => {
+  const layers = [{ layerUid: 'L1' }, { layerUid: 'IMG' }, { layerUid: 'L3' }];
+  const r = layered(layers, { L1: [quad('L1', 'shape')], IMG: [], L3: [quad('L3', 'top')] }, 1);
+  const hit = await Intent.pick(r, 425, 25);
+  assert.deepEqual([hit.data.strokeId, hit.data.nativeLayerIndex, hit.data.nativeLayerUid], ['top', 2, 'L3'], 'topmost layer wins when overlapping');
+  assert.deepEqual(r.reads, ['IMG', 'L3'], 'the active layer is read first, then others top-first, stopping at the hit');
+  Intent.applyPick(r, hit, false);
+  assert.deepEqual([r.state.activeLayerIdx, r._layerSel, r.selectedPaths.map((p) => p.data.strokeId), r.activations], [2, [2], ['top'], [2]]);
+  const own = layered(layers, { L1: [quad('L1', 'shape')], L3: [quad('L3', 'top')] }, 0);
+  assert.equal((await Intent.pick(own, 425, 25)).data.strokeId, 'shape', 'the active layer is tested before the others');
+  Intent.applyPick(own, await Intent.pick(own, 425, 25), false);
+  assert.deepEqual(own.activations, [], 'a hit on the active layer does not re-activate it');
+});
+
+test('hidden and locked layers are skipped, including the active one; a refused activation selects nothing (#2372)', async () => {
+  const layers = [{ layerUid: 'L1', locked: true }, { layerUid: 'L2', visible: false }, { layerUid: 'L3' }];
+  const r = layered(layers, { L1: [quad('L1', 'a')], L2: [quad('L2', 'b')], L3: [quad('L3', 'c')] }, 0);
+  assert.equal((await Intent.pick(r, 425, 25)).data.strokeId, 'c');
+  assert.deepEqual(r.reads, ['L3'], 'the locked active layer and the hidden layer are never read');
+  const none = layered([{ layerUid: 'L1', locked: true }], { L1: [quad('L1', 'a')] }, 0);
+  assert.equal(await Intent.pick(none, 425, 25), null);
+  const refused = layered(layers, { L3: [quad('L3', 'c')] }, 0);
+  refused.NemoNativeObjectProject.selectLayerUI = () => true;
+  Intent.applyPick(refused, await Intent.pick(refused, 425, 25), false);
+  assert.deepEqual(refused.selectedPaths, [], 'the layer did not become active, so nothing is selected');
 });

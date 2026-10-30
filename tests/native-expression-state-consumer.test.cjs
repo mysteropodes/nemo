@@ -71,3 +71,13 @@ test('retired diagnostic rows release display and never drain queued reads throu
  const before=h.calls.length;h.retire();h.waiting.splice(0).forEach(resolve=>resolve());await tick();await tick();
  assert.equal(h.calls.length,before);assert.equal(h.rows().length,0);assert.equal(h.errors().length,0);
 });
+
+// #2377 MS-5: the baseline f(x) indicator turns .err exactly while a native diagnostic is displayed.
+test('f(x) indicator takes .err from the displayed native diagnostic and clears with it',async()=>{
+ const fxErr=h=>tree(h.nodes['motion-props-body']).filter(n=>/\bmotion-expr-btn\b/.test(n.className||'')&&/\berr\b/.test(n.className));
+ const bad=mount({state:'evaluated',diagnostic:{kind:'runtime',message:'boom',line:3}});bad.paint();await bad.settle();await tick();
+ assert.ok(bad.errors().length);assert.equal(fxErr(bad).length,bad.errors().length);assert.ok(fxErr(bad).every(n=>n.title==='Expression error: boom'));bad.retire();
+ for(const evaluation of [{state:'evaluated',diagnostic:null},{state:'unavailable',reason:'not-evaluated'}]){const ok=mount(evaluation);ok.paint();await ok.settle();await tick();assert.equal(fxErr(ok).length,0);ok.retire();}
+ const next=mount({state:'evaluated',diagnostic:{kind:'runtime',message:'boom',line:3}});next.paint();await next.settle();await tick();assert.ok(fxErr(next).length);
+ next.setEvaluation({state:'evaluated',diagnostic:null});next.paint();await next.settle();await tick();assert.equal(fxErr(next).length,0);next.retire();
+});

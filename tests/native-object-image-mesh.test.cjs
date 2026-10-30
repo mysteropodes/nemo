@@ -524,3 +524,24 @@ test('real capture handlers cancel without a command and commit one leased point
   assert.deepEqual(read.mesh.offsets[0], [0.09999999999999998, 0.09999999999999998]);
   assert.deepEqual(h.messages, []);
 });
+
+test('picking the image on the canvas selects its layer row, which feeds the Mesh panel (#2372)', async () => {
+  const Intent = require('../src/js/adapters/select-canvas-intent.js');
+  const h = composedMesh(); await h.open();
+  h.root.NemoNativeObjectProject.selectLayerUI = (root, index, preserve, uid) => h.uiPorts.selectLayer(index, preserve, uid) === true;
+  // Both layer rows are selected, as after a layer-list gesture: no single image selection, so no Mesh panel.
+  h.root._layerSel = [0, 1];
+  assert.equal(ComposedUI.readImageMeshSelection(h.root), null);
+  const stroke = { data: { strokeId: 'ink', nativeRole: 'plain', nativeLayerIndex: 0, nativeLayerUid: 'L0' } };
+  Intent.applyPick(h.root, stroke, false);
+  assert.equal(ComposedUI.readImageMeshSelection(h.root), null, 'a stroke pick leaves the layer rows alone');
+  const image = { data: { strokeId: 'raster-0', nativeRole: 'raster', nativeLayerIndex: 0, nativeLayerUid: 'L0' } };
+  Intent.applyPick(h.root, image, false);
+  assert.deepEqual(h.root._layerSel, [0]);
+  assert.deepEqual(h.root.selectedPaths.map((p) => p.data.strokeId), ['raster-0']);
+  const proof = ComposedUI.readImageMeshSelection(h.root);
+  assert.ok(proof, 'the Mesh panel proof exists for the picked image'); assert.equal(proof.current(), true);
+  await h.settle();
+  assert.equal(h.root.SMImageMeshUI.hasMesh(), true);
+  assert.equal(h.root.document.getElementById('p-imagemesh-on').checked, true);
+});

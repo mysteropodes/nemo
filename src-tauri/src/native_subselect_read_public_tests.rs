@@ -98,3 +98,70 @@ fn check_presented_host(parametric: bool, held: bool) {
     assert_eq!(owner.content_revision(), 1);
     assert!(owner.preview.presented_vectors.is_none());
 }
+#[test]
+fn the_hit_test_listing_flags_fill_paint_per_record() {
+    // #2372: a filled closed record is hit inside, an unfilled closed outline and an open path only on their line.
+    let mut doc = project(false, true);
+    let stroke = json!({"kind":"solid","r":0,"g":0,"b":0,"a":1});
+    let objects = doc["drawing"]["objects"].as_array_mut().unwrap();
+    for (id, closed) in [("outline", true), ("open", false)] {
+        let mut r = objects[0].clone();
+        r["target"]["strokeId"] = json!(id);
+        r["geometry"]["closed"] = json!(closed);
+        r["fill"] = Value::Null;
+        r["vector"]["stroke"] = stroke.clone();
+        r["vector"]["hasRealStroke"] = json!(true);
+        objects.push(r);
+    }
+    let elements = doc["drawing"]["compositionOrder"]["contexts"][0]["scopes"][0]["elements"].as_array_mut().unwrap();
+    for (n, id) in ["outline", "open"].into_iter().enumerate() {
+        elements.push(json!({"layerUid":"L0","strokeId":id,"naturalPosition":n + 1,"order":{}}));
+    }
+    let mut owner = NativeObjectHost::from_project_file("subselect-fill".into(), doc.to_string().as_bytes()).unwrap();
+    let info = host_info(&owner);
+    let mut gpu = Compositor::new().expect("Subselect host requires headless Metal");
+    let (mut surface, trace) = viewport(&gpu, 64);
+    trace.borrow_mut().pixel = Some([255, 0, 0, 255]);
+    let snap = snapshot(&owner);
+    let shown = owner.present_object_preview(&selector(&snap, 0), output(), &mut gpu, &mut surface).unwrap();
+    assert_eq!(shown.status(), &ViewportStatus::Presented);
+    let query = json!({"apiVersion":2,"requestId":"subselect-fill","instanceId":info["instanceId"],"documentId":info["documentId"],"operation":"query.document.object","payload":{"atRevision":info["contentRevision"],"documentSnapshotId":info["documentSnapshotId"],"view":{"kind":"subselect","contextId":"scene-root","layerUid":"L0","frame":0,"workId":format!("native-work-{}",shown.identity().work_id().value()),"viewGeneration":shown.identity().view_generation().value(),"cursor":0,"limit":8,"hitTest":true}}});
+    let listed = host_read(&mut owner, &query);
+    assert_eq!(listed["ok"], true, "{listed}");
+    let flags: Vec<(String, bool, bool)> = listed["result"]["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| (i["stableTarget"]["strokeId"].as_str().unwrap().to_string(), i["closed"].as_bool().unwrap(), i["filled"].as_bool().unwrap()))
+        .collect();
+    assert_eq!(
+        flags,
+        [("pixels-0".to_string(), true, true), ("outline".to_string(), true, false), ("open".to_string(), false, false)]
+    );
+}
+#[test]
+fn the_hit_test_listing_of_a_mesh_bound_image_layer_names_the_image_and_its_rect() {
+    // #2372: an image (here bound to an image mesh) is listed with its painted rect and its own target, and never as editable.
+    let mut owner = NativeObjectHost::from_project_file("subselect-image".into(), presented_project().to_string().as_bytes()).unwrap();
+    let info = host_info(&owner);
+    let mut gpu = Compositor::new().expect("Subselect host requires headless Metal");
+    let (mut surface, trace) = viewport(&gpu, 64);
+    trace.borrow_mut().pixel = Some([0, 0, 255, 255]); // the fixture image is blue
+    let snap = snapshot(&owner);
+    let shown = owner.present_object_preview(&selector(&snap, 0), output(), &mut gpu, &mut surface).unwrap();
+    assert_eq!(shown.status(), &ViewportStatus::Presented);
+    let mut query = json!({"apiVersion":2,"requestId":"subselect-image","instanceId":info["instanceId"],"documentId":info["documentId"],"operation":"query.document.object","payload":{"atRevision":info["contentRevision"],"documentSnapshotId":info["documentSnapshotId"],"view":{"kind":"subselect","contextId":"scene-root","layerUid":"L0","frame":0,"workId":format!("native-work-{}",shown.identity().work_id().value()),"viewGeneration":shown.identity().view_generation().value(),"cursor":0,"limit":8,"hitTest":true}}});
+    let listed = host_read(&mut owner, &query);
+    assert_eq!(listed["ok"], true, "{listed}");
+    let items = listed["result"]["items"].as_array().unwrap();
+    assert_eq!(items.len(), 1, "{listed}");
+    let item = &items[0];
+    assert_eq!((item["role"].as_str(), item["stableTarget"]["strokeId"].as_str()), (Some("raster"), Some("pixels-0")));
+    // The fixture's image is centred on (16,10) with a 20 x 10 rect.
+    assert_eq!(item["bounds"], json!([6.0, 5.0, 26.0, 15.0]));
+    assert_eq!(item["matrix"], json!([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]));
+    assert_eq!((item["count"].as_u64(), item["closed"].as_bool(), item["filled"].as_bool()), (Some(0), Some(true), Some(true)));
+    query["payload"]["view"].as_object_mut().unwrap().remove("hitTest");
+    query["requestId"] = json!("subselect-image-editable");
+    assert_eq!(host_read(&mut owner, &query)["ok"], false, "an image layer stays outside the editable listing");
+}
