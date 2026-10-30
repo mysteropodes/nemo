@@ -259,6 +259,9 @@ fn holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
     if let Some(consumed) = crate::evaluation::object_scene_style_kernels::object_scene_producer_component_select::component_holder_consumed(document, holder) {
         return consumed;
     }
+    if crate::evaluation::object_vector_kernels::render_vector_eval::motion::widget_holder_consumed(document, holder) {
+        return true;
+    }
     let target = holder.target();
     if holder
         .controls
