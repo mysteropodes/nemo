@@ -98,30 +98,37 @@ impl ObjectSnapshot {
                 "Widget cursor is outside the list",
             );
         }
-        let end = (v.cursor + v.limit).min(items.len());
-        let response = ResponseEnvelope {
-            api_version: APPLICATION_API_VERSION,
-            request_id: request.request_id.clone(),
-            instance_id: self.instance_id().into(),
-            document_id: self.document_id().into(),
-            content_revision: self.content_revision(),
-            ok: true,
-            error: None,
-            result: Some(json!({"kind":"widget","atRevision":p.at_revision,
-                "documentSnapshotId":p.document_snapshot_id,"contextId":v.context_id,"frame":v.frame,
-                "workId":v.work_id,"viewGeneration":v.view_generation,"cursor":v.cursor,"total":items.len(),
-                "nextCursor":(end < items.len()).then_some(end),"items":&items[v.cursor..end]})),
-        };
-        if serde_json::to_vec(&response)
-            .map_err(|_| DispatchErrorCode::Internal)?
-            .len()
-            > MAX_MESSAGE_BYTES
-        {
-            return refused(
-                DispatchErrorCode::Unavailable,
-                "Widget view exceeds the response byte limit",
-            );
+        // A page holds at most `limit` widgets and, beyond that, as many as the byte limit allows: a few long control names
+        // shorten the page (the cursor then advances by fewer items) rather than making the whole widget view unavailable.
+        let mut end = (v.cursor + v.limit).min(items.len());
+        loop {
+            let response = ResponseEnvelope {
+                api_version: APPLICATION_API_VERSION,
+                request_id: request.request_id.clone(),
+                instance_id: self.instance_id().into(),
+                document_id: self.document_id().into(),
+                content_revision: self.content_revision(),
+                ok: true,
+                error: None,
+                result: Some(json!({"kind":"widget","atRevision":p.at_revision,
+                    "documentSnapshotId":p.document_snapshot_id,"contextId":v.context_id,"frame":v.frame,
+                    "workId":v.work_id,"viewGeneration":v.view_generation,"cursor":v.cursor,"total":items.len(),
+                    "nextCursor":(end < items.len()).then_some(end),"items":&items[v.cursor..end]})),
+            };
+            let size = serde_json::to_vec(&response)
+                .map_err(|_| DispatchErrorCode::Internal)?
+                .len();
+            if size <= MAX_MESSAGE_BYTES {
+                return Ok(response);
+            }
+            if end <= v.cursor + 1 {
+                // One widget alone is over the limit: nothing smaller can be sent, so this one stays unavailable.
+                return refused(
+                    DispatchErrorCode::Unavailable,
+                    "Widget view exceeds the response byte limit",
+                );
+            }
+            end -= 1;
         }
-        Ok(response)
     }
 }

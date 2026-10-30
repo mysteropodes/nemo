@@ -18,7 +18,7 @@ function harness(options) {
   options = options || {};
   const fx = createFixture({});
   const items = options.items || [joystick(UID), joystick(LOCKED, { locked: true, center: [200, 100], size: [100, 100] })];
-  const listeners = [], fields = {}, legacy = [], toasts = [], reads = [];
+  const listeners = [], fields = {}, legacy = [], toasts = [], reads = [], created = [], pan = { dx: 0, dy: 0 };
   // The context keeps its own intrinsics: injecting the outer Object or Array would break the contract's own prototype checks.
   const sandbox = { console, setTimeout, clearTimeout };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
@@ -36,7 +36,7 @@ function harness(options) {
     readyState: 'loading', body: null, documentElement: { appendChild() {} },
     addEventListener(type, fn, opts) { listeners.push({ type, fn, opts }); },
     getElementById(id) { return id === 'canvas-area' ? area : fields[id] || null; },
-    createElementNS() { const node = { style: {}, attrs: {}, children: [], setAttribute(k, v) { this.attrs[k] = v; }, appendChild(c) { this.children.push(c); this.firstChild = this.children[0]; }, removeChild() { this.children.shift(); this.firstChild = this.children[0]; }, isConnected: true }; return node; },
+    createElementNS() { const node = { style: {}, attrs: {}, children: [], setAttribute(k, v) { this.attrs[k] = v; }, appendChild(c) { this.children.push(c); this.firstChild = this.children[0]; }, removeChild() { this.children.shift(); this.firstChild = this.children[0]; }, isConnected: true }; created.push(node); return node; },
   };
   sandbox.document.body = { appendChild() {} };
   const frames = [];
@@ -60,7 +60,7 @@ function harness(options) {
   });
   sandbox.NemoNativeObjectProject = { desktop: () => fx.session, selectLayerUI: (win, index) => { sandbox.selected = index; return true; } };
   sandbox.NemoNativeViewportUnderlay = { canvasMapping: Object.freeze({ bounds: () => ({ left: 0, top: 0, width: 960, height: 540 }), matchesView: () => true,
-    point: (e) => ({ x: e.clientX, y: e.clientY }), screen: (p) => ({ x: p.x, y: p.y }) }) };
+    point: (e) => ({ x: e.clientX - pan.dx, y: e.clientY - pan.dy }), screen: (p) => ({ x: p.x + pan.dx, y: p.y + pan.dy }) }) };
   vm.createContext(sandbox);
   // The owner double lives in this realm; the contract checks prototypes of its own realm, so its replies are rebuilt in the context.
   const intoContext = vm.runInContext('(text) => JSON.parse(text)', sandbox), route = fx.session.runResourceCommand;
@@ -72,7 +72,7 @@ function harness(options) {
     for (const l of listeners.filter((entry) => entry.type === type)) { l.fn(e); if (e.stopped) break; }
     return e;
   };
-  return { fx, sandbox, listeners, fields, legacy, toasts, reads, fire, flushFrames, frames,
+  return { pan, created, fx, sandbox, listeners, fields, legacy, toasts, reads, fire, flushFrames, frames,
     // Inside the context `window` is its global object, not the sandbox object: the controller is keyed by that one.
     ui: () => sandbox.NemoNativeObjectWidgetUI.desktop(vm.runInContext('globalThis', sandbox)),
       sent: () => { assert.deepEqual(toasts.filter((t) => !/^toastWidgetLayerAdded$/.test(t)), [], 'a refused or uncorrelated command would have been toasted'); return fx.owner.log.received.map((r) => [r.operation, r.payload]); } };
@@ -321,4 +321,33 @@ test('a gesture whose document moved underneath it is dropped, never sent agains
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(h.sent(), [], 'a stale gesture is dropped, not sent');
   assert.ok(h.reads.length >= before);
+});
+
+test('a Space-held or panning pointerdown over a pad is not consumed, so the pan gesture keeps it', async () => {
+  for (const flag of ['spaceDown', 'isPanning']) {
+    const h = await started();
+    h.sandbox.state[flag] = true;
+    const e = h.fire('pointerdown', { clientX: 960, clientY: 540 });
+    assert.equal(e.stopped, false, flag);
+    assert.equal(e.prevented, false, flag);
+    h.fire('pointerup', { clientX: 1000, clientY: 540 });
+    assert.deepEqual(h.sent(), [], flag);
+    h.sandbox.state[flag] = false;
+    assert.equal(h.fire('pointerdown', { clientX: 960, clientY: 540 }).stopped, true, flag + ' released: the pad takes the gesture again');
+    h.fire('pointerup', { clientX: 960, clientY: 540 });
+  }
+});
+
+test('the widget overlay follows a pan of the view by itself, with no revision or frame change and no read', async () => {
+  const h = await started();
+  h.flushFrames();
+  const svg = h.created[0], polygon = () => svg.children.find((n) => n.attrs && n.attrs.points);
+  const before = polygon().attrs.points, base = h.reads.length;
+  h.pan.dx = 40; h.pan.dy = -25;
+  h.flushFrames();
+  const after = polygon().attrs.points;
+  assert.notEqual(after, before);
+  const first = (text) => text.split(' ')[0].split(',').map(Number);
+  assert.deepEqual([first(after)[0] - first(before)[0], first(after)[1] - first(before)[1]], [40, -25]);
+  assert.equal(h.reads.length, base);
 });
