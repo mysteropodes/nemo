@@ -23,7 +23,7 @@ function admissionRoutes(bootstrap, reopen) {
     bootstrap.indexOf('#[tauri::command]'));
   assert.match(file, /if format.format == "nemo.native-project-document"\s*\{\s*state\s*\.install_native_project_file\(bytes\)/);
   assert.match(file, /else\s*\{[\s\S]*let document = decode_storage_project\(bytes\)[\s\S]*\.install_native_object\(document\)/);
-  assert.match(reopen, /let bytes = read_file\(state, &request, allowed\)\?;\s*return bootstrap_file_bytes\(state, request.request_id, &bytes\);/);
+  assert.match(reopen, /let bytes = read_file\(state, &request, allowed\)(\.map_err\(not_dispatched\))?\?;[\s\S]*?return bootstrap_file_bytes\(state, request.request_id, &bytes\);/);
   assert.match(reopen, /\}\s*bootstrap_raw\(state, raw\)/);
 }
 
@@ -72,7 +72,7 @@ test('storage decoder remains confined to command and actual host-release tests'
 test('actual desktop graph admits new command port, denies old command and cross-adapter decoders', () => {
   const result = R.checkRustCrate(profile, policy, { root });
   assert.equal(result.ok, true, JSON.stringify(result.violations));
-  assert.equal(result.moduleCount, 17); assert.equal(result.edges.length, 45);
+  assert.equal(result.moduleCount, 17); assert.equal(result.edges.length, 46);
   assert.deepEqual(result.unsupported, []); assert.deepEqual(result.exceptionsApplied, []);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-v2-host-port-'));
   try {

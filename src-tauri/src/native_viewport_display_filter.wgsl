@@ -3,17 +3,31 @@ struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) uv: vec2<f32>,
 }
-@vertex
-fn vs_main(@builtin(vertex_index) index: u32) -> VertexOutput {
+fn fullscreen(index: u32) -> VertexOutput {
     var out: VertexOutput;
     out.uv = vec2<f32>(f32((index << 1u) & 2u), f32(index & 2u));
     out.position = vec4<f32>(out.uv * 2.0 - 1.0, 0.0, 1.0);
     out.uv.y = 1.0 - out.uv.y;
     return out;
 }
+@vertex
+fn vs_main(@builtin(vertex_index) index: u32) -> VertexOutput {
+    return fullscreen(index);
+}
+// The mirror check samples the source flipped horizontally; colors are untouched.
+@vertex
+fn vs_mirror(@builtin(vertex_index) index: u32) -> VertexOutput {
+    var out = fullscreen(index);
+    out.uv.x = 1.0 - out.uv.x;
+    return out;
+}
 @group(0) @binding(0) var source: texture_2d<f32>;
 @group(0) @binding(1) var source_sampler: sampler;
 
+@fragment
+fn fs_copy(v: VertexOutput) -> @location(0) vec4<f32> {
+    return textureSample(source, source_sampler, v.uv);
+}
 @fragment
 fn fs_values(v: VertexOutput) -> @location(0) vec4<f32> {
     let color = textureSample(source, source_sampler, v.uv);

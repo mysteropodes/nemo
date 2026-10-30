@@ -167,7 +167,7 @@ fn gpu_display_filter_presets_preserve_source_alpha_and_restore_color() {
                         Values => [gray[index]; 3],
                         Contrast => contrast[index],
                         Dim => dim[index],
-                        Off => unreachable!(),
+                        _ => unreachable!("mirrored variants: see the mirror test"),
                     };
                     for channel in 0..3 {
                         assert!((i16::from(pixel[channel]) - i16::from(expected[channel])).abs() <= 1,
@@ -194,5 +194,74 @@ fn gpu_display_filter_presets_preserve_source_alpha_and_restore_color() {
     assert!(
         pollster::block_on(errors.pop()).is_none(),
         "production display-filter GPU validation"
+    );
+}
+
+#[test]
+fn gpu_mirror_check_flips_each_row_and_keeps_its_color_check() {
+    use wgpu::TextureFormat::Rgba8Unorm;
+    use ViewportDisplayFilter::{
+        Contrast, ContrastMirrored, Dim, DimMirrored, Mirrored, None as Off, Values, ValuesMirrored,
+    };
+    let gpu = Compositor::new().unwrap();
+    let errors = gpu.device().push_error_scope(wgpu::ErrorFilter::Validation);
+    let source = texture(
+        &gpu,
+        Rgba8Unorm,
+        wgpu::TextureUsages::TEXTURE_BINDING
+            | wgpu::TextureUsages::COPY_SRC
+            | wgpu::TextureUsages::COPY_DST,
+    );
+    gpu.queue().write_texture(
+        wgpu::TexelCopyTextureInfo {
+            texture: &source,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        &PIXELS,
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(16),
+            rows_per_image: Some(2),
+        },
+        EXTENT,
+    );
+    let source_view = source.create_view(&Default::default());
+    let target = texture(
+        &gpu,
+        Rgba8Unorm,
+        wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+    );
+    let target_view = target.create_view(&Default::default());
+    let blitter = DisplayFilterBlitter::new(gpu.device(), Rgba8Unorm);
+    let run = |filter| {
+        let mut encoder = gpu.device().create_command_encoder(&Default::default());
+        blitter.copy(gpu.device(), &mut encoder, &source_view, &target_view, filter);
+        gpu.queue().submit(Some(encoder.finish()));
+        read(&gpu, &target, Rgba8Unorm)
+    };
+    // Each 4-pixel row reversed, pixel by pixel: a horizontal flip about the centre.
+    let flip = |bytes: Vec<u8>| -> Vec<u8> {
+        bytes
+            .chunks_exact(16)
+            .flat_map(|row| row.chunks_exact(4).rev().flatten().copied().collect::<Vec<_>>())
+            .collect()
+    };
+    assert_eq!(run(Mirrored), flip(PIXELS.to_vec()), "mirror alone keeps every byte");
+    for (plain, mirrored) in [
+        (Off, Mirrored),
+        (Values, ValuesMirrored),
+        (Contrast, ContrastMirrored),
+        (Dim, DimMirrored),
+    ] {
+        let expected = flip(run(plain));
+        assert_eq!(run(mirrored), expected, "{mirrored:?} is {plain:?} flipped");
+    }
+    assert_eq!(run(Off), PIXELS, "off restores the unflipped source");
+    assert_eq!(read(&gpu, &source, Rgba8Unorm), PIXELS, "retained source unchanged");
+    assert!(
+        pollster::block_on(errors.pop()).is_none(),
+        "production mirror GPU validation"
     );
 }

@@ -66,6 +66,21 @@ test('canvas grid draws one overlay beside the drawing canvas; disable removes i
   h.untouched();
 });
 
+test('desktop mirror check re-presents the native surface with the mirror while held and without it after (#2374)', () => {
+  const shown = [];
+  const session = { isActive: () => true, renderPreview: (frame) => shown.push([frame, h.root.SMLabs.isMirrored()]) };
+  const h = harness('mirror-check.js', { __TAURI__: {}, NemoNativeObjectProject: { desktop: () => session } });
+  h.state.currentFrame = 4;
+  const before = JSON.stringify(h.state);
+  h.enable('mirror-check');
+  h.key('keydown', 'm');
+  h.key('keydown', 'm', { repeat: true });
+  h.key('keyup', 'm');
+  h.key('keydown', 'm');
+  h.pointer('pointerdown', {});
+  assert.deepEqual(shown, [[4, true], [4, false], [4, true], [4, false]], 'held, released, held, clicked: one preview each; repeats add none');
+  assert.equal(JSON.stringify(h.state), before, 'view only: no document state changes');
+});
 test('mirror check flips only the view while held, ignores the key when off, and disable restores the view', () => {
   const h = harness('mirror-check.js');
   h.key('keydown', 'm');
