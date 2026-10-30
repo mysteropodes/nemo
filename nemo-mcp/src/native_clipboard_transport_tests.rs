@@ -89,6 +89,13 @@ fn actual_typed_request_lengths_and_data_budget_are_independent() {
     assert!(data_admitted(&cells));
     cells[0]["records"][0]["padding"] = json!("x".repeat(DATA_BYTES - overhead + 1));
     assert!(!data_admitted(&cells));
+    // #2248: a cell's raster images and text blocks count against the same data bound.
+    let mut items = json!([{"records":[],"textItems":[{"padding":""}]}]);
+    let overhead = serde_json::to_vec(&items[0]["textItems"][0]).unwrap().len();
+    items[0]["textItems"][0]["padding"] = json!("x".repeat(DATA_BYTES - overhead));
+    assert!(data_admitted(&items));
+    items[0]["textItems"][0]["padding"] = json!("x".repeat(DATA_BYTES - overhead + 1));
+    assert!(!data_admitted(&items));
 }
 #[test]
 fn larger_frames_never_mask_recursive_duplicate_malformed_depth_or_source_identity() {

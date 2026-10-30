@@ -1626,6 +1626,7 @@
         "object_frame_clipboard_paste_apply.rs",
         "object_frame_clipboard_paste_controls.rs",
         "object_frame_clipboard_paste_edges.rs",
+        "object_frame_clipboard_paste_items.rs",
         "object_frame_clipboard_paste_exposure.rs",
         "object_frame_clipboard_repeat.rs",
         "object_frame_clipboard_repeat_timing.rs",

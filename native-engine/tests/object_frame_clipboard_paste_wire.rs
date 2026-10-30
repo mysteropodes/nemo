@@ -50,6 +50,7 @@ fn each_command_admits_exactly_its_own_fields_and_builds_its_operation() {
         anchor_frame: 2,
         cells: vec![
             PasteCell {
+                items: Default::default(),
                 order_elements: crate::object_document::Presence::Missing,
                 rel_layer: 0,
                 rel_frame: 1,
@@ -57,6 +58,7 @@ fn each_command_admits_exactly_its_own_fields_and_builds_its_operation() {
                 records: vec![stroke_record("a", 1, 10)],
             },
             PasteCell {
+                items: Default::default(),
                 order_elements: crate::object_document::Presence::Missing,
                 rel_layer: 1,
                 rel_frame: 0,
