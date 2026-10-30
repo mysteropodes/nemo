@@ -17,6 +17,8 @@ const records = {
   a: { segments: [seg([10, 10], [0, -5], [8, 3]), seg([60, 20], [-6, 5], [4, 9]), seg([30, 50], [-5, 2], [3, -6])], strokeWidth: 3 },
   b: { segments: rect(80, 10, 40, 30), gradient: { from: [80, 10], to: [120, 40] } },
 };
+// A raster item shares the layer: its display rect joins the pivot union. x/y is the item's CENTRE (a Paper Raster position).
+const imageRect = { x: 130, y: 5, width: 40, height: 30 };
 const parentRecord = { segments: rect(300, 0, 40, 20) };
 const makePath = s => new paper.Path({ insert: false, closed: true, segments: s.map(s => new paper.Segment(s.point, s.handleIn, s.handleOut)) });
 function unionCentre(list) {
@@ -54,13 +56,15 @@ const cases = [
   { name: 'anchor-rotation', layer: { anchor: { static: [12, -8] }, rotation: { static: [30] } }, frames: [0] },
   { name: 'combined', layer: { position: { static: [7, -3] }, anchor: { static: [10, 5] }, rotation: { static: [-40] }, scale: { static: [120, 80] } }, frames: [0] },
   { name: 'keyed', layer: { anchor: { static: [6, -4] }, rotation: { track: { keys: [key(0, [0]), key(8, [60])] } }, scale: { track: { keys: [key(0, [100, 100]), key(8, [200, 50])] } } }, frames: [0, 4, 8, 12] },
+  { name: 'mixed-image', layer: { position: { static: [7, -3] }, anchor: { static: [10, 5] }, rotation: { static: [-40] }, scale: { static: [120, 80] } }, raster: true, frames: [0] },
   { name: 'parented', layer: { position: { static: [7, -3] }, anchor: { static: [10, 5] }, rotation: { static: [-40] }, scale: { static: [120, 80] } }, parent: parentPose, frames: [0] },
 ];
 const out = cases.map(c => ({
-  name: c.name, layer: c.layer, parent: c.parent || null,
+  name: c.name, layer: c.layer, parent: c.parent || null, raster: c.raster ? imageRect : null,
   frames: c.frames.map(frame => {
     const layerMat = matAt(c.layer, frame), parentMat = c.parent ? matAt(c.parent, frame) : null;
     const own = Object.values(records).map(r => r.segments);
+    if (c.raster) own.push(rect(imageRect.x - imageRect.width / 2, imageRect.y - imageRect.height / 2, imageRect.width, imageRect.height));
     const lp = layerMat ? { x: unionCentre(own).x + layerMat.ax, y: unionCentre(own).y + layerMat.ay } : null;
     const pc = parentMat ? unionCentre([parentRecord.segments]) : null;
     const pp = parentMat ? { x: pc.x + parentMat.ax, y: pc.y + parentMat.ay } : null;

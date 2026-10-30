@@ -9,6 +9,7 @@ use crate::evaluation::object_scene_style_kernels::object_scene_paint_pose::Pain
 use crate::object_frame_packet::projection::{
     apply_layer_entry, layer_chain_entry, project_layer_3d,
 };
+use crate::object_render_scene::text_scene::parent_chain::SceneParentChains;
 use crate::object_frame_packet::{MotionValues, ObjectFramePacket, ObjectFrameRecord};
 use crate::object_frame_packet::{ObjectRecord, Presence, PropertyHolderTarget};
 use std::collections::BTreeMap;
@@ -54,6 +55,7 @@ fn geometry_active(m: &MotionValues) -> bool {
 pub(super) fn prepare(
     packet: &ObjectFramePacket,
     poses: &BTreeMap<usize, Result<RigPoseEvaluation, &'static str>>,
+    chains: Option<&SceneParentChains>,
 ) -> VectorBatches {
     let mut layers: BTreeMap<usize, Vec<_>> = BTreeMap::new();
     for source in packet.records() {
@@ -64,7 +66,7 @@ pub(super) fn prepare(
     }
     let mut result = VectorBatches::default();
     for (index, sources) in layers {
-        match prepare_layer(packet, index, &sources, poses) {
+        match prepare_layer(packet, index, &sources, poses, chains) {
             Ok(Some(vectors)) => {
                 for vector in vectors {
                     result
@@ -86,6 +88,7 @@ fn prepare_layer(
     index: usize,
     sources: &[ObjectFrameRecord<'_>],
     poses: &BTreeMap<usize, Result<RigPoseEvaluation, &'static str>>,
+    chains: Option<&SceneParentChains>,
 ) -> Result<Option<Vec<PreparedVector>>, &'static str> {
     if packet.context_id() != "scene-root" {
         return Ok(None);
@@ -129,10 +132,26 @@ fn prepare_layer(
         }
         return Ok(None);
     }
-    let parents = if three_d {
-        Vec::new()
-    } else {
-        parent::chain(packet, index, poses)?
+    // Vectors that share a layer with Text or raster items take the pose of that union: the same chain those items use.
+    let item_consumers = packet.raster_records().any(|s| s.layer_index() == index)
+        || packet.text_records().any(|s| s.layer_index() == index);
+    let record_mixed = sources.iter().any(|s| {
+        (!is_vector_record(s.record()) && s.record().family != "closed-solid-fill-cubic-path")
+            || s.record().is_mask()
+    });
+    let item_chain = match chains {
+        Some(chains) if item_consumers && !record_mixed && !three_d => Some(
+            chains
+                .chain(index)
+                .map_err(|failure| failure.reason())?,
+        ),
+        _ => None,
+    };
+    let own_in_chain = motion.as_ref().is_some_and(geometry_active);
+    let parents = match &item_chain {
+        Some(chain) => chain[usize::from(own_in_chain).min(chain.len())..].to_vec(),
+        None if three_d => Vec::new(),
+        None => parent::chain(packet, index, poses)?,
     };
     // Keep the original no-geometry-Motion route and its per-record refusal/order behavior.
     // New expanded/defaulted holder shapes still need their actual receipt-backed consumer.
@@ -153,7 +172,8 @@ fn prepare_layer(
     // Identity Position still belongs to the admitted common consumer. Falling
     // back would ask the older vector-only path to validate unrelated authored
     // keys (including a legacy fill on a later frame of the same split piece).
-    let common_position = common_layer_motion_target(packet.snapshot().document(), &target)
+    let common_position = (item_chain.is_some()
+        || common_layer_motion_target(packet.snapshot().document(), &target))
         && packet
             .snapshot()
             .document()
@@ -167,11 +187,7 @@ fn prepare_layer(
     if !active && !expanded && parents.is_empty() && !common_position {
         return Ok(None);
     }
-    let mixed = sources.iter().any(|s| {
-        (!is_vector_record(s.record()) && s.record().family != "closed-solid-fill-cubic-path")
-            || s.record().is_mask()
-    }) || packet.raster_records().any(|s| s.layer_index() == index)
-        || packet.text_records().any(|s| s.layer_index() == index);
+    let mixed = (record_mixed || item_consumers) && item_chain.is_none();
     // The original per-record producers already consume raw Position, including
     // mask curves. A union-bounds transform is unnecessary for translation; keep
     // that admitted route unless an expanded holder or parent needs this batch.
@@ -271,11 +287,20 @@ fn prepare_layer(
         let motion = motion
             .as_ref()
             .ok_or("ordinary vector Motion receipt is unavailable")?;
-        let entry = layer_chain_entry(&vectors, motion)
-            .map_err(|_| "ordinary vector Motion batch refused its numeric inputs")?;
-        let vectors = apply_layer_entry(&vectors, entry)
-            .map_err(|_| "ordinary vector Motion batch refused its numeric inputs")?;
-        let vectors = parent::apply(&vectors, &parents)?;
+        let (entry, vectors) = match &item_chain {
+            Some(chain) => {
+                // The union pivot is already inside the shared chain; its first entry is this layer's own.
+                let own = own_in_chain.then(|| chain[0]);
+                (own, parent::apply(&vectors, chain)?)
+            }
+            None => {
+                let entry = layer_chain_entry(&vectors, motion)
+                    .map_err(|_| "ordinary vector Motion batch refused its numeric inputs")?;
+                let vectors = apply_layer_entry(&vectors, entry)
+                    .map_err(|_| "ordinary vector Motion batch refused its numeric inputs")?;
+                (entry, parent::apply(&vectors, &parents)?)
+            }
+        };
         let opacity = parents
             .iter()
             .fold((motion.opacity / 100.).max(0.), |op, p| op * p.mat.op);

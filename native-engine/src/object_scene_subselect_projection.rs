@@ -49,7 +49,7 @@ pub(crate) fn matrices_with_preview(
         .collect();
     let poses = BTreeMap::new();
     // Reuse the paint consumer's admission, including mixed geometry, parent blends and style limitations.
-    if let Some(prepared) = prepare_layer(packet, index, &sources, &poses)? {
+    if let Some(prepared) = prepare_layer(packet, index, &sources, &poses, None)? {
         if prepared.iter().any(|v| v.refusal.is_some()) {
             return Err("Subselect layer paint consumer is unavailable");
         }

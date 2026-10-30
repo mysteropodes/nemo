@@ -73,10 +73,41 @@ pub(crate) struct ContourProduction {
 
 /// Compile every selected record of the packet; one entry per record.
 pub(crate) fn produce(packet: &ObjectFramePacket) -> ContourProduction {
+    produce_chained(packet, None)
+}
+
+/// A layer that paints vectors together with Text or raster items has ONE pivot, the union of all of them, and only the
+/// Text scene's parent chains know it. Such a packet prepares its Text first and hands the result back, error included,
+/// so the scene reports it at the same point as before (after the rasters); every other packet keeps its original order
+/// and returns no Text.
+pub(crate) fn produce_with_texts(
+    packet: &ObjectFramePacket,
+) -> (
+    ContourProduction,
+    Option<Result<crate::object_render_scene::text_scene::TextSources, ObjectSceneError>>,
+) {
+    let shared = packet.records().any(|record| {
+        let layer = record.source_layer_index();
+        packet.raster_records().any(|r| r.layer_index() == layer)
+            || packet.text_records().any(|r| r.layer_index() == layer)
+    });
+    if !shared {
+        return (produce(packet), None);
+    }
+    let texts = crate::object_render_scene::text_scene::prepare(packet);
+    let chains = texts.as_ref().ok().map(|texts| texts.parent_chains.clone());
+    let production = produce_chained(packet, chains.as_deref());
+    (production, Some(texts))
+}
+
+fn produce_chained(
+    packet: &ObjectFramePacket,
+    chains: Option<&crate::object_render_scene::text_scene::parent_chain::SceneParentChains>,
+) -> ContourProduction {
     let mut output = ProducerOutput::new(PRODUCER, ScenePin::of_packet(packet));
     let mut rejections = Vec::new();
     let poses = packet_poses(packet);
-    let batches = batch::prepare(packet, &poses);
+    let batches = batch::prepare(packet, &poses, chains);
     for record in packet.records() {
         let index = record.source_object_index();
         let compiled = (|| {

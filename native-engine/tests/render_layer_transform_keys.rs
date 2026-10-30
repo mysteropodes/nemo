@@ -73,11 +73,39 @@ fn document(oracle: &Value, case: &Value) -> Value {
         elements.push(json!({"layerUid":"P","strokeId":"p","naturalPosition":0,"order":{}}));
         holders.push(holder("P", &case["parent"]));
     }
-    json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":16,"layers":layers,
+    let mut items = Value::Null;
+    if !case["raster"].is_null() {
+        let r = &case["raster"];
+        items = json!({"raster":[{"target":{"contextId":"scene-root","layerUid":"L1","strokeId":"img",
+            "frameScope":{"kind":"authored","frame":0}},
+            "item":{"assetId":"ink","x":r["x"],"y":r["y"],"width":r["width"],"height":r["height"],"opacity":1}}]});
+        elements.push(json!({"layerUid":"L1","strokeId":"img","naturalPosition":2,"order":{}}));
+    }
+    let mut document = json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":16,"layers":layers,
         "objects":objects,"propertyHolders":holders,
         "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
             "migration":"explicit-plan-required","referencePolicy":"unresolved","contexts":[{"contextId":"scene-root",
-                "layers":order,"scopes":[{"frameScope":{"kind":"authored","frame":0},"elements":elements}]}]}})
+                "layers":order,"scopes":[{"frameScope":{"kind":"authored","frame":0},"elements":elements}]}]}});
+    if !items.is_null() {
+        document["items"] = items;
+    }
+    document
+}
+/// A document with a raster item needs its asset in the project envelope; every other case uses the shared owner.
+fn open(drawing: &Value) -> crate::history::NativeObjectHistory {
+    if drawing.get("items").is_none() {
+        return owner(drawing);
+    }
+    let project = json!({"format":"nemo.native-project-document","formatVersion":2,
+        "project":{"canvasW":400,"canvasH":200,"fps":24},"viewportReference":null,
+        "assets":[{"id":"ink","name":"Authored ink","kind":"image","source":{"kind":"embedded","mediaType":"image/png",
+            "encoding":"base64","data":"iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADUlEQVR4nGNgYPgPBgAU9AX7uVYDfQAAAABJRU5ErkJggg=="}}],
+        "assetInventory":{"assetIds":["ink"],"placements":[]},"drawing":drawing});
+    crate::history::NativeObjectHistory::from_project_file(
+        "layer-transform",
+        project.to_string().as_bytes(),
+    )
+    .unwrap()
 }
 fn near(actual: f64, expected: f64, what: &str) {
     assert!(
@@ -151,7 +179,7 @@ fn layer_rotation_scale_anchor_match_the_frozen_baseline_through_the_real_scene_
     assert_eq!(oracle["baseline"], "1065e9d8");
     for case in oracle["cases"].as_array().unwrap() {
         let drawing = document(&oracle, case);
-        let o = owner(&drawing);
+        let o = open(&drawing);
         let s = o.acquire_snapshot(0).unwrap();
         for frame in case["frames"].as_array().unwrap() {
             let label = format!("{} @{}", case["name"].as_str().unwrap(), frame["frame"]);
@@ -167,7 +195,7 @@ fn the_raw_frame_route_admits_the_same_static_and_keyed_keys_and_still_refuses_a
     let oracle: Value = serde_json::from_str(ORACLE).unwrap();
     for case in oracle["cases"].as_array().unwrap() {
         let drawing = document(&oracle, case);
-        let o = owner(&drawing);
+        let o = open(&drawing);
         let s = o.acquire_snapshot(0).unwrap();
         for frame in case["frames"].as_array().unwrap() {
             let label = format!("raw {} @{}", case["name"].as_str().unwrap(), frame["frame"]);
@@ -196,7 +224,7 @@ fn the_raw_frame_route_admits_the_same_static_and_keyed_keys_and_still_refuses_a
             .find(|p| p["property"] == property)
             .unwrap();
         live["expression"] = json!({"enabled":true,"code":"[0,0]"});
-        let o = owner(&drawing);
+        let o = open(&drawing);
         let s = o.acquire_snapshot(0).unwrap();
         assert_eq!(
             prepare_object_exposure_frame(&s, &pins(&s, 0)).unwrap_err(),

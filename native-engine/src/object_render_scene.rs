@@ -382,10 +382,14 @@ pub fn prepare_object_render_scene(
     expected: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectRenderScene, ObjectSceneError> {
     validate_pins(packet, expected)?;
-    let contours = object_scene_producer_contour::produce(packet).into_admitted()?;
+    let (contours, early_texts) = object_scene_producer_contour::produce_with_texts(packet);
+    let contours = contours.into_admitted()?;
     let duplicators = Arc::new(duplicator_scene::prepare(packet)?);
     let mut rasters = raster_scene::sources(packet)?;
-    let mut texts = text_scene::prepare(packet)?;
+    let mut texts = match early_texts {
+        Some(texts) => texts?,
+        None => text_scene::prepare(packet)?,
+    };
     let components = component_scene::prepare(packet, expected, &mut rasters, &mut texts)?;
     Ok(ObjectRenderScene {
         duplicators,

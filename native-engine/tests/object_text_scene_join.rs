@@ -425,7 +425,7 @@ fn text_alpha_never_admits_other_layer_properties_or_enabled_expressions() {
     other["propertyHolders"][0]["properties"]
         .as_array_mut()
         .unwrap()
-        .push(json!({"property":"position","static":[0,0]}));
+        .push(json!({"property":"positionZ","static":[0]}));
     let mut active = base.clone();
     active["propertyHolders"][0]["properties"][0]["expression"] =
         json!({"enabled":true,"code":"50"});
@@ -440,6 +440,15 @@ fn text_alpha_never_admits_other_layer_properties_or_enabled_expressions() {
         );
         assert_eq!(o.history_depths(), (0, 0));
     }
+    // Position, like the rest of the layer pose, is consumed with the Text by the shared vector batch.
+    let mut posed = base.clone();
+    posed["propertyHolders"][0]["properties"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"property":"position","static":[0,0]}));
+    let o = owner(&posed);
+    let snapshot = support::head(&o);
+    assert!(prepare_object_exposure_frame(&snapshot, &selector(&snapshot, 7)).is_ok());
     let mut disabled = base;
     disabled["propertyHolders"][0]["properties"][0]["expression"] =
         json!({"enabled":false,"code":"throw 1"});
