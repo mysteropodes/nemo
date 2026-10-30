@@ -107,7 +107,7 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
             exact(
                 i,
                 &["stableTarget", "closed", "count", "matrix"],
-                if hit { &["bounds", "role", "filled", "owner", "brush", "group"] } else { &["paintCount"] },
+                if hit { &["bounds", "role", "filled", "strokeWidth", "owner", "brush", "group"] } else { &["paintCount"] },
             )
             .is_some()
                 && (!hit
@@ -116,6 +116,7 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
                     }) && ["plain", "ribbon", "fill", "shape", "brush", "raster", "text"].contains(&i["role"].as_str().unwrap_or(""))
                         && i.get("role").is_some()
                         && i["filled"].is_boolean()
+                        && i.get("strokeWidth").is_none_or(|w| w.as_f64().is_some_and(|w| w.is_finite() && w >= 0.0))
                         && i.get("bounds").is_some()
                         && i.get("owner").is_none_or(|o| i["role"] == "fill" && o.as_str().is_some_and(|s| !s.is_empty()))
                         && i.get("brush").is_none_or(|b| ["anchor", "copy", "bitmap"].contains(&b.as_str().unwrap_or("")))

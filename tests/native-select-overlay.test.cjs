@@ -109,27 +109,68 @@ test('a stale tool, frame, layer, revision or selection removes the overlay', ()
     const [svg] = h.svgs();
     assert.ok(svg);
     change(h);
+    Overlay.notify(h.root);
     h.tick();
     assert.equal(h.svgs().length, 0, String(change));
     assert.equal(svg.removed, true);
   }
 });
 
-test('pan and zoom redraw the same overlay in place; an unchanged view leaves it untouched', () => {
+test('pan and zoom redraw the same overlay in place on a change event; an unchanged view is untouched', () => {
   const h = harness();
   Intent.applyPick(h.root, h.quad('a', SQUARE), false);
   const first = h.svgs()[0];
+  Overlay.notify(h.root);
   h.tick();
   assert.equal(h.svgs()[0], first, 'unchanged view is not rebuilt');
-  assert.equal(h.frames.length, 1, 'the watcher keeps running while an overlay exists');
   h.setView([2, 0, 0, 2, 0, 0]);
+  Overlay.notify(h.root);
   h.tick();
   assert.equal(h.svgs().length, 1);
   assert.equal(h.svgs()[0].children.find((c) => c.tag === 'polygon').attrs.points, '80,80 160,80 160,180 80,180');
   h.root.selectedPaths = [];
+  Overlay.notify(h.root);
   h.tick();
+  assert.equal(h.svgs().length, 0);
+});
+
+test('an idle overlay queues no frame work; a change event queues exactly one frame, coalesced, never re-armed (#2372 REV-7)', () => {
+  const h = harness();
+  Intent.applyPick(h.root, h.quad('a', SQUARE), false);
+  assert.equal(h.frames.length, 0, 'drawing a selection arms no watcher');
+  for (let i = 0; i < 5; i++) h.tick();
+  assert.equal(h.frames.length, 0, 'ticks with nothing changed do no work');
+  Overlay.notify(h.root); Overlay.notify(h.root); Overlay.notify(h.root);
+  assert.equal(h.frames.length, 1, 'repeated events coalesce into one frame callback');
+  let captures = 0;
+  const I = h.root.NemoSelectCanvasIntent;
+  h.root.NemoSelectCanvasIntent = { ...I, presentedState: (r) => { captures++; return I.presentedState(r); } };
   h.tick();
-  assert.equal(h.frames.length, 0, 'the watcher stops once nothing is shown');
+  assert.equal(captures, 1);
+  assert.equal(h.frames.length, 0, 'the frame callback does not re-arm itself');
+  h.tick(); h.tick();
+  assert.equal(captures, 1, 'no polling while nothing changes');
+  Overlay.clear(h.root);
+  Overlay.notify(h.root);
+  assert.equal(h.frames.length, 0, 'nothing drawn, nothing queued');
+});
+
+test('a window resize and a viewport-underlay presentation both notify the overlay', () => {
+  const h = harness(), listeners = {};
+  h.root.addEventListener = (type, fn) => { listeners[type] = fn; };
+  Intent.applyPick(h.root, h.quad('a', SQUARE), false);
+  assert.equal(typeof listeners.resize, 'function');
+  h.rect.width = 200;
+  listeners.resize();
+  h.tick();
+  assert.equal(h.svgs()[0].style.width, '200px');
+  const Underlay = require('../src/js/adapters/native-viewport-underlay.js');
+  const calls = [];
+  h.root.NemoNativeSelectOverlay = { notify: (r) => calls.push(r) };
+  const desktop = Underlay.desktop({ ...h.root, document: { documentElement: null, getElementById: () => ({}), body: h.body } });
+  assert.equal(typeof desktop.surfaceChanged, 'function');
+  try { desktop.surfaceChanged(null); } catch (_) { /* the underlay port is not under test */ }
+  assert.equal(calls.length, 1, 'a surface change notifies the Select overlay on its root');
 });
 
 test('hover shows a 1.5px box for a picked, unselected path and not for a selected one', () => {
@@ -185,4 +226,27 @@ test('the pointer intent reports hover only while no gesture is pending and hide
   assert.deepEqual(calls, [5, null, 8]);
   const quiet = Intent.create({ context: () => 'c', probe: () => null, select() {} });
   assert.doesNotThrow(() => { quiet.move(ev(1)); quiet.down(ev(1)); });
+});
+
+test('a throwing hover read does not disable later hovers (#2372 REV-7)', async () => {
+  const h = harness(), a = h.quad('a', SQUARE);
+  let throwNow = true;
+  h.root.NemoSelectCanvasIntent = { ...Intent, pick: async () => a,
+    pickContext: (r) => { if (throwNow) { throwNow = false; throw new Error('context read failed'); } return Intent.pickContext(r); } };
+  Overlay.hoverAt(h.root, { clientX: 1, clientY: 1, buttons: 0 });
+  await new Promise((done) => setImmediate(done));
+  assert.equal(h.svgs().length, 0);
+  Overlay.hoverAt(h.root, { clientX: 2, clientY: 1, buttons: 0 });
+  await new Promise((done) => setImmediate(done));
+  assert.equal(h.svgs().length, 1, 'the next hover is read after the failed one');
+  // A throw inside the redraw itself is contained the same way.
+  Overlay.hover(h.root, null);
+  const create = h.root.document.createElementNS;
+  let failing = true;
+  h.root.document.createElementNS = (ns, tag) => { if (failing) { failing = false; throw new Error('svg failed'); } return create(ns, tag); };
+  Overlay.hoverAt(h.root, { clientX: 3, clientY: 1, buttons: 0 });
+  await new Promise((done) => setImmediate(done));
+  Overlay.hoverAt(h.root, { clientX: 4, clientY: 1, buttons: 0 });
+  await new Promise((done) => setImmediate(done));
+  assert.equal(h.svgs().length, 1, 'hover still works after a throwing redraw');
 });
