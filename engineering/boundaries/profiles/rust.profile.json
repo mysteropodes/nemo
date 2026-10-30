@@ -1763,6 +1763,8 @@
         "scene_effect_scene_join.rs",
         "scene_effect_scene_join_controls.rs",
         "scene_effect_scene_join_docs.rs",
+        "scene_effect_scene_join_families.rs",
+        "scene_effect_scene_join_families_docs.rs",
         "scene_effect_scene_join_stack.rs",
         "scene_effect_scene_join_support.rs",
         "object_parametric_edit.rs",

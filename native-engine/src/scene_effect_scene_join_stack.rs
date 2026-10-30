@@ -122,3 +122,6 @@ mod support;
 #[cfg(test)]
 #[path = "../tests/scene_effect_scene_join_stack.rs"]
 mod tests;
+#[cfg(all(test, feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/scene_effect_scene_join_families.rs"]
+mod families_tests;
