@@ -173,6 +173,8 @@ test('ordinary create, rename, duplicate, select and delete submit field-specifi
   assert.equal(h.edits().at(-1).payload.action.kind, 'create'); assert.equal(h.controller.read().palette.active.summary.name, 'New');
   h.prompts.push('Renamed'); h.tabs()[2].fire('click'); h.tabs()[2].fire('dblclick'); await h.settled();
   assert.deepEqual(h.edits().at(-1).payload.action, { kind: 'rename', ordinal: 3, name: 'Renamed' });
+  h.prompts.push('From menu'); h.tabs()[2].fire('contextmenu'); h.menus.at(-1).find(x => x.label === 'Renommer…').action(); await h.settled();
+  assert.deepEqual(h.edits().at(-1).payload.action, { kind: 'rename', ordinal: 3, name: 'From menu' }, 'the tab menu renames through the same native intent (#2378)');
   h.tabs()[2].fire('contextmenu'); h.menus.at(-1).find(x => x.label === 'Dupliquer').action(); await h.settled();
   assert.equal(h.edits().at(-1).payload.action.kind, 'duplicate'); assert.equal(h.metadata().palettes.length, 4);
   h.tabs()[0].fire('click'); await h.settled(); assert.deepEqual(h.edits().at(-1).payload.action, { kind: 'select', ordinal: 1 });

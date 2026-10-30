@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "252ee8e97346598774f38a3c17c9e36aec2fa883",
-  "describe": "v0.7.0-alpha.4-3636-g252ee8e9-dirty"
+  "head": "fc1c6238cddbad0b786b8a993d6a0cde3e4faaed",
+  "describe": "v0.7.0-alpha.4-3641-gfc1c6238-dirty"
  },
- "inputsDigest": "f4c558a2fe8ad809df700a98c6c5ff553049b85d9ab3a61387aa95d751b3f5a2",
+ "inputsDigest": "e282d772e82c1e0d9572ad766563e1197cf2ea73e4b7e62b004c5a6e3bd69977",
  "states": [
   "inventoried",
   "characterized",
@@ -4810,7 +4810,7 @@
     "functionsVisited": 137,
     "via": "variable b",
     "references": [
-     "src/js/adapters/native-object-ui.js:365 setShyMode()",
+     "src/js/adapters/native-object-ui.js:366 setShyMode()",
      "src/js/motion.js:13204 setAppMode()",
      "src/js/timeline.js:1237 toggleLayerShy()"
     ]
@@ -9917,7 +9917,7 @@
     "functionsVisited": 27,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:311 renderNativeObjectUiMetadata()"
+     "src/js/adapters/native-object-ui.js:312 renderNativeObjectUiMetadata()"
     ]
    },
    "fixtures": [
@@ -12243,7 +12243,7 @@
     "functionsVisited": 37,
     "via": "variable trig",
     "references": [
-     "src/js/adapters/native-object-ui.js:174 unavailableInspector()",
+     "src/js/adapters/native-object-ui.js:175 unavailableInspector()",
      "src/js/reference-bridge.js:362 syncUI()",
      "src/js/reference-bridge.js:431 openOptions()"
     ]
@@ -16334,7 +16334,7 @@
     "functionsVisited": 99,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:302 renderNativeObjectUiMetadata()",
+     "src/js/adapters/native-object-ui.js:303 renderNativeObjectUiMetadata()",
      "src/js/app.js:5100 syncInput()",
      "src/js/timeline.js:229 updatePlayhead()",
      "src/js/timeline.js:2843 updateUI()"
