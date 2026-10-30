@@ -26,7 +26,8 @@ fn drawing() -> Value {
 }
 fn install(state: &ApplicationMcp, video_layer: Option<&str>) -> Value {
     let mut project = json!({"format":"nemo.native-project-document","formatVersion":2,
-        "project":{"canvasW":320,"canvasH":180,"fps":24},"drawing":drawing(),"viewportReference":null});
+        "project":{"canvasW":320,"canvasH":180,"fps":24},"drawing":drawing(),"viewportReference":null,
+        "assets":[],"assetInventory":{"assetIds":[],"placements":[]}});
     if let Some(uid) = video_layer {
         project["assets"] = json!([{"id":"v1","name":"take","kind":"video","source":{"kind":"linked","locator":"clip.mov"}}]);
         project["assetInventory"] = json!({"assetIds":["v1"],"placements":[{"id":"p1","assetId":"v1",
