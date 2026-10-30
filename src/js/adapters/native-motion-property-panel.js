@@ -46,22 +46,33 @@
     }
     function makeKeyEditor(){
       if(!Keys||typeof Keys.create!=='function'||typeof ports.readProperty!=='function')return null;
-      var entry={id:null,property:null,editor:null};
-      entry.editor=Keys.create(section,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,
+      // Baseline-style on-demand drawer: an indented .lrow.motion-expr-editor row placed under its property row.
+      var holder=make('div',''),entry={id:null,property:null,target:null,editor:null,holder:holder};
+      holder.className='lrow motion-expr-editor motion-keys-drawer';holder.hidden=true;section.appendChild(holder);
+      entry.editor=Keys.create(holder,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,
         keyTimelineChanged:keyNotice,acceptKeySelection:function(frames){return acceptKeySelection(entry,frames);},
         get editPropertyTrack(){return entry.property==='order'?null:ports.editPropertyTrack;},refresh:function(){return refresh(true);}});
       keyEditors.push(entry);return entry;
     }
-    var initial=makeKeyEditor();if(initial)keyEditor=initial.editor;
+    var initial=makeKeyEditor(),keysAvailable=!!initial,rowIndex=new Map();if(initial)keyEditor=initial.editor;
+    function stow(entry){entry.holder.hidden=true;if(entry.holder.parentNode!==section)section.appendChild(entry.holder);}
     function clearKeys(){
       suppressKeyNotice=true;
-      try{keyEditors.forEach(function(entry,index){if(index===0){entry.editor.clear();entry.id=null;entry.property=null;}else entry.editor.dispose();});keyEditors=keyEditors.slice(0,1);keyEditor=keyEditors.length?keyEditors[0].editor:null;}
+      try{keyEditors.forEach(function(entry,index){if(index===0){entry.editor.clear();entry.id=null;entry.property=null;entry.target=null;stow(entry);}else{entry.editor.dispose();if(entry.holder.parentNode)entry.holder.parentNode.removeChild(entry.holder);}});keyEditors=keyEditors.slice(0,1);keyEditor=keyEditors.length?keyEditors[0].editor:null;}
       finally{suppressKeyNotice=false;keyNotice('reset');}
     }
+    function rowId(target,property){return JSON.stringify([key(target),property]);}
+    function place(entry){var slot=rowIndex.get(entry.id);if(!slot||!body.contains(slot))return false;if(entry.holder.parentNode!==slot)slot.appendChild(entry.holder);entry.holder.hidden=false;return true;}
+    // A repaint rebuilds the rows: re-seat each open drawer under its row, or close it when the row is filtered away.
+    function replaceDrawers(){
+      suppressKeyNotice=true;
+      try{keyEditors.forEach(function(entry){if(entry.id===null)return;if(!place(entry)){entry.editor.clear();entry.id=null;entry.property=null;entry.target=null;stow(entry);}});}
+      finally{suppressKeyNotice=false;}keyNotice('reset');
+    }
     function openKeys(target,property){
-      var id=JSON.stringify([key(target),property]),entry=keyEditors.find(function(item){return item.id===id;});
+      var id=rowId(target,property),entry=keyEditors.find(function(item){return item.id===id;});
       if(!entry)entry=keyEditors.find(function(item){return item.id===null;})||makeKeyEditor();
-      if(!entry)return false;entry.id=id;entry.property=property;keyEditor=entry.editor;return entry.editor.open(target,property);
+      if(!entry)return false;entry.id=id;entry.property=property;entry.target=target;keyEditor=entry.editor;place(entry);return entry.editor.open(target,property);
     }
     function readKeyTimelines(){
       if(retired||!validAccepted())return null;
@@ -136,7 +147,7 @@
     function savePreference(){try{if(ports.writePreference)ports.writePreference('nemo-motion-filter',mode);}catch(_){}}
     function button(label,action){var node=make('button',label);node.type='button';node.addEventListener('click',action);toolbar.appendChild(node);controls.push([node,action]);return node;}
     function clearValues(){valueEditors.forEach(function(editor){editor.dispose();});valueEditors=[];}
-    function clearBody(){releaseExpressionRows();clearValues();clearKeys();rowBindings.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});rowBindings=[];body.replaceChildren();}
+    function clearBody(){releaseExpressionRows();clearValues();clearKeys();rowBindings.forEach(function(pair){pair[0].removeEventListener(pair[2]||'click',pair[1]);});rowBindings=[];body.replaceChildren();}
     // Interim element names: the native read model carries no element names yet (read-model gap), so derive
     // "<kind> <n>" from the stable strokeId prefix and the element's 1-based ordinal among its layer's elements.
     function elementLabel(t){
@@ -180,6 +191,12 @@
       fragment.appendChild(block);return true;
     }
     async function readExpressionState(item,token,ticket,signature,frame,flight){
+      await readExpressionStateCore(item,token,ticket,signature,frame,flight);
+      // The f(x) indicator mirrors the diagnostic line that the core just settled (visible error text = error).
+      if(item.fx&&item.node.parentNode===item.line){item.fx.err=item.isError===true&&!item.node.hidden;item.fx.text=item.node.textContent;paintFx(item.fx);}
+    }
+    async function readExpressionStateCore(item,token,ticket,signature,frame,flight){
+      item.isError=false;
       function valid(){var context;try{context=ports.readContext();}catch(_){return false;}return expressionFlight===flight&&!flight.superseded&&current(token,ticket,signature)&&context.frame===frame&&body.contains(item.line)&&item.node.parentNode===item.line;}
       if(!valid()||typeof ports.readProperty!=='function')return;
       var selector={instanceId:token.pin.instanceId,documentId:token.pin.documentId,atRevision:token.pin.contentRevision,documentSnapshotId:token.pin.documentSnapshotId,
@@ -195,6 +212,7 @@
         item.node.hidden=false;item.node.textContent='';item.node.dataset.errorLine='-1';
         if(evaluation.state!=='evaluated'){item.node.textContent='Expression has not been evaluated for this frame.';return;}
         if(diagnostic===null){item.node.hidden=true;return;}
+        item.isError=true;
         var translations={mustReturnNumber:'exprErrorMustReturnNumber',mustReturnNumberOrXY:'exprErrorMustReturnNumberOrXY',tooDeep:'exprErrorTooDeep',timeout:'exprErrorTimeout'};
         if(Object.prototype.hasOwnProperty.call(translations,diagnostic.kind)){
           var translated=typeof ports.translate==='function'?ports.translate(translations[diagnostic.kind]):null;
@@ -203,10 +221,17 @@
           item.node.textContent=diagnostic.message;
           if(Number.isInteger(diagnostic.line)&&diagnostic.line>0)item.node.dataset.errorLine=String(diagnostic.line);
         }else throw Error('Invalid expression diagnostic');
-      }catch(_){if(valid()){item.node.hidden=false;item.node.textContent='Expression diagnostics are unavailable.';item.node.dataset.errorLine='-1';}}
+      }catch(_){if(valid()){item.isError=false;item.node.hidden=false;item.node.textContent='Expression diagnostics are unavailable.';item.node.dataset.errorLine='-1';}}
+    }
+    function paintFx(item){
+      var bad=item.err===true,text=bad?item.text:'';
+      item.fx.className='lico motion-expr-btn'+(item.on?' on':'')+(bad?' err':'');
+      var label=bad?tr('exprErrorPrefix','Expression error: ')+text:item.on?tr('nativeExprActiveBake','Expression active \u2014 click to bake'):tr('nativeExprNone','No expression on this property');
+      item.fx.title=label;item.fx.setAttribute('aria-label',label+' ('+item.label+')');
+      item.fx.innerHTML='<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 4c-2 0-3 1.2-3 3v10c0 2-1 3-3 3M16 4c2 0 3 1.2 3 3v10c0 2 1 3 3 3M9 12h6"/></svg>';
     }
     function invalidateExpressionDisplay(){
-      expressionRows.forEach(function(item){item.node.hidden=true;item.node.textContent='';item.node.dataset.errorLine='-1';});
+      expressionRows.forEach(function(item){item.node.hidden=true;item.node.textContent='';item.node.dataset.errorLine='-1';if(item.fx){item.fx.err=false;paintFx(item.fx);}});
     }
     function releaseExpressionRows(){
       invalidateExpressionDisplay();expressionRows=[];expressionScope=null;expressionWanted=false;
@@ -234,53 +259,59 @@
     function paintRows(){
       if(!validAccepted()){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}
       if(['errors','effects','mattes'].includes(mode)){clearBody();notify('This Motion filter is unavailable.');return false;}
-      var fragment=make('div',''),unknown=false,nextBindings=[],nextValues=[],nextExpressions=[],lastLayer=null;
+      var fragment=make('div',''),unknown=false,nextBindings=[],nextValues=[],nextExpressions=[],nextRows=new Map(),lastLayer=null;
       if(!accepted.groups.length){var none=make('div',tr('noLayerSelected','No layer selected'));none.className='motion-props-layername';fragment.appendChild(none);}
       accepted.groups.forEach(function(group){
         var filtered=filteredRows(group);unknown=unknown||filtered.unknown;
         var target=group.target,layerKey=JSON.stringify([target.contextId,target.layerUid]);
         if(layerKey!==lastLayer){lastLayer=layerKey;var name=make('div',labelTarget({contextId:target.contextId,layerUid:target.layerUid},accepted.token));name.className='motion-props-layername';name.dataset.layerUid=target.layerUid;fragment.appendChild(name);}
         var isElement=target.strokeId!==undefined,title=make('div',''),label=make('span',isElement?tr('hdrTransformElement','Transform (element)'):tr('hdrTransform','Transform'));
-        title.className='lrow motion-group-row';title.dataset.targetKey=key(target);if(isElement)label.title=labelTarget(target,accepted.token);title.appendChild(label);fragment.appendChild(title);
+        title.className='lrow motion-group-row';title.dataset.targetKey=key(target);if(isElement)label.title=labelTarget(target,accepted.token);title.appendChild(label);
+        // Baseline hide-unanimated funnel: same persisted nemo-motion-filter preference, 'animated' <-> 'all'.
+        var hiding=mode==='animated',funnel=make('span',''),fToken=accepted.token,fTicket=serial,fSignature=accepted.selection.signature;
+        funnel.className='motion-filter-btn'+(hiding?' on':'');funnel.title=hiding?tr('motionFilterShowAll','Show all properties'):tr('motionFilterHideUnanimated','Show only animated properties');
+        funnel.innerHTML='<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>';
+        var onFunnel=function(event){if(event&&event.stopPropagation)event.stopPropagation();if(!current(fToken,fTicket,fSignature))return false;return setFilter(mode==='animated'?'all':'animated');};
+        funnel.addEventListener('click',onFunnel);nextBindings.push([funnel,onFunnel]);title.appendChild(funnel);fragment.appendChild(title);
         filtered.rows.forEach(function(entry){var row=entry.row,line=make('div',''),name=make('div',''),nameText=make('span',entry.label);line.className='lrow motion-prop-row';line.dataset.property=row.property;line.dataset.targetKey=key(group.target);
+          var f=row.authored;
+          var token=accepted.token,ticket=serial,signature=accepted.selection.signature;
+          if(f.availability==='available'&&(typeof ports.editProperty==='function'||typeof ports.readProperty==='function')){
+            // Baseline f(x) indicator: .on when an expression is enabled, .err from the live diagnostic; click offers Bake.
+            var fx=make('div',''),fxItem={fx:fx,on:f.expressionEnabled===true,err:false,line:line,label:entry.label};
+            fx.setAttribute('role','button');fx.setAttribute('tabindex','0');paintFx(fxItem);
+            var offer=function(event){
+              if(event&&event.stopPropagation)event.stopPropagation();if(event&&event.preventDefault&&event.type==='contextmenu')event.preventDefault();
+              if(!fxItem.on||typeof ports.editProperty!=='function'||typeof ports.showContextMenu!=='function'||!current(token,ticket,signature)||!body.contains(line))return false;
+              var action=async function(){
+                function isCurrent(){return current(token,ticket,signature)&&body.contains(line);}
+                if(!isCurrent()||fxItem.busy)return;fxItem.busy=true;
+                try{await ports.editProperty({command:'object.property.edit',target:group.target,property:row.property,action:{kind:'bake'}},token.pin,isCurrent);}
+                catch(_){if(isCurrent())notify('Expression could not be baked.');}
+                finally{fxItem.busy=false;}
+              };
+              ports.showContextMenu(event&&event.clientX||0,event&&event.clientY||0,[{label:tr('exprBake','Bake expression'),action:action}]);return true;
+            };
+            var onFxKey=function(event){if(event&&(event.key==='Enter'||event.key===' ')){if(event.preventDefault)event.preventDefault();return offer(event);}};
+            fx.addEventListener('click',offer);fx.addEventListener('contextmenu',offer);fx.addEventListener('keydown',onFxKey);
+            nextBindings.push([fx,offer],[fx,offer,'contextmenu'],[fx,onFxKey,'keydown']);line.appendChild(fx);
+          }
           name.className='lnm motion-prop-name';name.appendChild(nameText);line.appendChild(name);
           var slot=make('div','');slot.className='native-motion-property-slot';line.appendChild(slot);
-          var f=row.authored;
-          if(keyEditor){
-            var keysButton=make('button','Keys');keysButton.type='button';
-            keysButton.setAttribute('aria-label','Edit keys for '+entry.label);
-            var token=accepted.token,ticket=serial,signature=accepted.selection.signature;
-            var onOpenKeys=function(){
-              if(!current(token,ticket,signature)||keysButton.parentNode!==line)return;
-              return openKeys(group.target,row.property);
-            };
-            keysButton.addEventListener('click',onOpenKeys);nextBindings.push([keysButton,onOpenKeys]);line.appendChild(keysButton);
-          }
-          if(f.availability==='available'&&f.expressionEnabled&&typeof ports.editProperty==='function'){
-            var bakeButton=make('button','Bake expression'),bakeToken=accepted.token,bakeTicket=serial,bakeSignature=accepted.selection.signature;
-            bakeButton.type='button';bakeButton.setAttribute('aria-label','Bake expression for '+entry.label);
-            var onBake=async function(){
-              function isCurrent(){return current(bakeToken,bakeTicket,bakeSignature)&&bakeButton.parentNode===line;}
-              if(!isCurrent()||bakeButton.disabled)return;
-              bakeButton.disabled=true;
-              try{await ports.editProperty({command:'object.property.edit',target:group.target,property:row.property,action:{kind:'bake'}},bakeToken.pin,isCurrent);}
-              catch(_){if(isCurrent())notify('Expression could not be baked.');}
-              finally{if(isCurrent())bakeButton.disabled=false;}
-            };
-            bakeButton.addEventListener('click',onBake);nextBindings.push([bakeButton,onBake]);line.appendChild(bakeButton);
-          }
-          if(Value&&typeof ports.readProperty==='function'&&row.authored.availability==='available')nextValues.push({container:slot,target:group.target,row:row});
+          var drawerSlot=make('div','');drawerSlot.className='motion-keys-slot';nextRows.set(rowId(group.target,row.property),drawerSlot);
+          var openDrawer=keysAvailable?function(){if(!current(token,ticket,signature)||!body.contains(line))return false;return openKeys(group.target,row.property);}:null;
+          if(Value&&typeof ports.readProperty==='function'&&row.authored.availability==='available')nextValues.push({container:slot,target:group.target,row:row,openKeys:openDrawer});
           if(typeof ports.readProperty==='function'&&f.availability==='available'){
             var diagnostic=make('span','');diagnostic.className='motion-expr-error';diagnostic.setAttribute('role','status');diagnostic.hidden=true;line.appendChild(diagnostic);
-            nextExpressions.push({node:diagnostic,line:line,target:group.target,property:row.property});
+            nextExpressions.push({node:diagnostic,line:line,target:group.target,property:row.property,fx:typeof fxItem==='object'?fxItem:null});
           }
-          fragment.appendChild(line);});
+          fragment.appendChild(line);fragment.appendChild(drawerSlot);});
       });
       // Unsupported native families do not become an empty global-U result.
       if(appendRevealLimits(fragment))unknown=true;
       if(!validAccepted()){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}
-      rowBindings.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});rowBindings=nextBindings;clearValues();body.replaceChildren(fragment);
-      nextValues.forEach(function(item){var editor=Value.create(item.container,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,dimLabels:ports.dimLabels,translate:ports.translate,get editProperty(){return item.row.property==='order'?null:ports.editProperty;}},item.target,item.row);valueEditors.push(editor);Promise.resolve(editor.refresh()).catch(function(){editor.cancel();});});
+      rowBindings.forEach(function(pair){pair[0].removeEventListener(pair[2]||'click',pair[1]);});rowBindings=nextBindings;clearValues();body.replaceChildren(fragment);rowIndex=nextRows;replaceDrawers();
+      nextValues.forEach(function(item){var editor=Value.create(item.container,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,dimLabels:ports.dimLabels,translate:ports.translate,get editProperty(){return item.row.property==='order'?null:ports.editProperty;},openKeys:item.openKeys},item.target,item.row);valueEditors.push(editor);Promise.resolve(editor.refresh()).catch(function(){editor.cancel();});});
       expressionRows=nextExpressions;refreshExpressionStates();
       notify(collapsed?'':contentOnly&&unknown?'Partial reveal: some property groups are unavailable.':unknown?'Some property filters are unavailable.':'');return true;
     }

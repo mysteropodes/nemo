@@ -33,6 +33,7 @@ function fixture(options={}){
  const ports={document:doc,readContext:context,readProperty(q){reads.push(copy(q));return options.reader?options.reader(q,response):Promise.resolve(response(q));},
   async editProperty(payload,expected,current){writes.push({payload:copy(payload),expected:copy(expected),current});assert.equal(current(),true);return options.writer?options.writer(payload,expected,current):{applied:true,historyEntriesAdded:1};}};
  if(options.readonly)delete ports.editProperty;
+ if(options.openKeys)ports.openKeys=options.openKeys;
  const editor=Value.create(container,ports,target,descriptor);
  return {doc,win:doc.defaultView,container,ports,editor,reads,writes,context,response,nativeValues,
   inputs:()=>tree(editor.element).filter(n=>n.type==='number'),sw:()=>tree(editor.element).find(n=>/\bmotion-stopwatch\b/.test(n.className||'')),keyReads:()=>reads.filter(r=>r.view.kind==='authoredKeys'),status:()=>tree(editor.element).find(n=>n.attrs.role==='status').textContent,
@@ -168,4 +169,18 @@ test('cancel and dispose drop a pending scrub commit and remove the document lis
 test('a nonfinite value mid-drag never arms a commit',async()=>{
  const h=fixture();await h.editor.refresh();h.win._scrubLiveActive=true;h.inputs()[0].value='';await h.inputs()[0].fire('change');
  h.win._scrubLiveActive=false;await h.doc.fire('pointerup');assert.equal(h.writes.length,0);assert.equal(listenerCount(h),0);
+});
+
+// #2377 MS-5: the keys drawer opens on demand from the stopwatch instead of a per-row Keys button.
+test('Alt-click and double-click on the stopwatch open the keys drawer without toggling the key',async()=>{
+ let opened=0;const h=fixture({keyCount:2,keyFrames:[2,20],openKeys(){opened++;return true;}});await h.editor.refresh();const sw=h.sw();
+ await sw.fire('click',{altKey:true});assert.equal(opened,1);assert.equal(h.writes.length,0,'Alt-click never edits');
+ await sw.fire('dblclick');assert.equal(opened,2);assert.equal(h.writes.length,0);
+ await sw.fire('click',{detail:2});assert.equal(h.writes.length,0,'the second click of a double-click is not a second toggle');
+ await sw.fire('click');assert.equal(h.writes.length,1,'a plain click still drives the key toggle');assert.equal(opened,2);
+});
+test('Alt-click opens the drawer even when the stopwatch is disabled, and is inert without a drawer port',async()=>{
+ let opened=0;const h=fixture({animatable:false,openKeys(){opened++;return true;}});await h.editor.refresh();
+ await h.sw().fire('click',{altKey:true});assert.equal(opened,1);assert.equal(h.writes.length,0);
+ const bare=fixture({});await bare.editor.refresh();await bare.sw().fire('click',{altKey:true});await bare.sw().fire('dblclick');assert.equal(bare.writes.length,0);
 });

@@ -1079,6 +1079,12 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
 .native-motion-toolbar,.native-motion-status{padding:2px 8px;font-size:10px;color:var(--text-dim);}
 .native-motion-toolbar[hidden],.native-motion-status[hidden]{display:none;}
 .native-motion-property-slot{display:contents;}
+/* On-demand authored-keys drawer (baseline expression-editor idiom): an indented row under its property. */
+.motion-keys-slot{display:contents;}
+.motion-keys-drawer[hidden]{display:none;}
+.motion-keys-drawer .native-motion-property-keys{display:flex;flex-direction:column;gap:3px;font-size:10.5px;color:var(--text-dim);}
+.motion-keys-drawer .native-motion-property-keys label{display:flex;align-items:center;gap:5px;cursor:pointer;}
+.motion-keys-drawer [role="toolbar"]{display:flex;flex-wrap:wrap;gap:3px;}
 .native-motion-property-status{font-size:9px;color:var(--danger,#ff6b6b);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .native-motion-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
 .motion-prop-name{display:flex;align-items:center;gap:5px;flex:1;color:var(--text-dim);}
