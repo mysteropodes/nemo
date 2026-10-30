@@ -46,8 +46,13 @@ struct Memo {
     ghost: usize,
     paths: Drawable,
 }
-/// Small and recency-ordered: one active read plus a concurrent one. A dead revision is dropped on the next access.
-const MEMO_ENTRIES: usize = 4;
+/// Recency-ordered and bounded by weight (segments plus a fixed cost per entry, ~50 MB of paths at most), so one big
+/// frame never starves the others and a read is not evicted by unrelated small ones. A dead revision is dropped on the
+/// next access.
+const MEMO_WEIGHT: usize = 1_000_000;
+fn weight(paths: &[GhostPathFacts]) -> usize {
+    64 + paths.iter().map(|p| p.segments.len() + 1).sum::<usize>()
+}
 static MEMOS: Mutex<Vec<Memo>> = Mutex::new(Vec::new());
 
 impl ObjectSnapshot {
@@ -82,7 +87,11 @@ impl ObjectSnapshot {
                     paths: Arc::clone(&paths),
                 },
             );
-            memos.truncate(MEMO_ENTRIES);
+            let mut kept = 0usize;
+            memos.retain(|m| {
+                kept = kept.saturating_add(weight(&m.paths));
+                kept <= MEMO_WEIGHT
+            });
         }
         Ok(paths)
     }
