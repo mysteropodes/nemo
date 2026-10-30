@@ -84,7 +84,7 @@
   const puckRadius = (item, scale) => Math.max(6 / scale, Math.min(item.size[0], item.size[1]) * 0.12);
 
   function create(win) {
-    let cached = null, serial = 0, queue = Promise.resolve(), overlay = null, paintQueued = false, drag = null, busy = false, watching = false, hadPads = false;
+    let cached = null, serial = 0, queue = Promise.resolve(), overlay = null, paintQueued = false, drag = null, busy = false, watching = false, hadPads = false, panelWanted = false;
     const keyOf = (proof) => JSON.stringify([proof.info.instanceId, proof.info.documentId, proof.info.lifecycleGeneration,
       proof.info.contentRevision, proof.info.documentSnapshotId, proof.selector.frame]);
     const usable = () => (cached && cached.read && cached.proof.current() ? cached : null);
@@ -137,6 +137,7 @@
       svg.appendChild(node('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: color, 'stroke-width': width, 'vector-effect': 'non-scaling-stroke' }));
     }
     function paint() {
+      if (panelWanted) fillPanel();
       if (paintQueued) return;
       paintQueued = true;
       (win.requestAnimationFrame || ((fn) => fn()))(() => { paintQueued = false; draw(); });
@@ -267,21 +268,28 @@
       const entry = usable(), info = entry && entry.proof.info, layer = info && info.layers && info.layers[win.state.activeLayerIdx];
       return layer ? (entry.read.items.find((item) => item.layerUid === layer.layerUid) || null) : null;
     }
+    // The panel DOM follows the same read as the overlay: paintPanel only arms it, and every paint() (a read landing, a pin or frame
+    // change, the settings commit's refresh, a failure) refills it, so a section hidden while the read was pending appears by itself.
     function paintPanel() {
+      if (!el('p-widget-sec')) return;
+      panelWanted = true;
+      refresh();
+      fillPanel();
+    }
+    function fillPanel() {
       const section = el('p-widget-sec');
       if (!section) return;
-      refresh();
       const item = activeItem();
-      if (!item) { section.style.display = 'none'; return; }
-      section.style.display = '';
-      const put = (id, value) => { const field = el(id); if (field && win.document.activeElement !== field) field.value = value; };
-      const text = (id, value) => { const field = el(id); if (field) field.textContent = value; };
+      if (!item) { if (section.style.display !== 'none') section.style.display = 'none'; return; }
+      if (section.style.display !== '') section.style.display = '';
+      const put = (id, value) => { const field = el(id); if (field && win.document.activeElement !== field && String(field.value) !== String(value)) field.value = value; };
+      const text = (id, value) => { const field = el(id); if (field && field.textContent !== value) field.textContent = value; };
       put('p-widget-w', Math.round(item.size ? item.size[0] : 0)); put('p-widget-h', Math.round(item.size ? item.size[1] : 0));
       text('p-widget-xlabel', item.x.label || 'X');
       put('p-widget-xmin', item.x.min); put('p-widget-xmax', item.x.max); put('p-widget-xrest', item.x.rest);
-      ['p-widget-yrange-row', 'p-widget-yrest-row'].forEach((id) => { if (el(id)) el(id).style.display = item.y ? '' : 'none'; });
+      ['p-widget-yrange-row', 'p-widget-yrest-row'].forEach((id) => { const row = el(id), want = item.y ? '' : 'none'; if (row && row.style.display !== want) row.style.display = want; });
       if (item.y) { text('p-widget-ylabel', item.y.label || 'Y'); put('p-widget-ymin', item.y.min); put('p-widget-ymax', item.y.max); put('p-widget-yrest', item.y.rest); }
-      ['p-widget-xadd', 'p-widget-yadd'].forEach((id) => { if (el(id)) el(id).style.display = 'none'; });
+      ['p-widget-xadd', 'p-widget-yadd'].forEach((id) => { if (el(id) && el(id).style.display !== 'none') el(id).style.display = 'none'; });
     }
     // A panel edit is one `widget.settings` command. The pad size keeps the other edge at its current value.
     const SETTINGS = {
