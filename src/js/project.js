@@ -158,11 +158,6 @@
     notice:showToast,hide:hideStartScreen,show:showStartScreen,opened:ensureInitialTab,repaint:renderTabBar
   });
   async function writeProjectTo(path,ticket,mode){projectJSON();return nativeSavedUI.write(path,ticket,mode);}
-  // Crash-recovery writer for native projects (#2360 R2): idle-timed, reads cached session facts only; bytes are written Rust-side.
-  try{if(window.NemoNativeObjectRecovery&&nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.recoveryPin){
-    var nativeRecovery=window.NemoNativeObjectRecovery.bind(window,{pin:nativeSavedUI.nativeObject.recoveryPin,
-      slot:function(){return {path:currentPath,name:currentName};},notice:showToast});
-    if(nativeRecovery)nativeRecovery.start();}}catch(e){console.warn('[recovery] scheduler unavailable',e);}
   // ---- Browser-mode save (2026-07, "ajoute la possibilité de save un
   // projet en mode web aussi") — no Tauri fs/dialog to write a real path
   // to, so Save/Save As both trigger a browser file download of the exact
@@ -227,6 +222,11 @@
     await openPath(Array.isArray(path)?path[0]:path);
   }
 
+  // Crash-recovery writer for native projects (#2360 R2): idle-timed, reads cached session facts only; bytes are written Rust-side.
+  try{if(window.NemoNativeObjectRecovery&&nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.recoveryPin){
+    var nativeRecovery=window.NemoNativeObjectRecovery.bind(window,{pin:nativeSavedUI.nativeObject.recoveryPin,
+      slot:function(){return {path:currentPath,name:currentName};},notice:showToast});
+    if(nativeRecovery)nativeRecovery.start();}}catch(e){console.warn('[recovery] scheduler unavailable',e);}
   // ---- Version history (v15) — the existing 30s autosave (timeline.js)
   // only ever held ONE slot ('nemo-auto' in localStorage): a crash right
   // after a bad edit overwrote the one good copy with the bad one on the
