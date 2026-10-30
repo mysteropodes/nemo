@@ -305,6 +305,8 @@
     var field=root.document.getElementById('tl-cf');
     if(field){if(root.document.activeElement!==field)field.value=root.state.currentFrame+1;field.max=info.totalFrames;}
     ['tl-tf','info-frame'].forEach(function(id){var el=root.document.getElementById(id);if(el)el.textContent=id==='tl-tf'?info.totalFrames:root.state.currentFrame+1;});
+    // The ruler playhead follows the native frame like the readouts above; updatePlayhead() is the legacy path this replaces (#2371).
+    var head=root.document.getElementById('playhead'),flag=root.document.getElementById('playhead-flag');if(head&&typeof root.playheadLeftPx==='function')head.style.left=root.playheadLeftPx(root.state.currentFrame)+'px';if(flag)flag.textContent=root.state.currentFrame+1;
     // These are read-side projections only; legacy field event handlers remain
     // guarded and no legacy document/frame reader is called.
     var metadata={'p-cw':info.canvasW,'p-ch':info.canvasH,'tl-fps':info.fps,'tl-total':info.totalFrames,
