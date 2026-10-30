@@ -31,7 +31,15 @@ impl NativeObjectHost {
         let composition = decode(self.preview.reference_cache.as_ref())?;
         if composition.has_scene_images() {
             self.preview.reference_cache = Some(composition.clone());
-        } else {
+        } else if !self
+            .preview
+            .reference_cache
+            .as_ref()
+            .is_some_and(ObjectCompositionWitness::has_viewport_reference)
+        {
+            // A hidden (or zero-opacity) reference leaves this composition without
+            // scene images, but the plan-matched cached raster stays so an undo or
+            // re-show reuses it; a replaced/removed one was already cleared above.
             self.preview.reference_cache = None;
         }
         Ok(composition)
