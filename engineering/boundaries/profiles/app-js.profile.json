@@ -2731,6 +2731,7 @@
       "files": [
         "native-frame-cell-selection.js",
         "native-subselect-ui.js",
+        "native-select-overlay.js",
         "native-layer-list-presenter.js",
         "native-object-ui.js",
         "native-layer-range-desktop.js",
