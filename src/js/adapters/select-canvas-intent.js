@@ -266,14 +266,16 @@
   // The top-most presented stroke within 8 screen pixels of the click, or null, as the baseline did: the active layer is
   // tested first, then every other visible unlocked layer from the topmost down (#2372). The hit carries its layer
   // (data.nativeLayerIndex/Uid) so applyPick can activate it. Only records whose bounds reach the click have their geometry
-  // read; a hidden or locked layer (the active one too) is never read.
-  async function pick(root, clientX, clientY) {
+  // read; a hidden or locked layer (the active one too) is never read. An integer `only` tests that one layer alone (the Tween
+  // Reassign flow clicks the elements of its own layer, as the baseline layer.hitTest did).
+  async function pick(root, clientX, clientY, only) {
     var s = presentedSession(root);
     if (!s) return undefined;
     var w = worldPoint(root, clientX, clientY, s.pin, s.presentation), t = 8 * w.perPixel, active = root.state.activeLayerIdx;
     var Point = root.Point || root.paper.Point, at = new Point(w.x, w.y), order = [active], reach = function (_item, b) {
       return w.x >= b[0] - t && w.x <= b[2] + t && w.y >= b[1] - t && w.y <= b[3] + t; };
-    for (var k = s.pin.layers.length - 1; k >= 0; k--) if (k !== active) order.push(k);
+    if (Number.isInteger(only)) order = [only];
+    else for (var k = s.pin.layers.length - 1; k >= 0; k--) if (k !== active) order.push(k);
     for (var n = 0; n < order.length; n++) {
       var info = s.pin.layers[order[n]];
       if (!info || info.locked === true || info.visible === false) continue;

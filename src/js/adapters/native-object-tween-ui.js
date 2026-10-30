@@ -4,7 +4,9 @@
  * through native-object-tween.js. Nothing here writes the document: no pushUndoLayers, saveAllLayerFrames, loadFrame or
  * generateTweens. Every entry returns null when the host is not in native mode (the baseline path then runs) and otherwise a
  * Promise of a typed result, never a rejection: {status: applied | unchanged | unavailable | refused | unconfirmed, code?, receipt?}.
- * Motion-arc drags and the D23/D24 reads have no native operation and stay typed-unavailable. */
+ * The Reassign flow takes its key span from the native cells read and its clicked identities from the native hit-test listing
+ * (reassignSpan, pickStroke), never from frames[] or Paper items. Motion-arc drags and the D23/D24 reads have no native
+ * operation and stay typed-unavailable. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -13,7 +15,8 @@
   'use strict';
   const unavailable = (code) => Object.freeze({ status: 'unavailable', code });
   const CODES = Object.freeze({ session: 'tween_session_unavailable', declaration: 'tween_declaration_missing', layer: 'tween_layer_unresolved',
-    arc: 'tween_motion_arc_unavailable', easing: 'tween_easing_invalid', span: 'tween_span_unavailable', selection: 'tween_selection_pending' });
+    arc: 'tween_motion_arc_unavailable', easing: 'tween_easing_invalid', span: 'tween_span_unavailable', selection: 'tween_selection_pending',
+    cells: 'tween_cells_unavailable', noKey: 'tween_no_key_before', noNext: 'tween_no_next_key', presentation: 'tween_presentation_unavailable' });
 
   function nativeMode(host) {
     try {
@@ -41,6 +44,8 @@
       : result.status === 'refused' ? 'Native tween was refused' + (result.reason ? ' (' + result.reason + ').' : '.')
       : result.code === CODES.arc ? 'Motion-arc tweens are unavailable in the native document.'
       : result.code === CODES.selection ? 'Finish or cancel the frame selection first.'
+      : result.code === CODES.noKey ? t(host, 'toastPlayheadOnKeyframeHint', 'Put the playhead on or after a keyframe.')
+      : result.code === CODES.noNext ? t(host, 'toastNoNextKeyframeToReassign', 'No next keyframe to reassign to.')
       : 'Native tween is unavailable.');
     return result;
   }
@@ -88,11 +93,21 @@
     const state = host.state, row = state && state.layers && state.layers[index], uid = commands.layerUid(index);
     return typeof uid === 'string' && uid && row && row.layerUid === uid ? uid : null;
   }
-  const drawn = (frame) => !!(frame && frame.isKeyframe && frame.strokes && frame.strokes.length > 0);
-  function drawnKeys(host, index) {
-    const row = host.state.layers[index], keys = [];
-    for (let i = 0; i < host.state.totalFrames; i++) if (drawn(row.frames[i])) keys.push(i);
-    return keys;
+  const sleep = (host, ms) => new Promise((done) => (host.setTimeout || setTimeout)(done, ms));
+  // The layer's key frames from the native whole-row cells read (the x-sheet's query), never from the legacy frames[] a native
+  // project projects empty: [{frame, drawn}] for every 'key' run, `drawn` = the key holds content. A refusal while the
+  // presentation catches up a revision is retried; null when the row stays unavailable.
+  async function readKeys(host, index) {
+    let session, uid;
+    try { session = host.NemoNativeObjectProject.desktop(host); uid = layerOf(host, host.NemoNativeObjectTween.desktop(host), index); } catch (_) { return null; }
+    if (!uid || !session || typeof session.readLayerCells !== 'function') return null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      let runs = null;
+      try { runs = await session.readLayerCells(uid, session.info()); } catch (_) { runs = null; }
+      if (Array.isArray(runs)) return runs.filter((run) => run[2] === 'key').map((run) => ({ frame: run[0], drawn: run[4] === true }));
+      if (attempt < 2) await sleep(host, 120);
+    }
+    return null;
   }
   const frames = (list) => Array.from(new Set(list.filter((f) => Number.isSafeInteger(f) && f >= 0))).sort((a, b) => a - b);
 
@@ -115,7 +130,8 @@
     });
   }
 
-  // reassign: the span's overrides (UI buffer, already updated by the flow), its own curve and its manual strokes.
+  // reassign: the span's overrides (UI buffer, already updated by the flow) and its own curve. A native document projects no
+  // frames[] and its hit-test listing carries no per-stroke tween flag, so there is no manual-stroke source to send here.
   function spanOf(host, index, from, to) {
     const state = host.state, row = state.layers[index];
     const key = typeof host.tweenSpanKey === 'function' ? host.tweenSpanKey(index, from, to) : row.layerUid + ':' + from + '-' + to;
@@ -128,11 +144,6 @@
     });
     const own = state.tweenEasing && state.tweenEasing[key], easing = curvePoints(own && own.points);
     if (easing) span.easing = easing;
-    const start = row.frames[from];
-    if (start && start.tweenManualMode) {
-      const ids = (start.strokes || []).filter((s) => s && s.tweenOn && typeof s.strokeId === 'string' && s.strokeId).map((s) => s.strokeId);
-      if (ids.length) span.manualStrokes = ids;
-    }
     return span;
   }
   function reassign(host, index, from, to) {
@@ -146,12 +157,41 @@
       return () => commands.reassign(uid, span, options);
     });
   }
-  // A per-span easing curve edit: the span starting at `from`, up to the next drawn key.
+  // A per-span easing curve edit: the span starting at the drawn key `from`, up to the next drawn key of the native cells read.
   function pairCurve(host, index, from) {
     if (!nativeMode(host)) return null;
-    let to = -1;
-    try { const keys = drawnKeys(host, index); const at = keys.indexOf(from); to = at >= 0 && at + 1 < keys.length ? keys[at + 1] : -1; } catch (_) { to = -1; }
-    return reassign(host, index, from, to);
+    return readKeys(host, index).then((keys) => {
+      const drawnKeys = (keys || []).filter((k) => k.drawn).map((k) => k.frame), at = drawnKeys.indexOf(from);
+      return reassign(host, index, from, at >= 0 && at + 1 < drawnKeys.length ? drawnKeys[at + 1] : -1);
+    });
+  }
+  // Reassign step 0: the key span the playhead is in (the nearest key at or before it, and the next key), from the cells read.
+  // Resolves {status:'span', from, to} or a noticed typed unavailable (no key before the playhead, no next key, cells unavailable).
+  function reassignSpan(host, index, frame) {
+    if (!nativeMode(host)) return null;
+    return readKeys(host, index).then((keys) => {
+      if (!keys) return notice(host, unavailable(CODES.cells));
+      const before = keys.filter((k) => k.frame <= frame).pop(), next = before && keys.find((k) => k.frame > before.frame);
+      if (!before) return notice(host, unavailable(CODES.noKey));
+      if (!next) return notice(host, unavailable(CODES.noNext));
+      return Object.freeze({ status: 'span', from: before.frame, to: next.frame });
+    });
+  }
+  // Reassign clicks: the native identity of the top-most presented element of layer `index` under the client point, read from
+  // the native hit-test listing (a linked fill answers its ribbon, a texture dab its anchor) once the canvas presents `frame`.
+  // Resolves {status:'hit', strokeId} (strokeId null on empty canvas) or a typed unavailable when the presentation never settled.
+  async function pickStroke(host, index, clientX, clientY, frame) {
+    const Intent = host.NemoSelectCanvasIntent;
+    for (let attempt = 0; Intent && attempt < 5; attempt++) {
+      let shown = null, hit;
+      try { shown = Intent.presentedState(host); } catch (_) { shown = null; }
+      if (shown && shown.presentation.frame === frame) {
+        try { hit = await Intent.pick(host, clientX, clientY, index); } catch (_) { hit = undefined; }
+        if (hit !== undefined) return Object.freeze({ status: 'hit', strokeId: hit && hit.data && typeof hit.data.strokeId === 'string' ? hit.data.strokeId : null });
+      }
+      await sleep(host, 120);
+    }
+    return unavailable(CODES.presentation);
   }
   // Harmonize: the edited interpolated frame becomes a key and the two spans around it are re-tweened (opt-in panel toggle).
   function harmonize(host, frame) {
@@ -169,5 +209,5 @@
       return () => commands.split(uid, frame, options);
     });
   }
-  return Object.freeze({ active: nativeMode, generate, reassign, pairCurve, split, harmonize, CODES });
+  return Object.freeze({ active: nativeMode, generate, reassign, pairCurve, reassignSpan, pickStroke, split, harmonize, CODES });
 }));
