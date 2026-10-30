@@ -228,7 +228,7 @@ test('presence publishes true only for a valid recovery and false for empty, mis
   }
   assert.deepEqual(await probe({entries:[ENTRY]}),[true]);
   assert.deepEqual(await probe({entries:[]}),[false]);
-  assert.deepEqual(await probe({throws:true}),[],'a failing store publishes nothing (card stays hidden)');
+  assert.deepEqual(await probe({throws:true}),[false],'a failing store publishes none, so a card shown earlier is hidden');
   assert.deepEqual(await probe({status:{apiVersion:2}}),[false]);
   assert.deepEqual(await probe({reply:r=>({apiVersion:2,requestId:'other',instanceId:r.instanceId,entries:[ENTRY]})}),[false]);
   assert.deepEqual(await probe({reply:r=>({apiVersion:2,requestId:r.requestId,instanceId:'other',entries:[ENTRY]})}),[false]);
@@ -275,14 +275,45 @@ test('Resume when the store has emptied since startup says so instead of opening
   const h=recoveryHost([ENTRY]),app=ordinary(h);await turn();await turn();
   h.entries=[];
   await app.element('start-resume').listeners.click();await turn();
-  assert.deepEqual(h.opened,[]);assert.ok(app.toasts.includes('toastCannotResumeSessionCorrupt'));
+  assert.deepEqual(h.opened,[]);
+  assert.ok(app.toasts.includes('Nothing to resume.'),'neutral notice');
+  assert.equal(app.toasts.includes('toastCannotResumeSessionCorrupt'),false,'an empty store is not a corrupt session');
+  assert.equal(app.element('start-resume').style.display,'none','the stale card is withdrawn');
+});
+
+test('the card is re-decided whenever the start screen is shown: hidden once the only slot is discarded, back when one appears',async()=>{
+  const h=recoveryHost([ENTRY]),app=ordinary(h);await turn();await turn();
+  assert.equal(app.element('start-resume').style.display,'');
+  h.entries=[];
+  await app.element('btn-new').listeners.click();await turn();await turn();
+  assert.equal(app.element('start-resume').style.display,'none');
+  assert.equal(app.element('start-cards').classList.contains('has-resume'),false);
+  h.entries=[ENTRY];
+  await app.element('btn-new').listeners.click();await turn();await turn();
+  assert.equal(app.element('start-resume').style.display,'');
+});
+
+test('the running session own slot is never offered: filtered from the list, and a lone own slot reads as nothing to resume',async()=>{
+  const OTHER={...ENTRY,slotKey:'other-bbbb2222',generations:[gen(5,500)]};
+  const notices=[],opened=[];
+  const make=(entries,own)=>Resume.create({
+    invoke:async(command,args)=>command==='nemo_native_object_client_status'?{apiVersion:2,instanceId:'inst-1'}
+      :(r=>({apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,entries}))(JSON.parse(args.requestJson)),
+    requestId:k=>'project-'+k+'-1',openRecovered:async e=>{opened.push(e.slotKey);return true;},notice:t=>notices.push(t),
+    failureText:()=>'corrupt',emptyText:()=>'nothing',ownSlots:()=>own});
+  const mixed=make([ENTRY,OTHER],[SLOT]);
+  assert.deepEqual((await mixed.list()).map(e=>e.slotKey),['other-bbbb2222']);
+  assert.equal(await mixed.resume(),true);assert.deepEqual(opened,['other-bbbb2222'],'resumes the other slot, not the newest own one');
+  const lone=make([ENTRY],[SLOT]);const seen=[];
+  assert.equal(await lone.presence(v=>seen.push(v)),false);assert.deepEqual(seen,[false]);
+  assert.equal(await lone.resume(),false);assert.deepEqual(notices,['nothing']);assert.deepEqual(opened,['other-bbbb2222']);
 });
 
 test('the scheduler sends supersedes with the resumed session first write only',async()=>{
   const hex=n=>n.toString(16).padStart(64,'0');let now=1_000_000,rev=1,serial=0;const writes=[];
   const pin={active:true,busy:false,presented:true,reference:hex(0),supersedes:SLOT};
   const scheduler=Recovery.create({now:()=>now,setTimer:()=>1,clearTimer:()=>{},blocked:()=>false,slot:()=>({path:null,name:'Untitled'}),
-    notice:()=>{},requestId:k=>'project-'+k+'-'+(++serial),hash:()=>'h4sh',randomHex:()=>'deadbeef',
+    notice:()=>{},requestId:k=>'project-'+k+'-'+(++serial),hash:()=>'h4sh',
     pin:()=>({...pin,info:{instanceId:'instance',documentId:'document-1',lifecycleGeneration:1,contentRevision:rev,
       documentSnapshotId:'snapshot-'+rev,documentDigest:hex(rev),byteCount:1000}}),
     write:async(command,request)=>{writes.push(request);return {apiVersion:2,requestId:request.requestId,instanceId:request.instanceId,
@@ -297,7 +328,7 @@ test('the scheduler sends supersedes with the resumed session first write only',
 test('a malformed pin supersedes is ignored and never reaches the request',async()=>{
   const hex=n=>n.toString(16).padStart(64,'0');const writes=[];let serial=0;
   const scheduler=Recovery.create({now:()=>1_000_000,setTimer:()=>1,clearTimer:()=>{},blocked:()=>false,slot:()=>({path:null,name:'Untitled'}),
-    notice:()=>{},requestId:k=>'project-'+k+'-'+(++serial),hash:()=>'h4sh',randomHex:()=>'deadbeef',
+    notice:()=>{},requestId:k=>'project-'+k+'-'+(++serial),hash:()=>'h4sh',
     pin:()=>({active:true,busy:false,presented:true,reference:hex(0),supersedes:'../etc',info:{instanceId:'instance',documentId:'document-1',
       lifecycleGeneration:1,contentRevision:1,documentSnapshotId:'snapshot-1',documentDigest:hex(1),byteCount:1000}}),
     write:async(c,r)=>{writes.push(r);return {apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,published:true,byteCount:1,savedAtMs:1,cleanupPending:false,supersededRemoved:false};}});

@@ -238,6 +238,10 @@
     // #2358 D23: the onion / Ghost All ghost frames of one layer around the presented frame: stored vector geometry of each ghost frame,
     // read in the bounded pages of the one ghosts view. Every page is pinned to the same revision, snapshot and presentation, so a frame
     // or revision change anywhere in the sequence throws `stale_revision` and nothing partial is returned.
+    // The page budget follows what the answers report instead of a fixed count: a page covers at least one segment, so a ghost frame of
+    // `total` segments is at most `max(total, 1)` pages and the whole read at most one page plus the sum of the frames' totals. A ceiling on
+    // the segments of the whole read bounds what one read may assemble.
+    const GHOST_SEGMENT_CEILING = 2000000;
     const GHOST_KEYS = ['contextId', 'frame', 'layerUid', 'onion', 'ghostAll', 'from', 'to', 'previousOpacity', 'nextOpacity', 'mode'];
     async function readGhosts(selector, pin) {
       if (!exact(selector, GHOST_KEYS, ['previousTint', 'nextTint', 'shift']) || selector.contextId !== 'scene-root' || !integer(selector.frame, 0, 4294967295) || !text(selector.layerUid) || !pins(pin))
@@ -246,12 +250,17 @@
       if (!o) throw fault('unavailable', 'No matching presented native ghost view', 'ghost_view_unavailable');
       await settle(o);
       const frames = [];
-      let at = { ghost: 0, cursor: 0 }, pages = 0;
+      let at = { ghost: 0, cursor: 0 }, pages = 0, allowed = 1, segments = 0;
       for (;;) {
-        if (++pages > 600) throw fault('unavailable', 'Ghost frames exceed the page budget', 'ghost_pages_exceeded');
+        if (++pages > allowed) throw fault('unavailable', 'Ghost frames exceed the page budget', 'ghost_pages_exceeded');
         const view = Object.assign({ kind: 'ghosts', workId: o.workId, viewGeneration: o.viewGeneration, ghost: at.ghost, cursor: at.cursor }, selector);
         const r = await queryBody(o, { atRevision: o.info.contentRevision, documentSnapshotId: o.info.documentSnapshotId, view: view });
         if (r.ghost !== null) {
+          if (at.cursor === 0) {
+            segments += r.total;
+            if (segments > GHOST_SEGMENT_CEILING) throw fault('unavailable', 'Ghost frames exceed the segment budget', 'ghost_segments_exceeded');
+            allowed += Math.max(r.total, 1);
+          }
           if (!frames[r.ghost.index]) frames[r.ghost.index] = { frame: r.ghost.frame, kind: r.ghost.kind, opacity: r.ghost.opacity, translation: r.ghost.translation, paths: [] };
           const paths = frames[r.ghost.index].paths;
           r.items.forEach((item) => {

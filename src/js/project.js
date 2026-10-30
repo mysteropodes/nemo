@@ -466,7 +466,7 @@
         var allowConfirmedClose=false;
         appWindow.onCloseRequested(async function(event){
           if(allowConfirmedClose)return; // confirmed quit-without-saving keeps the recovery (parity)
-          if(!isDirty()){ // clean quit: drop the crash recovery first, bounded and best effort
+          if(!isDirty()){ // clean quit: drop the ACTIVE document's crash recovery only (parked dirty tabs keep theirs), bounded, best effort
             if(nativeRecoveryCleanup)try{await nativeRecoveryCleanup.cleanQuit();}catch(_){}
             return;
           }
@@ -662,7 +662,8 @@
 
   // ---- Start screen ----
   function hideStartScreen(){document.getElementById('start-screen').classList.add('hid');}
-  function showStartScreen(){document.getElementById('start-screen').classList.remove('hid');}
+  var startScreenView=null; // re-decides the Resume card on every show
+  function showStartScreen(){document.getElementById('start-screen').classList.remove('hid');if(startScreenView)startScreenView.refresh();}
 
   function renderRecents(){
     var snapshot;
@@ -707,10 +708,10 @@
   // Native desktop Resume (#2360 R3): the card follows the Rust recovery store, never the legacy nemo-auto slot.
   var nativeResume=window.NemoNativeObjectRecoveryResume&&nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.openRecovered?
     window.NemoNativeObjectRecoveryResume.bind(window,{openRecovered:nativeSavedUI.openRecovered,
-      allowOpen:nativeSavedUI.allowOpen,notice:showToast}):null;
+      allowOpen:nativeSavedUI.allowOpen,notice:showToast,ownSlots:function(){return nativeRecovery?nativeRecovery.claim():[];}}):null;
   function initStartScreen(){
     SMProjectEntry.initializeTabs(document);
-    SMProjectEntry.bindStartScreen(document,{
+    startScreenView=SMProjectEntry.bindStartScreen(document,{
       readResumePresence:function(){if(nativeResume)return false;try{return !!localStorage.getItem('nemo-auto');}catch(e){return false;}},
       // Media-heavy autosave can be present only in IndexedDB after quota
       // overflow. Resolve to a boolean before crossing the view boundary.

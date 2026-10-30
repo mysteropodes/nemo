@@ -6,7 +6,7 @@
  * settings changed, is discarded, never shown. This file only reads and paints: it never writes, selects or touches history.
  * The view preferences (onion toggle, range, opacities, mode, Ghost All) stay in `state`, the tints and shift in the baseline's own
  * localStorage keys. Viewport compositing of ghosts inside the native renderer is not available: the ghosts are an SVG overlay of the
- * viewport, below the select / rig / widget overlays and never part of an export. */
+ * viewport, below the select (20) / rig / widget overlays and never part of an export. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -15,6 +15,7 @@
   'use strict';
   const SVG = 'http://www.w3.org/2000/svg';
   const PIN = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
+  const STALE_RETRY_MS = 250;
   const TINTS = { prev: '#ff4d4d', next: '#4d8cff' };
   const samePin = (a, b) => !!a && !!b && PIN.every((k) => a[k] === b[k]);
   const hex6 = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
@@ -92,8 +93,14 @@
   }
 
   function create(win) {
-    let overlay = null, lastSig = null, shown = null, pending = null, serial = 0, paintQueued = false, queue = Promise.resolve(), timer = null, frameTick = false, installed = false;
+    let failed = null, overlay = null, lastSig = null, shown = null, pending = null, serial = 0, paintQueued = false, queue = Promise.resolve(), timer = null, frameTick = false, installed = false;
     const warned = new Set();
+    function nowMs() { return win.performance && typeof win.performance.now === 'function' ? win.performance.now() : Date.now(); }
+    function blocked(entry) {
+      if (!failed) return false;
+      if (failed.key !== entry.key) { failed = null; return false; }
+      return !failed.stale || nowMs() - failed.at < STALE_RETRY_MS;
+    }
     function toast(message) { try { if (win.showToast) win.showToast(message, 'warn'); } catch (_) { /* presentation only */ } }
     function node(name, attrs) {
       const n = win.document.createElementNS(SVG, name);
@@ -103,7 +110,7 @@
     function ensureOverlay() {
       if (overlay && overlay.isConnected) return overlay;
       overlay = node('svg', { 'aria-hidden': 'true', 'data-nemo-ghosts': '' });
-      Object.assign(overlay.style, { position: 'fixed', left: '0', top: '0', width: '100vw', height: '100vh', overflow: 'visible', pointerEvents: 'none', zIndex: '800' });
+      Object.assign(overlay.style, { position: 'fixed', left: '0', top: '0', width: '100vw', height: '100vh', overflow: 'visible', pointerEvents: 'none', zIndex: '15' });
       (win.document.body || win.document.documentElement).appendChild(overlay);
       return overlay;
     }
@@ -144,6 +151,8 @@
     }
     function failure(entry, error) {
       shown = null;
+      // Remember the refused key: it is asked again only when the key changes (a stale answer after a short pause), never once per frame.
+      failed = { key: entry.key, at: nowMs(), stale: !!error && error.code === 'stale_revision' };
       const reason = (error && (error.reason || error.code)) || 'unavailable', key = entry.selector.layerUid + ':' + reason;
       // A stale answer is not a failure: the next tick asks again. Anything else is said once per layer and reason.
       if ((error && error.code) !== 'stale_revision' && reason !== 'ghost_view_unavailable' && !warned.has(key)) {
@@ -154,7 +163,16 @@
     // One read at a time, keyed by pin + presentation + settings: an unchanged key costs a comparison, a changed one supersedes the pending read.
     function refresh(known) {
       const entry = known || selectorNow(win);
-      if (!entry) { if (pending || shown) { serial++; pending = null; shown = null; } paint(); return Promise.resolve(null); }
+      if (!entry) {
+        failed = null;
+        const had = !!(pending || shown || (overlay && overlay.firstChild));
+        if (pending || shown) { serial++; pending = null; shown = null; }
+        if (had) paint();
+        return Promise.resolve(null);
+      }
+      // The previous frame's ghosts never stay over a new frame while its read is in flight.
+      if (shown && shown.key !== entry.key) { shown = null; clearOverlay(); paint(); }
+      if (blocked(entry)) return Promise.resolve(null);
       if (shown && shown.key === entry.key && shown.entry.current()) { draw(entry); return Promise.resolve(shown.value); }
       if (pending && pending.key === entry.key && entry.current()) return pending.promise;
       serial++;
@@ -165,6 +183,7 @@
         .then((value) => {
           const now = token === serial && value && entry.current() ? selectorNow(win) : null;
           if (!now || now.key !== entry.key || !samePin(value.info, entry.info)) return null; // stale, superseded or settings moved: discard
+          failed = null;
           shown = { key: entry.key, entry, value };
           paint();
           return value;
@@ -177,9 +196,11 @@
     function tick() {
       timer = null; frameTick = false;
       if (!installed) return;
-      refresh(selectorNow(win));
-      const st = win.state;
-      if (st && (st.onionSkin || st.ghostAllFrames) && win.requestAnimationFrame) { frameTick = true; win.requestAnimationFrame(tick); } else schedule();
+      const entry = selectorNow(win);
+      refresh(entry);
+      // Animation frames only while a native presentation is being followed or a read is pending; no session or a refused key idles on the slow timer.
+      const st = win.state, live = session(win), following = !!(st && (st.onionSkin || st.ghostAllFrames) && live && live.isActive() && !(entry && blocked(entry)));
+      if ((pending || following) && win.requestAnimationFrame) { frameTick = true; win.requestAnimationFrame(tick); } else schedule();
     }
     function schedule() { if (!installed || timer !== null || frameTick) return; timer = win.setTimeout ? win.setTimeout(tick, 300) : null; }
     function install() { if (installed) return api; installed = true; schedule(); return api; }

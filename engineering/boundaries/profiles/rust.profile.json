@@ -2379,6 +2379,7 @@
         "native_object_recovery_tests.rs",
         "native_object_recovery_failure_tests.rs",
         "native_object_recovery_list_tests.rs",
+        "native_object_recovery_corrupt_tests.rs",
         "native_object_v2_persistence_tests.rs",
         "native_object_v2_refusal_tests.rs",
         "native_object_preview_tests.rs",

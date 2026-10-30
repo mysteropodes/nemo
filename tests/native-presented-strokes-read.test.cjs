@@ -15,7 +15,9 @@ function fixture(mode){
   const reads=Reads.create({state:()=>state,settled:async()=>{},requestId:()=>`q-${++serial}`,dispatch:async q=>{
     sent.push(q);const p=q.payload;let result;const rev=state.info.contentRevision;
     if(p.view){const {limit,...view}=p.view;
-      result={...view,atRevision:rev,documentSnapshotId:state.info.documentSnapshotId,total:2,nextCursor:null,preview:false,items:items.map(i=>({...i}))};
+      if(mode==='bytes'){const end=Math.min(view.cursor+1,items.length);
+        result={...view,atRevision:rev,documentSnapshotId:state.info.documentSnapshotId,total:items.length,nextCursor:end===items.length?null:end,preview:false,items:items.slice(view.cursor,end).map(i=>({...i}))};}
+      else result={...view,atRevision:rev,documentSnapshotId:state.info.documentSnapshotId,total:2,nextCursor:null,preview:false,items:items.map(i=>({...i}))};
       if(mode==='unmarked')delete result.hitTest;
     }else{
       const page=p.subselect,ribbon=p.stableTarget.strokeId==='ribbon',source=page.center?outline.slice(0,18):ribbon?outline:outline.slice(0,2),total=mode==='count'&&ribbon?19:source.length;
@@ -34,6 +36,11 @@ test('the hit-test listing names every record and pages geometry only for the re
     [['view',true],['geometry','ink',true]]);
   const all=await fixture().read();
   assert.deepEqual(all.items[1].segments,f.outline,'without a filter every painted outline is paged (16 + 4)');
+});
+test('a listing the engine shortened to its byte cap is followed by nextCursor until every record is read (#2372 SEL-PAGE)',async()=>{
+  const f=fixture('bytes'),r=await f.read(item=>item.role==='plain');
+  assert.deepEqual(r.items.map(i=>[i.stableTarget.strokeId,i.role]),[['ink','plain'],['ribbon','ribbon']]);
+  assert.deepEqual(f.sent.filter(q=>q.payload.view).map(q=>q.payload.view.cursor),[0,1],'the second page starts where the shortened first one ended');
 });
 test('an unmarked listing or geometry that disagrees with it is refused',async()=>{
   await assert.rejects(fixture('unmarked').read(),undefined,'unmarked');

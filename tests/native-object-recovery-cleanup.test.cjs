@@ -23,7 +23,7 @@ function rig(options={}){
   const scheduler=Recovery.create({
     now:()=>now,setTimer:(fn,ms)=>{timers.push({id:++timerId,at:now+ms,fn});return timerId;},clearTimer:id=>{timers=timers.filter(t=>t.id!==id);},
     blocked:()=>false,slot:()=>r.slot||{path:null,name:'Untitled'},notice:()=>{},requestId:k=>'project-'+k+'-'+(++serial),
-    hash:()=>'h4sh',randomHex:()=>'deadbeef',
+    hash:()=>'h4sh',
     pin:()=>({active:true,busy:false,presented:true,reference:hex(0),info:{instanceId:'instance',documentId:r.documentId||'document-1',
       lifecycleGeneration:1,contentRevision:r.rev,documentSnapshotId:'snapshot-'+r.rev,documentDigest:hex(r.rev),byteCount:1000}}),
     write:async(command,request)=>{
@@ -33,7 +33,7 @@ function rig(options={}){
   const realStop=scheduler.stop;
   const wrapped=Object.freeze({...scheduler,stop(){r.stopped++;realStop();}});
   const cleanupTimers=[];
-  const cleanup=Cleanup.create({scheduler:wrapped,instanceId:()=>r.noInstance?null:'instance',requestId:k=>'project-'+k+'-'+(++serial),
+  const cleanup=Cleanup.create({scheduler:wrapped,instanceId:()=>r.noInstance?null:'instance',documentId:()=>r.documentId||'document-1',requestId:k=>'project-'+k+'-'+(++serial),
     setTimer:(fn,ms)=>{const t={fn,ms,cleared:false};cleanupTimers.push(t);return t;},clearTimer:t=>{t.cleared=true;},
     invoke:async(command,args)=>{
       assert.equal(command,'nemo_native_object_recovery_discard');
@@ -131,6 +131,29 @@ test('cleanQuit stops the writer, waits for an in-flight write, drops every slot
   assert.equal((await stuck).discarded.length,0);hang.discardGate.resolve();
 });
 
+test('cleanQuit drops only the active document slots: a dirty parked tab keeps its recovery',async()=>{
+  const r=rig();
+  r.documentId='document-A';r.slot={path:'/p/a.json',name:'A'};r.rev=2;await r.raw.flush();            // tab A has unsaved edits and a recovery slot
+  const slotA=r.writes[0].slotKey;
+  r.documentId='document-B';r.slot={path:'/p/b.json',name:'B'};r.rev=3;r.advance(60_000);await r.raw.flush(); // switch to tab B, which also published one
+  const slotB=r.writes[1].slotKey;
+  assert.notEqual(slotA,slotB);
+  assert.deepEqual(r.scheduler.claim().sort(),[slotA,slotB].sort());
+  const out=await r.cleanup.cleanQuit();                            // quit with B (clean) active
+  assert.deepEqual(r.discards,[slotB],"only the active document's slot is discarded");
+  assert.deepEqual(out.discarded,[slotB]);
+  assert.deepEqual(r.scheduler.claim(),[slotA],'the parked dirty tab keeps its recovery slot, still owned');
+  assert.equal(r.stopped,1,'the writer is still stopped');
+});
+
+test('cleanQuit with no resolvable active document discards nothing',async()=>{
+  const r=rig();await r.raw.flush();
+  const none=Cleanup.create({scheduler:r.scheduler,instanceId:()=>'instance',documentId:()=>null,requestId:()=>'x',
+    setTimer:()=>1,clearTimer:()=>{},invoke:async()=>assert.fail('no IPC')});
+  assert.deepEqual(await none.cleanQuit(),{discarded:[],failed:[]});
+  assert.equal(r.scheduler.claim().length,1);
+});
+
 test('cleanQuit with nothing written does no IPC and never throws',async()=>{
   const r=rig();
   assert.deepEqual(await r.cleanup.cleanQuit(),{discarded:[],failed:[]});assert.equal(r.discards.length,0);
@@ -185,7 +208,7 @@ function wire(h,extra={},acknowledgement=Ack){
   const s=session(h),state={confirms:0,confirm:true,pick:'/new.json',effects:[]};let serial=0;
   const holder={};
   const scheduler=Recovery.create({now:()=>Date.now(),setTimer:()=>1,clearTimer:()=>{},blocked:()=>false,
-    slot:()=>({path:null,name:'Untitled'}),notice:()=>{},requestId:k=>'project-'+k+'-'+(++serial),hash:()=>'h4sh',randomHex:()=>'deadbeef',
+    slot:()=>({path:null,name:'Untitled'}),notice:()=>{},requestId:k=>'project-'+k+'-'+(++serial),hash:()=>'h4sh',
     pin:()=>{const p=holder.ui.recoveryPin();return {...p,presented:true,reference:hex(0)};},
     write:(command,request)=>h.invoke(command,{requestJson:JSON.stringify(request)})});
   scheduler.start();
@@ -302,7 +325,7 @@ function ordinary(h,extra={}){
     root.NemoNativeObjectRecoveryCleanup=Cleanup;
     root.NemoNativeObjectRecovery={bind(r,ports){let serial=0;
       captured.scheduler=Recovery.create({now:()=>Date.now(),setTimer:()=>1,clearTimer:()=>{},blocked:()=>false,slot:ports.slot,notice:ports.notice,
-        requestId:k=>'project-'+k+'-'+(++serial),hash:()=>'h4sh',randomHex:()=>'deadbeef',
+        requestId:k=>'project-'+k+'-'+(++serial),hash:()=>'h4sh',
         pin:()=>({...ports.pin(),presented:true,reference:hex(0)}),
         write:(command,request)=>h.invoke(command,{requestJson:JSON.stringify(request)})});
       return captured.scheduler;}};

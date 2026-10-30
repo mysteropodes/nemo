@@ -10,7 +10,8 @@ const UID = 'native-layer:1:0';
 function harness(options) {
   options = options || {};
   const legacy = [], toasts = [], reads = [], store = {}, frames = [], held = [];
-  const sandbox = { console, setTimeout: () => 0, clearTimeout() {} };
+  const timers = [], clock = { t: 1000 };
+  const sandbox = { console, setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; }, clearTimeout() {}, performance: { now: () => clock.t } };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   sandbox.state = { currentFrame: 4, totalFrames: 10, activeLayerIdx: 0, playing: false, onionSkin: false, ghostAllFrames: false, onionIn: 1, onionOut: 8,
     onionPrevOpacity: 30, onionNextOpacity: 40, onionMode: 'tinted', layers: [] };
@@ -48,7 +49,7 @@ function harness(options) {
         { frame: 0, kind: 'allKeys', opacity: 0.34, translation: [0, 0], paths: [{ sourceId: 'b', closed: false, width: 1, fill: null, stroke: '#adc0ffff', opacity: 0.4, count: 2,
           segments: [[0, 0], [10, 10]] }] }] });
     } };
-  sandbox.NemoNativeObjectProject = { desktop: () => session };
+  if (!options.noSession) sandbox.NemoNativeObjectProject = { desktop: () => session };
   sandbox.NemoNativeViewportUnderlay = { canvasMapping: Object.freeze({ bounds: () => ({ left: 10, top: 20, width: 960, height: 540 }), matchesView: () => true,
     screen: (p) => ({ x: p.x + 10, y: p.y + 20 }) }) };
   vm.createContext(sandbox);
@@ -57,7 +58,7 @@ function harness(options) {
   const ui = () => sandbox.NemoNativeObjectGhostUI.desktop(global);
   const svg = () => created.find((n) => n.name === 'svg');
   const paths = () => { const s = svg(); const g = s && s.children.find((c) => c.name === 'g'); return g ? g.children : []; };
-  return { sandbox, session, legacy, toasts, reads, store, flush, held, ui, svg, paths, store,
+  return { sandbox, session, timers, clock, frames, legacy, toasts, reads, store, flush, held, ui, svg, paths, store,
     bump: () => { revision += 1; }, ticket: () => { ticket += 1; }, setView: (v) => { view = v; shown = null; } };
 }
 const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -181,4 +182,60 @@ test('a refused read paints nothing and is said once per layer and reason; a sta
   quiet.sandbox.state.onionSkin = true;
   await quiet.ui().refresh();
   assert.deepEqual(quiet.toasts, []);
+});
+
+test('a refused read is not retried every frame: the failed key is asked again only when it changes (stale after a short pause)', async () => {
+  const h = harness({ fail: 'unavailable' });
+  h.sandbox.state.onionSkin = true;
+  await h.ui().refresh();
+  for (let n = 0; n < 5; n++) { await h.ui().refresh(); h.flush(); }
+  assert.equal(h.reads.length, 1, 'one failing read per key, not one per animation frame');
+  h.bump(); await h.ui().refresh();
+  assert.equal(h.reads.length, 2, 'a changed key asks again');
+  const stale = harness({ fail: 'stale_revision' });
+  stale.sandbox.state.onionSkin = true;
+  await stale.ui().refresh(); await stale.ui().refresh();
+  assert.equal(stale.reads.length, 1, 'inside the short window a stale refusal is not repeated');
+  stale.clock.t += 400; await stale.ui().refresh();
+  assert.equal(stale.reads.length, 2, 'after the short window it is asked again');
+});
+
+test('a frame change clears the old ghosts at once, before the new read lands', async () => {
+  const h = harness({ hold: true });
+  h.sandbox.state.onionSkin = true;
+  const first = h.ui().refresh(); await settle(); h.held[0](); await first; h.flush();
+  assert.equal(h.paths().length, 2);
+  h.sandbox.state.currentFrame = 5;
+  const next = h.ui().refresh(); h.flush();
+  assert.deepEqual(h.paths(), [], 'the previous frame ghosts are gone while the new read is pending');
+  await settle(); h.held[1](); await next; h.flush();
+  assert.equal(h.paths().length, 2);
+});
+
+test('the ghost overlay sits just below the select overlay (z-index 15)', async () => {
+  const h = harness();
+  h.sandbox.state.onionSkin = true;
+  await h.ui().refresh(); h.flush();
+  assert.equal(h.svg().style.zIndex, '15');
+});
+
+test('without a native session no animation frame is ever scheduled, only the slow timer', async () => {
+  const h = harness({ noSession: true });
+  h.sandbox.state.onionSkin = true; h.sandbox.state.ghostAllFrames = true;
+  h.ui().install();
+  for (let n = 0; n < 3; n++) { const t = h.timers.shift(); assert.ok(t, 'a slow timer is armed'); assert.ok(t.ms >= 300); t.fn(); await settle(); }
+  assert.equal(h.frames.length, 0, 'no requestAnimationFrame while there is no native-active session');
+  h.ui().dispose();
+});
+
+test('with a native session the loop follows on animation frames and a refused key goes back to the slow timer', async () => {
+  const h = harness({ fail: 'unavailable' });
+  h.sandbox.state.onionSkin = true;
+  h.ui().install();
+  h.timers.shift().fn(); await settle();
+  assert.ok(h.frames.length >= 1, 'a live native session is followed per animation frame');
+  for (let n = 0; n < 6; n++) { h.flush(); await settle(); }
+  assert.equal(h.reads.length, 1);
+  assert.ok(h.timers.length >= 1 || h.frames.length === 0, 'the refused key no longer spins on animation frames');
+  h.ui().dispose();
 });
