@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "90b4d6874346e1ebff179d59431430d225a5ef49",
-  "describe": "v0.7.0-alpha.4-3992-g90b4d687-dirty"
+  "head": "f17c39d8ac776cd4c432b9ff298c97379170d94c",
+  "describe": "f17c39d8-dirty"
  },
- "inputsDigest": "62375993efd669f85e368f574601e1414bd978c4cf2c667a754135bb4016a4c9",
+ "inputsDigest": "58ed329b44e952fdceb1037d67bc485ed2e1aefdd65701eff1129ac2b7f1ab26",
  "states": [
   "inventoried",
   "characterized",
@@ -8005,7 +8005,7 @@
     "container": "footage-blend-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 35,
+    "functionsVisited": 34,
     "via": "variable sel",
     "references": []
    },
@@ -25749,7 +25749,7 @@
    "source": "src/js/motion.js:9819",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 166
+    "functionsVisited": 174
    },
    "fixtures": [
     "static-props",
@@ -25791,7 +25791,7 @@
    "source": "src/js/motion.js:9864",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 457
+    "functionsVisited": 462
    },
    "fixtures": [
     "static-props",
@@ -28351,7 +28351,7 @@
    "source": "src/js/shapes-panel.js:738",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 92
+    "functionsVisited": 100
    },
    "fixtures": [
     "static-props",
@@ -28465,7 +28465,7 @@
    "source": "src/js/shapes-panel.js:860",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 92
+    "functionsVisited": 100
    },
    "fixtures": [
     "static-props",
@@ -30935,7 +30935,7 @@
    "source": "src/js/timeline.js:5622",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 166
+    "functionsVisited": 174
    },
    "fixtures": [
     "keyed-props",
@@ -30974,7 +30974,7 @@
    "source": "src/js/timeline.js:5653",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 457
+    "functionsVisited": 462
    },
    "fixtures": [
     "keyed-props",
