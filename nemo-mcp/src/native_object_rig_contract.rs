@@ -23,10 +23,14 @@ const SPEC: &str = r####"{
 "labs.pingpong": {"command":"object.labs.pingpong","result":"command","node":{"t":"obj","req":{"fromLayer":{"t":"str","min":1,"max":256},"toLayer":{"t":"str","min":1,"max":256},"fromFrame":{"t":"int","min":0,"max":4294967295},"toFrame":{"t":"int","min":0,"max":4294967295},"times":{"t":"int","min":1,"max":50}}}},
 "labs.retime": {"command":"object.labs.retime","result":"command","node":{"t":"obj","req":{"fromLayer":{"t":"str","min":1,"max":256},"toLayer":{"t":"str","min":1,"max":256},"fromFrame":{"t":"int","min":0,"max":4294967295},"toFrame":{"t":"int","min":0,"max":4294967295},"spacing":{"t":"int","min":1,"max":12}}}},
 "labs.interval": {"command":"object.labs.interval","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":256},"fromFrame":{"t":"int","min":0,"max":4294967295},"toFrame":{"t":"int","min":0,"max":4294967295},"count":{"t":"int","min":1,"max":999},"ease":{"t":"enum","v":["linear","in","out","inout"]}}}},
-"labs.moveToLayer": {"command":"object.labs.moveToLayer","result":"command","node":{"t":"obj","req":{"fromLayer":{"t":"str","min":1,"max":256},"toLayer":{"t":"str","min":1,"max":256},"frame":{"t":"int","min":0,"max":4294967295},"strokeIds":{"t":"arr","min":1,"max":256,"of":{"t":"str","min":1,"max":256}}}}}
+"labs.moveToLayer": {"command":"object.labs.moveToLayer","result":"command","node":{"t":"obj","req":{"fromLayer":{"t":"str","min":1,"max":256},"toLayer":{"t":"str","min":1,"max":256},"frame":{"t":"int","min":0,"max":4294967295},"strokeIds":{"t":"arr","min":1,"max":256,"of":{"t":"str","min":1,"max":256}}}}},
+"tween.generate": {"command":"object.tween.generate","result":"command","node":{"t":"oneOf","cases":[{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":255}},"opt":{"options":{"t":"obj","req":{"resamplePoints":{"t":"int","min":2,"max":256},"step":{"t":"int","min":1,"max":999},"skipManual":{"t":"bool"},"easing":{"t":"arr","of":{"t":"obj","req":{"x":{"t":"num","min":0,"max":1},"y":{"t":"num"}},"opt":{"tx":{"t":"num"},"ty":{"t":"num"}}},"min":0,"max":256}}}}},{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":255},"starts":{"t":"arr","of":{"t":"int","min":0,"max":4294967295},"min":0,"max":4096}},"opt":{"options":{"t":"obj","req":{"resamplePoints":{"t":"int","min":2,"max":256},"step":{"t":"int","min":1,"max":999},"skipManual":{"t":"bool"},"easing":{"t":"arr","of":{"t":"obj","req":{"x":{"t":"num","min":0,"max":1},"y":{"t":"num"}},"opt":{"tx":{"t":"num"},"ty":{"t":"num"}}},"min":0,"max":256}}}}},{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":255},"selection":{"t":"arr","of":{"t":"int","min":0,"max":4294967295},"min":0,"max":4096}},"opt":{"options":{"t":"obj","req":{"resamplePoints":{"t":"int","min":2,"max":256},"step":{"t":"int","min":1,"max":999},"skipManual":{"t":"bool"},"easing":{"t":"arr","of":{"t":"obj","req":{"x":{"t":"num","min":0,"max":1},"y":{"t":"num"}},"opt":{"tx":{"t":"num"},"ty":{"t":"num"}}},"min":0,"max":256}}}}}]}},
+"tween.regenerate": {"command":"object.tween.regenerate","result":"command","node":{"t":"oneOf","cases":[{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":255}},"opt":{"options":{"t":"obj","req":{"resamplePoints":{"t":"int","min":2,"max":256},"step":{"t":"int","min":1,"max":999},"skipManual":{"t":"bool"},"easing":{"t":"arr","of":{"t":"obj","req":{"x":{"t":"num","min":0,"max":1},"y":{"t":"num"}},"opt":{"tx":{"t":"num"},"ty":{"t":"num"}}},"min":0,"max":256}}}}},{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":255},"starts":{"t":"arr","of":{"t":"int","min":0,"max":4294967295},"min":0,"max":4096}},"opt":{"options":{"t":"obj","req":{"resamplePoints":{"t":"int","min":2,"max":256},"step":{"t":"int","min":1,"max":999},"skipManual":{"t":"bool"},"easing":{"t":"arr","of":{"t":"obj","req":{"x":{"t":"num","min":0,"max":1},"y":{"t":"num"}},"opt":{"tx":{"t":"num"},"ty":{"t":"num"}}},"min":0,"max":256}}}}},{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":255},"selection":{"t":"arr","of":{"t":"int","min":0,"max":4294967295},"min":0,"max":4096}},"opt":{"options":{"t":"obj","req":{"resamplePoints":{"t":"int","min":2,"max":256},"step":{"t":"int","min":1,"max":999},"skipManual":{"t":"bool"},"easing":{"t":"arr","of":{"t":"obj","req":{"x":{"t":"num","min":0,"max":1},"y":{"t":"num"}},"opt":{"tx":{"t":"num"},"ty":{"t":"num"}}},"min":0,"max":256}}}}}]}},
+"tween.split": {"command":"object.tween.split","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":255},"frame":{"t":"int","min":0,"max":4294967295}},"opt":{"options":{"t":"obj","req":{"resamplePoints":{"t":"int","min":2,"max":256},"step":{"t":"int","min":1,"max":999},"skipManual":{"t":"bool"},"easing":{"t":"arr","of":{"t":"obj","req":{"x":{"t":"num","min":0,"max":1},"y":{"t":"num"}},"opt":{"tx":{"t":"num"},"ty":{"t":"num"}}},"min":0,"max":256}}}}}},
+"tween.reassign": {"command":"object.tween.reassign","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":255},"span":{"t":"obj","req":{"from":{"t":"int","min":0,"max":4294967295},"to":{"t":"int","min":0,"max":4294967295},"overrides":{"t":"arr","min":0,"max":128,"of":{"t":"obj","req":{"bId":{"t":"str","min":1,"max":255}},"opt":{"aId":{"t":"str","min":1,"max":255},"aIds":{"t":"arr","of":{"t":"str","min":1,"max":255},"min":1,"max":128}},"xor":["aId","aIds"]}}},"opt":{"easing":{"t":"arr","of":{"t":"obj","req":{"x":{"t":"num","min":0,"max":1},"y":{"t":"num"}},"opt":{"tx":{"t":"num"},"ty":{"t":"num"}}},"min":0,"max":256},"manualStrokes":{"t":"arr","of":{"t":"str","min":1,"max":255},"min":0,"max":128}}}},"opt":{"options":{"t":"obj","req":{"resamplePoints":{"t":"int","min":2,"max":256},"step":{"t":"int","min":1,"max":999},"skipManual":{"t":"bool"},"easing":{"t":"arr","of":{"t":"obj","req":{"x":{"t":"num","min":0,"max":1},"y":{"t":"num"}},"opt":{"tx":{"t":"num"},"ty":{"t":"num"}}},"min":0,"max":256}}}}}}
 }"####;
 
-const DECLARED: [&str; 14] = [
+const DECLARED: [&str; 18] = [
     "image.mesh.edit",
     "widget.create",
     "widget.write",
@@ -41,6 +45,10 @@ const DECLARED: [&str; 14] = [
     "labs.retime",
     "labs.interval",
     "labs.moveToLayer",
+    "tween.generate",
+    "tween.regenerate",
+    "tween.split",
+    "tween.reassign",
 ];
 fn parse_table(source: &str) -> Map<String, Value> {
     match serde_json::from_str::<Value>(source) {
@@ -296,3 +304,7 @@ mod tests;
 #[cfg(test)]
 #[path = "native_object_rig_receipt_tests.rs"]
 mod receipt_tests;
+
+#[cfg(test)]
+#[path = "native_object_tween_contract_tests.rs"]
+mod tween_tests;

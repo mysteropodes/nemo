@@ -450,3 +450,6 @@ mod ghosts;
 
 #[path = "object_tween_bitmap.rs"]
 mod bitmap;
+
+#[path = "object_tween_public_shapes.rs"]
+mod public_shapes;
