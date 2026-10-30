@@ -11,7 +11,7 @@ use std::{cell::Cell, fs, path::PathBuf};
 
 pub(super) struct Fixture {
     pub(super) state: ApplicationMcp,
-    root: PathBuf,
+    pub(super) root: PathBuf,
     path: PathBuf,
     pub(super) request: Value,
     before: Value,

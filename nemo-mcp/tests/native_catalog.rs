@@ -119,3 +119,28 @@ fn public_catalog_entry_rejects_duplicate_ids_and_operation_ownership() {
         );
     }
 }
+
+#[test]
+fn lifecycle_generation_bound_operations_say_where_a_client_reads_it() {
+    let catalog = serde_json::to_value(nemo_mcp::capabilities::native_catalog().descriptors())
+        .unwrap();
+    for id in [
+        "native.object.import",
+        "native.object.asset",
+        "native.object.brush-bitmap-stroke",
+        "native.object.font-assets",
+    ] {
+        let descriptor = catalog
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|d| d["id"] == id)
+            .unwrap_or_else(|| panic!("{id} missing"));
+        assert!(
+            descriptor["semantics"]
+                .as_str()
+                .is_some_and(|text| text.contains("nativeHostStatus.lifecycleGeneration")),
+            "{id} must tell clients to read lifecycleGeneration from nemo_discover"
+        );
+    }
+}

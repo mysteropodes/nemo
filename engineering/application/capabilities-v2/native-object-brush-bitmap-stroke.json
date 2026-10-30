@@ -25,7 +25,7 @@
     "maxReadResponseBytes": 4096,
     "policy": "Complete correlated retained receipt or typed refusal. The request carries the anchor record (up to 256 segments, 64 KiB); the baked PNG is a host-scoped staged file the host reads (up to 16 MiB), never request bytes."
   },
-  "semantics": "One bitmap-brush Draw stroke as bitmap-brush.js applyBitmapBrushTexture leaves it, in one revision and one history entry: the baked PNG joins the asset catalog, the camouflaged anchor (bitmapBrushSpec, brush group, pressure profile) lands in its authored scene-root cell (a held or unexposed cell first becomes a key), and its tagged companion raster (isBrushTextureCopy, isBitmapBrush, the same group) lands directly above it, where the brush read pairs and paints it. No JS/Paper document fallback.",
+  "semantics": "One bitmap-brush Draw stroke as bitmap-brush.js applyBitmapBrushTexture leaves it, in one revision and one history entry: the baked PNG joins the asset catalog, the camouflaged anchor (bitmapBrushSpec, brush group, pressure profile) lands in its authored scene-root cell (a held or unexposed cell first becomes a key), and its tagged companion raster (isBrushTextureCopy, isBitmapBrush, the same group) lands directly above it, where the brush read pairs and paints it. No JS/Paper document fallback. The current lifecycleGeneration is not a constant: it advances on every project New/Open/replacement, so read it from nemo_discover instances[].nativeHostStatus.lifecycleGeneration (or the Tauri client status) immediately before this request; the lifecycleGeneration values in the examples are illustrative only, and a stale value is refused as unavailable before any source work.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",

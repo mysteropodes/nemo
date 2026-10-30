@@ -2372,6 +2372,7 @@
         "native_object_serialization_tests.rs",
         "native_object_reopen_tests.rs",
         "native_object_project_replace_tests.rs",
+        "native_status_lifecycle_tests.rs",
         "native_object_new_project_tests.rs",
         "native_object_save_tests.rs",
         "native_object_save_failure_tests.rs",

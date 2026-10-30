@@ -195,6 +195,10 @@ pub(super) fn reconcile_executor(
 mod tests;
 
 #[cfg(test)]
+#[path = "native_status_lifecycle_tests.rs"]
+mod status_lifecycle_tests;
+
+#[cfg(test)]
 mod callback_tests {
     use super::tests::Fixture;
     use super::*;
