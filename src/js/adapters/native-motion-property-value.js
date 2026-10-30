@@ -13,7 +13,7 @@
     if(!target||!descriptor||typeof descriptor.property!=='string'||!descriptor.property||
         !Number.isInteger(descriptor.dimension)||descriptor.dimension<1||descriptor.dimension>4||
         !ports||!ports.document||typeof ports.readContext!=='function'||typeof ports.readProperty!=='function')throw TypeError('Native property value ports are unavailable');
-    var doc=ports.document,serial=0,retired=false,accepted=null,busy=false,inputs=[],actions=[],bindings=[];
+    var doc=ports.document,serial=0,retired=false,accepted=null,busy=false,inputs=[],actions=[],bindings=[],pending=null,armed=false,shown=null;
     var element=make('div',''),fields=element,status=make('span',''),toolbar=make('div',''),unit=unitText(descriptor.unit),dims=dimLabels();
     element.className='native-motion-property-value motion-fields';element.setAttribute('aria-label',descriptor.property+' value');
     status.setAttribute('role','status');status.className='native-motion-property-status';toolbar.setAttribute('role','toolbar');toolbar.className='native-motion-property-actions';toolbar.hidden=true;
@@ -34,16 +34,36 @@
       inputs.forEach(function(n){n.disabled=!enabled;n.readOnly=!enabled;n.title=typeof ports.editProperty==='function'?'':'Read-only';});
       actions.forEach(function(item){item.node.disabled=!enabled||item.animation&&descriptor.animatable!==true;});
     }
-    function clear(message){serial++;accepted=null;busy=false;inputs.forEach(function(n){n.value='';});say(message);controls();return false;}
+    function clear(message){serial++;accepted=null;busy=false;shown=null;drop();inputs.forEach(function(n){n.value='';});say(message);controls();return false;}
+    // ui.js drives a scrub by dispatching change every frame while the document-level
+    // window._scrubLiveActive flag is up, and one last change before it drops the flag
+    // at pointerup. Only the final value of such a drag reaches the native owner, so one
+    // drag is one history entry; typed edits (flag down) commit at once.
+    function scrubbing(){var w=doc.defaultView;return !!(w&&w._scrubLiveActive);}
+    function disarm(){if(armed){armed=false;doc.removeEventListener('pointerup',release);doc.removeEventListener('pointercancel',release);}}
+    function drop(){pending=null;disarm();}
+    function settle(force){if(!pending||!force&&scrubbing())return false;var held=pending;drop();return apply('setValue',undefined,held);}
+    function release(){if(scrubbing()){setTimeout(function(){settle(true);},0);return false;}return settle(false);}
+    function onChange(){
+      if(!scrubbing()){drop();return apply('setValue');}
+      try{pending=values();}catch(error){say(error.message);return false;}
+      if(!armed){armed=true;doc.addEventListener('pointerup',release);doc.addEventListener('pointercancel',release);}
+      Promise.resolve().then(function(){return settle(false);});return false;
+    }
+    function onKey(event){
+      if(!event||event.key!=='Escape')return;
+      drop();if(shown)inputs.forEach(function(n,i){n.value=String(shown[i]);});
+      var node=event.target;if(node&&typeof node.blur==='function')node.blur();
+    }
     function values(){return inputs.map(function(input){var text=String(input.value);if(!text.trim()||!Number.isFinite(Number(text)))throw Error('Enter finite numeric values.');return Number(text);});}
     function receipt(value){return exact(value,['applied','historyEntriesAdded'])&&typeof value.applied==='boolean'&&value.historyEntriesAdded===(value.applied?1:0);}
-    async function apply(kind,animated){
+    async function apply(kind,animated,held){
       if(busy)return false;
       var value=accepted,ticket=serial,writer=ports.editProperty;
       if(!value||!current(value,ticket)||typeof writer!=='function')return clear('Native property edit is unavailable or stale.');
       if(kind!=='setValue'&&descriptor.animatable!==true)return false;
       var action={kind:kind,frame:value.frame};
-      try{if(kind==='setValue'||kind==='setKey')action.values=values();else if(kind==='setAnimated')action.animated=animated;}
+      try{if(kind==='setValue'||kind==='setKey')action.values=held||values();else if(kind==='setAnimated')action.animated=animated;}
       catch(error){say(error.message);return false;}
       var payload=frozen({command:'object.property.edit',target:JSON.parse(JSON.stringify(target)),property:descriptor.property,action:action});
       busy=true;controls();say('Waiting for native property edit…');
@@ -64,7 +84,7 @@
       if(dims){var dl=make('span',dims[i]);dl.className='motion-dim-label';fields.appendChild(dl);}
       var input=make('input','');input.type='number';input.step='1';input.className='pi scrub motion-val';input.dataset.step='1';
       input.setAttribute('aria-label',descriptor.property+' component '+(i+1));
-      listen(input,'change',function(){return apply('setValue');});fields.appendChild(input);inputs.push(input);
+      listen(input,'change',onChange);listen(input,'keydown',onKey);fields.appendChild(input);inputs.push(input);
     }
     if(unit){var ut=make('span',unit);ut.className='motion-unit';fields.appendChild(ut);}
     fields.appendChild(toolbar);fields.appendChild(status);
@@ -86,12 +106,12 @@
             ['instanceId','documentId','atRevision','documentSnapshotId'].some(function(k){return result[k]!==selector[k];})||
             result.kind!=='rawSample'||result.property!==descriptor.property||result.frame!==value.frame||result.dimension!==descriptor.dimension||
             !Array.isArray(result.value)||result.value.length!==descriptor.dimension||!Array.from(result.value).every(Number.isFinite))throw Error('Native property read is uncorrelated or malformed.');
-        accepted=value;inputs.forEach(function(input,i){input.value=String(result.value[i]);});
+        accepted=value;shown=result.value.slice();inputs.forEach(function(input,i){input.value=String(result.value[i]);});
         say('');controls();return true;
       }catch(error){if(ticket!==serial||!mounted())return false;return clear('Native property value unavailable: '+String(error&&error.message||error));}
     }
     controls();
-    return Object.freeze({element:element,refresh:refresh,cancel:function(){return clear('Property read cancelled.');},dispose:function(){if(retired)return;retired=true;serial++;accepted=null;bindings.forEach(function(b){b[0].removeEventListener(b[1],b[2]);});if(element.parentNode===container)container.removeChild(element);}});
+    return Object.freeze({element:element,refresh:refresh,cancel:function(){return clear('Property read cancelled.');},dispose:function(){if(retired)return;retired=true;serial++;accepted=null;drop();bindings.forEach(function(b){b[0].removeEventListener(b[1],b[2]);});if(element.parentNode===container)container.removeChild(element);}});
   }
   return Object.freeze({create:create});
 }));
