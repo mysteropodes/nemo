@@ -81,3 +81,23 @@ test('malformed receipt and owner replacement cannot claim a current accepted ed
  for(const result of [null,{applied:true,historyEntriesAdded:0},{applied:false,historyEntriesAdded:1},{applied:true,historyEntriesAdded:1,extra:true}]){const h=fixture({writer:async()=>result});await h.editor.refresh();await h.button('Add key').fire('click');assert.match(h.status(),/refused/);assert.equal(h.writes.length,1);}
  const wait=deferred(),h=fixture({writer:()=>wait.promise});await h.editor.refresh();const acting=h.button('Add key').fire('click');h.replace();wait.resolve({applied:true,historyEntriesAdded:1});await acting;assert.match(h.status(),/view changed/);assert.doesNotMatch(h.status(),/updated/);
 });
+test('fields carry baseline classes, X/Y labels, unit span and scrub step; port dimLabels overrides the default',async()=>{
+ const h=fixture();await h.editor.refresh();const all=tree(h.editor.element);
+ assert.equal(h.editor.element.className,'native-motion-property-value motion-fields');
+ assert.ok(h.inputs().every(n=>n.className==='pi scrub motion-val'&&n.step==='1'&&n.dataset.step==='1'));
+ assert.deepEqual(all.filter(n=>n.className==='motion-dim-label').map(n=>n.textContent),['X','Y']);
+ assert.equal(all.filter(n=>n.className==='motion-unit').length,0,'no unit span when the descriptor has no unit');
+ const one=fixture({values:[1]});await one.editor.refresh();assert.equal(tree(one.editor.element).filter(n=>n.className==='motion-dim-label').length,0);
+ const doc=h.doc,box=doc.createElement('div');doc.appendChild(box);
+ const e=Value.create(box,{...h.ports,dimLabels:()=>['W','H']},target,{property:'position',dimension:2,unit:'deg',animatable:true,authored:{}});
+ assert.deepEqual(tree(e.element).filter(n=>n.className==='motion-dim-label').map(n=>n.textContent),['W','H']);
+ assert.deepEqual(tree(e.element).filter(n=>n.className==='motion-unit').map(n=>n.textContent),['°']);
+});
+test('read-only rows grey their fields with a tooltip and never print a sentence',async()=>{
+ const h=fixture({readonly:true});await h.editor.refresh();
+ assert.ok(h.inputs().every(n=>n.disabled&&n.readOnly&&n.title==='Read-only'));assert.equal(h.status(),'');
+ assert.doesNotMatch(h.editor.element.textContent,/read-only/i);
+ const w=fixture({writer:async()=>{throw Error('no');}});await w.editor.refresh();w.inputs()[0].value='1';await w.inputs()[0].fire('change');
+ assert.match(w.status(),/^Property edit refused/);
+ const s=tree(w.editor.element).find(n=>n.attrs.role==='status');assert.equal(s.className,'native-motion-property-status');
+});

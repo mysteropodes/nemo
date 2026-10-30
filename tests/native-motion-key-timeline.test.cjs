@@ -92,7 +92,7 @@ async function multiFixture(options={}){
  const ordinary=Binding.createOrdinary(root,{readContextId:()=>layer.contextId,readTargetSelection:()=>({primary:layer,selected:targets}),acceptsTarget:()=>true,keyTimelineChanged:reason=>events.push(reason)});
  let notices=0;ordinary.setKeyTimelineListener(()=>{notices++;ordinary.readKeyTimelines();});assert.ok(ordinary.render(container,{ports:ui,header,isCurrent:()=>true}));
  async function settle(){for(let i=0;i<8;i++)await tick();}await settle();
- function row(target,property){return tree(container).find(n=>n.className==='native-motion-property-row'&&n.dataset.property===property&&n.dataset.targetKey===JSON.stringify([target.contextId,target.layerUid,target.strokeId===undefined?null:target.strokeId]));}
+ function row(target,property){return tree(container).find(n=>n.className==='lrow motion-prop-row'&&n.dataset.property===property&&n.dataset.targetKey===JSON.stringify([target.contextId,target.layerUid,target.strokeId===undefined?null:target.strokeId]));}
  return {doc,root,container,ordinary,layer,element,targets,writes,events,reads,settle,get notices(){return notices;},
   open(target=layer,property='opacity'){const line=row(target,property);assert.ok(line);return tree(line).find(n=>n.tagName==='BUTTON'&&n.textContent==='Keys').fire('click');},
   inspectors:()=>tree(container).filter(n=>n.className==='native-motion-property-keys'&&!n.hidden),
@@ -190,7 +190,7 @@ function createPropertyPanel(options){
  return {ready:panel.refresh(true),
   openProperty(target,property){
    const id=JSON.stringify([target.contextId,target.layerUid,target.strokeId===undefined?null:target.strokeId]);
-   const row=descendants(options.container).find(node=>node.className==='native-motion-property-row'&&node.dataset.targetKey===id&&node.dataset.property===property);
+   const row=descendants(options.container).find(node=>node.className==='lrow motion-prop-row'&&node.dataset.targetKey===id&&node.dataset.property===property);
    if(!row)throw Error('Real property row not present');
    const button=descendants(row).find(node=>node.tagName==='BUTTON'&&node.textContent==='Keys');
    if(typeof button.fire==='function')return button.fire('click');
