@@ -2725,6 +2725,18 @@
       ]
     },
     {
+      "id": "app.native.object.recovery.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-recovery.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-recovery.js"
+      ]
+    },
+    {
       "id": "app.native.object.ui.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

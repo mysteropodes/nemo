@@ -69,6 +69,9 @@ fn envelope_identity(value: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || b"._:/-".contains(byte))
 }
 
+/// Encoder over an already-acquired immutable project snapshot.
+pub(crate) type DetachedProjectSerializer = Box<dyn FnOnce() -> Result<Vec<u8>, String> + Send>;
+
 /// Sole routed active history; any parked history remains private and unrouted.
 pub(crate) struct NativeObjectHost {
     history: NativeObjectHistory,
@@ -231,6 +234,25 @@ impl NativeObjectHost {
             .serialize_project_file(revision, snapshot)
             .map(Some)
             .map_err(|_| "native project snapshot is unavailable".into())
+    }
+    /// Recovery variant of `project_file_snapshot`: the immutable snapshot is
+    /// acquired here (O(1)) and the encoder runs wherever the caller invokes the
+    /// returned closure, so the authority lock need not be held while encoding.
+    pub(crate) fn detached_project_file_serializer(
+        &self,
+        revision: u64,
+        snapshot: &str,
+    ) -> Result<Option<DetachedProjectSerializer>, String> {
+        if !self.history.is_project_file() {
+            return Ok(None);
+        }
+        let serialize = self
+            .history
+            .detached_project_file_serializer(revision, snapshot)
+            .map_err(|_| "native project snapshot is unavailable")?;
+        Ok(Some(Box::new(move || {
+            serialize().map_err(|_| "native project snapshot is unavailable".to_owned())
+        })))
     }
     pub(crate) fn project_reference(
         &mut self,

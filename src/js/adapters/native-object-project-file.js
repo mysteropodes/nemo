@@ -112,7 +112,7 @@
     return true;
   }
   function create(session,ports,workflow,acknowledgement){
-    var baseline=null,saving=false,opening=false,baselines=new Map();
+    var baseline=null,saving=false,opening=false,baselines=new Map(),initials=new Map();
     var saved=acknowledgement.create({
       readUISession:ports.readUI,readPresentedObjectSession:session.readPresentedObjectSession,
       commitSavedMetadata:function(plan){
@@ -151,7 +151,7 @@
           commit:function(current){
             if((creating?ports.created(config.name||'Untitled',current):ports.opened(path,current))!==true)
               throw new Error('Native project UI publication failed');
-            baseline=creating?null:current.documentDigest;baselines=new Map([[current.documentId,baseline]]);ports.repaint();
+            baseline=creating?null:current.documentDigest;baselines=new Map([[current.documentId,baseline]]);initials.set(current.documentId,current.documentDigest);ports.repaint();
           }
         });
         if(creating&&info&&ports.createdNotice)ports.createdNotice();
@@ -204,7 +204,13 @@
       }catch(error){ports.notice({status:'refused'},null,error);return {status:'refused',reason:error&&error.message||'save-failed'};}
       finally{saving=false;}
     }
-    return Object.freeze({openPath:openPath,newProject:newProject,activateProject:activateProject,saveAs:saveAs,
+    // Cached facts for the crash-recovery scheduler (#2360 R2): no IPC, no serialization.
+    function recoveryPin(){
+      var info=session.info();
+      return {active:session.isActive(),info:info,busy:saving||opening,presented:!!session.readPresentedObjectSession(),
+        reference:baseline||info&&initials.get(info.documentId)||null};
+    }
+    return Object.freeze({openPath:openPath,newProject:newProject,activateProject:activateProject,saveAs:saveAs,recoveryPin:recoveryPin,
       canOpen:function(){return !saving&&!opening&&(!session.blocksLegacy()||session.isActive());},
       isDirty:function(){var info=session.info();return !session.isActive()&&session.blocksLegacy()||!baseline||!info||info.documentDigest!==baseline;}});
   }
@@ -276,7 +282,7 @@
       refused:function(error){ports.notice('Could not open native project: '+(error.message||error));},
       failed:function(error){ports.show();ports.notice('Could not open native project: '+(error.message||error));}
     },root.NemoNativeObjectSaveAsWorkflow,root.NemoNativeObjectSavedAcknowledgement);
-    return Object.freeze({isActive:session.blocksLegacy,canOpen:ui.canOpen,isDirty:ui.isDirty,saveAs:ui.saveAs,openPath:ui.openPath,newProject:ui.newProject,activateProject:ui.activateProject});
+    return Object.freeze({isActive:session.blocksLegacy,recoveryPin:ui.recoveryPin,canOpen:ui.canOpen,isDirty:ui.isDirty,saveAs:ui.saveAs,openPath:ui.openPath,newProject:ui.newProject,activateProject:ui.activateProject});
   }
   return Object.freeze({create:create,projectView:projectView,bind:bind,
     projectionReadyForUI:projectionReadyForUI,

@@ -796,6 +796,7 @@
         "boundaries-object-frame-packet.test.cjs",
         "boundaries-object-render-scene.test.cjs",
         "boundaries-native-object-save.test.cjs",
+        "boundaries-native-object-recovery.test.cjs",
         "boundaries-native-object-order.test.cjs",
         "boundaries-object-order-history.test.cjs",
         "boundaries-object-order-evaluation.test.cjs",
