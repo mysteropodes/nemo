@@ -175,6 +175,45 @@
         throw fault('unavailable', 'Native image-mesh read failed: ' + (e && e.message || e), 'native_read_failed');
       }
     }
+    // #2255: the rig of one layer at the presented frame, read part by part in the bounded pages of the one rig view. `parts` names the
+    // lists wanted (bones, vertices, chains, binds, bound); `weights` is one vertex of one bind and has its own call. A reason (`unavailable`)
+    // replaces every list: nothing is guessed.
+    const RIG_CAPS = { bones: 8, vertices: 16, chains: 8, binds: 8, bound: 64, weights: 8 };
+    async function pageRig(o, selector, part, bind, vertex) {
+      let cursor = 0, total = null, items = [], unavailable = null;
+      for (;;) {
+        const view = { kind: 'rig', contextId: selector.contextId, frame: selector.frame, workId: o.workId, viewGeneration: o.viewGeneration,
+          layerUid: selector.layerUid, part: part, bind: bind, vertex: vertex, cursor: cursor, limit: RIG_CAPS[part] };
+        const r = await queryBody(o, { atRevision: o.info.contentRevision, documentSnapshotId: o.info.documentSnapshotId, view: view });
+        if (total !== null && total !== r.total) throw fault('uncorrelated', 'Rig list changed between pages', 'rig_page_total');
+        total = r.total; items = items.concat(r.items); unavailable = r.unavailable;
+        if (r.nextCursor === null) break;
+        if (r.nextCursor <= cursor) throw fault('uncorrelated', 'Rig page cursor made no progress', 'rig_page_stale');
+        cursor = r.nextCursor;
+      }
+      if (items.length !== total) throw fault('uncorrelated', 'Rig list is incomplete', 'rig_page_incomplete');
+      return { items: items, unavailable: unavailable };
+    }
+    async function readRigParts(selector, pin, parts, bind, vertex) {
+      if (!exact(selector, ['contextId', 'frame', 'layerUid'], []) || selector.contextId !== 'scene-root' || !integer(selector.frame, 0, 4294967295) ||
+        typeof selector.layerUid !== 'string' || !selector.layerUid || !pins(pin) || !Array.isArray(parts) || !parts.length || !parts.every((p) => own(RIG_CAPS, p)))
+        throw fault('invalid_request', 'Rig selector is invalid', 'local_validation');
+      const o = origin(selector, pin);
+      if (!o) throw fault('unavailable', 'No matching presented native rig view', 'rig_view_unavailable');
+      await settle(o);
+      const out = {};
+      let unavailable = null;
+      for (const part of parts) {
+        const page = await pageRig(o, selector, part, bind, vertex);
+        out[part] = page.items;
+        if (page.unavailable) { unavailable = page.unavailable; break; }
+      }
+      requireCurrent(o);
+      return freeze({ info: copyPins(o.info), presentation: o.presentation, layerUid: selector.layerUid, unavailable: unavailable, parts: freeze(out) });
+    }
+    const readRig = (selector, pin, parts) => readRigParts(selector, pin, parts, 0, 0);
+    const readRigWeights = (selector, pin, bind, vertex) => (integer(bind, 0, 4294967295) && integer(vertex, 0, 4294967295)
+      ? readRigParts(selector, pin, ['weights'], bind, vertex) : Promise.reject(fault('invalid_request', 'Rig weight selector is invalid', 'local_validation')));
     // #2255: every widget layer of the presented frame (pad, puck, rest, axes), read in bounded pages of the one widget view.
     async function readWidgets(selector, pin) {
       if (!exact(selector, ['contextId', 'frame'], []) || selector.contextId !== 'scene-root' || !integer(selector.frame, 0, 4294967295) || !pins(pin))
@@ -319,7 +358,7 @@
       return freeze(runs.map((run) => freeze(run.slice())));
     }
     return Object.freeze({ readLayerTiming: (l, f, p) => readLegacy(l, f, p), readLayerRange: (l, f, p) => readLegacy(l, f, p, 'range'),
-      readLayerPlacement: (l, f, p) => readLegacy(l, f, p, 'placement'), readLayerCells: readLayerCells, readImageMesh: readImageMesh, readWidgets: readWidgets, readSubselect: readSubselect, readPresentedStrokes: readPresentedStrokes, previewSubselect: previewSubselect });
+      readLayerPlacement: (l, f, p) => readLegacy(l, f, p, 'placement'), readLayerCells: readLayerCells, readImageMesh: readImageMesh, readWidgets: readWidgets, readRig: readRig, readRigWeights: readRigWeights, readSubselect: readSubselect, readPresentedStrokes: readPresentedStrokes, previewSubselect: previewSubselect });
   }
   function boxSegments(b) { return [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]].map((p) => ({ point: p, handleIn: [0, 0], handleOut: [0, 0] })); }
   function expectedCount(kind, m) { return kind === 'outline' ? m.outlineCount : kind === 'verts' ? m.vertexCount : kind === 'tris' ? m.triangleIndexCount : m.vertexCount; }

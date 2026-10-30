@@ -38,6 +38,9 @@ pub(super) fn request(value: &Value) -> bool {
     if widget_read::widget_view(value) {
         return widget_read::request(value);
     }
+    if rig_read::rig_view(value) {
+        return rig_read::request(value);
+    }
     if image_mesh::presentation_view(value) {
         return image_mesh::presentation_request(value);
     }
@@ -298,6 +301,9 @@ pub(super) fn result(document_id: &str, payload: &Value, result: &Value) -> bool
     if widget_read::widget_view(payload) {
         return widget_read::result(document_id, payload, result);
     }
+    if rig_read::rig_view(payload) {
+        return rig_read::result(document_id, payload, result);
+    }
     if image_mesh::presentation_view(payload) {
         return image_mesh::presentation_result(document_id, payload, result);
     }
@@ -348,6 +354,13 @@ mod widget_read;
 #[cfg(test)]
 #[path = "native_widget_read_contract_tests.rs"]
 mod widget_read_tests;
+
+#[path = "native_rig_read_contract.rs"]
+mod rig_read;
+
+#[cfg(test)]
+#[path = "native_rig_read_contract_tests.rs"]
+mod rig_read_tests;
 
 #[path = "native_subselect_contract.rs"]
 pub(crate) mod subselect;

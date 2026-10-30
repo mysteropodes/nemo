@@ -2,8 +2,9 @@
  * `state.layers`. Facts come from ONE bounded native read (`readWidgets`, the widget view of query.document.object: the composed pad,
  * the puck and rest offsets, the axes) pinned to the actual presentation; every change is one native command through
  * NemoNativeObjectWidget (create / write / settings). The drag is a local preview and ONE `widget.write` on release, so a gesture is
- * one history entry. This file never reads or writes a JS layer record; what has no native route (moving the whole pad) is a typed
- * unavailable. The pointer listeners stay on `document` in the capture phase (CLAUDE.md section 13: motion.js owns a capture
+ * one history entry. Moving the whole pad (a body drag, baseline: the layer Position) is one `widget.settings` with the new `pos`:
+ * the world delta through the inverse of the parents' linear part (`item.linear`) added to the stored anchor (`item.anchor`), a
+ * singular parent being the typed `widget_move_unavailable`. This file never reads or writes a JS layer record. The pointer listeners stay on `document` in the capture phase (CLAUDE.md section 13: motion.js owns a capture
  * listener on #canvas-area and loads first), and each handler stops the event only when a pad is actually under the pointer. */
 (function (root, factory) {
   const api = factory();
@@ -31,9 +32,9 @@
     toast(win, (error && error.message || 'Native widget is unavailable.') + (error && error.code ? ' (' + error.code + (error.reason ? ': ' + error.reason : '') + ')' : ''));
   }
   // The proof that the widgets are read from the presentation the user is looking at, at the playhead.
-  function proofNow(win) {
+  function proofNow(win, method) {
     const s = session(win);
-    if (!s || !s.isActive() || typeof s.readWidgets !== 'function' || !win.state || win.state.playing) return null;
+    if (!s || !s.isActive() || typeof s[method || 'readWidgets'] !== 'function' || !win.state || win.state.playing) return null;
     try {
       const info = s.info(), shown = s.readPresentedObjectSession(), p = shown && shown.presentation;
       if (!info || !p || shown.available !== true || p.owner !== 'native' || p.status !== 'presented' || p.contextId !== 'scene-root' ||
@@ -70,13 +71,35 @@
     const a = map.api.screen({ x: 0, y: 0 }, map), b = map.api.screen({ x: 1, y: 0 }, map), d = Math.hypot(b.x - a.x, b.y - a.y);
     return d > 0 && Number.isFinite(d) ? d : 1;
   }
+  const shifted = (item, delta) => Object.assign({}, item, { center: [item.center[0] + delta[0], item.center[1] + delta[1]] });
+  // The `pos` that moves the pad by a world delta: the delta through the inverse of the parents' linear part, added to the anchor.
+  function moveTarget(item, delta) {
+    const l = item.linear, anchor = item.anchor;
+    if (!l || !anchor) return null;
+    const det = l[0] * l[3] - l[1] * l[2];
+    if (!Number.isFinite(det) || Math.abs(det) < 1e-9) return null;
+    const x = (l[3] * delta[0] - l[2] * delta[1]) / det, y = (-l[1] * delta[0] + l[0] * delta[1]) / det;
+    return Number.isFinite(x) && Number.isFinite(y) ? [anchor[0] + x, anchor[1] + y] : null;
+  }
   const puckRadius = (item, scale) => Math.max(6 / scale, Math.min(item.size[0], item.size[1]) * 0.12);
 
   function create(win) {
-    let cached = null, serial = 0, queue = Promise.resolve(), overlay = null, paintQueued = false, drag = null, busy = false;
+    let cached = null, serial = 0, queue = Promise.resolve(), overlay = null, paintQueued = false, drag = null, busy = false, watching = false, hadPads = false;
     const keyOf = (proof) => JSON.stringify([proof.info.instanceId, proof.info.documentId, proof.info.lifecycleGeneration,
       proof.info.contentRevision, proof.info.documentSnapshotId, proof.selector.frame]);
     const usable = () => (cached && cached.read && cached.proof.current() ? cached : null);
+    // While a pad is on screen, one animation frame at a time re-checks the pin and the playhead (the read itself is keyed, so an
+    // unchanged frame costs a comparison): a native revision or frame change repaints the overlay without a panel update.
+    function watch() {
+      if (watching || !win.requestAnimationFrame) return;
+      watching = true;
+      win.requestAnimationFrame(() => {
+        watching = false;
+        if (!active(win)) return;
+        refresh();
+        if (hadPads) watch();
+      });
+    }
 
     function refresh() {
       const proof = proofNow(win), prior = cached;
@@ -89,7 +112,7 @@
       entry.promise = queue.catch(() => {}).then(() => (token === serial && proof.current() ? proof.session.readWidgets(proof.selector, proof.info) : null))
         .then((read) => {
           if (token !== serial || cached !== entry || !read || !samePin(read.info, proof.info) || !proof.current()) return null;
-          entry.read = read; paint(); return read;
+          entry.read = read; hadPads = read.items.length > 0; paint(); if (hadPads) watch(); return read;
         }).catch((error) => { if (token === serial && cached === entry) { entry.error = error; paint(); } return null; })
         .finally(() => { if (cached === entry) entry.promise = null; });
       queue = entry.promise.catch(() => {});
@@ -127,12 +150,13 @@
       entry.read.items.forEach((item) => {
         if (!item.visible || !item.center) return;
         const dragging = drag && drag.item.layerUid === item.layerUid, color = dragging ? ACCENT : IDLE, hw = item.size[0] / 2, hh = item.size[1] / 2;
+        if (dragging && drag.mode === 'move') item = shifted(item, drag.delta);
         const corners = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map((c) => screen(item, c[0], c[1]));
         svg.appendChild(node('polygon', { points: corners.map((p) => p.x + ',' + p.y).join(' '), fill: 'none', stroke: color, 'stroke-width': 1.4 }));
         if (item.kind === 'joystick') { line(svg, screen(item, -hw, 0), screen(item, hw, 0), GHOST, 1); line(svg, screen(item, 0, -hh), screen(item, 0, hh), GHOST, 1); }
         else line(svg, screen(item, -hw, 0), screen(item, hw, 0), TRACK, 1.4);
         if (item.rest) line(svg, screen(item, item.rest[0] - 4 / scale, item.rest[1]), screen(item, item.rest[0] + 4 / scale, item.rest[1]), GHOST, 1);
-        const puck = dragging ? drag.local : item.puck;
+        const puck = dragging && drag.mode === 'puck' ? drag.local : item.puck;
         if (!puck) return;
         const at = screen(item, puck[0], puck[1]), r = puckRadius(item, scale) * scale;
         if (item.kind === 'joystick') line(svg, map.api.screen({ x: item.center[0], y: item.center[1] }, map), at, TRACK, 1.4);
@@ -171,8 +195,9 @@
       const found = hit(e);
       if (!found) return;
       consume(e);
-      if (!found.onPuck) { toast(win, 'Moving a native widget pad is unavailable (' + MOVE_REASON + ').'); return; }
-      drag = { entry: found.entry, map: found.map, item: found.item, pointerId: e.pointerId, local: found.item.puck.slice(), world: [found.world.x, found.world.y], moved: false };
+      const base = { entry: found.entry, map: found.map, item: found.item, pointerId: e.pointerId, world: [found.world.x, found.world.y], moved: false };
+      if (!found.onPuck) { drag = Object.assign(base, { mode: 'move', start: base.world.slice(), delta: [0, 0] }); paint(); return; }
+      drag = Object.assign(base, { mode: 'puck', local: found.item.puck.slice() });
       paint();
     }
     function onMove(e) {
@@ -182,6 +207,7 @@
       try {
         const w = drag.map.api.point(e, drag.map), loc = toLocal(drag.item, w.x, w.y), item = drag.item;
         drag.world = [w.x, w.y];
+        if (drag.mode === 'move') { drag.delta = [w.x - drag.start[0], w.y - drag.start[1]]; drag.moved = true; paint(); return; }
         drag.local = [clamp(loc[0], -item.size[0] / 2, item.size[0] / 2), item.kind === 'joystick' ? clamp(loc[1], -item.size[1] / 2, item.size[1] / 2) : 0];
         drag.moved = true; paint();
       } catch (_) { cancel(); }
@@ -198,6 +224,12 @@
       consume(e);
       const done = drag; drag = null;
       if (!done.moved || !done.entry.proof.current()) { paint(); return; }
+      if (done.mode === 'move') {
+        const pos = moveTarget(done.item, done.delta);
+        if (!pos) { toast(win, 'Moving this native widget pad is unavailable (' + MOVE_REASON + ').'); paint(); return; }
+        write(done.entry, (api) => api.settings(done.item.layerUid, { pos }));
+        return;
+      }
       write(done.entry, (api, frame) => api.writeWorld(done.item.layerUid, frame, done.world, done.item.center, done.item.angle));
     }
     function onDbl(e) {
@@ -269,8 +301,32 @@
         });
       });
     }
+    // The layer menu's "Widget settings…" (both timelines): the same prompts as the baseline, each answer one `widget.settings`.
+    function openSettingsMenu(x, y, index) {
+      const s = session(win), info = s && s.info(), layer = info && info.layers && info.layers[index];
+      const item = layer ? items().find((one) => one.layerUid === layer.layerUid) : null, adapterApi = adapter();
+      if (!item || !adapterApi || !win.showContextMenu) { toast(win, 'Native widget settings are unavailable.'); refresh(); return false; }
+      const t = (key) => (win.SM && win.SM.t ? win.SM.t(key) : key), ask = (key, value) => win.prompt(t(key), value);
+      const apply = (set) => adapterApi.settings(item.layerUid, set).then(refresh, (error) => { failure(win, error); refresh(); });
+      const numbers = (text) => (text === null ? null : String(text).split(',').map(parseFloat));
+      const axisEntry = (name) => {
+        const ax = item[name];
+        return ax && { label: t('widgetMenuAxisRangePrefix') + (ax.label || name.toUpperCase()) + '  (' + ax.min + '…' + ax.max + ')', action: () => {
+          const p = numbers(ask('promptWidgetRange', ax.min + ', ' + ax.max + ', ' + ax.rest));
+          if (!p || p.length < 2 || !Number.isFinite(p[0]) || !Number.isFinite(p[1])) return;
+          apply({ [name]: p.length > 2 && Number.isFinite(p[2]) ? { min: p[0], max: p[1], rest: p[2] } : { min: p[0], max: p[1] } });
+        } };
+      };
+      const entries = [axisEntry('x'), axisEntry('y')].filter(Boolean);
+      if (item.size) entries.push({ label: t('widgetMenuSizeEllipsis'), action: () => {
+        const p = numbers(ask('promptWidgetSize', item.size[0] + ', ' + item.size[1]));
+        if (p && p.length >= 2 && Number.isFinite(p[0]) && Number.isFinite(p[1])) apply({ size: [Math.max(8, p[0]), Math.max(8, p[1])] });
+      } });
+      win.showContextMenu(x, y, entries);
+      return true;
+    }
     function install() { listeners(); bindPanel(); return api; }
-    const api = Object.freeze({ install, refresh, paintPanel, createLayer, items, hit, active: () => active(win) });
+    const api = Object.freeze({ install, refresh, paintPanel, createLayer, openSettingsMenu, items, hit, active: () => active(win) });
     return api;
   }
   const controllers = new WeakMap();
@@ -278,5 +334,5 @@
     if (!controllers.has(win)) controllers.set(win, create(win));
     return controllers.get(win);
   }
-  return Object.freeze({ create, desktop, active, toLocal, toWorld, MOVE_REASON });
+  return Object.freeze({ create, desktop, active, session, proofNow, mappingFor, toLocal, toWorld, moveTarget, MOVE_REASON });
 }));

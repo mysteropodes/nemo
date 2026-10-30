@@ -910,6 +910,8 @@
         "object_widget_read.rs",
         "object_widget_presentation.rs",
         "object_widget_view.rs",
+        "object_rig_presentation.rs",
+        "object_rig_view.rs",
         "object_image_mesh_edit_read.rs",
         "object_rig_edit_read.rs",
         "object_rig_pose_read.rs",
@@ -1720,6 +1722,7 @@
         "object_rig_edit_mesh_rows.rs",
         "object_rig_edit_meshes.rs",
         "object_rig_edit_mesh_controls.rs",
+        "object_rig_view.rs",
         "object_rig_pose_commit.rs",
         "object_rig_pose_commit_oracle.rs",
         "object_rig_pose_commit_rows.rs",
@@ -1985,6 +1988,8 @@
         "src/native_image_mesh_read_contract_tests.rs",
         "src/native_widget_read_contract.rs",
         "src/native_widget_read_contract_tests.rs",
+        "src/native_rig_read_contract.rs",
+        "src/native_rig_read_contract_tests.rs",
         "src/native_presentation_read_contract_tests.rs",
         "src/native_object_wire_tests.rs",
         "src/native_reproduction_contract.rs",
@@ -2412,7 +2417,8 @@
         "native_object_brush_preview_tests.rs",
         "native_import_batch_dispatch_tests.rs",
         "native_subselect_read_public_tests.rs",
-        "native_widget_read_public_tests.rs"
+        "native_widget_read_public_tests.rs",
+        "native_rig_read_public_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -2429,6 +2435,7 @@
         "native_object_preview.rs",
         "native_object_image_mesh_read.rs",
         "native_object_widget_read.rs",
+        "native_object_rig_read.rs",
         "native_object_export.rs",
         "native_dispatch_replacement.rs",
         "native_dispatch_tests.rs",
