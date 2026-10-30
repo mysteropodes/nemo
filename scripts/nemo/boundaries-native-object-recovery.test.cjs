@@ -8,14 +8,16 @@ const root = path.resolve(__dirname, '../..');
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const profile = JSON.parse(read('engineering/boundaries/profiles/rust.profile.json'));
 const source = 'src-tauri/src/native_object_recovery.rs';
-const tests = ['src-tauri/src/native_object_recovery_tests.rs', 'src-tauri/src/native_object_recovery_failure_tests.rs'];
+const store = 'src-tauri/src/native_object_recovery_store.rs';
+const listing = 'src-tauri/src/native_object_recovery_list.rs';
+const tests = ['recovery_tests', 'recovery_failure_tests', 'recovery_list_tests'].map(n => `src-tauri/src/native_object_${n}.rs`);
 
 test('recovery store and its controls have an exact module census', () => {
   const commands = profile.modules.find(m => m.id === 'rust.desktop.native.application.commands');
-  assert.equal(commands.files.filter(f => f === 'native_object_recovery.rs').length, 1);
+  for (const file of [source, store, listing]) assert.equal(commands.files.filter(f => f === path.basename(file)).length, 1);
   const controls = profile.modules.find(m => m.id === 'rust.desktop.native.host.release.tests');
   for (const file of tests) assert.equal(controls.files.filter(f => f === path.basename(file)).length, 1);
-  for (const file of [source, ...tests]) {
+  for (const file of [source, store, listing, ...tests]) {
     const omitted = structuredClone(profile);
     for (const m of omitted.modules) m.files = m.files.filter(f => f !== path.basename(file));
     assert.ok(C.checkSourceCoverage(omitted, { root, sourcePaths: [file] }).violations
@@ -40,7 +42,7 @@ test('four private main-window async commands are registered and gated', () => {
 });
 
 test('publication order is temp, sync, unique rename, dir sync, manifest rename and never a path from JS', () => {
-  const producer = read(source);
+  const producer = read(store) + read(source) + read(listing);
   assert.match(producer, /create_new\(true\)/);
   assert.match(producer, /options\.mode\(0o600\)/);
   assert.match(producer, /builder\.mode\(0o700\)/);
