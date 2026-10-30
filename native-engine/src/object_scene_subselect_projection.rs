@@ -22,6 +22,14 @@ fn affine(entry: &ChainEntry) -> Affine {
         * Affine::scale_non_uniform(m.sx, m.sy)
         * Affine::translate((-p[0], -p[1]))
 }
+/// The affine the layer's parent chain applies to everything it holds (what a Text block or raster's stored space is posed by).
+pub(crate) fn layer_chain(
+    chains: &crate::object_render_scene::text_scene::parent_chain::SceneParentChains,
+    index: usize,
+) -> Result<[f64; 6], &'static str> {
+    let chain = chains.chain(index).map_err(|failure| failure.reason())?;
+    Ok(chain.iter().fold(Affine::IDENTITY, |outer, entry| affine(entry) * outer).as_coeffs())
+}
 pub(crate) fn matrices(
     packet: &ObjectFramePacket,
     index: usize,

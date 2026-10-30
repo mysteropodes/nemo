@@ -7,7 +7,8 @@
 //! geometry rebuilds a pressure ribbon on that centreline (sculpt). A `reshape` with a `matrix` (six numbers, the record's
 //! own space, #2372 Select) maps the record by that affine and brings what belongs to it: a ribbon's rebuilt outline and
 //! linked fill, a texture anchor's copies, a gradient's end points and a dynamic shape's box; its receipt id is still the
-//! one named record.
+//! one named record. The named target may also be a stored raster image or text block (its own frame: an image's centre, size and
+//! rotation, a text block's anchor and size), so one gesture over a mixed selection is one batch.
 use super::shapes::{anchor, geometry, record_shape};
 use super::target;
 use crate::native_contract::exact;

@@ -421,5 +421,5 @@
   }
 
   return Object.freeze({ create: create, hitHandles: hitHandles, objectProject: objectProject, presented: presented,
-    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, transformSteps: transformSteps, layerPaths: layerPaths, marquee: marquee, pick: pick, pickContext: pickContext, applyPick: applyPick, resolvePick: resolvePick });
+    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, transformSteps: transformSteps, inRecordSpace: inRecordSpace, layerPaths: layerPaths, marquee: marquee, pick: pick, pickContext: pickContext, applyPick: applyPick, resolvePick: resolvePick });
 }));
