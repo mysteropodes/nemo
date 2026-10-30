@@ -62,7 +62,7 @@ async function harness(){
   root._sel={frames:[]};root.NemoNativeFrameEditIntent=FrameIntent;root.NemoNativeApplicationAdapter=SDK;
   const frame=FrameDesktop.install(root);
   const d=Object.assign(new EventTarget(),root.document,{readyState:'complete',tagName:'DIV'});root.document=d;
-  d.getElementById('canvas-area').addEventListener=()=>{};root.addEventListener=()=>{};
+  root.addEventListener=()=>{};
   Bridge.install(root);const controller=root.NemoNativeSubselectController;
   let bubbled=0;d.addEventListener('keydown',()=>bubbled++);
   async function select(){controller.handle('down',f.event(100,60));await controller.settled();
