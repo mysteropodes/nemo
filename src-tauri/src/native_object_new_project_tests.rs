@@ -363,3 +363,51 @@ fn new_cleanup_failure_fences_without_activation_or_retry() {
         "replacement_indeterminate"
     );
 }
+
+#[test]
+fn new_project_total_frames_sets_duration_and_work_area_or_defaults() {
+    for (frames, expected) in [(Some(37), 37), (Some(1), 1), (None, 120)] {
+        let state = ApplicationMcp::default();
+        let mut value = request(&state);
+        if let Some(frames) = frames {
+            value["newProject"]["totalFrames"] = json!(frames);
+        }
+        let receipt = reopen::bootstrap_request(&state, &value.to_string(), |_| {
+            panic!("New must not consult filesystem admission")
+        })
+        .unwrap();
+        let info = state.native_project_info(&receipt.document_id).unwrap();
+        assert_eq!(info["totalFrames"], expected);
+        let project: Value =
+            serde_json::from_slice(&saved(&state, &receipt.document_id)).unwrap();
+        assert_eq!(project["project"]["waOut"], (expected - 1) as f64);
+    }
+}
+
+#[test]
+fn new_project_total_frames_out_of_range_is_refused_before_install() {
+    for bad in [json!(0), json!(-1), json!(1.5), json!("12"), json!(4294967296u64)] {
+        let state = ApplicationMcp::default();
+        let mut value = request(&state);
+        value["newProject"]["totalFrames"] = bad.clone();
+        assert!(
+            reopen::bootstrap_request(&state, &value.to_string(), |_| {
+                panic!("New must not consult filesystem admission")
+            })
+            .is_err(),
+            "{bad}"
+        );
+        assert!(state.native_project_info("none").is_err());
+    }
+}
+
+#[test]
+fn replacement_new_project_honours_total_frames_and_refuses_zero() {
+    let state = ApplicationMcp::default();
+    let first = initial(&state);
+    let mut value = replacement(&state, &first);
+    value["newProject"]["totalFrames"] = json!(0);
+    assert!(prepare(&state, &value).is_err());
+    value["newProject"]["totalFrames"] = json!(48);
+    assert!(prepare(&state, &value).is_ok());
+}

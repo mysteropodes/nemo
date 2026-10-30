@@ -1,0 +1,211 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.tween",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.tween.generate",
+    "command.document.object.tween.regenerate",
+    "command.document.object.tween.split",
+    "command.document.object.tween.reassign"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectTweenGeneratePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectTweenRegeneratePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectTweenSplitPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectTweenReassignPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 65536,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal; the engine reads the layer cells itself, so no drawing travels in the request. Requests above 65536 encoded bytes are refused, never split."
+  },
+  "semantics": "D20-D22 (#2358): generate or regenerate the in-betweens of a layer as one native transaction, split an interpolated frame into a new key and re-tween the two spans around it, or reassign the stroke pairing of one span. options (resamplePoints 2..256, step 1..999, skipManual, easing curve of strictly increasing x in 0..1) are optional and, when present, carry all four members and are stored with the layer; starts lists start-key frames and selection lists frames that each resolve to the key starting their span (mutually exclusive; absent means every span); split names an interpolated frame and promotes it; reassign carries the span (from < to, two consecutive drawn keys) with its overrides (one of aId or aIds per bId), optional easing and optional manualStrokes. A layer with fewer than two drawn keys, a locked layer, an unknown layer or an unordered request is refused or reported applied=false with no history entry. Texture dabs never take part in matching and are re-stamped from a seeded generator. One history entry per command; the spans, cells and bitmap-brush companions persist with the document and undo, redo and save/reopen restore them. No JS/Paper writer or fallback.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Generate the in-betweens of the span holding frame 4 (selection resolves each frame to its start key); installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "tween-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.tween.generate",
+        "payload": {
+          "command": "object.tween.generate",
+          "layerUid": "layer-1",
+          "selection": [
+            4
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "tween-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Regenerate the spans starting at keys 0 and 4 with explicit options (all four option members are required)",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "tween-2",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.tween.regenerate",
+        "payload": {
+          "command": "object.tween.regenerate",
+          "layerUid": "layer-1",
+          "options": {
+            "resamplePoints": 64,
+            "step": 2,
+            "skipManual": true,
+            "easing": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ]
+          },
+          "starts": [
+            0,
+            4
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "tween-2",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Split an interpolated frame into a new key and re-tween the two spans around it",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "tween-3",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.tween.split",
+        "payload": {
+          "command": "object.tween.split",
+          "layerUid": "layer-1",
+          "frame": 2
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "tween-3",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Reassign: pin stroke native-stroke:2:0 of the key A to native-stroke:6:0 of key B, tween only that span",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "tween-4",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.tween.reassign",
+        "payload": {
+          "command": "object.tween.reassign",
+          "layerUid": "layer-1",
+          "span": {
+            "from": 0,
+            "to": 4,
+            "overrides": [
+              {
+                "aId": "native-stroke:2:0",
+                "bId": "native-stroke:6:0"
+              }
+            ],
+            "manualStrokes": [
+              "native-stroke:2:0"
+            ]
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "tween-4",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

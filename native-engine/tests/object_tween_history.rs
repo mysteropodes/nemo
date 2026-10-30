@@ -373,6 +373,72 @@ fn native_tween_generation_matches_baseline_with_one_undo_redo_and_reopen() {
     }
 }
 
+/// D21: the baseline leaves in-betweens untouched when an endpoint key is edited (no regeneration, no flag, no
+/// manual-edit mark); only an explicit regenerate recomputes them. Both phases are fixed by the pinned baseline.
+#[test]
+fn endpoint_key_edit_keeps_in_betweens_until_regenerate_recomputes_them() {
+    let oracle: Value =
+        serde_json::from_str(include_str!("fixtures/tween-baseline/oracle.json")).unwrap();
+    let c = oracle["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["operation"] == "endpoint-edit")
+        .unwrap();
+    let (input, wanted) = (&c["input"], &c["expected"]);
+    let edit = &input["edited"];
+    let (frame, stroke) = (
+        edit["frame"].as_u64().unwrap(),
+        edit["strokes"][0]["strokeId"].as_str().unwrap(),
+    );
+    let axis = |i: usize| {
+        edit["strokes"][0]["segments"][0]["point"][i].as_f64().unwrap()
+            - input["frames"][frame as usize]["strokes"][0]["segments"][0]["point"][i]
+                .as_f64()
+                .unwrap()
+    };
+    let delta = [axis(0), axis(1)];
+    assert!(delta != [0., 0.]);
+    for v2 in [false, true] {
+        let mut doc = document(&input["frames"], v2);
+        doc.tweens = crate::object_document::Presence::Present(
+            serde_json::from_value(json!({"layers":[{"layerUid":"L0","options":input["options"],"spans":[input["span"]]}]})).unwrap(),
+        );
+        let mut o = NativeObjectHistory::new("endpoint", doc).unwrap();
+        assert_frames(&head(&o), &input["frames"], "endpoint-generated");
+        let (original, retained) = (bytes(&o), o.acquire_snapshot(0).unwrap());
+        let target = json!({"contextId":"scene-root","frameScope":{"kind":"authored","frame":frame},"layerUid":"L0","strokeId":stroke});
+        let q = request(&o, "edit", "subselect.edit", json!({"command":"object.subselect.edit","stableTarget":target,"intent":{"kind":"move","indices":[0],"delta":delta}}));
+        let reply = dispatch(&mut o, &q);
+        assert_eq!(reply["ok"], true, "{reply}");
+        assert_eq!((o.history_depths(), o.content_revision()), ((1, 0), 1));
+        // Stay: the edited key moved, every in-between keeps its generated record and exposure.
+        assert_frames(&head(&o), &wanted["stay"], "endpoint-stay");
+        let edited = bytes(&o);
+        assert_ne!(edited, original);
+        let q = request(&o, "regenerate", "tween.regenerate", json!({"command":"object.tween.regenerate","layerUid":"L0","options":input["options"]}));
+        let reply = dispatch(&mut o, &q);
+        assert_eq!(reply["ok"], true, "{reply}");
+        assert_eq!((o.history_depths(), o.content_revision()), ((2, 0), 2));
+        assert_frames(&head(&o), &wanted["regenerated"], "endpoint-regenerated");
+        assert_ne!(bytes(&o), edited);
+        let regenerated = bytes(&o);
+        for (id, want) in [("undo-regenerate", &edited), ("undo-edit", &original)] {
+            let q = request(&o, id, "undo", json!({"command":"object.undo"}));
+            assert_eq!(dispatch(&mut o, &q)["ok"], true);
+            assert_eq!(&bytes(&o), want, "{id}");
+        }
+        for id in ["redo-edit", "redo-regenerate"] {
+            let q = request(&o, id, "redo", json!({"command":"object.redo"}));
+            assert_eq!(dispatch(&mut o, &q)["ok"], true);
+        }
+        assert_eq!(bytes(&o), regenerated);
+        assert_eq!(encode_storage_project(retained.document()).unwrap(), original);
+        let reopened = NativeObjectHistory::new("reopened", decode_storage_project(&regenerated).unwrap()).unwrap();
+        assert_frames(&head(&reopened), &wanted["regenerated"], "endpoint-reopened");
+    }
+}
+
 #[path = "object_tween_refusals.rs"]
 mod refusals;
 
@@ -384,3 +450,6 @@ mod ghosts;
 
 #[path = "object_tween_bitmap.rs"]
 mod bitmap;
+
+#[path = "object_tween_public_shapes.rs"]
+mod public_shapes;

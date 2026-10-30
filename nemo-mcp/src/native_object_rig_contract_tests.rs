@@ -23,6 +23,13 @@ pub(super) const LABS: [&str; 8] = [
     "labs.interval",
     "labs.moveToLayer",
 ];
+/// D20-D22 (#2358): the four tween commands share the table too; their own shapes are pinned in the tween tests.
+pub(super) const TWEEN: [&str; 4] = [
+    "tween.generate",
+    "tween.regenerate",
+    "tween.split",
+    "tween.reassign",
+];
 
 pub(super) fn corpus() -> Value {
     serde_json::from_str(CORPUS).expect("the agreement corpus parses")
@@ -36,9 +43,9 @@ pub(super) fn envelope(operation: &str, payload: Value) -> NativeApplicationRequ
 }
 
 #[test]
-fn the_table_declares_exactly_the_fourteen_operations_and_nothing_else() {
-    assert_eq!(table().len(), 14, "an unparsable table admits nothing");
-    for &suffix in OPERATIONS.iter().chain(&LABS) {
+fn the_table_declares_exactly_the_eighteen_operations_and_nothing_else() {
+    assert_eq!(table().len(), 18, "an unparsable table admits nothing");
+    for &suffix in OPERATIONS.iter().chain(&LABS).chain(&TWEEN) {
         assert!(admitted(&format!("{P}{suffix}")), "{suffix}");
     }
     for other in [

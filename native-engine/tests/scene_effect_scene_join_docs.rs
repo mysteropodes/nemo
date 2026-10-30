@@ -363,3 +363,96 @@ fn a_witness_carries_only_a_plan_joined_from_its_own_packet_and_the_plan_is_part
         ObjectSceneError::WrongSnapshot
     );
 }
+
+/// Add a property holder for layer `uid` carrying one `property` track keyed at frames 0 and `FRAME`.
+fn key_layer_property(document: &mut serde_json::Value, uid: &str, property: &str) {
+    let holder = json!({
+        "target": {"contextId": "scene-root", "layerUid": uid},
+        "properties": [{"property": property, "track": {"keys": [
+            {"frame": 0, "v": [100]}, {"frame": FRAME, "v": [0]}
+        ]}}]
+    });
+    match document["propertyHolders"].as_array_mut() {
+        Some(holders) => holders.push(holder),
+        None => document["propertyHolders"] = json!([holder]),
+    }
+}
+
+fn packet_is_refused(document: &serde_json::Value, instance: &str) -> bool {
+    use crate::object_frame_packet::{prepare_object_frame, ObjectFrameError};
+    let snap = snapshot(document, instance);
+    matches!(
+        prepare_object_frame(&snap, &selector(&snap, FRAME)),
+        Err(ObjectFrameError::Unavailable)
+    )
+}
+
+#[test]
+fn a_keyed_matte_on_track_is_refused_at_packet_admission_and_by_the_join_guard() {
+    use super::inputs::first_animated_composition_property as first;
+    let mut document = base_document();
+    set_layer(
+        &mut document,
+        "L0",
+        json!({"matteMode": "alpha", "matteSourceLayerUid": "L1"}),
+    );
+    // Control: no track, and the packet joins.
+    assert!(!packet_is_refused(&document, "guard-matte-plain"));
+    key_layer_property(&mut document, "L0", "matteOn");
+    // Today no packet exists for such a document, so no join can substitute the neutral value either.
+    assert!(packet_is_refused(&document, "guard-matte"));
+    // The join's own guard names the animated property and ignores static ones and other properties.
+    assert_eq!(first([("position", true), ("matteOn", true)]), Some("matteOn"));
+    assert_eq!(first([("blend", true)]), Some("blend"));
+    assert_eq!(first([("matteOn", false), ("opacity", true)]), None);
+}
+
+#[test]
+fn a_blend_track_or_blend_keys_cannot_be_authored_so_no_neutral_blend_can_stand_in() {
+    use crate::object_codec::decode_storage_project;
+    let mut document = base_document();
+    set_layer(&mut document, "L1", json!({"blendMode": "multiply"}));
+    key_layer_property(&mut document, "L1", "blend");
+    assert!(decode_storage_project(&serde_json::to_vec(&document).unwrap()).is_err());
+    // `blendKeys` on the layer record is likewise not admitted: animated blend belongs to the property provider.
+    let mut document = base_document();
+    set_layer(
+        &mut document,
+        "L1",
+        json!({"blendKeys": [{"frame": 0, "mode": "multiply"}]}),
+    );
+    assert!(decode_storage_project(&serde_json::to_vec(&document).unwrap()).is_err());
+}
+
+#[test]
+fn an_enabled_item_effect_is_a_typed_input_refusal_on_its_layer() {
+    use super::layer_inputs;
+    let inputs = |document: &serde_json::Value, instance: &str| {
+        let snap = snapshot(document, instance);
+        layer_inputs(&packet(&snap, FRAME)).map(|layers| layers.len())
+    };
+    let mut document = base_document();
+    let uid = document["objects"][0]["target"]["layerUid"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let source = document["layers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|layer| layer["layerUid"] == uid.as_str())
+        .unwrap();
+    assert_eq!(inputs(&document, "guard-fx-plain"), Ok(3));
+    document["objects"][0]["effects"] = json!([{"type": "blur", "enabled": true, "p1": 4}]);
+    assert_eq!(
+        inputs(&document, "guard-fx"),
+        Err(SceneEffectJoinError::LayerCompositionPropertyUnavailable {
+            layer: source,
+            property: "itemEffects"
+        })
+    );
+    // A disabled stack is not an input. Mask objects carry a blur stack that the mask-feather path owns; the
+    // stored-mask joins in scene_effect_scene_join_stack.rs fail if the guard counted them.
+    document["objects"][0]["effects"] = json!([{"type": "blur", "enabled": false, "p1": 4}]);
+    assert_eq!(inputs(&document, "guard-fx-off"), Ok(3));
+}
