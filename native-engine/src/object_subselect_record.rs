@@ -266,6 +266,19 @@ pub(crate) fn hit_role(record: &ObjectRecord) -> &'static str {
         "plain"
     }
 }
+/// #2372 hit-test listing: what a record is to a brush (a texture `anchor`, one of its `copy` dabs, a `bitmap` anchor) and
+/// the group they share.
+pub(crate) fn brush_of(record: &ObjectRecord) -> (Option<&'static str>, Option<String>) {
+    let ext = record.vector_ext.value();
+    if let Some(texture) = ext.and_then(|e| e.brush_texture.value()) {
+        let kind = if texture.is_brush_texture_copy.value() == Some(&true) { "copy" } else { "anchor" };
+        return (Some(kind), texture.brush_group_id.value().cloned());
+    }
+    match ext.and_then(|e| e.bitmap_brush.value()) {
+        Some(bitmap) => (Some("bitmap"), Some(bitmap.brush_group_id.clone())),
+        None => (None, None),
+    }
+}
 /// The linked-fill identity a ribbon and its fill share.
 pub(crate) fn linked_fill(record: &ObjectRecord) -> Option<&String> {
     record.vector_ext.value().and_then(|e| e.linked_fill_id.value())

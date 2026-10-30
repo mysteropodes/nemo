@@ -283,3 +283,14 @@ test('a batch reshape takes new geometry or a ribbon centreline (#2362 sculpt), 
   }
   assert.throws(() => C.payload(EDIT, { command: 'object.vector.batch', ops: [{ op: 'clone', stableTarget: target('s-r'), frame: 3, center: [anchor(0), anchor(9)] }] }), TypeError);
 });
+
+test('a batch reshape by matrix (#2372 Select) is six finite numbers and excludes geometry and a centreline', () => {
+  const EDIT = 'command.document.object.vector.edit';
+  const step = (op) => ({ command: 'object.vector.batch', ops: [Object.assign({ op: 'reshape', stableTarget: target('s-r') }, op)] });
+  assert.doesNotThrow(() => C.payload(EDIT, step({ matrix: [1, 0, 0, 1, 12.5, -4] })));
+  assert.doesNotThrow(() => C.payload(EDIT, step({ matrix: [2, 0, 0, 2, 0, 0], frame: 3 })));
+  for (const bad of [{ matrix: [1, 0, 0, 1, 0] }, { matrix: [1, 0, 0, 1, 0, 0, 0] }, { matrix: [1, 0, 0, 1, 0, NaN] }, { matrix: 'id' }, { matrix: [1, 0, 0, 1, 0, 0], geometry: record('s-r').geometry }]) {
+    assert.throws(() => C.payload(EDIT, step(bad)), TypeError, JSON.stringify(bad));
+  }
+  assert.throws(() => C.payload(EDIT, { command: 'object.vector.batch', ops: [{ op: 'clone', stableTarget: target('s-r'), frame: 3, matrix: [1, 0, 0, 1, 0, 0] }] }), TypeError);
+});

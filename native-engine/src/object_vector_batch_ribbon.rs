@@ -47,8 +47,21 @@ pub(super) fn reshape(
     {
         return Err(InvalidRequest);
     }
+    rebuild(source, existing, center)
+}
+
+/// A pressure ribbon rebuilt on `center` from its own width profile, and its linked fill re-synced to it. The caller has
+/// decided that this record may be rebuilt (a sculpt refuses a texture anchor; a Select transform carries it).
+pub(super) fn rebuild(
+    source: &ObjectDocument,
+    existing: &ObjectRecord,
+    center: Vec<CenterSegment>,
+) -> Result<(ObjectRecord, Option<ObjectRecord>), DispatchErrorCode> {
+    use DispatchErrorCode::InvalidRequest;
+    let target = &existing.target;
+    let ext = existing.vector_ext.value().ok_or(InvalidRequest)?;
     let pressure = ext.pressure.value().ok_or(InvalidRequest)?;
-    if pressure.center_segments.missing() {
+    if pressure.center_segments.missing() || !(2..=256).contains(&center.len()) {
         return Err(InvalidRequest);
     }
     let segments: Vec<SegOut> = center

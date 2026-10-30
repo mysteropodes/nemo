@@ -66,6 +66,11 @@ mod timing;
 // L03-M (#2109): widget write planning through the evaluation kernel (commands may not import it).
 #[path = "object_widget_read.rs"]
 pub(crate) mod widget_read;
+// #2255: the presentation read of the widget layers (pad geometry, puck, axes) for the ordinary gesture.
+#[path = "object_widget_presentation.rs"]
+mod widget_presentation;
+#[path = "object_widget_view.rs"]
+mod widget_view;
 use serde::{Deserialize, Serialize};
 pub use timing::LayerTimingReadResponse;
 const MAX_MESSAGE_BYTES: usize = 4096;

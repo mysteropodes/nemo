@@ -175,6 +175,27 @@
         throw fault('unavailable', 'Native image-mesh read failed: ' + (e && e.message || e), 'native_read_failed');
       }
     }
+    // #2255: every widget layer of the presented frame (pad, puck, rest, axes), read in bounded pages of the one widget view.
+    async function readWidgets(selector, pin) {
+      if (!exact(selector, ['contextId', 'frame'], []) || selector.contextId !== 'scene-root' || !integer(selector.frame, 0, 4294967295) || !pins(pin))
+        throw fault('invalid_request', 'Widget selector is invalid', 'local_validation');
+      const o = origin(selector, pin);
+      if (!o) throw fault('unavailable', 'No matching presented native widget view', 'widget_view_unavailable');
+      await settle(o);
+      let cursor = 0, total = null, items = [];
+      for (;;) {
+        const view = { kind: 'widget', contextId: selector.contextId, frame: selector.frame, workId: o.workId, viewGeneration: o.viewGeneration, cursor: cursor, limit: 2 };
+        const r = await queryBody(o, { atRevision: o.info.contentRevision, documentSnapshotId: o.info.documentSnapshotId, view: view });
+        if (total !== null && total !== r.total) throw fault('uncorrelated', 'Widget list changed between pages', 'widget_page_total');
+        total = r.total; items = items.concat(r.items);
+        if (r.nextCursor === null) break;
+        if (r.nextCursor <= cursor) throw fault('uncorrelated', 'Widget page cursor made no progress', 'widget_page_stale');
+        cursor = r.nextCursor;
+      }
+      if (items.length !== total) throw fault('uncorrelated', 'Widget list is incomplete', 'widget_page_incomplete');
+      requireCurrent(o);
+      return freeze({ info: copyPins(o.info), presentation: o.presentation, items: items });
+    }
     async function subselectGeometry(o, stableTarget, intent, paint, hitTest, center) {
       let cursor=0,segments=[],total=null,closed=null,widths=[];
       for(;;){
@@ -298,7 +319,7 @@
       return freeze(runs.map((run) => freeze(run.slice())));
     }
     return Object.freeze({ readLayerTiming: (l, f, p) => readLegacy(l, f, p), readLayerRange: (l, f, p) => readLegacy(l, f, p, 'range'),
-      readLayerPlacement: (l, f, p) => readLegacy(l, f, p, 'placement'), readLayerCells: readLayerCells, readImageMesh: readImageMesh, readSubselect: readSubselect, readPresentedStrokes: readPresentedStrokes, previewSubselect: previewSubselect });
+      readLayerPlacement: (l, f, p) => readLegacy(l, f, p, 'placement'), readLayerCells: readLayerCells, readImageMesh: readImageMesh, readWidgets: readWidgets, readSubselect: readSubselect, readPresentedStrokes: readPresentedStrokes, previewSubselect: previewSubselect });
   }
   function boxSegments(b) { return [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]].map((p) => ({ point: p, handleIn: [0, 0], handleOut: [0, 0] })); }
   function expectedCount(kind, m) { return kind === 'outline' ? m.outlineCount : kind === 'verts' ? m.vertexCount : kind === 'tris' ? m.triangleIndexCount : m.vertexCount; }

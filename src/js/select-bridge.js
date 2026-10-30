@@ -478,7 +478,7 @@
   function nativePointer() {
     if (nativePointerIntent) return nativePointerIntent;
     nativePointerIntent = window.NemoSelectCanvasIntent.create({
-      hover: function (e) { if (window.NemoNativeSelectOverlay) window.NemoNativeSelectOverlay.hoverAt(window, e); },
+      hover: function (e) { if (window.NemoNativeSelectOverlay) window.NemoNativeSelectOverlay.hoverAt(window, e); }, gesture: window.NemoNativeSelectGesture && window.NemoNativeSelectGesture.bind(window), // #2372: marquee, move, scale, rotate
       context: function () {
         var c = window.NemoNativeOpacityCutover;
         if (!c || c.blocksLegacy() !== true) throw new Error('Native canvas authority unavailable');

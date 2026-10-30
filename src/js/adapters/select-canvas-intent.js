@@ -10,14 +10,17 @@
     ['context', 'probe', 'select'].forEach(function (name) {
       if (!ports || typeof ports[name] !== 'function') throw new TypeError('Missing pointer port: ' + name);
     });
-    var pending = null, captureTarget = null;
+    var pending = null, captureTarget = null, gesture = null;
     function valid() {
       try { return pending.context === ports.context(); }
       catch (_) { return false; }
     }
+    // #2372: a drag gesture (marquee, move, scale, rotate) rides on the pending press; cancelling the press cancels it with no write.
+    function drop() { var g = gesture; gesture = null; if (g) try { g.cancel(); } catch (_) {} }
     function cancel(e) {
       if (!pending || e && e.pointerId !== undefined && e.pointerId !== pending.id) return false;
       var id = pending.id, target = captureTarget;
+      drop();
       pending = null; captureTarget = null;
       if (target && target.releasePointerCapture &&
           (!target.hasPointerCapture || target.hasPointerCapture(id))) {
@@ -39,12 +42,15 @@
           context: context, decision: decision, shift: !!e.shiftKey, blocked: false };
         captureTarget = e.currentTarget;
         if (captureTarget && captureTarget.setPointerCapture) captureTarget.setPointerCapture(e.pointerId);
+        if (ports.gesture && decision.mode === 'pick') gesture = ports.gesture.begin(e, function () { cancel(); }) || null;
       } catch (_) { cancel(); }
     }
     function move(e) {
       consume(e);
       if (!pending) return hover(e);
-      if (pending.blocked || e.pointerId !== pending.id) return;
+      if (e.pointerId !== pending.id) return;
+      if (gesture) try { gesture.move(e); } catch (_) {}
+      if (pending.blocked) return;
       if (!valid() || e.buttons !== 1 || !Number.isFinite(e.clientX) || !Number.isFinite(e.clientY) ||
           Math.hypot(e.clientX - pending.x, e.clientY - pending.y) > 3) pending.blocked = true;
     }
@@ -54,8 +60,13 @@
       if (e.pointerId !== pending.id) return;
       var accept = !pending.blocked && valid() && Number.isFinite(e.clientX) && Number.isFinite(e.clientY) &&
         Math.hypot(e.clientX - pending.x, e.clientY - pending.y) <= 3;
-      var decision = pending.decision, shift = pending.shift;
-      cancel();
+      var decision = pending.decision, shift = pending.shift, g = gesture;
+      gesture = null; cancel();
+      if (g) try { // a drag commits through the gesture; a click that never dragged selects, except on a handle (which selects nothing)
+        if (!accept) return g.end(e);
+        g.cancel();
+        if (g.owns()) return;
+      } catch (_) { return; }
       if (accept) try { ports.select(decision, shift); } catch (_) {}
     }
     function cancelEvent(e) { consume(e); cancel(e); }
@@ -197,7 +208,7 @@
       // baseline did a filled Paper item); an unfilled plain stroke only on its line.
       path.strokeColor = [0, 0, 0]; path.strokeWidth = 1; if (item.closed && (item.role !== 'plain' || item.filled === true)) path.fillColor = [0, 0, 0];
       path.data = { strokeId: item.stableTarget.strokeId, nativeStableTarget: item.stableTarget, nativeRole: item.role, nativeRibbon: item.role === 'ribbon', nativeMatrix: item.matrix,
-        nativeOwner: item.owner };
+        nativeOwner: item.owner, nativeBrush: item.brush, nativeGroup: item.group };
       if (item.center) { var m = item.matrix, at = function (p, d) { return [m[0] * p[0] + m[2] * p[1] + d * m[4], m[1] * p[0] + m[3] * p[1] + d * m[5]]; };
         path.data.isVectorBrush = true; path.data.centerSegments = item.center.map(function (c) {
           return { point: at(c.point, 1), handleIn: at(c.handleIn, 0), handleOut: at(c.handleOut, 0), width: c.width }; }); }
@@ -244,6 +255,14 @@
     if (fill) path.data.linkedFill = { data: { strokeId: fill.stableTarget.strokeId } };
     return path;
   }
+  // #2372: a texture dab is selected as its brush's anchor (the baseline resolved a companion to its anchor); a dab whose anchor is not
+  // listed stays itself and Select refuses to transform it.
+  async function anchored(root, layerIndex, hit, layers) {
+    if (hit.data.nativeBrush !== 'copy' || !hit.data.nativeGroup) return hit;
+    var anchor = layers.items.find(function (i) { return i.brush === 'anchor' && i.group === hit.data.nativeGroup; });
+    var again = anchor && await presented(root, layerIndex, function (item) { return item.stableTarget.strokeId === anchor.stableTarget.strokeId; });
+    return again && again.paths[0] ? withFill(again.paths[0], again.items) : hit;
+  }
   // The top-most presented stroke within 8 screen pixels of the click, or null, as the baseline did: the active layer is
   // tested first, then every other visible unlocked layer from the topmost down (#2372). The hit carries its layer
   // (data.nativeLayerIndex/Uid) so applyPick can activate it. Only records whose bounds reach the click have their geometry
@@ -261,12 +280,29 @@
       var layers = await presented(root, order[n], reach);
       if (!layers) return undefined;
       for (var i = layers.paths.length - 1; i >= 0; i--) if (layers.paths[i].hitTest(at, { fill: true, stroke: true, tolerance: t })) {
-        var hit = withFill(owned(layers.paths[i]), layers.items);
+        var hit = await anchored(root, order[n], withFill(owned(layers.paths[i]), layers.items), layers);
         hit.data.nativeLayerIndex = order[n]; hit.data.nativeLayerUid = layers.layerUid;
         return hit;
       }
     }
     return null;
+  }
+
+  // #2372: the selectable paths of one layer (default: the active one) the `wanted(item, worldBounds)` filter keeps, each carrying its
+  // linked fill and layer; a locked or hidden layer is never read. `centres` adds a ribbon's world centreline (what a commit needs).
+  async function layerPaths(root, wanted, centres, layerIndex) {
+    var s = presentedSession(root), idx = layerIndex === undefined ? root.state.activeLayerIdx : layerIndex, info = s && s.pin.layers[idx];
+    if (!info || info.locked === true || info.visible === false) return null;
+    var layers = await presented(root, idx, wanted, 0, centres);
+    if (layers) layers.paths.forEach(function (p) { withFill(p, layers.items); p.data.nativeLayerIndex = idx; p.data.nativeLayerUid = layers.layerUid; });
+    return layers;
+  }
+  // The items of the active layer whose painted bounds meet the world rectangle [x0, y0, x1, y1] (the baseline marquee's intersection
+  // rule); a linked fill and a texture dab are never their own selection, they follow their ribbon / anchor.
+  async function marquee(root, rect) {
+    var layers = await layerPaths(root, function (item, b) {
+      return !(item.role === 'fill' && item.owner) && item.brush !== 'copy' && b[0] <= rect[2] && b[2] >= rect[0] && b[1] <= rect[3] && b[3] >= rect[1]; });
+    return layers && layers.paths;
   }
 
   // #2362 Labs sculpt: a drag over the active layer's presented strokes (a ribbon with its world centreline). Moves wait
@@ -318,6 +354,27 @@
     });
   }
 
+  // #2372 Select: a world affine `m` ([a b c d e f]) in the record's own space, P^-1 * M * P for the presented matrix P of the record.
+  function inRecordSpace(p, m) {
+    var d = p[0] * p[3] - p[1] * p[2];
+    if (!Number.isFinite(d) || Math.abs(d) < 1e-12) throw new Error('Presented transform is singular');
+    var mul = function (a, b) { return [a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1], a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3],
+      a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]]; };
+    var inv = [p[3] / d, -p[1] / d, -p[2] / d, p[0] / d, (p[2] * p[5] - p[3] * p[4]) / d, (p[1] * p[4] - p[0] * p[5]) / d];
+    return mul(inv, mul(m, p));
+  }
+  // The Select gesture's batch steps: a plain stroke takes its transformed world geometry (the route the knife and sculpt use); every other
+  // painted record (ribbon, fill, shape, texture anchor) is mapped by the engine through a record-space matrix, which also carries its linked
+  // fill, texture copies, gradient and shape box. `paths` are fresh presented paths (untransformed) and `m` the world affine.
+  function transformSteps(root, paths, m) {
+    var Matrix = root.Matrix || root.paper.Matrix, world = new Matrix(m[0], m[1], m[2], m[3], m[4], m[5]);
+    return paths.map(function (p) {
+      var t = p.data.nativeStableTarget;
+      if (p.data.nativeRole === 'plain') { var moved = p.clone({ insert: false }); moved.transform(world); return { reshape: { stableTarget: t, geometry: recordGeometry(moved, p.data.nativeMatrix) } }; }
+      return { reshape: { stableTarget: t, matrix: inRecordSpace(p.data.nativeMatrix, m) } };
+    });
+  }
+
   // What a pick depends on: a repaint may re-project the layer rows (the pointer context counts those) but a pick still
   // stands while the tool, mode, frame, layer and document revision are unchanged.
   function pickContext(root) {
@@ -364,5 +421,5 @@
   }
 
   return Object.freeze({ create: create, hitHandles: hitHandles, objectProject: objectProject, presented: presented,
-    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, pick: pick, pickContext: pickContext, applyPick: applyPick, resolvePick: resolvePick });
+    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, transformSteps: transformSteps, layerPaths: layerPaths, marquee: marquee, pick: pick, pickContext: pickContext, applyPick: applyPick, resolvePick: resolvePick });
 }));

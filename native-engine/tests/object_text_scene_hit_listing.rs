@@ -126,3 +126,20 @@ fn a_rotated_raster_keeps_its_unrotated_rect_and_the_map_about_its_centre() {
         "the centre is fixed: {c:?}"
     );
 }
+
+#[test]
+fn a_texture_anchor_names_its_brush_and_group_for_select() {
+    let mut doc = drawing();
+    let texture = json!({"brushGroupId":"g","brushTexturePreset":"chalk-round","preTextureOpacity":1});
+    doc["objects"][0]["family"] = json!("editable-vector-path");
+    doc["objects"][0]["geometry"]["coordinateSpace"] = json!("document-world");
+    doc["objects"][0]["geometry"]["handleSpace"] = json!("relative");
+    doc["objects"][0]["vector"] = json!({"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"butt","strokeJoin":"miter",
+        "miterLimit":10,"dashOffset":0,"opacity":1});
+    doc["objects"][0]["vectorExt"] = json!({"brushTexture":texture});
+    let items = listing(&doc)["items"].as_array().unwrap().clone();
+    let by = |role: &str| items.iter().find(|i| i["role"] == role).unwrap().clone();
+    assert_eq!((by("brush")["brush"].clone(), by("brush")["group"].clone()), (json!("anchor"), json!("g")));
+    assert!(by("raster").get("brush").is_none(), "an ordinary image names no brush");
+    assert!(by("text").get("brush").is_none(), "an ordinary item names no brush");
+}
