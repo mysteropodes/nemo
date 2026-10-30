@@ -1,6 +1,7 @@
 /* Start-screen Resume card for native crash recovery (#2360 R3). Lists the Rust recovery store
    (paths and counts only, never project bytes) and resumes the newest slot through the file UI's
-   openRecovered, which uses the ordinary session.openPath admission. */
+   openRecovered, which uses the ordinary session.openPath admission. The list never offers a slot the running
+   session owns (ports.ownSlots), and an empty store reads as "nothing to resume", not as a corrupt session. */
 (function(root,factory){
   var api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;
@@ -26,7 +27,8 @@
     });
     return out.sort(function(a,b){return b.generations[0].savedAtMs-a.generations[0].savedAtMs;});
   }
-  // ports: invoke(command,args), requestId(kind), openRecovered(entry), allowOpen(), notice(text), failureText()
+  // ports: invoke(command,args), requestId(kind), openRecovered(entry), allowOpen(), notice(text), failureText(), emptyText(),
+  // ownSlots() (slot keys the live session may have published; optional)
   function create(ports){
     var busy=false;
     async function list(){
@@ -35,11 +37,14 @@
       var request={apiVersion:2,requestId:ports.requestId('recovery-list'),instanceId:status.instanceId};
       var receipt=await ports.invoke(LIST,{requestJson:JSON.stringify(request)});
       if(!receipt||receipt.apiVersion!==2||receipt.requestId!==request.requestId||receipt.instanceId!==request.instanceId)return [];
-      return normalize(receipt);
+      var own=[];
+      try{own=ports.ownSlots?ports.ownSlots()||[]:[];}catch(_){own=[];}
+      return normalize(receipt).filter(function(e){return own.indexOf(e.slotKey)<0;});
     }
-    // The card is shown only when a valid recovery exists. Any failure reads as "none": Open and New are unaffected.
+    // The card is shown only when a valid recovery exists. Any failure reads as "none" (published, so a card shown earlier
+    // is hidden again): Open and New are unaffected.
     function presence(publish){
-      return list().then(function(entries){publish(entries.length>0);return entries.length>0;},function(){return false;});
+      return list().then(function(entries){publish(entries.length>0);return entries.length>0;},function(){publish(false);return false;});
     }
     async function resume(){
       if(busy)return false;
@@ -47,7 +52,7 @@
       try{
         if(ports.allowOpen&&ports.allowOpen()!==true)return false;
         var entries=await list();
-        if(!entries.length){ports.notice(ports.failureText());return false;}
+        if(!entries.length){ports.notice(ports.emptyText?ports.emptyText():ports.failureText());return false;}
         return await ports.openRecovered(entries[0]);
       }catch(_){
         try{ports.notice(ports.failureText());}catch(__){}
@@ -64,7 +69,8 @@
     return create({
       invoke:function(command,args){return arguments.length>1?root.__TAURI__.core.invoke(command,args):root.__TAURI__.core.invoke(command);},
       requestId:function(kind){return session.requestId(kind);},
-      openRecovered:ports.openRecovered,allowOpen:ports.allowOpen,notice:ports.notice,
+      openRecovered:ports.openRecovered,allowOpen:ports.allowOpen,notice:ports.notice,ownSlots:ports.ownSlots,
+      emptyText:function(){return 'Nothing to resume.';},
       failureText:function(){return root.SM&&root.SM.t?root.SM.t('toastCannotResumeSessionCorrupt'):'Cannot resume the session.';}
     });
   }
