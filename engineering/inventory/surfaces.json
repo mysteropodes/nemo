@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "576c32627e7a76745e54ad03762dff51f6478eca",
-  "describe": "v0.7.0-alpha.4-3666-g576c3262-dirty"
+  "head": "cddfbc618a04c84a7f4a74620bca61c0513428f9",
+  "describe": "v0.7.0-alpha.4-3676-gcddfbc61-dirty"
  },
- "inputsDigest": "58ebddcea3b6d49b122c24c9257ee401de4f5dc1270c027fbd7d319bac54caab",
+ "inputsDigest": "6505f5f9bf74fb05d0d6897f90d02d41c867dd6b0d949bcf0f904b7d9cb14c59",
  "states": [
   "inventoried",
   "characterized",
@@ -52,7 +52,7 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 258,
+   "native": 259,
    "export": 5,
    "animation": 439,
    "history": 350,
@@ -17439,7 +17439,7 @@
     "functionsVisited": 254,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-project-desktop.js:345 presented()",
+     "src/js/adapters/native-object-project-desktop.js:347 presented()",
      "src/js/app.js:536 updZoom()",
      "src/js/tools.js:7112 show()"
     ]
@@ -21603,7 +21603,7 @@
    "capability": "Mirror check: hold M to flip the view horizontally (proportion check), release or click to return to normal",
    "area": "labs",
    "handler": [
-    "src/js/labs/mirror-check.js:50"
+    "src/js/labs/mirror-check.js:56"
    ],
    "events": [],
    "exposure": [
@@ -21612,13 +21612,15 @@
    ],
    "mcp": "none (R14)",
    "sdk": "SMLabs",
-   "consumers": {},
+   "consumers": {
+    "native": 2
+   },
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/mirror-check.js:50",
+   "source": "src/js/labs/mirror-check.js:56",
    "meta": {
-    "functionsVisited": 3
+    "functionsVisited": 6
    },
    "fixtures": []
   },

@@ -281,7 +281,9 @@
     }
     return Object.assign({},root.NemoNativeViewportUnderlay.desktop(root),{invoke:invokeProjectObserved,publishRevision:publishRevision,
       viewMode:function(){return root.state&&root.state.cameraView===true?'stored-camera':'canvas';},
-      displayFilter:function(){return root.SMLabs&&typeof root.SMLabs.getViewFilter==='function'?root.SMLabs.getViewFilter():'none';},
+      // The held mirror check (#2374) rides the same final-surface transform as the color check.
+      displayFilter:function(){var labs=root.SMLabs,color=labs&&typeof labs.getViewFilter==='function'?labs.getViewFilter():'none';
+        return labs&&typeof labs.isMirrored==='function'&&labs.isMirrored()?(color==='none'?'mirrored':color+'-mirrored'):color;},
       subscribeWindowOcclusion:root.__TAURI__.event&&typeof root.__TAURI__.event.listen==='function'?async function(hint,cancel){
         var closing=function(){cancel(new Error('Native project window closed'));},remove,detached=false;
         var observesClose=typeof root.addEventListener==='function'&&typeof root.removeEventListener==='function';

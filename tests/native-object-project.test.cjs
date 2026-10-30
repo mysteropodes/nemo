@@ -836,7 +836,7 @@ test('native first preview carries persisted filter; toggles preserve navigation
  assert.ok(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').every(c=>c.r.displayFilter==='values'));
  const hand=f.s.beginViewportNavigation('pan',{x:100,y:60});await f.s.updateViewportNavigation(hand,{x:80,y:70});
  const view=f.s.readPresentedObjectSession().presentation.view;
- for(const filter of ['dim','none','values']){
+ for(const filter of ['dim','none','mirrored','values-mirrored','values']){
   f.filter=filter;assert.equal(f.s.readPresentedObjectSession(),null);await f.s.renderPreview(0);
   const shown=f.s.readPresentedObjectSession().presentation;assert.equal(shown.displayFilter,filter);assert.deepEqual(shown.view,view);
  }

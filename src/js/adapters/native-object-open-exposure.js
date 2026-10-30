@@ -16,7 +16,7 @@
   function equalNav(a,b){return a.zoom===b.zoom&&a.pan.every(function(n,i){return n===b.pan[i];});}
   function displayFilter(value){
     if(value===undefined)return 'none';
-    if(!['none','values','contrast','dim'].includes(value))throw new Error('Native display filter is unavailable');
+    if(!['none','values','contrast','dim','mirrored','values-mirrored','contrast-mirrored','dim-mirrored'].includes(value))throw new Error('Native display filter is unavailable');
     return value;
   }
   function requestView(request,selected){

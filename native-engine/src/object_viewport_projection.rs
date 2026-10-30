@@ -3,6 +3,8 @@ use crate::desktop_viewport::{DesktopViewportHost, PresentationReceipt, SurfaceP
 use serde::{Deserialize, Serialize};
 
 /// Session-only color check applied to the final surface, never to export pixels.
+/// The `-mirrored` variants also flip the presented image horizontally: the Labs
+/// mirror check (#2374), a view-only display transform like the color checks.
 #[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum ViewportDisplayFilter {
@@ -11,6 +13,10 @@ pub enum ViewportDisplayFilter {
     Values,
     Contrast,
     Dim,
+    Mirrored,
+    ValuesMirrored,
+    ContrastMirrored,
+    DimMirrored,
 }
 
 impl<P: SurfacePort> DesktopViewportHost<P> {
