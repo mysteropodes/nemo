@@ -363,6 +363,22 @@ impl NativeObjectHistory {
         snapshot.serialize_project_file()
     }
 
+    /// The same pin and encoder as `serialize_project_file`, split so a caller can
+    /// hold its authority lock only for the O(1) acquisition of the immutable,
+    /// Arc-shared snapshot and run the encoding after releasing it.
+    pub fn detached_project_file_serializer(
+        &self,
+        at_revision: u64,
+        snapshot_id: &str,
+    ) -> Result<impl FnOnce() -> Result<Vec<u8>, DispatchErrorCode> + Send + 'static, DispatchErrorCode>
+    {
+        let snapshot = self
+            .acquire_snapshot(at_revision)
+            .filter(|s| s.snapshot_id() == snapshot_id)
+            .ok_or(DispatchErrorCode::StaleRevision)?;
+        Ok(move || snapshot.serialize_project_file())
+    }
+
     /// Detached presentation metadata and a digest of the native file bytes.
     /// No drawing authority, media bytes or resource handles cross this port.
     pub fn project_file_info(&self) -> Result<serde_json::Value, DispatchErrorCode> {
