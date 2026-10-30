@@ -179,7 +179,7 @@ impl ObjectCompositionWitness {
     }
 }
 fn hit_item(
-    stable_target: crate::object_codec::ObjectTarget,
+    stable_target: crate::object_frame_packet::text::ObjectTarget,
     bounds: [f64; 4],
     matrix: [f64; 6],
     role: &'static str,
