@@ -227,11 +227,11 @@ test('request shape: unique ids, slot key from session tag or path, sanitized na
     'documentSnapshotId', 'instanceId', 'requestId', 'slotKey', 'supersedes']);
   assert.equal(first.apiVersion, 2); assert.equal(first.slotKey, 'untitled-deadbeef'); assert.equal(first.displayName, 'A  B');
   assert.equal(first.supersedes, 'untitled-cafebabe');
-  h.slot = { path: '/home/user/My Project.json', name: 'My Project' };
+  h.slot = { path: '/home/example/My Project.json', name: 'My Project' };
   h.edit(); await h.advance(30 * S);
   const second = h.writes[1].request;
   assert.match(second.slotKey, /^[a-z0-9-]{1,64}$/); assert.equal(second.slotKey, 'my-project-json-h4sh');
-  assert.equal(second.originPath, '/home/user/My Project.json'); assert.equal('supersedes' in second, false, 'sent once, after durable publish');
+  assert.equal(second.originPath, '/home/example/My Project.json'); assert.equal('supersedes' in second, false, 'sent once, after durable publish');
   assert.notEqual(first.requestId, second.requestId);
   h.slot = { path: '/' + 'x'.repeat(2000) + '/Name.json', name: 'n'.repeat(300) };
   h.edit(); await h.advance(30 * S);
