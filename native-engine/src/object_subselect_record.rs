@@ -260,6 +260,15 @@ pub(crate) fn painted_stroke_width(record: &ObjectRecord) -> f64 {
         .filter(|w| w.is_finite() && *w > 0.0)
         .unwrap_or(0.0)
 }
+/// #2372 hit-test listing: the stored `boxAngle` in degrees, or None when the record has none or it is 0 (serP drops a falsy angle).
+pub(crate) fn stored_box_angle(record: &ObjectRecord) -> Option<f64> {
+    record
+        .vector_ext
+        .value()
+        .and_then(|e| e.box_angle.value())
+        .and_then(serde_json::Number::as_f64)
+        .filter(|a| a.is_finite() && *a != 0.0)
+}
 /// #2362 hit-test listing: what a painted record is, so a reader can tell a ribbon's linked fill or a derived shape
 /// from a plain stroke without the record itself.
 pub(crate) fn hit_role(record: &ObjectRecord) -> &'static str {

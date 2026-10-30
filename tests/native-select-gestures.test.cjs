@@ -40,7 +40,8 @@ function harness(items, options = {}) {
       if (options.refuse) return { status: 'invalid', reason: 'refused' };
       steps.forEach((s) => { const it = store.find((i) => i.stableTarget.strokeId === s.reshape.stableTarget.strokeId);
         if (s.reshape.geometry) it.segments = s.reshape.geometry.segments.map((q) => ({ point: [q.point.x, q.point.y], handleIn: [0, 0], handleOut: [0, 0] }));
-        if (s.reshape.matrix) { const m = s.reshape.matrix, at = (q) => [m[0] * q[0] + m[2] * q[1] + m[4], m[1] * q[0] + m[3] * q[1] + m[5]];
+        if (s.reshape.matrix) { const m = s.reshape.matrix; if (Math.abs(m[0] - m[3]) < 1e-9 && Math.abs(m[1] + m[2]) < 1e-9 && Math.abs(Math.hypot(m[0], m[1]) - 1) < 1e-6 && Math.abs(m[1]) > 1e-9) it.boxAngle = ((it.boxAngle || 0) + Math.atan2(m[1], m[0]) * 180 / Math.PI) % 360; // the engine stores a turn as boxAngle
+          const at = (q) => [m[0] * q[0] + m[2] * q[1] + m[4], m[1] * q[0] + m[3] * q[1] + m[5]];
           it.segments = it.segments.map((q) => ({ point: at(q.point), handleIn: q.handleIn, handleOut: q.handleOut }));
           const [x0, y0, x1, y1] = it.bounds, c = [at([x0, y0]), at([x1, y1])]; it.bounds = [Math.min(c[0][0], c[1][0]), Math.min(c[0][1], c[1][1]), Math.max(c[0][0], c[1][0]), Math.max(c[0][1], c[1][1])]; }
         if (s.reshape.center) it.center = s.reshape.center.map((c) => ({ point: [c.point.x, c.point.y], handleIn: [c.handleIn.x, c.handleIn.y], handleOut: [c.handleOut.x, c.handleOut.y], width: c.width })); });
@@ -400,4 +401,60 @@ test('a batch whose payload would pass the byte cap is refused with a notice and
   h.press(35, 35); h.drag(65, 50); await settle(); await h.release(65, 50); await settle();
   assert.equal(h.batches.length, 0);
   assert.ok(h.toasts.some((t) => /Too much/.test(t)), h.toasts.join('|'));
+});
+
+// #2372 REV-13: the box angle is stored natively with the turn and read back from the listing; a handle scale follows the box's own axes.
+const turnedQuad = (id, deg) => { const r = deg * Math.PI / 180, c = Math.cos(r), n = Math.sin(r), mid = [70, 45], at = (x, y) => [mid[0] + (x - mid[0]) * c - (y - mid[1]) * n, mid[1] + (x - mid[0]) * n + (y - mid[1]) * c];
+  const q = quad(id, 20, 30, 120, 60); q.segments = [at(20, 30), at(120, 30), at(120, 60), at(20, 60)].map((p) => seg(p[0], p[1]));
+  q.bounds = [Math.min(...q.segments.map((s) => s.point[0])), Math.min(...q.segments.map((s) => s.point[1])), Math.max(...q.segments.map((s) => s.point[0])), Math.max(...q.segments.map((s) => s.point[1]))];
+  q.boxAngle = deg; return q; };
+
+test('a turn is committed with the batch and the re-read selection draws the turned box; a later pick (frame change, undo, reload) reads it back from the listing', async () => {
+  const h = harness([BIG]); await h.select(35, 35);
+  h.press(100, 70); h.drag(70 + 30 * Math.cos(Math.PI / 6), 70 + 30 * Math.sin(Math.PI / 6), { shiftKey: true }); await settle();
+  await h.release(70 + 30 * Math.cos(Math.PI / 6), 70 + 30 * Math.sin(Math.PI / 6), { shiftKey: true }); await settle();
+  assert.equal(h.batches.length, 1);
+  assert.ok(Math.abs(h.store[0].boxAngle - 30) < 1e-9, 'the engine (harness) stored the 30 degree turn with the same batch');
+  const box = Overlay.boxOf(h.root, h.root.selectedPaths);
+  assert.ok(Math.abs(box.angle - 30) < 1e-9, 'the re-read selection is oriented from the listing: ' + box.angle);
+  // A fresh context: deselect, then pick the item again. Nothing of the session carries over, only the listing does.
+  h.root.selectedPaths = []; await h.select(300, 300); await settle();
+  const w = h.store[0].bounds; await h.select((w[0] + w[2]) / 2, (w[1] + w[3]) / 2); await settle();
+  assert.equal(h.ids().join(), 'A');
+  assert.ok(Math.abs(h.root.selectedPaths[0].data.boxAngle - 30) < 1e-9, 'the picked path carries the stored angle');
+  assert.ok(Math.abs(Overlay.boxOf(h.root, h.root.selectedPaths).angle - 30) < 1e-9, 'and its box is still turned');
+});
+
+test('a listing angle is turned by a rotated presented matrix, and an unturned record has none', async () => {
+  const q = turnedQuad('T', 20); q.matrix = [0, 1, -1, 0, 0, 0]; // a quarter-turned layer: the world angle is the stored 20 plus 90
+  const h = harness([q, quad('P', 150, 150, 190, 190)]); await h.select(160, 160);
+  const read = await Intent.layerPaths(h.root, () => true, false, 0), by = (id) => read.paths.find((p) => p.data.strokeId === id);
+  assert.ok(Math.abs(by('T').data.boxAngle - 110) < 1e-9, String(by('T').data.boxAngle));
+  assert.equal(by('P').data.boxAngle, undefined, 'an unturned record has no box angle');
+});
+
+test('a handle scale of a turned box follows the box axes: a right-edge drag stretches along the box, leaving the perpendicular axis alone', async () => {
+  const h = harness([turnedQuad('T', 30)]); const r = 30 * Math.PI / 180, u = [Math.cos(r), Math.sin(r)], v = [-Math.sin(r), Math.cos(r)];
+  const c = [70, 45], e = [c[0] + 50 * u[0], c[1] + 50 * u[1]];
+  await h.select(c[0], c[1]);
+  const box = Overlay.boxOf(h.root, h.root.selectedPaths);
+  assert.ok(Math.abs(box.angle - 30) < 1e-9);
+  h.press(e[0], e[1]); const to = [e[0] + 30 * u[0], e[1] + 30 * u[1]]; h.drag(to[0], to[1]); await settle(); await h.release(to[0], to[1]); await settle();
+  assert.equal(h.batches.length, 1, h.toasts.join());
+  const m = h.batches[0].steps[0].reshape.matrix, lin = (p) => [m[0] * p[0] + m[2] * p[1], m[1] * p[0] + m[3] * p[1]];
+  const lu = lin(u), lv = lin(v);
+  assert.ok(Math.hypot(lu[0] - 1.3 * u[0], lu[1] - 1.3 * u[1]) < 1e-9, 'the box x axis grows from 100 to 130 (factor 1.3), anchored at the far edge: ' + lu);
+  assert.ok(Math.hypot(lv[0] - v[0], lv[1] - v[1]) < 1e-9, 'the perpendicular box axis is untouched: ' + lv);
+  const far = [c[0] - 50 * u[0], c[1] - 50 * u[1]], at = (p) => [m[0] * p[0] + m[2] * p[1] + m[4], m[1] * p[0] + m[3] * p[1] + m[5]];
+  assert.ok(Math.hypot(at(far)[0] - far[0], at(far)[1] - far[1]) < 1e-9, 'the opposite edge midpoint stays fixed');
+  assert.ok(Math.abs(h.store[0].boxAngle - 30) < 1e-9, 'a scale leaves the stored orientation alone');
+});
+
+test('a dynamic shape keeps the world-axis resize of its engine kernel even under a turned box', async () => {
+  const q = turnedQuad('S', 30); q.role = 'shape';
+  const h = harness([q]); const r = 30 * Math.PI / 180, c = [70, 45], e = [c[0] + 50 * Math.cos(r), c[1] + 50 * Math.sin(r)];
+  await h.select(c[0], c[1]);
+  h.press(e[0], e[1]); h.drag(e[0] + 30, e[1]); await settle(); await h.release(e[0] + 30, e[1]); await settle();
+  const m = h.batches[0].steps[0].reshape.matrix;
+  assert.ok(Math.abs(m[1]) < 1e-9 && Math.abs(m[2]) < 1e-9, 'axis-aligned, so the shape kernel accepts it');
 });
