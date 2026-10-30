@@ -343,7 +343,10 @@
   // Picks are fresh objects, so identity is the native stroke id.
   function applyPick(root, item, shift) {
     var data = item && item.data;
-    if (data && Number.isInteger(data.nativeLayerIndex) && data.nativeLayerIndex !== root.state.activeLayerIdx) {
+    // #2372: a picked image also makes its layer the one selected layer row, which is what the Mesh panel reads
+    // (readImageMeshSelection); a Shift pick keeps the layer selection it extends.
+    var image = !!data && data.nativeRole === 'raster' && !shift;
+    if (data && Number.isInteger(data.nativeLayerIndex) && (data.nativeLayerIndex !== root.state.activeLayerIdx || image)) {
       // #2372: a hit on another layer activates it through the native layer-selection route (_layerSel follows); a refused
       // activation selects nothing rather than a stroke of a layer that is not active.
       var project = root.NemoNativeObjectProject;

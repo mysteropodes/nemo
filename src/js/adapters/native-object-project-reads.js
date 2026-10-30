@@ -224,6 +224,8 @@
         total=r.total;items=items.concat(r.items);if(r.nextCursor===null)break;cursor=r.nextCursor;
       }
       for(const item of items){
+        // #2372: a raster image or text block has no outline to page; a kept one is hit as its painted rect/glyph box.
+        if(item.role==='raster'||item.role==='text'){if(typeof wanted!=='function'||wanted(item))item.segments=boxSegments(item.bounds);continue;}
         if(typeof wanted==='function'&&!wanted(item))continue;
         const geometry=await subselectGeometry(o,item.stableTarget,undefined,false,true);
         if(geometry.closed!==item.closed||geometry.segments.length!==item.count)throw fault('uncorrelated','Presented geometry differs from its listing');
@@ -298,6 +300,7 @@
     return Object.freeze({ readLayerTiming: (l, f, p) => readLegacy(l, f, p), readLayerRange: (l, f, p) => readLegacy(l, f, p, 'range'),
       readLayerPlacement: (l, f, p) => readLegacy(l, f, p, 'placement'), readLayerCells: readLayerCells, readImageMesh: readImageMesh, readSubselect: readSubselect, readPresentedStrokes: readPresentedStrokes, previewSubselect: previewSubselect });
   }
+  function boxSegments(b) { return [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]].map((p) => ({ point: p, handleIn: [0, 0], handleOut: [0, 0] })); }
   function expectedCount(kind, m) { return kind === 'outline' ? m.outlineCount : kind === 'verts' ? m.vertexCount : kind === 'tris' ? m.triangleIndexCount : m.vertexCount; }
   function copyTarget(t) { return { contextId: t.contextId, layerUid: t.layerUid, frameScope: { kind: t.frameScope.kind, frame: t.frameScope.frame }, strokeId: t.strokeId }; }
   function copyRect(r) { return { x: r.x, y: r.y, width: r.width, height: r.height, rotation: r.rotation }; }

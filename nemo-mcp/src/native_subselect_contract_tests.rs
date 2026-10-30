@@ -203,6 +203,12 @@ fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
     let mut owned = r.clone();
     owned["items"][0]["owner"] = json!("ribbon-a");
     assert!(public_read(&q, &owned), "a linked fill names its ribbon");
+    for role in ["raster", "text"] {
+        let mut item = r.clone();
+        item["items"][0]["role"] = json!(role);
+        item["items"][0]["count"] = json!(0);
+        assert!(public_read(&q, &item), "an image or text block is listed too (#2372): {role}");
+    }
     let mut stray = owned.clone();
     stray["items"][0]["role"] = json!("plain");
     assert!(!public_read(&q, &stray), "only a fill has an owner");
