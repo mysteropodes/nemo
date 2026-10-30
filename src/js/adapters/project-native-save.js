@@ -183,6 +183,7 @@ var NemoProjectNativeSave = (function () {
         return saved.save(writer);
       },
       openNative:function(path){return object?object.openPath(path):Promise.resolve(null);},
+      openRecovered:function(entry){return object?object.openRecovered(entry):Promise.resolve(null);},
       allowOpen:function(){
         if(!object||object.canOpen())return true;
         ports.notice('Native project Open is unavailable while another Open or Save is in progress.');return false;

@@ -112,7 +112,7 @@
     return true;
   }
   function create(session,ports,workflow,acknowledgement){
-    var baseline=null,saving=false,opening=false,baselines=new Map(),initials=new Map();
+    var baseline=null,saving=false,opening=false,baselines=new Map(),initials=new Map(),recoveredSlots=new Map();
     var saved=acknowledgement.create({
       readUISession:ports.readUI,readPresentedObjectSession:session.readPresentedObjectSession,
       commitSavedMetadata:function(plan){
@@ -131,7 +131,9 @@
       if(framed)config.totalFrames=frames;
       return enter(null,config,isCurrent,onCreationFailure);
     }
-    async function enter(path,config,isCurrent,onCreationFailure){
+    // recovered (#2360 R3): {slotKey, confirmed?, refused?}. The project is Untitled and dirty, never a recents entry, and a
+    // not-dispatched refusal is recorded for openRecovered() instead of toasting, so it can try the older generation first.
+    async function enter(path,config,isCurrent,onCreationFailure,recovered){
       if(saving||opening)return false;
       opening=true;
       diagnostic(config?'file-new-started':'file-open-started');
@@ -145,24 +147,44 @@
           // generation. Other callers retain their complete currency predicate.
           isCurrent:function(){var current=revealing&&isCurrent&&isCurrent.requestCurrent||isCurrent;
             return !current||current()===true;},
-          confirm:async function(previous){return !previous||baseline===previous.documentDigest||
-            !!(ports.confirmReplace&&await ports.confirmReplace(creating));},
+          confirm:async function(previous){
+            if(!previous||baseline===previous.documentDigest||recovered&&recovered.confirmed)return true;
+            var yes=!!(ports.confirmReplace&&await ports.confirmReplace(creating));
+            if(yes&&recovered)recovered.confirmed=true;return yes;},
           occlude:ports.occlude,reveal:ports.reveal?async function(current){revealing=true;await ports.reveal(current);}:undefined,restore:ports.restore,
           commit:function(current){
-            if((creating?ports.created(config.name||'Untitled',current):ports.opened(path,current))!==true)
+            if((recovered?ports.created('Untitled',current):creating?ports.created(config.name||'Untitled',current):ports.opened(path,current))!==true)
               throw new Error('Native project UI publication failed');
-            baseline=creating?null:current.documentDigest;baselines=new Map([[current.documentId,baseline]]);initials.set(current.documentId,current.documentDigest);ports.repaint();
+            baseline=creating||recovered?null:current.documentDigest;baselines=new Map([[current.documentId,baseline]]);initials.set(current.documentId,current.documentDigest);
+            if(recovered)recoveredSlots.set(current.documentId,recovered.slotKey);ports.repaint();
           }
         });
+        // No project and no error: the session found the file unsupported (corrupt or foreign). For a recovery that is a refusal.
+        if(recovered&&info===null){diagnostic('file-failed','not-dispatched');recovered.refused={message:'Native recovery file is unsupported',code:'unsupported_format'};return false;}
         if(creating&&info&&ports.createdNotice)ports.createdNotice();
+        if(recovered&&info&&ports.resumedNotice)ports.resumedNotice();
         diagnostic(info?'file-completed':'file-cancelled');
         return info===null?null:!!info;
       }catch(error){
         try{diagnostic('file-failed',error&&error.details&&error.details.disposition==='notDispatched'?'not-dispatched':'unconfirmed');}catch(_){}
-        if(error&&error.details&&error.details.disposition==='notDispatched')ports.refused(error);
+        if(error&&error.details&&error.details.disposition==='notDispatched'){if(recovered)recovered.refused=error;else ports.refused(error);}
         else{baseline=null;ports.failed(error);ports.repaint();if(onCreationFailure)onCreationFailure(error);}
         return false;
       }finally{opening=false;}
+    }
+    // Resume a crash-recovery slot (#2360 R3) through the same session.openPath admission as Open. Newest generation first; a
+    // not-dispatched refusal (unreadable or strict-codec refusal; Open/New stay usable) retries the older one before any toast.
+    async function openRecovered(entry){
+      var generations=entry&&typeof entry.slotKey==='string'&&Array.isArray(entry.generations)?entry.generations:[];
+      var failure=null,recovered={slotKey:entry&&entry.slotKey,confirmed:false,refused:null};
+      for(var i=0;i<generations.length;i++){
+        recovered.refused=null;
+        var result=await enter(generations[i].path,null,undefined,undefined,recovered);
+        if(result!==false||!recovered.refused)return result;
+        failure=recovered.refused;
+      }
+      if(failure&&ports.recoveryRefused)ports.recoveryRefused(failure);
+      return false;
     }
     async function activateProject(target,transition){
       if(saving||opening||!session.isActive()||typeof session.activateProject!=='function')return {notDispatched:true};
@@ -208,9 +230,11 @@
     function recoveryPin(){
       var info=session.info();
       return {active:session.isActive(),info:info,busy:saving||opening,presented:!!session.readPresentedObjectSession(),
-        reference:baseline||info&&initials.get(info.documentId)||null};
+        reference:baseline||info&&initials.get(info.documentId)||null,
+        // The slot a resumed session replaces: sent as `supersedes` with its first own write (#2360 R3).
+        supersedes:info&&recoveredSlots.get(info.documentId)||null};
     }
-    return Object.freeze({openPath:openPath,newProject:newProject,activateProject:activateProject,saveAs:saveAs,recoveryPin:recoveryPin,
+    return Object.freeze({openPath:openPath,openRecovered:openRecovered,newProject:newProject,activateProject:activateProject,saveAs:saveAs,recoveryPin:recoveryPin,
       canOpen:function(){return !saving&&!opening&&(!session.blocksLegacy()||session.isActive());},
       isDirty:function(){var info=session.info();return !session.isActive()&&session.blocksLegacy()||!baseline||!info||info.documentDigest!==baseline;}});
   }
@@ -273,6 +297,8 @@
       opened:function(path,info){if(commit(path,info)!==true)return false;ports.opened();ports.notice('Opened: '+ports.read().name);return true;},
       created:function(name){ports.commit(null,name);ports.opened();return true;},
       createdNotice:function(){ports.notice('New project created');},
+      resumedNotice:function(){ports.notice('Session resumed');},
+      recoveryRefused:function(){ports.notice(root.SM&&root.SM.t?root.SM.t('toastCannotResumeSessionCorrupt'):'Cannot resume the session: the recovery is unreadable.');},
       commit:commit,repaint:ports.repaint,
       pick:function(){return root.__TAURI__.dialog.save({title:'Save Project As',defaultPath:ports.read().name+'-copy.json',filters:[{name:'Nemo Project',extensions:['json']}]});},
       notice:function(result,written,error){
@@ -282,7 +308,7 @@
       refused:function(error){ports.notice('Could not open native project: '+(error.message||error));},
       failed:function(error){ports.show();ports.notice('Could not open native project: '+(error.message||error));}
     },root.NemoNativeObjectSaveAsWorkflow,root.NemoNativeObjectSavedAcknowledgement);
-    return Object.freeze({isActive:session.blocksLegacy,recoveryPin:ui.recoveryPin,canOpen:ui.canOpen,isDirty:ui.isDirty,saveAs:ui.saveAs,openPath:ui.openPath,newProject:ui.newProject,activateProject:ui.activateProject});
+    return Object.freeze({isActive:session.blocksLegacy,recoveryPin:ui.recoveryPin,canOpen:ui.canOpen,isDirty:ui.isDirty,saveAs:ui.saveAs,openPath:ui.openPath,openRecovered:ui.openRecovered,newProject:ui.newProject,activateProject:ui.activateProject});
   }
   return Object.freeze({create:create,projectView:projectView,bind:bind,
     projectionReadyForUI:projectionReadyForUI,
