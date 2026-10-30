@@ -143,7 +143,7 @@ fn unchanged(item: &RasterItem, edits: &[(&'static str, Number)]) -> bool {
 }
 
 /// The item re-decoded with the edited members replaced (a rotation of 0 removes the member).
-fn redecode(
+pub(crate) fn redecode(
     item: &RasterItem,
     edits: &[(&'static str, Number)],
 ) -> Result<RasterItem, DispatchErrorCode> {
