@@ -1,6 +1,6 @@
 //! #2242: which image paths an MCP request admits into the fs scope, and where they must lie.
 use crate::application_mcp::source_scope::{admissible, named_sources};
-use nemo_mcp::contract::NativeApplicationRequest;
+use crate::application_mcp::NativeApplicationRequest;
 use serde_json::json;
 use std::path::PathBuf;
 
