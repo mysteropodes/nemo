@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "8f861ebb70514b63bc7e185dfc5e532889ecbb1b",
-  "describe": "v0.7.0-alpha.4-3879-g8f861ebb-dirty"
+  "head": "6420cf06c20447977e1236782dd1891cb831358f",
+  "describe": "v0.7.0-alpha.4-3881-g6420cf06-dirty"
  },
- "inputsDigest": "ff11267c6cd9429617b743d8413dc597ed95696e294b135e420d6a9767741b89",
+ "inputsDigest": "d0c9e7f8b3934c6169c643b5ee8cb9f80b93409d069080d42023755fb2340fc0",
  "states": [
   "inventoried",
   "characterized",
@@ -7826,7 +7826,7 @@
     "functionsVisited": 64,
     "via": "chain",
     "references": [
-     "src/js/project.js:224 openDialog()"
+     "src/js/project.js:219 openDialog()"
     ]
    },
    "fixtures": [
