@@ -1,16 +1,15 @@
 /* The ordinary Rig panel on a native object project (#2255): auto-assign, commit pose and reset pose act on the active layer through
  * NemoNativeObjectRig (`object.rig.edit` autoAssign, `object.rig.pose` commit / reset), one native command per click, so the
  * undo/redo and the receipt are the owner's. Nothing here reads `ld.rig` or calls rigAutoAssignLayer / rigCommitFrame / rigResetPose.
- * The Rig tool's canvas gestures (draw a bone, move an anchor or a handle, resize an influence circle, edit a weight, set an IK
- * chain) need the rig presentation read that does not exist yet, and the live pose / IK drag has no native operation by contract:
- * each is a typed unavailable (the gesture is consumed so nothing else draws), never a fall back to the JS rig model. */
+ * The Rig tool's canvas gestures (draw a bone, move an anchor or a handle, resize an influence circle, edit a weight) are
+ * native-object-rig-canvas.js, over the rig presentation read; the live pose / IK drag has no native operation by contract and is
+ * a typed unavailable there, never a fall back to the JS rig model. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.NemoNativeObjectRigUI = api;
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
-  const CANVAS_REASON = 'rig_presentation_read_unavailable';
   function session(win) {
     try {
       const module = win.NemoNativeObjectProject, s = module && typeof module.desktop === 'function' ? module.desktop(win) : null;
@@ -44,19 +43,5 @@
     }, (error) => failure(win, error));
     return true;
   }
-  const installed = new WeakSet();
-  function install(win) {
-    if (installed.has(win)) return;
-    installed.add(win);
-    win.document.addEventListener('pointerdown', (e) => {
-      const area = win.document.getElementById('canvas-area');
-      if (win.state.tool !== 'rig' || win.state.playing || !session(win) || !area || !e.target || !area.contains(e.target) || (e.button !== undefined && e.button !== 0)) return;
-      e.stopImmediatePropagation(); e.preventDefault();
-      toast(win, 'Rig editing on the canvas is unavailable on a native project (' + CANVAS_REASON + ').');
-    }, { capture: true });
-  }
-  const api = Object.freeze({ panel, install, CANVAS_REASON });
-  // The gesture notice listens on document from the first load; it reads the window state only when a pointer arrives.
-  if (typeof window === 'object' && window && typeof document === 'object' && document && typeof document.addEventListener === 'function') install(window);
-  return api;
+  return Object.freeze({ panel });
 }));

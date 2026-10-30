@@ -71,6 +71,11 @@ pub(crate) mod widget_read;
 mod widget_presentation;
 #[path = "object_widget_view.rs"]
 mod widget_view;
+// #2255: the presentation read of one layer's rig (bones, handles, influence circles, binds, weights) for the Rig canvas tool.
+#[path = "object_rig_presentation.rs"]
+mod rig_presentation;
+#[path = "object_rig_view.rs"]
+mod rig_view;
 use serde::{Deserialize, Serialize};
 pub use timing::LayerTimingReadResponse;
 const MAX_MESSAGE_BYTES: usize = 4096;

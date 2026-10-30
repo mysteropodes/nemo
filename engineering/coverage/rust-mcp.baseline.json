@@ -827,6 +827,17 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "Measured on the #2255 candidate with normal cargo-llvm-cov 0.9.1 (unfiltered nemo-mcp suite); new file entry only, every prior entry, floor, exclusion and aggregate is preserved. Source measurement is not installed acceptance."
+    },
+    "nemo-mcp/src/native_rig_read_contract.rs": {
+      "lines": 98.33,
+      "regions": 98.8,
+      "functions": 100,
+      "note": "Measured on the #2255 candidate with normal cargo-llvm-cov 0.9.1 (unfiltered nemo-mcp suite); new file entry only, every prior entry, floor, exclusion and aggregate is preserved. Source measurement is not installed acceptance."
+    },
+    "nemo-mcp/src/native_rig_read_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured on the #2255 candidate with normal cargo-llvm-cov 0.9.1 (unfiltered nemo-mcp suite); new file entry only, every prior entry, floor, exclusion and aggregate is preserved. Source measurement is not installed acceptance."
     }
   }
 }

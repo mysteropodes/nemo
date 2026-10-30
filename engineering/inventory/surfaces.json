@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "4eaaed21617d3fc477c4453992d75f0d043ff244",
-  "describe": "v0.7.0-alpha.4-3796-g4eaaed21-dirty"
+  "head": "59c4249aef15c294ce4df58da030c37398813c79",
+  "describe": "v0.7.0-alpha.4-3797-g59c4249a-dirty"
  },
- "inputsDigest": "bf61dbeb3218148f9cb06f16db8a67061793278aadac2c4d92610ea9bedee8e1",
+ "inputsDigest": "40ad71b0f7cd2cfd1dc5cd92d10a044b2cf5679aa6439f4281780cf73b9a799e",
  "states": [
   "inventoried",
   "characterized",
@@ -301,7 +301,7 @@
   },
   "SMRigWidget": {
    "file": "src/js/rig-widget.js",
-   "line": 666,
+   "line": 668,
    "members": 2
   },
   "SMRulers": {
@@ -2028,7 +2028,7 @@
     "container": "tool-opts-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 22,
+    "functionsVisited": 27,
     "via": "variable _pcurveEditBtn",
     "references": []
    },
@@ -6062,7 +6062,7 @@
     "container": "easing-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 57,
+    "functionsVisited": 62,
     "via": "variable savePresetBtn",
     "references": []
    },
@@ -13429,7 +13429,7 @@
    "capability": "widget h",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:592 bindWidgetField()"
+    "src/js/rig-widget.js:594 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13460,7 +13460,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:564 renderWidgetPanel()"
+     "src/js/rig-widget.js:566 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13479,7 +13479,7 @@
    "capability": "widget w",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:592 bindWidgetField()"
+    "src/js/rig-widget.js:594 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13510,7 +13510,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:564 renderWidgetPanel()"
+     "src/js/rig-widget.js:566 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13529,7 +13529,7 @@
    "capability": "Link a property or drive a pose from this axis",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:613 initWidgetPanelFields()"
+    "src/js/rig-widget.js:615 initWidgetPanelFields()"
    ],
    "events": [
     "click"
@@ -13554,10 +13554,10 @@
     "container": "p-widget-xrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 48,
+    "functionsVisited": 49,
     "via": "helper el()",
     "references": [
-     "src/js/adapters/native-object-widget-ui.js:252 paintPanel()"
+     "src/js/adapters/native-object-widget-ui.js:284 paintPanel()"
     ]
    },
    "fixtures": [
@@ -13576,7 +13576,7 @@
    "capability": "widget xmax",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:592 bindWidgetField()"
+    "src/js/rig-widget.js:594 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13607,7 +13607,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:568 renderWidgetPanel()"
+     "src/js/rig-widget.js:570 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13626,7 +13626,7 @@
    "capability": "widget xmin",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:592 bindWidgetField()"
+    "src/js/rig-widget.js:594 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13657,7 +13657,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:568 renderWidgetPanel()"
+     "src/js/rig-widget.js:570 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13676,7 +13676,7 @@
    "capability": "widget xrest",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:592 bindWidgetField()"
+    "src/js/rig-widget.js:594 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13707,7 +13707,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:568 renderWidgetPanel()"
+     "src/js/rig-widget.js:570 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13726,7 +13726,7 @@
    "capability": "Link a property or drive a pose from this axis",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:615 initWidgetPanelFields()"
+    "src/js/rig-widget.js:617 initWidgetPanelFields()"
    ],
    "events": [
     "click"
@@ -13751,10 +13751,10 @@
     "container": "p-widget-yrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 48,
+    "functionsVisited": 49,
     "via": "helper el()",
     "references": [
-     "src/js/adapters/native-object-widget-ui.js:252 paintPanel()"
+     "src/js/adapters/native-object-widget-ui.js:284 paintPanel()"
     ]
    },
    "fixtures": [
@@ -13773,7 +13773,7 @@
    "capability": "widget ymax",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:592 bindWidgetField()"
+    "src/js/rig-widget.js:594 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13804,7 +13804,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:578 renderWidgetPanel()"
+     "src/js/rig-widget.js:580 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13823,7 +13823,7 @@
    "capability": "widget ymin",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:592 bindWidgetField()"
+    "src/js/rig-widget.js:594 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13854,7 +13854,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:578 renderWidgetPanel()"
+     "src/js/rig-widget.js:580 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13873,7 +13873,7 @@
    "capability": "widget yrest",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:592 bindWidgetField()"
+    "src/js/rig-widget.js:594 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13904,7 +13904,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:578 renderWidgetPanel()"
+     "src/js/rig-widget.js:580 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -14902,7 +14902,8 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/rig-bridge.js:194 panelSoftness())",
+   "reason": "helper parameter has no proved registration or unchanged returned lookup (reassignment, shadowing or unsupported return flow)",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/adapters/native-object-rig-canvas.js:32)",
    "source": "src/index.html:1579",
    "meta": {
     "data": {
@@ -14914,6 +14915,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
+     "src/js/adapters/native-object-rig-canvas.js:32",
      "src/js/rig-bridge.js:194 panelSoftness()",
      "src/js/timeline.js:11386"
     ]
@@ -14982,7 +14984,8 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/engine-bridge.js:3663 buildRigPreviewItems())",
+   "reason": "helper parameter has no proved registration or unchanged returned lookup (reassignment, shadowing or unsupported return flow)",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/adapters/native-object-rig-canvas.js:31)",
    "source": "src/index.html:1578",
    "meta": {
     "data": {
@@ -14994,6 +14997,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
+     "src/js/adapters/native-object-rig-canvas.js:31",
      "src/js/engine-bridge.js:3663 buildRigPreviewItems()",
      "src/js/rig-bridge.js:192 panelDefaultRadius()",
      "src/js/timeline.js:11384"
@@ -23469,7 +23473,7 @@
    "source": "src/js/layer-inout.js:1555",
    "meta": {
     "i18n": null,
-    "functionsVisited": 380
+    "functionsVisited": 382
    },
    "fixtures": [
     "static-props",
@@ -24477,7 +24481,7 @@
    "source": "src/js/motion.js:9069",
    "meta": {
     "i18n": "exprExBounce",
-    "functionsVisited": 34
+    "functionsVisited": 35
    },
    "fixtures": [
     "static-props",
@@ -24588,7 +24592,7 @@
    "source": "src/js/motion.js:9097",
    "meta": {
     "i18n": "exprExFirstKey",
-    "functionsVisited": 20
+    "functionsVisited": 21
    },
    "fixtures": [
     "static-props",
@@ -25450,7 +25454,7 @@
    "source": "src/js/motion.js:8257",
    "meta": {
     "i18n": "menuRemoveThisParent",
-    "functionsVisited": 508
+    "functionsVisited": 510
    },
    "fixtures": [
     "static-props",
@@ -25682,7 +25686,7 @@
    "source": "src/js/motion.js:10522",
    "meta": {
     "i18n": "ctxDeleteThisKey",
-    "functionsVisited": 520
+    "functionsVisited": 522
    },
    "fixtures": [
     "static-props",
@@ -25724,7 +25728,7 @@
    "source": "src/js/motion.js:9866",
    "meta": {
     "i18n": "elementsDelete",
-    "functionsVisited": 565
+    "functionsVisited": 567
    },
    "fixtures": [
     "static-props",
@@ -25805,7 +25809,7 @@
    "source": "src/js/motion.js:9864",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 454
+    "functionsVisited": 456
    },
    "fixtures": [
     "static-props",
@@ -25927,7 +25931,7 @@
    "source": "src/js/motion.js:9821",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 527
+    "functionsVisited": 529
    },
    "fixtures": [
     "static-props",
@@ -26366,7 +26370,7 @@
    "source": "src/js/motion.js:7307",
    "meta": {
     "i18n": "ctxParentInTimeLinkTimeEllipsis",
-    "functionsVisited": 380
+    "functionsVisited": 382
    },
    "fixtures": [
     "static-props",
@@ -26526,7 +26530,7 @@
    "source": "src/js/motion.js:7323",
    "meta": {
     "i18n": "ctxWidgetSettingsEllipsis",
-    "functionsVisited": 54
+    "functionsVisited": 71
    },
    "fixtures": [
     "static-props",
@@ -26607,7 +26611,7 @@
    "source": "src/js/motion.js:8334",
    "meta": {
     "i18n": "ctxUnlinkTime",
-    "functionsVisited": 525
+    "functionsVisited": 527
    },
    "fixtures": [
     "static-props",
@@ -26649,7 +26653,7 @@
    "source": "src/js/motion.js:10957",
    "meta": {
     "i18n": "ctxAddKeyHere",
-    "functionsVisited": 515
+    "functionsVisited": 517
    },
    "fixtures": [
     "static-props",
@@ -27124,7 +27128,7 @@
    "source": "src/js/motion.js:11020",
    "meta": {
     "i18n": "ctxParentInTimeLinkTimeEllipsis",
-    "functionsVisited": 380
+    "functionsVisited": 382
    },
    "fixtures": [
     "static-props",
@@ -27242,7 +27246,7 @@
    "source": "src/js/motion.js:10992",
    "meta": {
     "i18n": "ctxSubdivideMidpoint",
-    "functionsVisited": 526
+    "functionsVisited": 528
    },
    "fixtures": [
     "static-props",
@@ -27503,7 +27507,7 @@
    "capability": "Range of ",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:512 axisItem()"
+    "src/js/rig-widget.js:514 axisItem()"
    ],
    "events": [
     "click"
@@ -27522,7 +27526,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/rig-widget.js:512",
+   "source": "src/js/rig-widget.js:514",
    "meta": {
     "i18n": "widgetMenuAxisRangePrefix",
     "functionsVisited": 197
@@ -27543,7 +27547,7 @@
    "capability": "Pad size…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:526 openWidgetMenu()"
+    "src/js/rig-widget.js:528 openWidgetMenu()"
    ],
    "events": [
     "click"
@@ -27562,7 +27566,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/rig-widget.js:526",
+   "source": "src/js/rig-widget.js:528",
    "meta": {
     "i18n": "widgetMenuSizeEllipsis",
     "functionsVisited": 197
@@ -30273,7 +30277,7 @@
    "source": "src/js/timeline.js:6881",
    "meta": {
     "i18n": "ctxMatteSource",
-    "functionsVisited": 377
+    "functionsVisited": 379
    },
    "fixtures": [
     "keyed-props",
@@ -30617,7 +30621,7 @@
    "source": "src/js/timeline.js:6836",
    "meta": {
     "i18n": "ctxRemoveFromFolder",
-    "functionsVisited": 377
+    "functionsVisited": 379
    },
    "fixtures": [
     "keyed-props",
@@ -30768,7 +30772,7 @@
    "source": "src/js/timeline.js:6844",
    "meta": {
     "i18n": "ctxUnlinkFromLFSGroup",
-    "functionsVisited": 378
+    "functionsVisited": 380
    },
    "fixtures": [
     "keyed-props",
@@ -30804,7 +30808,7 @@
    "source": "src/js/timeline.js:6819",
    "meta": {
     "i18n": "ctxWidgetSettingsEllipsis",
-    "functionsVisited": 54
+    "functionsVisited": 71
    },
    "fixtures": [
     "keyed-props",
@@ -30988,7 +30992,7 @@
    "source": "src/js/timeline.js:5639",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 454
+    "functionsVisited": 456
    },
    "fixtures": [
     "keyed-props",
@@ -31101,7 +31105,7 @@
    "source": "src/js/timeline.js:5610",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 527
+    "functionsVisited": 529
    },
    "fixtures": [
     "keyed-props",
@@ -31140,7 +31144,7 @@
    "source": "src/js/timeline.js:5641",
    "meta": {
     "i18n": "fxDelete",
-    "functionsVisited": 565
+    "functionsVisited": 567
    },
    "fixtures": [
     "keyed-props",
@@ -32144,7 +32148,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:433",
    "meta": {
-    "functionsVisited": 353
+    "functionsVisited": 355
    },
    "fixtures": [
     "media",
@@ -32179,7 +32183,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:442",
    "meta": {
-    "functionsVisited": 383
+    "functionsVisited": 385
    },
    "fixtures": [
     "media",
@@ -32825,7 +32829,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:286",
    "meta": {
-    "functionsVisited": 351
+    "functionsVisited": 353
    },
    "fixtures": [
     "media",
@@ -33231,7 +33235,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:60",
    "meta": {
-    "functionsVisited": 351
+    "functionsVisited": 353
    },
    "fixtures": [
     "media",
@@ -33394,7 +33398,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:52",
    "meta": {
-    "functionsVisited": 351
+    "functionsVisited": 353
    },
    "fixtures": [
     "media",
@@ -33462,7 +33466,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:64",
    "meta": {
-    "functionsVisited": 371
+    "functionsVisited": 373
    },
    "fixtures": [
     "media",
@@ -33807,7 +33811,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:56",
    "meta": {
-    "functionsVisited": 351
+    "functionsVisited": 353
    },
    "fixtures": [
     "media",
@@ -34137,7 +34141,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:603",
    "meta": {
-    "functionsVisited": 350
+    "functionsVisited": 352
    },
    "fixtures": [
     "media",
@@ -34200,7 +34204,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:590",
    "meta": {
-    "functionsVisited": 423
+    "functionsVisited": 425
    },
    "fixtures": [
     "media",

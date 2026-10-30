@@ -36,7 +36,7 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
 
   function shouldIntercept() {
     return (
-      window.SMEngineBridge && window.SMEngineBridge.isEnabled() &&
+      !(window.NemoNativeObjectRigCanvas && window.NemoNativeObjectRigCanvas.active(window)) && window.SMEngineBridge && window.SMEngineBridge.isEnabled() &&
       state.tool === 'rig' && !state.playing
     );
   }

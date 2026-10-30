@@ -1,7 +1,7 @@
 'use strict';
 // #2255: the ordinary Rig panel and Rig tool on a native object project. The real native-object-rig-ui.js and rig-bridge.js run in one
 // vm context against a session double with the real command-route semantics: the panel buttons are exact native commands, the canvas
-// gestures are a typed unavailable that no legacy rig writer can answer, and a legacy (non-native) project is left to the old handlers.
+// gestures belong to native-object-rig-canvas.js (its own test), and a legacy (non-native) project is left to the old handlers.
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 const { createFixture } = require('./native-object-rig-support.cjs');
 
@@ -84,23 +84,13 @@ test('a legacy project keeps the old panel handlers: the native route answers fa
   assert.equal(h.fire('pointerdown', {}).stopped, false, 'the Rig tool is untouched on a legacy project');
 });
 
-test('the Rig tool canvas gestures are a typed unavailable that no legacy rig writer can answer', async () => {
+test('the panel owns no canvas listener (the canvas gestures are native-object-rig-canvas.js) and the pose / IK drag stays a typed unavailable at the adapter', async () => {
   const h = harness();
-  const down = h.fire('pointerdown', {});
-  assert.equal(down.stopped, true, 'the document-capture listener takes the gesture before rig-bridge.js on #canvas-area');
-  assert.match(h.toasts[0], /rig_presentation_read_unavailable/);
+  assert.deepEqual(h.listeners.map((l) => l.type), [], 'native-object-rig-ui.js listens to nothing on document');
   assert.equal(h.area.listeners.some((l) => l.type === 'pointerdown' && l.opts && l.opts.capture), true, 'rig-bridge.js is loaded and listening on #canvas-area');
-  // Every other tool, state and target is left alone, and a secondary button never starts a gesture.
-  h.sandbox.state.tool = 'draw';
-  assert.equal(h.fire('pointerdown', {}).stopped, false);
-  h.sandbox.state.tool = 'rig'; h.sandbox.state.playing = true;
-  assert.equal(h.fire('pointerdown', {}).stopped, false);
-  h.sandbox.state.playing = false;
-  assert.equal(h.fire('pointerdown', { button: 2 }).stopped, false);
-  assert.equal(h.fire('pointerdown', { target: { tag: 'panel' } }).stopped, false);
+  assert.equal(h.fire('pointerdown', {}).stopped, false, 'with no canvas module loaded nothing takes the gesture here');
   assert.deepEqual(h.sent(), []);
   assert.deepEqual(h.legacy, []);
-  // The live pose and IK drag stay typed unavailable at the adapter itself.
   const rig = h.sandbox.NemoNativeObjectRig.desktop(h.win());
   for (const name of ['dragPose', 'dragIkEnd']) {
     const error = await rig[name]().catch((e) => e);

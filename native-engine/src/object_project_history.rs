@@ -455,6 +455,10 @@ fn project_snapshot_info(
             if let Some(parent) = layer.parent_layer_uid.value() {
                 info["parentLayerUid"] = serde_json::json!(parent);
             }
+            // #2255: only a widget layer carries the flag, so the layer menu can offer its settings; nothing else changes.
+            if layer.widget().is_some() {
+                info["widget"] = serde_json::json!(true);
+            }
             info
         })
         .collect();
