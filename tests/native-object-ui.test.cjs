@@ -92,6 +92,18 @@ test('unadmitted inspector values are hidden explicitly, with original nodes/vis
   assert.equal(Project.paintUI(root),false);assert.equal(panel.children.length,3);assert.equal(panel.children[0],width);
   assert.equal(width.hidden,false);assert.equal(hiddenSection.hidden,true);assert.equal(panel.children[2],foreign);
 });
+test('the ruler playhead and its flag follow the native frame on full and frame-only renders (#2371)',()=>{
+  const root=view(),head=element(),flag=element();root.document.nodes.set('playhead',head);root.document.nodes.set('playhead-flag',flag);
+  root.playheadLeftPx=frame=>frame*30;root.state.currentFrame=2;UI.render(root,metadata(),false,fixturePorts(root));
+  assert.deepEqual([head.style.left,flag.textContent],['60px',3]);
+  root.state.currentFrame=1;UI.render(root,metadata(),true,fixturePorts(root));assert.deepEqual([head.style.left,flag.textContent],['30px',2]);
+});
+test('the Swatches section stays shown beside the native inspector only when the native palette controller renders it (#2378)',()=>{
+  for(const palette of [true,false]){const root=view(),panel=element(),swatches=element(),other=element();swatches.id='swatches-sec';panel.appendChild(swatches);panel.appendChild(other);
+    if(palette)root.NemoNativePaletteController={};root.document.nodes.set('props-panel',panel);UI.render(root,metadata(),false,fixturePorts(root));
+    assert.equal(swatches.hidden===true,!palette,'swatches');assert.equal(other.hidden,true,'other sections stay hidden');
+    assert.equal(root._lastPropsShow['swatches-sec'],palette,'and it gets a collapsed-rail entry');}
+});
 test('native inspector reuses actual bound Reference nodes, preserves collapsed layout and restores original parents/styles',async()=>{
   const root=view(),doc=root.document;
   function add(id,parent){const n=element();n.id=id;n.hidden=false;doc.nodes.set(id,n);if(parent)parent.appendChild(n);return n;}

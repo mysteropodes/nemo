@@ -173,9 +173,11 @@
       var heading=createNativeObjectUiText(root,'div','Native document');heading.className='phdr';section.appendChild(heading);
       var notice=createNativeObjectUiText(root,'div','Native drawing property inspectors are unavailable.');notice.setAttribute('role','status');section.appendChild(notice);
       var rail=root.document.getElementById('props-panel-rail'),trigger=root.document.getElementById('p-ref-menu');
-      prior={panel:panel,children:Array.from(panel.children).filter(function(child){return !['props-panel-hdr-row','props-panel-rail'].includes(child.id);})
+      // Swatches stays shown (always visible at baseline): its native palette controller renders into it (#2378).
+      var palette=!!root.NemoNativePaletteController,kept=['props-panel-hdr-row','props-panel-rail'].concat(palette?['swatches-sec']:[]);
+      prior={panel:panel,children:Array.from(panel.children).filter(function(child){return !kept.includes(child.id);})
         .map(function(child){return {node:child,hidden:child.hidden,display:child.style.display};}),section:section,
-        notice:notice,rail:rail,railChildren:rail?Array.from(rail.children):[],previousShow:root._lastPropsShow,show:{'native-object-inspector':true}};
+        notice:notice,rail:rail,railChildren:rail?Array.from(rail.children):[],previousShow:root._lastPropsShow,show:{'native-object-inspector':true,'swatches-sec':palette}};
       if(trigger&&trigger.parentNode){
         var reference=createNativeObjectUiText(root,'div','Reference');reference.className='pr';
         prior.trigger={node:trigger,parent:trigger.parentNode,next:trigger.nextSibling};prior.reference=reference;
@@ -303,6 +305,8 @@
     var field=root.document.getElementById('tl-cf');
     if(field){if(root.document.activeElement!==field)field.value=root.state.currentFrame+1;field.max=info.totalFrames;}
     ['tl-tf','info-frame'].forEach(function(id){var el=root.document.getElementById(id);if(el)el.textContent=id==='tl-tf'?info.totalFrames:root.state.currentFrame+1;});
+    // The ruler playhead follows the native frame like the readouts above; updatePlayhead() is the legacy path this replaces (#2371).
+    var head=root.document.getElementById('playhead'),flag=root.document.getElementById('playhead-flag');if(head&&typeof root.playheadLeftPx==='function')head.style.left=root.playheadLeftPx(root.state.currentFrame)+'px';if(flag)flag.textContent=root.state.currentFrame+1;
     // These are read-side projections only; legacy field event handlers remain
     // guarded and no legacy document/frame reader is called.
     var metadata={'p-cw':info.canvasW,'p-ch':info.canvasH,'tl-fps':info.fps,'tl-total':info.totalFrames,

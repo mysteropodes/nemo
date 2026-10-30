@@ -262,6 +262,8 @@ struct BlankIntent {
     canvas_w: u32,
     canvas_h: u32,
     fps: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    total_frames: Option<u32>,
 }
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -299,11 +301,12 @@ pub(super) fn prepare_blank(state: &ApplicationMcp, request: NewRequest) -> Host
         || serde_json::to_vec(&request),
         || Ok(()),
         |owner, snapshot, ()| {
-            owner.prepare_blank_project_replacement(
+            owner.prepare_blank_project_replacement_frames(
                 snapshot,
                 request.new_project.canvas_w,
                 request.new_project.canvas_h,
                 request.new_project.fps,
+                request.new_project.total_frames,
             )
         },
         "native blank project intent refused",
@@ -331,10 +334,11 @@ pub(super) fn bootstrap_new(
         ));
     }
     let (document_id, content_revision, resource_count) = state
-        .install_native_blank_project(
+        .install_native_blank_project_frames(
             request.new_project.canvas_w,
             request.new_project.canvas_h,
             request.new_project.fps,
+            request.new_project.total_frames,
         )
         .map_err(|_| host_error("unavailable", "native blank project installation refused"))?;
     Ok(ObjectBootstrapReceipt {

@@ -16,14 +16,30 @@ impl ApplicationMcp {
         self.install_project_owner(owner)
     }
 
+    #[cfg(test)]
     pub(crate) fn install_native_blank_project(
         &self,
         width: u32,
         height: u32,
         fps: f64,
     ) -> Result<(String, u64, usize), String> {
-        let owner =
-            NativeObjectHost::new_blank_project(self.instance_id().into(), width, height, fps)?;
+        self.install_native_blank_project_frames(width, height, fps, None)
+    }
+
+    pub(crate) fn install_native_blank_project_frames(
+        &self,
+        width: u32,
+        height: u32,
+        fps: f64,
+        total_frames: Option<u32>,
+    ) -> Result<(String, u64, usize), String> {
+        let owner = NativeObjectHost::new_blank_project_frames(
+            self.instance_id().into(),
+            width,
+            height,
+            fps,
+            total_frames,
+        )?;
         self.install_project_owner(owner)
     }
 

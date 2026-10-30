@@ -387,3 +387,28 @@ fn blank_replacement_refuses_invalid_stale_and_foreign_intent_before_commit() {
 
 #[path = "object_project_retained_history.rs"]
 mod retained_history_tests;
+
+#[test]
+fn blank_project_explicit_total_frames_sets_duration_and_work_area() {
+    let owner = NativeObjectHistory::new_blank_project_frames("kitsu", 640, 360, 25., Some(37)).unwrap();
+    let info = owner.project_file_info().unwrap();
+    assert_eq!(info["totalFrames"].as_u64(), Some(37));
+    let saved: Value = serde_json::from_slice(&save(&owner, 0)).unwrap();
+    assert_eq!(saved["project"]["waOut"].as_f64(), Some(36.));
+    let default = NativeObjectHistory::new_blank_project_frames("kitsu", 640, 360, 25., None).unwrap();
+    assert_eq!(default.project_file_info().unwrap()["totalFrames"].as_u64(), Some(125));
+    assert!(matches!(
+        NativeObjectHistory::new_blank_project_frames("kitsu", 640, 360, 25., Some(0)),
+        Err(DispatchErrorCode::InvalidRequest)
+    ));
+    let max = NativeObjectHistory::new_blank_project_frames("kitsu", 64, 48, 24., Some(u32::MAX)).unwrap();
+    assert_eq!(max.project_file_info().unwrap()["totalFrames"].as_u64(), Some(u32::MAX as u64));
+    let prepared = owner
+        .prepare_blank_project_replacement_frames(&pin(&owner), 80, 48, 24., Some(9))
+        .unwrap();
+    owner.validate_project_replacement(&prepared).unwrap();
+    assert!(matches!(
+        owner.prepare_blank_project_replacement_frames(&pin(&owner), 80, 48, 24., Some(0)),
+        Err(DispatchErrorCode::InvalidRequest)
+    ));
+}

@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "014484179146247b199b2ea2b1fa8e9e9683142d",
-  "describe": "01448417-dirty"
+  "head": "d573ccca559ecf73da252966bbbec5e8f2a8ecf4",
+  "describe": "v0.7.0-alpha.4-3651-gd573ccca-dirty"
  },
- "inputsDigest": "1614d241b8772fa8f8295fb03e68dd12405d430bfe3ec2f7a112c2f6da49645e",
+ "inputsDigest": "7eb30974ba28c41215c99ecd9c7840572dc8e54567ab499256130adf7e8fc6de",
  "states": [
   "inventoried",
   "characterized",
@@ -186,7 +186,7 @@
   },
   "SMKitsu": {
    "file": "src/js/kitsu.js",
-   "line": 254,
+   "line": 275,
    "members": 3
   },
   "SMLabs": {
@@ -1852,7 +1852,7 @@
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 199,
+    "functionsVisited": 198,
     "via": "chain",
     "references": []
    },
@@ -2660,7 +2660,7 @@
    "capability": "kitsu open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:392 initKitsuUI()"
+    "src/js/kitsu.js:413 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -2681,7 +2681,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 20,
+    "functionsVisited": 21,
     "via": "helper el()",
     "references": [
      "src/js/timeline.js:9105 action()"
@@ -2699,7 +2699,7 @@
    "capability": "kitsu publish",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:418 initKitsuUI()"
+    "src/js/kitsu.js:439 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -4810,7 +4810,7 @@
     "functionsVisited": 137,
     "via": "variable b",
     "references": [
-     "src/js/adapters/native-object-ui.js:366 setShyMode()",
+     "src/js/adapters/native-object-ui.js:370 setShyMode()",
      "src/js/motion.js:13204 setAppMode()",
      "src/js/timeline.js:1237 toggleLayerShy()"
     ]
@@ -5063,7 +5063,7 @@
     "container": "track-apply-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 99,
+    "functionsVisited": 98,
     "via": "helper el()",
     "references": []
    },
@@ -5106,7 +5106,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 23,
+    "functionsVisited": 22,
     "via": "helper el()",
     "references": []
    },
@@ -8018,7 +8018,7 @@
     "container": "footage-blend-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 34,
+    "functionsVisited": 35,
     "via": "variable sel",
     "references": []
    },
@@ -8319,7 +8319,7 @@
    "capability": "&larr; Back",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:413 initKitsuUI()"
+    "src/js/kitsu.js:434 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8340,7 +8340,7 @@
     "container": "kitsu-step-browse",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 22,
+    "functionsVisited": 23,
     "via": "helper el()",
     "references": []
    },
@@ -8356,7 +8356,7 @@
    "capability": "&times;",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:394 initKitsuUI()"
+    "src/js/kitsu.js:415 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8393,7 +8393,7 @@
    "capability": "kitsu email",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:396 initKitsuUI()"
+    "src/js/kitsu.js:417 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8417,7 +8417,7 @@
     "functionsVisited": 3,
     "via": "container delegation #kitsu-modal",
     "references": [
-     "src/js/kitsu.js:401 initKitsuUI()"
+     "src/js/kitsu.js:422 initKitsuUI()"
     ]
    },
    "fixtures": [
@@ -8432,7 +8432,7 @@
    "capability": "Log in",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:399 initKitsuUI()"
+    "src/js/kitsu.js:420 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8455,7 +8455,7 @@
     "container": "kitsu-step-login",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 39,
+    "functionsVisited": 40,
     "via": "helper el()",
     "references": []
    },
@@ -8471,7 +8471,7 @@
    "capability": "Log out",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:415 initKitsuUI()"
+    "src/js/kitsu.js:436 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8508,7 +8508,7 @@
    "capability": "kitsu password",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:396 initKitsuUI()"
+    "src/js/kitsu.js:417 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8532,7 +8532,7 @@
     "functionsVisited": 3,
     "via": "container delegation #kitsu-modal",
     "references": [
-     "src/js/kitsu.js:401 initKitsuUI()"
+     "src/js/kitsu.js:422 initKitsuUI()"
     ]
    },
    "fixtures": [
@@ -8547,7 +8547,7 @@
    "capability": "kitsu url",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:396 initKitsuUI()"
+    "src/js/kitsu.js:417 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8571,7 +8571,7 @@
     "functionsVisited": 3,
     "via": "container delegation #kitsu-modal",
     "references": [
-     "src/js/kitsu.js:401 initKitsuUI()"
+     "src/js/kitsu.js:422 initKitsuUI()"
     ]
    },
    "fixtures": [
@@ -9182,7 +9182,7 @@
     "container": "start-newpanel",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 92,
+    "functionsVisited": 93,
     "via": "chain",
     "references": []
    },
@@ -9917,7 +9917,7 @@
     "functionsVisited": 27,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:312 renderNativeObjectUiMetadata()"
+     "src/js/adapters/native-object-ui.js:316 renderNativeObjectUiMetadata()"
     ]
    },
    "fixtures": [
@@ -16334,7 +16334,7 @@
     "functionsVisited": 99,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:303 renderNativeObjectUiMetadata()",
+     "src/js/adapters/native-object-ui.js:305 renderNativeObjectUiMetadata()",
      "src/js/app.js:5100 syncInput()",
      "src/js/timeline.js:229 updatePlayhead()",
      "src/js/timeline.js:2843 updateUI()"
@@ -17216,7 +17216,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 8,
+    "functionsVisited": 7,
     "via": "callback id",
     "references": [
      "src/js/tracker-panel.js:41 currentPoint()",
@@ -17263,7 +17263,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 8,
+    "functionsVisited": 7,
     "via": "callback id",
     "references": [
      "src/js/tracker-panel.js:42 currentPoint()",
@@ -25756,7 +25756,7 @@
    "source": "src/js/motion.js:9819",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 174
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -25798,7 +25798,7 @@
    "source": "src/js/motion.js:9864",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 439
+    "functionsVisited": 432
    },
    "fixtures": [
     "static-props",
@@ -28358,7 +28358,7 @@
    "source": "src/js/shapes-panel.js:738",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 100
+    "functionsVisited": 92
    },
    "fixtures": [
     "static-props",
@@ -28472,7 +28472,7 @@
    "source": "src/js/shapes-panel.js:860",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 100
+    "functionsVisited": 92
    },
    "fixtures": [
     "static-props",
@@ -30942,7 +30942,7 @@
    "source": "src/js/timeline.js:5605",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 174
+    "functionsVisited": 166
    },
    "fixtures": [
     "keyed-props",
@@ -30981,7 +30981,7 @@
    "source": "src/js/timeline.js:5636",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 439
+    "functionsVisited": 432
    },
    "fixtures": [
     "keyed-props",

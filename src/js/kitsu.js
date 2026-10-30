@@ -94,7 +94,19 @@
   // read-only instead, see openShotResult.previews.
   async function openShot(session, project, sequence, shot) {
     var meta = shotMetadata(shot, project);
-    await window.SMProject.newProject({ w: meta.w, h: meta.h, fps: meta.fps, name: (project.name || 'Kitsu') + ' — ' + shot.name });
+    var title = (project.name || 'Kitsu') + ' — ' + shot.name;
+    if (nativeProjectMode()) {
+      // Native authority: width/height/fps/duration are one New Project intent. No state.layers, createUserLayer or
+      // totalFrames write exists on this path and nothing falls back to one. A refusal throws before any Kitsu state is
+      // recorded, so an unrelated active project is never reset by a failed open. The Rough/Clean/Color layer structure
+      // is NOT built: native layer create exists but there is no native layer rename for "Layer 1" (#2381 I44).
+      if (!Number.isSafeInteger(meta.frameCount) || meta.frameCount < 1) throw new Error('Durée du shot illisible : projet natif non créé');
+      var created = await window.SMProject.newProject({ w: meta.w, h: meta.h, fps: meta.fps, name: title, totalFrames: meta.frameCount });
+      if (created !== true) throw new Error('Création du projet natif refusée ou indisponible');
+      meta.layerStructure = 'unavailable';
+      return finishOpenShot(session, project, sequence, shot, meta);
+    }
+    await window.SMProject.newProject({ w: meta.w, h: meta.h, fps: meta.fps, name: title });
     state.totalFrames = meta.frameCount;
     state.waIn = 0; state.waOut = meta.frameCount - 1;
     window._waIn = 0; window._waOut = meta.frameCount - 1; window._totalF = meta.frameCount;
@@ -105,7 +117,16 @@
     var colorIdx = createUserLayer('Color');
     activateUL(0);
     loadFrame(0); renderOS(); renderArcs(); updateUI(); if (window.renderSymbolTabs) renderSymbolTabs();
+    return finishOpenShot(session, project, sequence, shot, meta);
+  }
 
+  function nativeProjectMode() {
+    var owner = window.SMProject && typeof window.SMProject.nativeObjectProject === 'function' && window.SMProject.nativeObjectProject();
+    return !!(owner || window.NemoNativeObjectProject);
+  }
+
+  // Kitsu-side binding only (tasks, previews, publish target); never a document write.
+  async function finishOpenShot(session, project, sequence, shot, meta) {
     var tasks = [];
     try { tasks = await listShotTasks(session, shot.id); } catch (e) { }
     var previews = [];

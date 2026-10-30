@@ -50,6 +50,7 @@ fn blank_project(
     canvas_width: u32,
     canvas_height: u32,
     fps: f64,
+    total_frames: Option<u32>,
 ) -> Result<crate::object_document::ProjectEnvelope, DispatchErrorCode> {
     use crate::object_document::{
         AuthoredOrder, FrameScope, FrameScopeKind, ObjectDocument, ObjectLayer, OrderContext,
@@ -58,7 +59,11 @@ fn blank_project(
     };
     let metadata = ProjectMetadata::new(canvas_width, canvas_height, fps)
         .map_err(|_| DispatchErrorCode::InvalidRequest)?;
-    let frames = (fps * 5.0).round().max(1.0);
+    let frames = match total_frames {
+        Some(0) => return Err(DispatchErrorCode::InvalidRequest),
+        Some(explicit) => f64::from(explicit),
+        None => (fps * 5.0).round().max(1.0),
+    };
     if !frames.is_finite() || frames > u32::MAX as f64 {
         return Err(DispatchErrorCode::InvalidRequest);
     }
@@ -125,7 +130,19 @@ impl NativeObjectHistory {
         canvas_height: u32,
         fps: f64,
     ) -> Result<Self, DispatchErrorCode> {
-        let project = blank_project(canvas_width, canvas_height, fps)?;
+        Self::new_blank_project_frames(instance, canvas_width, canvas_height, fps, None)
+    }
+
+    /// New Project with an explicit duration (for example a Kitsu shot). `None`
+    /// keeps the five-second default; zero is refused.
+    pub fn new_blank_project_frames(
+        instance: impl Into<String>,
+        canvas_width: u32,
+        canvas_height: u32,
+        fps: f64,
+        total_frames: Option<u32>,
+    ) -> Result<Self, DispatchErrorCode> {
+        let project = blank_project(canvas_width, canvas_height, fps, total_frames)?;
         let instance = instance.into();
         if instance.is_empty() {
             return Err(DispatchErrorCode::InvalidRequest);
@@ -142,6 +159,24 @@ impl NativeObjectHistory {
         canvas_height: u32,
         fps: f64,
     ) -> Result<PreparedProjectReplacement, DispatchErrorCode> {
+        self.prepare_blank_project_replacement_frames(
+            snapshot_id,
+            canvas_width,
+            canvas_height,
+            fps,
+            None,
+        )
+    }
+
+    /// As `prepare_blank_project_replacement`, with an explicit duration.
+    pub fn prepare_blank_project_replacement_frames(
+        &self,
+        snapshot_id: &str,
+        canvas_width: u32,
+        canvas_height: u32,
+        fps: f64,
+        total_frames: Option<u32>,
+    ) -> Result<PreparedProjectReplacement, DispatchErrorCode> {
         let origin = self
             .acquire_snapshot(self.content_revision())
             .filter(|snapshot| snapshot.snapshot_id() == snapshot_id)
@@ -149,7 +184,7 @@ impl NativeObjectHistory {
         if origin.project().is_none() {
             return Err(DispatchErrorCode::Unavailable);
         }
-        let project = blank_project(canvas_width, canvas_height, fps)?;
+        let project = blank_project(canvas_width, canvas_height, fps, total_frames)?;
         let next = ObjectSnapshot::from_admitted_project(self.instance_id().into(), project)
             .map_err(|_| DispatchErrorCode::Unavailable)?;
         Ok(PreparedProjectReplacement { origin, next })
