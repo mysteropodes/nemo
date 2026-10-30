@@ -544,8 +544,7 @@
     try {
       var c = window.NemoNativeOpacityCutover;
       if (c && typeof c.blocksLegacy === 'function' && c.blocksLegacy() === false) return false;
-      // Direct Select owns its own native controller (subselect-bridge, document capture): never consume its gesture here.
-      if (state.tool === 'subselect') return true;
+      if (state.tool === 'subselect') return true; // Direct Select owns its native controller (subselect-bridge, document capture): never consume its gesture
       nativePointer()[method](e);
     } catch (_) { e.stopImmediatePropagation(); e.preventDefault(); }
     return true;
