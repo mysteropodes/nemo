@@ -7,6 +7,50 @@ use serde::Serialize;
 pub(crate) const MAX_RETAINED_REPLACEMENTS: usize = 16;
 /// Request ids of retired receipts, kept only so a late retry replays Expired instead of re-executing.
 pub(super) const MAX_REPLACEMENT_TOMBSTONES: usize = 256;
+/// Bits in the overflow filter (64 KiB). Tombstones beyond the exact bound are folded in here.
+const RETIRED_FILTER_BITS: usize = 1 << 19;
+const RETIRED_FILTER_HASHES: u64 = 4;
+
+/// Compact, fixed-size memory of request ids whose exact tombstone was pruned. A Bloom filter has
+/// no false negatives, so an id retired long ago always replays Expired and never re-executes.
+/// A false positive only makes a brand-new id replay Expired (a refusal, never a re-execution);
+/// the client retries with a fresh id. Ids carry no generation, so membership is the only sound test.
+pub(super) struct RetiredIds {
+    bits: Vec<u64>,
+}
+
+impl Default for RetiredIds {
+    fn default() -> Self {
+        Self {
+            bits: vec![0; RETIRED_FILTER_BITS / 64],
+        }
+    }
+}
+
+impl RetiredIds {
+    fn positions(request_id: &str) -> impl Iterator<Item = usize> {
+        use std::hash::{Hash, Hasher};
+        let hash = |salt: u64| {
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            salt.hash(&mut hasher);
+            request_id.hash(&mut hasher);
+            hasher.finish()
+        };
+        let (a, b) = (hash(1), hash(2) | 1);
+        (0..RETIRED_FILTER_HASHES)
+            .map(move |i| (a.wrapping_add(i.wrapping_mul(b)) as usize) % RETIRED_FILTER_BITS)
+    }
+
+    pub(super) fn insert(&mut self, request_id: &str) {
+        for bit in Self::positions(request_id) {
+            self.bits[bit / 64] |= 1 << (bit % 64);
+        }
+    }
+
+    pub(super) fn contains(&self, request_id: &str) -> bool {
+        Self::positions(request_id).all(|bit| self.bits[bit / 64] & (1 << (bit % 64)) != 0)
+    }
+}
 
 pub(crate) struct ReplacementIdentity<'a> {
     pub(crate) request_id: &'a str,
@@ -129,6 +173,9 @@ impl NativeAuthority {
             }
             return Ok(Some(record.outcome.clone()));
         }
+        if self.retired_replacement_ids.contains(request_id) {
+            return Ok(Some(ReplacementReplay::Expired));
+        }
         if self.live_replacements() >= MAX_RETAINED_REPLACEMENTS
             && self.evictable_replacement().is_none()
         {
@@ -180,6 +227,7 @@ impl NativeAuthority {
         retired.sort();
         let excess = retired.len().saturating_sub(MAX_REPLACEMENT_TOMBSTONES);
         for (_, request_id) in retired.into_iter().take(excess) {
+            self.retired_replacement_ids.insert(&request_id);
             self.retained_replacements.remove(&request_id);
         }
     }
