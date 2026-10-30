@@ -77,3 +77,13 @@ test('a centre read (#2362 sculpt) is a hit-test read marked center, with one wi
   const {center,widths,...unmarked}=a.subselect;
   assert.throws(()=>C.readCorrelate(q,{...a,subselect:unmarked},'document'),undefined,'the page must say it is a centreline');
 });
+test('a hit-test listing item must say whether the record is filled (#2372)',()=>{
+  const view={kind:'subselect',contextId:'scene-root',layerUid:'layer-a',frame:0,workId:'native-work-1',viewGeneration:1,cursor:0,hitTest:true};
+  const item={stableTarget:target,closed:true,count:4,matrix:[1,0,0,1,0,0],bounds:[0,0,10,10],role:'plain',filled:true};
+  const r={...view,atRevision:7,documentSnapshotId:'native-object:document:7',total:1,nextCursor:null,preview:false,items:[item]};
+  C.viewResult(r);C.viewResult({...r,items:[{...item,filled:false}]});
+  const {filled,...missing}=item;
+  for(const bad of [missing,{...item,filled:1},{...item,filled:null},{...item,filled:'true'}])assert.throws(()=>C.viewResult({...r,items:[bad]}),undefined,JSON.stringify(bad.filled));
+  const {hitTest,...plain}=r;
+  assert.throws(()=>C.viewResult({...plain,items:[{stableTarget:target,closed:false,count:2,matrix:[1,0,0,1,0,0],filled:true}]}),undefined,'an editable page has no filled flag');
+});

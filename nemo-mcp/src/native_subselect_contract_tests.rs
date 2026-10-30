@@ -197,7 +197,7 @@ fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
     let view = json!({"kind":"subselect","contextId":"scene-root","layerUid":"layer-a","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"limit":8,"hitTest":true});
     let q = json!({"atRevision":7,"documentSnapshotId":"native-object:document:7","view":view});
     let r = json!({"kind":"subselect","atRevision":7,"documentSnapshotId":"native-object:document:7","contextId":"scene-root","layerUid":"layer-a","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"total":1,"nextCursor":null,"preview":false,"hitTest":true,
-        "items":[{"stableTarget":target(),"closed":true,"count":4,"matrix":[1,0,0,1,0,0],"bounds":[0.0,0.0,10.0,10.0],"role":"fill"}]});
+        "items":[{"stableTarget":target(),"closed":true,"count":4,"matrix":[1,0,0,1,0,0],"bounds":[0.0,0.0,10.0,10.0],"role":"fill","filled":true}]});
     assert!(view_request(&q));
     assert!(public_read(&q, &r), "a listed linked fill is legal in a hit-test listing");
     let mut owned = r.clone();
