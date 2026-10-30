@@ -111,6 +111,18 @@
         "operation": "command.document.object.redo",
         "payload": { "command": "object.redo" }
       }
+    },
+    {
+      "label": "Jump three entries back in one restore (the History panel's click); steps is optional and defaults to 1, the revision advances by exactly one",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "object-undo-jump-11",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 10,
+        "operation": "command.document.object.undo",
+        "payload": { "command": "object.undo", "steps": 3 }
+      }
     }
   ]
 }

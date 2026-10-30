@@ -189,8 +189,13 @@ pub(super) fn history_request(operation: &str, value: &Value) -> bool {
         "command.document.object.redo" => "object.redo",
         _ => return false,
     };
-    exact(value, &["command"], &[])
-        .is_some_and(|value| value.get("command").and_then(Value::as_str) == Some(command))
+    // Optional `steps`: move that many entries as one restore (the History panel's jump).
+    exact(value, &["command"], &["steps"]).is_some_and(|value| {
+        value.get("command").and_then(Value::as_str) == Some(command)
+            && value
+                .get("steps")
+                .is_none_or(|steps| revision(Some(steps)).is_some_and(|steps| steps >= 1))
+    })
 }
 
 pub(super) fn history_result(value: &Value) -> bool {

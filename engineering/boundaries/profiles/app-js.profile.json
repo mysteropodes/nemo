@@ -3248,6 +3248,30 @@
       ]
     },
     {
+      "id": "app.native.history.read.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-history-read-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-history-read-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.object.history.ui.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-history-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-history-ui.js"
+      ]
+    },
+    {
       "id": "app.native.object.ghost.ui.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

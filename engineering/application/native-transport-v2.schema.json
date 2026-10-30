@@ -3950,6 +3950,12 @@
       "properties": {
         "command": {
           "const": "object.undo"
+        },
+        "steps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991,
+          "description": "Optional (default 1): move that many history entries as one restore and one new revision. The History panel's jump."
         }
       }
     },
@@ -3962,6 +3968,12 @@
       "properties": {
         "command": {
           "const": "object.redo"
+        },
+        "steps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991,
+          "description": "Optional (default 1): move that many history entries as one restore and one new revision. The History panel's jump."
         }
       }
     },
@@ -17803,6 +17815,16 @@
         },
         "documentSnapshotId": {
           "$ref": "#/$defs/Identifier"
+        },
+        "offset": {
+          "$ref": "#/$defs/Revision",
+          "description": "Optional first entry index of the page; absent = a window that starts up to 20 entries before the cursor."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32,
+          "description": "Optional page size (default 32)."
         }
       }
     },
@@ -17813,7 +17835,9 @@
         "atRevision",
         "documentSnapshotId",
         "undoDepth",
-        "redoDepth"
+        "redoDepth",
+        "offset",
+        "entries"
       ],
       "properties": {
         "atRevision": {
@@ -17827,9 +17851,35 @@
         },
         "redoDepth": {
           "$ref": "#/$defs/Revision"
+        },
+        "offset": {
+          "$ref": "#/$defs/Revision"
+        },
+        "entries": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "index",
+              "label"
+            ],
+            "properties": {
+              "index": {
+                "$ref": "#/$defs/Revision"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32
+              }
+            }
+          },
+          "description": "One page of the chronological entry list: the done entries oldest first (index below undoDepth), then the redoable ones nearest first. The cursor is undoDepth."
         }
       },
-      "description": "Live current-owner depths only; atRevision and documentSnapshotId must equal the request and current owner. No retained-snapshot stack semantics."
+      "description": "Live current-owner stack depths and one labelled page of entries; atRevision and documentSnapshotId must equal the request and current owner. No retained-snapshot stack semantics."
     },
     "ObjectClipboardCopyPayload": {
       "type": "object",

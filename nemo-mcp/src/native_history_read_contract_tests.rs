@@ -9,7 +9,9 @@ fn envelope() -> Value {
 fn response() -> Value {
     json!({"apiVersion":2,"requestId":"history-read","instanceId":"instance","documentId":"document",
         "contentRevision":7,"ok":true,"result":{"atRevision":7,
-        "documentSnapshotId":"native-object:document:7","undoDepth":2,"redoDepth":1}})
+        "documentSnapshotId":"native-object:document:7","undoDepth":2,"redoDepth":1,
+        "offset":0,"entries":[{"index":0,"label":"Draw"},{"index":1,"label":"Property: Opacity"},
+        {"index":2,"label":"Rename Layer"}]}})
 }
 #[test]
 fn published_history_schema_keeps_existing_branches_and_closes_new_shapes() {
@@ -74,7 +76,7 @@ fn published_history_schema_keeps_existing_branches_and_closes_new_shapes() {
     let mut bad = envelope();
     bad["expectedRevision"] = json!(7);
     assert!(!validator.is_valid(&bad));
-    for field in ["undoDepth", "redoDepth"] {
+    for field in ["undoDepth", "redoDepth", "offset"] {
         for value in [
             json!(-1),
             json!(0.5),
@@ -92,6 +94,36 @@ fn published_history_schema_keeps_existing_branches_and_closes_new_shapes() {
     let mut bad = response();
     bad["result"]["extra"] = json!(true);
     assert!(!validator.is_valid(&bad));
+    // The optional page members and the closed entry shape.
+    for (field, value) in [
+        ("offset", json!(4)),
+        ("limit", json!(32)),
+        ("limit", json!(1)),
+    ] {
+        let mut ok = envelope();
+        ok["payload"][field] = value;
+        assert!(validator.is_valid(&ok), "{field}");
+    }
+    for (field, value) in [
+        ("limit", json!(0)),
+        ("limit", json!(33)),
+        ("offset", json!(-1)),
+    ] {
+        let mut bad = envelope();
+        bad["payload"][field] = value;
+        assert!(!validator.is_valid(&bad), "{field}");
+    }
+    for entries in [
+        json!([{"index":0}]),
+        json!([{"index":0,"label":""}]),
+        json!([{"index":0,"label":"x".repeat(33)}]),
+        json!([{"index":0,"label":"a","extra":1}]),
+        json!(vec![json!({"index":0,"label":"a"}); 33]),
+    ] {
+        let mut bad = response();
+        bad["result"]["entries"] = entries;
+        assert!(!validator.is_valid(&bad));
+    }
 }
 #[test]
 fn registered_public_input_is_closed_bounded_and_duplicate_safe() {
@@ -118,8 +150,18 @@ fn registered_public_input_is_closed_bounded_and_duplicate_safe() {
         json!([]),
         json!({}),
         json!({"atRevision":7,"documentSnapshotId":"s","extra":true}),
+        json!({"atRevision":7,"documentSnapshotId":"s","limit":0}),
+        json!({"atRevision":7,"documentSnapshotId":"s","limit":33}),
+        json!({"atRevision":7,"documentSnapshotId":"s","offset":-1}),
+        json!({"atRevision":7,"documentSnapshotId":"s","offset":"1"}),
     ] {
         assert!(!request(&p));
+    }
+    for p in [
+        json!({"atRevision":7,"documentSnapshotId":"s","offset":0,"limit":32}),
+        json!({"atRevision":7,"documentSnapshotId":"s","limit":1}),
+    ] {
+        assert!(request(&p));
     }
     for value in [
         Value::Null,
@@ -173,6 +215,16 @@ fn wire_result_rejects_forged_owner_pins_depths_fields_and_original_byte_duplica
         ("undoDepth", json!(true)),
         ("redoDepth", json!(9007199254740992u64)),
         ("extra", json!(true)),
+        ("offset", json!(1)),
+        ("offset", json!(-1)),
+        (
+            "entries",
+            json!([{"index":0,"label":"Draw"},{"index":1,"label":"x"},{"index":2,"label":"y"},{"index":3,"label":"z"}]),
+        ),
+        ("entries", json!([{"index":1,"label":"Draw"}])),
+        ("entries", json!([{"index":0,"label":""}])),
+        ("entries", json!([{"index":0,"label":"Draw","extra":1}])),
+        ("entries", json!("none")),
     ] {
         let mut bad = response();
         bad["result"][key] = value;
@@ -181,7 +233,14 @@ fn wire_result_rejects_forged_owner_pins_depths_fields_and_original_byte_duplica
             "{key}"
         );
     }
-    for field in ["undoDepth", "redoDepth", "atRevision", "documentSnapshotId"] {
+    for field in [
+        "undoDepth",
+        "redoDepth",
+        "atRevision",
+        "documentSnapshotId",
+        "offset",
+        "entries",
+    ] {
         let mut bad = response();
         bad["result"].as_object_mut().unwrap().remove(field);
         assert!(validate_native_response(&serde_json::from_value(bad).unwrap(), &r).is_err());
@@ -193,4 +252,68 @@ fn wire_result_rejects_forged_owner_pins_depths_fields_and_original_byte_duplica
     assert!(decode_json_bounded::<NativeApplicationResponse>(raw.as_bytes(), 4096).is_err());
     let raw = format!("{}{}", response(), " ".repeat(4096));
     assert!(decode_json_bounded::<NativeApplicationResponse>(raw.as_bytes(), 4096).is_err());
+}
+#[test]
+fn a_page_answers_its_own_request_offset_and_limit() {
+    let mut payload = envelope()["payload"].clone();
+    payload["offset"] = json!(1);
+    payload["limit"] = json!(2);
+    let mut ok = response()["result"].clone();
+    ok["offset"] = json!(1);
+    ok["entries"] =
+        json!([{"index":1,"label":"Property: Opacity"},{"index":2,"label":"Rename Layer"}]);
+    assert!(result(&payload, &ok));
+    let mut other = ok.clone();
+    other["offset"] = json!(0);
+    other["entries"] = json!([{"index":0,"label":"Draw"},{"index":1,"label":"a"}]);
+    assert!(
+        !result(&payload, &other),
+        "the answer must be the requested offset"
+    );
+    let mut longer = ok.clone();
+    longer["entries"] =
+        json!([{"index":1,"label":"a"},{"index":2,"label":"b"},{"index":3,"label":"c"}]);
+    longer["redoDepth"] = json!(5);
+    assert!(
+        !result(&payload, &longer),
+        "more entries than the requested limit"
+    );
+}
+
+#[test]
+fn history_payload_admits_only_a_positive_safe_integer_steps_member() {
+    let op = "command.document.object.undo";
+    assert!(crate::native_contract::object::history_request(
+        op,
+        &json!({"command":"object.undo","steps":3})
+    ));
+    assert!(crate::native_contract::object::history_request(
+        op,
+        &json!({"command":"object.undo","steps":9007199254740991u64})
+    ));
+    for steps in [
+        json!(0),
+        json!(-1),
+        json!(1.5),
+        json!("2"),
+        json!(null),
+        json!(9007199254740992u64),
+    ] {
+        assert!(!crate::native_contract::object::history_request(
+            op,
+            &json!({"command":"object.undo","steps":steps})
+        ));
+    }
+    assert!(!crate::native_contract::object::history_request(
+        op,
+        &json!({"command":"object.undo","count":2})
+    ));
+    assert!(!crate::native_contract::object::history_request(
+        op,
+        &json!({"command":"object.redo","steps":1})
+    ));
+    assert!(crate::native_contract::object::history_request(
+        "command.document.object.redo",
+        &json!({"command":"object.redo","steps":2})
+    ));
 }
