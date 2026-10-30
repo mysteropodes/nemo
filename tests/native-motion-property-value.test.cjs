@@ -27,36 +27,69 @@ const target={contextId:'opaque scene:α',layerUid:'layer / value',strokeId:'str
 function fixture(options={}){
  const doc=new Node(null,'#document');doc.defaultView={_scrubLiveActive:false};doc.createElement=t=>new Node(doc,t);const container=doc.createElement('div');doc.appendChild(container);
  let pin={instanceId:'instance-value',documentId:'document-value',lifecycleGeneration:1,contentRevision:7,documentSnapshotId:'native-object:document-value:7'},frame=10,generation=2,ready=true;
- const reads=[],writes=[],nativeValues=options.values||[0,64],descriptor={property:'position',dimension:nativeValues.length,animatable:options.animatable!==false,authored:{expressionEnabled:!!options.expression}};
+ const reads=[],writes=[],nativeValues=options.values||[0,64],descriptor={property:'position',dimension:nativeValues.length,animatable:options.animatable!==false,authored:{expressionEnabled:!!options.expression,keyCount:options.keyCount||0,hasStaticOverride:false}},keyFrames=options.keyFrames||[];
  function context(){return {pin,frame,viewGeneration:generation,presented:{...pin,available:ready,presentation:{...pin,owner:'native',status:ready?'presented':'pending',frame}}};}
- function response(q){return {instanceId:q.instanceId,documentId:q.documentId,atRevision:q.atRevision,documentSnapshotId:q.documentSnapshotId,kind:'rawSample',target:copy(q.view.target),property:q.view.property,dimension:nativeValues.length,frame:q.view.frame,value:nativeValues.slice()};}
+ function response(q){if(q.view.kind==='authoredKeys')return {instanceId:q.instanceId,documentId:q.documentId,atRevision:q.atRevision,documentSnapshotId:q.documentSnapshotId,kind:'authoredKeys',target:copy(q.view.target),property:q.view.property,dimension:nativeValues.length,trackPresent:true,items:keyFrames.slice(q.view.offset,q.view.offset+8).map(f=>({frame:f,v:nativeValues.slice()})),nextOffset:q.view.offset+8<keyFrames.length?q.view.offset+8:null};return {instanceId:q.instanceId,documentId:q.documentId,atRevision:q.atRevision,documentSnapshotId:q.documentSnapshotId,kind:'rawSample',target:copy(q.view.target),property:q.view.property,dimension:nativeValues.length,frame:q.view.frame,value:nativeValues.slice()};}
  const ports={document:doc,readContext:context,readProperty(q){reads.push(copy(q));return options.reader?options.reader(q,response):Promise.resolve(response(q));},
   async editProperty(payload,expected,current){writes.push({payload:copy(payload),expected:copy(expected),current});assert.equal(current(),true);return options.writer?options.writer(payload,expected,current):{applied:true,historyEntriesAdded:1};}};
  if(options.readonly)delete ports.editProperty;
  const editor=Value.create(container,ports,target,descriptor);
  return {doc,win:doc.defaultView,container,ports,editor,reads,writes,context,response,nativeValues,
-  inputs:()=>tree(editor.element).filter(n=>n.type==='number'),button:label=>tree(editor.element).find(n=>n.tagName==='BUTTON'&&n.textContent===label),status:()=>tree(editor.element).find(n=>n.attrs.role==='status').textContent,
+  inputs:()=>tree(editor.element).filter(n=>n.type==='number'),sw:()=>tree(editor.element).find(n=>/\bmotion-stopwatch\b/.test(n.className||'')),keyReads:()=>reads.filter(r=>r.view.kind==='authoredKeys'),status:()=>tree(editor.element).find(n=>n.attrs.role==='status').textContent,
   frame(v){frame=v;},generation(){generation++;},replace(){pin={...pin,lifecycleGeneration:pin.lifecycleGeneration+1};},revision(){pin={...pin,contentRevision:8,documentSnapshotId:'native-object:document-value:8'};generation++;},ready(v){ready=v;},foreign(){pin={...pin,documentId:'another-document'};}};
 }
 test('ordinary numeric fields read exact native values and preserve opaque targets and finite numbers',async()=>{
  const h=fixture();assert.equal(await h.editor.refresh(),true);assert.deepEqual(h.inputs().map(n=>n.value),['0','64']);assert.deepEqual(h.reads[0].view,{kind:'rawSample',target,property:'position',frame:10});
  h.inputs()[0].value='-3.25';await h.inputs()[0].fire('change');assert.deepEqual(h.writes[0].payload,{command:'object.property.edit',target,property:'position',action:{kind:'setValue',frame:10,values:[-3.25,64]}});assert.equal(h.writes[0].expected.contentRevision,7);assert.deepEqual(h.nativeValues,[0,64]);assert.equal(legacyEffects.reads,0);
 });
-test('key and animation controls send four existing native intents without local sampling',async()=>{
- for(const [label,action] of [['Add key',{kind:'setKey',frame:10,values:[0,64]}],['Remove key',{kind:'removeKey',frame:10}],['Enable animation',{kind:'setAnimated',frame:10,animated:true}],['Disable animation',{kind:'setAnimated',frame:10,animated:false}]]){
-  const h=fixture();await h.editor.refresh();await h.button(label).fire('click');assert.deepEqual(h.writes[0].payload.action,action);assert.equal(h.writes.length,1);assert.match(h.status(),/updated/);assert.deepEqual(h.nativeValues,[0,64]);
+test('stopwatch diamond maps four states onto the existing native intents without local sampling',async()=>{
+ const cases=[
+  ['not animated enables animation',{},{kind:'setAnimated',frame:10,animated:true},false,false],
+  ['animated, key here, several keys removes the key',{keyCount:3,keyFrames:[2,10,20]},{kind:'removeKey',frame:10},true,true],
+  ['animated, last key here freezes via setAnimated false',{keyCount:1,keyFrames:[10]},{kind:'setAnimated',frame:10,animated:false},true,true],
+  ['animated, no key here adds a key with the raw sample',{keyCount:2,keyFrames:[2,20]},{kind:'setKey',frame:10,values:[0,64]},true,false]];
+ for(const [name,options,action,on,filled] of cases){
+  const h=fixture(options);await h.editor.refresh();const sw=h.sw();assert.ok(sw,name);
+  assert.equal(/\bon\b/.test(sw.className),on,name);assert.equal(/fill="currentColor"/.test(sw.innerHTML),filled,name);assert.doesNotMatch(sw.className,/disabled/);
+  assert.equal(h.keyReads().length,on?1:0,name);
+  await sw.fire('click');assert.deepEqual(h.writes.map(w=>w.payload.action),[action],name);assert.match(h.status(),/updated/);assert.deepEqual(h.nativeValues,[0,64]);
  }
+});
+test('no text action buttons remain in the property value editor',async()=>{
+ const h=fixture({keyCount:2,keyFrames:[10,20]});await h.editor.refresh();
+ assert.equal(tree(h.editor.element).filter(n=>n.tagName==='BUTTON').length,0);assert.doesNotMatch(h.editor.element.textContent,/Add key|Remove key|Enable animation|Disable animation/);
+ assert.equal(tree(h.editor.element).filter(n=>/native-motion-property-actions/.test(n.className||'')).length,0);
+});
+test('stopwatch pages through authored keys and finds a key beyond the first page',async()=>{
+ const frames=Array.from({length:20},(_,i)=>i*2),h=fixture({keyCount:20,keyFrames:frames});await h.editor.refresh();
+ assert.equal(h.keyReads().length,3);assert.deepEqual(h.keyReads().map(r=>r.view.offset),[0,8,16]);assert.match(h.sw().innerHTML,/fill="currentColor"/);
+ const g=fixture({keyCount:20,keyFrames:frames.map(f=>f+1)});await g.editor.refresh();assert.match(g.sw().innerHTML,/fill="none"/);
+});
+test('stopwatch titles come from translated stopwatch keys with English fallbacks',async()=>{
+ const h=fixture({keyCount:2,keyFrames:[10,20]});h.ports.translate=k=>({motionKeyRemove:'RM',motionKeyAdd:'ADD',motionAnimateProp:'ANIM'})[k];
+ const e=Value.create(h.container,h.ports,target,{property:'position',dimension:2,animatable:true,authored:{keyCount:2,expressionEnabled:false}});await e.refresh();
+ const sw=tree(e.element).find(n=>/motion-stopwatch/.test(n.className||''));assert.equal(sw.title,'RM');assert.equal(sw.attrs['aria-label'],'RM');
+ const none=fixture();await none.editor.refresh();assert.match(none.sw().title,/Enable animation/);
+});
+test('stopwatch is disabled for expression rows, nonanimatable rows, unreadable keys and read-only ports',async()=>{
+ const x=fixture({expression:true,keyCount:2,keyFrames:[10,20]});await x.editor.refresh();assert.match(x.sw().className,/disabled/);assert.equal(x.sw().attrs['aria-disabled'],'true');await x.sw().fire('click');assert.equal(x.writes.length,0);
+ const n=fixture({animatable:false});await n.editor.refresh();assert.match(n.sw().className,/disabled/);await n.sw().fire('click');assert.equal(n.writes.length,0);assert.equal(n.inputs()[0].disabled,false);
+ const u=fixture({keyCount:2,keyFrames:[10,20],reader:(q,r)=>q.view.kind==='authoredKeys'?Promise.reject(Error('nope')):Promise.resolve(r(q))});await u.editor.refresh();assert.match(u.sw().className,/disabled/);await u.sw().fire('click');assert.equal(u.writes.length,0);
+ const r=fixture({readonly:true});await r.editor.refresh();assert.match(r.sw().className,/disabled/);await r.sw().fire('click');assert.equal(r.writes.length,0);
+});
+test('stopwatch also activates from the keyboard',async()=>{
+ const h=fixture();await h.editor.refresh();await h.sw().fire('keydown',{key:'Enter',preventDefault(){}});assert.deepEqual(h.writes.map(w=>w.payload.action),[{kind:'setAnimated',frame:10,animated:true}]);
 });
 test('one and four dimensional zero and out-of-range numbers remain native values',async()=>{
  for(const numbers of [[0],[0,-100.5,999,0.25]]){const h=fixture({values:numbers});await h.editor.refresh();await h.inputs()[0].fire('change');assert.deepEqual(h.writes[0].payload.action.values,numbers);}
 });
-test('enabled expressions are explicitly presented as base values; animation mode is decided by native owner',async()=>{
- const h=fixture({expression:true,writer:async()=>{throw Error('unavailable');}});await h.editor.refresh();assert.match(h.editor.element.textContent,/Base value before expression/);await h.button('Disable animation').fire('click');assert.deepEqual(h.writes[0].payload.action,{kind:'setAnimated',frame:10,animated:false});assert.match(h.status(),/refused/);assert.deepEqual(h.nativeValues,[0,64]);
+test('enabled expressions are explicitly presented as base values and refuse animation toggling',async()=>{
+ const h=fixture({expression:true});await h.editor.refresh();assert.match(h.editor.element.textContent,/Base value before expression/);await h.sw().fire('click');assert.equal(h.writes.length,0);assert.deepEqual(h.nativeValues,[0,64]);
 });
 test('absent or revoked write capability and nonanimatable metadata never manufacture a writer',async()=>{
  const h=fixture({readonly:true});assert.equal(await h.editor.refresh(),true);assert.ok(h.inputs().every(n=>n.disabled&&n.readOnly));await h.inputs()[0].fire('change');assert.equal(h.writes.length,0);
- const r=fixture();await r.editor.refresh();delete r.ports.editProperty;await r.button('Add key').fire('click');assert.equal(r.writes.length,0);
- const n=fixture({animatable:false});await n.editor.refresh();assert.equal(n.button('Add key').disabled,true);await n.button('Add key').fire('click');assert.equal(n.writes.length,0);assert.equal(n.inputs()[0].disabled,false);
+ const r=fixture();await r.editor.refresh();delete r.ports.editProperty;await r.sw().fire('click');assert.equal(r.writes.length,0);
+ const n=fixture({animatable:false});await n.editor.refresh();assert.match(n.sw().className,/disabled/);await n.sw().fire('click');assert.equal(n.writes.length,0);assert.equal(n.inputs()[0].disabled,false);
 });
 test('blank and nonfinite drafts never dispatch or replace the last accepted native value',async()=>{
  for(const text of ['',' ','Infinity','-Infinity','NaN','abc']){const h=fixture();await h.editor.refresh();h.inputs()[1].value=text;await h.inputs()[1].fire('change');assert.equal(h.writes.length,0);assert.match(h.status(),/finite numeric/);assert.deepEqual(h.nativeValues,[0,64]);}
@@ -72,14 +105,14 @@ test('each delayed read is fenced by frame, generation, owner, presentation and 
  }
 });
 test('queued local intent expires on cancellation or detachment before submission',async()=>{
- for(const change of [h=>h.editor.cancel(),h=>h.doc.removeChild(h.container)]){let applied=0;const wait=deferred(),h=fixture({writer:async(payload,pin,current)=>{await wait.promise;if(!current())throw Error('stale');applied++;return {applied:true,historyEntriesAdded:1};}});await h.editor.refresh();const acting=h.button('Add key').fire('click');change(h);assert.equal(h.writes[0].current(),false);wait.resolve();await acting;assert.equal(applied,0);}
+ for(const change of [h=>h.editor.cancel(),h=>h.doc.removeChild(h.container)]){let applied=0;const wait=deferred(),h=fixture({writer:async(payload,pin,current)=>{await wait.promise;if(!current())throw Error('stale');applied++;return {applied:true,historyEntriesAdded:1};}});await h.editor.refresh();const acting=h.sw().fire('click');change(h);assert.equal(h.writes[0].current(),false);wait.resolve();await acting;assert.equal(applied,0);}
 });
 test('busy fields cannot submit duplicate commands and a native no-op remains a no-op',async()=>{
- const wait=deferred(),h=fixture({writer:()=>wait.promise});await h.editor.refresh();const acting=h.button('Add key').fire('click');assert.ok(h.inputs().every(n=>n.disabled));await h.button('Add key').fire('click');assert.equal(h.writes.length,1);assert.deepEqual(h.nativeValues,[0,64]);wait.resolve({applied:false,historyEntriesAdded:0});await acting;assert.match(h.status(),/No property change/);
+ const wait=deferred(),h=fixture({writer:()=>wait.promise});await h.editor.refresh();const acting=h.sw().fire('click');assert.ok(h.inputs().every(n=>n.disabled));await h.sw().fire('click');assert.equal(h.writes.length,1);assert.deepEqual(h.nativeValues,[0,64]);wait.resolve({applied:false,historyEntriesAdded:0});await acting;assert.match(h.status(),/No property change/);
 });
 test('malformed receipt and owner replacement cannot claim a current accepted edit',async()=>{
- for(const result of [null,{applied:true,historyEntriesAdded:0},{applied:false,historyEntriesAdded:1},{applied:true,historyEntriesAdded:1,extra:true}]){const h=fixture({writer:async()=>result});await h.editor.refresh();await h.button('Add key').fire('click');assert.match(h.status(),/refused/);assert.equal(h.writes.length,1);}
- const wait=deferred(),h=fixture({writer:()=>wait.promise});await h.editor.refresh();const acting=h.button('Add key').fire('click');h.replace();wait.resolve({applied:true,historyEntriesAdded:1});await acting;assert.match(h.status(),/view changed/);assert.doesNotMatch(h.status(),/updated/);
+ for(const result of [null,{applied:true,historyEntriesAdded:0},{applied:false,historyEntriesAdded:1},{applied:true,historyEntriesAdded:1,extra:true}]){const h=fixture({writer:async()=>result});await h.editor.refresh();await h.sw().fire('click');assert.match(h.status(),/refused/);assert.equal(h.writes.length,1);}
+ const wait=deferred(),h=fixture({writer:()=>wait.promise});await h.editor.refresh();const acting=h.sw().fire('click');h.replace();wait.resolve({applied:true,historyEntriesAdded:1});await acting;assert.match(h.status(),/view changed/);assert.doesNotMatch(h.status(),/updated/);
 });
 test('fields carry baseline classes, X/Y labels, unit span and scrub step; port dimLabels overrides the default',async()=>{
  const h=fixture();await h.editor.refresh();const all=tree(h.editor.element);
