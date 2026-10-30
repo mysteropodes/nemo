@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "b73efd11154dd6715513af3115f00ace993af318",
-  "describe": "v0.7.0-alpha.4-3901-gb73efd11-dirty"
+  "head": "e648f4aaae0c107616c829566b34c94ad54cc153",
+  "describe": "v0.7.0-alpha.4-3908-ge648f4aa-dirty"
  },
- "inputsDigest": "093d50a6a9edd8e074ed7dc7d3b4f7ee651f1a039effa94a206f0db8b4fe0e63",
+ "inputsDigest": "6386dd7d567cc7d9c74ebaaa1194a90fc81cd24fd5090cb1204f4978c699afb9",
  "states": [
   "inventoried",
   "characterized",
@@ -276,7 +276,7 @@
   },
   "SMProject": {
    "file": "src/js/project.js",
-   "line": 406,
+   "line": 411,
    "members": 2
   },
   "SMAgPsdLoader": {
@@ -453,7 +453,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 132,
+    "functionsVisited": 135,
     "via": "variable btn",
     "references": []
    },
@@ -2445,7 +2445,7 @@
    "capability": "history",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:723 initStartScreen()"
+    "src/js/project.js:732 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3306,7 +3306,7 @@
    "capability": "new",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:720 initStartScreen()"
+    "src/js/project.js:729 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3386,7 +3386,7 @@
    "capability": "open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:719 initStartScreen()"
+    "src/js/project.js:728 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4622,7 +4622,7 @@
    "capability": "save",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:717 initStartScreen()"
+    "src/js/project.js:726 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4662,7 +4662,7 @@
    "capability": "saveas",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:718 initStartScreen()"
+    "src/js/project.js:727 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4686,7 +4686,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 61,
+    "functionsVisited": 68,
     "via": "chain",
     "references": []
    },
@@ -7802,7 +7802,7 @@
    "capability": "file input",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:724 initStartScreen()"
+    "src/js/project.js:733 initStartScreen()"
    ],
    "events": [
     "change"
@@ -7826,7 +7826,7 @@
     "functionsVisited": 64,
     "via": "chain",
     "references": [
-     "src/js/project.js:219 openDialog()"
+     "src/js/project.js:221 openDialog()"
     ]
    },
    "fixtures": [
@@ -14632,7 +14632,7 @@
    "capability": "New project (new tab)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:652"
+    "src/js/project.js:661"
    ],
    "events": [
     "click"
@@ -14663,7 +14663,7 @@
     "via": "chain",
     "references": [
      "src/js/adapters/native-object-project-tabs-ui.js:93 render()",
-     "src/js/project.js:652",
+     "src/js/project.js:661",
      "src/js/timeline.js:9104 action()"
     ]
    },
@@ -15690,7 +15690,7 @@
     "functionsVisited": 0,
     "via": "chain",
     "references": [
-     "src/js/project.js:598 addTab()"
+     "src/js/project.js:607 addTab()"
     ]
    },
    "fixtures": [
