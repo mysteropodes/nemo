@@ -65,7 +65,7 @@ pub(crate) fn inside(target: &Target, roots: &[PathBuf]) -> bool {
         .any(|root| path.starts_with(root) && path != root)
 }
 
-fn roots<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Vec<PathBuf> {
+pub(crate) fn roots<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Vec<PathBuf> {
     let paths = app.path();
     [
         paths.home_dir(),

@@ -60,7 +60,7 @@ pub(crate) use font_source::fetch_google_font;
 
 #[path = "native_revision_sync.rs"]
 mod revision_sync;
-#[path = "native_mcp_project_scope.rs"] mod project_scope;
+#[path = "native_mcp_project_scope.rs"] mod project_scope; #[path = "native_mcp_source_scope.rs"] mod source_scope;
 #[cfg(test)]
 use revision_sync::dispatch_native;
 use revision_sync::{RevisionControl, RevisionSync};
@@ -418,7 +418,7 @@ async fn serve_connection(
             let window = app
                 .get_webview_window("main")
                 .ok_or("application window unavailable")?;
-            use tauri_plugin_fs::FsExt;
+            use tauri_plugin_fs::FsExt; source_scope::admit(&app, &message.native_request); // #2242
             let source_window = window.clone();
             let permission = Arc::new(move |path: &std::path::Path| {
                 source_window
