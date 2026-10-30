@@ -23,6 +23,8 @@ function host(){
       assert.equal(r.projectOnly,true);assert.equal(typeof r.sourcePath,'string');assert.equal('documentJson' in r,false);
       if(r.sourcePath==='/opacity.json')throw {code:'unsupported_format'};
       if(r.sourcePath==='/bad.json')throw {code:'invalid_request'};
+      if(r.sourcePath==='/outside.json')throw {code:'unavailable',message:'object file is outside the existing filesystem scope',
+        details:{disposition:'notDispatched',retryExecution:false}};
       installed=true;return {...info(),requestId:r.requestId,resourceCount:0,viewportAvailable:false};
     }
     if(command==='nemo_native_object_reference'&&r.action.kind==='inspect'){
@@ -137,6 +139,12 @@ test('only explicit pre-install unsupported format allows the older file route',
   const h=host(),s=session(h);assert.equal(await s.openPath('/opacity.json'),null);assert.equal(s.blocksLegacy(),false);
   await s.openPath('/project.json');assert.equal(s.blocksLegacy(),true);
   const bad=session(host());await assert.rejects(bad.openPath('/bad.json'));assert.equal(bad.blocksLegacy(),true);assert.throws(bad.getNativeIdentity);
+});
+test('a first Open refused before dispatch returns to idle, so a later Open still runs (#2511)',async()=>{
+  const s=session(host());
+  await assert.rejects(s.openPath('/outside.json'),(e)=>e.details.disposition==='notDispatched');
+  assert.equal(s.blocksLegacy(),false);assert.equal(s.isActive(),false);assert.equal(s.isIndeterminate(),false);
+  await s.openPath('/project.json');assert.equal(s.isActive(),true);
 });
 test('metadata is detached and immutable; malformed or foreign inspection fences admission',async()=>{
   const h=host(),s=await presented(h);assert.equal(Object.isFrozen(s.info().layers[0]),true);

@@ -4,7 +4,9 @@ use crate::native_application_contract::{
     bounded_id, host_error, require_api_instance, HostResult,
 };
 use crate::native_object_bootstrap::{bootstrap_file_bytes, bootstrap_raw, ObjectBootstrapReceipt};
+use nemo_mcp::contract::NativeApplicationError;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::{fs::File, io::Read, path::Path};
 
 const MAX_FILE_REQUEST_BYTES: usize = 4096;
@@ -128,6 +130,11 @@ pub(super) fn read_file(
     Ok(bytes)
 }
 
+fn not_dispatched(mut error: NativeApplicationError) -> NativeApplicationError {
+    error.details = Some(json!({"disposition":"notDispatched","retryExecution":false}));
+    error
+}
+
 pub(super) fn bootstrap_request(
     state: &ApplicationMcp,
     raw: &str,
@@ -141,7 +148,9 @@ pub(super) fn bootstrap_request(
                 "replacement requires its committed main-thread route",
             ));
         }
-        let bytes = read_file(state, &request, allowed)?;
+        // Nothing is installed until the file is read, so a refused read leaves the
+        // slot as it was and the caller may retry instead of fencing (#2511).
+        let bytes = read_file(state, &request, allowed).map_err(not_dispatched)?;
         return bootstrap_file_bytes(state, request.request_id, &bytes);
     }
     bootstrap_raw(state, raw)
