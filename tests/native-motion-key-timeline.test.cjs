@@ -193,8 +193,9 @@ function createPropertyPanel(options){
    const row=descendants(options.container).find(node=>node.className==='lrow motion-prop-row'&&node.dataset.targetKey===id&&node.dataset.property===property);
    if(!row)throw Error('Real property row not present');
    const button=descendants(row).find(node=>/\bmotion-stopwatch\b/.test(node.className||''));
-   if(typeof button.fire==='function')return button.fire('click',{altKey:true});
-   button.dispatchEvent(new options.document.defaultView.MouseEvent('click',{bubbles:true,altKey:true}));
+   // Double-click opens the drawer; it carries no event fields, so every consumer's minimal DOM model can fire it.
+   if(typeof button.fire==='function')return button.fire('dblclick');
+   button.dispatchEvent(new options.document.defaultView.MouseEvent('dblclick',{bubbles:true}));
   },readKeyTimeline:panel.readKeyTimeline,readKeyTimelines:panel.readKeyTimelines,captureSelectedKeys:panel.captureSelectedKeys,dispose:panel.dispose};
 }
 // END REUSABLE REAL PROPERTY PANEL FIXTURE

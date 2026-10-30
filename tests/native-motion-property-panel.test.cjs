@@ -480,10 +480,10 @@ test('there is no per-row Keys or Bake button; the drawer opens on demand from t
   await sw.fire('click');await h.settle();assert.equal(drawers().length,0,'a plain click only drives the key toggle');
   await sw.fire('click',{altKey:true});await h.settle();
   assert.equal(drawers().length,1);const drawer=drawers()[0];
-  assert.equal(drawer.className,'lrow motion-expr-editor motion-keys-drawer');assert.strictEqual(line.nextSibling,drawer,'indented row directly under its property');
+  assert.equal(drawer.className,'lrow motion-expr-editor motion-keys-drawer');const after=line.parentNode.children[line.parentNode.children.indexOf(line)+1];assert.strictEqual(drawer.parentNode,after,'drawer slot directly follows its property row');assert.equal(after.className,'motion-keys-slot');
   assert.ok(tree(drawer).some(n=>n.className==='native-motion-property-keys'&&!n.hidden));
   await h.funnel().fire('click');await h.settle();
-  assert.ok(drawers().every(d=>d.previousSibling&&d.previousSibling.className==='lrow motion-prop-row'),'a repaint re-seats open drawers under a surviving row');
+  assert.ok(drawers().every(d=>{const sib=d.parentNode.parentNode.children,i=sib.indexOf(d.parentNode);return sib[i-1].className==='lrow motion-prop-row';}),'a repaint re-seats open drawers under a surviving row');
   const other=h.stopwatch(1);if(other){await other.fire('dblclick');await h.settle();assert.ok(drawers().length>=1,'double-click also opens a drawer');}
  }finally{h.retire();}
 });

@@ -62,7 +62,7 @@
       finally{suppressKeyNotice=false;keyNotice('reset');}
     }
     function rowId(target,property){return JSON.stringify([key(target),property]);}
-    function place(entry){var line=rowIndex.get(entry.id);if(!line||!line.parentNode||!body.contains(line))return false;if(line.nextSibling!==entry.holder)line.parentNode.insertBefore(entry.holder,line.nextSibling);entry.holder.hidden=false;return true;}
+    function place(entry){var slot=rowIndex.get(entry.id);if(!slot||!body.contains(slot))return false;if(entry.holder.parentNode!==slot)slot.appendChild(entry.holder);entry.holder.hidden=false;return true;}
     // A repaint rebuilds the rows: re-seat each open drawer under its row, or close it when the row is filtered away.
     function replaceDrawers(){
       suppressKeyNotice=true;
@@ -298,14 +298,14 @@
           }
           name.className='lnm motion-prop-name';name.appendChild(nameText);line.appendChild(name);
           var slot=make('div','');slot.className='native-motion-property-slot';line.appendChild(slot);
-          nextRows.set(rowId(group.target,row.property),line);
+          var drawerSlot=make('div','');drawerSlot.className='motion-keys-slot';nextRows.set(rowId(group.target,row.property),drawerSlot);
           var openDrawer=keysAvailable?function(){if(!current(token,ticket,signature)||!body.contains(line))return false;return openKeys(group.target,row.property);}:null;
           if(Value&&typeof ports.readProperty==='function'&&row.authored.availability==='available')nextValues.push({container:slot,target:group.target,row:row,openKeys:openDrawer});
           if(typeof ports.readProperty==='function'&&f.availability==='available'){
             var diagnostic=make('span','');diagnostic.className='motion-expr-error';diagnostic.setAttribute('role','status');diagnostic.hidden=true;line.appendChild(diagnostic);
             nextExpressions.push({node:diagnostic,line:line,target:group.target,property:row.property,fx:typeof fxItem==='object'?fxItem:null});
           }
-          fragment.appendChild(line);});
+          fragment.appendChild(line);fragment.appendChild(drawerSlot);});
       });
       // Unsupported native families do not become an empty global-U result.
       if(appendRevealLimits(fragment))unknown=true;
