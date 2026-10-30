@@ -4767,6 +4767,9 @@ function openTweenCurveInset(li,fA,fB){
 // editTweenSegForCell) — regenerate just this span and refresh every
 // display that could be showing it (strips, onion, arcs).
 function onTweenPairCurveChanged(li,fA){
+  // Native object project: the span's easing is one native reassign command (native-object-tween-ui.js).
+  var nativeCurve=window.NemoNativeTweenUI&&window.NemoNativeTweenUI.pairCurve(window,li,fA);
+  if(nativeCurve)return nativeCurve;
   selClear();selAdd(li,fA);
   generateTweens();
   selClear();

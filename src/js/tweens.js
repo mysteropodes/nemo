@@ -3751,6 +3751,9 @@ function _dedupeFrameStrokeIds(strokes,frameIdx){
   }
 }
 function generateTweens(explicitRestrictTo,skipUndo){
+  // Native object project: one native tween command (native-object-tween-ui.js); the legacy writer below never runs.
+  var nativeTween=window.NemoNativeTweenUI&&window.NemoNativeTweenUI.generate(window,explicitRestrictTo,skipUndo);
+  if(nativeTween)return nativeTween;
   if(!n20AllowLegacyWrite('timeline-generate-tweens'))return false;
   saveAllLayerFrames();var li=state.activeLayerIdx;var ld=state.layers[li];
   var keys=[];for(var i=0;i<state.totalFrames;i++){if(ld.frames[i].isKeyframe&&ld.frames[i].strokes.length>0)keys.push(i);}
@@ -4379,6 +4382,8 @@ function generateTweens(explicitRestrictTo,skipUndo){
 // Opt-in (state.tweenHarmonizeEdits, "en option" per the feedback) since
 // it silently re-tweens a whole span from a plain sculpt/subselect drag.
 function harmonizeAfterEdit(fi){
+  var nativeSplit=window.NemoNativeTweenUI&&window.NemoNativeTweenUI.harmonize(window,fi);
+  if(nativeSplit)return nativeSplit;
   if(!n20AllowLegacyWrite('timeline-harmonize-edit'))return false;
   if(!state.tweenHarmonizeEdits)return;
   var ld=state.layers[state.activeLayerIdx];if(!ld)return;
@@ -5047,9 +5052,10 @@ function cancelReassign(silent){
   hideReassignBadge();
   if(!silent)showToast(SM.t('toastReassignmentCanceled'));
 }
+function nativeTweenActive(){return !!(window.NemoNativeTweenUI&&window.NemoNativeTweenUI.active(window));}
 function startReassign(){
   if(_reassign.active){cancelReassign();return;}
-  saveAllLayerFrames();
+  if(!nativeTweenActive())saveAllLayerFrames();
   var li=state.activeLayerIdx,ld=state.layers[li],cf=state.currentFrame;
   var fA=-1;
   for(var i=cf;i>=0;i--){if(ld.frames[i].isKeyframe){fA=i;break;}}
@@ -5064,11 +5070,35 @@ function startReassign(){
 function confirmReassignStep1(){
   if(!_reassign.active||_reassign.step!==1)return;
   if(!_reassign.aIds.length){showToast(SM.t('toastClickAtLeastOneElement'));return;}
-  saveActiveLayerFrame();
+  if(!nativeTweenActive())saveActiveLayerFrame();
   _reassign.step=2;
   goToFrame(_reassign.frameB);
   reassignSetStatus('2/2 — Cliquez l\'élément correspondant sur la keyframe '+(_reassign.frameB+1));
   showToast(SM.t('toastClickMatchingElementNext'));
+}
+// Shared by the step-2 click and the yellow badge: replace any earlier override touching either side of this pair (one
+// strokeId can't sensibly be forced into two different correspondences for the same keyframe pair), then regenerate just this
+// span — on a native object project as ONE native reassign command (the span, its overrides and its curve), otherwise the
+// legacy generateTweens narrowed to the origin keyframe.
+function commitReassignOverride(li,sid){
+  var key=tweenSpanKey(li,_reassign.frameA,_reassign.frameB);
+  var list=state.tweenOverrides[key]=state.tweenOverrides[key]||[];
+  state.tweenOverrides[key]=list.filter(function(ov){
+    var ovA=ov.aIds||[ov.aId];
+    return _reassign.aIds.every(function(id){return ovA.indexOf(id)<0;})&&ov.bId!==sid;
+  });
+  state.tweenOverrides[key].push(_reassign.aIds.length===1?{aId:_reassign.aIds[0],bId:sid}:{aIds:_reassign.aIds.slice(),bId:sid});
+  var doneA=_reassign.frameA,doneB=_reassign.frameB;
+  cancelReassign(true);
+  var nativeReassign=window.NemoNativeTweenUI&&window.NemoNativeTweenUI.reassign(window,li,doneA,doneB);
+  if(nativeReassign){
+    nativeReassign.then(function(r){if(r&&r.status==='applied')showToast(SM.t('toastInbetweenReassigned'));});
+    return;
+  }
+  selClear();selAdd(li,doneA);
+  generateTweens();
+  selClear();
+  showToast(SM.t('toastInbetweenReassigned'));
 }
 function reassignHandleClick(pt){
   if(!_reassign.active)return false;
@@ -5082,33 +5112,17 @@ function reassignHandleClick(pt){
   var hit=layer.hitTest(pt,{stroke:true,fill:true,tolerance:8/view.zoom});
   if(!hit||!(hit.item instanceof Path)){showToast(SM.t('toastNoElementHere'));return true;}
   var target=resolveBrushAnchor(hit.item,layer);
-  var sid=ensureStrokeId(target);
+  // Native project: the projected stroke identity is the native one; never stamp a new id on a presented item.
+  var sid=nativeTweenActive()?(target.data&&target.data.strokeId):ensureStrokeId(target);
+  if(!sid){showToast(SM.t('toastNoElementHere'));return true;}
   if(_reassign.step===1){
     if(_reassign.aIds.indexOf(sid)<0)_reassign.aIds.push(sid);
     reassignSetStatus('1/2 — '+_reassign.aIds.length+' élément(s) sélectionné(s). Cliquez-en d\'autres si ce trait a été séparé, ou appuyez sur Entrée');
     return true;
   }
   // step 2
-  saveActiveLayerFrame();
-  var key=tweenSpanKey(li,_reassign.frameA,_reassign.frameB);
-  var list=state.tweenOverrides[key]=state.tweenOverrides[key]||[];
-  // replace any earlier override touching either side of this pair — one
-  // strokeId can't sensibly be forced into two different correspondences
-  // for the same keyframe pair
-  state.tweenOverrides[key]=list.filter(function(ov){
-    var ovA=ov.aIds||[ov.aId];
-    return ovA.indexOf(_reassign.aIds[0])<0&&_reassign.aIds.every(function(id){return ovA.indexOf(id)<0;})&&ov.bId!==sid;
-  });
-  state.tweenOverrides[key].push(_reassign.aIds.length===1?{aId:_reassign.aIds[0],bId:sid}:{aIds:_reassign.aIds.slice(),bId:sid});
-  var doneA=_reassign.frameA;
-  cancelReassign(true);
-  // regenerate just this span: select the origin keyframe so generateTweens'
-  // own restrictTo logic (tweens.js generateTweens, selOnLayer) narrows to
-  // it instead of redoing the whole layer.
-  selClear();selAdd(li,doneA);
-  generateTweens();
-  selClear();
-  showToast(SM.t('toastInbetweenReassigned'));
+  if(!nativeTweenActive())saveActiveLayerFrame();
+  commitReassignOverride(li,sid);
   return true;
 }
 document.addEventListener('pointerdown',function(e){
@@ -5198,22 +5212,10 @@ function updateReassignBadge(cached){
     positionReassignBadge(p.bounds,shortIdLabel(_reassign.aIds[0]||''),'yellow');
     _reassignBadgeAction=function(){
       var target=selectedPaths[0];if(!target)return;
-      var sid=ensureStrokeId(target);
-      saveActiveLayerFrame();
-      var li=_reassign.layer;
-      var key=tweenSpanKey(li,_reassign.frameA,_reassign.frameB);
-      var list=state.tweenOverrides[key]=state.tweenOverrides[key]||[];
-      state.tweenOverrides[key]=list.filter(function(ov){
-        var ovA=ov.aIds||[ov.aId];
-        return _reassign.aIds.every(function(id){return ovA.indexOf(id)<0;})&&ov.bId!==sid;
-      });
-      state.tweenOverrides[key].push(_reassign.aIds.length===1?{aId:_reassign.aIds[0],bId:sid}:{aIds:_reassign.aIds.slice(),bId:sid});
-      var doneA=_reassign.frameA;
-      cancelReassign(true);
-      selClear();selAdd(li,doneA);
-      generateTweens();
-      selClear();
-      showToast(SM.t('toastInbetweenReassigned'));
+      var sid=nativeTweenActive()?(target.data&&target.data.strokeId):ensureStrokeId(target);
+      if(!sid){showToast(SM.t('toastNoElementHere'));return;}
+      if(!nativeTweenActive())saveActiveLayerFrame();
+      commitReassignOverride(_reassign.layer,sid);
     };
     return;
   }
@@ -5229,11 +5231,12 @@ function updateReassignBadge(cached){
     var hst=matchStateForPath(_reassignHoverPath);
     if(hst){
       var hm=hst.fm[0],hsd=hst.sA[hm.a],hp=_reassignHoverPath;
-      var haId=hsd.strokeId||ensureStrokeId(hp);
+      var haId=hsd.strokeId||(nativeTweenActive()?null:ensureStrokeId(hp));
+      if(!haId)return;
       var hfA=hst.fA,hfB=hst.fB;
       positionReassignBadge(hp.bounds,shortIdLabel(haId),'green');
       _reassignBadgeAction=function(){
-        saveAllLayerFrames();
+        if(!nativeTweenActive())saveAllLayerFrames();
         _reassign.active=true;_reassign.step=2;_reassign.layer=state.activeLayerIdx;_reassign.frameA=hfA;_reassign.frameB=hfB;_reassign.aIds=[haId];
         goToFrame(hfB);
         reassignSetStatus('2/2 — Cliquez l\'élément correspondant sur la keyframe '+(hfB+1)+' (ou sélectionnez-le puis cliquez le bouton jaune)');
