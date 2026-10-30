@@ -18,9 +18,10 @@
 //! * a scene entry that no producer claimed, or that a producer reported unavailable, stays on its layer as a typed
 //!   [`EntryOutcome::Unavailable`]; nothing is dropped and no producer may publish a partial scene on top of it.
 //!
-//! Inputs no record carries yet (item-level effects, canvas-background layers, animated blend and the
-//! matte-on track) are not guessed: the adapter supplies the neutral value and a later provider fills the same
-//! `JoinLayerInput` field. Folder children come from `parent_layer_uid`, which the codec still refuses, so a native
+//! Inputs no record carries yet (animated blend, the matte-on track and item-level effects) are not guessed and
+//! not neutralised: the input adapter refuses a layer that has them with a typed
+//! `SceneEffectJoinError::LayerCompositionPropertyUnavailable` until the raw layer-property consumer fills the
+//! same `JoinLayerInput` field. Canvas-background layers are not document layers and carry no input. Folder children come from `parent_layer_uid`, which the codec still refuses, so a native
 //! folder has none until layer parenting is admitted. The module owns no pixel, texture or scheduler state.
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::{
     PinField, PinnedScene, SceneOutcome, ScenePin, UnavailableCause,
@@ -318,6 +319,12 @@ pub(crate) enum SceneEffectJoinError {
     /// Stored keys need their actual parameter sampler; static substitution is forbidden.
     EffectParametersUnavailable {
         layer: usize,
+    },
+    /// A keyed/expressed `matteOn` or `blend` track, or an enabled item-level effect, needs the raw layer-property
+    /// consumer; the neutral static value is never substituted.
+    LayerCompositionPropertyUnavailable {
+        layer: usize,
+        property: &'static str,
     },
 }
 
