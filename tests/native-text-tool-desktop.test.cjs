@@ -485,3 +485,40 @@ test('zero-mask clickOnly Text pair never creates a drag guide',async()=>{
  f.canvas.fire('pointermove',{buttons:0,clientX:300,clientY:190});f.canvas.fire('pointermove',{buttons:1,clientX:320,clientY:190});
  assert.equal(f.get('native-text-drag-guide'),null);f.canvas.fire('pointerup',{buttons:0,clientX:320,clientY:190});await f.turn();assert.equal(f.get('native-text-drag-guide'),null);
 });
+
+const px=v=>parseFloat(v);
+const rectOf=n=>({l:px(n.style.left),t:px(n.style.top),r:px(n.style.left)+(n.style.width?px(n.style.width):240),b:px(n.style.top)+(n.offsetHeight||px(n.style.height))});
+const overlaps=(a,b)=>a.l<b.r&&b.l<a.r&&a.t<b.b&&b.t<a.b;
+async function dragOpen(f,x0,y0,x1,y1){
+ f.get('text-popover').offsetHeight=200;
+ f.canvas.fire('pointerdown',{buttons:1,clientX:x0,clientY:y0});f.canvas.fire('pointermove',{buttons:1,clientX:x1,clientY:y1});f.canvas.fire('pointerup',{buttons:0,clientX:x1,clientY:y1});await f.turn();
+}
+test('area Text draft is dock-positioned below the dragged box and styled like the guide',async()=>{
+ const f=await fixture();await dragOpen(f,100,110,300,190);
+ const area=f.get('native-text-area-draft'),pop=f.get('text-popover');assert.ok(area);
+ assert.equal(area.style.width,'200px','fixedWidth*scale');assert.equal(area.style.height,'80px','dragged client height');
+ assert.equal(area.style.border,'1px dashed rgba(255,184,108,.9)');assert.equal(area.style.background,'rgba(255,184,108,.06)');assert.equal(area.style.resize,'none');
+ assert.equal(pop.style.left,'100px');assert.equal(pop.style.top,'198px','at.y + height + 8');
+ assert.equal(overlaps({l:100,t:110,r:300,b:190},rectOf(pop)),false);
+});
+test('area Text draft popover flips above, or beside, when there is no room below',async()=>{
+ const f=await fixture();f.doc.documentElement.clientHeight=500;await dragOpen(f,100,330,300,380);
+ const pop=f.get('text-popover'),area=f.get('native-text-area-draft');
+ assert.equal(pop.style.top,'122px','flipped to at.y - popH - 8');assert.equal(overlaps(rectOf(area),rectOf(pop)),false);
+ const g=await fixture();g.doc.documentElement.clientHeight=400;await dragOpen(g,100,110,300,190);
+ assert.equal(overlaps(rectOf(g.get('native-text-area-draft')),rectOf(g.get('text-popover'))),false,'side dock when neither below nor above fits');
+});
+test('area Text draft height has a 24px floor and click placement keeps the baseline +10,+10 popover',async()=>{
+ const f=await fixture();await dragOpen(f,100,110,300,112);assert.equal(f.get('native-text-area-draft').style.height,'24px');
+ const c=await fixture();c.get('text-popover').offsetHeight=200;await c.click(100,110);
+ assert.equal(c.get('native-text-area-draft'),null);assert.equal(c.get('text-popover').style.left,'110px');assert.equal(c.get('text-popover').style.top,'120px');
+});
+test('stashed drag height is cleared by cancel and commit so a later API-opened area draft uses the default height',async()=>{
+ for(const end of ['cancel','commit']){
+  const f=await fixture();await dragOpen(f,100,110,300,190);assert.equal(f.get('native-text-area-draft').style.height,'80px',end);
+  if(end==='cancel')f.get('text-cancel').fire('click');else{const a=f.get('native-text-area-draft');a.value='x';a.fire('input');a.fire('keydown',{key:'Enter',ctrlKey:true});}
+  await f.turn();assert.equal(f.get('native-text-area-draft'),null,end);
+  await f.binding.core.openNew({anchorTopLeft:{x:20,y:20},fixedWidth:100});
+  assert.equal(f.get('native-text-area-draft').style.height,'120px',end+': default max(24,size*1.25*scale)');
+ }
+});
