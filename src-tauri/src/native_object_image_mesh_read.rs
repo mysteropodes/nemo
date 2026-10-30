@@ -244,3 +244,7 @@ mod presentation_guards {
 #[cfg(test)]
 #[path = "native_subselect_read_public_tests.rs"]
 mod subselect_tests;
+
+#[cfg(test)]
+#[path = "native_widget_read_public_tests.rs"]
+mod widget_tests;

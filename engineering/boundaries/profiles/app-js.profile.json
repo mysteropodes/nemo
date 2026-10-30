@@ -3199,11 +3199,13 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-widget.js"
+        "native-object-widget.js",
+        "native-object-widget-ui.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
-        "native-object-widget.js"
+        "native-object-widget.js",
+        "native-object-widget-ui.js"
       ]
     },
     {

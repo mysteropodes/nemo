@@ -81,6 +81,12 @@
 
   var drag = null;   // {li, mode:'puck'|'move', moved:boolean, ...}
 
+  // #2255: on a native object project (state.layers is empty) every widget fact comes from the native read and every change is a
+  // native command; the JS layer model below is then never read or written. native-object-widget-ui.js owns that route.
+  function nativeUi() {
+    var m = window.NemoNativeObjectWidgetUI;
+    try { return m && m.active(window) ? m.desktop(window) : null; } catch (_) { return null; }
+  }
   function engineOn() { return window.SMEngineBridge && SMEngineBridge.isEnabled() && !state.playing; }
 
   // ---- data ------------------------------------------------------------
@@ -440,6 +446,8 @@
   }
   function addWidgetLayer(kind) {
     if (kind !== 'joystick' && kind !== 'slider') kind = 'joystick';
+    var native = nativeUi();
+    if (native) { native.createLayer(kind); return -1; }
     if (!window.SMMotion || typeof createUserLayer !== 'function') return -1;
     var d = DEFAULTS[kind];
     saveAllLayerFrames(); pushUndoLayers(true);
@@ -562,6 +570,8 @@
   function renderWidgetPanel() {
     var sec = el('p-widget-sec');
     if (!sec) return;
+    var native = nativeUi();
+    if (native) { native.paintPanel(); return; }
     var aw = activeWidget();
     if (!aw) { sec.style.display = 'none'; return; }
     sec.style.display = '';
@@ -595,6 +605,7 @@
     var fld = el(id);
     if (!fld) return;
     fld.addEventListener('change', function () {
+      if (nativeUi()) return;
       var aw = activeWidget();
       if (!aw) return;
       var v = parseFloat(this.value);
@@ -685,6 +696,7 @@
   // ---- listeners -------------------------------------------------------
   function init() {
     initWidgetPanelFields();
+    if (window.NemoNativeObjectWidgetUI) window.NemoNativeObjectWidgetUI.desktop(window).install();
     // Capture phase on DOCUMENT, not on #canvas-area — see
     // image-mesh-bridge.js's own long note: motion.js registers a
     // capture-phase pointerdown on #canvas-area and loads FIRST, and among

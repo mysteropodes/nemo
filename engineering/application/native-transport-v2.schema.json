@@ -1455,6 +1455,9 @@
         },
         {
           "$ref": "#/$defs/ObjectSubselectViewPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectWidgetViewPayload"
         }
       ]
     },
@@ -5668,6 +5671,9 @@
         },
         {
           "$ref": "#/$defs/ObjectSubselectViewResult"
+        },
+        {
+          "$ref": "#/$defs/ObjectWidgetViewResult"
         }
       ]
     },
@@ -19209,6 +19215,539 @@
               }
             }
           ]
+        }
+      }
+    },
+    "ObjectWidgetViewPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "view"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "view": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "contextId",
+            "frame",
+            "workId",
+            "viewGeneration",
+            "cursor",
+            "limit"
+          ],
+          "properties": {
+            "kind": {
+              "const": "widget"
+            },
+            "contextId": {
+              "const": "scene-root"
+            },
+            "frame": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "workId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+            },
+            "viewGeneration": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "cursor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1024
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            }
+          }
+        }
+      }
+    },
+    "ObjectWidgetViewResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "kind",
+        "contextId",
+        "frame",
+        "workId",
+        "viewGeneration",
+        "cursor",
+        "total",
+        "nextCursor",
+        "items"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "widget"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "workId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+        },
+        "viewGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1024
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "layerUid",
+              "visible",
+              "locked",
+              "kind",
+              "x",
+              "y",
+              "center",
+              "angle",
+              "size",
+              "puck",
+              "rest",
+              "unavailable"
+            ],
+            "properties": {
+              "layerUid": {
+                "type": "string",
+                "minLength": 1
+              },
+              "visible": {
+                "type": "boolean"
+              },
+              "locked": {
+                "type": "boolean"
+              },
+              "kind": {
+                "enum": [
+                  "joystick",
+                  "slider"
+                ]
+              },
+              "x": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "key",
+                  "min",
+                  "max",
+                  "rest",
+                  "label",
+                  "value"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "min": {
+                    "type": "number"
+                  },
+                  "max": {
+                    "type": "number"
+                  },
+                  "rest": {
+                    "type": "number"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "oneOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              },
+              "y": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "key",
+                      "min",
+                      "max",
+                      "rest",
+                      "label",
+                      "value"
+                    ],
+                    "properties": {
+                      "key": {
+                        "type": "string"
+                      },
+                      "min": {
+                        "type": "number"
+                      },
+                      "max": {
+                        "type": "number"
+                      },
+                      "rest": {
+                        "type": "number"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "oneOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "center": {
+                "oneOf": [
+                  {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "angle": {
+                "oneOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "size": {
+                "oneOf": [
+                  {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "puck": {
+                "oneOf": [
+                  {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rest": {
+                "oneOf": [
+                  {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "unavailable": {
+                "oneOf": [
+                  {
+                    "enum": [
+                      "control",
+                      "expression",
+                      "sample",
+                      "parent",
+                      "parent_geometry",
+                      "canvas"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "kind": {
+                      "const": "slider"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "y": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "y": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "key",
+                        "min",
+                        "max",
+                        "rest",
+                        "label",
+                        "value"
+                      ],
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "min": {
+                          "type": "number"
+                        },
+                        "max": {
+                          "type": "number"
+                        },
+                        "rest": {
+                          "type": "number"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "oneOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "unavailable": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "center": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "angle": {
+                      "type": "number"
+                    },
+                    "size": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "puck": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "rest": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "unavailable": {
+                      "const": "control"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "center": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "angle": {
+                      "type": "number"
+                    },
+                    "size": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "puck": {
+                      "type": "null"
+                    },
+                    "rest": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "unavailable": {
+                      "enum": [
+                        "expression",
+                        "sample",
+                        "parent",
+                        "parent_geometry",
+                        "canvas"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "center": {
+                      "type": "null"
+                    },
+                    "angle": {
+                      "type": "null"
+                    },
+                    "size": {
+                      "type": "null"
+                    },
+                    "puck": {
+                      "type": "null"
+                    },
+                    "rest": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            ]
+          }
         }
       }
     },

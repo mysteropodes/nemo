@@ -907,6 +907,8 @@
         "object_raster_asset_resources.rs",
         "bitmap_brush_resources_publish.rs",
         "object_widget_read.rs",
+        "object_widget_presentation.rs",
+        "object_widget_view.rs",
         "object_image_mesh_edit_read.rs",
         "object_rig_edit_read.rs",
         "object_rig_pose_read.rs",
@@ -1413,6 +1415,7 @@
         "object_widget_edit_controls.rs",
         "object_widget_edit_guards.rs",
         "object_widget_edit_writes.rs",
+        "object_widget_view.rs",
         "object_storyboard_chain.rs",
         "object_storyboard_chain_admission.rs",
         "object_storyboard_chain_controls.rs",
@@ -2404,7 +2407,8 @@
         "native_comments_dispatch_tests.rs",
         "native_object_brush_preview_tests.rs",
         "native_import_batch_dispatch_tests.rs",
-        "native_subselect_read_public_tests.rs"
+        "native_subselect_read_public_tests.rs",
+        "native_widget_read_public_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -2420,6 +2424,7 @@
         "native_object_expression_state.rs",
         "native_object_preview.rs",
         "native_object_image_mesh_read.rs",
+        "native_object_widget_read.rs",
         "native_object_export.rs",
         "native_dispatch_replacement.rs",
         "native_dispatch_tests.rs",
