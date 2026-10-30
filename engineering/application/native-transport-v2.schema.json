@@ -3899,8 +3899,8 @@
       "properties": {
         "frame": {
           "type": "number",
-          "minimum": -1000000000.0,
-          "maximum": 1000000000.0
+          "minimum": -1000000000,
+          "maximum": 1000000000
         },
         "v": {
           "type": "array",
@@ -3908,8 +3908,8 @@
           "maxItems": 4,
           "items": {
             "type": "number",
-            "minimum": -1000000000.0,
-            "maximum": 1000000000.0
+            "minimum": -1000000000,
+            "maximum": 1000000000
           }
         },
         "hold": {
@@ -3935,23 +3935,23 @@
             "properties": {
               "x": {
                 "type": "number",
-                "minimum": -1000000000.0,
-                "maximum": 1000000000.0
+                "minimum": -1000000000,
+                "maximum": 1000000000
               },
               "y": {
                 "type": "number",
-                "minimum": -1000000000.0,
-                "maximum": 1000000000.0
+                "minimum": -1000000000,
+                "maximum": 1000000000
               },
               "tx": {
                 "type": "number",
-                "minimum": -1000000000.0,
-                "maximum": 1000000000.0
+                "minimum": -1000000000,
+                "maximum": 1000000000
               },
               "ty": {
                 "type": "number",
-                "minimum": -1000000000.0,
-                "maximum": 1000000000.0
+                "minimum": -1000000000,
+                "maximum": 1000000000
               }
             }
           }
@@ -3962,8 +3962,8 @@
           "maxItems": 2,
           "items": {
             "type": "number",
-            "minimum": -1000000000.0,
-            "maximum": 1000000000.0
+            "minimum": -1000000000,
+            "maximum": 1000000000
           }
         },
         "hOut": {
@@ -3972,8 +3972,8 @@
           "maxItems": 2,
           "items": {
             "type": "number",
-            "minimum": -1000000000.0,
-            "maximum": 1000000000.0
+            "minimum": -1000000000,
+            "maximum": 1000000000
           }
         }
       }
@@ -4044,8 +4044,8 @@
                 "maxItems": 4,
                 "items": {
                   "type": "number",
-                  "minimum": -1000000000.0,
-                  "maximum": 1000000000.0
+                  "minimum": -1000000000,
+                  "maximum": 1000000000
                 }
               }
             }
