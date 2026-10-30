@@ -20,12 +20,12 @@ const WIDTH: usize = 320;
 const HEIGHT: usize = 180;
 const GLYPH_ORACLE: &str = include_str!("fixtures/text-glyph-source/oracle.txt");
 
-fn metal() -> Compositor {
+pub(super) fn metal() -> Compositor {
     let gpu = Compositor::new().expect("Text GPU acceptance requires a real Metal adapter");
     assert_eq!(gpu.adapter().get_info().backend, wgpu::Backend::Metal);
     gpu
 }
-fn document() -> Value {
+pub(super) fn document() -> Value {
     let mut doc = drawing();
     doc["objects"] = json!([]);
     doc["items"]["raster"][0]["item"] = support::raster_item("img-1", 280, 150, 2, 2);
@@ -74,7 +74,7 @@ fn decode_png(bytes: &[u8]) -> Vec<u8> {
     assert_eq!(rgba.len(), WIDTH * HEIGHT * 4);
     rgba
 }
-fn render(gpu: &mut Compositor, witness: &ObjectCompositionWitness) -> Vec<u8> {
+pub(super) fn render(gpu: &mut Compositor, witness: &ObjectCompositionWitness) -> Vec<u8> {
     let packet = witness.plan().packet();
     let snapshot = packet.snapshot();
     let frame = packet.frame();
@@ -166,12 +166,12 @@ fn assert_repeatable(
         }
     }
 }
-fn pixel(bytes: &[u8], x: usize, y: usize) -> [u8; 4] {
+pub(super) fn pixel(bytes: &[u8], x: usize, y: usize) -> [u8; 4] {
     bytes[(y * WIDTH + x) * 4..(y * WIDTH + x + 1) * 4]
         .try_into()
         .unwrap()
 }
-fn witnesses(snapshot: &ObjectSnapshot) -> (ObjectCompositionWitness, ObjectCompositionWitness) {
+pub(super) fn witnesses(snapshot: &ObjectSnapshot) -> (ObjectCompositionWitness, ObjectCompositionWitness) {
     let p = plan(snapshot, 7);
     assert_eq!(
         p.commands().len(),
@@ -297,31 +297,6 @@ fn gpu_real_bundled_text_matches_original_ink_and_viewport_export_png() {
     assert_eq!(pixel(&shown, 30, 42), [17, 34, 51, 255]);
     assert_eq!(pixel(&shown, 30, 20), [255; 4]);
     assert_eq!(pixel(&shown, 319, 179), [255; 4]);
-}
-
-#[test]
-fn gpu_a_turned_block_draws_its_ink_turned_about_the_anchor_in_view_and_export() {
-    // #2267: a quarter turn the other way about the anchor (10,20) sends the bundled A's ink box (x 10..26, y 22..40) to
-    // x 12..30, y 4..20, in the viewport and the export alike (one producer).
-    let mut gpu = metal();
-    let flat = {
-        let o = owner(&document());
-        let (view, _) = witnesses(&support::head(&o));
-        render(&mut gpu, &view)
-    };
-    let mut doc = document();
-    doc["items"]["text"][0]["block"]["rotation"] = json!(-90);
-    let o = owner(&doc);
-    let (view, export) = witnesses(&support::head(&o));
-    let shown = render(&mut gpu, &view);
-    assert_eq!(shown, render(&mut gpu, &export), "export pixels are the viewport pixels");
-    assert_ne!(shown, flat, "the turn changes the pixels");
-    let ink = |bytes: &[u8], xs: std::ops::Range<usize>, ys: std::ops::Range<usize>| {
-        ys.flat_map(|y| xs.clone().map(move |x| (x, y))).filter(|&(x, y)| pixel(bytes, x, y)[0] < 128).count()
-    };
-    assert!(ink(&shown, 12..30, 4..20) > 20, "ink sits where the turned A lands");
-    assert_eq!(ink(&shown, 10..26, 30..40), 0, "and no longer where the upright A stood");
-    assert!(ink(&flat, 10..26, 30..40) > 20 && ink(&flat, 12..30, 4..20) == 0);
 }
 
 #[test]

@@ -146,3 +146,35 @@ fn a_rotation_that_is_not_a_finite_turn_is_refused() {
     ok["items"]["text"][0]["block"]["rotation"] = json!(-360);
     assert!(decode_storage_project(ok.to_string().as_bytes()).is_ok());
 }
+
+#[cfg(feature = "font_asset_wire")]
+mod gpu_turn {
+    use super::super::gpu::{document, metal, pixel, render, witnesses};
+    use super::super::{json, owner, support};
+
+    #[test]
+    fn gpu_a_turned_block_draws_its_ink_turned_about_the_anchor_in_view_and_export() {
+        // #2267: a quarter turn the other way about the anchor (10,20) sends the bundled A's ink box (x 10..26, y 22..40) to
+        // x 12..30, y 4..20, in the viewport and the export alike (one producer).
+        let mut gpu = metal();
+        let flat = {
+            let o = owner(&document());
+            let (view, _) = witnesses(&support::head(&o));
+            render(&mut gpu, &view)
+        };
+        let mut doc = document();
+        doc["items"]["text"][0]["block"]["rotation"] = json!(-90);
+        let o = owner(&doc);
+        let (view, export) = witnesses(&support::head(&o));
+        let shown = render(&mut gpu, &view);
+        assert_eq!(shown, render(&mut gpu, &export), "export pixels are the viewport pixels");
+        assert_ne!(shown, flat, "the turn changes the pixels");
+        let ink = |bytes: &[u8], xs: std::ops::Range<usize>, ys: std::ops::Range<usize>| {
+            ys.flat_map(|y| xs.clone().map(move |x| (x, y))).filter(|&(x, y)| pixel(bytes, x, y)[0] < 128).count()
+        };
+        assert!(ink(&shown, 12..30, 4..20) > 20, "ink sits where the turned A lands");
+        assert_eq!(ink(&shown, 10..26, 30..40), 0, "and no longer where the upright A stood");
+        assert!(ink(&flat, 10..26, 30..40) > 20 && ink(&flat, 12..30, 4..20) == 0);
+    }
+
+}
