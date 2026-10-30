@@ -71,9 +71,10 @@
     }
     const end=r.cursor+r.items.length;if(end===r.total?r.nextCursor!==null:r.nextCursor!==end||!r.items.length)fail('Invalid subselect selection progress');
   }
+  // A page may be shorter than the limit (the engine shortens it to fit the byte cap); the progress check in viewResult requires nextCursor to follow the items actually sent.
   function viewCorrelate(p,r,documentId){viewPayload(p);viewResult(r);
     if(p.atRevision!==r.atRevision||p.documentSnapshotId!==r.documentSnapshotId||r.preview!==own(p.view,'preview')||own(r,'hitTest')!==own(p.view,'hitTest')||['kind','contextId','layerUid','frame','workId','viewGeneration','cursor'].some(k=>p.view[k]!==r[k])||
-      r.items.length!==Math.min(p.view.limit,r.total-r.cursor)||documentId!==undefined&&r.documentSnapshotId!==`native-object:${documentId}:${p.atRevision}`)fail('Subselect presentation origin mismatch');return true;
+      r.items.length>Math.min(p.view.limit,r.total-r.cursor)||documentId!==undefined&&r.documentSnapshotId!==`native-object:${documentId}:${p.atRevision}`)fail('Subselect presentation origin mismatch');return true;
   }
   return Object.freeze({EDIT,intent,target,payload,result,correlate,readPayload,readResult,readCorrelate,viewPayload,viewResult,viewCorrelate,bytes,sameTarget});
 }));

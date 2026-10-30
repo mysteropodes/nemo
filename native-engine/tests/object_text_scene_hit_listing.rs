@@ -267,3 +267,105 @@ fn a_copy_without_a_listed_anchor_stays_listed_as_itself() {
     let kinds: Vec<_> = items.iter().map(|i| i["brush"].as_str().unwrap().to_owned()).collect();
     assert_eq!(kinds, ["anchor", "copy", "copy", "copy"], "stroke 0 lists its anchor only, stroke 1 keeps its anchorless copies");
 }
+
+/// #2372 SEL-PAGE: eight hit-test items with 64-character UUID-style ids and full-precision matrices and bounds exceed the 4096-byte
+/// response, so a page is shortened by bytes (its cursor advancing by the items actually sent) instead of refusing the whole view.
+fn worst_case_items(count: usize, id_len: usize) -> Vec<crate::object_snapshot::SubselectReadItem> {
+    use crate::object_codec::{FrameScope, FrameScopeKind, ObjectTarget};
+    (0..count)
+        .map(|n| {
+            let t = 1.0 / 3.0 + n as f64 * 0.1234567890123457;
+            crate::object_snapshot::SubselectReadItem {
+                stable_target: ObjectTarget {
+                    context_id: "scene-root".into(),
+                    frame_scope: FrameScope {
+                        kind: FrameScopeKind::Authored,
+                        frame: 0,
+                    },
+                    layer_uid: "L0".into(),
+                    stroke_id: format!("{n:02}{}", "a1b2c3d4-e5f6-4789-8abc-def012345678".repeat(120))[..id_len].into(),
+                },
+                closed: true,
+                count: 12,
+                paint_count: None,
+                matrix: [t, -t / 7.0, t / 11.0, t * 1.7, t * 123.456789012345, -t * 98.7654321098765],
+                bounds: Some([t * 1.1, t * 2.2, t * 333.3333333333333, t * 444.4444444444444]),
+                role: Some("plain"),
+                filled: Some(true),
+                stroke_width: Some(t * 3.0),
+                box_angle: Some(t * 17.0),
+                owner: None,
+                brush: None,
+                group: None,
+            }
+        })
+        .collect()
+}
+fn worst_case_read(items: Vec<crate::object_snapshot::SubselectReadItem>, cursor: u64) -> Value {
+    let owner = owner(&drawing());
+    let snapshot = support::head(&owner);
+    let projection = crate::object_snapshot::SubselectReadProjection::new(&snapshot, 0, "L0", items, None)
+        .with_hit_test(true)
+        .with_presentation("native-work-1".into(), 1)
+        .unwrap();
+    let request = json!({"apiVersion":2,"requestId":"hit","instanceId":snapshot.instance_id(),"documentId":snapshot.document_id(),
+        "operation":"query.document.object","payload":{"atRevision":snapshot.content_revision(),
+        "documentSnapshotId":snapshot.snapshot_id(),"view":{"kind":"subselect","contextId":"scene-root","layerUid":"L0","frame":0,
+        "workId":"native-work-1","viewGeneration":1,"cursor":cursor,"limit":8,"hitTest":true}}});
+    let response = snapshot
+        .dispatch_with_subselect_view(serde_json::from_value(request).unwrap(), Ok(&projection))
+        .unwrap();
+    let encoded = serde_json::to_vec(&response).unwrap();
+    assert!(encoded.len() <= 4096, "{} bytes", encoded.len());
+    serde_json::to_value(response).unwrap()
+}
+#[test]
+fn a_worst_case_page_is_shortened_by_bytes_and_the_listing_still_pages_through_every_item() {
+    let first = worst_case_read(worst_case_items(20, 64), 0);
+    assert!(first["result"]["items"].as_array().unwrap().len() < 8, "eight such items do not fit one 4096-byte page");
+    let (mut cursor, mut seen, mut pages, mut shortened) = (0u64, Vec::new(), 0, false);
+    loop {
+        let response = worst_case_read(worst_case_items(20, 64), cursor);
+        assert_eq!(response["ok"], true, "{response}");
+        let result = &response["result"];
+        let page = result["items"].as_array().unwrap();
+        assert!(!page.is_empty() && page.len() <= 8, "{result}");
+        assert_eq!(result["total"], json!(20));
+        shortened |= page.len() < 8 && result["nextCursor"] != Value::Null;
+        seen.extend(page.iter().map(|i| i["stableTarget"]["strokeId"].as_str().unwrap().to_string()));
+        pages += 1;
+        match result["nextCursor"].as_u64() {
+            Some(next) => {
+                assert_eq!(next, cursor + page.len() as u64, "the cursor advances by the items actually sent");
+                cursor = next;
+            }
+            None => break,
+        }
+    }
+    assert!(shortened && pages >= 3, "the byte cap must have shortened pages ({pages} pages)");
+    let expected: Vec<String> = worst_case_items(20, 64).iter().map(|i| i.stable_target.stroke_id.clone()).collect();
+    assert_eq!(seen, expected, "every item is read once, in order");
+}
+#[test]
+fn a_page_that_fits_is_not_shortened_and_one_item_alone_over_the_limit_stays_refused() {
+    let small = worst_case_read(worst_case_items(3, 12), 0);
+    assert_eq!((small["result"]["items"].as_array().unwrap().len(), small["result"]["nextCursor"].clone()), (3, Value::Null));
+    let owner = owner(&drawing());
+    let snapshot = support::head(&owner);
+    let projection = crate::object_snapshot::SubselectReadProjection::new(&snapshot, 0, "L0", worst_case_items(2, 4000), None)
+        .with_hit_test(true)
+        .with_presentation("native-work-1".into(), 1)
+        .unwrap();
+    let request = json!({"apiVersion":2,"requestId":"hit","instanceId":snapshot.instance_id(),"documentId":snapshot.document_id(),
+        "operation":"query.document.object","payload":{"atRevision":snapshot.content_revision(),
+        "documentSnapshotId":snapshot.snapshot_id(),"view":{"kind":"subselect","contextId":"scene-root","layerUid":"L0","frame":0,
+        "workId":"native-work-1","viewGeneration":1,"cursor":0,"limit":8,"hitTest":true}}});
+    let response = serde_json::to_value(
+        snapshot
+            .dispatch_with_subselect_view(serde_json::from_value(request).unwrap(), Ok(&projection))
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(response["ok"], false, "{response}");
+    assert_eq!(response["error"]["message"], "Subselect view exceeds the response byte limit");
+}
