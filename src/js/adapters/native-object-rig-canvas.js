@@ -228,7 +228,8 @@
     const consume = (e) => { e.stopImmediatePropagation(); e.preventDefault(); };
     function world(e, map) { try { const w = map.api.point(e, map); return [w.x, w.y]; } catch (_) { return null; } }
     function onDown(e) {
-      if (!active(win) || !rigTool(win) || win.state.playing || busy || (e.button !== undefined && e.button !== 0) || !areaOf(e)) return;
+      // Space-drag and the pan hand own the gesture (every other bridge bails out the same way); Alt keeps its own rig meanings below.
+      if (!active(win) || !rigTool(win) || win.state.playing || win.state.spaceDown || win.state.isPanning || busy || (e.button !== undefined && e.button !== 0) || !areaOf(e)) return;
       consume(e);
       const entry = usable(), map = entry && mapping(entry), P = parts();
       if (!entry || !map || !P) {

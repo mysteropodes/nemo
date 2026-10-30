@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "7968c6a3c5b6585e7bfd2486224da2406b674757",
-  "describe": "v0.7.0-alpha.4-3844-g7968c6a3-dirty"
+  "head": "78dad12a0ea8071510b9abb16d2e6dd5bb7b0123",
+  "describe": "v0.7.0-alpha.4-3851-g78dad12a-dirty"
  },
- "inputsDigest": "1946882cd356d93c865308c1720432ae2be6300d3ec6f1620b8f2b58325f3b9e",
+ "inputsDigest": "df96e1b99f160ae1bf066a8c9213019099a1d440f473cf779d7ca599f579a9ca",
  "states": [
   "inventoried",
   "characterized",
@@ -13557,7 +13557,7 @@
     "functionsVisited": 49,
     "via": "helper el()",
     "references": [
-     "src/js/adapters/native-object-widget-ui.js:292 fillPanel()"
+     "src/js/adapters/native-object-widget-ui.js:293 fillPanel()"
     ]
    },
    "fixtures": [
@@ -13754,7 +13754,7 @@
     "functionsVisited": 49,
     "via": "helper el()",
     "references": [
-     "src/js/adapters/native-object-widget-ui.js:292 fillPanel()"
+     "src/js/adapters/native-object-widget-ui.js:293 fillPanel()"
     ]
    },
    "fixtures": [
