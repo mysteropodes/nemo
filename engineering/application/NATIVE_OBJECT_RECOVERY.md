@@ -89,6 +89,28 @@ uses the detached variant: the lock covers only the O(1) acquisition of the
 immutable Arc-shared snapshot (`detached_project_file_serializer` in the engine)
 and the encoder runs after release. Save As keeps its existing inline path.
 
+## Start-screen Resume (R3)
+
+On native desktop the Resume card follows the store, not the legacy `nemo-auto` slot:
+`native-object-recovery-resume.js` reads `nemo_native_object_client_status` for the
+instance id, calls `nemo_native_object_recovery_list`, keeps only well-formed slots
+and publishes a boolean (existing `startResumeTitle`/`startResumeSub` text). A failing
+or empty store leaves the card hidden. Browser and legacy projects keep `nemo-auto`.
+
+Clicking the card re-lists and calls `openRecovered(newestSlot)` in
+`native-object-project-file.js`, which goes through the same `session.openPath`
+(`project_only` bootstrap) as Open: the project comes back Untitled and dirty
+(`baseline = null`, so the close guard fires and Save As is offered), no recents
+entry, never bound to the recovery path. A refusal before dispatch (including the
+session's no-project `unsupported_format` answer) tries the older generation first and
+toasts (`toastCannotResumeSessionCorrupt`) only after the last one; the session is
+idle again so Open and New stay usable. A post-dispatch failure is indeterminate and
+is not retried. A replace confirmation is asked once across the retries. The recovery
+files are not deleted on open: the recovered session's first own recovery write sends
+`supersedes: <slotKey>` (`recoveryPin().supersedes`), which Rust honours only after
+the new manifest is durable. When a native project is already active, Resume replaces
+it exactly as New does (confirm if unsaved).
+
 ## Not covered
 
 Only the active project; parked tabs are a documented gap. Version-history parity

@@ -159,6 +159,8 @@
             if(recovered)recoveredSlots.set(current.documentId,recovered.slotKey);ports.repaint();
           }
         });
+        // No project and no error: the session found the file unsupported (corrupt or foreign). For a recovery that is a refusal.
+        if(recovered&&info===null){diagnostic('file-failed','not-dispatched');recovered.refused={message:'Native recovery file is unsupported',code:'unsupported_format'};return false;}
         if(creating&&info&&ports.createdNotice)ports.createdNotice();
         if(recovered&&info&&ports.resumedNotice)ports.resumedNotice();
         diagnostic(info?'file-completed':'file-cancelled');
