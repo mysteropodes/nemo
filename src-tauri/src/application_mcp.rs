@@ -307,9 +307,7 @@ fn native_status(
     request: NativeStatusRequest,
 ) -> Result<NativeHostStatus, String> {
     request.validate().map_err(|error| error.to_string())?;
-    let authority = native
-        .lock()
-        .map_err(|_| "native application lock unavailable")?;
+    let authority = native.lock().map_err(|_| "native application lock unavailable")?;
     let active = authority.active();
     let current = active.filter(|(_, application)| {
         request.instance_id == instance_id && application.instance_id() == instance_id
