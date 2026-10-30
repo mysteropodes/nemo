@@ -91,7 +91,11 @@ fn pair(v: &Value) -> [f64; 2] {
 
 /// Every drawn record, its stroke width and gradient endpoints against the oracle frame.
 fn check(plan: &crate::object_render_scene::ObjectPaintPlan, frame: &Value, label: &str) {
-    assert_eq!(plan.commands().len(), 2, "{label}: the hidden parent must not paint");
+    assert_eq!(
+        plan.commands().len(),
+        2,
+        "{label}: the hidden parent must not paint"
+    );
     for command in plan.commands() {
         let id = command.source().record().target.stroke_id.clone();
         let expected = frame["segments"][id.as_str()].as_array().unwrap();
@@ -110,16 +114,32 @@ fn check(plan: &crate::object_render_scene::ObjectPaintPlan, frame: &Value, labe
         let style = command.style().unwrap();
         if id == "a" {
             let width = style.stroke.as_ref().unwrap().stroke.width;
-            near(width, frame["strokeWidth"]["a"].as_f64().unwrap(), &format!("{label} stroke width"));
+            near(
+                width,
+                frame["strokeWidth"]["a"].as_f64().unwrap(),
+                &format!("{label} stroke width"),
+            );
         } else {
             use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::GradientGeometry;
-            let Some(GradientGeometry::Linear { from, to }) = style.fill.gradient().map(|g| g.geometry)
+            let Some(GradientGeometry::Linear { from, to }) =
+                style.fill.gradient().map(|g| g.geometry)
             else {
                 panic!("{label}: the gradient fill is missing");
             };
-            for (name, got, want) in [("from", from, &frame["gradient"]["from"]), ("to", to, &frame["gradient"]["to"])] {
-                near(got[0], want[0].as_f64().unwrap(), &format!("{label} gradient {name}.x"));
-                near(got[1], want[1].as_f64().unwrap(), &format!("{label} gradient {name}.y"));
+            for (name, got, want) in [
+                ("from", from, &frame["gradient"]["from"]),
+                ("to", to, &frame["gradient"]["to"]),
+            ] {
+                near(
+                    got[0],
+                    want[0].as_f64().unwrap(),
+                    &format!("{label} gradient {name}.x"),
+                );
+                near(
+                    got[1],
+                    want[1].as_f64().unwrap(),
+                    &format!("{label} gradient {name}.y"),
+                );
             }
         }
     }
@@ -154,8 +174,10 @@ fn the_raw_frame_route_admits_the_same_static_and_keyed_keys_and_still_refuses_a
             let selector = pins(&s, frame["frame"].as_u64().unwrap() as u32);
             let raw = prepare_object_exposure_frame(&s, &selector)
                 .unwrap_or_else(|error| panic!("{label}: {error:?}"));
-            let scene = crate::object_render_scene::prepare_object_render_scene(&raw, &selector).unwrap();
-            let prepared = crate::object_render_scene::prepare_object_paint_plan(&scene, &selector).unwrap();
+            let scene =
+                crate::object_render_scene::prepare_object_render_scene(&raw, &selector).unwrap();
+            let prepared =
+                crate::object_render_scene::prepare_object_paint_plan(&scene, &selector).unwrap();
             check(&prepared, frame, &label);
         }
     }

@@ -31,7 +31,10 @@ fn a_translation_only_layer_keeps_the_raw_position_gradient_but_any_parent_moves
     assert!(!PaintPose::from_chain(Some(translate), &[]).moves_gradient());
     assert!(PaintPose::from_chain(Some(translate), &[translate]).moves_gradient());
     assert!(PaintPose::from_chain(None, &[translate]).moves_gradient());
-    assert!(PaintPose::from_chain(Some(entry([0., 0.], 10., [100., 100.], [0., 0.])), &[]).moves_gradient());
+    assert!(
+        PaintPose::from_chain(Some(entry([0., 0.], 10., [100., 100.], [0., 0.])), &[])
+            .moves_gradient()
+    );
 }
 
 #[test]
