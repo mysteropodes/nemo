@@ -214,6 +214,17 @@ fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
         item["items"][0]["strokeWidth"] = bad.clone();
         assert!(!public_read(&q, &item), "strokeWidth {bad} is refused");
     }
+    // #2591: a rotated record's stored box angle is optional and finite, as in the engine and JS contracts.
+    for good in [json!(0), json!(30), json!(-1.5)] {
+        let mut item = r.clone();
+        item["items"][0]["boxAngle"] = good.clone();
+        assert!(public_read(&q, &item), "boxAngle {good} is legal in a hit-test listing");
+    }
+    for bad in [json!("30"), json!(null), json!([30])] {
+        let mut item = r.clone();
+        item["items"][0]["boxAngle"] = bad.clone();
+        assert!(!public_read(&q, &item), "boxAngle {bad} is refused");
+    }
     for role in ["raster", "text"] {
         let mut item = r.clone();
         item["items"][0]["role"] = json!(role);
