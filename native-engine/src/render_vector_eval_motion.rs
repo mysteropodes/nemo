@@ -126,9 +126,82 @@ fn vector_layer_holder_consumed(document: &ObjectDocument, holder: &PropertyHold
             !property.expression.value().is_some_and(|code| code.enabled)
                 && match property.property() {
                     "opacity" | "timeLinkInOffset" | "timeLinkOutOffset" => true,
-                    "position" => vector_only_layer(document, target),
+                    "position" => {
+                        vector_only_layer(document, target)
+                            || contentless_unreferenced_layer(document, target)
+                    }
+                    "anchor" | "rotation" | "scale" => {
+                        contentless_unreferenced_layer(document, target)
+                    }
                     _ => false,
                 }
+        })
+}
+
+/// True when another layer reads this layer's pose or paint: a parent, a matte or effect source, or a follow-path
+/// target. Such a layer's transform reaches the frame through its dependents, so it is not free to ignore.
+fn layer_is_referenced(document: &ObjectDocument, uid: &str) -> bool {
+    document.layers().iter().any(|other| {
+        other.parent_layer_uid.value().and_then(Option::as_deref) == Some(uid)
+            || other.matte_source_layer_uid.value().map(String::as_str) == Some(uid)
+            || other
+                .mattes_more
+                .value()
+                .is_some_and(|mattes| mattes.iter().any(|matte| matte.uid == uid))
+            || other.effects_from.value().map(String::as_str) == Some(uid)
+            || other
+                .follow_path
+                .value()
+                .and_then(Option::as_ref)
+                .is_some_and(|follow| follow.target_layer_uid() == uid)
+    })
+}
+
+/// An ordinary root layer that paints nothing (no record, text/raster item or component instance) and that no other
+/// layer, duplicator or effector reads. Its transform
+/// cannot change a single pixel, so a holder carrying only transform keys is consumed by simply not being applied.
+/// The first content record or the first dependent makes the keys unavailable again until their producer consumes them.
+fn contentless_unreferenced_layer(document: &ObjectDocument, target: &PropertyHolderTarget) -> bool {
+    let uid = target.layer_uid();
+    ordinary_root_layer(document, target)
+        && !document
+            .objects()
+            .iter()
+            .any(|record| record.target.layer_uid == uid)
+        && document
+            .item_records()
+            .is_none_or(|items| !items.targets().any(|item| item.layer_uid() == uid))
+        && !layer_is_referenced(document, uid)
+        && !document
+            .component_set()
+            .is_some_and(|set| set.instance(target.context_id(), uid).is_some())
+        && document.duplicator_set().is_none()
+}
+
+/// A widget layer is an on-canvas editor of its own controls and never paints. Its holder is consumed when it holds
+/// only those controls' values (plus inert opacity/time-link keys); its transform keys are consumed only while no
+/// dependent layer inherits the pose. Expressions elsewhere read the controls through the Motion port, not this gate.
+pub(super) fn widget_holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
+    let target = holder.target();
+    let widget = target.context_id() == "scene-root"
+        && target.stroke_id().is_none()
+        && document.layers().iter().any(|layer| {
+            layer.layer_uid() == target.layer_uid()
+                && layer.widget.value().is_some()
+                && !layer.is_effect_layer()
+                && !layer.is_folder_layer()
+        });
+    widget
+        && holder.properties().iter().all(|property| {
+            let key = property.property();
+            !property.expression.value().is_some_and(|code| code.enabled)
+                && (holder
+                    .controls
+                    .value()
+                    .is_some_and(|controls| controls.iter().any(|control| control.key == key))
+                    || matches!(key, "opacity" | "timeLinkInOffset" | "timeLinkOutOffset")
+                    || matches!(key, "position" | "anchor" | "rotation" | "scale")
+                        && !layer_is_referenced(document, target.layer_uid()))
         })
 }
 
