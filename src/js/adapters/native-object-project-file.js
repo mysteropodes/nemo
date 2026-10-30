@@ -58,20 +58,23 @@
       var layer=layers[i];
       if(!layer||typeof layer.layerUid!=='string'||!layer.layerUid||seen.has(layer.layerUid))
         throw new Error('Native layer identity is invalid');
-      if(Object.keys(layer).some(function(k){return !['layerUid','name','visible','locked','shy','color','parentLayerUid'].includes(k);}))
+      if(Object.keys(layer).some(function(k){return !['layerUid','name','visible','locked','shy','color','parentLayerUid','widget'].includes(k);}))
         throw new Error('Native layer metadata is unsupported');
       if(Object.prototype.hasOwnProperty.call(layer,'name')&&typeof layer.name!=='string')throw new Error('Native layer name is invalid');
       if(Object.prototype.hasOwnProperty.call(layer,'visible')&&typeof layer.visible!=='boolean')throw new Error('Native layer visibility is invalid');
       if(['locked','shy'].some(function(k){return Object.prototype.hasOwnProperty.call(layer,k)&&typeof layer[k]!=='boolean';}))throw new Error('Native layer policy flags are invalid');
+      if(Object.prototype.hasOwnProperty.call(layer,'widget')&&layer.widget!==true)throw new Error('Native layer widget flag is invalid');
       if(Object.prototype.hasOwnProperty.call(layer,'color')&&(typeof layer.color!=='string'||!/^#[a-fA-F0-9]{6}$/.test(layer.color)))throw new Error('Native layer color is invalid');
       if(!validParent(layer))throw new Error('Native layer parent is invalid');
       var row={layerUid:layer.layerUid,name:Object.prototype.hasOwnProperty.call(layer,'name')?layer.name:undefined,visible:layer.visible!==false};
-      ['locked','shy','color','parentLayerUid'].forEach(function(k){if(Object.prototype.hasOwnProperty.call(layer,k))row[k]=layer[k];});
+      ['locked','shy','color','parentLayerUid','widget'].forEach(function(k){if(Object.prototype.hasOwnProperty.call(layer,k))row[k]=layer[k];});
       seen.add(layer.layerUid);next.push(row);
     }
     return next;
   }
   function projectFields(row,layer){
+    // #2255: a widget layer carries the legacy kind flag the layer menus read ("Widget settings…"); the facts stay native reads.
+    var widget=layer.widget===true;delete row.widget;if(widget)row.isWidgetLayer=true;else delete row.isWidgetLayer;
     ['locked','shy','color','parentLayerUid'].forEach(function(k){
       if(Object.prototype.hasOwnProperty.call(layer,k))row[k]=layer[k];else if(['locked','shy'].includes(k))row[k]=false;
       else if(k==='parentLayerUid'&&has(row,k))row[k]=null;

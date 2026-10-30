@@ -14,6 +14,7 @@
         (!Object.prototype.hasOwnProperty.call(l,'name')||typeof l.name==='string')&&
         (!Object.prototype.hasOwnProperty.call(l,'visible')||typeof l.visible==='boolean')&&
         ['locked','shy'].every(function(k){return !Object.prototype.hasOwnProperty.call(l,k)||typeof l[k]==='boolean';})&&
+        (!Object.prototype.hasOwnProperty.call(l,'widget')||l.widget===true)&&
         (!Object.prototype.hasOwnProperty.call(l,'color')||typeof l.color==='string'&&/^#[a-fA-F0-9]{6}$/.test(l.color))&&
         (!Object.prototype.hasOwnProperty.call(l,'parentLayerUid')||l.parentLayerUid===null||
           typeof l.parentLayerUid==='string'&&l.parentLayerUid.length>0);}))throw new Error('Native project metadata is uncorrelated');
@@ -24,7 +25,7 @@
     result.layers=v.layers.map(function(l){var row={layerUid:l.layerUid};
       if(Object.prototype.hasOwnProperty.call(l,'name'))row.name=l.name;
       if(Object.prototype.hasOwnProperty.call(l,'visible'))row.visible=l.visible;
-      ['locked','shy','color','parentLayerUid'].forEach(function(k){if(Object.prototype.hasOwnProperty.call(l,k))row[k]=l[k];});return row;});
+      ['locked','shy','color','parentLayerUid','widget'].forEach(function(k){if(Object.prototype.hasOwnProperty.call(l,k))row[k]=l[k];});return row;});
     var r=v.reference;
     if(r!==null&&(!r||!id(r.id)||typeof r.name!=='string'||typeof r.visible!=='boolean'||!Number.isFinite(r.opacity)||
       r.opacity<0||r.opacity>1||!Number.isSafeInteger(r.offsetFrames)))throw new Error('Native reference metadata is invalid');

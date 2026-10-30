@@ -4,7 +4,8 @@
 //! ordinary joystick / slider need exactly what `geomFor`, `puckLocal` and `restLocal` of `src/js/rig-widget.js` computed:
 //! the composed world anchor and angle, the pad size, the puck and rest offsets and each axis. This module returns them,
 //! through the same pad kernel the write transaction uses (`widget_read.rs`), so the drag and the overlay cannot disagree.
-//! Nothing is written, cached or kept; without the `evaluation` feature the read is a typed unavailable.
+//! `anchor` (the stored or defaulted `pos`) and `linear` (the parents' 2x2 linear part, `[a, b, c, d]` by columns) let the gesture
+//! turn a world delta of the whole pad into the one `pos` it commits. Nothing is written, cached or kept; without the `evaluation` feature the read is a typed unavailable.
 //!
 //! The placement is `layerMotionAt` (the layer's own position and rotation, a flat offset with no pivot) then the parent
 //! chain, exactly `geomFor`. A parent that pivots on its content bounds is reported as `parent_geometry`: only the
@@ -41,7 +42,7 @@ impl ObjectSnapshot {
 }
 
 #[cfg(feature = "evaluation")]
-mod kernels {
+pub(crate) mod kernels {
     use crate::evaluation::motion_parent_chain::{
         motion_mat_from_values, transform_segment, MotionMat, Segment, CHAIN_NODE_LIMIT,
     };
@@ -104,7 +105,7 @@ mod kernels {
     }
 
     /// `computeMotionMat` of one layer at `frame`, from the raw sampler. An enabled expression is not evaluated here.
-    fn layer_mat(
+    pub(crate) fn layer_mat(
         snapshot: &ObjectSnapshot,
         layer_uid: &str,
         frame: f64,
@@ -146,7 +147,7 @@ mod kernels {
         layer_uid: &str,
         pos: Option<[f64; 2]>,
         frame: f64,
-    ) -> Result<Placement, &'static str> {
+    ) -> Result<(Placement, [f64; 2], [f64; 4]), &'static str> {
         let canvas = snapshot
             .project()
             .map(|project| project.project().canvas_dimensions());
@@ -161,6 +162,9 @@ mod kernels {
             base[1] + own.map_or(0.0, |m| m.dy),
         ];
         let mut angle = own.map_or(0.0, |m| m.rot);
+        // The same chain carried over the two unit steps: the linear part of the parents, to turn a world delta into a pos delta.
+        let mut step_x = [point[0] + 1.0, point[1]];
+        let mut step_y = [point[0], point[1] + 1.0];
         let layers = snapshot.document().layers();
         let mut seen = vec![layer_uid];
         let mut next = layers
@@ -191,15 +195,38 @@ mod kernels {
                     pivot,
                     &mat,
                 );
+                let carry = |at: [f64; 2]| {
+                    transform_segment(
+                        &Segment {
+                            point: at,
+                            handle_in: None,
+                            handle_out: None,
+                        },
+                        pivot,
+                        &mat,
+                    )
+                    .point
+                };
+                (step_x, step_y) = (carry(step_x), carry(step_y));
                 point = moved.point;
                 angle += mat.rot;
             }
             next = parent.parent_layer_uid.value().and_then(Option::as_deref);
         }
-        Ok(Placement {
-            anchor: point,
-            angle_degrees: angle,
-        })
+        let linear = [
+            step_x[0] - point[0],
+            step_x[1] - point[1],
+            step_y[0] - point[0],
+            step_y[1] - point[1],
+        ];
+        Ok((
+            Placement {
+                anchor: point,
+                angle_degrees: angle,
+            },
+            base,
+            linear,
+        ))
     }
 
     pub(super) fn item(snapshot: &ObjectSnapshot, index: usize, frame: u32) -> Value {
@@ -228,10 +255,13 @@ mod kernels {
         let mut out = json!({"layerUid":layer.layer_uid(),"visible":layer.visible(),
             "locked":layer.locked.value().copied().unwrap_or(false),"kind":widget.kind.as_str(),
             "x":axis_json!(snapshot, layer, widget.x, spec.x, vx),"y":y_json,
-            "center":null,"angle":null,"size":null,"puck":null,"rest":null,"unavailable":null});
+            "center":null,"angle":null,"size":null,"puck":null,"rest":null,"anchor":null,"linear":null,
+            "unavailable":null});
         match placement(snapshot, layer.layer_uid(), widget.pos_value(), at) {
             Err(reason) => out["unavailable"] = json!(reason),
-            Ok(placed) => {
+            Ok((placed, base, linear)) => {
+                out["anchor"] = json!(base);
+                out["linear"] = json!(linear);
                 let geometry = geom_for(&spec, &placed, at);
                 out["center"] = json!([geometry.cx, geometry.cy]);
                 out["angle"] = json!(geometry.angle);

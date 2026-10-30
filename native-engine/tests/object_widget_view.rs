@@ -80,6 +80,9 @@ fn a_fresh_joystick_reads_its_pad_puck_rest_and_axes() {
     near(&item["size"], &[200., 120.]);
     near(&item["puck"], &[0., 0.]);
     near(&item["rest"], &[0., 0.]);
+    // The stored (here defaulted) anchor and the parents' linear part, for moving the whole pad by a world delta.
+    near(&item["anchor"], &[960., 540.]);
+    near(&item["linear"], &[1., 0., 0., 1.]);
     assert_eq!(
         (item["angle"].as_f64(), item["unavailable"].clone()),
         (Some(0.0), Value::Null)
@@ -165,12 +168,19 @@ fn a_null_parent_rotates_the_pad_about_its_stored_pivot() {
     assert_eq!(item["angle"].as_f64(), Some(90.0), "{item}");
     // (960,540) about (100,100) by 90 degrees: (860,440) becomes (-440,860).
     near(&item["center"], &[-340., 960.]);
+    // The own anchor stays the stored one; the parent's quarter turn is the linear part (x step to +y, y step to -x).
+    near(&item["anchor"], &[960., 540.]);
+    near(&item["linear"], &[0., 1., -1., 0.]);
     // The same parent without a Null pivot has bounds only the presented scene could know.
     wire["layers"][0]["isNullLayer"] = json!(false);
     let item = read(&owner_of(&wire))["items"][0].clone();
     assert_eq!(item["unavailable"], "parent_geometry");
     assert_eq!(
         (item["center"].clone(), item["puck"].clone()),
+        (Value::Null, Value::Null)
+    );
+    assert_eq!(
+        (item["anchor"].clone(), item["linear"].clone()),
         (Value::Null, Value::Null)
     );
 }
@@ -287,4 +297,27 @@ fn a_read_changes_nothing_and_undo_moves_the_puck_back() {
     near(&read(&owner)["items"][0]["puck"], &[100., 0.]);
     owner.undo(owner.content_revision()).unwrap();
     near(&read(&owner)["items"][0]["puck"], &[0., 0.]);
+}
+
+#[test]
+fn only_a_widget_layer_carries_the_project_info_flag_the_layer_menu_reads() {
+    // The drawing of a widget owner inside a project file: layer 0 is the widget, a plain drawing layer is added after it.
+    let mut drawing = wire(&joystick(None));
+    drawing["layers"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"layerUid":"plain"}));
+    let project = json!({"format":"nemo.native-project-document","formatVersion":1,
+        "project":{"canvasW":320,"canvasH":180,"fps":24},"drawing":drawing,"viewportReference":null,"assets":[]});
+    let owner =
+        NativeObjectHistory::from_project_file("desktop", &serde_json::to_vec(&project).unwrap())
+            .expect("a project file");
+    let info = owner.project_file_info().expect("a project info");
+    let layers = info["layers"].as_array().unwrap();
+    let flagged: Vec<_> = layers
+        .iter()
+        .filter(|layer| layer.get("widget").is_some())
+        .map(|layer| (layer["layerUid"].clone(), layer["widget"].clone()))
+        .collect();
+    assert_eq!(flagged, vec![(json!(UID), json!(true))], "{layers:?}");
 }

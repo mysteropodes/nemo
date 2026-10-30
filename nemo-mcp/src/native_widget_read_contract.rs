@@ -56,6 +56,11 @@ fn pair(value: &Value) -> bool {
         .as_array()
         .is_some_and(|v| v.len() == 2 && v.iter().all(number))
 }
+fn quad(value: &Value) -> bool {
+    value
+        .as_array()
+        .is_some_and(|v| v.len() == 4 && v.iter().all(number))
+}
 fn axis(value: &Value) -> bool {
     exact(value, &["key", "min", "max", "rest", "label", "value"], &[]).is_some_and(|axis| {
         axis["key"].is_string()
@@ -79,6 +84,8 @@ fn item(value: &Value) -> bool {
             "size",
             "puck",
             "rest",
+            "anchor",
+            "linear",
             "unavailable",
         ],
         &[],
@@ -86,7 +93,12 @@ fn item(value: &Value) -> bool {
         return false;
     };
     let slider = item["kind"] == "slider";
-    let geometry = [&item["center"], &item["size"], &item["rest"]];
+    let geometry = [
+        &item["center"],
+        &item["size"],
+        &item["rest"],
+        &item["anchor"],
+    ];
     let placed = !item["center"].is_null();
     let basics = item["layerUid"].as_str().is_some_and(|uid| !uid.is_empty())
         && item["visible"].is_boolean()
@@ -107,9 +119,11 @@ fn item(value: &Value) -> bool {
     basics
         && consistent
         && if placed {
-            geometry.iter().all(|v| pair(v)) && number(&item["angle"])
+            geometry.iter().all(|v| pair(v)) && number(&item["angle"]) && quad(&item["linear"])
         } else {
-            geometry.iter().all(|v| v.is_null()) && item["angle"].is_null()
+            geometry.iter().all(|v| v.is_null())
+                && item["angle"].is_null()
+                && item["linear"].is_null()
         }
 }
 pub(super) fn result(document_id: &str, payload: &Value, result: &Value) -> bool {
