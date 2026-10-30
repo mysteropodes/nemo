@@ -16,7 +16,7 @@
     backoff:20,         // never closer than backoff x the last write duration
     maxBytes:32*1024*1024});
   var COMMAND='nemo_native_object_recovery_write';
-  var HEX64=/^[a-f0-9]{64}$/,ID=/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
+  var SLOT=/^[a-z0-9-]{1,64}$/,HEX64=/^[a-f0-9]{64}$/,ID=/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
   // Pin of the session info() fields the scheduler consumes. A change that
   // drops or retypes one fails tests/native-object-recovery-contract.test.cjs.
   var INFO_FIELDS=Object.freeze(['instanceId','documentId','lifecycleGeneration','contentRevision',
@@ -56,6 +56,8 @@
       var info=readInfo(pin.info);
       if(!info)return {why:'info-missing'};
       if(!s||!sameSession(s,info))s=fresh(info);
+      // A resumed session (#2360 R3) names the recovery slot it replaces; it rides with the first published write.
+      s.pinSupersedes=typeof pin.supersedes==='string'&&SLOT.test(pin.supersedes)&&!s.supersedeDone?pin.supersedes:null;
       if(writing)return {why:'in-flight',info:info};
       var reference=pin.reference||null;
       if(info.documentDigest===reference||info.documentDigest===s.recovered||info.documentDigest===s.skipDigest){
@@ -79,7 +81,8 @@
         atRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId,slotKey:key,
         displayName:plainName(slot.name),documentDigest:info.documentDigest};
       if(path)r.originPath=path;
-      if(s.supersedes&&s.supersedes!==key)r.supersedes=s.supersedes;
+      var replaced=s.supersedes||s.pinSupersedes;
+      if(replaced&&replaced!==key)r.supersedes=replaced;
       return r;
     }
     function notifyOnce(flag,message){
@@ -103,7 +106,7 @@
           return {wrote:false,why:receipt.reason||'unpublished'};
         }
         mine.lastWriteAt=ended;mine.lastDuration=Math.max(0,ended-began);mine.lastRevision=info.contentRevision;
-        mine.recovered=info.documentDigest;mine.idleSince=null;mine.supersedes=null;
+        mine.recovered=info.documentDigest;mine.idleSince=null;mine.supersedes=null;mine.supersedeDone=true;mine.pinSupersedes=null;
         return {wrote:true,receipt:receipt};
       }catch(error){
         // Failure (ENOSPC and similar): the previous generation is untouched; retry next tick.

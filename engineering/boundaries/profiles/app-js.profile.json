@@ -2729,11 +2729,13 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-recovery.js"
+        "native-object-recovery.js",
+        "native-object-recovery-resume.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
-        "native-object-recovery.js"
+        "native-object-recovery.js",
+        "native-object-recovery-resume.js"
       ]
     },
     {
