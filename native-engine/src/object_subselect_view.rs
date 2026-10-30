@@ -22,6 +22,9 @@ pub(crate) struct SubselectReadItem {
     /// Hit-test listing only: plain | ribbon | fill (a ribbon's linked fill) | shape | brush.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) role: Option<&'static str>,
+    /// Hit-test listing only: the record carries any fill paint (solid or gradient), so an interior click hits it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) filled: Option<bool>,
     /// Hit-test listing only: a linked fill's ribbon (same cell, same linkedFillId); Select resolves a fill to it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) owner: Option<String>,

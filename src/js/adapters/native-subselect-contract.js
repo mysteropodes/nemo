@@ -61,8 +61,8 @@
       typeof r.preview!=='boolean'||!integer(r.total,1024)||!integer(r.cursor,r.total)||!Array.isArray(r.items)||r.items.length>8||r.cursor+r.items.length>r.total)fail('Invalid subselect selection page');
     viewPayload({atRevision:r.atRevision,documentSnapshotId:r.documentSnapshotId,view:{kind:r.kind,contextId:r.contextId,layerUid:r.layerUid,frame:r.frame,workId:r.workId,viewGeneration:r.viewGeneration,cursor:r.cursor,limit:8}});
     for(const item of r.items){
-      // A hit-test listing (#2362) gives every painted record its bounds and role instead of a paint count.
-      if(own(r,'hitTest')?!exact(item,['stableTarget','closed','count','matrix','bounds','role'],['owner'])||!Array.isArray(item.bounds)||item.bounds.length!==4||!item.bounds.every(Number.isFinite)||
+      // A hit-test listing (#2362) gives every painted record its bounds, role and fill flag instead of a paint count.
+      if(own(r,'hitTest')?!exact(item,['stableTarget','closed','count','matrix','bounds','role','filled'],['owner'])||typeof item.filled!=='boolean'||!Array.isArray(item.bounds)||item.bounds.length!==4||!item.bounds.every(Number.isFinite)||
         !['plain','ribbon','fill','shape','brush'].includes(item.role)||own(item,'owner')&&(item.role!=='fill'||typeof item.owner!=='string'||!item.owner):!exact(item,['stableTarget','closed','count','matrix'],['paintCount']))fail('Invalid native subselect item');
       if(!target(item.stableTarget)||item.stableTarget.contextId!==r.contextId||item.stableTarget.layerUid!==r.layerUid||typeof item.closed!=='boolean'||
         !integer(item.count,256)||own(item,'paintCount')&&(!integer(item.paintCount,256)||item.paintCount<2||item.closed!==false)||!Array.isArray(item.matrix)||item.matrix.length!==6||!item.matrix.every(Number.isFinite))fail('Invalid native subselect transform');

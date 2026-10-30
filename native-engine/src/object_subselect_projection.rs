@@ -67,6 +67,7 @@ impl ObjectCompositionWitness {
                 matrix,
                 bounds: hit_test.then(|| record::painted_bounds(r)),
                 role: hit_test.then(|| record::hit_role(r)),
+                filled: hit_test.then(|| r.solid_fill().is_some() || r.fill_gradient().is_some()),
                 owner: (hit_test && record::hit_role(r) == "fill")
                     .then(|| record::linked_fill(r))
                     .flatten()

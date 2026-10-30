@@ -9,8 +9,8 @@ function fixture(mode){
   const state={active:true,opening:false,pending:0,synchronizing:false,projectionReady:true,ticket:1,info:pin,presented:{...pin,available:true,presentation}};
   const target=s=>({contextId:'scene-root',layerUid:'L',strokeId:s,frameScope:{kind:'authored',frame:0}});
   const segment=i=>({point:[i,10],handleIn:[0,0],handleOut:[0,0]}),outline=Array.from({length:20},(_,i)=>segment(i));
-  const items=[{stableTarget:target('ink'),closed:false,count:2,matrix:[1,0,0,1,0,0],bounds:[0,10,1,10],role:'plain'},
-    {stableTarget:target('ribbon'),closed:true,count:20,matrix:[1,0,0,1,0,0],bounds:[0,10,19,10],role:'ribbon'}];
+  const items=[{stableTarget:target('ink'),closed:false,count:2,matrix:[1,0,0,1,0,0],bounds:[0,10,1,10],role:'plain',filled:false},
+    {stableTarget:target('ribbon'),closed:true,count:20,matrix:[1,0,0,1,0,0],bounds:[0,10,19,10],role:'ribbon',filled:false}];
   const sent=[];let serial=0;
   const reads=Reads.create({state:()=>state,settled:async()=>{},requestId:()=>`q-${++serial}`,dispatch:async q=>{
     sent.push(q);const p=q.payload;let result;
