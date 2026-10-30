@@ -283,3 +283,24 @@ fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
     geometry["subselect"]["paint"] = json!(true);
     assert!(!request(&geometry), "never with the paint mode");
 }
+
+#[test]
+fn a_hit_test_page_may_be_shorter_than_the_limit_when_the_engine_shortened_it_to_the_byte_cap() {
+    // #2372 SEL-PAGE: the nextCursor follows the items actually sent, never fewer than one before the end.
+    let view = json!({"kind":"subselect","contextId":"scene-root","layerUid":"layer-a","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":2,"limit":8,"hitTest":true});
+    let q = json!({"atRevision":7,"documentSnapshotId":"native-object:document:7","view":view});
+    let item = |n: usize| json!({"stableTarget":{"contextId":"scene-root","layerUid":"layer-a","frameScope":{"kind":"authored","frame":0},"strokeId":format!("s{n}")},
+        "closed":true,"count":4,"matrix":[1,0,0,1,0,0],"bounds":[0.0,0.0,10.0,10.0],"role":"plain","filled":true});
+    let page = |n: usize, next: Value| json!({"kind":"subselect","atRevision":7,"documentSnapshotId":"native-object:document:7","contextId":"scene-root","layerUid":"layer-a","frame":0,
+        "workId":"native-work-1","viewGeneration":1,"cursor":2,"total":20,"nextCursor":next,"preview":false,"hitTest":true,"items":(0..n).map(item).collect::<Vec<_>>()});
+    assert!(public_read(&q, &page(8, json!(10))), "a full page");
+    for n in [1usize, 3, 7] {
+        assert!(public_read(&q, &page(n, json!(2 + n))), "{n} items");
+    }
+    assert!(!public_read(&q, &page(3, json!(10))), "nextCursor must follow the items actually sent");
+    assert!(!public_read(&q, &page(0, json!(2))), "an empty page before the end makes no progress");
+    assert!(!public_read(&q, &page(9, json!(11))), "more than the limit");
+    let mut last = page(3, Value::Null);
+    last["total"] = json!(5);
+    assert!(public_read(&q, &last), "the final short page");
+}

@@ -202,35 +202,42 @@ impl ObjectSnapshot {
                 "Subselect cursor is outside the selection",
             );
         }
-        let end = (v.cursor + v.limit).min(projection.items.len());
-        let response = ResponseEnvelope {
-            api_version: APPLICATION_API_VERSION,
-            request_id: request.request_id.clone(),
-            instance_id: self.instance_id().into(),
-            document_id: self.document_id().into(),
-            content_revision: self.content_revision(),
-            ok: true,
-            error: None,
-            result: Some(
-                json!({"kind":"subselect","atRevision":p.at_revision,"documentSnapshotId":p.document_snapshot_id,"contextId":v.context_id,"layerUid":v.layer_uid,"frame":v.frame,"workId":v.work_id,"viewGeneration":v.view_generation,"cursor":v.cursor,"total":projection.items.len(),"nextCursor":(end<projection.items.len()).then_some(end),"preview":projection.preview.is_some(),"items":projection.items[v.cursor..end]}),
-            ),
-        };
-        let mut response = response;
-        if hit_test {
-            if let Some(result) = response.result.as_mut() {
-                result["hitTest"] = json!(true);
+        // A page holds at most `limit` items and, beyond that, as many as the byte limit allows: full-precision matrices, bounds and
+        // long (UUID) ids shorten the page (the cursor then advances by the items actually sent) rather than making the whole
+        // selection view unavailable.
+        let mut end = (v.cursor + v.limit).min(projection.items.len());
+        loop {
+            let mut response = ResponseEnvelope {
+                api_version: APPLICATION_API_VERSION,
+                request_id: request.request_id.clone(),
+                instance_id: self.instance_id().into(),
+                document_id: self.document_id().into(),
+                content_revision: self.content_revision(),
+                ok: true,
+                error: None,
+                result: Some(
+                    json!({"kind":"subselect","atRevision":p.at_revision,"documentSnapshotId":p.document_snapshot_id,"contextId":v.context_id,"layerUid":v.layer_uid,"frame":v.frame,"workId":v.work_id,"viewGeneration":v.view_generation,"cursor":v.cursor,"total":projection.items.len(),"nextCursor":(end<projection.items.len()).then_some(end),"preview":projection.preview.is_some(),"items":projection.items[v.cursor..end]}),
+                ),
+            };
+            if hit_test {
+                if let Some(result) = response.result.as_mut() {
+                    result["hitTest"] = json!(true);
+                }
             }
+            let size = serde_json::to_vec(&response)
+                .map_err(|_| DispatchErrorCode::Internal)?
+                .len();
+            if size <= MAX_MESSAGE_BYTES {
+                return Ok(response);
+            }
+            if end <= v.cursor + 1 {
+                // One item alone is over the limit: nothing smaller can be sent, so this one stays unavailable.
+                return refused(
+                    DispatchErrorCode::Unavailable,
+                    "Subselect view exceeds the response byte limit",
+                );
+            }
+            end -= 1;
         }
-        if serde_json::to_vec(&response)
-            .map_err(|_| DispatchErrorCode::Internal)?
-            .len()
-            > MAX_MESSAGE_BYTES
-        {
-            return refused(
-                DispatchErrorCode::Unavailable,
-                "Subselect view exceeds the response byte limit",
-            );
-        }
-        Ok(response)
     }
 }

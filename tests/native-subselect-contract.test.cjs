@@ -114,3 +114,18 @@ test('a hit-test listing item may carry a finite boxAngle, and only on a hit-tes
   const {hitTest,...plain}=r;
   assert.throws(()=>C.viewResult({...plain,items:[{stableTarget:target,closed:false,count:2,matrix:[1,0,0,1,0,0],boxAngle:30}]}),undefined,'an editable page has no boxAngle');
 });
+test('a hit-test page may be shorter than the limit when the engine shortened it to the byte cap (#2372 SEL-PAGE)',()=>{
+  const view={kind:'subselect',contextId:'scene-root',layerUid:'layer-a',frame:0,workId:'native-work-1',viewGeneration:1,cursor:2,limit:8,hitTest:true};
+  const p={atRevision:7,documentSnapshotId:'native-object:document:7',view};
+  const item=n=>({stableTarget:{...target,strokeId:'s'+n},closed:true,count:4,matrix:[1,0,0,1,0,0],bounds:[0,0,10,10],role:'plain',filled:true});
+  const {limit,...echo}=view;
+  const page=(n,next)=>({...echo,atRevision:7,documentSnapshotId:'native-object:document:7',total:20,nextCursor:next,preview:false,items:Array.from({length:n},(_,i)=>item(i))});
+  assert.equal(C.viewCorrelate(p,page(8,10),'document'),true,'a full page');
+  for(const n of [1,3,7])assert.equal(C.viewCorrelate(p,page(n,2+n),'document'),true,n+' items, nextCursor follows the items sent');
+  assert.throws(()=>C.viewCorrelate(p,page(3,10),'document'),undefined,'nextCursor must follow the items actually sent');
+  assert.throws(()=>C.viewCorrelate(p,page(0,2),'document'),undefined,'an empty page before the end makes no progress');
+  assert.throws(()=>C.viewCorrelate(p,page(9,11),'document'),undefined,'more than the limit');
+  assert.throws(()=>C.viewCorrelate({...p,view:{...view,limit:2}},page(3,5),'document'),undefined,'more than the requested limit');
+  const last={...page(3,null),total:5};
+  assert.equal(C.viewCorrelate(p,last,'document'),true,'the final short page');
+});

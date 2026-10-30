@@ -96,7 +96,9 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
     let cursor = r["cursor"].as_u64().unwrap();
     let end = cursor + items.len() as u64;
     end <= total
-        && items.len() as u64 == (total - cursor).min(p["view"]["limit"].as_u64().unwrap())
+        // A page may be shorter than the limit: the engine shortens it to fit the byte cap, and nextCursor follows the items sent.
+        && items.len() as u64 <= (total - cursor).min(p["view"]["limit"].as_u64().unwrap())
+        && (end == total || !items.is_empty())
         && (if end == total {
             r["nextCursor"].is_null()
         } else {
