@@ -95,7 +95,10 @@ async function multiFixture(options={}){
  function row(target,property){return tree(container).find(n=>n.className==='lrow motion-prop-row'&&n.dataset.property===property&&n.dataset.targetKey===JSON.stringify([target.contextId,target.layerUid,target.strokeId===undefined?null:target.strokeId]));}
  return {doc,root,container,ordinary,layer,element,targets,writes,events,reads,settle,get notices(){return notices;},
   open(target=layer,property='opacity'){const line=row(target,property);assert.ok(line);return tree(line).find(n=>/\bmotion-stopwatch\b/.test(n.className||'')).fire('click',{altKey:true});},
-  inspectors:()=>tree(container).filter(n=>n.className==='native-motion-property-keys'&&!n.hidden),
+  // Rows follow the baseline propsFor order (position before opacity) but these assertions index drawers as
+  // layer opacity, layer position, element opacity, so rank them explicitly instead of by DOM order.
+  inspectors:()=>{const rank=n=>{const t=tree(n).map(x=>x._text).find(x=>/ · /.test(x||''))||'';return (/element:/.test(t)?2:0)+(/^position/.test(t)?1:0);};
+   return tree(container).filter(n=>n.className==='native-motion-property-keys'&&!n.hidden).map((n,i)=>[n,i]).sort((x,y)=>rank(x[0])-rank(y[0])||x[1]-y[1]).map(x=>x[0]);},
   checks(index){return tree(this.inspectors()[index]).filter(n=>n.type==='checkbox');},
   hold(property){let resolve;const promise=new Promise(r=>resolve=r);held={property,promise,resolve};return ()=>{const wait=held;held=null;wait.resolve();};},
   ownAction(){const origin=session.readPresentedObjectSession();assert.ok(origin);pending=true;let running=true;
