@@ -12,7 +12,7 @@ const OP = 'command.document.object.widget.';
 const UID = 'native-layer:1:0', LOCKED = 'native-layer:2:0';
 const axis = (label) => ({ key: 'xc_' + label, min: -100, max: 100, rest: 0, label, value: 0 });
 const joystick = (uid, over) => Object.assign({ layerUid: uid, visible: true, locked: false, kind: 'joystick', x: axis('X'), y: axis('Y'),
-  center: [960, 540], angle: 0, size: [200, 200], puck: [0, 0], rest: [0, 0], unavailable: null }, over || {});
+  center: [960, 540], angle: 0, size: [200, 200], puck: [0, 0], rest: [0, 0], anchor: [960, 540], linear: [1, 0, 0, 1], unavailable: null }, over || {});
 
 function harness(options) {
   options = options || {};
@@ -39,16 +39,18 @@ function harness(options) {
     createElementNS() { const node = { style: {}, attrs: {}, children: [], setAttribute(k, v) { this.attrs[k] = v; }, appendChild(c) { this.children.push(c); this.firstChild = this.children[0]; }, removeChild() { this.children.shift(); this.firstChild = this.children[0]; }, isConnected: true }; return node; },
   };
   sandbox.document.body = { appendChild() {} };
-  sandbox.requestAnimationFrame = (fn) => fn();
+  const frames = [];
+  sandbox.requestAnimationFrame = (fn) => { frames.push(fn); return frames.length; };
+  const flushFrames = () => { for (let n = 0; n < 4 && frames.length; n++) frames.splice(0).forEach((fn) => fn()); };
   const live = fx.session.info;
-  const presentation = () => Object.assign(live(), { owner: 'native', status: 'presented', contextId: 'scene-root', frame: 0 });
+  const presentation = () => Object.assign(live(), { owner: 'native', status: 'presented', contextId: 'scene-root', frame: sandbox.state.currentFrame });
   let shown = null, shownRevision = -1;
   const info = () => Object.assign(live(), { canvasW: 960, canvasH: 540, layers: [{ layerUid: UID }, { layerUid: LOCKED }] });
   Object.assign(fx.session, {
     info,
     readSubscriptionGeneration: () => 1,
     readPresentedObjectSession() {
-      if (shownRevision !== fx.state.revision) { shownRevision = fx.state.revision; shown = Object.assign(info(), { available: true, kind: 'native-object', presentation: presentation() }); }
+      if (shownRevision !== fx.state.revision || shown.presentation.frame !== sandbox.state.currentFrame) { shownRevision = fx.state.revision; shown = Object.assign(info(), { available: true, kind: 'native-object', presentation: presentation() }); }
       return shown;
     },
     async readWidgets(selector, pin) {
@@ -70,10 +72,10 @@ function harness(options) {
     for (const l of listeners.filter((entry) => entry.type === type)) { l.fn(e); if (e.stopped) break; }
     return e;
   };
-  return { fx, sandbox, listeners, fields, legacy, toasts, reads, fire,
+  return { fx, sandbox, listeners, fields, legacy, toasts, reads, fire, flushFrames, frames,
     // Inside the context `window` is its global object, not the sandbox object: the controller is keyed by that one.
     ui: () => sandbox.NemoNativeObjectWidgetUI.desktop(vm.runInContext('globalThis', sandbox)),
-      sent: () => { assert.deepEqual(toasts.filter((t) => !/widget_move_unavailable|^toastWidgetLayerAdded$/.test(t)), [], 'a refused or uncorrelated command would have been toasted'); return fx.owner.log.received.map((r) => [r.operation, r.payload]); } };
+      sent: () => { assert.deepEqual(toasts.filter((t) => !/^toastWidgetLayerAdded$/.test(t)), [], 'a refused or uncorrelated command would have been toasted'); return fx.owner.log.received.map((r) => [r.operation, r.payload]); } };
 }
 async function started(options) {
   const h = harness(options);
@@ -109,14 +111,90 @@ test('a puck drag is a local preview and ONE widget.write with the world point, 
   assert.deepEqual(h.legacy, []);
 });
 
-test('a pad body click is consumed with a typed unavailable, a locked or hidden pad and an empty canvas are left to the pen', async () => {
+test('a locked or hidden pad and an empty canvas are left to the pen, and a secondary button never grabs a pad', async () => {
   const h = await started({ items: [joystick(UID), joystick(LOCKED, { locked: true, center: [200, 100], size: [100, 100] }), joystick('native-layer:3:0', { visible: false, center: [700, 100], size: [100, 100] })] });
-  const body = h.fire('pointerdown', { clientX: 1040, clientY: 620 });
-  assert.equal(body.stopped, true);
-  assert.match(h.toasts[0], /widget_move_unavailable/);
-  assert.deepEqual(h.sent(), []);
   for (const point of [[200, 100], [700, 100], [10, 500]]) assert.equal(h.fire('pointerdown', { clientX: point[0], clientY: point[1] }).stopped, false, point.join());
-  assert.equal(h.fire('pointerdown', { clientX: 960, clientY: 540, button: 2 }).stopped, false, 'a secondary button never grabs a pad');
+  assert.equal(h.fire('pointerdown', { clientX: 960, clientY: 540, button: 2 }).stopped, false);
+  assert.deepEqual(h.sent(), []);
+  assert.deepEqual(h.legacy, []);
+});
+
+test('a pad body drag moves the whole pad: a local preview and ONE widget.settings with the new world pos', async () => {
+  const h = await started();
+  assert.equal(h.fire('pointerdown', { clientX: 1040, clientY: 620 }).stopped, true, 'the body is taken from motion.js and the brush');
+  h.fire('pointermove', { clientX: 1060, clientY: 600 });
+  h.fire('pointermove', { clientX: 1090, clientY: 660 });
+  assert.deepEqual(h.sent(), [], 'nothing is written while the pointer moves');
+  assert.equal(h.fire('pointerup', { clientX: 1090, clientY: 660 }).stopped, true);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(h.sent(), [[OP + 'settings', { command: 'object.widget.settings', layerUid: UID, set: { pos: [1010, 580] } }]]);
+  assert.deepEqual(h.legacy, []);
+});
+
+test('a pad under a rotated, scaled parent moves through the inverse of the parents\' linear part', async () => {
+  // A quarter turn doubled: x steps to +2y, y steps to -2x. A world delta (+20, +40) is the local (20, -10).
+  const turned = joystick(UID, { anchor: [100, 50], linear: [0, 2, -2, 0], center: [500, 300], angle: 90 });
+  const h = await started({ items: [turned] });
+  h.fire('pointerdown', { clientX: 540, clientY: 380 });
+  h.fire('pointermove', { clientX: 560, clientY: 420 });
+  h.fire('pointerup', { clientX: 560, clientY: 420 });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(h.sent(), [[OP + 'settings', { command: 'object.widget.settings', layerUid: UID, set: { pos: [120, 40] } }]]);
+});
+
+test('a pad whose parents collapse the plane is a typed widget_move_unavailable and writes nothing; a click without a drag writes nothing', async () => {
+  const h = await started({ items: [joystick(UID, { linear: [1, 2, 2, 4] })] });
+  h.fire('pointerdown', { clientX: 1040, clientY: 620 });
+  h.fire('pointermove', { clientX: 1060, clientY: 640 });
+  h.fire('pointerup', { clientX: 1060, clientY: 640 });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(h.toasts[0], /widget_move_unavailable/);
+  assert.equal(h.fx.owner.log.received.length, 0);
+  const still = await started();
+  still.fire('pointerdown', { clientX: 1040, clientY: 620 });
+  still.fire('pointerup', { clientX: 1040, clientY: 620 });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(still.sent(), []);
+});
+
+test('the overlay re-reads on a revision change and on a frame change by itself, without a panel update', async () => {
+  const h = await started();
+  h.flushFrames();
+  const base = h.reads.length;
+  h.fx.state.revision += 1;
+  h.flushFrames();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.reads.length, base + 1, 'one read for the new revision');
+  assert.equal(h.reads[h.reads.length - 1].pin, h.fx.state.revision);
+  h.sandbox.state.currentFrame = 3;
+  h.flushFrames();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.reads.length, base + 2, 'one read for the new frame');
+  assert.equal(h.reads[h.reads.length - 1].selector.frame, 3);
+  h.flushFrames();
+  assert.equal(h.reads.length, base + 2, 'an unchanged pin and frame cost no read');
+  h.sandbox.state.playing = true;
+  h.flushFrames();
+  assert.equal(h.reads.length, base + 2, 'nothing is read while playing');
+  assert.deepEqual(h.legacy, []);
+});
+
+test('Widget settings on a native layer row edits the axis range and the size through widget.settings, with the baseline prompts', async () => {
+  const h = await started();
+  const prompts = [], menus = [];
+  h.sandbox.showContextMenu = (x, y, entries) => menus.push({ x, y, entries });
+  h.sandbox.prompt = (text, value) => { prompts.push([text, value]); return prompts.length === 1 ? '-50, 50, 5' : '300, 4'; };
+  h.sandbox.SMRigWidget.openWidgetMenu(10, 20, 0);
+  assert.equal(menus.length, 1);
+  assert.deepEqual([menus[0].x, menus[0].y], [10, 20]);
+  assert.deepEqual(Array.from(menus[0].entries, (e) => e.label), ['widgetMenuAxisRangePrefixX  (-100…100)', 'widgetMenuAxisRangePrefixY  (-100…100)', 'widgetMenuSizeEllipsis']);
+  menus[0].entries[0].action();
+  await new Promise((resolve) => setImmediate(resolve));
+  menus[0].entries[2].action();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(prompts, [['promptWidgetRange', '-100, 100, 0'], ['promptWidgetSize', '200, 200']]);
+  assert.deepEqual(h.sent(), [[OP + 'settings', { command: 'object.widget.settings', layerUid: UID, set: { x: { min: -50, max: 50, rest: 5 } } }],
+    [OP + 'settings', { command: 'object.widget.settings', layerUid: UID, set: { size: [300, 8] } }]]);
   assert.deepEqual(h.legacy, []);
 });
 

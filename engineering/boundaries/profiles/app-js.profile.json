@@ -3232,6 +3232,30 @@
       ]
     },
     {
+      "id": "app.native.object.rig.weights.ui.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-rig-weights-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-rig-weights-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.object.rig.canvas.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-rig-canvas.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-rig-canvas.js"
+      ]
+    },
+    {
       "id": "app.native.object.labs.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

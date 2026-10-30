@@ -8,7 +8,7 @@ const Query = require('../src/js/adapters/native-object-query-contract.js');
 const PIN = { instanceId: 'instance-A', documentId: 'document-A', lifecycleGeneration: 3, contentRevision: 7, documentSnapshotId: 'native-object:document-A:7' };
 const axis = (label, value) => ({ key: 'xc_' + label, min: -100, max: 100, rest: 0, label, value });
 const item = (uid, over) => Object.assign({ layerUid: uid, visible: true, locked: false, kind: 'joystick', x: axis('X', 0), y: axis('Y', 0), center: [960, 540],
-  angle: 0, size: [160, 160], puck: [0, 0], rest: [0, 0], unavailable: null }, over || {});
+  angle: 0, size: [160, 160], puck: [0, 0], rest: [0, 0], anchor: [960, 540], linear: [1, 0, 0, 1], unavailable: null }, over || {});
 
 function fixture(items, options) {
   options = options || {};
