@@ -244,17 +244,28 @@
     if (fill) path.data.linkedFill = { data: { strokeId: fill.stableTarget.strokeId } };
     return path;
   }
-  // The top-most presented stroke of the active layer within 8 screen pixels of the click, or null. Only records whose
-  // bounds reach the click have their geometry read.
+  // The top-most presented stroke within 8 screen pixels of the click, or null, as the baseline did: the active layer is
+  // tested first, then every other visible unlocked layer from the topmost down (#2372). The hit carries its layer
+  // (data.nativeLayerIndex/Uid) so applyPick can activate it. Only records whose bounds reach the click have their geometry
+  // read; a hidden or locked layer (the active one too) is never read.
   async function pick(root, clientX, clientY) {
     var s = presentedSession(root);
     if (!s) return undefined;
-    var w = worldPoint(root, clientX, clientY, s.pin, s.presentation), t = 8 * w.perPixel;
-    var layers = await presented(root, root.state.activeLayerIdx, function (_item, b) { return w.x >= b[0] - t && w.x <= b[2] + t && w.y >= b[1] - t && w.y <= b[3] + t; });
-    if (!layers) return undefined;
-    var Point = root.Point || root.paper.Point, at = new Point(w.x, w.y);
-    for (var i = layers.paths.length - 1; i >= 0; i--)
-      if (layers.paths[i].hitTest(at, { fill: true, stroke: true, tolerance: t })) return withFill(owned(layers.paths[i]), layers.items);
+    var w = worldPoint(root, clientX, clientY, s.pin, s.presentation), t = 8 * w.perPixel, active = root.state.activeLayerIdx;
+    var Point = root.Point || root.paper.Point, at = new Point(w.x, w.y), order = [active], reach = function (_item, b) {
+      return w.x >= b[0] - t && w.x <= b[2] + t && w.y >= b[1] - t && w.y <= b[3] + t; };
+    for (var k = s.pin.layers.length - 1; k >= 0; k--) if (k !== active) order.push(k);
+    for (var n = 0; n < order.length; n++) {
+      var info = s.pin.layers[order[n]];
+      if (!info || info.locked === true || info.visible === false) continue;
+      var layers = await presented(root, order[n], reach);
+      if (!layers) return undefined;
+      for (var i = layers.paths.length - 1; i >= 0; i--) if (layers.paths[i].hitTest(at, { fill: true, stroke: true, tolerance: t })) {
+        var hit = withFill(owned(layers.paths[i]), layers.items);
+        hit.data.nativeLayerIndex = order[n]; hit.data.nativeLayerUid = layers.layerUid;
+        return hit;
+      }
+    }
     return null;
   }
 
@@ -317,6 +328,14 @@
   // Select's own rule on a picked stroke: a click selects it, Shift toggles it, an empty click clears unless Shift is held.
   // Picks are fresh objects, so identity is the native stroke id.
   function applyPick(root, item, shift) {
+    var data = item && item.data;
+    if (data && Number.isInteger(data.nativeLayerIndex) && data.nativeLayerIndex !== root.state.activeLayerIdx) {
+      // #2372: a hit on another layer activates it through the native layer-selection route (_layerSel follows); a refused
+      // activation selects nothing rather than a stroke of a layer that is not active.
+      var project = root.NemoNativeObjectProject;
+      if (!project || project.selectLayerUI(root, data.nativeLayerIndex, false, data.nativeLayerUid) !== true ||
+          root.state.activeLayerIdx !== data.nativeLayerIndex) return;
+    }
     var selected = root.selectedPaths || [], id = item && item.data.strokeId;
     var held = item ? selected.filter(function (p) { return p && p.data && p.data.strokeId === id; }) : [];
     root.selectedPaths = item ? (shift ? (held.length ? selected.filter(function (p) { return held.indexOf(p) < 0; }) : selected.concat([item])) : [item])
