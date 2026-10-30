@@ -84,7 +84,8 @@ test('F6 and F7 stay distinct native commands, and every frame insert also has a
   assert.equal(Registry.defFor('cmdInsertFrame').key,'F5');
   // The frame-cell context menu (baseline 1065e9d8) runs the global writers, which the native adapter routes.
   const menu=timeline.slice(timeline.indexOf("getElementById('frame-grid').addEventListener('contextmenu'"));
-  for(const [label,fn] of [['ctxInsertFrame','insertFrame'],['ctxInsertKeyframe','insertKeyframe'],['ctxInsertBlankKeyframe','insertBlankKeyframe']])
-    assert.ok(menu.includes("SM.t('"+label+"'),shortcut:'F"+(fn==='insertFrame'?5:fn==='insertKeyframe'?6:7)+"',action:function(){"+fn+"();}"),label);
+  // U04a (#2370): the hint is the registry's current binding (F5/F6/F7 by default), so a remap shows in the menu.
+  for(const [label,fn,action] of [['ctxInsertFrame','insertFrame','cmdInsertFrame'],['ctxInsertKeyframe','insertKeyframe','cmdInsertKey'],['ctxInsertBlankKeyframe','insertBlankKeyframe','cmdInsertBlankKey']])
+    assert.ok(menu.includes("SM.t('"+label+"'),shortcut:shortcutHint('"+action+"'),action:function(){"+fn+"();}"),label);
   for(const fn of ['insertFrame','insertKeyframe','insertBlankKeyframe'])assert.ok(FrameEdit.writerNames('global').includes(fn),fn);
 });
