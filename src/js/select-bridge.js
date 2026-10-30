@@ -477,6 +477,19 @@
   var nativePointerIntent = null, nativeLayersRef = null, nativeLayersEpoch = 0;
   function nativePointer() {
     if (nativePointerIntent) return nativePointerIntent;
+    // #2372: a pick that resolves undefined (the presentation could not be proven current) or throws is not "nothing under
+    // the cursor" (null, which clears): retry once after the presentation settles, then say so instead of dropping the click.
+    function pickUnavailable() { if (typeof window.showToast === 'function') window.showToast('Could not read the canvas just now \u2014 click again.'); }
+    function pickAndApply(I, intent, shift, ctx, retried) {
+      return I.pick(window, intent.x, intent.y).then(function (item) {
+        if (I.pickContext(window) !== ctx) return;
+        if (item === undefined) {
+          if (retried) return pickUnavailable();
+          return new Promise(function (done) { (window.setTimeout || setTimeout)(done, 120); }).then(function () { return pickAndApply(I, intent, shift, ctx, true); });
+        }
+        try { I.applyPick(window, item, shift); } catch (_) {}
+      }, pickUnavailable);
+    }
     nativePointerIntent = window.NemoSelectCanvasIntent.create({
       hover: function (e) { if (window.NemoNativeSelectOverlay) window.NemoNativeSelectOverlay.hoverAt(window, e); },
       context: function () {
@@ -508,7 +521,7 @@
       },
       select: function (intent, shift) {
         if (intent.mode === 'unavailable') return;
-        if (intent.mode === 'pick') { var I = window.NemoSelectCanvasIntent, ctx = I.pickContext(window); return void I.pick(window, intent.x, intent.y).then(function (item) { if (item !== undefined && I.pickContext(window) === ctx) I.applyPick(window, item, shift); }).catch(function () {}); }
+        if (intent.mode === 'pick') return void pickAndApply(window.NemoSelectCanvasIntent, intent, shift, window.NemoSelectCanvasIntent.pickContext(window), false);
         var c = window.NemoNativeOpacityCutover, prepared = c.prepared(), identity = c.identity();
         var ld = state.layers[state.activeLayerIdx], layer = userLayers[state.activeLayerIdx];
         if (!prepared || !identity || !ld || !layer || prepared.layerUid !== ld.layerUid) return;
