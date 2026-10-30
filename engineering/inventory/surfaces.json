@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "ef52f9913f89fc06aeb91385420f25c0da3d74f5",
-  "describe": "v0.7.0-alpha.4-3767-gef52f991-dirty"
+  "head": "d992fa37ce528464f994666ea2cd92dea0b2d043",
+  "describe": "v0.7.0-alpha.4-3769-gd992fa37-dirty"
  },
- "inputsDigest": "f7214dfafba276f7492d1aeb2a46b3d6833f08a10b02f0bd4cd442e90839b561",
+ "inputsDigest": "38f009faba3025ea28a8d62fc71074ccffc06e3e7258ff096b44f357958f27e0",
  "states": [
   "inventoried",
   "characterized",
@@ -52,7 +52,7 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 259,
+   "native": 260,
    "export": 5,
    "animation": 439,
    "history": 350,
@@ -181,7 +181,7 @@
   },
   "SM": {
    "file": "src/js/timeline.js",
-   "line": 11732,
+   "line": 11735,
    "members": 0
   },
   "SMKitsu": {
@@ -301,7 +301,7 @@
   },
   "SMRigWidget": {
    "file": "src/js/rig-widget.js",
-   "line": 681,
+   "line": 666,
    "members": 2
   },
   "SMRulers": {
@@ -1173,7 +1173,7 @@
    "capability": "Exclude — keep everything except the overlap (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11480"
+    "src/js/timeline.js:11483"
    ],
    "events": [
     "click"
@@ -1205,8 +1205,8 @@
     "functionsVisited": 91,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11431 updateCombinePanel()",
-     "src/js/timeline.js:11446 updateCombinePanel()"
+     "src/js/timeline.js:11434 updateCombinePanel()",
+     "src/js/timeline.js:11449 updateCombinePanel()"
     ]
    },
    "fixtures": [
@@ -1225,7 +1225,7 @@
    "capability": "Flatten",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11495"
+    "src/js/timeline.js:11498"
    ],
    "events": [
     "click"
@@ -1272,7 +1272,7 @@
    "capability": "Intersect — keep only the overlapping area (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11480"
+    "src/js/timeline.js:11483"
    ],
    "events": [
     "click"
@@ -1304,8 +1304,8 @@
     "functionsVisited": 91,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11431 updateCombinePanel()",
-     "src/js/timeline.js:11446 updateCombinePanel()"
+     "src/js/timeline.js:11434 updateCombinePanel()",
+     "src/js/timeline.js:11449 updateCombinePanel()"
     ]
    },
    "fixtures": [
@@ -1324,7 +1324,7 @@
    "capability": "Remove from group",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11488"
+    "src/js/timeline.js:11491"
    ],
    "events": [
     "click"
@@ -1371,7 +1371,7 @@
    "capability": "Subtract — cut later shapes out of the first (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11480"
+    "src/js/timeline.js:11483"
    ],
    "events": [
     "click"
@@ -1403,8 +1403,8 @@
     "functionsVisited": 91,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11431 updateCombinePanel()",
-     "src/js/timeline.js:11446 updateCombinePanel()"
+     "src/js/timeline.js:11434 updateCombinePanel()",
+     "src/js/timeline.js:11449 updateCombinePanel()"
     ]
    },
    "fixtures": [
@@ -1423,7 +1423,7 @@
    "capability": "Union — merge shapes into one (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11480"
+    "src/js/timeline.js:11483"
    ],
    "events": [
     "click"
@@ -1455,8 +1455,8 @@
     "functionsVisited": 91,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11431 updateCombinePanel()",
-     "src/js/timeline.js:11446 updateCombinePanel()"
+     "src/js/timeline.js:11434 updateCombinePanel()",
+     "src/js/timeline.js:11449 updateCombinePanel()"
     ]
    },
    "fixtures": [
@@ -2093,7 +2093,7 @@
    "capability": "export",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11575"
+    "src/js/timeline.js:11578"
    ],
    "events": [
     "click"
@@ -4263,8 +4263,8 @@
     "history": 1,
     "render": 1,
     "persist": 3,
-    "animation": 3,
     "native": 3,
+    "animation": 3,
     "selection": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
@@ -4277,7 +4277,7 @@
     "container": "rig-assign-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 223,
+    "functionsVisited": 249,
     "via": "chain",
     "references": []
    },
@@ -4297,7 +4297,7 @@
    "capability": "Commit pose",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11406"
+    "src/js/timeline.js:11407"
    ],
    "events": [
     "click"
@@ -4312,9 +4312,10 @@
     "history": 2,
     "render": 2,
     "selection": 3,
-    "animation": 3
+    "animation": 3,
+    "native": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1591",
@@ -4324,7 +4325,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 89,
+    "functionsVisited": 118,
     "via": "chain",
     "references": []
    },
@@ -4491,7 +4492,7 @@
    "capability": "Reset",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11410"
+    "src/js/timeline.js:11412"
    ],
    "events": [
     "click"
@@ -4505,8 +4506,8 @@
     "history": 1,
     "render": 1,
     "persist": 3,
-    "animation": 3,
     "native": 3,
+    "animation": 3,
     "selection": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
@@ -4519,7 +4520,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 224,
+    "functionsVisited": 252,
     "via": "chain",
     "references": []
    },
@@ -7101,7 +7102,7 @@
    "capability": "alpha",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11588"
+    "src/js/timeline.js:11591"
    ],
    "events": [
     "click"
@@ -7125,7 +7126,7 @@
     "functionsVisited": 0,
     "via": "container delegation #export-modal",
     "references": [
-     "src/js/timeline.js:11606"
+     "src/js/timeline.js:11609"
     ]
    },
    "fixtures": [
@@ -7142,7 +7143,7 @@
    "capability": "Cancel",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11595"
+    "src/js/timeline.js:11598"
    ],
    "events": [
     "click"
@@ -7182,7 +7183,7 @@
    "capability": "format",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11558"
+    "src/js/timeline.js:11561"
    ],
    "events": [
     "change"
@@ -7222,7 +7223,7 @@
    "capability": "h",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11566"
+    "src/js/timeline.js:11569"
    ],
    "events": [
     "input"
@@ -7263,7 +7264,7 @@
    "capability": "include shadow",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11588"
+    "src/js/timeline.js:11591"
    ],
    "events": [
     "click"
@@ -7287,7 +7288,7 @@
     "functionsVisited": 0,
     "via": "container delegation #export-modal",
     "references": [
-     "src/js/timeline.js:11611"
+     "src/js/timeline.js:11614"
     ]
    },
    "fixtures": [
@@ -7304,7 +7305,7 @@
    "capability": "range",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11588"
+    "src/js/timeline.js:11591"
    ],
    "events": [
     "click"
@@ -7328,7 +7329,7 @@
     "functionsVisited": 0,
     "via": "container delegation #export-modal",
     "references": [
-     "src/js/timeline.js:11511"
+     "src/js/timeline.js:11514"
     ]
    },
    "fixtures": [
@@ -7344,7 +7345,7 @@
    "capability": "Export",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11603"
+    "src/js/timeline.js:11606"
    ],
    "events": [
     "click"
@@ -7387,7 +7388,7 @@
    "capability": "Vector content — scaling stays crisp at any factor",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11559"
+    "src/js/timeline.js:11562"
    ],
    "events": [
     "change"
@@ -7426,7 +7427,7 @@
    "capability": "w",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11565"
+    "src/js/timeline.js:11568"
    ],
    "events": [
     "input"
@@ -7467,7 +7468,7 @@
    "capability": "&times;",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11587"
+    "src/js/timeline.js:11590"
    ],
    "events": [
     "click"
@@ -13428,7 +13429,7 @@
    "capability": "widget h",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:607 bindWidgetField()"
+    "src/js/rig-widget.js:592 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13459,7 +13460,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:579 renderWidgetPanel()"
+     "src/js/rig-widget.js:564 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13478,7 +13479,7 @@
    "capability": "widget w",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:607 bindWidgetField()"
+    "src/js/rig-widget.js:592 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13509,7 +13510,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:579 renderWidgetPanel()"
+     "src/js/rig-widget.js:564 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13528,7 +13529,7 @@
    "capability": "Link a property or drive a pose from this axis",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:628 initWidgetPanelFields()"
+    "src/js/rig-widget.js:613 initWidgetPanelFields()"
    ],
    "events": [
     "click"
@@ -13575,7 +13576,7 @@
    "capability": "widget xmax",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:607 bindWidgetField()"
+    "src/js/rig-widget.js:592 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13606,7 +13607,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:583 renderWidgetPanel()"
+     "src/js/rig-widget.js:568 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13625,7 +13626,7 @@
    "capability": "widget xmin",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:607 bindWidgetField()"
+    "src/js/rig-widget.js:592 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13656,7 +13657,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:583 renderWidgetPanel()"
+     "src/js/rig-widget.js:568 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13675,7 +13676,7 @@
    "capability": "widget xrest",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:607 bindWidgetField()"
+    "src/js/rig-widget.js:592 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13706,7 +13707,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:583 renderWidgetPanel()"
+     "src/js/rig-widget.js:568 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13725,7 +13726,7 @@
    "capability": "Link a property or drive a pose from this axis",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:630 initWidgetPanelFields()"
+    "src/js/rig-widget.js:615 initWidgetPanelFields()"
    ],
    "events": [
     "click"
@@ -13772,7 +13773,7 @@
    "capability": "widget ymax",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:607 bindWidgetField()"
+    "src/js/rig-widget.js:592 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13803,7 +13804,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:593 renderWidgetPanel()"
+     "src/js/rig-widget.js:578 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13822,7 +13823,7 @@
    "capability": "widget ymin",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:607 bindWidgetField()"
+    "src/js/rig-widget.js:592 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13853,7 +13854,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:593 renderWidgetPanel()"
+     "src/js/rig-widget.js:578 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13872,7 +13873,7 @@
    "capability": "widget yrest",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:607 bindWidgetField()"
+    "src/js/rig-widget.js:592 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13903,7 +13904,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:593 renderWidgetPanel()"
+     "src/js/rig-widget.js:578 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -14712,7 +14713,7 @@
    "capability": "Collapse panel",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11731 initPropsPanelCollapse()"
+    "src/js/timeline.js:11734 initPropsPanelCollapse()"
    ],
    "events": [
     "click"
@@ -14736,7 +14737,7 @@
     "functionsVisited": 9,
     "via": "variable btn",
     "references": [
-     "src/js/timeline.js:11724 syncPropsPanelCollapseTitle()"
+     "src/js/timeline.js:11727 syncPropsPanelCollapseTitle()"
     ]
    },
    "fixtures": [
@@ -14831,7 +14832,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:11391)",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:11392)",
    "source": "src/index.html:1588",
    "meta": {
     "data": {},
@@ -14841,7 +14842,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:11391"
+     "src/js/timeline.js:11392"
     ]
    },
    "fixtures": [
@@ -14866,7 +14867,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:11390)",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:11391)",
    "source": "src/index.html:1587",
    "meta": {
     "data": {},
@@ -14876,7 +14877,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:11390"
+     "src/js/timeline.js:11391"
     ]
    },
    "fixtures": [
@@ -14914,7 +14915,7 @@
     "functionsVisited": 0,
     "references": [
      "src/js/rig-bridge.js:194 panelSoftness()",
-     "src/js/timeline.js:11385"
+     "src/js/timeline.js:11386"
     ]
    },
    "fixtures": [
@@ -14953,7 +14954,7 @@
     "functionsVisited": 0,
     "references": [
      "src/js/rig-bridge.js:193 panelRotate()",
-     "src/js/timeline.js:11384"
+     "src/js/timeline.js:11385"
     ]
    },
    "fixtures": [
@@ -14995,7 +14996,7 @@
     "references": [
      "src/js/engine-bridge.js:3663 buildRigPreviewItems()",
      "src/js/rig-bridge.js:192 panelDefaultRadius()",
-     "src/js/timeline.js:11383"
+     "src/js/timeline.js:11384"
     ]
    },
    "fixtures": [
@@ -27502,7 +27503,7 @@
    "capability": "Range of ",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:527 axisItem()"
+    "src/js/rig-widget.js:512 axisItem()"
    ],
    "events": [
     "click"
@@ -27521,7 +27522,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/rig-widget.js:527",
+   "source": "src/js/rig-widget.js:512",
    "meta": {
     "i18n": "widgetMenuAxisRangePrefix",
     "functionsVisited": 197
@@ -27542,7 +27543,7 @@
    "capability": "Pad size…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:541 openWidgetMenu()"
+    "src/js/rig-widget.js:526 openWidgetMenu()"
    ],
    "events": [
     "click"
@@ -27561,7 +27562,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/rig-widget.js:541",
+   "source": "src/js/rig-widget.js:526",
    "meta": {
     "i18n": "widgetMenuSizeEllipsis",
     "functionsVisited": 197
@@ -32609,7 +32610,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 374
+    "functionsVisited": 383
    },
    "fixtures": [
     "media",
