@@ -273,24 +273,46 @@
     // #2362: Select and the Labs knife read every painted record of the presented layer (the hit-test listing: bounds
     // and role, never refused for being outside the editable scope); geometry is paged only for the records `wanted` keeps,
     // and with `centres` a kept ribbon also carries its centreline with widths (`center`, what sculpt deforms).
+    // #2372: the listing of one layer (and the geometry paged for its records) is a pure function of the pinned revision, the
+    // presentation (work id, view generation), the layer and the frame, so a hover that walks every visible layer on each move
+    // reads each unchanged layer once; any commit or re-presentation changes the key and reads afresh. Bounded, oldest first out.
+    const presented = new Map();
+    function presentedEntry(o, selector) {
+      const key = [o.info.instanceId, o.info.documentId, o.info.lifecycleGeneration, o.info.contentRevision, o.info.documentSnapshotId,
+        o.workId, o.viewGeneration, selector.layerUid, selector.frame].join('|');
+      if (!presented.has(key)) {
+        if (presented.size >= 24) presented.delete(presented.keys().next().value);
+        presented.set(key, { items: null, geometry: new Map() });
+      }
+      return presented.get(key);
+    }
     async function readPresentedStrokes(selector,pin,wanted,centres){
       if(!exact(selector,['contextId','layerUid','frame'],[])||selector.contextId!=='scene-root'||!text(selector.layerUid)||!integer(selector.frame,0,4294967295)||!pins(pin))throw fault('invalid_request','Invalid presented-stroke selection');
       const o=origin(selector,pin);if(!o)throw fault('unavailable','Presented strokes need a current native presentation');
-      await settle(o);let cursor=0,total=null,items=[];
-      for(;;){
-        const view=Object.assign({kind:'subselect',workId:o.workId,viewGeneration:o.viewGeneration,cursor:cursor,limit:8,hitTest:true},selector);
-        const r=await queryBody(o,{atRevision:o.info.contentRevision,documentSnapshotId:o.info.documentSnapshotId,view:view});
-        if(total!==null&&total!==r.total)throw fault('uncorrelated','Presented strokes changed between pages');
-        total=r.total;items=items.concat(r.items);if(r.nextCursor===null)break;cursor=r.nextCursor;
+      await settle(o);const entry=presentedEntry(o,selector);let items;
+      if(entry.items)items=entry.items.map(i=>Object.assign({},i));
+      else{
+        let cursor=0,total=null;items=[];
+        for(;;){
+          const view=Object.assign({kind:'subselect',workId:o.workId,viewGeneration:o.viewGeneration,cursor:cursor,limit:8,hitTest:true},selector);
+          const r=await queryBody(o,{atRevision:o.info.contentRevision,documentSnapshotId:o.info.documentSnapshotId,view:view});
+          if(total!==null&&total!==r.total)throw fault('uncorrelated','Presented strokes changed between pages');
+          total=r.total;items=items.concat(r.items);if(r.nextCursor===null)break;cursor=r.nextCursor;
+        }
+        requireCurrent(o);entry.items=items.map(i=>Object.assign({},i));
       }
+      const geometryOf=async(item,center)=>{
+        const k=stable(item.stableTarget)+(center?'|c':''),hit=entry.geometry.get(k);if(hit)return hit;
+        const g=await subselectGeometry(o,item.stableTarget,undefined,false,true,center);requireCurrent(o);entry.geometry.set(k,g);return g;
+      };
       for(const item of items){
         // #2372: a raster image or text block has no outline to page; a kept one is hit as its painted rect/glyph box.
         if(item.role==='raster'||item.role==='text'){if(typeof wanted!=='function'||wanted(item))item.segments=boxSegments(item.bounds);continue;}
         if(typeof wanted==='function'&&!wanted(item))continue;
-        const geometry=await subselectGeometry(o,item.stableTarget,undefined,false,true);
+        const geometry=await geometryOf(item,false);
         if(geometry.closed!==item.closed||geometry.segments.length!==item.count)throw fault('uncorrelated','Presented geometry differs from its listing');
         item.segments=geometry.segments;
-        if(centres&&item.role==='ribbon'){const c=await subselectGeometry(o,item.stableTarget,undefined,false,true,true);
+        if(centres&&item.role==='ribbon'){const c=await geometryOf(item,true);
           item.center=c.segments.map((a,i)=>({point:a.point,handleIn:a.handleIn,handleOut:a.handleOut,width:c.widths[i]}));}
       }
       requireCurrent(o);return freeze({info:copyPins(o.info),presentation:o.presentation,items:items});
