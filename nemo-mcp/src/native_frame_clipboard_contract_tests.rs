@@ -105,6 +105,10 @@ fn clipboard_paste_accepts_blank_and_plain_empty_cells_with_closed_order_shells_
         ("orderElements", Value::Null),
         ("orderElements", json!([null])),
         ("orderElements", json!([[]])),
+        ("rasterItems", Value::Null),
+        ("rasterItems", json!([null])),
+        ("textItems", Value::Null),
+        ("textItems", json!([[]])),
         ("extra", json!(true)),
     ] {
         let mut bad = cell.clone();
@@ -121,7 +125,7 @@ fn clipboard_paste_accepts_blank_and_plain_empty_cells_with_closed_order_shells_
     }
     // Count cells separately from record/order shells; native storage still owns record grammar.
     assert_eq!(MAX_DATA_ITEMS, 131_072);
-    for field in ["records", "orderElements"] {
+    for field in ["records", "orderElements", "rasterItems", "textItems"] {
         for count in [4096, 4097, MAX_DATA_ITEMS] {
             let mut at_limit = cell.clone();
             at_limit[field] = json!(vec![json!({}); count]);

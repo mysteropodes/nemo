@@ -12003,9 +12003,23 @@
           "items": {
             "type": "object"
           }
+        },
+        "rasterItems": {
+          "type": "array",
+          "maxItems": 131072,
+          "items": {
+            "type": "object"
+          }
+        },
+        "textItems": {
+          "type": "array",
+          "maxItems": 131072,
+          "items": {
+            "type": "object"
+          }
         }
       },
-      "description": "Bounded structural DTO shell only. Native strict decoding validates full record/order grammar, offsets, key/record and version/order relationships atomically; no record/order data is dropped. Records/order arrays use nativeDataBytes/32=131072 entries to avoid rejecting native-valid packets above4096 objects; cell/selection counts stay4096 and aggregate native data bytes remain4MiB."
+      "description": "Bounded structural DTO shell only. Optional rasterItems/textItems carry the cell's raster images and text blocks (entries target+item / target+block, strict native decoding, asset and mesh references stay valid only in the source document; a paste into another document or with an unresolved reference refuses typed). They count toward the same 4MiB data bound. Native strict decoding validates full record/order grammar, offsets, key/record and version/order relationships atomically; no record/order data is dropped. Records/order arrays use nativeDataBytes/32=131072 entries to avoid rejecting native-valid packets above4096 objects; cell/selection counts stay4096 and aggregate native data bytes remain4MiB."
     },
     "ObjectFrameClipboardPacket": {
       "type": "object",

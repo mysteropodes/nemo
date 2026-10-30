@@ -21,6 +21,8 @@ mod copy_dispatch;
 mod cut_dispatch;
 #[path = "object_frame_clipboard_paste_edges.rs"]
 mod edges;
+#[path = "object_frame_clipboard_paste_items.rs"]
+mod items;
 #[cfg(feature = "evaluation")]
 #[path = "object_frame_clipboard_paste_exposure.rs"]
 mod exposure;

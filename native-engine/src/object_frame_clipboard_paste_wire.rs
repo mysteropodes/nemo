@@ -7,10 +7,12 @@
 //! Records plus complete order arrays retain the existing4MiB copied-data bound.
 use crate::commands::object_fill_owner::object_frame_clipboard_packet::FrameClipboardPacket;
 use crate::commands::object_fill_owner::object_frame_clipboard_paste::{
-    CellRef, FrameClipboardOperation, PasteCell, PasteRequest,
+    CellItems, CellRef, FrameClipboardOperation, PasteCell, PasteRequest,
 };
 use crate::commands::object_fill_owner::object_frame_clipboard_paste_plan::packet_paste_cells;
-use crate::object_document::{object_deserialize, ObjectRecord, OrderElement, Presence};
+use crate::object_document::{
+    object_deserialize, ObjectRecord, OrderElement, Presence, RasterEntry, TextEntry,
+};
 use crate::request_receipts::{frame_clipboard_transport as budget, DispatchErrorCode};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -24,9 +26,13 @@ struct WireCell {
     keyframe: bool,
     records: Vec<ObjectRecord>,
     order_elements: Presence<Vec<OrderElement>>,
+    raster_items: Presence<Vec<RasterEntry>>,
+    text_items: Presence<Vec<TextEntry>>,
 }
 object_deserialize!(WireCell { rel_layer: u32, rel_frame: u32, keyframe: bool, records: Vec<ObjectRecord>,
-    #[serde(default)] order_elements: Presence<Vec<OrderElement>> });
+    #[serde(default)] order_elements: Presence<Vec<OrderElement>>,
+    #[serde(default)] raster_items: Presence<Vec<RasterEntry>>,
+    #[serde(default)] text_items: Presence<Vec<TextEntry>> });
 
 #[derive(Debug)]
 struct WireRef {
@@ -165,6 +171,16 @@ pub(crate) fn parse_clipboard_payload(
                         return Err(DispatchErrorCode::InvalidRequest);
                     }
                 }
+                for item in cell.raster_items.value().into_iter().flatten() {
+                    if !budget::charge(&mut data_bytes, item) {
+                        return Err(DispatchErrorCode::InvalidRequest);
+                    }
+                }
+                for item in cell.text_items.value().into_iter().flatten() {
+                    if !budget::charge(&mut data_bytes, item) {
+                        return Err(DispatchErrorCode::InvalidRequest);
+                    }
+                }
             }
             let cells = wire_cells
                 .into_iter()
@@ -173,6 +189,10 @@ pub(crate) fn parse_clipboard_payload(
                     rel_frame: cell.rel_frame,
                     keyframe: cell.keyframe,
                     records: cell.records,
+                    items: CellItems {
+                        raster: cell.raster_items.value().cloned().unwrap_or_default(),
+                        text: cell.text_items.value().cloned().unwrap_or_default(),
+                    },
                     order_elements: cell.order_elements,
                 })
                 .collect();
@@ -216,6 +236,12 @@ fn packet_cells_payload(packet: &FrameClipboardPacket) -> Vec<Value> {
                 "keyframe":cell.keyframe,"records":cell.records});
             if let Presence::Present(elements) = &cell.order_elements {
                 value["orderElements"] = json!(elements);
+            }
+            if !cell.items.raster.is_empty() {
+                value["rasterItems"] = json!(cell.items.raster);
+            }
+            if !cell.items.text.is_empty() {
+                value["textItems"] = json!(cell.items.text);
             }
             value
         })
