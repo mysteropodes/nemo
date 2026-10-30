@@ -111,8 +111,26 @@ files are not deleted on open: the recovered session's first own recovery write 
 the new manifest is durable. When a native project is already active, Resume replaces
 it exactly as New does (confirm if unsaved).
 
+## Cleanup and retention triggers (R4)
+
+`native-object-recovery-cleanup.js` drops recovery slots through `nemo_native_object_recovery_discard`. The
+scheduler records each slot it requests per document (`claim`/`release`) and exposes `quiesce()`, so a write still in
+flight is awaited before a discard and its slot is covered. A claim is synchronous with the trigger, so a write that
+starts afterwards (for example the post-save project's own recovery) is never discarded by it.
+
+| trigger | action |
+|---|---|
+| Save As acknowledged (`saved-current`) | discard the project's slots and the slot it was resumed from; not on cancel, refusal, stale or indeterminate |
+| New / Open / Resume that replaces a project | discard the replaced project's slots and its resumed slot, only after the replacement is installed (a declined or failed replace keeps them) |
+| clean quit (`isDirty()` false) | stop the writer, await an in-flight write, discard every slot; bounded to 1.5 s, never blocks or cancels the close |
+| confirmed quit-without-saving | nothing: the recovery is kept (approved default, baseline parity) |
+| start screen list (startup sweep) | Rust `list` drops a slot whose `originPath` file is at least as new as its newest generation, plus the age/count/byte caps |
+
+Every discard is best effort and fire-and-forget except at quit: a failure never fails Save, Open, New or Quit, and a
+failed slot stays claimed for the next trigger. An untitled slot has no `originPath`, so only an explicit discard (or the
+14-day cap) removes it. To delete the recovery after a confirmed quit-without-saving instead, call `cleanQuit()` in the
+confirmed branch of the close guard in `project.js`.
+
 ## Not covered
 
-Only the active project; parked tabs are a documented gap. Version-history parity
-(R6) is out of scope. After a confirmed quit-without-saving the recovery files are
-kept (baseline parity; one line in R4 flips it).
+Only the active project; parked tabs are a documented gap. Version-history parity (R6) is out of scope.
