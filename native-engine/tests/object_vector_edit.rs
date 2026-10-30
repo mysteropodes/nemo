@@ -16,6 +16,8 @@ mod create_many;
 mod create_held;
 #[path = "object_vector_batch.rs"]
 mod batch;
+#[path = "object_vector_batch_items.rs"]
+mod batch_items;
 #[path = "object_vector_trim_ends.rs"]
 mod trim_ends;
 #[path = "object_vector_edit_support.rs"]
