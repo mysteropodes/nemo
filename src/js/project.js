@@ -466,7 +466,7 @@
         var allowConfirmedClose=false;
         appWindow.onCloseRequested(async function(event){
           if(allowConfirmedClose)return; // confirmed quit-without-saving keeps the recovery (parity)
-          if(!isDirty()){ // clean quit: drop the crash recovery first, bounded and best effort
+          if(!isDirty()){ // clean quit: drop the ACTIVE document's crash recovery only (parked dirty tabs keep theirs), bounded, best effort
             if(nativeRecoveryCleanup)try{await nativeRecoveryCleanup.cleanQuit();}catch(_){}
             return;
           }
