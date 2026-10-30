@@ -29,8 +29,8 @@ test('N25C2g input child registration keeps full validation at every production 
   assert.match(wire, /pub fn native_request_byte_limit\(operation: &str\) -> usize \{\s*native_request_bytes::request_limit\(operation\)\s*\}/);
   const limits = fs.readFileSync(path.join(ROOT, 'nemo-mcp/src/native_request_bytes.rs'), 'utf8');
   assert.match(limits, /pub\(super\) const MAX_REQUEST_BYTES: usize = 65_536;/);
-  // Exactly two operations carry vector geometry and get that budget: a vector record edit and a Fill Brush outline.
-  assert.match(limits, /fn request_limit\(operation: &str\) -> usize \{\s*if super::native_clipboard_transport::owns\(operation\) \{\s*super::native_clipboard_transport::MESSAGE_BYTES\s*\} else if operation == "command\.document\.object\.vector\.edit"\s*\|\| operation == "command\.document\.object\.fill\.brush"\s*\|\| operation == "command\.document\.object\.brush\.bitmap\.stroke"\s*\{\s*MAX_REQUEST_BYTES\s*\} else \{\s*crate::contract::NATIVE_MAX_MESSAGE_BYTES\s*\}\s*\}/);
+  // Exactly two operations carry vector geometry and get that budget: a vector record edit and a Fill Brush outline (plus the bitmap-brush stroke and the four tween commands, whose frame lists and overrides need it).
+  assert.match(limits, /fn request_limit\(operation: &str\) -> usize \{\s*if super::native_clipboard_transport::owns\(operation\) \{\s*super::native_clipboard_transport::MESSAGE_BYTES\s*\} else if operation == "command\.document\.object\.vector\.edit"\s*\|\| operation == "command\.document\.object\.fill\.brush"\s*\|\| operation == "command\.document\.object\.brush\.bitmap\.stroke"\s*\|\| operation\.starts_with\("command\.document\.object\.tween\."\)\s*\{\s*MAX_REQUEST_BYTES\s*\} else \{\s*crate::contract::NATIVE_MAX_MESSAGE_BYTES\s*\}\s*\}/);
   assert.match(limits, /let limit = request_limit\(operation\.as_deref\(\)\.unwrap_or\(""\)\);\s*if request\.len\(\) > limit \{\s*return Err/);
 
   for (const file of ['nemo-mcp/src/server.rs', 'nemo-mcp/src/wire.rs', 'src-tauri/src/native_revision_sync.rs']) {

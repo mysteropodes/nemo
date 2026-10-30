@@ -57,6 +57,7 @@
         "src/native_object_rig_contract.rs",
         "src/native_object_rig_contract_tests.rs",
         "src/native_object_rig_receipt_tests.rs",
+        "src/native_object_tween_contract_tests.rs",
         "src/native_object_component_contract.rs",
         "src/native_object_component_contract_tests.rs",
         "src/native_object_component_receipt_tests.rs",
