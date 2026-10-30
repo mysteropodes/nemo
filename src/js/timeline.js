@@ -7576,7 +7576,7 @@ function showToast(m){var el=document.getElementById('toast');el.textContent=m;e
 // Tables, override persistence and the pure lookups all live in
 // shortcut-registry.js (P30/#1032) now; onOverrideChanged wires a rebind back
 // to the left-rail badge, exactly what setShortcutKey called directly before.
-var shortcutRegistry=NemoShortcutRegistry.create({storage:window.localStorage,onOverrideChanged:function(action){syncToolButtonShortcutBadge(action);}});
+var shortcutRegistry=NemoShortcutRegistry.create({storage:window.localStorage,onOverrideChanged:function(action){syncToolButtonShortcutBadge(action);},onReset:function(){syncAllToolButtonShortcutBadges();}});
 var toolRailBadges=NemoToolRail.createBadges({doc:document,registry:shortcutRegistry});
 // COMMAND_SHORTCUTS is pure {action,key,cat,label} data (P30/#1032, review on
 // #1114); dispatch by action lives here, same pattern as runToolShortcut below.
@@ -9018,7 +9018,7 @@ function settingsPreferencesUiInstance(){
     document:document,readProfile:function(){return state.userProfile;},
     setProfileField:function(key,value){state.userProfile[key]=value;},saveProfile:function(){return saveUserProfile();},
     setHex8Input:function(input,value){return setHex8Input(input,value);},
-    renderShortcuts:function(){return renderShortcutsList();},resetShortcuts:function(){var r=shortcutRegistry.reset();syncAllToolButtonShortcutBadges();return r;},
+    renderShortcuts:function(){return renderShortcutsList();},resetShortcuts:function(){return shortcutRegistry.reset();},
     refreshFeedback:function(){return refreshFeedbackList();},
     renderLabs:function(){var render=window.renderLabsPanel;if(render)return render();},
     showToast:function(text){return showToast(text);},translate:function(key){return SM.t(key);},
@@ -10029,10 +10029,10 @@ function onKeyDown(event){
 // U06 (#2370): the Space, Alt and Cmd/Ctrl holds live in application/tool-holds.js. Space taps play (a quick release with no
 // pointer press), holds pan; Cmd/Ctrl held past the arm delay with no other key switches to Select until release; a lost keyup
 // (window blur, page hidden) resets all three and restores the held tool exactly once.
+function onKeyUp(event){toolHolds.keyUp(event);}
 var toolHolds=NemoToolHolds.create({state:state,doc:document,win:window,
   setTool:function(t){window.SM.setTool(t);},togglePlay:function(){togglePlay();},
   penActive:function(){return !!(_pen&&_pen.path);},setCursor:function(c){canvasEl.style.cursor=c;}});
-function onKeyUp(event){toolHolds.keyUp(event);}
 NemoKeyboardArbiter.mount(document,{keydown:onKeyDown,keyup:onKeyUp});
 toolHolds.mount();
 document.querySelectorAll('.tool-btn').forEach(function(b){b.addEventListener('click',function(){window.SM.setTool(this.dataset.tool);});});

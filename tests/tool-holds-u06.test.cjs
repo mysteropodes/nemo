@@ -151,15 +151,14 @@ function badgeRig(){
   const doc={buttons:{}};const sk={};
   ['select','draw'].forEach(a=>{const s={textContent:'?'};doc.buttons[a]={querySelector:()=>s};sk[a]=s;});
   doc.querySelector=sel=>{const m=/data-tool="([^"]+)"/.exec(sel);return m?doc.buttons[m[1]]||null:null;};
-  const store={};const reg=Registry.create({storage:{getItem:k=>store[k]||null,setItem:(k,v)=>{store[k]=v;},removeItem:k=>{delete store[k];}}});
-  return {sk,reg,badges:Rail.createBadges({doc,registry:reg})};
+  const store={};let badges;const reg=Registry.create({onReset:()=>badges.syncAll(),storage:{getItem:k=>store[k]||null,setItem:(k,v)=>{store[k]=v;},removeItem:k=>{delete store[k];}}});
+  badges=Rail.createBadges({doc,registry:reg});return {sk,reg,badges};
 }
 
 test('badges show the bound key, follow a remap, and return to the defaults after a reset',()=>{
   const r=badgeRig();r.badges.syncAll();assert.equal(r.sk.select.textContent,'V');assert.equal(r.sk.draw.textContent,'B');
   r.reg.setKey('select','y');r.badges.sync('select');assert.equal(r.sk.select.textContent,'Y');assert.equal(r.sk.draw.textContent,'B');
-  r.reg.reset();assert.equal(r.sk.select.textContent,'Y','the registry alone never touches the DOM');
-  r.badges.syncAll();assert.equal(r.sk.select.textContent,'V');
+  r.reg.reset();assert.equal(r.sk.select.textContent,'V','a reset refreshes every badge through onReset');
   assert.equal(r.badges.sync('nonexistent'),false);
 });
 
@@ -167,7 +166,7 @@ test('badges show the bound key, follow a remap, and return to the defaults afte
 test('timeline.js routes the holds, the flyout and the badge refresh through the modules',()=>{
   assert.match(timeline,/spaceKeyDown\(event\)/);assert.match(timeline,/toolHolds\.altKeyDown\(\)/);assert.match(timeline,/function onKeyUp\(event\)\{toolHolds\.keyUp\(event\);\}/);
   assert.match(timeline,/NemoKeyboardArbiter\.mount\(document,\{keydown:onKeyDown,keyup:onKeyUp\}\);\s*toolHolds\.mount\(\);/);
-  assert.match(timeline,/resetShortcuts:function\(\)\{var r=shortcutRegistry\.reset\(\);syncAllToolButtonShortcutBadges\(\);return r;\}/,'a reset refreshes the rail badges');
+  assert.match(timeline,/onReset:function\(\)\{syncAllToolButtonShortcutBadges\(\);\}/,'a reset refreshes the rail badges');
   assert.doesNotMatch(timeline,/_cmdHold|SPACE_TAP_MS|state\.spaceDown=true/,'no hold logic left inline');
   assert.match(timeline,/window\.SMShapeGroup=\{ensureFront:shapeGroup\.ensureFront\}/);
   const html=fs.readFileSync(path.join(__dirname,'../src/index.html'),'utf8');

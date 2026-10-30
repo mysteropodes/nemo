@@ -164,6 +164,7 @@ var NemoShortcutRegistry = (function () {
   function create(ports) {
     var storage = ports && ports.storage;
     var onOverrideChanged = ports && ports.onOverrideChanged;
+    var onReset = ports && ports.onReset;
     var overrides = loadOverrides(storage);
 
     function setKey(action, key) {
@@ -172,12 +173,13 @@ var NemoShortcutRegistry = (function () {
       if (typeof onOverrideChanged === 'function') onOverrideChanged(action);
     }
 
-    // Matches the original reset button handler: clears state and storage
-    // only. It never called the badge-refresh port either — the modal list
-    // re-render was the caller's own job then, and stays so now.
+    // Clears state and storage. The modal list re-render is the caller's own
+    // job; the left-rail badges are refreshed through the optional onReset
+    // port (U06 #2370: without it a reset left every rebound letter on the rail).
     function reset() {
       overrides = {};
       try { storage.removeItem(STORAGE_KEY); } catch (e) { /* ignored, same as before */ }
+      if (typeof onReset === 'function') onReset();
     }
 
     return {
