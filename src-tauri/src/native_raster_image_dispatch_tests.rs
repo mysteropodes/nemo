@@ -177,6 +177,31 @@ async fn corrupt_image_source_leaves_no_partial_native_asset_or_layer() {
 }
 
 #[tokio::test]
+async fn a_refused_source_reports_its_reason_and_not_dispatched_so_the_client_may_correct_and_retry() {
+    let state = state();
+    let original = save(&state);
+    let reply = state
+        .revisions
+        .dispatch_image_using(
+            state.instance_id(),
+            &state.native_state(),
+            input(&state, "refused"),
+            false,
+            |_| async { Err("native image source outside filesystem scope".to_owned()) },
+        )
+        .await
+        .unwrap()
+        .response;
+    let error = reply.error.unwrap();
+    assert_eq!(error.code, "unavailable");
+    assert!(error.message.ends_with("outside filesystem scope"), "{}", error.message);
+    let details = error.details.unwrap();
+    assert_eq!(details["disposition"], "notDispatched");
+    assert_eq!(details["committed"], false);
+    assert_eq!(save(&state), original);
+}
+
+#[tokio::test]
 async fn wrong_owner_and_changed_body_return_typed_terminal_envelopes_before_source_io_without_poisoning_replay(
 ) {
     // Like the existing positive host controls, execution waits for reviewed PNG activation.
