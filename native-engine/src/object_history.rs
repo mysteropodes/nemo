@@ -229,6 +229,10 @@ mod object_widget_edit_tests;
 #[cfg(all(test, feature = "evaluation"))]
 #[path = "../tests/object_widget_edit_writes.rs"]
 mod object_widget_edit_writes_tests;
+// #2255: the widget presentation read, over widgets created by the owner itself.
+#[cfg(all(test, feature = "evaluation"))]
+#[path = "../tests/object_widget_view.rs"]
+mod object_widget_view_tests;
 #[cfg(all(test, feature = "evaluation"))]
 #[path = "../tests/object_property_sampling.rs"]
 mod property_sampling_tests;

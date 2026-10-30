@@ -3208,6 +3208,30 @@
       ]
     },
     {
+      "id": "app.native.object.widget.ui.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-widget-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-widget-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.object.rig.ui.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-rig-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-rig-ui.js"
+      ]
+    },
+    {
       "id": "app.native.object.labs.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
