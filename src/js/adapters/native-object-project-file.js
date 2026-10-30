@@ -123,6 +123,12 @@
       markSavedIndeterminate:function(){baseline=null;ports.repaint();}
     });
     function diagnostic(event,code){try{if(ports.openDiagnostic)ports.openDiagnostic(event,code);}catch(_){}}
+    // Crash-recovery cleanup (#2360 R4): the project's slots are dropped once saved or replaced. Fire and forget, so it never
+    // fails or delays Save/Open/New; the slots are claimed synchronously inside the port call.
+    function discardRecovery(documentId){
+      var extra=recoveredSlots.get(documentId);recoveredSlots.delete(documentId);
+      try{if(ports.discardRecovery)Promise.resolve(ports.discardRecovery(documentId,extra?[extra]:[])).catch(function(){});}catch(_){}
+    }
     async function openPath(path){return enter(path,null);}
     async function newProject(config,isCurrent,onCreationFailure){
       if(!config||typeof config!=='object')return false;
@@ -138,7 +144,7 @@
       opening=true;
       diagnostic(config?'file-new-started':'file-open-started');
       try{
-        var creating=!!config,revealing=false;
+        var creating=!!config,revealing=false,replaced=null;
         if(creating&&typeof session.newProject!=='function')throw {message:'Native New Project is unavailable',details:{disposition:'notDispatched'}};
         var value=creating?{canvasW:config.w,canvasH:config.h,fps:config.fps}:path;
         if(creating&&Object.prototype.hasOwnProperty.call(config,'totalFrames'))value.totalFrames=config.totalFrames;
@@ -148,6 +154,7 @@
           isCurrent:function(){var current=revealing&&isCurrent&&isCurrent.requestCurrent||isCurrent;
             return !current||current()===true;},
           confirm:async function(previous){
+            replaced=previous||null;
             if(!previous||baseline===previous.documentDigest||recovered&&recovered.confirmed)return true;
             var yes=!!(ports.confirmReplace&&await ports.confirmReplace(creating));
             if(yes&&recovered)recovered.confirmed=true;return yes;},
@@ -161,6 +168,7 @@
         });
         // No project and no error: the session found the file unsupported (corrupt or foreign). For a recovery that is a refusal.
         if(recovered&&info===null){diagnostic('file-failed','not-dispatched');recovered.refused={message:'Native recovery file is unsupported',code:'unsupported_format'};return false;}
+        if(info&&replaced)discardRecovery(replaced.documentId);
         if(creating&&info&&ports.createdNotice)ports.createdNotice();
         if(recovered&&info&&ports.resumedNotice)ports.resumedNotice();
         diagnostic(info?'file-completed':'file-cancelled');
@@ -222,7 +230,9 @@
           acquirePin:async function(request){serialization=await session.acquirePin(request);return serialization;},
           pickDestination:pick,savePinned:session.savePinned},options);
         var result=await saved.acknowledge(ticket,{written:written,serialization:serialization},options);
-        ports.notice(result,written);return written&&written.reason&&!result.acknowledged?Object.assign({},result,{reason:written.reason}):result;
+        ports.notice(result,written);
+        if(result.acknowledged&&session.info())discardRecovery(session.info().documentId);
+        return written&&written.reason&&!result.acknowledged?Object.assign({},result,{reason:written.reason}):result;
       }catch(error){ports.notice({status:'refused'},null,error);return {status:'refused',reason:error&&error.message||'save-failed'};}
       finally{saving=false;}
     }
@@ -299,7 +309,7 @@
       createdNotice:function(){ports.notice('New project created');},
       resumedNotice:function(){ports.notice('Session resumed');},
       recoveryRefused:function(){ports.notice(root.SM&&root.SM.t?root.SM.t('toastCannotResumeSessionCorrupt'):'Cannot resume the session: the recovery is unreadable.');},
-      commit:commit,repaint:ports.repaint,
+      commit:commit,repaint:ports.repaint,discardRecovery:ports.recoveryDiscard,
       pick:function(){return root.__TAURI__.dialog.save({title:'Save Project As',defaultPath:ports.read().name+'-copy.json',filters:[{name:'Nemo Project',extensions:['json']}]});},
       notice:function(result,written,error){
         ports.notice(result.acknowledged?'Saved: '+ports.read().name:error?'Save failed: '+(error.message||error):
