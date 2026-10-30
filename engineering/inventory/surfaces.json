@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "e581b211ab68e454588a78b4f95d49cdf4dc4383",
-  "describe": "v0.7.0-alpha.4-3951-ge581b211-dirty"
+  "head": "8d17c3ddbc6be5f1424601aee99f33da8f685676",
+  "describe": "v0.7.0-alpha.4-3953-g8d17c3dd-dirty"
  },
- "inputsDigest": "fc193e1da818a445db4a3d089596c74a503f01d6cd4a5e14dbd7b2dafb93bf08",
+ "inputsDigest": "612897bf531554cf3ac8d0b79d906b5ddb754f091516a11ad0089228405866bf",
  "states": [
   "inventoried",
   "characterized",
@@ -2445,7 +2445,7 @@
    "capability": "history",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:736 initStartScreen()"
+    "src/js/project.js:733 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3306,7 +3306,7 @@
    "capability": "new",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:733 initStartScreen()"
+    "src/js/project.js:730 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3386,7 +3386,7 @@
    "capability": "open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:732 initStartScreen()"
+    "src/js/project.js:729 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4622,7 +4622,7 @@
    "capability": "save",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:730 initStartScreen()"
+    "src/js/project.js:727 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4662,7 +4662,7 @@
    "capability": "saveas",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:731 initStartScreen()"
+    "src/js/project.js:728 initStartScreen()"
    ],
    "events": [
     "click"
@@ -7802,7 +7802,7 @@
    "capability": "file input",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:737 initStartScreen()"
+    "src/js/project.js:734 initStartScreen()"
    ],
    "events": [
     "change"
