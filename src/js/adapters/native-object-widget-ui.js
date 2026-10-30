@@ -192,7 +192,8 @@
     function adapter() { const m = win.NemoNativeObjectWidget; return m && typeof m.desktop === 'function' ? m.desktop(win) : null; }
     function cancel() { if (drag) { drag = null; paint(); } }
     function onDown(e) {
-      if (drag || busy || (e.button !== undefined && e.button !== 0) || !areaOf(e)) return;
+      const s = win.state;
+      if (drag || busy || (e.button !== undefined && e.button !== 0) || (s && (s.spaceDown || s.isPanning)) || !areaOf(e)) return; // Space-drag / the pan hand keep the gesture
       const found = hit(e);
       if (!found) return;
       consume(e);

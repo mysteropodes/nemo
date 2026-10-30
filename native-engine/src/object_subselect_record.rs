@@ -250,6 +250,16 @@ pub(crate) fn painted_bounds(record: &ObjectRecord) -> [f64; 4] {
     }
     if b.iter().all(|v| v.is_finite()) { b } else { [0.0; 4] }
 }
+/// #2372 hit-test listing: the authored stroke width in record space when the record really paints a stroke, else 0 (a ribbon
+/// and an unstroked fill have none beyond their outline, which `painted_bounds` already covers).
+pub(crate) fn painted_stroke_width(record: &ObjectRecord) -> f64 {
+    record
+        .vector()
+        .filter(|v| v.has_real_stroke && !has_pressure(record))
+        .and_then(|v| v.stroke_width.as_f64())
+        .filter(|w| w.is_finite() && *w > 0.0)
+        .unwrap_or(0.0)
+}
 /// #2362 hit-test listing: what a painted record is, so a reader can tell a ribbon's linked fill or a derived shape
 /// from a plain stroke without the record itself.
 pub(crate) fn hit_role(record: &ObjectRecord) -> &'static str {

@@ -157,3 +157,21 @@ test('hidden and locked layers are skipped, including the active one; a refused 
   Intent.applyPick(refused, await Intent.pick(refused, 425, 25), false);
   assert.deepEqual(refused.selectedPaths, [], 'the layer did not become active, so nothing is selected');
 });
+
+test('a layer of many textured strokes lists their anchors only (bounds cover the copies) and a pick on an anchor works', async () => {
+  // #2372: ten textured strokes list as ten anchors, the bounds of each grown over its stamped copies, so the listing is bounded
+  // and a click inside a brush stroke's reach reads that anchor's line alone.
+  const anchors = Array.from({ length: 10 }, (_, i) => ({ stableTarget: target('a' + i), closed: false, count: 2, role: 'brush', brush: 'anchor', group: 'g' + i,
+    filled: false, bounds: [i * 100, 10, i * 100 + 50, 209], matrix: [1, 0, 0, 1, 0, 0], segments: [seg(i * 100, 10), seg(i * 100 + 50, 10)] }));
+  const fetched = [];
+  const session = { isActive: () => true, blocksLegacy: () => true, info: () => PIN, readPresentedObjectSession: () => ({ presentation: { ...PIN, frame: 0 } }),
+    async readPresentedStrokes(_selector, _pin, wanted) {
+      return { items: anchors.map(({ segments, ...item }) => { const kept = wanted(item); fetched.push([item.stableTarget.strokeId, kept]); return kept ? { ...item, segments } : item; }) };
+    } };
+  const r = { selectedPaths: [], state: { activeLayerIdx: 0 }, Path: paper.Path, Matrix: paper.Matrix, Point: paper.Point, NemoNativeObjectProject: { desktop: () => session },
+    document: { getElementById: () => ({ getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 540 }) }) },
+    NemoNativeViewportUnderlay: { canvasMapping: { point: (e) => ({ x: e.clientX * 2, y: e.clientY * 2 }) } } };
+  const hit = await Intent.pick(r, 160, 5);
+  assert.deepEqual([hit.data.strokeId, hit.data.nativeBrush, hit.data.nativeGroup], ['a3', 'anchor', 'g3'], 'world (320,10) lies on the fourth anchor line');
+  assert.deepEqual(fetched.filter(([, kept]) => kept).map(([id]) => id), ['a3'], 'only the anchor whose bounds reach the click is read');
+});

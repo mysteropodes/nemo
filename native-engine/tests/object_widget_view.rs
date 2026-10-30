@@ -241,6 +241,54 @@ fn pages_are_bounded_and_a_cursor_past_the_list_is_refused() {
 }
 
 #[test]
+fn long_control_names_shorten_a_page_by_bytes_instead_of_refusing_the_view() {
+    let mut owner = owner_of(&base(1));
+    for n in 0..4 {
+        run_ok(
+            &mut owner,
+            &format!("c{n}"),
+            "create",
+            create_payload("joystick", "J", [10., 10.]),
+        );
+    }
+    let mut document = wire(&owner);
+    let mut uids: Vec<String> = document["layers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|layer| layer["layerUid"].as_str().unwrap().to_string())
+        .collect();
+    uids.drain(..uids.len() - 4); // the base document's own layer is not a widget
+    let mut n = 0;
+    for holder in document["propertyHolders"].as_array_mut().unwrap() {
+        for control in holder["controls"].as_array_mut().into_iter().flatten() {
+            control["name"] = json!(format!("{n:02}{}", "L".repeat(700)));
+            n += 1;
+        }
+    }
+    let owner = owner_of(&document);
+    // Four such pads cannot share one 4096-byte page, but the whole list still reads, page by page, in order.
+    let (mut cursor, mut seen, mut pages) = (0u64, Vec::new(), 0);
+    loop {
+        let result = read_with(&owner, cursor, 4, Ok(PROOF)).result.unwrap();
+        let items = result["items"].as_array().unwrap();
+        assert!(!items.is_empty(), "{result}");
+        assert_eq!(result["total"], json!(4));
+        seen.extend(items.iter().map(|i| i["layerUid"].as_str().unwrap().to_string()));
+        pages += 1;
+        match result["nextCursor"].as_u64() {
+            Some(next) => {
+                assert_eq!(next, cursor + items.len() as u64);
+                cursor = next;
+            }
+            None => break,
+        }
+    }
+    assert!(pages > 1, "the long names must have split the list");
+    assert_eq!(seen, uids);
+}
+
+#[test]
 fn only_the_actual_presentation_may_read_and_a_changed_one_is_stale() {
     let owner = joystick(None);
     assert_eq!(

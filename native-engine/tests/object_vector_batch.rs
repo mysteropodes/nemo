@@ -398,6 +398,51 @@ mod select_transform {
         assert_eq!(state(&owner), before, "one undo restores all of them");
     }
 
+    fn ribbon_with_fill(fill_ext: Value) -> NativeObjectHistory {
+        use super::super::create_many::pressure_record;
+        let center = json!([{"point":{"x":0,"y":10},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":2},
+            {"point":{"x":40,"y":10},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":4}]);
+        let mut doc = document(1, seeds(), None);
+        doc["layers"][0]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+            "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+        let mut owner = owner_of(&doc);
+        let companion = pressure_record([0.2, 0.4, 0.6], fill_ext);
+        let ribbon = pressure_record([0.1, 0.1, 0.1], json!({"linkedFillId":"lf",
+            "pressure":{"centerSegments":center,"widthProfile":[{"t":0,"width":2},{"t":1,"width":4}]}}));
+        let made = send(&mut owner, "set", json!({"command":"object.vector.createMany","records":[companion, ribbon]}));
+        assert_eq!(made["ok"], true, "{made}");
+        owner
+    }
+
+    #[test]
+    fn a_ribbons_gradient_linked_fill_takes_its_end_points() {
+        let gradient = json!({"kind":"linear","from":[0,0],"to":[100,0],"stops":[{"offset":0,"color":"#ff0000ff"},{"offset":1,"color":"#0000ffff"}]});
+        let mut owner = ribbon_with_fill(json!({"linkedFillId":"lf","isLinkedFillCompanion":true,"fillGradient":gradient}));
+        let response = send(&mut owner, "move", batch(vec![reshape("native-stroke:1:1", MOVE)]));
+        assert_eq!(response["ok"], true, "{response}");
+        let fill = at(&owner, "native-stroke:1:0");
+        assert_eq!((fill["vectorExt"]["fillGradient"]["from"].clone(), fill["vectorExt"]["fillGradient"]["to"].clone()),
+            (json!([10., 5.]), json!([210., 5.])), "the rebuilt fill's gradient follows the move");
+    }
+
+    #[test]
+    fn a_copy_step_after_a_transform_copies_the_step_it_named_not_one_the_expansion_shifted_onto_it() {
+        let by_copy_doc = ribbon_with_fill(json!({"linkedFillId":"lf","isLinkedFillCompanion":true}));
+        let by_record_doc = ribbon_with_fill(json!({"linkedFillId":"lf","isLinkedFillCompanion":true}));
+        let (mut by_copy, mut by_record) = (by_copy_doc, by_record_doc);
+        // Requested steps: 0 transform (expands to the ribbon and its fill), 1 create B, 2 create C, 3 copy of step 2.
+        let steps = |last: Value| vec![reshape("native-stroke:1:1", MOVE), op_create(record_at("B", "L1", 2, "")), op_create(record_at("C", "L1", 3, "")), last];
+        let copied = send(&mut by_copy, "copy", batch(steps(json!({"op":"copy","fromStep":2,"frame":4}))));
+        let resent = send(&mut by_record, "record", batch(steps(op_create(record_at("C", "L1", 4, "")))));
+        assert_eq!(resent["ok"], true, "{resent}");
+        assert_eq!(copied["ok"], true, "{copied}");
+        assert_eq!(copied["result"], resent["result"], "the same receipt as the resent record");
+        assert_eq!(state(&by_copy), state(&by_record), "step 2 (C) was copied, not the step the expanded list holds at index 2");
+        // A step that is not before the copy is still refused after the indices are resolved.
+        let forward = send(&mut by_copy, "forward", batch(vec![reshape("native-stroke:1:1", MOVE), json!({"op":"copy","fromStep":1,"frame":4})]));
+        assert_eq!(forward["ok"], false, "{forward}");
+    }
+
     #[test]
     fn a_gradient_fill_shape_takes_its_end_points() {
         let ext = json!({"isFillShape":true,"fillGradient":{"kind":"linear","from":[0,0],"to":[100,0],"stops":[{"offset":0,"color":"#ff0000ff"},{"offset":1,"color":"#0000ffff"}]}});

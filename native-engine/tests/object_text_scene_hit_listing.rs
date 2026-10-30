@@ -2,6 +2,9 @@
 use super::*;
 
 fn listing(drawing: &Value) -> Value {
+    page(drawing, 0)
+}
+fn page(drawing: &Value, cursor: u64) -> Value {
     let owner = owner(drawing);
     let snapshot = support::head(&owner);
     let p = plan(&snapshot, 0);
@@ -15,7 +18,7 @@ fn listing(drawing: &Value) -> Value {
     let request = json!({"apiVersion":2,"requestId":"hit","instanceId":snapshot.instance_id(),"documentId":snapshot.document_id(),
         "operation":"query.document.object","payload":{"atRevision":snapshot.content_revision(),
         "documentSnapshotId":snapshot.snapshot_id(),"view":{"kind":"subselect","contextId":"scene-root","layerUid":"L0","frame":0,
-        "workId":"native-work-1","viewGeneration":1,"cursor":0,"limit":8,"hitTest":true}}});
+        "workId":"native-work-1","viewGeneration":1,"cursor":cursor,"limit":8,"hitTest":true}}});
     let response = snapshot
         .dispatch_with_subselect_view(serde_json::from_value(request).unwrap(), Ok(&projection))
         .unwrap();
@@ -145,6 +148,23 @@ fn a_texture_anchor_names_its_brush_and_group_for_select() {
 }
 
 #[test]
+fn a_stroked_plain_record_lists_its_authored_width_and_an_unstroked_or_image_item_does_not() {
+    // #2372: Select pads its reach and hit test with half this width, as the baseline hit the real painted stroke.
+    let stroked = |real: bool| {
+        let mut doc = drawing();
+        doc["objects"][0]["family"] = json!("editable-vector-path");
+        doc["objects"][0]["vector"] = json!({"stroke":if real { json!({"kind":"solid","r":0.0,"g":0.0,"b":0.0,"a":1.0}) } else { Value::Null },
+            "hasRealStroke":real,"strokeWidth":40,"strokeCap":"butt","strokeJoin":"miter","miterLimit":10,"dashOffset":0,"opacity":1});
+        listing(&doc)["items"].as_array().unwrap().clone()
+    };
+    let items = stroked(true);
+    assert_eq!(items[0]["role"], "plain");
+    assert_eq!(items[0]["strokeWidth"].as_f64(), Some(40.0), "the authored width, in record space");
+    assert!(items[1].get("strokeWidth").is_none() && items[2].get("strokeWidth").is_none(), "a text block and an image carry none");
+    assert_eq!(stroked(false)[0]["strokeWidth"].as_f64(), Some(0.0), "no real stroke paints no width");
+}
+
+#[test]
 fn a_posed_layer_lists_its_image_and_text_in_their_stored_frame_with_the_pose_as_the_map() {
     // #2372: record space is the stored item's own frame, so a Select matrix conjugated with the listing's map is what the
     // item's batch transform applies to the stored centre / anchor.
@@ -159,4 +179,70 @@ fn a_posed_layer_lists_its_image_and_text_in_their_stored_frame_with_the_pose_as
     assert_eq!(pair(&text["matrix"]), [1.0, 0.0, 0.0, 1.0, 7.0, 9.0]);
     let b = pair(&text["bounds"]);
     assert!(b[0] >= 9.0 - 1e-9 && b[0] < 20.0 && b[1] >= 19.0 - 1e-9, "the glyph bounds are back in the stored frame near the anchor (10,20): {b:?}");
+}
+
+fn textured_layer(strokes: usize, copies: usize, anchorless: Option<usize>) -> Value {
+    let mut doc = drawing();
+    doc.as_object_mut().unwrap().remove("items");
+    let template = doc["objects"][0].clone();
+    let line = |x0: f64, x1: f64, y: f64| json!({"kind":"cubic-path","closed":false,"coordinateSpace":"document-world","handleSpace":"relative",
+        "segments":[{"point":{"x":x0,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}},
+            {"point":{"x":x1,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}}]});
+    let (mut objects, mut elements) = (Vec::new(), Vec::new());
+    let mut add = |id: String, geometry: Value, texture: Value| {
+        let mut r = template.clone();
+        r["target"] = support::target("L0", &id);
+        r["family"] = json!("editable-vector-path");
+        r["geometry"] = geometry;
+        r["vector"] = json!({"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"butt","strokeJoin":"miter",
+            "miterLimit":10,"dashOffset":0,"opacity":1});
+        r["vectorExt"] = json!({"brushTexture":texture});
+        elements.push(json!({"layerUid":"L0","strokeId":id,"naturalPosition":objects.len(),"order":{}}));
+        objects.push(r);
+    };
+    for i in 0..strokes {
+        let x = i as f64 * 100.0;
+        if anchorless != Some(i) {
+            add(format!("a{i}"), line(x, x + 50.0, 10.0), json!({"brushGroupId":format!("g{i}"),"brushTexturePreset":"chalk-round","preTextureOpacity":1}));
+        }
+        for k in 0..copies {
+            let y = 40.0 + k as f64;
+            add(format!("d{i}_{k}"), line(x + k as f64 * 0.25, x + k as f64 * 0.25 + 2.0, y),
+                json!({"brushGroupId":format!("g{i}"),"isBrushTextureCopy":true}));
+        }
+    }
+    doc["objects"] = json!(objects);
+    doc["compositionOrder"]["contexts"][0]["scopes"][0]["elements"] = json!(elements);
+    doc
+}
+fn listed(doc: &Value) -> Vec<Value> {
+    let (mut items, mut cursor) = (Vec::new(), 0);
+    loop {
+        let r = page(doc, cursor);
+        items.extend(r["items"].as_array().unwrap().iter().cloned());
+        match r["nextCursor"].as_u64() {
+            Some(next) => cursor = next,
+            None => return items,
+        }
+    }
+}
+
+#[test]
+fn ten_textured_strokes_list_as_ten_anchors_whose_bounds_cover_their_copies() {
+    // 10 strokes x 170 stamped copies is 1710 records; before, the listing refused past 1024 and Select read nothing.
+    let items = listed(&textured_layer(10, 170, None));
+    assert_eq!(items.len(), 10, "one anchor per textured stroke, no copy listed");
+    for (i, item) in items.iter().enumerate() {
+        assert_eq!((item["brush"].as_str(), item["group"].as_str().map(str::to_owned)), (Some("anchor"), Some(format!("g{i}"))));
+        let (b, x) = (pair(&item["bounds"]), i as f64 * 100.0);
+        assert_eq!((b[0], b[2]), (x, x + 50.0), "the anchor line spans x..x+50 wider than the copies' x extent");
+        assert_eq!((b[1], b[3]), (10.0, 40.0 + 169.0), "the box is grown down over the copies' y extent (40..209)");
+    }
+}
+
+#[test]
+fn a_copy_without_a_listed_anchor_stays_listed_as_itself() {
+    let items = listed(&textured_layer(2, 3, Some(1)));
+    let kinds: Vec<_> = items.iter().map(|i| i["brush"].as_str().unwrap().to_owned()).collect();
+    assert_eq!(kinds, ["anchor", "copy", "copy", "copy"], "stroke 0 lists its anchor only, stroke 1 keeps its anchorless copies");
 }

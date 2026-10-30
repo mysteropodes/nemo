@@ -70,6 +70,7 @@ pub(crate) struct NativeAuthority {
     inactive_project: Option<inactive_project::InactiveProject>,
     retained_releases: BTreeMap<String, ReleaseTombstone>,
     retained_replacements: BTreeMap<String, replacement::ReplacementRecord>,
+    retired_replacement_ids: replacement::RetiredIds,
     pub(crate) phase: NativePhase,
 }
 
@@ -129,6 +130,7 @@ impl Default for NativeAuthority {
             inactive_project: None,
             retained_releases: BTreeMap::new(),
             retained_replacements: BTreeMap::new(),
+            retired_replacement_ids: replacement::RetiredIds::default(),
             phase: NativePhase::Vacant,
         }
     }

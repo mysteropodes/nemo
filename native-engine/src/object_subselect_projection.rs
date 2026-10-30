@@ -56,6 +56,10 @@ impl ObjectCompositionWitness {
         } else {
             plan.commands().map(PaintEntry::Contour).collect()
         };
+        // #2372: a texture brush is listed as its anchor alone, the bounds covering every stamped copy (a copy resolves to its
+        // anchor anyway), so a layer of many textured strokes stays inside the listing bound. A copy whose anchor is absent
+        // from the layer is listed as itself.
+        let dabs = if hit_test { dab_bounds(self, index, &matrices) } else { DabBounds::default() };
         for entry in ordered {
             let command = match entry {
                 PaintEntry::Contour(command) if command.source().source_layer_index() == index => command,
@@ -85,15 +89,25 @@ impl ObjectCompositionWitness {
                 .get(&source.source_object_index())
                 .ok_or("Subselect transform is absent")?;
             let brush = if hit_test { record::brush_of(r) } else { (None, None) };
+            if brush.0 == Some("copy") && brush.1.as_ref().is_some_and(|g| dabs.anchored.contains(g)) {
+                continue;
+            }
             items.push(SubselectReadItem {
                 stable_target: r.target.clone(),
                 closed: if hit_test { r.geometry.closed } else { record::closed(r) },
                 count,
                 paint_count: (!hit_test && record::has_pressure(r)).then_some(r.geometry.segments.len()),
                 matrix,
-                bounds: hit_test.then(|| record::painted_bounds(r)),
+                bounds: hit_test.then(|| {
+                    let own = record::painted_bounds(r);
+                    match (brush.0, brush.1.as_ref().and_then(|g| dabs.union.get(g)), matrices.get(&source.source_object_index())) {
+                        (Some("anchor"), Some(world), Some(m)) => widen(own, *world, m),
+                        _ => own,
+                    }
+                }),
                 role: hit_test.then(|| record::hit_role(r)),
                 filled: hit_test.then(|| r.solid_fill().is_some() || r.fill_gradient().is_some()),
+                stroke_width: hit_test.then(|| record::painted_stroke_width(r)),
                 owner: (hit_test && record::hit_role(r) == "fill")
                     .then(|| record::linked_fill(r))
                     .flatten()
@@ -217,8 +231,62 @@ fn hit_item(
         bounds: Some(bounds),
         role: Some(role),
         filled: Some(true),
+        stroke_width: None,
         owner: None,
         brush: None,
         group: None,
+    }
+}
+
+/// #2372: the stamped copies of each texture brush of a layer, as one world box per brush group, and the groups whose anchor
+/// is listed (only those copies drop out of the listing).
+#[derive(Default)]
+struct DabBounds {
+    union: std::collections::HashMap<String, [f64; 4]>,
+    anchored: std::collections::HashSet<String>,
+}
+fn dab_bounds(witness: &ObjectCompositionWitness, layer: usize, matrices: &std::collections::BTreeMap<usize, [f64; 6]>) -> DabBounds {
+    let mut out = DabBounds::default();
+    for command in witness.plan().commands().filter(|c| c.source().source_layer_index() == layer) {
+        let source = command.source();
+        let r = source.record();
+        let (kind, Some(group)) = record::brush_of(r) else { continue };
+        match kind {
+            Some("anchor") => {
+                out.anchored.insert(group);
+            }
+            Some("copy") => {
+                let world = matrices.get(&source.source_object_index()).and_then(|m| through(m, record::painted_bounds(r)));
+                if let Some(w) = world {
+                    let b = out.union.entry(group).or_insert(w);
+                    *b = [b[0].min(w[0]), b[1].min(w[1]), b[2].max(w[2]), b[3].max(w[3])];
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+/// The box of `b` (x0, y0, x1, y1) carried through the affine `m` (a, b, c, d, e, f), when every corner stays finite.
+fn through(m: &[f64; 6], b: [f64; 4]) -> Option<[f64; 4]> {
+    let mut out = [f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY];
+    for (x, y) in [(b[0], b[1]), (b[2], b[1]), (b[0], b[3]), (b[2], b[3])] {
+        let (px, py) = (m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]);
+        out = [out[0].min(px), out[1].min(py), out[2].max(px), out[3].max(py)];
+    }
+    out.iter().all(|v| v.is_finite()).then_some(out)
+}
+/// `own` (an anchor's record-space bounds) grown to also cover the world box `world`, mapped back through the inverse of `m`.
+/// A singular or non-finite map leaves `own` as it was.
+fn widen(own: [f64; 4], world: [f64; 4], m: &[f64; 6]) -> [f64; 4] {
+    let det = m[0] * m[3] - m[1] * m[2];
+    if !det.is_finite() || det.abs() < 1e-12 {
+        return own;
+    }
+    let inv = [m[3] / det, -m[1] / det, -m[2] / det, m[0] / det, 0.0, 0.0];
+    let inv = [inv[0], inv[1], inv[2], inv[3], -(inv[0] * m[4] + inv[2] * m[5]), -(inv[1] * m[4] + inv[3] * m[5])];
+    match through(&inv, world) {
+        Some(b) => [own[0].min(b[0]), own[1].min(b[1]), own[2].max(b[2]), own[3].max(b[3])],
+        None => own,
     }
 }

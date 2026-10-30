@@ -203,6 +203,17 @@ fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
     let mut owned = r.clone();
     owned["items"][0]["owner"] = json!("ribbon-a");
     assert!(public_read(&q, &owned), "a linked fill names its ribbon");
+    // #2372: a plain stroke's authored width is optional, finite and non-negative.
+    for good in [json!(0), json!(40), json!(0.5)] {
+        let mut item = r.clone();
+        item["items"][0]["strokeWidth"] = good.clone();
+        assert!(public_read(&q, &item), "strokeWidth {good} is legal in a hit-test listing");
+    }
+    for bad in [json!(-1), json!("40"), json!(null), json!([40])] {
+        let mut item = r.clone();
+        item["items"][0]["strokeWidth"] = bad.clone();
+        assert!(!public_read(&q, &item), "strokeWidth {bad} is refused");
+    }
     for role in ["raster", "text"] {
         let mut item = r.clone();
         item["items"][0]["role"] = json!(role);

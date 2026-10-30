@@ -91,6 +91,7 @@ fn thread_allocation_failure_runs_the_accepted_job_synchronously() {
         inactive_project: None,
         retained_releases: BTreeMap::new(),
         retained_replacements: BTreeMap::new(),
+        retired_replacement_ids: Default::default(),
         phase: NativePhase::Active {
             generation: 1,
             application: Box::new(TerminalPump(Arc::clone(&advances))),
@@ -110,6 +111,7 @@ fn generation_exhaustion_preserves_active_authority_during_release_admission() {
         inactive_project: None,
         retained_releases: BTreeMap::new(),
         retained_replacements: BTreeMap::new(),
+        retired_replacement_ids: Default::default(),
         phase: NativePhase::Active {
             generation: u64::MAX,
             application: Box::new(TerminalPump(Arc::new(AtomicUsize::new(0)))),
@@ -143,6 +145,7 @@ fn generation_exhaustion_preserves_released_reentry_tombstone() {
         inactive_project: None,
         retained_releases: BTreeMap::new(),
         retained_replacements: BTreeMap::new(),
+        retired_replacement_ids: Default::default(),
         phase: NativePhase::Released(tombstone),
     };
     assert!(authority
@@ -466,4 +469,41 @@ fn tombstones_are_bounded_and_the_oldest_are_forgotten_first() {
     assert_eq!(kept, replacement::MAX_REPLACEMENT_TOMBSTONES);
     assert!(!authority.retained_replacements.contains_key("t0"));
     assert!(authority.retained_replacements.contains_key("t260"));
+}
+
+#[test]
+fn an_id_pruned_beyond_the_tombstone_bound_never_reexecutes() {
+    let mut authority = installed_pump();
+    authority.generation = 10_000;
+    let total = replacement::MAX_REPLACEMENT_TOMBSTONES + 40;
+    for ordinal in 0..total as u64 {
+        seed_replacement(
+            &mut authority,
+            &format!("t{ordinal}"),
+            ordinal + 1,
+            ReplacementReplay::Expired,
+        );
+        authority
+            .retained_replacements
+            .get_mut(&format!("t{ordinal}"))
+            .unwrap()
+            .tombstone = true;
+    }
+    authority.retire_for_capacity();
+    assert!(!authority.retained_replacements.contains_key("t0"));
+    // The exact tombstone is gone, yet every pruned id still replays Expired.
+    for ordinal in 0..40 {
+        let id = format!("t{ordinal}");
+        assert!(matches!(
+            authority.admit_replace_request(&id, b"body", "pump-fixture", "document-fixture", 0, |_| {
+                panic!("a retired id must not re-execute")
+            }),
+            Ok(ReplacementAdmission::Replay(ReplacementReplay::Expired))
+        ));
+    }
+    // An unrelated new id is still admitted and executed.
+    assert!(matches!(
+        admit_new(&mut authority, "fresh-request"),
+        Ok(ReplacementAdmission::Execute(_))
+    ));
 }

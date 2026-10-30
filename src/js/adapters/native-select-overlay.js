@@ -15,7 +15,11 @@
   var states = new WeakMap();
   function state(root) {
     var s = states.get(root);
-    if (!s) { s = { svg: null, sel: null, hov: null, prev: null, sig: '', watching: false, busy: false, next: null }; states.set(root, s); }
+    if (!s) {
+      s = { svg: null, sel: null, hov: null, prev: null, sig: '', scheduled: false, busy: false, next: null }; states.set(root, s);
+      // A window resize moves the canvas rectangle; it is an event, not something to poll for (#2372 REV-7).
+      if (typeof root.addEventListener === 'function') root.addEventListener('resize', function () { notify(root); });
+    }
     return s;
   }
   // What the overlay maps through, or null when no native presentation is current. `ctx` is the pick context (tool, mode,
@@ -97,7 +101,7 @@
     if (s.prev && (!c || s.prev.ctx !== c.ctx)) { s.prev = null; force = true; }
     if (!s.sel && !s.hov && !s.prev) { remove(s); return; }
     var sig = JSON.stringify([c.V, c.bounds, c.pin.canvasW, c.pin.canvasH]);
-    if (!force && s.svg && sig === s.sig) { watch(root); return; }
+    if (!force && s.svg && sig === s.sig) return;
     remove(s); s.sig = sig;
     var svg = node(root, 'svg', { viewBox: '0 0 ' + c.pin.canvasW + ' ' + c.pin.canvasH, preserveAspectRatio: 'none', 'aria-hidden': 'true' });
     Object.assign(svg.style, { position: 'fixed', pointerEvents: 'none', zIndex: '20', left: c.bounds.left + 'px', top: c.bounds.top + 'px', width: c.bounds.width + 'px', height: c.bounds.height + 'px' });
@@ -129,14 +133,16 @@
       svg.appendChild(polygon(root, c.V, { corners: [[m[0], m[1]], [m[2], m[1]], [m[2], m[3]], [m[0], m[3]]] }, { fill: 'rgba(74,158,255,0.08)', stroke: BLUE, 'stroke-opacity': '0.9', 'stroke-width': '1' }));
     }
     root.document.body.appendChild(svg); s.svg = svg;
-    watch(root);
   }
-  // Pan, zoom and resize redraw in place; a changed context or selection removes the overlay. No-op once nothing is shown.
-  function watch(root) {
+  // Something the overlay maps through may have changed (a new presentation or view from the viewport underlay, a UI repaint
+  // after a tool, layer, frame or mode change, a window resize): redraw in place, or drop what no longer holds. Event driven
+  // and one-shot: a single frame callback is queued only while something is drawn and is never re-armed, so an idle selection
+  // costs no per-frame work. The callback runs after the presenting call has returned, so the presentation is settled.
+  function notify(root) {
     var s = state(root);
-    if (s.watching || !root.requestAnimationFrame) return;
-    s.watching = true;
-    root.requestAnimationFrame(function () { s.watching = false; if (s.svg) refresh(root, false); });
+    if (s.scheduled || (!s.svg && !s.sel && !s.hov && !s.prev) || !root.requestAnimationFrame) return;
+    s.scheduled = true;
+    root.requestAnimationFrame(function () { s.scheduled = false; refresh(root, false); });
   }
   // The selection changed (applyPick): redraw from root.selectedPaths; an empty selection draws nothing.
   function show(root) {
@@ -145,6 +151,8 @@
     s.hov = null;
     refresh(root, true);
   }
+  // The pick context the drawn selection (box, handles, ring) belongs to, or null when none is drawn for the current selection (#2372).
+  function selectionContext(root) { var s = state(root); return s.sel && s.sel.paths === root.selectedPaths && s.sel.count === (root.selectedPaths || []).length ? s.sel.ctx : null; }
   function clear(root) { var s = state(root); s.sel = null; s.hov = null; s.prev = null; s.next = null; remove(s); }
   // A drag in flight (#2372): `spec` is { paths } (the transformed copies of the selection, drawn with their box and handles)
   // and/or { marquee: [x0, y0, x1, y1] } in world space; null ends it. Nothing here writes the document.
@@ -161,7 +169,8 @@
     var held = sid && (root.selectedPaths || []).some(function (p) { return p && p.data && p.data.strokeId === sid; });
     var next = c && path && !held ? { path: path, ctx: c.ctx } : null;
     if (next && s.hov && sid && s.hov.path.data.strokeId === sid && s.hov.ctx === next.ctx) return;
-    s.hov = next; refresh(root, true);
+    s.hov = next;
+    try { refresh(root, true); } catch (e) { s.hov = null; remove(s); throw e; } // a failed draw must not leave a hover that suppresses the retry
   }
   // Pointer hover over the active layer's presented strokes. Picks are coalesced: one read at a time, the latest position wins,
   // and a read whose context changed before it returned is discarded.
@@ -172,14 +181,16 @@
     if (s.busy) return;
     s.busy = true;
     (async function () {
-      while (s.next) {
-        var job = s.next, ctx = I.pickContext(root), item;
-        s.next = null;
-        try { item = await I.pick(root, job.x, job.y); } catch (_) { item = undefined; }
-        if (item !== undefined && !s.next && I.pickContext(root) === ctx) hover(root, item);
-      }
-      s.busy = false;
+      // A throw anywhere in a read (context, pick, redraw) must not leave busy set: that disabled hover for good (#2372 REV-7).
+      try {
+        while (s.next) {
+          var job = s.next, ctx = I.pickContext(root), item;
+          s.next = null;
+          try { item = await I.pick(root, job.x, job.y); } catch (_) { item = undefined; }
+          if (item !== undefined && !s.next && I.pickContext(root) === ctx) hover(root, item);
+        }
+      } catch (_) { s.next = null; } finally { s.busy = false; }
     }());
   }
-  return Object.freeze({ show: show, clear: clear, hover: hover, hoverAt: hoverAt, preview: preview, boxOf: orientedBox, refresh: function (root) { refresh(root, false); } });
+  return Object.freeze({ show: show, clear: clear, hover: hover, hoverAt: hoverAt, preview: preview, boxOf: orientedBox, selectionContext: selectionContext, notify: notify, refresh: function (root) { refresh(root, false); } });
 }));
