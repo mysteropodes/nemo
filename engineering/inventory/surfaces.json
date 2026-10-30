@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "58bc366397ed91f041e228c9c7b67fef215246cf",
-  "describe": "v0.7.0-alpha.4-3696-g58bc3663-dirty"
+  "head": "7494dabd8fcef3445305730ce537c1bcbcb82794",
+  "describe": "v0.7.0-alpha.4-3708-g7494dabd-dirty"
  },
- "inputsDigest": "f304ac0bc0608836bd3a67d8e53ce338353369376ee7472a3e17744075bd00f8",
+ "inputsDigest": "dee3ea27fe14ce65c38c1150c3198d87da61fa8a244cb903d542488a2cf916dd",
  "states": [
   "inventoried",
   "characterized",
@@ -321,7 +321,7 @@
   },
   "SMSelectBridge": {
    "file": "src/js/select-bridge.js",
-   "line": 3563,
+   "line": 3564,
    "members": 4
   },
   "SMShadowBrush": {
@@ -27578,7 +27578,7 @@
    "capability": "Accepter la correction",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3192 onContext()"
+    "src/js/select-bridge.js:3193 onContext()"
    ],
    "events": [
     "click"
@@ -27598,7 +27598,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3192",
+   "source": "src/js/select-bridge.js:3193",
    "meta": {
     "i18n": null,
     "functionsVisited": 277
@@ -27617,7 +27617,7 @@
    "capability": "Animer le texte…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3247 onContext()"
+    "src/js/select-bridge.js:3248 onContext()"
    ],
    "events": [
     "click"
@@ -27636,7 +27636,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3247",
+   "source": "src/js/select-bridge.js:3248",
    "meta": {
     "i18n": null,
     "functionsVisited": 93
@@ -27655,7 +27655,7 @@
    "capability": "Aplatir",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3082 onContext()"
+    "src/js/select-bridge.js:3083 onContext()"
    ],
    "events": [
     "click"
@@ -27675,7 +27675,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3082",
+   "source": "src/js/select-bridge.js:3083",
    "meta": {
     "i18n": null,
     "functionsVisited": 96
@@ -27694,7 +27694,7 @@
    "capability": "Arrière-plan",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3093 onContext()"
+    "src/js/select-bridge.js:3094 onContext()"
    ],
    "events": [
     "click"
@@ -27715,7 +27715,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3093",
+   "source": "src/js/select-bridge.js:3094",
    "meta": {
     "i18n": null,
     "functionsVisited": 202
@@ -27734,7 +27734,7 @@
    "capability": "Centrer le point d\\'ancrage",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3109 onContext()"
+    "src/js/select-bridge.js:3110 onContext()"
    ],
    "events": [
     "click"
@@ -27755,7 +27755,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3109",
+   "source": "src/js/select-bridge.js:3110",
    "meta": {
     "i18n": null,
     "functionsVisited": 409
@@ -27774,7 +27774,7 @@
    "capability": "Coller",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3005 onContext()"
+    "src/js/select-bridge.js:3006 onContext()"
    ],
    "events": [
     "click"
@@ -27794,7 +27794,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3005",
+   "source": "src/js/select-bridge.js:3006",
    "meta": {
     "i18n": null,
     "functionsVisited": 115
@@ -27811,230 +27811,6 @@
    "kind": "menu",
    "surface": "dynamic menu (onContext)",
    "capability": "Coller",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/select-bridge.js:3041 onContext()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "selection": 2,
-    "render": 2,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3041",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 115
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "menu:select-bridge.js:onContext:combiner-union-non-destructif",
-   "kind": "menu",
-   "surface": "dynamic menu (onContext)",
-   "capability": "Combiner (Union) — non destructif",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/select-bridge.js:3071 onContext()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "selection": 2,
-    "render": 2,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3071",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 79
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "menu:select-bridge.js:onContext:convertir-le-trait-en-remplissage-fill",
-   "kind": "menu",
-   "surface": "dynamic menu (onContext)",
-   "capability": "Convertir le trait en remplissage (Fill)",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/select-bridge.js:3226 onContext()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "selection": 2,
-    "render": 2,
-    "native": 3,
-    "animation": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3226",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 77
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "menu:select-bridge.js:onContext:copier",
-   "kind": "menu",
-   "surface": "dynamic menu (onContext)",
-   "capability": "Copier",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/select-bridge.js:3039 onContext()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "selection": 2
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3039",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 29
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "menu:select-bridge.js:onContext:couper",
-   "kind": "menu",
-   "surface": "dynamic menu (onContext)",
-   "capability": "Couper",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/select-bridge.js:3040 onContext()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "selection": 2,
-    "persist": 3,
-    "history": 3,
-    "render": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3040",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 28
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "menu:select-bridge.js:onContext:ctxmaskimagewithshape",
-   "kind": "menu",
-   "surface": "dynamic menu (onContext)",
-   "capability": "Mask the image with this shape",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/select-bridge.js:3132 onContext()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3132",
-   "meta": {
-    "i18n": "ctxMaskImageWithShape",
-    "functionsVisited": 8
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "menu:select-bridge.js:onContext:dupliquer",
-   "kind": "menu",
-   "surface": "dynamic menu (onContext)",
-   "capability": "Dupliquer",
    "area": "drawing-selection",
    "handler": [
     "src/js/select-bridge.js:3042 onContext()"
@@ -28060,6 +27836,230 @@
    "source": "src/js/select-bridge.js:3042",
    "meta": {
     "i18n": null,
+    "functionsVisited": 115
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "menu:select-bridge.js:onContext:combiner-union-non-destructif",
+   "kind": "menu",
+   "surface": "dynamic menu (onContext)",
+   "capability": "Combiner (Union) — non destructif",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/select-bridge.js:3072 onContext()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "selection": 2,
+    "render": 2,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/select-bridge.js:3072",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 79
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "menu:select-bridge.js:onContext:convertir-le-trait-en-remplissage-fill",
+   "kind": "menu",
+   "surface": "dynamic menu (onContext)",
+   "capability": "Convertir le trait en remplissage (Fill)",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/select-bridge.js:3227 onContext()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "selection": 2,
+    "render": 2,
+    "native": 3,
+    "animation": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/select-bridge.js:3227",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 77
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "menu:select-bridge.js:onContext:copier",
+   "kind": "menu",
+   "surface": "dynamic menu (onContext)",
+   "capability": "Copier",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/select-bridge.js:3040 onContext()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "selection": 2
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/select-bridge.js:3040",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 29
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "menu:select-bridge.js:onContext:couper",
+   "kind": "menu",
+   "surface": "dynamic menu (onContext)",
+   "capability": "Couper",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/select-bridge.js:3041 onContext()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "selection": 2,
+    "persist": 3,
+    "history": 3,
+    "render": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/select-bridge.js:3041",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 28
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "menu:select-bridge.js:onContext:ctxmaskimagewithshape",
+   "kind": "menu",
+   "surface": "dynamic menu (onContext)",
+   "capability": "Mask the image with this shape",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/select-bridge.js:3133 onContext()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/select-bridge.js:3133",
+   "meta": {
+    "i18n": "ctxMaskImageWithShape",
+    "functionsVisited": 8
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "menu:select-bridge.js:onContext:dupliquer",
+   "kind": "menu",
+   "surface": "dynamic menu (onContext)",
+   "capability": "Dupliquer",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/select-bridge.js:3043 onContext()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "selection": 2,
+    "render": 2,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/select-bridge.js:3043",
+   "meta": {
+    "i18n": null,
     "functionsVisited": 99
    },
    "fixtures": [
@@ -28076,7 +28076,7 @@
    "capability": "Exposer l\\'opacité comme propriété de Component…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3263 onContext()"
+    "src/js/select-bridge.js:3264 onContext()"
    ],
    "events": [
     "click"
@@ -28094,7 +28094,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3263",
+   "source": "src/js/select-bridge.js:3264",
    "meta": {
     "i18n": null,
     "functionsVisited": 34
@@ -28113,7 +28113,7 @@
    "capability": "Exposer la visibilité comme propriété de Component…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3272 onContext()"
+    "src/js/select-bridge.js:3273 onContext()"
    ],
    "events": [
     "click"
@@ -28131,7 +28131,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3272",
+   "source": "src/js/select-bridge.js:3273",
    "meta": {
     "i18n": null,
     "functionsVisited": 33
@@ -28150,7 +28150,7 @@
    "capability": "Premier plan",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3086 onContext()"
+    "src/js/select-bridge.js:3087 onContext()"
    ],
    "events": [
     "click"
@@ -28171,7 +28171,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3086",
+   "source": "src/js/select-bridge.js:3087",
    "meta": {
     "i18n": null,
     "functionsVisited": 202
@@ -28190,7 +28190,7 @@
    "capability": "Profil de contour :",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3227 onContext()"
+    "src/js/select-bridge.js:3228 onContext()"
    ],
    "events": [
     "click"
@@ -28204,7 +28204,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3227",
+   "source": "src/js/select-bridge.js:3228",
    "meta": {
     "i18n": null,
     "functionsVisited": 0
@@ -28223,7 +28223,7 @@
    "capability": "Rejeter la correction",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3199 onContext()"
+    "src/js/select-bridge.js:3200 onContext()"
    ],
    "events": [
     "click"
@@ -28243,7 +28243,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3199",
+   "source": "src/js/select-bridge.js:3200",
    "meta": {
     "i18n": null,
     "functionsVisited": 277
@@ -28262,7 +28262,7 @@
    "capability": "Sortir du groupe",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3081 onContext()"
+    "src/js/select-bridge.js:3082 onContext()"
    ],
    "events": [
     "click"
@@ -28282,7 +28282,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3081",
+   "source": "src/js/select-bridge.js:3082",
    "meta": {
     "i18n": null,
     "functionsVisited": 63
@@ -28301,7 +28301,7 @@
    "capability": "Suggérer la forme pour « ",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3020 onContext()"
+    "src/js/select-bridge.js:3021 onContext()"
    ],
    "events": [
     "click"
@@ -28319,7 +28319,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3020",
+   "source": "src/js/select-bridge.js:3021",
    "meta": {
     "i18n": null,
     "functionsVisited": 82

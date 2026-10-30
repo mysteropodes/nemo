@@ -170,7 +170,8 @@
       dispose:()=>{retired=true;cancel(true);}});
   }
   function install(root){const init=()=>{const controller=create(root);root.NemoNativeSubselectController=controller;const d=root.document,target=d.getElementById('canvas-area')||d.getElementById('drawing-canvas');if(!target)return;
-    for(const [event,kind] of [['pointerdown','down'],['pointermove','move'],['pointerup','up'],['pointercancel','cancel'],['lostpointercapture','lost']])target.addEventListener(event,e=>controller.handle(kind,e),{capture:true});
+    // Document-level capture runs before any canvas-area listener whatever the script order, so select-bridge's native canvas intent can never swallow a Subselect gesture; handle() filters on tool, native project and event target.
+    for(const [event,kind] of [['pointerdown','down'],['pointermove','move'],['pointerup','up'],['pointercancel','cancel'],['lostpointercapture','lost']])d.addEventListener(event,e=>controller.handle(kind,e),{capture:true});
     d.addEventListener('keydown',e=>controller.key(e),{capture:true});root.addEventListener('blur',()=>controller.cancel());
   };if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init);else init();}
   return Object.freeze({create,install,inverse,map});
