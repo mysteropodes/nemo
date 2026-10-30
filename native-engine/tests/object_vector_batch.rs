@@ -409,6 +409,17 @@ mod select_transform {
         assert_eq!(points(&shape)[2], [210., 125.]);
     }
 
+    #[test]
+    fn a_plain_closed_stroke_with_a_gradient_takes_its_end_points_through_the_matrix() {
+        let ext = json!({"fillGradient":{"kind":"linear","from":[0,0],"to":[100,0],"stops":[{"offset":0,"color":"#ff0000ff"},{"offset":1,"color":"#0000ffff"}]}});
+        let mut owner = owner_of(&document(1, vec![closed(record_at("A", "L1", 0, ""), "s-a", SQUARE, ext)], None));
+        let response = send(&mut owner, "move", batch(vec![reshape("s-a", MOVE)]));
+        assert_eq!(response["ok"], true, "{response}");
+        let stroke = at(&owner, "s-a");
+        assert_eq!((stroke["vectorExt"]["fillGradient"]["from"].clone(), stroke["vectorExt"]["fillGradient"]["to"].clone()), (json!([10., 5.]), json!([210., 5.])));
+        assert_eq!(points(&stroke)[2], [210., 125.]);
+    }
+
     #[cfg(feature = "evaluation")]
     #[test]
     fn a_dynamic_shape_keeps_its_box_and_takes_a_turn_as_box_angle() {
