@@ -192,6 +192,75 @@ fn a_text_block_is_re_anchored_and_scaled_as_the_baseline_resize_did() {
     assert_eq!(owner.history_depths(), (0, 2));
 }
 
+/// A turn of `degrees` about the record-space point `(px, py)` as `[a b c d e f]`.
+fn turn_about(degrees: f64, px: f64, py: f64) -> [f64; 6] {
+    let (s, c) = degrees.to_radians().sin_cos();
+    [c, s, -s, c, px - c * px + s * py, py - s * px - c * py]
+}
+
+#[test]
+fn a_text_block_stores_a_turn_about_its_anchor_and_composes_further_turns() {
+    let mut owner = owner_of(&with_items());
+    let before = state(&owner);
+    assert!(text(&owner).get("rotation").is_none(), "an authored block has no stored turn");
+    // 30 degrees about the anchor itself: the anchor stays, size and spacing are untouched.
+    let r = send(&mut owner, "turn", batch(vec![reshape("txt", turn_about(30., 10., 20.))]));
+    assert_eq!(r["ok"], true, "{r}");
+    let turned = text(&owner);
+    assert!(
+        close(num(&turned, "rotation"), 30.)
+            && close(num(&turned["anchorTopLeft"], "x"), 10.)
+            && close(num(&turned["anchorTopLeft"], "y"), 20.)
+            && num(&turned, "size") == 24.
+            && num(&turned, "fixedWidth") == 200.
+            && num(&turned, "letterSpacing") == 2.,
+        "{turned}"
+    );
+    // A second turn of 45 about the record-space origin: the stored turn adds up and the anchor orbits as
+    // `a + R(30) (r(a) - a)`, which is where the unturned frame's image lands once the stored turn is applied.
+    let r = send(&mut owner, "turn-again", batch(vec![reshape("txt", turn_about(45., 0., 0.))]));
+    assert_eq!(r["ok"], true, "{r}");
+    let twice = text(&owner);
+    let (s45, c45) = 45f64.to_radians().sin_cos();
+    let (s30, c30) = 30f64.to_radians().sin_cos();
+    let moved = (10. * c45 - 20. * s45 - 10., 10. * s45 + 20. * c45 - 20.);
+    let expect = (10. + moved.0 * c30 - moved.1 * s30, 20. + moved.0 * s30 + moved.1 * c30);
+    assert!(close(num(&twice, "rotation"), 75.), "{twice}");
+    assert!(
+        (num(&twice["anchorTopLeft"], "x") - expect.0).abs() < 1e-9
+            && (num(&twice["anchorTopLeft"], "y") - expect.1).abs() < 1e-9,
+        "{twice}"
+    );
+    // Back to an upright block: the member disappears rather than storing 0.
+    let r = send(&mut owner, "undo-turn", batch(vec![reshape("txt", turn_about(-75., 0., 0.))]));
+    assert_eq!(r["ok"], true, "{r}");
+    assert!(text(&owner).get("rotation").is_none(), "{}", text(&owner));
+    for _ in 0..3 {
+        owner.undo(owner.content_revision()).unwrap();
+    }
+    assert_eq!(state(&owner), before, "undo is exact");
+    assert_eq!(owner.history_depths(), (0, 3));
+}
+
+#[test]
+fn a_turn_with_a_scale_turns_and_scales_the_text_along_its_own_axes() {
+    let mut owner = owner_of(&with_items());
+    let (s, c) = 90f64.to_radians().sin_cos();
+    // Scale by 2 then turn 90 degrees about the anchor: columns (c, s) * 2 and (-s, c) * 2.
+    let m = [2. * c, 2. * s, -2. * s, 2. * c, 10. - 2. * c * 10. + 2. * s * 20., 20. - 2. * s * 10. - 2. * c * 20.];
+    let r = send(&mut owner, "turn-scale", batch(vec![reshape("txt", m)]));
+    assert_eq!(r["ok"], true, "{r}");
+    let block = text(&owner);
+    assert!(
+        close(num(&block, "rotation"), 90.) && close(num(&block, "size"), 48.) && close(num(&block, "fixedWidth"), 400.),
+        "{block}"
+    );
+    // A half turn is a turn, not a mirror.
+    let r = send(&mut owner, "half", batch(vec![reshape("txt", turn_about(90., 10., 20.))]));
+    assert_eq!(r["ok"], true, "{r}");
+    assert!(close(num(&text(&owner), "rotation"), 180.), "{}", text(&owner));
+}
+
 #[test]
 fn a_mixed_selection_is_one_batch_and_one_history_entry() {
     let mut owner = owner_of(&with_items());
@@ -236,8 +305,8 @@ fn a_transform_an_item_cannot_store_refuses_the_whole_batch() {
         ("mirror", vec![reshape("img", [-1., 0., 0., 1., 0., 0.])]),
         ("singular", vec![reshape("img", [1., 2., 2., 4., 0., 0.])]),
         (
-            "turned-text",
-            vec![reshape("txt", [0., 1., -1., 0., 0., 0.])],
+            "sheared-text",
+            vec![reshape("txt", [1., 0., 0.5, 1., 0., 0.])],
         ),
         (
             "mirrored-text",
@@ -254,7 +323,7 @@ fn a_transform_an_item_cannot_store_refuses_the_whole_batch() {
             "good-then-bad",
             vec![
                 reshape("s-a", [1., 0., 0., 1., 1., 0.]),
-                reshape("txt", [0., 1., -1., 0., 0., 0.]),
+                reshape("txt", [1., 0., 0.5, 1., 0., 0.]),
             ],
         ),
         ("absent", vec![reshape("nope", [1., 0., 0., 1., 1., 0.])]),

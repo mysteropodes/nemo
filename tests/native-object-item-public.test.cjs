@@ -105,6 +105,9 @@ test('the closed schema and the SDK contract accept the same corpus and refuse t
     ['empty text', (p) => { p.block.text = ''; }, COMMANDS[6][1]],
     ['derived member', (p) => { p.block.textOverflow = false; }, COMMANDS[6][1]],
     ['patch with the anchor', (p) => { p.patch.anchorTopLeft = { x: 1, y: 2 }; }, COMMANDS[7][1]],
+    ['patch with the rotation', (p) => { p.patch.rotation = 30; }, COMMANDS[7][1]],
+    ['block rotation beyond one turn', (p) => { p.block.rotation = 361; }, COMMANDS[6][1]],
+    ['block rotation not a number', (p) => { p.block.rotation = '30'; }, COMMANDS[6][1]],
     ['empty patch', (p) => { p.patch = {}; }, COMMANDS[7][1]],
     ['attach bytes', (p) => { p.source.bytes = 'QUJD'; }, ATTACH_PAYLOAD()],
     ['attach url source', (p) => { p.source.kind = 'url'; }, ATTACH_PAYLOAD()],
@@ -360,5 +363,16 @@ test('schema: every object is closed and the enumerations are the contract table
   assert.equal(d.TextPatch.minProperties, 1);
   assert.equal('anchorTopLeft' in d.TextPatch.properties, false);
   assert.equal('anchorTopLeft' in d.TextBlock.properties, true);
+  // #2267: the stored turn belongs to a block (and a Select turn), never to an edit patch.
+  assert.deepEqual(d.TextBlock.properties.rotation, { type: 'number', minimum: -360, maximum: 360 });
+  assert.equal('rotation' in d.TextPatch.properties, false);
   assert.deepEqual(d.Output.oneOf.map((v) => v.$ref), ['#/$defs/ItemEditResult', '#/$defs/AssetCommandResult', '#/$defs/ImageImportResult']);
+});
+
+test('a created text block may carry its stored rotation (degrees about its anchor), within one turn either way', () => {
+  for (const rotation of [0, 30, -360, 360, 12.5]) {
+    const payload = structuredClone(COMMANDS[6][1]); payload.block.rotation = rotation;
+    assert.doesNotThrow(() => Contract.payload(ITEM, payload), String(rotation));
+    assert.equal(valid(schema.$defs.Input, payload), true, 'schema admits ' + rotation);
+  }
 });

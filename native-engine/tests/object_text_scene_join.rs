@@ -19,6 +19,8 @@ mod svg;
 mod hit_listing;
 #[path = "object_text_scene_font_refusal.rs"]
 mod font_refusal;
+#[path = "object_text_rotation.rs"]
+mod rotation;
 
 pub(super) fn block() -> Value {
     json!({"text":"A","font":{"kind":"bundled","fontKey":"Roboto-Regular"},"size":24,

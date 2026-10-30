@@ -5,7 +5,7 @@ const Reader=require('../src/js/adapters/native-text-read.js');
 const SDK=require('../src/js/adapters/native-application.js');
 const target={contextId:'scene-root',layerUid:'native layer / 雪',frameScope:{kind:'authored',frame:2},strokeId:'native-text:1:0'};
 const scope={contextId:target.contextId,layerUid:target.layerUid,frameScope:target.frameScope};
-const metadata={font:{kind:'asset',assetId:' native font / 雪 '},size:48,color:'#102030',align:'left',anchorTopLeft:{x:-10,y:20},fixedWidth:null,bold:false};
+const metadata={font:{kind:'asset',assetId:' native font / 雪 '},size:48,color:'#102030',align:'left',anchorTopLeft:{x:-10,y:20},fixedWidth:null,bold:false,rotation:-30};
 const clone=v=>JSON.parse(JSON.stringify(v));
 function fixture(text='Hi 雪🦊\n"\\'){let pin={instanceId:'instance',documentId:'document',lifecycleGeneration:4,contentRevision:7,documentSnapshotId:'native-object:document:7'},serial=0,calls=[],override=null,queue=Promise.resolve();
   function reply(q){const v=q.payload.view,base={instanceId:pin.instanceId,documentId:pin.documentId,atRevision:pin.contentRevision,documentSnapshotId:pin.documentSnapshotId};let result;

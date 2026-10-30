@@ -264,6 +264,11 @@
               "type": "number"
             }
           }
+        },
+        "rotation": {
+          "type": "number",
+          "minimum": -360,
+          "maximum": 360
         }
       }
     },
