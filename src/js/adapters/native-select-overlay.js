@@ -145,6 +145,8 @@
     s.hov = null;
     refresh(root, true);
   }
+  // The pick context the drawn selection (box, handles, ring) belongs to, or null when none is drawn for the current selection (#2372).
+  function selectionContext(root) { var s = state(root); return s.sel && s.sel.paths === root.selectedPaths && s.sel.count === (root.selectedPaths || []).length ? s.sel.ctx : null; }
   function clear(root) { var s = state(root); s.sel = null; s.hov = null; s.prev = null; s.next = null; remove(s); }
   // A drag in flight (#2372): `spec` is { paths } (the transformed copies of the selection, drawn with their box and handles)
   // and/or { marquee: [x0, y0, x1, y1] } in world space; null ends it. Nothing here writes the document.
@@ -181,5 +183,5 @@
       s.busy = false;
     }());
   }
-  return Object.freeze({ show: show, clear: clear, hover: hover, hoverAt: hoverAt, preview: preview, boxOf: orientedBox, refresh: function (root) { refresh(root, false); } });
+  return Object.freeze({ show: show, clear: clear, hover: hover, hoverAt: hoverAt, preview: preview, boxOf: orientedBox, selectionContext: selectionContext, refresh: function (root) { refresh(root, false); } });
 }));
