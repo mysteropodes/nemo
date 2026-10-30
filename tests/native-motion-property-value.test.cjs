@@ -118,7 +118,7 @@ test('malformed receipt and owner replacement cannot claim a current accepted ed
 test('fields carry baseline classes, X/Y labels, unit span and scrub step; port dimLabels overrides the default',async()=>{
  const h=fixture();await h.editor.refresh();const all=tree(h.editor.element);
  assert.equal(h.editor.element.className,'native-motion-property-value motion-fields');
- assert.ok(h.inputs().every(n=>n.className==='pi scrub motion-val'&&n.step==='1'&&n.dataset.step==='1'));
+ assert.ok(h.inputs().every(n=>n.className==='pi scrub motion-val'&&n.step==='1'&&n.dataset.step==='1'&&n.dataset.nativeOpacityScrub==='static'));
  assert.deepEqual(all.filter(n=>n.className==='motion-dim-label').map(n=>n.textContent),['X','Y']);
  assert.equal(all.filter(n=>n.className==='motion-unit').length,0,'no unit span when the descriptor has no unit');
  const one=fixture({values:[1]});await one.editor.refresh();assert.equal(tree(one.editor.element).filter(n=>n.className==='motion-dim-label').length,0);

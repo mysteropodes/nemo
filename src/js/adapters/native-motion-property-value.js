@@ -112,6 +112,8 @@
     for(var i=0;i<descriptor.dimension;i++){
       if(dims){var dl=make('span',dims[i]);dl.className='motion-dim-label';fields.appendChild(dl);}
       var input=make('input','');input.type='number';input.step='1';input.className='pi scrub motion-val';input.dataset.step='1';
+      // Mark the field native so the document scrub (ui.js) skips the legacy undo checkpoint and sends one final change on release (#2377).
+      input.dataset.nativeOpacityScrub='static';
       input.setAttribute('aria-label',descriptor.property+' component '+(i+1));
       listen(input,'change',onChange);listen(input,'keydown',onKey);fields.appendChild(input);inputs.push(input);
     }
