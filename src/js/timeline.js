@@ -9502,61 +9502,39 @@ function onKeyDown(event){
   // Figma): field focused → Ctrl+Z is text-level undo; blur/Esc first
   // for app-level undo. Ctrl+S stays global — native "save page" is
   // never what anyone wants here.
-  var inField=event.target.tagName==='INPUT'||event.target.tagName==='SELECT'||event.target.tagName==='TEXTAREA'||event.target.isContentEditable;
-  // Enter in a (single-line) field confirms AND releases focus — same
-  // convention as AE/Figma, and the necessary complement to the in-field
-  // Ctrl+Z guard below: without the blur, focus stayed in the field after
-  // Enter, so the very next Ctrl+Z was still treated as text-level undo
-  // instead of undoing the just-committed value.
-  if(event.key==='Enter'&&event.target.tagName==='INPUT'){event.target.blur();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='z'){if(inField)return;event.preventDefault();if(event.shiftKey)redo();else undo();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='s'){event.preventDefault();if(event.shiftKey)window.SMProject.saveAs();else window.SMProject.save();return;}
-  // ⌘C/⌘X/⌘V routes to whichever clipboard is relevant: a live canvas shape
-  // selection (selectedPaths, Select/Subselect tool) takes priority over a
-  // timeline keyframe-cell selection (_sel.frames) when BOTH happen to be
-  // non-empty — matches how ⌘D (duplicate, below) and Delete already treat
-  // a canvas selection as the more specific/intentional one. Paste has no
-  // "current selection" to disambiguate from, so it follows whichever
-  // clipboard was filled most recently (2026-07, "vérifie que copier/
-  // couper/coller existe pour tous les éléments... les keyframes" — canvas
-  // shapes had NO copy/cut/paste at all before this, only keyframes did).
-  // A Motion keyframe selection is the most specific thing ⌘C can mean, so it
-  // wins over shapes and frame cells — same "more specific selection wins"
-  // rule the shape-vs-frame split below already follows. Gated on there BEING
-  // a keyframe selection, so ⌘C is unchanged everywhere else.
-  // Cmd/Ctrl+Shift+C — AE's "Precompose" (→ convert to Component). Checked
-  // BEFORE the plain Cmd+C below, which never excluded shiftKey and would
-  // otherwise silently swallow this combo as a copy (2026-07-31 AE/Animate
-  // shortcut-parity sweep).
-  if((event.metaKey||event.ctrlKey)&&event.shiftKey&&(event.key==='c'||event.key==='C')){if(inField)return;event.preventDefault();window.SM.convertActiveLayerToComponent();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='c'){if(inField)return;event.preventDefault();
-    if(state.appMode==='motion'&&window.SMMotion&&SMMotion.hasKeySelection&&SMMotion.hasKeySelection()){SMMotion.copySelectedKeys();return;}
-    if(selectedPaths.length)copySelection();else window.SM.copyFrames();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='x'){if(inField)return;event.preventDefault();if(selectedPaths.length)cutSelection();else window.SM.cutFrames();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='v'){if(inField)return;
-    // SVG on the SYSTEM clipboard (2026-09, feedback #749 — Figma's and
-    // Illustrator's "Copy as SVG"). Reaching it needs the browser's OWN
-    // paste event, which never fires if this handler calls preventDefault
-    // — and reading the clipboard directly (navigator.clipboard.readText)
-    // is refused without the clipboard-read permission, confirmed live:
-    // NotAllowedError. So when Nemo's own clipboard is EMPTY, this lets
-    // the default through, svg-import.js's listener gets the data with no
-    // permission at all, and a short timer restores the ordinary
-    // "paste frames" fallback if what arrived wasn't SVG.
-    var _hasInternalClip = (state.appMode==='motion'&&window.SMMotion&&SMMotion.hasKeyClipboard&&SMMotion.hasKeyClipboard())
-      || !!(_canvasClip&&_canvasClip.snaps.length) || !!(_sel.clipboard&&_sel.clipboard.length);
-    if(!_hasInternalClip&&window.SMSvgImport){
-      if(window._svgPasteFallback)clearTimeout(window._svgPasteFallback);
-      window._svgPasteFallback=setTimeout(function(){window._svgPasteFallback=null;window.SM.pasteFrames();},80);
-      return;
+  // Focus and clipboard arbitration lives in application/keyboard-arbiter.js (U05, #2370); this runs its decision.
+  var inField=NemoKeyboardArbiter.inField(event.target);
+  var arb=NemoKeyboardArbiter.decide(event,function(){return {
+    motionKeySelection:state.appMode==='motion'&&!!(window.SMMotion&&SMMotion.hasKeySelection&&SMMotion.hasKeySelection()),
+    shapeSelection:selectedPaths.length>0,
+    motionKeyClipboard:state.appMode==='motion'&&!!(window.SMMotion&&SMMotion.hasKeyClipboard&&SMMotion.hasKeyClipboard()),
+    canvasClipboard:!!(_canvasClip&&_canvasClip.snaps.length),frameClipboard:!!(_sel.clipboard&&_sel.clipboard.length),
+    lastClipKind:window._lastClipKind,svgImport:!!window.SMSvgImport};});
+  if(arb){
+    if(arb.preventDefault)event.preventDefault();
+    switch(arb.kind){
+      case'blurField':event.target.blur();return;
+      case'undo':undo();return;
+      case'redo':redo();return;
+      case'save':window.SMProject.save();return;
+      case'saveAs':window.SMProject.saveAs();return;
+      case'convertToComponent':window.SM.convertActiveLayerToComponent();return;
+      case'copyKeys':SMMotion.copySelectedKeys();return;
+      case'copyShapes':copySelection();return;
+      case'copyFrames':window.SM.copyFrames();return;
+      case'cutShapes':cutSelection();return;
+      case'cutFrames':window.SM.cutFrames();return;
+      case'pasteSvgFallback':
+        // Nemo's own clipboard is empty: the browser's paste event (svg-import.js) gets the system clipboard, and a short
+        // timer restores the ordinary "paste frames" fallback if what arrived wasn't SVG (feedback #749).
+        if(window._svgPasteFallback)clearTimeout(window._svgPasteFallback);
+        window._svgPasteFallback=setTimeout(function(){window._svgPasteFallback=null;window.SM.pasteFrames();},80);
+        return;
+      case'pasteKeys':SMMotion.pasteKeys();return;
+      case'pasteShapes':pasteSelection();return;
+      case'pasteFrames':window.SM.pasteFrames();return;
+      default:return;
     }
-    event.preventDefault();
-    if(state.appMode==='motion'&&window.SMMotion&&SMMotion.hasKeyClipboard&&SMMotion.hasKeyClipboard()){SMMotion.pasteKeys();return;}
-    if(window._lastClipKind==='canvas'&&_canvasClip&&_canvasClip.snaps.length)pasteSelection();
-    else if(window._lastClipKind==='frames'&&_sel.clipboard&&_sel.clipboard.length)window.SM.pasteFrames();
-    else if(_canvasClip&&_canvasClip.snaps.length)pasteSelection();
-    else window.SM.pasteFrames();
-    return;
   }
   // UI/UX audit (2026-07): Ctrl/Cmd+A "select all" existed nowhere in the
   // app — a near-universal convention in every creative tool. Selects
@@ -10098,7 +10076,7 @@ window.addEventListener('blur',function(){
 // up moving far enough to shift the view.
 document.addEventListener('pointerdown',function(){if(state.spaceDown)state.spaceUsedForPan=true;},true);
 
-document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);
+NemoKeyboardArbiter.mount(document,{keydown:onKeyDown,keyup:onKeyUp});
 // Cmd/Ctrl-HOLD temporarily switches to Select (2026-08-27, feedback #64
 // — "pomme en cliquant pour passer a l'outil selection", and Cyril:
 // "command est utilisé un peu dans tout logiciel, voit comment mettre ça

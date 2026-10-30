@@ -1,5 +1,6 @@
 'use strict';
-// U05 (#2370) characterization of the real timeline.js onKeyDown arbitration, before any extraction:
+// U05 (#2370) characterization of the real timeline.js onKeyDown arbitration (written before the keyboard-arbiter.js extraction,
+// and unchanged by it apart from supplying the arbiter module):
 // a focused field keeps undo and clipboard keys while Save stays global; a Motion key selection beats a canvas
 // selection, which beats frame cells; paste follows the clipboard filled last. F6/F7 as distinct native commands are
 // covered by tests/native-frame-edit-desktop.test.cjs.
@@ -16,7 +17,7 @@ function harness({motion=false,keySelection=false,keyClipboard=false,paths=0,can
     SMProject:{save:call('save'),saveAs:call('saveAs')},
     SM:{copyFrames:call('copyFrames'),cutFrames:call('cutFrames'),pasteFrames:call('pasteFrames'),convertActiveLayerToComponent:call('toComponent')},
     SMMotion:{hasKeySelection:()=>keySelection,copySelectedKeys:call('copyKeys'),hasKeyClipboard:()=>keyClipboard,pasteKeys:call('pasteKeys')},
-    _lastClipKind:lastKind};
+    _lastClipKind:lastKind,NemoKeyboardArbiter:require('../src/js/application/keyboard-arbiter.js')};
   ctx.window=ctx;
   vm.runInNewContext(timeline.slice(start,end),ctx);
   const press=(key,mods={},target={tagName:'DIV'})=>{let prevented=0;
