@@ -47,7 +47,7 @@ function startNativePlay(controller){
     advance:advancePlayFrame,navigate:goToFrame,stop:stopPlay,
     now:function(){return performance.now();},request:function(step){return window.requestAnimationFrame(step);},cancel:function(id){window.cancelAnimationFrame(id);}
   });
-  if(nativeFlipPreview)nativeFlipPreview.cancel();if(!nativePlayScheduler.start(controller)){showToast('Native playback is unavailable');return;}
+  if(typeof nativeFlipPreview!=='undefined'&&nativeFlipPreview)nativeFlipPreview.cancel();if(!nativePlayScheduler.start(controller)){showToast('Native playback is unavailable');return;}
   state.playing=true;state.playDir=1;
   try{var observer=window.NemoTestPlayObserver;if(observer)observer.playState(state.playing,state.currentFrame);}catch(_){}
   document.getElementById('btn-play').innerHTML='<span class="material-symbols-rounded">\u{e034}</span>';
