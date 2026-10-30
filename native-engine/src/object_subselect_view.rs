@@ -29,6 +29,11 @@ pub(crate) struct SubselectReadItem {
     /// text block); Select pads its reach and hit test with half of it scaled by the item matrix, as the baseline hit the real width.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) stroke_width: Option<f64>,
+    /// Hit-test listing only (#2372): the record's stored `boxAngle` in degrees (the rotation of the frame its selection box sits in,
+    /// baseline `serP`); absent when it is 0 or the record has none. Select draws its oriented box from it after a frame change,
+    /// an undo or a reload.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) box_angle: Option<f64>,
     /// Hit-test listing only: a linked fill's ribbon (same cell, same linkedFillId); Select resolves a fill to it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) owner: Option<String>,

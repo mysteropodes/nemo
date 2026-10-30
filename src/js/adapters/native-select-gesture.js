@@ -67,9 +67,12 @@
       g.angle = delta;
       return [cos, sin, -sin, cos, c.x - cos * c.x + sin * c.y, c.y - sin * c.x - cos * c.y];
     }
-    var i = g.index, h = g.box.handles[i], dir = g.dir, sx = 1, sy = 1;
-    var anchor = alt ? [g.box.center.x, g.box.center.y] : g.box.handles[(i + 4) % 8], ax = anchor[0], ay = anchor[1], odx = h[0] - ax, ody = h[1] - ay;
-    var cdx = at.x - ax, cdy = at.y - ay;
+    // A handle drag scales along the box's OWN axes (`g.axis` degrees, 0 for an unturned box): the pointer and handle offsets are read in the
+    // de-rotated frame and the world affine is R(axis) * diag(sx, sy) * R(-axis) about the anchor.
+    var i = g.index, h = g.box.handles[i], dir = g.dir, sx = 1, sy = 1, th = (g.axis || 0) * Math.PI / 180, co = Math.cos(th), si = Math.sin(th);
+    var anchor = alt ? [g.box.center.x, g.box.center.y] : g.box.handles[(i + 4) % 8], ax = anchor[0], ay = anchor[1];
+    var odx = (h[0] - ax) * co + (h[1] - ay) * si, ody = -(h[0] - ax) * si + (h[1] - ay) * co;
+    var cdx = (at.x - ax) * co + (at.y - ay) * si, cdy = -(at.x - ax) * si + (at.y - ay) * co;
     if (dir.length === 2) {
       sx = odx !== 0 ? cdx / odx : 1; sy = ody !== 0 ? cdy / ody : 1;
       if (shift) {
@@ -80,7 +83,8 @@
     else sx = odx !== 0 ? cdx / odx : 1;
     if (Math.abs(sx) < 0.05) sx = sx < 0 ? -0.05 : 0.05;
     if (Math.abs(sy) < 0.05) sy = sy < 0 ? -0.05 : 0.05;
-    return [sx, 0, 0, sy, ax - sx * ax, ay - sy * ay];
+    var la = sx * co * co + sy * si * si, lb = (sx - sy) * co * si, ld = sx * si * si + sy * co * co;
+    return [la, lb, lb, ld, ax - la * ax - lb * ay, ay - lb * ax - ld * ay];
   }
   var identity = function (m) { return Math.abs(m[0] - 1) + Math.abs(m[1]) + Math.abs(m[2]) + Math.abs(m[3] - 1) + Math.abs(m[4]) + Math.abs(m[5]) < 1e-9; };
   function begin(root, e, abort) {
@@ -102,6 +106,8 @@
     var box = O && current.length ? O.boxOf(root, current) : null, handle = box && hitHandle(box, origin, wpp);
     if (handle) {
       g.kind = handle.type; g.sel = current; g.box = box; g.dir = handle.dir; g.index = handle.index; g.ctx = I.pickContext(root);
+      // The box's own axes. A dynamic shape keeps the world-axis resize its engine kernel (and the baseline) applies: it refuses a skewed one.
+      g.axis = current.some(function (p) { return p.data.nativeRole === 'shape'; }) ? 0 : box.angle || 0;
       g.startAngle = Math.atan2(origin.y - box.center.y, origin.x - box.center.x) * 180 / Math.PI;
     } else {
       pickDone = I.pick(root, e.clientX, e.clientY).then(function (item) { picked = { item: item }; }, function () { picked = { item: undefined }; }).then(function () {
@@ -194,7 +200,8 @@
       if (!result || result.status !== 'applied') return notice(root, 'The transform could not be applied.');
       await reselect(ids, layerIdx);
     }
-    // The committed strokes as fresh presented paths (the old transient ones hold the geometry from before), keeping each box angle.
+    // The committed strokes as fresh presented paths (the old transient ones hold the geometry from before). A vector record's box angle comes
+    // back from the engine's listing (the turn was stored in the same batch); an image or text block has no stored one, so it keeps the session's.
     async function reselect(ids, layerIdx) {
       var angles = {}, fresh = null;
       g.sel.forEach(function (p) { angles[p.data.strokeId] = (p.data.boxAngle || 0) + (g.kind === 'rotate' ? g.angle : 0); });
@@ -203,7 +210,7 @@
         try { fresh = await I.layerPaths(root, function (item) { return ids.indexOf(item.stableTarget.strokeId) >= 0; }, false, layerIdx); } catch (_) { fresh = null; }
       }
       root.selectedPaths = fresh ? fresh.paths.sort(function (a, b) { return ids.indexOf(a.data.strokeId) - ids.indexOf(b.data.strokeId); })
-        .map(function (p) { if (angles[p.data.strokeId]) p.data.boxAngle = angles[p.data.strokeId] % 360; return p; }) : [];
+        .map(function (p) { if (angles[p.data.strokeId] && (p.data.nativeRole === 'raster' || p.data.nativeRole === 'text')) p.data.boxAngle = angles[p.data.strokeId] % 360; return p; }) : [];
       root.state.selectedStrokeIndices = [];
     }
     async function end(ev) {
