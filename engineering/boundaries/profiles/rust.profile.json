@@ -1296,6 +1296,7 @@
         "object_vector_create_held.rs",
         "object_vector_batch.rs",
         "object_vector_batch_items.rs",
+        "object_vector_batch_box_angle.rs",
         "object_vector_trim_ends.rs",
         "object_vector_edit_limits.rs",
         "object_vector_edit_lock.rs",
