@@ -44,20 +44,9 @@
 //
 // ---- NEVER RENDERED ----
 //
-// Four touch points, the Guide layer precedent exactly, and no Rust change
-// at all (engine.rs's LayerIn never learns the concept, so CLAUDE.md §3's
-// twin-function hazard is not triggered):
-//   1. getEffectiveStrokes (app.js) returns [] — which closes PNG, video,
-//      Lottie and Rive export in one line, because export.js and
-//      rive-export.js all read through it.
-//   2. buildSceneJson's per-layer loop (engine-bridge.js) pushes an empty
-//      slot and continues, so stack indices stay correct for mattes and
-//      parenting.
-//   3. buildRigWidgetOverlayItems (below) is pushed INSIDE
-//      `includeEditorOverlays`, which renderFrameRawPixels already sets to
-//      false for the single GPU-readback path used by PNG export AND the
-//      playback bake.
-//   4. Nothing else.
+// Four touch points, the Guide layer precedent, and no Rust change: getEffectiveStrokes (app.js) returns [] (which closes PNG,
+// video, Lottie and Rive export at once), buildSceneJson pushes an empty slot, buildRigWidgetOverlayItems runs inside
+// `includeEditorOverlays` only, and nothing else.
 //
 // ---- HANDLE CONVENTIONS ----
 //
@@ -81,12 +70,8 @@
 
   var drag = null;   // {li, mode:'puck'|'move', moved:boolean, ...}
 
-  // #2255: on a native object project (state.layers is empty) every widget fact comes from the native read and every change is a
-  // native command; the JS layer model below is then never read or written. native-object-widget-ui.js owns that route.
-  function nativeUi() {
-    var m = window.NemoNativeObjectWidgetUI;
-    try { return m && m.active(window) ? m.desktop(window) : null; } catch (_) { return null; }
-  }
+  // #2255: on a native object project every widget fact is a native read and every change a native command (never this JS model).
+  function nativeUi() { var m = window.NemoNativeObjectWidgetUI; try { return m && m.active(window) ? m.desktop(window) : null; } catch (_) { return null; } }
   function engineOn() { return window.SMEngineBridge && SMEngineBridge.isEnabled() && !state.playing; }
 
   // ---- data ------------------------------------------------------------

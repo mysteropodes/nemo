@@ -47,9 +47,36 @@ mod kernels {
         AxisValueSource, Placement, WidgetKind, WidgetSpec,
     };
     use crate::object_codec::{Presence, PropertyHolderTarget};
-    use crate::object_document::{ObjectLayer, WidgetAxis, WidgetRecord};
     use crate::revision::ObjectSnapshot;
     use serde_json::{json, Value};
+
+    // The read-queries layer never names a document type: the stored axis and widget are reached by inference.
+    macro_rules! axis_spec {
+        ($axis:expr) => {
+            AxisSpec {
+                key: Some($axis.key.clone()),
+                min: $axis.min_value(),
+                max: $axis.max_value(),
+                rest: match $axis.rest.value() {
+                    None => AxisRest::Absent,
+                    Some(None) => AxisRest::Null,
+                    Some(Some(number)) => AxisRest::Value(number.as_f64().unwrap_or(f64::NAN)),
+                },
+            }
+        };
+    }
+    macro_rules! axis_json {
+        ($snapshot:expr, $layer:expr, $axis:expr, $spec:expr, $value:expr) => {{
+            let rest = match $spec.rest {
+                AxisRest::Absent => $spec.min,
+                AxisRest::Null => 0.0,
+                AxisRest::Value(v) => v,
+            };
+            let holders = $snapshot.document().property_holders().unwrap_or(&[]);
+            json!({"key":$axis.key,"min":$spec.min,"max":$spec.max,"rest":rest,
+                "label":$axis.display_label($layer.layer_uid(), holders),"value":$value})
+        }};
+    }
 
     fn layer_target(layer_uid: &str) -> PropertyHolderTarget {
         PropertyHolderTarget {
@@ -70,30 +97,6 @@ mod kernels {
                 Ok(values) => AxisSample::Values(values),
                 Err(_) => AxisSample::Absent,
             }
-        }
-    }
-
-    fn rest_of(axis: &WidgetAxis) -> AxisRest {
-        match axis.rest.value() {
-            None => AxisRest::Absent,
-            Some(None) => AxisRest::Null,
-            Some(Some(number)) => AxisRest::Value(number.as_f64().unwrap_or(f64::NAN)),
-        }
-    }
-    fn axis_spec(axis: &WidgetAxis) -> AxisSpec {
-        AxisSpec {
-            key: Some(axis.key.clone()),
-            min: axis.min_value(),
-            max: axis.max_value(),
-            rest: rest_of(axis),
-        }
-    }
-    fn spec_of(widget: &WidgetRecord, kind: WidgetKind) -> WidgetSpec {
-        WidgetSpec {
-            kind,
-            size: widget.size_value(),
-            x: axis_spec(&widget.x),
-            y: widget.y_axis().map(axis_spec),
         }
     }
 
@@ -131,27 +134,31 @@ mod kernels {
         ))
     }
 
-    /// `geomFor`'s anchor and accumulated angle.
+    /// `geomFor`'s anchor and accumulated angle: the stored anchor (or the canvas centre), the layer's own flat offset and
+    /// rotation, then each parent that has a motion mat about its Null pivot.
     fn placement(
         snapshot: &ObjectSnapshot,
-        layer: &ObjectLayer,
-        widget: &WidgetRecord,
+        layer_uid: &str,
+        pos: Option<[f64; 2]>,
         frame: f64,
     ) -> Result<Placement, &'static str> {
         let canvas = snapshot
             .project()
             .map(|project| project.project().canvas_dimensions());
-        let base = match (widget.pos_value(), canvas) {
+        let base = match (pos, canvas) {
             (Some(pos), _) => pos,
             (None, Some((w, h))) => [f64::from(w) / 2.0, f64::from(h) / 2.0],
             (None, None) => return Err("canvas"),
         };
-        let own = layer_mat(snapshot, layer.layer_uid(), frame)?;
+        let own = layer_mat(snapshot, layer_uid, frame)?;
         let mut point = [base[0] + own.map_or(0.0, |m| m.dx), base[1] + own.map_or(0.0, |m| m.dy)];
         let mut angle = own.map_or(0.0, |m| m.rot);
         let layers = snapshot.document().layers();
-        let mut seen = vec![layer.layer_uid()];
-        let mut next = layer.parent_layer_uid.value().and_then(Option::as_deref);
+        let mut seen = vec![layer_uid];
+        let mut next = layers
+            .iter()
+            .find(|layer| layer.layer_uid() == layer_uid)
+            .and_then(|layer| layer.parent_layer_uid.value().and_then(Option::as_deref));
         while let Some(uid) = next.filter(|_| seen.len() <= CHAIN_NODE_LIMIT) {
             if seen.contains(&uid) {
                 break;
@@ -180,37 +187,23 @@ mod kernels {
         Ok(Placement { anchor: point, angle_degrees: angle })
     }
 
-    fn axis_json(
-        snapshot: &ObjectSnapshot,
-        layer: &ObjectLayer,
-        axis: &WidgetAxis,
-        value: Option<f64>,
-    ) -> Value {
-        let rest = match rest_of(axis) {
-            AxisRest::Absent => axis.min_value(),
-            AxisRest::Null => 0.0,
-            AxisRest::Value(v) => v,
-        };
-        let holders = snapshot.document().property_holders().unwrap_or(&[]);
-        json!({"key":axis.key,"min":axis.min_value(),"max":axis.max_value(),"rest":rest,
-            "label":axis.display_label(layer.layer_uid(), holders),"value":value})
-    }
-
     pub(super) fn item(snapshot: &ObjectSnapshot, index: usize, frame: u32) -> Value {
         let layer = &snapshot.document().layers()[index];
         let widget = layer.widget().expect("a widget layer");
         let kind = WidgetKind::parse(widget.kind.as_str()).expect("an admitted widget kind");
-        let spec = spec_of(widget, kind);
+        let x = axis_spec!(widget.x);
+        let y = widget.y_axis().map(|axis| axis_spec!(axis));
+        let spec = WidgetSpec { kind, size: widget.size_value(), x, y };
         let at = f64::from(frame);
         let source = Controls { snapshot, target: layer_target(layer.layer_uid()) };
         let value = |axis: Option<&AxisSpec>| axis_value(axis, at, &source).ok();
         let (vx, vy) = (value(Some(&spec.x)), value(spec.y.as_ref()));
+        let y_json = widget.y_axis().zip(spec.y.as_ref()).map(|(axis, y)| axis_json!(snapshot, layer, axis, y, vy));
         let mut out = json!({"layerUid":layer.layer_uid(),"visible":layer.visible(),
             "locked":layer.locked.value().copied().unwrap_or(false),"kind":widget.kind.as_str(),
-            "x":axis_json(snapshot, layer, &widget.x, vx),
-            "y":widget.y_axis().map(|y| axis_json(snapshot, layer, y, vy)),
+            "x":axis_json!(snapshot, layer, widget.x, spec.x, vx),"y":y_json,
             "center":null,"angle":null,"size":null,"puck":null,"rest":null,"unavailable":null});
-        match placement(snapshot, layer, widget, at) {
+        match placement(snapshot, layer.layer_uid(), widget.pos_value(), at) {
             Err(reason) => out["unavailable"] = json!(reason),
             Ok(placed) => {
                 let geometry = geom_for(&spec, &placed, at);
