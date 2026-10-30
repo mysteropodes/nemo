@@ -198,3 +198,16 @@ test('without a native object session the panel keeps the explicit unavailable s
   assert.deepEqual(h.reads, []);
   assert.deepEqual(h.legacy, []);
 });
+
+test('a jump from a page the project has left reloads the panel and sends nothing', async () => {
+  const h = harness();
+  await h.open();
+  const before = h.reads.length;
+  h.bump();                                  // a commit lands before the watch refreshed the panel
+  h.rows()[0].click(); await h.flush();
+  assert.deepEqual(h.jumps, [], 'a stale click is not dispatched');
+  assert.deepEqual(h.legacy, []);
+  assert.ok(h.reads.length > before, 'the panel read the new state instead');
+  h.rows()[0].click(); await h.flush();      // the fresh page jumps normally
+  assert.deepEqual(h.jumps, [['undo', 3]]);
+});
