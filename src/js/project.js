@@ -222,6 +222,11 @@
     await openPath(Array.isArray(path)?path[0]:path);
   }
 
+  // Crash-recovery writer for native projects (#2360 R2): idle-timed, reads cached session facts only; bytes are written Rust-side.
+  try{if(window.NemoNativeObjectRecovery&&nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.recoveryPin){
+    var nativeRecovery=window.NemoNativeObjectRecovery.bind(window,{pin:nativeSavedUI.nativeObject.recoveryPin,
+      slot:function(){return {path:currentPath,name:currentName};},notice:showToast});
+    if(nativeRecovery)nativeRecovery.start();}}catch(e){console.warn('[recovery] scheduler unavailable',e);}
   // ---- Version history (v15) — the existing 30s autosave (timeline.js)
   // only ever held ONE slot ('nemo-auto' in localStorage): a crash right
   // after a bad edit overwrote the one good copy with the bad one on the
@@ -690,14 +695,20 @@
       else if(window.SMIdb)window.SMIdb.get('nemo-auto').then(applyAuto).catch(function(){applyAuto(null);});
       else applyAuto(null);
   }
+  // Native desktop Resume (#2360 R3): the card follows the Rust recovery store, never the legacy nemo-auto slot.
+  var nativeResume=window.NemoNativeObjectRecoveryResume&&nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.openRecovered?
+    window.NemoNativeObjectRecoveryResume.bind(window,{openRecovered:nativeSavedUI.openRecovered,
+      allowOpen:nativeSavedUI.allowOpen,notice:showToast}):null;
   function initStartScreen(){
     SMProjectEntry.initializeTabs(document);
     SMProjectEntry.bindStartScreen(document,{
-      readResumePresence:function(){try{return !!localStorage.getItem('nemo-auto');}catch(e){return false;}},
+      readResumePresence:function(){if(nativeResume)return false;try{return !!localStorage.getItem('nemo-auto');}catch(e){return false;}},
       // Media-heavy autosave can be present only in IndexedDB after quota
       // overflow. Resolve to a boolean before crossing the view boundary.
-      readResumePresenceAsync:function(publish){if(window.SMIdb)window.SMIdb.get('nemo-auto').then(function(v){publish(!!v);}).catch(function(){});},
-      renderRecents:renderRecents,resume:resumeAutosave,open:openDialog,
+      readResumePresenceAsync:function(publish){
+        if(nativeResume){nativeResume.presence(publish);return;}
+        if(window.SMIdb)window.SMIdb.get('nemo-auto').then(function(v){publish(!!v);}).catch(function(){});},
+      renderRecents:renderRecents,resume:nativeResume?nativeResume.resume:resumeAutosave,open:openDialog,
       createProject:function(config,current,onCreationFailure){return window.SMProject.newProject(config,current,onCreationFailure);},
       showStartScreen:showStartScreen,cancelProjectEntry:cancelNativeNew,notice:showToast
     });

@@ -165,6 +165,27 @@ fn a_stroked_plain_record_lists_its_authored_width_and_an_unstroked_or_image_ite
 }
 
 #[test]
+fn a_record_lists_its_stored_box_angle_and_an_unturned_record_or_an_image_lists_none() {
+    // #2372: Select draws its oriented box from this after a frame change, an undo or a reload (baseline serP boxAngle).
+    let listed = |ext: Value| {
+        let mut doc = drawing();
+        doc["objects"][0]["family"] = json!("editable-vector-path");
+        doc["objects"][0]["vector"] = json!({"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"butt","strokeJoin":"miter",
+            "miterLimit":10,"dashOffset":0,"opacity":1});
+        if !ext.is_null() {
+            doc["objects"][0]["vectorExt"] = ext;
+        }
+        listing(&doc)["items"].as_array().unwrap().clone()
+    };
+    let items = listed(json!({"boxAngle":37.5}));
+    assert_eq!(items[0]["role"], "plain");
+    assert_eq!(items[0]["boxAngle"].as_f64(), Some(37.5), "the stored rotation of the record's frame, in degrees");
+    assert!(items[1].get("boxAngle").is_none() && items[2].get("boxAngle").is_none(), "a text block and an image carry none");
+    assert!(listed(Value::Null)[0].get("boxAngle").is_none(), "an unturned record lists none");
+    assert!(listed(json!({"boxAngle":0}))[0].get("boxAngle").is_none(), "an explicit 0 is a falsy angle, as serP drops it");
+}
+
+#[test]
 fn a_posed_layer_lists_its_image_and_text_in_their_stored_frame_with_the_pose_as_the_map() {
     // #2372: record space is the stored item's own frame, so a Select matrix conjugated with the listing's map is what the
     // item's batch transform applies to the stored centre / anchor.

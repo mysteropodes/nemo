@@ -18,6 +18,8 @@ mod create_held;
 mod batch;
 #[path = "object_vector_batch_items.rs"]
 mod batch_items;
+#[path = "object_vector_batch_box_angle.rs"]
+mod batch_box_angle;
 #[path = "object_vector_trim_ends.rs"]
 mod trim_ends;
 #[path = "object_vector_edit_support.rs"]

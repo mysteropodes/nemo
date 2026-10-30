@@ -105,3 +105,12 @@ test('a hit-test listing item may carry a finite non-negative strokeWidth, and o
   const {hitTest,...plain}=r;
   assert.throws(()=>C.viewResult({...plain,items:[{stableTarget:target,closed:false,count:2,matrix:[1,0,0,1,0,0],strokeWidth:4}]}),undefined,'an editable page has no strokeWidth');
 });
+test('a hit-test listing item may carry a finite boxAngle, and only on a hit-test listing (#2372)',()=>{
+  const view={kind:'subselect',contextId:'scene-root',layerUid:'layer-a',frame:0,workId:'native-work-1',viewGeneration:1,cursor:0,hitTest:true};
+  const item={stableTarget:target,closed:false,count:2,matrix:[1,0,0,1,0,0],bounds:[0,0,10,10],role:'plain',filled:false};
+  const r={...view,atRevision:7,documentSnapshotId:'native-object:document:7',total:1,nextCursor:null,preview:false,items:[item]};
+  for(const boxAngle of [30,-45.5,359.5])C.viewResult({...r,items:[{...item,boxAngle}]});
+  for(const bad of [NaN,Infinity,'30',null,[30]])assert.throws(()=>C.viewResult({...r,items:[{...item,boxAngle:bad}]}),undefined,String(bad));
+  const {hitTest,...plain}=r;
+  assert.throws(()=>C.viewResult({...plain,items:[{stableTarget:target,closed:false,count:2,matrix:[1,0,0,1,0,0],boxAngle:30}]}),undefined,'an editable page has no boxAngle');
+});

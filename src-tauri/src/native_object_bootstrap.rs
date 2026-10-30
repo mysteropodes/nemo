@@ -39,9 +39,27 @@ pub(crate) use save::{
     nemo_native_object_save_as,
 };
 
+#[path = "native_object_recovery.rs"]
+mod recovery;
+#[allow(unused_imports)]
+pub(crate) use recovery::{
+    __cmd__nemo_native_object_recovery_discard, __cmd__nemo_native_object_recovery_list,
+    __cmd__nemo_native_object_recovery_quarantine, __cmd__nemo_native_object_recovery_write,
+    __tauri_command_name_nemo_native_object_recovery_discard,
+    __tauri_command_name_nemo_native_object_recovery_list,
+    __tauri_command_name_nemo_native_object_recovery_quarantine,
+    __tauri_command_name_nemo_native_object_recovery_write, nemo_native_object_recovery_discard,
+    nemo_native_object_recovery_list, nemo_native_object_recovery_quarantine,
+    nemo_native_object_recovery_write,
+};
+
 #[cfg(test)]
 #[path = "native_object_save_tests.rs"]
 mod save_tests;
+
+#[cfg(test)]
+#[path = "native_object_recovery_tests.rs"]
+mod recovery_tests;
 
 #[cfg(test)]
 #[path = "native_object_v2_persistence_tests.rs"]
