@@ -1400,6 +1400,7 @@
         "object_frame_edit_structure_history.rs",
         "object_frame_edit_structure_rows.rs",
         "object_frame_edit_structure_controls.rs",
+        "object_frame_edit_structure_items.rs",
         "object_frame_edit_structure_exposure.rs",
         "object_exposure_edit_key.rs",
         "object_exposure_edit_key_history.rs",
