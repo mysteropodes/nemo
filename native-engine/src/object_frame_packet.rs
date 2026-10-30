@@ -441,6 +441,9 @@ mod exposure_tests;
 #[cfg(test)]
 #[path = "../tests/render_vector_eval_guard.rs"]
 mod render_vector_eval_guard;
+#[cfg(test)]
+#[path = "../tests/render_vector_eval_contentless.rs"]
+mod render_vector_eval_contentless;
 
 #[cfg(all(test, feature = "history", feature = "compositor"))]
 #[path = "../tests/object_layer_opacity_scene.rs"]
