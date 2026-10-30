@@ -215,6 +215,12 @@
       path.strokeColor = [0, 0, 0]; path.strokeWidth = Math.max(1, worldStrokeWidth(item)); if (item.closed && (item.role !== 'plain' || item.filled === true)) path.fillColor = [0, 0, 0];
       path.data = { strokeId: item.stableTarget.strokeId, nativeStableTarget: item.stableTarget, nativeRole: item.role, nativeRibbon: item.role === 'ribbon', nativeMatrix: item.matrix,
         nativeOwner: item.owner, nativeBrush: item.brush, nativeGroup: item.group };
+      // The record's stored boxAngle (baseline serP/desP data.boxAngle) turned by the presented matrix when that is a pure similarity, so the
+      // oriented box is drawn in world space after a frame change, an undo or a reload.
+      if (item.boxAngle) {
+        var mx = item.matrix, sim = mx[0] * mx[3] - mx[1] * mx[2] > 0 && Math.abs(mx[0] - mx[3]) < 1e-6 * (Math.abs(mx[0]) + 1) && Math.abs(mx[1] + mx[2]) < 1e-6 * (Math.abs(mx[1]) + 1);
+        path.data.boxAngle = (item.boxAngle + (sim ? Math.atan2(mx[1], mx[0]) * 180 / Math.PI : 0)) % 360;
+      }
       if (item.center) { var m = item.matrix, at = function (p, d) { return [m[0] * p[0] + m[2] * p[1] + d * m[4], m[1] * p[0] + m[3] * p[1] + d * m[5]]; };
         path.data.isVectorBrush = true; path.data.centerSegments = item.center.map(function (c) {
           return { point: at(c.point, 1), handleIn: at(c.handleIn, 0), handleOut: at(c.handleOut, 0), width: c.width }; }); }

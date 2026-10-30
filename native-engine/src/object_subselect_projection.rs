@@ -108,6 +108,7 @@ impl ObjectCompositionWitness {
                 role: hit_test.then(|| record::hit_role(r)),
                 filled: hit_test.then(|| r.solid_fill().is_some() || r.fill_gradient().is_some()),
                 stroke_width: hit_test.then(|| record::painted_stroke_width(r)),
+                box_angle: if hit_test { record::stored_box_angle(r) } else { None },
                 owner: (hit_test && record::hit_role(r) == "fill")
                     .then(|| record::linked_fill(r))
                     .flatten()
@@ -232,6 +233,7 @@ fn hit_item(
         role: Some(role),
         filled: Some(true),
         stroke_width: None,
+        box_angle: None,
         owner: None,
         brush: None,
         group: None,

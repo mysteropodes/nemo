@@ -9,7 +9,7 @@
 use crate::commands::object_fill_owner::parametric_edit;
 use crate::commands::object_fill_owner::vector_edit::batch_ops::ribbon;
 use crate::commands::object_fill_owner::vector_edit::is_vector_record;
-use crate::object_document::{CenterSegment, ObjectDocument, ObjectGeometry, ObjectPoint, ObjectRecord, ObjectTarget};
+use crate::object_document::{CenterSegment, ObjectDocument, ObjectGeometry, ObjectPoint, ObjectRecord, ObjectTarget, Presence, VectorExt};
 use crate::request_receipts::DispatchErrorCode;
 use serde_json::Number;
 
@@ -54,6 +54,24 @@ fn map_record(record: &mut ObjectRecord, m: &[f64; 6]) -> Result<(), DispatchErr
     map_geometry(&mut record.geometry, m)?;
     map_gradient(record, m)
 }
+/// A turn adds to the record's stored `boxAngle` (baseline: every rotate gesture adds its step to `data.boxAngle` of each selected
+/// stroke, and `serP` keeps it), so the oriented selection box survives a frame change, an undo and a reload. Only a pure turn does:
+/// a move, a scale (along the box axes or not) and a mirror leave the orientation as it is. An angle that returns to 0 is dropped
+/// as `serP` drops a falsy one, and an extension left empty is dropped with it.
+fn turn_box(record: &mut ObjectRecord, m: &[f64; 6]) -> Result<(), DispatchErrorCode> {
+    const EPS: f64 = 1e-9;
+    let [a, b, c, d, ..] = *m;
+    let turned = b.atan2(a).to_degrees();
+    if !((a - d).abs() < EPS && (b + c).abs() < EPS && (a.hypot(b) - 1.0).abs() < 1e-6) || turned.abs() < EPS {
+        return Ok(());
+    }
+    let before = record.vector_ext.value().and_then(|e| e.box_angle.value()).and_then(Number::as_f64).unwrap_or(0.0);
+    let after = (before + turned) % 360.0;
+    let mut ext = record.vector_ext.value().cloned().unwrap_or_default();
+    ext.box_angle = if after.abs() < EPS { Presence::Missing } else { Presence::Present(num(after)?) };
+    record.vector_ext = if ext.is_empty() { Presence::Missing } else { Presence::Present(ext) };
+    Ok(())
+}
 fn same_cell(a: &ObjectRecord, t: &ObjectTarget) -> bool {
     a.target.context_id == t.context_id && a.target.layer_uid == t.layer_uid && a.target.frame_scope == t.frame_scope
 }
@@ -94,6 +112,7 @@ pub(super) fn transform(source: &ObjectDocument, target: &ObjectTarget, m: [f64;
                 .collect::<Result<Vec<_>, DispatchErrorCode>>()?;
             let (mut ribbon, fill) = ribbon::rebuild(source, existing, moved)?;
             map_gradient(&mut ribbon, &m)?;
+            turn_box(&mut ribbon, &m)?;
             out.push(ribbon);
             if let Some(mut fill) = fill {
                 map_gradient(&mut fill, &m)?;
@@ -116,6 +135,7 @@ pub(super) fn transform(source: &ObjectDocument, target: &ObjectTarget, m: [f64;
                     }
                 }
             }
+            turn_box(&mut moved, &m)?;
             out.push(moved);
         }
     }
