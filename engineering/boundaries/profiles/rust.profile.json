@@ -1911,6 +1911,7 @@
         "object_tween_bitmap.rs",
         "object_tween_ghosts.rs",
         "object_tween_history.rs",
+        "object_tween_public_shapes.rs",
         "object_tween_refusals.rs",
         "tween_kernels.rs",
         "encoded_retention_batch.rs",
