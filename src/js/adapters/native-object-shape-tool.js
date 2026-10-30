@@ -79,7 +79,8 @@
     }
     function selection(info){
       var s=root.state,index=s.activeLayerIdx,row=s.layers&&s.layers[index],selected=root._layerSel;
-      if(!Number.isSafeInteger(index)||!row||!Array.isArray(selected)||selected.length!==1||selected[0]!==index)fail('Select one native Drawing layer.');
+      // The baseline draws on the ACTIVE layer; a canvas click on empty stage leaves _layerSel=[]. Only other/several layers are ambiguous.
+      if(!Number.isSafeInteger(index)||!row||!Array.isArray(selected)||selected.length>1||selected.length===1&&selected[0]!==index)fail('Select one native Drawing layer.');
       var layer=info.layers.filter(function(l){return l.layerUid===row.layerUid;});
       if(layer.length!==1||layer[0].locked===true||layer[0].visible===false||layer[0].parentLayerUid||row.threeD||row.motion&&Object.keys(row.motion).length)fail('The selected native layer is unavailable for this gesture.');
       return row.layerUid;
@@ -91,12 +92,12 @@
           !Mapping.matchesView(root,shown.presentation)||shown.presentation.contextId!=='scene-root'||shown.presentation.frame!==frame||!Number.isSafeInteger(frame)||frame<0||frame>=pin.totalFrames||
           !root.NemoNativeObjectProjectFile||root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||!root.NemoNativeObjectVector)fail('Native Drawing is not ready.');
       var perspective=root.NemoNativePerspectiveController&&root.NemoNativePerspectiveController.read();
-      var t={perspective:perspective,session:s,pin:pin,presentation:shown.presentation,frame:frame,tool:state.tool,layerUid:selection(pin),style:style(state.tool,perspective),bounds:bounds(pin),pointer:e.pointerId,cancelled:false};
+      var t={perspective:perspective,session:s,pin:pin,presentation:shown.presentation,frame:frame,tool:state.tool,layerUid:selection(pin),sel:JSON.stringify(root._layerSel),style:style(state.tool,perspective),bounds:bounds(pin),pointer:e.pointerId,cancelled:false};
       t.behind=root.state.drawMode==='behind';t.start=point(e,t);t.scale=presentedScale(t);if(ports.freehand)t.samples=ports.begin(t.start,e,t);return t;
     }
     function current(t,requirePresentation,lease){
       try{var s=session(),pin=s&&s.info();
-        if(retired||t.cancelled||requirePresentation&&!Mapping.matchesView(root,t.presentation)||s!==t.session||!s.isActive()||!s.blocksLegacy()||!same(pin,t.pin)||root.state.currentFrame!==t.frame||!t.finished&&root.state.tool!==t.tool||selection(pin)!==t.layerUid||
+        if(retired||t.cancelled||requirePresentation&&!Mapping.matchesView(root,t.presentation)||s!==t.session||!s.isActive()||!s.blocksLegacy()||!same(pin,t.pin)||root.state.currentFrame!==t.frame||!t.finished&&root.state.tool!==t.tool||selection(pin)!==t.layerUid||JSON.stringify(root._layerSel)!==t.sel||
             root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||JSON.stringify(style(t.tool,requirePresentation?undefined:t.perspective))!==JSON.stringify(t.style)||JSON.stringify(bounds(pin))!==JSON.stringify(t.bounds))return false;
         // Public presentation is hidden by this action's own pending entry.
         // Its existing lease still verifies the exact origin, view and subscription.
@@ -144,6 +145,7 @@
       if(ports.pen&&t.anchors.length<2)return Promise.resolve({status:'cancelled'});
       if(!ports.freehand&&!ports.pen&&Math.hypot(end[0]-t.start[0],end[1]-t.start[1])<2)return Promise.resolve({status:'cancelled'});
       var dict=dictionary(t,end,true),s=t.session,companion=linkedCompanions.get(dict)||null;
+      if(ports.freehand&&dict&&!dict.isFillShape&&!dict.isVectorBrush&&dict.segments&&dict.segments.length<2)return Promise.resolve({status:'cancelled'}); // tap: a one-anchor Path draws nothing
       // Labs predictive stroke (draw-bridge.js onStrokeCommitted @1065e9d8) reshapes a freehand stroke before it is committed.
       if(ports.freehand&&root.SMLabs&&typeof root.SMLabs.predictStrokeDict==='function')dict=root.SMLabs.predictStrokeDict(dict)||dict;
       // Mask mode (tools.js tagOwner @1065e9d8, on every Draw/Pen/shape commit): the shape becomes a mask of the layer
@@ -300,8 +302,7 @@
       dispose:function(){retired=true;cancel();if(pending)pending.cancelled=true;root.document.removeEventListener('keydown',key,{capture:true});
         if(boundSetTool&&root.SM&&root.SM.setTool===boundSetTool)root.SM.setTool=setTool;}});
   }
-  // Composition of existing brush filters and detached geometry; no Paper
-  // insertion, document writer or second queue. Shared by the real draw route.
+  // Composition of existing brush filters and detached geometry; no Paper insertion, writer or second queue.
   function freehandPorts(root,filters) {
     var Point=root.Point,Path=root.Path;
     var buildCenterSegmentsFromRawStroke=root.buildCenterSegmentsFromRawStroke,applyTaperToCenterSegments=root.applyTaperToCenterSegments;
@@ -417,8 +418,7 @@
         if(!path)throw new Error('Native brush outline is unavailable.');
         out.isVectorBrush=true;out.centerSegments=cs;out.widthProfile=cs.widthProfile;
         out.strokeColor=null;out.hasRealStroke=false;out.fillColor=style.strokeColor;
-        // Matches a new baseline pressure Path: no actual stroke, Paper default
-        // stroke width/cap/join, and applyBrushKeyline has no width to paint.
+        // Matches a new baseline pressure Path: no actual stroke, Paper default stroke width/cap/join, no width to paint.
         out.strokeWidth=1;out.strokeCap='butt';out.strokeJoin='miter';out.miterLimit=10;out.dashOffset=0;
         // Shadow mode draws neither texture nor linked fill (draw-bridge.js ribbon branch @1065e9d8).
         if(!style.shadowSwatch&&style.brushPreset&&style.brushPreset!=='none')Paint.textureRibbon(out,style.brushPreset);
@@ -431,6 +431,7 @@
           sampled.centerSegments.forEach(function(s){fill.add(new root.Segment(new Point(s.point.x,s.point.y),new Point(s.handleIn.x,s.handleIn.y),new Point(s.handleOut.x,s.handleOut.y)));});
           fill.closed=true;
           try{fitRecord(fill);var fillSegments=segments(fill);}finally{fill.remove();}
+          if(fillSegments.length<2)delete out.linkedFillId;else // a tap: one anchor, invisible in the baseline, below the 2..256 a record needs
           linkedCompanions.set(out,{segments:fillSegments,
             closed:true,strokeColor:null,hasRealStroke:false,strokeWidth:1,strokeCap:'butt',strokeJoin:'miter',miterLimit:10,dashOffset:0,
             fillColor:style.fillColor,opacity:style.opacity/100,isLinkedFillCompanion:true,linkedFillId:link});
