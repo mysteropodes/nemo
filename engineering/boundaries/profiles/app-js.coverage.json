@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "23a1ab66fddc8c61ab75b01d209007dd4bc3c36c",
-    "sourceRootTree": "b68ad09deec2609d00c0b6fac945419584b95677",
+    "candidateCommit": "9abf787033c08ad74f8b9281906b82f41240e41a",
+    "sourceRootTree": "7f76bb56251223ff2ba9c7cce83ff751bf061fd4",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "6506f20b13cb39e1025bf633452519c4d7b58277",
-      "lastChangedCommit": "23a1ab66fddc8c61ab75b01d209007dd4bc3c36c"
+      "gitTree": "420f6ac65d68504c3275a11d5a7bb7bd280e13ce",
+      "lastChangedCommit": "9abf787033c08ad74f8b9281906b82f41240e41a"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,7 +35,7 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "b48f625fd30e09955deb53fefb972da06e9a8022a1c3ed0d7581be327d84d3f5"
+      "value": "1912bec8bfb0370aa04dc3cf15b34e7f1fc0096cce5919e815ef28c03ea1c994"
     },
     "profiles": [
       {
@@ -43,7 +43,7 @@
         "gitBlob": "39723e0f564b9d874be8a0b859725d697faed231",
         "sha256": "b218f382728170fcd6fd318b1db0c3f31bc72436a68e0e6255c2340c6002b5c2",
         "moduleCount": 307,
-        "basedOnCommit": "23a1ab66fddc8c61ab75b01d209007dd4bc3c36c"
+        "basedOnCommit": "9abf787033c08ad74f8b9281906b82f41240e41a"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -125,7 +125,7 @@
     "externalClassicTags": 339,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
-    "retainedClassicTags": 334,
+    "retainedClassicTags": 335,
     "retainedModuleTags": 2,
     "classicTagsUnderSrcJsIncludingVendors": 338,
     "inlineScripts": [
@@ -849,6 +849,18 @@
           "path": "src/index.html",
           "line": 2690,
           "scriptOrdinal": 337
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/keyboard-arbiter.js",
+      "moduleId": "app.keyboard.arbiter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2441,
+          "scriptOrdinal": 122
         }
       ]
     },
