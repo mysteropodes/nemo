@@ -298,3 +298,125 @@ fn native_ghost_view_refuses_open_selectors_and_reports_an_empty_layer_as_no_gho
             && r["total"] == 0
     );
 }
+
+/// The retained ghost query seen through a counter of how often the geometry of a frame is built.
+struct Counting<'a> {
+    inner: Box<dyn crate::request_receipts::GhostFrames + 'a>,
+    built: &'a std::sync::atomic::AtomicUsize,
+}
+impl crate::request_receipts::GhostFrames for Counting<'_> {
+    fn layer_uid(&self) -> &str {
+        self.inner.layer_uid()
+    }
+    fn count(&self) -> usize {
+        self.inner.count()
+    }
+    fn frame(&self, index: usize) -> crate::request_receipts::GhostFrameFacts {
+        self.inner.frame(index)
+    }
+    fn paths(
+        &self,
+        index: usize,
+    ) -> Result<Vec<crate::request_receipts::GhostPathFacts>, DispatchErrorCode> {
+        self.built.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.inner.paths(index)
+    }
+}
+/// Reads every ghost frame page by page; returns `(pages, geometry builds, segments seen per ghost)`.
+fn drain_counting(snapshot: &ObjectSnapshot, first: u64) -> (u64, usize, Vec<u64>) {
+    let built = std::sync::atomic::AtomicUsize::new(0);
+    let (mut at, mut pages, mut seen) = ((first, 0u64), 0u64, vec![]);
+    loop {
+        pages += 1;
+        assert!(pages < 2_000, "paging does not terminate");
+        let response = snapshot
+            .dispatch_ghost_view_with(
+                query(snapshot, view(at.0, at.1, "default")),
+                Ok(PROOF),
+                &|bytes| {
+                    snapshot.query_tween_ghosts_json(bytes).map(|read| {
+                        Box::new(Counting {
+                            inner: Box::new(read),
+                            built: &built,
+                        }) as Box<dyn crate::request_receipts::GhostFrames + '_>
+                    })
+                },
+            )
+            .unwrap();
+        assert!(serde_json::to_vec(&response).unwrap().len() <= 4096);
+        assert!(response.ok, "{:?}", response.error);
+        let r = response.result.unwrap();
+        if r["ghost"].is_null() {
+            break;
+        }
+        if seen.is_empty() || at.1 == 0 {
+            seen.push(0);
+        }
+        let covered: u64 = r["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|i| i["segments"].as_array().unwrap().len() as u64)
+            .sum();
+        *seen.last_mut().unwrap() += covered;
+        match r["next"].as_object() {
+            None => break,
+            Some(next) => at = (next["ghost"].as_u64().unwrap(), next["cursor"].as_u64().unwrap()),
+        }
+    }
+    (pages, built.load(std::sync::atomic::Ordering::SeqCst), seen)
+}
+
+/// Every frame carries `paths` strokes of `each` segments (a stored path holds at most 256).
+fn crowded_frames(paths: usize, each: usize, cubic: bool) -> Value {
+    let mut frames = oracle_frames();
+    for frame in frames.as_array_mut().unwrap() {
+        let template = frame["strokes"][0].clone();
+        let strokes: Vec<Value> = (0..paths)
+            .map(|p| {
+                let mut stroke = template.clone();
+                stroke["strokeId"] = json!(format!("s{p}"));
+                stroke["segments"] = json!((0..each)
+                    .map(|n| {
+                        let handle = if cubic { [0.5, 0.25] } else { [0.0, 0.0] };
+                        json!({"point":[(n % 90) as f64 * 1.25,(p * 3 + n % 7) as f64],"handleIn":handle,"handleOut":handle})
+                    })
+                    .collect::<Vec<_>>());
+                stroke
+            })
+            .collect();
+        frame["strokes"] = json!(strokes);
+    }
+    frames
+}
+
+#[test]
+fn native_ghost_view_builds_the_geometry_of_a_frame_once_across_its_pages() {
+    let owner = frames_of(&crowded_frames(3, 200, true));
+    let snapshot = owner.acquire_snapshot(0).unwrap();
+    let (pages, built, seen) = drain_counting(&snapshot, 0);
+    assert!(
+        pages as usize > seen.len() * 2,
+        "600 cubic segments span several 4096 byte pages per frame"
+    );
+    assert_eq!(built, seen.len(), "one geometry build per ghost frame, not per page");
+    assert!(seen.iter().all(|n| *n == 600), "{seen:?}");
+    // Another acquire of the same revision shares the build of the frame last read: nothing is rebuilt.
+    let again = owner.acquire_snapshot(0).unwrap();
+    assert_eq!(drain_counting(&again, seen.len() as u64 - 1).1, 0);
+}
+
+#[test]
+fn native_ghost_view_reads_a_five_thousand_segment_frame_completely() {
+    let owner = frames_of(&crowded_frames(20, 250, false));
+    let snapshot = owner.acquire_snapshot(0).unwrap();
+    let (pages, built, seen) = drain_counting(&snapshot, 0);
+    assert!(!seen.is_empty() && seen.iter().all(|n| *n == 5_000), "{seen:?}");
+    assert_eq!(built, seen.len());
+    // Pages grow to the byte limit: plain line segments need clearly fewer pages than the 160-segment first guess.
+    assert!(
+        (pages as usize) * 10 < seen.len() * (5_000 / 160) * 7,
+        "{pages} pages for {} frames",
+        seen.len()
+    );
+}
