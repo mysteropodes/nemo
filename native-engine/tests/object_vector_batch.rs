@@ -321,3 +321,132 @@ fn a_centred_reshape_rebuilds_a_ribbon_and_resyncs_its_linked_fill_in_one_step()
         assert_eq!(send(&mut owner, name, batch(vec![op]))["ok"], false, "{name} is refused");
     }
 }
+
+/// #2372 Select: a `reshape` with a record-space `matrix` moves one stored record and what belongs to it.
+mod select_transform {
+    use super::*;
+
+    const MOVE: [f64; 6] = [2.0, 0.0, 0.0, 2.0, 10.0, 5.0];
+    fn reshape(id: &str, m: [f64; 6]) -> Value {
+        json!({"op":"reshape","stableTarget":target("L1", 0, id),"matrix":m})
+    }
+    fn closed(mut record: Value, id: &str, pts: [(f64, f64); 4], ext: Value) -> Value {
+        record["target"]["strokeId"] = json!(id);
+        record["geometry"]["closed"] = json!(true);
+        record["geometry"]["segments"] = json!(pts.map(|(x, y)| json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}})));
+        if !ext.is_null() {
+            record["vectorExt"] = ext;
+        }
+        record
+    }
+    const SQUARE: [(f64, f64); 4] = [(0., 0.), (100., 0.), (100., 60.), (0., 60.)];
+    fn at(owner: &NativeObjectHistory, id: &str) -> Value {
+        objects(&state(owner)).iter().find(|r| r["target"]["strokeId"] == id).unwrap().clone()
+    }
+    fn xy(v: &Value) -> [f64; 2] {
+        [v["x"].as_f64().unwrap(), v["y"].as_f64().unwrap()]
+    }
+    fn points(record: &Value) -> Vec<[f64; 2]> {
+        record["geometry"]["segments"].as_array().unwrap().iter().map(|s| xy(&s["point"])).collect()
+    }
+
+    #[test]
+    fn a_plain_stroke_is_mapped_by_the_matrix_in_one_entry() {
+        let doc = document(1, vec![closed(record_at("A", "L1", 0, ""), "s-a", SQUARE, Value::Null)], None);
+        let mut owner = owner_of(&doc);
+        let before = state(&owner);
+        let response = send(&mut owner, "move", batch(vec![reshape("s-a", MOVE)]));
+        assert_eq!(response["ok"], true, "{response}");
+        assert_eq!(points(&at(&owner, "s-a")), vec![[10., 5.], [210., 5.], [210., 125.], [10., 125.]]);
+        assert_eq!(owner.history_depths(), (1, 0));
+        owner.undo(1).unwrap();
+        assert_eq!(state(&owner), before);
+    }
+
+    #[test]
+    fn a_textured_ribbon_moves_with_its_centreline_linked_fill_and_dabs() {
+        use super::super::create_many::pressure_record;
+        use crate::object_document::pressure_geometry::{profiled_outline, SegOut};
+        let center = json!([{"point":{"x":0,"y":10},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":2},
+            {"point":{"x":40,"y":10},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":4}]);
+        let mut owner = owner_of(&document(1, seeds(), None));
+        let companion = pressure_record([0.2, 0.4, 0.6], json!({"linkedFillId":"lf","isLinkedFillCompanion":true}));
+        let ribbon = pressure_record([0.1, 0.1, 0.1], json!({"linkedFillId":"lf","brushTexture":{"brushGroupId":"g","brushTexturePreset":"chalk-round","preTextureOpacity":1},
+            "pressure":{"centerSegments":center,"widthProfile":[{"t":0,"width":2},{"t":1,"width":4}]}}));
+        let dab = closed(record_at("A", "L1", 0, ""), "", SQUARE, json!({"brushTexture":{"brushGroupId":"g","isBrushTextureCopy":true}}));
+        let other = closed(record_at("A", "L1", 0, ""), "", SQUARE, json!({"brushTexture":{"brushGroupId":"h","isBrushTextureCopy":true}}));
+        let made = send(&mut owner, "set", json!({"command":"object.vector.createMany","records":[companion, ribbon, dab, other]}));
+        assert_eq!(made["ok"], true, "{made}");
+        let before = state(&owner);
+        let response = send(&mut owner, "move", batch(vec![reshape("native-stroke:1:1", MOVE)]));
+        assert_eq!(response["ok"], true, "{response}");
+        assert_eq!(response["result"]["strokeIds"], json!(["native-stroke:1:1"]), "one receipt id per requested step; the fill and copies are not steps");
+        let (ribbon, fill, dab, other) = (at(&owner, "native-stroke:1:1"), at(&owner, "native-stroke:1:0"), at(&owner, "native-stroke:1:2"), at(&owner, "native-stroke:1:3"));
+        let moved = ribbon["vectorExt"]["pressure"]["centerSegments"].as_array().unwrap().clone();
+        assert_eq!((xy(&moved[0]["point"]), xy(&moved[1]["point"])), ([10., 25.], [90., 25.]), "the centreline is mapped");
+        assert_eq!((moved[0]["width"].as_f64(), moved[1]["width"].as_f64()), (Some(4.), Some(8.)), "widths follow the mean axis scale");
+        let segs: Vec<SegOut> = moved.iter().map(|a| SegOut { point: xy(&a["point"]), handle_in: xy(&a["handleIn"]), handle_out: xy(&a["handleOut"]) }).collect();
+        let outline = profiled_outline(&segs, &[(0., 2.), (1., 4.)]).unwrap();
+        let painted = ribbon["geometry"]["segments"].as_array().unwrap();
+        assert_eq!(painted.len(), outline.len(), "the outline is rebuilt from the mapped centreline");
+        assert_eq!(xy(&painted[0]["point"]), outline[0].point);
+        assert_eq!(fill["geometry"]["segments"].as_array().unwrap().iter().map(|s| xy(&s["point"])).collect::<Vec<_>>(), vec![[10., 25.], [90., 25.]]);
+        assert_eq!(points(&dab), vec![[10., 5.], [210., 5.], [210., 125.], [10., 125.]], "the anchor's copy follows");
+        assert_eq!(points(&other), vec![[0., 0.], [100., 0.], [100., 60.], [0., 60.]], "another group's copy stays");
+        assert_eq!(owner.history_depths(), (2, 0));
+        owner.undo(2).unwrap();
+        assert_eq!(state(&owner), before, "one undo restores all of them");
+    }
+
+    #[test]
+    fn a_gradient_fill_shape_takes_its_end_points() {
+        let ext = json!({"isFillShape":true,"fillGradient":{"kind":"linear","from":[0,0],"to":[100,0],"stops":[{"offset":0,"color":"#ff0000ff"},{"offset":1,"color":"#0000ffff"}]}});
+        let mut owner = owner_of(&document(1, vec![closed(record_at("A", "L1", 0, ""), "s-a", SQUARE, ext)], None));
+        let response = send(&mut owner, "move", batch(vec![reshape("s-a", MOVE)]));
+        assert_eq!(response["ok"], true, "{response}");
+        let shape = at(&owner, "s-a");
+        assert_eq!((shape["vectorExt"]["fillGradient"]["from"].clone(), shape["vectorExt"]["fillGradient"]["to"].clone()), (json!([10., 5.]), json!([210., 5.])));
+        assert_eq!(points(&shape)[2], [210., 125.]);
+    }
+
+    #[cfg(feature = "evaluation")]
+    #[test]
+    fn a_dynamic_shape_keeps_its_box_and_takes_a_turn_as_box_angle() {
+        let ext = json!({"paramShape":{"kind":"rect","box":{"x1":0,"y1":0,"x2":100,"y2":60}}});
+        let mut owner = owner_of(&document(1, vec![closed(record_at("A", "L1", 0, ""), "s-a", SQUARE, ext)], None));
+        assert_eq!(send(&mut owner, "move", batch(vec![reshape("s-a", [1., 0., 0., 1., 10., 5.])]))["ok"], true);
+        let shape = at(&owner, "s-a");
+        assert_eq!(shape["vectorExt"]["paramShape"]["box"], json!({"x1":10.,"y1":5.,"x2":110.,"y2":65.}), "the frame follows a move");
+        assert_eq!(points(&shape)[0], [10., 5.]);
+        assert_eq!(send(&mut owner, "scale", batch(vec![reshape("s-a", [2., 0., 0., 1., 0., 0.])]))["ok"], true);
+        assert_eq!(at(&owner, "s-a")["vectorExt"]["paramShape"]["box"], json!({"x1":20.,"y1":5.,"x2":220.,"y2":65.}), "the frame follows a resize");
+        let quarter = send(&mut owner, "turn", batch(vec![reshape("s-a", [0., 1., -1., 0., 0., 0.])]));
+        assert_eq!(quarter["ok"], true, "{quarter}");
+        assert_eq!(at(&owner, "s-a")["vectorExt"]["boxAngle"].as_f64(), Some(90.), "a turn adds to the stored angle");
+        assert_eq!(send(&mut owner, "skew", batch(vec![reshape("s-a", [1., 0., 0.5, 1., 0., 0.])]))["ok"], false, "a skew of a dynamic shape is refused");
+        assert_eq!(owner.history_depths(), (3, 0));
+    }
+
+    #[test]
+    fn a_matrix_that_cannot_be_applied_refuses_the_whole_batch() {
+        let bitmap = json!({"bitmapBrush":{"bitmapBrushSpec":{"tip":"hard","size":8,"spacing":15,"scatter":0,"opacity":1,"color":"#0000ffff","pressure":false,"seed":17},"brushGroupId":"g","preTextureOpacity":1}});
+        let dab = json!({"brushTexture":{"brushGroupId":"g","isBrushTextureCopy":true}});
+        let doc = document(1, vec![closed(record_at("A", "L1", 0, ""), "s-a", SQUARE, Value::Null), closed(record_at("A", "L1", 0, ""), "s-d", SQUARE, dab),
+            { let mut b = closed(record_at("A", "L1", 0, ""), "s-b", SQUARE, bitmap); b["vector"]["opacity"] = json!(0); b }], None);
+        let mut owner = owner_of(&doc);
+        let before = state(&owner);
+        for (name, ops) in [
+            ("singular", vec![reshape("s-a", [1., 2., 2., 4., 0., 0.])]),
+            ("missing", vec![reshape("s-x", MOVE)]),
+            ("copy", vec![reshape("s-d", MOVE)]),
+            ("bitmap", vec![reshape("s-b", MOVE)]),
+            ("also-geometry", vec![json!({"op":"reshape","stableTarget":target("L1", 0, "s-a"),"matrix":MOVE,"center":[]})]),
+            ("clone", vec![json!({"op":"clone","stableTarget":target("L1", 0, "s-a"),"frame":0,"matrix":MOVE})]),
+            ("create", vec![json!({"op":"create","record":record_at("B", "L1", 0, ""),"matrix":MOVE})]),
+            ("second-step", vec![reshape("s-a", MOVE), reshape("s-x", MOVE)]),
+        ] {
+            assert_eq!(send(&mut owner, name, batch(ops))["ok"], false, "{name} is refused");
+        }
+        assert_eq!(state(&owner), before, "nothing was written");
+    }
+}

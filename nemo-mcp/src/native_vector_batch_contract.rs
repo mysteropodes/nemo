@@ -4,7 +4,10 @@
 //! (multiframe stamps) is an earlier create's record again on another frame: a create in every respect but its size. A
 //! `reshape` (new geometry for a named stroke) or `clone` (a new stroke from a named one, on `frame`) keeps the native
 //! style, so a client that reads presented geometry only (the Labs knife) can cut. A `reshape` with a `center` instead of
-//! geometry rebuilds a pressure ribbon on that centreline (sculpt).
+//! geometry rebuilds a pressure ribbon on that centreline (sculpt). A `reshape` with a `matrix` (six numbers, the record's
+//! own space, #2372 Select) maps the record by that affine and brings what belongs to it: a ribbon's rebuilt outline and
+//! linked fill, a texture anchor's copies, a gradient's end points and a dynamic shape's box; its receipt id is still the
+//! one named record.
 use super::shapes::{anchor, geometry, record_shape};
 use super::target;
 use crate::native_contract::exact;
@@ -26,9 +29,10 @@ fn step(op: &Value) -> Option<&Value> {
         .then(|| &op["record"]["target"]),
         "delete" => (exact(op, &["op", "stableTarget"], &[]).is_some() && target(&op["stableTarget"], false))
             .then(|| &op["stableTarget"]),
-        "reshape" => (exact(op, &["op", "stableTarget"], &["geometry", "center", "frame"]).is_some()
+        "reshape" => (exact(op, &["op", "stableTarget"], &["geometry", "center", "matrix", "frame"]).is_some()
             && target(&op["stableTarget"], false)
-            && op.get("geometry").is_some() != op.get("center").is_some()
+            && [op.get("geometry"), op.get("center"), op.get("matrix")].iter().filter(|m| m.is_some()).count() == 1
+            && op.get("matrix").is_none_or(|m| m.as_array().is_some_and(|a| a.len() == 6 && a.iter().all(|v| v.as_f64().is_some_and(f64::is_finite))))
             && op.get("geometry").is_none_or(geometry)
             && op.get("center").is_none_or(|c| c.as_array().is_some_and(|a| (2..=256).contains(&a.len()) && a.iter().all(anchor)))
             && op.get("frame").is_none_or(|f| f.as_u64().is_some_and(|f| u32::try_from(f).is_ok())))

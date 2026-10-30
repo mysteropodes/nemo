@@ -278,6 +278,7 @@
         "object_vector_create.rs",
         "object_vector_batch.rs",
         "object_vector_batch_ribbon.rs",
+        "object_vector_batch_transform.rs",
         "object_vector_trim.rs",
         "object_vector_edit_order.rs",
         "object_layer_lifecycle_ops.rs",

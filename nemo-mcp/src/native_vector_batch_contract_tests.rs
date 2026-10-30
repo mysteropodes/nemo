@@ -116,7 +116,23 @@ fn reshape_and_clone_name_a_stroke_and_new_geometry() {
         p["ops"][0] = json!({"op":"reshape","stableTarget":target("L1","s-a"),"center":bad});
         assert!(!vector_request(VECTOR, &p), "{p}");
     }
+    // #2372 Select: a reshape by a record-space affine of six finite numbers; one receipt id for the named record.
+    let mut moved = payload.clone();
+    moved["ops"][0] = json!({"op":"reshape","stableTarget":target("L1","s-a"),"matrix":[1,0,0,1,12.5,-4],"frame":2});
+    assert!(vector_request(VECTOR, &moved), "a Select move names its record and a matrix");
+    assert!(vector_result(VECTOR, &moved, &receipt));
+    for bad in [json!([1, 0, 0, 1, 0]), json!([1, 0, 0, 1, 0, 0, 0]), json!([1, 0, 0, 1, 0, "x"]), json!("identity")] {
+        let mut p = payload.clone();
+        p["ops"][0] = json!({"op":"reshape","stableTarget":target("L1","s-a"),"matrix":bad});
+        assert!(!vector_request(VECTOR, &p), "{p}");
+    }
     let mut both = payload.clone();
+    both["ops"][0]["center"] = json!([anchor, anchor]);
+    assert!(!vector_request(VECTOR, &both), "a reshape takes geometry or a centreline, never both");
+    both = payload.clone();
+    both["ops"][0]["matrix"] = json!([1, 0, 0, 1, 0, 0]);
+    assert!(!vector_request(VECTOR, &both), "a matrix excludes geometry too");
+    both = payload.clone();
     both["ops"][0]["center"] = json!([anchor, anchor]);
     assert!(!vector_request(VECTOR, &both), "a reshape takes geometry or a centreline, never both");
     for bad in [

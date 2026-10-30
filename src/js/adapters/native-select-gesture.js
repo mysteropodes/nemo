@@ -2,11 +2,14 @@
  * through select-canvas-intent (which owns the pointer capture and the click rule); this module decides what a drag over the presented
  * layer means, previews it as a disposable SVG (NemoNativeSelectOverlay.preview) and, on release, commits it as exactly ONE native
  * `object.vector.batch` of reshapes (the route the Labs sculpt and knife use), checked against the document pin read when the drag
- * began. It holds no document state and writes nothing while the pointer moves: Escape, a lost capture or a stale document ends the
- * gesture with no write. Baseline (1065e9d8 select-bridge onDown/onMove/onUp): Shift on a corner scales proportionally, Alt scales from
- * the box centre, Shift snaps a rotation to 15 degrees, Shift on the press extends the selection. Not carried over: skew zones, a custom
- * anchor, the Alt lasso, ruler snapping. Images, text, parametric shapes and brushes have no readable native transform here, so a drag
- * that includes one is refused with a notice (images have move/resize/rotate item commands but the stored rect is not readable). */
+ * began. A plain stroke is reshaped by its transformed geometry; a ribbon, a fill, a parametric shape and a texture anchor go as one
+ * record-space matrix the engine applies (it rebuilds a ribbon from its centreline and re-syncs its linked fill, carries a texture
+ * anchor's dabs and a gradient's end points, keeps a shape's box). It holds no document state and writes nothing while the pointer
+ * moves: Escape, a lost capture or a stale document ends the gesture with no write. Baseline (1065e9d8 select-bridge onDown/onMove/onUp):
+ * Shift on a corner scales proportionally, Alt scales from the box centre, Shift snaps a rotation to 15 degrees, Shift on the press extends
+ * the selection. Not carried over: skew zones, a custom anchor, the Alt lasso, ruler snapping. Still refused with a notice: images and text
+ * (their stored rect is not readable here and one gesture would be several history entries), bitmap brushes (their image is baked) and a
+ * dab whose anchor could not be read. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -15,15 +18,15 @@
   'use strict';
   var DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], DRAG = 3, MAX_STEPS = 64;
   var PINS = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
-  var LABEL = { raster: 'images', text: 'text', shape: 'shapes', brush: 'brushes', fill: 'fills' };
+  var LABEL = { raster: 'images', text: 'text' }, MAPPED = ['plain', 'ribbon', 'fill', 'shape', 'brush'];
   function samePin(a, b) { return !!a && !!b && PINS.every(function (k) { return a[k] === b[k]; }); }
   function notice(root, text) { if (typeof root.showToast === 'function') try { root.showToast(text); } catch (_) {} }
   // The selection's items that have no native transform here, as labels (null when every one can be moved, scaled and rotated).
   function unsupported(paths) {
     var found = [];
     paths.forEach(function (p) {
-      var role = p.data && p.data.nativeRole;
-      if (role !== 'plain' && role !== 'ribbon' && found.indexOf(LABEL[role] || 'this item') < 0) found.push(LABEL[role] || 'this item');
+      var d = p.data || {}, label = d.nativeBrush === 'bitmap' ? 'bitmap brushes' : d.nativeBrush === 'copy' ? 'brush dabs' : MAPPED.indexOf(d.nativeRole) < 0 ? (LABEL[d.nativeRole] || 'this item') : null;
+      if (label && found.indexOf(label) < 0) found.push(label);
     });
     return found.length ? found.join(', ') : null;
   }
@@ -62,16 +65,6 @@
     return [sx, 0, 0, sy, ax - sx * ax, ay - sy * ay];
   }
   var identity = function (m) { return Math.abs(m[0] - 1) + Math.abs(m[1]) + Math.abs(m[2]) + Math.abs(m[3] - 1) + Math.abs(m[4]) + Math.abs(m[5]) < 1e-9; };
-  // A ribbon's world centreline through the affine; its width follows the mean axis scale (baseline scaleCenterSegments).
-  function mapCenter(segs, m) {
-    var k = (Math.hypot(m[0], m[1]) + Math.hypot(m[2], m[3])) / 2, lin = function (v) { return [m[0] * v[0] + m[2] * v[1], m[1] * v[0] + m[3] * v[1]]; };
-    segs.forEach(function (s) {
-      s.point = [m[0] * s.point[0] + m[2] * s.point[1] + m[4], m[1] * s.point[0] + m[3] * s.point[1] + m[5]];
-      s.handleIn = lin(s.handleIn); s.handleOut = lin(s.handleOut);
-      if (s.width !== undefined) s.width *= k;
-    });
-  }
-
   function begin(root, e, abort) {
     var I = root.NemoSelectCanvasIntent, O = root.NemoNativeSelectOverlay, st = root.state, shown = I && st && st.tool === 'select' && st.appMode !== 'motion' && I.presentedState(root);
     if (!shown) return null;
@@ -163,13 +156,11 @@
       var m = g.matrix, now = I.presentedState(root), route = root.NemoNativeObjectLabs && root.NemoNativeObjectLabs.desktop(root);
       if (!now || !samePin(now.pin, g.pin) || now.presentation.frame !== g.frame || I.pickContext(root) !== g.ctx) return notice(root, 'The document changed during the drag — nothing was changed.');
       if (!route) return notice(root, 'Transforming is not available right now.');
-      var layers = await I.layerPaths(root, function (item) { return ids.indexOf(item.stableTarget.strokeId) >= 0; }, true, layerIdx);
+      var layers = await I.layerPaths(root, function (item) { return ids.indexOf(item.stableTarget.strokeId) >= 0; }, false, layerIdx);
       var again = I.presentedState(root);
       if (!layers || layers.paths.length !== ids.length || !again || !samePin(again.pin, g.pin)) return notice(root, 'The document changed during the drag — nothing was changed.');
-      var matrix = new Matrix(m[0], m[1], m[2], m[3], m[4], m[5]);
-      layers.paths.forEach(function (p) { p.transform(matrix); if (p.data.centerSegments) mapCenter(p.data.centerSegments, m); });
       var result;
-      try { result = await route.batchStrokes(layers.layerUid, layers.frame, I.reshapeSteps(layers.paths)); } catch (_) { result = null; }
+      try { result = await route.batchStrokes(layers.layerUid, layers.frame, I.transformSteps(root, layers.paths, m)); } catch (_) { result = null; }
       if (!result || result.status !== 'applied') return notice(root, 'The transform could not be applied.');
       await reselect(ids, layerIdx);
     }
