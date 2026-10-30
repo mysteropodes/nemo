@@ -22,8 +22,8 @@
     cmdInsertFrame:NATIVE,cmdInsertKey:NATIVE,cmdInsertBlankKey:NATIVE,cmdDuplicateKey:NATIVE,cmdExtendExposure:NATIVE,
     // generateTweens is a legacy writer; tween generation has no native route yet.
     cmdTween:off('Generating tweens is unavailable in native Nemo.'),
-    // flipPreview steps goToFrame; resetView uses the native viewport navigation first.
-    cmdFlipPreview:UI,cmdResetView:UI,
+    // flipPreview browses through the native frame navigator (native-flip-preview.js); resetView uses the native viewport navigation first.
+    cmdFlipPreview:NATIVE,cmdResetView:UI,
     // The rename field commits through the legacy SM.renameLayer, which refuses; no native rename field exists yet.
     cmdRenameLayer:off('Renaming a layer from the keyboard is unavailable in native Nemo.')
   });

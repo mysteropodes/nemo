@@ -2810,6 +2810,18 @@
       ]
     },
     {
+      "id": "app.native.flip-preview.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-flip-preview.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-flip-preview.js"
+      ]
+    },
+    {
       "id": "app.motion.canvas-intent.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
