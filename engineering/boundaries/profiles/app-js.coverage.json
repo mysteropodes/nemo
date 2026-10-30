@@ -3958,6 +3958,30 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-object-widget-ui.js",
+      "moduleId": "app.native.object.widget.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-rig-ui.js",
+      "moduleId": "app.native.object.rig.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-object-labs.js",
       "moduleId": "app.native.object.labs.adapter",
       "executionClass": "document-classic",
