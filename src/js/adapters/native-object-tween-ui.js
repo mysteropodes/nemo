@@ -170,13 +170,14 @@
       return reassign(host, index, from, at >= 0 && at + 1 < drawnKeys.length ? drawnKeys[at + 1] : -1);
     });
   }
-  // Reassign step 0: the key span the playhead is in (the nearest key at or before it, and the next key), from the cells read.
+  // Reassign step 0: the drawn-key span the playhead is in (the nearest drawn key at or before it, and the next drawn key), from the cells read.
   // Resolves {status:'span', from, to} or a noticed typed unavailable (no key before the playhead, no next key, cells unavailable).
   function reassignSpan(host, index, frame) {
     if (!nativeMode(host)) return null;
     return readKeys(host, index).then((keys) => {
       if (!keys) return notice(host, unavailable(CODES.cells));
-      const before = keys.filter((k) => k.frame <= frame).pop(), next = before && keys.find((k) => k.frame > before.frame);
+      // Tween spans run between DRAWN keys (the engine refuses a span ending at an empty key), so skip empty keys.
+      const drawn = keys.filter((k) => k.drawn), before = drawn.filter((k) => k.frame <= frame).pop(), next = before && drawn.find((k) => k.frame > before.frame);
       if (!before) return notice(host, unavailable(CODES.noKey));
       if (!next) return notice(host, unavailable(CODES.noNext));
       return Object.freeze({ status: 'span', from: before.frame, to: next.frame });
