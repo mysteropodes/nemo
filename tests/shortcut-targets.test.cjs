@@ -42,7 +42,9 @@ test('every rebindable shortcut has a declared desktop target, and no declared t
 
 test('on desktop an unavailable shortcut shows its reason and reaches nothing; native and presentation shortcuts run',()=>{
   const k=keyboard();
-  assert.equal(k.press('t'),true,'the Tween key is consumed');
+  assert.equal(k.registry.keyFor('cmdTween'),'','Tween ships unbound');
+  k.registry.setKey('cmdTween','F8');
+  assert.equal(k.press('F8'),true,'a user-bound Tween key is consumed');
   assert.equal(k.press('F2'),true,'the Rename key is consumed');
   assert.deepEqual(k.calls,[],'neither generateTweens nor the rename field runs');
   assert.deepEqual(k.notices,['Generating tweens is unavailable in native Nemo.','Renaming a layer from the keyboard is unavailable in native Nemo.']);
@@ -52,12 +54,21 @@ test('on desktop an unavailable shortcut shows its reason and reaches nothing; n
   assert.equal(k.notices.length,2,'no further notice');
 });
 
+test('T selects the Text tool and never reaches Tween or its unavailable notice',()=>{
+  const k=keyboard();
+  assert.equal(k.press('t'),true);
+  assert.deepEqual(k.calls,['setTool:text']);
+  assert.deepEqual(k.notices,[],'no "tween is unavailable" toast');
+  assert.equal(k.press('y'),false,'Y no longer reaches the Text tool');
+  assert.deepEqual(k.calls,['setTool:text']);
+});
+
 test('a rebound key keeps its action\'s target',()=>{
   const k=keyboard();
   assert.equal(k.registry.clashFor('cmdTween','F8'),null,'F8 is free');
   k.registry.setKey('cmdTween','F8');
-  assert.equal(k.press('F8'),true);assert.equal(k.press('t'),false,'the old key no longer reaches Tween');
-  assert.deepEqual(k.calls,[]);assert.deepEqual(k.notices,['Generating tweens is unavailable in native Nemo.']);
+  assert.equal(k.press('F8'),true);assert.equal(k.press('t'),true,'T stays the Text tool');
+  assert.deepEqual(k.calls,['setTool:text']);assert.deepEqual(k.notices,['Generating tweens is unavailable in native Nemo.']);
 });
 
 test('without the target table every desktop shortcut refuses; outside the desktop host every shortcut runs as before',()=>{
@@ -65,8 +76,9 @@ test('without the target table every desktop shortcut refuses; outside the deskt
   assert.equal(missing.press('b'),true);assert.equal(missing.press('F5'),true);
   assert.deepEqual(missing.calls,[]);assert.deepEqual(missing.notices,['Keyboard shortcuts are unavailable.','Keyboard shortcuts are unavailable.']);
   const browser=keyboard({desktop:false,nativeFrames:false});
-  for(const key of ['t','F2','F5','b'])browser.press(key);
-  assert.deepEqual(browser.calls,['generateTweens','startLayerRename:0','insertFrame','setTool:draw']);
+  browser.registry.setKey('cmdTween','F8');
+  for(const key of ['F8','F2','F5','b','t'])browser.press(key);
+  assert.deepEqual(browser.calls,['generateTweens','startLayerRename:0','insertFrame','setTool:draw','setTool:text']);
   assert.deepEqual(browser.notices,[]);
 });
 

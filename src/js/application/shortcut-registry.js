@@ -45,7 +45,7 @@ var NemoShortcutRegistry = (function () {
     // p=pen...) so these are arbitrary placeholders, not a claimed "right"
     // answer — rebindable via the existing Réglages > Raccourcis UI
     // (shortcutOverrides/localStorage) like any other entry here.
-    {action:'text',key:'y',label:'Texte'},
+    {action:'text',key:'t',label:'Texte'},
     {action:'rotate',key:'w',label:'Rotation du canevas'},
     {action:'rig',key:'s',label:'Rig (Skeleton)'},
     // Deliberately NOT bound to 'q' (or anything): the Perspective rail
@@ -81,7 +81,10 @@ var NemoShortcutRegistry = (function () {
     {action:'cmdInsertBlankKey',key:'F7',cat:'frames',label:'shortcutCmdInsertBlankKey'},
     {action:'cmdDuplicateKey',key:'',cat:'frames',label:'shortcutCmdDuplicateKey'},
     {action:'cmdExtendExposure',key:'+',cat:'frames',label:'shortcutCmdExtendExposure'},
-    {action:'cmdTween',key:'t',cat:'frames',label:'shortcutCmdTween'},
+    // Tween is deliberately unbound by default: T is the Text tool (Illustrator/Figma
+    // convention, per installed-build validation feedback) and Tween is unavailable in native Nemo anyway.
+    // Rebindable in Réglages > Raccourcis like cmdDuplicateKey.
+    {action:'cmdTween',key:'',cat:'frames',label:'shortcutCmdTween'},
     {action:'cmdFlipPreview',key:'f',cat:'view',label:'shortcutCmdFlipPreview'},
     {action:'cmdResetView',key:'/',cat:'view',label:'shortcutCmdResetView'},
     {action:'cmdRenameLayer',key:'F2',cat:'layers',label:'shortcutCmdRenameLayer'},
