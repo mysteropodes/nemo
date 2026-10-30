@@ -2312,6 +2312,7 @@
         "native_object_project_replace.rs",
         "native_object_project_admission.rs",
         "native_object_save.rs",
+        "native_object_recovery.rs",
         "native_object_inactive_project.rs",
         "native_object_retained_activation.rs",
         "native_object_retained_activation_callback.rs"
@@ -2359,6 +2360,8 @@
         "native_object_new_project_tests.rs",
         "native_object_save_tests.rs",
         "native_object_save_failure_tests.rs",
+        "native_object_recovery_tests.rs",
+        "native_object_recovery_failure_tests.rs",
         "native_object_v2_persistence_tests.rs",
         "native_object_v2_refusal_tests.rs",
         "native_object_preview_tests.rs",
