@@ -41,7 +41,12 @@
     return (text||'Untitled').slice(0,128);
   }
   function create(ports){
-    var timer=null,running=false,writing=false,s=null,noticed={};
+    var timer=null,running=false,writing=false,s=null,noticed={},inflight=null,owned=new Map();
+    // Slots this scheduler may have published, per document (#2360 R4). A slot is claimed when its write is requested, so a
+    // write still in flight when a cleanup runs is covered; a failed or stale write leaves a name whose discard is a no-op.
+    function own(documentId,slot){
+      var set=owned.get(documentId);if(!set){set=new Set();owned.set(documentId,set);}set.add(slot);
+    }
     function fresh(info){
       return {instanceId:info.instanceId,documentId:info.documentId,generation:info.lifecycleGeneration,
         tag:ports.randomHex(8),lastWriteAt:null,lastDuration:0,lastRevision:null,recovered:null,
@@ -83,6 +88,7 @@
       if(path)r.originPath=path;
       var replaced=s.supersedes||s.pinSupersedes;
       if(replaced&&replaced!==key)r.supersedes=replaced;
+      own(info.documentId,key);
       return r;
     }
     function notifyOnce(flag,message){
@@ -90,8 +96,9 @@
       try{ports.notice(message);}catch(_){}
     }
     async function attempt(info,now){
-      var mine=s,req=request(info),began=now;
+      var mine=s,req=request(info),began=now,done=null;
       writing=true;
+      inflight=new Promise(function(resolve){done=resolve;});
       try{
         var receipt=await ports.write(COMMAND,req);
         if(s!==mine)return {wrote:false,why:'session-changed'};
@@ -112,7 +119,17 @@
         // Failure (ENOSPC and similar): the previous generation is untouched; retry next tick.
         if(s===mine)notifyOnce('failed','Crash recovery could not be saved: '+(error&&error.message||error));
         return {wrote:false,why:'failed'};
-      }finally{writing=false;}
+      }finally{writing=false;inflight=null;done();}
+    }
+    // Cleanup surface (#2360 R4). claim() is synchronous: the slots of one document (or of all) at this instant.
+    function claim(documentId){
+      var out=[];
+      owned.forEach(function(set,id){if(documentId===undefined||id===documentId)set.forEach(function(k){if(out.indexOf(k)<0)out.push(k);});});
+      return out;
+    }
+    function release(documentId,slots){
+      var set=owned.get(documentId);if(!set)return;
+      slots.forEach(function(k){set.delete(k);});if(!set.size)owned.delete(documentId);
     }
     async function tick(options){
       var now=ports.now(),c=check();
@@ -131,6 +148,9 @@
       start:function(){if(running)return;running=true;schedule();},
       stop:function(){running=false;if(timer!==null){ports.clearTimer(timer);timer=null;}},
       tick:tick,
+      claim:claim,release:release,
+      // Resolves once any write in flight has settled (it never rejects), so a discard cannot be overtaken by it.
+      quiesce:function(){return inflight||Promise.resolve();},
       // Hidden window / blur: write the dirty state once now, still honoring the 20x backoff floor.
       flush:function(){return tick({force:true});},
       state:function(){return s?{lastWriteAt:s.lastWriteAt,lastDuration:s.lastDuration,lastRevision:s.lastRevision,

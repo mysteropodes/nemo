@@ -230,6 +230,100 @@ fn a_slot_saved_after_its_recovery_is_dropped_by_the_origin_rule() {
 }
 
 #[test]
+fn the_startup_sweep_judges_a_slot_by_its_newest_generation_and_keeps_what_it_cannot_judge() {
+    let scratch = Scratch::new();
+    let root = scratch.root();
+    let origin = scratch.0.join("saved.nemo");
+    fs::write(&origin, b"saved").unwrap();
+    let mtime = fs::metadata(&origin)
+        .unwrap()
+        .modified()
+        .unwrap()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    let origin = origin.to_str().unwrap().to_owned();
+    let missing = scratch.0.join("never-saved.nemo");
+    let missing = missing.to_str().unwrap().to_owned();
+    fn with<'a>(slot: &'a str, origin: &'a str) -> Entry<'a> {
+        Entry {
+            origin_path: Some(origin),
+            ..entry(slot, 1)
+        }
+    }
+    // Two generations straddle the origin's mtime: the newest was written after the save, so the work is unsaved.
+    let straddle = with("slot-straddle", &origin);
+    publish(
+        &root,
+        &straddle,
+        &project_with("old"),
+        mtime - 9_000,
+        &mut |_, _| Ok(()),
+    )
+    .unwrap();
+    publish(
+        &root,
+        &straddle,
+        &project_with("new"),
+        mtime + 9_000,
+        &mut |_, _| Ok(()),
+    )
+    .unwrap();
+    // Both generations predate the save: the save superseded them, so the whole slot goes.
+    let saved = with("slot-saved", &origin);
+    publish(
+        &root,
+        &saved,
+        &project_with("a"),
+        mtime - 9_000,
+        &mut |_, _| Ok(()),
+    )
+    .unwrap();
+    publish(
+        &root,
+        &saved,
+        &project_with("b"),
+        mtime - 3_000,
+        &mut |_, _| Ok(()),
+    )
+    .unwrap();
+    // The origin file is gone: nothing says it was saved, so the recovery stays.
+    let gone = with("slot-gone", &missing);
+    publish(
+        &root,
+        &gone,
+        &project_with("c"),
+        mtime + 1_000,
+        &mut |_, _| Ok(()),
+    )
+    .unwrap();
+    // No origin at all (an untitled project) is never dropped by this rule.
+    publish_ok(
+        &root,
+        "slot-untitled",
+        1,
+        &project_with("d"),
+        mtime - 50_000,
+    );
+    let listing = list_slots(&root, mtime + 10_000, None, &Limits::DEFAULT).unwrap();
+    let mut keys: Vec<_> = listing
+        .entries
+        .iter()
+        .map(|e| e.slot_key.as_str())
+        .collect();
+    keys.sort();
+    assert_eq!(keys, ["slot-gone", "slot-straddle", "slot-untitled"]);
+    assert!(
+        !root.join("slot-saved").exists(),
+        "swept from disk, not only hidden"
+    );
+    assert!(root.join("slot-straddle").is_dir());
+    // The sweep is idempotent: a second pass changes nothing.
+    let again = list_slots(&root, mtime + 10_001, None, &Limits::DEFAULT).unwrap();
+    assert_eq!(again.entries.len(), 3);
+}
+
+#[test]
 fn explicit_discard_and_quarantine_keep_their_scopes() {
     let scratch = Scratch::new();
     let root = scratch.root();
