@@ -129,12 +129,13 @@
       var box=createNativeObjectUiText(root,'div','');box.id='native-project-settings';
       var heading=createNativeObjectUiText(root,'div','Document');heading.className='phdr';box.appendChild(heading);
       prior.settings={box:box,moves:[],pin:null,bg:null};prior.section.appendChild(box);
-      [['p-cw','Width'],['p-ch','Height'],['btn-dims-lock','Proportions'],['proj-fps','FPS'],['p-cbg','Background']].forEach(function(entry){
+      [['p-cw','Width'],['p-ch','Height'],['btn-dims-lock','Proportions'],['proj-fps','FPS'],['p-cbg','Background'],['btn-rulers','Rulers',true]].forEach(function(entry){
         var node=root.document.getElementById(entry[0]);if(!node||!node.parentNode)return;
         var parent=node.parentNode,marker=root.document.createComment('native settings position'),row=createNativeObjectUiText(root,'div','');row.className='pr';
         var label=createNativeObjectUiText(root,'span',entry[1]);label.className='pl';row.appendChild(label);
         var saved={node:node,parent:parent,marker:marker,hidden:node.hidden,display:node.style.display,pointer:node.style.pointerEvents,events:[],gesture:null};
         parent.insertBefore(marker,node);row.appendChild(node);node.hidden=false;node.style.display='';box.appendChild(row);prior.settings.moves.push(saved);
+        if(entry[2])return; // View-only (rulersOn is a session flag the native guide bars read; never saved): moved as is, no edit guard (#2378).
         function observe(event,sourceEvent){
           try{var diagnostic=root.NemoNativeObjectProjectDesktop;if(diagnostic&&diagnostic.settingsDiagnostic){
             var session=ports.currentSession();diagnostic.settingsDiagnostic(root,event,Object.assign({},session&&session.info(),{
