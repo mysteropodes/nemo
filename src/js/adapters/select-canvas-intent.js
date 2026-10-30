@@ -365,16 +365,11 @@
     var inv = [p[3] / d, -p[1] / d, -p[2] / d, p[0] / d, (p[2] * p[5] - p[3] * p[4]) / d, (p[1] * p[4] - p[0] * p[5]) / d];
     return mul(inv, mul(m, p));
   }
-  // The Select gesture's batch steps: a plain stroke takes its transformed world geometry (the route the knife and sculpt use); every other
-  // painted record (ribbon, fill, shape, texture anchor) is mapped by the engine through a record-space matrix, which also carries its linked
-  // fill, texture copies, gradient and shape box. `paths` are fresh presented paths (untransformed) and `m` the world affine.
+  // The Select gesture's batch steps: EVERY painted record (plain stroke, ribbon, fill, shape, texture anchor) is mapped by the engine through
+  // a record-space matrix (six numbers however many anchors it has), which also carries its linked fill, texture copies, gradient end
+  // points and shape box. `paths` are fresh presented paths (untransformed) and `m` the world affine.
   function transformSteps(root, paths, m) {
-    var Matrix = root.Matrix || root.paper.Matrix, world = new Matrix(m[0], m[1], m[2], m[3], m[4], m[5]);
-    return paths.map(function (p) {
-      var t = p.data.nativeStableTarget;
-      if (p.data.nativeRole === 'plain') { var moved = p.clone({ insert: false }); moved.transform(world); return { reshape: { stableTarget: t, geometry: recordGeometry(moved, p.data.nativeMatrix) } }; }
-      return { reshape: { stableTarget: t, matrix: inRecordSpace(p.data.nativeMatrix, m) } };
-    });
+    return paths.map(function (p) { return { reshape: { stableTarget: p.data.nativeStableTarget, matrix: inRecordSpace(p.data.nativeMatrix, m) } }; });
   }
 
   // What a pick depends on: a repaint may re-project the layer rows (the pointer context counts those) but a pick still

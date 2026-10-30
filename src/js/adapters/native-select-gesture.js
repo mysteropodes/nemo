@@ -19,7 +19,7 @@
   else root.NemoNativeSelectGesture = api;
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
-  var DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], DRAG = 3, MAX_STEPS = 64;
+  var DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], DRAG = 3, MAX_STEPS = 64, MAX_BYTES = 60000; // under the 65536-byte vector request cap
   var PINS = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
   var MAPPED = ['plain', 'ribbon', 'fill', 'shape', 'brush', 'raster', 'text'];
   function samePin(a, b) { return !!a && !!b && PINS.every(function (k) { return a[k] === b[k]; }); }
@@ -181,7 +181,10 @@
       var again = I.presentedState(root);
       if (!layers || layers.paths.length !== ids.length || !again || !samePin(again.pin, g.pin)) return notice(root, 'The document changed during the drag — nothing was changed.');
       var result;
-      try { result = await route.batchStrokes(layers.layerUid, layers.frame, I.transformSteps(root, layers.paths, m)); } catch (_) { result = null; }
+      var steps;
+      try { steps = I.transformSteps(root, layers.paths, m); } catch (_) { steps = null; }
+      if (steps && JSON.stringify(steps).length > MAX_BYTES) return notice(root, 'Too much to transform at once \u2014 select fewer items.');
+      try { result = steps ? await route.batchStrokes(layers.layerUid, layers.frame, steps) : null; } catch (_) { result = null; }
       if (!result || result.status !== 'applied') return notice(root, 'The transform could not be applied.');
       await reselect(ids, layerIdx);
     }

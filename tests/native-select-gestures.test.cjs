@@ -35,6 +35,7 @@ function harness(items, options = {}) {
     NemoNativeObjectProject: { desktop: () => session, selectLayerUI: () => true },
     NemoNativeViewportUnderlay: { canvasMapping: { point: (e) => ({ x: e.clientX, y: e.clientY }), transform: () => [1, 0, 0, 1, 0, 0] } },
     NemoNativeObjectLabs: { desktop: () => ({ batchStrokes: async (layerUid, frame, steps) => {
+      steps.forEach((s) => { const it = store.find((i) => i.stableTarget.strokeId === s.reshape.stableTarget.strokeId); s.before = it.segments.map((q) => q.point); });
       batches.push({ layerUid, frame, steps });
       if (options.refuse) return { status: 'invalid', reason: 'refused' };
       steps.forEach((s) => { const it = store.find((i) => i.stableTarget.strokeId === s.reshape.stableTarget.strokeId);
@@ -65,7 +66,8 @@ function harness(items, options = {}) {
     ids: () => root.selectedPaths.map((p) => p.data.strokeId) };
   return h;
 }
-const pts = (step) => JSON.parse(JSON.stringify(step.reshape.geometry.segments.map((s) => [s.point.x, s.point.y].map((v) => Math.round(v * 1e6) / 1e6 + 0))));
+// The anchors a plain stroke ends at: its pre-batch anchors (recorded by the harness) mapped by the step's record-space matrix.
+const pts = (step) => { const m = step.reshape.matrix; return step.before.map((q) => [m[0] * q[0] + m[2] * q[1] + m[4], m[1] * q[0] + m[3] * q[1] + m[5]].map((v) => Math.round(v * 1e6) / 1e6 + 0)); };
 const BIG = quad('A', 20, 20, 120, 120), FAR = quad('B', 150, 150, 190, 190);
 
 test('a marquee selects the items whose bounds meet the rectangle, previews it live, and writes nothing', async () => {
@@ -307,7 +309,8 @@ test('the matrix is the gesture conjugated into the record space of a posed reco
   assert.equal(h.batches.length, 1, 'one history entry for the whole gesture');
   const [shape, plain] = h.batches[0].steps;
   assert.deepEqual(M(shape), [1, 0, 0, 1, 10, 5], 'a world move of (20,10) is (10,5) in a record posed at scale 2');
-  assert.ok(plain.reshape.geometry && !plain.reshape.matrix, 'a plain stroke still goes by its geometry');
+  assert.ok(plain.reshape.matrix && !plain.reshape.geometry, 'a plain stroke goes by the matrix too');
+  assert.deepEqual(M(plain), [1, 0, 0, 1, 20, 10]);
 });
 
 test('a handle scale of a shape uses the baseline pivot (the opposite corner; Alt the centre) and a ring turn rotates about the box centre', async () => {
@@ -351,4 +354,39 @@ test('a ribbon keeps its linked fill: the fill is selected as its ribbon and the
   assert.equal(h.batches.length, 1);
   assert.deepEqual(h.batches[0].steps.map((s) => s.reshape.stableTarget.strokeId), ['R']);
   assert.deepEqual(M(h.batches[0].steps[0]), [1, 0, 0, 1, 0, 40]);
+});
+
+test('a plain stroke moves by the matrix route: its payload has no geometry and does not grow with its anchor count', async () => {
+  const dense = quad('D', 20, 20, 120, 120, { segments: Array.from({ length: 400 }, (_, i) => seg(20 + (i % 100), 20 + Math.floor(i / 4))), count: 400 });
+  const h = harness([dense, FAR]);
+  await h.select(35, 35);
+  h.press(35, 35); h.drag(65, 50); await settle(); await h.release(65, 50); await settle();
+  assert.equal(h.batches.length, 1);
+  const step = h.batches[0].steps[0];
+  assert.deepEqual(Object.keys(step.reshape).sort(), ['matrix', 'stableTarget']);
+  assert.deepEqual(M(step), [1, 0, 0, 1, 30, 15]);
+  assert.ok(JSON.stringify(h.batches[0].steps.map((x) => x.reshape)).length < 400, 'six numbers, not 400 anchors');
+});
+
+test('thirty plain strokes of 400 anchors each move as ONE batch well under the 65536-byte request cap', async () => {
+  const items = Array.from({ length: 30 }, (_, i) => quad('P' + i, 20, 20, 120, 120, { segments: Array.from({ length: 400 }, (_, k) => seg(20 + (k % 100), 20 + Math.floor(k / 4))), count: 400 }));
+  const h = harness(items);
+  h.root.selectedPaths = [];
+  await h.select(35, 35);
+  h.root.selectedPaths = (await Intent.layerPaths(h.root, () => true, false, 0)).paths;
+  h.press(35, 35); h.drag(65, 50); await settle(); await h.release(65, 50); await settle();
+  assert.equal(h.toasts.length, 0, h.toasts.join('|'));
+  assert.equal(h.batches.length, 1, 'one batch');
+  assert.equal(h.batches[0].steps.length, 30);
+  assert.ok(h.batches[0].steps.every((st) => st.reshape.matrix && !st.reshape.geometry));
+  assert.ok(JSON.stringify(h.batches[0].steps.map((x) => x.reshape)).length < 65536 / 4, 'far under the cap');
+});
+
+test('a batch whose payload would pass the byte cap is refused with a notice and writes nothing', async () => {
+  const h = harness([BIG, FAR]);
+  await h.select(35, 35);
+  h.root.NemoSelectCanvasIntent = { ...Intent, transformSteps: () => [{ reshape: { stableTarget: BIG.stableTarget, matrix: [1, 0, 0, 1, 1, 1], pad: 'x'.repeat(70000) } }] };
+  h.press(35, 35); h.drag(65, 50); await settle(); await h.release(65, 50); await settle();
+  assert.equal(h.batches.length, 0);
+  assert.ok(h.toasts.some((t) => /Too much/.test(t)), h.toasts.join('|'));
 });
