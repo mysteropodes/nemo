@@ -1,11 +1,27 @@
 //! Listing, retention, discard and quarantine for the native recovery store.
+//!
+//! Quarantine moves bytes aside (`<name>.corrupt-<unixms>`) and never deletes at
+//! that moment: the file or slot directory is renamed first and the manifest is
+//! rewritten only after the move succeeded. Set-aside names are then part of
+//! retention: `list_slots` evicts them past the age limit and, with live slots,
+//! counts them in the byte budget, shedding the oldest set-aside bytes first.
+//! A slot with generation files but no manifest at all (a first-ever write killed
+//! between the data rename and the manifest rename) is adopted into a manifest
+//! when its newest file parses, instead of being quarantined.
 use crate::native_object_bootstrap::recovery::store::{
-    mtime_ms, plain_dir, plain_file, quarantine_slot, read_manifest, remove_slot, sync_dir,
-    unique_corrupt, valid_generation_file, valid_slot_key, write_manifest, Generation, Limits,
-    MANIFEST, MAX_FILE_BYTES, SNIFF, STALE_TMP_MS,
+    corrupt_stamp, mtime_ms, plain_dir, plain_file, quarantine_slot, quarantine_slot_with,
+    read_manifest, remove_slot, sync_dir, unique_corrupt, valid_generation_file, valid_slot_key,
+    write_manifest, Generation, Limits, Manifest, Mover, CORRUPT_MARK, MANIFEST, MAX_FILE_BYTES,
+    MAX_GENERATIONS, SNIFF, STALE_TMP_MS,
 };
 use serde::Serialize;
-use std::{fs, fs::File, io, io::Read, path::Path};
+use std::{
+    fs,
+    fs::File,
+    io,
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +51,62 @@ pub(crate) struct Listing {
 }
 
 // ---- list / retention -------------------------------------------------------
+
+/// A set-aside file or slot directory (`*.corrupt-<unixms>`), judged by the time
+/// in its name and sized for the byte budget.
+struct SetAside {
+    path: PathBuf,
+    is_dir: bool,
+    at: u64,
+    bytes: u64,
+}
+
+fn tree_bytes(path: &Path) -> u64 {
+    let Ok(meta) = fs::symlink_metadata(path) else {
+        return 0;
+    };
+    if meta.is_file() {
+        return meta.len();
+    }
+    if !meta.is_dir() {
+        return 0;
+    }
+    fs::read_dir(path).map_or(0, |items| {
+        items.flatten().map(|i| tree_bytes(&i.path())).sum()
+    })
+}
+
+fn set_aside_in(dir: &Path, now: u64, out: &mut Vec<SetAside>) {
+    let Ok(items) = fs::read_dir(dir) else { return };
+    for item in items.flatten() {
+        let name = item.file_name();
+        let Some(name) = name.to_str().filter(|n| n.contains(CORRUPT_MARK)) else {
+            continue;
+        };
+        let Ok(meta) = fs::symlink_metadata(item.path()) else {
+            continue;
+        };
+        if !(meta.is_dir() || meta.is_file()) {
+            continue; // never follow or touch a symlink
+        }
+        out.push(SetAside {
+            path: item.path(),
+            is_dir: meta.is_dir(),
+            at: corrupt_stamp(name)
+                .or_else(|| mtime_ms(&meta))
+                .unwrap_or(now),
+            bytes: tree_bytes(&item.path()),
+        });
+    }
+}
+
+fn evict_set_aside(item: &SetAside) {
+    let _ = if item.is_dir {
+        fs::remove_dir_all(&item.path)
+    } else {
+        fs::remove_file(&item.path)
+    };
+}
 
 struct Candidate {
     listed: ListedSlot,
@@ -84,6 +156,60 @@ fn has_generation_files(slot_dir: &Path) -> bool {
     })
 }
 
+/// A slot with no manifest file at all but intact generation files: the first
+/// write died between the data rename and the manifest rename. Adopts the
+/// newest parsing files into a manifest; the rest are set aside, never deleted.
+fn adopt_orphan(slot_dir: &Path, slot: &str, now: u64) -> Option<Manifest> {
+    if fs::symlink_metadata(slot_dir.join(MANIFEST)).is_ok() {
+        return None;
+    }
+    let mut files = Vec::new();
+    for item in fs::read_dir(slot_dir).ok()?.flatten() {
+        let name = item.file_name().into_string().ok()?;
+        if !valid_generation_file(&name) {
+            continue;
+        }
+        let meta = plain_file(&item.path())?;
+        let parts: Vec<&str> = name.strip_suffix(".json")?.split('-').collect();
+        let g = Generation {
+            file: name.clone(),
+            saved_at_ms: parts[1].parse().ok()?,
+            content_revision: parts[2].parse().ok()?,
+            byte_count: meta.len(),
+            document_digest: None,
+        };
+        files.push((generation_valid(slot_dir, &g), g));
+    }
+    files.sort_by(|a, b| {
+        (b.1.saved_at_ms, b.1.content_revision).cmp(&(a.1.saved_at_ms, a.1.content_revision))
+    });
+    let mut generations = Vec::new();
+    let mut aside = Vec::new();
+    for (ok, g) in files {
+        if ok && generations.len() < MAX_GENERATIONS {
+            generations.push(g);
+        } else {
+            aside.push(g.file);
+        }
+    }
+    if generations.is_empty() {
+        return None;
+    }
+    let manifest = Manifest {
+        v: 1,
+        slot_key: slot.to_owned(),
+        display_name: "Recovered project".to_owned(),
+        origin_path: None,
+        app_version: env!("CARGO_PKG_VERSION").to_owned(),
+        generations,
+    };
+    write_manifest(slot_dir, &manifest, &mut |_, _| Ok(())).ok()?;
+    for file in aside {
+        let _ = fs::rename(slot_dir.join(&file), unique_corrupt(slot_dir, &file, now));
+    }
+    Some(manifest)
+}
+
 fn inspect_slot(
     root: &Path,
     slot: &str,
@@ -93,7 +219,9 @@ fn inspect_slot(
 ) -> Option<Candidate> {
     let slot_dir = root.join(slot);
     clean_slot_tmp(&slot_dir, now);
-    let Some(mut manifest) = read_manifest(&slot_dir) else {
+    let Some(mut manifest) =
+        read_manifest(&slot_dir).or_else(|| adopt_orphan(&slot_dir, slot, now))
+    else {
         if plain_file(&slot_dir.join(MANIFEST)).is_some() || has_generation_files(&slot_dir) {
             if quarantine_slot(root, slot, now).is_ok() {
                 quarantined.push(slot.to_owned());
@@ -210,6 +338,30 @@ pub(crate) fn list_slots(
             kept.push(candidate);
         }
     }
+    // Set-aside bytes (quarantined slots at the root, quarantined generations in
+    // kept slots) share the budget: past the age limit they go, then they are the
+    // first to be shed, oldest first, before any live slot.
+    let mut aside = Vec::new();
+    set_aside_in(root, now, &mut aside);
+    for c in &kept {
+        set_aside_in(&root.join(&c.listed.slot_key), now, &mut aside);
+    }
+    aside.sort_by_key(|a| a.at);
+    aside.retain(|a| {
+        let expired = now.saturating_sub(a.at) > limits.age_ms;
+        if expired {
+            evict_set_aside(a);
+        }
+        !expired
+    });
+    total += aside.iter().map(|a| a.bytes).sum::<u64>();
+    for a in &aside {
+        if total <= limits.bytes {
+            break;
+        }
+        total -= a.bytes;
+        evict_set_aside(a);
+    }
     while total > limits.bytes {
         let Some(at) = kept
             .iter()
@@ -242,6 +394,22 @@ pub(crate) fn quarantine(
     file: &str,
     now: u64,
 ) -> io::Result<(bool, bool)> {
+    quarantine_with(root, slot, file, now, &mut |from, to| fs::rename(from, to))
+}
+
+/// Order matters: the bytes move first and the manifest is rewritten after. If
+/// the move fails nothing else was touched (the file stays referenced). If the
+/// manifest write fails after the move, the manifest still names a file that is
+/// gone, which `inspect_slot` drops on the next list; the bytes are in the
+/// set-aside name either way, so an unreferenced file is never left for
+/// `prune_slot` to delete.
+pub(crate) fn quarantine_with(
+    root: &Path,
+    slot: &str,
+    file: &str,
+    now: u64,
+    mover: Mover,
+) -> io::Result<(bool, bool)> {
     if !valid_slot_key(slot) || !valid_generation_file(file) {
         return Err(io::Error::other("invalid recovery quarantine request"));
     }
@@ -249,24 +417,23 @@ pub(crate) fn quarantine(
     if !plain_dir(&slot_dir) {
         return Ok((false, false));
     }
-    let manifest = read_manifest(&slot_dir);
-    let Some(mut manifest) = manifest else {
-        quarantine_slot(root, slot, now)?;
+    let Some(mut manifest) = read_manifest(&slot_dir) else {
+        quarantine_slot_with(root, slot, now, mover)?;
         return Ok((true, true));
     };
     let Some(position) = manifest.generations.iter().position(|g| g.file == file) else {
         return Ok((false, false));
     };
     if manifest.generations.len() == 1 {
-        quarantine_slot(root, slot, now)?;
+        quarantine_slot_with(root, slot, now, mover)?;
         return Ok((true, true));
+    }
+    let from = slot_dir.join(file);
+    if plain_file(&from).is_some() {
+        mover(&from, &unique_corrupt(&slot_dir, file, now))?;
     }
     manifest.generations.remove(position);
     write_manifest(&slot_dir, &manifest, &mut |_, _| Ok(()))?;
-    let from = slot_dir.join(file);
-    if plain_file(&from).is_some() {
-        fs::rename(&from, unique_corrupt(&slot_dir, file, now))?;
-    }
     sync_dir(&slot_dir)?;
     Ok((true, false))
 }
