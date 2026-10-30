@@ -5,6 +5,9 @@
 
 #[path = "object_frame_clipboard_transport.rs"]
 pub(crate) mod frame_clipboard_transport;
+#[path = "object_ghost_facts.rs"]
+mod ghost_facts;
+pub use ghost_facts::{GhostFrameFacts, GhostFrames, GhostPathFacts};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Number, Value};

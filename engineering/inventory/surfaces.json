@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "20fed67c622a631248b690b054c023b0671e0f9a",
-  "describe": "v0.7.0-alpha.4-3887-g20fed67c-dirty"
+  "head": "c19b398167740af58bdaf7d0189e9487d3ccbcd0",
+  "describe": "v0.7.0-alpha.4-3896-gc19b3981-dirty"
  },
- "inputsDigest": "45779904a3285d0307df7e21f77f72ae332a9f4fc41e1e6ad52848b4f22448f9",
+ "inputsDigest": "7b5950ddf11fb11c47438a402c537a9e5dcd0ce9191caded14ee0e61438bf57c",
  "states": [
   "inventoried",
   "characterized",
@@ -2028,7 +2028,7 @@
     "container": "tool-opts-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 27,
+    "functionsVisited": 23,
     "via": "variable _pcurveEditBtn",
     "references": []
    },
@@ -6062,7 +6062,7 @@
     "container": "easing-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 62,
+    "functionsVisited": 58,
     "via": "variable savePresetBtn",
     "references": []
    },
@@ -13554,7 +13554,7 @@
     "container": "p-widget-xrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 49,
+    "functionsVisited": 50,
     "via": "helper el()",
     "references": [
      "src/js/adapters/native-object-widget-ui.js:293 fillPanel()"
@@ -13751,7 +13751,7 @@
     "container": "p-widget-yrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 49,
+    "functionsVisited": 50,
     "via": "helper el()",
     "references": [
      "src/js/adapters/native-object-widget-ui.js:293 fillPanel()"
@@ -21341,7 +21341,7 @@
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
    "source": "src/js/labs/canvas-grid.js:132",
    "meta": {
-    "functionsVisited": 7
+    "functionsVisited": 4
    },
    "fixtures": []
   },
@@ -24481,7 +24481,7 @@
    "source": "src/js/motion.js:9069",
    "meta": {
     "i18n": "exprExBounce",
-    "functionsVisited": 35
+    "functionsVisited": 39
    },
    "fixtures": [
     "static-props",
@@ -24592,7 +24592,7 @@
    "source": "src/js/motion.js:9097",
    "meta": {
     "i18n": "exprExFirstKey",
-    "functionsVisited": 21
+    "functionsVisited": 25
    },
    "fixtures": [
     "static-props",

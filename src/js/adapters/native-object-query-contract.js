@@ -142,6 +142,50 @@
       fail('rig query result does not match its request');
     return true;
   }
+  // #2358 D23: the onion / Ghost All view (stored vector geometry of the ghost frames of one layer, one ghost frame per page chain).
+  const GHOST_REQUIRED = ['kind', 'contextId', 'frame', 'workId', 'viewGeneration', 'layerUid', 'onion', 'ghostAll', 'from', 'to', 'previousOpacity',
+    'nextOpacity', 'mode', 'ghost', 'cursor'];
+  const percent = (n) => finite(n) && n >= 0 && n <= 100, unit = (n) => finite(n) && n >= 0 && n <= 1;
+  const hex = (n) => (v) => typeof v === 'string' && new RegExp('^#[0-9a-fA-F]{' + n + '}$').test(v);
+  const orNullOf = (v, f) => v === null || f(v);
+  function ghostView(v) {
+    return exact(v, GHOST_REQUIRED, ['previousTint', 'nextTint', 'shift']) && v.kind === 'ghosts' && v.contextId === 'scene-root' && integer(v.frame, 0, 4294967295) &&
+      bounded(v.workId) && integer(v.viewGeneration, 1) && text(v.layerUid) && typeof v.onion === 'boolean' && typeof v.ghostAll === 'boolean' &&
+      integer(v.from, 0, 4294967295) && integer(v.to, 0, 4294967295) && percent(v.previousOpacity) && percent(v.nextOpacity) &&
+      ['default', 'tinted', 'outline'].includes(v.mode) && integer(v.ghost, 0, 4095) && integer(v.cursor, 0, 262144) &&
+      ['previousTint', 'nextTint'].every((k) => !own(v, k) || hex(6)(v[k])) &&
+      (!own(v, 'shift') || exact(v.shift, ['x', 'y', 'next'], []) && finite(v.shift.x) && finite(v.shift.y) && typeof v.shift.next === 'boolean');
+  }
+  function ghostPayload(v) {
+    return exact(v, ['atRevision', 'documentSnapshotId', 'view'], []) && integer(v.atRevision, 0) && text(v.documentSnapshotId) &&
+      ghostView(v.view) || fail('invalid ghost query payload');
+  }
+  function ghostItem(i) {
+    return exact(i, ['path', 'from', 'count', 'sourceId', 'closed', 'width', 'fill', 'stroke', 'opacity', 'segments'], []) && integer(i.path, 0, 262143) &&
+      integer(i.from, 0, 262144) && integer(i.count, 1, 262144) && typeof i.sourceId === 'string' && typeof i.closed === 'boolean' && finite(i.width) &&
+      orNullOf(i.fill, hex(8)) && orNullOf(i.stroke, hex(8)) && unit(i.opacity) && Array.isArray(i.segments) && i.segments.length >= 1 &&
+      i.from + i.segments.length <= i.count && i.segments.every((s) => Array.isArray(s) && (s.length === 2 || s.length === 6) && s.every(finite));
+  }
+  function ghostDescriptor(d) {
+    return exact(d, ['index', 'count', 'frame', 'kind', 'opacity', 'translation'], []) && integer(d.count, 1, 4096) && integer(d.index, 0, d.count - 1) &&
+      integer(d.frame, 0, 4294967295) && ['previous', 'next', 'allKeys'].includes(d.kind) && unit(d.opacity) && point(d.translation);
+  }
+  function ghostResult(v) {
+    return exact(v, ['kind', 'atRevision', 'documentSnapshotId', 'contextId', 'frame', 'workId', 'viewGeneration', 'layerUid', 'ghost', 'cursor', 'total', 'next',
+      'items'], []) && v.kind === 'ghosts' && integer(v.atRevision, 0) && text(v.documentSnapshotId) && v.contextId === 'scene-root' && integer(v.frame, 0, 4294967295) &&
+      bounded(v.workId) && integer(v.viewGeneration, 1) && text(v.layerUid) && orNullOf(v.ghost, ghostDescriptor) && integer(v.cursor, 0, 262144) &&
+      integer(v.total, 0, 262144) && orNullOf(v.next, (n) => exact(n, ['ghost', 'cursor'], []) && integer(n.ghost, 0, 4095) && integer(n.cursor, 0, 262144)) &&
+      Array.isArray(v.items) && v.items.length <= 64 && v.items.every(ghostItem) || fail('invalid ghost query result');
+  }
+  function ghostCorrelate(p, v) {
+    ghostPayload(p); ghostResult(v);
+    const end = v.cursor + v.items.reduce((n, i) => n + i.segments.length, 0), g = v.ghost, w = p.view;
+    const next = g === null ? null : end < v.total ? { ghost: w.ghost, cursor: end } : g.index + 1 < g.count ? { ghost: w.ghost + 1, cursor: 0 } : null;
+    if (v.atRevision !== p.atRevision || v.documentSnapshotId !== p.documentSnapshotId || ['contextId', 'frame', 'workId', 'viewGeneration', 'layerUid', 'cursor']
+      .some((k) => v[k] !== w[k]) || end > v.total || (g === null ? w.ghost !== 0 || w.cursor !== 0 || v.total !== 0 : g.index !== w.ghost) ||
+      JSON.stringify(v.next) !== JSON.stringify(next)) fail('ghost query result does not match its request');
+    return true;
+  }
   function pageResult(p, v) {
     if (!exact(v, ['kind', 'cursor', 'total', 'nextCursor', 'items'], []) || v.kind !== p.kind ||
       !integer(v.cursor, 0, 4294967295) || !integer(v.total, 0) ||
@@ -176,6 +220,7 @@
     if (object(value) && object(value.view) && value.view.kind === 'imageMesh') return imagePayload(value);
     if (object(value) && object(value.view) && value.view.kind === 'widget') return widgetPayload(value);
     if (object(value) && object(value.view) && value.view.kind === 'rig') return rigPayload(value);
+    if (object(value) && object(value.view) && value.view.kind === 'ghosts') return ghostPayload(value);
     if (typeof legacyValidator === 'function') return legacyValidator(value);
     if (legacyValidator) {
       legacyValidator.exact(value, ['atRevision', 'stableTarget'], [], 'object query');
@@ -191,6 +236,7 @@
     if (object(value) && value.kind === 'imageMesh') { if (!imageResult(value)) fail('invalid image-mesh query result'); return; }
     if (object(value) && value.kind === 'widget') return widgetResult(value);
     if (object(value) && value.kind === 'rig') return rigResult(value);
+    if (object(value) && value.kind === 'ghosts') return ghostResult(value);
     if (typeof legacyValidator === 'function') return legacyValidator(value);
     if (legacyValidator) {
       legacyValidator.exact(value, ['atRevision', 'documentSnapshotId', 'object'], [], 'object read result');
@@ -214,6 +260,11 @@
       const w = object(value) && own(value, 'result') ? value.result : value;
       if (documentId !== undefined && w.documentSnapshotId !== `native-object:${documentId}:${p.atRevision}`) fail('widget snapshot mismatch');
       return widgetCorrelate(p, w);
+    }
+    if (object(p) && object(p.view) && p.view.kind === 'ghosts') {
+      const w = object(value) && own(value, 'result') ? value.result : value;
+      if (documentId !== undefined && w.documentSnapshotId !== `native-object:${documentId}:${p.atRevision}`) fail('ghost snapshot mismatch');
+      return ghostCorrelate(p, w);
     }
     if (object(p) && object(p.view) && p.view.kind === 'rig') {
       const w = object(value) && own(value, 'result') ? value.result : value;
@@ -245,6 +296,6 @@
     'payload.view.preview.stableTarget.contextId','payload.view.preview.stableTarget.layerUid','payload.view.preview.stableTarget.strokeId'].forEach(p=>paths.add(p));
   const knownPath = paths.has.bind(paths);
   paths.has = p => knownPath(p) || /^result\.items\.[0-7]\.stableTarget\.(contextId|layerUid|strokeId)$/.test(p) || /^result\.items\.[0-3]\.layerUid$/.test(p) ||
-    /^result\.items\.\d+\.(boneId|strokeId|meshId|endKey|(root|joint|end)\.boneId)$/.test(p);
+    /^result\.items\.\d+\.(boneId|strokeId|meshId|endKey|(root|joint|end)\.boneId)$/.test(p) || /^result\.items\.\d+\.sourceId$/.test(p);
   return Object.freeze({ payload, result, correlate, paths });
 }));

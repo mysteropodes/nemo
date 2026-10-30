@@ -1,6 +1,9 @@
 //! Immutable onion/ghost selection and native frame inputs. These reads grant no UI epoch or writer.
 //! The retained snapshot outlives owner edits; native composition is prepared lazily per selected frame.
 use crate::object_document::{object_deserialize, ObjectRecord, Presence};
+use crate::request_receipts::{
+    GhostFrameFacts, GhostFrames, GhostPathFacts, OpacityRequest, ResponseEnvelope,
+};
 use crate::object_frame_packet::{
     prepare_object_exposure_frame, ObjectFramePacket, ObjectFrameSelector,
 };
@@ -141,6 +144,8 @@ pub struct TweenGhostRead {
     snapshot: ObjectSnapshot,
     layer_uid: String,
     frames: Vec<TweenGhostFrame>,
+    /// A component or duplicator layer: its ghosts need native frame evaluation, not stored key geometry.
+    derived: bool,
 }
 impl TweenGhostRead {
     pub fn snapshot(&self) -> &ObjectSnapshot {
@@ -172,6 +177,29 @@ impl TweenGhostRead {
             return Err(Error::InvalidRequest);
         }
         geometry::paths(&self.snapshot, &self.layer_uid, frame)
+    }
+    /// Authored vector geometry of one ghost frame, ready to present. An onion frame is the stored geometry
+    /// of the keyframe that exposes it; a derived layer (component, duplicator) needs the evaluated frame
+    /// (`prepare_frame`) and refuses here rather than showing a different picture.
+    pub fn frame_paths(&self, index: usize) -> Result<Vec<TweenGhostPath>, Error> {
+        let frame = self.frames.get(index).ok_or(Error::InvalidRequest)?;
+        if self.derived {
+            return Err(Error::Unavailable);
+        }
+        let mut stored = frame.clone();
+        if frame.kind != TweenGhostKind::AllKeys {
+            let source = self
+                .snapshot
+                .document()
+                .layers
+                .iter()
+                .find(|l| l.layer_uid == self.layer_uid)
+                .and_then(|l| l.timing.value())
+                .and_then(|t| t.exposure(frame.frame).1)
+                .ok_or(Error::Unavailable)?;
+            stored.frame = source;
+        }
+        geometry::paths(&self.snapshot, &self.layer_uid, &stored)
     }
     /// A real pinned onion frame for existing native mixed/resource consumers.
     /// Ghost All must use all_keys_paths, never normal frame evaluation.
@@ -321,6 +349,77 @@ impl ObjectSnapshot {
             snapshot: self.clone(),
             layer_uid: s.layer_uid,
             frames,
+            derived,
+        })
+    }
+}
+
+/// #2358 D23: the retained ghost query seen as the facts the ghosts view of the object read presents.
+fn hex(rgba: [f64; 4]) -> String {
+    let c = |v: f64| (v.clamp(0., 1.) * 255.).round() as u32;
+    format!("#{:02x}{:02x}{:02x}{:02x}", c(rgba[0]), c(rgba[1]), c(rgba[2]), c(rgba[3]))
+}
+impl GhostFrames for TweenGhostRead {
+    fn layer_uid(&self) -> &str {
+        &self.layer_uid
+    }
+    fn count(&self) -> usize {
+        self.frames.len()
+    }
+    fn frame(&self, index: usize) -> GhostFrameFacts {
+        let f = &self.frames[index];
+        GhostFrameFacts {
+            frame: f.frame,
+            kind: match f.kind {
+                TweenGhostKind::Previous => "previous",
+                TweenGhostKind::Next => "next",
+                TweenGhostKind::AllKeys => "allKeys",
+            },
+            opacity: f.opacity,
+            translation: f.translation,
+        }
+    }
+    /// Nothing is shown for a path with no segments, no paint left, or no opacity (a texture anchor hidden by its dabs);
+    /// a visual override replaces the source stroke, and a cleared fill is no fill.
+    fn paths(&self, index: usize) -> Result<Vec<GhostPathFacts>, Error> {
+        let n = |p: &crate::object_document::ObjectPoint| (p.x.as_f64().unwrap_or(0.), p.y.as_f64().unwrap_or(0.));
+        Ok(self
+            .frame_paths(index)?
+            .into_iter()
+            .filter_map(|p| {
+                let v = &p.visual;
+                let stroke = v.stroke.map(hex).or(p.stroke.clone());
+                let fill = if v.clear_fill { None } else { p.fill.clone() };
+                if p.geometry.segments.is_empty() || v.opacity <= 0. || (fill.is_none() && stroke.is_none()) {
+                    return None;
+                }
+                let segments = p.geometry.segments.iter().map(|s| {
+                    let (point, i, o) = (n(&s.point), n(&s.handle_in), n(&s.handle_out));
+                    [point.0, point.1, i.0, i.1, o.0, o.1]
+                });
+                Some(GhostPathFacts {
+                    source_id: p.source_id.clone(),
+                    closed: p.geometry.closed,
+                    width: v.stroke_width.unwrap_or(p.stroke_width),
+                    fill,
+                    stroke,
+                    opacity: v.opacity,
+                    segments: segments.collect(),
+                })
+            })
+            .collect())
+    }
+}
+impl ObjectSnapshot {
+    /// The ghosts view of the object read: `presented` is the host's proof of its actual presentation.
+    pub fn dispatch_with_ghost_view(
+        &self,
+        request: OpacityRequest,
+        presented: Result<(&str, u64, &str, u32), &str>,
+    ) -> Result<ResponseEnvelope, Error> {
+        self.dispatch_ghost_view_with(request, presented, &|bytes| {
+            self.query_tween_ghosts_json(bytes)
+                .map(|read| Box::new(read) as Box<dyn GhostFrames>)
         })
     }
 }
