@@ -13,6 +13,8 @@
   const RASTER=['create','move','resize','rotate','opacity','delete'].map(v=>'raster.'+v),TEXT=['create','edit','delete'].map(v=>'text.'+v);
   const BOOLS=['bold','italic','underline','strike'],NUMS=['letterSpacing','wordSpacing','lineHeightMult'];
   const TEXT_OPTIONAL=['fixedWidth','fixedHeight'].concat(BOOLS,NUMS,['textCase']);
+  // #2267: a created block may carry the stored turn (degrees about its anchor, within one turn either way); a patch never does.
+  const BLOCK_OPTIONAL=TEXT_OPTIONAL.concat(['rotation']);
   const ITEM_OPTIONAL=['opacity','rotation','isBitmapBrush','brushGroupId','isBrushTextureCopy','meshId'];
   function fail(message){throw new TypeError(message);}
   function plain(v){return !!v&&typeof v==='object'&&!Array.isArray(v);}
@@ -54,9 +56,9 @@
     ['fixedWidth','fixedHeight'].forEach(k=>{if(k in v&&v[k]!==null)num(v[k]);});
     BOOLS.forEach(k=>{if(k in v)bool(v[k]);});NUMS.forEach(k=>{if(k in v)num(v[k]);});
     if('textCase' in v)oneOf(v.textCase,CASES);
-    if(block){exact(v.anchorTopLeft,['x','y'],[],'anchorTopLeft');num(v.anchorTopLeft.x);num(v.anchorTopLeft.y);}
+    if(block){exact(v.anchorTopLeft,['x','y'],[],'anchorTopLeft');num(v.anchorTopLeft.x);num(v.anchorTopLeft.y);if('rotation' in v){num(v.rotation);if(Math.abs(v.rotation)>360)fail('rotation invalid');}}
   }
-  function textBlock(v){exact(v,['text','font','size','color','align','anchorTopLeft'],TEXT_OPTIONAL,'text block');textBody(v,true);}
+  function textBlock(v){exact(v,['text','font','size','color','align','anchorTopLeft'],BLOCK_OPTIONAL,'text block');textBody(v,true);}
   function textPatch(v){
     // Same members as a block minus the anchor: a patch can never re-anchor (baseline feedback #37).
     const members=['text','font','size','color','align'].concat(TEXT_OPTIONAL);

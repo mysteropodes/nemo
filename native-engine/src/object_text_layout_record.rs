@@ -8,8 +8,9 @@
 //! number or an explicit `null` for "no box"), `bold`, `italic`, `underline`,
 //! `strike`, `letterSpacing`, `wordSpacing`, `lineHeightMult` (positive),
 //! `textCase` (`none` | `upper` | `lower` | `capitalize`) and `anchorTopLeft`
-//! (`{x, y}`, the point the glyphs were placed FROM). `text`, `font`, `size`,
-//! `color`, `align` and `anchorTopLeft` are required; every other member may be
+//! (`{x, y}`, the point the glyphs were placed FROM) and `rotation` (#2267, degrees, the turn of the whole block about
+//! its `anchorTopLeft`, absent = 0; only a Select turn writes it, the baseline turned the glyph paths instead).
+//! `text`, `font`, `size`, `color`, `align` and `anchorTopLeft` are required; every other member may be
 //! absent, and absent, default and explicit stay distinct on a round trip
 //! (`fixedWidth` absent is not `null`; an explicit `0` letter spacing and an
 //! explicit `1.25` multiplier are kept; the spelling class of a number is kept).
@@ -70,6 +71,8 @@ pub(crate) enum TextRecordError {
     FixedHeight,
     LineHeightMult,
     TextCase,
+    /// `rotation` is not a finite number of degrees within one turn either way.
+    Rotation,
     /// Capture: the value is not a root-data object with `isTextRoot === true`.
     NotATextRoot,
     /// Capture: this root-data member is missing or has the wrong JSON type.
@@ -121,6 +124,8 @@ pub(crate) struct TextBlockRecord {
     #[serde(skip_serializing_if = "Presence::missing")]
     text_case: Presence<String>,
     anchor_top_left: TextAnchor,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    rotation: Presence<Number>,
 }
 
 struct TextBlockWire {
@@ -140,6 +145,7 @@ struct TextBlockWire {
     line_height_mult: Presence<Number>,
     text_case: Presence<String>,
     anchor_top_left: TextAnchor,
+    rotation: Presence<Number>,
 }
 object_deserialize!(TextBlockWire {
     text: String, font: FontRefWire, size: Number, color: String, align: String,
@@ -153,7 +159,8 @@ object_deserialize!(TextBlockWire {
     #[serde(default)] word_spacing: Presence<Number>,
     #[serde(default)] line_height_mult: Presence<Number>,
     #[serde(default)] text_case: Presence<String>,
-    anchor_top_left: TextAnchor
+    anchor_top_left: TextAnchor,
+    #[serde(default)] rotation: Presence<Number>
 });
 
 impl<'de> Deserialize<'de> for TextBlockRecord {
@@ -225,6 +232,7 @@ impl TextBlockRecord {
             line_height_mult: wire.line_height_mult,
             text_case: wire.text_case,
             anchor_top_left: wire.anchor_top_left,
+            rotation: wire.rotation,
         };
         record.validate()?;
         Ok(record)
@@ -261,6 +269,11 @@ impl TextBlockRecord {
         if let Some(case) = self.text_case.value() {
             if !matches!(case.as_str(), "none" | "upper" | "lower" | "capitalize") {
                 return Err(TextRecordError::TextCase);
+            }
+        }
+        if let Some(turn) = self.rotation.value() {
+            if !f64_of(turn).is_finite() || f64_of(turn).abs() > 360.0 {
+                return Err(TextRecordError::Rotation);
             }
         }
         Ok(())

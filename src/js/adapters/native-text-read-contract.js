@@ -37,7 +37,7 @@
       if(r.nextOffset===null?r.offset+r.items.length!==r.total:!r.items.length||r.nextOffset!==r.offset+r.items.length||r.nextOffset>=r.total)fail('text page progress invalid');
     }else if(r.kind==='inspect'){
       exact(r,base.concat(['target','textBytes','block']));target(r.target);uint(r.textBytes,MAX_TEXT_BYTES);if(!r.textBytes)fail('empty native text');
-      var required=['font','size','color','align','anchorTopLeft'],allowed=required.concat(['fixedWidth','fixedHeight','bold','italic','underline','strike','letterSpacing','wordSpacing','lineHeightMult','textCase']);
+      var required=['font','size','color','align','anchorTopLeft'],allowed=required.concat(['fixedWidth','fixedHeight','bold','italic','underline','strike','letterSpacing','wordSpacing','lineHeightMult','textCase','rotation']);
       if(!plain(r.block)||!required.every(function(k){return Object.prototype.hasOwnProperty.call(r.block,k);})||!Object.keys(r.block).every(function(k){return allowed.includes(k);}))fail('text metadata fields invalid');
       function positive(v){return typeof v==='number'&&Number.isFinite(v)&&v>0;}
       if(!positive(r.block.size)||['fixedWidth','fixedHeight'].some(function(k){return Object.prototype.hasOwnProperty.call(r.block,k)&&r.block[k]!==null&&!positive(r.block[k]);})||Object.prototype.hasOwnProperty.call(r.block,'lineHeightMult')&&!positive(r.block.lineHeightMult))fail('text metadata positive dimension invalid');

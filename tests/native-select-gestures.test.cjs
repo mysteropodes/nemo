@@ -218,7 +218,7 @@ test('dragging an image is ONE batch with the exact delta as a record-space matr
   assert.deepEqual(h.toasts, []);
 });
 
-test('a text block moves and scales in one commit; a turn or a mirror of text, and a mirror or a shear of an image, are refused with a notice and write nothing', async () => {
+test('a text block moves and scales in one commit; a mirror of text or of an image is refused with a notice and writes nothing', async () => {
   let h = harness([TXT]); await h.select(165, 40);
   await gesture(h, [165, 40], [185, 60]);
   assert.equal(h.batches.length, 1); assert.deepEqual(M(h.batches[0].steps[0]), [1, 0, 0, 1, 20, 20]); assert.deepEqual(h.toasts, []);
@@ -228,9 +228,31 @@ test('a text block moves and scales in one commit; a turn or a mirror of text, a
   assert.deepEqual(M(h.batches[0].steps[0]), [2, 0, 0, 2, -140, -20]);
   const none = async (items, press, to, pattern, pick = [165, 40]) => { const x = harness(items); await x.select(pick[0], pick[1]);
     await gesture(x, press, to); assert.deepEqual(x.batches, [], String(pattern)); assert.ok(x.toasts.some((t) => pattern.test(t) && /not available/.test(t)), x.toasts.join('|')); };
-  await none([TXT], [165, 25], [180, 40], /Rotating text/);
   await none([TXT], [190, 60], [110, 100], /Flipping text/);
   await none([IMG], [120, 70], [-40, 70], /Flipping images/, [70, 70]);
+});
+
+// #2267: the text block has a stored rotation, so the ring turns it exactly as it turns an image: ONE batch, the record-space matrix.
+test('the rotate ring turns a text block: one commit with the turn matrix, no refusal', async () => {
+  const h = harness([TXT]); await h.select(165, 40);
+  await gesture(h, [165, 25], [180, 40]); // the ring spot above the box centre (165,40), dragged a quarter turn clockwise
+  assert.equal(h.batches.length, 1, 'one commit'); assert.equal(h.batches[0].steps.length, 1);
+  assert.deepEqual(h.batches[0].steps[0].reshape.stableTarget, TXT.stableTarget);
+  assert.deepEqual(M(h.batches[0].steps[0]), [0, 1, -1, 0, 205, -125], 'a quarter turn about the centre');
+  assert.deepEqual(h.toasts, [], 'no notice');
+  assert.deepEqual(h.ids(), ['T'], 'the selection is re-read');
+});
+
+test('a turned text block takes the box of its stored turn and scales along its own axes', async () => {
+  const c = Math.SQRT1_2, turned = quad('T', 140, 20, 190, 60, { role: 'text', filled: true, matrix: [c, c, -c, c, 165 - c * 165 + c * 40, 40 - c * 165 - c * 40] });
+  const h = harness([turned]); await h.select(165, 40);
+  assert.deepEqual(h.ids(), ['T']);
+  assert.ok(Math.abs(h.root.selectedPaths[0].data.boxAngle - 45) < 1e-9, 'the listed map carries the stored turn into the box');
+  const box = Overlay.boxOf(h.root, h.root.selectedPaths), e = box.handles[3];
+  await gesture(h, e, [e[0] + 20 * c, e[1] + 20 * c]);
+  assert.equal(h.batches.length, 1, 'a stretch along the text own axis is one commit'); assert.deepEqual(h.toasts, []);
+  const m = M(h.batches[0].steps[0]);
+  assert.ok(Math.abs(m[0] - 1.4) < 1e-4 && m[1] === 0 && m[2] === 0 && m[3] === 1, m.join());
 });
 
 test('a turned image scales along its own axes, not along the world axes (a shear has no stored form)', async () => {

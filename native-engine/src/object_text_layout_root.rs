@@ -105,6 +105,8 @@ impl TextBlockRecord {
             line_height_mult: optional(data, "lineHeightMult", as_number)?,
             text_case: optional(data, "textCase", as_string)?,
             anchor_top_left: anchor(data)?,
+            // A baseline root turned its glyph paths instead; the stored turn is native-only.
+            rotation: Presence::Missing,
         };
         record.validate()?;
         Ok(record)

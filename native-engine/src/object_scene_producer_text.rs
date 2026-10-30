@@ -25,7 +25,7 @@
 //!
 //! Inputs are borrowed and never mutated; the item owns detached copies.
 
-use crate::evaluation::motion_parent_chain::ChainEntry;
+use crate::evaluation::motion_parent_chain::{ChainEntry, MotionMat};
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::{
     ProducerOutput, ScenePin,
 };
@@ -161,6 +161,17 @@ pub(crate) fn fill_rgba(color: &str, opacity: f64) -> Result<[u8; 4], TextProduc
     }
 }
 
+/// #2267: the stored turn of a block as the first stage of its chain: a rotation of every contour (decorations too) about the
+/// stored anchor, applied after a glyph's own animator stage and before the layer stage and the parent chain, so preview, export and
+/// every other reader of the scene (one producer) draw the same turned block.
+pub(crate) fn turn_stage(record: &TextBlockRecord) -> Option<ChainEntry> {
+    let turn = record.rotation();
+    (turn != 0.0).then(|| ChainEntry {
+        mat: MotionMat { dx: 0.0, dy: 0.0, rot: turn, sx: 1.0, sy: 1.0, op: 1.0, ax: 0.0, ay: 0.0 },
+        pivot: record.anchor(),
+    })
+}
+
 pub(super) fn prepare_block(
     fonts: Option<TextFontProvider<'_>>,
     target: &TextBlockTarget<'_>,
@@ -169,11 +180,15 @@ pub(super) fn prepare_block(
     let request = target.record.layout_request(target.holder_id);
     let layout =
         layout_text(&request, Some(provider.catalog)).map_err(TextProducerError::Layout)?;
+    let turned: Vec<ChainEntry> = turn_stage(target.record)
+        .into_iter()
+        .chain(target.chain.iter().copied())
+        .collect();
     let input = TextSceneInput {
         layout: &layout,
         outlines: Some(provider.outlines),
         glyph_stages: target.glyph_stages,
-        chain: target.chain,
+        chain: &turned,
         item_opacity: target.item_opacity,
         admission: target.admission,
     };
