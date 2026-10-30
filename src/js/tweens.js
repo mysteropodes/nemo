@@ -5039,7 +5039,7 @@ var applied=NemoFrameHistoryEntry.apply(state,s);state.undoStack.push(applied.in
 // so a single click + Enter reproduces the old one-element flow exactly,
 // and clicking 2-3 pieces first lets `generateTweens` split the ONE
 // target B stroke to match, via splitMergedIntoOrderedPieces above.
-var _reassign={active:false,starting:false,step:0,layer:-1,frameA:-1,frameB:-1,aIds:[],chain:Promise.resolve()};
+var _reassign={active:false,step:0,layer:-1,frameA:-1,frameB:-1,aIds:[]};
 function reassignStatusEl(){return document.getElementById('tw-reassign-status');}
 function reassignSetStatus(msg){
   var el=reassignStatusEl();if(!el)return;
@@ -5053,26 +5053,13 @@ function cancelReassign(silent){
   if(!silent)showToast(SM.t('toastReassignmentCanceled'));
 }
 function nativeTweenActive(){return !!(window.NemoNativeTweenUI&&window.NemoNativeTweenUI.active(window));}
-// Native object project: the key span comes from the native cells read (the legacy frames[] is empty there), asynchronously;
-// the flow only arms once it lands, and only if the playhead did not move meanwhile.
-function startNativeReassign(){
-  if(_reassign.starting)return;
-  var li=state.activeLayerIdx,cf=state.currentFrame;
-  _reassign.starting=true;
-  window.NemoNativeTweenUI.reassignSpan(window,li,cf).then(function(r){
-    _reassign.starting=false;
-    if(_reassign.active||!r||r.status!=='span'||state.activeLayerIdx!==li||state.currentFrame!==cf)return;
-    beginReassign(li,r.from,r.to);
-  });
-}
 function beginReassign(li,fA,fB){
   _reassign.active=true;_reassign.step=1;_reassign.layer=li;_reassign.frameA=fA;_reassign.frameB=fB;_reassign.aIds=[];
-  reassignSetStatus('1/2 — Cliquez l\'élément de départ (plusieurs si un même trait a été séparé), puis Entrée');
-  showToast(SM.t('toastClickStartElement'));
+  reassignSetStatus('1/2 — Cliquez l\'élément de départ (plusieurs si un même trait a été séparé), puis Entrée');showToast(SM.t('toastClickStartElement'));
 }
 function startReassign(){
   if(_reassign.active){cancelReassign();return;}
-  if(nativeTweenActive()){startNativeReassign();return;}
+  if(window.NemoNativeTweenUI&&window.NemoNativeTweenUI.startReassign(window,_reassign,beginReassign))return;
   saveAllLayerFrames();
   var li=state.activeLayerIdx,ld=state.layers[li],cf=state.currentFrame;
   var fA=-1;
@@ -5084,10 +5071,7 @@ function startReassign(){
   beginReassign(li,fA,fB);
 }
 function confirmReassignStep1(){
-  if(!_reassign.active||_reassign.step!==1)return;
-  // Native: the element picks are asynchronous reads; Enter confirms after the ones already in flight.
-  if(nativeTweenActive()){_reassign.chain=_reassign.chain.then(confirmReassignStep1Now).catch(function(){});return;}
-  confirmReassignStep1Now();
+  if(!(window.NemoNativeTweenUI&&window.NemoNativeTweenUI.afterPicks(window,_reassign,confirmReassignStep1Now)))confirmReassignStep1Now();
 }
 function confirmReassignStep1Now(){
   if(!_reassign.active||_reassign.step!==1)return;
@@ -5122,32 +5106,13 @@ function commitReassignOverride(li,sid){
   selClear();
   showToast(SM.t('toastInbetweenReassigned'));
 }
-// One clicked element's native identity, once resolved (both flows): step 1 collects it, step 2 commits the override.
 function applyReassignPick(li,sid){
   if(!sid){showToast(SM.t('toastNoElementHere'));return;}
   if(_reassign.step===1){
     if(_reassign.aIds.indexOf(sid)<0)_reassign.aIds.push(sid);
-    reassignSetStatus('1/2 — '+_reassign.aIds.length+' élément(s) sélectionné(s). Cliquez-en d\'autres si ce trait a été séparé, ou appuyez sur Entrée');
-    return;
+    reassignSetStatus('1/2 — '+_reassign.aIds.length+' élément(s) sélectionné(s). Cliquez-en d\'autres si ce trait a été séparé, ou appuyez sur Entrée');return;
   }
-  // step 2
-  if(!nativeTweenActive())saveActiveLayerFrame();
-  commitReassignOverride(li,sid);
-}
-// Native object project: no Paper item exists to hit-test, so the click is resolved from the native hit-test listing of the
-// layer (pickStroke), serialised after the earlier clicks; the gesture itself is swallowed at once. A result that lands after
-// the flow ended, moved to the other step or changed layer is dropped.
-function nativeReassignClick(li,e){
-  var step=_reassign.step,frame=step===1?_reassign.frameA:_reassign.frameB,x=e&&e.clientX,y=e&&e.clientY;
-  _reassign.chain=_reassign.chain.then(function(){
-    if(!_reassign.active||_reassign.step!==step||_reassign.layer!==li)return;
-    return window.NemoNativeTweenUI.pickStroke(window,li,x,y,frame).then(function(r){
-      if(!_reassign.active||_reassign.step!==step||_reassign.layer!==li||state.currentFrame!==frame)return;
-      if(!r||r.status!=='hit'){showToast('Native tween is unavailable.');return;}
-      applyReassignPick(li,r.strokeId);
-    });
-  }).catch(function(){});
-  return true;
+  if(!nativeTweenActive())saveActiveLayerFrame();commitReassignOverride(li,sid);
 }
 function reassignHandleClick(pt,e){
   if(!_reassign.active)return false;
@@ -5157,7 +5122,7 @@ function reassignHandleClick(pt,e){
     // the intended keyframe's own content, safer to just cancel than guess
     cancelReassign();return false;
   }
-  if(nativeTweenActive())return nativeReassignClick(li,e);
+  if(window.NemoNativeTweenUI&&window.NemoNativeTweenUI.reassignClick(window,_reassign,e,function(sid){applyReassignPick(li,sid);}))return true;
   var layer=userLayers[li];
   var hit=layer.hitTest(pt,{stroke:true,fill:true,tolerance:8/view.zoom});
   if(!hit||!(hit.item instanceof Path)){showToast(SM.t('toastNoElementHere'));return true;}
@@ -5169,10 +5134,9 @@ document.addEventListener('pointerdown',function(e){
   if(!_reassign.active)return;
   var area=document.getElementById('canvas-area');
   if(!area||!area.contains(e.target))return;
-  var native=nativeTweenActive();
-  var w=!native&&window.SMEngineBridge?window.SMEngineBridge.screenToWorld(e.clientX,e.clientY):null;
+  var w=window.SMEngineBridge&&!nativeTweenActive()?window.SMEngineBridge.screenToWorld(e.clientX,e.clientY):null;
   var pt=w?new Point(w[0],w[1]):null;
-  if(!pt&&!native)return;
+  if(!pt&&!nativeTweenActive())return;
   if(reassignHandleClick(pt,e)){e.stopImmediatePropagation();e.preventDefault();}
 },true);
 document.addEventListener('keydown',function(e){

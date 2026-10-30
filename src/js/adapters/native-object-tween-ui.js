@@ -193,6 +193,34 @@
     }
     return unavailable(CODES.presentation);
   }
+  // ---- the Reassign flow's native steps, over tweens.js's own `_reassign` state `st` (see startReassign / reassignHandleClick) ----
+  // Start: arm the flow from the cells read, only if the playhead and layer did not move meanwhile. Returns null off native mode.
+  function startReassign(host, st, begin) {
+    if (!nativeMode(host)) return null;
+    if (st.starting) return true;
+    const index = host.state.activeLayerIdx, frame = host.state.currentFrame;
+    st.starting = true;
+    reassignSpan(host, index, frame).then((r) => {
+      st.starting = false;
+      if (!st.active && r && r.status === 'span' && host.state.activeLayerIdx === index && host.state.currentFrame === frame) begin(index, r.from, r.to);
+    });
+    return true;
+  }
+  // The picks and Enter run in click order: a result that lands after the flow ended, changed step or layer is dropped.
+  function queue(st, step) { st.chain = (st.chain || Promise.resolve()).then(step).catch(() => {}); }
+  // A click: the gesture is swallowed at once (true) and the element read from the native hit-test listing; `apply(strokeId)` takes
+  // its identity (null on empty canvas). Returns null off native mode.
+  function reassignClick(host, st, e, apply) {
+    if (!nativeMode(host)) return null;
+    const step = st.step, layer = st.layer, frame = step === 1 ? st.frameA : st.frameB, here = () => st.active && st.step === step && st.layer === layer;
+    queue(st, () => here() && pickStroke(host, layer, e && e.clientX, e && e.clientY, frame).then((r) => {
+      if (!here() || host.state.currentFrame !== frame) return;
+      if (r.status === 'hit') apply(r.strokeId); else notice(host, r);
+    }));
+    return true;
+  }
+  // Enter: `confirm` runs after the picks already in flight. Returns null off native mode.
+  function afterPicks(host, st, confirm) { if (!nativeMode(host)) return null; queue(st, confirm); return true; }
   // Harmonize: the edited interpolated frame becomes a key and the two spans around it are re-tweened (opt-in panel toggle).
   function harmonize(host, frame) {
     if (!nativeMode(host)) return null;
@@ -209,5 +237,5 @@
       return () => commands.split(uid, frame, options);
     });
   }
-  return Object.freeze({ active: nativeMode, generate, reassign, pairCurve, reassignSpan, pickStroke, split, harmonize, CODES });
+  return Object.freeze({ active: nativeMode, generate, reassign, pairCurve, reassignSpan, pickStroke, startReassign, reassignClick, afterPicks, split, harmonize, CODES });
 }));
