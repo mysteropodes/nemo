@@ -148,6 +148,7 @@ impl NativeObjectHost {
             .validate_project_replacement(prepared)
             .map_err(|_| "native project replacement origin changed".into())
     }
+    #[cfg(test)]
     pub(crate) fn prepare_blank_project_replacement(
         &self,
         snapshot: &str,
@@ -155,11 +156,27 @@ impl NativeObjectHost {
         canvas_height: u32,
         fps: f64,
     ) -> Result<PreparedProjectReplacement, String> {
+        self.prepare_blank_project_replacement_frames(snapshot, canvas_width, canvas_height, fps, None)
+    }
+    pub(crate) fn prepare_blank_project_replacement_frames(
+        &self,
+        snapshot: &str,
+        canvas_width: u32,
+        canvas_height: u32,
+        fps: f64,
+        total_frames: Option<u32>,
+    ) -> Result<PreparedProjectReplacement, String> {
         if self.released.is_some() {
             return Err("native project owner was released".into());
         }
         self.history
-            .prepare_blank_project_replacement(snapshot, canvas_width, canvas_height, fps)
+            .prepare_blank_project_replacement_frames(
+                snapshot,
+                canvas_width,
+                canvas_height,
+                fps,
+                total_frames,
+            )
             .map_err(|error| format!("native blank project admission: {error:?}"))
     }
     pub(crate) fn commit_project_replacement(
@@ -251,18 +268,33 @@ impl NativeObjectHost {
             released: None,
         })
     }
+    #[cfg(test)]
     pub(crate) fn new_blank_project(
         instance_id: String,
         canvas_width: u32,
         canvas_height: u32,
         fps: f64,
     ) -> Result<Self, String> {
+        Self::new_blank_project_frames(instance_id, canvas_width, canvas_height, fps, None)
+    }
+    pub(crate) fn new_blank_project_frames(
+        instance_id: String,
+        canvas_width: u32,
+        canvas_height: u32,
+        fps: f64,
+        total_frames: Option<u32>,
+    ) -> Result<Self, String> {
         if !envelope_identity(&instance_id) {
             return Err("native project instance identity is invalid".into());
         }
-        let history =
-            NativeObjectHistory::new_blank_project(instance_id, canvas_width, canvas_height, fps)
-                .map_err(|error| format!("native blank project admission: {error:?}"))?;
+        let history = NativeObjectHistory::new_blank_project_frames(
+            instance_id,
+            canvas_width,
+            canvas_height,
+            fps,
+            total_frames,
+        )
+        .map_err(|error| format!("native blank project admission: {error:?}"))?;
         Ok(Self {
             history,
             inactive_project: None,

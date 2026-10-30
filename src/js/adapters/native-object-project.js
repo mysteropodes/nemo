@@ -126,10 +126,13 @@
     }
     function openPath(path,transition){return enterProject({sourcePath:path,projectOnly:true},transition);}
     function newProject(intent,transition){
-      if(!intent||typeof intent!=='object'||Array.isArray(intent)||Object.keys(intent).length!==3||!integer(intent.canvasW,1)||!integer(intent.canvasH,1)||
-        !Number.isFinite(intent.fps)||intent.fps<=0)
+      var framed=!!intent&&typeof intent==='object'&&Object.prototype.hasOwnProperty.call(intent,'totalFrames');
+      if(!intent||typeof intent!=='object'||Array.isArray(intent)||Object.keys(intent).length!==(framed?4:3)||!integer(intent.canvasW,1)||!integer(intent.canvasH,1)||
+        !Number.isFinite(intent.fps)||intent.fps<=0||framed&&(!integer(intent.totalFrames,1)||intent.totalFrames>4294967295))
         return Promise.reject(localRefusal('Native New Project scalar intent is invalid'));
-      return enterProject({newProject:{canvasW:intent.canvasW,canvasH:intent.canvasH,fps:intent.fps}},transition);
+      var scalars={canvasW:intent.canvasW,canvasH:intent.canvasH,fps:intent.fps};
+      if(framed)scalars.totalFrames=intent.totalFrames;
+      return enterProject({newProject:scalars},transition);
     }
     function activateProject(target,transition){
       try{target=Entry.target(target);}catch(error){return Promise.reject(localRefusal(error.message));}
