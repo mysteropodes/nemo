@@ -78,7 +78,8 @@
   }
   function candidate(info,source,receipt){
     if(source.newProject&&(info.canvasW!==source.newProject.canvasW||info.canvasH!==source.newProject.canvasH||
-        info.fps!==source.newProject.fps||receipt.resourceCount!==0))
+        info.fps!==source.newProject.fps||receipt.resourceCount!==0||
+        Object.prototype.hasOwnProperty.call(source.newProject,'totalFrames')&&info.totalFrames!==source.newProject.totalFrames))
       throw new Error('Native New Project metadata is uncorrelated');
     if(source.retainedProject&&(info.documentSnapshotId!==source.retainedProject.documentSnapshotId||
         info.documentDigest!==source.retainedProject.digest))

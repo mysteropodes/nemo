@@ -123,7 +123,9 @@
     async function openPath(path){return enter(path,null);}
     async function newProject(config,isCurrent,onCreationFailure){
       if(!config||typeof config!=='object')return false;
+      var frames=config.totalFrames,framed=Object.prototype.hasOwnProperty.call(config,'totalFrames');
       config={w:config.w,h:config.h,fps:config.fps,name:typeof config.name==='string'?config.name:'Untitled'};
+      if(framed)config.totalFrames=frames;
       return enter(null,config,isCurrent,onCreationFailure);
     }
     async function enter(path,config,isCurrent,onCreationFailure){
@@ -134,6 +136,7 @@
         var creating=!!config,revealing=false;
         if(creating&&typeof session.newProject!=='function')throw {message:'Native New Project is unavailable',details:{disposition:'notDispatched'}};
         var value=creating?{canvasW:config.w,canvasH:config.h,fps:config.fps}:path;
+        if(creating&&Object.prototype.hasOwnProperty.call(config,'totalFrames'))value.totalFrames=config.totalFrames;
         var info=await session[creating?'newProject':'openPath'](value,{
           // Reveal hides this form intentionally, but never retires its request
           // generation. Other callers retain their complete currency predicate.
