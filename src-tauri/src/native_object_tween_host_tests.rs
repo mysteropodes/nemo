@@ -76,6 +76,16 @@ fn object_frames(file: &[u8]) -> Vec<u64> {
     frames.sort_unstable();
     frames
 }
+fn manual_samples(file: &[u8]) -> Vec<u64> {
+    let saved: Value = serde_json::from_slice(file).unwrap();
+    saved["drawing"]["layers"][0]["timing"]["samples"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|s| s["manualEdit"] == true)
+        .map(|s| s["frame"].as_u64().unwrap())
+        .collect()
+}
 fn keys(file: &[u8]) -> Vec<u64> {
     let saved: Value = serde_json::from_slice(file).unwrap();
     saved["drawing"]["layers"][0]["timing"]["keys"]
@@ -123,7 +133,11 @@ fn generate_split_reassign_regenerate_undo_redo_and_reopen_through_the_public_ro
         "{split}"
     );
     let split_file = saved(&state, &id);
-    assert_eq!(keys(&split_file), vec![0, 2, 4]);
+    // Baseline #126 (harmonize): the corrected frame is re-tweened as a key, then stays a SOFT manually edited
+    // in-between, so the drawn keys are unchanged and frame 2 is a manual sample.
+    assert_eq!(keys(&split_file), vec![0, 4]);
+    assert_eq!(manual_samples(&split_file), vec![2]);
+    assert_eq!(object_frames(&split_file), vec![0, 1, 2, 3, 4]);
 
     let reassign = tween(
         &state,
@@ -131,7 +145,7 @@ fn generate_split_reassign_regenerate_undo_redo_and_reopen_through_the_public_ro
         "reassign",
         2,
         json!({"command":"object.tween.reassign","layerUid":"L0",
-        "span":{"from":0,"to":2,"overrides":[{"aId":"s0","bId":"s0"}]}}),
+        "span":{"from":0,"to":4,"overrides":[{"aId":"s0","bId":"s0"}]}}),
     );
     assert_eq!(reassign["ok"], true, "{reassign}");
     assert_eq!(reassign["contentRevision"], 3);
@@ -147,6 +161,11 @@ fn generate_split_reassign_regenerate_undo_redo_and_reopen_through_the_public_ro
     assert_eq!(regenerate["contentRevision"], 4);
     let last = saved(&state, &id);
     assert_eq!(object_frames(&last), vec![0, 1, 2, 3, 4]);
+    assert_eq!(
+        manual_samples(&last),
+        vec![2],
+        "skipManual keeps the harmonized frame"
+    );
 
     // Undo and redo are revisions of their own: each receipt names the revision the next request expects.
     let mut revision = 4;
