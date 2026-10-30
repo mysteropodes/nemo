@@ -193,8 +193,9 @@
       return Array.isArray(item.segments); }).map(function (item) {
       var path = new Path({ insert: false, closed: item.closed, segments: item.segments.map(function (a) { return [a.point, a.handleIn, a.handleOut]; }) });
       path.transform(new Matrix(item.matrix[0], item.matrix[1], item.matrix[2], item.matrix[3], item.matrix[4], item.matrix[5]));
-      // Painted outlines (a ribbon, its fill, a shape) are hit inside; a plain stroke on its line.
-      path.strokeColor = [0, 0, 0]; path.strokeWidth = 1; if (item.closed && item.role !== 'plain') path.fillColor = [0, 0, 0];
+      // Painted outlines (a ribbon, its fill, a shape) and any closed record that carries fill paint are hit inside (as the
+      // baseline did a filled Paper item); an unfilled plain stroke only on its line.
+      path.strokeColor = [0, 0, 0]; path.strokeWidth = 1; if (item.closed && (item.role !== 'plain' || item.filled === true)) path.fillColor = [0, 0, 0];
       path.data = { strokeId: item.stableTarget.strokeId, nativeStableTarget: item.stableTarget, nativeRole: item.role, nativeRibbon: item.role === 'ribbon', nativeMatrix: item.matrix,
         nativeOwner: item.owner };
       if (item.center) { var m = item.matrix, at = function (p, d) { return [m[0] * p[0] + m[2] * p[1] + d * m[4], m[1] * p[0] + m[3] * p[1] + d * m[5]]; };
