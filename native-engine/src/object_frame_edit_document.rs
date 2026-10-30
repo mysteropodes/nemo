@@ -158,39 +158,6 @@ fn remap_scopes(
     Ok(())
 }
 
-/// Move the scene-root authored raster images and text blocks like the records: `dests` names every frame a
-/// layer's cell content lands on (none drops it, several copy it). Targets keep their stroke ids and the items
-/// (and with them their mesh bindings) are untouched, so only the frame of the target changes.
-fn remap_items(document: &mut ObjectDocument, dests: &dyn Fn(&str, u32) -> Vec<u32>) {
-    let Some(items) = document.item_records() else {
-        return;
-    };
-    let mut raster = Vec::with_capacity(items.raster_entries().len());
-    for entry in items.raster_entries() {
-        for to in item_dests(&entry.target, dests) {
-            let mut copy = entry.clone();
-            copy.target.frame_scope.frame = to;
-            raster.push(copy);
-        }
-    }
-    let mut text = Vec::with_capacity(items.text_entries().len());
-    for entry in items.text_entries() {
-        for to in item_dests(&entry.target, dests) {
-            let mut copy = entry.clone();
-            copy.target.frame_scope.frame = to;
-            text.push(copy);
-        }
-    }
-    document.items = ItemRecords::normalized(raster, text);
-}
-fn item_dests(target: &ObjectTarget, dests: &dyn Fn(&str, u32) -> Vec<u32>) -> Vec<u32> {
-    if target.context_id == CONTEXT && target.frame_scope.kind == FrameScopeKind::Authored {
-        dests(target.layer_uid.as_str(), target.frame_scope.frame)
-    } else {
-        vec![target.frame_scope.frame]
-    }
-}
-
 /// Apply a per-layer frame map (`None` drops) to the scene-root authored records, items and order scopes.
 pub(crate) fn remap(
     document: &mut ObjectDocument,
@@ -505,6 +472,10 @@ pub(crate) fn demote_span(
     finish(next)
 }
 
+// #2248: the raster-image and text-block half of the frame remap, a child to stay under the size ceiling.
+#[path = "object_frame_edit_items.rs"]
+mod object_frame_edit_items;
+use object_frame_edit_items::remap_items;
 // L05-E (lane #2111): the document half of the key retime (moveKeyframe, F10); a child so the scope helpers stay private.
 #[path = "object_exposure_edit_retime_document.rs"]
 mod object_exposure_edit_retime_document;
