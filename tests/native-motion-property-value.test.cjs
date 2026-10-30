@@ -184,3 +184,21 @@ test('Alt-click opens the drawer even when the stopwatch is disabled, and is ine
  await h.sw().fire('click',{altKey:true});assert.equal(opened,1);assert.equal(h.writes.length,0);
  const bare=fixture({});await bare.editor.refresh();await bare.sw().fire('click',{altKey:true});await bare.sw().fire('dblclick');assert.equal(bare.writes.length,0);
 });
+const afterWindow=()=>new Promise(r=>setTimeout(r,360));
+test('a real double-click (click detail 1, click detail 2, dblclick) sends no edit and opens the drawer once',async()=>{
+ let opened=0;const h=fixture({keyCount:2,keyFrames:[2,20],openKeys(){opened++;return true;}});await h.editor.refresh();const sw=h.sw();
+ await sw.fire('click',{detail:1});assert.equal(h.writes.length,0,'the first click waits out the double-click window');
+ await sw.fire('click',{detail:2});await sw.fire('dblclick',{detail:2});assert.equal(opened,1);
+ await afterWindow();assert.equal(h.writes.length,0,'no write ever follows a double-click');
+});
+test('a single mouse click still toggles exactly once after the double-click window',async()=>{
+ let opened=0;const h=fixture({keyCount:2,keyFrames:[2,20],openKeys(){opened++;return true;}});await h.editor.refresh();const sw=h.sw();
+ await sw.fire('click',{detail:1});assert.equal(h.writes.length,0);await afterWindow();
+ assert.deepEqual(h.writes.map(w=>w.payload.action),[{kind:'setKey',frame:10,values:[0,64]}]);assert.equal(opened,0);
+});
+test('keyboard activation toggles at once and a pending click is dropped on dispose',async()=>{
+ const h=fixture({keyCount:2,keyFrames:[2,20],openKeys(){return true;}});await h.editor.refresh();
+ await h.sw().fire('keydown',{key:'Enter',preventDefault(){}});assert.equal(h.writes.length,1);await tick();
+ const g=fixture({keyCount:2,keyFrames:[2,20],openKeys(){return true;}});await g.editor.refresh();const sw=g.sw();
+ await sw.fire('click',{detail:1});g.editor.dispose();await afterWindow();assert.equal(g.writes.length,0);
+});
