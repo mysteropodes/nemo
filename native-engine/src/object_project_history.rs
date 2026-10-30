@@ -287,6 +287,7 @@ impl NativeObjectHistory {
             owner,
             undo: Vec::new(),
             redo: Vec::new(),
+            labels: Default::default(),
             receipts: StageReceipts::default(),
         };
         drop(incoming.take());
@@ -334,6 +335,7 @@ impl NativeObjectHistory {
         self.owner.replace_admitted_snapshot(prepared.next)?;
         self.undo.clear();
         self.redo.clear();
+        self.labels.clear();
         self.receipts = StageReceipts::default();
         Ok(())
     }
@@ -346,6 +348,7 @@ impl NativeObjectHistory {
             owner: ObjectFillOwner::from_project_file(instance.into(), bytes)?,
             undo: Vec::new(),
             redo: Vec::new(),
+            labels: Default::default(),
             receipts: StageReceipts::default(),
         })
     }

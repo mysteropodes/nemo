@@ -4018,6 +4018,30 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-history-read-contract.js",
+      "moduleId": "app.native.history.read.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-history-ui.js",
+      "moduleId": "app.native.object.history.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-object-ghost-ui.js",
       "moduleId": "app.native.object.ghost.ui.adapter",
       "executionClass": "document-classic",

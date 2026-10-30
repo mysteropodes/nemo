@@ -423,8 +423,31 @@
       }
       return freeze(runs.map((run) => freeze(run.slice())));
     }
+    // #2376 G26: the live undo/redo stacks as one labelled page, pinned to the project's current revision and snapshot. It reads no
+    // presentation: the answer is discarded unless the project is still on the same pin when it lands.
+    async function readHistory(pin, offset) {
+      if (!pins(pin) || offset !== undefined && !integer(offset, 0)) throw fault('invalid_request', 'History pin or offset is invalid', 'local_validation');
+      const still = () => { const s = ports.state(); return readyState(s) && samePins(s.info, pin); };
+      await ports.settled();
+      if (!still()) throw fault('stale_revision', 'Native history changed before it was read', 'history_stale');
+      const body = { atRevision: pin.contentRevision, documentSnapshotId: pin.documentSnapshotId };
+      if (offset !== undefined) body.offset = offset;
+      const request = { apiVersion: 2, requestId: ports.requestId('history-read'), instanceId: pin.instanceId, documentId: pin.documentId,
+        operation: 'query.document.object.history', payload: body };
+      let response;
+      try { response = await ports.dispatch(request); } catch (e) { throw e && e.code ? e : fault('unavailable', 'Native history read transport failed', 'native_read_transport'); }
+      if (!still()) throw fault('stale_revision', 'Native history changed while it was read', 'history_stale');
+      if (!object(response) || response.requestId !== request.requestId || response.documentId !== request.documentId || typeof response.ok !== 'boolean')
+        throw fault('uncorrelated', 'Native history response is uncorrelated', 'response_identity');
+      responseError(response);
+      const r = response.result;
+      if (response.ok !== true || !object(r) || r.atRevision !== pin.contentRevision || !Array.isArray(r.entries))
+        throw fault('uncorrelated', 'Native history result is invalid', 'response_shape');
+      return freeze({ info: copyPins(pin), undoDepth: r.undoDepth, redoDepth: r.redoDepth, offset: r.offset,
+        entries: r.entries.map((e) => ({ index: e.index, label: e.label })) });
+    }
     return Object.freeze({ readLayerTiming: (l, f, p) => readLegacy(l, f, p), readLayerRange: (l, f, p) => readLegacy(l, f, p, 'range'),
-      readLayerPlacement: (l, f, p) => readLegacy(l, f, p, 'placement'), readLayerCells: readLayerCells, readImageMesh: readImageMesh, readWidgets: readWidgets, readGhosts: readGhosts, readRig: readRig, readRigWeights: readRigWeights, readSubselect: readSubselect, readPresentedStrokes: readPresentedStrokes, previewSubselect: previewSubselect });
+      readLayerPlacement: (l, f, p) => readLegacy(l, f, p, 'placement'), readLayerCells: readLayerCells, readHistory: readHistory, readImageMesh: readImageMesh, readWidgets: readWidgets, readGhosts: readGhosts, readRig: readRig, readRigWeights: readRigWeights, readSubselect: readSubselect, readPresentedStrokes: readPresentedStrokes, previewSubselect: previewSubselect });
   }
   function boxSegments(b) { return [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]].map((p) => ({ point: p, handleIn: [0, 0], handleOut: [0, 0] })); }
   function expectedCount(kind, m) { return kind === 'outline' ? m.outlineCount : kind === 'verts' ? m.vertexCount : kind === 'tris' ? m.triangleIndexCount : m.vertexCount; }

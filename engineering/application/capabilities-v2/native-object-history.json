@@ -23,11 +23,11 @@
     "adapterOwnsWritableMirror": false,
     "fallback": "none"
   },
-  "readPolicy": "Read actual undo/redo stack depths under the existing current-owner dispatch lock. Exact current revision and snapshot pins required; retained older snapshots refuse stale_revision. No mutation, revision publication, notification, read receipt, mirror or history copy.",
+  "readPolicy": "Read actual undo/redo stack depths and one bounded page (at most 32) of labelled entries under the existing current-owner dispatch lock. Entries are chronological: done entries oldest first, then the redoable ones nearest first; the cursor is undoDepth. The label is the display name of the command family or kind that created the entry. Optional offset/limit select the page (default: a window starting up to 20 entries before the cursor). Exact current revision and snapshot pins required; retained older snapshots refuse stale_revision. No mutation, revision publication, notification, read receipt, mirror or history copy. The jump behind a click is command.document.object.undo/redo with an optional steps count (one restore, one new revision), owned by native.object.",
   "resourceBoundary": {
     "maxRequestBytes": 4096,
     "maxReadResponseBytes": 4096,
-    "policy": "Bounded original request bytes and complete correlated response; unsigned safe integer depths."
+    "policy": "Bounded original request bytes and complete correlated response; unsigned safe integer depths, at most 32 entries of at most 32 characters."
   },
   "commonErrorCodes": [
     "invalid_request",
@@ -72,8 +72,14 @@
         "result": {
           "atRevision": 0,
           "documentSnapshotId": "native-object:native-object-document-1:0",
-          "undoDepth": 0,
-          "redoDepth": 0
+          "undoDepth": 2,
+          "redoDepth": 1,
+          "offset": 0,
+          "entries": [
+            { "index": 0, "label": "Draw" },
+            { "index": 1, "label": "Property: Opacity" },
+            { "index": 2, "label": "Rename Layer" }
+          ]
         }
       }
     }
