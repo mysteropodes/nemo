@@ -33,6 +33,17 @@ const ROUTED_ELSEWHERE: &[(&str, &str)] = &[
     ),
 ];
 
+/// Declared operations whose only owner is a family gated on the `application` feature (the
+/// tween family: it needs the app-level history and export modules). Without that feature no
+/// target builds the owner, so the declaration is expected to be unowned there; the
+/// `application` build must own every one of them exactly once.
+const APPLICATION_ONLY: &[&str] = &[
+    "command.document.object.tween.generate",
+    "command.document.object.tween.regenerate",
+    "command.document.object.tween.split",
+    "command.document.object.tween.reassign",
+];
+
 fn probe(operation: &str) -> OpacityRequest {
     serde_json::from_value(
         serde_json::json!({"apiVersion":2,"requestId":"probe","instanceId":"probe",
@@ -66,6 +77,9 @@ fn owners(operation: &str) -> Vec<String> {
 fn every_declared_object_operation_has_exactly_one_owner() {
     let mut problems = Vec::new();
     for operation in DECLARED_OBJECT_OPERATIONS {
+        if !cfg!(feature = "application") && APPLICATION_ONLY.contains(operation) {
+            continue;
+        }
         let owners = owners(operation);
         if owners.len() != 1 {
             problems.push(format!("{operation}: {} owners {owners:?}", owners.len()));
@@ -85,6 +99,21 @@ fn routed_elsewhere_entries_are_declared_and_not_stale() {
         assert!(
             DECLARED_OBJECT_OPERATIONS.contains(operation),
             "{operation} is pinned as routed elsewhere but no capability declares it"
+        );
+    }
+}
+
+#[test]
+fn application_only_operations_are_declared_and_not_stale() {
+    for operation in APPLICATION_ONLY {
+        assert!(
+            DECLARED_OBJECT_OPERATIONS.contains(operation),
+            "{operation} is pinned as application-only but no capability declares it"
+        );
+        assert_eq!(
+            families::owner(operation).is_some(),
+            cfg!(feature = "application"),
+            "{operation}"
         );
     }
 }
