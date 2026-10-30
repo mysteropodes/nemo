@@ -19,6 +19,8 @@ use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 #[path = "object_vector_batch_ribbon.rs"]
 mod ribbon;
+#[path = "object_vector_batch_items.rs"]
+mod items;
 #[path = "object_vector_batch_transform.rs"]
 mod transform;
 
@@ -118,14 +120,16 @@ fn target_of(op: &BatchOp) -> Option<ObjectTarget> {
 
 /// A `reshape` with a `matrix` (#2372 Select) becomes the replaces of the records it moves: the named record, its linked
 /// fill and the copies of its texture group, each retargeted to the held cell's `frame` as a geometry reshape is.
-fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<BatchOp>, Vec<bool>), DispatchErrorCode> {
+fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<BatchOp>, Vec<bool>, Vec<Option<items::ItemSwap>>), DispatchErrorCode> {
     use DispatchErrorCode::InvalidRequest;
     // The receipt lists one stroke id per REQUESTED step; the companions a transform brings are not steps of their own.
     let (mut out, mut companion) = (Vec::with_capacity(ops.len()), Vec::with_capacity(ops.len()));
+    let mut swaps: Vec<Option<items::ItemSwap>> = Vec::with_capacity(ops.len());
     for op in ops {
         let Some(matrix) = op.matrix.value().copied() else {
             out.push(op);
             companion.push(false);
+            swaps.push(None);
             continue;
         };
         let frame = op.frame.value().and_then(serde_json::Number::as_u64).and_then(|n| u32::try_from(n).ok());
@@ -137,9 +141,22 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<
         {
             return Err(InvalidRequest);
         }
+        // A stored raster image or text block is mapped in place, in the cell it is stored in (it has no held-cell copy).
+        if let Some(swap) = items::transform(origin.document(), &target, matrix)? {
+            if swaps.iter().flatten().any(|s| s.target() == &target) {
+                return Err(InvalidRequest);
+            }
+            out.push(BatchOp { op: "item".into(), record: Presence::Missing, stable_target: Presence::Present(target), placement: Presence::Missing,
+                keyframe: Presence::Missing, from_step: Presence::Missing, frame: Presence::Missing, geometry: Presence::Missing,
+                offset: Presence::Missing, center: Presence::Missing, matrix: Presence::Missing });
+            companion.push(false);
+            swaps.push(Some(swap));
+            continue;
+        }
         for (at, mut record) in transform::transform(origin.document(), &target, matrix)?.into_iter().enumerate() {
             record.target.frame_scope.frame = frame.unwrap_or(target.frame_scope.frame);
             companion.push(at > 0);
+            swaps.push(None);
             out.push(BatchOp { op: "replace".into(), record: Presence::Present(record), stable_target: Presence::Missing, placement: Presence::Missing,
                 keyframe: Presence::Missing, from_step: Presence::Missing, frame: Presence::Missing, geometry: Presence::Missing,
                 offset: Presence::Missing, center: Presence::Missing, matrix: Presence::Missing });
@@ -148,7 +165,7 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<
             return Err(InvalidRequest);
         }
     }
-    Ok((out, companion))
+    Ok((out, companion, swaps))
 }
 
 pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool, trim: Option<f64>) -> Result<Edit, DispatchErrorCode> {
@@ -156,7 +173,7 @@ pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool, 
     if !(1..=MAX_BATCH_OPS).contains(&ops.len()) {
         return Err(InvalidRequest);
     }
-    let (mut ops, companions) = expand_transforms(origin, ops)?;
+    let (mut ops, companions, swaps) = expand_transforms(origin, ops)?;
     // `copy` {fromStep, frame}: the record of an EARLIER create (or copy) step, retargeted to `frame` and then a create in
     // every respect; a stroke and its companion stamped on n frames cost one record each, not n.
     let mut links: Vec<(String, String)> = Vec::new();
@@ -284,10 +301,15 @@ pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool, 
         }
     }
     let (mut stroke_ids, mut changed) = (Vec::new(), false);
-    for (((op, copy), fill), companion) in ops.into_iter().zip(keyed).zip(fills).zip(companions) {
+    for ((((op, copy), fill), companion), swap) in ops.into_iter().zip(keyed).zip(fills).zip(companions).zip(swaps) {
         let target = target_of(&op).ok_or(InvalidRequest)?;
         if target.context_id != first.context_id || target.layer_uid != first.layer_uid {
             return Err(InvalidRequest);
+        }
+        if let Some(swap) = swap {
+            stroke_ids.push(target.stroke_id.clone());
+            changed |= items::apply(&mut document, swap)?;
+            continue;
         }
         let edit = match (op.op.as_str(), op.record, op.stable_target) {
             ("create", Presence::Present(record), Presence::Missing) => {

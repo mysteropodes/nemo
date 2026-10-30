@@ -141,12 +141,18 @@ impl ObjectCompositionWitness {
             .target
             .clone();
         let rect = self.raster_final_rect(at)?;
-        // The retained draw rotates the display rect about its centre; the listing keeps the unrotated rect and that map.
-        let (cx, cy) = (rect.x + rect.width / 2.0, rect.y + rect.height / 2.0);
+        // The listing's record space is the stored item's own frame (its centre and size, unrotated): bounds are the stored rect and
+        // the matrix carries it to the painted rect (rotation about the final centre, the layer chain included), so a record-space
+        // matrix a client conjugates with it is exactly what the item's batch transform applies to the stored centre and size.
+        let record = plan.packet().raster_records().find(|r| r.source_index() == source.source_index)?;
+        let ((cx, cy), (w, h)) = (record.entry().item.center(), record.entry().item.size());
+        let (fx, fy) = (rect.x + rect.width / 2.0, rect.y + rect.height / 2.0);
         let (sin, cos) = rect.rotation.to_radians().sin_cos();
-        let matrix = [cos, sin, -sin, cos, cx - cos * cx + sin * cy, cy - sin * cx - cos * cy];
-        let bounds = [rect.x, rect.y, rect.x + rect.width, rect.y + rect.height];
-        (bounds.iter().chain(&matrix).all(|v| v.is_finite()) && rect.width > 0.0 && rect.height > 0.0)
+        let (kx, ky) = (rect.width / w, rect.height / h);
+        let (a, b, c, d) = (cos * kx, sin * kx, -sin * ky, cos * ky);
+        let matrix = [a, b, c, d, fx - (a * cx + c * cy), fy - (b * cx + d * cy)];
+        let bounds = [cx - w / 2.0, cy - h / 2.0, cx + w / 2.0, cy + h / 2.0];
+        (bounds.iter().chain(&matrix).all(|v| v.is_finite()) && w > 0.0 && h > 0.0 && rect.width > 0.0 && rect.height > 0.0)
             .then(|| hit_item(target, bounds, matrix, "raster"))
     }
     fn text_hit_item(
@@ -165,12 +171,27 @@ impl ObjectCompositionWitness {
             .entry()
             .target
             .clone();
-        // The block's painted glyph and decoration contours are already in world space.
+        // The block's painted glyph and decoration contours are already in world space; its record space is the stored anchor's
+        // own frame, which the layer's parent chain carries to the world. An unposed layer keeps the identity (and the world box).
         let b = source.item.scene().contours().iter().fold(
             [f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY],
             |b, c| [b[0].min(c.envelope[0]), b[1].min(c.envelope[1]), b[2].max(c.envelope[2]), b[3].max(c.envelope[3])],
         );
-        b.iter().all(|v| v.is_finite()).then(|| hit_item(target, b, [1.0, 0.0, 0.0, 1.0, 0.0, 0.0], "text"))
+        let chain = subselect::layer_chain(&self.plan().native_parent_chains(), layer).ok();
+        let (bounds, matrix) = match chain {
+            Some(m) if m != [1.0, 0.0, 0.0, 1.0, 0.0, 0.0] => {
+                let det = m[0] * m[3] - m[1] * m[2];
+                let back = |x: f64, y: f64| {
+                    let (x, y) = (x - m[4], y - m[5]);
+                    [(m[3] * x - m[2] * y) / det, (-m[1] * x + m[0] * y) / det]
+                };
+                let corners = [back(b[0], b[1]), back(b[2], b[1]), back(b[0], b[3]), back(b[2], b[3])];
+                let fold = |at: usize, lo: bool| corners.iter().map(|p| p[at]).fold(if lo { f64::INFINITY } else { f64::NEG_INFINITY }, |a, v| if lo { a.min(v) } else { a.max(v) });
+                ([fold(0, true), fold(1, true), fold(0, false), fold(1, false)], m)
+            }
+            _ => (b, [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
+        };
+        (bounds.iter().chain(&matrix).all(|v| v.is_finite())).then(|| hit_item(target, bounds, matrix, "text"))
     }
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     fn raster_final_rect(&self, at: usize) -> Option<crate::evaluation::motion_parent_chain::ImageRect> {
