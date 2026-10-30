@@ -7,9 +7,9 @@
 //! there. These tests decode real documents (widget layer last, first and absent), build the real
 //! render scenes of two frames and compare every entry. The layer-level property holder that
 //! `addWidgetLayer` leaves behind (the widget's two controls) is a holder the evaluation join does not
-//! read (L01-H's packet guard), so a document that carries it has no frame packet at all: it is a typed
-//! `Unavailable`, never a partial render, and the scenes compared are those of the same document
-//! without its holder table, the only thing that guard reads. The slot rule itself is unit-tested in
+//! read as a paint input: a widget layer never paints and its controls are read by expressions elsewhere, so
+//! the packet gate admits that holder and the scenes compared are those of the same document with and
+//! without its holder table, which must be identical. The slot rule itself is unit-tested in
 //! `render_image_mesh_scene_policy`.
 
 use crate::evaluation::object_image_mesh_kernels::render_image_mesh_scene_policy::widget_layers_with_content;
@@ -101,9 +101,9 @@ fn frame_entries(value: &Value) -> Vec<Vec<Entry>> {
 }
 
 /// The widget document of `widget_at` with its control holders: the holder table is the ONLY difference from the
-/// document without them, and the packet over it is the typed `Unavailable` of L01-H's guard (pinned by
-/// `every_other_holder_keeps_the_packet_unavailable`) at every sampled frame, as in the widget creation test.
-fn assert_holders_keep_the_packet_unavailable(widget_at: usize) {
+/// document without them, the packet over it is admitted (the widget never paints, its controls are read by
+/// expressions elsewhere) and its scene entries are exactly those of the document without the table.
+fn assert_holders_do_not_change_the_scene(widget_at: usize) {
     let with_holders = widget_document(Some(widget_at), true);
     let mut stripped = with_holders.clone();
     stripped
@@ -116,11 +116,11 @@ fn assert_holders_keep_the_packet_unavailable(widget_at: usize) {
         widget_document(Some(widget_at), false),
         "the holder table is the only difference (widget at {widget_at})"
     );
-    let snapshot = snapshot(&with_holders);
+    let (held, bare) = (snapshot(&with_holders), snapshot(&stripped));
     for (kind, frame) in frames() {
         assert_eq!(
-            try_packet(&snapshot, kind.clone(), frame).err(),
-            Some(ObjectFrameError::Unavailable),
+            entries(&scene(&packet(&held, kind.clone(), frame))),
+            entries(&scene(&packet(&bare, kind.clone(), frame))),
             "widget at {widget_at}, {kind:?} frame {frame}"
         );
     }
@@ -149,16 +149,16 @@ fn a_widget_layer_adds_no_scene_entry_and_changes_no_other() {
         first, shifted,
         "a leading widget layer only shifts layer positions"
     );
-    // With its control holders the same documents have no packet to paint.
+    // With its control holders the same documents paint the same entries.
     for widget_at in [2, 0] {
-        assert_holders_keep_the_packet_unavailable(widget_at);
+        assert_holders_do_not_change_the_scene(widget_at);
     }
 }
 
 #[test]
 fn no_scene_entry_is_owned_by_a_widget_layer() {
     for widget_at in [0, 2] {
-        assert_holders_keep_the_packet_unavailable(widget_at);
+        assert_holders_do_not_change_the_scene(widget_at);
         let value = widget_document(Some(widget_at), false);
         let snapshot = snapshot(&value);
         let layers = snapshot.document().layers();

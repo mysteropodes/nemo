@@ -468,6 +468,10 @@ mod command_tests;
 mod history_tests;
 
 #[cfg(test)]
+#[path = "native_object_tween_host_tests.rs"]
+mod tween_tests;
+
+#[cfg(test)]
 #[path = "native_object_export_tests.rs"]
 mod export_tests;
 

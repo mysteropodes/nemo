@@ -1454,6 +1454,7 @@
         "render_vector_eval_motion.rs",
         "render_vector_eval_controls.rs",
         "render_vector_eval_guard.rs",
+        "render_vector_eval_contentless.rs",
         "render_vector_eval_join.rs",
         "render_vector_eval_pins.rs",
         "render_vector_eval_scene.rs",
@@ -1915,6 +1916,7 @@
         "object_tween_bitmap.rs",
         "object_tween_ghosts.rs",
         "object_tween_history.rs",
+        "object_tween_public_shapes.rs",
         "object_tween_refusals.rs",
         "tween_kernels.rs",
         "encoded_retention_batch.rs",
@@ -2013,6 +2015,7 @@
         "src/native_object_rig_contract.rs",
         "src/native_object_rig_contract_tests.rs",
         "src/native_object_rig_receipt_tests.rs",
+        "src/native_object_tween_contract_tests.rs",
         "src/native_object_component_contract.rs",
         "src/native_object_component_contract_tests.rs",
         "src/native_object_component_receipt_tests.rs",
@@ -2168,7 +2171,8 @@
         "native_video_link_source.rs",
         "native_video_link_dispatch.rs",
         "native_import_batch_dispatch.rs",
-        "native_mcp_project_scope.rs"
+        "native_mcp_project_scope.rs",
+        "native_mcp_source_scope.rs"
       ],
       "publicApi": [
         "application_mcp.rs"
@@ -2186,7 +2190,8 @@
         "native_revision_sync_tests.rs",
         "native_font_dispatch_tests.rs",
         "native_font_source_tests.rs",
-        "native_mcp_project_scope_tests.rs"
+        "native_mcp_project_scope_tests.rs",
+        "native_mcp_source_scope_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -2333,6 +2338,7 @@
         "native_object_bootstrap_tests.rs",
         "native_object_host_read_tests.rs",
         "native_object_host_command_tests.rs",
+        "native_object_tween_host_tests.rs",
         "native_object_host_history_tests.rs",
         "native_object_history_read_tests.rs",
         "native_object_client_tests.rs",
@@ -2354,6 +2360,7 @@
         "native_object_preview_lifecycle_tests.rs",
         "native_object_preview_route_tests.rs",
         "native_object_preview_route_split_tests.rs",
+        "native_object_preview_route_property_tests.rs",
         "native_object_preview_route_test_support.rs",
         "native_object_desktop_preview_tests.rs",
         "native_object_desktop_preview_test_support.rs",

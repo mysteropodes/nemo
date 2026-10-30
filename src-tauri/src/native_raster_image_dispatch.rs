@@ -112,9 +112,14 @@ impl RevisionSync {
         }
         let source: ImageSource = serde_json::from_value(request.payload["source"].clone())
             .map_err(|_| "native image source descriptor invalid")?;
-        let bytes = match tokio::time::timeout(Duration::from_secs(30), resolve(source)).await {
-            Ok(Ok(bytes)) => bytes,
-            _ => {
+        let refusal = match tokio::time::timeout(Duration::from_secs(30), resolve(source)).await {
+            Ok(Ok(bytes)) => Ok(bytes),
+            Ok(Err(reason)) => Err(Some(reason)),
+            Err(_) => Err(None),
+        };
+        let bytes = match refusal {
+            Ok(bytes) => bytes,
+            Err(reason) => {
                 if let Some(known) = self.dispatch_image_step(
                     instance,
                     native,
@@ -124,16 +129,24 @@ impl RevisionSync {
                 )? {
                     return Ok(known);
                 }
+                // A source the port itself refused read nothing and published nothing: the client may correct the
+                // source and send again (#2242). Only a timeout leaves the blocking read unproven.
+                let message = match &reason {
+                    Some(reason) => format!("native image source unavailable before publication: {reason}"),
+                    None => "native image source unavailable before publication".to_owned(),
+                };
                 let mut response = unavailable(
                     &request,
                     instance,
                     request.expected_revision.unwrap_or(0),
-                    "native image source unavailable before publication",
+                    &message,
                     false,
                 );
-                response.error.as_mut().unwrap().details = Some(
-                    serde_json::json!({"disposition":"indeterminate","committed":null,"retryExecution":false}),
-                );
+                if reason.is_none() {
+                    response.error.as_mut().unwrap().details = Some(
+                        serde_json::json!({"disposition":"indeterminate","committed":null,"retryExecution":false}),
+                    );
+                }
                 return Ok(Delivery {
                     response,
                     notification: None,

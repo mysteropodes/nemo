@@ -19,6 +19,7 @@ pub(super) fn request_limit(operation: &str) -> usize {
     } else if operation == "command.document.object.vector.edit"
         || operation == "command.document.object.fill.brush"
         || operation == "command.document.object.brush.bitmap.stroke"
+        || operation.starts_with("command.document.object.tween.")
     {
         MAX_REQUEST_BYTES
     } else {
