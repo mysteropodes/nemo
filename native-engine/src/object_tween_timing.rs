@@ -39,4 +39,23 @@ impl LayerTiming {
         next.validate(total)?;
         Ok(next)
     }
+    /// Harmonize (baseline #126): once the spans around an edited frame are re-tweened, that frame
+    /// goes back from a key to a SOFT in-between flagged as manually edited. Its drawing is untouched;
+    /// only its exposure changes, so a later regeneration that skips manual frames keeps the correction.
+    pub(crate) fn soften_key(&self, frame: u32, total: u32) -> Result<Self, LayerTimingError> {
+        self.validate(total)?;
+        let at = self
+            .keys
+            .binary_search_by_key(&frame, |k| k.frame)
+            .map_err(|_| LayerTimingError::Invalid)?;
+        let mut next = self.clone();
+        next.keys.remove(at);
+        next.samples.push(TimingSample {
+            frame,
+            manual_edit: Presence::Present(true),
+        });
+        next.samples.sort_by_key(|s| s.frame);
+        next.validate(total)?;
+        Ok(next)
+    }
 }

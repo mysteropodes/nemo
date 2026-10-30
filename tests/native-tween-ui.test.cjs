@@ -142,6 +142,19 @@ test('Harmonize re-tweens an edited interpolated frame as ONE native split at th
   assert.deepEqual([h.legacy, off.legacy], [[], []]);
 });
 
+test('an unchanged receipt names "need 2 drawn keyframes" only when the cells read confirms fewer than two drawn keys', async () => {
+  const enough = harness({ fixture: { applied: () => false } });
+  assert.equal((await enough.root.generateTweens()).status, 'unchanged');
+  assert.equal((await enough.root.harmonizeAfterEdit(2)).status, 'unchanged');
+  assert.deepEqual([enough.toasts, enough.cellReads.length, enough.legacy], [[], 2, []]);
+  const few = harness({ fixture: { applied: () => false }, keys: { 0: true } });
+  assert.equal((await few.root.harmonizeAfterEdit(2)).status, 'unchanged');
+  assert.deepEqual(few.toasts, ['Need at least 2 drawn keyframes.']);
+  const applied = harness({ keys: { 0: true } });
+  await applied.root.generateTweens();
+  assert.deepEqual([applied.toasts, applied.cellReads], [[], []]);
+});
+
 const settle = async () => { for (let i = 0; i < 12; i++) await new Promise((resolve) => setImmediate(resolve)); };
 const click = (h, id) => h.root.reassignHandleClick({}, { clientX: AT[id][0], clientY: AT[id][1] });
 // The whole user flow: the Reassign button, the start element(s), Enter, then the matching element on the next key.
@@ -323,7 +336,7 @@ test('refusals and unavailability are typed notices; nothing falls back to the l
   assert.deepEqual(plain(await locked.root.generateTweens()), { status: 'unavailable', code: 'layer_locked' });
   const bad = harness({ fixture: { refuse: () => ({ code: 'invalid_request', reason: 'span_not_adjacent' }) } });
   assert.deepEqual(plain(await bad.root.onTweenPairCurveChanged(1, 4)), { status: 'refused', code: 'invalid_request', reason: 'span_not_adjacent' });
-  const miss = harness({ fixture: { applied: () => false } });
+  const miss = harness({ fixture: { applied: () => false }, keys: { 0: true, 4: false } });
   assert.equal((await miss.root.generateTweens()).status, 'unchanged');
   const away = harness({ cutover: true, noSession: true });
   assert.deepEqual(plain(await away.root.generateTweens()), { status: 'unavailable', code: 'tween_session_unavailable' });

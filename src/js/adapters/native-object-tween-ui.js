@@ -36,10 +36,7 @@
 
   // The result and the one notice that goes with it.
   function notice(host, result) {
-    if (result.status === 'applied' || result.status === 'unchanged') {
-      if (result.status === 'unchanged' && result.receipt && result.receipt.applied === false) toast(host, t(host, 'toastNeedAtLeast2DrawnKeyframes', 'Need at least 2 drawn keyframes.'));
-      return result;
-    }
+    if (result.status === 'applied' || result.status === 'unchanged') return result;
     toast(host, result.status === 'unconfirmed' ? 'Native tween was not confirmed. Wait for synchronization.'
       : result.status === 'refused' ? 'Native tween was refused' + (result.reason ? ' (' + result.reason + ').' : '.')
       : result.code === CODES.arc ? 'Motion-arc tweens are unavailable in the native document.'
@@ -57,7 +54,7 @@
   }
   // Always a Promise that resolves: `prepare(commands)` runs synchronously (it reads the panel and the selection) and returns the
   // send thunk, or a typed result when the request cannot be built.
-  function run(host, prepare) {
+  function run(host, prepare, layerIndex) {
     let commands = null;
     try { commands = host.NemoNativeObjectTween && host.NemoNativeObjectTween.desktop(host); } catch (_) { commands = null; }
     if (!commands) return Promise.resolve(notice(host, unavailable(CODES.session)));
@@ -65,8 +62,16 @@
     let step;
     try { step = prepare(commands); } catch (_) { step = unavailable(CODES.layer); }
     if (typeof step !== 'function') return Promise.resolve(notice(host, step));
-    return Promise.resolve().then(step).then((receipt) => notice(host, Object.freeze({ status: receipt.applied ? 'applied' : 'unchanged', receipt })),
+    return Promise.resolve().then(step).then((receipt) => explainUnchanged(host, notice(host, Object.freeze({ status: receipt.applied ? 'applied' : 'unchanged', receipt })), layerIndex),
       (error) => notice(host, failure(host, error)));
+  }
+  // An unchanged receipt has several causes (nothing to regenerate, an identical result, too few keys). The baseline notice names
+  // only the last one, so it is shown only when the native cells read confirms fewer than two drawn keys on that layer.
+  async function explainUnchanged(host, result, layerIndex) {
+    if (result.status !== 'unchanged' || !result.receipt || result.receipt.applied !== false) return result;
+    const keys = await readKeys(host, layerIndex === undefined ? host.state.activeLayerIdx : layerIndex);
+    if (keys && keys.filter((k) => k.drawn).length < 2) toast(host, t(host, 'toastNeedAtLeast2DrawnKeyframes', 'Need at least 2 drawn keyframes.'));
+    return result;
   }
 
   // ---- panel and layer reads (synchronous, at click time) ----
@@ -155,7 +160,7 @@
       if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || !(from < to)) return unavailable(CODES.span);
       const span = spanOf(host, index, from, to);
       return () => commands.reassign(uid, span, options);
-    });
+    }, index);
   }
   // A per-span easing curve edit: the span starting at the drawn key `from`, up to the next drawn key of the native cells read.
   function pairCurve(host, index, from) {
@@ -221,7 +226,8 @@
   }
   // Enter: `confirm` runs after the picks already in flight. Returns null off native mode.
   function afterPicks(host, st, confirm) { if (!nativeMode(host)) return null; queue(st, confirm); return true; }
-  // Harmonize: the edited interpolated frame becomes a key and the two spans around it are re-tweened (opt-in panel toggle).
+  // Harmonize (baseline #126): the two spans around the edited interpolated frame are re-tweened with it as a key, and the frame
+  // then stays a soft, manually edited in-between; one native split does all of it (opt-in panel toggle).
   function harmonize(host, frame) {
     if (!nativeMode(host)) return null;
     if (!(host.state && host.state.tweenHarmonizeEdits)) return Promise.resolve(Object.freeze({ status: 'unchanged' }));
@@ -235,7 +241,7 @@
       if (!options) return unavailable(CODES.easing);
       if (!Number.isSafeInteger(frame) || frame < 0) return unavailable(CODES.span);
       return () => commands.split(uid, frame, options);
-    });
+    }, index);
   }
   return Object.freeze({ active: nativeMode, generate, reassign, pairCurve, reassignSpan, pickStroke, startReassign, reassignClick, afterPicks, split, harmonize, CODES });
 }));

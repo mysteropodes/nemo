@@ -41,7 +41,7 @@
     "maxReadResponseBytes": 4096,
     "policy": "Complete correlated retained receipt or typed refusal; the engine reads the layer cells itself, so no drawing travels in the request. Requests above 65536 encoded bytes are refused, never split."
   },
-  "semantics": "D20-D22 (#2358): generate or regenerate the in-betweens of a layer as one native transaction, split an interpolated frame into a new key and re-tween the two spans around it, or reassign the stroke pairing of one span. options (resamplePoints 2..256, step 1..999, skipManual, easing curve of strictly increasing x in 0..1) are optional and, when present, carry all four members and are stored with the layer; starts lists start-key frames and selection lists frames that each resolve to the key starting their span (mutually exclusive; absent means every span); split names an interpolated frame and promotes it; reassign carries the span (from < to, two consecutive drawn keys) with its overrides (one of aId or aIds per bId), optional easing and optional manualStrokes. A layer with fewer than two drawn keys, a locked layer, an unknown layer or an unordered request is refused or reported applied=false with no history entry. Texture dabs never take part in matching and are re-stamped from a seeded generator. One history entry per command; the spans, cells and bitmap-brush companions persist with the document and undo, redo and save/reopen restore them. No JS/Paper writer or fallback.",
+  "semantics": "D20-D22 (#2358): generate or regenerate the in-betweens of a layer as one native transaction, split an interpolated frame (re-tween the two spans around it with the frame as a key, then leave it a soft manually edited in-between), or reassign the stroke pairing of one span. options (resamplePoints 2..256, step 1..999, skipManual, easing curve of strictly increasing x in 0..1) are optional and, when present, carry all four members and are stored with the layer; starts lists start-key frames and selection lists frames that each resolve to the key starting their span (mutually exclusive; absent means every span); split names an interpolated frame, re-tweens around it as a key and leaves it a manual-edit in-between; reassign carries the span (from < to, two consecutive drawn keys) with its overrides (one of aId or aIds per bId), optional easing and optional manualStrokes. A layer with fewer than two drawn keys, a locked layer, an unknown layer or an unordered request is refused or reported applied=false with no history entry. Texture dabs never take part in matching and are re-stamped from a seeded generator. One history entry per command; the spans, cells and bitmap-brush companions persist with the document and undo, redo and save/reopen restore them. No JS/Paper writer or fallback.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",
@@ -140,7 +140,7 @@
       }
     },
     {
-      "label": "Split an interpolated frame into a new key and re-tween the two spans around it",
+      "label": "Split an interpolated frame: re-tween the two spans around it, leaving it a soft manually edited in-between",
       "request": {
         "apiVersion": 2,
         "requestId": "tween-3",
