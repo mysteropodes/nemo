@@ -448,3 +448,40 @@ test('navigated Canvas area Text draft uses the actual full affine and commits t
  area.value='Canvas affine';area.fire('input');area.fire('keydown',{key:'Enter',ctrlKey:true});await f.turn();
  const q=f.owner.log.received[0];assert.equal(f.owner.log.executed.length,1);assert.deepEqual(q.payload.block.anchorTopLeft,{x:100,y:65});assert.equal(q.payload.block.fixedWidth,50);assert.equal(f.root.state.cameraView,false);assert.equal(f.logs.legacy,0);
 });
+
+test('held Text drag shows one live dashed guide with baseline look and exact client geometry',async()=>{
+ const f=await fixture();assert.equal(f.get('native-text-drag-guide'),null);
+ f.canvas.fire('pointerdown',{buttons:1,clientX:100,clientY:110});assert.equal(f.get('native-text-drag-guide'),null,'down alone creates none');
+ f.canvas.fire('pointermove',{buttons:1,clientX:300,clientY:190});
+ const g=f.get('native-text-drag-guide');assert.ok(g);
+ assert.deepEqual([g.style.left,g.style.top,g.style.width,g.style.height],['100px','110px','200px','80px']);
+ assert.equal(g.style.position,'fixed');assert.equal(g.style.pointerEvents,'none');assert.equal(g.style.zIndex,'200');
+ assert.equal(g.style.border,'1px dashed rgba(255,184,108,.9)');assert.equal(g.style.background,'rgba(255,184,108,.06)');
+ f.canvas.fire('pointermove',{buttons:1,clientX:40,clientY:112});
+ assert.equal(f.get('native-text-drag-guide'),g,'same single element is updated');assert.equal(f.doc.body.children.filter(n=>n.id==='native-text-drag-guide').length,1);
+ assert.deepEqual([g.style.left,g.style.top,g.style.width,g.style.height],['40px','110px','60px','24px'],'min height 24, left follows min(x)');
+ f.canvas.fire('pointerup',{buttons:0,clientX:40,clientY:112});await f.turn();assert.equal(f.get('native-text-drag-guide'),null);
+});
+test('Text drag guide needs more than 4px of horizontal travel',async()=>{
+ const f=await fixture();f.canvas.fire('pointerdown',{buttons:1,clientX:100,clientY:110});
+ for(const x of [100,102,104,96])f.canvas.fire('pointermove',{buttons:1,clientX:x,clientY:150}),assert.equal(f.get('native-text-drag-guide'),null,String(x));
+ f.canvas.fire('pointermove',{buttons:1,clientX:105,clientY:150});assert.ok(f.get('native-text-drag-guide'));
+ f.canvas.fire('pointermove',{buttons:1,clientX:103,clientY:150});assert.equal(f.get('native-text-drag-guide'),null,'shrinking back inside slop removes it');
+});
+test('Text drag guide is removed on up, Escape, blur, tool switch and retire',async()=>{
+ for(const end of ['up','Escape','blur','tool','retire','cancelEvent']){
+  const f=await fixture(true);f.canvas.fire('pointerdown',{buttons:1,clientX:100,clientY:110});f.canvas.fire('pointermove',{buttons:1,clientX:300,clientY:190});assert.ok(f.get('native-text-drag-guide'),end);
+  if(end==='up')f.canvas.fire('pointerup',{buttons:0,clientX:300,clientY:190});
+  else if(end==='Escape')f.doc.fire('keydown',{key:'Escape'});
+  else if(end==='blur')f.root.fire('blur');
+  else if(end==='tool'){f.root.state.tool='select';f.canvas.fire('pointermove',{buttons:1,clientX:310,clientY:190});}
+  else if(end==='cancelEvent')f.canvas.fire('pointercancel',{pointerId:1});
+  else f.binding.retire();
+  await f.turn();assert.equal(f.get('native-text-drag-guide'),null,end);assert.equal(f.doc.body.children.some(n=>n.id==='native-text-drag-guide'),false,end);
+ }
+});
+test('zero-mask clickOnly Text pair never creates a drag guide',async()=>{
+ const f=await fixture();f.canvas.fire('pointerdown',{buttons:0,clientX:100,clientY:110});
+ f.canvas.fire('pointermove',{buttons:0,clientX:300,clientY:190});f.canvas.fire('pointermove',{buttons:1,clientX:320,clientY:190});
+ assert.equal(f.get('native-text-drag-guide'),null);f.canvas.fire('pointerup',{buttons:0,clientX:320,clientY:190});await f.turn();assert.equal(f.get('native-text-drag-guide'),null);
+});
