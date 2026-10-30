@@ -244,6 +244,7 @@
     {"src":"js/draw-bridge.js"},
     {"src":"js/group-bridge.js"},
     {"src":"js/adapters/select-canvas-intent.js"},
+    {"src":"js/adapters/native-select-overlay.js"},
     {"src":"js/select-bridge.js"},
     {"src":"js/adapters/native-subselect-ui.js"},
     {"src":"js/subselect-bridge.js"},

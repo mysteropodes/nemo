@@ -478,6 +478,7 @@
   function nativePointer() {
     if (nativePointerIntent) return nativePointerIntent;
     nativePointerIntent = window.NemoSelectCanvasIntent.create({
+      hover: function (e) { if (window.NemoNativeSelectOverlay) window.NemoNativeSelectOverlay.hoverAt(window, e); },
       context: function () {
         var c = window.NemoNativeOpacityCutover;
         if (!c || c.blocksLegacy() !== true) throw new Error('Native canvas authority unavailable');
@@ -3564,8 +3565,7 @@
   window.SMSelectBridge = {
     refreshAfterDocumentRestore: function () {
       if (nativePointerIntent) nativePointerIntent.cancel();
-      // Undo/redo rebuilds every Paper item. Any gesture-local object
-      // reference therefore points at removed geometry after the restore.
+      // Undo/redo rebuilds every Paper item: gesture-local object references point at removed geometry after the restore.
       mode = null;
       draggingArc = null;
       arcDragCache = null;
