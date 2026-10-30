@@ -226,7 +226,8 @@
       "dir": "native-engine/src",
       "files": [
         "request_receipts.rs",
-        "object_frame_clipboard_transport.rs"
+        "object_frame_clipboard_transport.rs",
+        "object_ghost_facts.rs"
       ],
       "publicApi": [
         "request_receipts.rs"
@@ -2425,6 +2426,7 @@
         "native_import_batch_dispatch_tests.rs",
         "native_subselect_read_public_tests.rs",
         "native_widget_read_public_tests.rs",
+        "native_ghost_read_public_tests.rs",
         "native_rig_read_public_tests.rs"
       ],
       "publicApi": [],

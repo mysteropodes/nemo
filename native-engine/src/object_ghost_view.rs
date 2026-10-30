@@ -6,7 +6,8 @@
 //! ONE ghost frame, as many segments as the response byte limit allows; `next` names the following page. Nothing here writes.
 use crate::object_snapshot::{ObjectSnapshot, ReadAdmission, MAX_MESSAGE_BYTES};
 use crate::request_receipts::{
-    DispatchErrorCode, OpacityRequest, ResponseEnvelope, APPLICATION_API_VERSION,
+    DispatchErrorCode, GhostFrameFacts, GhostFrames, GhostPathFacts, OpacityRequest,
+    ResponseEnvelope, APPLICATION_API_VERSION,
 };
 use serde_json::{json, Map, Value};
 
@@ -51,32 +52,6 @@ fn segment(s: &[f64; 6]) -> Value {
     } else {
         json!(s.iter().map(|v| round(*v)).collect::<Vec<_>>())
     }
-}
-/// One ghost frame as the retained ghost query decided it (opacity falloff, translation, kind).
-#[derive(Debug, Clone, PartialEq)]
-pub struct GhostFrameFacts {
-    pub frame: u32,
-    pub kind: &'static str,
-    pub opacity: f64,
-    pub translation: [f64; 2],
-}
-/// One drawable ghost path with its presented paint. Segments are `[x, y, inX, inY, outX, outY]`, handles relative.
-#[derive(Debug, Clone, PartialEq)]
-pub struct GhostPathFacts {
-    pub source_id: String,
-    pub closed: bool,
-    pub width: f64,
-    pub fill: Option<String>,
-    pub stroke: Option<String>,
-    pub opacity: f64,
-    pub segments: Vec<[f64; 6]>,
-}
-/// The retained ghost query of the application layer, seen through the facts this read-query layer presents.
-pub trait GhostFrames {
-    fn layer_uid(&self) -> &str;
-    fn count(&self) -> usize;
-    fn frame(&self, index: usize) -> GhostFrameFacts;
-    fn paths(&self, index: usize) -> Result<Vec<GhostPathFacts>, DispatchErrorCode>;
 }
 fn descriptor(index: usize, count: usize, f: &GhostFrameFacts) -> Value {
     json!({"index":index,"count":count,"frame":f.frame,"kind":f.kind,"opacity":scaled(f.opacity, 1000.),

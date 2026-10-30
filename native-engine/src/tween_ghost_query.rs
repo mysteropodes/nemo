@@ -1,8 +1,9 @@
 //! Immutable onion/ghost selection and native frame inputs. These reads grant no UI epoch or writer.
 //! The retained snapshot outlives owner edits; native composition is prepared lazily per selected frame.
 use crate::object_document::{object_deserialize, ObjectRecord, Presence};
-use crate::object_snapshot::{GhostFrameFacts, GhostFrames, GhostPathFacts};
-use crate::request_receipts::{OpacityRequest, ResponseEnvelope};
+use crate::request_receipts::{
+    GhostFrameFacts, GhostFrames, GhostPathFacts, OpacityRequest, ResponseEnvelope,
+};
 use crate::object_frame_packet::{
     prepare_object_exposure_frame, ObjectFramePacket, ObjectFrameSelector,
 };
