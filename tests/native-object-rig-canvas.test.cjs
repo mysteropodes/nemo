@@ -55,6 +55,7 @@ function harness(options) {
     createElementNS() { const node = { style: {}, attrs: {}, children: [], setAttribute(k, v) { this.attrs[k] = v; }, appendChild(c) { this.children.push(c); this.firstChild = this.children[0]; }, removeChild() { this.children.shift(); this.firstChild = this.children[0]; }, isConnected: true }; return node; } };
   sandbox.requestAnimationFrame = (fn) => { frames.push(fn); return frames.length; };
   const flushFrames = () => { for (let n = 0; n < 4 && frames.length; n++) frames.splice(0).forEach((fn) => fn()); };
+  const view = { dx: 0, dy: 0 }; // pan offset of the viewport; zoom changes the same mapping
   const live = fx.session.info;
   const info = () => Object.assign(live(), { canvasW: 960, canvasH: 540, layers: [{ layerUid: UID }] });
   const presentation = () => Object.assign(live(), { owner: 'native', status: 'presented', contextId: 'scene-root', frame: sandbox.state.currentFrame });
@@ -77,7 +78,7 @@ function harness(options) {
     } });
   sandbox.NemoNativeObjectProject = { desktop: () => (options.legacy ? null : fx.session) };
   sandbox.NemoNativeViewportUnderlay = { canvasMapping: Object.freeze({ bounds: () => ({ left: 0, top: 0, width: 960, height: 540 }), matchesView: () => true,
-    point: (e) => ({ x: e.clientX, y: e.clientY }), screen: (p) => ({ x: p.x, y: p.y }) }) };
+    point: (e) => ({ x: e.clientX - view.dx, y: e.clientY - view.dy }), screen: (p) => ({ x: p.x + view.dx, y: p.y + view.dy }) }) };
   vm.createContext(sandbox);
   const intoContext = vm.runInContext('(text) => JSON.parse(text)', sandbox), route = fx.session.runResourceCommand;
   fx.session.runResourceCommand = (action) => route((ctx) => action({ dispatch: async (request) => intoContext(JSON.stringify(await ctx.dispatch(request))), reconcile: ctx.reconcile }));
@@ -89,7 +90,7 @@ function harness(options) {
     return e;
   };
   const win = vm.runInContext('globalThis', sandbox);
-  return { fx, sandbox, data, listeners, area, fields, legacy, toasts, reads, body, fire, flushFrames, win,
+  return { view, fx, sandbox, data, listeners, area, fields, legacy, toasts, reads, body, fire, flushFrames, win,
     ui: () => sandbox.NemoNativeObjectRigCanvas.desktop(win),
     sent: () => fx.owner.log.received.map((r) => [r.operation, r.payload]),
     settle: async () => { for (let n = 0; n < 6; n++) { await new Promise((resolve) => setImmediate(resolve)); flushFrames(); } } };
@@ -273,4 +274,32 @@ test('the overlay re-reads on a revision change and a frame change by itself, an
   h.fx.state.revision += 1;
   await h.settle();
   assert.equal(h.reads.length, base + 2, 'nothing is read while another tool is active');
+});
+
+test('a Space-held or panning pointerdown in the Rig tool is not consumed: the pan gesture keeps it, and nothing is sent', async () => {
+  for (const flag of ['spaceDown', 'isPanning']) {
+    const h = await started({ mode: 'move' });
+    h.sandbox.state[flag] = true;
+    const e = h.fire('pointerdown', { clientX: 100, clientY: 100 });
+    assert.equal(e.stopped, false, flag);
+    assert.equal(e.prevented, false, flag);
+    h.fire('pointerup', { clientX: 140, clientY: 120 });
+    await h.settle();
+    assert.deepEqual(h.sent(), [], flag);
+    assert.deepEqual(h.toasts, [], flag);
+    h.sandbox.state[flag] = false;
+    assert.equal(h.fire('pointerdown', { clientX: 100, clientY: 100 }).stopped, true, flag + ' released: the tool takes the gesture again');
+  }
+});
+
+test('the rig overlay follows a pan or zoom of the view by itself, with no revision or frame change', async () => {
+  const h = await started({ mode: 'move' });
+  const svg = h.body.children[0], firstPath = () => svg.children.find((n) => n.attrs && n.attrs.d);
+  const before = firstPath().attrs.d, base = h.reads.length;
+  h.view.dx = 30; h.view.dy = -10;
+  await h.settle();
+  const after = firstPath().attrs.d;
+  assert.notEqual(after, before);
+  assert.match(after, /^M 130 90 /, 'the first anchor (100, 100) is drawn at the panned screen position');
+  assert.equal(h.reads.length, base, 'a view change repaints without a native read');
 });
