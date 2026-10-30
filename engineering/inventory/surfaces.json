@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "bdf726b6c04fcccb856f2b16bf3d6a56f92e019e",
-  "describe": "v0.7.0-alpha.4-3693-gbdf726b6-dirty"
+  "head": "58bc366397ed91f041e228c9c7b67fef215246cf",
+  "describe": "v0.7.0-alpha.4-3696-g58bc3663-dirty"
  },
- "inputsDigest": "d1c51a37161deae9a224b15fb749a7b15a6e40d321e57e137af62d912d9daa5b",
+ "inputsDigest": "f304ac0bc0608836bd3a67d8e53ce338353369376ee7472a3e17744075bd00f8",
  "states": [
   "inventoried",
   "characterized",
@@ -25800,7 +25800,7 @@
    "source": "src/js/motion.js:9864",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 432
+    "functionsVisited": 454
    },
    "fixtures": [
     "static-props",
@@ -30983,7 +30983,7 @@
    "source": "src/js/timeline.js:5636",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 432
+    "functionsVisited": 454
    },
    "fixtures": [
     "keyed-props",
