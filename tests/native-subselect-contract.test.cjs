@@ -87,3 +87,11 @@ test('a hit-test listing item must say whether the record is filled (#2372)',()=
   const {hitTest,...plain}=r;
   assert.throws(()=>C.viewResult({...plain,items:[{stableTarget:target,closed:false,count:2,matrix:[1,0,0,1,0,0],filled:true}]}),undefined,'an editable page has no filled flag');
 });
+test('a hit-test listing item names a brush anchor, copy or bitmap brush and the group they share (#2372)',()=>{
+  const view={kind:'subselect',contextId:'scene-root',layerUid:'layer-a',frame:0,workId:'native-work-1',viewGeneration:1,cursor:0,hitTest:true};
+  const item={stableTarget:target,closed:true,count:4,matrix:[1,0,0,1,0,0],bounds:[0,0,10,10],role:'brush',filled:true};
+  const r={...view,atRevision:7,documentSnapshotId:'native-object:document:7',total:1,nextCursor:null,preview:false,items:[item]};
+  for(const brush of ['anchor','copy','bitmap'])C.viewResult({...r,items:[{...item,brush,group:'g1'}]});
+  C.viewResult({...r,items:[{...item,brush:'anchor'}]});
+  for(const bad of [{brush:'dab',group:'g1'},{brush:'anchor',group:''},{brush:'anchor',group:7},{group:'g1'}])assert.throws(()=>C.viewResult({...r,items:[{...item,...bad}]}),undefined,JSON.stringify(bad));
+});

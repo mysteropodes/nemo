@@ -28,6 +28,13 @@ pub(crate) struct SubselectReadItem {
     /// Hit-test listing only: a linked fill's ribbon (same cell, same linkedFillId); Select resolves a fill to it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) owner: Option<String>,
+    /// Hit-test listing only (#2372): a texture brush's `anchor`, one of its stamped `copy` dabs, or a `bitmap` brush's
+    /// anchor or companion image. Select moves an anchor with its copies, selects a copy as its anchor and refuses a bitmap.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) brush: Option<&'static str>,
+    /// Hit-test listing only: the brush group an anchor, its copies and a bitmap brush's companion share.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) group: Option<String>,
 }
 #[derive(Debug, Clone)]
 pub struct SubselectReadProjection {

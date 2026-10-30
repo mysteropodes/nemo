@@ -29,6 +29,12 @@ impl<T> Presence<T> {
             Self::Present(value) => Some(value),
         }
     }
+    pub(crate) fn value_mut(&mut self) -> Option<&mut T> {
+        match self {
+            Self::Missing => None,
+            Self::Present(value) => Some(value),
+        }
+    }
 }
 impl<'de, T: Deserialize<'de>> Deserialize<'de> for Presence<T> {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
