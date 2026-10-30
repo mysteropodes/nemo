@@ -31,6 +31,7 @@ use crate::evaluation::object_scene_style_kernels::object_scene_style_stroke::{
     EngineStrokeItem, SceneStroke, StrokeError, BASELINE as STROKE_RULES,
 };
 use crate::object_document::{ObjectRecord, SolidFill, VectorBody, VECTOR_FAMILY};
+use crate::evaluation::object_scene_style_kernels::object_scene_paint_pose::PaintPose;
 use serde_json::Number;
 
 /// The legacy record family (one closed cubic contour with a required solid fill).
@@ -115,15 +116,35 @@ pub(crate) fn style_of_record_with_opacity(
             let fill = record.solid_fill().ok_or(StyleUnavailable::MissingFill)?;
             Ok(SceneItemStyle::solid_fill(solid_of(fill, layer_opacity)?))
         }
-        VECTOR_FAMILY => vector_style(record, layer_opacity, [0.0, 0.0]),
+        VECTOR_FAMILY => vector_style(record, layer_opacity, Placement::at([0.0, 0.0])),
         _ => Err(StyleUnavailable::UnknownFamily),
+    }
+}
+
+/// Where the layer's pose puts the item's paint coordinates: a raw Position offset, or the carried whole-layer chain.
+#[derive(Clone, Copy)]
+struct Placement<'a> {
+    offset: [f64; 2],
+    chain: Option<&'a PaintPose>,
+}
+
+impl<'a> Placement<'a> {
+    fn at(offset: [f64; 2]) -> Self {
+        Self {
+            offset,
+            chain: None,
+        }
+    }
+
+    fn stroke_scale(&self) -> f64 {
+        self.chain.map_or(1.0, PaintPose::stroke_scale)
     }
 }
 
 fn vector_style(
     record: &ObjectRecord,
     layer_opacity: f64,
-    offset: [f64; 2],
+    placement: Placement<'_>,
 ) -> Result<SceneItemStyle, StyleUnavailable> {
     let body = record.vector().ok_or(StyleUnavailable::MissingVectorBody)?;
     let opacity = body
@@ -148,7 +169,7 @@ fn vector_style(
         None => None,
         Some(paint) => Some(ItemStroke {
             paint: solid_of(paint, opacity)?,
-            stroke: stroke_of(body)?,
+            stroke: stroke_of(body, placement.stroke_scale())?,
         }),
     };
     let order = PaintRules::BASELINE.paint_order(body.paint_order.value().map(String::as_str));
@@ -156,8 +177,8 @@ fn vector_style(
         if !stored.valid() {
             return Err(StyleUnavailable::GradientUnavailable);
         }
-        let from = translate_gradient_point(&stored.from, offset)?;
-        let to = translate_gradient_point(&stored.to, offset)?;
+        let from = place_gradient_point(&stored.from, placement)?;
+        let to = place_gradient_point(&stored.to, placement)?;
         let stops: Vec<_> = stored
             .stops
             .iter()
@@ -196,11 +217,38 @@ pub(crate) fn style_of_record_at_frame(
     factor: f64,
     packet: &crate::object_frame_packet::ObjectFramePacket,
 ) -> Result<SceneItemStyle, StyleUnavailable> {
+    style_of_record_posed(record, factor, packet, &PaintPose::default())
+}
+
+/// The style of a record whose layer went through the common vector batch: the batch's carried pose scales the stroke
+/// width and, once the pose is more than a translation, moves the gradient endpoints through the same chain as the path.
+/// A pose the batch did not carry is the raw Position-only behavior above.
+pub(crate) fn style_of_record_posed(
+    record: &ObjectRecord,
+    factor: f64,
+    packet: &crate::object_frame_packet::ObjectFramePacket,
+    pose: &PaintPose,
+) -> Result<SceneItemStyle, StyleUnavailable> {
     if !factor.is_finite() || factor < 0.0 {
         return Err(StyleUnavailable::InvalidOpacity);
     }
-    if record.fill_gradient().is_none() {
+    let chain = pose.carried().then_some(pose);
+    if record.family != VECTOR_FAMILY {
         return style_of_record_with_opacity(record, factor);
+    }
+    if record.fill_gradient().is_none() {
+        let placement = Placement {
+            offset: [0.0, 0.0],
+            chain,
+        };
+        return vector_style(record, factor, placement);
+    }
+    if pose.moves_gradient() {
+        let placement = Placement {
+            offset: [0.0, 0.0],
+            chain,
+        };
+        return vector_style(record, factor, placement);
     }
     let target = crate::object_document::PropertyHolderTarget {
         context_id: record.target.context_id.clone(),
@@ -234,29 +282,34 @@ pub(crate) fn style_of_record_at_frame(
         };
         offset = [*x, *y];
     }
-    vector_style(record, factor, offset)
+    vector_style(record, factor, Placement { offset, chain })
 }
-fn translate_gradient_point(
+fn place_gradient_point(
     point: &[Number; 2],
-    offset: [f64; 2],
+    placement: Placement<'_>,
 ) -> Result<[f64; 2], StyleUnavailable> {
     use crate::evaluation::motion_parent_chain::{
         motion_mat_from_values, transform_segments, Segment,
     };
     let source = [point[0].as_f64().unwrap(), point[1].as_f64().unwrap()];
-    let Some(mat) = motion_mat_from_values(offset, [0., 0.], 0., [100., 100.], 100.) else {
-        return Ok(source);
+    let result = match placement.chain.filter(|pose| pose.moves_gradient()) {
+        Some(pose) => pose.gradient_point(source),
+        None => {
+            let Some(mat) = motion_mat_from_values(placement.offset, [0., 0.], 0., [100., 100.], 100.)
+            else {
+                return Ok(source);
+            };
+            let segment = Segment {
+                point: source,
+                handle_in: None,
+                handle_out: None,
+            };
+            transform_segments(&[segment], [0., 0.], &mat)
+                .first()
+                .ok_or(StyleUnavailable::TransformUnavailable)?
+                .point
+        }
     };
-    let segment = Segment {
-        point: source,
-        handle_in: None,
-        handle_out: None,
-    };
-    let moved = transform_segments(&[segment], [0., 0.], &mat);
-    let result = moved
-        .first()
-        .ok_or(StyleUnavailable::TransformUnavailable)?
-        .point;
     if !result
         .iter()
         .all(|v| v.is_finite() && (*v as f32).is_finite())
@@ -290,7 +343,7 @@ fn solid_of(fill: &SolidFill, opacity: f64) -> Result<SceneSolid, StyleUnavailab
 }
 
 /// The L07-B composition of `scene_stroke`, minus the css color the native paint replaces.
-fn stroke_of(body: &VectorBody) -> Result<SceneStroke, StyleUnavailable> {
+fn stroke_of(body: &VectorBody, stroke_scale: f64) -> Result<SceneStroke, StyleUnavailable> {
     let width = body
         .stroke_width
         .as_f64()
@@ -311,7 +364,7 @@ fn stroke_of(body: &VectorBody) -> Result<SceneStroke, StyleUnavailable> {
         }
     }
     let item = EngineStrokeItem {
-        width: Some(STROKE_RULES.scene_width(Some(width), false, 1.0)),
+        width: Some(STROKE_RULES.scene_width(Some(width), false, stroke_scale)),
         cap: Some(body.stroke_cap.clone()),
         join: Some(body.stroke_join.clone()),
         miter_limit: body.miter_limit.value().and_then(Number::as_f64),

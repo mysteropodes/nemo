@@ -5,7 +5,10 @@ use crate::evaluation::object_vector_kernels::render_vector_eval::{
     common_layer_motion_target, evaluate_record_rest_with_pose, has_unjoined_parent_blend,
     is_vector_record, record_layer_has_active_path_fx, EvalSegment, EvaluatedVector,
 };
-use crate::object_frame_packet::projection::{project_layer_3d, transform_layer_2d};
+use crate::evaluation::object_scene_style_kernels::object_scene_paint_pose::PaintPose;
+use crate::object_frame_packet::projection::{
+    apply_layer_entry, layer_chain_entry, project_layer_3d,
+};
 use crate::object_frame_packet::{MotionValues, ObjectFramePacket, ObjectFrameRecord};
 use crate::object_frame_packet::{ObjectRecord, Presence, PropertyHolderTarget};
 use std::collections::BTreeMap;
@@ -16,6 +19,7 @@ mod parent;
 pub(super) struct PreparedVector {
     pub(super) geometry: EvaluatedVector,
     pub(super) layer_opacity: f64,
+    pub(super) paint: PaintPose,
     refusal: Option<&'static str>,
 }
 #[derive(Default)]
@@ -183,12 +187,12 @@ fn prepare_layer(
     let mut refusals = Vec::new();
     for source in sources.iter().copied().filter(|s| !s.record().is_mask()) {
         let record = source.record();
-        // The actual paint-plan style still has only its original raw translation gradient port.
+        // The paint style carries the layer pose (`PaintPose`): stroke width and gradient endpoints follow the same chain
+        // as the path. What stays unjoined is a gradient under 3D, a gradient whose Position is an expression (the raw
+        // translation port ignores it) and a dash pattern under a scaled stroke (the baseline inline route leaves the
+        // dash unscaled while its retained route scales it with the pen).
         let refusal = if record.fill_gradient().is_some()
             && (three_d
-                || motion
-                    .as_ref()
-                    .is_some_and(|m| m.rotation != 0. || m.scale != [100., 100.])
                 || packet
                     .snapshot()
                     .document()
@@ -206,26 +210,23 @@ fn prepare_layer(
         } else {
             None
         };
+        let dashed = record
+            .vector()
+            .and_then(|body| body.dash_array.value())
+            .is_some_and(|dash| !dash.is_empty());
         let stroke = record.vector().is_some_and(|body| body.has_real_stroke());
-        let refusal = refusal.or_else(|| {
-            (stroke
-                && motion
-                    .as_ref()
-                    .is_some_and(|m| (m.scale[0].abs() + m.scale[1].abs()) / 200. != 1.))
-            .then_some("scaled vector stroke awaits its actual paint width and dash consumer")
-        });
-        let refusal = refusal.or_else(|| {
-            if !parents.is_empty() && record.fill_gradient().is_some() {
-                Some("parented vector gradient awaits its actual paint coordinates consumer")
-            } else if stroke
-                && parents
+        let scaled_stroke_scale = !three_d && stroke && dashed && {
+            let own = motion
+                .as_ref()
+                .map_or(1., |m| (m.scale[0].abs() + m.scale[1].abs()) / 200.);
+            own != 1.
+                || parents
                     .iter()
                     .any(|p| (p.mat.sx.abs() + p.mat.sy.abs()) / 2. != 1.)
-            {
-                Some("scaled parent stroke awaits its actual paint width and dash consumer")
-            } else {
-                None
-            }
+        };
+        let refusal = refusal.or_else(|| {
+            scaled_stroke_scale
+                .then_some("scaled dashed vector stroke awaits its actual paint dash consumer")
         });
         refusals.push(refusal);
         let pose = match poses.get(&index) {
@@ -245,7 +246,7 @@ fn prepare_layer(
     if vectors.is_empty() {
         return Ok(Some(Vec::new()));
     }
-    let (vectors, layer_opacity) = if three_d {
+    let (vectors, layer_opacity, paint) = if three_d {
         let pose = packet
             .sampled_pose_3d(&target)
             .map_err(|_| "pinned ordinary vector 3D values are unavailable")?
@@ -265,12 +266,14 @@ fn prepare_layer(
         )
         .map_err(|_| "ordinary vector 3D batch projection refused its numeric inputs")?;
         // Original3D suppresses layer2D Motion, parent opacity and strokeScale.
-        (vectors, 1.)
+        (vectors, 1., PaintPose::default())
     } else {
         let motion = motion
             .as_ref()
             .ok_or("ordinary vector Motion receipt is unavailable")?;
-        let vectors = transform_layer_2d(&vectors, motion)
+        let entry = layer_chain_entry(&vectors, motion)
+            .map_err(|_| "ordinary vector Motion batch refused its numeric inputs")?;
+        let vectors = apply_layer_entry(&vectors, entry)
             .map_err(|_| "ordinary vector Motion batch refused its numeric inputs")?;
         let vectors = parent::apply(&vectors, &parents)?;
         let opacity = parents
@@ -279,7 +282,7 @@ fn prepare_layer(
         if !opacity.is_finite() {
             return Err("parent opacity product is not finite");
         }
-        (vectors, opacity)
+        (vectors, opacity, PaintPose::from_chain(entry, &parents))
     };
     Ok(Some(
         vectors
@@ -288,6 +291,7 @@ fn prepare_layer(
             .map(|(geometry, refusal)| PreparedVector {
                 geometry,
                 layer_opacity,
+                paint: paint.clone(),
                 refusal,
             })
             .collect(),

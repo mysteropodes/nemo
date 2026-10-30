@@ -367,6 +367,7 @@ pub(crate) fn compile_mask(
         solid: white_solid()?,
         layer_opacity: 1.,
         drawn: Some(shape.path),
+        paint: Default::default(),
     })
 }
 

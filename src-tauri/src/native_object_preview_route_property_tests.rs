@@ -133,6 +133,63 @@ fn gpu_transform_edits_on_an_empty_layer_present_under_their_exact_proof() {
     }
 }
 
+fn project_of(drawing: Value) -> Fixture {
+    Fixture::from_project(
+        json!({"format":"nemo.native-project-document","formatVersion":1,
+        "project":{"canvasW":64,"canvasH":64,"fps":24},"drawing":drawing,"viewportReference":null,"assets":[]}),
+    )
+}
+
+/// One vector layer whose only record carries a real black stroke: the default look of a drawn line.
+fn stroked_project() -> Fixture {
+    let mut drawing = document();
+    drawing["objects"][0]["family"] = json!("editable-vector-path");
+    drawing["objects"][0]["vector"] = json!({"stroke":{"kind":"solid","r":0,"g":0,"b":0,"a":1},"hasRealStroke":true,
+        "strokeWidth":3,"strokeCap":"round","strokeJoin":"round","miterLimit":10,"dashOffset":0,"opacity":1});
+    project_of(drawing)
+}
+
+fn set_key(layer: &str, property: &str, frame: u32, values: Value) -> Value {
+    json!({"command":"object.property.edit","target":{"contextId":"scene-root","layerUid":layer},
+        "property":property,"action":{"kind":"setKey","frame":frame,"values":values}})
+}
+
+// Rotation, Scale and Anchor of a layer that paints are applied by the common vector batch (the whole-layer pivot is the
+// union of its cubic bounds); the pixels checked here stay inside the square for each of these, so a refusal is the only
+// way these can fail.
+#[test]
+fn gpu_rotation_scale_anchor_edits_on_a_vector_layer_present_under_their_exact_proof() {
+    for (property, values) in [
+        ("rotation", json!([30])),
+        ("scale", json!([150, 150])),
+        ("anchor", json!([3, 4])),
+    ] {
+        acknowledged_preview(
+            Fixture::cut_project(),
+            BLUE,
+            PROPERTY,
+            set("L0", property, values),
+        );
+    }
+}
+
+#[test]
+fn gpu_scale_edits_on_a_stroked_vector_layer_present_with_the_baseline_stroke_width() {
+    for values in [json!([150, 150]), json!([100, 150])] {
+        acknowledged_preview(stroked_project(), BLUE, PROPERTY, set("L0", "scale", values));
+    }
+}
+
+#[test]
+fn gpu_a_keyed_rotation_edit_on_a_vector_layer_presents_under_its_exact_proof() {
+    let f = Fixture::cut_project();
+    let seeded = f.command_named("seed-key", PROPERTY, set_key("L0", "rotation", 3, json!([60])), false);
+    assert!(seeded.response.ok, "{:?}", seeded.response.error);
+    let mut f = f;
+    f.refresh();
+    acknowledged_preview(f, BLUE, PROPERTY, set_key("L0", "rotation", 0, json!([30])));
+}
+
 #[test]
 fn gpu_widget_create_revision_presents_under_its_exact_proof() {
     acknowledged_preview(

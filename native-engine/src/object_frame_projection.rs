@@ -87,7 +87,16 @@ pub(crate) fn transform_layer_2d(
     vectors: &[EvaluatedVector],
     motion: &MotionValues,
 ) -> Result<Vec<EvaluatedVector>, ProjectionError> {
-    let Some(entry) = layer_chain_entry(vectors, motion)? else {
+    let entry = layer_chain_entry(vectors, motion)?;
+    apply_layer_entry(vectors, entry)
+}
+
+/// The geometry half of `transform_layer_2d`, for a caller that also needs the entry itself (paint coordinates).
+pub(crate) fn apply_layer_entry(
+    vectors: &[EvaluatedVector],
+    entry: Option<crate::evaluation::motion_parent_chain::ChainEntry>,
+) -> Result<Vec<EvaluatedVector>, ProjectionError> {
+    let Some(entry) = entry else {
         return Ok(vectors.to_vec());
     };
     let mat = entry.mat;

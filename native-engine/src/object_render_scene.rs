@@ -318,6 +318,10 @@ impl<'a> ObjectRenderEntry<'a> {
     pub(crate) fn layer_opacity(&self) -> f64 {
         self.compiled.layer_opacity
     }
+    /// The whole-layer pose the item's paint style follows.
+    pub(crate) fn paint_pose(&self) -> &'a crate::evaluation::object_scene_style_kernels::object_scene_paint_pose::PaintPose {
+        &self.compiled.paint
+    }
     /// Typed straight-RGBA paint admitted with the contour (L07-A `SceneSolid`).
     pub(crate) fn solid(&self) -> &'a SceneSolid {
         &self.compiled.solid
