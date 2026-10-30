@@ -182,6 +182,12 @@
     [[b[0], b[1]], [b[2], b[1]], [b[0], b[3]], [b[2], b[3]]].forEach(function (p) { xs.push(m[0] * p[0] + m[2] * p[1] + m[4]); ys.push(m[1] * p[0] + m[3] * p[1] + m[5]); });
     return [Math.min.apply(null, xs), Math.min.apply(null, ys), Math.max.apply(null, xs), Math.max.apply(null, ys)];
   }
+  // #2372: a listed plain stroke's authored width (record space) carried to world space by the item matrix, as the baseline hit the
+  // real painted width; 0 for an unstroked record, a ribbon, an image or a text block (they hit by their outline or bounds).
+  function worldStrokeWidth(item) {
+    var m = item.matrix, w = item.strokeWidth, k = Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]));
+    return typeof w === 'number' && w > 0 && Number.isFinite(k) ? w * k : 0;
+  }
   // The presented layer through the native hit-test listing: every painted record (role plain | ribbon | fill | shape |
   // brush), geometry paged only for the records `wanted(item, worldBounds)` keeps; with `centres` a kept ribbon also carries
   // its world-space centreline as the baseline item did (data.isVectorBrush, data.centerSegments with record widths).
@@ -206,7 +212,7 @@
       path.transform(new Matrix(item.matrix[0], item.matrix[1], item.matrix[2], item.matrix[3], item.matrix[4], item.matrix[5]));
       // Painted outlines (a ribbon, its fill, a shape) and any closed record that carries fill paint are hit inside (as the
       // baseline did a filled Paper item); an unfilled plain stroke only on its line.
-      path.strokeColor = [0, 0, 0]; path.strokeWidth = 1; if (item.closed && (item.role !== 'plain' || item.filled === true)) path.fillColor = [0, 0, 0];
+      path.strokeColor = [0, 0, 0]; path.strokeWidth = Math.max(1, worldStrokeWidth(item)); if (item.closed && (item.role !== 'plain' || item.filled === true)) path.fillColor = [0, 0, 0];
       path.data = { strokeId: item.stableTarget.strokeId, nativeStableTarget: item.stableTarget, nativeRole: item.role, nativeRibbon: item.role === 'ribbon', nativeMatrix: item.matrix,
         nativeOwner: item.owner, nativeBrush: item.brush, nativeGroup: item.group };
       if (item.center) { var m = item.matrix, at = function (p, d) { return [m[0] * p[0] + m[2] * p[1] + d * m[4], m[1] * p[0] + m[3] * p[1] + d * m[5]]; };
@@ -272,8 +278,9 @@
     var s = presentedSession(root);
     if (!s) return undefined;
     var w = worldPoint(root, clientX, clientY, s.pin, s.presentation), t = 8 * w.perPixel, active = root.state.activeLayerIdx;
-    var Point = root.Point || root.paper.Point, at = new Point(w.x, w.y), order = [active], reach = function (_item, b) {
-      return w.x >= b[0] - t && w.x <= b[2] + t && w.y >= b[1] - t && w.y <= b[3] + t; };
+    var Point = root.Point || root.paper.Point, at = new Point(w.x, w.y), order = [active], reach = function (item, b) {
+      var r = t + worldStrokeWidth(item) / 2;
+      return w.x >= b[0] - r && w.x <= b[2] + r && w.y >= b[1] - r && w.y <= b[3] + r; };
     if (Number.isInteger(only)) order = [only];
     else for (var k = s.pin.layers.length - 1; k >= 0; k--) if (k !== active) order.push(k);
     for (var n = 0; n < order.length; n++) {

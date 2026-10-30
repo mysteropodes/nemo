@@ -25,6 +25,10 @@ pub(crate) struct SubselectReadItem {
     /// Hit-test listing only: the record carries any fill paint (solid or gradient), so an interior click hits it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) filled: Option<bool>,
+    /// Hit-test listing only (#2372): the authored stroke width in record space (0 for an unstroked record, absent for an image or
+    /// text block); Select pads its reach and hit test with half of it scaled by the item matrix, as the baseline hit the real width.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) stroke_width: Option<f64>,
     /// Hit-test listing only: a linked fill's ribbon (same cell, same linkedFillId); Select resolves a fill to it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) owner: Option<String>,

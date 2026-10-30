@@ -148,6 +148,23 @@ fn a_texture_anchor_names_its_brush_and_group_for_select() {
 }
 
 #[test]
+fn a_stroked_plain_record_lists_its_authored_width_and_an_unstroked_or_image_item_does_not() {
+    // #2372: Select pads its reach and hit test with half this width, as the baseline hit the real painted stroke.
+    let stroked = |real: bool| {
+        let mut doc = drawing();
+        doc["objects"][0]["family"] = json!("editable-vector-path");
+        doc["objects"][0]["vector"] = json!({"stroke":if real { json!({"kind":"solid","r":0.0,"g":0.0,"b":0.0,"a":1.0}) } else { Value::Null },
+            "hasRealStroke":real,"strokeWidth":40,"strokeCap":"butt","strokeJoin":"miter","miterLimit":10,"dashOffset":0,"opacity":1});
+        listing(&doc)["items"].as_array().unwrap().clone()
+    };
+    let items = stroked(true);
+    assert_eq!(items[0]["role"], "plain");
+    assert_eq!(items[0]["strokeWidth"].as_f64(), Some(40.0), "the authored width, in record space");
+    assert!(items[1].get("strokeWidth").is_none() && items[2].get("strokeWidth").is_none(), "a text block and an image carry none");
+    assert_eq!(stroked(false)[0]["strokeWidth"].as_f64(), Some(0.0), "no real stroke paints no width");
+}
+
+#[test]
 fn a_posed_layer_lists_its_image_and_text_in_their_stored_frame_with_the_pose_as_the_map() {
     // #2372: record space is the stored item's own frame, so a Select matrix conjugated with the listing's map is what the
     // item's batch transform applies to the stored centre / anchor.
