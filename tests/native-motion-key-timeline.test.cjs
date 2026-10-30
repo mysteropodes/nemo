@@ -32,9 +32,9 @@ async function fixture(options={}){
  let latest=null,notifications=0;ordinary.setKeyTimelineListener(()=>{notifications++;latest=ordinary.readKeyTimeline();});
  assert.ok(ordinary.render(container,{ports:ui,header,isCurrent:()=>true}));
  async function settle(){for(let i=0;i<8;i++)await tick();}
- await settle();const keyButton=tree(container).find(n=>n.tagName==='BUTTON'&&n.textContent==='Keys');assert.ok(keyButton);
+ await settle();const keyButton=tree(container).find(n=>/\bmotion-stopwatch\b/.test(n.className||''));assert.ok(keyButton);
  return {root,doc,container,ordinary,events,calls,writes,session,target,settle,get latest(){return latest;},get notifications(){return notifications;},
-  async open(){await keyButton.fire('click');await settle();},checks:()=>tree(container).filter(n=>n.type==='checkbox'),
+  async open(){await keyButton.fire('click',{altKey:true});await settle();},checks:()=>tree(container).filter(n=>n.type==='checkbox'),
   ready(v){ready=v;},replace(){info={...info,lifecycleGeneration:2};},retire(){ordinary.dispose();}};
 }
 
@@ -94,7 +94,7 @@ async function multiFixture(options={}){
  async function settle(){for(let i=0;i<8;i++)await tick();}await settle();
  function row(target,property){return tree(container).find(n=>n.className==='lrow motion-prop-row'&&n.dataset.property===property&&n.dataset.targetKey===JSON.stringify([target.contextId,target.layerUid,target.strokeId===undefined?null:target.strokeId]));}
  return {doc,root,container,ordinary,layer,element,targets,writes,events,reads,settle,get notices(){return notices;},
-  open(target=layer,property='opacity'){const line=row(target,property);assert.ok(line);return tree(line).find(n=>n.tagName==='BUTTON'&&n.textContent==='Keys').fire('click');},
+  open(target=layer,property='opacity'){const line=row(target,property);assert.ok(line);return tree(line).find(n=>/\bmotion-stopwatch\b/.test(n.className||'')).fire('click',{altKey:true});},
   inspectors:()=>tree(container).filter(n=>n.className==='native-motion-property-keys'&&!n.hidden),
   checks(index){return tree(this.inspectors()[index]).filter(n=>n.type==='checkbox');},
   hold(property){let resolve;const promise=new Promise(r=>resolve=r);held={property,promise,resolve};return ()=>{const wait=held;held=null;wait.resolve();};},
@@ -192,9 +192,9 @@ function createPropertyPanel(options){
    const id=JSON.stringify([target.contextId,target.layerUid,target.strokeId===undefined?null:target.strokeId]);
    const row=descendants(options.container).find(node=>node.className==='lrow motion-prop-row'&&node.dataset.targetKey===id&&node.dataset.property===property);
    if(!row)throw Error('Real property row not present');
-   const button=descendants(row).find(node=>node.tagName==='BUTTON'&&node.textContent==='Keys');
-   if(typeof button.fire==='function')return button.fire('click');
-   button.dispatchEvent(new options.document.defaultView.MouseEvent('click',{bubbles:true}));
+   const button=descendants(row).find(node=>/\bmotion-stopwatch\b/.test(node.className||''));
+   if(typeof button.fire==='function')return button.fire('click',{altKey:true});
+   button.dispatchEvent(new options.document.defaultView.MouseEvent('click',{bubbles:true,altKey:true}));
   },readKeyTimeline:panel.readKeyTimeline,readKeyTimelines:panel.readKeyTimelines,captureSelectedKeys:panel.captureSelectedKeys,dispose:panel.dispose};
 }
 // END REUSABLE REAL PROPERTY PANEL FIXTURE
