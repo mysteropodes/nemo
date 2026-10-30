@@ -265,6 +265,50 @@ test('the right panel edits one setting per field through widget.settings and th
   assert.deepEqual(h.legacy, []);
 });
 
+const PANEL_IDS = ['p-widget-sec', 'p-widget-w', 'p-widget-h', 'p-widget-xlabel', 'p-widget-xmin', 'p-widget-xmax', 'p-widget-xrest', 'p-widget-yrange-row',
+  'p-widget-yrest-row', 'p-widget-ylabel', 'p-widget-ymin', 'p-widget-ymax', 'p-widget-yrest', 'p-widget-xadd', 'p-widget-yadd'];
+const panelField = (value) => ({ value, handlers: [], style: {}, textContent: '', addEventListener(type, fn) { if (type === 'change') this.handlers.push(fn); } });
+
+test('the right panel appears with its values when the pending read lands, without a second renderRigWidgetPanel() call', async () => {
+  const h = harness();
+  PANEL_IDS.forEach((id) => { h.fields[id] = panelField(''); });
+  h.fire('DOMContentLoaded', {});
+  h.sandbox.renderRigWidgetPanel();
+  assert.equal(h.fields['p-widget-sec'].style.display, 'none', 'no read has landed yet, so nothing is shown');
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.fields['p-widget-sec'].style.display, '', 'the landed read shows the section by itself');
+  assert.deepEqual(['p-widget-w', 'p-widget-h', 'p-widget-xmin', 'p-widget-xmax', 'p-widget-xrest', 'p-widget-ymax'].map((id) => h.fields[id].value), [200, 200, -100, 100, 0, 100]);
+  assert.equal(h.fields['p-widget-xlabel'].textContent, 'X');
+  assert.deepEqual(h.legacy, []);
+});
+
+test('the right panel repaints after a settings edit lands, from the new native read', async () => {
+  const items = [joystick(UID)];
+  const h = harness({ items });
+  PANEL_IDS.forEach((id) => { h.fields[id] = panelField(''); });
+  h.fire('DOMContentLoaded', {});
+  h.sandbox.renderRigWidgetPanel();
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.fields['p-widget-xmax'].value, 100);
+  // The native owner applies the edit and the next read reports it (the double reads the shared `items`).
+  const route = h.fx.session.runResourceCommand;
+  h.fx.session.runResourceCommand = (action) => route(action).then((out) => { items[0] = Object.assign({}, items[0], { x: Object.assign({}, items[0].x, { max: 50 }) }); return out; });
+  h.fields['p-widget-xmax'].value = '50';
+  h.fields['p-widget-xmax'].handlers.forEach((fn) => fn());
+  for (let n = 0; n < 6; n++) await new Promise((resolve) => setImmediate(resolve));
+  h.flushFrames();
+  assert.equal(h.sent().pop()[1].set.x.max, 50);
+  assert.equal(Number(h.fields['p-widget-xmax'].value), 50);
+  items[0] = Object.assign({}, items[0], { x: Object.assign({}, items[0].x, { max: 80 }) });
+  h.fx.state.revision += 1;
+  h.flushFrames();
+  for (let n = 0; n < 4; n++) await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.fields['p-widget-xmax'].value, 80, 'a later native revision repaints the panel without another renderRigWidgetPanel()');
+  assert.deepEqual(h.legacy, []);
+});
+
 test('a gesture whose document moved underneath it is dropped, never sent against a newer revision', async () => {
   const h = await started();
   h.fx.owner.log.received.length = 0;
