@@ -4102,6 +4102,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-object-motion-preset.js",
+      "moduleId": "app.native.object.motion-preset.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2644,
+          "scriptOrdinal": 294
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-object-rig.js",
       "moduleId": "app.native.object.rig.adapter",
       "executionClass": "document-classic",

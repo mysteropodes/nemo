@@ -13,6 +13,8 @@ use serde_json::Number;
 mod bake_edit;
 #[path = "object_property_curve_edits.rs"]
 mod curves;
+#[path = "object_property_preset_apply.rs"]
+mod preset_apply;
 #[path = "object_property_track_edit.rs"]
 mod track_edit;
 
@@ -97,6 +99,15 @@ pub(crate) struct PreparedPropertyEdit {
     changed: bool,
 }
 impl PreparedPropertyEdit {
+    /// Seal a document built from `origin` by a sibling preparer; `changed` is derived, never supplied.
+    pub(super) fn sealed(origin: ObjectSnapshot, document: ObjectDocument) -> Self {
+        let changed = &document != origin.document();
+        Self {
+            origin,
+            document,
+            changed,
+        }
+    }
     /// The proposed document, for a caller that chains further edits before sealing its own candidate.
     pub(super) fn into_document(self) -> ObjectDocument {
         self.document

@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.motion-preset",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.property.preset.apply"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectPropertyPresetApplyPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 65536,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal. The request carries the preset's authored tracks (at most five transform properties, 512 keys each); requests above 65536 encoded bytes are refused, never split."
+  },
+  "semantics": "G39 (#2376): the baseline Motion Preset apply (src/js/motion-preset-picker.js @1065e9d8, which replaced the layer's whole motion/motionStatic with the preset's copy) as one native transaction. Each listed transform property (position, anchor, rotation, scale, opacity) of the target layer holder has its authored keys (frame, value, hold, lock, curve points, handles) and its static value replaced by the preset's; a listed property with neither keys nor static is cleared. Unlisted properties, expressions, order and time remap are never touched. Keys must be strictly increasing by frame and match the property's dimension; every property validates before any is written, so a refusal publishes nothing. One history entry covers every property and undo restores the exact prior document; an apply that changes nothing adds no entry. The preset library itself (names, tabs) is application data outside the document. No JS/Paper writer or fallback.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "G39 apply a captured preset to a layer; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "preset-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.property.preset.apply",
+        "payload": {
+          "command": "object.property.preset.apply",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "layer-1"
+          },
+          "properties": [
+            {
+              "property": "position",
+              "keys": [
+                {
+                  "frame": 0,
+                  "v": [
+                    10,
+                    20
+                  ]
+                },
+                {
+                  "frame": 24,
+                  "v": [
+                    300,
+                    40
+                  ],
+                  "hold": true
+                }
+              ]
+            },
+            {
+              "property": "opacity",
+              "keys": [],
+              "static": [
+                75
+              ]
+            }
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "preset-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}
