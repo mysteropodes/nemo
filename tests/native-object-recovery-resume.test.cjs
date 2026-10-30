@@ -282,7 +282,7 @@ test('the scheduler sends supersedes with the resumed session first write only',
   const hex=n=>n.toString(16).padStart(64,'0');let now=1_000_000,rev=1,serial=0;const writes=[];
   const pin={active:true,busy:false,presented:true,reference:hex(0),supersedes:SLOT};
   const scheduler=Recovery.create({now:()=>now,setTimer:()=>1,clearTimer:()=>{},blocked:()=>false,slot:()=>({path:null,name:'Untitled'}),
-    notice:()=>{},requestId:k=>'project-'+k+'-'+(++serial),hash:()=>'h4sh',randomHex:()=>'deadbeef',
+    notice:()=>{},requestId:k=>'project-'+k+'-'+(++serial),hash:()=>'h4sh',
     pin:()=>({...pin,info:{instanceId:'instance',documentId:'document-1',lifecycleGeneration:1,contentRevision:rev,
       documentSnapshotId:'snapshot-'+rev,documentDigest:hex(rev),byteCount:1000}}),
     write:async(command,request)=>{writes.push(request);return {apiVersion:2,requestId:request.requestId,instanceId:request.instanceId,
@@ -297,7 +297,7 @@ test('the scheduler sends supersedes with the resumed session first write only',
 test('a malformed pin supersedes is ignored and never reaches the request',async()=>{
   const hex=n=>n.toString(16).padStart(64,'0');const writes=[];let serial=0;
   const scheduler=Recovery.create({now:()=>1_000_000,setTimer:()=>1,clearTimer:()=>{},blocked:()=>false,slot:()=>({path:null,name:'Untitled'}),
-    notice:()=>{},requestId:k=>'project-'+k+'-'+(++serial),hash:()=>'h4sh',randomHex:()=>'deadbeef',
+    notice:()=>{},requestId:k=>'project-'+k+'-'+(++serial),hash:()=>'h4sh',
     pin:()=>({active:true,busy:false,presented:true,reference:hex(0),supersedes:'../etc',info:{instanceId:'instance',documentId:'document-1',
       lifecycleGeneration:1,contentRevision:1,documentSnapshotId:'snapshot-1',documentDigest:hex(1),byteCount:1000}}),
     write:async(c,r)=>{writes.push(r);return {apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,published:true,byteCount:1,savedAtMs:1,cleanupPending:false,supersededRemoved:false};}});

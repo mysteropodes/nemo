@@ -23,7 +23,7 @@ function rig(options={}){
   const scheduler=Recovery.create({
     now:()=>now,setTimer:(fn,ms)=>{timers.push({id:++timerId,at:now+ms,fn});return timerId;},clearTimer:id=>{timers=timers.filter(t=>t.id!==id);},
     blocked:()=>false,slot:()=>r.slot||{path:null,name:'Untitled'},notice:()=>{},requestId:k=>'project-'+k+'-'+(++serial),
-    hash:()=>'h4sh',randomHex:()=>'deadbeef',
+    hash:()=>'h4sh',
     pin:()=>({active:true,busy:false,presented:true,reference:hex(0),info:{instanceId:'instance',documentId:r.documentId||'document-1',
       lifecycleGeneration:1,contentRevision:r.rev,documentSnapshotId:'snapshot-'+r.rev,documentDigest:hex(r.rev),byteCount:1000}}),
     write:async(command,request)=>{
@@ -208,7 +208,7 @@ function wire(h,extra={},acknowledgement=Ack){
   const s=session(h),state={confirms:0,confirm:true,pick:'/new.json',effects:[]};let serial=0;
   const holder={};
   const scheduler=Recovery.create({now:()=>Date.now(),setTimer:()=>1,clearTimer:()=>{},blocked:()=>false,
-    slot:()=>({path:null,name:'Untitled'}),notice:()=>{},requestId:k=>'project-'+k+'-'+(++serial),hash:()=>'h4sh',randomHex:()=>'deadbeef',
+    slot:()=>({path:null,name:'Untitled'}),notice:()=>{},requestId:k=>'project-'+k+'-'+(++serial),hash:()=>'h4sh',
     pin:()=>{const p=holder.ui.recoveryPin();return {...p,presented:true,reference:hex(0)};},
     write:(command,request)=>h.invoke(command,{requestJson:JSON.stringify(request)})});
   scheduler.start();
@@ -325,7 +325,7 @@ function ordinary(h,extra={}){
     root.NemoNativeObjectRecoveryCleanup=Cleanup;
     root.NemoNativeObjectRecovery={bind(r,ports){let serial=0;
       captured.scheduler=Recovery.create({now:()=>Date.now(),setTimer:()=>1,clearTimer:()=>{},blocked:()=>false,slot:ports.slot,notice:ports.notice,
-        requestId:k=>'project-'+k+'-'+(++serial),hash:()=>'h4sh',randomHex:()=>'deadbeef',
+        requestId:k=>'project-'+k+'-'+(++serial),hash:()=>'h4sh',
         pin:()=>({...ports.pin(),presented:true,reference:hex(0)}),
         write:(command,request)=>h.invoke(command,{requestJson:JSON.stringify(request)})});
       return captured.scheduler;}};
