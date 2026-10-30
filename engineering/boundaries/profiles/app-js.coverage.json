@@ -3970,6 +3970,30 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-object-tween.js",
+      "moduleId": "app.native.object.tween.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-tween-ui.js",
+      "moduleId": "app.native.object.tween.ui",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-object-vector-contract.js",
       "moduleId": "app.native.object.vector.contract",
       "executionClass": "document-classic",
