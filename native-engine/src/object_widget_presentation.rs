@@ -17,7 +17,10 @@ use serde_json::Value;
 
 impl ObjectSnapshot {
     /// One JSON item per widget layer, in document order.
-    pub(super) fn widget_presentation_items(&self, frame: u32) -> Result<Vec<Value>, DispatchErrorCode> {
+    pub(super) fn widget_presentation_items(
+        &self,
+        frame: u32,
+    ) -> Result<Vec<Value>, DispatchErrorCode> {
         #[cfg(feature = "evaluation")]
         {
             Ok(self
@@ -117,7 +120,9 @@ mod kernels {
                 return Err("expression");
             }
             match snapshot.sample_property_raw(&target, property, frame) {
-                Ok(values) if values.len() >= count && values.iter().all(|v| v.is_finite()) => Ok(values),
+                Ok(values) if values.len() >= count && values.iter().all(|v| v.is_finite()) => {
+                    Ok(values)
+                }
                 _ => Err("sample"),
             }
         };
@@ -151,7 +156,10 @@ mod kernels {
             (None, None) => return Err("canvas"),
         };
         let own = layer_mat(snapshot, layer_uid, frame)?;
-        let mut point = [base[0] + own.map_or(0.0, |m| m.dx), base[1] + own.map_or(0.0, |m| m.dy)];
+        let mut point = [
+            base[0] + own.map_or(0.0, |m| m.dx),
+            base[1] + own.map_or(0.0, |m| m.dy),
+        ];
         let mut angle = own.map_or(0.0, |m| m.rot);
         let layers = snapshot.document().layers();
         let mut seen = vec![layer_uid];
@@ -175,7 +183,11 @@ mod kernels {
                     .ok_or("parent_geometry")?;
                 let pivot = [centre[0] + mat.ax, centre[1] + mat.ay];
                 let moved = transform_segment(
-                    &Segment { point, handle_in: None, handle_out: None },
+                    &Segment {
+                        point,
+                        handle_in: None,
+                        handle_out: None,
+                    },
                     pivot,
                     &mat,
                 );
@@ -184,7 +196,10 @@ mod kernels {
             }
             next = parent.parent_layer_uid.value().and_then(Option::as_deref);
         }
-        Ok(Placement { anchor: point, angle_degrees: angle })
+        Ok(Placement {
+            anchor: point,
+            angle_degrees: angle,
+        })
     }
 
     pub(super) fn item(snapshot: &ObjectSnapshot, index: usize, frame: u32) -> Value {
@@ -193,12 +208,23 @@ mod kernels {
         let kind = WidgetKind::parse(widget.kind.as_str()).expect("an admitted widget kind");
         let x = axis_spec!(widget.x);
         let y = widget.y_axis().map(|axis| axis_spec!(axis));
-        let spec = WidgetSpec { kind, size: widget.size_value(), x, y };
+        let spec = WidgetSpec {
+            kind,
+            size: widget.size_value(),
+            x,
+            y,
+        };
         let at = f64::from(frame);
-        let source = Controls { snapshot, target: layer_target(layer.layer_uid()) };
+        let source = Controls {
+            snapshot,
+            target: layer_target(layer.layer_uid()),
+        };
         let value = |axis: Option<&AxisSpec>| axis_value(axis, at, &source).ok();
         let (vx, vy) = (value(Some(&spec.x)), value(spec.y.as_ref()));
-        let y_json = widget.y_axis().zip(spec.y.as_ref()).map(|(axis, y)| axis_json!(snapshot, layer, axis, y, vy));
+        let y_json = widget
+            .y_axis()
+            .zip(spec.y.as_ref())
+            .map(|(axis, y)| axis_json!(snapshot, layer, axis, y, vy));
         let mut out = json!({"layerUid":layer.layer_uid(),"visible":layer.visible(),
             "locked":layer.locked.value().copied().unwrap_or(false),"kind":widget.kind.as_str(),
             "x":axis_json!(snapshot, layer, widget.x, spec.x, vx),"y":y_json,

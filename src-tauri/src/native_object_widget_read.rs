@@ -14,10 +14,17 @@ impl NativeObjectHost {
                 let work = format!("native-work-{}", identity.work_id().value());
                 snapshot.dispatch_with_widget_view(
                     request,
-                    Ok((&work, identity.view_generation().value(), witness.context_id(), witness.frame())),
+                    Ok((
+                        &work,
+                        identity.view_generation().value(),
+                        witness.context_id(),
+                        witness.frame(),
+                    )),
                 )
             }
-            Err(_) => snapshot.dispatch_with_widget_view(request, Err("Widget presentation unavailable")),
+            Err(_) => {
+                snapshot.dispatch_with_widget_view(request, Err("Widget presentation unavailable"))
+            }
         };
         answer.map_err(|_| "native widget read correlation is invalid".into())
     }

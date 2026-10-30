@@ -62,24 +62,41 @@ impl ObjectSnapshot {
             || v.limit > 4
             || v.cursor > 1024
         {
-            return refused(DispatchErrorCode::InvalidRequest, "Invalid widget view selector");
+            return refused(
+                DispatchErrorCode::InvalidRequest,
+                "Invalid widget view selector",
+            );
         }
-        if p.at_revision != self.content_revision() || p.document_snapshot_id != self.snapshot_id() {
-            return refused(DispatchErrorCode::StaleRevision, "Widget view origin changed");
+        if p.at_revision != self.content_revision() || p.document_snapshot_id != self.snapshot_id()
+        {
+            return refused(
+                DispatchErrorCode::StaleRevision,
+                "Widget view origin changed",
+            );
         }
         let (work, generation, context, frame) = match presented {
             Ok(proof) => proof,
             Err(reason) => return refused(DispatchErrorCode::Unavailable, reason),
         };
-        if work != v.work_id || generation != v.view_generation || context != v.context_id || frame != v.frame {
-            return refused(DispatchErrorCode::StaleRevision, "Widget presentation changed");
+        if work != v.work_id
+            || generation != v.view_generation
+            || context != v.context_id
+            || frame != v.frame
+        {
+            return refused(
+                DispatchErrorCode::StaleRevision,
+                "Widget presentation changed",
+            );
         }
         let items = match self.widget_presentation_items(v.frame) {
             Ok(items) => items,
             Err(code) => return refused(code, "Widget presentation is unavailable"),
         };
         if v.cursor > items.len() {
-            return refused(DispatchErrorCode::InvalidRequest, "Widget cursor is outside the list");
+            return refused(
+                DispatchErrorCode::InvalidRequest,
+                "Widget cursor is outside the list",
+            );
         }
         let end = (v.cursor + v.limit).min(items.len());
         let response = ResponseEnvelope {
@@ -95,8 +112,15 @@ impl ObjectSnapshot {
                 "workId":v.work_id,"viewGeneration":v.view_generation,"cursor":v.cursor,"total":items.len(),
                 "nextCursor":(end < items.len()).then_some(end),"items":&items[v.cursor..end]})),
         };
-        if serde_json::to_vec(&response).map_err(|_| DispatchErrorCode::Internal)?.len() > MAX_MESSAGE_BYTES {
-            return refused(DispatchErrorCode::Unavailable, "Widget view exceeds the response byte limit");
+        if serde_json::to_vec(&response)
+            .map_err(|_| DispatchErrorCode::Internal)?
+            .len()
+            > MAX_MESSAGE_BYTES
+        {
+            return refused(
+                DispatchErrorCode::Unavailable,
+                "Widget view exceeds the response byte limit",
+            );
         }
         Ok(response)
     }
