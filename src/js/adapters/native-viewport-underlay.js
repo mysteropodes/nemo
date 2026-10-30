@@ -139,6 +139,11 @@
       if (!html || !html.classList || !html.style) return;
       html.classList.remove('nemo-native-fit'); html.style.removeProperty('--nemo-native-aspect');
     }
+    // #2372: the Select overlay maps through this presentation and view; tell it to redraw (one-shot, it queues its own frame).
+    function nudgeSelect() {
+      var overlay = root.NemoNativeSelectOverlay;
+      if (overlay && typeof overlay.notify === 'function') overlay.notify(root);
+    }
     return Object.freeze({
       projectionReady: function (info) {
         return !!root.NemoNativeObjectProjectFile && root.NemoNativeObjectProjectFile.projectionMatches(root, info);
@@ -153,10 +158,12 @@
           compositionExtent: { width: info.canvasW, height: info.canvasH }, reportedDpr: dpr };
       },
       surfaceChanged: function (presentation, mapping) {
-        if (!presentation) { if (underlay) underlay.clear(); bounds = null; unfit(); return; }
-        if (!underlay) underlay = create({ document: root.document, measure: function () { return bounds; }, setBackdropHidden: setBackdropHidden });
-        bounds = { left: mapping.x, top: mapping.y, width: mapping.width, height: mapping.height };
-        underlay.present(presentation);
+        try {
+          if (!presentation) { if (underlay) underlay.clear(); bounds = null; unfit(); return; }
+          if (!underlay) underlay = create({ document: root.document, measure: function () { return bounds; }, setBackdropHidden: setBackdropHidden });
+          bounds = { left: mapping.x, top: mapping.y, width: mapping.width, height: mapping.height };
+          underlay.present(presentation);
+        } finally { nudgeSelect(); }
       }
     });
   }
