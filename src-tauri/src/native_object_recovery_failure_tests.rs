@@ -1,8 +1,16 @@
 //! Atomicity controls: a fault at any publication stage leaves the previous
 //! generation, its manifest and the directory clean.
-use crate::native_object_bootstrap::recovery::{list_slots, publish, Limits};
+use crate::application_mcp::ApplicationMcp;
+use crate::native_object_bootstrap::recovery::{
+    list_request, list_slots, publish, write_request, Limits,
+};
 use crate::native_object_bootstrap::recovery_tests::*;
-use std::{fs, io};
+use serde_json::json;
+use std::{
+    fs, io,
+    sync::{mpsc, Mutex},
+    time::Duration,
+};
 
 const BEFORE_MANIFEST_RENAME: [&str; 8] = [
     "data-create",
@@ -170,4 +178,68 @@ fn a_corrupt_manifest_is_quarantined_on_write_and_the_new_generation_starts_clea
     assert!(files(&root)
         .iter()
         .any(|n| n.starts_with("slot-a.corrupt-")));
+}
+
+/// #2360 REC-F2: a first write to a new slot is paused inside publish while the
+/// start-card list runs. Without mutual exclusion `inspect_slot` sees a slot
+/// with only a temp (removes it) or a generation file without a manifest
+/// (quarantines the directory) under the writer.
+#[test]
+fn a_list_during_the_first_write_of_a_new_slot_waits_and_never_disturbs_it() {
+    for pause_at in ["rename", "manifest-create"] {
+        let scratch = Scratch::new();
+        let root = scratch.root();
+        let state = ApplicationMcp::default();
+        let opened = install(&state, &project_bytes(40));
+        let document = opened["documentId"].as_str().unwrap().to_owned();
+        let info = info(&state, &opened);
+        let raw = write_json(&state, &info, &document, "untitled-0a1b2c3d").to_string();
+        let list_raw =
+            json!({"apiVersion":2,"requestId":"recovery-list","instanceId":state.instance_id()})
+                .to_string();
+        let (paused_tx, paused_rx) = mpsc::channel::<()>();
+        let (release_tx, release_rx) = mpsc::channel::<()>();
+        let release_rx = Mutex::new(release_rx);
+        let (listed_tx, listed_rx) = mpsc::channel::<()>();
+        std::thread::scope(|scope| {
+            let writer = scope.spawn(|| {
+                write_request(&state, &root, &raw, 1_000, |stage, _| {
+                    if stage == pause_at {
+                        paused_tx.send(()).unwrap();
+                        release_rx.lock().unwrap().recv().unwrap();
+                    }
+                    Ok(())
+                })
+                .unwrap()
+            });
+            paused_rx.recv_timeout(Duration::from_secs(30)).unwrap();
+            let lister = scope.spawn(|| {
+                let listing = list_request(&state, &root, &list_raw, 2_000).unwrap();
+                listed_tx.send(()).unwrap();
+                listing
+            });
+            let listed_early = listed_rx.recv_timeout(Duration::from_millis(400)).is_ok();
+            release_tx.send(()).unwrap();
+            let written = writer.join();
+            let listed = lister.join();
+            assert!(
+                !listed_early,
+                "{pause_at}: the list must wait for the in-flight write"
+            );
+            let receipt = serde_json::to_value(written.unwrap()).unwrap();
+            assert_eq!(receipt["published"], true, "{pause_at}");
+            let listing = serde_json::to_value(listed.unwrap()).unwrap();
+            assert_eq!(listing["quarantined"], json!([]), "{pause_at}");
+            assert_eq!(
+                listing["entries"].as_array().unwrap().len(),
+                1,
+                "{pause_at}"
+            );
+        });
+        assert_eq!(manifest(&root, "untitled-0a1b2c3d").generations.len(), 1);
+        assert!(
+            files(&root).iter().all(|n| !n.contains(".corrupt-")),
+            "{pause_at}: nothing quarantined"
+        );
+    }
 }
