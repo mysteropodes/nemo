@@ -74,6 +74,10 @@
         return false;
       }
       if (!Number.isInteger(from) || !Number.isInteger(to) || !(to > from)) return false; // Nothing to flip.
+      // Flip and Play are mutually exclusive (optional ports): starting a flip stops a running Play first, so the Play
+      // scheduler's stop-on-unpresented rule cannot end the flip and the flip never fights a running Play.
+      try { if (typeof ports.playing === 'function' && ports.playing() === true) ports.stopPlay(); }
+      catch (_) { /* Play's own stop path owns its failures. */ }
       owner = candidate; identity = initial; wa = from; wo = to; origin = cur = ports.frame(); dir = 1; pending = false;
       var run = ++generation;
       try { timer = ports.setInterval(function () { tick(run); }, 1000 / fps); }
@@ -86,8 +90,11 @@
       release();
       return restore ? Promise.resolve(ports.navigate(back)) : Promise.resolve(false);
     }
+    // Ends the run without presenting anything (a Play that starts next continues from the frame on screen; restoring the
+    // origin here would race its first presentation). The generation fence drops any in-flight flip result.
+    function cancel() { var was = timer !== null; release(); return was; }
     function toggle(candidate) { return timer !== null ? stop() : Promise.resolve(start(candidate)); }
-    return Object.freeze({ toggle: toggle, start: start, stop: stop, active: function () { return timer !== null; } });
+    return Object.freeze({ toggle: toggle, start: start, stop: stop, cancel: cancel, active: function () { return timer !== null; } });
   }
   return Object.freeze({ flipStep: flipStep, createFlipPreview: createFlipPreview });
 }));

@@ -283,6 +283,94 @@ test('toggleNativeFlipPreview builds the adapter over the frame navigator and th
   assert.deepEqual(calls, [['interval', 50], ['clear', 7], ['go', 1]]);
 });
 
+// ---- Flip and Play are mutually exclusive (#2358) -------------------------------------------------------------------------
+function exclusive(options = {}) {
+  const harness = flipHarness({ from: 3 });
+  const log = [];
+  const play = { playing: !!options.playing };
+  // Rebuild the preview with the two exclusion ports over the same navigator the harness uses.
+  const preview = flip.createFlipPreview({
+    frame: () => harness.state.currentFrame, fps: () => harness.state.fps, waIn: () => harness.state.waIn, waOut: () => harness.state.waOut,
+    controller: () => harness.owned, navigate: frame => { log.push(['go', frame]); harness.state.currentFrame = frame; return Promise.resolve(true); },
+    playing: () => play.playing, stopPlay: () => { log.push(['stopPlay', harness.state.currentFrame]); play.playing = false; },
+    setInterval: (fn, ms) => { harness.intervals.set(99, { fn, ms }); return 99; }, clearInterval: id => { harness.intervals.delete(id); },
+    notify: message => harness.toasts.push(message)
+  });
+  return { harness, preview, play, log };
+}
+
+test('Flip start stops a running Play first and takes its origin from the frame Play left, with no stale frame', async () => {
+  const e = exclusive({ playing: true });
+  e.harness.state.currentFrame = 4; // Play had advanced to 4
+  assert.equal(await e.preview.toggle(e.harness.owned), true);
+  assert.deepEqual(e.log, [['stopPlay', 4]]);
+  assert.equal(e.play.playing, false);
+  await e.preview.toggle(e.harness.owned);
+  assert.deepEqual(e.log[e.log.length - 1], ['go', 4], 'toggling off returns to the frame the flip started on');
+});
+
+test('Flip start without a running Play never calls stopPlay, and a refused start does not stop Play', async () => {
+  const idle = exclusive();
+  await idle.preview.toggle(idle.harness.owned);
+  assert.deepEqual(idle.log, []);
+  const refused = exclusive({ playing: true });
+  refused.harness.state.waOut = refused.harness.state.waIn; // nothing to flip
+  assert.equal(await refused.preview.toggle(refused.harness.owned), false);
+  assert.equal(refused.play.playing, true, 'a flip that cannot start leaves Play running');
+});
+
+test('cancel ends a running flip without presenting any frame and fences its in-flight result', async () => {
+  const e = exclusive();
+  await e.preview.toggle(e.harness.owned);
+  [...e.harness.intervals.values()].forEach(entry => entry.fn());
+  const before = e.log.length;
+  assert.equal(e.preview.cancel(), true);
+  await tick();
+  assert.equal(e.preview.active(), false);
+  assert.equal(e.harness.intervals.size, 0);
+  assert.equal(e.log.length, before, 'cancel presents nothing (no origin restore racing the Play that follows)');
+  assert.equal(e.preview.cancel(), false, 'cancelling an idle flip is a no-op');
+});
+
+test('F then Space: the flip ends and Play runs; Space then F: Play ends and the flip runs (real timeline wiring)', async () => {
+  const toggle = extractFunction(timeline, 'toggleNativeFlipPreview');
+  const startPlayFn = extractFunction(timeline, 'startNativePlay');
+  const calls = [], intervals = new Map();
+  const controller = owner();
+  const state = { currentFrame: 3, fps: 10, waIn: 2, waOut: 5, playing: false, playDir: 1 };
+  const el = { innerHTML: '', classList: { add() {}, remove() {} } };
+  const sandbox = {
+    window: { NemoNativeOpacityCutover: controller, setInterval: (fn, ms) => { intervals.set(1, fn); return 1; },
+      clearInterval: id => { intervals.delete(id); }, requestAnimationFrame: () => 1, cancelAnimationFrame() {} },
+    state, NemoNativeFlipPreview: flip, performance: { now: () => 0 },
+    document: { getElementById: () => el },
+    NemoNativeOpacityMotionSurface: { createPlaybackScheduler: () => ({ start: () => { calls.push('playStart'); return true; }, stop: () => {} }) },
+    goToFrame: frame => { calls.push(['go', frame]); state.currentFrame = frame; return Promise.resolve(true); },
+    advancePlayFrame() {}, showToast: message => calls.push(['toast', message]),
+    stopPlay: () => { calls.push('stopPlay'); state.playing = false; }
+  };
+  vm.createContext(sandbox);
+  vm.runInContext('var nativePlayScheduler=null;var nativeFlipPreview=null;\n' + toggle + '\n' + startPlayFn, sandbox);
+  // F then Space.
+  await sandbox.toggleNativeFlipPreview(controller);
+  assert.equal(intervals.size, 1);
+  intervals.get(1)();
+  await tick();
+  sandbox.startNativePlay(controller);
+  assert.equal(intervals.size, 0, 'Play start cancelled the running flip');
+  assert.equal(state.playing, true);
+  assert.deepEqual(calls.filter(c => c === 'playStart' || c === 'stopPlay'), ['playStart']);
+  const goes = calls.filter(c => Array.isArray(c) && c[0] === 'go').length;
+  await tick();
+  assert.equal(calls.filter(c => Array.isArray(c) && c[0] === 'go').length, goes, 'no stale flip frame after Play starts');
+  // Space then F.
+  calls.length = 0;
+  await sandbox.toggleNativeFlipPreview(controller);
+  assert.deepEqual(calls.slice(0, 1), ['stopPlay'], 'flip start stops Play first');
+  assert.equal(state.playing, false);
+  assert.equal(intervals.size, 1, 'the flip runs');
+});
+
 test('the shortcut table declares Flip preview as a native route', () => {
   assert.equal(Targets.target({}, 'cmdFlipPreview').kind, 'native');
 });
