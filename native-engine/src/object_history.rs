@@ -239,6 +239,10 @@ mod property_sampling_tests;
 #[cfg(test)]
 #[path = "../tests/object_property_track_edit.rs"]
 mod property_track_edit_tests;
+// G39 (#2376): a Motion preset applied as one atomic native history entry.
+#[cfg(test)]
+#[path = "../tests/object_property_preset_apply.rs"]
+mod property_preset_apply_tests;
 
 #[cfg(feature = "project_media_codec")]
 #[path = "object_project_history.rs"]

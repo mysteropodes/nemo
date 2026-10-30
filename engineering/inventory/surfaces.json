@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "b77d8a2242274f2b00c74886c704c812dc278dcc",
-  "describe": "v0.7.0-alpha.4-4003-gb77d8a22-dirty"
+  "head": "91452cd23c5724324658bdc01f71ca74eff054ff",
+  "describe": "v0.7.0-alpha.4-4004-g91452cd2-dirty"
  },
- "inputsDigest": "5de4b7d58e9d21a0e7570ec6ee78899586ea03e24f31c9cca90d9c4540525671",
+ "inputsDigest": "2150ab7129c7a7a48c4ad4fbfee598411a1f57be28110acbf8ec932f50d634bd",
  "states": [
   "inventoried",
   "characterized",
@@ -52,7 +52,7 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 255,
+   "native": 256,
    "export": 5,
    "animation": 436,
    "history": 350,
@@ -3217,7 +3217,7 @@
    "capability": "Nouvel onglet",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion-preset-picker.js:177"
+    "src/js/motion-preset-picker.js:208"
    ],
    "events": [
     "click"
@@ -3258,7 +3258,7 @@
    "capability": "Save layer as preset",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion-preset-picker.js:176"
+    "src/js/motion-preset-picker.js:207"
    ],
    "events": [
     "click"
@@ -3268,8 +3268,10 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
+   "consumers": {
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1330",
@@ -3279,7 +3281,7 @@
     "container": "assets-view-presets",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 56,
+    "functionsVisited": 69,
     "via": "chain",
     "references": []
    },
@@ -24138,7 +24140,7 @@
    "capability": "Renommer…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion-preset-picker.js:71 renderTabs()"
+    "src/js/motion-preset-picker.js:83 renderTabs()"
    ],
    "events": [
     "click"
@@ -24152,7 +24154,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion-preset-picker.js:71",
+   "source": "src/js/motion-preset-picker.js:83",
    "meta": {
     "i18n": null,
     "functionsVisited": 11
@@ -24173,7 +24175,7 @@
    "capability": "Supprimer l\\'onglet",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion-preset-picker.js:73 renderTabs()"
+    "src/js/motion-preset-picker.js:85 renderTabs()"
    ],
    "events": [
     "click"
@@ -24187,7 +24189,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion-preset-picker.js:73",
+   "source": "src/js/motion-preset-picker.js:85",
    "meta": {
     "i18n": null,
     "functionsVisited": 18
