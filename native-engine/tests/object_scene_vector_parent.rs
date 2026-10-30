@@ -285,7 +285,7 @@ fn missing_cycle_foreign_owner_stale_frame_and_overdepth_never_publish_parented_
 }
 
 #[test]
-fn missing_held_parent_geometry_and_unjoined_parent_paint_stay_explicit() {
+fn missing_held_parent_geometry_stays_explicit() {
     let mut source = parented(true);
     source["layers"][1]["timing"]["keys"] = json!([]);
     let o = owner(&source);
@@ -300,35 +300,6 @@ fn missing_held_parent_geometry_and_unjoined_parent_paint_stay_explicit() {
         error.contains("ordinary parent held source is unavailable"),
         "{error}"
     );
-    for kind in ["stroke", "gradient"] {
-        let mut source = parented(false);
-        source["propertyHolders"].as_array_mut().unwrap().remove(0);
-        if kind == "stroke" {
-            source["objects"][0]["vector"]["stroke"] =
-                json!({"kind":"solid","r":0,"g":0,"b":0,"a":1});
-            source["objects"][0]["vector"]["hasRealStroke"] = json!(true);
-        } else {
-            source["objects"][0]["vectorExt"] = json!({"fillGradient":{
-                "kind":"linear","from":[0,0],"to":[100,60],"stops":[
-                    {"offset":0,"color":"#000000"},{"offset":1,"color":"#ffffff"}]}});
-        }
-        let o = owner(&source);
-        let s = o.acquire_snapshot(0).unwrap();
-        let p = packet(&o, &s, 0);
-        let error = format!(
-            "{:?}",
-            prepare_object_render_scene(&p, &pins(&s, 0)).unwrap_err()
-        );
-        assert!(
-            error.contains(if kind == "stroke" {
-                "scaled parent stroke"
-            } else {
-                "parented vector gradient"
-            }),
-            "{error}"
-        );
-        assert_eq!(o.history_depths(), (0, 0));
-    }
 }
 
 fn null_bytes(snapshot: &crate::revision::ObjectSnapshot) -> Vec<u8> {

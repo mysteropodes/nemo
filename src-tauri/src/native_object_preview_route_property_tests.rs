@@ -133,6 +133,145 @@ fn gpu_transform_edits_on_an_empty_layer_present_under_their_exact_proof() {
     }
 }
 
+fn project_of(drawing: Value) -> Fixture {
+    Fixture::from_project(
+        json!({"format":"nemo.native-project-document","formatVersion":1,
+        "project":{"canvasW":64,"canvasH":64,"fps":24},"drawing":drawing,"viewportReference":null,"assets":[]}),
+    )
+}
+
+/// One vector layer whose only record carries a real black stroke: the default look of a drawn line.
+fn stroked_project() -> Fixture {
+    let mut drawing = document();
+    drawing["objects"][0]["family"] = json!("editable-vector-path");
+    drawing["objects"][0]["vector"] = json!({"stroke":{"kind":"solid","r":0,"g":0,"b":0,"a":1},"hasRealStroke":true,
+        "strokeWidth":3,"strokeCap":"round","strokeJoin":"round","miterLimit":10,"dashOffset":0,"opacity":1});
+    project_of(drawing)
+}
+
+fn set_key(layer: &str, property: &str, frame: u32, values: Value) -> Value {
+    json!({"command":"object.property.edit","target":{"contextId":"scene-root","layerUid":layer},
+        "property":property,"action":{"kind":"setKey","frame":frame,"values":values}})
+}
+
+// Rotation, Scale and Anchor of a layer that paints are applied by the common vector batch (the whole-layer pivot is the
+// union of its cubic bounds); the pixels checked here stay inside the square for each of these, so a refusal is the only
+// way these can fail.
+#[test]
+fn gpu_rotation_scale_anchor_edits_on_a_vector_layer_present_under_their_exact_proof() {
+    for (property, values) in [
+        ("rotation", json!([30])),
+        ("scale", json!([150, 150])),
+        ("anchor", json!([3, 4])),
+    ] {
+        acknowledged_preview(
+            Fixture::cut_project(),
+            BLUE,
+            PROPERTY,
+            set("L0", property, values),
+        );
+    }
+}
+
+#[test]
+fn gpu_scale_edits_on_a_stroked_vector_layer_present_with_the_baseline_stroke_width() {
+    for values in [json!([150, 150]), json!([100, 150])] {
+        acknowledged_preview(stroked_project(), BLUE, PROPERTY, set("L0", "scale", values));
+    }
+}
+
+#[test]
+fn gpu_a_keyed_rotation_edit_on_a_vector_layer_presents_under_its_exact_proof() {
+    let f = Fixture::cut_project();
+    let seeded = f.command_named("seed-key", PROPERTY, set_key("L0", "rotation", 3, json!([60])), false);
+    assert!(seeded.response.ok, "{:?}", seeded.response.error);
+    let mut f = f;
+    f.refresh();
+    acknowledged_preview(f, BLUE, PROPERTY, set_key("L0", "rotation", 0, json!([30])));
+}
+
+/// One layer that paints a vector square AND a native Text block: the layer a drawing app produces after the first label.
+fn text_and_vector_project() -> Fixture {
+    let mut drawing = document();
+    drawing["items"] = json!({"text":[{
+        "target":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},"layerUid":"L0","strokeId":"label"},
+        "block":{"text":"I","font":{"kind":"bundled","fontKey":"Roboto-Regular"},"size":12,"color":"#112233",
+            "align":"left","anchorTopLeft":{"x":46,"y":46}}}]});
+    drawing["totalFrames"] = json!(4);
+    drawing["compositionOrder"]["contexts"][0]["scopes"][0]["elements"] = json!([
+        {"layerUid":"L0","strokeId":"a","naturalPosition":0,"order":{}},
+        {"layerUid":"L0","strokeId":"label","naturalPosition":1,"order":{}}]);
+    project_of(drawing)
+}
+
+#[test]
+fn gpu_a_keyed_position_edit_on_a_layer_of_vectors_and_text_presents_under_its_exact_proof() {
+    // The pivot of a mixed layer is the union of its vector and its Text, so the probes stay inside the square for these.
+    for property in ["position", "rotation", "scale", "anchor"] {
+        let f = text_and_vector_project();
+        let (key, value, edit) = match property {
+            "position" => ("position", json!([3, 3]), json!([1, 1])),
+            "rotation" => ("rotation", json!([8]), json!([5])),
+            "scale" => ("scale", json!([120, 120]), json!([150, 150])),
+            _ => ("anchor", json!([9, 9]), json!([3, 4])),
+        };
+        let seeded = f.command_named("seed-key", PROPERTY, set_key("L0", key, 3, value), false);
+        assert!(seeded.response.ok, "{property}: {:?}", seeded.response.error);
+        let mut f = f;
+        f.refresh();
+        acknowledged_preview(f, BLUE, PROPERTY, set_key("L0", key, 0, edit));
+    }
+}
+
+/// The image is a 24 x 24 raster of a two-pixel PNG, clear of both probes. On its own layer L1 it is an image layer;
+/// on L0 it shares the layer of the vector square.
+fn image_project(layer: &str) -> Fixture {
+    let mut drawing = document();
+    drawing["totalFrames"] = json!(4);
+    let timing = drawing["layers"][0]["timing"].clone();
+    if layer == "L1" {
+        drawing["layers"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"layerUid":"L1","timing":timing}));
+        drawing["compositionOrder"]["contexts"][0]["layers"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"layerUid":"L1","naturalPosition":1,"order":{}}));
+    }
+    drawing["items"] = json!({"raster":[{
+        "target":{"contextId":"scene-root","layerUid":layer,"strokeId":"ink","frameScope":{"kind":"authored","frame":0}},
+        "item":{"assetId":"ink","x":36,"y":4,"width":24,"height":24,"opacity":1}}]});
+    drawing["compositionOrder"]["contexts"][0]["scopes"][0]["elements"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"layerUid":layer,"strokeId":"ink","naturalPosition":usize::from(layer == "L0"),"order":{}}));
+    Fixture::from_project(json!({"format":"nemo.native-project-document","formatVersion":2,
+        "project":{"canvasW":64,"canvasH":64,"fps":24},"viewportReference":null,
+        "assets":[{"id":"ink","name":"Authored ink","kind":"image","source":{"kind":"embedded","mediaType":"image/png",
+            "encoding":"base64","data":"iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADUlEQVR4nGNgYPgPBgAU9AX7uVYDfQAAAABJRU5ErkJggg=="}}],
+        "assetInventory":{"assetIds":["ink"],"placements":[]},"drawing":drawing}))
+}
+
+#[test]
+fn gpu_a_keyed_position_edit_on_an_image_layer_presents_under_its_exact_proof() {
+    for (layer, property, seed, edit) in [
+        ("L1", "position", json!([3, 3]), json!([1, 1])),
+        ("L1", "rotation", json!([8]), json!([5])),
+        ("L1", "scale", json!([120, 120]), json!([150, 150])),
+        // The image shares its layer with the vector square: both move with the union pivot.
+        ("L0", "position", json!([3, 3]), json!([1, 1])),
+        ("L0", "rotation", json!([8]), json!([5])),
+        ("L0", "scale", json!([120, 120]), json!([150, 150])),
+    ] {
+        let mut f = image_project(layer);
+        let seeded = f.command_named("seed-key", PROPERTY, set_key(layer, property, 3, seed), false);
+        assert!(seeded.response.ok, "{property}: {:?}", seeded.response.error);
+        f.refresh();
+        acknowledged_preview(f, BLUE, PROPERTY, set_key(layer, property, 0, edit));
+    }
+}
+
 #[test]
 fn gpu_widget_create_revision_presents_under_its_exact_proof() {
     acknowledged_preview(

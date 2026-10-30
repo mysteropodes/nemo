@@ -25,7 +25,10 @@ use crate::object_render_scene::rig_packet_pose::packet_poses;
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::{
     join_scene, PinField, ProducerEntry, ProducerOutput, SceneJoinError, ScenePin,
 };
-use crate::evaluation::object_scene_style_kernels::object_scene_style_item::style_of_record_with_opacity;
+use crate::evaluation::object_scene_style_kernels::object_scene_paint_pose::PaintPose;
+use crate::evaluation::object_scene_style_kernels::object_scene_style_item::{
+    style_of_record_posed, style_of_record_with_opacity,
+};
 use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::SceneSolid;
 use crate::evaluation::object_vector_kernels::render_vector_eval::{
     evaluate_record_with_pose, is_vector_record, record_layer_has_active_path_fx,
@@ -57,6 +60,8 @@ pub(crate) struct CompiledContour {
     pub(crate) solid: SceneSolid,
     pub(crate) layer_opacity: f64,
     pub(crate) drawn: Option<BezPath>,
+    /// The whole-layer pose the paint style follows (stroke scale, gradient endpoints); default when no batch ran.
+    pub(crate) paint: PaintPose,
 }
 
 /// Everything the contour producer reports for one packet. `rejections` holds the
@@ -68,10 +73,41 @@ pub(crate) struct ContourProduction {
 
 /// Compile every selected record of the packet; one entry per record.
 pub(crate) fn produce(packet: &ObjectFramePacket) -> ContourProduction {
+    produce_chained(packet, None)
+}
+
+/// A layer that paints vectors together with Text or raster items has ONE pivot, the union of all of them, and only the
+/// Text scene's parent chains know it. Such a packet prepares its Text first and hands the result back, error included,
+/// so the scene reports it at the same point as before (after the rasters); every other packet keeps its original order
+/// and returns no Text.
+pub(crate) fn produce_with_texts(
+    packet: &ObjectFramePacket,
+) -> (
+    ContourProduction,
+    Option<Result<crate::object_render_scene::text_scene::TextSources, ObjectSceneError>>,
+) {
+    let shared = packet.records().any(|record| {
+        let layer = record.source_layer_index();
+        packet.raster_records().any(|r| r.layer_index() == layer)
+            || packet.text_records().any(|r| r.layer_index() == layer)
+    });
+    if !shared {
+        return (produce(packet), None);
+    }
+    let texts = crate::object_render_scene::text_scene::prepare(packet);
+    let chains = texts.as_ref().ok().map(|texts| texts.parent_chains.clone());
+    let production = produce_chained(packet, chains.as_deref());
+    (production, Some(texts))
+}
+
+fn produce_chained(
+    packet: &ObjectFramePacket,
+    chains: Option<&crate::object_render_scene::text_scene::parent_chain::SceneParentChains>,
+) -> ContourProduction {
     let mut output = ProducerOutput::new(PRODUCER, ScenePin::of_packet(packet));
     let mut rejections = Vec::new();
     let poses = packet_poses(packet);
-    let batches = batch::prepare(packet, &poses);
+    let batches = batch::prepare(packet, &poses, chains);
     for record in packet.records() {
         let index = record.source_object_index();
         let compiled = (|| {
@@ -178,6 +214,7 @@ fn compile(
         solid,
         layer_opacity,
         drawn: None,
+        paint: prepared.map(|p| p.paint.clone()).unwrap_or_default(),
     })
 }
 
@@ -203,8 +240,13 @@ fn compile_vector(
             .layer_opacity(source.source_layer_index())
             .map_err(|_| "raw layer opacity is unavailable")?,
     };
-    let style = style_of_record_with_opacity(source.record(), layer_opacity)
-        .map_err(|error| error.message())?;
+    let paint = prepared.map(|p| p.paint.clone()).unwrap_or_default();
+    let style = if paint.carried() {
+        style_of_record_posed(source.record(), layer_opacity, packet, &paint)
+    } else {
+        style_of_record_with_opacity(source.record(), layer_opacity)
+    }
+    .map_err(|error| error.message())?;
     prepare_item(&style).map_err(|error| error.message())?;
     let evaluated = match prepared {
         Some(prepared) => prepared.geometry.clone(),
@@ -227,6 +269,7 @@ fn compile_vector(
         solid,
         layer_opacity,
         drawn: Some(shape.path),
+        paint,
     })
 }
 

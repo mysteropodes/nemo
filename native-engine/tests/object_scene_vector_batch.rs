@@ -236,16 +236,17 @@ fn real_common_3d_replaces_2d_and_suppresses_original_layer_opacity_and_stroke_s
 #[test]
 fn actual_scene_refuses_unjoined_scaled_stroke_gradient_and_legacy_pathfx_combinations() {
     for (kind, reason) in [
-        ("stroke", "scaled vector stroke awaits"),
+        ("dashed-stroke", "scaled dashed vector stroke awaits"),
         ("gradient", "transformed vector gradient awaits"),
         ("legacy-pathfx", "layer path effects on a legacy record"),
     ] {
         let mut source = drawing(kind == "legacy-pathfx");
         match kind {
-            "stroke" => {
+            "dashed-stroke" => {
                 source["objects"][0]["vector"]["stroke"] =
                     json!({"kind":"solid","r":0,"g":0,"b":0,"a":1});
                 source["objects"][0]["vector"]["hasRealStroke"] = json!(true);
+                source["objects"][0]["vector"]["dashArray"] = json!([4, 2]);
             }
             "gradient" => {
                 source["objects"][0]["vectorExt"] = json!({"fillGradient":{
@@ -284,6 +285,7 @@ fn unjoined_second_record_paint_preserves_its_actual_source_index_and_atomic_sce
     let mut source = drawing(false);
     source["objects"][1]["vector"]["stroke"] = json!({"kind":"solid","r":0,"g":0,"b":0,"a":1});
     source["objects"][1]["vector"]["hasRealStroke"] = json!(true);
+    source["objects"][1]["vector"]["dashArray"] = json!([4, 2]);
     let o = owner(&source);
     let s = o.acquire_snapshot(0).unwrap();
     let p = packet(&o, &s, 0);
@@ -292,7 +294,7 @@ fn unjoined_second_record_paint_preserves_its_actual_source_index_and_atomic_sce
         Err(
             crate::object_render_scene::ObjectSceneError::UnsupportedGeometry {
                 source_object_index: 1,
-                reason: "scaled vector stroke awaits its actual paint width and dash consumer"
+                reason: "scaled dashed vector stroke awaits its actual paint dash consumer"
             }
         )
     ));
@@ -355,6 +357,8 @@ fn shared_motion_admission_refuses_mask_and_multiple_parent_controls_without_pub
 
 #[path = "object_scene_vector_parent.rs"]
 mod parent_tests;
+#[path = "render_layer_transform_keys.rs"]
+mod layer_transform_keys;
 
 // A split promotes element Position to a layer shared with differently authored frames.
 fn mixed_authored_position(position: Option<[f64; 2]>) -> Value {

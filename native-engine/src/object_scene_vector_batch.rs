@@ -5,7 +5,11 @@ use crate::evaluation::object_vector_kernels::render_vector_eval::{
     common_layer_motion_target, evaluate_record_rest_with_pose, has_unjoined_parent_blend,
     is_vector_record, record_layer_has_active_path_fx, EvalSegment, EvaluatedVector,
 };
-use crate::object_frame_packet::projection::{project_layer_3d, transform_layer_2d};
+use crate::evaluation::object_scene_style_kernels::object_scene_paint_pose::PaintPose;
+use crate::object_frame_packet::projection::{
+    apply_layer_entry, layer_chain_entry, project_layer_3d,
+};
+use crate::object_render_scene::text_scene::parent_chain::SceneParentChains;
 use crate::object_frame_packet::{MotionValues, ObjectFramePacket, ObjectFrameRecord};
 use crate::object_frame_packet::{ObjectRecord, Presence, PropertyHolderTarget};
 use std::collections::BTreeMap;
@@ -16,6 +20,7 @@ mod parent;
 pub(super) struct PreparedVector {
     pub(super) geometry: EvaluatedVector,
     pub(super) layer_opacity: f64,
+    pub(super) paint: PaintPose,
     refusal: Option<&'static str>,
 }
 #[derive(Default)]
@@ -50,6 +55,7 @@ fn geometry_active(m: &MotionValues) -> bool {
 pub(super) fn prepare(
     packet: &ObjectFramePacket,
     poses: &BTreeMap<usize, Result<RigPoseEvaluation, &'static str>>,
+    chains: Option<&SceneParentChains>,
 ) -> VectorBatches {
     let mut layers: BTreeMap<usize, Vec<_>> = BTreeMap::new();
     for source in packet.records() {
@@ -60,7 +66,7 @@ pub(super) fn prepare(
     }
     let mut result = VectorBatches::default();
     for (index, sources) in layers {
-        match prepare_layer(packet, index, &sources, poses) {
+        match prepare_layer(packet, index, &sources, poses, chains) {
             Ok(Some(vectors)) => {
                 for vector in vectors {
                     result
@@ -82,6 +88,7 @@ fn prepare_layer(
     index: usize,
     sources: &[ObjectFrameRecord<'_>],
     poses: &BTreeMap<usize, Result<RigPoseEvaluation, &'static str>>,
+    chains: Option<&SceneParentChains>,
 ) -> Result<Option<Vec<PreparedVector>>, &'static str> {
     if packet.context_id() != "scene-root" {
         return Ok(None);
@@ -125,10 +132,26 @@ fn prepare_layer(
         }
         return Ok(None);
     }
-    let parents = if three_d {
-        Vec::new()
-    } else {
-        parent::chain(packet, index, poses)?
+    // Vectors that share a layer with Text or raster items take the pose of that union: the same chain those items use.
+    let item_consumers = packet.raster_records().any(|s| s.layer_index() == index)
+        || packet.text_records().any(|s| s.layer_index() == index);
+    let record_mixed = sources.iter().any(|s| {
+        (!is_vector_record(s.record()) && s.record().family != "closed-solid-fill-cubic-path")
+            || s.record().is_mask()
+    });
+    let item_chain = match chains {
+        Some(chains) if item_consumers && !record_mixed && !three_d => Some(
+            chains
+                .chain(index)
+                .map_err(|failure| failure.reason())?,
+        ),
+        _ => None,
+    };
+    let own_in_chain = motion.as_ref().is_some_and(geometry_active);
+    let parents = match &item_chain {
+        Some(chain) => chain[usize::from(own_in_chain).min(chain.len())..].to_vec(),
+        None if three_d => Vec::new(),
+        None => parent::chain(packet, index, poses)?,
     };
     // Keep the original no-geometry-Motion route and its per-record refusal/order behavior.
     // New expanded/defaulted holder shapes still need their actual receipt-backed consumer.
@@ -149,7 +172,8 @@ fn prepare_layer(
     // Identity Position still belongs to the admitted common consumer. Falling
     // back would ask the older vector-only path to validate unrelated authored
     // keys (including a legacy fill on a later frame of the same split piece).
-    let common_position = common_layer_motion_target(packet.snapshot().document(), &target)
+    let common_position = (item_chain.is_some()
+        || common_layer_motion_target(packet.snapshot().document(), &target))
         && packet
             .snapshot()
             .document()
@@ -163,11 +187,7 @@ fn prepare_layer(
     if !active && !expanded && parents.is_empty() && !common_position {
         return Ok(None);
     }
-    let mixed = sources.iter().any(|s| {
-        (!is_vector_record(s.record()) && s.record().family != "closed-solid-fill-cubic-path")
-            || s.record().is_mask()
-    }) || packet.raster_records().any(|s| s.layer_index() == index)
-        || packet.text_records().any(|s| s.layer_index() == index);
+    let mixed = (record_mixed || item_consumers) && item_chain.is_none();
     // The original per-record producers already consume raw Position, including
     // mask curves. A union-bounds transform is unnecessary for translation; keep
     // that admitted route unless an expanded holder or parent needs this batch.
@@ -183,12 +203,12 @@ fn prepare_layer(
     let mut refusals = Vec::new();
     for source in sources.iter().copied().filter(|s| !s.record().is_mask()) {
         let record = source.record();
-        // The actual paint-plan style still has only its original raw translation gradient port.
+        // The paint style carries the layer pose (`PaintPose`): stroke width and gradient endpoints follow the same chain
+        // as the path. What stays unjoined is a gradient under 3D, a gradient whose Position is an expression (the raw
+        // translation port ignores it) and a dash pattern under a scaled stroke (the baseline inline route leaves the
+        // dash unscaled while its retained route scales it with the pen).
         let refusal = if record.fill_gradient().is_some()
             && (three_d
-                || motion
-                    .as_ref()
-                    .is_some_and(|m| m.rotation != 0. || m.scale != [100., 100.])
                 || packet
                     .snapshot()
                     .document()
@@ -206,26 +226,23 @@ fn prepare_layer(
         } else {
             None
         };
+        let dashed = record
+            .vector()
+            .and_then(|body| body.dash_array.value())
+            .is_some_and(|dash| !dash.is_empty());
         let stroke = record.vector().is_some_and(|body| body.has_real_stroke());
-        let refusal = refusal.or_else(|| {
-            (stroke
-                && motion
-                    .as_ref()
-                    .is_some_and(|m| (m.scale[0].abs() + m.scale[1].abs()) / 200. != 1.))
-            .then_some("scaled vector stroke awaits its actual paint width and dash consumer")
-        });
-        let refusal = refusal.or_else(|| {
-            if !parents.is_empty() && record.fill_gradient().is_some() {
-                Some("parented vector gradient awaits its actual paint coordinates consumer")
-            } else if stroke
-                && parents
+        let scaled_stroke_scale = !three_d && stroke && dashed && {
+            let own = motion
+                .as_ref()
+                .map_or(1., |m| (m.scale[0].abs() + m.scale[1].abs()) / 200.);
+            own != 1.
+                || parents
                     .iter()
                     .any(|p| (p.mat.sx.abs() + p.mat.sy.abs()) / 2. != 1.)
-            {
-                Some("scaled parent stroke awaits its actual paint width and dash consumer")
-            } else {
-                None
-            }
+        };
+        let refusal = refusal.or_else(|| {
+            scaled_stroke_scale
+                .then_some("scaled dashed vector stroke awaits its actual paint dash consumer")
         });
         refusals.push(refusal);
         let pose = match poses.get(&index) {
@@ -245,7 +262,7 @@ fn prepare_layer(
     if vectors.is_empty() {
         return Ok(Some(Vec::new()));
     }
-    let (vectors, layer_opacity) = if three_d {
+    let (vectors, layer_opacity, paint) = if three_d {
         let pose = packet
             .sampled_pose_3d(&target)
             .map_err(|_| "pinned ordinary vector 3D values are unavailable")?
@@ -265,21 +282,32 @@ fn prepare_layer(
         )
         .map_err(|_| "ordinary vector 3D batch projection refused its numeric inputs")?;
         // Original3D suppresses layer2D Motion, parent opacity and strokeScale.
-        (vectors, 1.)
+        (vectors, 1., PaintPose::default())
     } else {
         let motion = motion
             .as_ref()
             .ok_or("ordinary vector Motion receipt is unavailable")?;
-        let vectors = transform_layer_2d(&vectors, motion)
-            .map_err(|_| "ordinary vector Motion batch refused its numeric inputs")?;
-        let vectors = parent::apply(&vectors, &parents)?;
+        let (entry, vectors) = match &item_chain {
+            Some(chain) => {
+                // The union pivot is already inside the shared chain; its first entry is this layer's own.
+                let own = own_in_chain.then(|| chain[0]);
+                (own, parent::apply(&vectors, chain)?)
+            }
+            None => {
+                let entry = layer_chain_entry(&vectors, motion)
+                    .map_err(|_| "ordinary vector Motion batch refused its numeric inputs")?;
+                let vectors = apply_layer_entry(&vectors, entry)
+                    .map_err(|_| "ordinary vector Motion batch refused its numeric inputs")?;
+                (entry, parent::apply(&vectors, &parents)?)
+            }
+        };
         let opacity = parents
             .iter()
             .fold((motion.opacity / 100.).max(0.), |op, p| op * p.mat.op);
         if !opacity.is_finite() {
             return Err("parent opacity product is not finite");
         }
-        (vectors, opacity)
+        (vectors, opacity, PaintPose::from_chain(entry, &parents))
     };
     Ok(Some(
         vectors
@@ -288,6 +316,7 @@ fn prepare_layer(
             .map(|(geometry, refusal)| PreparedVector {
                 geometry,
                 layer_opacity,
+                paint: paint.clone(),
                 refusal,
             })
             .collect(),

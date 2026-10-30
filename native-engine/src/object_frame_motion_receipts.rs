@@ -234,6 +234,7 @@ pub(crate) fn remaining_holder(
     // may consume only its shared opacity here. Other pose fields must not be
     // admitted on the strength of a Text/raster sibling alone.
     let mixed = layer
+        && !crate::evaluation::object_vector_kernels::render_vector_eval::motion::layer_vectors_batchable(document, target)
         && document.layers().iter().any(|l| {
             l.layer_uid() == target.layer_uid()
                 && l.visible()
