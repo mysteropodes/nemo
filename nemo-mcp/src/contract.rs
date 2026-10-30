@@ -437,6 +437,13 @@ pub struct NativeHostStatus {
     pub document_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content_revision: Option<u64>,
+    /// The host's current native lifecycle generation. Image attach with a
+    /// placement, font import, sourced import batches and bitmap-brush strokes
+    /// carry it in their payload and are refused as stale unless it equals this
+    /// value; it advances on every project replacement, so a client reads it
+    /// here (never assumes 1) immediately before such a request.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lifecycle_generation: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
 }
@@ -450,6 +457,7 @@ impl NativeHostStatus {
             available: false,
             document_id: None,
             content_revision: None,
+            lifecycle_generation: None,
             reason: Some(reason.into()),
         }
     }
@@ -465,7 +473,13 @@ impl NativeHostStatus {
             || self
                 .content_revision
                 .is_some_and(|value| value > MAX_SAFE_REVISION)
-            || (self.available && (self.document_id.is_none() || self.content_revision.is_none()))
+            || self
+                .lifecycle_generation
+                .is_some_and(|value| value == 0 || value > MAX_SAFE_REVISION)
+            || (self.available
+                && (self.document_id.is_none()
+                    || self.content_revision.is_none()
+                    || self.lifecycle_generation.is_none()))
             || (!self.available && self.reason.as_deref().is_none_or(str::is_empty))
         {
             return Err(RequestError::InvalidRequest(
