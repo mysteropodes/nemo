@@ -82,10 +82,16 @@ pub(crate) struct ObjectBootstrapReceipt {
 }
 
 /// A commit receipt, not a claim about a later UI, dispatch or presentation state.
+/// Every refusal here precedes the single atomic install, so it leaves the slot as it
+/// was and is reported not dispatched: the caller may retry instead of fencing (#2511).
 pub(crate) fn bootstrap_raw(
     state: &ApplicationMcp,
     request_json: &str,
 ) -> HostResult<ObjectBootstrapReceipt> {
+    raw_checked(state, request_json).map_err(reopen::not_dispatched)
+}
+
+fn raw_checked(state: &ApplicationMcp, request_json: &str) -> HostResult<ObjectBootstrapReceipt> {
     if let Some(request) = admission::new_request(request_json) {
         return admission::bootstrap_new(state, request);
     }
@@ -125,6 +131,14 @@ pub(crate) fn bootstrap_raw(
 }
 
 pub(super) fn bootstrap_file_bytes(
+    state: &ApplicationMcp,
+    request_id: String,
+    bytes: &[u8],
+) -> HostResult<ObjectBootstrapReceipt> {
+    file_bytes_checked(state, request_id, bytes).map_err(reopen::not_dispatched)
+}
+
+fn file_bytes_checked(
     state: &ApplicationMcp,
     request_id: String,
     bytes: &[u8],

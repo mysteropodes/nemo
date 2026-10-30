@@ -411,3 +411,29 @@ fn replacement_new_project_honours_total_frames_and_refuses_zero() {
     value["newProject"]["totalFrames"] = json!(48);
     assert!(prepare(&state, &value).is_ok());
 }
+
+#[test]
+fn an_initial_bootstrap_refused_before_install_is_not_dispatched_so_the_client_may_retry() {
+    // A bare New refused by the install slot, or any refusal before the one atomic
+    // install, left nothing behind; typing it lets the JS session return to idle.
+    let state = ApplicationMcp::default();
+    let first = initial(&state);
+    let refused = reopen::bootstrap_request(&state, &request(&state).to_string(), |_| {
+        panic!("New must not consult filesystem admission")
+    })
+    .unwrap_err();
+    assert_eq!(refused.code, "unavailable");
+    assert_eq!(refused.details.unwrap()["disposition"], "notDispatched");
+    let info = state.native_project_info(&first.document_id).unwrap();
+    assert_eq!(info["documentId"], first.document_id.as_str());
+
+    let fresh = ApplicationMcp::default();
+    let mut bad = request(&fresh);
+    bad["newProject"]["canvasW"] = json!("wide");
+    let malformed = bootstrap_raw(&fresh, &bad.to_string()).unwrap_err();
+    assert_eq!(malformed.details.unwrap()["disposition"], "notDispatched");
+    let bytes = bootstrap_raw(&fresh, "not json").unwrap_err();
+    assert_eq!(bytes.details.unwrap()["disposition"], "notDispatched");
+    assert!(fresh.native_project_info("none").is_err());
+    assert!(initial(&fresh).document_id.len() > 0);
+}
