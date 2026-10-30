@@ -41,16 +41,23 @@
     return (text||'Untitled').slice(0,128);
   }
   function create(ports){
-    var timer=null,running=false,writing=false,s=null,noticed={},inflight=null,owned=new Map();
+    var timer=null,running=false,writing=false,s=null,noticed={},inflight=null,owned=new Map(),superseded=new Set();
     // Slots this scheduler may have published, per document (#2360 R4). A slot is claimed when its write is requested, so a
     // write still in flight when a cleanup runs is covered; a failed or stale write leaves a name whose discard is a no-op.
     function own(documentId,slot){
       var set=owned.get(documentId);if(!set){set=new Set();owned.set(documentId,set);}set.add(slot);
     }
+    // The untitled slot name is a pure function of the stable documentId (#2360 RV3), so a session rebuilt after a tab
+    // switch lands in the SAME slot instead of orphaning the old one. Two differently-seeded hashes keep it collision-safe.
+    function documentTag(documentId){
+      return String(ports.hash(documentId))+String(ports.hash(documentId.split('').reverse().join('')));
+    }
+    // supersedeDone outlives the per-session state: a rebuilt session must not re-send an already-delivered supersede.
     function fresh(info){
       return {instanceId:info.instanceId,documentId:info.documentId,generation:info.lifecycleGeneration,
-        tag:ports.randomHex(8),lastWriteAt:null,lastDuration:0,lastRevision:null,recovered:null,
-        idleSince:null,skipDigest:null,supersedes:ports.supersedes?ports.supersedes()||null:null};
+        tag:documentTag(info.documentId),lastWriteAt:null,lastDuration:0,lastRevision:null,recovered:null,
+        idleSince:null,skipDigest:null,
+        supersedes:!superseded.has(info.documentId)&&ports.supersedes?ports.supersedes()||null:null};
     }
     function sameSession(a,b){return !!a&&!!b&&a.instanceId===b.instanceId&&a.documentId===b.documentId&&a.generation===b.lifecycleGeneration;}
     // Why not to write now, or null. Reads cached state only.
@@ -62,7 +69,7 @@
       if(!info)return {why:'info-missing'};
       if(!s||!sameSession(s,info))s=fresh(info);
       // A resumed session (#2360 R3) names the recovery slot it replaces; it rides with the first published write.
-      s.pinSupersedes=typeof pin.supersedes==='string'&&SLOT.test(pin.supersedes)&&!s.supersedeDone?pin.supersedes:null;
+      s.pinSupersedes=typeof pin.supersedes==='string'&&SLOT.test(pin.supersedes)&&!superseded.has(info.documentId)?pin.supersedes:null;
       if(writing)return {why:'in-flight',info:info};
       var reference=pin.reference||null;
       if(info.documentDigest===reference||info.documentDigest===s.recovered||info.documentDigest===s.skipDigest){
@@ -113,7 +120,8 @@
           return {wrote:false,why:receipt.reason||'unpublished'};
         }
         mine.lastWriteAt=ended;mine.lastDuration=Math.max(0,ended-began);mine.lastRevision=info.contentRevision;
-        mine.recovered=info.documentDigest;mine.idleSince=null;mine.supersedes=null;mine.supersedeDone=true;mine.pinSupersedes=null;
+        mine.recovered=info.documentDigest;mine.idleSince=null;mine.supersedes=null;mine.pinSupersedes=null;
+        superseded.add(info.documentId);
         return {wrote:true,receipt:receipt};
       }catch(error){
         // Failure (ENOSPC and similar): the previous generation is untouched; retry next tick.
@@ -158,13 +166,6 @@
     });
   }
   function simpleHash(s){var h=0;for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return (h>>>0).toString(36);}
-  function randomHex(root,n){
-    var out='';
-    try{var bytes=root.crypto.getRandomValues(new Uint8Array(Math.ceil(n/2)));
-      bytes.forEach(function(b){out+=('0'+b.toString(16)).slice(-2);});}catch(_){}
-    while(out.length<n)out+=Math.floor(Math.random()*16).toString(16);
-    return out.slice(0,n);
-  }
   // Binds the scheduler to the desktop session: cached pin from the file UI, the private Tauri
   // command for the write, and the page signals (playing, pointer held, hidden) that gate it.
   function bind(root,ports){
@@ -175,7 +176,7 @@
       setTimer:function(fn,ms){return root.setTimeout(fn,ms);},clearTimer:function(id){root.clearTimeout(id);},
       pin:ports.pin,slot:ports.slot,notice:ports.notice,supersedes:ports.supersedes,
       blocked:function(){return held||!!(root.state&&root.state.playing);},
-      requestId:function(kind){return session.requestId(kind);},hash:simpleHash,randomHex:function(n){return randomHex(root,n);},
+      requestId:function(kind){return session.requestId(kind);},hash:simpleHash,
       write:function(command,request){return root.__TAURI__.core.invoke(command,{requestJson:JSON.stringify(request)});}
     });
     var doc=root.document;
