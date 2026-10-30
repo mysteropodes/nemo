@@ -16,7 +16,7 @@ test('CS8 tween oracle pins every independently executed baseline source', () =>
   cp.execFileSync('git', ['merge-base', '--is-ancestor', baseline, 'HEAD'], { cwd: root });
   const files = {
     sourceSha256: 'src/js/tweens.js', toolsSha256: 'src/js/tools.js', uiSha256: 'src/js/ui.js',
-    bitmapSha256: 'src/js/bitmap-brush.js', groupSha256: 'src/js/group-bridge.js',
+    bitmapSha256: 'src/js/bitmap-brush.js', appSha256: 'src/js/app.js', groupSha256: 'src/js/group-bridge.js',
     wasmJsSha256: 'src/wasm/geometry_wasm.js', wasmBinarySha256: 'src/wasm/geometry_wasm_bg.wasm',
     paperSha256: 'src/paper-full.min.js',
   };
