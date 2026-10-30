@@ -28,6 +28,18 @@ async function smConfirm(msg, title) {
 var playInt=null;
 var playRaf=null;
 var nativePlayScheduler=null;
+// D24 (#2358): Flip preview on a native project browses through the native frame navigator (native-flip-preview.js).
+var nativeFlipPreview=null;
+function toggleNativeFlipPreview(controller){
+  if(!nativeFlipPreview)nativeFlipPreview=NemoNativeFlipPreview.createFlipPreview({
+    frame:function(){return state.currentFrame;},fps:function(){return state.fps;},
+    waIn:function(){return state.waIn;},waOut:function(){return state.waOut;},
+    controller:function(){return window.NemoNativeOpacityCutover;},navigate:goToFrame,
+    setInterval:function(fn,ms){return window.setInterval(fn,ms);},clearInterval:function(id){window.clearInterval(id);},
+    notify:function(message){showToast(message);}
+  });
+  return nativeFlipPreview.toggle(controller);
+}
 function startNativePlay(controller){
   if(!nativePlayScheduler)nativePlayScheduler=NemoNativeOpacityMotionSurface.createPlaybackScheduler({
     frame:function(){return state.currentFrame;},fps:function(){return state.fps;},
@@ -2085,6 +2097,8 @@ window.SM={
     if(_dOrigin>=0){_dLd.frames[_dOrigin].strokes=_collectLayerStrokes(_dLi,_dLd);window._sceneVersion=(window._sceneVersion||0)+1;}else saveActiveLayerFrame();
     updateUI();}},
   flipPreview:function(){
+    var nativeOpacity=window.NemoNativeOpacityCutover;
+    if(nativeOpacity&&nativeOpacity.blocksLegacy()){toggleNativeFlipPreview(nativeOpacity);return;}
     var prev=state.currentFrame;var wa=state.waIn;var wo=state.waOut;
     if(state._flipping){state._flipping=false;return;}
     state._flipping=true;var dir=1;var cur=prev;

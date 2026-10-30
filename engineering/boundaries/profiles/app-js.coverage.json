@@ -1033,6 +1033,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-flip-preview.js",
+      "moduleId": "app.native.flip-preview.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-opacity-preview.js",
       "moduleId": "app.native.opacity.preview.adapter",
       "executionClass": "document-classic",
