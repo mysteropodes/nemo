@@ -176,7 +176,7 @@ test('shipped Cmd+D after native header selection reaches the wrapped frame dupl
   const timeline=fs.readFileSync(require.resolve('../src/js/timeline.js'),'utf8'),start=timeline.indexOf('function onKeyDown(event){');
   const end=timeline.indexOf('function onKeyUp(event)',start);assert.ok(start>=0&&end>start);
   const context={window:h.root,state:h.root.state,_sel:h.root._sel,selectedPaths:h.root.selectedPaths,
-    duplicateSelection(){throw Error('CANVAS WRITER');}};
+    duplicateSelection(){throw Error('CANVAS WRITER');},NemoKeyboardArbiter:require('../src/js/application/keyboard-arbiter.js')};
   vm.runInNewContext(timeline.slice(start,end),context);
   const key={key:'d',metaKey:true,target:{tagName:'DIV'},preventDefault(){}};
   try{
