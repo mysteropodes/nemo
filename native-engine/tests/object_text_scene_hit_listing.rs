@@ -143,3 +143,20 @@ fn a_texture_anchor_names_its_brush_and_group_for_select() {
     assert!(by("raster").get("brush").is_none(), "an ordinary image names no brush");
     assert!(by("text").get("brush").is_none(), "an ordinary item names no brush");
 }
+
+#[test]
+fn a_posed_layer_lists_its_image_and_text_in_their_stored_frame_with_the_pose_as_the_map() {
+    // #2372: record space is the stored item's own frame, so a Select matrix conjugated with the listing's map is what the
+    // item's batch transform applies to the stored centre / anchor.
+    let mut doc = drawing();
+    doc["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"L0"},
+        "properties":[{"property":"position","static":[7,9]}]}]);
+    let items = listing(&doc)["items"].as_array().unwrap().clone();
+    let by = |role: &str| items.iter().find(|i| i["role"] == role).unwrap().clone();
+    let (image, text) = (by("raster"), by("text"));
+    assert_eq!(pair(&image["bounds"]), [39.0, 39.0, 41.0, 41.0], "the stored centre (40,40) and size, not the posed rect");
+    assert_eq!(pair(&image["matrix"]), [1.0, 0.0, 0.0, 1.0, 7.0, 9.0], "the pose carries the stored frame to the painted rect");
+    assert_eq!(pair(&text["matrix"]), [1.0, 0.0, 0.0, 1.0, 7.0, 9.0]);
+    let b = pair(&text["bounds"]);
+    assert!(b[0] >= 9.0 - 1e-9 && b[0] < 20.0 && b[1] >= 19.0 - 1e-9, "the glyph bounds are back in the stored frame near the anchor (10,20): {b:?}");
+}

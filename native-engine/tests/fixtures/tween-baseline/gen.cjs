@@ -95,7 +95,7 @@ for (const n of [6, 24, 90]) {
   }
 }
 // Execute the original document-mutating generation entry point in an isolated baseline store.
-vm.runInContext(source.slice(source.indexOf('function generateTweens('),source.indexOf('// #122 ("harmoniser')),context);
+vm.runInContext(source.slice(source.indexOf('function generateTweens('),source.indexOf('// ---- ARCS ----')),context);
 Object.assign(context,{n20AllowLegacyWrite:()=>true,saveAllLayerFrames:()=>{},pushUndoLayers:()=>{},
   loadFrame:()=>{},renderOS:()=>{},renderArcs:()=>{},updateUI:()=>{},showToast:()=>{},SM:{t:()=>''}});
 const idStroke=(s,id)=>({...copy(s),strokeId:id,hasRealStroke:true});
@@ -177,7 +177,7 @@ for(const mode of ['auto-split-b','auto-split-a','force-multiple']){
  context._sel={frames:[]};context.state={layers:[{layerUid:'L0',frames:copy(frames)}],activeLayerIdx:0,currentFrame:0,totalFrames:4,resamplePts:12,tweenStep:1,tweenSkipManual:true,motionArcs:{},tweenOverrides:{'L0:0-3':span.overrides}};
  call('generate',{name:mode,frames,options,span,motionArcs:copy(context.state.motionArcs)},()=>{context.generateTweens();return context.state.layers[0].frames;});
 }
-// Regeneration reuses persisted overrides; splitting promotes the corrected cell then regenerates its two neighbors.
+// Regeneration reuses persisted overrides; splitting is the real harmonizeAfterEdit (#126): the promoted cell is re-tweened as a key, then stays a soft manually edited in-between.
 const uiSource=read('src/js/ui.js');
 vm.runInContext(uiSource.slice(uiSource.indexOf('function cubicAt('),uiSource.indexOf('function evalCurve(')),context);
 for(const mode of ['regenerate-force','split-generated','span-easing','selected-span']) {
@@ -197,7 +197,7 @@ for(const mode of ['regenerate-force','split-generated','span-easing','selected-
  tweenOverrides:{'L0:0-5':span.overrides},tweenEasing:span.easing?{'L0:0-5':{points:span.easing}}:{}};
  const tweens=mode==='regenerate-force'||mode==='span-easing'?{layers:[{layerUid:'L0',options,spans:[span]}]}:undefined;
  call('generate',{name:mode,frames,options,span,command,tweens,selection,frame:command==='split'?2:undefined},()=>{
-   if(command==='split'){context.state.layers[0].frames[2].isKeyframe=true;context.state.layers[0].frames[2].isInterpolated=false;context.generateTweens({0:true,2:true});}
+   if(command==='split'){context.state.layers[0].frames[2].isKeyframe=true;context.state.layers[0].frames[2].isInterpolated=false;context.state.tweenHarmonizeEdits=true;context.harmonizeAfterEdit(2);}
    else context.generateTweens();return context.state.layers[0].frames;
  });
 }

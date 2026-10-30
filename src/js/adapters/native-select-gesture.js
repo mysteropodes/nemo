@@ -7,28 +7,46 @@
  * anchor's dabs and a gradient's end points, keeps a shape's box). It holds no document state and writes nothing while the pointer
  * moves: Escape, a lost capture or a stale document ends the gesture with no write. Baseline (1065e9d8 select-bridge onDown/onMove/onUp):
  * Shift on a corner scales proportionally, Alt scales from the box centre, Shift snaps a rotation to 15 degrees, Shift on the press extends
- * the selection. Not carried over: skew zones, a custom anchor, the Alt lasso, ruler snapping. Still refused with a notice: images and text
- * (their stored rect is not readable here and one gesture would be several history entries), bitmap brushes (their image is baked) and a
- * dab whose anchor could not be read. */
+ * the selection. An image and a text block go in the same batch as a record-space matrix in their own frame (the listing's bounds and
+ * matrix): the engine moves the image's stored centre, scales its size and turns its rotation (a mesh bound to it follows) and re-anchors
+ * a text block and scales its size, fixed width and spacing as the baseline resize did. An image takes a move, a scale along its own axes
+ * and a turn; text takes a move and a scale only (it has no stored rotation); a mirror of either and a shear of an image have no stored
+ * form. Not carried over: skew zones, a custom anchor, the Alt lasso, ruler snapping. Still refused with a notice: those transforms,
+ * bitmap brushes (their image is baked) and a dab whose anchor could not be read. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.NemoNativeSelectGesture = api;
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
-  var DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], DRAG = 3, MAX_STEPS = 64;
+  var DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], DRAG = 3, MAX_STEPS = 64, MAX_BYTES = 60000; // under the 65536-byte vector request cap
   var PINS = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
-  var LABEL = { raster: 'images', text: 'text' }, MAPPED = ['plain', 'ribbon', 'fill', 'shape', 'brush'];
+  var MAPPED = ['plain', 'ribbon', 'fill', 'shape', 'brush', 'raster', 'text'];
   function samePin(a, b) { return !!a && !!b && PINS.every(function (k) { return a[k] === b[k]; }); }
   function notice(root, text) { if (typeof root.showToast === 'function') try { root.showToast(text); } catch (_) {} }
   // The selection's items that have no native transform here, as labels (null when every one can be moved, scaled and rotated).
   function unsupported(paths) {
     var found = [];
     paths.forEach(function (p) {
-      var d = p.data || {}, label = d.nativeBrush === 'bitmap' ? 'bitmap brushes' : d.nativeBrush === 'copy' ? 'brush dabs' : MAPPED.indexOf(d.nativeRole) < 0 ? (LABEL[d.nativeRole] || 'this item') : null;
+      var d = p.data || {}, label = d.nativeBrush === 'bitmap' ? 'bitmap brushes' : d.nativeBrush === 'copy' ? 'brush dabs' : MAPPED.indexOf(d.nativeRole) < 0 ? 'this item' : null;
       if (label && found.indexOf(label) < 0) found.push(label);
     });
     return found.length ? found.join(', ') : null;
+  }
+  // The transform an image or a text block has no stored form for, as a label (null when every one can take `m`, the world affine): the
+  // matrix is read in each item's own frame (the presented matrix conjugated), where an image takes a move, a scale along its axes and a
+  // turn, and text a move and a scale.
+  function unstorable(root, paths, m) {
+    var conj = root.NemoSelectCanvasIntent && root.NemoSelectCanvasIntent.inRecordSpace, found = [];
+    paths.forEach(function (p) {
+      var role = p.data && p.data.nativeRole, r = (role === 'raster' || role === 'text') && conj ? conj(p.data.nativeMatrix, m) : null;
+      if (!r) return;
+      var det = r[0] * r[3] - r[1] * r[2], tol = 1e-9 * (Math.abs(r[0]) + Math.abs(r[1]) + Math.abs(r[2]) + Math.abs(r[3]));
+      if (det < 0) found.push(role === 'text' ? 'Flipping text' : 'Flipping images');
+      else if (role === 'text' && (Math.abs(r[1]) > tol || Math.abs(r[2]) > tol)) found.push('Rotating text');
+      else if (role === 'raster' && Math.abs(r[0] * r[2] + r[1] * r[3]) > 1e-9 * Math.hypot(r[0], r[1]) * Math.hypot(r[2], r[3])) found.push('Skewing images (scale along their own axes)');
+    });
+    return found.length ? found.filter(function (l, i) { return found.indexOf(l) === i; }).join(', ') : null;
   }
   // Which handle of the oriented box a world point grabs: the rotate ring first (a band of 7 screen px), then the 8 scale handles
   // (9 px), as the baseline hitHandles did. `wpp` is world units per screen pixel.
@@ -117,6 +135,8 @@
       var bad = unsupported(g.sel);
       if (bad) { g.kind = 'none'; notice(root, 'Transforming ' + bad + ' is not available on native projects yet.'); return; }
       g.matrix = matrixOf(g, at, !!g.last.shiftKey, !!g.last.altKey);
+      var cannot = unstorable(root, g.sel, g.matrix);
+      if (cannot) { g.kind = 'none'; if (g.previewed) { O.preview(root, null); g.previewed = false; } notice(root, cannot + ' is not available on native projects yet.'); return; }
       var m = new Matrix(g.matrix[0], g.matrix[1], g.matrix[2], g.matrix[3], g.matrix[4], g.matrix[5]);
       O.preview(root, { paths: g.sel.map(function (p) {
         var c = p.clone({ insert: false });
@@ -153,14 +173,18 @@
       if (bad) return notice(root, 'Transforming ' + bad + ' is not available on native projects yet.');
       if (!ids.length || layerIdx === undefined || g.sel.some(function (p) { return p.data.nativeLayerIndex !== layerIdx; })) return notice(root, 'Select items of one layer to transform them.');
       if (ids.length > MAX_STEPS) return notice(root, 'Too many items to transform at once (' + MAX_STEPS + ' at most).');
-      var m = g.matrix, now = I.presentedState(root), route = root.NemoNativeObjectLabs && root.NemoNativeObjectLabs.desktop(root);
+      var m = g.matrix, cannot = unstorable(root, g.sel, m), now = I.presentedState(root), route = root.NemoNativeObjectLabs && root.NemoNativeObjectLabs.desktop(root);
+      if (cannot) return notice(root, cannot + ' is not available on native projects yet.');
       if (!now || !samePin(now.pin, g.pin) || now.presentation.frame !== g.frame || I.pickContext(root) !== g.ctx) return notice(root, 'The document changed during the drag — nothing was changed.');
       if (!route) return notice(root, 'Transforming is not available right now.');
       var layers = await I.layerPaths(root, function (item) { return ids.indexOf(item.stableTarget.strokeId) >= 0; }, false, layerIdx);
       var again = I.presentedState(root);
       if (!layers || layers.paths.length !== ids.length || !again || !samePin(again.pin, g.pin)) return notice(root, 'The document changed during the drag — nothing was changed.');
       var result;
-      try { result = await route.batchStrokes(layers.layerUid, layers.frame, I.transformSteps(root, layers.paths, m)); } catch (_) { result = null; }
+      var steps;
+      try { steps = I.transformSteps(root, layers.paths, m); } catch (_) { steps = null; }
+      if (steps && JSON.stringify(steps).length > MAX_BYTES) return notice(root, 'Too much to transform at once \u2014 select fewer items.');
+      try { result = steps ? await route.batchStrokes(layers.layerUid, layers.frame, steps) : null; } catch (_) { result = null; }
       if (!result || result.status !== 'applied') return notice(root, 'The transform could not be applied.');
       await reselect(ids, layerIdx);
     }
@@ -198,5 +222,5 @@
     return { move: move, end: end, cancel: cancel, owns: function () { return !!handle; } };
   }
   function bind(root) { return Object.freeze({ begin: function (e, abort) { return begin(root, e, abort); } }); }
-  return Object.freeze({ bind: bind, begin: begin, hitHandle: hitHandle, matrixOf: matrixOf, unsupported: unsupported });
+  return Object.freeze({ bind: bind, begin: begin, hitHandle: hitHandle, matrixOf: matrixOf, unsupported: unsupported, unstorable: unstorable });
 }));

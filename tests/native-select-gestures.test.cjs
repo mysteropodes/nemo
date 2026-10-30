@@ -35,6 +35,7 @@ function harness(items, options = {}) {
     NemoNativeObjectProject: { desktop: () => session, selectLayerUI: () => true },
     NemoNativeViewportUnderlay: { canvasMapping: { point: (e) => ({ x: e.clientX, y: e.clientY }), transform: () => [1, 0, 0, 1, 0, 0] } },
     NemoNativeObjectLabs: { desktop: () => ({ batchStrokes: async (layerUid, frame, steps) => {
+      steps.forEach((s) => { const it = store.find((i) => i.stableTarget.strokeId === s.reshape.stableTarget.strokeId); s.before = it.segments.map((q) => q.point); });
       batches.push({ layerUid, frame, steps });
       if (options.refuse) return { status: 'invalid', reason: 'refused' };
       steps.forEach((s) => { const it = store.find((i) => i.stableTarget.strokeId === s.reshape.stableTarget.strokeId);
@@ -65,7 +66,8 @@ function harness(items, options = {}) {
     ids: () => root.selectedPaths.map((p) => p.data.strokeId) };
   return h;
 }
-const pts = (step) => JSON.parse(JSON.stringify(step.reshape.geometry.segments.map((s) => [s.point.x, s.point.y].map((v) => Math.round(v * 1e6) / 1e6 + 0))));
+// The anchors a plain stroke ends at: its pre-batch anchors (recorded by the harness) mapped by the step's record-space matrix.
+const pts = (step) => { const m = step.reshape.matrix; return step.before.map((q) => [m[0] * q[0] + m[2] * q[1] + m[4], m[1] * q[0] + m[3] * q[1] + m[5]].map((v) => Math.round(v * 1e6) / 1e6 + 0)); };
 const BIG = quad('A', 20, 20, 120, 120), FAR = quad('B', 150, 150, 190, 190);
 
 test('a marquee selects the items whose bounds meet the rectangle, previews it live, and writes nothing', async () => {
@@ -177,18 +179,84 @@ test('a click that does not drag still selects; a press on a handle that does no
   assert.deepEqual(h.batches, []);
 });
 
-test('images, text, bitmap brushes and an unresolved dab have no native transform here: a drag is refused with a notice naming them, and nothing is written', async () => {
-  const h = harness([quad('IMG', 20, 20, 120, 120, { role: 'raster' }), quad('T', 140, 20, 190, 60, { role: 'text' })]);
-  await h.select(35, 35);
-  h.press(35, 35); h.drag(60, 60); await settle(); await h.release(60, 60); await settle();
-  assert.deepEqual(h.batches, []);
-  assert.ok(h.toasts.some((t) => /images/.test(t) && /not available/.test(t)), h.toasts.join('|'));
+test('bitmap brushes and an unresolved dab have no native transform here: a drag is refused with a notice naming them, and nothing is written', async () => {
   const refused = async (extra, pattern) => { const x = harness([quad('X', 20, 20, 120, 120, extra)]); await x.select(35, 35);
     x.press(35, 35); x.drag(60, 60); await settle(); await x.release(60, 60); await settle();
     assert.deepEqual(x.batches, [], pattern); assert.ok(x.toasts.some((t) => pattern.test(t)), x.toasts.join('|')); };
-  await refused({ role: 'text' }, /text/);
   await refused({ role: 'brush', brush: 'bitmap', group: 'g' }, /bitmap brushes/);
   await refused({ role: 'brush', brush: 'copy', group: 'g' }, /brush dabs/);
+});
+
+// #2372 SEL-F6C: an image and a text block are transformed by the same record-space matrix batch step as every other painted family
+// (the engine maps the stored rect / anchor), so one gesture over any selection is one commit.
+const IMG = quad('IMG', 20, 20, 120, 120, { role: 'raster', filled: true }), TXT = quad('T', 140, 20, 190, 60, { role: 'text', filled: true });
+const gesture = async (h, from, to, mods) => { h.press(from[0], from[1]); h.drag(to[0], to[1], mods); await settle(); await h.release(to[0], to[1], mods); await settle(); };
+
+test('dragging an image is ONE batch with the exact delta as a record-space matrix, and the selection is re-read', async () => {
+  const h = harness([IMG, FAR]);
+  await h.select(70, 70); assert.deepEqual(h.ids(), ['IMG']);
+  h.press(70, 70); h.drag(95, 85); await settle(); assert.equal(h.batches.length, 0, 'no write while dragging');
+  assert.ok(h.svg().children.some((c) => c.tag === 'path' && /^M 45 35/.test(c.attrs.d)), 'the live preview is the rect moved by (25,15)');
+  await h.release(95, 85); await settle();
+  assert.equal(h.batches.length, 1); assert.equal(h.batches[0].steps.length, 1);
+  assert.deepEqual(h.batches[0].steps[0].reshape.stableTarget, IMG.stableTarget);
+  assert.deepEqual(M(h.batches[0].steps[0]), [1, 0, 0, 1, 25, 15]);
+  assert.equal(h.batches[0].steps[0].reshape.geometry, undefined);
+  assert.deepEqual(h.ids(), ['IMG']);
+  assert.deepEqual(h.toasts, []);
+});
+
+test('a text block moves and scales in one commit; a turn or a mirror of text, and a mirror or a shear of an image, are refused with a notice and write nothing', async () => {
+  let h = harness([TXT]); await h.select(165, 40);
+  await gesture(h, [165, 40], [185, 60]);
+  assert.equal(h.batches.length, 1); assert.deepEqual(M(h.batches[0].steps[0]), [1, 0, 0, 1, 20, 20]); assert.deepEqual(h.toasts, []);
+  h = harness([TXT]); await h.select(165, 40);
+  await gesture(h, [190, 60], [240, 100]);
+  assert.equal(h.batches.length, 1, 'a corner handle scales text about the opposite corner');
+  assert.deepEqual(M(h.batches[0].steps[0]), [2, 0, 0, 2, -140, -20]);
+  const none = async (items, press, to, pattern, pick = [165, 40]) => { const x = harness(items); await x.select(pick[0], pick[1]);
+    await gesture(x, press, to); assert.deepEqual(x.batches, [], String(pattern)); assert.ok(x.toasts.some((t) => pattern.test(t) && /not available/.test(t)), x.toasts.join('|')); };
+  await none([TXT], [165, 25], [180, 40], /Rotating text/);
+  await none([TXT], [190, 60], [110, 100], /Flipping text/);
+  await none([IMG], [120, 70], [-40, 70], /Flipping images/, [70, 70]);
+});
+
+test('a turned image scales along its own axes, not along the world axes (a shear has no stored form)', async () => {
+  const c = Math.SQRT1_2, turned = quad('IMG', 20, 20, 120, 120, { role: 'raster', filled: true, matrix: [c, c, -c, c, 70 - c * 70 + c * 70, 70 - c * 70 - c * 70] });
+  const h = harness([turned]); await h.select(70, 70);
+  assert.deepEqual(h.ids(), ['IMG']);
+  const box = h.root.selectedPaths[0].bounds;
+  await gesture(h, [box.x + box.width, box.y + box.height], [box.x + box.width + 40, box.y + box.height]);
+  assert.deepEqual(h.batches, []);
+  assert.ok(h.toasts.some((t) => /Skewing images/.test(t) && /not available/.test(t)), h.toasts.join('|'));
+});
+
+test('a mixed selection of a ribbon, an image and a text block moves as ONE batch of three matrices', async () => {
+  const ribbon = quad('R', 20, 150, 120, 170, { role: 'ribbon', center: centre });
+  const h = harness([ribbon, IMG, TXT]);
+  await h.select(70, 160);
+  await h.select(70, 70, true); await h.select(165, 40, true);
+  assert.deepEqual(h.ids(), ['R', 'IMG', 'T']);
+  await gesture(h, [165, 40], [175, 55]);
+  assert.equal(h.batches.length, 1, 'one history entry for the mixed gesture');
+  assert.deepEqual(h.batches[0].steps.map((s) => s.reshape.stableTarget.strokeId), ['R', 'IMG', 'T']);
+  h.batches[0].steps.forEach((s) => assert.deepEqual(M(s), [1, 0, 0, 1, 10, 15]));
+});
+
+test('the image matrix is conjugated into its own frame (the listing matrix of a posed image)', async () => {
+  const posed = quad('IMG', 20, 20, 60, 60, { role: 'raster', filled: true, matrix: [2, 0, 0, 2, 10, 0] });
+  const h = harness([posed]); await h.select(100, 40);
+  await gesture(h, [100, 40], [120, 50]);
+  assert.deepEqual(M(h.batches[0].steps[0]), [1, 0, 0, 1, 10, 5], 'a world move of (20,10) is (10,5) in a frame posed at scale 2');
+});
+
+test('Escape mid-drag of an image or text writes nothing', async () => {
+  for (const item of [IMG, TXT]) {
+    const h = harness([item]); await h.select(item.bounds[0] + 10, item.bounds[1] + 10);
+    h.press(item.bounds[0] + 10, item.bounds[1] + 10); h.drag(item.bounds[0] + 40, item.bounds[1] + 30); await settle();
+    h.key('Escape'); await h.release(item.bounds[0] + 40, item.bounds[1] + 30); await settle();
+    assert.deepEqual(h.batches, [], item.role); assert.deepEqual(h.listeners, []); assert.deepEqual(h.toasts, []);
+  }
 });
 
 test('a document that changed during the drag is not written over, and a refused batch says so', async () => {
@@ -241,7 +309,8 @@ test('the matrix is the gesture conjugated into the record space of a posed reco
   assert.equal(h.batches.length, 1, 'one history entry for the whole gesture');
   const [shape, plain] = h.batches[0].steps;
   assert.deepEqual(M(shape), [1, 0, 0, 1, 10, 5], 'a world move of (20,10) is (10,5) in a record posed at scale 2');
-  assert.ok(plain.reshape.geometry && !plain.reshape.matrix, 'a plain stroke still goes by its geometry');
+  assert.ok(plain.reshape.matrix && !plain.reshape.geometry, 'a plain stroke goes by the matrix too');
+  assert.deepEqual(M(plain), [1, 0, 0, 1, 20, 10]);
 });
 
 test('a handle scale of a shape uses the baseline pivot (the opposite corner; Alt the centre) and a ring turn rotates about the box centre', async () => {
@@ -285,4 +354,39 @@ test('a ribbon keeps its linked fill: the fill is selected as its ribbon and the
   assert.equal(h.batches.length, 1);
   assert.deepEqual(h.batches[0].steps.map((s) => s.reshape.stableTarget.strokeId), ['R']);
   assert.deepEqual(M(h.batches[0].steps[0]), [1, 0, 0, 1, 0, 40]);
+});
+
+test('a plain stroke moves by the matrix route: its payload has no geometry and does not grow with its anchor count', async () => {
+  const dense = quad('D', 20, 20, 120, 120, { segments: Array.from({ length: 400 }, (_, i) => seg(20 + (i % 100), 20 + Math.floor(i / 4))), count: 400 });
+  const h = harness([dense, FAR]);
+  await h.select(35, 35);
+  h.press(35, 35); h.drag(65, 50); await settle(); await h.release(65, 50); await settle();
+  assert.equal(h.batches.length, 1);
+  const step = h.batches[0].steps[0];
+  assert.deepEqual(Object.keys(step.reshape).sort(), ['matrix', 'stableTarget']);
+  assert.deepEqual(M(step), [1, 0, 0, 1, 30, 15]);
+  assert.ok(JSON.stringify(h.batches[0].steps.map((x) => x.reshape)).length < 400, 'six numbers, not 400 anchors');
+});
+
+test('thirty plain strokes of 400 anchors each move as ONE batch well under the 65536-byte request cap', async () => {
+  const items = Array.from({ length: 30 }, (_, i) => quad('P' + i, 20, 20, 120, 120, { segments: Array.from({ length: 400 }, (_, k) => seg(20 + (k % 100), 20 + Math.floor(k / 4))), count: 400 }));
+  const h = harness(items);
+  h.root.selectedPaths = [];
+  await h.select(35, 35);
+  h.root.selectedPaths = (await Intent.layerPaths(h.root, () => true, false, 0)).paths;
+  h.press(35, 35); h.drag(65, 50); await settle(); await h.release(65, 50); await settle();
+  assert.equal(h.toasts.length, 0, h.toasts.join('|'));
+  assert.equal(h.batches.length, 1, 'one batch');
+  assert.equal(h.batches[0].steps.length, 30);
+  assert.ok(h.batches[0].steps.every((st) => st.reshape.matrix && !st.reshape.geometry));
+  assert.ok(JSON.stringify(h.batches[0].steps.map((x) => x.reshape)).length < 65536 / 4, 'far under the cap');
+});
+
+test('a batch whose payload would pass the byte cap is refused with a notice and writes nothing', async () => {
+  const h = harness([BIG, FAR]);
+  await h.select(35, 35);
+  h.root.NemoSelectCanvasIntent = { ...Intent, transformSteps: () => [{ reshape: { stableTarget: BIG.stableTarget, matrix: [1, 0, 0, 1, 1, 1], pad: 'x'.repeat(70000) } }] };
+  h.press(35, 35); h.drag(65, 50); await settle(); await h.release(65, 50); await settle();
+  assert.equal(h.batches.length, 0);
+  assert.ok(h.toasts.some((t) => /Too much/.test(t)), h.toasts.join('|'));
 });

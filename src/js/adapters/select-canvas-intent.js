@@ -266,14 +266,16 @@
   // The top-most presented stroke within 8 screen pixels of the click, or null, as the baseline did: the active layer is
   // tested first, then every other visible unlocked layer from the topmost down (#2372). The hit carries its layer
   // (data.nativeLayerIndex/Uid) so applyPick can activate it. Only records whose bounds reach the click have their geometry
-  // read; a hidden or locked layer (the active one too) is never read.
-  async function pick(root, clientX, clientY) {
+  // read; a hidden or locked layer (the active one too) is never read. An integer `only` tests that one layer alone (the Tween
+  // Reassign flow clicks the elements of its own layer, as the baseline layer.hitTest did).
+  async function pick(root, clientX, clientY, only) {
     var s = presentedSession(root);
     if (!s) return undefined;
     var w = worldPoint(root, clientX, clientY, s.pin, s.presentation), t = 8 * w.perPixel, active = root.state.activeLayerIdx;
     var Point = root.Point || root.paper.Point, at = new Point(w.x, w.y), order = [active], reach = function (_item, b) {
       return w.x >= b[0] - t && w.x <= b[2] + t && w.y >= b[1] - t && w.y <= b[3] + t; };
-    for (var k = s.pin.layers.length - 1; k >= 0; k--) if (k !== active) order.push(k);
+    if (Number.isInteger(only)) order = [only];
+    else for (var k = s.pin.layers.length - 1; k >= 0; k--) if (k !== active) order.push(k);
     for (var n = 0; n < order.length; n++) {
       var info = s.pin.layers[order[n]];
       if (!info || info.locked === true || info.visible === false) continue;
@@ -363,16 +365,11 @@
     var inv = [p[3] / d, -p[1] / d, -p[2] / d, p[0] / d, (p[2] * p[5] - p[3] * p[4]) / d, (p[1] * p[4] - p[0] * p[5]) / d];
     return mul(inv, mul(m, p));
   }
-  // The Select gesture's batch steps: a plain stroke takes its transformed world geometry (the route the knife and sculpt use); every other
-  // painted record (ribbon, fill, shape, texture anchor) is mapped by the engine through a record-space matrix, which also carries its linked
-  // fill, texture copies, gradient and shape box. `paths` are fresh presented paths (untransformed) and `m` the world affine.
+  // The Select gesture's batch steps: EVERY painted record (plain stroke, ribbon, fill, shape, texture anchor) is mapped by the engine through
+  // a record-space matrix (six numbers however many anchors it has), which also carries its linked fill, texture copies, gradient end
+  // points and shape box. `paths` are fresh presented paths (untransformed) and `m` the world affine.
   function transformSteps(root, paths, m) {
-    var Matrix = root.Matrix || root.paper.Matrix, world = new Matrix(m[0], m[1], m[2], m[3], m[4], m[5]);
-    return paths.map(function (p) {
-      var t = p.data.nativeStableTarget;
-      if (p.data.nativeRole === 'plain') { var moved = p.clone({ insert: false }); moved.transform(world); return { reshape: { stableTarget: t, geometry: recordGeometry(moved, p.data.nativeMatrix) } }; }
-      return { reshape: { stableTarget: t, matrix: inRecordSpace(p.data.nativeMatrix, m) } };
-    });
+    return paths.map(function (p) { return { reshape: { stableTarget: p.data.nativeStableTarget, matrix: inRecordSpace(p.data.nativeMatrix, m) } }; });
   }
 
   // What a pick depends on: a repaint may re-project the layer rows (the pointer context counts those) but a pick still
@@ -421,5 +418,5 @@
   }
 
   return Object.freeze({ create: create, hitHandles: hitHandles, objectProject: objectProject, presented: presented,
-    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, transformSteps: transformSteps, layerPaths: layerPaths, marquee: marquee, pick: pick, pickContext: pickContext, applyPick: applyPick, resolvePick: resolvePick });
+    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, transformSteps: transformSteps, inRecordSpace: inRecordSpace, layerPaths: layerPaths, marquee: marquee, pick: pick, pickContext: pickContext, applyPick: applyPick, resolvePick: resolvePick });
 }));

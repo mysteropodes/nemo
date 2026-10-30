@@ -161,6 +161,19 @@ pub(crate) fn plan_tween(
             &mut bakes,
         )?;
     }
+    // Baseline harmonizeAfterEdit (#126): the corrected frame is re-tweened as a key, then stays a soft,
+    // manually edited in-between (only when a drawn key still follows it).
+    if let Some(&frame) = request.frame.value() {
+        if keys.contains(&frame) && keys.iter().any(|&k| k > frame) {
+            let soft = next.layers[index]
+                .timing
+                .value()
+                .ok_or(invalid)?
+                .soften_key(frame, next.total_frames)
+                .map_err(|_| invalid)?;
+            next.layers[index].timing = Presence::Present(soft);
+        }
+    }
     next.tweens = Presence::Present(store);
     crate::revision::ObjectSnapshot::validate_drawing(&next).map_err(|_| invalid)?;
     Ok(Some(TweenPlan {

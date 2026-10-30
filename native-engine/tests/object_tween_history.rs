@@ -338,6 +338,14 @@ fn native_tween_generation_matches_baseline_with_one_undo_redo_and_reopen() {
             assert_eq!(o.content_revision(), 1);
             assert_frames(&head(&o), &c["expected"], name);
             bitmap::assert_native_bitmap_resources(&o, &c["expected"]);
+            if input["command"].as_str() == Some("split") {
+                // Baseline #126: the corrected frame is re-tweened as a key, then stays a SOFT manually edited in-between.
+                let doc = head(&o);
+                let timing = doc.layers[0].timing.value().unwrap();
+                assert_eq!(timing.exposure(2), ("interpolated", Some(2), true), "{name}");
+                assert_eq!(timing.exposure(1), ("interpolated", Some(1), false), "{name}");
+                assert_eq!(timing.exposure(0).0, "key", "{name}");
+            }
             let after = bytes(&o);
             assert_eq!(dispatch(&mut o, &q), reply);
             assert_eq!(bytes(&o), after);
