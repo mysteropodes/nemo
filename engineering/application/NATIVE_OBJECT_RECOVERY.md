@@ -73,14 +73,21 @@ They are not capabilities-v2/MCP operations, so no engine ownership entry exists
 ## Authority lock
 
 `native_project_file_snapshot` serializes the whole project while holding the
-native authority mutex. Measured on a 2600-object project (1.58 MB, debug build,
-`cargo test --lib recovery_lock_hold -- --ignored --nocapture`), a contender thread
-that takes the same lock was blocked 83.7 ms by the inline variant, over the 16 ms
-budget. The write command therefore uses
-`native_project_recovery_snapshot`, which holds the lock only to acquire the
+native authority mutex. Measured with a contender thread that takes the same lock
+(`cargo test --lib recovery_lock_hold -- --ignored --nocapture`, 2600 objects,
+1.58 MB, 30 samples, `NEMO_RECOVERY_OBJECTS` scales it):
+
+| variant | release | debug |
+|---|---|---|
+| inline (`native_project_file_snapshot`) max stall | 8.71 ms | 83.7 ms |
+| detached (`native_project_recovery_snapshot`) max stall | 0.02 ms | 0.03 ms |
+
+Inline is under the 16 ms budget in release at this size, but the hold grows
+linearly with the file (about 5.5 ms per MB in release, so about 175 ms at the
+32 MiB cap) and a 30 s periodic writer would repeat it. The write command therefore
+uses the detached variant: the lock covers only the O(1) acquisition of the
 immutable Arc-shared snapshot (`detached_project_file_serializer` in the engine)
-and encodes after releasing it: contender stall 0.03 ms. Save As keeps its existing
-inline path unchanged.
+and the encoder runs after release. Save As keeps its existing inline path.
 
 ## Not covered
 
