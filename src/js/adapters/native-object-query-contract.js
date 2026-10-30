@@ -58,6 +58,46 @@
       v.kind === 'presentation' && integer(v.atRevision, 0) && bounded(v.documentSnapshotId) && bounded(v.contextId) &&
       integer(v.frame, 0, 4294967295) && bounded(v.workId) && integer(v.viewGeneration, 1) || fail('invalid presentation query result');
   }
+  // #2255: the widget presentation view (every widget layer's pad, puck and axes at the presented frame).
+  const WIDGET_REASONS = ['control', 'expression', 'sample', 'parent', 'parent_geometry', 'canvas'];
+  function widgetView(v) {
+    return exact(v, ['kind', 'contextId', 'frame', 'workId', 'viewGeneration', 'cursor', 'limit'], []) && v.kind === 'widget' &&
+      v.contextId === 'scene-root' && integer(v.frame, 0, 4294967295) && bounded(v.workId) && integer(v.viewGeneration, 1) &&
+      integer(v.cursor, 0, 1024) && integer(v.limit, 1, 4);
+  }
+  function widgetPayload(v) {
+    return exact(v, ['atRevision', 'documentSnapshotId', 'view'], []) && integer(v.atRevision, 0) &&
+      text(v.documentSnapshotId) && widgetView(v.view) || fail('invalid widget query payload');
+  }
+  function widgetAxis(a) {
+    return exact(a, ['key', 'min', 'max', 'rest', 'label', 'value'], []) && typeof a.key === 'string' && typeof a.label === 'string' &&
+      finite(a.min) && finite(a.max) && finite(a.rest) && (a.value === null || finite(a.value));
+  }
+  function widgetItem(i) {
+    if (!exact(i, ['layerUid', 'visible', 'locked', 'kind', 'x', 'y', 'center', 'angle', 'size', 'puck', 'rest', 'unavailable'], []) ||
+      !text(i.layerUid) || typeof i.visible !== 'boolean' || typeof i.locked !== 'boolean' || !['joystick', 'slider'].includes(i.kind) ||
+      !widgetAxis(i.x) || (i.kind === 'slider' ? i.y !== null : !widgetAxis(i.y))) return false;
+    const placed = i.center !== null, reason = i.unavailable;
+    if (reason === null ? !(placed && point(i.puck)) : reason === 'control' ? !(placed && i.puck === null) :
+      !(WIDGET_REASONS.includes(reason) && !placed && i.puck === null)) return false;
+    return placed ? point(i.center) && point(i.size) && point(i.rest) && finite(i.angle) :
+      i.size === null && i.rest === null && i.angle === null;
+  }
+  function widgetResult(v) {
+    return exact(v, ['kind', 'atRevision', 'documentSnapshotId', 'contextId', 'frame', 'workId', 'viewGeneration', 'cursor',
+      'total', 'nextCursor', 'items'], []) && v.kind === 'widget' && integer(v.atRevision, 0) && text(v.documentSnapshotId) &&
+      v.contextId === 'scene-root' && integer(v.frame, 0, 4294967295) && bounded(v.workId) && integer(v.viewGeneration, 1) &&
+      integer(v.cursor, 0, 1024) && integer(v.total, 0, 1024) && (v.nextCursor === null || integer(v.nextCursor, 0, 1024)) &&
+      Array.isArray(v.items) && v.items.length <= 4 && v.items.every(widgetItem) || fail('invalid widget query result');
+  }
+  function widgetCorrelate(p, v) {
+    widgetPayload(p); widgetResult(v);
+    const end = v.cursor + v.items.length;
+    if (v.atRevision !== p.atRevision || v.documentSnapshotId !== p.documentSnapshotId || ['contextId', 'frame', 'workId', 'viewGeneration', 'cursor']
+      .some((k) => v[k] !== p.view[k]) || v.items.length > p.view.limit || end > v.total || (end === v.total ? v.nextCursor !== null : v.nextCursor !== end))
+      fail('widget query result does not match its request');
+    return true;
+  }
   function pageResult(p, v) {
     if (!exact(v, ['kind', 'cursor', 'total', 'nextCursor', 'items'], []) || v.kind !== p.kind ||
       !integer(v.cursor, 0, 4294967295) || !integer(v.total, 0) ||
@@ -90,6 +130,7 @@
     if (object(value) && object(value.view) && value.view.kind === 'subselect') return Subselect.viewPayload(value);
     if (object(value) && object(value.view) && value.view.kind === 'presentation') return presentationPayload(value);
     if (object(value) && object(value.view) && value.view.kind === 'imageMesh') return imagePayload(value);
+    if (object(value) && object(value.view) && value.view.kind === 'widget') return widgetPayload(value);
     if (typeof legacyValidator === 'function') return legacyValidator(value);
     if (legacyValidator) {
       legacyValidator.exact(value, ['atRevision', 'stableTarget'], [], 'object query');
@@ -103,6 +144,7 @@
     if (object(value) && value.kind === 'subselect') return Subselect.viewResult(value);
     if (object(value) && value.kind === 'presentation') return presentationResult(value);
     if (object(value) && value.kind === 'imageMesh') { if (!imageResult(value)) fail('invalid image-mesh query result'); return; }
+    if (object(value) && value.kind === 'widget') return widgetResult(value);
     if (typeof legacyValidator === 'function') return legacyValidator(value);
     if (legacyValidator) {
       legacyValidator.exact(value, ['atRevision', 'documentSnapshotId', 'object'], [], 'object read result');
@@ -121,6 +163,11 @@
       if (documentId !== undefined && value.documentSnapshotId !== `native-object:${documentId}:${p.atRevision}`)
         fail('presentation snapshot mismatch');
       return true;
+    }
+    if (object(p) && object(p.view) && p.view.kind === 'widget') {
+      const w = object(value) && own(value, 'result') ? value.result : value;
+      if (documentId !== undefined && w.documentSnapshotId !== `native-object:${documentId}:${p.atRevision}`) fail('widget snapshot mismatch');
+      return widgetCorrelate(p, w);
     }
     if (!object(p) || !object(p.view) || p.view.kind !== 'imageMesh') {
       if (typeof legacyCorrelator === 'function') return legacyCorrelator(p, value);
@@ -146,6 +193,6 @@
   ['result.subselect.stableTarget.contextId','result.subselect.stableTarget.layerUid','result.subselect.stableTarget.strokeId',
     'payload.view.preview.stableTarget.contextId','payload.view.preview.stableTarget.layerUid','payload.view.preview.stableTarget.strokeId'].forEach(p=>paths.add(p));
   const knownPath = paths.has.bind(paths);
-  paths.has = p => knownPath(p) || /^result\.items\.[0-7]\.stableTarget\.(contextId|layerUid|strokeId)$/.test(p);
+  paths.has = p => knownPath(p) || /^result\.items\.[0-7]\.stableTarget\.(contextId|layerUid|strokeId)$/.test(p) || /^result\.items\.[0-3]\.layerUid$/.test(p);
   return Object.freeze({ payload, result, correlate, paths });
 }));

@@ -11375,6 +11375,7 @@ window.renderRigModeUI=renderRigModeUI;
     });
   });
   document.getElementById('btn-rig-auto-assign').addEventListener('click',function(){
+    if(window.NemoNativeObjectRigUI&&NemoNativeObjectRigUI.panel(window,'autoAssign'))return;
     var ld=state.layers[state.activeLayerIdx];
     if(!ld)return;
     if(!canEditActiveLayer())return;
@@ -11404,10 +11405,12 @@ window.renderRigModeUI=renderRigModeUI;
     else showToast(res.n+(window.SM&&SM.t?SM.t('rigAutoAssignedToast'):SM.t('toastShapesAutoAssignedSuffix')));
   });
   document.getElementById('btn-rig-commit').addEventListener('click',function(){
+    if(window.NemoNativeObjectRigUI&&NemoNativeObjectRigUI.panel(window,'commit'))return;
     var ld=state.layers[state.activeLayerIdx];
     if(ld)rigCommitFrame(ld);
   });
   document.getElementById('btn-rig-reset').addEventListener('click',function(){
+    if(window.NemoNativeObjectRigUI&&NemoNativeObjectRigUI.panel(window,'reset'))return;
     var ld=state.layers[state.activeLayerIdx];
     if(!ld||!ld.rig)return;
     if(!canEditActiveLayer())return;
