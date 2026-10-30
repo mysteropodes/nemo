@@ -17,7 +17,7 @@ class Node{
  setAttribute(k,v){this.attrs[k]=String(v);}
  addEventListener(type,fn){this.listeners.set(type,[...this.listeners.get(type)||[],fn]);}
  removeEventListener(type,fn){this.listeners.set(type,(this.listeners.get(type)||[]).filter(x=>x!==fn));}
- async fire(type){for(const fn of [...this.listeners.get(type)||[]])await fn({target:this});}
+ async fire(type,extra){for(const fn of [...this.listeners.get(type)||[]])await fn({target:this,type,...extra});}
  get isConnected(){return this.tagName==='#DOCUMENT'||!!this.parentNode&&this.parentNode.isConnected;}
 }
 function tree(n){return [n,...n.children.flatMap(tree)];}
@@ -25,7 +25,7 @@ function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve
 const tick=()=>new Promise(r=>setImmediate(r));
 const target={contextId:'opaque scene:α',layerUid:'layer / value',strokeId:'stroke:β'};
 function fixture(options={}){
- const doc=new Node(null,'#document');doc.createElement=t=>new Node(doc,t);const container=doc.createElement('div');doc.appendChild(container);
+ const doc=new Node(null,'#document');doc.defaultView={_scrubLiveActive:false};doc.createElement=t=>new Node(doc,t);const container=doc.createElement('div');doc.appendChild(container);
  let pin={instanceId:'instance-value',documentId:'document-value',lifecycleGeneration:1,contentRevision:7,documentSnapshotId:'native-object:document-value:7'},frame=10,generation=2,ready=true;
  const reads=[],writes=[],nativeValues=options.values||[0,64],descriptor={property:'position',dimension:nativeValues.length,animatable:options.animatable!==false,authored:{expressionEnabled:!!options.expression}};
  function context(){return {pin,frame,viewGeneration:generation,presented:{...pin,available:ready,presentation:{...pin,owner:'native',status:ready?'presented':'pending',frame}}};}
@@ -34,7 +34,7 @@ function fixture(options={}){
   async editProperty(payload,expected,current){writes.push({payload:copy(payload),expected:copy(expected),current});assert.equal(current(),true);return options.writer?options.writer(payload,expected,current):{applied:true,historyEntriesAdded:1};}};
  if(options.readonly)delete ports.editProperty;
  const editor=Value.create(container,ports,target,descriptor);
- return {doc,container,ports,editor,reads,writes,context,response,nativeValues,
+ return {doc,win:doc.defaultView,container,ports,editor,reads,writes,context,response,nativeValues,
   inputs:()=>tree(editor.element).filter(n=>n.type==='number'),button:label=>tree(editor.element).find(n=>n.tagName==='BUTTON'&&n.textContent===label),status:()=>tree(editor.element).find(n=>n.attrs.role==='status').textContent,
   frame(v){frame=v;},generation(){generation++;},replace(){pin={...pin,lifecycleGeneration:pin.lifecycleGeneration+1};},revision(){pin={...pin,contentRevision:8,documentSnapshotId:'native-object:document-value:8'};generation++;},ready(v){ready=v;},foreign(){pin={...pin,documentId:'another-document'};}};
 }
@@ -80,4 +80,59 @@ test('busy fields cannot submit duplicate commands and a native no-op remains a 
 test('malformed receipt and owner replacement cannot claim a current accepted edit',async()=>{
  for(const result of [null,{applied:true,historyEntriesAdded:0},{applied:false,historyEntriesAdded:1},{applied:true,historyEntriesAdded:1,extra:true}]){const h=fixture({writer:async()=>result});await h.editor.refresh();await h.button('Add key').fire('click');assert.match(h.status(),/refused/);assert.equal(h.writes.length,1);}
  const wait=deferred(),h=fixture({writer:()=>wait.promise});await h.editor.refresh();const acting=h.button('Add key').fire('click');h.replace();wait.resolve({applied:true,historyEntriesAdded:1});await acting;assert.match(h.status(),/view changed/);assert.doesNotMatch(h.status(),/updated/);
+});
+test('fields carry baseline classes, X/Y labels, unit span and scrub step; port dimLabels overrides the default',async()=>{
+ const h=fixture();await h.editor.refresh();const all=tree(h.editor.element);
+ assert.equal(h.editor.element.className,'native-motion-property-value motion-fields');
+ assert.ok(h.inputs().every(n=>n.className==='pi scrub motion-val'&&n.step==='1'&&n.dataset.step==='1'));
+ assert.deepEqual(all.filter(n=>n.className==='motion-dim-label').map(n=>n.textContent),['X','Y']);
+ assert.equal(all.filter(n=>n.className==='motion-unit').length,0,'no unit span when the descriptor has no unit');
+ const one=fixture({values:[1]});await one.editor.refresh();assert.equal(tree(one.editor.element).filter(n=>n.className==='motion-dim-label').length,0);
+ const doc=h.doc,box=doc.createElement('div');doc.appendChild(box);
+ const e=Value.create(box,{...h.ports,dimLabels:()=>['W','H']},target,{property:'position',dimension:2,unit:'deg',animatable:true,authored:{}});
+ assert.deepEqual(tree(e.element).filter(n=>n.className==='motion-dim-label').map(n=>n.textContent),['W','H']);
+ assert.deepEqual(tree(e.element).filter(n=>n.className==='motion-unit').map(n=>n.textContent),['°']);
+});
+test('read-only rows grey their fields with a tooltip and never print a sentence',async()=>{
+ const h=fixture({readonly:true});await h.editor.refresh();
+ assert.ok(h.inputs().every(n=>n.disabled&&n.readOnly&&n.title==='Read-only'));assert.equal(h.status(),'');
+ assert.doesNotMatch(h.editor.element.textContent,/read-only/i);
+ const w=fixture({writer:async()=>{throw Error('no');}});await w.editor.refresh();w.inputs()[0].value='1';await w.inputs()[0].fire('change');
+ assert.match(w.status(),/^Property edit refused/);
+ const s=tree(w.editor.element).find(n=>n.attrs.role==='status');assert.equal(s.className,'native-motion-property-status');
+});
+
+const listenerCount=h=>(h.doc.listeners.get('pointerup')||[]).length+(h.doc.listeners.get('pointercancel')||[]).length;
+test('a scrub drag commits ONE native edit with the last value on release, not one per change',async()=>{
+ for(const end of ['pointerup','pointercancel']){
+  const h=fixture();await h.editor.refresh();const input=h.inputs()[0];h.win._scrubLiveActive=true;
+  for(let i=1;i<=30;i++){input.value=String(i);await input.fire('change');}
+  assert.equal(h.writes.length,0,'no edit while the drag is live');assert.equal(input.value,'30');assert.equal(listenerCount(h),2);
+  h.win._scrubLiveActive=false;await h.doc.fire(end);await tick();
+  assert.equal(h.writes.length,1);assert.deepEqual(h.writes[0].payload.action,{kind:'setValue',frame:10,values:[30,64]});assert.match(h.status(),/updated/);
+  await h.doc.fire(end);assert.equal(h.writes.length,1,'a second release is inert');assert.equal(listenerCount(h),0);
+ }
+});
+test('the closing change dispatched inside the pointerup window commits once after the flag drops',async()=>{
+ const h=fixture();await h.editor.refresh();const input=h.inputs()[1];h.win._scrubLiveActive=true;input.value='-7';
+ const closing=input.fire('change');h.win._scrubLiveActive=false;await closing;await tick();
+ assert.equal(h.writes.length,1);assert.deepEqual(h.writes[0].payload.action.values,[0,-7]);
+});
+test('typed values and Enter commit immediately and once; Escape reverts without an edit',async()=>{
+ const h=fixture();await h.editor.refresh();const input=h.inputs()[0];
+ input.value='12';await input.fire('keydown',{key:'Enter'});await input.fire('change');
+ assert.equal(h.writes.length,1);assert.deepEqual(h.writes[0].payload.action.values,[12,64]);assert.equal(listenerCount(h),0);
+ const e=fixture();await e.editor.refresh();const field=e.inputs()[0];field.value='99';let blurred=0;field.blur=()=>blurred++;
+ await field.fire('keydown',{key:'Escape'});assert.equal(field.value,'0');assert.equal(blurred,1);assert.equal(e.writes.length,0);
+ field.value='5';await field.fire('keydown',{key:'a'});assert.equal(field.value,'5');
+});
+test('cancel and dispose drop a pending scrub commit and remove the document listeners',async()=>{
+ for(const stop of [h=>h.editor.cancel(),h=>h.editor.dispose()]){
+  const h=fixture();await h.editor.refresh();h.win._scrubLiveActive=true;h.inputs()[0].value='8';await h.inputs()[0].fire('change');assert.equal(listenerCount(h),2);
+  stop(h);assert.equal(listenerCount(h),0);h.win._scrubLiveActive=false;await h.doc.fire('pointerup');await tick();assert.equal(h.writes.length,0);
+ }
+});
+test('a nonfinite value mid-drag never arms a commit',async()=>{
+ const h=fixture();await h.editor.refresh();h.win._scrubLiveActive=true;h.inputs()[0].value='';await h.inputs()[0].fire('change');
+ h.win._scrubLiveActive=false;await h.doc.fire('pointerup');assert.equal(h.writes.length,0);assert.equal(listenerCount(h),0);
 });

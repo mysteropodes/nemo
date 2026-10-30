@@ -13,7 +13,7 @@ fn display_filter_toggle_acquires_fresh_work_without_changing_source_or_document
     let before = f.retained_project();
     let mut request = f.raw.clone();
     let mut works = Vec::new();
-    for filter in ["none", "values", "none", "contrast", "dim"] {
+    for filter in ["none", "values", "none", "contrast", "dim", "mirrored", "values-mirrored"] {
         request["displayFilter"] = json!(filter);
         let receipt = f.run(&request.to_string()).unwrap();
         assert_eq!(receipt.status, "presented");
@@ -27,7 +27,7 @@ fn display_filter_toggle_acquires_fresh_work_without_changing_source_or_document
         // blue artwork and white pasteboard remain byte-identical before blit.
         assert_eq!(f.retained_project(), before);
     }
-    assert_eq!(f.trace.borrow().acquisitions, 5);
+    assert_eq!(f.trace.borrow().acquisitions, 7);
     assert_eq!(
         f.trace.borrow().filters,
         [
@@ -35,7 +35,9 @@ fn display_filter_toggle_acquires_fresh_work_without_changing_source_or_document
             ViewportDisplayFilter::Values,
             ViewportDisplayFilter::None,
             ViewportDisplayFilter::Contrast,
-            ViewportDisplayFilter::Dim
+            ViewportDisplayFilter::Dim,
+            ViewportDisplayFilter::Mirrored,
+            ViewportDisplayFilter::ValuesMirrored
         ]
     );
     assert_eq!(f.creations.get(), 1);

@@ -1,6 +1,6 @@
 //! Pinned CPU commands join existing numeric order to retained real contours.
 use crate::evaluation::object_scene_style_kernels::object_scene_style_item::{
-    style_of_record_at_frame, SceneItemStyle, StyleUnavailable,
+    style_of_record_posed, SceneItemStyle, StyleUnavailable,
 };
 use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::SceneSolid;
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFrameSelector};
@@ -69,7 +69,12 @@ impl<'a> ObjectPaintCommand<'a> {
         if record.vector().is_none() {
             return Ok(SceneItemStyle::solid_fill(self.solid().clone()));
         }
-        style_of_record_at_frame(record, self.entry.layer_opacity(), self.packet)
+        style_of_record_posed(
+            record,
+            self.entry.layer_opacity(),
+            self.packet,
+            self.entry.paint_pose(),
+        )
     }
 }
 

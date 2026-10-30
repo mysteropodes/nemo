@@ -9,6 +9,8 @@ pub(super) struct DisplayFilterBlitter {
     values: wgpu::RenderPipeline,
     contrast: wgpu::RenderPipeline,
     dim: wgpu::RenderPipeline,
+    /// Copy, values, contrast and dim, each sampled through `vs_mirror`.
+    mirrored: [wgpu::RenderPipeline; 4],
 }
 
 impl DisplayFilterBlitter {
@@ -46,13 +48,13 @@ impl DisplayFilterBlitter {
         });
         let shader =
             device.create_shader_module(wgpu::include_wgsl!("native_viewport_display_filter.wgsl"));
-        let pipeline = |entry| {
+        let stage = |vertex, entry| {
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(entry),
                 layout: Some(&pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &shader,
-                    entry_point: Some("vs_main"),
+                    entry_point: Some(vertex),
                     compilation_options: Default::default(),
                     buffers: &[],
                 },
@@ -73,12 +75,16 @@ impl DisplayFilterBlitter {
                 cache: None,
             })
         };
+        let pipeline = |entry| stage("vs_main", entry);
+        let mirrored = ["fs_copy", "fs_values", "fs_contrast", "fs_dim"]
+            .map(|entry| stage("vs_mirror", entry));
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
         Self {
             unfiltered: wgpu::util::TextureBlitter::new(device, format),
             values: pipeline("fs_values"),
             contrast: pipeline("fs_contrast"),
             dim: pipeline("fs_dim"),
+            mirrored,
             layout,
             sampler,
         }
@@ -100,6 +106,10 @@ impl DisplayFilterBlitter {
             ViewportDisplayFilter::Values => &self.values,
             ViewportDisplayFilter::Contrast => &self.contrast,
             ViewportDisplayFilter::Dim => &self.dim,
+            ViewportDisplayFilter::Mirrored => &self.mirrored[0],
+            ViewportDisplayFilter::ValuesMirrored => &self.mirrored[1],
+            ViewportDisplayFilter::ContrastMirrored => &self.mirrored[2],
+            ViewportDisplayFilter::DimMirrored => &self.mirrored[3],
         };
         let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("native-display-filter-source"),

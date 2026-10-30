@@ -11,7 +11,7 @@ const turn=()=>new Promise(setImmediate);
 function deferred(){let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};}
 function host(){
   const calls=[];let installed=false,revision=0,edited=false,undo=false,preview='presented',failure=null;
-  let reference=null;const copies=[];
+  let reference=null,newFailure=null;const copies=[];
   const info=()=>({apiVersion:2,instanceId:'instance',documentId:'document',lifecycleGeneration:1,
     documentSnapshotId:'snapshot-'+revision,contentRevision:revision,canvasW:320,canvasH:180,fps:24,totalFrames:21,
     documentDigest:(edited?'b':'a').repeat(64),byteCount:edited?200000:10000,layers:[{layerUid:'drawing'}],reference,
@@ -19,6 +19,10 @@ function host(){
   async function invoke(command,args){
     const r=args?JSON.parse(args.requestJson):null;calls.push({command,r});
     if(command==='nemo_native_object_client_status')return {...info(),available:installed};
+    if(command==='nemo_native_object_bootstrap'&&r.newProject){
+      if(newFailure){const e=newFailure;newFailure=null;throw e;}
+      installed=true;return {...info(),requestId:r.requestId,resourceCount:0,viewportAvailable:false};
+    }
     if(command==='nemo_native_object_bootstrap'){
       assert.equal(r.projectOnly,true);assert.equal(typeof r.sourcePath,'string');assert.equal('documentJson' in r,false);
       if(r.sourcePath==='/opacity.json')throw {code:'unsupported_format'};
@@ -56,7 +60,7 @@ function host(){
       externalEffectDisposition:'committed',errorCode:null,artifactFiles:['frame_0001.png'],published:true,cleanupComplete:true};
     throw Error('Unexpected command: '+command);
   }
-  return {invoke,info,calls,copies,preview(value){preview=value;},fail(value){failure=value;}};
+  return {invoke,info,calls,copies,preview(value){preview=value;},fail(value){failure=value;},failNew(e){newFailure=e;}};
 }
 function session(h){return Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{x:0,y:0,width:320,height:180},
   physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0});}
@@ -145,6 +149,20 @@ test('a first Open refused before dispatch returns to idle, so a later Open stil
   await assert.rejects(s.openPath('/outside.json'),(e)=>e.details.disposition==='notDispatched');
   assert.equal(s.blocksLegacy(),false);assert.equal(s.isActive(),false);assert.equal(s.isIndeterminate(),false);
   await s.openPath('/project.json');assert.equal(s.isActive(),true);
+});
+const blank={canvasW:320,canvasH:180,fps:24};
+test('a first New refused before install returns to idle, so a later New still runs (early-New fence)',async()=>{
+  const h=host(),s=session(h);
+  h.failNew({code:'unavailable',message:'native blank project installation refused',details:{disposition:'notDispatched',retryExecution:false}});
+  await assert.rejects(s.newProject(blank),(e)=>e.details.disposition==='notDispatched');
+  assert.equal(s.blocksLegacy(),false);assert.equal(s.isActive(),false);assert.equal(s.isIndeterminate(),false);
+  await s.newProject(blank);assert.equal(s.isActive(),true);
+});
+test('a first New that fails untyped stays fenced: nothing proves the slot is unchanged',async()=>{
+  const h=host(),s=session(h);h.failNew({code:'unavailable',message:'lost'});
+  await assert.rejects(s.newProject(blank));
+  assert.equal(s.isIndeterminate(),true);assert.equal(s.blocksLegacy(),true);
+  await assert.rejects(s.newProject(blank));
 });
 test('metadata is detached and immutable; malformed or foreign inspection fences admission',async()=>{
   const h=host(),s=await presented(h);assert.equal(Object.isFrozen(s.info().layers[0]),true);
@@ -818,7 +836,7 @@ test('native first preview carries persisted filter; toggles preserve navigation
  assert.ok(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').every(c=>c.r.displayFilter==='values'));
  const hand=f.s.beginViewportNavigation('pan',{x:100,y:60});await f.s.updateViewportNavigation(hand,{x:80,y:70});
  const view=f.s.readPresentedObjectSession().presentation.view;
- for(const filter of ['dim','none','values']){
+ for(const filter of ['dim','none','mirrored','values-mirrored','values']){
   f.filter=filter;assert.equal(f.s.readPresentedObjectSession(),null);await f.s.renderPreview(0);
   const shown=f.s.readPresentedObjectSession().presentation;assert.equal(shown.displayFilter,filter);assert.deepEqual(shown.view,view);
  }

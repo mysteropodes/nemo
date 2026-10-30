@@ -365,6 +365,17 @@ test('area draft refuses invalid hex on blur then publishes #336699 by the exist
  f.input('native-text-color-hex','#336699');area.fire('keydown',{key:'Enter',ctrlKey:true});await f.turn();assert.equal(f.owner.log.executed.length,1);assert.equal(f.owner.log.received[0].payload.block.color,'#336699');assert.equal(f.owner.log.received[0].payload.block.fixedWidth,100);assert.equal(f.owner.log.received[0].payload.block.text,'Hex area');assert.equal(f.logs.legacy,0);
 });
 
+test('area draft blur after a pointerdown inside the popover chrome does not commit; blur after a stage pointerdown still commits',async()=>{
+ for(const inside of [true,false]){
+  const f=await fixture();f.canvas.fire('pointerdown',{clientX:100,clientY:110});f.canvas.fire('pointermove',{clientX:300,clientY:190});f.canvas.fire('pointerup',{clientX:300,clientY:190});await f.turn();
+  const area=f.get('native-text-area-draft');assert.ok(area);area.value='Chrome text';area.fire('input');
+  (inside?f.get('text-popover'):f.canvas).fire('pointerdown',{clientX:5,clientY:5});area.fire('blur',{relatedTarget:null});await f.turn();
+  if(inside){assert.equal(f.owner.log.executed.length,0,'popover padding click must not commit');assert.ok(f.binding.core.snapshot().draft);
+   f.canvas.fire('pointerdown',{clientX:5,clientY:5});area.fire('blur',{relatedTarget:null});await f.turn();assert.equal(f.owner.log.executed.length,1,'a later outside blur commits');}
+  else assert.equal(f.owner.log.executed.length,1,'stage blur commits');
+ }
+});
+
 test('native hex layout preserves existing controls and restores prior inline wrapping across remounts',async()=>{
  const f=await fixture(),parent=f.get('text-color').parentNode,controls=parent.children.filter(n=>n!==f.get('native-text-color-hex').parentNode);
  f.binding.retire();assert.deepEqual(parent.children,controls);parent.style.flexWrap='wrap-reverse';
@@ -447,4 +458,78 @@ test('navigated Canvas area Text draft uses the actual full affine and commits t
  assert.equal(area.style.width,'50px');assert.equal(area.style.left,'100px');assert.equal(area.style.top,'110px');
  area.value='Canvas affine';area.fire('input');area.fire('keydown',{key:'Enter',ctrlKey:true});await f.turn();
  const q=f.owner.log.received[0];assert.equal(f.owner.log.executed.length,1);assert.deepEqual(q.payload.block.anchorTopLeft,{x:100,y:65});assert.equal(q.payload.block.fixedWidth,50);assert.equal(f.root.state.cameraView,false);assert.equal(f.logs.legacy,0);
+});
+
+test('held Text drag shows one live dashed guide with baseline look and exact client geometry',async()=>{
+ const f=await fixture();assert.equal(f.get('native-text-drag-guide'),null);
+ f.canvas.fire('pointerdown',{buttons:1,clientX:100,clientY:110});assert.equal(f.get('native-text-drag-guide'),null,'down alone creates none');
+ f.canvas.fire('pointermove',{buttons:1,clientX:300,clientY:190});
+ const g=f.get('native-text-drag-guide');assert.ok(g);
+ assert.deepEqual([g.style.left,g.style.top,g.style.width,g.style.height],['100px','110px','200px','80px']);
+ assert.equal(g.style.position,'fixed');assert.equal(g.style.pointerEvents,'none');assert.equal(g.style.zIndex,'200');
+ assert.equal(g.style.border,'1px dashed rgba(255,184,108,.9)');assert.equal(g.style.background,'rgba(255,184,108,.06)');
+ f.canvas.fire('pointermove',{buttons:1,clientX:40,clientY:112});
+ assert.equal(f.get('native-text-drag-guide'),g,'same single element is updated');assert.equal(f.doc.body.children.filter(n=>n.id==='native-text-drag-guide').length,1);
+ assert.deepEqual([g.style.left,g.style.top,g.style.width,g.style.height],['40px','110px','60px','24px'],'min height 24, left follows min(x)');
+ f.canvas.fire('pointerup',{buttons:0,clientX:40,clientY:112});await f.turn();assert.equal(f.get('native-text-drag-guide'),null);
+});
+test('Text drag guide needs more than 4px of horizontal travel',async()=>{
+ const f=await fixture();f.canvas.fire('pointerdown',{buttons:1,clientX:100,clientY:110});
+ for(const x of [100,102,104,96])f.canvas.fire('pointermove',{buttons:1,clientX:x,clientY:150}),assert.equal(f.get('native-text-drag-guide'),null,String(x));
+ f.canvas.fire('pointermove',{buttons:1,clientX:105,clientY:150});assert.ok(f.get('native-text-drag-guide'));
+ f.canvas.fire('pointermove',{buttons:1,clientX:103,clientY:150});assert.equal(f.get('native-text-drag-guide'),null,'shrinking back inside slop removes it');
+});
+test('Text drag guide is removed on up, Escape, blur, tool switch and retire',async()=>{
+ for(const end of ['up','Escape','blur','tool','retire','cancelEvent']){
+  const f=await fixture(true);f.canvas.fire('pointerdown',{buttons:1,clientX:100,clientY:110});f.canvas.fire('pointermove',{buttons:1,clientX:300,clientY:190});assert.ok(f.get('native-text-drag-guide'),end);
+  if(end==='up')f.canvas.fire('pointerup',{buttons:0,clientX:300,clientY:190});
+  else if(end==='Escape')f.doc.fire('keydown',{key:'Escape'});
+  else if(end==='blur')f.root.fire('blur');
+  else if(end==='tool'){f.root.state.tool='select';f.canvas.fire('pointermove',{buttons:1,clientX:310,clientY:190});}
+  else if(end==='cancelEvent')f.canvas.fire('pointercancel',{pointerId:1});
+  else f.binding.retire();
+  await f.turn();assert.equal(f.get('native-text-drag-guide'),null,end);assert.equal(f.doc.body.children.some(n=>n.id==='native-text-drag-guide'),false,end);
+ }
+});
+test('zero-mask clickOnly Text pair never creates a drag guide',async()=>{
+ const f=await fixture();f.canvas.fire('pointerdown',{buttons:0,clientX:100,clientY:110});
+ f.canvas.fire('pointermove',{buttons:0,clientX:300,clientY:190});f.canvas.fire('pointermove',{buttons:1,clientX:320,clientY:190});
+ assert.equal(f.get('native-text-drag-guide'),null);f.canvas.fire('pointerup',{buttons:0,clientX:320,clientY:190});await f.turn();assert.equal(f.get('native-text-drag-guide'),null);
+});
+
+const px=v=>parseFloat(v);
+const rectOf=n=>({l:px(n.style.left),t:px(n.style.top),r:px(n.style.left)+(n.style.width?px(n.style.width):240),b:px(n.style.top)+(n.offsetHeight||px(n.style.height))});
+const overlaps=(a,b)=>a.l<b.r&&b.l<a.r&&a.t<b.b&&b.t<a.b;
+async function dragOpen(f,x0,y0,x1,y1){
+ f.get('text-popover').offsetHeight=200;
+ f.canvas.fire('pointerdown',{buttons:1,clientX:x0,clientY:y0});f.canvas.fire('pointermove',{buttons:1,clientX:x1,clientY:y1});f.canvas.fire('pointerup',{buttons:0,clientX:x1,clientY:y1});await f.turn();
+}
+test('area Text draft is dock-positioned below the dragged box and styled like the guide',async()=>{
+ const f=await fixture();await dragOpen(f,100,110,300,190);
+ const area=f.get('native-text-area-draft'),pop=f.get('text-popover');assert.ok(area);
+ assert.equal(area.style.width,'200px','fixedWidth*scale');assert.equal(area.style.height,'80px','dragged client height');
+ assert.equal(area.style.border,'1px dashed rgba(255,184,108,.9)');assert.equal(area.style.background,'rgba(255,184,108,.06)');assert.equal(area.style.resize,'none');
+ assert.equal(pop.style.left,'100px');assert.equal(pop.style.top,'198px','at.y + height + 8');
+ assert.equal(overlaps({l:100,t:110,r:300,b:190},rectOf(pop)),false);
+});
+test('area Text draft popover flips above, or beside, when there is no room below',async()=>{
+ const f=await fixture();f.doc.documentElement.clientHeight=500;await dragOpen(f,100,330,300,380);
+ const pop=f.get('text-popover'),area=f.get('native-text-area-draft');
+ assert.equal(pop.style.top,'122px','flipped to at.y - popH - 8');assert.equal(overlaps(rectOf(area),rectOf(pop)),false);
+ const g=await fixture();g.doc.documentElement.clientHeight=400;await dragOpen(g,100,110,300,190);
+ assert.equal(overlaps(rectOf(g.get('native-text-area-draft')),rectOf(g.get('text-popover'))),false,'side dock when neither below nor above fits');
+});
+test('area Text draft height has a 24px floor and click placement keeps the baseline +10,+10 popover',async()=>{
+ const f=await fixture();await dragOpen(f,100,110,300,112);assert.equal(f.get('native-text-area-draft').style.height,'24px');
+ const c=await fixture();c.get('text-popover').offsetHeight=200;await c.click(100,110);
+ assert.equal(c.get('native-text-area-draft'),null);assert.equal(c.get('text-popover').style.left,'110px');assert.equal(c.get('text-popover').style.top,'120px');
+});
+test('stashed drag height is cleared by cancel and commit so a later API-opened area draft uses the default height',async()=>{
+ for(const end of ['cancel','commit']){
+  const f=await fixture();await dragOpen(f,100,110,300,190);assert.equal(f.get('native-text-area-draft').style.height,'80px',end);
+  if(end==='cancel')f.get('text-cancel').fire('click');else{const a=f.get('native-text-area-draft');a.value='x';a.fire('input');a.fire('keydown',{key:'Enter',ctrlKey:true});}
+  await f.turn();assert.equal(f.get('native-text-area-draft'),null,end);
+  await f.binding.core.openNew({anchorTopLeft:{x:20,y:20},fixedWidth:100});
+  assert.equal(f.get('native-text-area-draft').style.height,'120px',end+': default max(24,size*1.25*scale)');
+ }
 });

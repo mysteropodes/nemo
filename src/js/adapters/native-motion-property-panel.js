@@ -21,7 +21,10 @@
     if(maxPages!==Infinity&&(!Number.isSafeInteger(maxPages)||maxPages<1))throw new TypeError('Invalid explicit native Motion read budget');
     var section=make('section',''),toolbar=make('div',''),status=make('div',''),body=make('div',''),controls=[];
     section.className='native-motion-property-panel';section.setAttribute('aria-label','Motion properties');
-    toolbar.setAttribute('role','toolbar');status.setAttribute('role','status');body.className='native-motion-property-rows';
+    // Baseline sidebar chrome is only the layer name + Transform group. The toolbar holds Cancel while a read is in flight;
+    // status is a dim line for loading/unavailable states and stays hidden in steady state.
+    toolbar.className='native-motion-toolbar';toolbar.hidden=true;toolbar.setAttribute('role','toolbar');
+    status.className='native-motion-status';status.hidden=true;status.setAttribute('role','status');body.className='native-motion-property-rows';
     section.appendChild(toolbar);section.appendChild(status);section.appendChild(body);container.appendChild(section);
     var keyEditor=null,keyEditors=[],selectionBatch=null,suppressKeyNotice=false,notifyingKeys=false;
     function keyNotice(reason){
@@ -114,7 +117,9 @@
       Object.defineProperties(value,{isCurrent:{value:view.isCurrent},isSelectionCurrent:{value:isSelectionCurrent}});return Object.freeze(value);
     }
     function make(tag,text){var node=doc.createElement(tag);node.textContent=text;return node;}
-    function notify(message){if(!retired)status.textContent=message;}
+    function notify(message){if(retired)return;status.textContent=message||'';status.hidden=!message;}
+    function setLoading(value){loading=value;toolbar.hidden=!value;}
+    function tr(keyName,fallback){var value;try{value=ports.translate?ports.translate(keyName):undefined;}catch(_){value=undefined;}return typeof value==='string'&&value&&value!==keyName?value:fallback;}
     function selectionInfo(lease){
       var value=ports.readSelection(lease),primary=value==null?null:View.normalizeTarget(value);
       if(value!=null&&!primary)throw new Error('Invalid active native target');
@@ -132,7 +137,17 @@
     function button(label,action){var node=make('button',label);node.type='button';node.addEventListener('click',action);toolbar.appendChild(node);controls.push([node,action]);return node;}
     function clearValues(){valueEditors.forEach(function(editor){editor.dispose();});valueEditors=[];}
     function clearBody(){releaseExpressionRows();clearValues();clearKeys();rowBindings.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});rowBindings=[];body.replaceChildren();}
-    function labelTarget(t,token){return (ports.labelTarget&&ports.labelTarget(t,token.pin))||((t.strokeId===undefined?'Layer ':'Element ')+(t.strokeId===undefined?t.layerUid:t.strokeId));}
+    // Interim element names: the native read model carries no element names yet (read-model gap), so derive
+    // "<kind> <n>" from the stable strokeId prefix and the element's 1-based ordinal among its layer's elements.
+    function elementLabel(t){
+      var prefix=String(t.strokeId).split(':')[0],base=prefix==='native-stroke'?tr('autoNameShape','Shape'):prefix==='native-text'?tr('autoNameText','Text'):prefix==='native-raster'?'Image':'Element';
+      var siblings=accepted?accepted.targets.filter(function(item){return item.kind==='element'&&item.target.contextId===t.contextId&&item.target.layerUid===t.layerUid;}):[];
+      var at=siblings.findIndex(function(item){return key(item.target)===key(t);});return at<0?base:base+' '+(at+1);
+    }
+    function labelTarget(t,token){
+      var named=ports.labelTarget&&ports.labelTarget(t,token.pin);if(named)return named;
+      return t.strokeId===undefined?'Layer '+t.layerUid:elementLabel(t);
+    }
     function wantedTargets(targets,selection){
       if(!targets.some(function(item){return item.kind==='context'&&item.contextId===selection.contextId;}))throw new Error('Native active context is absent');
       var chosen=selection.selected.length?selection.selected:scope==='reveal'?targets.filter(function(item){return item.kind==='layer'&&item.target.contextId===selection.contextId;}).map(function(item){return item.target;}):selection.primary?[selection.primary]:[];
@@ -219,21 +234,18 @@
     function paintRows(){
       if(!validAccepted()){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}
       if(['errors','effects','mattes'].includes(mode)){clearBody();notify('This Motion filter is unavailable.');return false;}
-      var fragment=make('div',''),unknown=false,shown=0,nextBindings=[],nextValues=[],nextExpressions=[],selected=new Set(accepted.selection.selected.map(key));
-      if(!selected.size&&accepted.selection.primary)selected.add(key(accepted.selection.primary));
-      accepted.targets.forEach(function(item){
-        if(item.kind==='context'){if(item.contextId===accepted.selection.contextId){var heading=make('div','Context '+item.contextId);heading.className='phdr';fragment.appendChild(heading);}return;}
-        if(item.target.contextId!==accepted.selection.contextId)return;
-        var t=item.target,pick=make('button',labelTarget(t,accepted.token));pick.type='button';pick.setAttribute('aria-pressed',String(selected.has(key(t))));
-        var token=accepted.token,ticket=serial,signature=accepted.selection.signature;
-        var choose=function(event){if(pick.parentNode===fragment&&fragment.parentNode===body)return select(t,token,ticket,signature,!!(event.shiftKey||event.ctrlKey||event.metaKey));};
-        pick.addEventListener('click',choose);nextBindings.push([pick,choose]);fragment.appendChild(pick);
-      });
+      var fragment=make('div',''),unknown=false,nextBindings=[],nextValues=[],nextExpressions=[],lastLayer=null;
+      if(!accepted.groups.length){var none=make('div',tr('noLayerSelected','No layer selected'));none.className='motion-props-layername';fragment.appendChild(none);}
       accepted.groups.forEach(function(group){
-        var filtered=filteredRows(group);unknown=unknown||filtered.unknown;if(!filtered.rows.length)return;
-        var title=make('div',labelTarget(group.target,accepted.token));title.className='native-motion-target-header';title.dataset.targetKey=key(group.target);fragment.appendChild(title);
-        filtered.rows.forEach(function(entry){var row=entry.row,line=make('div',''),name=make('span',entry.label);line.className='native-motion-property-row';line.dataset.property=row.property;line.dataset.targetKey=key(group.target);line.appendChild(name);
-          var f=row.authored,detail=f.availability!=='available'?'Property details unavailable':f.keyCount>0?'Animated ('+f.keyCount+' keys)':f.hasStaticOverride?'Static override':f.expressionEnabled?'Expression':'Default';line.appendChild(make('span',detail));
+        var filtered=filteredRows(group);unknown=unknown||filtered.unknown;
+        var target=group.target,layerKey=JSON.stringify([target.contextId,target.layerUid]);
+        if(layerKey!==lastLayer){lastLayer=layerKey;var name=make('div',labelTarget({contextId:target.contextId,layerUid:target.layerUid},accepted.token));name.className='motion-props-layername';name.dataset.layerUid=target.layerUid;fragment.appendChild(name);}
+        var isElement=target.strokeId!==undefined,title=make('div',''),label=make('span',isElement?tr('hdrTransformElement','Transform (element)'):tr('hdrTransform','Transform'));
+        title.className='lrow motion-group-row';title.dataset.targetKey=key(target);if(isElement)label.title=labelTarget(target,accepted.token);title.appendChild(label);fragment.appendChild(title);
+        filtered.rows.forEach(function(entry){var row=entry.row,line=make('div',''),name=make('div',''),nameText=make('span',entry.label);line.className='lrow motion-prop-row';line.dataset.property=row.property;line.dataset.targetKey=key(group.target);
+          name.className='lnm motion-prop-name';name.appendChild(nameText);line.appendChild(name);
+          var slot=make('div','');slot.className='native-motion-property-slot';line.appendChild(slot);
+          var f=row.authored;
           if(keyEditor){
             var keysButton=make('button','Keys');keysButton.type='button';
             keysButton.setAttribute('aria-label','Edit keys for '+entry.label);
@@ -257,20 +269,20 @@
             };
             bakeButton.addEventListener('click',onBake);nextBindings.push([bakeButton,onBake]);line.appendChild(bakeButton);
           }
-          if(Value&&typeof ports.readProperty==='function'&&row.authored.availability==='available')nextValues.push({container:line,target:group.target,row:row});
+          if(Value&&typeof ports.readProperty==='function'&&row.authored.availability==='available')nextValues.push({container:slot,target:group.target,row:row});
           if(typeof ports.readProperty==='function'&&f.availability==='available'){
             var diagnostic=make('span','');diagnostic.className='motion-expr-error';diagnostic.setAttribute('role','status');diagnostic.hidden=true;line.appendChild(diagnostic);
             nextExpressions.push({node:diagnostic,line:line,target:group.target,property:row.property});
           }
-          fragment.appendChild(line);shown++;});
+          fragment.appendChild(line);});
       });
       // Unsupported native families do not become an empty global-U result.
       if(appendRevealLimits(fragment))unknown=true;
       if(!validAccepted()){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}
       rowBindings.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});rowBindings=nextBindings;clearValues();body.replaceChildren(fragment);
-      nextValues.forEach(function(item){var editor=Value.create(item.container,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,get editProperty(){return item.row.property==='order'?null:ports.editProperty;}},item.target,item.row);valueEditors.push(editor);Promise.resolve(editor.refresh()).catch(function(){editor.cancel();});});
+      nextValues.forEach(function(item){var editor=Value.create(item.container,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,dimLabels:ports.dimLabels,get editProperty(){return item.row.property==='order'?null:ports.editProperty;}},item.target,item.row);valueEditors.push(editor);Promise.resolve(editor.refresh()).catch(function(){editor.cancel();});});
       expressionRows=nextExpressions;refreshExpressionStates();
-      notify(collapsed?'Properties collapsed.':contentOnly&&unknown?'Partial reveal: some property groups are unavailable.':unknown?'Some property filters are unavailable.':shown?(keyEditor?'Select Keys to inspect native animation.':'Properties are read-only.'):accepted.groups.length?'No matching properties.':'Select a native target to view properties.');return true;
+      notify(collapsed?'':contentOnly&&unknown?'Partial reveal: some property groups are unavailable.':unknown?'Some property filters are unavailable.':'');return true;
     }
     function paint(){try{return paintRows();}catch(_){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}}
     function setFilter(value){if(retired||!modes.includes(value))return false;mode=value;savePreference();return paint();}
@@ -303,32 +315,29 @@
       if(!force&&accepted&&current(accepted.token,ticket,accepted.selection.signature)){
         try{var wanted=wantedTargets(accepted.targets,selection);if(accepted.groupKey===groupKey(wanted)){if(repaint)return paint();refreshExpressionStates();return true;}}catch(_){}
       }
-      ticket=++serial;loading=true;accepted=null;clearBody();notify('Loading properties…');
+      ticket=++serial;setLoading(true);accepted=null;clearBody();notify('Loading properties…');
       try{
         var discovery=await collect({kind:'targets',offset:0,limit:8},token,ticket,selection.signature),targets=discovery.items,wanted=wantedTargets(targets,selection),groups=[],categories=new Map(discovery.categories.map(function(c){return [c.category,c];}));
         for(var t of wanted){var page=await collect({kind:'properties',target:t,offset:0,limit:8},token,ticket,selection.signature);groups.push(Object.freeze({target:t,rows:page.items}));page.categories.forEach(function(c){categories.set(c.category,c);});}
         if(!current(token,ticket,selection.signature))throw new Error('Native selection changed');
-        accepted=Object.freeze({token:token,targets:targets,groups:Object.freeze(groups),selection:selection,groupKey:groupKey(wanted),categories:Object.freeze(Array.from(categories.values()))});loading=false;return paint();
-      }catch(_){if(!retired&&ticket===serial&&section.parentNode===container){loading=false;accepted=null;clearBody();notify('Native properties are unavailable.');}return false;}
+        accepted=Object.freeze({token:token,targets:targets,groups:Object.freeze(groups),selection:selection,groupKey:groupKey(wanted),categories:Object.freeze(Array.from(categories.values()))});setLoading(false);return paint();
+      }catch(_){if(!retired&&ticket===serial&&section.parentNode===container){setLoading(false);accepted=null;clearBody();notify('Native properties are unavailable.');}return false;}
     }
     async function select(target,token,ticket,signature,preserve){if(!current(token,ticket,signature)||typeof ports.selectTarget!=='function')return false;
       try{if(await ports.selectTarget(View.normalizeTarget(target),token.pin,Object.freeze({preserveSelection:preserve}))!==true){notify('Native selection is unavailable.');return false;}
         if(retired||ticket!==serial)return false;var selected=selectionInfo();if(!selected.primary||key(selected.primary)!==key(target)){notify('Native selection did not confirm.');return false;}
         scope='inspector';propertySet=null;contentOnly=false;collapsed=false;return refresh(true);
       }catch(_){if(!retired)notify('Native selection is unavailable.');return false;}}
-    function cancel(){valueEditors.forEach(function(editor){editor.cancel();});var keyCancelled=keyEditors.length>0;clearKeys();if(retired||!loading)return keyCancelled;serial++;loading=false;accepted=null;clearBody();notify('Property read cancelled.');return true;}
-    function dispose(){if(retired)return;retired=true;serial++;loading=false;client.dispose();accepted=null;clearBody();keyEditors.forEach(function(entry){entry.editor.dispose();});keyEditors=[];keyEditor=null;container.removeEventListener('keydown',onKey);searchInput.removeEventListener('input',onSearch);controls.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});if(section.parentNode===container)container.removeChild(section);}
-    button('All',function(){scope='inspector';propertySet=null;contentOnly=false;collapsed=false;mode='all';savePreference();return refreshPaint();});
-    Object.keys(shortcuts).forEach(function(k){button(k.toUpperCase(),function(){return reveal(shortcuts[k],false);});});button('U',function(){return revealContent();});
-    ['animated','modified','expressions'].forEach(function(value){button(value,function(){return setFilter(value);});});
-    button('E',function(){notify('Effect reveal is unavailable.');});button('M',function(){notify('Matte reveal is unavailable.');});button('Cancel',cancel);
-    var searchInput=make('input','');searchInput.type='search';searchInput.setAttribute('aria-label','Search properties');function onSearch(){search=String(searchInput.value||'').toLowerCase();paint();}searchInput.addEventListener('input',onSearch);toolbar.appendChild(searchInput);
+    function cancel(){valueEditors.forEach(function(editor){editor.cancel();});var keyCancelled=keyEditors.length>0;clearKeys();if(retired||!loading)return keyCancelled;serial++;setLoading(false);accepted=null;clearBody();notify('Property read cancelled.');return true;}
+    function dispose(){if(retired)return;retired=true;serial++;setLoading(false);client.dispose();accepted=null;clearBody();keyEditors.forEach(function(entry){entry.editor.dispose();});keyEditors=[];keyEditor=null;container.removeEventListener('keydown',onKey);controls.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});if(section.parentNode===container)container.removeChild(section);}
+    button('Cancel',cancel);
+    function setSearch(value){if(retired)return false;search=String(value||'').toLowerCase();return paint();}
     container.addEventListener('keydown',onKey);readPreference();
-    return Object.freeze({refresh:refresh,notice:notify,setFilter:setFilter,reveal:reveal,revealContent:revealContent,refuseReveal:function(){notify('This Motion reveal is unavailable.');return false;},cancel:cancel,dispose:dispose,element:section,readKeyTimeline:function(){return !retired&&validAccepted()&&keyEditor?keyEditor.readKeyTimeline():null;},readKeyTimelines:readKeyTimelines,captureSelectedKeys:captureSelectedKeys});
+    return Object.freeze({refresh:refresh,notice:notify,setFilter:setFilter,setSearch:setSearch,select:function(target){return validAccepted()?select(target,accepted.token,serial,accepted.selection.signature,false):Promise.resolve(false);},reveal:reveal,revealContent:revealContent,refuseReveal:function(){notify('This Motion reveal is unavailable.');return false;},cancel:cancel,dispose:dispose,element:section,readKeyTimeline:function(){return !retired&&validAccepted()&&keyEditor?keyEditor.readKeyTimeline():null;},readKeyTimelines:readKeyTimelines,captureSelectedKeys:captureSelectedKeys});
   }
   function createCaller(ports){var panel=null,retired=false;
     async function update(force){if(retired)return false;if(!ports.isMotion()){if(panel)panel.dispose();panel=null;return false;}if(!panel)panel=create(ports.container,ports);return panel.refresh(force);}
-    return Object.freeze({update:update,notice:function(message){if(panel&&!retired)panel.notice(message);},shortcut:function(k,shift){if(retired||!ports.isMotion())return Promise.resolve(false);if(!panel)panel=create(ports.container,ports);k=String(k).toLowerCase();return shortcuts[k]?panel.reveal(shortcuts[k],!!shift):k==='u'?panel.revealContent():['e','m'].includes(k)?Promise.resolve(panel.refuseReveal()):Promise.resolve(false);},readKeyTimeline:function(){return !retired&&ports.isMotion()&&panel?panel.readKeyTimeline():null;},readKeyTimelines:function(){return !retired&&ports.isMotion()&&panel?panel.readKeyTimelines():null;},captureSelectedKeys:function(){return !retired&&panel?panel.captureSelectedKeys():null;},isMounted:function(){return !panel||panel.element.parentNode===ports.container;},setFilter:function(mode){return panel?panel.setFilter(mode):false;},cancel:function(){return panel?panel.cancel():false;},dispose:function(){retired=true;if(panel)panel.dispose();panel=null;}});
+    return Object.freeze({update:update,notice:function(message){if(panel&&!retired)panel.notice(message);},shortcut:function(k,shift){if(retired||!ports.isMotion())return Promise.resolve(false);if(!panel)panel=create(ports.container,ports);k=String(k).toLowerCase();return shortcuts[k]?panel.reveal(shortcuts[k],!!shift):k==='u'?panel.revealContent():['e','m'].includes(k)?Promise.resolve(panel.refuseReveal()):Promise.resolve(false);},readKeyTimeline:function(){return !retired&&ports.isMotion()&&panel?panel.readKeyTimeline():null;},readKeyTimelines:function(){return !retired&&ports.isMotion()&&panel?panel.readKeyTimelines():null;},captureSelectedKeys:function(){return !retired&&panel?panel.captureSelectedKeys():null;},isMounted:function(){return !panel||panel.element.parentNode===ports.container;},setFilter:function(mode){return panel?panel.setFilter(mode):false;},setSearch:function(value){return panel?panel.setSearch(value):false;},select:function(target){return panel?panel.select(target):Promise.resolve(false);},cancel:function(){return panel?panel.cancel():false;},dispose:function(){retired=true;if(panel)panel.dispose();panel=null;}});
   }
   return Object.freeze({create:create,createCaller:createCaller});
 }));

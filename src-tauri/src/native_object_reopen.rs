@@ -130,7 +130,7 @@ pub(super) fn read_file(
     Ok(bytes)
 }
 
-fn not_dispatched(mut error: NativeApplicationError) -> NativeApplicationError {
+pub(super) fn not_dispatched(mut error: NativeApplicationError) -> NativeApplicationError {
     error.details = Some(json!({"disposition":"notDispatched","retryExecution":false}));
     error
 }

@@ -25,9 +25,13 @@ impl ObjectBrushAdmission {
         let brush_indices = brush_read::admitted_indices(packet).map_err(read_error)?;
         let claimed: BTreeSet<_> = brush_indices.iter().map(|(source, _)| *source).collect();
         let duplicators = Arc::new(duplicator_scene::prepare(packet)?);
-        let contours = object_scene_producer_contour::produce(packet).into_admitted()?;
+        let (contours, early_texts) = object_scene_producer_contour::produce_with_texts(packet);
+        let contours = contours.into_admitted()?;
         let mut rasters = raster_scene::sources_excluding(packet, &claimed)?;
-        let mut texts = text_scene::prepare(packet)?;
+        let mut texts = match early_texts {
+            Some(texts) => texts?,
+            None => text_scene::prepare(packet)?,
+        };
         let components = component_scene::prepare(packet, expected, &mut rasters, &mut texts)?;
         let scene = ObjectRenderScene {
             packet: packet.clone(),

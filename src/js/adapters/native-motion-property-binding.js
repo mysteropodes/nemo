@@ -142,14 +142,14 @@
       else{if(typeof ui.selectLayer!=='function')return false;var index=before.info.layers.findIndex(function(l){return l.layerUid===t.layerUid;});if(index<0||preserve&&!before.selected.some(function(item){return key(item)===key(t);}))return false;result=ui.selectLayer(index,preserve,t.layerUid,before.info);}
       if(result!==true)return false;var after=scope();return !!after&&before.session===after.session&&same(before.identity,after.identity)&&after.primary&&key(after.primary)===key(t)&&after.selected.some(function(item){return key(item)===key(t);});
     }
-    function labelTarget(t,pin){var v=scope();if(!v||!same(v.identity,pin)||t.contextId!==v.contextId)throw new Error('Stale native label');if(t.strokeId!==undefined)return t.strokeId;var matches=v.info.layers.filter(function(l){return l.layerUid===t.layerUid;});return matches.length===1&&typeof matches[0].name==='string'?matches[0].name:t.layerUid;}
+    function labelTarget(t,pin){var v=scope();if(!v||!same(v.identity,pin)||t.contextId!==v.contextId)throw new Error('Stale native label');if(t.strokeId!==undefined)return null; /* Element names are a read-model gap: the panel derives an interim label. */ var matches=v.info.layers.filter(function(l){return l.layerUid===t.layerUid;});return matches.length===1&&typeof matches[0].name==='string'?matches[0].name:t.layerUid;}
     var caller=Panel.createCaller({document:root.document,container:options.container,pageBudget:options.pageBudget,yieldControl:options.yieldControl,
       isMotion:function(){return !retired&&root.state.appMode==='motion';},readContext:readContext,readSelection:readSelection,readSelections:readSelections,readContextId:readContextId,
       query:query,readProperty:readProperty,keyTimelineChanged:options.keyTimelineChanged,
       translate:function(key){return root.SM&&typeof root.SM.t==='function'?root.SM.t(key):key;},
       get editPropertyTrack(){return typeof ui.editPropertyTrack==='function'?function(payload,pin,current){return editProperty(payload,pin,current,true);}:undefined;},
       get editProperty(){return typeof ui.editProperty==='function'?editProperty:undefined;},
-      selectTarget:selectTarget,labelTarget:labelTarget,labelProperty:options.labelProperty,readPreference:options.readPreference,writePreference:options.writePreference});
+      selectTarget:selectTarget,labelTarget:labelTarget,labelProperty:options.labelProperty,dimLabels:options.dimLabels,readPreference:options.readPreference,writePreference:options.writePreference});
     async function update(force){var ticket=++updateSerial,base=baseScope();if(base&&!base.explicit&&!cacheMatches(base)&&uniqueContextAllowed())showWait('Loading properties…',true);
       if(base)await resolveContext(base,!!force);if(retired||ticket!==updateSerial||options.isCurrent&&options.isCurrent()!==true)return false;clearWait();return caller.update(force);}
     function cancel(){var wasPending=!!pending;updateSerial++;resolveSerial++;pending=null;clearWait();var stopped=caller.cancel();if(wasPending&&!retired)showWait('Property read cancelled.',false);return wasPending||stopped;}

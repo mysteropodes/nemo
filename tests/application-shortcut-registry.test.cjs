@@ -24,7 +24,8 @@ test('the fixed tables carry the current baseline counts and a representative sa
   assert.equal(registry.READONLY_SHORTCUTS.length, 14);
   assert.equal(registry.defFor('draw').key, 'b');
   assert.equal(registry.defFor('eraser').key, 'e');
-  assert.equal(registry.defFor('cmdTween').key, 't');
+  assert.equal(registry.defFor('cmdTween').key, '', 'Tween ships unbound: T belongs to the Text tool');
+  assert.equal(registry.defFor('text').key, 't');
   assert.equal(registry.defFor('cmdInsertFrame').key, 'F5');
   assert.equal(registry.defFor('not-a-real-action'), null);
 });
@@ -32,7 +33,8 @@ test('the fixed tables carry the current baseline counts and a representative sa
 test('a fresh preference context resolves every action to its table default', () => {
   const shortcuts = registry.create({ storage: memoryStorage() });
   assert.equal(shortcuts.keyFor('draw'), 'b');
-  assert.equal(shortcuts.keyFor('cmdTween'), 't');
+  assert.equal(shortcuts.keyFor('cmdTween'), '');
+  assert.equal(shortcuts.keyFor('text'), 't');
   assert.equal(shortcuts.keyFor('not-a-real-action'), null);
 });
 
@@ -156,4 +158,16 @@ test('the read accessors expose the same table instances the registry resolves a
   assert.equal(shortcuts.commandShortcuts(), registry.COMMAND_SHORTCUTS);
   assert.equal(shortcuts.readonlyShortcuts(), registry.READONLY_SHORTCUTS);
   assert.equal(shortcuts.categories(), registry.SHORTCUT_CATS);
+});
+
+test('no default key is shared between the TOOL and COMMAND tables (unbound entries excepted)', () => {
+  const keyed = registry.TOOL_SHORTCUTS.concat(registry.COMMAND_SHORTCUTS).filter((d) => d.key);
+  const seen = new Map();
+  const dupes = [];
+  for (const d of keyed) {
+    const k = d.key.toLowerCase();
+    if (seen.has(k)) dupes.push(k + ': ' + seen.get(k) + ' / ' + d.action);
+    else seen.set(k, d.action);
+  }
+  assert.deepEqual(dupes, []);
 });

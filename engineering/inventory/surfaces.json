@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "ac17817603d5b6a07c7e84395b52c94504ded22c",
-  "describe": "ac178176-dirty"
+  "head": "6968a85217301b8aa76f49255059202cc69c4109",
+  "describe": "v0.7.0-alpha.4-3726-g6968a852-dirty"
  },
- "inputsDigest": "23ecb72f8128afe619901d49f13f2948b14bd820f6175d886e29b3519776702c",
+ "inputsDigest": "938cf848a2ef145434dcaa481b612d82685218573b2930f7d96a5da798313665",
  "states": [
   "inventoried",
   "characterized",
@@ -52,7 +52,7 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 258,
+   "native": 259,
    "export": 5,
    "animation": 439,
    "history": 350,
@@ -321,7 +321,7 @@
   },
   "SMSelectBridge": {
    "file": "src/js/select-bridge.js",
-   "line": 3563,
+   "line": 3565,
    "members": 4
   },
   "SMShadowBrush": {
@@ -1852,7 +1852,7 @@
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 199,
+    "functionsVisited": 198,
     "via": "chain",
     "references": []
    },
@@ -2681,7 +2681,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 20,
+    "functionsVisited": 21,
     "via": "helper el()",
     "references": [
      "src/js/timeline.js:9105 action()"
@@ -5063,7 +5063,7 @@
     "container": "track-apply-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 99,
+    "functionsVisited": 98,
     "via": "helper el()",
     "references": []
    },
@@ -5106,7 +5106,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 23,
+    "functionsVisited": 22,
     "via": "helper el()",
     "references": []
    },
@@ -8018,7 +8018,7 @@
     "container": "footage-blend-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 34,
+    "functionsVisited": 35,
     "via": "variable sel",
     "references": []
    },
@@ -8340,7 +8340,7 @@
     "container": "kitsu-step-browse",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 22,
+    "functionsVisited": 23,
     "via": "helper el()",
     "references": []
    },
@@ -8455,7 +8455,7 @@
     "container": "kitsu-step-login",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 39,
+    "functionsVisited": 40,
     "via": "helper el()",
     "references": []
    },
@@ -17216,7 +17216,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 8,
+    "functionsVisited": 7,
     "via": "callback id",
     "references": [
      "src/js/tracker-panel.js:41 currentPoint()",
@@ -17263,7 +17263,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 8,
+    "functionsVisited": 7,
     "via": "callback id",
     "references": [
      "src/js/tracker-panel.js:42 currentPoint()",
@@ -17439,7 +17439,7 @@
     "functionsVisited": 254,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-project-desktop.js:345 presented()",
+     "src/js/adapters/native-object-project-desktop.js:347 presented()",
      "src/js/app.js:536 updZoom()",
      "src/js/tools.js:7112 show()"
     ]
@@ -21603,7 +21603,7 @@
    "capability": "Mirror check: hold M to flip the view horizontally (proportion check), release or click to return to normal",
    "area": "labs",
    "handler": [
-    "src/js/labs/mirror-check.js:50"
+    "src/js/labs/mirror-check.js:56"
    ],
    "events": [],
    "exposure": [
@@ -21612,13 +21612,15 @@
    ],
    "mcp": "none (R14)",
    "sdk": "SMLabs",
-   "consumers": {},
+   "consumers": {
+    "native": 2
+   },
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/mirror-check.js:50",
+   "source": "src/js/labs/mirror-check.js:56",
    "meta": {
-    "functionsVisited": 3
+    "functionsVisited": 6
    },
    "fixtures": []
   },
@@ -25756,7 +25758,7 @@
    "source": "src/js/motion.js:9819",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 174
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -25798,7 +25800,7 @@
    "source": "src/js/motion.js:9864",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 439
+    "functionsVisited": 454
    },
    "fixtures": [
     "static-props",
@@ -27576,7 +27578,7 @@
    "capability": "Accepter la correction",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3192 onContext()"
+    "src/js/select-bridge.js:3194 onContext()"
    ],
    "events": [
     "click"
@@ -27596,7 +27598,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3192",
+   "source": "src/js/select-bridge.js:3194",
    "meta": {
     "i18n": null,
     "functionsVisited": 277
@@ -27615,7 +27617,7 @@
    "capability": "Animer le texte…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3247 onContext()"
+    "src/js/select-bridge.js:3249 onContext()"
    ],
    "events": [
     "click"
@@ -27634,7 +27636,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3247",
+   "source": "src/js/select-bridge.js:3249",
    "meta": {
     "i18n": null,
     "functionsVisited": 93
@@ -27653,7 +27655,7 @@
    "capability": "Aplatir",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3082 onContext()"
+    "src/js/select-bridge.js:3084 onContext()"
    ],
    "events": [
     "click"
@@ -27673,7 +27675,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3082",
+   "source": "src/js/select-bridge.js:3084",
    "meta": {
     "i18n": null,
     "functionsVisited": 96
@@ -27692,7 +27694,7 @@
    "capability": "Arrière-plan",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3093 onContext()"
+    "src/js/select-bridge.js:3095 onContext()"
    ],
    "events": [
     "click"
@@ -27713,7 +27715,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3093",
+   "source": "src/js/select-bridge.js:3095",
    "meta": {
     "i18n": null,
     "functionsVisited": 202
@@ -27732,7 +27734,7 @@
    "capability": "Centrer le point d\\'ancrage",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3109 onContext()"
+    "src/js/select-bridge.js:3111 onContext()"
    ],
    "events": [
     "click"
@@ -27753,7 +27755,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3109",
+   "source": "src/js/select-bridge.js:3111",
    "meta": {
     "i18n": null,
     "functionsVisited": 409
@@ -27772,7 +27774,7 @@
    "capability": "Coller",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3005 onContext()"
+    "src/js/select-bridge.js:3007 onContext()"
    ],
    "events": [
     "click"
@@ -27792,7 +27794,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3005",
+   "source": "src/js/select-bridge.js:3007",
    "meta": {
     "i18n": null,
     "functionsVisited": 115
@@ -27811,7 +27813,7 @@
    "capability": "Coller",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3041 onContext()"
+    "src/js/select-bridge.js:3043 onContext()"
    ],
    "events": [
     "click"
@@ -27831,7 +27833,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3041",
+   "source": "src/js/select-bridge.js:3043",
    "meta": {
     "i18n": null,
     "functionsVisited": 115
@@ -27850,7 +27852,7 @@
    "capability": "Combiner (Union) — non destructif",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3071 onContext()"
+    "src/js/select-bridge.js:3073 onContext()"
    ],
    "events": [
     "click"
@@ -27870,7 +27872,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3071",
+   "source": "src/js/select-bridge.js:3073",
    "meta": {
     "i18n": null,
     "functionsVisited": 79
@@ -27889,7 +27891,7 @@
    "capability": "Convertir le trait en remplissage (Fill)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3226 onContext()"
+    "src/js/select-bridge.js:3228 onContext()"
    ],
    "events": [
     "click"
@@ -27910,7 +27912,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3226",
+   "source": "src/js/select-bridge.js:3228",
    "meta": {
     "i18n": null,
     "functionsVisited": 77
@@ -27929,7 +27931,7 @@
    "capability": "Copier",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3039 onContext()"
+    "src/js/select-bridge.js:3041 onContext()"
    ],
    "events": [
     "click"
@@ -27945,7 +27947,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3039",
+   "source": "src/js/select-bridge.js:3041",
    "meta": {
     "i18n": null,
     "functionsVisited": 29
@@ -27964,7 +27966,7 @@
    "capability": "Couper",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3040 onContext()"
+    "src/js/select-bridge.js:3042 onContext()"
    ],
    "events": [
     "click"
@@ -27983,7 +27985,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3040",
+   "source": "src/js/select-bridge.js:3042",
    "meta": {
     "i18n": null,
     "functionsVisited": 28
@@ -28002,7 +28004,7 @@
    "capability": "Mask the image with this shape",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3132 onContext()"
+    "src/js/select-bridge.js:3134 onContext()"
    ],
    "events": [
     "click"
@@ -28016,7 +28018,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3132",
+   "source": "src/js/select-bridge.js:3134",
    "meta": {
     "i18n": "ctxMaskImageWithShape",
     "functionsVisited": 8
@@ -28035,7 +28037,7 @@
    "capability": "Dupliquer",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3042 onContext()"
+    "src/js/select-bridge.js:3044 onContext()"
    ],
    "events": [
     "click"
@@ -28055,7 +28057,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3042",
+   "source": "src/js/select-bridge.js:3044",
    "meta": {
     "i18n": null,
     "functionsVisited": 99
@@ -28074,7 +28076,7 @@
    "capability": "Exposer l\\'opacité comme propriété de Component…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3263 onContext()"
+    "src/js/select-bridge.js:3265 onContext()"
    ],
    "events": [
     "click"
@@ -28092,7 +28094,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3263",
+   "source": "src/js/select-bridge.js:3265",
    "meta": {
     "i18n": null,
     "functionsVisited": 34
@@ -28111,7 +28113,7 @@
    "capability": "Exposer la visibilité comme propriété de Component…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3272 onContext()"
+    "src/js/select-bridge.js:3274 onContext()"
    ],
    "events": [
     "click"
@@ -28129,7 +28131,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3272",
+   "source": "src/js/select-bridge.js:3274",
    "meta": {
     "i18n": null,
     "functionsVisited": 33
@@ -28148,7 +28150,7 @@
    "capability": "Premier plan",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3086 onContext()"
+    "src/js/select-bridge.js:3088 onContext()"
    ],
    "events": [
     "click"
@@ -28169,7 +28171,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3086",
+   "source": "src/js/select-bridge.js:3088",
    "meta": {
     "i18n": null,
     "functionsVisited": 202
@@ -28188,7 +28190,7 @@
    "capability": "Profil de contour :",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3227 onContext()"
+    "src/js/select-bridge.js:3229 onContext()"
    ],
    "events": [
     "click"
@@ -28202,7 +28204,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3227",
+   "source": "src/js/select-bridge.js:3229",
    "meta": {
     "i18n": null,
     "functionsVisited": 0
@@ -28221,7 +28223,7 @@
    "capability": "Rejeter la correction",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3199 onContext()"
+    "src/js/select-bridge.js:3201 onContext()"
    ],
    "events": [
     "click"
@@ -28241,7 +28243,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3199",
+   "source": "src/js/select-bridge.js:3201",
    "meta": {
     "i18n": null,
     "functionsVisited": 277
@@ -28260,7 +28262,7 @@
    "capability": "Sortir du groupe",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3081 onContext()"
+    "src/js/select-bridge.js:3083 onContext()"
    ],
    "events": [
     "click"
@@ -28280,7 +28282,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3081",
+   "source": "src/js/select-bridge.js:3083",
    "meta": {
     "i18n": null,
     "functionsVisited": 63
@@ -28299,7 +28301,7 @@
    "capability": "Suggérer la forme pour « ",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3020 onContext()"
+    "src/js/select-bridge.js:3022 onContext()"
    ],
    "events": [
     "click"
@@ -28317,7 +28319,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3020",
+   "source": "src/js/select-bridge.js:3022",
    "meta": {
     "i18n": null,
     "functionsVisited": 82
@@ -28358,7 +28360,7 @@
    "source": "src/js/shapes-panel.js:738",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 100
+    "functionsVisited": 92
    },
    "fixtures": [
     "static-props",
@@ -28472,7 +28474,7 @@
    "source": "src/js/shapes-panel.js:860",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 100
+    "functionsVisited": 92
    },
    "fixtures": [
     "static-props",
@@ -30942,7 +30944,7 @@
    "source": "src/js/timeline.js:5605",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 174
+    "functionsVisited": 166
    },
    "fixtures": [
     "keyed-props",
@@ -30981,7 +30983,7 @@
    "source": "src/js/timeline.js:5636",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 439
+    "functionsVisited": 454
    },
    "fixtures": [
     "keyed-props",
@@ -34401,7 +34403,7 @@
    "capability": "Flip preview",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/application/shortcut-registry.js:85 COMMAND_SHORTCUTS"
+    "src/js/application/shortcut-registry.js:88 COMMAND_SHORTCUTS"
    ],
    "events": [
     "keydown"
@@ -34416,7 +34418,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:85",
+   "source": "src/js/application/shortcut-registry.js:88",
    "meta": {
     "table": "COMMAND_SHORTCUTS",
     "key": "f",
@@ -34751,7 +34753,7 @@
    "capability": "Rename layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/application/shortcut-registry.js:87 COMMAND_SHORTCUTS"
+    "src/js/application/shortcut-registry.js:90 COMMAND_SHORTCUTS"
    ],
    "events": [
     "keydown"
@@ -34766,7 +34768,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:87",
+   "source": "src/js/application/shortcut-registry.js:90",
    "meta": {
     "table": "COMMAND_SHORTCUTS",
     "key": "F2",
@@ -34786,7 +34788,7 @@
    "capability": "Reset view",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/application/shortcut-registry.js:86 COMMAND_SHORTCUTS"
+    "src/js/application/shortcut-registry.js:89 COMMAND_SHORTCUTS"
    ],
    "events": [
     "keydown"
@@ -34801,7 +34803,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:86",
+   "source": "src/js/application/shortcut-registry.js:89",
    "meta": {
     "table": "COMMAND_SHORTCUTS",
     "key": "/",
@@ -34817,11 +34819,11 @@
   {
    "id": "shortcut:cmdTween",
    "kind": "shortcut",
-   "surface": "keyboard t",
+   "surface": "keyboard (unbound)",
    "capability": "Generate tweens",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/application/shortcut-registry.js:84 COMMAND_SHORTCUTS"
+    "src/js/application/shortcut-registry.js:87 COMMAND_SHORTCUTS"
    ],
    "events": [
     "keydown"
@@ -34836,10 +34838,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:84",
+   "source": "src/js/application/shortcut-registry.js:87",
    "meta": {
     "table": "COMMAND_SHORTCUTS",
-    "key": "t",
+    "key": "",
     "cat": "frames",
     "functionsVisited": 0
    },
@@ -35307,7 +35309,7 @@
    "capability": "Copy / paste / cut",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/application/shortcut-registry.js:96 READONLY_SHORTCUTS"
+    "src/js/application/shortcut-registry.js:99 READONLY_SHORTCUTS"
    ],
    "events": [
     "keydown"
@@ -35322,7 +35324,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:96",
+   "source": "src/js/application/shortcut-registry.js:99",
    "meta": {
     "table": "READONLY_SHORTCUTS",
     "key": "⌘C / ⌘V / ⌘X",
@@ -35340,181 +35342,6 @@
    "kind": "shortcut",
    "surface": "keyboard ⌫",
    "capability": "Delete selection",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:100 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:100",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "⌫",
-    "cat": "edit",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoDuplicate",
-   "kind": "shortcut",
-   "surface": "keyboard ⌘D",
-   "capability": "Duplicate",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:97 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:97",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "⌘D",
-    "cat": "edit",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoEasyEase",
-   "kind": "shortcut",
-   "surface": "keyboard F9",
-   "capability": "Easy ease",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:102 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:102",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "F9",
-    "cat": "frames",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoEscape",
-   "kind": "shortcut",
-   "surface": "keyboard Échap",
-   "capability": "Cancel / deselect",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:105 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:105",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "Échap",
-    "cat": "edit",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoGroup",
-   "kind": "shortcut",
-   "surface": "keyboard ⌘G / ⇧⌘G",
-   "capability": "Group / ungroup",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:98 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:98",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "⌘G / ⇧⌘G",
-    "cat": "edit",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoNudgeKeys",
-   "kind": "shortcut",
-   "surface": "keyboard ⌥ ← →",
-   "capability": "Nudge keys in time",
    "area": "timeline-layers-frames",
    "handler": [
     "src/js/application/shortcut-registry.js:103 READONLY_SHORTCUTS"
@@ -35535,6 +35362,181 @@
    "source": "src/js/application/shortcut-registry.js:103",
    "meta": {
     "table": "READONLY_SHORTCUTS",
+    "key": "⌫",
+    "cat": "edit",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoDuplicate",
+   "kind": "shortcut",
+   "surface": "keyboard ⌘D",
+   "capability": "Duplicate",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:100 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:100",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "⌘D",
+    "cat": "edit",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoEasyEase",
+   "kind": "shortcut",
+   "surface": "keyboard F9",
+   "capability": "Easy ease",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:105 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:105",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "F9",
+    "cat": "frames",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoEscape",
+   "kind": "shortcut",
+   "surface": "keyboard Échap",
+   "capability": "Cancel / deselect",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:108 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:108",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "Échap",
+    "cat": "edit",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoGroup",
+   "kind": "shortcut",
+   "surface": "keyboard ⌘G / ⇧⌘G",
+   "capability": "Group / ungroup",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:101 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:101",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "⌘G / ⇧⌘G",
+    "cat": "edit",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoNudgeKeys",
+   "kind": "shortcut",
+   "surface": "keyboard ⌥ ← →",
+   "capability": "Nudge keys in time",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:106 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:106",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
     "key": "⌥ ← →",
     "cat": "frames",
     "functionsVisited": 0
@@ -35550,181 +35552,6 @@
    "kind": "shortcut",
    "surface": "keyboard Espace",
    "capability": "Play / pause",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:92 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:92",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "Espace",
-    "cat": "nav",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoSelectAll",
-   "kind": "shortcut",
-   "surface": "keyboard ⌘A",
-   "capability": "Select all",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:99 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:99",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "⌘A",
-    "cat": "edit",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoSplitLayer",
-   "kind": "shortcut",
-   "surface": "keyboard ⇧⌘D",
-   "capability": "Split layer at playhead",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:104 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:104",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "⇧⌘D",
-    "cat": "layers",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoStepFrame",
-   "kind": "shortcut",
-   "surface": "keyboard ←  →",
-   "capability": "Step one frame",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:93 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:93",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "←  →",
-    "cat": "nav",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoStepLayer",
-   "kind": "shortcut",
-   "surface": "keyboard ⇧ Page",
-   "capability": "Previous / next layer",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:94 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:94",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "⇧ Page",
-    "cat": "layers",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoUndo",
-   "kind": "shortcut",
-   "surface": "keyboard ⌘Z / ⇧⌘Z",
-   "capability": "Undo / redo",
    "area": "timeline-layers-frames",
    "handler": [
     "src/js/application/shortcut-registry.js:95 READONLY_SHORTCUTS"
@@ -35745,6 +35572,181 @@
    "source": "src/js/application/shortcut-registry.js:95",
    "meta": {
     "table": "READONLY_SHORTCUTS",
+    "key": "Espace",
+    "cat": "nav",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoSelectAll",
+   "kind": "shortcut",
+   "surface": "keyboard ⌘A",
+   "capability": "Select all",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:102 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:102",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "⌘A",
+    "cat": "edit",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoSplitLayer",
+   "kind": "shortcut",
+   "surface": "keyboard ⇧⌘D",
+   "capability": "Split layer at playhead",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:107 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:107",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "⇧⌘D",
+    "cat": "layers",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoStepFrame",
+   "kind": "shortcut",
+   "surface": "keyboard ←  →",
+   "capability": "Step one frame",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:96 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:96",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "←  →",
+    "cat": "nav",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoStepLayer",
+   "kind": "shortcut",
+   "surface": "keyboard ⇧ Page",
+   "capability": "Previous / next layer",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:97 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:97",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "⇧ Page",
+    "cat": "layers",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoUndo",
+   "kind": "shortcut",
+   "surface": "keyboard ⌘Z / ⇧⌘Z",
+   "capability": "Undo / redo",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:98 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:98",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
     "key": "⌘Z / ⇧⌘Z",
     "cat": "edit",
     "functionsVisited": 0
@@ -35762,7 +35764,7 @@
    "capability": "Work area in / out",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/application/shortcut-registry.js:101 READONLY_SHORTCUTS"
+    "src/js/application/shortcut-registry.js:104 READONLY_SHORTCUTS"
    ],
    "events": [
     "keydown"
@@ -35777,7 +35779,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:101",
+   "source": "src/js/application/shortcut-registry.js:104",
    "meta": {
     "table": "READONLY_SHORTCUTS",
     "key": "B / N",
@@ -36080,7 +36082,7 @@
   {
    "id": "shortcut:text",
    "kind": "shortcut",
-   "surface": "keyboard y",
+   "surface": "keyboard t",
    "capability": "Texte",
    "area": "drawing-selection",
    "handler": [
@@ -36107,7 +36109,7 @@
    "source": "src/js/application/shortcut-registry.js:48",
    "meta": {
     "table": "TOOL_SHORTCUTS",
-    "key": "y",
+    "key": "t",
     "cat": null,
     "functionsVisited": 166
    },

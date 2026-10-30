@@ -13911,6 +13911,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     var modes=['all','animated','modified','expressions','errors','effects','mattes'];
     ui.bindMotion(window,binding.createOrdinary(window,{
       labelProperty:function(property){return PROP_LABEL[property]||property;},
+      dimLabels:function(property){return typeof PROP_DIM_LABELS==='object'&&PROP_DIM_LABELS&&PROP_DIM_LABELS[property]||null;},
       readPreference:function(key){return key==='nemo-motion-filter'?_motionFilterMode:null;},
       writePreference:function(key,value){if(key!=='nemo-motion-filter'||modes.indexOf(value)<0)return;_motionFilterMode=value;try{localStorage.setItem(key,value);}catch(_){}},
       acceptsTarget:function(event){

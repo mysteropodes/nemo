@@ -2038,7 +2038,7 @@ test('L07-F contour producer join stays a private render-scene child and fails c
   assert.match(coverage.nativeObjectSceneProducerContourRegistration, /L07-F\/#2161/);
   const parentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_render_scene.rs'), 'utf8');
   assert.match(parentText, /#\[path = "object_scene_producer_contour\.rs"\]\s*mod object_scene_producer_contour;/);
-  assert.match(parentText, /object_scene_producer_contour::produce\(packet\)\.into_admitted\(\)\?/);
+  assert.match(parentText, /object_scene_producer_contour::produce_with_texts\(packet\);\s*let contours = contours\.into_admitted\(\)\?;/);
   const planText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_paint_plan.rs'), 'utf8');
   assert.match(planText, /object_scene_producer_contour::command_sequence\(scene, expected\)\?/);
   const compositorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_compositor.rs'), 'utf8');

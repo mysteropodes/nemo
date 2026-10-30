@@ -284,14 +284,15 @@ pub(super) fn layer_holder_consumed(document: &ObjectDocument, holder: &Property
     }
     // The new provider transforms only Text/raster paints. A visible vector on
     // the same layer must never silently ignore rotation/scale/anchor/Position.
-    let visible_vector = document.layers().iter().any(|layer| {
-        layer.layer_uid() == target.layer_uid()
-            && layer.visible()
-            && document.objects().iter().any(|record| {
-                record.target.context_id == target.context_id()
-                    && record.target.layer_uid == target.layer_uid()
-            })
-    });
+    let visible_vector = !layer_vectors_batchable(document, target)
+        && document.layers().iter().any(|layer| {
+            layer.layer_uid() == target.layer_uid()
+                && layer.visible()
+                && document.objects().iter().any(|record| {
+                    record.target.context_id == target.context_id()
+                        && record.target.layer_uid == target.layer_uid()
+                })
+        });
     holder.properties().iter().all(|property| {
         !property.expression.value().is_some_and(|code| code.enabled)
             && match property.property() {
@@ -300,6 +301,27 @@ pub(super) fn layer_holder_consumed(document: &ObjectDocument, holder: &Property
                 _ => false,
             }
     })
+}
+
+/// Every object record the layer paints is an authored, non-mask vector or closed legacy record. The common vector batch
+/// then moves them with the pivot and chain the layer's Text and raster items already use, so a layer that mixes the
+/// families consumes its pose in all of them. A mask or any other record family keeps the explicit refusal.
+pub(crate) fn layer_vectors_batchable(document: &ObjectDocument, target: &PropertyHolderTarget) -> bool {
+    document
+        .objects()
+        .iter()
+        .filter(|record| {
+            record.target.context_id == target.context_id()
+                && record.target.layer_uid == target.layer_uid()
+        })
+        .all(|record| {
+            record.target.frame_scope.kind == FrameScopeKind::Authored
+                && !record.is_mask()
+                && matches!(
+                    record.family.as_str(),
+                    VECTOR_FAMILY | "closed-solid-fill-cubic-path"
+                )
+        })
 }
 
 /// Static parenting is consumed only by the exact ordinary common-layer batch.
