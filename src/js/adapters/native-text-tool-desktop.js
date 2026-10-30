@@ -99,27 +99,40 @@
       if(selected<0){choices.push({name:'Unavailable font: '+(wanted.assetId||wanted.fontKey),font:wanted,unavailable:true});selected=choices.length-1;}
       fontChoices=choices;font.replaceChildren();choices.forEach(function(c,i){var o=node('option',c.name);o.value=String(i);o.disabled=!!c.unavailable;font.appendChild(o);});font.value=String(selected);controls();
     }
+    function turnedBox(b){ // Doc-unit frame of a turned block: stored width, else a monospace-ish estimate of the longest line.
+      var lines=String(b.text).split('\n'),longest=Math.max.apply(null,lines.map(function(l){return l.length;}));
+      return {w:typeof b.fixedWidth==='number'&&b.fixedWidth>0?b.fixedWidth:Math.max(b.size*2,longest*b.size*0.6),h:lines.length*b.size*1.25};}
     function show(d){
       if(!ownsUI()){trace(root,'show.reject.owner',null,null);return;}
       if(!pop||Object.values(fields).some(function(n){return !n;})){trace(root,'show.reject.controls',null,null);notify('Text editor controls are unavailable.');return;}
       shown=d;dirty.clear();fields.text.value=d.block.text;fields.size.value=String(d.block.size);fields.color.value=d.block.color.slice(0,7);syncHex();fields.align.value=d.block.align;
       var c=context(true);if(!c){trace(root,'show.reject.context',null,null);return;}var at=screen(d.block.anchorTopLeft,c);
       var isArea=!d.target&&!!d.placement&&d.placement.fixedWidth!==null,sx=c.bounds.width/c.canvasW,sy=c.bounds.height/c.canvasH,box=dragBox;dragBox=null;
-      var m=c.presentation.view?Mapping.transform(c,false):null,wPx=box?box.w:isArea?d.placement.fixedWidth*sx:0,hPx=box?box.h:Math.max(24,d.block.size*1.25*sy);
+      // #2267: a stored turn (degrees about the anchor) edits in place: the overlay carries it as a screen-space transform about the anchor's screen point.
+      var rot=Number.isFinite(d.block.rotation)?d.block.rotation:0,turned=!!d.target&&rot!==0,tb=turned?turnedBox(d.block):null;
+      var m=c.presentation.view?Mapping.transform(c,false):null,wDoc=isArea?d.placement.fixedWidth:turned?tb.w:0,wPx=box?box.w:wDoc*sx,hPx=box?box.h:Math.max(24,(turned?tb.h:d.block.size*1.25)*sy);
+      var th=rot*Math.PI/180,cs=Math.cos(th),sn=Math.sin(th),M=m||[1,0,0,1,0,0];
+      var L=[sx*(M[0]*cs+M[2]*sn),sy*(M[1]*cs+M[3]*sn),sx*(M[2]*cs-M[0]*sn),sy*(M[3]*cs-M[1]*sn)]; // doc units -> screen px, turn included
       var left=at.x+10,top=at.y+10,vh=root.innerHeight||doc.documentElement.clientHeight,popH=pop.offsetHeight||220;
+      if(turned){ // Dock outside the turned frame: its screen corners bound the overlay.
+        var xs=[],ys=[];[[0,0],[tb.w,0],[0,tb.h],[tb.w,tb.h]].forEach(function(q){xs.push(at.x+L[0]*q[0]+L[2]*q[1]);ys.push(at.y+L[1]*q[0]+L[3]*q[1]);});
+        var x0=Math.min.apply(null,xs),x1=Math.max.apply(null,xs),y0=Math.min.apply(null,ys),y1=Math.max.apply(null,ys);
+        left=x0;top=y1+8;
+        if(top>vh-220){var over=y0-popH-8;if(over>=4)top=over;else if(x1+8<=doc.documentElement.clientWidth-240){left=x1+8;top=y0;}}
+      }
       if(isArea){ // Dock outside the draft rect so the dragged box stays visible (baseline had no popover for area drafts).
         left=at.x;top=at.y+hPx+8;
         if(top>vh-220){var above=at.y-popH-8;if(above>=4)top=above;else if(at.x+wPx+8<=doc.documentElement.clientWidth-240){left=at.x+wPx+8;top=at.y;}}
       }
       pop.style.display='block';pop.style.left=Math.max(4,Math.min(doc.documentElement.clientWidth-240,left))+'px';pop.style.top=Math.max(4,Math.min(vh-220,top))+'px';
       if(area&&area.parentNode)area.parentNode.removeChild(area);area=null;
-      if(isArea){
+      if(isArea||turned){
         area=node('textarea');area.id='native-text-area-draft';area.setAttribute('aria-label','Text');area.value=d.block.text;
-        Object.assign(area.style,{position:'fixed',zIndex:'201',left:at.x+'px',top:at.y+'px',width:(d.placement.fixedWidth*sx)+'px',height:hPx+'px',boxSizing:'border-box',resize:'none',border:'1px dashed rgba(255,184,108,.9)',background:'rgba(255,184,108,.06)',fontSize:(d.block.size*sy)+'px',color:d.block.color});
+        Object.assign(area.style,{position:'fixed',zIndex:'201',left:at.x+'px',top:at.y+'px',width:(wDoc*sx)+'px',height:hPx+'px',boxSizing:'border-box',resize:'none',border:'1px dashed rgba(255,184,108,.9)',background:'rgba(255,184,108,.06)',fontSize:(d.block.size*sy)+'px',color:d.block.color});
         if(m){
           var ky=Math.hypot(sy*m[1],sy*m[3])||1;
-          Object.assign(area.style,{width:d.placement.fixedWidth+'px',height:(hPx/ky)+'px',fontSize:d.block.size+'px',transformOrigin:'0 0',transform:'matrix('+[sx*m[0],sy*m[1],sx*m[2],sy*m[3],0,0].join(',')+')'});
-        }
+          Object.assign(area.style,{width:wDoc+'px',height:(turned?tb.h:hPx/ky)+'px',fontSize:d.block.size+'px',transformOrigin:'0 0',transform:'matrix('+L.concat([0,0]).join(',')+')'});
+        }else if(rot)Object.assign(area.style,{transformOrigin:'0 0',transform:'rotate('+rot+'deg)'});
         area.addEventListener('input',function(){dirty.add('text');input.value=area.value;});area.addEventListener('keydown',key);
         area.addEventListener('blur',function(e){var inPop=popDown||(e.relatedTarget&&pop.contains(e.relatedTarget));popDown=false;if(!inPop)commit();});doc.body.appendChild(area);area.focus();
       }else input.focus();

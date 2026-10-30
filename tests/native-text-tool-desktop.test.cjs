@@ -533,3 +533,23 @@ test('stashed drag height is cleared by cancel and commit so a later API-opened 
   assert.equal(f.get('native-text-area-draft').style.height,'120px',end+': default max(24,size*1.25*scale)');
  }
 });
+
+test('#2267 editing a block with stored rotation 30 turns the in-place overlay about the anchor screen point; rotation 0 and absent are unchanged',async()=>{
+ const f=await fixture(),t=target('rot-30');f.seed(t,{...block('Turned'),rotation:30});await f.binding.core.openExisting(t);
+ const area=f.get('native-text-area-draft');assert.ok(area,'turned existing block edits in an overlay, not only the popover');
+ assert.equal(area.style.left,'40px','anchor (10,20) -> screen (40,70) at scale 2');assert.equal(area.style.top,'70px');
+ assert.equal(area.style.transform,'rotate(30deg)');assert.equal(area.style.transformOrigin,'0 0');
+ assert.equal(area.value,'Turned');area.value='Turned!';area.fire('input');area.fire('keydown',{key:'Enter',ctrlKey:true});await f.turn();
+ const sent=f.owner.log.received.at(-1).payload;assert.equal(sent.patch.text,'Turned!');assert.equal('rotation' in sent.patch,false,'a patch never carries rotation');
+ for(const stored of [{rotation:0},{}]){const g=await fixture(),u=target('rot-none');g.seed(u,{...block('Flat'),...stored});await g.binding.core.openExisting(u);
+  assert.equal(g.get('native-text-area-draft'),null,'unturned existing text keeps the popover editor');}
+});
+test('#2267 turned overlay composes the turn with the presented view affine and docks the popover outside the turned frame',async()=>{
+ const cameraView={mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]};
+ const f=await fixture(false,Desktop,{cameraView}),t=target('rot-90');f.seed(t,{...block('Cam'),rotation:90,fixedWidth:40});await f.binding.core.openExisting(t);
+ const area=f.get('native-text-area-draft');assert.ok(area);const v=area.style.transform.match(/-?[\d.e-]+/g).map(Number);
+ const want=[0,4,-4,0,0,0];v.forEach((x,i)=>assert.ok(Math.abs(x-want[i])<1e-9,'matrix '+v+' vs '+want));
+ assert.equal(area.style.width,'40px');assert.equal(area.style.transformOrigin,'0 0');
+ const pop=f.get('text-popover'),rect=n=>({l:parseFloat(n.style.left),t:parseFloat(n.style.top)});
+ assert.ok(rect(pop).t>=parseFloat(area.style.top)||rect(pop).l>=parseFloat(area.style.left),'popover is not parked on the anchor');
+});

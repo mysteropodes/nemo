@@ -131,7 +131,7 @@ impl ApplicationMcp {
         native.active_mut(generation)?.replace_document(document)
     }
 
-    fn native_status(&self, request: NativeStatusRequest) -> Result<NativeHostStatus, String> {
+    pub(crate) fn native_status(&self, request: NativeStatusRequest) -> Result<NativeHostStatus, String> {
         native_status(&self.instance_id, &self.native, request)
     }
 
@@ -307,9 +307,7 @@ fn native_status(
     request: NativeStatusRequest,
 ) -> Result<NativeHostStatus, String> {
     request.validate().map_err(|error| error.to_string())?;
-    let authority = native
-        .lock()
-        .map_err(|_| "native application lock unavailable")?;
+    let authority = native.lock().map_err(|_| "native application lock unavailable")?;
     let active = authority.active();
     let current = active.filter(|(_, application)| {
         request.instance_id == instance_id && application.instance_id() == instance_id
@@ -326,6 +324,7 @@ fn native_status(
         available: reason.is_none(),
         document_id: current.map(|(_, application)| application.document_id().into()),
         content_revision: current.map(|(_, application)| application.content_revision()),
+        lifecycle_generation: current.map(|(generation, _)| generation),
         reason: reason.map(str::to_owned),
     })
 }

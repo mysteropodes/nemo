@@ -39,6 +39,10 @@ impl TextBlockRecord {
             f64_of(&self.anchor_top_left.y),
         ]
     }
+    /// #2267: the turn of the whole block about its anchor, degrees (absent reads 0).
+    pub(crate) fn rotation(&self) -> f64 {
+        self.rotation.value().map(f64_of).unwrap_or(0.0)
+    }
     /// Three states: `None` absent, `Some(None)` explicit `null`, `Some(Some(w))`.
     pub(crate) fn fixed_width_authored(&self) -> Option<Option<f64>> {
         self.fixed_width

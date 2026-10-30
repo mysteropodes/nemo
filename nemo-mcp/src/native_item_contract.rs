@@ -151,6 +151,8 @@ fn text_fields(members: &Map<String, Value>) -> bool {
             value.as_str(),
             Some("none" | "upper" | "lower" | "capitalize")
         ),
+        // #2267: the stored turn of a block, degrees within one turn either way (a patch never carries it, see `text_patch`).
+        "rotation" => value.as_f64().is_some_and(|d| d.abs() <= 360.0),
         "anchorTopLeft" => {
             exact(value, &["x", "y"], &[]).is_some()
                 && value["x"].is_number()
@@ -160,7 +162,7 @@ fn text_fields(members: &Map<String, Value>) -> bool {
     })
 }
 
-const TEXT_OPTIONAL: [&str; 11] = [
+const TEXT_OPTIONAL: [&str; 12] = [
     "fixedWidth",
     "fixedHeight",
     "bold",
@@ -172,6 +174,7 @@ const TEXT_OPTIONAL: [&str; 11] = [
     "lineHeightMult",
     "textCase",
     "anchorTopLeft",
+    "rotation",
 ];
 
 fn text_block(value: &Value) -> bool {
@@ -183,10 +186,13 @@ fn text_block(value: &Value) -> bool {
     .is_some_and(text_fields)
 }
 
-/// A patch names members to replace; it never carries `anchorTopLeft` (an edit cannot re-anchor).
+/// A patch names members to replace; it never carries `anchorTopLeft` (an edit cannot re-anchor) or `rotation` (a Select turn owns it).
 fn text_patch(value: &Value) -> bool {
     value.as_object().is_some_and(|members| {
-        !members.is_empty() && !members.contains_key("anchorTopLeft") && text_fields(members)
+        !members.is_empty()
+            && !members.contains_key("anchorTopLeft")
+            && !members.contains_key("rotation")
+            && text_fields(members)
     })
 }
 

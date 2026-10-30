@@ -20,6 +20,7 @@ pub(super) fn request_limit(operation: &str) -> usize {
         || operation == "command.document.object.fill.brush"
         || operation == "command.document.object.brush.bitmap.stroke"
         || operation.starts_with("command.document.object.tween.")
+        || operation == "command.document.object.property.preset.apply"
     {
         MAX_REQUEST_BYTES
     } else {

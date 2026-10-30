@@ -75,3 +75,16 @@ test('curated ownership adds owners with snapshot state and is validated', () =>
   for (const pattern of [/unknown task Q99/, /invalid issue/, /invalid confidence sure/, /noTask but lists tasks/, /lists #9 twice/,
     /#9 has no evidence/, /#9 has no state in the owners snapshot/]) assert.ok(bad.some((p) => pattern.test(p)), pattern + ' in ' + bad.join(' | '));
 });
+
+test('D34/D36-D40 are owned one-to-one by #2520-#2525, not by the Motion presenter slice #2377', () => {
+  const matrix = JSON.parse(fs.readFileSync(path.join(cli.DIR, 'matrix.json'), 'utf8'));
+  const expected = { D34: 2520, D36: 2521, D37: 2522, D38: 2523, D39: 2524, D40: 2525 };
+  for (const [task, issue] of Object.entries(expected)) {
+    const row = matrix.tasks.find((t) => t.task === task);
+    assert.deepEqual(row.owners.map((o) => o.issue), [issue], task + ' owner');
+  }
+  assert.ok(!matrix.tasks.some((t) => t.owners.some((o) => o.issue === 2377)), '#2377 closing must not flip any task row');
+  const pending = matrix.surfaces.filter((s) => (s.tasks || []).some((t) => t in expected));
+  assert.equal(pending.length, 30);
+  assert.ok(pending.every((s) => /-open$/.test(s.status)), 'the 30 rows stay open');
+});

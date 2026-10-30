@@ -9,9 +9,9 @@
  * Shift on a corner scales proportionally, Alt scales from the box centre, Shift snaps a rotation to 15 degrees, Shift on the press extends
  * the selection. An image and a text block go in the same batch as a record-space matrix in their own frame (the listing's bounds and
  * matrix): the engine moves the image's stored centre, scales its size and turns its rotation (a mesh bound to it follows) and re-anchors
- * a text block and scales its size, fixed width and spacing as the baseline resize did. An image takes a move, a scale along its own axes
- * and a turn; text takes a move and a scale only (it has no stored rotation); a mirror of either and a shear of an image have no stored
- * form. Not carried over: skew zones, a custom anchor, the Alt lasso, ruler snapping. Still refused with a notice: those transforms,
+ * a text block and scales its size, fixed width and spacing as the baseline resize did. An image or a text block takes a move, a scale
+ * along its own axes and a turn (#2267: the text block stores a rotation about its anchor); a mirror of either and a shear of either have
+ * no stored form. Not carried over: skew zones, a custom anchor, the Alt lasso, ruler snapping. Still refused with a notice: those transforms,
  * bitmap brushes (their image is baked) and a dab whose anchor could not be read. */
 (function (root, factory) {
   var api = factory();
@@ -35,16 +35,15 @@
   }
   // The transform an image or a text block has no stored form for, as a label (null when every one can take `m`, the world affine): the
   // matrix is read in each item's own frame (the presented matrix conjugated), where an image takes a move, a scale along its axes and a
-  // turn, and text a move and a scale.
+  // turn (text the same, #2267).
   function unstorable(root, paths, m) {
     var conj = root.NemoSelectCanvasIntent && root.NemoSelectCanvasIntent.inRecordSpace, found = [];
     paths.forEach(function (p) {
       var role = p.data && p.data.nativeRole, r = (role === 'raster' || role === 'text') && conj ? conj(p.data.nativeMatrix, m) : null;
       if (!r) return;
-      var det = r[0] * r[3] - r[1] * r[2], tol = 1e-9 * (Math.abs(r[0]) + Math.abs(r[1]) + Math.abs(r[2]) + Math.abs(r[3]));
+      var det = r[0] * r[3] - r[1] * r[2];
       if (det < 0) found.push(role === 'text' ? 'Flipping text' : 'Flipping images');
-      else if (role === 'text' && (Math.abs(r[1]) > tol || Math.abs(r[2]) > tol)) found.push('Rotating text');
-      else if (role === 'raster' && Math.abs(r[0] * r[2] + r[1] * r[3]) > 1e-9 * Math.hypot(r[0], r[1]) * Math.hypot(r[2], r[3])) found.push('Skewing images (scale along their own axes)');
+      else if (Math.abs(r[0] * r[2] + r[1] * r[3]) > 1e-9 * Math.hypot(r[0], r[1]) * Math.hypot(r[2], r[3])) found.push(role === 'text' ? 'Skewing text (scale along its own axes)' : 'Skewing images (scale along their own axes)');
     });
     return found.length ? found.filter(function (l, i) { return found.indexOf(l) === i; }).join(', ') : null;
   }

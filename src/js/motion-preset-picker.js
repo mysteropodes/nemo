@@ -24,6 +24,18 @@
 
   // The catalog stays local. Document capture/apply must never use the legacy
   // projection while native authority owns the project, including after a prompt.
+  // G39 (#2376): under native authority both go through the native adapter instead:
+  // capture reads the layer's tracks through the native property read, apply is one native command.
+  function nativePresets() {
+    try {
+      var adapter = window.NemoNativeObjectMotionPreset;
+      return adapter && typeof adapter.desktop === 'function' ? adapter.desktop(window) : null;
+    } catch (_) { return null; }
+  }
+  function nativeRefusal(error) {
+    var code = error && error.code;
+    if (window.showToast) showToast(code === 'not_found' ? SM.t('hsSelectLayerFirst') : 'Native Motion preset command was refused.');
+  }
   function allowLegacyDocument() {
     try {
       var cutover = window.NemoNativeOpacityCutover;
@@ -135,7 +147,25 @@
   function render() { renderTabs(); renderGrid(); }
   window.renderMotionPresetPanel = render;
 
+  function storePreset(label, motion, motionStatic) {
+    _presets[newId()] = { label: label, categoryId: activeCategory().id, motion: motion, motionStatic: motionStatic };
+    persistPresets();
+    render();
+    if (window.showToast) showToast('Preset "' + label + '" enregistré');
+  }
+  function saveNativePreset(native) {
+    var index = state.activeLayerIdx;
+    if (!native.layerUid(index)) { if (window.showToast) showToast(SM.t('hsSelectLayerFirst')); return; }
+    native.capture(index, state.currentFrame).then(function (captured) {
+      if (!captured.motion && !captured.motionStatic) { if (window.showToast) showToast(SM.t('hsLayerNoTransform')); return; }
+      var name = prompt('Nom du preset', native.layerName(index) || 'Preset');
+      if (!name || !name.trim()) return;
+      storePreset(name.trim(), captured.motion, captured.motionStatic);
+    }, nativeRefusal);
+  }
   function savePreset() {
+    var native = nativePresets();
+    if (native) return saveNativePreset(native);
     if (!documentAvailable()) return;
     var ld = state.layers[state.activeLayerIdx];
     if (!ld) { if (window.showToast) showToast(SM.t('hsSelectLayerFirst')); return; }
@@ -143,22 +173,23 @@
     var name = prompt('Nom du preset', ld.name || 'Preset');
     if (!name || !name.trim()) return;
     if (!documentAvailable()) return;
-    var id = newId();
-    _presets[id] = {
-      label: name.trim(),
-      categoryId: activeCategory().id,
-      motion: ld.motion ? JSON.parse(JSON.stringify(ld.motion)) : null,
-      motionStatic: ld.motionStatic ? JSON.parse(JSON.stringify(ld.motionStatic)) : null,
-    };
-    persistPresets();
-    render();
-    if (window.showToast) showToast('Preset "' + name.trim() + '" enregistré');
+    storePreset(name.trim(),
+      ld.motion ? JSON.parse(JSON.stringify(ld.motion)) : null,
+      ld.motionStatic ? JSON.parse(JSON.stringify(ld.motionStatic)) : null);
   }
 
+  function applyNativePreset(native, p, id) {
+    native.apply(state.activeLayerIdx, p).then(function (receipt) {
+      if (window.showToast) showToast('Preset "' + (p.label || id) + '" appliqué' +
+        (receipt.skipped && receipt.skipped.length ? ' (ignoré : ' + receipt.skipped.join(', ') + ')' : ''));
+    }, nativeRefusal);
+  }
   function applyPreset(id) {
-    if (!documentAvailable()) return;
     var p = _presets[id];
     if (!p) return;
+    var native = nativePresets();
+    if (native) return applyNativePreset(native, p, id);
+    if (!documentAvailable()) return;
     var ld = state.layers[state.activeLayerIdx];
     if (!ld) { if (window.showToast) showToast(SM.t('hsSelectTargetLayerFirst')); return; }
     saveAllLayerFrames();

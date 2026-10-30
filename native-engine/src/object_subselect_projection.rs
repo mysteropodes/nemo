@@ -178,14 +178,13 @@ impl ObjectCompositionWitness {
         if source.placed || source.layer_index != layer {
             return None;
         }
-        let target = self
+        let record = self
             .plan()
             .packet()
             .text_records()
-            .find(|r| r.source_index() == source.source_index)?
-            .entry()
-            .target
-            .clone();
+            .find(|r| r.source_index() == source.source_index)?;
+        let target = record.entry().target.clone();
+        let turn = record.entry().block.rotation();
         // The block's painted glyph and decoration contours are already in world space; its record space is the stored anchor's
         // own frame, which the layer's parent chain carries to the world. An unposed layer keeps the identity (and the world box).
         let b = source.item.scene().contours().iter().fold(
@@ -193,6 +192,11 @@ impl ObjectCompositionWitness {
             |b, c| [b[0].min(c.envelope[0]), b[1].min(c.envelope[1]), b[2].max(c.envelope[2]), b[3].max(c.envelope[3])],
         );
         let chain = subselect::layer_chain(&self.plan().native_parent_chains(), layer).ok();
+        if turn != 0.0 {
+            // #2267: a turned block's record space is its stored (unturned) frame about the anchor; the matrix is the turn then the layer's
+            // chain, and the bounds are the contours' extent in that frame, so a client's conjugated gesture is what the batch applies.
+            return turned_text_item(target, source.item.scene().contours(), record.entry().block.anchor(), turn, chain.unwrap_or([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]));
+        }
         let (bounds, matrix) = match chain {
             Some(m) if m != [1.0, 0.0, 0.0, 1.0, 0.0, 0.0] => {
                 let det = m[0] * m[3] - m[1] * m[2];
@@ -216,6 +220,39 @@ impl ObjectCompositionWitness {
     fn raster_final_rect(&self, _at: usize) -> Option<crate::evaluation::motion_parent_chain::ImageRect> {
         None
     }
+}
+/// `a` after `b` (`b` applied first) as `[a b c d e f]` affines.
+fn after(a: [f64; 6], b: [f64; 6]) -> [f64; 6] {
+    [
+        a[0] * b[0] + a[2] * b[1],
+        a[1] * b[0] + a[3] * b[1],
+        a[0] * b[2] + a[2] * b[3],
+        a[1] * b[2] + a[3] * b[3],
+        a[0] * b[4] + a[2] * b[5] + a[4],
+        a[1] * b[4] + a[3] * b[5] + a[5],
+    ]
+}
+fn turned_text_item(
+    target: crate::object_frame_packet::text::ObjectTarget,
+    contours: &[crate::object_render_scene::text_glyph_scene_kernels::text_glyph_scene::SceneContour],
+    anchor: [f64; 2],
+    degrees: f64,
+    layer: [f64; 6],
+) -> Option<SubselectReadItem> {
+    let (sin, cos) = degrees.to_radians().sin_cos();
+    let turn = [cos, sin, -sin, cos, anchor[0] - cos * anchor[0] + sin * anchor[1], anchor[1] - sin * anchor[0] - cos * anchor[1]];
+    let m = after(layer, turn);
+    let det = m[0] * m[3] - m[1] * m[2];
+    if !det.is_finite() || det.abs() < 1e-12 {
+        return None;
+    }
+    let inverse = [m[3] / det, -m[1] / det, -m[2] / det, m[0] / det, (m[2] * m[5] - m[3] * m[4]) / det, (m[1] * m[4] - m[0] * m[5]) / det];
+    let mut b = [f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY];
+    for c in contours {
+        let e = c.contour.transformed_envelope(inverse).ok()?;
+        b = [b[0].min(e[0]), b[1].min(e[1]), b[2].max(e[2]), b[3].max(e[3])];
+    }
+    (b.iter().chain(&m).all(|v| v.is_finite())).then(|| hit_item(target, b, m, "text"))
 }
 fn hit_item(
     stable_target: crate::object_frame_packet::text::ObjectTarget,
