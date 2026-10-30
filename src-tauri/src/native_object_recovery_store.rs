@@ -6,6 +6,7 @@ use std::{
     fs::File,
     io::{self, Read, Write},
     path::{Path, PathBuf},
+    sync::{Mutex, MutexGuard, PoisonError},
     time::UNIX_EPOCH,
 };
 
@@ -55,6 +56,20 @@ pub(crate) struct Manifest {
     pub(crate) app_version: String,
     /// Newest first, at most MAX_GENERATIONS.
     pub(crate) generations: Vec<Generation>,
+}
+
+// ---- mutual exclusion -------------------------------------------------------
+
+static STORE_LOCK: Mutex<()> = Mutex::new(());
+
+/// One process-wide lock for every command that touches the store on disk
+/// (write, list, discard, quarantine). Each command runs in its own blocking
+/// task, and `inspect_slot` reads a slot with no manifest yet (publish in
+/// flight) as empty/corrupt and would remove or quarantine it under the writer.
+/// Held only for the filesystem work; a poisoned lock is still a valid guard
+/// because the store never relies on in-memory state.
+pub(crate) fn lock() -> MutexGuard<'static, ()> {
+    STORE_LOCK.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 // ---- validation -----------------------------------------------------------
