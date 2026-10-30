@@ -7577,6 +7577,7 @@ function showToast(m){var el=document.getElementById('toast');el.textContent=m;e
 // shortcut-registry.js (P30/#1032) now; onOverrideChanged wires a rebind back
 // to the left-rail badge, exactly what setShortcutKey called directly before.
 var shortcutRegistry=NemoShortcutRegistry.create({storage:window.localStorage,onOverrideChanged:function(action){syncToolButtonShortcutBadge(action);}});
+var toolRailBadges=NemoToolRail.createBadges({doc:document,registry:shortcutRegistry});
 // COMMAND_SHORTCUTS is pure {action,key,cat,label} data (P30/#1032, review on
 // #1114); dispatch by action lives here, same pattern as runToolShortcut below.
 function runCommandShortcutAction(action,e){if(window.NemoNativeFrameEditDesktop&&window.NemoNativeFrameEditDesktop.install(window).shortcut(action,e))return;switch(action){case'cmdPrevKey':if(state.playing)stopPlay();goToFrame(prevKeyframeFrame(state.activeLayerIdx,state.currentFrame));return;case'cmdNextKey':if(state.playing)stopPlay();goToFrame(nextKeyframeFrame(state.activeLayerIdx,state.currentFrame));return;case'cmdPrevFrame':if(state.playing)stopPlay();goToFrame(state.currentFrame-1);return;case'cmdNextFrame':if(state.playing)stopPlay();goToFrame(state.currentFrame+1);return;case'cmdGoStart':if(state.playing)stopPlay();goToFrame(0);return;case'cmdGoEnd':if(state.playing)stopPlay();goToFrame(state.totalFrames-1);return;case'cmdInsertFrame':e.preventDefault();insertFrame();return;case'cmdInsertKey':e.preventDefault();insertKeyframe();return;case'cmdInsertBlankKey':e.preventDefault();insertBlankKeyframe();return;case'cmdDuplicateKey':window.SM.duplicateKeyframe();return;case'cmdExtendExposure':window.SM.extendExposure(1);return;case'cmdTween':window.SM.generateTweens();return;case'cmdFlipPreview':if(!e.shiftKey)window.SM.flipPreview();return;case'cmdResetView':e.preventDefault();window.SM.resetView();return;case'cmdRenameLayer':e.preventDefault();if(state.layers[state.activeLayerIdx])startLayerRename(state.activeLayerIdx);return;}}
@@ -7605,17 +7606,8 @@ function runCommandShortcut(k,event){
 // the prose title= attribute — those aren't all "(X)"-suffixed the same
 // way (e.g. Hand's is "(H or Space)"), so rewriting them generically here
 // would be more likely to mangle one than to fix it.
-function syncToolButtonShortcutBadge(action){
-  var btn=document.querySelector('.tool-btn[data-tool="'+action+'"]');
-  if(!btn)return;
-  var sk=btn.querySelector('.sk');
-  if(!sk)return;
-  var key=shortcutRegistry.keyFor(action);
-  sk.textContent=key?key.toUpperCase():'';
-}
-function syncAllToolButtonShortcutBadges(){
-  shortcutRegistry.toolShortcuts().forEach(function(s){syncToolButtonShortcutBadge(s.action);});
-}
+function syncToolButtonShortcutBadge(action){return toolRailBadges.sync(action);}
+function syncAllToolButtonShortcutBadges(){toolRailBadges.syncAll();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',syncAllToolButtonShortcutBadges);else syncAllToolButtonShortcutBadges();
 function runToolShortcut(k){
   var lk=(k||'').toLowerCase();
@@ -9026,7 +9018,7 @@ function settingsPreferencesUiInstance(){
     document:document,readProfile:function(){return state.userProfile;},
     setProfileField:function(key,value){state.userProfile[key]=value;},saveProfile:function(){return saveUserProfile();},
     setHex8Input:function(input,value){return setHex8Input(input,value);},
-    renderShortcuts:function(){return renderShortcutsList();},resetShortcuts:function(){return shortcutRegistry.reset();},
+    renderShortcuts:function(){return renderShortcutsList();},resetShortcuts:function(){var r=shortcutRegistry.reset();syncAllToolButtonShortcutBadges();return r;},
     refreshFeedback:function(){return refreshFeedbackList();},
     renderLabs:function(){var render=window.renderLabsPanel;if(render)return render();},
     showToast:function(text){return showToast(text);},translate:function(key){return SM.t(key);},
@@ -9817,16 +9809,8 @@ function onKeyDown(event){
   // means plain Space (the only gesture this handler is actually for) is
   // unaffected; the window-blur listener below is a second-layer safety net
   // for any other modifier combo that steals focus the same way.
-  else if(k===' '&&!event.metaKey&&!event.ctrlKey){
-    event.preventDefault();
-    if(!state.spaceDown){
-      state.spaceDown=true;
-      state._spaceAt=(window.performance&&performance.now)?performance.now():Date.now();
-      state.spaceUsedForPan=false;
-      canvasEl.style.cursor='grab';
-    }
-  }
-  else if(k==='Alt'){state.altDown=true;}
+  else if(k===' '&&!event.metaKey&&!event.ctrlKey){toolHolds.spaceKeyDown(event);}
+  else if(k==='Alt'){toolHolds.altKeyDown();}
   // Rig: Enter-to-finish / Escape-to-cancel an in-progress bone (2026-07-29
   // fix, QA-confirmed "on ne sait pas comment finir les traits de bones") —
   // rig-bridge.js's bone drawing otherwise ONLY finished via double-click or
@@ -10042,101 +10026,15 @@ function onKeyDown(event){
   // a Shift+/ distinction (AE's fit-to-window) is unreachable for French
   // layouts — fit already has Ctrl+Alt+0.
 }
-// Longest hold still read as a tap. Generous enough to survive a slow
-// keypress, short enough that parking a thumb on Space to pan and thinking
-// better of it never starts playback.
-var SPACE_TAP_MS=250;
-function onKeyUp(event){if(event.key===' '){
-  // wasDown gates the whole thing: onKeyDown returns before its Space branch
-  // whenever a field has focus, so without this a Space typed into a text
-  // input would still reach here and start playback on release.
-  var wasDown=state.spaceDown;
-  var held=((window.performance&&performance.now)?performance.now():Date.now())-(state._spaceAt||0);
-  var tapped=wasDown&&!state.spaceUsedForPan&&held<SPACE_TAP_MS;
-  state.spaceDown=false;state.isPanning=false;state.spaceUsedForPan=false;
-  var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',eraser:'crosshair',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};canvasEl.style.cursor=cc[state.tool]||'default';
-  // Mid-path the Pen tool owns Enter/Escape to finish or cancel; starting
-  // playback under it would strand a half-drawn path, so Space stays inert
-  // there — the one place the tap gesture is suppressed.
-  if(tapped&&!(state.tool==='pen'&&_pen.path))togglePlay();
-}else if(event.key==='Alt'){state.altDown=false;}}
-// Second-layer safety net for the same stuck-spaceDown class of bug as the
-// Cmd/Ctrl+Space exclusion above: if focus ever leaves the window while
-// spaceDown/altDown is armed (any OS shortcut that steals focus before its
-// keyup reaches us — Spotlight is only the one actually reported), force a
-// clean reset on return rather than leaving the app permanently stuck in
-// "everything pans" / "everything rotates".
-window.addEventListener('blur',function(){
-  state.spaceDown=false;state.isPanning=false;state.spaceUsedForPan=false;state.altDown=false;
-});
-// One capture-phase listener marks "the Space hold was actually used", rather
-// than touching either pan implementation: panning lives in BOTH tools.js
-// (Paper.js path) and viewtools-bridge.js (Rust engine path), and any pointer
-// press while Space is held belongs to the pan gesture whether or not it ends
-// up moving far enough to shift the view.
-document.addEventListener('pointerdown',function(){if(state.spaceDown)state.spaceUsedForPan=true;},true);
-
+// U06 (#2370): the Space, Alt and Cmd/Ctrl holds live in application/tool-holds.js. Space taps play (a quick release with no
+// pointer press), holds pan; Cmd/Ctrl held past the arm delay with no other key switches to Select until release; a lost keyup
+// (window blur, page hidden) resets all three and restores the held tool exactly once.
+var toolHolds=NemoToolHolds.create({state:state,doc:document,win:window,
+  setTool:function(t){window.SM.setTool(t);},togglePlay:function(){togglePlay();},
+  penActive:function(){return !!(_pen&&_pen.path);},setCursor:function(c){canvasEl.style.cursor=c;}});
+function onKeyUp(event){toolHolds.keyUp(event);}
 NemoKeyboardArbiter.mount(document,{keydown:onKeyDown,keyup:onKeyUp});
-// Cmd/Ctrl-HOLD temporarily switches to Select (2026-08-27, feedback #64
-// — "pomme en cliquant pour passer a l'outil selection", and Cyril:
-// "command est utilisé un peu dans tout logiciel, voit comment mettre ça
-// en place sans faire de conflit"). Illustrator/Photoshop convention:
-// hold Cmd while using another tool, canvas clicks act like Select;
-// release, back to what you were doing.
-//
-// The hazard: Cmd/Ctrl is the FIRST key of ~15 shortcuts already in
-// onKeyDown (Z, S, C, X, V, A, G, D, L…) — a real keypress of any combo
-// fires a genuine 'keydown' with key:'Meta'/'Control' the instant the
-// modifier itself goes down, BEFORE the letter's own keydown. Switching
-// tools on that alone would flicker the tool (and its cursor) on every
-// single Cmd+shortcut the user already relies on.
-// Fix: a short arm-delay (matches the SPACE_TAP_MS precedent above for
-// the exact same class of tap-vs-hold ambiguity). The modifier alone
-// only counts as "hold to select" if it's STILL down, with no other key
-// pressed meanwhile, after this delay — a real shortcut's letter always
-// lands well inside that window. Any other keydown while armed cancels
-// immediately (this is what actually prevents the conflict, the delay
-// alone is just what makes cancellation possible in the first place).
-var _cmdHoldTimer=null,_cmdHoldPrevTool=null,_cmdHoldDown=false;
-var CMD_HOLD_MS=180;
-function _cmdHoldEligible(){
-  return !(document.activeElement&&(document.activeElement.tagName==='INPUT'||document.activeElement.tagName==='SELECT'||document.activeElement.tagName==='TEXTAREA'||document.activeElement.isContentEditable))
-    &&!state.playing&&state.tool!=='select'&&state.tool!=='subselect'
-    &&!(_pen&&_pen.path)&&!state.spaceDown;
-}
-document.addEventListener('keydown',function(e){
-  if(e.key==='Meta'||e.key==='Control'){
-    if(_cmdHoldDown)return; // already tracking this hold (no native repeat for modifiers, but stay safe)
-    _cmdHoldDown=true;
-    if(!_cmdHoldEligible())return;
-    _cmdHoldTimer=setTimeout(function(){
-      _cmdHoldTimer=null;
-      if(!_cmdHoldDown||!_cmdHoldEligible())return; // released, or state changed during the wait
-      _cmdHoldPrevTool=state.tool;
-      window.SM.setTool('select');
-    },CMD_HOLD_MS);
-  }else if(_cmdHoldTimer){
-    // A real key landed while the modifier was still just "maybe about to
-    // be a hold" — this IS a shortcut combo, not a hold gesture. Cancel
-    // silently; the shortcut's own Cmd+<key> handler (already gated on
-    // event.metaKey/ctrlKey) fires completely normally afterward.
-    clearTimeout(_cmdHoldTimer);_cmdHoldTimer=null;
-  }
-});
-document.addEventListener('keyup',function(e){
-  if(e.key!=='Meta'&&e.key!=='Control')return;
-  _cmdHoldDown=false;
-  if(_cmdHoldTimer){clearTimeout(_cmdHoldTimer);_cmdHoldTimer=null;return;} // never actually armed — nothing to restore
-  if(_cmdHoldPrevTool){window.SM.setTool(_cmdHoldPrevTool);_cmdHoldPrevTool=null;}
-});
-// Same stuck-modifier safety net as state.spaceDown's own window-blur
-// listener above (e.g. Cmd+Tab stealing focus mid-hold) — without this,
-// losing focus while armed would leave the tool stuck on Select forever.
-window.addEventListener('blur',function(){
-  if(_cmdHoldTimer){clearTimeout(_cmdHoldTimer);_cmdHoldTimer=null;}
-  _cmdHoldDown=false;
-  if(_cmdHoldPrevTool){window.SM.setTool(_cmdHoldPrevTool);_cmdHoldPrevTool=null;}
-});
+toolHolds.mount();
 document.querySelectorAll('.tool-btn').forEach(function(b){b.addEventListener('click',function(){window.SM.setTool(this.dataset.tool);});});
 // Shape-tool group (2026-08, "regrouper les shape dans un mini menu comme
 // dans illustrator ou rive... click un peu longtemps ça affiche le menu").
@@ -10152,52 +10050,10 @@ document.querySelectorAll('.tool-btn').forEach(function(b){b.addEventListener('c
 // tutorial.js call before spotlighting a grouped tool, so a step targeting
 // e.g. '[data-tool="ellipse"]' fronts it FIRST — otherwise the real click
 // tutorial.js waits for would land on a hidden, unclickable button.
-(function(){
-  var SHAPE_TOOLS=['rect','line','ellipse','speechbubble','star'];
-  var LPRESS_MS=450,pressTimer=null,suppressClick=false,flyoutEl=null;
-  function ensureFront(tool){
-    if(SHAPE_TOOLS.indexOf(tool)<0)return;
-    SHAPE_TOOLS.forEach(function(t){
-      var b=document.querySelector('.tool-btn[data-tool="'+t+'"]');
-      if(b)b.classList.toggle('stack-front',t===tool);
-    });
-  }
-  window.SMShapeGroup={ensureFront:ensureFront};
-  function closeFlyout(){if(flyoutEl){flyoutEl.remove();flyoutEl=null;}document.removeEventListener('pointerdown',onOutsideDown,true);}
-  function onOutsideDown(e){if(flyoutEl&&!flyoutEl.contains(e.target))closeFlyout();}
-  function openFlyout(originBtn){
-    closeFlyout();
-    var rect=originBtn.getBoundingClientRect();
-    flyoutEl=document.createElement('div');
-    flyoutEl.className='shape-tool-flyout';
-    SHAPE_TOOLS.forEach(function(t){
-      var src=document.querySelector('.tool-btn[data-tool="'+t+'"]');
-      if(!src)return;
-      var item=document.createElement('button');
-      item.className='shape-tool-flyout-item'+(t===state.tool?' active':'');
-      item.innerHTML=src.innerHTML.replace(/<span class="sk">.*?<\/span>/,'');
-      item.title=src.title;
-      item.addEventListener('click',function(ev){ev.stopPropagation();ensureFront(t);window.SM.setTool(t);closeFlyout();});
-      flyoutEl.appendChild(item);
-    });
-    document.body.appendChild(flyoutEl);
-    var fr=flyoutEl.getBoundingClientRect();
-    flyoutEl.style.left=Math.min(rect.right+6,window.innerWidth-fr.width-4)+'px';
-    flyoutEl.style.top=Math.max(4,Math.min(rect.top,window.innerHeight-fr.height-4))+'px';
-    setTimeout(function(){document.addEventListener('pointerdown',onOutsideDown,true);},0);
-  }
-  var stack=document.getElementById('shape-tool-stack');
-  if(stack){
-    stack.addEventListener('pointerdown',function(e){
-      var btn=e.target.closest('.tool-btn');
-      if(!btn)return;
-      suppressClick=false;
-      pressTimer=setTimeout(function(){suppressClick=true;openFlyout(btn);},LPRESS_MS);
-    });
-    ['pointerup','pointerleave'].forEach(function(ev){stack.addEventListener(ev,function(){clearTimeout(pressTimer);});});
-    stack.addEventListener('click',function(ev){if(suppressClick){ev.stopImmediatePropagation();suppressClick=false;}},true);
-  }
-})();
+// U06 (#2370): the group and its flyout live in application/tool-rail.js; window.SMShapeGroup keeps its ensureFront contract.
+var shapeGroup=NemoToolRail.createShapeGroup({doc:document,win:window,getTool:function(){return state.tool;},setTool:function(t){window.SM.setTool(t);}});
+window.SMShapeGroup={ensureFront:shapeGroup.ensureFront};
+shapeGroup.attach(document.getElementById('shape-tool-stack'));
 document.getElementById('p-sw').addEventListener('change',function(){window.SM.setBrushSize(parseInt(this.value));});
 // Actively picking a fill color also ENABLES fill (Graphite behavior) —
 // without this, the default-off fill state made "I set my fill to red, drew,
