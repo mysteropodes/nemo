@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "d7e8effbb6b30dbb880420379233ede2c853c7f0",
-  "describe": "v0.7.0-alpha.4-3983-gd7e8effb-dirty"
+  "head": "3fd7e2c52f00a366a7ecb8156d5708bbf6cef0b3",
+  "describe": "v0.7.0-alpha.4-3988-g3fd7e2c5-dirty"
  },
- "inputsDigest": "4f12d9ba1be65b46a55a1d3125adc4a9a7503996df67fbefd3b79d84c5d91e02",
+ "inputsDigest": "2b3e61029ab643d4f1c8a58dae1f22445114104b5858d6f1ef13eb3a52df5160",
  "states": [
   "inventoried",
   "characterized",
@@ -2677,7 +2677,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 21,
+    "functionsVisited": 20,
     "via": "helper el()",
     "references": [
      "src/js/timeline.js:9122 action()"
@@ -5050,7 +5050,7 @@
     "container": "track-apply-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 98,
+    "functionsVisited": 99,
     "via": "helper el()",
     "references": []
    },
@@ -5093,7 +5093,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 22,
+    "functionsVisited": 23,
     "via": "helper el()",
     "references": []
    },
@@ -8187,7 +8187,7 @@
    "capability": "History — undo/redo in one click",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/history-panel.js:155 initHistoryPanel()"
+    "src/js/history-panel.js:160 initHistoryPanel()"
    ],
    "events": [
     "click"
@@ -8210,10 +8210,10 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 26,
+    "functionsVisited": 30,
     "via": "variable btn",
     "references": [
-     "src/js/history-panel.js:147 toggleHistoryPopover()"
+     "src/js/history-panel.js:151 toggleHistoryPopover()"
     ]
    },
    "fixtures": [
@@ -8327,7 +8327,7 @@
     "container": "kitsu-step-browse",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 23,
+    "functionsVisited": 22,
     "via": "helper el()",
     "references": []
    },
@@ -8442,7 +8442,7 @@
     "container": "kitsu-step-login",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 40,
+    "functionsVisited": 39,
     "via": "helper el()",
     "references": []
    },
@@ -17208,7 +17208,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 7,
+    "functionsVisited": 8,
     "via": "callback id",
     "references": [
      "src/js/tracker-panel.js:41 currentPoint()",
@@ -17255,7 +17255,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 7,
+    "functionsVisited": 8,
     "via": "callback id",
     "references": [
      "src/js/tracker-panel.js:42 currentPoint()",

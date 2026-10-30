@@ -40,7 +40,8 @@ function host(){
       assert.equal(r.expectedRevision,revision);
       if(command==='nemo_native_object_dispatch'){
         assert.ok(['command.document.object.undo','command.document.object.redo'].includes(r.operation));
-        assert.deepEqual(r.payload,{command:r.operation==='command.document.object.undo'?'object.undo':'object.redo'});
+        const {steps,...rest}=r.payload;assert.ok(steps===undefined||Number.isSafeInteger(steps)&&steps>1);
+        assert.deepEqual(rest,{command:r.operation==='command.document.object.undo'?'object.undo':'object.redo'});
       }
       if(failure==='refused')return {apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId:'document',contentRevision:revision,ok:false,error:{code:'invalid_request'}};
       if(failure==='transport-before'||failure==='inspection')throw Error('Native response lost');
@@ -108,6 +109,19 @@ test('undo to saved bytes clears dirty even though native content revision incre
     ['command.document.object.undo',{command:'object.undo'}],['command.document.object.redo',{command:'object.redo'}]
   ]);
   const count=h.calls.length;await assert.rejects(s.historyFromUi('clear'),/Unsupported history action/);assert.equal(h.calls.length,count);
+});
+test('a history jump is ONE native undo or redo carrying its step count, and the UI undo still carries none (#2376 G26)',async()=>{
+  const h=host(),s=session(h),f=files(s);await f.ui.openPath('/project.json');
+  await s.reference({kind:'attach',id:'ref',sourcePath:'/image.png'});
+  await s.jumpHistory('undo',3);await s.jumpHistory('redo',1);await s.historyFromUi('undo','request-id-is-not-a-step-count');
+  assert.deepEqual(h.calls.filter(c=>c.command==='nemo_native_object_dispatch').map(c=>[c.r.operation,c.r.payload]),[
+    ['command.document.object.undo',{command:'object.undo',steps:3}],['command.document.object.redo',{command:'object.redo'}],
+    ['command.document.object.undo',{command:'object.undo'}]
+  ]);
+  const count=h.calls.length;
+  for(const steps of [0,-1,1.5,'2',null,Infinity])await assert.rejects(s.jumpHistory('undo',steps),/Unsupported history action/);
+  await assert.rejects(s.jumpHistory('clear',2),/Unsupported history action/);
+  assert.equal(h.calls.length,count,'a refused jump reaches no native command');
 });
 for(const failure of ['refused','transport-before','transport-after']){
   test('reconciled '+failure+' re-presents current native state without retrying mutation',async()=>{

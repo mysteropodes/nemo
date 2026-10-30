@@ -287,6 +287,7 @@ impl NativeObjectHistory {
             }
             ReceiptLookup::Missing => {}
         }
+        let undo_before = self.history_depths().0;
         let outcome = if request.cancelled_before_dispatch {
             Err((
                 DispatchErrorCode::CancelledBeforeDispatch,
@@ -400,29 +401,26 @@ impl NativeObjectHistory {
             } else {
                 let undo = request.operation == OP_OBJECT_UNDO;
                 let command = if undo { "object.undo" } else { "object.redo" };
-                if request.payload != serde_json::json!({"command":command}) {
-                    Err((
-                        DispatchErrorCode::InvalidRequest,
-                        "Object history payload is invalid.",
-                    ))
-                } else {
+                // `steps` (default 1) moves that many entries as one restore: the History panel's jump.
+                if let Some(steps) = Self::history_steps(&request.payload, command) {
                     let revision = request
                         .expected_revision
                         .ok_or(DispatchErrorCode::InvalidRequest)?;
-                    let moved = if undo {
-                        self.undo(revision)
-                    } else {
-                        self.redo(revision)
-                    };
-                    moved
+                    self.move_history_steps(revision, undo, steps)
                         .map(|_| CompactResult::Command {
                             applied: true,
                             history_entries_added: 0,
                         })
                         .map_err(|code| (code, "Object history could not move."))
+                } else {
+                    Err((
+                        DispatchErrorCode::InvalidRequest,
+                        "Object history payload is invalid.",
+                    ))
                 }
             }
         };
+        self.label_new_entries(undo_before, &request.operation, &request.payload);
         let disposition = RetainedDisposition::Exact {
             content_revision: self.content_revision(),
             outcome: outcome.map_err(|(code, message)| CompactFailure {
