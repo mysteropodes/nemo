@@ -165,11 +165,26 @@
     var cards=document.getElementById('start-cards');
     var open=document.getElementById('start-open');
     if(!screen||!resume||!cards||!open||!document.getElementById('start-newpanel'))return;
-    function showResume(){resume.style.display='';cards.classList.add('has-resume');}
-    if(ports.readResumePresence())showResume();
-    else ports.readResumePresenceAsync(function(available){if(available)showResume();});
+    // The card follows the store each time the start screen is shown (refresh), not just at startup: a Save As, New or
+    // resume can discard or supersede every slot. A newer refresh wins over a slower earlier answer.
+    var token=0;
+    function setResume(on){
+      resume.style.display=on?'':'none';
+      if(on)cards.classList.add('has-resume');else cards.classList.remove('has-resume');
+    }
+    function refresh(){
+      var mine=++token;
+      if(ports.readResumePresence()){setResume(true);return;}
+      ports.readResumePresenceAsync(function(available){if(mine===token)setResume(!!available);});
+    }
+    refresh();
     ports.renderRecents();
-    resume.addEventListener('click',ports.resume);
+    resume.addEventListener('click',function(event){
+      var done=function(){if(!screen.classList.contains('hid'))refresh();};
+      var result=ports.resume(event);
+      Promise.resolve(result).then(done,done);
+      return result;
+    });
     bindNewProjectForm(document,ports);
     // Preserve the native button's default Enter/Space activation. Only stop
     // propagation so document playback shortcuts cannot cancel these keys.
@@ -179,6 +194,7 @@
     open.addEventListener('keydown',keepOpenKeysLocal);
     open.addEventListener('keyup',keepOpenKeysLocal);
     open.addEventListener('click',ports.open);
+    return {refresh:refresh};
   }
   function repaintProjectEntry(){
     // Native Open/Resume can restore live paths while the canvas stays blank
