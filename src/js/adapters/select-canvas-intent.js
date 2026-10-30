@@ -10,14 +10,17 @@
     ['context', 'probe', 'select'].forEach(function (name) {
       if (!ports || typeof ports[name] !== 'function') throw new TypeError('Missing pointer port: ' + name);
     });
-    var pending = null, captureTarget = null;
+    var pending = null, captureTarget = null, gesture = null;
     function valid() {
       try { return pending.context === ports.context(); }
       catch (_) { return false; }
     }
+    // #2372: a drag gesture (marquee, move, scale, rotate) rides on the pending press; cancelling the press cancels it with no write.
+    function drop() { var g = gesture; gesture = null; if (g) try { g.cancel(); } catch (_) {} }
     function cancel(e) {
       if (!pending || e && e.pointerId !== undefined && e.pointerId !== pending.id) return false;
       var id = pending.id, target = captureTarget;
+      drop();
       pending = null; captureTarget = null;
       if (target && target.releasePointerCapture &&
           (!target.hasPointerCapture || target.hasPointerCapture(id))) {
@@ -39,12 +42,15 @@
           context: context, decision: decision, shift: !!e.shiftKey, blocked: false };
         captureTarget = e.currentTarget;
         if (captureTarget && captureTarget.setPointerCapture) captureTarget.setPointerCapture(e.pointerId);
+        if (ports.gesture && decision.mode === 'pick') gesture = ports.gesture.begin(e, function () { cancel(); }) || null;
       } catch (_) { cancel(); }
     }
     function move(e) {
       consume(e);
       if (!pending) return hover(e);
-      if (pending.blocked || e.pointerId !== pending.id) return;
+      if (e.pointerId !== pending.id) return;
+      if (gesture) try { gesture.move(e); } catch (_) {}
+      if (pending.blocked) return;
       if (!valid() || e.buttons !== 1 || !Number.isFinite(e.clientX) || !Number.isFinite(e.clientY) ||
           Math.hypot(e.clientX - pending.x, e.clientY - pending.y) > 3) pending.blocked = true;
     }
@@ -54,8 +60,13 @@
       if (e.pointerId !== pending.id) return;
       var accept = !pending.blocked && valid() && Number.isFinite(e.clientX) && Number.isFinite(e.clientY) &&
         Math.hypot(e.clientX - pending.x, e.clientY - pending.y) <= 3;
-      var decision = pending.decision, shift = pending.shift;
-      cancel();
+      var decision = pending.decision, shift = pending.shift, g = gesture;
+      gesture = null; cancel();
+      if (g) try { // a drag commits through the gesture; a click that never dragged selects, except on a handle (which selects nothing)
+        if (!accept) return g.end(e);
+        g.cancel();
+        if (g.owns()) return;
+      } catch (_) { return; }
       if (accept) try { ports.select(decision, shift); } catch (_) {}
     }
     function cancelEvent(e) { consume(e); cancel(e); }
@@ -269,6 +280,23 @@
     return null;
   }
 
+  // #2372: the selectable paths of one layer (default: the active one) the `wanted(item, worldBounds)` filter keeps, each carrying its
+  // linked fill and layer; a locked or hidden layer is never read. `centres` adds a ribbon's world centreline (what a commit needs).
+  async function layerPaths(root, wanted, centres, layerIndex) {
+    var s = presentedSession(root), idx = layerIndex === undefined ? root.state.activeLayerIdx : layerIndex, info = s && s.pin.layers[idx];
+    if (!info || info.locked === true || info.visible === false) return null;
+    var layers = await presented(root, idx, wanted, 0, centres);
+    if (layers) layers.paths.forEach(function (p) { withFill(p, layers.items); p.data.nativeLayerIndex = idx; p.data.nativeLayerUid = layers.layerUid; });
+    return layers;
+  }
+  // The items of the active layer whose painted bounds meet the world rectangle [x0, y0, x1, y1] (the baseline marquee's intersection
+  // rule); a linked fill is never its own selection, it follows its ribbon.
+  async function marquee(root, rect) {
+    var layers = await layerPaths(root, function (item, b) {
+      return !(item.role === 'fill' && item.owner) && b[0] <= rect[2] && b[2] >= rect[0] && b[1] <= rect[3] && b[3] >= rect[1]; });
+    return layers && layers.paths;
+  }
+
   // #2362 Labs sculpt: a drag over the active layer's presented strokes (a ribbon with its world centreline). Moves wait
   // until the read lands; the tool's `push(layer, at, delta, R)` / `smooth(layer, at, R)` (R its `radius()` in screen pixels)
   // edit the transient paths and the ones `touched()` lists are previewed in an SVG over the canvas, as native Subselect
@@ -364,5 +392,5 @@
   }
 
   return Object.freeze({ create: create, hitHandles: hitHandles, objectProject: objectProject, presented: presented,
-    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, pick: pick, pickContext: pickContext, applyPick: applyPick, resolvePick: resolvePick });
+    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, layerPaths: layerPaths, marquee: marquee, pick: pick, pickContext: pickContext, applyPick: applyPick, resolvePick: resolvePick });
 }));

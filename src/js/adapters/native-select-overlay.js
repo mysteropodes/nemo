@@ -15,7 +15,7 @@
   var states = new WeakMap();
   function state(root) {
     var s = states.get(root);
-    if (!s) { s = { svg: null, sel: null, hov: null, sig: '', watching: false, busy: false, next: null }; states.set(root, s); }
+    if (!s) { s = { svg: null, sel: null, hov: null, prev: null, sig: '', watching: false, busy: false, next: null }; states.set(root, s); }
     return s;
   }
   // What the overlay maps through, or null when no native presentation is current. `ctx` is the pick context (tool, mode,
@@ -69,7 +69,9 @@
       return angle ? [pivot.x + dx * cos - dy * sin, pivot.y + dx * sin + dy * cos] : [x, y];
     };
     var mx = (b.left + b.right) / 2, my = (b.top + b.bottom) / 2;
-    return { corners: [pt(b.left, b.top), pt(b.right, b.top), pt(b.right, b.bottom), pt(b.left, b.bottom)],
+    var mid = pt(mx, my);
+    return { center: { x: mid[0], y: mid[1] }, width: b.right - b.left, height: b.bottom - b.top, angle: angle,
+      corners: [pt(b.left, b.top), pt(b.right, b.top), pt(b.right, b.bottom), pt(b.left, b.bottom)],
       handles: [pt(b.left, b.top), pt(mx, b.top), pt(b.right, b.top), pt(b.right, my), pt(b.right, b.bottom), pt(mx, b.bottom), pt(b.left, b.bottom), pt(b.left, my)] };
   }
   function outline(V, p) {
@@ -92,7 +94,8 @@
     var s = state(root), c = capture(root), paths = root.selectedPaths;
     if (s.sel && (!c || s.sel.ctx !== c.ctx || s.sel.paths !== paths || s.sel.count !== paths.length)) { s.sel = null; force = true; }
     if (s.hov && (!c || s.hov.ctx !== c.ctx)) { s.hov = null; force = true; }
-    if (!s.sel && !s.hov) { remove(s); return; }
+    if (s.prev && (!c || s.prev.ctx !== c.ctx)) { s.prev = null; force = true; }
+    if (!s.sel && !s.hov && !s.prev) { remove(s); return; }
     var sig = JSON.stringify([c.V, c.bounds, c.pin.canvasW, c.pin.canvasH]);
     if (!force && s.svg && sig === s.sig) { watch(root); return; }
     remove(s); s.sig = sig;
@@ -102,19 +105,28 @@
       var hover = orientedBox(root, [s.hov.path]);
       if (hover) svg.appendChild(polygon(root, c.V, hover, { stroke: BLUE, 'stroke-opacity': '0.86', 'stroke-width': '1.5' }));
     }
-    if (s.sel) {
-      s.sel.paths.forEach(function (p) {
+    var shown = s.prev && s.prev.paths ? s.prev.paths : s.sel && s.sel.paths;
+    if (shown) {
+      shown.forEach(function (p) {
         var d = outline(c.V, p);
         if (d) svg.appendChild(node(root, 'path', line(root, { d: d, stroke: BLUE, 'stroke-opacity': '0.8', 'stroke-width': '1' })));
       });
-      var box = orientedBox(root, s.sel.paths), r = HANDLE * c.pin.canvasW / c.bounds.width;
+      var box = orientedBox(root, shown), r = HANDLE * c.pin.canvasW / c.bounds.width;
       if (box) {
+        // The rotate ring (baseline buildTransformBoxItems): centred on the box, 36 screen px at most, 30% of the box otherwise.
+        var mid = at(c.V, box.center.x, box.center.y);
+        svg.appendChild(node(root, 'circle', line(root, { cx: mid[0], cy: mid[1], stroke: BLUE, 'stroke-opacity': '0.63', 'stroke-width': '1',
+          r: Math.min(36 * c.pin.canvasW / c.bounds.width, Math.max(box.width, box.height) * 0.3 * Math.hypot(c.V[0], c.V[1])) })));
         svg.appendChild(polygon(root, c.V, box, { stroke: BLUE, 'stroke-opacity': '0.8', 'stroke-width': '1' }));
         box.handles.forEach(function (h) {
           var p = at(c.V, h[0], h[1]);
           svg.appendChild(node(root, 'rect', line(root, { x: p[0] - r, y: p[1] - r, width: 2 * r, height: 2 * r, fill: '#ffffff', stroke: BLUE, 'stroke-width': '1.2' })));
         });
       }
+    }
+    if (s.prev && s.prev.marquee) {
+      var m = s.prev.marquee;
+      svg.appendChild(polygon(root, c.V, { corners: [[m[0], m[1]], [m[2], m[1]], [m[2], m[3]], [m[0], m[3]]] }, { fill: 'rgba(74,158,255,0.08)', stroke: BLUE, 'stroke-opacity': '0.9', 'stroke-width': '1' }));
     }
     root.document.body.appendChild(svg); s.svg = svg;
     watch(root);
@@ -133,7 +145,14 @@
     s.hov = null;
     refresh(root, true);
   }
-  function clear(root) { var s = state(root); s.sel = null; s.hov = null; s.next = null; remove(s); }
+  function clear(root) { var s = state(root); s.sel = null; s.hov = null; s.prev = null; s.next = null; remove(s); }
+  // A drag in flight (#2372): `spec` is { paths } (the transformed copies of the selection, drawn with their box and handles)
+  // and/or { marquee: [x0, y0, x1, y1] } in world space; null ends it. Nothing here writes the document.
+  function preview(root, spec) {
+    var s = state(root), c = capture(root);
+    s.prev = spec && c ? { paths: spec.paths || null, marquee: spec.marquee || null, ctx: c.ctx } : null;
+    refresh(root, true);
+  }
   // Hover box of one picked path (null clears). A path already selected shows its selection box instead.
   function hover(root, path) {
     var s = state(root), sid = path && path.data && path.data.strokeId;
@@ -162,5 +181,5 @@
       s.busy = false;
     }());
   }
-  return Object.freeze({ show: show, clear: clear, hover: hover, hoverAt: hoverAt, refresh: function (root) { refresh(root, false); } });
+  return Object.freeze({ show: show, clear: clear, hover: hover, hoverAt: hoverAt, preview: preview, boxOf: orientedBox, refresh: function (root) { refresh(root, false); } });
 }));
