@@ -4,7 +4,6 @@
 //! ghost frames come from the immutable snapshot's retained ghost query (`tween_ghost_query.rs`), so a result is pinned to the
 //! revision it was read at and a changed revision or frame is refused as stale. One page holds the stored vector geometry of
 //! ONE ghost frame, as many segments as the response byte limit allows; `next` names the following page. Nothing here writes.
-use crate::application::{TweenGhostFrame, TweenGhostPath};
 use crate::object_snapshot::{ObjectSnapshot, ReadAdmission, MAX_MESSAGE_BYTES};
 use crate::request_receipts::{
     DispatchErrorCode, OpacityRequest, ResponseEnvelope, APPLICATION_API_VERSION,
@@ -46,77 +45,72 @@ fn scaled(v: f64, scale: f64) -> Value {
         json!(r)
     }
 }
-fn segment(s: &crate::object_document::ObjectSegment) -> Value {
-    let n =
-        |p: &crate::object_document::ObjectPoint| (p.x.as_f64().unwrap(), p.y.as_f64().unwrap());
-    let (x, y) = n(&s.point);
-    let ((ix, iy), (ox, oy)) = (n(&s.handle_in), n(&s.handle_out));
-    if ix == 0. && iy == 0. && ox == 0. && oy == 0. {
-        json!([round(x), round(y)])
+fn segment(s: &[f64; 6]) -> Value {
+    if s[2..].iter().all(|v| *v == 0.) {
+        json!([round(s[0]), round(s[1])])
     } else {
-        json!([
-            round(x),
-            round(y),
-            round(ix),
-            round(iy),
-            round(ox),
-            round(oy)
-        ])
+        json!(s.iter().map(|v| round(*v)).collect::<Vec<_>>())
     }
 }
-fn hex(rgba: [f64; 4]) -> String {
-    let c = |v: f64| (v.clamp(0., 1.) * 255.).round() as u32;
-    format!(
-        "#{:02x}{:02x}{:02x}{:02x}",
-        c(rgba[0]),
-        c(rgba[1]),
-        c(rgba[2]),
-        c(rgba[3])
-    )
+/// One ghost frame as the retained ghost query decided it (opacity falloff, translation, kind).
+#[derive(Debug, Clone, PartialEq)]
+pub struct GhostFrameFacts {
+    pub frame: u32,
+    pub kind: &'static str,
+    pub opacity: f64,
+    pub translation: [f64; 2],
 }
-/// The presented paint of one ghost path: an override of the source paint, or the source paint itself.
-fn meta(path: &TweenGhostPath) -> (Option<String>, Option<String>, f64) {
-    let v = &path.visual;
-    let stroke = v.stroke.map(hex).or_else(|| path.stroke.clone());
-    let fill = if v.clear_fill {
-        None
-    } else {
-        path.fill.clone()
-    };
-    (fill, stroke, v.stroke_width.unwrap_or(path.stroke_width))
+/// One drawable ghost path with its presented paint. Segments are `[x, y, inX, inY, outX, outY]`, handles relative.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GhostPathFacts {
+    pub source_id: String,
+    pub closed: bool,
+    pub width: f64,
+    pub fill: Option<String>,
+    pub stroke: Option<String>,
+    pub opacity: f64,
+    pub segments: Vec<[f64; 6]>,
 }
-fn descriptor(index: usize, count: usize, f: &TweenGhostFrame) -> Value {
+/// The retained ghost query of the application layer, seen through the facts this read-query layer presents.
+pub trait GhostFrames {
+    fn layer_uid(&self) -> &str;
+    fn count(&self) -> usize;
+    fn frame(&self, index: usize) -> GhostFrameFacts;
+    fn paths(&self, index: usize) -> Result<Vec<GhostPathFacts>, DispatchErrorCode>;
+}
+fn descriptor(index: usize, count: usize, f: &GhostFrameFacts) -> Value {
     json!({"index":index,"count":count,"frame":f.frame,"kind":f.kind,"opacity":scaled(f.opacity, 1000.),
         "translation":[round(f.translation[0]),round(f.translation[1])]})
 }
 /// The pieces of the segment stream `[start, end)` of a ghost frame, one per path they touch.
-fn pieces(paths: &[&TweenGhostPath], start: u64, end: u64) -> Vec<Value> {
+fn pieces(paths: &[GhostPathFacts], start: u64, end: u64) -> Vec<Value> {
     let (mut out, mut at) = (vec![], 0u64);
     for (i, p) in paths.iter().enumerate() {
-        let n = p.geometry.segments.len() as u64;
+        let n = p.segments.len() as u64;
         let (lo, hi) = (at.max(start), (at + n).min(end));
+        let base = at;
         at += n;
         if lo >= hi {
             continue;
         }
-        let (fill, stroke, width) = meta(p);
-        let segs: Vec<Value> = p.geometry.segments
-            [(lo - (at - n)) as usize..(hi - (at - n)) as usize]
+        let segs: Vec<Value> = p.segments[(lo - base) as usize..(hi - base) as usize]
             .iter()
             .map(segment)
             .collect();
-        out.push(json!({"path":i,"from":lo - (at - n),"count":n,"sourceId":p.source_id,"closed":p.geometry.closed,
-            "width":round(width),"fill":fill,"stroke":stroke,"opacity":scaled(p.visual.opacity, 1000.),"segments":segs}));
+        out.push(json!({"path":i,"from":lo - base,"count":n,"sourceId":p.source_id,"closed":p.closed,
+            "width":round(p.width),"fill":p.fill,"stroke":p.stroke,"opacity":scaled(p.opacity, 1000.),"segments":segs}));
     }
     out
 }
 
 impl ObjectSnapshot {
     /// `presented` is the host's proof: `(workId, viewGeneration, contextId, frame)` of its actual presentation.
-    pub fn dispatch_with_ghost_view(
-        &self,
+    /// `query` is the application layer's retained ghost query over the validated selector bytes.
+    pub fn dispatch_ghost_view_with<'a>(
+        &'a self,
         request: OpacityRequest,
         presented: Result<(&str, u64, &str, u32), &str>,
+        query: &dyn Fn(&[u8]) -> Result<Box<dyn GhostFrames + 'a>, DispatchErrorCode>,
     ) -> Result<ResponseEnvelope, DispatchErrorCode> {
         if let ReadAdmission::Refused(response) = self.read_admission(&request)? {
             return Ok(response);
@@ -198,7 +192,7 @@ impl ObjectSnapshot {
             }
         }
         let bytes = serde_json::to_vec(&selector).map_err(|_| DispatchErrorCode::Internal)?;
-        let read = match self.query_tween_ghosts_json(&bytes) {
+        let read = match query(&bytes) {
             Ok(read) => read,
             Err(DispatchErrorCode::Unavailable) => {
                 return refused(
@@ -217,7 +211,7 @@ impl ObjectSnapshot {
             }
             Err(_) => return invalid(),
         };
-        let count = read.frames().len();
+        let count = read.count();
         let ghost = ghost as usize;
         let envelope = |result: Value| ResponseEnvelope {
             api_version: APPLICATION_API_VERSION,
@@ -243,25 +237,12 @@ impl ObjectSnapshot {
         if ghost >= count {
             return invalid();
         }
-        let frame_info = &read.frames()[ghost];
-        let paths = match read.frame_paths(ghost) {
+        let frame_info = read.frame(ghost);
+        let drawable = match read.paths(ghost) {
             Ok(paths) => paths,
             Err(code) => return refused(code, "Ghost geometry is unavailable"),
         };
-        // Nothing is shown for a path with no segments, no paint left, or no opacity (a texture anchor hidden by its dabs).
-        let drawable: Vec<&TweenGhostPath> = paths
-            .iter()
-            .filter(|p| {
-                let (fill, stroke, _) = meta(p);
-                !p.geometry.segments.is_empty()
-                    && p.visual.opacity > 0.
-                    && (fill.is_some() || stroke.is_some())
-            })
-            .collect();
-        let total: u64 = drawable
-            .iter()
-            .map(|p| p.geometry.segments.len() as u64)
-            .sum();
+        let total: u64 = drawable.iter().map(|p| p.segments.len() as u64).sum();
         if total > MAX_SEGMENTS {
             return refused(
                 DispatchErrorCode::Unavailable,
@@ -280,7 +261,7 @@ impl ObjectSnapshot {
                 Value::Null
             }
         };
-        let descriptor = descriptor(ghost, count, frame_info);
+        let descriptor = descriptor(ghost, count, &frame_info);
         let mut end = (cursor + FIRST_TRY as u64).min(total);
         loop {
             let response = envelope(head(
