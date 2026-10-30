@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "8e64f6aba1e5e847e10a925a9d733409eb7f9ad6",
-  "describe": "v0.7.0-alpha.4-3764-g8e64f6ab-dirty"
+  "head": "ef52f9913f89fc06aeb91385420f25c0da3d74f5",
+  "describe": "v0.7.0-alpha.4-3767-gef52f991-dirty"
  },
- "inputsDigest": "74b7a4fb0b13079d6de96a8c1c28008734e415d476262d283e5fd2d20764e8b2",
+ "inputsDigest": "f7214dfafba276f7492d1aeb2a46b3d6833f08a10b02f0bd4cd442e90839b561",
  "states": [
   "inventoried",
   "characterized",
@@ -301,7 +301,7 @@
   },
   "SMRigWidget": {
    "file": "src/js/rig-widget.js",
-   "line": 670,
+   "line": 681,
    "members": 2
   },
   "SMRulers": {
@@ -629,7 +629,7 @@
     "container": "layer-ctrls",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 182,
+    "functionsVisited": 184,
     "via": "chain",
     "references": []
    },
@@ -1852,7 +1852,7 @@
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 198,
+    "functionsVisited": 199,
     "via": "chain",
     "references": []
    },
@@ -2028,7 +2028,7 @@
     "container": "tool-opts-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 37,
+    "functionsVisited": 22,
     "via": "variable _pcurveEditBtn",
     "references": []
    },
@@ -6061,7 +6061,7 @@
     "container": "easing-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 70,
+    "functionsVisited": 57,
     "via": "variable savePresetBtn",
     "references": []
    },
@@ -10956,7 +10956,7 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 11,
+    "functionsVisited": 16,
     "via": "helper el()",
     "references": [
      "src/js/image-mesh-bridge.js:151 paintPanel()"
@@ -13428,7 +13428,7 @@
    "capability": "widget h",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:597 bindWidgetField()"
+    "src/js/rig-widget.js:607 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13459,7 +13459,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:569 renderWidgetPanel()"
+     "src/js/rig-widget.js:579 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13478,7 +13478,7 @@
    "capability": "widget w",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:597 bindWidgetField()"
+    "src/js/rig-widget.js:607 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13509,7 +13509,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:569 renderWidgetPanel()"
+     "src/js/rig-widget.js:579 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13528,7 +13528,7 @@
    "capability": "Link a property or drive a pose from this axis",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:617 initWidgetPanelFields()"
+    "src/js/rig-widget.js:628 initWidgetPanelFields()"
    ],
    "events": [
     "click"
@@ -13555,7 +13555,9 @@
     "hiddenAtLoad": true,
     "functionsVisited": 48,
     "via": "helper el()",
-    "references": []
+    "references": [
+     "src/js/adapters/native-object-widget-ui.js:252 paintPanel()"
+    ]
    },
    "fixtures": [
     "static-props",
@@ -13573,7 +13575,7 @@
    "capability": "widget xmax",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:597 bindWidgetField()"
+    "src/js/rig-widget.js:607 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13604,7 +13606,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:573 renderWidgetPanel()"
+     "src/js/rig-widget.js:583 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13623,7 +13625,7 @@
    "capability": "widget xmin",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:597 bindWidgetField()"
+    "src/js/rig-widget.js:607 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13654,7 +13656,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:573 renderWidgetPanel()"
+     "src/js/rig-widget.js:583 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13673,7 +13675,7 @@
    "capability": "widget xrest",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:597 bindWidgetField()"
+    "src/js/rig-widget.js:607 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13704,7 +13706,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:573 renderWidgetPanel()"
+     "src/js/rig-widget.js:583 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13723,7 +13725,7 @@
    "capability": "Link a property or drive a pose from this axis",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:619 initWidgetPanelFields()"
+    "src/js/rig-widget.js:630 initWidgetPanelFields()"
    ],
    "events": [
     "click"
@@ -13750,7 +13752,9 @@
     "hiddenAtLoad": true,
     "functionsVisited": 48,
     "via": "helper el()",
-    "references": []
+    "references": [
+     "src/js/adapters/native-object-widget-ui.js:252 paintPanel()"
+    ]
    },
    "fixtures": [
     "static-props",
@@ -13768,7 +13772,7 @@
    "capability": "widget ymax",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:597 bindWidgetField()"
+    "src/js/rig-widget.js:607 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13799,7 +13803,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:583 renderWidgetPanel()"
+     "src/js/rig-widget.js:593 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13818,7 +13822,7 @@
    "capability": "widget ymin",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:597 bindWidgetField()"
+    "src/js/rig-widget.js:607 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13849,7 +13853,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:583 renderWidgetPanel()"
+     "src/js/rig-widget.js:593 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -13868,7 +13872,7 @@
    "capability": "widget yrest",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:597 bindWidgetField()"
+    "src/js/rig-widget.js:607 bindWidgetField()"
    ],
    "events": [
     "change"
@@ -13899,7 +13903,7 @@
     "functionsVisited": 189,
     "via": "helper bindWidgetField()",
     "references": [
-     "src/js/rig-widget.js:583 renderWidgetPanel()"
+     "src/js/rig-widget.js:593 renderWidgetPanel()"
     ]
    },
    "fixtures": [
@@ -27498,7 +27502,7 @@
    "capability": "Range of ",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:519 axisItem()"
+    "src/js/rig-widget.js:527 axisItem()"
    ],
    "events": [
     "click"
@@ -27517,7 +27521,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/rig-widget.js:519",
+   "source": "src/js/rig-widget.js:527",
    "meta": {
     "i18n": "widgetMenuAxisRangePrefix",
     "functionsVisited": 197
@@ -27538,7 +27542,7 @@
    "capability": "Pad size…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/rig-widget.js:533 openWidgetMenu()"
+    "src/js/rig-widget.js:541 openWidgetMenu()"
    ],
    "events": [
     "click"
@@ -27557,7 +27561,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/rig-widget.js:533",
+   "source": "src/js/rig-widget.js:541",
    "meta": {
     "i18n": "widgetMenuSizeEllipsis",
     "functionsVisited": 197
@@ -30116,7 +30120,7 @@
    "source": "src/js/timeline.js:6812",
    "meta": {
     "i18n": "ctxInsertLayerJoystick",
-    "functionsVisited": 15
+    "functionsVisited": 17
    },
    "fixtures": [
     "keyed-props",
@@ -30191,7 +30195,7 @@
    "source": "src/js/timeline.js:6813",
    "meta": {
     "i18n": "ctxInsertLayerSlider",
-    "functionsVisited": 15
+    "functionsVisited": 17
    },
    "fixtures": [
     "keyed-props",
@@ -31658,7 +31662,7 @@
    "source": "src/js/timeline.js:11260",
    "meta": {
     "i18n": "ctxInsertLayerJoystick",
-    "functionsVisited": 15
+    "functionsVisited": 17
    },
    "fixtures": [
     "keyed-props",
@@ -31733,7 +31737,7 @@
    "source": "src/js/timeline.js:11261",
    "meta": {
     "i18n": "ctxInsertLayerSlider",
-    "functionsVisited": 15
+    "functionsVisited": 17
    },
    "fixtures": [
     "keyed-props",
