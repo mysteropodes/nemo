@@ -250,5 +250,9 @@ mod subselect_tests;
 mod widget_tests;
 
 #[cfg(test)]
+#[path = "native_ghost_read_public_tests.rs"]
+mod ghost_tests;
+
+#[cfg(test)]
 #[path = "native_rig_read_public_tests.rs"]
 mod rig_tests;

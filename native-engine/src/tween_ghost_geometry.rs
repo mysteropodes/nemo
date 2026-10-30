@@ -23,6 +23,9 @@ pub struct TweenGhostPath {
     pub source_id: String,
     pub geometry: ObjectGeometry,
     pub stroke_width: f64,
+    /// The source fill and the real stroke as `#rrggbbaa`; the visual only carries overrides of them.
+    pub fill: Option<String>,
+    pub stroke: Option<String>,
     pub visual: TweenGhostVisual,
 }
 struct Members<'a> {
@@ -169,6 +172,8 @@ pub(super) fn paths(
                         source_id: format!("ghost-combine:{}:{i}", combined.group),
                         geometry,
                         stroke_width: combined.style.stroke_width,
+                        fill: combined.style.fill.clone(),
+                        stroke: combined.style.stroke.clone(),
                         visual,
                     },
                 ));
@@ -183,6 +188,12 @@ pub(super) fn paths(
                 source_id: r.target.stroke_id.clone(),
                 geometry: r.geometry.clone(),
                 stroke_width: r.vector().map_or(1., |v| v.stroke_width.as_f64().unwrap()),
+                fill: r.solid_fill().map(hex8),
+                stroke: r
+                    .vector()
+                    .filter(|v| v.has_real_stroke)
+                    .and_then(|v| v.solid_stroke())
+                    .map(hex8),
                 visual,
             });
         }

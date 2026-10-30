@@ -141,6 +141,8 @@ pub struct TweenGhostRead {
     snapshot: ObjectSnapshot,
     layer_uid: String,
     frames: Vec<TweenGhostFrame>,
+    /// A component or duplicator layer: its ghosts need native frame evaluation, not stored key geometry.
+    derived: bool,
 }
 impl TweenGhostRead {
     pub fn snapshot(&self) -> &ObjectSnapshot {
@@ -172,6 +174,29 @@ impl TweenGhostRead {
             return Err(Error::InvalidRequest);
         }
         geometry::paths(&self.snapshot, &self.layer_uid, frame)
+    }
+    /// Authored vector geometry of one ghost frame, ready to present. An onion frame is the stored geometry
+    /// of the keyframe that exposes it; a derived layer (component, duplicator) needs the evaluated frame
+    /// (`prepare_frame`) and refuses here rather than showing a different picture.
+    pub fn frame_paths(&self, index: usize) -> Result<Vec<TweenGhostPath>, Error> {
+        let frame = self.frames.get(index).ok_or(Error::InvalidRequest)?;
+        if self.derived {
+            return Err(Error::Unavailable);
+        }
+        let mut stored = frame.clone();
+        if frame.kind != TweenGhostKind::AllKeys {
+            let source = self
+                .snapshot
+                .document()
+                .layers
+                .iter()
+                .find(|l| l.layer_uid == self.layer_uid)
+                .and_then(|l| l.timing.value())
+                .and_then(|t| t.exposure(frame.frame).1)
+                .ok_or(Error::Unavailable)?;
+            stored.frame = source;
+        }
+        geometry::paths(&self.snapshot, &self.layer_uid, &stored)
     }
     /// A real pinned onion frame for existing native mixed/resource consumers.
     /// Ghost All must use all_keys_paths, never normal frame evaluation.
@@ -321,6 +346,7 @@ impl ObjectSnapshot {
             snapshot: self.clone(),
             layer_uid: s.layer_uid,
             frames,
+            derived,
         })
     }
 }

@@ -3970,6 +3970,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-object-ghost-ui.js",
+      "moduleId": "app.native.object.ghost.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2632,
+          "scriptOrdinal": 282
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-object-rig-ui.js",
       "moduleId": "app.native.object.rig.ui.adapter",
       "executionClass": "document-classic",

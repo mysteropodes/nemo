@@ -71,6 +71,10 @@ pub(crate) mod widget_read;
 mod widget_presentation;
 #[path = "object_widget_view.rs"]
 mod widget_view;
+// #2358 D23: the onion / Ghost All presentation read over the retained ghost query (application builds).
+#[cfg(feature = "application")]
+#[path = "object_ghost_view.rs"]
+mod ghost_view;
 // #2255: the presentation read of one layer's rig (bones, handles, influence circles, binds, weights) for the Rig canvas tool.
 #[path = "object_rig_presentation.rs"]
 mod rig_presentation;

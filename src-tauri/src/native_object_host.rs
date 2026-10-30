@@ -375,6 +375,7 @@ impl NativeDispatch for NativeObjectHost {
         {
             if serde_json::to_value(&request).ok().is_some_and(|wire| wire["payload"]["view"]["kind"] == "subselect") { return self.dispatch_subselect_view(&snapshot, request); }
             if serde_json::to_value(&request).ok().is_some_and(|wire| wire["payload"]["view"]["kind"] == "widget") { return self.dispatch_widget_view(&snapshot, request); }
+            if serde_json::to_value(&request).ok().is_some_and(|wire| wire["payload"]["view"]["kind"] == "ghosts") { return self.dispatch_ghost_view(&snapshot, request); }
             if serde_json::to_value(&request).ok().is_some_and(|wire| wire["payload"]["view"]["kind"] == "rig") { return self.dispatch_rig_view(&snapshot, request); }
             return self.dispatch_image_mesh_view(&snapshot, request);
         }
