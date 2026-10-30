@@ -3,7 +3,10 @@
 use crate::native_dispatch::{NativeAuthority, NativeDispatch, NativePhase};
 use serde::Serialize;
 
+/// Live replay receipts. A superseded settled receipt is retired, not refused (see `retire_for_capacity`).
 pub(crate) const MAX_RETAINED_REPLACEMENTS: usize = 16;
+/// Request ids of retired receipts, kept only so a late retry replays Expired instead of re-executing.
+pub(super) const MAX_REPLACEMENT_TOMBSTONES: usize = 256;
 
 pub(crate) struct ReplacementIdentity<'a> {
     pub(crate) request_id: &'a str,
@@ -28,9 +31,11 @@ pub(crate) enum ReplacementAdmission {
 }
 
 pub(super) struct ReplacementRecord {
-    generation: u64,
-    fingerprint: Vec<u8>,
-    outcome: ReplacementReplay,
+    pub(super) generation: u64,
+    pub(super) fingerprint: Vec<u8>,
+    pub(super) outcome: ReplacementReplay,
+    /// Retired: only the id and generation remain, and any retry replays Expired.
+    pub(super) tombstone: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
@@ -114,6 +119,9 @@ impl NativeAuthority {
         fingerprint: &[u8],
     ) -> Result<Option<ReplacementReplay>, String> {
         if let Some(record) = self.retained_replacements.get(request_id) {
+            if record.tombstone {
+                return Ok(Some(ReplacementReplay::Expired));
+            }
             if record.fingerprint != fingerprint {
                 return Err(
                     "invalid_request:requestId was reused with a changed replacement body".into(),
@@ -121,10 +129,59 @@ impl NativeAuthority {
             }
             return Ok(Some(record.outcome.clone()));
         }
-        if self.retained_replacements.len() >= MAX_RETAINED_REPLACEMENTS {
+        if self.live_replacements() >= MAX_RETAINED_REPLACEMENTS
+            && self.evictable_replacement().is_none()
+        {
             return Err("unavailable:native replacement receipt capacity exhausted".into());
         }
         Ok(None)
+    }
+
+    fn live_replacements(&self) -> usize {
+        self.retained_replacements
+            .values()
+            .filter(|record| !record.tombstone)
+            .count()
+    }
+
+    /// The oldest settled receipt of a generation the lifecycle has moved past. It can no
+    /// longer be the live replacement, so its replay guarantee may lapse. Pending receipts
+    /// and the receipt of the current generation are never candidates.
+    fn evictable_replacement(&self) -> Option<String> {
+        self.retained_replacements
+            .iter()
+            .filter(|(_, record)| {
+                !record.tombstone
+                    && record.generation < self.generation
+                    && !matches!(record.outcome, ReplacementReplay::Pending(_))
+            })
+            .min_by_key(|(_, record)| record.generation)
+            .map(|(request_id, _)| request_id.clone())
+    }
+
+    /// Make room for one more live receipt by retiring the oldest superseded one to a tombstone.
+    pub(super) fn retire_for_capacity(&mut self) {
+        if self.live_replacements() >= MAX_RETAINED_REPLACEMENTS {
+            if let Some(record) = self
+                .evictable_replacement()
+                .and_then(|request_id| self.retained_replacements.get_mut(&request_id))
+            {
+                record.tombstone = true;
+                record.outcome = ReplacementReplay::Expired;
+                record.fingerprint = Vec::new();
+            }
+        }
+        let mut retired: Vec<(u64, String)> = self
+            .retained_replacements
+            .iter()
+            .filter(|(_, record)| record.tombstone)
+            .map(|(request_id, record)| (record.generation, request_id.clone()))
+            .collect();
+        retired.sort();
+        let excess = retired.len().saturating_sub(MAX_REPLACEMENT_TOMBSTONES);
+        for (_, request_id) in retired.into_iter().take(excess) {
+            self.retained_replacements.remove(&request_id);
+        }
     }
 
     pub(crate) fn admit_replace_request(
@@ -141,12 +198,14 @@ impl NativeAuthority {
         }
         let generation =
             self.admit_replace(instance_id, document_id, expected_revision, preflight)?;
+        self.retire_for_capacity();
         self.retained_replacements.insert(
             request_id.into(),
             ReplacementRecord {
                 generation,
                 fingerprint: fingerprint.to_vec(),
                 outcome: ReplacementReplay::Pending(ReplacementProgress::default()),
+                tombstone: false,
             },
         );
         Ok(ReplacementAdmission::Execute(generation))
