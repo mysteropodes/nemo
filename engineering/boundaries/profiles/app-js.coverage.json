@@ -3947,7 +3947,7 @@
     },
     {
       "path": "src/js/adapters/native-object-widget-ui.js",
-      "moduleId": "app.native.object.widget.adapter",
+      "moduleId": "app.native.object.widget.ui.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
