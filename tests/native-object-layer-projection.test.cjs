@@ -327,3 +327,22 @@ test('malformed parent tables and foreign or stale revision pins refuse atomical
     assert.equal(Files.refreshLayerTable(root,bad),false);assert.equal(snapshot(root),before);
   }
 });
+test('#2255: the native layer table carries the widget flag as the legacy kind flag the layer menus read, and nothing else of the widget',()=>{
+  const W={layerUid:'W',name:'Joystick 1',visible:true,widget:true};
+  const root=view([A]),rows=root.state.layers;
+  assert.equal(Files.refreshLayerTable(root,info([A,W],1)),true);
+  assert.equal(rows[1].isWidgetLayer,true);assert.equal(Object.hasOwn(rows[1],'widget'),false,'no widget record on a row');
+  assert.equal(Object.hasOwn(rows[0],'isWidgetLayer'),false);
+  assert.equal(Files.refreshLayerTable(root,info([A],2)),true);assert.equal(rows.length,1);
+  const opened={state:{},userLayers:[],selectedPaths:[]};Files.projectView(opened,info([A,W]));
+  assert.deepEqual(opened.state.layers.map(l=>l.isWidgetLayer===true),[false,true]);
+  assert.throws(()=>Files.projectView({state:{},userLayers:[],selectedPaths:[]},info([{...W,widget:false}])),/widget flag/);
+  assert.throws(()=>Files.projectView({state:{},userLayers:[],selectedPaths:[]},info([{...W,widget:'yes'}])),/widget flag/);
+});
+test('#2255: the project metadata decoder admits only a true widget flag and copies it onto the layer row',()=>{
+  const request={requestId:'r',instanceId:'instance',documentId:'document'};
+  const wire=layers=>({...info(layers),requestId:'r'});
+  const decoded=Metadata.decode(wire([{layerUid:'W',widget:true},{layerUid:'P'}]),request);
+  assert.equal(decoded.layers[0].widget,true);assert.equal(Object.hasOwn(decoded.layers[1],'widget'),false);
+  assert.throws(()=>Metadata.decode(wire([{layerUid:'W',widget:false}]),request),/uncorrelated/);
+});

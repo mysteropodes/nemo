@@ -504,6 +504,8 @@
   // `self.at(layerControl(...))` means the axis value IS a frame number, so
   // an axis that runs 0…24 scrubs a 24-frame pose track.
   function openWidgetMenu(x, y, li) {
+    var native = nativeUi();
+    if (native) { native.openSettingsMenu(x, y, li); return; }
     var ld = state.layers[li], w = widgetOf(ld);
     if (!w || !window.showContextMenu) return;
     function axisItem(k) {

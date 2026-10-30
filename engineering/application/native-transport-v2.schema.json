@@ -1458,6 +1458,9 @@
         },
         {
           "$ref": "#/$defs/ObjectWidgetViewPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectRigViewPayload"
         }
       ]
     },
@@ -5674,6 +5677,9 @@
         },
         {
           "$ref": "#/$defs/ObjectWidgetViewResult"
+        },
+        {
+          "$ref": "#/$defs/ObjectRigViewResult"
         }
       ]
     },
@@ -19574,6 +19580,8 @@
               "size",
               "puck",
               "rest",
+              "anchor",
+              "linear",
               "unavailable"
             ],
             "properties": {
@@ -19748,6 +19756,36 @@
                   }
                 ]
               },
+              "anchor": {
+                "oneOf": [
+                  {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "linear": {
+                "oneOf": [
+                  {
+                    "type": "array",
+                    "minItems": 4,
+                    "maxItems": 4,
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "unavailable": {
                 "oneOf": [
                   {
@@ -19870,6 +19908,22 @@
                       "items": {
                         "type": "number"
                       }
+                    },
+                    "anchor": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "linear": {
+                      "type": "array",
+                      "minItems": 4,
+                      "maxItems": 4,
+                      "items": {
+                        "type": "number"
+                      }
                     }
                   }
                 }
@@ -19913,6 +19967,22 @@
                       "items": {
                         "type": "number"
                       }
+                    },
+                    "anchor": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "linear": {
+                      "type": "array",
+                      "minItems": 4,
+                      "maxItems": 4,
+                      "items": {
+                        "type": "number"
+                      }
                     }
                   }
                 }
@@ -19946,6 +20016,12 @@
                       "type": "null"
                     },
                     "rest": {
+                      "type": "null"
+                    },
+                    "anchor": {
+                      "type": "null"
+                    },
+                    "linear": {
                       "type": "null"
                     }
                   }
@@ -20176,6 +20252,788 @@
           "type": "boolean"
         }
       }
+    },
+    "ObjectRigViewPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "view"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "view": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "contextId",
+            "frame",
+            "workId",
+            "viewGeneration",
+            "layerUid",
+            "part",
+            "bind",
+            "vertex",
+            "cursor",
+            "limit"
+          ],
+          "properties": {
+            "kind": {
+              "const": "rig"
+            },
+            "contextId": {
+              "const": "scene-root"
+            },
+            "frame": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "workId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+            },
+            "viewGeneration": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "part": {
+              "enum": [
+                "bones",
+                "vertices",
+                "chains",
+                "binds",
+                "bound",
+                "weights"
+              ]
+            },
+            "bind": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "vertex": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "cursor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "part": {
+                    "const": "bones"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "part": {
+                    "const": "vertices"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "part": {
+                    "const": "chains"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "part": {
+                    "const": "binds"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "part": {
+                    "const": "bound"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 64
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "part": {
+                    "const": "weights"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "part": {
+                    "const": "weights"
+                  }
+                },
+                "required": [
+                  "part"
+                ]
+              },
+              "else": {
+                "properties": {
+                  "bind": {
+                    "const": 0
+                  },
+                  "vertex": {
+                    "const": 0
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ObjectRigViewResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "kind",
+        "contextId",
+        "frame",
+        "workId",
+        "viewGeneration",
+        "layerUid",
+        "part",
+        "bind",
+        "vertex",
+        "cursor",
+        "total",
+        "nextCursor",
+        "unavailable",
+        "items"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "rig"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "workId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+        },
+        "viewGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "part": {
+          "enum": [
+            "bones",
+            "vertices",
+            "chains",
+            "binds",
+            "bound",
+            "weights"
+          ]
+        },
+        "bind": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "vertex": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {}
+        },
+        "unavailable": {
+          "oneOf": [
+            {
+              "enum": [
+                "expression",
+                "sample",
+                "parent",
+                "motion"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "part": {
+                "const": "bones"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "items": {
+                "type": "array",
+                "maxItems": 8,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "boneId",
+                    "closed",
+                    "radius",
+                    "count",
+                    "center"
+                  ],
+                  "properties": {
+                    "boneId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "closed": {
+                      "type": "boolean"
+                    },
+                    "radius": {
+                      "oneOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": 2,
+                      "maximum": 256
+                    },
+                    "center": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "part": {
+                "const": "vertices"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "items": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "boneId",
+                    "vi",
+                    "point",
+                    "handleIn",
+                    "handleOut"
+                  ],
+                  "properties": {
+                    "boneId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "vi": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "point": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "handleIn": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "handleOut": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "part": {
+                "const": "chains"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "items": {
+                "type": "array",
+                "maxItems": 8,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "endKey",
+                    "root",
+                    "joint",
+                    "end",
+                    "l1",
+                    "l2",
+                    "flip"
+                  ],
+                  "properties": {
+                    "endKey": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "root": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "boneId",
+                        "vi"
+                      ],
+                      "properties": {
+                        "boneId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "vi": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 4294967295
+                        }
+                      }
+                    },
+                    "joint": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "boneId",
+                        "vi"
+                      ],
+                      "properties": {
+                        "boneId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "vi": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 4294967295
+                        }
+                      }
+                    },
+                    "end": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "boneId",
+                        "vi"
+                      ],
+                      "properties": {
+                        "boneId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "vi": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 4294967295
+                        }
+                      }
+                    },
+                    "l1": {
+                      "type": "number"
+                    },
+                    "l2": {
+                      "type": "number"
+                    },
+                    "flip": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "part": {
+                "const": "binds"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "items": {
+                "type": "array",
+                "maxItems": 8,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "index",
+                    "strokeId",
+                    "meshId",
+                    "points",
+                    "rotate",
+                    "state"
+                  ],
+                  "properties": {
+                    "index": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "strokeId": {
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "meshId": {
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "points": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "rotate": {
+                      "type": "boolean"
+                    },
+                    "state": {
+                      "enum": [
+                        "posed",
+                        "skipped",
+                        "unlinked",
+                        "unavailable"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "part": {
+                "const": "bound"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "items": {
+                "type": "array",
+                "maxItems": 64,
+                "items": {
+                  "type": "array",
+                  "minItems": 4,
+                  "maxItems": 4,
+                  "prefixItems": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "part": {
+                "const": "weights"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "items": {
+                "type": "array",
+                "maxItems": 8,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "entry",
+                    "boneId",
+                    "ptIndex",
+                    "offset",
+                    "w"
+                  ],
+                  "properties": {
+                    "entry": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "boneId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "ptIndex": {
+                      "oneOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 4294967295
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "offset": {
+                      "oneOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "w": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "unavailable": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "unavailable"
+            ]
+          },
+          "then": {
+            "properties": {
+              "total": {
+                "const": 0
+              },
+              "items": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

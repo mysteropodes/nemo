@@ -107,3 +107,8 @@ mod object_rig_edit_mesh_tests;
 #[cfg(all(test, feature = "evaluation"))]
 #[path = "../tests/object_rig_edit_mesh_controls.rs"]
 mod object_rig_edit_mesh_control_tests;
+
+// #2255: the rig presentation view, over rigs created by the owner itself.
+#[cfg(all(test, feature = "evaluation"))]
+#[path = "../tests/object_rig_view.rs"]
+mod object_rig_view_tests;
