@@ -426,3 +426,25 @@ fn a_page_is_pinned_bounded_and_windowed_around_the_cursor() {
         32
     );
 }
+
+#[test]
+fn a_long_property_id_label_is_cut_to_the_label_cap_like_every_other_label() {
+    use super::history_read::label_for;
+    let longest = "abcdefghijklmnopqrstuvwx";
+    assert_eq!(longest.len(), 24);
+    for operation in [
+        "command.document.object.property.edit",
+        "command.document.object.property.track.edit",
+    ] {
+        let label = label_for(operation, &json!({ "property": longest }));
+        assert_eq!(label.chars().count(), 32, "{label}");
+        assert_eq!(label, "Property: Abcdefghijklmnopqrstuv");
+    }
+    assert_eq!(
+        label_for(
+            "command.document.object.property.edit",
+            &json!({"property":"opacity"})
+        ),
+        "Property: Opacity"
+    );
+}
