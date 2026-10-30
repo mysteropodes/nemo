@@ -365,6 +365,17 @@ test('area draft refuses invalid hex on blur then publishes #336699 by the exist
  f.input('native-text-color-hex','#336699');area.fire('keydown',{key:'Enter',ctrlKey:true});await f.turn();assert.equal(f.owner.log.executed.length,1);assert.equal(f.owner.log.received[0].payload.block.color,'#336699');assert.equal(f.owner.log.received[0].payload.block.fixedWidth,100);assert.equal(f.owner.log.received[0].payload.block.text,'Hex area');assert.equal(f.logs.legacy,0);
 });
 
+test('area draft blur after a pointerdown inside the popover chrome does not commit; blur after a stage pointerdown still commits',async()=>{
+ for(const inside of [true,false]){
+  const f=await fixture();f.canvas.fire('pointerdown',{clientX:100,clientY:110});f.canvas.fire('pointermove',{clientX:300,clientY:190});f.canvas.fire('pointerup',{clientX:300,clientY:190});await f.turn();
+  const area=f.get('native-text-area-draft');assert.ok(area);area.value='Chrome text';area.fire('input');
+  (inside?f.get('text-popover'):f.canvas).fire('pointerdown',{clientX:5,clientY:5});area.fire('blur',{relatedTarget:null});await f.turn();
+  if(inside){assert.equal(f.owner.log.executed.length,0,'popover padding click must not commit');assert.ok(f.binding.core.snapshot().draft);
+   f.canvas.fire('pointerdown',{clientX:5,clientY:5});area.fire('blur',{relatedTarget:null});await f.turn();assert.equal(f.owner.log.executed.length,1,'a later outside blur commits');}
+  else assert.equal(f.owner.log.executed.length,1,'stage blur commits');
+ }
+});
+
 test('native hex layout preserves existing controls and restores prior inline wrapping across remounts',async()=>{
  const f=await fixture(),parent=f.get('text-color').parentNode,controls=parent.children.filter(n=>n!==f.get('native-text-color-hex').parentNode);
  f.binding.retire();assert.deepEqual(parent.children,controls);parent.style.flexWrap='wrap-reverse';
