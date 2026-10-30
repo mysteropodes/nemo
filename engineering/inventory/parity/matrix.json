@@ -2,22 +2,22 @@
   "schema": "nemo.parity-matrix/1",
   "baseline": "1065e9d8d9c48e66d9b44bb4de446e8f4e887040",
   "baselineStatus": "proposed — pending Ilya and Cyrill approval (CS9 #2344 / PR #2352)",
-  "ownersSnapshotAt": "2026-10-25",
+  "ownersSnapshotAt": "2026-10-30",
   "counts": {
     "surfaces": 903,
     "tasks": 228,
     "surfaceStatus": {
-      "issues-open": 550,
-      "curated-open": 213,
-      "curated-closed": 57,
-      "issues-closed": 46,
+      "issues-open": 519,
+      "curated-open": 195,
+      "curated-closed": 75,
+      "issues-closed": 77,
       "disposition": 37
     },
     "taskStatus": {
-      "issues-closed": 41,
-      "curated-closed": 28,
-      "curated-open": 33,
-      "issues-open": 126
+      "issues-closed": 67,
+      "curated-closed": 43,
+      "curated-open": 18,
+      "issues-open": 100
     },
     "evidence": {
       "frames": {
@@ -280,7 +280,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-cam-ease-edit",
@@ -295,7 +295,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-camera",
@@ -309,7 +309,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-clip",
@@ -339,7 +339,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-combine-flatten",
@@ -354,7 +354,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-combine-intersect",
@@ -369,7 +369,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-combine-remove",
@@ -398,7 +398,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-combine-unite",
@@ -413,7 +413,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-comp",
@@ -803,7 +803,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-import-video",
@@ -1675,7 +1675,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "dom:#btn-tw",
@@ -2532,7 +2532,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#figma-token",
@@ -2561,7 +2561,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#figma-url",
@@ -3093,7 +3093,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "dom:#np-fps",
@@ -4967,7 +4967,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#ref-file-input",
@@ -5269,7 +5269,7 @@
       "disposition": null,
       "proposedDisposition": "presentational external link; no document behaviour",
       "confidence": "low",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#start-github",
@@ -5849,7 +5849,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "dom:#video-input",
@@ -7226,7 +7226,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "labs:canvas-grid",
@@ -7240,7 +7240,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "labs:clip-mask-bake",
@@ -7282,7 +7282,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "labs:follow-path",
@@ -7296,7 +7296,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "labs:french-curve",
@@ -7310,7 +7310,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "labs:interval-assistant",
@@ -7382,7 +7382,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "labs:move-to-layer",
@@ -7396,7 +7396,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "labs:multiframe-draw",
@@ -7410,7 +7410,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "labs:oca-export",
@@ -7438,7 +7438,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "labs:pingpong-cycle",
@@ -7466,7 +7466,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "labs:predictive-stroke",
@@ -7480,7 +7480,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "labs:reference-3d",
@@ -7494,7 +7494,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "labs:reference-fill",
@@ -7508,7 +7508,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "labs:retime-exposure",
@@ -7580,7 +7580,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "labs:storyboard-mode",
@@ -7622,7 +7622,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "labs:timeline-zoom",
@@ -7650,7 +7650,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "labs:vector-trim",
@@ -7664,7 +7664,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "labs:view-filter",
@@ -7678,7 +7678,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "labs:xsheet",
@@ -7692,7 +7692,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "menu:effects-panel.js:openCustom:new-custom-shader",
@@ -8814,7 +8814,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "menu:motion.js:decorateMotionPropertyRow:ctxexprcontrolsellipsis",
@@ -9141,7 +9141,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "menu:motion.js:renderLayerListMotion:ctxaddmarkeronlayer",
@@ -9242,7 +9242,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "menu:motion.js:renderLayerListMotion:ctxmergeselectedlayers",
@@ -9271,7 +9271,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "menu:motion.js:renderLayerListMotion:ctxparentintimelinktimeellipsis",
@@ -9449,7 +9449,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxeasyeaseinshiftf9",
@@ -9464,7 +9464,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxeasyeaseoutcmdshiftf9",
@@ -9479,7 +9479,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxediteasecurve",
@@ -9494,7 +9494,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxfliporder",
@@ -9551,7 +9551,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "high",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxparentintimelinktimeellipsis",
@@ -9788,7 +9788,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "menu:select-bridge.js:onContext:arriere-plan",
@@ -9862,7 +9862,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "menu:select-bridge.js:onContext:convertir-le-trait-en-remplissage-fill",
@@ -10745,7 +10745,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "menu:timeline.js:renderLayerList:ctxinsertlayerfolder",
@@ -11395,7 +11395,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "medium",
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "id": "menu:timeline.js:top:ctxinsertlayerfolder",
@@ -13128,7 +13128,7 @@
       "disposition": null,
       "proposedDisposition": null,
       "confidence": "low",
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "id": "shortcut:readonly:shortcutRoGroup",
@@ -13534,10 +13534,10 @@
         },
         {
           "issue": 2380,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "D08",
@@ -13607,10 +13607,10 @@
       "owners": [
         {
           "issue": 2094,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "D13",
@@ -13701,10 +13701,10 @@
       "owners": [
         {
           "issue": 2379,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "D20",
@@ -13783,10 +13783,10 @@
         },
         {
           "issue": 2243,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "D26",
@@ -13850,10 +13850,10 @@
       "owners": [
         {
           "issue": 2243,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "D31",
@@ -13913,7 +13913,7 @@
       "surfaces": 0,
       "owners": [
         {
-          "issue": 2377,
+          "issue": 2520,
           "state": "open"
         }
       ],
@@ -13943,7 +13943,7 @@
       "surfaces": 14,
       "owners": [
         {
-          "issue": 2377,
+          "issue": 2521,
           "state": "open"
         }
       ],
@@ -13956,7 +13956,7 @@
       "surfaces": 2,
       "owners": [
         {
-          "issue": 2377,
+          "issue": 2522,
           "state": "open"
         }
       ],
@@ -13969,7 +13969,7 @@
       "surfaces": 8,
       "owners": [
         {
-          "issue": 2377,
+          "issue": 2523,
           "state": "open"
         }
       ],
@@ -13982,7 +13982,7 @@
       "surfaces": 2,
       "owners": [
         {
-          "issue": 2377,
+          "issue": 2524,
           "state": "open"
         }
       ],
@@ -13995,7 +13995,7 @@
       "surfaces": 4,
       "owners": [
         {
-          "issue": 2377,
+          "issue": 2525,
           "state": "open"
         }
       ],
@@ -14069,10 +14069,10 @@
       "owners": [
         {
           "issue": 2378,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "F06",
@@ -14270,11 +14270,11 @@
       "owners": [
         {
           "issue": 2225,
-          "state": "open",
+          "state": "closed",
           "curated": "high"
         }
       ],
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "task": "F15",
@@ -14317,10 +14317,10 @@
         },
         {
           "issue": 2218,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "F17",
@@ -14463,7 +14463,7 @@
         },
         {
           "issue": 2206,
-          "state": "open"
+          "state": "closed"
         },
         {
           "issue": 2217,
@@ -14474,7 +14474,7 @@
           "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "G02",
@@ -14517,14 +14517,14 @@
         },
         {
           "issue": 2218,
-          "state": "open"
+          "state": "closed"
         },
         {
           "issue": 2230,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "G03b",
@@ -14841,10 +14841,10 @@
         },
         {
           "issue": 2222,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "G19",
@@ -14862,14 +14862,14 @@
         },
         {
           "issue": 2222,
-          "state": "open"
+          "state": "closed"
         },
         {
           "issue": 2234,
           "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "G20",
@@ -15137,14 +15137,14 @@
         },
         {
           "issue": 2219,
-          "state": "open"
+          "state": "closed"
         },
         {
           "issue": 2258,
           "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "G36",
@@ -15166,14 +15166,14 @@
         },
         {
           "issue": 2219,
-          "state": "open"
+          "state": "closed"
         },
         {
           "issue": 2258,
           "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "G37",
@@ -15195,14 +15195,14 @@
         },
         {
           "issue": 2219,
-          "state": "open"
+          "state": "closed"
         },
         {
           "issue": 2258,
           "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "G38a",
@@ -15249,14 +15249,14 @@
         },
         {
           "issue": 2206,
-          "state": "open"
+          "state": "closed"
         },
         {
           "issue": 2229,
           "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "G39",
@@ -15318,10 +15318,10 @@
         },
         {
           "issue": 2207,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "G43",
@@ -15441,10 +15441,10 @@
       "owners": [
         {
           "issue": 2367,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "I01",
@@ -15580,11 +15580,11 @@
       "owners": [
         {
           "issue": 2244,
-          "state": "open",
+          "state": "closed",
           "curated": "high"
         }
       ],
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "task": "I11",
@@ -15627,11 +15627,11 @@
         },
         {
           "issue": 2251,
-          "state": "open"
+          "state": "closed"
         },
         {
           "issue": 2252,
-          "state": "open"
+          "state": "closed"
         },
         {
           "issue": 2255,
@@ -15699,14 +15699,14 @@
         },
         {
           "issue": 2230,
-          "state": "open"
+          "state": "closed"
         },
         {
           "issue": 2231,
           "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "I16b",
@@ -15716,7 +15716,7 @@
       "owners": [
         {
           "issue": 2207,
-          "state": "open"
+          "state": "closed"
         },
         {
           "issue": 2232,
@@ -15886,11 +15886,11 @@
       "owners": [
         {
           "issue": 2364,
-          "state": "open",
+          "state": "closed",
           "curated": "medium"
         }
       ],
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "task": "I27",
@@ -16038,11 +16038,11 @@
       "owners": [
         {
           "issue": 2219,
-          "state": "open",
+          "state": "closed",
           "curated": "medium"
         }
       ],
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "task": "I38",
@@ -16177,14 +16177,14 @@
         },
         {
           "issue": 2219,
-          "state": "open"
+          "state": "closed"
         },
         {
           "issue": 2258,
           "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "I47",
@@ -16194,11 +16194,11 @@
       "owners": [
         {
           "issue": 1005,
-          "state": "open",
+          "state": "closed",
           "curated": "medium"
         }
       ],
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "task": "I48",
@@ -16208,11 +16208,11 @@
       "owners": [
         {
           "issue": 1005,
-          "state": "open",
+          "state": "closed",
           "curated": "medium"
         }
       ],
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "task": "I49",
@@ -16222,11 +16222,11 @@
       "owners": [
         {
           "issue": 1005,
-          "state": "open",
+          "state": "closed",
           "curated": "medium"
         }
       ],
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "task": "I50",
@@ -16236,11 +16236,11 @@
       "owners": [
         {
           "issue": 1005,
-          "state": "open",
+          "state": "closed",
           "curated": "high"
         }
       ],
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "task": "I51",
@@ -16250,10 +16250,10 @@
       "owners": [
         {
           "issue": 2380,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "I52",
@@ -16290,10 +16290,10 @@
       "owners": [
         {
           "issue": 2369,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "U02",
@@ -16689,10 +16689,10 @@
       "owners": [
         {
           "issue": 2374,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "U32",
@@ -16702,10 +16702,10 @@
       "owners": [
         {
           "issue": 2374,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "U33",
@@ -16715,11 +16715,11 @@
       "owners": [
         {
           "issue": 2362,
-          "state": "open",
+          "state": "closed",
           "curated": "low"
         }
       ],
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "task": "U34",
@@ -16729,11 +16729,11 @@
       "owners": [
         {
           "issue": 2362,
-          "state": "open",
+          "state": "closed",
           "curated": "low"
         }
       ],
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "task": "U35",
@@ -16757,10 +16757,10 @@
       "owners": [
         {
           "issue": 2362,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "U37",
@@ -16770,10 +16770,10 @@
       "owners": [
         {
           "issue": 2374,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "U38",
@@ -16796,10 +16796,10 @@
       "owners": [
         {
           "issue": 2369,
-          "state": "open"
+          "state": "closed"
         }
       ],
-      "status": "issues-open"
+      "status": "issues-closed"
     },
     {
       "task": "X01",
@@ -16963,11 +16963,11 @@
       "owners": [
         {
           "issue": 1573,
-          "state": "open",
+          "state": "closed",
           "curated": "high"
         }
       ],
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "task": "X13",
@@ -17019,11 +17019,11 @@
       "owners": [
         {
           "issue": 1005,
-          "state": "open",
+          "state": "closed",
           "curated": "medium"
         }
       ],
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "task": "X17",
@@ -17033,11 +17033,11 @@
       "owners": [
         {
           "issue": 2346,
-          "state": "open",
+          "state": "closed",
           "curated": "medium"
         }
       ],
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "task": "X18",
@@ -17074,11 +17074,11 @@
       "owners": [
         {
           "issue": 1035,
-          "state": "open",
+          "state": "closed",
           "curated": "low"
         }
       ],
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "task": "X21",
@@ -17101,11 +17101,11 @@
       "owners": [
         {
           "issue": 1035,
-          "state": "open",
+          "state": "closed",
           "curated": "high"
         }
       ],
-      "status": "curated-open"
+      "status": "curated-closed"
     },
     {
       "task": "X23",

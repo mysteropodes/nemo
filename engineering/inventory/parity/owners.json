@@ -1,6 +1,6 @@
 {
   "schema": "nemo.parity-owners/1",
-  "snapshotAt": "2026-10-25",
+  "snapshotAt": "2026-10-30",
   "owners": {
     "D01": [
       {
@@ -37,7 +37,7 @@
     "D07": [
       {
         "issue": 2380,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "D08": [
@@ -49,7 +49,7 @@
     "D12": [
       {
         "issue": 2094,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "D15": [
@@ -73,7 +73,7 @@
     "D19": [
       {
         "issue": 2379,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "D20": [
@@ -113,7 +113,7 @@
       },
       {
         "issue": 2243,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "D26": [
@@ -131,7 +131,7 @@
     "D30": [
       {
         "issue": 2243,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "D31": [
@@ -166,7 +166,7 @@
     ],
     "D34": [
       {
-        "issue": 2377,
+        "issue": 2520,
         "state": "open"
       }
     ],
@@ -182,31 +182,31 @@
     ],
     "D36": [
       {
-        "issue": 2377,
+        "issue": 2521,
         "state": "open"
       }
     ],
     "D37": [
       {
-        "issue": 2377,
+        "issue": 2522,
         "state": "open"
       }
     ],
     "D38": [
       {
-        "issue": 2377,
+        "issue": 2523,
         "state": "open"
       }
     ],
     "D39": [
       {
-        "issue": 2377,
+        "issue": 2524,
         "state": "open"
       }
     ],
     "D40": [
       {
-        "issue": 2377,
+        "issue": 2525,
         "state": "open"
       }
     ],
@@ -245,7 +245,7 @@
     "F05": [
       {
         "issue": 2378,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "F06": [
@@ -409,7 +409,7 @@
       },
       {
         "issue": 2218,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "F17": [
@@ -513,7 +513,7 @@
       },
       {
         "issue": 2206,
-        "state": "open"
+        "state": "closed"
       },
       {
         "issue": 2217,
@@ -553,11 +553,11 @@
       },
       {
         "issue": 2218,
-        "state": "open"
+        "state": "closed"
       },
       {
         "issue": 2230,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "G03b": [
@@ -765,7 +765,7 @@
       },
       {
         "issue": 2222,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "G19": [
@@ -779,7 +779,7 @@
       },
       {
         "issue": 2222,
-        "state": "open"
+        "state": "closed"
       },
       {
         "issue": 2234,
@@ -921,7 +921,7 @@
       },
       {
         "issue": 2219,
-        "state": "open"
+        "state": "closed"
       },
       {
         "issue": 2258,
@@ -943,7 +943,7 @@
       },
       {
         "issue": 2219,
-        "state": "open"
+        "state": "closed"
       },
       {
         "issue": 2258,
@@ -965,7 +965,7 @@
       },
       {
         "issue": 2219,
-        "state": "open"
+        "state": "closed"
       },
       {
         "issue": 2258,
@@ -1005,7 +1005,7 @@
       },
       {
         "issue": 2206,
-        "state": "open"
+        "state": "closed"
       },
       {
         "issue": 2229,
@@ -1039,7 +1039,7 @@
       },
       {
         "issue": 2207,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "G43": [
@@ -1113,7 +1113,7 @@
     "G52": [
       {
         "issue": 2367,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "I01": [
@@ -1201,11 +1201,11 @@
       },
       {
         "issue": 2251,
-        "state": "open"
+        "state": "closed"
       },
       {
         "issue": 2252,
-        "state": "open"
+        "state": "closed"
       },
       {
         "issue": 2255,
@@ -1245,7 +1245,7 @@
       },
       {
         "issue": 2230,
-        "state": "open"
+        "state": "closed"
       },
       {
         "issue": 2231,
@@ -1255,7 +1255,7 @@
     "I16b": [
       {
         "issue": 2207,
-        "state": "open"
+        "state": "closed"
       },
       {
         "issue": 2232,
@@ -1485,7 +1485,7 @@
       },
       {
         "issue": 2219,
-        "state": "open"
+        "state": "closed"
       },
       {
         "issue": 2258,
@@ -1495,7 +1495,7 @@
     "I51": [
       {
         "issue": 2380,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "I52": [
@@ -1507,7 +1507,7 @@
     "U01": [
       {
         "issue": 2369,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "U02": [
@@ -1633,25 +1633,25 @@
     "U31": [
       {
         "issue": 2374,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "U32": [
       {
         "issue": 2374,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "U36": [
       {
         "issue": 2362,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "U37": [
       {
         "issue": 2374,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "U38": [
@@ -1663,7 +1663,7 @@
     "U39": [
       {
         "issue": 2369,
-        "state": "open"
+        "state": "closed"
       }
     ],
     "X19": [
@@ -1698,10 +1698,10 @@
     ]
   },
   "curatedStates": {
-    "1005": "open",
-    "1035": "open",
+    "1005": "closed",
+    "1035": "closed",
     "1049": "open",
-    "1573": "open",
+    "1573": "closed",
     "1577": "closed",
     "1645": "closed",
     "1647": "closed",
@@ -1719,23 +1719,23 @@
     "2088": "closed",
     "2153": "closed",
     "2202": "closed",
-    "2219": "open",
-    "2225": "open",
+    "2219": "closed",
+    "2225": "closed",
     "2234": "closed",
     "2240": "closed",
-    "2244": "open",
+    "2244": "closed",
     "2246": "closed",
     "2248": "open",
     "2255": "open",
     "2256": "open",
     "2267": "open",
     "2272": "closed",
-    "2346": "open",
+    "2346": "closed",
     "2348": "open",
     "2355": "open",
     "2359": "open",
-    "2362": "open",
-    "2364": "open",
+    "2362": "closed",
+    "2364": "closed",
     "2368": "open"
   }
 }
