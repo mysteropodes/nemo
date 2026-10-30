@@ -13,8 +13,8 @@ const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const corpus = JSON.parse(read('tests/native-object-rig-fixtures/public-corpus.json'));
 const schema = JSON.parse(read('engineering/application/native-transport-v2.schema.json'));
 const P = 'command.document.object.';
-const SUFFIXES = ['image.mesh.edit', 'widget.create', 'widget.write', 'widget.settings', 'rig.edit', 'rig.pose', 'labs.speedLines', 'labs.boil', 'labs.followPath', 'labs.referenceFill', 'labs.pingpong', 'labs.retime', 'labs.interval', 'labs.moveToLayer', 'tween.generate', 'tween.regenerate', 'tween.split', 'tween.reassign'];
-const COMMANDS = { 'image.mesh.edit': 'object.image.mesh.edit', 'widget.create': 'object.widget.create', 'widget.write': 'object.widget.write', 'widget.settings': 'object.widget.settings', 'rig.edit': 'object.rig.edit', 'rig.pose': 'object.rig.pose' , 'labs.speedLines': 'object.labs.speedLines', 'labs.boil': 'object.labs.boil', 'labs.followPath': 'object.labs.followPath', 'labs.referenceFill': 'object.labs.referenceFill', 'labs.pingpong': 'object.labs.pingpong', 'labs.retime': 'object.labs.retime', 'labs.interval': 'object.labs.interval', 'labs.moveToLayer': 'object.labs.moveToLayer', 'tween.generate': 'object.tween.generate', 'tween.regenerate': 'object.tween.regenerate', 'tween.split': 'object.tween.split', 'tween.reassign': 'object.tween.reassign' };
+const SUFFIXES = ['image.mesh.edit', 'widget.create', 'widget.write', 'widget.settings', 'rig.edit', 'rig.pose', 'labs.speedLines', 'labs.boil', 'labs.followPath', 'labs.referenceFill', 'labs.pingpong', 'labs.retime', 'labs.interval', 'labs.moveToLayer', 'tween.generate', 'tween.regenerate', 'tween.split', 'tween.reassign', 'property.preset.apply'];
+const COMMANDS = { 'image.mesh.edit': 'object.image.mesh.edit', 'widget.create': 'object.widget.create', 'widget.write': 'object.widget.write', 'widget.settings': 'object.widget.settings', 'rig.edit': 'object.rig.edit', 'rig.pose': 'object.rig.pose' , 'labs.speedLines': 'object.labs.speedLines', 'labs.boil': 'object.labs.boil', 'labs.followPath': 'object.labs.followPath', 'labs.referenceFill': 'object.labs.referenceFill', 'labs.pingpong': 'object.labs.pingpong', 'labs.retime': 'object.labs.retime', 'labs.interval': 'object.labs.interval', 'labs.moveToLayer': 'object.labs.moveToLayer', 'tween.generate': 'object.tween.generate', 'tween.regenerate': 'object.tween.regenerate', 'tween.split': 'object.tween.split', 'tween.reassign': 'object.tween.reassign', 'property.preset.apply': 'object.property.preset.apply' };
 // The original agreement corpus covers the six lane-3 operations; the U36 Labs rows are tests/native-object-labs-public.test.cjs.
 const ORIGINAL = SUFFIXES.slice(0, 6).map((s) => P + s);
 const envelope = (operation, payload, extra) => Object.assign({ apiVersion: 2, requestId: 'edit-1', instanceId: 'instance-A', documentId: 'document-A', expectedRevision: 7, operation, payload }, extra);
@@ -25,7 +25,7 @@ const defOf = (operation) => {
   return branches[0].allOf[1].properties.payload.$ref.replace('#/$defs/', '');
 };
 
-test('the contract admits exactly the eighteen declared operations, all revisioned commands, and nothing else', () => {
+test('the contract admits exactly the nineteen declared operations, all revisioned commands, and nothing else', () => {
   assert.deepEqual(contract.OPERATIONS, SUFFIXES.map((s) => P + s));
   for (const op of contract.OPERATIONS) {
     assert.equal(contract.admitted(op), true); assert.equal(contract.requiresRevision(op), true); assert.equal(seam.admitted(op), true);
@@ -172,11 +172,11 @@ test('the Rust validator data is the same table as the JS contract', () => {
 test('capability descriptors and the closed transport schema declare exactly the contract operations', () => {
   const dir = path.join(ROOT, 'engineering/application/capabilities-v2');
   const ids = new Set(), declared = [];
-  for (const family of ['image-mesh', 'widget', 'rig', 'labs', 'tween']) {
+  for (const family of ['image-mesh', 'widget', 'rig', 'labs', 'tween', 'motion-preset']) {
     const d = JSON.parse(fs.readFileSync(path.join(dir, 'native-object-' + family + '.json'), 'utf8'));
     assert.equal(d.schemaVersion, 2); assert.equal(d.apiVersion, 2); assert.equal(d.id, 'native.object.' + family);
     assert.deepEqual(d.availability, { state: 'available', reason: null });
-    assert.equal(d.authority.adapterOwnsWritableMirror, false); assert.equal(d.authority.fallback, 'none'); assert.equal(d.resourceBoundary.maxRequestBytes, family === 'tween' ? 65536 : 4096);
+    assert.equal(d.authority.adapterOwnsWritableMirror, false); assert.equal(d.authority.fallback, 'none'); assert.equal(d.resourceBoundary.maxRequestBytes, family === 'tween' || family === 'motion-preset' ? 65536 : 4096);
     assert.equal(ids.has(d.id), false); ids.add(d.id);
     assert.equal(d.input.oneOf.length, d.operations.length);
     d.input.oneOf.forEach((entry, i) => assert.equal(entry.$ref, '../native-transport-v2.schema.json#/$defs/' + defOf(d.operations[i])));

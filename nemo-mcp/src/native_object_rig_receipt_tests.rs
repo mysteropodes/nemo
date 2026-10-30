@@ -1,4 +1,4 @@
-use super::tests::{corpus, envelope, LABS, OPERATIONS, P, TWEEN};
+use super::tests::{corpus, envelope, LABS, OPERATIONS, P, PRESET, TWEEN};
 use super::*;
 use crate::contract::{NativeApplicationRequest, NativeApplicationResponse};
 use serde_json::{json, Value};
@@ -9,7 +9,7 @@ fn response(value: Value) -> NativeApplicationResponse {
 
 #[test]
 fn receipts_are_the_compact_command_result_and_a_creation_names_its_minted_layer() {
-    for &suffix in OPERATIONS.iter().chain(&LABS).chain(&TWEEN) {
+    for &suffix in OPERATIONS.iter().chain(&LABS).chain(&TWEEN).chain(&PRESET) {
         let operation = format!("{P}{suffix}");
         if suffix == "widget.create" {
             assert!(result(
@@ -128,9 +128,10 @@ fn the_catalog_declares_each_operation_once_under_five_owner_descriptors() {
         s if s.starts_with("widget.") => "native.object.widget",
         s if s.starts_with("labs.") => "native.object.labs",
         s if s.starts_with("tween.") => "native.object.tween",
+        "property.preset.apply" => "native.object.motion-preset",
         _ => "native.object.rig",
     };
-    for &suffix in OPERATIONS.iter().chain(&LABS).chain(&TWEEN) {
+    for &suffix in OPERATIONS.iter().chain(&LABS).chain(&TWEEN).chain(&PRESET) {
         let operation = format!("{P}{suffix}");
         let descriptor = crate::capabilities::native_catalog()
             .capability_for_operation(&operation)
@@ -141,7 +142,7 @@ fn the_catalog_declares_each_operation_once_under_five_owner_descriptors() {
         assert_eq!(descriptor["availability"]["state"], "available");
         assert_eq!(
             descriptor["resourceBoundary"]["maxRequestBytes"],
-            if suffix.starts_with("tween.") { 65536 } else { 4096 }
+            if suffix.starts_with("tween.") || suffix == "property.preset.apply" { 65536 } else { 4096 }
         );
     }
 }
@@ -151,7 +152,7 @@ fn every_descriptor_example_is_a_valid_request_with_a_correlated_valid_response(
     let mut seen = 0;
     for descriptor in crate::capabilities::native_catalog().descriptors() {
         let id = descriptor["id"].as_str().unwrap();
-        if !["image-mesh", "widget", "rig", "tween"]
+        if !["image-mesh", "widget", "rig", "tween", "motion-preset"]
             .iter()
             .any(|family| id == format!("native.object.{family}"))
         {
@@ -177,7 +178,7 @@ fn every_descriptor_example_is_a_valid_request_with_a_correlated_valid_response(
             seen += 1;
         }
     }
-    assert_eq!(seen, 10, "one copyable example per declared operation");
+    assert_eq!(seen, 11, "one copyable example per declared operation");
 }
 
 #[test]

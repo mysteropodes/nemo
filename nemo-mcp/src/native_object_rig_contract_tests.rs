@@ -31,6 +31,9 @@ pub(super) const TWEEN: [&str; 4] = [
     "tween.reassign",
 ];
 
+/// G39 (#2376): the Motion preset apply shares the table; its own shapes are pinned in the preset tests.
+pub(super) const PRESET: [&str; 1] = ["property.preset.apply"];
+
 pub(super) fn corpus() -> Value {
     serde_json::from_str(CORPUS).expect("the agreement corpus parses")
 }
@@ -43,9 +46,9 @@ pub(super) fn envelope(operation: &str, payload: Value) -> NativeApplicationRequ
 }
 
 #[test]
-fn the_table_declares_exactly_the_eighteen_operations_and_nothing_else() {
-    assert_eq!(table().len(), 18, "an unparsable table admits nothing");
-    for &suffix in OPERATIONS.iter().chain(&LABS).chain(&TWEEN) {
+fn the_table_declares_exactly_the_nineteen_operations_and_nothing_else() {
+    assert_eq!(table().len(), 19, "an unparsable table admits nothing");
+    for &suffix in OPERATIONS.iter().chain(&LABS).chain(&TWEEN).chain(&PRESET) {
         assert!(admitted(&format!("{P}{suffix}")), "{suffix}");
     }
     for other in [
@@ -409,4 +412,27 @@ fn binding_duplicate_members_are_refused_from_original_bytes_at_every_new_object
             "{duplicate}"
         );
     }
+}
+
+/// G39 (#2376): the preset payload is closed; the engine repeats every rule on original bytes.
+#[test]
+fn the_motion_preset_payload_is_closed_and_bounded() {
+    let op = format!("{P}property.preset.apply");
+    let target = json!({"contextId":"scene-root","layerUid":"L"});
+    let ok = |properties: Value| {
+        let request = envelope(
+            &op,
+            json!({"command":"object.property.preset.apply","target":target,"properties":properties}),
+        );
+        crate::native_contract::validate_request(&request.operation, &request.payload)
+    };
+    let key = json!({"frame":0,"v":[1,2],"hold":true,"curvePoints":[{"x":0,"y":0},{"x":1,"y":1,"tx":0.5}],"hIn":[0,0],"hOut":[1,1]});
+    assert!(ok(json!([{"property":"position","keys":[key]},{"property":"opacity","keys":[],"static":[75]}])));
+    assert!(!ok(json!([])), "at least one property");
+    assert!(!ok(json!([{"property":"order","keys":[]}])), "another owner");
+    assert!(!ok(json!([{"property":"position"}])), "keys are required");
+    assert!(!ok(json!([{"property":"position","keys":[{"frame":0,"v":[]}]}])));
+    assert!(!ok(json!([{"property":"position","keys":[{"frame":0,"v":[1],"x":1}]}])));
+    assert!(!ok(json!([{"property":"opacity","keys":[],"static":[1,2,3,4,5]}])));
+    assert!(!ok(json!([{"property":"opacity","keys":[{"frame":0,"v":[1],"lockTo":"up"}]}])));
 }

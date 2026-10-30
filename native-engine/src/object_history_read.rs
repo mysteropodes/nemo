@@ -65,6 +65,7 @@ fn label_for(operation: &str, payload: &Value) -> String {
             Some("object.vector.mask.edit") => "Edit Mask",
             _ => "Edit Shapes",
         },
+        "property.preset.apply" => "Apply Motion Preset",
         "fill.set" => "Set Fill",
         "fill.brush" => "Brush Fill",
         "fill.trace" => "Trace Fill",
