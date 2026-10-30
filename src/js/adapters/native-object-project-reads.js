@@ -235,6 +235,41 @@
       requireCurrent(o);
       return freeze({ info: copyPins(o.info), presentation: o.presentation, items: items });
     }
+    // #2358 D23: the onion / Ghost All ghost frames of one layer around the presented frame: stored vector geometry of each ghost frame,
+    // read in the bounded pages of the one ghosts view. Every page is pinned to the same revision, snapshot and presentation, so a frame
+    // or revision change anywhere in the sequence throws `stale_revision` and nothing partial is returned.
+    const GHOST_KEYS = ['contextId', 'frame', 'layerUid', 'onion', 'ghostAll', 'from', 'to', 'previousOpacity', 'nextOpacity', 'mode'];
+    async function readGhosts(selector, pin) {
+      if (!exact(selector, GHOST_KEYS, ['previousTint', 'nextTint', 'shift']) || selector.contextId !== 'scene-root' || !integer(selector.frame, 0, 4294967295) || !text(selector.layerUid) || !pins(pin))
+        throw fault('invalid_request', 'Ghost selector is invalid', 'local_validation');
+      const o = origin(selector, pin);
+      if (!o) throw fault('unavailable', 'No matching presented native ghost view', 'ghost_view_unavailable');
+      await settle(o);
+      const frames = [];
+      let at = { ghost: 0, cursor: 0 }, pages = 0;
+      for (;;) {
+        if (++pages > 600) throw fault('unavailable', 'Ghost frames exceed the page budget', 'ghost_pages_exceeded');
+        const view = Object.assign({ kind: 'ghosts', workId: o.workId, viewGeneration: o.viewGeneration, ghost: at.ghost, cursor: at.cursor }, selector);
+        const r = await queryBody(o, { atRevision: o.info.contentRevision, documentSnapshotId: o.info.documentSnapshotId, view: view });
+        if (r.ghost !== null) {
+          if (!frames[r.ghost.index]) frames[r.ghost.index] = { frame: r.ghost.frame, kind: r.ghost.kind, opacity: r.ghost.opacity, translation: r.ghost.translation, paths: [] };
+          const paths = frames[r.ghost.index].paths;
+          r.items.forEach((item) => {
+            if (item.from === 0) paths[item.path] = { sourceId: item.sourceId, closed: item.closed, width: item.width, fill: item.fill, stroke: item.stroke, opacity: item.opacity, count: item.count, segments: [] };
+            const path = paths[item.path];
+            if (!path || path.segments.length !== item.from || path.count !== item.count) throw fault('uncorrelated', 'Ghost pieces are out of order', 'ghost_page_order');
+            path.segments = path.segments.concat(item.segments);
+          });
+        }
+        if (r.next === null) break;
+        if (r.next.ghost < at.ghost || (r.next.ghost === at.ghost && r.next.cursor <= at.cursor)) throw fault('uncorrelated', 'Ghost page cursor made no progress', 'ghost_page_stale');
+        at = r.next;
+      }
+      requireCurrent(o);
+      const ok = frames.every((f) => f && f.paths.every((p) => p && p.segments.length === p.count));
+      if (!ok) throw fault('uncorrelated', 'Ghost frames are incomplete', 'ghost_page_incomplete');
+      return freeze({ info: copyPins(o.info), presentation: o.presentation, layerUid: selector.layerUid, frames: frames });
+    }
     async function subselectGeometry(o, stableTarget, intent, paint, hitTest, center) {
       let cursor=0,segments=[],total=null,closed=null,widths=[];
       for(;;){
@@ -380,7 +415,7 @@
       return freeze(runs.map((run) => freeze(run.slice())));
     }
     return Object.freeze({ readLayerTiming: (l, f, p) => readLegacy(l, f, p), readLayerRange: (l, f, p) => readLegacy(l, f, p, 'range'),
-      readLayerPlacement: (l, f, p) => readLegacy(l, f, p, 'placement'), readLayerCells: readLayerCells, readImageMesh: readImageMesh, readWidgets: readWidgets, readRig: readRig, readRigWeights: readRigWeights, readSubselect: readSubselect, readPresentedStrokes: readPresentedStrokes, previewSubselect: previewSubselect });
+      readLayerPlacement: (l, f, p) => readLegacy(l, f, p, 'placement'), readLayerCells: readLayerCells, readImageMesh: readImageMesh, readWidgets: readWidgets, readGhosts: readGhosts, readRig: readRig, readRigWeights: readRigWeights, readSubselect: readSubselect, readPresentedStrokes: readPresentedStrokes, previewSubselect: previewSubselect });
   }
   function boxSegments(b) { return [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]].map((p) => ({ point: p, handleIn: [0, 0], handleOut: [0, 0] })); }
   function expectedCount(kind, m) { return kind === 'outline' ? m.outlineCount : kind === 'verts' ? m.vertexCount : kind === 'tris' ? m.triangleIndexCount : m.vertexCount; }

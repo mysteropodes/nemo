@@ -3236,6 +3236,18 @@
       ]
     },
     {
+      "id": "app.native.object.ghost.ui.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-ghost-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-ghost-ui.js"
+      ]
+    },
+    {
       "id": "app.native.object.rig.ui.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

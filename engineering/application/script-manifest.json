@@ -305,6 +305,7 @@
     {"src":"js/adapters/native-object-image-mesh.js"},
     {"src":"js/adapters/native-object-widget.js"},
     {"src":"js/adapters/native-object-widget-ui.js"},
+    {"src":"js/adapters/native-object-ghost-ui.js"},
     {"src":"js/adapters/native-object-rig-ui.js"},
     {"src":"js/adapters/native-object-rig-weights-ui.js"},
     {"src":"js/adapters/native-object-rig-canvas.js"},

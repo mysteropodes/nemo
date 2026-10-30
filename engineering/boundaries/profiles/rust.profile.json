@@ -226,7 +226,8 @@
       "dir": "native-engine/src",
       "files": [
         "request_receipts.rs",
-        "object_frame_clipboard_transport.rs"
+        "object_frame_clipboard_transport.rs",
+        "object_ghost_facts.rs"
       ],
       "publicApi": [
         "request_receipts.rs"
@@ -911,6 +912,7 @@
         "object_widget_read.rs",
         "object_widget_presentation.rs",
         "object_widget_view.rs",
+        "object_ghost_view.rs",
         "object_rig_presentation.rs",
         "object_rig_view.rs",
         "object_image_mesh_edit_read.rs",
@@ -1925,6 +1927,7 @@
         "object_rig_packet_pose_gpu.rs",
         "object_tween_bitmap.rs",
         "object_tween_ghosts.rs",
+        "object_tween_ghost_view.rs",
         "object_tween_history.rs",
         "object_tween_public_shapes.rs",
         "object_tween_refusals.rs",
@@ -1991,6 +1994,8 @@
         "src/native_image_mesh_read_contract_tests.rs",
         "src/native_widget_read_contract.rs",
         "src/native_widget_read_contract_tests.rs",
+        "src/native_ghost_read_contract.rs",
+        "src/native_ghost_read_contract_tests.rs",
         "src/native_rig_read_contract.rs",
         "src/native_rig_read_contract_tests.rs",
         "src/native_presentation_read_contract_tests.rs",
@@ -2427,6 +2432,7 @@
         "native_import_batch_dispatch_tests.rs",
         "native_subselect_read_public_tests.rs",
         "native_widget_read_public_tests.rs",
+        "native_ghost_read_public_tests.rs",
         "native_rig_read_public_tests.rs"
       ],
       "publicApi": [],
@@ -2444,6 +2450,7 @@
         "native_object_preview.rs",
         "native_object_image_mesh_read.rs",
         "native_object_widget_read.rs",
+        "native_object_ghost_read.rs",
         "native_object_rig_read.rs",
         "native_object_export.rs",
         "native_dispatch_replacement.rs",

@@ -38,6 +38,8 @@ mod image_mesh_read;
 mod subselect_read;
 #[path = "native_object_widget_read.rs"]
 mod widget_read;
+#[path = "native_object_ghost_read.rs"]
+mod ghost_read;
 #[path = "native_object_rig_read.rs"]
 mod rig_read;
 
