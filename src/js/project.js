@@ -662,11 +662,8 @@
 
   // ---- Start screen ----
   function hideStartScreen(){document.getElementById('start-screen').classList.add('hid');}
-  var startScreenView=null;
-  function showStartScreen(){
-    document.getElementById('start-screen').classList.remove('hid');
-    if(startScreenView&&startScreenView.refresh)startScreenView.refresh();
-  }
+  var startScreenView=null; // re-decides the Resume card on every show
+  function showStartScreen(){document.getElementById('start-screen').classList.remove('hid');if(startScreenView)startScreenView.refresh();}
 
   function renderRecents(){
     var snapshot;
