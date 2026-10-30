@@ -33,7 +33,7 @@ function rig(options={}){
   const realStop=scheduler.stop;
   const wrapped=Object.freeze({...scheduler,stop(){r.stopped++;realStop();}});
   const cleanupTimers=[];
-  const cleanup=Cleanup.create({scheduler:wrapped,instanceId:()=>r.noInstance?null:'instance',requestId:k=>'project-'+k+'-'+(++serial),
+  const cleanup=Cleanup.create({scheduler:wrapped,instanceId:()=>r.noInstance?null:'instance',documentId:()=>r.documentId||'document-1',requestId:k=>'project-'+k+'-'+(++serial),
     setTimer:(fn,ms)=>{const t={fn,ms,cleared:false};cleanupTimers.push(t);return t;},clearTimer:t=>{t.cleared=true;},
     invoke:async(command,args)=>{
       assert.equal(command,'nemo_native_object_recovery_discard');
@@ -129,6 +129,29 @@ test('cleanQuit stops the writer, waits for an in-flight write, drops every slot
   const stuck=hang.cleanup.cleanQuit();await turn();
   const timer=hang.cleanupTimers.at(-1);assert.equal(timer.ms,Cleanup.LIMITS.quitMs);timer.fn();
   assert.equal((await stuck).discarded.length,0);hang.discardGate.resolve();
+});
+
+test('cleanQuit drops only the active document slots: a dirty parked tab keeps its recovery',async()=>{
+  const r=rig();
+  r.documentId='document-A';r.slot={path:'/p/a.json',name:'A'};r.rev=2;await r.raw.flush();            // tab A has unsaved edits and a recovery slot
+  const slotA=r.writes[0].slotKey;
+  r.documentId='document-B';r.slot={path:'/p/b.json',name:'B'};r.rev=3;r.advance(60_000);await r.raw.flush(); // switch to tab B, which also published one
+  const slotB=r.writes[1].slotKey;
+  assert.notEqual(slotA,slotB);
+  assert.deepEqual(r.scheduler.claim().sort(),[slotA,slotB].sort());
+  const out=await r.cleanup.cleanQuit();                            // quit with B (clean) active
+  assert.deepEqual(r.discards,[slotB],"only the active document's slot is discarded");
+  assert.deepEqual(out.discarded,[slotB]);
+  assert.deepEqual(r.scheduler.claim(),[slotA],'the parked dirty tab keeps its recovery slot, still owned');
+  assert.equal(r.stopped,1,'the writer is still stopped');
+});
+
+test('cleanQuit with no resolvable active document discards nothing',async()=>{
+  const r=rig();await r.raw.flush();
+  const none=Cleanup.create({scheduler:r.scheduler,instanceId:()=>'instance',documentId:()=>null,requestId:()=>'x',
+    setTimer:()=>1,clearTimer:()=>{},invoke:async()=>assert.fail('no IPC')});
+  assert.deepEqual(await none.cleanQuit(),{discarded:[],failed:[]});
+  assert.equal(r.scheduler.claim().length,1);
 });
 
 test('cleanQuit with nothing written does no IPC and never throws',async()=>{

@@ -12,8 +12,8 @@
   var DISCARD='nemo_native_object_recovery_discard';
   var LIMITS=Object.freeze({discardMs:3000,quitMs:1500});
   var SLOT=/^[a-z0-9-]{1,64}$/;
-  // ports: scheduler{claim,release,quiesce,stop}, instanceId(), invoke(command,args), requestId(kind),
-  //        setTimer(fn,ms), clearTimer(id)
+  // ports: scheduler{claim,release,quiesce,stop}, instanceId(), documentId() (the ACTIVE document), invoke(command,args),
+  //        requestId(kind), setTimer(fn,ms), clearTimer(id)
   function create(ports){
     function bounded(promise,ms){
       return new Promise(function(resolve){
@@ -49,14 +49,19 @@
       })();
       return bounded(work,LIMITS.discardMs).then(function(r){return r.discarded?r:{discarded:[],failed:claimed};});
     }
-    // Clean quit: stop writing, let an in-flight write land, drop the slots of the quitting project. Bounded.
-    function cleanQuit(){
+    // Clean quit: stop writing, let an in-flight write land, drop the slots of the ACTIVE document only. The caller decides
+    // "clean" from the active document's dirty state alone, so every other document the scheduler ever wrote for (a parked tab
+    // that may hold unsaved edits and exists only through its recovery) is deliberately left alone: its recovery is its
+    // only copy. With no resolvable active document nothing is discarded. Bounded.
+    function cleanQuit(documentId){
       try{ports.scheduler.stop();}catch(_){}
-      var claimed=ports.scheduler.claim(),instanceId=ports.instanceId();
+      var active=typeof documentId==='string'?documentId:(typeof ports.documentId==='function'?ports.documentId():null);
+      var instanceId=ports.instanceId();
+      var claimed=typeof active==='string'&&active?ports.scheduler.claim(active):[];
       if(!claimed.length||typeof instanceId!=='string'||!instanceId)return Promise.resolve({discarded:[],failed:[]});
       var work=(async function(){
         await ports.scheduler.quiesce();
-        return discardSlots(null,claimed,instanceId);
+        return discardSlots(active,claimed,instanceId);
       })();
       return bounded(work,LIMITS.quitMs).then(function(r){return r.discarded?r:{discarded:[],failed:claimed};});
     }
@@ -68,6 +73,7 @@
     return create({
       scheduler:ports.scheduler,
       instanceId:function(){var info=session.info();return info&&info.instanceId||null;},
+      documentId:function(){var info=session.info();return info&&info.documentId||null;},
       invoke:function(command,args){return root.__TAURI__.core.invoke(command,args);},
       requestId:function(kind){return session.requestId(kind);},
       setTimer:function(fn,ms){return root.setTimeout(fn,ms);},clearTimer:function(id){root.clearTimeout(id);}
