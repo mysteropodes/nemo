@@ -93,6 +93,12 @@
       sel: [], box: null, angle: 0, ctx: null, matrix: [1, 0, 0, 1, 0, 0], previewed: false };
     var picked = null, pickDone = null;
     var current = (root.selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget; });
+    // The box, handles and ring exist only while the overlay draws them for THIS context: a selection that outlived a frame, layer or tool
+    // change (nothing else clears root.selectedPaths on a native project) has invisible handles, so it is dropped rather than grabbed.
+    if (current.length && !(O && typeof O.selectionContext === 'function' && O.selectionContext(root) === I.pickContext(root))) {
+      root.selectedPaths = []; if (st.selectedStrokeIndices) st.selectedStrokeIndices = []; current = [];
+      if (O) O.show(root);
+    }
     var box = O && current.length ? O.boxOf(root, current) : null, handle = box && hitHandle(box, origin, wpp);
     if (handle) {
       g.kind = handle.type; g.sel = current; g.box = box; g.dir = handle.dir; g.index = handle.index; g.ctx = I.pickContext(root);

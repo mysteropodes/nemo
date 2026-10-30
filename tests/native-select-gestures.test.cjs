@@ -179,6 +179,17 @@ test('a click that does not drag still selects; a press on a handle that does no
   assert.deepEqual(h.batches, []);
 });
 
+test('after the frame changes, pressing where a handle was does not start a transform, drops the stale selection and writes nothing', async () => {
+  const h = harness([quad('A', 20, 20, 120, 120, { filled: false }), FAR]);
+  await h.select(20, 70); assert.deepEqual(h.ids(), ['A']);
+  const session = h.root.NemoNativeObjectProject.desktop(); session.readPresentedObjectSession = () => ({ presentation: { ...session.info(), frame: 1 } });
+  h.root.state.currentFrame = 1; // the frame changed; nothing on a native project clears root.selectedPaths
+  const stale = h.root.selectedPaths;
+  h.press(106, 70); h.drag(100, 100); await settle(); await h.release(100, 100); await settle(); // the rotate ring's spot (36 px from the centre), over the hollow shape
+  assert.deepEqual(h.batches, [], 'no transform was started on the new frame');
+  assert.notEqual(h.root.selectedPaths, stale, 'the stale selection was dropped (the press became a marquee, not a grab of its ring)');
+});
+
 test('bitmap brushes and an unresolved dab have no native transform here: a drag is refused with a notice naming them, and nothing is written', async () => {
   const refused = async (extra, pattern) => { const x = harness([quad('X', 20, 20, 120, 120, extra)]); await x.select(35, 35);
     x.press(35, 35); x.drag(60, 60); await settle(); await x.release(60, 60); await settle();
@@ -373,7 +384,7 @@ test('thirty plain strokes of 400 anchors each move as ONE batch well under the 
   const h = harness(items);
   h.root.selectedPaths = [];
   await h.select(35, 35);
-  h.root.selectedPaths = (await Intent.layerPaths(h.root, () => true, false, 0)).paths;
+  h.root.selectedPaths = (await Intent.layerPaths(h.root, () => true, false, 0)).paths; Overlay.show(h.root);
   h.press(35, 35); h.drag(65, 50); await settle(); await h.release(65, 50); await settle();
   assert.equal(h.toasts.length, 0, h.toasts.join('|'));
   assert.equal(h.batches.length, 1, 'one batch');
