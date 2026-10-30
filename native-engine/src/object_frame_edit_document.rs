@@ -12,8 +12,8 @@
 //! timing, and every stroke id, natural position and authored order (a copy keeps the originals). Locked/shy
 //! policy, markers, in/out points, history and requests belong to callers and later leaves.
 use crate::object_document::{
-    FrameScope, FrameScopeKind, LayerTiming, LayerTimingError, ObjectDocument, ObjectRecord,
-    OrderContext, OrderElement, OrderScope, Presence, TimingEdit,
+    FrameScope, FrameScopeKind, ItemRecords, LayerTiming, LayerTimingError, ObjectDocument,
+    ObjectRecord, ObjectTarget, OrderContext, OrderElement, OrderScope, Presence, TimingEdit,
 };
 use crate::revision::ObjectSnapshot;
 
@@ -53,6 +53,13 @@ impl From<LayerTimingError> for FrameEditError {
 fn scene_authored(record: &ObjectRecord) -> bool {
     record.target.context_id == CONTEXT
         && record.target.frame_scope.kind == FrameScopeKind::Authored
+}
+/// A scene-root authored item (raster image or text block) target of `layer` on a matching frame.
+fn item_cell(target: &ObjectTarget, layer: &str, matches: &dyn Fn(u32) -> bool) -> bool {
+    target.context_id == CONTEXT
+        && target.frame_scope.kind == FrameScopeKind::Authored
+        && target.layer_uid == layer
+        && matches(target.frame_scope.frame)
 }
 fn is_target(targets: &[&str], uid: &str) -> bool {
     targets.iter().any(|target| *target == uid)
@@ -188,6 +195,14 @@ pub(crate) fn drop_cells(
             && record.target.layer_uid == layer
             && matches(record.target.frame_scope.frame))
     });
+    // The items of the cell (raster images, text blocks) are its content as much as the records are.
+    if let Some(items) = document.item_records() {
+        let raster: Vec<_> = items.raster_entries().iter().filter(|e| !item_cell(&e.target, layer, matches)).cloned().collect();
+        let text: Vec<_> = items.text_entries().iter().filter(|e| !item_cell(&e.target, layer, matches)).cloned().collect();
+        if raster.len() != items.raster_entries().len() || text.len() != items.text_entries().len() {
+            document.items = ItemRecords::normalized(raster, text);
+        }
+    }
     for context in scene_contexts(document) {
         for scope in context.scopes.iter_mut() {
             if matches(scope.frame_scope.frame) {
@@ -215,6 +230,19 @@ pub(crate) fn clone_cell(document: &mut ObjectDocument, layer: &str, from: u32, 
         })
         .collect();
     document.objects.extend(copies);
+    // The cell's raster images and text blocks are copied under their own ids, as the records are.
+    if let Some(items) = document.item_records() {
+        let here = |frame: u32| frame == from;
+        let (mut raster, mut text) = (items.raster_entries().to_vec(), items.text_entries().to_vec());
+        let (r_len, t_len) = (raster.len(), text.len());
+        let copied_raster: Vec<_> = raster.iter().filter(|e| item_cell(&e.target, layer, &here)).cloned().map(|mut e| { e.target.frame_scope.frame = to; e }).collect();
+        let copied_text: Vec<_> = text.iter().filter(|e| item_cell(&e.target, layer, &here)).cloned().map(|mut e| { e.target.frame_scope.frame = to; e }).collect();
+        raster.extend(copied_raster);
+        text.extend(copied_text);
+        if raster.len() != r_len || text.len() != t_len {
+            document.items = ItemRecords::normalized(raster, text);
+        }
+    }
     for context in scene_contexts(document) {
         let elements: Vec<OrderElement> = context
             .scopes
