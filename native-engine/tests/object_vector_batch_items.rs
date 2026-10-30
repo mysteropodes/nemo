@@ -284,3 +284,84 @@ fn an_identity_transform_changes_nothing() {
     assert_eq!(r["result"]["applied"], false);
     assert_eq!(owner.history_depths(), (0, 0));
 }
+
+/// `with_items` on a layer whose only key is frame 0, so every later frame is a hold of it.
+fn held(version: u32) -> Value {
+    let mut doc = with_items();
+    if version == 2 {
+        let items = doc["items"].take();
+        doc = document(2, vec![record_at("A", "L1", 0, "s-a")], None);
+        doc["items"] = items;
+        // Each item holds one element of the order plan, above the stroke (natural positions 1 and 2).
+        for (at, id) in ["img", "txt"].iter().enumerate() {
+            doc["compositionOrder"]["contexts"][0]["scopes"][0]["elements"].as_array_mut().unwrap()
+                .push(json!({"layerUid":"L1","strokeId":id,"naturalPosition":at + 1,"order":{}}));
+        }
+    }
+    doc["layers"][0]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+        "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+    doc
+}
+/// Every stored thing of the layer on one frame: vector records, raster entries and text entries, by stroke id.
+fn cell(owner: &NativeObjectHistory, frame: u64) -> Value {
+    let s = state(owner);
+    let at = |list: &Value, key: &str| -> Value {
+        let mut out: Vec<Value> = list.as_array().cloned().unwrap_or_default().into_iter()
+            .filter(|e| e["target"]["frameScope"]["frame"].as_u64() == Some(frame))
+            .map(|e| json!([e["target"]["strokeId"].clone(), e[key].clone()])).collect();
+        out.sort_by_key(Value::to_string);
+        Value::Array(out)
+    };
+    json!({"vector": at(&s["objects"], "geometry"), "raster": at(&s["items"]["raster"], "item"), "text": at(&s["items"]["text"], "block")})
+}
+fn at_frame(id: &str, m: [f64; 6], frame: u32) -> Value {
+    json!({"op":"reshape","stableTarget":target("L1", 0, id),"matrix":m,"frame":frame})
+}
+
+#[test]
+fn a_mixed_transform_on_a_held_frame_moves_only_the_new_key_for_vectors_images_and_text() {
+    for version in [1, 2] {
+        let mut owner = owner_of(&held(version));
+        let (before, all_before) = (state(&owner), (0..24).map(|f| cell(&owner, f)).collect::<Vec<_>>());
+        let m = [1., 0., 0., 1., 4., 2.];
+        let mut payload = batch(vec![at_frame("s-a", m, 4), at_frame("img", m, 4), at_frame("txt", m, 4)]);
+        payload["keyframe"] = json!("copy");
+        let r = send(&mut owner, "held-mixed", payload);
+        assert_eq!(r["ok"], true, "v{version}: {r}");
+        assert_eq!(r["result"]["strokeIds"], json!(["s-a", "img", "txt"]));
+        assert_eq!(owner.history_depths(), (1, 0));
+        let after: Vec<Value> = (0..24).map(|f| cell(&owner, f)).collect();
+        for f in (0..24).filter(|f| *f != 4) {
+            assert_eq!(after[f], all_before[f], "v{version}: frame {f} (the source key and every hold) is untouched");
+        }
+        // The new key at frame 4 holds all three, under the same ids, each moved by the matrix from the source key.
+        let new = &after[4];
+        assert_eq!(new["vector"].as_array().map(Vec::len), Some(1), "v{version}: {new}");
+        assert_eq!(new["raster"][0][0], "img");
+        assert_eq!(new["raster"][0][1]["x"], 104, "{new}");
+        assert_eq!(new["raster"][0][1]["y"], 52);
+        assert_eq!(new["raster"][0][1]["meshId"], "mesh-1");
+        assert_eq!(new["text"][0][0], "txt");
+        assert_eq!(new["text"][0][1]["anchorTopLeft"], json!({"x":14,"y":22}));
+        assert_ne!(new["vector"], all_before[0]["vector"], "the stroke moved on the new key");
+        assert_eq!(state(&owner)["layers"][0]["timing"]["keys"], json!([{"frame":0},{"frame":4}]));
+        owner.undo(owner.content_revision()).unwrap();
+        assert_eq!(state(&owner), before, "v{version}: one undo restores the document exactly");
+    }
+}
+
+#[test]
+fn an_image_alone_on_a_held_frame_keys_that_frame_and_a_batch_without_the_copy_key_is_refused() {
+    let mut owner = owner_of(&held(1));
+    let before = state(&owner);
+    let plain = send(&mut owner, "plain", batch(vec![at_frame("img", [1., 0., 0., 1., 4., 2.], 4)]));
+    assert_eq!(plain["ok"], false, "without the copy key a held cell has no item to edit: {plain}");
+    assert_eq!(state(&owner), before);
+    let mut payload = batch(vec![at_frame("img", [1., 0., 0., 1., 4., 2.], 4)]);
+    payload["keyframe"] = json!("copy");
+    let r = send(&mut owner, "keyed", payload);
+    assert_eq!(r["ok"], true, "{r}");
+    assert_eq!(cell(&owner, 0), json!({"vector": cell(&owner, 0)["vector"].clone(), "raster": [["img", before["items"]["raster"][0]["item"].clone()]],
+        "text": [["txt", before["items"]["text"][0]["block"].clone()]]}), "the source key's image is untouched");
+    assert_eq!(cell(&owner, 4)["raster"][0][1]["x"], 104);
+}

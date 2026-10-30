@@ -17,7 +17,8 @@ use crate::object_document::{ObjectDocument, ObjectTarget};
 use crate::request_receipts::DispatchErrorCode;
 use serde_json::{Map, Number, Value};
 
-/// The edited item and the stored entry it replaces (named by its own target).
+/// The edited item and the stored entry it replaces (named by its own target: the DESTINATION cell, which is the held
+/// cell's new key when a `frame` retargets the step, exactly as a vector record is).
 pub(super) enum ItemSwap {
     Raster(ObjectTarget, RasterItem),
     Text(ObjectTarget, TextBlockRecord),
@@ -38,10 +39,13 @@ fn at(m: &[f64; 6], x: f64, y: f64) -> (f64, f64) {
     (m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5])
 }
 
-/// `Ok(None)` when `target` is not a stored item (a vector record then takes the vector transform).
+/// `Ok(None)` when `target` is not a stored item (a vector record then takes the vector transform). The edit is computed from
+/// the item stored at `target` and lands on the same item in the cell of `frame` (default: `target`'s own), the cell a copy key
+/// has just made of a held frame: the source key and every hold of it are never touched.
 pub(super) fn transform(
     document: &ObjectDocument,
     target: &ObjectTarget,
+    frame: Option<u32>,
     m: [f64; 6],
 ) -> Result<Option<ItemSwap>, DispatchErrorCode> {
     use DispatchErrorCode::{InvalidRequest, Unavailable};
@@ -59,6 +63,8 @@ pub(super) fn transform(
     }
     check_target(document, target)?;
     check_layer(document, target)?;
+    let mut landing = target.clone();
+    landing.frame_scope.frame = frame.unwrap_or(target.frame_scope.frame);
     if let Some(entry) = raster {
         let item = &entry.item;
         let ((cx, cy), (w, h), theta) = (item.center(), item.size(), item.rotation());
@@ -114,7 +120,7 @@ pub(super) fn transform(
         } else {
             redecode(item, &edits)?
         };
-        return Ok(Some(ItemSwap::Raster(target.clone(), edited)));
+        return Ok(Some(ItemSwap::Raster(landing, edited)));
     }
     let block = &text.ok_or(InvalidRequest)?.block;
     let tol = 1e-9 * (m[0].abs() + m[3].abs());
@@ -161,7 +167,7 @@ pub(super) fn transform(
     }
     let edited =
         TextBlockRecord::decode(&Value::Object(members).to_string()).map_err(|_| InvalidRequest)?;
-    Ok(Some(ItemSwap::Text(target.clone(), edited)))
+    Ok(Some(ItemSwap::Text(landing, edited)))
 }
 
 impl ItemSwap {
