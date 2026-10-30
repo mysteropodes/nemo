@@ -133,6 +133,7 @@
     {"src":"js/application/keyboard-arbiter.js"},
     {"src":"js/application/tool-holds.js"},
     {"src":"js/application/tool-rail.js"},
+    {"src":"js/application/shortcut-pane.js"},
     {"src":"js/adapters/settings-preferences-ui.js"},
     {"src":"js/timeline.js"},
     {"src":"js/adapters/i18n-runtime.js"},
