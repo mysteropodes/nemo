@@ -95,7 +95,8 @@ pub(super) fn transform(source: &ObjectDocument, target: &ObjectTarget, m: [f64;
             let (mut ribbon, fill) = ribbon::rebuild(source, existing, moved)?;
             map_gradient(&mut ribbon, &m)?;
             out.push(ribbon);
-            if let Some(fill) = fill {
+            if let Some(mut fill) = fill {
+                map_gradient(&mut fill, &m)?;
                 out.push(fill);
                 fill_done = true;
             }

@@ -125,7 +125,17 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<
     // The receipt lists one stroke id per REQUESTED step; the companions a transform brings are not steps of their own.
     let (mut out, mut companion) = (Vec::with_capacity(ops.len()), Vec::with_capacity(ops.len()));
     let mut swaps: Vec<Option<items::ItemSwap>> = Vec::with_capacity(ops.len());
-    for op in ops {
+    // Where each REQUESTED step starts in the expanded list: a transform becomes several replaces, so a `copy`'s
+    // `fromStep` (an index into the requested steps) is resolved here, before the indices shift.
+    let mut starts: Vec<usize> = Vec::with_capacity(ops.len());
+    for (requested, mut op) in ops.into_iter().enumerate() {
+        starts.push(out.len());
+        if op.op == "copy" {
+            if let Some(from) = op.from_step.value().map(serde_json::Number::as_u64) {
+                let from = from.and_then(|n| usize::try_from(n).ok()).filter(|&n| n < requested).ok_or(InvalidRequest)?;
+                op.from_step = Presence::Present(serde_json::Number::from(starts[from]));
+            }
+        }
         let Some(matrix) = op.matrix.value().copied() else {
             out.push(op);
             companion.push(false);
