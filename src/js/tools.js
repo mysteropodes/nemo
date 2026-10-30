@@ -5499,7 +5499,9 @@ function sampleVectorBrushCenterline(cs,profile){
   var pts=[],widths=[];
   for(var k=0;k<=n;k++){
     var d=len*k/n;
-    var pt=center.getPointAt(d);if(!pt)pt=center.getPointAt(len)||cs[cs.length-1].point;
+    // A tap simplifies to ONE anchor (no curve), where getPointAt is null: fall back to a real Point, never the
+    // anchor's plain [x,y] array, which buildVariableWidthPath cannot measure (pts[i].getDistance is not a function).
+    var pt=center.getPointAt(d);if(!pt)pt=center.getPointAt(len)||new Point(cs[cs.length-1].point);
     pts.push(pt);
     // Prefer the dense raw-pressure profile (arc-length fraction along the
     // CURRENT centerline — a reasonable proxy for "fraction along the
