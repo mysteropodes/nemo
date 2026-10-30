@@ -5590,6 +5590,28 @@ test('L08-K scene-effect join stays private render-scene children with a composi
   }
 });
 
+test('F2 scene-join family parity tests stay private test children of the compositor-layer selector and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const stack = fs.readFileSync(path.join(ROOT, 'native-engine/src/scene_effect_scene_join_stack.rs'), 'utf8');
+  assert.match(stack, /#\[cfg\(all\(test, feature = "application", feature = "project_media_codec"\)\)\]\s*#\[path = "\.\.\/tests\/scene_effect_scene_join_families\.rs"\]\s*mod \w+;/);
+  const families = fs.readFileSync(path.join(ROOT, 'native-engine/tests/scene_effect_scene_join_families.rs'), 'utf8');
+  assert.match(families, /#\[path = "scene_effect_scene_join_families_docs\.rs"\]\s*mod docs;/);
+  assert.doesNotMatch(families + stack, /\buse super::/, 'children import through the absolute module chain');
+  for (const file of [
+    'native-engine/tests/scene_effect_scene_join_families.rs',
+    'native-engine/tests/scene_effect_scene_join_families_docs.rs',
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === 'rust.native.engine.tests');
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, 'tests owner must own ' + file);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, file + ' stays private');
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === 'rust.native.engine.tests').files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      file + ' must fail when unregistered');
+  }
+});
+
 test('L03-R image-mesh binding kernel stays two private image-mesh-family children and fails closed without registration', () => {
   const profile = readJson(ROOT, PROFILE);
   const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
