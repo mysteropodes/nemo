@@ -1070,6 +1070,11 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
    alone wasn't enough (still 24px/clipped when rendered inside this right-
    panel mirror specifically). */
 #motion-props-body .lrow.motion-expr-editor{height:auto;}
+/* Native Motion property panel (adapters/native-motion-property-panel.js): its wrapper elements take no
+   box so the layer-name / Transform header rows and '#motion-props-body .lrow' rules above apply as in baseline. */
+.native-motion-property-panel,.native-motion-property-rows{display:contents;}
+.native-motion-toolbar,.native-motion-status{padding:2px 8px;font-size:10px;color:var(--text-dim);}
+.native-motion-toolbar[hidden],.native-motion-status[hidden]{display:none;}
 .motion-prop-name{display:flex;align-items:center;gap:5px;flex:1;color:var(--text-dim);}
 .motion-prop-name svg{flex-shrink:0;}
 .motion-fields{display:flex;align-items:center;gap:3px;flex-shrink:0;}
