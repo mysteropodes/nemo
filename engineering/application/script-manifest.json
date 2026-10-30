@@ -131,6 +131,7 @@
     {"src":"js/project-document.js"},
     {"src":"js/application/shortcut-registry.js"},
     {"src":"js/adapters/settings-preferences-ui.js"},
+    {"src":"js/application/keyboard-arbiter.js"},
     {"src":"js/timeline.js"},
     {"src":"js/adapters/i18n-runtime.js"},
     {"src":"js/i18n.js"},

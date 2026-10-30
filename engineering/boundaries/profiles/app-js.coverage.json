@@ -853,6 +853,18 @@
       ]
     },
     {
+      "path": "src/js/application/keyboard-arbiter.js",
+      "moduleId": "app.keyboard.arbiter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2442,
+          "scriptOrdinal": 127
+        }
+      ]
+    },
+    {
       "path": "src/js/application/shortcut-targets.js",
       "moduleId": "app.shortcut.targets",
       "executionClass": "document-classic",
