@@ -224,20 +224,42 @@ pub(crate) fn write_manifest(
     Ok(())
 }
 
+/// Marker of a set-aside name: `<base>.corrupt-<unixms>[-<n>]`.
+pub(crate) const CORRUPT_MARK: &str = ".corrupt-";
+
+/// When a set-aside name was quarantined (the unix ms after the marker).
+pub(crate) fn corrupt_stamp(name: &str) -> Option<u64> {
+    let (_, tail) = name.rsplit_once(CORRUPT_MARK)?;
+    tail.split('-').next()?.parse().ok()
+}
+
 pub(crate) fn unique_corrupt(parent: &Path, base: &str, now: u64) -> PathBuf {
-    let mut candidate = parent.join(format!("{base}.corrupt-{now}"));
+    let mut candidate = parent.join(format!("{base}{CORRUPT_MARK}{now}"));
     let mut n = 1;
     while fs::symlink_metadata(&candidate).is_ok() {
-        candidate = parent.join(format!("{base}.corrupt-{now}-{n}"));
+        candidate = parent.join(format!("{base}{CORRUPT_MARK}{now}-{n}"));
         n += 1;
     }
     candidate
 }
 
-/// Never deletes: the whole slot directory keeps its bytes under a name the
-/// list never returns again.
+/// Never deletes at quarantine time: the whole slot directory keeps its bytes
+/// under a name the list never returns again. Retention (`list_slots`) later
+/// evicts set-aside names by age and size, oldest first.
 pub(crate) fn quarantine_slot(root: &Path, slot: &str, now: u64) -> io::Result<()> {
-    fs::rename(root.join(slot), unique_corrupt(root, slot, now))?;
+    quarantine_slot_with(root, slot, now, &mut |from, to| fs::rename(from, to))
+}
+
+/// Moves `from` to `to`; injectable so a failed move is testable.
+pub(crate) type Mover<'a> = &'a mut dyn FnMut(&Path, &Path) -> io::Result<()>;
+
+pub(crate) fn quarantine_slot_with(
+    root: &Path,
+    slot: &str,
+    now: u64,
+    mover: Mover,
+) -> io::Result<()> {
+    mover(&root.join(slot), &unique_corrupt(root, slot, now))?;
     sync_dir(root)
 }
 

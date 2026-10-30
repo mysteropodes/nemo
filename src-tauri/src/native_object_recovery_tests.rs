@@ -460,3 +460,5 @@ fn recovery_lock_hold_at_workload_size() {
 mod failure_tests;
 #[path = "native_object_recovery_list_tests.rs"]
 mod list_tests;
+#[path = "native_object_recovery_corrupt_tests.rs"]
+mod corrupt_tests;

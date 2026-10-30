@@ -127,11 +127,12 @@ fn list_validates_cheaply_and_quarantines_instead_of_deleting() {
         serde_json::to_vec(&edited).unwrap(),
     )
     .unwrap();
-    // Data file without any manifest (killed during a first write).
+    // Data file without any manifest that is not a native project: kept aside.
+    // (A parsing one is adopted instead, see the corrupt-retention tests.)
     fs::create_dir(root.join("slot-orphan")).unwrap();
     fs::write(
         root.join("slot-orphan").join("rec-1-1-0a1b2c3d.json"),
-        project_with("o"),
+        b"{\"format\":\"something-else\"}",
     )
     .unwrap();
     // Only an old temp: nothing worth keeping.

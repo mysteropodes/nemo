@@ -26,7 +26,7 @@ function harness(options = {}) {
     clearTimer: (id) => { const i = timers.findIndex((t) => t.id === id); if (i >= 0) timers.splice(i, 1); },
     pin: () => { if (h.pinThrows) throw new Error('pin failed'); return { active: h.active, info: info(), busy: h.busy, presented: h.presented, reference: h.baseline }; },
     blocked: () => h.blocked, slot: () => h.slot, notice: (m) => h.notices.push(m),
-    requestId: (kind) => 'project-' + kind + '-' + (++serial), hash: () => 'h4sh', randomHex: () => 'deadbeef',
+    requestId: (kind) => 'project-' + kind + '-' + (++serial), hash: options.hash || (() => 'h4sh'),
     supersedes: () => h.supersedes || null,
     write: async (command, request) => {
       assert.equal(command, 'nemo_native_object_recovery_write');
@@ -225,7 +225,7 @@ test('request shape: unique ids, slot key from session tag or path, sanitized na
   const first = h.writes[0].request;
   assert.deepEqual(Object.keys(first).sort(), ['apiVersion', 'atRevision', 'displayName', 'documentDigest', 'documentId',
     'documentSnapshotId', 'instanceId', 'requestId', 'slotKey', 'supersedes']);
-  assert.equal(first.apiVersion, 2); assert.equal(first.slotKey, 'untitled-deadbeef'); assert.equal(first.displayName, 'A  B');
+  assert.equal(first.apiVersion, 2); assert.equal(first.slotKey, 'untitled-h4shh4sh'); assert.equal(first.displayName, 'A  B');
   assert.equal(first.supersedes, 'untitled-cafebabe');
   h.slot = { path: '/home/example/My Project.json', name: 'My Project' };
   h.edit(); await h.advance(30 * S);
@@ -262,7 +262,7 @@ test('bind: invokes the private command with requestJson, held pointer blocks, h
   assert.equal(invoked.length, 1); assert.equal(invoked[0].command, 'nemo_native_object_recovery_write');
   assert.deepEqual(Object.keys(invoked[0].args), ['requestJson']);
   const body = JSON.parse(invoked[0].args.requestJson);
-  assert.equal(body.requestId, 'project-recovery-7'); assert.equal(body.atRevision, 3); assert.match(body.slotKey, /^untitled-[0-9a-f]{8}$/);
+  assert.equal(body.requestId, 'project-recovery-7'); assert.equal(body.atRevision, 3); assert.match(body.slotKey, /^untitled-[a-z0-9]{2,40}$/);
   root.state.playing = true; assert.equal((await scheduler.flush()).why, 'clean', 'recovered digest: nothing more to write');
   assert.equal(Recovery.bind({ __TAURI__: {} }, {}), null);
 });
@@ -279,4 +279,30 @@ test('timeline timer stays a native no-op: its documentJSON path still throws an
   assert.match(timeline, /Timed autosave unavailable/);
   const project = fs.readFileSync('src/js/adapters/native-object-project.js', 'utf8');
   assert.match(project, /persistenceJSON:function\(\)\{throw new Error\('Native project files must be saved through the native file command'\);\}/);
+});
+
+test('untitled slot key is derived from the documentId and survives a session rebuild (#2360 RV3)', async () => {
+  const hash = (s) => { let x = 7; for (const c of s) x = (x * 31 + c.charCodeAt(0)) >>> 0; return x.toString(36); };
+  const h = harness({ rev: 0, hash, documentId: 'doc-a' });
+  h.scheduler.start(); h.edit(); await h.advance(10 * S);
+  const a1 = h.writes[0].request.slotKey;
+  h.documentId = 'doc-b'; h.edit(); await h.advance(10 * S);
+  const b1 = h.writes[1].request.slotKey;
+  h.documentId = 'doc-a'; h.edit(); await h.advance(40 * S);
+  const a2 = h.writes[2].request.slotKey;
+  h.documentId = 'doc-b'; h.edit(); await h.advance(40 * S);
+  const b2 = h.writes[3].request.slotKey;
+  assert.match(a1, /^untitled-[a-z0-9]+$/); assert.notEqual(a1, b1);
+  assert.equal(a2, a1, 'switching away and back keeps the same slot'); assert.equal(b2, b1);
+  assert.deepEqual(h.scheduler.claim('doc-a'), [a1]); assert.deepEqual(h.scheduler.claim('doc-b'), [b1]);
+});
+
+test('supersedes is sent once per document even when the session is rebuilt (#2360 RV3)', async () => {
+  const h = harness({ rev: 0, supersedes: 'untitled-cafebabe', documentId: 'doc-a' });
+  h.scheduler.start(); h.edit(); await h.advance(10 * S);
+  assert.equal(h.writes[0].request.supersedes, 'untitled-cafebabe');
+  h.documentId = 'doc-b'; h.supersedes = null; h.edit(); await h.advance(10 * S);
+  h.documentId = 'doc-a'; h.supersedes = 'untitled-cafebabe'; h.edit(); await h.advance(40 * S);
+  const back = h.writes[h.writes.length - 1].request;
+  assert.equal(back.documentId, 'doc-a'); assert.equal('supersedes' in back, false, 'not re-sent after the rebuild');
 });
