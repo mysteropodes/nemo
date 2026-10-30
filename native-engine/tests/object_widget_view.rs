@@ -347,6 +347,8 @@ fn a_read_changes_nothing_and_undo_moves_the_puck_back() {
     near(&read(&owner)["items"][0]["puck"], &[0., 0.]);
 }
 
+// `from_project_file` exists only with the project media codec (as in every codec-dependent test).
+#[cfg(feature = "project_media_codec")]
 #[test]
 fn only_a_widget_layer_carries_the_project_info_flag_the_layer_menu_reads() {
     // The drawing of a widget owner inside a project file: layer 0 is the widget, a plain drawing layer is added after it.
