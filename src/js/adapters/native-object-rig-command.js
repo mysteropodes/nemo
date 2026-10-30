@@ -19,8 +19,9 @@
     if (typeof session.runFontResource === 'function') return (action) => session.runFontResource(action);
     return null;
   }
-  function create(session, label, contract) {
+  function create(session, label, contract, limit) {
     contract = contract || defaultContract;
+    const maxBytes = Number.isSafeInteger(limit) && limit > 0 ? limit : MAX_REQUEST_BYTES;
     if (!contract) throw new Error('Native object rig contract is unavailable');
     const route = routeOf(session);
 
@@ -104,7 +105,7 @@
         try { contract.payload(operation, payload); } catch (bad) { throw fault('invalid_request', bad.message, { reason: 'local_validation' }); }
         const request = { apiVersion: 2, requestId: session.requestId(label), instanceId: pin.instanceId, documentId: pin.documentId,
           expectedRevision: pin.contentRevision, operation, payload };
-        if (contract.bytes(JSON.stringify(request)) > MAX_REQUEST_BYTES) throw fault('invalid_request', 'Native ' + label + ' request exceeds ' + MAX_REQUEST_BYTES + ' encoded bytes', { reason: 'request_size' });
+        if (contract.bytes(JSON.stringify(request)) > maxBytes) throw fault('invalid_request', 'Native ' + label + ' request exceeds ' + maxBytes + ' encoded bytes', { reason: 'request_size' });
         return settle(ctx, request, key, finish);
       });
     }

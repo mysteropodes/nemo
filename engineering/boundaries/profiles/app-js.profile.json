@@ -3231,6 +3231,30 @@
       ]
     },
     {
+      "id": "app.native.object.tween.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-tween.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-tween.js"
+      ]
+    },
+    {
+      "id": "app.native.object.tween.ui",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-tween-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-tween-ui.js"
+      ]
+    },
+    {
       "id": "app.native.object.item.contract",
       "layer": "domain",
       "dir": "src/js/adapters",
