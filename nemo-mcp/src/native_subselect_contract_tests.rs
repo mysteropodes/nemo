@@ -209,6 +209,21 @@ fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
         item["items"][0]["count"] = json!(0);
         assert!(public_read(&q, &item), "an image or text block is listed too (#2372): {role}");
     }
+    // #2372: a brush's anchor, one of its copies or a bitmap brush says so, with the group they share.
+    for brush in ["anchor", "copy", "bitmap"] {
+        let mut item = r.clone();
+        item["items"][0]["role"] = json!("brush");
+        item["items"][0]["brush"] = json!(brush);
+        item["items"][0]["group"] = json!("g1");
+        assert!(public_read(&q, &item), "{brush}");
+    }
+    for (brush, group) in [(json!("dab"), json!("g1")), (json!("anchor"), json!("")), (json!(null), json!("g1"))] {
+        let mut bad = r.clone();
+        bad["items"][0]["role"] = json!("brush");
+        if !brush.is_null() { bad["items"][0]["brush"] = brush; }
+        bad["items"][0]["group"] = group;
+        assert!(!public_read(&q, &bad), "{bad}");
+    }
     let mut stray = owned.clone();
     stray["items"][0]["role"] = json!("plain");
     assert!(!public_read(&q, &stray), "only a fill has an owner");

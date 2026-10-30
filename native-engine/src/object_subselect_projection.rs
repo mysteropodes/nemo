@@ -84,6 +84,7 @@ impl ObjectCompositionWitness {
             let matrix = *matrices
                 .get(&source.source_object_index())
                 .ok_or("Subselect transform is absent")?;
+            let brush = if hit_test { record::brush_of(r) } else { (None, None) };
             items.push(SubselectReadItem {
                 stable_target: r.target.clone(),
                 closed: if hit_test { r.geometry.closed } else { record::closed(r) },
@@ -108,6 +109,8 @@ impl ObjectCompositionWitness {
                             })
                             .map(|o| o.target.stroke_id.clone())
                     }),
+                brush: brush.0,
+                group: brush.1,
             });
         }
         if items.len() > 1024 {
@@ -194,5 +197,7 @@ fn hit_item(
         role: Some(role),
         filled: Some(true),
         owner: None,
+        brush: None,
+        group: None,
     }
 }
