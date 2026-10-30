@@ -60,12 +60,16 @@ function _histRow(entry,extraCls,frameLabel){
 function renderHistoryPanel(){
   var pop=document.getElementById('history-pop');
   if(!pop)return;
-  pop.innerHTML='';
   if(!_histAllowLegacy()){
+    // A native object project: the entries, cursor and jump come from the native history read (adapters/native-object-history-ui.js).
+    var nativeUi=window.NemoNativeObjectHistoryUI;
+    if(nativeUi&&nativeUi.render(window,pop))return;
+    pop.innerHTML='';
     var unavailable=document.createElement('div');unavailable.className='hist-empty';
     unavailable.setAttribute('role','status');unavailable.textContent='Native history panel is unavailable.';
     pop.appendChild(unavailable);return;
   }
+  pop.innerHTML='';
   var undoStack=state.undoStack||[],undoLabels=state.undoLabels||[];
   var redoStack=state.redoStack||[],redoLabels=state.redoLabels||[];
 
@@ -148,6 +152,7 @@ function toggleHistoryPopover(){
   pop.style.top=(r.bottom+6)+'px';
   pop.style.right=(window.innerWidth-r.right)+'px';
   pop.classList.add('open');
+  if(window.NemoNativeObjectHistoryUI)window.NemoNativeObjectHistoryUI.watch(window,pop);
 }
 function initHistoryPanel(){
   var btn=document.getElementById('history-btn');

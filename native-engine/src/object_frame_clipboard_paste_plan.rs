@@ -11,12 +11,12 @@ use crate::commands::object_fill_owner::object_frame_clipboard_packet::{
 };
 use crate::commands::object_fill_owner::object_frame_clipboard_paste::{
     edit_refusal, layer_position, packet_refusal, paste_cells, CellRef, FrameClipboardOperation,
-    PasteCell, PasteRequest,
+    CellItems, PasteCell, PasteRequest,
 };
 use crate::commands::object_fill_owner::object_frame_clipboard_paste_wire::parse_clipboard_payload;
 use crate::commands::object_fill_owner::object_frame_edit_document::{clear_cells, DocumentEdit};
 use crate::commands::ObjectFillOwner;
-use crate::object_document::{ObjectDocument, Presence};
+use crate::object_document::{item_asset_issue, ObjectDocument, Presence};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 
@@ -31,6 +31,10 @@ pub(crate) fn packet_paste_cells(packet: &FrameClipboardPacket) -> Vec<PasteCell
             rel_frame: cell.rel_frame(),
             keyframe: cell.paste_is_keyframe(),
             records: cell.paste_records().to_vec(),
+            items: CellItems {
+                raster: cell.paste_rasters().to_vec(),
+                text: cell.paste_texts().to_vec(),
+            },
             order_elements: match cell.order_elements() {
                 Presence::Present(elements) => Presence::Present(if cell.paste_is_keyframe() {
                     elements.clone()
@@ -79,7 +83,38 @@ fn paste(
     if request.anchor_frame >= document.total_frames {
         return Err(DispatchErrorCode::InvalidRequest);
     }
-    paste_cells(document, anchor, request.anchor_frame, &request.cells)
+    let edit = paste_cells(document, anchor, request.anchor_frame, &request.cells)?;
+    if let DocumentEdit::Changed(next) = &edit {
+        if request.cells.iter().any(|cell| !cell.items.is_empty()) {
+            check_pasted_items(snapshot, next, &request.cells)?;
+        }
+    }
+    Ok(edit)
+}
+
+/// #2248: pasted raster images and text blocks must still resolve in THIS document: the asset (or font) in the project
+/// inventory and the mesh binding in the image-mesh store. A reference that does not resolve is refused typed
+/// (NotFound for an absent one, InvalidRequest for a wrong kind, Unavailable without an inventory), never dropped.
+fn check_pasted_items(
+    snapshot: &ObjectSnapshot,
+    next: &ObjectDocument,
+    cells: &[PasteCell],
+) -> Result<(), DispatchErrorCode> {
+    use crate::commands::object_fill_owner::item_commands::{asset_code, inventory_of};
+    if let Some(issue) = item_asset_issue(next, inventory_of(snapshot)) {
+        return Err(asset_code(issue));
+    }
+    let meshes = next.image_meshes();
+    let dangling = cells.iter().flat_map(|cell| &cell.items.raster).any(|entry| {
+        entry
+            .item
+            .mesh_id()
+            .is_some_and(|id| !id.is_empty() && meshes.is_none_or(|store| store.get(id).is_none()))
+    });
+    if dangling {
+        return Err(DispatchErrorCode::NotFound);
+    }
+    Ok(())
 }
 
 /// cutFrames: the packet is copied from the pre-edit document, then every selected cell of an UNLOCKED layer becomes

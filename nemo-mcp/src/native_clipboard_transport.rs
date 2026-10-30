@@ -46,7 +46,11 @@ pub(crate) fn data_admitted(cells: &Value) -> bool {
         let Some(records) = cell.get("records").and_then(Value::as_array) else {
             return false;
         };
-        for value in records.iter().chain(cell.get("orderElements")) {
+        let items = ["rasterItems", "textItems"]
+            .iter()
+            .filter_map(|key| cell.get(*key).and_then(Value::as_array))
+            .flatten();
+        for value in records.iter().chain(cell.get("orderElements")).chain(items) {
             let Ok(bytes) = serde_json::to_vec(value) else {
                 return false;
             };

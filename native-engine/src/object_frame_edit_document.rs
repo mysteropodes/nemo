@@ -158,7 +158,7 @@ fn remap_scopes(
     Ok(())
 }
 
-/// Apply a per-layer frame map (`None` drops) to the scene-root authored records and order scopes.
+/// Apply a per-layer frame map (`None` drops) to the scene-root authored records, items and order scopes.
 pub(crate) fn remap(
     document: &mut ObjectDocument,
     map: &dyn Fn(&str, u32) -> Option<u32>,
@@ -178,6 +178,7 @@ pub(crate) fn remap(
             Some(record)
         })
         .collect();
+    remap_items(document, &|layer, frame| map(layer, frame).into_iter().collect());
     for context in scene_contexts(document) {
         remap_scopes(context, map, empty)?;
     }
@@ -471,6 +472,10 @@ pub(crate) fn demote_span(
     finish(next)
 }
 
+// #2248: the raster-image and text-block half of the frame remap, a child to stay under the size ceiling.
+#[path = "object_frame_edit_items.rs"]
+mod object_frame_edit_items;
+use object_frame_edit_items::remap_items;
 // L05-E (lane #2111): the document half of the key retime (moveKeyframe, F10); a child so the scope helpers stay private.
 #[path = "object_exposure_edit_retime_document.rs"]
 mod object_exposure_edit_retime_document;

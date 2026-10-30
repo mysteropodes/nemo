@@ -102,12 +102,16 @@
     if (!Array.isArray(value) || value.length > MAX_LIST) fail('clipboard cells must be bounded');
     var dataBytes = 0;
     value.forEach(function (v) {
-      exact(v, ['relLayer', 'relFrame', 'keyframe', 'records'], ['orderElements'], 'clipboard cell');
+      exact(v, ['relLayer', 'relFrame', 'keyframe', 'records'], ['orderElements', 'rasterItems', 'textItems'], 'clipboard cell');
       u32(v.relLayer, 'relLayer'); u32(v.relFrame, 'relFrame');
       if (typeof v.keyframe !== 'boolean' || !Array.isArray(v.records) || v.records.length > MAX_DATA_ITEMS ||
           !v.records.every(plain)) fail('invalid clipboard records');
       if (has(v, 'orderElements') && (!Array.isArray(v.orderElements) || v.orderElements.length > MAX_DATA_ITEMS ||
           !v.orderElements.every(plain))) fail('invalid clipboard order');
+      ['rasterItems', 'textItems'].forEach(function (key) {
+        if (has(v, key) && (!Array.isArray(v[key]) || v[key].length > MAX_DATA_ITEMS || !v[key].every(plain))) fail('invalid clipboard items');
+        if (has(v, key)) v[key].forEach(function (item) { dataBytes += bytes(item); });
+      });
       v.records.forEach(function (record) { dataBytes += bytes(record); });
       if (has(v, 'orderElements')) dataBytes += bytes(v.orderElements);
       if (dataBytes > DATA_BYTES) fail('clipboard data exceeds native 4MiB bound');
@@ -289,8 +293,8 @@
   // Layer UIDs are opaque authored bytes: a `data:`-prefixed UID is a name, not a resource payload.
   function paths(operation) {
     return admitted(operation) ? { has: function (path) {
-      return OPAQUE_PATH.test(path) || (operation === PREFIX + 'layer.range.drag' && (/^payload\.(?:contextId|activeLayerUid)$/.test(path) || /^payload\.barSelection\.\d+\.layerUid$/.test(path) || /^payload\.selectedKeys\.\d+\.target\.(?:target\.)?(?:contextId|layerUid|strokeId)$/.test(path))) || (operation === PREFIX + 'frames.move' && /^result\.selection\.\d+\.layerUid$/.test(path)) || /^payload\.cells\.\d+\.(?:records\.\d+\.target\.(?:contextId|layerUid|strokeId)|orderElements\.\d+\.(?:layerUid|strokeId))$/.test(path) ||
-        /^result\.clipboard\.cells\.\d+\.(?:records\.\d+\.target\.(?:contextId|layerUid|strokeId)|orderElements\.\d+\.(?:layerUid|strokeId))$/.test(path);
+      return OPAQUE_PATH.test(path) || (operation === PREFIX + 'layer.range.drag' && (/^payload\.(?:contextId|activeLayerUid)$/.test(path) || /^payload\.barSelection\.\d+\.layerUid$/.test(path) || /^payload\.selectedKeys\.\d+\.target\.(?:target\.)?(?:contextId|layerUid|strokeId)$/.test(path))) || (operation === PREFIX + 'frames.move' && /^result\.selection\.\d+\.layerUid$/.test(path)) || /^payload\.cells\.\d+\.(?:records\.\d+\.target\.(?:contextId|layerUid|strokeId)|orderElements\.\d+\.(?:layerUid|strokeId)|(?:rasterItems|textItems)\.\d+\.target\.(?:contextId|layerUid|strokeId))$/.test(path) ||
+        /^result\.clipboard\.cells\.\d+\.(?:records\.\d+\.target\.(?:contextId|layerUid|strokeId)|orderElements\.\d+\.(?:layerUid|strokeId)|(?:rasterItems|textItems)\.\d+\.target\.(?:contextId|layerUid|strokeId))$/.test(path);
     } } : null;
   }
   // The SDK holds one contract object. join() adds these operations to whichever contract it already has (fonts).

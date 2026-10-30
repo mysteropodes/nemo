@@ -254,6 +254,7 @@ pub struct NativeObjectHistory {
     owner: ObjectFillOwner,
     undo: Vec<ObjectHistoryEntry>,
     redo: Vec<ObjectHistoryEntry>,
+    labels: history_read::HistoryLabels,
     receipts: StageReceipts,
 }
 
@@ -391,6 +392,7 @@ impl NativeObjectHistory {
             owner: ObjectFillOwner::from_admitted_project(instance_id, project)?,
             undo: vec![],
             redo: vec![],
+            labels: Default::default(),
             receipts: StageReceipts::default(),
         })
     }
@@ -402,6 +404,7 @@ impl NativeObjectHistory {
             owner: ObjectFillOwner::new(instance_id, document)?,
             undo: vec![],
             redo: vec![],
+            labels: Default::default(),
             receipts: StageReceipts::default(),
         })
     }
@@ -471,25 +474,7 @@ impl NativeObjectHistory {
         expected_revision: u64,
         undo: bool,
     ) -> Result<u64, DispatchErrorCode> {
-        if expected_revision != self.content_revision() {
-            return Err(DispatchErrorCode::StaleRevision);
-        }
-        let source = if undo { &self.undo } else { &self.redo };
-        let entry = source.last().ok_or(DispatchErrorCode::Unavailable)?.clone();
-        let revision = if undo {
-            entry.before_revision
-        } else {
-            entry.after_revision
-        };
-        let restored = self.owner.restore(revision)?;
-        if undo {
-            self.undo.pop();
-            self.redo.push(entry);
-        } else {
-            self.redo.pop();
-            self.undo.push(entry);
-        }
-        Ok(restored)
+        self.move_history_steps(expected_revision, undo, 1)
     }
 }
 

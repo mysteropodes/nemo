@@ -110,7 +110,7 @@ fn clipboard_cells(value: Option<&Value>) -> bool {
                     exact(
                         cell,
                         &["relLayer", "relFrame", "keyframe", "records"],
-                        &["orderElements"],
+                        &["orderElements", "rasterItems", "textItems"],
                     )
                     .is_some_and(|cell| {
                         frame(cell.get("relLayer")).is_some()
@@ -120,6 +120,9 @@ fn clipboard_cells(value: Option<&Value>) -> bool {
                             && cell
                                 .get("orderElements")
                                 .is_none_or(|v| object_list(Some(v)))
+                            && ["rasterItems", "textItems"]
+                                .iter()
+                                .all(|key| cell.get(*key).is_none_or(|v| object_list(Some(v))))
                     })
                 })
         })

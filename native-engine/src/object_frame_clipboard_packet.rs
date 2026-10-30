@@ -12,7 +12,9 @@
 //! nothing, owns every byte it returns (no reference or Arc into the snapshot survives), and
 //! refuses typed before cloning past its cell and byte bounds. Paste, cut, delete and every
 //! history effect belong to the sealed clipboard planner; nothing here is a document writer.
-use crate::object_document::{FrameScopeKind, ObjectRecord, OrderElement, Presence};
+use crate::object_document::{
+    FrameScopeKind, ObjectRecord, ObjectTarget, OrderElement, Presence, RasterEntry, TextEntry,
+};
 use crate::revision::ObjectSnapshot;
 use std::collections::{HashMap, HashSet};
 
@@ -97,6 +99,9 @@ pub(crate) struct PacketCell {
     source_frame: Option<u32>,
     manual_edit: bool,
     records: Vec<ObjectRecord>,
+    /// Raster images and text blocks of the shown source cell (#2248), cloned with their own targets.
+    rasters: Vec<RasterEntry>,
+    texts: Vec<TextEntry>,
     order_elements: Presence<Vec<OrderElement>>,
 }
 impl PacketCell {
@@ -131,6 +136,14 @@ impl PacketCell {
     pub(crate) fn records(&self) -> &[ObjectRecord] {
         &self.records
     }
+    /// Raster images of the shown source cell (same visibility rule as `records`).
+    pub(crate) fn rasters(&self) -> &[RasterEntry] {
+        &self.rasters
+    }
+    /// Text blocks of the shown source cell (same visibility rule as `records`).
+    pub(crate) fn texts(&self) -> &[TextEntry] {
+        &self.texts
+    }
     /// Exact authored order DTOs of the shown source cell; absent only for legacy v1.
     pub(crate) fn order_elements(&self) -> &Presence<Vec<OrderElement>> {
         &self.order_elements
@@ -145,6 +158,22 @@ impl PacketCell {
     pub(crate) fn paste_records(&self) -> &[ObjectRecord] {
         if self.paste_is_keyframe() {
             self.records.as_slice()
+        } else {
+            &[]
+        }
+    }
+    /// Raster images a paste writes; a plain cell pastes none (baseline: a plain cell has no strokes).
+    pub(crate) fn paste_rasters(&self) -> &[RasterEntry] {
+        if self.paste_is_keyframe() {
+            self.rasters.as_slice()
+        } else {
+            &[]
+        }
+    }
+    /// Text blocks a paste writes; a plain cell pastes none.
+    pub(crate) fn paste_texts(&self) -> &[TextEntry] {
+        if self.paste_is_keyframe() {
+            self.texts.as_slice()
         } else {
             &[]
         }
@@ -271,6 +300,12 @@ pub(crate) fn copy_frame_cells(
         }
     }
 
+    let in_cell = |target: &ObjectTarget, layer: &str, frame: Option<u32>| {
+        target.context_id() == CONTEXT
+            && target.scope_kind() == &FrameScopeKind::Authored
+            && target.layer_uid() == layer
+            && Some(target.frame()) == frame
+    };
     let mut cells: Vec<PacketCell> = Vec::with_capacity(resolved.len());
     let mut encoded_bytes = 0usize;
     for &(layer_position, frame) in &resolved {
@@ -281,8 +316,25 @@ pub(crate) fn copy_frame_cells(
             .and_then(|source| by_cell.get(&(layer.layer_uid(), source)))
             .map(Vec::as_slice)
             .unwrap_or(&[]);
+        let rasters: Vec<RasterEntry> = document
+            .item_records()
+            .map(|items| items.raster_entries())
+            .unwrap_or(&[])
+            .iter()
+            .filter(|entry| in_cell(&entry.target, layer.layer_uid(), source_frame))
+            .cloned()
+            .collect();
+        let texts: Vec<TextEntry> = document
+            .item_records()
+            .map(|items| items.text_entries())
+            .unwrap_or(&[])
+            .iter()
+            .filter(|entry| in_cell(&entry.target, layer.layer_uid(), source_frame))
+            .cloned()
+            .collect();
+        let has_items = !rasters.is_empty() || !texts.is_empty();
         let kind = match label {
-            "key" if indices.is_empty() => CellKind::BlankKey,
+            "key" if indices.is_empty() && !has_items => CellKind::BlankKey,
             "key" => CellKind::Key,
             "interpolated" => CellKind::Interpolated,
             "held" => CellKind::Held,
@@ -300,6 +352,17 @@ pub(crate) fn copy_frame_cells(
                 .filter(|total| *total <= max_bytes)
                 .ok_or(E::TooManyBytes)?;
             records.push(record.clone());
+        }
+        for cost in rasters
+            .iter()
+            .map(serde_json::to_vec)
+            .chain(texts.iter().map(serde_json::to_vec))
+        {
+            let cost = cost.map_err(|_| E::RecordUnavailable)?.len();
+            encoded_bytes = encoded_bytes
+                .checked_add(cost)
+                .filter(|total| *total <= max_bytes)
+                .ok_or(E::TooManyBytes)?;
         }
         let order_elements = match &document.composition_order {
             Presence::Missing => Presence::Missing,
@@ -323,9 +386,11 @@ pub(crate) fn copy_frame_cells(
                     .flat_map(|scope| &scope.elements)
                     .filter(|element| element.layer_uid == layer.layer_uid())
                 {
-                    if !records
-                        .iter()
-                        .any(|record| record.target().stroke_id() == element.stroke_id.as_str())
+                    // An order element names a vector record, a raster image or a text block of the cell.
+                    let named = |id: &str| id == element.stroke_id.as_str();
+                    if !records.iter().any(|record| named(record.target().stroke_id()))
+                        && !rasters.iter().any(|entry| named(entry.target.stroke_id()))
+                        && !texts.iter().any(|entry| named(entry.target.stroke_id()))
                     {
                         return Err(E::RecordUnavailable);
                     }
@@ -339,7 +404,7 @@ pub(crate) fn copy_frame_cells(
                         .ok_or(E::TooManyBytes)?;
                     elements.push(element.clone());
                 }
-                if elements.len() != records.len() {
+                if elements.len() != records.len() + rasters.len() + texts.len() {
                     return Err(E::RecordUnavailable);
                 }
                 Presence::Present(elements)
@@ -354,6 +419,8 @@ pub(crate) fn copy_frame_cells(
             source_frame,
             manual_edit,
             records,
+            rasters,
+            texts,
             order_elements,
         });
     }
