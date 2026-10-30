@@ -202,6 +202,27 @@ for(const mode of ['regenerate-force','split-generated','span-easing','selected-
  });
 }
 delete context._curveEditor;
+// D21: editing an endpoint key after generation. The real baseline saveActiveLayerFrame (src/js/app.js) runs on the
+// edited key; the in-betweens must stay untouched and unflagged, and only an explicit regenerate recomputes them.
+const appSource=read('src/js/app.js');
+{
+ const origin=cases.find(c=>c.operation==='generate'&&c.input.name==='move');
+ const generated=copy(origin.expected),options=copy(origin.input.options),span=copy(origin.input.span);
+ const edited=copy(generated[5].strokes);edited[0].segments[0].point[0]+=10;edited[0].segments[0].point[1]+=10;
+ const save=vm.createContext({window:{_tweenFrameDirty:true,_sceneVersion:0},JSON,state:{activeLayerIdx:0,currentFrame:5,layers:[{layerUid:'L0',frames:copy(generated)}]},
+  n20RequireLegacyWrite(){},layerIsEffectivelyVisible:()=>true,layerHasTimeRange:()=>false,_writeBackGhostProxies(){},
+  _collectLayerStrokes:()=>copy(edited),strokesEqual:(x,y)=>JSON.stringify(x)===JSON.stringify(y)});
+ vm.runInContext(appSource.slice(appSource.indexOf('function _maybePromoteInterpolated('),appSource.indexOf('function saveAllLayerFrames(')),save);
+ vm.runInContext('saveActiveLayerFrame()',save);
+ const stay=copy(save.state.layers[0].frames);
+ call('endpoint-edit',{name:'endpoint-edit-move',frames:generated,edited:{frame:5,strokes:edited},options,span},()=>{
+  context._sel={frames:[]};
+  context.state={layers:[{layerUid:'L0',frames:copy(stay)}],activeLayerIdx:0,currentFrame:0,totalFrames:6,resamplePts:options.resamplePoints,tweenStep:options.step,tweenSkipManual:true,motionArcs:{},tweenOverrides:{'L0:0-5':span.overrides}};
+  context.generateTweens();
+  return {stay,regenerated:context.state.layers[0].frames};
+ });
+}
+
 // Pressure generation reuses original centreline interpolation, outline cleanup and per-pair seeded dabs.
 for(const mode of ['pressure-pair','pressure-texture','pressure-mixed','pressure-unmatched','pressure-backdrop-both','pressure-backdrop-a','pressure-backdrop-vanish']) {
  const pressure=(pts,widths,id)=>{
@@ -329,5 +350,5 @@ for(const [name,s] of [
 ]) call('resample',{name,stroke:s,count:8},()=>context.resamplePJS(copy(s),8));
 
 const hash=s=>crypto.createHash('sha256').update(s).digest('hex');
-const provenance={baseline,sourceSha256:hash(source),toolsSha256:hash(toolsSource),uiSha256:hash(uiSource),bitmapSha256:hash(bitmapSource),groupSha256:hash(groupSource),wasmJsSha256:hash(wasmSource),wasmBinarySha256:hash(wasmBytes),paperSha256:hash(read('src/paper-full.min.js'))};
+const provenance={baseline,sourceSha256:hash(source),toolsSha256:hash(toolsSource),uiSha256:hash(uiSource),bitmapSha256:hash(bitmapSource),appSha256:hash(appSource),groupSha256:hash(groupSource),wasmJsSha256:hash(wasmSource),wasmBinarySha256:hash(wasmBytes),paperSha256:hash(read('src/paper-full.min.js'))};
 process.stdout.write(JSON.stringify(provenance).slice(0,-1)+',"cases":[\n'+cases.map(c=>JSON.stringify(c)).join(',\n')+'\n]}\n');
