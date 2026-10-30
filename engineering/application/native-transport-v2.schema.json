@@ -11664,6 +11664,11 @@
             }
           }
         },
+        "rotation": {
+          "type": "number",
+          "minimum": -360,
+          "maximum": 360
+        },
         "fixedWidth": {
           "anyOf": [
             {

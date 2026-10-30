@@ -4,6 +4,10 @@ use super::*;
 fn listing(drawing: &Value) -> Value {
     page(drawing, 0)
 }
+/// The first page of the hit-test listing of `drawing`'s layer (shared with the rotation tests).
+pub(super) fn listing_of(drawing: &Value) -> Value {
+    listing(drawing)
+}
 fn page(drawing: &Value, cursor: u64) -> Value {
     let owner = owner(drawing);
     let snapshot = support::head(&owner);

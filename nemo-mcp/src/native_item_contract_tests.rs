@@ -167,6 +167,9 @@ fn text_blocks_and_patches_are_closed_and_a_patch_never_carries_the_anchor() {
         ("fixedWidth", json!("120")),
         ("bold", json!(1)),
         ("anchorTopLeft", json!({"x":1})),
+        ("rotation", json!("30")),
+        ("rotation", json!(361)),
+        ("rotation", json!(-360.5)),
         ("isText", json!(true)),
         ("textOverflow", json!(false)),
     ] {
@@ -174,12 +177,19 @@ fn text_blocks_and_patches_are_closed_and_a_patch_never_carries_the_anchor() {
         payload["block"][key] = bad.clone();
         assert!(!request(ITEM, &payload), "block {key} {bad}");
     }
+    // #2267: a created block may carry its stored turn (degrees within one turn either way); a patch never does.
+    for turn in [json!(0), json!(30), json!(-360), json!(360), json!(12.5)] {
+        let mut turned = commands()[6].clone();
+        turned["block"]["rotation"] = turn.clone();
+        assert!(request(ITEM, &turned), "rotation {turn}");
+    }
     let mut asset_font = commands()[6].clone();
     asset_font["block"]["font"] = json!({"kind":"asset","assetId":"font-1"});
     assert!(request(ITEM, &asset_font));
     for patch in [
         json!({}),
         json!({"anchorTopLeft":{"x":1,"y":2}}),
+        json!({"rotation":30}),
         json!({"isText":true}),
         json!({"text":""}),
         json!({"size":"9"}),

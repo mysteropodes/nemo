@@ -7,7 +7,8 @@
 //!   display rect, so it follows without being touched.
 //! - a text block's record space is its stored anchor space. Baseline (1065e9d8 select-bridge xform-scale): the anchor
 //!   goes through the affine, the font size scales by the mean axis scale, and the fixed width and the letter / word spacing
-//!   by the horizontal scale. A block has no stored rotation, so a turn, a shear or a mirror is refused.
+//!   by the horizontal scale. #2267: the block also has a stored `rotation` (degrees, about its anchor), so a turn is stored (the
+//!   anchor orbits as the raster centre does) and a shear or a mirror is refused.
 //! Companions are not touched: an item has none.
 use crate::commands::object_fill_owner::item_commands::raster::redecode;
 use crate::commands::object_fill_owner::item_commands::{check_layer, check_target, lists, store};
@@ -123,13 +124,25 @@ pub(super) fn transform(
         return Ok(Some(ItemSwap::Raster(landing, edited)));
     }
     let block = &text.ok_or(InvalidRequest)?.block;
-    let tol = 1e-9 * (m[0].abs() + m[3].abs());
-    if m[1].abs() > tol || m[2].abs() > tol {
+    // The affine is read in the stored (unturned) frame: a turn followed by a scale along the block's own axes. A shear (columns not
+    // orthogonal) or a mirror has no stored form and is refused.
+    let (v1, v2) = ((m[0], m[1]), (m[2], m[3]));
+    let (l1, l2) = (v1.0.hypot(v1.1), v2.0.hypot(v2.1));
+    if (v1.0 * v2.0 + v1.1 * v2.1).abs() > 1e-9 * l1 * l2 {
         return Err(InvalidRequest);
     }
-    if m[0] <= 0.0 || m[3] <= 0.0 {
+    if det < 0.0 {
         return Err(Unavailable);
     }
+    // A pure turn has unit columns up to rounding: that is no scale (it must not nudge the size by 1e-16).
+    let unit = |l: f64| if (l - 1.0).abs() < 1e-9 { 1.0 } else { l };
+    let (l1, l2) = (unit(l1), unit(l2));
+    let identity = m[0] == 1.0 && m[1] == 0.0 && m[2] == 0.0 && m[3] == 1.0;
+    let turn = if identity || m[1].abs() <= 1e-9 * l1 && m[0] > 0.0 {
+        0.0
+    } else {
+        v1.1.atan2(v1.0).to_degrees()
+    };
     let Value::Object(mut members) =
         serde_json::to_value(block).map_err(|_| DispatchErrorCode::Internal)?
     else {
@@ -141,24 +154,49 @@ pub(super) fn transform(
         anchor["x"].as_f64().ok_or(InvalidRequest)?,
         anchor["y"].as_f64().ok_or(InvalidRequest)?,
     );
-    let (nx, ny) = at(&m, ax, ay);
+    let (mx, my) = at(&m, ax, ay);
+    // The stored turn carries the moved anchor about the old anchor (the record space is the unturned frame), so the world gesture's move
+    // lands exactly: with no stored turn this is the plain image of the anchor, as the baseline resize did.
+    let theta = block.rotation();
+    let (nx, ny) = if theta == 0.0 {
+        (mx, my)
+    } else {
+        let (sin, cos) = theta.to_radians().sin_cos();
+        let (dx, dy) = (mx - ax, my - ay);
+        (ax + dx * cos - dy * sin, ay + dx * sin + dy * cos)
+    };
     if (nx, ny) != (ax, ay) {
         members.insert(
             "anchorTopLeft".into(),
             serde_json::json!({"x":num(nx)?,"y":num(ny)?}),
         );
     }
-    if !(m[0] == 1.0 && m[3] == 1.0) {
+    if turn != 0.0 {
+        let mut next = (theta + turn) % 360.0;
+        if next > 180.0 {
+            next -= 360.0;
+        } else if next <= -180.0 {
+            next += 360.0;
+        }
+        // Composed turns carry rounding noise (a half-way back to upright reads -1e-14): keep a nanodegree grid.
+        next = (next * 1e9).round() / 1e9 + 0.0;
+        if next == 0.0 {
+            members.remove("rotation");
+        } else {
+            members.insert("rotation".into(), Value::Number(num(next)?));
+        }
+    }
+    if !(l1 == 1.0 && l2 == 1.0) && !identity {
         let size = read(&members, "size").ok_or(InvalidRequest)?;
         members.insert(
             "size".into(),
-            Value::Number(num((size * (m[0] + m[3]) / 2.0).max(1.0))?),
+            Value::Number(num((size * (l1 + l2) / 2.0).max(1.0))?),
         );
         for (key, k) in [
-            ("fixedWidth", m[0]),
-            ("fixedHeight", m[3]),
-            ("letterSpacing", m[0]),
-            ("wordSpacing", m[0]),
+            ("fixedWidth", l1),
+            ("fixedHeight", l2),
+            ("letterSpacing", l1),
+            ("wordSpacing", l1),
         ] {
             if let Some(v) = read(&members, key) {
                 members.insert(key.into(), Value::Number(num(v * k)?));
