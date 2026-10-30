@@ -127,6 +127,7 @@ fn cell(rel_frame: u32, items: Vec<Item>, ordered: bool) -> Result<PasteCell, Di
         rel_frame,
         keyframe: true,
         records,
+        items: Default::default(),
         order_elements,
     })
 }

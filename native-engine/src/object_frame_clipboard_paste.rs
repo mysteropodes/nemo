@@ -15,8 +15,8 @@ use crate::commands::object_fill_owner::object_frame_edit_document::{
     drop_cells, DocumentEdit, FrameEditError,
 };
 use crate::object_document::{
-    FrameScope, FrameScopeKind, LayerTimingError, ObjectDocument, ObjectRecord, OrderElement,
-    OrderScope, Presence, TimingEdit,
+    FrameScope, FrameScopeKind, ItemRecords, LayerTimingError, ObjectDocument, ObjectRecord,
+    ObjectTarget, OrderElement, OrderScope, Presence, RasterEntry, TextEntry, TimingEdit,
 };
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
@@ -31,6 +31,26 @@ pub(crate) struct CellRef {
     pub(crate) frame: u32,
 }
 
+/// The raster images and text blocks of one clipboard cell (#2248): cell content as much as the records are
+/// (baseline 1065e9d8: a cell is one stroke list). They keep their stroke ids and their asset and mesh references,
+/// so within the document the clipboard was copied from they stay valid; only layer and frame change on paste.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub(crate) struct CellItems {
+    pub(crate) raster: Vec<RasterEntry>,
+    pub(crate) text: Vec<TextEntry>,
+}
+impl CellItems {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.raster.is_empty() && self.text.is_empty()
+    }
+    fn targets(&self) -> impl Iterator<Item = &ObjectTarget> {
+        self.raster
+            .iter()
+            .map(|entry| &entry.target)
+            .chain(self.text.iter().map(|entry| &entry.target))
+    }
+}
+
 /// One clipboard cell in the form a paste writes it (the baseline copy after pasteFrames normalised an in-between
 /// to a full key): offsets from the selection bounds, whether the target becomes a key, and the strokes it holds.
 /// A plain cell (`keyframe: false`) holds none.
@@ -40,6 +60,8 @@ pub(crate) struct PasteCell {
     pub(crate) rel_frame: u32,
     pub(crate) keyframe: bool,
     pub(crate) records: Vec<ObjectRecord>,
+    /// Raster images and text blocks of the cell; empty for a plain cell.
+    pub(crate) items: CellItems,
     /// Missing for v1; v2 requires explicit exact authored order, including empty cells.
     pub(crate) order_elements: Presence<Vec<OrderElement>>,
 }
@@ -118,11 +140,37 @@ pub(crate) fn finish(document: ObjectDocument) -> Result<DocumentEdit, DispatchE
 
 /// The record as a copy at another cell: only the layer and the frame change, never the stroke id.
 fn retarget(record: &mut ObjectRecord, layer: &str, frame: u32) {
-    record.target.layer_uid = layer.to_owned();
-    record.target.frame_scope = FrameScope {
+    retarget_item(&mut record.target, layer, frame);
+}
+fn retarget_item(target: &mut ObjectTarget, layer: &str, frame: u32) {
+    target.layer_uid = layer.to_owned();
+    target.frame_scope = FrameScope {
         kind: FrameScopeKind::Authored,
         frame,
     };
+}
+/// The items the pasted cell would hold at `(layer, frame)`.
+fn moved_items(items: &CellItems, layer: &str, frame: u32) -> CellItems {
+    let mut moved = items.clone();
+    moved.raster.iter_mut().for_each(|e| retarget_item(&mut e.target, layer, frame));
+    moved.text.iter_mut().for_each(|e| retarget_item(&mut e.target, layer, frame));
+    moved
+}
+/// The scene-root authored items the document holds at `(layer, frame)`, in stored order.
+fn held_items(document: &ObjectDocument, layer: &str, frame: u32) -> CellItems {
+    let here = |target: &ObjectTarget| {
+        target.context_id == CONTEXT
+            && target.frame_scope.kind == FrameScopeKind::Authored
+            && target.layer_uid == layer
+            && target.frame_scope.frame == frame
+    };
+    let Some(items) = document.item_records() else {
+        return CellItems::default();
+    };
+    CellItems {
+        raster: items.raster_entries().iter().filter(|e| here(&e.target)).cloned().collect(),
+        text: items.text_entries().iter().filter(|e| here(&e.target)).cloned().collect(),
+    }
 }
 
 /// True when the target cell already is exactly what this paste would write there, so writing it changes nothing.
@@ -180,6 +228,7 @@ fn cell_matches(
         _ => false,
     };
     order_same
+        && held_items(document, &layer.layer_uid, frame) == moved_items(&cell.items, &layer.layer_uid, frame)
         && current.len() == cell.records.len()
         && current.iter().zip(&cell.records).all(|(have, want)| {
             let mut moved = want.clone();
@@ -218,6 +267,16 @@ fn write_cell(
         let mut copy = record.clone();
         retarget(&mut copy, &layer_uid, frame);
         next.objects.push(copy);
+    }
+    if !cell.items.is_empty() {
+        let moved = moved_items(&cell.items, &layer_uid, frame);
+        let (mut raster, mut text) = match next.item_records() {
+            Some(items) => (items.raster_entries().to_vec(), items.text_entries().to_vec()),
+            None => (Vec::new(), Vec::new()),
+        };
+        raster.extend(moved.raster);
+        text.extend(moved.text);
+        next.items = ItemRecords::normalized(raster, text);
     }
     if let (Presence::Present(plan), Presence::Present(elements)) =
         (&mut next.composition_order, &cell.order_elements)
@@ -283,15 +342,18 @@ pub(crate) fn paste_cells(
             (2, Presence::Present(elements)) => {
                 let mut ids = HashSet::new();
                 let mut positions = HashSet::new();
-                elements.len() == cell.records.len()
+                elements.len() == cell.records.len() + cell.items.raster.len() + cell.items.text.len()
                     && elements.iter().all(|element| {
                         ids.insert(element.stroke_id.as_str())
                             && positions.insert(element.natural_position)
                             && (element.natural_position as usize) < elements.len()
-                            && cell.records.iter().any(|record| {
+                            && (cell.records.iter().any(|record| {
                                 record.target.layer_uid == element.layer_uid
                                     && record.target.stroke_id == element.stroke_id
-                            })
+                            }) || cell.items.targets().any(|target| {
+                                target.layer_uid == element.layer_uid
+                                    && target.stroke_id == element.stroke_id
+                            }))
                     })
             }
             _ => false,
@@ -299,7 +361,10 @@ pub(crate) fn paste_cells(
         let well_formed = ordered
             && seen.insert((cell.rel_layer, cell.rel_frame))
             && cell.records.iter().all(scene_authored)
-            && (cell.keyframe || cell.records.is_empty());
+            && cell.items.targets().all(|target| {
+                target.context_id == CONTEXT && target.frame_scope.kind == FrameScopeKind::Authored
+            })
+            && (cell.keyframe || (cell.records.is_empty() && cell.items.is_empty()));
         if !well_formed {
             return Err(DispatchErrorCode::InvalidRequest);
         }

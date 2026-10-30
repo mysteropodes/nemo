@@ -231,6 +231,20 @@ test('F7 success always checkpoints once, including an already blank key; no-op 
 });
 
 
+test('clipboard cells admit raster and text items strictly (#2248)', () => {
+  const op=P+'frames.clipboard.paste';
+  const cell={relLayer:0,relFrame:0,keyframe:true,records:[],rasterItems:[{target:{contextId:'scene-root',layerUid:'a',strokeId:'i',frameScope:{kind:'authored',frame:0}},item:{assetId:'img-1'}}],textItems:[]};
+  const payload=function(c){return {command:'object.frames.clipboard.paste',instanceId:'instance-A',documentId:'document-A',layerUid:'L0',frame:0,cells:[c]};};
+  assert.doesNotThrow(()=>SDK.validateRequest(request(op,payload(cell))));
+  for(const field of ['rasterItems','textItems']){
+    for(const bad of [null,{},[null],[[]],['x']])
+      assert.throws(()=>SDK.validateRequest(request(op,payload(Object.assign({},cell,{[field]:bad})))),TypeError,field);
+  }
+  assert.throws(()=>SDK.validateRequest(request(op,payload(Object.assign({},cell,{items:[]})))),TypeError);
+  const big=Object.assign({},cell,{textItems:[{block:{text:'x'.repeat(Contract.DATA_BYTES)}}]});
+  assert.throws(()=>SDK.validateRequest(request(op,payload(big))),/4MiB/);
+});
+
 test('clipboard shells preserve native ownership, records/order presence and every fixed message bound', async () => {
   for(const kind of ['copy','cut']){
     const op=P+'frames.clipboard.'+kind,q=request(op,Contract.example(op));
