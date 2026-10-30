@@ -19,44 +19,6 @@ fn history_payload_matcher_refuses_legacy_and_foreign_operations() {
     }
 }
 
-#[test]
-fn history_payload_admits_only_a_positive_safe_integer_steps_member() {
-    let op = "command.document.object.undo";
-    assert!(history_request(
-        op,
-        &json!({"command":"object.undo","steps":3})
-    ));
-    assert!(history_request(
-        op,
-        &json!({"command":"object.undo","steps":9007199254740991u64})
-    ));
-    for steps in [
-        json!(0),
-        json!(-1),
-        json!(1.5),
-        json!("2"),
-        json!(null),
-        json!(9007199254740992u64),
-    ] {
-        assert!(!history_request(
-            op,
-            &json!({"command":"object.undo","steps":steps})
-        ));
-    }
-    assert!(!history_request(
-        op,
-        &json!({"command":"object.undo","count":2})
-    ));
-    assert!(!history_request(
-        op,
-        &json!({"command":"object.redo","steps":1})
-    ));
-    assert!(history_request(
-        "command.document.object.redo",
-        &json!({"command":"object.redo","steps":2})
-    ));
-}
-
 fn cases() -> Value {
     serde_json::from_str(include_str!(
         "../../engineering/application/examples/native-object-v1/cases.json"

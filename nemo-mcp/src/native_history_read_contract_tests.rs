@@ -279,3 +279,41 @@ fn a_page_answers_its_own_request_offset_and_limit() {
         "more entries than the requested limit"
     );
 }
+
+#[test]
+fn history_payload_admits_only_a_positive_safe_integer_steps_member() {
+    let op = "command.document.object.undo";
+    assert!(crate::native_contract::object::history_request(
+        op,
+        &json!({"command":"object.undo","steps":3})
+    ));
+    assert!(crate::native_contract::object::history_request(
+        op,
+        &json!({"command":"object.undo","steps":9007199254740991u64})
+    ));
+    for steps in [
+        json!(0),
+        json!(-1),
+        json!(1.5),
+        json!("2"),
+        json!(null),
+        json!(9007199254740992u64),
+    ] {
+        assert!(!crate::native_contract::object::history_request(
+            op,
+            &json!({"command":"object.undo","steps":steps})
+        ));
+    }
+    assert!(!crate::native_contract::object::history_request(
+        op,
+        &json!({"command":"object.undo","count":2})
+    ));
+    assert!(!crate::native_contract::object::history_request(
+        op,
+        &json!({"command":"object.redo","steps":1})
+    ));
+    assert!(crate::native_contract::object::history_request(
+        "command.document.object.redo",
+        &json!({"command":"object.redo","steps":2})
+    ));
+}

@@ -1,0 +1,40 @@
+test at scripts/nemo/boundaries-application.test.cjs:194:1
+✖ N20 contract, authority, adapters and bootstrap load in their frozen order (2.72275ms)
+  AssertionError [ERR_ASSERTION]: N20 chain: adjacent within a run
+  
+  263 !== 262
+  
+      at assertRuns (/private/tmp/claude-501/-Users-ivg-github-nemo/2944655e-0fd3-469e-8011-1bdf28e69ad4/scratchpad/wt-fix2/scripts/nemo/boundaries-application.test.cjs:188:43)
+      at TestContext.<anonymous> (/private/tmp/claude-501/-Users-ivg-github-nemo/2944655e-0fd3-469e-8011-1bdf28e69ad4/scratchpad/wt-fix2/scripts/nemo/boundaries-application.test.cjs:258:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 263,
+    expected: 262,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/nemo-mcp-boundaries.test.cjs:17:1
+✖ all MCP transport and desktop-host Rust modules have actual size enforcement without legacy waivers (58.041708ms)
+  AssertionError [ERR_ASSERTION]: [{"rule":"size","module":"mcp.transport","file":"nemo-mcp/src/native_object_contract_tests.rs","line":null,"message":"536 nonblank lines exceeds hard maximum 500 for profile \"Rust production module\"","detail":{"lines":536,"hardMax":500}}]
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/private/tmp/claude-501/-Users-ivg-github-nemo/2944655e-0fd3-469e-8011-1bdf28e69ad4/scratchpad/wt-fix2/tests/nemo-mcp-boundaries.test.cjs:38:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
