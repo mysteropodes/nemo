@@ -51,6 +51,8 @@
     colorHexLabel.appendChild(colorHex);if(pop&&colorParent){colorParent.style.flexWrap='wrap';colorParent.appendChild(colorHexLabel);}
     var savedFonts=font?Array.from(font.children):[],savedFontValue=font&&font.value,events=[];
     function on(n,name,fn,capture){if(!n)return;n.addEventListener(name,fn,!!capture);events.push([n,name,fn,!!capture]);}
+    // Non-focusable popover chrome (padding, labels) gives blur relatedTarget=null: track where the last pointerdown landed instead.
+    var popDown=false;on(doc,'pointerdown',function(e){popDown=!!(pop&&e.target&&pop.contains(e.target));},true);
     function ownsUI(){return !b.retired&&bindings.get(root)===b;}
     function notify(message){if(ownsUI())status.textContent=message;}
     // Baseline look (1065e9d8 text drag rect): dashed orange outline, faint fill; pure presentation, never a document item.
@@ -119,7 +121,7 @@
           Object.assign(area.style,{width:d.placement.fixedWidth+'px',height:(hPx/ky)+'px',fontSize:d.block.size+'px',transformOrigin:'0 0',transform:'matrix('+[sx*m[0],sy*m[1],sx*m[2],sy*m[3],0,0].join(',')+')'});
         }
         area.addEventListener('input',function(){dirty.add('text');input.value=area.value;});area.addEventListener('keydown',key);
-        area.addEventListener('blur',function(e){if(!e.relatedTarget||!pop.contains(e.relatedTarget))commit();});doc.body.appendChild(area);area.focus();
+        area.addEventListener('blur',function(e){var inPop=popDown||(e.relatedTarget&&pop.contains(e.relatedTarget));popDown=false;if(!inPop)commit();});doc.body.appendChild(area);area.focus();
       }else input.focus();
       var ticket=++fontTicket;fillFonts([],d,ticket);
       var resources=b.ports.fontResources&&b.ports.fontResources();
