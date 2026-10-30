@@ -149,7 +149,7 @@
       translate:function(key){return root.SM&&typeof root.SM.t==='function'?root.SM.t(key):key;},
       get editPropertyTrack(){return typeof ui.editPropertyTrack==='function'?function(payload,pin,current){return editProperty(payload,pin,current,true);}:undefined;},
       get editProperty(){return typeof ui.editProperty==='function'?editProperty:undefined;},
-      selectTarget:selectTarget,labelTarget:labelTarget,labelProperty:options.labelProperty,readPreference:options.readPreference,writePreference:options.writePreference});
+      selectTarget:selectTarget,labelTarget:labelTarget,labelProperty:options.labelProperty,dimLabels:options.dimLabels,readPreference:options.readPreference,writePreference:options.writePreference});
     async function update(force){var ticket=++updateSerial,base=baseScope();if(base&&!base.explicit&&!cacheMatches(base)&&uniqueContextAllowed())showWait('Loading properties…',true);
       if(base)await resolveContext(base,!!force);if(retired||ticket!==updateSerial||options.isCurrent&&options.isCurrent()!==true)return false;clearWait();return caller.update(force);}
     function cancel(){var wasPending=!!pending;updateSerial++;resolveSerial++;pending=null;clearWait();var stopped=caller.cancel();if(wasPending&&!retired)showWait('Property read cancelled.',false);return wasPending||stopped;}

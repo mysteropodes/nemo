@@ -14,11 +14,16 @@
         !Number.isInteger(descriptor.dimension)||descriptor.dimension<1||descriptor.dimension>4||
         !ports||!ports.document||typeof ports.readContext!=='function'||typeof ports.readProperty!=='function')throw TypeError('Native property value ports are unavailable');
     var doc=ports.document,serial=0,retired=false,accepted=null,busy=false,inputs=[],actions=[],bindings=[];
-    var element=make('div',''),fields=make('div',''),status=make('span',''),toolbar=make('div','');
-    element.className='native-motion-property-value';element.setAttribute('aria-label',descriptor.property+' value');
-    fields.className='motion-fields';status.setAttribute('role','status');toolbar.setAttribute('role','toolbar');
-    if(descriptor.authored&&descriptor.authored.expressionEnabled)element.appendChild(make('span','Base value before expression'));
-    element.appendChild(fields);element.appendChild(toolbar);element.appendChild(status);container.appendChild(element);
+    var element=make('div',''),fields=element,status=make('span',''),toolbar=make('div',''),unit=unitText(descriptor.unit),dims=dimLabels();
+    element.className='native-motion-property-value motion-fields';element.setAttribute('aria-label',descriptor.property+' value');
+    status.setAttribute('role','status');status.className='native-motion-property-status';toolbar.setAttribute('role','toolbar');toolbar.className='native-motion-property-actions';toolbar.hidden=true;
+    if(descriptor.authored&&descriptor.authored.expressionEnabled){var note=make('span','Base value before expression');note.className='native-motion-sr-only';element.appendChild(note);}
+    container.appendChild(element);
+    function unitText(u){return u==='deg'?'\u00b0':typeof u==='string'?u:'';}
+    function dimLabels(){var named;try{named=ports.dimLabels?ports.dimLabels(descriptor.property):null;}catch(_){named=null;}
+      if(Array.isArray(named)&&named.length===descriptor.dimension&&named.every(function(x){return typeof x==='string'&&x;}))return named.slice();
+      return descriptor.dimension===2?['X','Y']:null;}
+    function say(message){status.textContent=message;status.className=/^(Property edit refused|Native property|Enter finite)/.test(message)?'native-motion-property-status':'native-motion-property-status native-motion-sr-only';}
     function make(tag,label){var n=doc.createElement(tag);n.textContent=label;return n;}
     function listen(node,type,fn){node.addEventListener(type,fn);bindings.push([node,type,fn]);}
     function mounted(){return !retired&&element.parentNode===container&&(!('isConnected'in container)||container.isConnected);}
@@ -26,10 +31,10 @@
     function ownerCurrent(value,ticket){try{var context=ports.readContext(),pin=context&&context.pin;return mounted()&&ticket===serial&&View.captureContext(context)&&value.frame===context.frame&&['instanceId','documentId','lifecycleGeneration'].every(function(k){return pin[k]===value.token.pin[k];});}catch(_){return false;}}
     function controls(){
       var enabled=!!accepted&&!busy&&current(accepted,serial)&&typeof ports.editProperty==='function';
-      inputs.forEach(function(n){n.disabled=!enabled;n.readOnly=!enabled;});
+      inputs.forEach(function(n){n.disabled=!enabled;n.readOnly=!enabled;n.title=typeof ports.editProperty==='function'?'':'Read-only';});
       actions.forEach(function(item){item.node.disabled=!enabled||item.animation&&descriptor.animatable!==true;});
     }
-    function clear(message){serial++;accepted=null;busy=false;inputs.forEach(function(n){n.value='';});status.textContent=message;controls();return false;}
+    function clear(message){serial++;accepted=null;busy=false;inputs.forEach(function(n){n.value='';});say(message);controls();return false;}
     function values(){return inputs.map(function(input){var text=String(input.value);if(!text.trim()||!Number.isFinite(Number(text)))throw Error('Enter finite numeric values.');return Number(text);});}
     function receipt(value){return exact(value,['applied','historyEntriesAdded'])&&typeof value.applied==='boolean'&&value.historyEntriesAdded===(value.applied?1:0);}
     async function apply(kind,animated){
@@ -39,9 +44,9 @@
       if(kind!=='setValue'&&descriptor.animatable!==true)return false;
       var action={kind:kind,frame:value.frame};
       try{if(kind==='setValue'||kind==='setKey')action.values=values();else if(kind==='setAnimated')action.animated=animated;}
-      catch(error){status.textContent=error.message;return false;}
+      catch(error){say(error.message);return false;}
       var payload=frozen({command:'object.property.edit',target:JSON.parse(JSON.stringify(target)),property:descriptor.property,action:action});
-      busy=true;controls();status.textContent='Waiting for native property edit…';
+      busy=true;controls();say('Waiting for native property edit…');
       try{
         // Binding fences the actual session, frame and selection at queue entry.
         // Do not demand a presented session while that same queue is busy.
@@ -56,10 +61,13 @@
       }catch(error){if(ticket!==serial||!mounted())return false;return clear('Property edit refused: '+String(error&&error.message||error));}
     }
     for(var i=0;i<descriptor.dimension;i++){
-      var input=make('input','');input.type='number';input.step='any';input.className='motion-val';
+      if(dims){var dl=make('span',dims[i]);dl.className='motion-dim-label';fields.appendChild(dl);}
+      var input=make('input','');input.type='number';input.step='1';input.className='pi scrub motion-val';input.dataset.step='1';
       input.setAttribute('aria-label',descriptor.property+' component '+(i+1));
       listen(input,'change',function(){return apply('setValue');});fields.appendChild(input);inputs.push(input);
     }
+    if(unit){var ut=make('span',unit);ut.className='motion-unit';fields.appendChild(ut);}
+    fields.appendChild(toolbar);fields.appendChild(status);
     function button(label,kind,animated){var node=make('button',label);node.type='button';listen(node,'click',function(){return apply(kind,animated);});toolbar.appendChild(node);actions.push({node:node,animation:true});}
     button('Add key','setKey');button('Remove key','removeKey');button('Enable animation','setAnimated',true);button('Disable animation','setAnimated',false);
     async function refresh(){
@@ -79,7 +87,7 @@
             result.kind!=='rawSample'||result.property!==descriptor.property||result.frame!==value.frame||result.dimension!==descriptor.dimension||
             !Array.isArray(result.value)||result.value.length!==descriptor.dimension||!Array.from(result.value).every(Number.isFinite))throw Error('Native property read is uncorrelated or malformed.');
         accepted=value;inputs.forEach(function(input,i){input.value=String(result.value[i]);});
-        status.textContent=typeof ports.editProperty==='function'?'':'Native value is read-only.';controls();return true;
+        say('');controls();return true;
       }catch(error){if(ticket!==serial||!mounted())return false;return clear('Native property value unavailable: '+String(error&&error.message||error));}
     }
     controls();
