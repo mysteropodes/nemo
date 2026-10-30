@@ -75,7 +75,7 @@ test('every property row carries a stopwatch diamond and the sidebar has no Add 
  const rows=h.rows(),counts=rows.map(row=>tree(row).filter(n=>/\bmotion-stopwatch\b/.test(n.className||'')).length);assert.ok(rows.length>0);assert.ok(counts.every(c=>c<=1));assert.ok(counts.filter(c=>c===1).length>=1);
  assert.doesNotMatch(body.map(n=>n.textContent).join('\n'),/Add key|Remove key|Enable animation|Disable animation/);assert.equal(body.filter(n=>/native-motion-property-actions/.test(n.className||'')).length,0);h.retire();});
 test('repeated frame paints retain controls, focus and one header listener',async()=>{const h=host();h.paint();await h.settle();const pick=h.stopwatch(),before=h.calls.length;await pick.focus();h.root.state.currentFrame=10;h.paint();await h.settle();assert.equal(h.calls.length,before);assert.equal(h.doc.activeElement,pick);assert.equal(h.header.listeners.get('contextmenu').length,1);h.retire();assert.equal(h.header.listeners.get('contextmenu').length,0);});
-test('document capture routes P Shift R and U with no legacy bubble shortcut',async()=>{const h=host();let legacy=0;h.doc.addEventListener('keydown',()=>legacy++);h.paint();await h.settle();await h.doc.body.fire('keydown',{key:'p'});await h.settle();assert.equal(h.rows().length,1);assert.equal(h.rows()[0].dataset.property,'position');await h.doc.body.fire('keydown',{key:'r',shiftKey:true});await h.settle();assert.deepEqual([...new Set(h.rows().map(r=>r.dataset.property))],['position','rotation']);await h.doc.body.fire('keydown',{key:'u'});await h.settle();assert.match(h.status(),/^Partial reveal:/);assert.equal(legacy,0);assert.equal(tree(h.nodes['motion-props-body']).filter(n=>n.className==='native-motion-unavailable-group').length,4);h.retire();});
+test('document capture routes P Shift R and U with no legacy bubble shortcut',async()=>{const h=host();let legacy=0;h.doc.addEventListener('keydown',()=>legacy++);h.paint();await h.settle();await h.doc.body.fire('keydown',{key:'p'});await h.settle();assert.equal(h.rows().length,1);assert.equal(h.rows()[0].dataset.property,'position');await h.doc.body.fire('keydown',{key:'r',shiftKey:true});await h.settle();assert.deepEqual([...new Set(h.rows().map(r=>r.dataset.property))],['position','rotation']);await h.doc.body.fire('keydown',{key:'u'});await h.settle();assert.equal(h.status(),'');assert.equal(legacy,0);assert.equal(tree(h.nodes['motion-props-body']).filter(n=>n.className==='native-motion-unavailable-group').length,4);h.retire();});
 test('header filter dispatch uses ordinary preference and refuses unsupported facts',async()=>{const h=host();h.paint();await h.settle();await h.header.fire('contextmenu');assert.equal(h.menus.length,1);h.menus[0].find(i=>i.label==='expressions').action();await h.settle();assert.equal(h.rows().length,1);assert.equal(h.rows()[0].dataset.property,'xc_number');assert.equal(h.storage['nemo-motion-filter'],'expressions');h.menus[0].find(i=>i.label==='errors').action();await h.settle();assert.equal(h.rows().length,0);assert.equal(h.status(),'This Motion filter is unavailable.');h.retire();});
 test('layer selection uses confirmed native UID and invalidates stale selected controls',async()=>{const h=host();h.paint();await h.settle();h.ports.selectLayer(1,false,'L1',h.ports.currentSession().info());h.paint();await h.settle();assert.equal(h.root.state.activeLayerIdx,1);assert.deepEqual(h.root._layerSel,[1]);assert.ok(h.calls.some(c=>c.payload.view.target?.layerUid==='L1'));const old=h.stopwatch(),count=h.calls.length;h.root._layerSel=[0];h.root.state.activeLayerIdx=0;h.paint();await h.settle();const after=h.calls.length;await old.fire('click',{altKey:true});assert.equal(h.calls.length,after);assert.ok(after>count);h.retire();});
 test('editable/modified keys retain their normal route and no search input is rendered',async()=>{const h=host();h.paint();await h.settle();assert.equal(tree(h.nodes['motion-props-body']).filter(n=>n.attrs.type==='search'||n.type==='search').length,0);const search=tree(h.nodes['motion-props-body']).find(n=>n.tagName==='INPUT');assert.ok(search);const count=h.rows().length;let e=await search.fire('keydown',{key:'p'});assert.equal(e.defaultPrevented,false);e=await h.doc.body.fire('keydown',{key:'p',metaKey:true});assert.equal(e.defaultPrevented,false);h.retire();});
@@ -377,13 +377,13 @@ function directPanel(options={}){
  const pin={instanceId:'ms1-instance',documentId:'ms1-document',lifecycleGeneration:1,contentRevision:0,documentSnapshotId:'ms1-snapshot'};
  const layer={contextId:'scene-root',layerUid:'L0'},shape={...layer,strokeId:'native-stroke:1:0'},text={...layer,strokeId:'native-text:6:0'},image={...layer,strokeId:'native-raster:7:0'};
  const context=()=>({pin,frame:3,viewGeneration:1,presented:{...pin,available:true,presentation:{...pin,owner:'native',status:'presented',frame:3}}});
- const row=name=>{const r=clone(fixture.propertyPageOracle.find(x=>x.property===name));return r;},categories=clone(fixture.cases.find(c=>c.expectedResult).expectedResult.unavailableCategories);
+ const row=name=>{const found=fixture.propertyPageOracle.find(x=>x.property===name),r=clone(found||fixture.propertyPageOracle.find(x=>x.property==='opacity'));r.property=name;return r;},categories=clone(fixture.cases.find(c=>c.expectedResult).expectedResult.unavailableCategories);
  const state={selected:options.selected||[shape,text,image]},translations=options.translations||{hdrTransform:'Transform',hdrTransformElement:'Transform (element)',noLayerSelected:'No layer selected'};
  const calls=[];let gate=null;
  const panel=Panel.create(container,{document:doc,readContext:context,readSelection:()=>state.selected[0]||null,readSelections:()=>state.selected,readContextId:()=>layer.contextId,
   translate:k=>translations[k]||k,labelTarget:t=>t.strokeId===undefined?'My Layer':null,
   async query(q){calls.push(q.view);if(gate)await gate.promise;const targets=[{kind:'context',contextId:layer.contextId},{kind:'layer',target:layer},{kind:'element',target:shape},{kind:'element',target:text},{kind:'element',target:image}];
-   return {instanceId:q.instanceId,documentId:q.documentId,atRevision:q.atRevision,documentSnapshotId:q.documentSnapshotId,kind:q.view.kind,target:q.view.kind==='targets'?null:q.view.target,items:q.view.kind==='targets'?targets:[row('position'),row('opacity')],nextOffset:null,unavailableCategories:categories};},
+   return {instanceId:q.instanceId,documentId:q.documentId,atRevision:q.atRevision,documentSnapshotId:q.documentSnapshotId,kind:q.view.kind,target:q.view.kind==='targets'?null:q.view.target,items:q.view.kind==='targets'?targets:(options.rows||['position','opacity']).map(row),nextOffset:null,unavailableCategories:categories};},
   readProperty:undefined});
  return {Panel,panel,doc,container,state,layer,shape,text,image,hold(){let release;gate={promise:new Promise(r=>release=r)};return ()=>{gate=null;release();};},calls,body:()=>tree(container)};
 }
@@ -416,7 +416,24 @@ test('hidden search, filters and reveal keys keep their object and keyboard rout
  for(const [key,property] of [['p','position'],['a','anchor'],['r','rotation'],['s','scale'],['t','opacity']]){await d.container.fire('keydown',{key});await tick();await tick();}
  assert.equal(d.panel.setFilter('modified'),true);assert.equal(d.panel.setFilter('bogus'),false);
  await d.container.fire('keydown',{key:'u'});await tick();await tick();
- assert.match(d.body().find(n=>n.attrs.role==='status').textContent,/^Partial reveal:/);
+ assert.equal(d.body().find(n=>n.attrs.role==='status').hidden,true,'U reveal carries its limits in the footer, not a status banner');
+ d.panel.dispose();
+});
+test('unavailable families stay silent in the default view and appear once as a dim footer under U',async()=>{
+ const d=directPanel({selected:[directPanel().layer]});assert.equal(await d.panel.refresh(true),true);
+ const footers=()=>d.body().filter(n=>n.className&&String(n.className).includes('native-motion-unavailable-groups')),status=()=>d.body().find(n=>n.attrs.role==='status');
+ assert.equal(footers().length,0);assert.equal(d.body().filter(n=>n.className==='native-motion-unavailable-group').length,0);
+ assert.equal(status().hidden,true);assert.equal(status().textContent,'');
+ await d.container.fire('keydown',{key:'u'});await tick();await tick();
+ assert.equal(footers().length,1);assert.match(footers()[0].className,/lrow motion-group-row/);
+ assert.deepEqual(d.body().filter(n=>n.className==='native-motion-unavailable-group').map(n=>n.dataset.family),['discreteTiming','textAnimators','conditionalGeometry','folderAncestors']);
+ assert.equal(status().hidden,true);
+ await d.container.fire('keydown',{key:'u'});await tick();await tick();assert.equal(footers().length,0);
+ d.panel.dispose();
+});
+test('property rows follow the baseline propsFor order regardless of native page order',async()=>{
+ const d=directPanel({selected:[directPanel().layer],rows:['opacity','anchor','position']});assert.equal(await d.panel.refresh(true),true);
+ assert.deepEqual(d.body().filter(n=>n.className==='lrow motion-prop-row').map(n=>n.dataset.property),['position','anchor','opacity']);
  d.panel.dispose();
 });
 test('Cancel is visible only while the native read is in flight and cancelling clears the read',async()=>{

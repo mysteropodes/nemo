@@ -10,6 +10,8 @@
 }(typeof globalThis==='object'?globalThis:this,function(View,Keys,Value){
   'use strict';
   var shortcuts={p:'position',a:'anchor',r:'rotation',s:'scale',t:'opacity'};
+  // Baseline propsFor() order (motion.js PROPS / PROPS_WITH_3D); anything else keeps its native order after these.
+  var baselineOrder=['position','positionZ','anchor','rotation','rotationX','rotationY','scale','opacity','order'];
   var modes=['all','animated','modified','expressions','errors','effects','mattes'];
   function key(t){return JSON.stringify([t.contextId,t.layerUid,t.strokeId===undefined?null:t.strokeId]);}
   function create(container,ports){
@@ -175,20 +177,21 @@
         if(contentOnly){result=View.filterRow(row,'modified');if(!result.available){unknown=true;return;}if(!result.matches)return;}
         var name=row.controlName||(ports.labelProperty&&ports.labelProperty(row.property))||row.property;
         if(!search||String(name).toLowerCase().indexOf(search)>=0||String(labelTarget(group.target,accepted.token)).toLowerCase().indexOf(search)>=0)rows.push({row:row,label:name});
-      });return {rows:rows,unknown:unknown};
+      });
+      var rank=function(entry){var at=baselineOrder.indexOf(entry.row.property);return at<0?baselineOrder.length:at;};
+      rows=rows.map(function(entry,i){return {entry:entry,i:i};}).sort(function(a,b){return rank(a.entry)-rank(b.entry)||a.i-b.i;}).map(function(item){return item.entry;});
+      return {rows:rows,unknown:unknown};
     }
-    // This ABI does not expose the owners required for complete baseline U.
-    // Missing categories are not a positive capability declaration.
+    // This ABI does not expose the owners required for complete baseline U. Missing categories are not a positive
+    // capability declaration, so they surface only under the explicit U reveal, once, as one dim group-row footer;
+    // the default view degrades silently (rows the ABI marks unavailable are simply omitted).
     function appendRevealLimits(fragment){
       if(!contentOnly||collapsed)return false;
-      var block=make('div','');block.className='native-motion-unavailable-groups';block.setAttribute('role','note');block.dataset.completeness='partial';
-      [['discreteTiming','Parent, blend and time remapping','Keyed owner facts are unavailable.'],
-       ['textAnimators','Text animators','Keyed animator identities are unavailable.'],
-       ['conditionalGeometry','Conditional and geometry properties','Required property kinds and prerequisites are unavailable.'],
-       ['folderAncestors','Folder reveal','Folder identity and expansion are unavailable.']].forEach(function(entry){
-        var line=make('div',entry[1]+': '+entry[2]);line.className='native-motion-unavailable-group';line.dataset.family=entry[0];block.appendChild(line);
+      var footer=make('div','');footer.className='lrow motion-group-row native-motion-unavailable-groups';footer.setAttribute('role','note');footer.dataset.completeness='partial';
+      [['discreteTiming','Parent, blend and time remapping'],['textAnimators','Text animators'],['conditionalGeometry','Conditional and geometry properties'],['folderAncestors','Folder reveal']].forEach(function(entry){
+        var item=make('span',entry[1]);item.className='native-motion-unavailable-group';item.dataset.family=entry[0];footer.appendChild(item);
       });
-      fragment.appendChild(block);return true;
+      fragment.appendChild(footer);return true;
     }
     async function readExpressionState(item,token,ticket,signature,frame,flight){
       await readExpressionStateCore(item,token,ticket,signature,frame,flight);
@@ -313,7 +316,7 @@
       rowBindings.forEach(function(pair){pair[0].removeEventListener(pair[2]||'click',pair[1]);});rowBindings=nextBindings;clearValues();body.replaceChildren(fragment);rowIndex=nextRows;replaceDrawers();
       nextValues.forEach(function(item){var editor=Value.create(item.container,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,dimLabels:ports.dimLabels,translate:ports.translate,get editProperty(){return item.row.property==='order'?null:ports.editProperty;},openKeys:item.openKeys},item.target,item.row);valueEditors.push(editor);Promise.resolve(editor.refresh()).catch(function(){editor.cancel();});});
       expressionRows=nextExpressions;refreshExpressionStates();
-      notify(collapsed?'':contentOnly&&unknown?'Partial reveal: some property groups are unavailable.':unknown?'Some property filters are unavailable.':'');return true;
+      notify('');return true;
     }
     function paint(){try{return paintRows();}catch(_){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}}
     function setFilter(value){if(retired||!modes.includes(value))return false;mode=value;savePreference();return paint();}
