@@ -239,56 +239,68 @@ fn replacement_identity_replays_pending_and_fenced_without_second_preflight() {
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
 
-#[test]
-fn replacement_capacity_denies_new_ids_without_eviction_or_generation_change() {
-    let mut authority = installed_pump();
-    for ordinal in 0..replacement::MAX_RETAINED_REPLACEMENTS {
-        let request_id = format!("replace-{ordinal}");
-        let ReplacementAdmission::Execute(generation) = authority
-            .admit_replace_request(
-                &request_id,
-                b"same-body",
-                "pump-fixture",
-                "document-fixture",
-                0,
-                |_| Ok(()),
-            )
-            .unwrap()
-        else {
-            panic!("within-capacity request must execute")
-        };
-        let (_, progress) = authority.replacing_mut(generation).unwrap();
-        for stage in [
-            &mut progress.callback,
-            &mut progress.core,
-            &mut progress.preview,
-            &mut progress.resources,
-            &mut progress.viewport,
-        ] {
-            *stage = ReplacementStage::Complete;
-        }
-        authority.activate_replace(generation).unwrap();
-        authority.record_replace_success(generation, serde_json::json!({"requestId":request_id}));
-    }
-    let current = authority.active_generation().unwrap();
-    assert!(authority
+fn complete_replacement(authority: &mut NativeAuthority, request_id: &str) -> u64 {
+    let ReplacementAdmission::Execute(generation) = authority
         .admit_replace_request(
-            "overflow",
+            request_id,
             b"same-body",
             "pump-fixture",
             "document-fixture",
             0,
-            |_| panic!("capacity failure cannot preflight")
+            |_| Ok(()),
         )
-        .unwrap_err()
-        .contains("capacity exhausted"));
-    assert_eq!(authority.active_generation().unwrap(), current);
+        .unwrap()
+    else {
+        panic!("{request_id} must execute")
+    };
+    let (_, progress) = authority.replacing_mut(generation).unwrap();
+    for stage in [
+        &mut progress.callback,
+        &mut progress.core,
+        &mut progress.preview,
+        &mut progress.resources,
+        &mut progress.viewport,
+    ] {
+        *stage = ReplacementStage::Complete;
+    }
+    authority.activate_replace(generation).unwrap();
+    authority.record_replace_success(generation, serde_json::json!({"requestId":request_id}));
+    generation
+}
+
+#[test]
+fn replacement_capacity_retires_superseded_receipts_so_it_never_blocks_a_user() {
+    let mut authority = installed_pump();
+    let total = replacement::MAX_RETAINED_REPLACEMENTS * 3 + 1;
+    let mut last = 0;
+    for ordinal in 0..total {
+        last = complete_replacement(&mut authority, &format!("replace-{ordinal}"));
+    }
+    assert_eq!(authority.active_generation().unwrap(), last);
+    // A recent request still replays its receipt.
     assert!(matches!(
         authority
-            .lookup_replace_replay("replace-0", b"same-body")
+            .lookup_replace_replay(&format!("replace-{}", total - 1), b"same-body")
             .unwrap(),
         Some(ReplacementReplay::Succeeded(_))
     ));
+    // A retired one replays Expired, never re-executing, whatever body the retry carries.
+    for body in [&b"same-body"[..], b"other-body"] {
+        let ReplacementAdmission::Replay(ReplacementReplay::Expired) = authority
+            .admit_replace_request(
+                "replace-0",
+                body,
+                "pump-fixture",
+                "document-fixture",
+                0,
+                |_| panic!("a retired request cannot preflight or re-execute"),
+            )
+            .unwrap()
+        else {
+            panic!("a retired request must replay Expired")
+        };
+    }
+    assert_eq!(authority.active_generation().unwrap(), last);
 }
 
 #[test]
@@ -367,4 +379,91 @@ fn release_and_reentry_expire_old_success_without_reexecuting_its_id() {
         Ok(ReplacementAdmission::Replay(ReplacementReplay::Expired))
     ));
     assert_eq!(authority.active_generation().unwrap(), new_generation);
+}
+
+fn seed_replacement(
+    authority: &mut NativeAuthority,
+    id: &str,
+    generation: u64,
+    outcome: ReplacementReplay,
+) {
+    authority.retained_replacements.insert(
+        id.into(),
+        replacement::ReplacementRecord {
+            generation,
+            fingerprint: b"body".to_vec(),
+            outcome,
+            tombstone: false,
+        },
+    );
+}
+
+fn admit_new(authority: &mut NativeAuthority, id: &str) -> Result<ReplacementAdmission, String> {
+    authority.admit_replace_request(id, b"body", "pump-fixture", "document-fixture", 0, |_| {
+        Ok(())
+    })
+}
+
+#[test]
+fn pending_and_current_generation_receipts_are_never_evicted() {
+    let mut authority = installed_pump();
+    authority.generation = 50;
+    for ordinal in 0..replacement::MAX_RETAINED_REPLACEMENTS as u64 {
+        let pending = ReplacementReplay::Pending(replacement::ReplacementProgress::default());
+        seed_replacement(&mut authority, &format!("p{ordinal}"), ordinal + 1, pending);
+    }
+    // All pending: capacity is exhausted and nothing changes.
+    assert!(admit_new(&mut authority, "new")
+        .unwrap_err()
+        .contains("capacity exhausted"));
+    assert_eq!(
+        authority.retained_replacements.len(),
+        replacement::MAX_RETAINED_REPLACEMENTS
+    );
+    // A settled receipt of the current generation is not superseded either.
+    seed_replacement(&mut authority, "p3", 50, ReplacementReplay::Expired);
+    assert!(admit_new(&mut authority, "new")
+        .unwrap_err()
+        .contains("capacity exhausted"));
+    // A settled superseded one is retired; every pending record survives.
+    seed_replacement(&mut authority, "p7", 8, ReplacementReplay::Expired);
+    assert!(matches!(
+        admit_new(&mut authority, "new"),
+        Ok(ReplacementAdmission::Execute(_))
+    ));
+    assert!(authority.retained_replacements["p7"].tombstone);
+    let pending = authority
+        .retained_replacements
+        .values()
+        .filter(|record| matches!(record.outcome, ReplacementReplay::Pending(_)))
+        .count();
+    assert_eq!(pending, replacement::MAX_RETAINED_REPLACEMENTS - 2 + 1);
+}
+
+#[test]
+fn tombstones_are_bounded_and_the_oldest_are_forgotten_first() {
+    let mut authority = installed_pump();
+    authority.generation = 10_000;
+    for ordinal in 0..(replacement::MAX_REPLACEMENT_TOMBSTONES + 5) as u64 {
+        seed_replacement(
+            &mut authority,
+            &format!("t{ordinal}"),
+            ordinal + 1,
+            ReplacementReplay::Expired,
+        );
+        authority
+            .retained_replacements
+            .get_mut(&format!("t{ordinal}"))
+            .unwrap()
+            .tombstone = true;
+    }
+    authority.retire_for_capacity();
+    let kept = authority
+        .retained_replacements
+        .values()
+        .filter(|r| r.tombstone)
+        .count();
+    assert_eq!(kept, replacement::MAX_REPLACEMENT_TOMBSTONES);
+    assert!(!authority.retained_replacements.contains_key("t0"));
+    assert!(authority.retained_replacements.contains_key("t260"));
 }
