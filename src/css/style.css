@@ -1028,6 +1028,9 @@ body.mode-motion #btn-tween-curves{display:none;}
 .motion-stopwatch{color:var(--text-dark);cursor:pointer;}
 .motion-stopwatch:hover{background:var(--panel3);color:var(--text);}
 .motion-stopwatch.on{color:var(--accent);}
+.motion-stopwatch.disabled{opacity:.4;cursor:default;}
+.motion-stopwatch.disabled:hover{background:transparent;color:var(--text-dark);}
+.motion-stopwatch.on.disabled:hover{color:var(--accent);}
 /* ƒx expression toggle (2026-07) — sits right after the stopwatch, same
    hollow/on visual language: neutral when no expression, accent when one is
    enabled, red when it's enabled but currently throwing (lastError set),
@@ -1076,7 +1079,6 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
 .native-motion-toolbar,.native-motion-status{padding:2px 8px;font-size:10px;color:var(--text-dim);}
 .native-motion-toolbar[hidden],.native-motion-status[hidden]{display:none;}
 .native-motion-property-slot{display:contents;}
-.native-motion-property-actions[hidden]{display:none;}
 .native-motion-property-status{font-size:9px;color:var(--danger,#ff6b6b);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .native-motion-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
 .motion-prop-name{display:flex;align-items:center;gap:5px;flex:1;color:var(--text-dim);}

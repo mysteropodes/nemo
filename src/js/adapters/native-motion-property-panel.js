@@ -280,7 +280,7 @@
       if(appendRevealLimits(fragment))unknown=true;
       if(!validAccepted()){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}
       rowBindings.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});rowBindings=nextBindings;clearValues();body.replaceChildren(fragment);
-      nextValues.forEach(function(item){var editor=Value.create(item.container,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,dimLabels:ports.dimLabels,get editProperty(){return item.row.property==='order'?null:ports.editProperty;}},item.target,item.row);valueEditors.push(editor);Promise.resolve(editor.refresh()).catch(function(){editor.cancel();});});
+      nextValues.forEach(function(item){var editor=Value.create(item.container,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,dimLabels:ports.dimLabels,translate:ports.translate,get editProperty(){return item.row.property==='order'?null:ports.editProperty;}},item.target,item.row);valueEditors.push(editor);Promise.resolve(editor.refresh()).catch(function(){editor.cancel();});});
       expressionRows=nextExpressions;refreshExpressionStates();
       notify(collapsed?'':contentOnly&&unknown?'Partial reveal: some property groups are unavailable.':unknown?'Some property filters are unavailable.':'');return true;
     }
