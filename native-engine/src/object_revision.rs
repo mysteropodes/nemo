@@ -124,6 +124,13 @@ impl ObjectSnapshot {
             value: Arc::new(value),
         })
     }
+    /// Identity of the shared immutable revision value: every `acquire` of one revision names the same
+    /// allocation, and the weak handle keeps that allocation from being reused while a cache holds it.
+    pub(crate) fn revision_identity(&self) -> std::sync::Weak<dyn std::any::Any + Send + Sync> {
+        let strong: Arc<ProjectRevisionValue> = Arc::clone(&self.value);
+        let strong: Arc<dyn std::any::Any + Send + Sync> = strong;
+        Arc::downgrade(&strong)
+    }
     pub fn instance_id(&self) -> &str {
         &self.instance_id
     }

@@ -124,3 +124,12 @@ test('a refused, uncorrelated or failed transport answer is a typed error, never
   const error = await code(down.reads.readGhosts(SELECTOR, PIN));
   assert.deepEqual([error.code, error.reason], ['unavailable', 'native_read_transport']);
 });
+
+test('the page budget follows the reported totals: a read of more than 600 pages completes, and each frame is one whole path', async () => {
+  const many = Array.from({ length: 30 }, (_, i) => ({ frame: i, kind: i < 15 ? 'previous' : 'next', opacity: 0.3, translation: [0, 0], paths: [5000] }));
+  const f = fixture({ ghosts: many, piece: 100 });
+  const read = await f.reads.readGhosts(SELECTOR, PIN);
+  assert.ok(f.sent.length > 600, 'more pages than the old fixed cap of 600: ' + f.sent.length);
+  assert.equal(f.sent.length, 30 * 50);
+  assert.deepEqual(read.frames.map((g) => g.paths[0].segments.length), many.map(() => 5000));
+});

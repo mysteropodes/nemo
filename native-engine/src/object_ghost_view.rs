@@ -10,6 +10,8 @@ use crate::request_receipts::{
     ResponseEnvelope, APPLICATION_API_VERSION,
 };
 use serde_json::{json, Map, Value};
+use std::any::Any;
+use std::sync::{Arc, Mutex, Weak};
 
 const REQUIRED: [&str; 15] = [
     "kind",
@@ -34,6 +36,66 @@ const MAX_SEGMENTS: u64 = 262_144;
 const MAX_GHOSTS: u64 = 4_096;
 /// Segments tried for a first page; the page shrinks until the whole response fits the byte limit.
 const FIRST_TRY: usize = 160;
+
+/// The drawable paths of the ghost frames a read pages through. Every page is its own request, and the frame geometry
+/// (stored paths, combine booleans) is the same for all of them, so it is built once per (revision, selector, frame).
+type Drawable = Arc<Vec<GhostPathFacts>>;
+struct Memo {
+    revision: Weak<dyn Any + Send + Sync>,
+    selector: Vec<u8>,
+    ghost: usize,
+    paths: Drawable,
+}
+/// Recency-ordered and bounded by weight (segments plus a fixed cost per entry, ~50 MB of paths at most), so one big
+/// frame never starves the others and a read is not evicted by unrelated small ones. A dead revision is dropped on the
+/// next access.
+const MEMO_WEIGHT: usize = 1_000_000;
+fn weight(paths: &[GhostPathFacts]) -> usize {
+    64 + paths.iter().map(|p| p.segments.len() + 1).sum::<usize>()
+}
+static MEMOS: Mutex<Vec<Memo>> = Mutex::new(Vec::new());
+
+impl ObjectSnapshot {
+    fn memo_paths(
+        &self,
+        selector: &[u8],
+        ghost: usize,
+        build: impl FnOnce() -> Result<Vec<GhostPathFacts>, DispatchErrorCode>,
+    ) -> Result<Drawable, DispatchErrorCode> {
+        let revision = self.revision_identity();
+        let hit = MEMOS.lock().ok().and_then(|mut memos| {
+            memos.retain(|m| m.revision.strong_count() > 0);
+            let at = memos.iter().position(|m| {
+                m.ghost == ghost && m.selector == selector && Weak::ptr_eq(&m.revision, &revision)
+            })?;
+            let memo = memos.remove(at);
+            let paths = Arc::clone(&memo.paths);
+            memos.insert(0, memo);
+            Some(paths)
+        });
+        if let Some(paths) = hit {
+            return Ok(paths);
+        }
+        let paths: Drawable = Arc::new(build()?);
+        if let Ok(mut memos) = MEMOS.lock() {
+            memos.insert(
+                0,
+                Memo {
+                    revision,
+                    selector: selector.to_vec(),
+                    ghost,
+                    paths: Arc::clone(&paths),
+                },
+            );
+            let mut kept = 0usize;
+            memos.retain(|m| {
+                kept = kept.saturating_add(weight(&m.paths));
+                kept <= MEMO_WEIGHT
+            });
+        }
+        Ok(paths)
+    }
+}
 
 fn round(v: f64) -> Value {
     scaled(v, 100.)
@@ -213,7 +275,7 @@ impl ObjectSnapshot {
             return invalid();
         }
         let frame_info = read.frame(ghost);
-        let drawable = match read.paths(ghost) {
+        let drawable = match self.memo_paths(&bytes, ghost, || read.paths(ghost)) {
             Ok(paths) => paths,
             Err(code) => return refused(code, "Ghost geometry is unavailable"),
         };
@@ -237,8 +299,7 @@ impl ObjectSnapshot {
             }
         };
         let descriptor = descriptor(ghost, count, &frame_info);
-        let mut end = (cursor + FIRST_TRY as u64).min(total);
-        loop {
+        let page = |end: u64| -> Result<(ResponseEnvelope, usize), DispatchErrorCode> {
             let response = envelope(head(
                 descriptor.clone(),
                 total,
@@ -248,16 +309,47 @@ impl ObjectSnapshot {
             let size = serde_json::to_vec(&response)
                 .map_err(|_| DispatchErrorCode::Internal)?
                 .len();
+            Ok((response, size))
+        };
+        // Fill the byte limit: shrink proportionally until the page fits, and grow a page that leaves room (a line
+        // segment is a few bytes, a cubic dozens) so a large frame needs few pages. The last page that fits wins.
+        let mut end = (cursor + FIRST_TRY as u64).min(total);
+        let mut best: Option<ResponseEnvelope> = None;
+        for _ in 0..8 {
+            let (response, size) = page(end)?;
+            let len = end - cursor;
             if size <= MAX_MESSAGE_BYTES {
-                return Ok(response);
+                let grow = end < total && size * 10 < MAX_MESSAGE_BYTES * 8;
+                let fits = end;
+                best = Some(response);
+                if !grow {
+                    break;
+                }
+                let want = len * (MAX_MESSAGE_BYTES * 9 / 10) as u64 / size as u64;
+                end = (cursor + want.max(len + 1)).min(total);
+                if end == fits {
+                    break;
+                }
+            } else {
+                if best.is_some() {
+                    break;
+                }
+                if len <= 1 {
+                    return refused(
+                        DispatchErrorCode::Unavailable,
+                        "Ghost view exceeds the response byte limit",
+                    );
+                }
+                let want = len * (MAX_MESSAGE_BYTES * 9 / 10) as u64 / size as u64;
+                end = cursor + want.clamp(1, len - 1);
             }
-            if end <= cursor + 1 {
-                return refused(
-                    DispatchErrorCode::Unavailable,
-                    "Ghost view exceeds the response byte limit",
-                );
-            }
-            end = cursor + ((end - cursor) * 3 / 4).max(1);
+        }
+        match best {
+            Some(response) => Ok(response),
+            None => refused(
+                DispatchErrorCode::Unavailable,
+                "Ghost view exceeds the response byte limit",
+            ),
         }
     }
 }
