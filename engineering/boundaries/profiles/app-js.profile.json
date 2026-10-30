@@ -2055,6 +2055,30 @@
       ]
     },
     {
+      "id": "app.tool.holds",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "tool-holds.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "tool-holds.js"
+      ]
+    },
+    {
+      "id": "app.tool.rail",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "tool-rail.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "tool-rail.js"
+      ]
+    },
+    {
       "id": "app.project.lifecycle",
       "layer": "application",
       "dir": "src/js/application",
