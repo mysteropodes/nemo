@@ -53,7 +53,15 @@
       inputs.forEach(function(n){n.disabled=!enabled;n.readOnly=!enabled;n.title=typeof ports.editProperty==='function'?'':'Read-only';});
       swOk=swEnabled(enabled);paintSw(enabled);
     }
-    function onSw(event){if(event&&event.stopPropagation)event.stopPropagation();if(!swOk)return false;var i=swIntent();return apply(i.kind,i.animated);}
+    // On-demand keys drawer: Alt/Option-click or double-click opens it for this property (no per-row Keys button).
+    function openKeys(){var open=ports.openKeys;if(typeof open!=='function')return false;try{return open();}catch(_){return false;}}
+    function onSw(event){
+      if(event&&event.stopPropagation)event.stopPropagation();
+      if(event&&event.altKey)return openKeys();
+      if(event&&event.detail>1)return false;
+      if(!swOk)return false;var i=swIntent();return apply(i.kind,i.animated);
+    }
+    function onSwDouble(event){if(event&&event.stopPropagation)event.stopPropagation();return openKeys();}
     function onSwKey(event){if(event&&(event.key==='Enter'||event.key===' ')){if(event.preventDefault)event.preventDefault();return onSw(event);}}
     function clear(message){serial++;accepted=null;busy=false;shown=null;keyHere=null;drop();inputs.forEach(function(n){n.value='';});say(message);controls();return false;}
     // ui.js drives a scrub by dispatching change every frame while the document-level
@@ -108,7 +116,7 @@
       listen(input,'change',onChange);listen(input,'keydown',onKey);fields.appendChild(input);inputs.push(input);
     }
     if(unit){var ut=make('span',unit);ut.className='motion-unit';fields.appendChild(ut);}
-    fields.appendChild(sw);fields.appendChild(status);listen(sw,'click',onSw);listen(sw,'keydown',onSwKey);
+    fields.appendChild(sw);fields.appendChild(status);listen(sw,'click',onSw);listen(sw,'dblclick',onSwDouble);listen(sw,'keydown',onSwKey);
     // Authored keys are read only for animated rows, to learn whether a key sits at the playhead.
     async function readKeyHere(value,ticket){
       var offset=0,found=false,pages=Math.ceil(descriptor.authored.keyCount/8)+1;

@@ -63,17 +63,21 @@ function host(options={}){
   async settle(){await tick();const until=Date.now()+1500;while(/^Loading/.test(tree(nodes['motion-props-body']).find(n=>n.attrs.role==='status')?.textContent||'')){if(Date.now()>until)throw Error('Metadata did not settle');await new Promise(r=>setTimeout(r,1));}},
   paint:()=>UI.render(root,info,true,ports),rows:()=>tree(nodes['motion-props-body']).filter(n=>n.className==='lrow motion-prop-row'),
   button:label=>tree(nodes['motion-props-body']).find(n=>n.tagName==='BUTTON'&&n.textContent===label),
+  stopwatch:(i=0)=>tree(nodes['motion-props-body']).filter(n=>/\bmotion-stopwatch\b/.test(n.className||''))[i],
+  fx:(on=true)=>tree(nodes['motion-props-body']).find(n=>/\bmotion-expr-btn\b/.test(n.className||'')&&(!on||/\bon\b/.test(n.className))),
+  funnel:()=>tree(nodes['motion-props-body']).find(n=>/\bmotion-filter-btn\b/.test(n.className||'')),
+  async bake(node){await node.fire('click');const items=menus.pop();assert.ok(items&&items.length===1,'f(x) click offers exactly one Bake menu item');return items[0].action();},
   status:()=>tree(nodes['motion-props-body']).find(n=>n.attrs.role==='status')?.textContent,
   set hold(v){hold=v;},set ready(v){ready=v;},replace(){info={...info,lifecycleGeneration:info.lifecycleGeneration+1};},transport(){transportGeneration++;},release(){const item=waiting.shift();if(item)item.resolve(reply(item.request));},retire(){UI.restoreInspector(root);},set active(v){active=v;}};
 }
-test('actual ordinary Motion installer reaches visible existing inspector through native UI paint and SDK',async()=>{const h=host();h.paint();await h.settle();assert.ok(h.rows().length>5);assert.equal(h.nodes['motion-props-sec'].hidden,false);assert.equal(h.status(),'');assert.ok(h.button('Keys'));assert.ok(h.calls.every(c=>c.operation==='query.document.object.property.metadata'));assert.equal(h.header.listeners.get('contextmenu').length,1);h.retire();assert.deepEqual(h.nodes['motion-props-body'].children,[h.old]);});
+test('actual ordinary Motion installer reaches visible existing inspector through native UI paint and SDK',async()=>{const h=host();h.paint();await h.settle();assert.ok(h.rows().length>5);assert.equal(h.nodes['motion-props-sec'].hidden,false);assert.equal(h.status(),'');assert.ok(h.stopwatch());assert.equal(tree(h.nodes['motion-props-body']).filter(n=>n.tagName==='BUTTON'&&n.textContent==='Keys').length,0);assert.ok(h.calls.every(c=>c.operation==='query.document.object.property.metadata'));assert.equal(h.header.listeners.get('contextmenu').length,1);h.retire();assert.deepEqual(h.nodes['motion-props-body'].children,[h.old]);});
 test('every property row carries a stopwatch diamond and the sidebar has no Add key/Remove key/Enable/Disable animation text',async()=>{const h=host();h.paint();await h.settle();const body=tree(h.nodes['motion-props-body']);
  const rows=h.rows(),counts=rows.map(row=>tree(row).filter(n=>/\bmotion-stopwatch\b/.test(n.className||'')).length);assert.ok(rows.length>0);assert.ok(counts.every(c=>c<=1));assert.ok(counts.filter(c=>c===1).length>=1);
  assert.doesNotMatch(body.map(n=>n.textContent).join('\n'),/Add key|Remove key|Enable animation|Disable animation/);assert.equal(body.filter(n=>/native-motion-property-actions/.test(n.className||'')).length,0);h.retire();});
-test('repeated frame paints retain controls, focus and one header listener',async()=>{const h=host();h.paint();await h.settle();const pick=h.button('Keys'),before=h.calls.length;await pick.focus();h.root.state.currentFrame=10;h.paint();await h.settle();assert.equal(h.calls.length,before);assert.equal(h.doc.activeElement,pick);assert.equal(h.header.listeners.get('contextmenu').length,1);h.retire();assert.equal(h.header.listeners.get('contextmenu').length,0);});
+test('repeated frame paints retain controls, focus and one header listener',async()=>{const h=host();h.paint();await h.settle();const pick=h.stopwatch(),before=h.calls.length;await pick.focus();h.root.state.currentFrame=10;h.paint();await h.settle();assert.equal(h.calls.length,before);assert.equal(h.doc.activeElement,pick);assert.equal(h.header.listeners.get('contextmenu').length,1);h.retire();assert.equal(h.header.listeners.get('contextmenu').length,0);});
 test('document capture routes P Shift R and U with no legacy bubble shortcut',async()=>{const h=host();let legacy=0;h.doc.addEventListener('keydown',()=>legacy++);h.paint();await h.settle();await h.doc.body.fire('keydown',{key:'p'});await h.settle();assert.equal(h.rows().length,1);assert.equal(h.rows()[0].dataset.property,'position');await h.doc.body.fire('keydown',{key:'r',shiftKey:true});await h.settle();assert.deepEqual([...new Set(h.rows().map(r=>r.dataset.property))],['position','rotation']);await h.doc.body.fire('keydown',{key:'u'});await h.settle();assert.match(h.status(),/^Partial reveal:/);assert.equal(legacy,0);assert.equal(tree(h.nodes['motion-props-body']).filter(n=>n.className==='native-motion-unavailable-group').length,4);h.retire();});
 test('header filter dispatch uses ordinary preference and refuses unsupported facts',async()=>{const h=host();h.paint();await h.settle();await h.header.fire('contextmenu');assert.equal(h.menus.length,1);h.menus[0].find(i=>i.label==='expressions').action();await h.settle();assert.equal(h.rows().length,1);assert.equal(h.rows()[0].dataset.property,'xc_number');assert.equal(h.storage['nemo-motion-filter'],'expressions');h.menus[0].find(i=>i.label==='errors').action();await h.settle();assert.equal(h.rows().length,0);assert.equal(h.status(),'This Motion filter is unavailable.');h.retire();});
-test('layer selection uses confirmed native UID and invalidates stale selected controls',async()=>{const h=host();h.paint();await h.settle();h.ports.selectLayer(1,false,'L1',h.ports.currentSession().info());h.paint();await h.settle();assert.equal(h.root.state.activeLayerIdx,1);assert.deepEqual(h.root._layerSel,[1]);assert.ok(h.calls.some(c=>c.payload.view.target?.layerUid==='L1'));const old=h.button('Keys'),count=h.calls.length;h.root._layerSel=[0];h.root.state.activeLayerIdx=0;h.paint();await h.settle();const after=h.calls.length;await old.fire('click');assert.equal(h.calls.length,after);assert.ok(after>count);h.retire();});
+test('layer selection uses confirmed native UID and invalidates stale selected controls',async()=>{const h=host();h.paint();await h.settle();h.ports.selectLayer(1,false,'L1',h.ports.currentSession().info());h.paint();await h.settle();assert.equal(h.root.state.activeLayerIdx,1);assert.deepEqual(h.root._layerSel,[1]);assert.ok(h.calls.some(c=>c.payload.view.target?.layerUid==='L1'));const old=h.stopwatch(),count=h.calls.length;h.root._layerSel=[0];h.root.state.activeLayerIdx=0;h.paint();await h.settle();const after=h.calls.length;await old.fire('click',{altKey:true});assert.equal(h.calls.length,after);assert.ok(after>count);h.retire();});
 test('editable/modified keys retain their normal route and no search input is rendered',async()=>{const h=host();h.paint();await h.settle();assert.equal(tree(h.nodes['motion-props-body']).filter(n=>n.attrs.type==='search'||n.type==='search').length,0);const search=tree(h.nodes['motion-props-body']).find(n=>n.tagName==='INPUT');assert.ok(search);const count=h.rows().length;let e=await search.fire('keydown',{key:'p'});assert.equal(e.defaultPrevented,false);e=await h.doc.body.fire('keydown',{key:'p',metaKey:true});assert.equal(e.defaultPrevented,false);h.retire();});
 for(const kind of ['replacement','transport','presentation','frame','selection','retirement'])test('late SDK metadata cannot publish after '+kind,async()=>{const h=host({hold:true});h.paint();await tick();assert.equal(h.waiting.length,1);if(kind==='replacement')h.replace();if(kind==='transport')h.transport();if(kind==='presentation')h.ready=false;if(kind==='frame')h.root.state.currentFrame=10;if(kind==='selection')h.root._layerSel=[1];if(kind==='retirement')h.retire();h.hold=false;h.release();await tick();assert.equal(h.rows().length,0);if(kind==='retirement')assert.deepEqual(h.nodes['motion-props-body'].children,[h.old]);h.retire();});
 test('missing SDK read port stays unavailable without showing legacy inspector rows',async()=>{const h=host({missingReader:true});h.paint();await h.settle();assert.equal(h.calls.length,0);assert.equal(h.rows().length,0);assert.equal(h.nodes['motion-props-sec'].hidden,true);assert.match(h.nodes['props-panel'].textContent,/Native Motion property metadata is unavailable/);h.retire();});
@@ -84,7 +88,7 @@ test('leaving Motion restores previous DOM and removes all owned listeners; retu
 test('unpresented native session cannot start metadata reads',async()=>{const h=host();h.ready=false;assert.throws(()=>h.paint(),/uncorrelated/);assert.equal(h.calls.length,0);h.retire();});
 
 test('actual drawing canvas is an accepted reveal focus and modal capture prevents legacy routing',async()=>{const h=host();h.paint();await h.settle();const e=await h.nodes['drawing-canvas'].fire('keydown',{key:'p'});await h.settle();assert.equal(e.defaultPrevented,true);assert.equal(h.rows().length,1);let legacy=0;h.doc.addEventListener('keydown',()=>legacy++);h.doc.modal=h.doc.createElement('dialog');await h.nodes['drawing-canvas'].fire('keydown',{key:'r'});await h.settle();assert.equal(h.rows()[0].dataset.property,'position');assert.equal(legacy,0);h.retire();});
-test('external inspector DOM replacement retires old controls and builds one current binding',async()=>{const h=host();h.paint();await h.settle();const old=h.button('Keys');h.nodes['motion-props-body'].replaceChildren();h.paint();await h.settle();assert.ok(h.rows().length>5);assert.equal(h.header.listeners.get('contextmenu').length,1);assert.equal(old.listeners.get('click').length,0);h.retire();});
+test('external inspector DOM replacement retires old controls and builds one current binding',async()=>{const h=host();h.paint();await h.settle();const old=h.stopwatch();h.nodes['motion-props-body'].replaceChildren();h.paint();await h.settle();assert.ok(h.rows().length>5);assert.equal(h.header.listeners.get('contextmenu').length,1);assert.equal(old.listeners.get('click').length,0);h.retire();});
 test('unselected reveal uses all native layers and preserves multiple selected targets',async()=>{const h=host();h.root._layerSel=[];h.paint();await h.settle();await h.doc.body.fire('keydown',{key:'p'});await h.settle();assert.equal(h.rows().length,2);assert.deepEqual(h.rows().map(r=>JSON.parse(r.dataset.targetKey)[1]),['L0','L1']);h.root._layerSel=[1,0];h.paint();await h.settle();await h.doc.body.fire('keydown',{key:'r'});await h.settle();assert.equal(h.rows().length,2);assert.ok(h.rows().every(r=>r.dataset.property==='rotation'));h.retire();});
 
 test('actual A S T reveal routes and E M remain explicitly unavailable',async()=>{const h=host();h.paint();await h.settle();for(const [key,property] of [['a','anchor'],['s','scale'],['t','opacity']]){await h.doc.body.fire('keydown',{key});await h.settle();assert.equal(h.rows().length,1);assert.equal(h.rows()[0].dataset.property,property);}for(const key of ['e','m']){await h.doc.body.fire('keydown',{key});await h.settle();assert.equal(h.status(),'This Motion reveal is unavailable.');}h.retire();});
@@ -102,7 +106,7 @@ async function ordinaryProjectHost(){
 }
 test('ordinary UI paint and public reveal use actual sole Project cached port and SDK owner request IDs',async()=>{
  const {f,h,Project,before}=await ordinaryProjectHost();
- assert.equal(Project.paintUI(f.root,false),true);await h.settle();assert.equal(h.rows().length,5);assert.equal(h.status(),'');assert.ok(h.button('Keys'));
+ assert.equal(Project.paintUI(f.root,false),true);await h.settle();assert.equal(h.rows().length,5);assert.equal(h.status(),'');assert.ok(h.stopwatch());
  await h.doc.body.fire('keydown',{key:'p'});await h.settle();assert.equal(h.rows().length,1);assert.equal(h.rows()[0].dataset.property,'position');assert.equal(Project.desktop(f.root),f.session);assert.strictEqual(f.session.info(),before);assert.equal(f.transports.length,1);
  const queries=f.calls.filter(c=>c.r?.operation==='query.document.object.property.metadata');assert.ok(queries.length>=3);assert.ok(queries.every(c=>/^project-metadata-/.test(c.r.requestId)&&!('expectedRevision'in c.r)));assert.ok(f.calls.every(c=>!c.r?.operation?.startsWith('command.')));h.retire();
 });
@@ -195,14 +199,14 @@ test('ordinary native Motion bake uses the existing exact pinned public intent a
   return app.dispatch({apiVersion:2,requestId:'ordinary-bake',instanceId:pin.instanceId,documentId:pin.documentId,
    expectedRevision:pin.contentRevision,operation:'command.document.object.property.edit',payload});
  };
- h.paint();await h.settle();const button=h.button('Bake expression');assert.ok(button);
+ h.paint();await h.settle();const button=h.fx();assert.ok(button);
  h.root.state.currentFrame++; // Whole-composition bake uses frame-independent metadata.
- await button.fire('click');assert.equal(writes.length,1);
+ await h.bake(button);assert.equal(writes.length,1);
  assert.deepEqual(writes[0].payload.action,{kind:'bake'});
  assert.equal(writes[0].payload.command,'object.property.edit');
  assert.equal(typeof writes[0].expectedRevision,'number');
- const retired=h.button('Bake expression');assert.ok(retired);h.replace();
- await retired.fire('click');assert.equal(writes.length,1,'retired owner cannot reuse the old native intent');
+ const retired=h.fx();assert.ok(retired);h.replace();
+ await retired.fire('click');assert.equal(h.menus.length,0,'retired owner is not even offered the menu');assert.equal(writes.length,1,'retired owner cannot reuse the old native intent');
  h.retire();
 });
 
@@ -211,16 +215,16 @@ test('real Order inspector exposes its bake and reads without granting unavailab
  const pin={instanceId:'order-instance',documentId:'order-document',lifecycleGeneration:1,contentRevision:0,documentSnapshotId:'order-snapshot'},target={contextId:'scene-root',layerUid:'L0'};
  const context=()=>({pin,frame:3,viewGeneration:1,presented:{...pin,available:true,presentation:{...pin,owner:'native',status:'presented',frame:3}}});
  const row=clone(fixture.propertyPageOracle.find(r=>r.property==='opacity'));row.property='order';row.authored={availability:'available',keyCount:2,hasStaticOverride:true,expressionEnabled:true};
- const categories=clone(fixture.cases.find(c=>c.expectedResult).expectedResult.unavailableCategories),writes=[];
+ const categories=clone(fixture.cases.find(c=>c.expectedResult).expectedResult.unavailableCategories),writes=[],menus=[];
  const panel=Panel.create(container,{document:doc,readContext:context,readSelection:()=>target,readSelections:()=>[target],readContextId:()=>target.contextId,
   async query(q){return {instanceId:q.instanceId,documentId:q.documentId,atRevision:q.atRevision,documentSnapshotId:q.documentSnapshotId,kind:q.view.kind,target:q.view.kind==='targets'?null:q.view.target,items:q.view.kind==='targets'?[{kind:'context',contextId:target.contextId},{kind:'layer',target}]:[clone(row)],nextOffset:null,unavailableCategories:categories};},
   async readProperty(q){return {instanceId:q.instanceId,documentId:q.documentId,atRevision:q.atRevision,documentSnapshotId:q.documentSnapshotId,kind:q.view.kind,target:q.view.target,property:'order',dimension:1,...q.view.kind==='rawSample'?{frame:q.view.frame,value:[20]}:{trackPresent:true,items:[{frame:0,v:[17]},{frame:15,v:[32]}],nextOffset:null}};},
-  async editProperty(p){writes.push(p);return {applied:true,historyEntriesAdded:1};},editPropertyTrack(){throw Error('Order generic track writer must remain unavailable');}});
+  showContextMenu(x,y,items){menus.push(items);},async editProperty(p){writes.push(p);return {applied:true,historyEntriesAdded:1};},editPropertyTrack(){throw Error('Order generic track writer must remain unavailable');}});
  assert.equal(await panel.refresh(true),true);await tick();await tick();
  const numeric=tree(container).filter(n=>n.tagName==='INPUT'&&n.className==='pi scrub motion-val');assert.equal(numeric.length,1);assert.ok(numeric.every(n=>n.disabled&&n.readOnly));
- const bake=tree(container).find(n=>n.tagName==='BUTTON'&&n.textContent==='Bake expression');assert.ok(bake);await bake.fire('click');
+ const bake=tree(container).find(n=>/\bmotion-expr-btn\b/.test(n.className||'')&&/\bon\b/.test(n.className));assert.ok(bake);await bake.fire('click');assert.equal(writes.length,0,'f(x) click only offers Bake');await menus.pop()[0].action();
  assert.equal(writes.length,1);assert.equal(writes[0].property,'order');assert.deepEqual(writes[0].action,{kind:'bake'});
- await tree(container).find(n=>n.tagName==='BUTTON'&&n.textContent==='Keys').fire('click');await tick();
+ await tree(container).find(n=>/\bmotion-stopwatch\b/.test(n.className||'')).fire('click',{altKey:true});await tick();
  const checks=tree(container).filter(n=>n.type==='checkbox');assert.equal(checks.length,2);assert.ok(checks.every(n=>n.disabled));
  const keyPanel=tree(container).find(n=>n.className==='native-motion-property-keys');assert.ok(tree(keyPanel).filter(n=>n.tagName==='INPUT').every(n=>n.disabled));
  assert.equal(panel.readKeyTimeline().selectFrames([0]),false);assert.equal(writes.length,1);panel.dispose();
@@ -292,7 +296,7 @@ test('Motion presenter failure or malformed handle fails closed and restores the
 test('default Motion surface preserves the fixed native row sequence, focus and single listeners',async()=>{
  const h=host();try{
   h.paint();await h.settle();assert.deepEqual(h.rows().map(row=>row.dataset.property),['position','anchor','rotation','scale','opacity','order','xc_number','xc_angle','xc_point','xc_color','xc_on']);
-  const search=h.button('Keys'),count=h.calls.length,keyListeners=h.doc.listeners.get('keydown').length;
+  const search=h.stopwatch(),count=h.calls.length,keyListeners=h.doc.listeners.get('keydown').length;
   await search.focus();h.root.state.currentFrame=4;h.paint();await h.settle();
   assert.strictEqual(h.doc.activeElement,search);assert.equal(h.calls.length,count);assert.equal(h.header.listeners.get('contextmenu').length,1);assert.equal(h.doc.listeners.get('keydown').length,keyListeners);
  }finally{h.retire();}
@@ -307,7 +311,7 @@ test('retired Motion surface fences an already queued native bake before dispatc
  const h=host(),read=h.ports.readPropertyMetadata;let entered,release;const started=new Promise(r=>entered=r),gate=new Promise(r=>release=r),writes=[];
  h.ports.readPropertyMetadata=async selector=>{const result=await read(selector);if(result.kind==='properties')result.items.forEach(row=>{if(row.authored?.availability==='available')row.authored.expressionEnabled=true;});return result;};
  h.ports.editProperty=async(payload,pin,current)=>{entered();await gate;if(!current())throw Error('retired before dispatch');writes.push(payload);return {applied:true,historyEntriesAdded:1};};
- h.paint();await h.settle();const button=h.button('Bake expression');assert.ok(button);const click=button.fire('click');await started;
+ h.paint();await h.settle();const button=h.fx();assert.ok(button);const click=h.bake(button);await started;
  h.retire();release();await click;await tick();assert.equal(writes.length,0);assert.ok(h.nodes['motion-props-body'].children.length===1&&h.nodes['motion-props-body'].children[0]===h.old);
 });
 
@@ -337,8 +341,8 @@ test('unregistering the default native provider fences queued writes without req
  h.ports.readPropertyMetadata=async selector=>{const result=await read(selector);if(result.kind==='properties')result.items.forEach(row=>{if(row.authored?.availability==='available')row.authored.expressionEnabled=true;});return result;};
  h.ports.editProperty=async(payload,pin,current)=>{entered();await gate;if(!current())throw Error('provider replaced');writes.push(payload);return {ok:true,result:{applied:true,historyEntriesAdded:1}};};
  try{
-  h.paint();await h.settle();const bake=h.button('Bake expression');assert.ok(bake);
-  const click=bake.fire('click');await started;off();const reads=h.calls.length;release();await click;await tick();
+  h.paint();await h.settle();const bake=h.fx();assert.ok(bake);
+  const click=h.bake(bake);await started;off();const reads=h.calls.length;release();await click;await tick();
   assert.equal(writes.length,0);assert.equal(h.calls.length,reads,'retired provider cannot refresh the replacement');
  }finally{release();h.retire();off();provider.dispose();}
 });
@@ -435,7 +439,7 @@ test('property rows use the baseline row markup: lrow motion-prop-row, name, X/Y
   const expectUnit={position:'px',anchor:'px',rotation:'°',scale:'%',opacity:'%'},expectDims={position:2,anchor:2,rotation:1,scale:2,opacity:1};
   for(const row of h.rows()){
    const p=row.dataset.property;if(!expectDims[p])continue;
-   const kids=tree(row),name=row.children[0];
+   const kids=tree(row),name=row.children.find(n=>n.className==='lnm motion-prop-name');assert.ok(name);
    assert.equal(name.className,'lnm motion-prop-name');assert.equal(name.children.length,1);assert.equal(name.children[0].tagName,'SPAN');assert.ok(name.children[0].textContent.length>0);
    assert.ok(!/Default|Animated \(|Static override|Expression$/.test(row.textContent.replace(name.textContent,'')),'no detail word fused to the label: '+row.textContent);
    const fields=kids.find(n=>n.className==='native-motion-property-value motion-fields');assert.ok(fields,p+' fields');
@@ -445,5 +449,56 @@ test('property rows use the baseline row markup: lrow motion-prop-row, name, X/Y
    const units=kids.filter(n=>n.className==='motion-unit').map(n=>n.textContent);assert.deepEqual(units,[expectUnit[p]]);
    assert.ok(!kids.some(n=>n.tagName==='SPAN'&&/read-only/i.test(n.textContent)),'no read-only sentence');
   }
+ }finally{h.retire();}
+});
+
+// #2377 MS-5: baseline Transform header funnel, f(x) indicator and the on-demand keys drawer.
+test('Transform header carries the baseline hide-unanimated funnel wired to the persisted filter preference',async()=>{
+ const h=host();try{
+  h.paint();await h.settle();
+  const header=tree(h.nodes['motion-props-body']).find(n=>n.className==='lrow motion-group-row'),funnel=h.funnel();
+  assert.ok(header&&funnel&&funnel.parentNode===header,'funnel sits inside the .lrow.motion-group-row header');
+  assert.equal(funnel.className,'motion-filter-btn');assert.equal(funnel.title,'Show only animated properties');assert.match(funnel.innerHTML,/<svg/);
+  const all=h.rows().length;assert.ok(all>5);
+  await funnel.fire('click');await h.settle();
+  assert.equal(h.storage['nemo-motion-filter'],'animated','same persisted preference key');
+  assert.equal(h.funnel().className,'motion-filter-btn on');assert.equal(h.funnel().title,'Show all properties');
+  assert.ok(h.rows().length<all,'unanimated rows are hidden');
+  await h.funnel().fire('click');await h.settle();
+  assert.equal(h.storage['nemo-motion-filter'],'all');assert.equal(h.funnel().className,'motion-filter-btn');assert.equal(h.rows().length,all);
+ }finally{h.retire();}
+});
+test('there is no per-row Keys or Bake button; the drawer opens on demand from the stopwatch only',async()=>{
+ const h=host();try{
+  h.paint();await h.settle();
+  const body=h.nodes['motion-props-body'],labels=()=>tree(body).filter(n=>n.tagName==='BUTTON').map(n=>n.textContent);
+  assert.ok(!labels().includes('Keys')&&!labels().includes('Bake expression'));
+  const sw=h.stopwatch(),line=sw.parentNode.parentNode.parentNode;assert.equal(line.className,'lrow motion-prop-row');
+  const drawers=()=>tree(body).filter(n=>/\bmotion-keys-drawer\b/.test(n.className||'')&&!n.hidden);
+  assert.equal(drawers().length,0,'closed until requested');
+  await h.settle();
+  await sw.fire('click');await h.settle();assert.equal(drawers().length,0,'a plain click only drives the key toggle');
+  await sw.fire('click',{altKey:true});await h.settle();
+  assert.equal(drawers().length,1);const drawer=drawers()[0];
+  assert.equal(drawer.className,'lrow motion-expr-editor motion-keys-drawer');const after=line.parentNode.children[line.parentNode.children.indexOf(line)+1];assert.strictEqual(drawer.parentNode,after,'drawer slot directly follows its property row');assert.equal(after.className,'motion-keys-slot');
+  assert.ok(tree(drawer).some(n=>n.className==='native-motion-property-keys'&&!n.hidden));
+  await h.funnel().fire('click');await h.settle();
+  assert.ok(drawers().every(d=>{const sib=d.parentNode.parentNode.children,i=sib.indexOf(d.parentNode);return sib[i-1].className==='lrow motion-prop-row';}),'a repaint re-seats open drawers under a surviving row');
+  const other=h.stopwatch(1);if(other){await other.fire('dblclick');await h.settle();assert.ok(drawers().length>=1,'double-click also opens a drawer');}
+ }finally{h.retire();}
+});
+test('f(x) indicator mirrors expressionEnabled and only offers Bake through a menu',async()=>{
+ const h=host(),read=h.ports.readPropertyMetadata,writes=[];let nth=0;
+ h.ports.readPropertyMetadata=async selector=>{const result=await read(selector);if(result.kind==='properties')result.items.forEach(row=>{if(row.authored?.availability==='available')row.authored.expressionEnabled=(nth++%2===0);});return result;};
+ h.ports.editProperty=async(payload,pin,current)=>{writes.push(payload);return {applied:true,historyEntriesAdded:1};};
+ try{
+  h.paint();await h.settle();
+  const all=tree(h.nodes['motion-props-body']).filter(n=>/\bmotion-expr-btn\b/.test(n.className||''));
+  assert.ok(all.length>=2);assert.ok(all.every(n=>/^lico motion-expr-btn( on)?$/.test(n.className)));
+  assert.ok(all.some(n=>/ on$/.test(n.className))&&all.some(n=>!/ on$/.test(n.className)));
+  const off=all.find(n=>!/ on$/.test(n.className));await off.fire('click');assert.equal(h.menus.length,0,'an off indicator offers nothing');
+  const on=h.fx();await on.fire('click');assert.equal(writes.length,0,'click alone never writes');assert.equal(h.menus.length,1);
+  assert.deepEqual(h.menus[0].map(i=>i.label),['Bake expression']);
+  await h.menus.pop()[0].action();assert.equal(writes.length,1);assert.deepEqual(writes[0].action,{kind:'bake'});assert.equal(writes[0].command,'object.property.edit');
  }finally{h.retire();}
 });
