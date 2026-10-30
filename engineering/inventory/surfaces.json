@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "f45e3eeb5761ea4c44e07b89d8b4633107457155",
-  "describe": "v0.7.0-alpha.4-3876-gf45e3eeb-dirty"
+  "head": "8f861ebb70514b63bc7e185dfc5e532889ecbb1b",
+  "describe": "v0.7.0-alpha.4-3879-g8f861ebb-dirty"
  },
- "inputsDigest": "31d43f0c8b8d663b32ecb51ac0eacab001ed208fe7431ecdec6208a1e5edb031",
+ "inputsDigest": "ff11267c6cd9429617b743d8413dc597ed95696e294b135e420d6a9767741b89",
  "states": [
   "inventoried",
   "characterized",
@@ -276,7 +276,7 @@
   },
   "SMProject": {
    "file": "src/js/project.js",
-   "line": 401,
+   "line": 406,
    "members": 2
   },
   "SMAgPsdLoader": {
@@ -2445,7 +2445,7 @@
    "capability": "history",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:712 initStartScreen()"
+    "src/js/project.js:717 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3306,7 +3306,7 @@
    "capability": "new",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:709 initStartScreen()"
+    "src/js/project.js:714 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3386,7 +3386,7 @@
    "capability": "open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:708 initStartScreen()"
+    "src/js/project.js:713 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4622,7 +4622,7 @@
    "capability": "save",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:706 initStartScreen()"
+    "src/js/project.js:711 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4662,7 +4662,7 @@
    "capability": "saveas",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:707 initStartScreen()"
+    "src/js/project.js:712 initStartScreen()"
    ],
    "events": [
     "click"
@@ -7802,7 +7802,7 @@
    "capability": "file input",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:713 initStartScreen()"
+    "src/js/project.js:718 initStartScreen()"
    ],
    "events": [
     "change"
@@ -7826,7 +7826,7 @@
     "functionsVisited": 64,
     "via": "chain",
     "references": [
-     "src/js/project.js:219 openDialog()"
+     "src/js/project.js:224 openDialog()"
     ]
    },
    "fixtures": [
@@ -14632,7 +14632,7 @@
    "capability": "New project (new tab)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:647"
+    "src/js/project.js:652"
    ],
    "events": [
     "click"
@@ -14663,7 +14663,7 @@
     "via": "chain",
     "references": [
      "src/js/adapters/native-object-project-tabs-ui.js:93 render()",
-     "src/js/project.js:647",
+     "src/js/project.js:652",
      "src/js/timeline.js:9104 action()"
     ]
    },
@@ -15690,7 +15690,7 @@
     "functionsVisited": 0,
     "via": "chain",
     "references": [
-     "src/js/project.js:593 addTab()"
+     "src/js/project.js:598 addTab()"
     ]
    },
    "fixtures": [
@@ -21341,7 +21341,7 @@
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
    "source": "src/js/labs/canvas-grid.js:132",
    "meta": {
-    "functionsVisited": 8
+    "functionsVisited": 7
    },
    "fixtures": []
   },
