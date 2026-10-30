@@ -793,6 +793,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-object-recovery.js",
+      "moduleId": "app.native.object.recovery.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2332,
+          "scriptOrdinal": 30
+        }
+      ]
+    },
+    {
       "path": "src/js/application/presenter-seam.js",
       "moduleId": "app.presenter.seam",
       "executionClass": "document-classic",

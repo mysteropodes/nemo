@@ -203,6 +203,7 @@
     {"src":"js/adapters/native-opacity-project-entry.js"},
     {"src":"js/adapters/native-object-inactive-project-tabs.js"},
     {"src":"js/adapters/native-object-project-tabs-ui.js"},
+    {"src":"js/adapters/native-object-recovery.js"},
     {"src":"js/project.js"},
     {"src":"js/adapters/feedback-local.js"},
     {"src":"js/adapters/feedback-remote.js"},
