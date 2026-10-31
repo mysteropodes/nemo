@@ -71,8 +71,8 @@ test('the Rust contract and its two test children are members of the MCP transpo
   assert.equal(/\bsuper::/.test(production), false, 'the production contract imports through crate paths (ruling R5 style)');
   const contract = read('nemo-mcp/src/native_contract.rs');
   assert.equal(contract.split('pub(crate) mod object_component;').length - 1, 1);
-  assert.match(contract, /op if object_component::admitted\(op\) => object_component::request\(op, payload\)/);
-  assert.match(contract, /op if object_component::admitted\(op\) => \|o, _, _, r\| object_component::result\(o, r\),/);
+  assert.match(contract, /op if object_component::owns\(op\) => object_component::request\(op, payload\)/);
+  assert.match(contract, /op if object_component::owns\(op\) => \|o, _, p, r\| object_component::result_for\(o, p, r\),/);
   assert.match(read('nemo-mcp/src/wire.rs'), /object_component::response_matches\(request, response\)/);
   assert.match(read('nemo-mcp/src/native_request_input.rs'), /native component command requires expectedRevision/);
 });

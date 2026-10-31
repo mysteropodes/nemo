@@ -92,6 +92,15 @@ pub(crate) fn admitted(operation: &str) -> bool {
     spec(operation).is_some()
 }
 
+/// #2256: the one read of the component model, kept beside its commands but a pinned query (no expectedRevision).
+#[path = "native_component_read_contract.rs"]
+pub(crate) mod read;
+
+/// A command or the component read: the operations whose request and result this module validates.
+pub(crate) fn owns(operation: &str) -> bool {
+    admitted(operation) || operation == read::OP
+}
+
 fn id_text(text: &str) -> bool {
     !text.is_empty() && text.len() <= MAX_ID && !text.contains('\0')
 }
@@ -149,6 +158,9 @@ fn members(row: &'static str) -> Vec<(&'static str, &'static str, bool)> {
 }
 
 pub(super) fn request(operation: &str, payload: &Value) -> bool {
+    if operation == read::OP {
+        return read::request(payload);
+    }
     let Some((command, _, row)) = spec(operation) else {
         return false;
     };
@@ -174,6 +186,15 @@ pub(super) fn request(operation: &str, payload: &Value) -> bool {
     })
 }
 
+/// The result of a command (receipt only) or of the component read (judged against its own request pins).
+pub(super) fn result_for(operation: &str, payload: &Value, value: &Value) -> bool {
+    if operation == read::OP {
+        read::result(payload, value)
+    } else {
+        result(operation, value)
+    }
+}
+
 pub(super) fn result(operation: &str, value: &Value) -> bool {
     let Some((_, receipt, _)) = spec(operation) else {
         return false;
@@ -196,6 +217,9 @@ pub(crate) fn response_matches(
     request: &NativeApplicationRequest,
     response: &NativeApplicationResponse,
 ) -> bool {
+    if request.operation == read::OP {
+        return read::response_matches(request, response);
+    }
     if !admitted(&request.operation) {
         return true;
     }
