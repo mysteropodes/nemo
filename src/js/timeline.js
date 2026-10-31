@@ -10471,6 +10471,10 @@ document.getElementById('btn-pt-symmetric').addEventListener('click',function(){
 // click keeps the existing destructive booleanOp byte-for-byte unchanged.
 function wireBoolBtn(id,mode){
   document.getElementById(id).addEventListener('click',function(e){
+    // #2372 insp-boolean-ops: on a native object project both gestures go to the native owner (booleanApply / combine, one history entry each)
+    // and never reach the legacy Paper writers whose history checkpoint a native project refuses.
+    var nativeBool=window.NemoNativeSelectionBoolean;
+    if(nativeBool&&nativeBool.native(window)){if(e.altKey)nativeBool.combine(window,mode);else nativeBool.apply(window,mode);return;}
     if(e.altKey&&window.SMGroup)SMGroup.combineSelection(mode);
     else window.SM.booleanOp(mode);
   });

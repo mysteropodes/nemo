@@ -260,6 +260,7 @@
     {"src":"js/adapters/native-select-gesture.js"},
     {"src":"js/adapters/native-selection-steps.js"},
     {"src":"js/adapters/native-selection-style.js"},
+    {"src":"js/adapters/native-selection-boolean.js"},
     {"src":"js/adapters/native-selection-transform.js"},
     {"src":"js/select-bridge.js"},
     {"src":"js/adapters/native-subselect-ui.js"},
