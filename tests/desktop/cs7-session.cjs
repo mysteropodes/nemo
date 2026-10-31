@@ -111,9 +111,12 @@ function createInstalledSession(config) {
   const appEnvironment = { ...process.env };
   delete appEnvironment.NEMO_TEST_PLAY_OBSERVER;
   delete appEnvironment.NEMO_NATIVE_OCCLUSION_DIAGNOSTICS;
+  delete appEnvironment.NEMO_TEST_PLAY_FIXED_CLOCK;
   if (config.playObserver === true) Object.assign(appEnvironment, {
     NEMO_TEST_PLAY_OBSERVER: '1', NEMO_NATIVE_OCCLUSION_DIAGNOSTICS: '1',
   });
+  // P24: opt-in virtual playback time, only with the observer package (see play-publication-observer-bootstrap.js).
+  if (config.playObserver === true && config.play?.fixedClock === true) appEnvironment.NEMO_TEST_PLAY_FIXED_CLOCK = '1';
   const controller = harness.createController({ root: ROOT, app: app.bundle, env: appEnvironment });
   const tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd: ROOT, encoding: 'utf8' }).trim();
   let instance, started = false, pinned, latestSnapshot, cleaned = false, lastIdentity;
