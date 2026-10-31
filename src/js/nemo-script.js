@@ -681,10 +681,10 @@
       if (!f) { inp.remove(); return; }
       var rd = new FileReader();
       rd.onload = function () {
-        var r = run(String(rd.result), { name: f.name });
-        if (window.showToast) showToast(r.ok ? ('Script « ' + f.name + SM.t('toastExecutedSuffix')) : ('« ' + f.name + ' » : ' + r.error));
-        window.__nemoScriptLast = r;
-        inp.remove();
+        Promise.resolve(run(String(rd.result), { name: f.name })).then(function (r) {
+          if (window.showToast) showToast(r.ok ? ('Script « ' + f.name + SM.t('toastExecutedSuffix')) : ('« ' + f.name + ' » : ' + r.error));
+          window.__nemoScriptLast = r; inp.remove();
+        });
       };
       rd.readAsText(f);
     });
