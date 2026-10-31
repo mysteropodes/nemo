@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "e75a47f3079b6dcae0c82f9cac11002a95f72dc6",
-  "describe": "v0.7.0-alpha.4-4424-ge75a47f3-dirty"
+  "head": "0e65953ee1b915225f9d2a270fc01f03f27b13cc",
+  "describe": "v0.7.0-alpha.4-4427-g0e65953e-dirty"
  },
- "inputsDigest": "17439d16dfc1c0fa4ca3725e46e7a4c7cd180f2d1033be7051aeb1d8c9a65713",
+ "inputsDigest": "301498e1507d9a5f1b473b99cb823406abe0b7a93a5afb6e06d043b3c6c7e42f",
  "states": [
   "inventoried",
   "characterized",
@@ -9803,7 +9803,7 @@
    "capability": "brushpreset btn",
    "area": "drawing-selection",
    "handler": [
-    "src/js/brush-preset-picker.js:348 init()"
+    "src/js/brush-preset-picker.js:352 init()"
    ],
    "events": [
     "click"
