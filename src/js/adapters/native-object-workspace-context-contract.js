@@ -41,8 +41,12 @@
   function action(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) fail('invalid workspace action');
     if (value.kind === 'enter') {
-      exact(value, ['kind', 'contextId', 'entryFrame'], 'enter action');
+      // `fromLayerUid` (optional) names the scene instance layer entered: the owner starts at the component frame it shows at the held playhead.
+      const from = has(value, 'fromLayerUid');
+      exact(value, from ? ['kind', 'contextId', 'entryFrame', 'fromLayerUid'] : ['kind', 'contextId', 'entryFrame'], 'enter action');
       if (!idText(value.contextId) || !(value.entryFrame === null || uint32(value.entryFrame))) fail('invalid enter action');
+      if (from && !(value.fromLayerUid === null || idText(value.fromLayerUid))) fail('invalid enter action');
+      if (from && value.fromLayerUid !== null && value.entryFrame !== null) fail('an enter action takes an entry frame or an instance layer, not both');
     } else if (value.kind === 'close') {
       exact(value, ['kind', 'contextId'], 'close action');
       if (!idText(value.contextId)) fail('invalid close action');

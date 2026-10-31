@@ -75,9 +75,13 @@ fn workspace_ok(value: &Value) -> bool {
 }
 fn action_ok(value: &Value) -> bool {
     match value.get("kind").and_then(Value::as_str) {
-        Some("enter") => exact(value, &["kind", "contextId", "entryFrame"], &[]).is_some_and(|o| {
+        // `fromLayerUid` (optional): the scene instance layer entered; the owner starts at the frame it shows. Never with an entry frame.
+        Some("enter") => exact(value, &["kind", "contextId", "entryFrame"], &["fromLayerUid"]).is_some_and(|o| {
             context_id(o.get("contextId")).is_some()
                 && (o["entryFrame"].is_null() || uint32(o.get("entryFrame")).is_some())
+                && o.get("fromLayerUid").map_or(true, |from| {
+                    from.is_null() || (context_id(Some(from)).is_some() && o["entryFrame"].is_null())
+                })
         }),
         Some("close") => exact(value, &["kind", "contextId"], &[])
             .is_some_and(|o| context_id(o.get("contextId")).is_some()),

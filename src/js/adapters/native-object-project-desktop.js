@@ -268,11 +268,12 @@
       if(presentation!==null&&(!presentation||typeof presentation!=='object'))return null;
       return {session:session,info:info,ticket:session.readSubscriptionGeneration(),document:root.document,presentation:presentation};
     }
-    function publishRevision(info){
+    function publishRevision(info,lease){
       settingsDiagnostic(root,'metadata',info);
       settingsNotice('willProject',info);
-      // #2256: inside an entered component the scene rows are not the projected rows; the context re-verifies itself instead.
-      var entered=root.NemoNativeComponentContext;if(entered&&entered.presented(root)){entered.revision(root,info);root.updateUI();return true;}
+      // #2256: inside an entered component the scene rows are not the projected rows; the context re-reads itself through the lease the
+      // publication runs in (its context, frame count and layers are settled BEFORE the frame of this revision is presented).
+      var entered=root.NemoNativeComponentContext;if(entered&&entered.presented(root))return entered.revision(root,info,lease).then(function(){root.updateUI();return true;});
       if(!root.NemoNativeObjectProjectFile||!root.NemoNativeObjectProjectFile.refreshLayerTable(root,info))
         throw new Error('Native object row projection is uncorrelated');
       if(typeof root.updateUI!=='function')throw new Error('Native document UI publication is unavailable');
@@ -369,7 +370,7 @@
           if(shown)openDiagnostic(root,'camera-presented',cameraPresentedCode(shown));
         }catch(_){}},0);
       },
-      changed:function(info){if(root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.hasProjection(root))publishRevision(info);
+      changed:function(info,lease){if(root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.hasProjection(root))return publishRevision(info,lease);
         else{if(root.SMReference)root.SMReference.refreshNative();if(root.SMProject)root.SMProject.refreshActiveTabDirtyDot();}},
       notice:function(message){if(root.showToast)root.showToast(message);},
       failed:function(){if(root.showToast)root.showToast('Native project state is unconfirmed. Reopen Nemo before continuing.');}});

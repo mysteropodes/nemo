@@ -93,7 +93,7 @@ test('the contract admits exactly the one op, pinned and without expectedRevisio
 });
 
 test('every action is accepted and malformed workspaces and actions are refused', () => {
-  for (const action of [enter('sym_a'), enter('sym_a', 4294967295), { kind: 'exit' }, { kind: 'close', contextId: 'sym_a' }, { kind: 'refresh' }]) contract.payload(OP, payload(scene(3), action));
+  for (const action of [enter('sym_a'), enter('sym_a', 4294967295), { kind: 'enter', contextId: 'sym_a', entryFrame: null, fromLayerUid: 'L2' }, { kind: 'enter', contextId: 'sym_a', entryFrame: 3, fromLayerUid: null }, { kind: 'exit' }, { kind: 'close', contextId: 'sym_a' }, { kind: 'refresh' }]) contract.payload(OP, payload(scene(3), action));
   const entered = { activeContextId: 'sym_a', openTabs: ['sym_a'], view: { frame: 0, workIn: 0, workOut: 11 }, sceneView: view(3) };
   contract.payload(OP, payload(entered, { kind: 'exit' }));
   const no = (workspace, action, label) => assert.throws(() => contract.payload(OP, payload(workspace, action)), TypeError, label);
@@ -102,6 +102,9 @@ test('every action is accepted and malformed workspaces and actions are refused'
   no(scene(3), { kind: 'enter', contextId: '', entryFrame: null }, 'empty id');
   no(scene(3), { kind: 'enter', contextId: 'sym_a', entryFrame: -1 }, 'negative entry');
   no(scene(3), { kind: 'exit', contextId: 'sym_a' }, 'exit carries nothing');
+  no(scene(3), { kind: 'enter', contextId: 'sym_a', entryFrame: null, fromLayerUid: '' }, 'empty instance layer');
+  no(scene(3), { kind: 'enter', contextId: 'sym_a', entryFrame: 3, fromLayerUid: 'L2' }, 'an entry frame and an instance layer are exclusive');
+  no(scene(3), { kind: 'enter', contextId: 'sym_a', entryFrame: null, fromLayerUid: 'L2', extra: 1 }, 'unknown field');
   no(scene(3), { kind: 'teleport' }, 'unknown action');
   no(mut({ openTabs: Array.from({ length: 9 }, (_, i) => 't' + i) }), enter('sym_a'), 'nine tabs');
   no(mut({ openTabs: ['a', 'a'] }), enter('sym_a'), 'duplicate tabs');
