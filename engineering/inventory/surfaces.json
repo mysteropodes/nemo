@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "9dbd8a9c00a4bec7434b4620b22d262b9580477e",
-  "describe": "v0.7.0-alpha.4-4278-g9dbd8a9c-dirty"
+  "head": "4aefa7ecfcf4322e951b9652f6b25b5e9f91abed",
+  "describe": "v0.7.0-alpha.4-4287-g4aefa7ec-dirty"
  },
- "inputsDigest": "a0e4cde820e73abf22fd50729d43788c9b70899296557b160aa323040eb99295",
+ "inputsDigest": "a8a21d2c8b6eee5cc20a4540a927565e92f161bc1f8653caf7f6a599bf25c2e2",
  "states": [
   "inventoried",
   "characterized",
@@ -13553,7 +13553,7 @@
     "container": "p-widget-xrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 49,
+    "functionsVisited": 45,
     "via": "helper el()",
     "references": [
      "src/js/adapters/native-object-widget-ui.js:293 fillPanel()"
@@ -13750,7 +13750,7 @@
     "container": "p-widget-yrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 49,
+    "functionsVisited": 45,
     "via": "helper el()",
     "references": [
      "src/js/adapters/native-object-widget-ui.js:293 fillPanel()"
@@ -22230,7 +22230,7 @@
    "source": "src/js/adapters/native-palette-ui.js:139",
    "meta": {
     "i18n": null,
-    "functionsVisited": 57
+    "functionsVisited": 58
    },
    "fixtures": [
     "static-props",

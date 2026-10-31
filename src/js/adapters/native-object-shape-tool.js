@@ -11,6 +11,7 @@
   var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
   function same(a,b){return !!a&&!!b&&pinKeys.every(function(k){return a[k]===b[k];});}
   function fail(message){throw new Error(message);}
+  function contextId(root){/* #2256: the context Draw/Pen/shape target and its frame bound are the workspace controller's held ones */var c=root.NemoNativeComponentContext;return c?c.contextId(root):'scene-root';}function frameBound(root,pin){var c=root.NemoNativeComponentContext;return c?c.frameBound(root,pin):pin.totalFrames;}
   // A pressure ribbon drawn with Fill on carries its linked fill companion (draw-bridge.js @1065e9d8): the dictionary
   // builder records it here, against the ribbon's dictionary, and the commit creates both in one createMany.
   var linkedCompanions=new WeakMap();
@@ -83,7 +84,7 @@
       var s=root.state,index=s.activeLayerIdx,row=s.layers&&s.layers[index],selected=root._layerSel;
       // The baseline draws on the ACTIVE layer; a canvas click on empty stage leaves _layerSel=[]. Only other/several layers are ambiguous.
       if(!Number.isSafeInteger(index)||!row||!Array.isArray(selected)||selected.length>1||selected.length===1&&selected[0]!==index)fail('Select one native Drawing layer.');
-      var layer=info.layers.filter(function(l){return l.layerUid===row.layerUid;});
+      var layer=(root.NemoNativeComponentContext&&root.NemoNativeComponentContext.layerRows(root)||info.layers).filter(function(l){return l.layerUid===row.layerUid;});
       if(layer.length!==1||layer[0].locked===true||layer[0].visible===false||layer[0].parentLayerUid||row.threeD||row.motion&&Object.keys(row.motion).length)fail('The selected native layer is unavailable for this gesture.');
       return row.layerUid;
     }
@@ -91,10 +92,10 @@
       if(!Mapping||['point','transform','matchesView'].some(function(key){return typeof Mapping[key]!=='function';}))fail('Native canvas mapping is unavailable.');
       var s=session(),pin=s&&s.info(),state=root.state,frame=state.currentFrame,shown=s&&s.readPresentedObjectSession();
       if(!s||!s.isActive()||!pin||typeof s.runResourceCommand!=='function'||!shown||!same(pin,shown)||!same(pin,shown.presentation)||shown.presentation.owner!=='native'||shown.presentation.status!=='presented'||
-          !Mapping.matchesView(root,shown.presentation)||shown.presentation.contextId!=='scene-root'||shown.presentation.frame!==frame||!Number.isSafeInteger(frame)||frame<0||frame>=pin.totalFrames||
+          !Mapping.matchesView(root,shown.presentation)||shown.presentation.contextId!==contextId(root)||shown.presentation.frame!==frame||!Number.isSafeInteger(frame)||frame<0||frame>=frameBound(root,pin)||
           !root.NemoNativeObjectProjectFile||root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||!root.NemoNativeObjectVector)fail('Native Drawing is not ready.');
       var perspective=root.NemoNativePerspectiveController&&root.NemoNativePerspectiveController.read();
-      var t={perspective:perspective,session:s,pin:pin,presentation:shown.presentation,frame:frame,tool:state.tool,layerUid:selection(pin),sel:JSON.stringify(root._layerSel),style:style(state.tool,perspective),bounds:bounds(pin),pointer:e.pointerId,cancelled:false};
+      var t={context:contextId(root),perspective:perspective,session:s,pin:pin,presentation:shown.presentation,frame:frame,tool:state.tool,layerUid:selection(pin),sel:JSON.stringify(root._layerSel),style:style(state.tool,perspective),bounds:bounds(pin),pointer:e.pointerId,cancelled:false};
       t.behind=root.state.drawMode==='behind';t.start=point(e,t);t.scale=presentedScale(t);if(ports.freehand)t.samples=ports.begin(t.start,e,t);return t;
     }
     // draw-bridge/shape-bridge @1065e9d8 keep the tool the gesture began with: a tool switch mid-drag still commits on release.
@@ -159,10 +160,11 @@
       if(root.state.maskMode)dict=Object.assign({},dict,{isMask:true,maskMode:root.state.maskModeType||'add'});
       // No second queue: only add a current-intent check to the real Project
       // resource action. While that action runs, its own pending count hides presentation.
-      var guarded={info:s.info,isActive:s.isActive,requestId:s.requestId,runResourceCommand:function(action){return s.runResourceCommand(function(ctx){
+      var wrap=function(route){return function(action){return s[route](function(ctx){
         if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});
         return action({reconcile:ctx.reconcile,dispatch:function(q){if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});return ctx.dispatch(q);}});
-      });}};
+      });};};
+      var guarded={info:s.info,isActive:s.isActive,requestId:s.requestId,runResourceCommand:wrap('runResourceCommand'),runComponentCommand:typeof s.runComponentCommand==='function'?wrap('runComponentCommand'):undefined};
       // draw-bridge.js Fill Brush: one native command places the shape (fillBrushMode) and merges same-colour fills.
       // Labs multi-frame draw stamps the path the merge hands back on the other selected frames, in the same commit.
       var fbStamps=dict.isFillShape&&root.SMLabs&&typeof root.SMLabs.multiframeTargets==='function'?root.SMLabs.multiframeTargets(t.frame):[];
@@ -175,7 +177,7 @@
       // tools.js @1065e9d8 Draw commit: drawMode 'behind' slips the stroke under the layer's artwork.
       // G23 (symmetry-bridge.js onStrokeCommitted @1065e9d8): the stroke and its copies, each linked fill below its ribbon,
       // in one createMany (behind keeps the order at the bottom).
-      var vector=root.NemoNativeObjectVector.create(guarded),dicts=Symmetry.copies(root,dict,t.pin,companion);
+      var vector=root.NemoNativeObjectVector.create(guarded,function(){return t.context;}),dicts=Symmetry.copies(root,dict,t.pin,companion);
       var group=companion?[companion,dict]:[dict];
       var options={origin:t.pin,placement:ports.freehand&&t.behind?'behind':'front'};
       // draw-bridge.js @1065e9d8 Trim Stroke Ends: a Draw commit trims before its symmetry copies exist; native shares the cuts.

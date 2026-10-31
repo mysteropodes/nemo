@@ -138,7 +138,7 @@ pub(super) fn timing_result(document_id: &str, payload: &Value, result: &Value) 
             .and_then(Value::as_str)
             .is_some_and(crate::contract::bounded_identifier)
             && value.get("documentId").and_then(Value::as_str) == Some(document_id)
-            && value.get("contextId").and_then(Value::as_str) == Some("scene-root")
+            && value.get("contextId").is_some_and(crate::native_contract::vector::context)
             && [
                 "atRevision",
                 "documentSnapshotId",

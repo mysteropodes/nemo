@@ -479,3 +479,28 @@ test('cancel matrix: lock, hide, frame change and undo mid-shape cancel with zer
  f.area.fire('pointerup',{clientX:240,clientY:210});assert.equal((await f.root.NemoNativeShapeToolController.whenSettled()).status,'applied');
  assert.equal(f.calls.length,1);assert.deepEqual(pts(f.calls[0].payload.record).length,4);
 });
+
+// #2256 component writes: Draw/Pen/shape create inside an entered component. The component is entered the way the workspace controller holds it
+// (presented context, its own rows); the real tool, Project session, SDK and transport run, only the native owner is simulated.
+function enter(f,id='comp-a',total=8){
+ let entered={contextId:id,totalFrames:total,fps:24};
+ f.root.NemoNativeComponentContext={SCENE:'scene-root',presented:()=>entered,contextId:()=>entered?entered.contextId:'scene-root',
+  layerRows:()=>entered?[{layerUid:'inner',locked:false,visible:true}]:null,frameBound:(h,pin)=>entered?entered.totalFrames:pin.totalFrames,
+  projectionReady:()=>true,revision:()=>Promise.resolve(true)};
+ // The vector contract reads the held context from the page global (the same object the workspace controller owns).
+ globalThis.NemoNativeComponentContext=f.root.NemoNativeComponentContext;
+ Object.assign(f.root.state,{layers:[{layerUid:'inner',visible:true,locked:false}],activeLayerIdx:0,currentFrame:2,totalFrames:total});f.root._layerSel=[0];
+ return ()=>{entered=null;delete globalThis.NemoNativeComponentContext;};
+}
+test('Draw inside an entered component creates in THAT component through the component route; the scene is not written',async()=>{
+ const f=await fixture('rect');const leave=enter(f);await f.session.presentPreview(2);
+ const result=await f.gesture();assert.equal(result.status,'applied',JSON.stringify(result));
+ assert.equal(f.calls.length,1);const r=f.calls[0].payload.record;
+ assert.deepEqual([r.target.contextId,r.target.layerUid,r.target.frameScope.frame,r.target.strokeId],['comp-a','inner',2,'']);
+ assert.equal(f.records.size,1);
+ leave();
+});
+test('a frame past the entered component is not drawable even though the scene has it',async()=>{
+ const f=await fixture('rect');const leave=enter(f,'comp-a',3);f.root.state.currentFrame=5;
+ const down=f.area.fire('pointerdown');assert.equal(f.calls.length,0);assert.equal(f.body.children.length,0,'no gesture started: '+down.stopped);leave();
+});

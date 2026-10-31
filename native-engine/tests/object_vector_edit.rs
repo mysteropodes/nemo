@@ -14,6 +14,8 @@ mod lock;
 mod create_many;
 #[path = "object_vector_create_held.rs"]
 mod create_held;
+#[path = "object_vector_edit_component.rs"]
+mod component;
 #[path = "object_vector_batch.rs"]
 mod batch;
 #[path = "object_vector_batch_layers.rs"]

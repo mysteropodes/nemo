@@ -1,5 +1,6 @@
 //! Snapshot-pinned timing read; host lifecycle and public routing are separate gates.
 use crate::object_codec::{object_deserialize, FrameScopeKind};
+use crate::evaluation::object_component_kernels::object_context_resolver::ContextSource;
 use crate::object_snapshot::MAX_MESSAGE_BYTES;
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
 use crate::revision::ObjectSnapshot;
@@ -108,8 +109,12 @@ impl ObjectSnapshot {
             || selector.document_snapshot_id.is_empty()
             || selector.context_id.is_empty()
             || selector.layer_uid.is_empty()
-            || selector.frame >= self.document().total_frames
         {
+            return Err(InvalidRequest);
+        }
+        // The scene root or a component the document declares (#2256): the entered timeline reads the component's own frames.
+        let context = ContextSource::of_document(self.document()).context(&selector.context_id);
+        if context.is_ok_and(|c| selector.frame >= c.total_frames()) {
             return Err(InvalidRequest);
         }
         if selector.at_revision != self.content_revision()
@@ -117,19 +122,16 @@ impl ObjectSnapshot {
         {
             return Err(StaleRevision);
         }
-        if selector.context_id != "scene-root" {
-            return Err(Unavailable);
-        }
-        let layer = self
-            .document()
-            .layers
+        let context = context.map_err(|_| Unavailable)?;
+        let layer = context
+            .layers()
             .iter()
             .find(|layer| layer.layer_uid == selector.layer_uid)
             .ok_or(NotFound)?;
         let timing = layer.timing.value().ok_or(Unavailable)?;
         let (cell_kind, source_frame, manual_edit) = timing.exposure(selector.frame);
         let has_content = source_frame.is_some_and(|source| {
-            self.document().objects.iter().any(|object| {
+            context.objects().iter().any(|object| {
                 object.target.context_id == selector.context_id
                     && object.target.layer_uid == selector.layer_uid
                     && object.target.frame_scope.kind == FrameScopeKind::Authored

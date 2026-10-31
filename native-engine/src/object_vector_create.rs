@@ -7,7 +7,6 @@ use crate::commands::object_fill_owner::vector_edit::{
 };
 use crate::object_document::{ObjectDocument, ObjectRecord, Presence, TimingEdit};
 use crate::commands::object_fill_owner::object_frame_edit_document::{promote_cells, DocumentEdit};
-use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use std::collections::HashSet;
 
@@ -78,27 +77,29 @@ pub(super) fn allocate_stroke_id(
 }
 
 pub(super) fn create(
-    origin: &ObjectSnapshot,
+    base: &ObjectDocument,
+    revision: u64,
     record: ObjectRecord,
     placement: Placement,
     trim: Option<f64>,
     copy_key: bool,
 ) -> Result<Edit, DispatchErrorCode> {
-    create_many_or_one(origin, vec![record], placement, trim, copy_key, VectorEditKind::Create)
+    create_many_or_one(base, revision, vec![record], placement, trim, copy_key, VectorEditKind::Create)
 }
 
 /// Admit each record exactly as a single create would be, against the document as it grows: ids and order
 /// positions follow the given order. Behind, the k-th record takes natural position k under the layer's
 /// existing elements of that frame (the baseline inserts the stroke at index 0 and symmetry copies above it).
 fn create_many_or_one(
-    origin: &ObjectSnapshot,
+    base: &ObjectDocument,
+    revision: u64,
     records: Vec<ObjectRecord>,
     placement: Placement,
     trim: Option<f64>,
     copy_key: bool,
     kind: VectorEditKind,
 ) -> Result<Edit, DispatchErrorCode> {
-    create_in(origin.document(), origin.content_revision(), records, placement, trim, copy_key, kind)
+    create_in(base, revision, records, placement, trim, copy_key, kind)
 }
 
 /// Trim Stroke Ends (draw-bridge.js @1065e9d8 trims the drawn path before the symmetry copies and the Labs multi-frame
@@ -150,10 +151,13 @@ pub(super) fn create_in(
     // @1065e9d8): a held or unexposed target cell becomes an empty key in the same undo step, so the new drawing is not
     // the held one carried forward and does not land under it unseen. An in-between is left as it is. With `copy_key`
     // the key holds a copy of what the cell showed (the Labs creators' ensureKeyframe()).
-    let held = first.context_id == "scene-root"
-        && document.layers.iter().find(|l| l.layer_uid == first.layer_uid).and_then(|l| l.timing.value())
+    let held = document.layers.iter().find(|l| l.layer_uid == first.layer_uid).and_then(|l| l.timing.value())
             .is_some_and(|timing| matches!(timing.exposure(first.frame()).0, "held" | "unexposed"));
     if held && copy_key {
+        // The copy key promotes through the scene's frame editor; a component's cells take only Draw's plain key (below).
+        if first.context_id != "scene-root" {
+            return Err(DispatchErrorCode::Unavailable);
+        }
         if let DocumentEdit::Changed(next) = promote_cells(&document, &first.layer_uid, &[first.frame()])
             .map_err(|_| DispatchErrorCode::Unavailable)?
         {
@@ -214,7 +218,8 @@ pub(super) fn create_in(
 }
 
 pub(super) fn create_many(
-    origin: &ObjectSnapshot,
+    base: &ObjectDocument,
+    revision: u64,
     records: Vec<ObjectRecord>,
     placement: Placement,
     trim: Option<f64>,
@@ -223,5 +228,5 @@ pub(super) fn create_many(
     if !(2..=MAX_CREATE_MANY).contains(&records.len()) {
         return Err(DispatchErrorCode::InvalidRequest);
     }
-    create_many_or_one(origin, records, placement, trim, copy_key, VectorEditKind::CreateMany)
+    create_many_or_one(base, revision, records, placement, trim, copy_key, VectorEditKind::CreateMany)
 }
