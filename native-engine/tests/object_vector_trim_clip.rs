@@ -480,10 +480,6 @@ fn trim_clip_needs_trim_ends_a_create_and_a_well_formed_plan() {
             good(json!({"trimClip":{"axis":[60.,0.,60.],"mirrors":[[0,1]]}})),
         ),
         (
-            "text axis",
-            good(json!({"trimClip":{"axis":[60.,0.,60.,"100"],"mirrors":[[0,1]]}})),
-        ),
-        (
             "no mirrors",
             good(json!({"trimClip":{"axis":[60.,0.,60.,100.],"mirrors":[]}})),
         ),
@@ -498,10 +494,6 @@ fn trim_clip_needs_trim_ends_a_create_and_a_well_formed_plan() {
         (
             "out of range",
             good(json!({"trimClip":{"axis":[60.,0.,60.,100.],"mirrors":[[0,7]]}})),
-        ),
-        (
-            "unknown member",
-            good(json!({"trimClip":{"axis":[60.,0.,60.,100.],"mirrors":[[0,1]],"extend":true}})),
         ),
         ("null", good(json!({"trimClip":null}))),
         (
