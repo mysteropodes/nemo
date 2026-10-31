@@ -886,6 +886,7 @@
         "native_media_video_facts.rs",
         "tween_ghost_geometry.rs",
         "tween_ghost_query.rs",
+        "tween_ghost_underlay.rs",
         "application_tween.rs"
       ],
       "publicApi": [

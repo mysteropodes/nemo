@@ -1,8 +1,9 @@
 //! #2358 GHOST-UNDER: text glyph and raster ghosts of the ghosted layer are composed with the vector ones (real Metal).
 use super::gpu::metal;
 use super::{drawing, owner, plan, selector};
+use crate::application::prepare_ghost_underlay;
 use crate::object_render_scene::{
-    prepare_ghost_underlay, prepare_object_composition, prepare_object_viewport_composition,
+    prepare_object_composition, prepare_object_viewport_composition,
     GhostMode, GhostUnderlayRequest,
 };
 

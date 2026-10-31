@@ -5,7 +5,7 @@ use crate::history::NativeObjectHistory;
 use crate::object_document::FrameScopeKind;
 use crate::object_frame_packet::ObjectFrameSelector;
 use crate::object_render_scene::{
-    prepare_object_composition, prepare_object_paint_plan, prepare_object_render_scene,
+    GhostMode, prepare_object_composition, prepare_object_paint_plan, prepare_object_render_scene,
     prepare_object_viewport_composition,
     prepare_scheduled_object_composition_from_witness as prepare_live, ObjectCompositionWitness,
     ObjectPaintPlan,

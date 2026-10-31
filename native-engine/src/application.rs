@@ -512,5 +512,6 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
 mod tween;
 use tween::{export_error_code, resolution_code};
 pub use tween::{
-    TweenGhostFrame, TweenGhostKind, TweenGhostPath, TweenGhostRead, TweenGhostVisual,
+    prepare_ghost_underlay, TweenGhostFrame, TweenGhostKind, TweenGhostPath, TweenGhostRead,
+    TweenGhostVisual,
 };

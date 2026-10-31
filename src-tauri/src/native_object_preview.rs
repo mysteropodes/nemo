@@ -5,7 +5,9 @@ use native_engine::desktop_viewport::{
     ViewportDisplayFilter,
 };
 use native_engine::{
-    application::{ApplicationReleaseReceipt, ObjectBrushRuntime, ObjectMotionFrameControl},
+    application::{
+        prepare_ghost_underlay, ApplicationReleaseReceipt, ObjectBrushRuntime, ObjectMotionFrameControl,
+    },
     compositor::Compositor,
     desktop_viewport::{
         DesktopViewportHost, ObjectViewportFrame, PresentationReceipt, SurfacePort, ViewportStatus,
@@ -16,7 +18,7 @@ use native_engine::{
     },
     object_frame_packet::ObjectFrameSelector,
     object_render_scene::{
-        prepare_ghost_underlay, prepare_object_navigated_viewport_composition,
+        prepare_object_navigated_viewport_composition,
         prepare_scheduled_object_composition_from_witness, ObjectCompositionWitness,
     },
     resource_leases::WorkId,

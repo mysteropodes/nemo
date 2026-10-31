@@ -7,12 +7,10 @@
 //! The underlay exists only on a viewport witness (editor overlay, `viewport_scene_overlay.rs`): an export or readback
 //! witness refuses it and never draws it. Vector ghosts are the stored key geometry; text and raster ghosts are the
 //! evaluated ghost frame filtered to the ghosted layer. Nothing here writes, selects or touches history.
-use crate::application::{TweenGhostKind, TweenGhostRead};
+//! This render-scene file knows only plain facts: the application layer owns the retained ghost query and hands them over
+//! through [`GhostSource`] (`tween_ghost_underlay.rs`).
 use crate::object_render_scene::{ordered_entries, ObjectCompositionWitness, PaintEntry};
-use crate::request_receipts::GhostFrames;
-use crate::revision::ObjectSnapshot;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex, Weak};
 use vello::kurbo::{Affine, BezPath, Cap, Join, Stroke};
 use vello::peniko::{Color, Fill, ImageBrush, ImageData};
 
@@ -75,11 +73,11 @@ impl GhostUnderlayRequest {
     pub fn quality_suffix(&self) -> String {
         format!("+ghost:{}", serde_json::to_string(self).unwrap_or_default())
     }
-    /// `from` / `to` are the user's onion range, independent of the frame; the query's range always holds the frame.
-    fn query(&self, snapshot: &ObjectSnapshot, frame: u32) -> Vec<u8> {
-        let last = snapshot.document().total_frames.saturating_sub(1);
-        let (from, to) = (self.from.min(frame), self.to.max(frame).min(last));
-        let mut q = serde_json::json!({"atRevision":snapshot.content_revision(),"documentSnapshotId":snapshot.snapshot_id(),
+    /// The retained ghost query's selector for `frame` of a snapshot. `from` / `to` are the user's onion range,
+    /// independent of the frame; the query's range always holds the frame and the last frame.
+    pub fn query_bytes(&self, at_revision: u64, snapshot_id: &str, total_frames: u32, frame: u32) -> Vec<u8> {
+        let (from, to) = (self.from.min(frame), self.to.max(frame).min(total_frames.saturating_sub(1)));
+        let mut q = serde_json::json!({"atRevision":at_revision,"documentSnapshotId":snapshot_id,
             "contextId":"scene-root","layerUid":self.layer_uid,"frame":frame,"onion":self.onion,"ghostAll":self.ghost_all,
             "from":from,"to":to,"previousOpacity":self.previous_opacity,"nextOpacity":self.next_opacity,"mode":self.mode});
         if let Some(t) = &self.previous_tint {
@@ -130,10 +128,9 @@ impl std::fmt::Debug for GhostUnderlay {
             .finish()
     }
 }
-fn color(hex: &str, opacity: f64) -> Option<Color> {
-    let [r, g, b, a] = crate::object_document::bitmap_brush::rgba(hex)?;
+fn color([r, g, b, a]: [u8; 4], opacity: f64) -> Color {
     let alpha = (f64::from(a) * opacity.clamp(0., 1.)).round().clamp(0., 255.) as u8;
-    Some(Color::from_rgba8(r, g, b, alpha))
+    Color::from_rgba8(r, g, b, alpha)
 }
 fn bez(segments: &[[f64; 6]], closed: bool) -> BezPath {
     let mut path = BezPath::new();
@@ -150,12 +147,6 @@ fn bez(segments: &[[f64; 6]], closed: bool) -> BezPath {
         path.close_path();
     }
     path
-}
-fn layer_has_items(snapshot: &ObjectSnapshot, layer_uid: &str) -> bool {
-    snapshot.document().item_records().is_some_and(|items| {
-        items.raster_entries().iter().any(|e| e.target.layer_uid() == layer_uid)
-            || items.text_entries().iter().any(|e| e.target.layer_uid() == layer_uid)
-    })
 }
 impl GhostUnderlay {
     pub fn request(&self) -> &GhostUnderlayRequest {
@@ -181,6 +172,9 @@ impl GhostUnderlay {
     pub(crate) fn counts(&self) -> (usize, usize) {
         let images = self.images().count();
         (self.pieces.len() - images, images)
+    }
+    pub fn has_images(&self) -> bool {
+        self.images().next().is_some()
     }
     pub(crate) fn images(&self) -> impl Iterator<Item = &ImageData> + '_ {
         self.pieces.iter().filter_map(|p| match p {
@@ -209,139 +203,126 @@ impl GhostUnderlay {
     }
 }
 
-struct Memo {
-    revision: Weak<dyn std::any::Any + Send + Sync>,
-    key: Vec<u8>,
-    underlay: Arc<GhostUnderlay>,
+/// One drawable ghost path with its presented paint (sRGB bytes, `[r, g, b, a]`). Segments are `[x, y, inX, inY, outX, outY]`,
+/// handles relative to the point.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GhostPath {
+    pub closed: bool,
+    pub width: f64,
+    pub fill: Option<[u8; 4]>,
+    pub stroke: Option<[u8; 4]>,
+    pub opacity: f64,
+    pub segments: Vec<[f64; 6]>,
 }
-/// Pan and zoom re-render the same frame of the same revision: the prepared vector pieces are reused (no raster
-/// ghost is cached, its decoded pixels are charged and must not outlive the preview that drew them).
-static MEMO: Mutex<Vec<Memo>> = Mutex::new(Vec::new());
-const MEMO_ENTRIES: usize = 4;
-
-/// The ghost pieces of `request` at `frame` of `snapshot`. Never fails: a refusal is recorded in the underlay so the
-/// preview identity stays stable and the UI is told why nothing was composed.
-pub fn prepare_ghost_underlay(snapshot: &ObjectSnapshot, request: &GhostUnderlayRequest, frame: u32) -> Arc<GhostUnderlay> {
-    let key = request.query(snapshot, frame);
-    let revision = snapshot.revision_identity();
-    let hit = MEMO.lock().ok().and_then(|mut memo| {
-        memo.retain(|m| m.revision.strong_count() > 0);
-        let at = memo.iter().position(|m| m.key == key && Weak::ptr_eq(&m.revision, &revision))?;
-        let entry = memo.remove(at);
-        let underlay = Arc::clone(&entry.underlay);
-        memo.insert(0, entry);
-        Some(underlay)
-    });
-    if let Some(hit) = hit {
-        return hit;
-    }
-    let underlay = Arc::new(build(snapshot, request, frame, &key));
-    if !underlay.pieces.iter().any(|p| matches!(p, Piece::Image { .. })) {
-        if let Ok(mut memo) = MEMO.lock() {
-            memo.insert(0, Memo { revision, key, underlay: Arc::clone(&underlay) });
-            memo.truncate(MEMO_ENTRIES);
+/// How one ghost frame is painted, as the retained ghost query decided it (kind, falloff, shift, mode and tint).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GhostFrameSpec {
+    pub translation: [f64; 2],
+    /// A Ghost All key frame: stored vector geometry only (its text and rasters are not ghosted).
+    pub all_keys: bool,
+    /// Glyph fill opacity, and the Outline-mode stroke `([r, g, b, a], width)` that replaces the fill.
+    pub text_opacity: f64,
+    pub text_stroke: Option<([f64; 4], f64)>,
+    pub text_clear_fill: bool,
+    pub raster_opacity: f64,
+}
+/// The application layer's retained ghost query seen as the plain facts the underlay is built from.
+pub trait GhostSource {
+    fn layer_uid(&self) -> &str;
+    fn frame_count(&self) -> usize;
+    fn frame(&self, index: usize) -> GhostFrameSpec;
+    /// Stored vector geometry of the frame with the mode's visual policy applied; `Err` when the layer has none (derived).
+    fn paths(&self, index: usize) -> Result<Vec<GhostPath>, ()>;
+    /// The evaluated ghost frame (text glyphs and images), pinned to the same snapshot.
+    fn witness(&self, index: usize) -> Result<ObjectCompositionWitness, ()>;
+    /// Whether the layer has any text or raster item at all, so a vector-only layer never evaluates ghost frames.
+    fn has_items(&self) -> bool;
+}
+impl GhostUnderlay {
+    /// A request the engine could not honour: no pieces, the reason kept, the identity stable.
+    pub fn refused(request: &GhostUnderlayRequest, snapshot_id: &str, frame: u32, reason: &'static str) -> Self {
+        Self {
+            request: request.clone(),
+            snapshot_id: snapshot_id.into(),
+            frame,
+            pieces: Vec::new(),
+            frames: 0,
+            refusal: Some(reason),
+            _keep: Vec::new(),
         }
     }
-    underlay
-}
-fn refused(snapshot: &ObjectSnapshot, request: &GhostUnderlayRequest, frame: u32, reason: &'static str) -> GhostUnderlay {
-    GhostUnderlay {
-        request: request.clone(),
-        snapshot_id: snapshot.snapshot_id().into(),
-        frame,
-        pieces: Vec::new(),
-        frames: 0,
-        refusal: Some(reason),
-        _keep: Vec::new(),
-    }
-}
-fn build(snapshot: &ObjectSnapshot, request: &GhostUnderlayRequest, frame: u32, query: &[u8]) -> GhostUnderlay {
-    if let Err(reason) = request.validate() {
-        return refused(snapshot, request, frame, reason);
-    }
-    let read = match snapshot.query_tween_ghosts_json(query) {
-        Ok(read) => read,
-        Err(error) => {
-            use crate::request_receipts::DispatchErrorCode as Code;
-            let reason = match error {
-                Code::StaleRevision => "stale_revision",
-                Code::InvalidRequest => "invalid_request",
-                Code::NotFound => "layer_not_found",
-                _ => "ghost_view_unavailable",
-            };
-            return refused(snapshot, request, frame, reason);
+    pub fn build(source: &dyn GhostSource, request: &GhostUnderlayRequest, snapshot_id: &str, frame: u32) -> Self {
+        if let Err(reason) = request.validate() {
+            return Self::refused(request, snapshot_id, frame, reason);
         }
-    };
-    let mut out = GhostUnderlay {
-        request: request.clone(),
-        snapshot_id: snapshot.snapshot_id().into(),
-        frame,
-        pieces: Vec::new(),
-        frames: read.frames().len(),
-        refusal: None,
-        _keep: Vec::new(),
-    };
-    let items = layer_has_items(snapshot, &request.layer_uid);
-    let mut segments = 0usize;
-    for index in 0..read.frames().len() {
-        let at = &read.frames()[index];
+        let mut out = Self {
+            request: request.clone(),
+            snapshot_id: snapshot_id.into(),
+            frame,
+            pieces: Vec::new(),
+            frames: source.frame_count(),
+            refusal: None,
+            _keep: Vec::new(),
+        };
+        let items = source.has_items();
+        let mut segments = 0usize;
+        for index in 0..source.frame_count() {
+            let at = source.frame(index);
+            let shift = Affine::translate((at.translation[0], at.translation[1]));
+            // Items first (they sit below the strokes drawn over them), then the stored vector geometry.
+            if items && !at.all_keys {
+                if let Ok(witness) = source.witness(index) {
+                    out.collect_items(source.layer_uid(), &at, &witness);
+                    out._keep.push(witness);
+                }
+            }
+            // A derived layer (component, duplicator) has no stored key geometry: its text and images above are what shows.
+            if let Ok(paths) = source.paths(index) {
+                for p in paths {
+                    segments += p.segments.len();
+                    let fill = p.fill.map(|c| color(c, p.opacity));
+                    let stroke = p.stroke.map(|c| (color(c, p.opacity), p.width.max(0.)));
+                    if fill.is_none() && stroke.is_none() {
+                        continue;
+                    }
+                    out.pieces.push(Piece::Shape { path: bez(&p.segments, p.closed), fill, stroke, at: shift });
+                }
+            }
+            if out.pieces.len() > MAX_PIECES || segments > MAX_SEGMENTS {
+                return Self::refused(request, snapshot_id, frame, "ghost_budget");
+            }
+        }
+        out
+    }
+    /// The text glyphs and images of one evaluated ghost frame that belong to the ghosted layer.
+    fn collect_items(&mut self, layer_uid: &str, at: &GhostFrameSpec, witness: &ObjectCompositionWitness) {
+        let plan = witness.plan();
+        let layers = plan.packet().source_layers();
+        let ours = |layer_index: usize| layers.get(layer_index).is_some_and(|l| l.layer_uid() == layer_uid);
         let shift = Affine::translate((at.translation[0], at.translation[1]));
-        // Items first (they sit below the strokes drawn over them), then the stored vector geometry.
-        if items && at.kind != TweenGhostKind::AllKeys {
-            if let Ok(witness) = read.prepare_frame(index) {
-                collect_items(&mut out, &read, index, &witness);
-                out._keep.push(witness);
-            }
-        }
-        // A derived layer (component, duplicator) has no stored key geometry: its text and images above are what shows.
-        if let Ok(paths) = read.paths(index) {
-            for p in paths {
-                segments += p.segments.len();
-                let fill = p.fill.as_deref().and_then(|c| color(c, p.opacity));
-                let stroke = p.stroke.as_deref().and_then(|c| color(c, p.opacity)).map(|c| (c, p.width.max(0.)));
-                if fill.is_none() && stroke.is_none() {
-                    continue;
+        for entry in ordered_entries(plan) {
+            match entry {
+                PaintEntry::Text(source) if ours(source.layer_index) => {
+                    for (contour, [r, g, b, a]) in source.item.painted() {
+                        let base = Color::from_rgba8(r, g, b, a);
+                        let fill = (!at.text_clear_fill).then(|| base.with_alpha(base.components[3] * at.text_opacity as f32));
+                        let stroke = at.text_stroke.map(|([tr, tg, tb, ta], width)| {
+                            (Color::new([tr as f32, tg as f32, tb as f32, (ta * at.text_opacity).clamp(0., 1.) as f32]), width)
+                        });
+                        self.pieces.push(Piece::Shape { path: contour.contour.path().clone(), fill, stroke, at: shift });
+                    }
                 }
-                out.pieces.push(Piece::Shape { path: bez(&p.segments, p.closed), fill, stroke, at: shift });
-            }
-        }
-        if out.pieces.len() > MAX_PIECES || segments > MAX_SEGMENTS {
-            return refused(snapshot, request, frame, "ghost_budget");
-        }
-    }
-    out
-}
-/// The text glyphs and images of one evaluated ghost frame that belong to the ghosted layer.
-fn collect_items(out: &mut GhostUnderlay, read: &TweenGhostRead, index: usize, witness: &ObjectCompositionWitness) {
-    let at = &read.frames()[index];
-    let plan = witness.plan();
-    let layers = plan.packet().source_layers();
-    let ours = |layer_index: usize| layers.get(layer_index).is_some_and(|l| l.layer_uid() == read.layer_uid());
-    let text = at.text_visual();
-    let raster = at.raster_visual();
-    let shift = Affine::translate((text.translation[0], text.translation[1]));
-    for entry in ordered_entries(plan) {
-        match entry {
-            PaintEntry::Text(source) if ours(source.layer_index) => {
-                for (contour, [r, g, b, a]) in source.item.painted() {
-                    let base = Color::from_rgba8(r, g, b, a);
-                    let fill = (!text.clear_fill).then(|| base.with_alpha(base.components[3] * text.opacity as f32));
-                    let stroke = text.stroke.map(|[tr, tg, tb, ta]| {
-                        (Color::new([tr as f32, tg as f32, tb as f32, (ta * text.opacity).clamp(0., 1.) as f32]), text.stroke_width.unwrap_or(1.))
-                    });
-                    out.pieces.push(Piece::Shape { path: contour.contour.path().clone(), fill, stroke, at: shift });
+                PaintEntry::Raster(i) if plan.raster_sources().get(i).is_some_and(|s| ours(s.layer_index)) => {
+                    if let Some((image, transform, opacity)) = witness.raster_image(i) {
+                        self.pieces.push(Piece::Image {
+                            image: image.clone(),
+                            transform,
+                            alpha: opacity * at.raster_opacity as f32,
+                        });
+                    }
                 }
+                _ => {}
             }
-            PaintEntry::Raster(i) if plan.raster_sources().get(i).is_some_and(|s| ours(s.layer_index)) => {
-                if let Some((image, transform, opacity)) = witness.raster_image(i) {
-                    out.pieces.push(Piece::Image { image: image.clone(), transform, alpha: opacity * raster.opacity as f32 });
-                }
-            }
-            _ => {}
         }
     }
 }
-
-#[cfg(all(test, feature = "history", feature = "export_job"))]
-#[path = "../tests/object_ghost_underlay.rs"]
-mod tests;
