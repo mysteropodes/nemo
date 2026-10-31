@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "b8a442a460f6ec2f099c63b6a84a7001efaeb809",
-  "describe": "v0.7.0-alpha.4-4312-gb8a442a4-dirty"
+  "head": "3a84aa49166a14f08930ba60228e14cce1f45185",
+  "describe": "v0.7.0-alpha.4-4320-g3a84aa49-dirty"
  },
- "inputsDigest": "72e91e3eb7a587ed1d0a4ef2c12b14e8e4c6b7e74607e73d90a4dd6cf1f788d8",
+ "inputsDigest": "a9fd90e926c54aa51047b2b3f54cc4c3fb0bab7ca7289677fa3d5dabd25f3d3f",
  "states": [
   "inventoried",
   "characterized",
@@ -5367,7 +5367,7 @@
      "src/js/tools.js:7593 onMouseDown()",
      "src/js/timeline.js:3945 updateFsSelPanel()",
      "src/js/timeline.js:6442 paintFillSwatches()",
-     "src/js/viewtools-bridge.js:121 setColorUI()"
+     "src/js/viewtools-bridge.js:140 setColorUI()"
     ]
    },
    "fixtures": [
@@ -5419,7 +5419,7 @@
      "src/js/tools.js:7592 onMouseDown()",
      "src/js/timeline.js:3957 updateFsSelPanel()",
      "src/js/timeline.js:6432 paintStrokeSwatches()",
-     "src/js/viewtools-bridge.js:117 setColorUI()"
+     "src/js/viewtools-bridge.js:136 setColorUI()"
     ]
    },
    "fixtures": [
@@ -10548,7 +10548,7 @@
     "references": [
      "src/js/timeline.js:697 _syncFillEnabledUI()",
      "src/js/tools.js:7593 onMouseDown()",
-     "src/js/viewtools-bridge.js:124 setColorUI()"
+     "src/js/viewtools-bridge.js:143 setColorUI()"
     ]
    },
    "fixtures": [
@@ -13195,8 +13195,8 @@
      "src/js/timeline.js:3706 _restoreDrawingDefaults()",
      "src/js/timeline.js:3863 updateSelPropsPanel()",
      "src/js/tools.js:7595 onMouseDown()",
-     "src/js/viewtools-bridge.js:167 pick()",
-     "src/js/viewtools-bridge.js:170 pick()"
+     "src/js/viewtools-bridge.js:186 pick()",
+     "src/js/viewtools-bridge.js:189 pick()"
     ]
    },
    "fixtures": [
@@ -14195,7 +14195,7 @@
      "src/js/timeline.js:3944 updateFsSelPanel()",
      "src/js/timeline.js:6441 paintFillSwatches()",
      "src/js/tools.js:7593 onMouseDown()",
-     "src/js/viewtools-bridge.js:122 setColorUI()"
+     "src/js/viewtools-bridge.js:141 setColorUI()"
     ]
    },
    "fixtures": [
@@ -14245,7 +14245,7 @@
      "src/js/tools.js:7593 onMouseDown()",
      "src/js/timeline.js:3945 updateFsSelPanel()",
      "src/js/timeline.js:6442 paintFillSwatches()",
-     "src/js/viewtools-bridge.js:121 setColorUI()"
+     "src/js/viewtools-bridge.js:140 setColorUI()"
     ]
    },
    "fixtures": [
@@ -14290,7 +14290,7 @@
      "src/js/timeline.js:6431 paintStrokeSwatches()",
      "src/js/tools.js:7590 onMouseDown()",
      "src/js/tools.js:7592 onMouseDown()",
-     "src/js/viewtools-bridge.js:118 setColorUI()"
+     "src/js/viewtools-bridge.js:137 setColorUI()"
     ]
    },
    "fixtures": [
@@ -14341,7 +14341,7 @@
      "src/js/tools.js:7592 onMouseDown()",
      "src/js/timeline.js:3957 updateFsSelPanel()",
      "src/js/timeline.js:6432 paintStrokeSwatches()",
-     "src/js/viewtools-bridge.js:117 setColorUI()"
+     "src/js/viewtools-bridge.js:136 setColorUI()"
     ]
    },
    "fixtures": [
