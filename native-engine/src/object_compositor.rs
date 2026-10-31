@@ -344,6 +344,7 @@ impl Compositor {
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         {
             self.last_reference_image = reference_image;
+            self.release_ghost_images(prepared)?;
         }
         Ok(ObjectCompositionResult {
             instance: self.instance.clone(),

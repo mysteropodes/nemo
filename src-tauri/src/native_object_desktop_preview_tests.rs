@@ -502,3 +502,6 @@ fn gpu_camera_navigation_changes_real_pixels_cache_and_inverse_without_history_o
     assert_eq!((f.raw.clone(), retained()), before);
     assert_eq!(f.raw["contentRevision"].as_u64(), Some(0));
 }
+
+#[path = "native_object_desktop_preview_onion_tests.rs"]
+mod onion;

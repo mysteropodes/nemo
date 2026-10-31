@@ -26,6 +26,15 @@ use scene_effect_kernels::scene_effect_scene_join::SceneEffectPlan;
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 #[path = "object_reference_scene.rs"]
 mod reference;
+// #2358 GHOST-UNDER: onion / Ghost All frames composed under the live frame of a viewport witness.
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+#[path = "object_ghost_underlay.rs"]
+pub(crate) mod ghost_underlay;
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+pub use ghost_underlay::{
+    GhostFrameSpec, GhostMode, GhostPath, GhostReceipt, GhostShift, GhostSource, GhostUnderlay,
+    GhostUnderlayRequest,
+};
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 pub use reference::{
     object_viewport_quality, prepare_object_camera_viewport_composition,
@@ -126,6 +135,9 @@ pub struct ObjectCompositionWitness {
     rasters: Option<Arc<raster_scene::RasterResources>>,
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     reference: Option<reference::ReferenceScene>,
+    /// Viewport-only onion / Ghost All frames drawn under the live paint sequence; never on an export witness.
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    ghosts: Option<Arc<ghost_underlay::GhostUnderlay>>,
 }
 
 pub fn prepare_object_composition(
@@ -151,6 +163,8 @@ pub fn prepare_object_composition(
         reference: None,
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         rasters: None,
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        ghosts: None,
     };
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     {
@@ -267,6 +281,19 @@ impl ObjectCompositionWitness {
             && self.frame() == other.frame()
             && same_scene_resources(self.resources.as_deref(), other.resources.as_deref())
             && self.scene_effects == other.scene_effects
+            && self.same_ghosts(other)
+    }
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    fn same_ghosts(&self, other: &Self) -> bool {
+        match (&self.ghosts, &other.ghosts) {
+            (None, None) => true,
+            (Some(a), Some(b)) => Arc::ptr_eq(a, b) || a.request() == b.request(),
+            _ => false,
+        }
+    }
+    #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
+    fn same_ghosts(&self, _: &Self) -> bool {
+        true
     }
 }
 
