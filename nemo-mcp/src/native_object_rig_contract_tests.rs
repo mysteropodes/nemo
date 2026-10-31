@@ -32,7 +32,7 @@ pub(super) const TWEEN: [&str; 4] = [
 ];
 
 /// G39 (#2376): the Motion preset apply shares the table; its own shapes are pinned in the preset tests.
-pub(super) const PRESET: [&str; 1] = ["property.preset.apply"];
+pub(super) const PRESET: [&str; 2] = ["property.preset.apply", "layer.compositing.edit"];
 
 pub(super) fn corpus() -> Value {
     serde_json::from_str(CORPUS).expect("the agreement corpus parses")
@@ -46,8 +46,8 @@ pub(super) fn envelope(operation: &str, payload: Value) -> NativeApplicationRequ
 }
 
 #[test]
-fn the_table_declares_exactly_the_nineteen_operations_and_nothing_else() {
-    assert_eq!(table().len(), 19, "an unparsable table admits nothing");
+fn the_table_declares_exactly_the_twenty_operations_and_nothing_else() {
+    assert_eq!(table().len(), 20, "an unparsable table admits nothing");
     for &suffix in OPERATIONS.iter().chain(&LABS).chain(&TWEEN).chain(&PRESET) {
         assert!(admitted(&format!("{P}{suffix}")), "{suffix}");
     }
@@ -435,4 +435,41 @@ fn the_motion_preset_payload_is_closed_and_bounded() {
     assert!(!ok(json!([{"property":"position","keys":[{"frame":0,"v":[1],"x":1}]}])));
     assert!(!ok(json!([{"property":"opacity","keys":[],"static":[1,2,3,4,5]}])));
     assert!(!ok(json!([{"property":"opacity","keys":[{"frame":0,"v":[1],"lockTo":"up"}]}])));
+}
+
+/// #2372: the layer compositing edit is one closed shape per edit kind; the engine repeats every rule on original bytes.
+#[test]
+fn the_layer_compositing_edit_is_a_closed_union_by_edit() {
+    let op = format!("{P}layer.compositing.edit");
+    let ok = |extra: Value| {
+        let mut payload = json!({"command":"object.layer.compositing.edit","layerUid":"L"});
+        for (key, member) in extra.as_object().unwrap() {
+            payload[key] = member.clone();
+        }
+        crate::native_contract::validate_request(&op, &payload)
+    };
+    assert!(ok(json!({"edit":"blend","mode":"multiply"})));
+    assert!(ok(json!({"edit":"matteMode","mode":"luma","source":"S"})));
+    assert!(ok(json!({"edit":"matteClear"})));
+    assert!(ok(json!({"edit":"matteMoreAdd","source":"S"})));
+    assert!(ok(json!({"edit":"matteMoreSet","index":0,"mode":"alpha"})));
+    assert!(ok(json!({"edit":"folderCollapsed","collapsed":true})));
+    let blur = json!({"type":"blur","enabled":true,"p1":4,"p2":null,"keys":{"p1":{"keys":[]}}});
+    assert!(ok(json!({"edit":"effects","effects":[blur, {"type":"vignette","enabled":false}]})));
+    assert!(ok(json!({"edit":"effects","effects":[]})));
+    assert!(!ok(json!({"edit":"blend","mode":"Multiply"})), "unknown blend");
+    assert!(!ok(json!({"edit":"blend"})), "mode is required");
+    assert!(!ok(json!({"edit":"matteMode","mode":"none"})), "none is matteClear");
+    assert!(!ok(json!({"edit":"blend","mode":"screen","source":"S"})), "closed members");
+    assert!(!ok(json!({"edit":"matteClear","mode":"alpha"})));
+    assert!(!ok(json!({"edit":"matteMoreRemove","index":-1})));
+    assert!(!ok(json!({"edit":"effects"})), "the stack is required");
+    assert!(!ok(json!({"edit":"effects","effects":[{"type":"blur"}]})));
+    assert!(!ok(json!({"edit":"effects","effects":[{"type":"blur","enabled":true,"p9":1}]})));
+    assert!(!ok(json!({"edit":"effects","effects":[{"type":"blur","enabled":true,"keys":[]}]})));
+    assert!(!ok(json!({"edit":"effects","effects":[{"type":"blur","enabled":true,"p1":"4"}]})));
+    assert!(!ok(json!({"edit":"unknown"})));
+    assert!(!ok(json!({"layerUid":"L"})), "edit is required");
+    let wide = json!({"type":"blur","enabled":true,"keys":{"p1":{"keys":"x".repeat(2100)}}});
+    assert!(!ok(json!({"edit":"effects","effects":[wide]})), "key tracks are bounded");
 }

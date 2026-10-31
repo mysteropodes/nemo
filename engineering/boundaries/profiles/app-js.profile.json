@@ -3459,6 +3459,18 @@
       ]
     },
     {
+      "id": "app.native.object.layer-compositing.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-layer-compositing.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-layer-compositing.js"
+      ]
+    },
+    {
       "id": "app.native.object.rig.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
