@@ -484,3 +484,27 @@ fn empty_and_scalar_effect_key_maps_publish_reopen_and_undo_without_losing_metad
         }
     }
 }
+
+/// #2372: the matte menu pick freezes the adjacent source into the same write, so one pick is one history entry.
+#[test]
+fn a_matte_mode_pick_may_carry_the_source_it_freezes_in_one_history_entry() {
+    let mut o = owner("compositing", &fixture(1));
+    let (undo_before, _) = o.history_depths();
+    apply(&mut o, "b", "matteMode", json!({"mode":"luma","source":"c"}));
+    let layer = layer_json(&o, "b");
+    assert_eq!(layer["matteMode"], json!("luma"));
+    assert_eq!(layer["matteSourceLayerUid"], json!("c"));
+    assert_eq!(o.history_depths().0, undo_before + 1);
+    o.undo(o.content_revision()).unwrap();
+    assert!(layer_json(&o, "b").get("matteMode").is_none());
+    assert!(layer_json(&o, "b").get("matteSourceLayerUid").is_none());
+    use crate::request_receipts::DispatchErrorCode::{InvalidRequest, NotFound};
+    for (source, code) in [("missing", NotFound), ("b", InvalidRequest), ("", InvalidRequest)] {
+        let raw = payload("b", "matteMode", json!({"mode":"luma","source":source})).to_string();
+        assert_eq!(
+            o.prepare_layer_compositing_json(raw.as_bytes()).unwrap_err(),
+            code,
+            "{source}"
+        );
+    }
+}

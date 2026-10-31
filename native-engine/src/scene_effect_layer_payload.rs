@@ -52,7 +52,11 @@ object_deserialize!(CreatePayload {
 pub(super) enum Edit {
     Blend(String),
     MatteSource(String),
-    MatteMode(String),
+    /// The matte menu pick: the mode, and optionally the source it freezes in the same write.
+    MatteMode {
+        mode: String,
+        source: Option<String>,
+    },
     MatteClear,
     MatteMoreAdd {
         source: String,
@@ -100,7 +104,8 @@ fn allowed(present: bool, rule: u8) -> bool {
 /// Which of `mode, source, index, collapsed, effects` an edit takes.
 fn rules(edit: &str) -> Option<[u8; 5]> {
     Some(match edit {
-        "blend" | "matteMode" => [REQUIRED, FORBIDDEN, FORBIDDEN, FORBIDDEN, FORBIDDEN],
+        "blend" => [REQUIRED, FORBIDDEN, FORBIDDEN, FORBIDDEN, FORBIDDEN],
+        "matteMode" => [REQUIRED, OPTIONAL, FORBIDDEN, FORBIDDEN, FORBIDDEN],
         "matteSource" | "effectsFromSet" => [FORBIDDEN, REQUIRED, FORBIDDEN, FORBIDDEN, FORBIDDEN],
         "matteClear" | "effectsFromClear" => [FORBIDDEN; 5],
         "matteMoreAdd" => [OPTIONAL, REQUIRED, FORBIDDEN, FORBIDDEN, FORBIDDEN],
@@ -157,7 +162,7 @@ pub(super) fn edit_of(payload: &EditPayload) -> Result<Edit, DispatchErrorCode> 
             _ => return bad(),
         },
         "matteMode" => match mode {
-            Some(mode) if matte_mode_ok(&mode) => Edit::MatteMode(mode),
+            Some(mode) if matte_mode_ok(&mode) => Edit::MatteMode { mode, source },
             _ => return bad(),
         },
         "matteSource" => Edit::MatteSource(source.ok_or(DispatchErrorCode::InvalidRequest)?),
