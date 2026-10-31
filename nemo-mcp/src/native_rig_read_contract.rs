@@ -210,8 +210,7 @@ pub(super) fn result(document_id: &str, payload: &Value, result: &Value) -> bool
     };
     let end = cursor + items.len() as u64;
     let reason = &answer["unavailable"];
-    request(payload)
-        && answer["kind"] == "rig"
+    answer["kind"] == "rig"
         && answer["atRevision"] == payload["atRevision"]
         && answer["documentSnapshotId"] == payload["documentSnapshotId"]
         && answer["documentSnapshotId"].as_str()
@@ -240,4 +239,6 @@ pub(super) fn result(document_id: &str, payload: &Value, result: &Value) -> bool
         && (reason.is_null()
             || (reason.as_str().is_some_and(|r| REASONS.contains(&r)) && total == 0))
         && items.iter().all(|value| item(part, value))
+        // The request pin is checked last: an item of an unlisted part is refused by `item` itself.
+        && request(payload)
 }

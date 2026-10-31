@@ -144,9 +144,6 @@ fn paged(
             .all(|(at, entry)| item(entry, cursor == 0 && at == 0))
 }
 pub(crate) fn result(payload: &Value, value: &Value) -> bool {
-    if !request(payload) {
-        return false;
-    }
     let wanted = &payload["selector"];
     let (Some(wanted), Some(kind)) = (wanted.as_object(), wanted["kind"].as_str()) else {
         return false;
@@ -163,7 +160,8 @@ pub(crate) fn result(payload: &Value, value: &Value) -> bool {
             && o.get("kind").and_then(Value::as_str) == Some(kind)
     };
     let same_context = |o: &Map<String, Value>| o.get("contextId") == wanted.get("contextId");
-    match kind {
+    // The request pin is checked last: an unnamed or unknown selector kind is refused by the match itself.
+    let answers = match kind {
         "contexts" => exact(
             value,
             &with(&["contextCount", "cursor", "items", "nextCursor"]),
@@ -254,7 +252,8 @@ pub(crate) fn result(payload: &Value, value: &Value) -> bool {
             pins(o) && o.get("layerUid") == wanted.get("layerUid") && duplicator_view(o)
         }),
         _ => false,
-    }
+    };
+    answers && request(payload)
 }
 
 const DUP_MODES: [&str; 3] = ["grid", "radial", "path"];

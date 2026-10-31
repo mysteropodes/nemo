@@ -106,6 +106,11 @@ fn reshape_and_clone_name_a_stroke_and_new_geometry() {
     let mut stamp = payload.clone();
     stamp["ops"][1] = json!({"op":"clone","stableTarget":target("L1","s-a"),"frame":3,"offset":[5,-7]});
     assert!(vector_request(VECTOR, &stamp), "a pose stamp clones any stroke shifted, without geometry");
+    for (keyframe, ok) in [(json!("copy"), true), (json!("hold"), false), (json!(1), false)] {
+        let mut keyed = stamp.clone();
+        keyed["ops"][1]["keyframe"] = keyframe.clone();
+        assert_eq!(vector_request(VECTOR, &keyed), ok, "a clone's keyframe is the single admitted value: {keyframe}");
+    }
     let anchor = json!({"point":{"x":1,"y":2},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":3});
     let mut sculpt = payload.clone();
     sculpt["ops"][0] = json!({"op":"reshape","stableTarget":target("L1","s-a"),"center":[anchor, anchor]});
@@ -242,4 +247,20 @@ fn skip_unavailable_is_an_optional_boolean_and_only_an_opted_in_receipt_reports_
     assert!(vector_result(VECTOR, &batch, &receipt));
     let other = json!({"command":"object.vector.delete","stableTarget":target("L1","s-a"),"skipUnavailable":true});
     assert!(!vector_request(VECTOR, &other), "skipUnavailable is a batch member only");
+}
+
+#[test]
+fn a_receipt_answers_a_request_that_names_its_steps_and_only_admitted_step_kinds() {
+    let payload = cut();
+    let receipt = json!({"applied":true,"historyEntriesAdded":1,"operation":"batch","strokeId":"s-a",
+        "strokeIds":["s-a","native-stroke:1","s-b"]});
+    assert!(vector_result(VECTOR, &payload, &receipt));
+    // No steps to follow, or a receipt that lists no stroke ids, answers nothing.
+    assert!(!vector_result(VECTOR, &json!({"command":"object.vector.batch"}), &receipt));
+    assert!(!vector_result(VECTOR, &payload, &json!({"applied":true})));
+    assert!(!vector_result(VECTOR, &payload, &json!({"strokeIds":"s-a"})));
+    // A step the contract does not admit has no receipt id.
+    let unknown = json!({"command":"object.vector.batch","ops":[{"op":"explode"}]});
+    let one = json!({"applied":true,"historyEntriesAdded":1,"operation":"batch","strokeId":"x","strokeIds":["x"]});
+    assert!(!vector_result(VECTOR, &unknown, &one));
 }

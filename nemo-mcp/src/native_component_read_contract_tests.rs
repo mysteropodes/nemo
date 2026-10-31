@@ -231,6 +231,10 @@ fn result_answers_its_own_request_pin_kind_and_page() {
         assert!(result(&payload_of(&selector), &answer), "{selector}");
     }
     let contexts_payload = payload_of(&contexts());
+    for selector in [Value::Null, json!("contexts"), json!({}), json!({"kind":"other"})] {
+        let payload = payload_of(&selector);
+        assert!(!result(&payload, &contexts_result()), "{selector}");
+    }
     for (key, value) in [
         ("atRevision", json!(8)),
         ("documentSnapshotId", json!("foreign")),
@@ -406,6 +410,13 @@ fn wire_result_rejects_forged_owner_revision_and_shape() {
         "error":{"code":"not_found","message":"x"}});
     assert!(!response_matches(
         &r,
+        &serde_json::from_value(foreign.clone()).unwrap()
+    ));
+    // Another operation's envelope is not this contract's to correlate.
+    let mut elsewhere: NativeApplicationRequest = serde_json::from_value(envelope(contexts())).unwrap();
+    elsewhere.operation = "query.document.object".to_string();
+    assert!(response_matches(
+        &elsewhere,
         &serde_json::from_value(foreign).unwrap()
     ));
 }
