@@ -65,7 +65,7 @@ async function fixture(selectionIntent=false,desktopModule=Desktop,options={}){
  doc.getElementById('text-apply').addEventListener('click',()=>logs.legacy++);
  root.NemoNativePresentationWait=require('../src/js/adapters/native-presentation-wait.js');root.setTimeout=fn=>setImmediate(fn);
  root.NemoNativeTextToolDesktop=desktopModule;root.NemoNativeOpacityCutover={blocksLegacy:()=>true};root.NemoSelectCanvasIntent={create(){if(!selectionIntent)throw new Error('Text reached generic native selection route');intent=require('../src/js/adapters/select-canvas-intent.js').create({context:()=> 'stable',probe:()=>Object.freeze({mode:'clear'}),select:()=>logs.selected++});return intent;}};
- const binding=desktopModule.mount(root,container,{currentSession:()=>f.session,fontResources:()=>({list:async()=>[{assetId:'document font / 雪',name:'Imported',available:true}]})});await turn();
+ const binding=desktopModule.mount(root,container,{currentSession:()=>f.session,fontResources:()=>({list:async()=>options.fontRows||[{assetId:'document font / 雪',name:'Imported',available:true}]})});await turn();
  const script=fs.readFileSync(path.join(__dirname,'../src/js/select-bridge.js'),'utf8');
  vm.runInNewContext(script,{window:root,document:doc,state:root.state,console,selectedPaths:[],userLayers:[],project:{layers:[]},view:{zoom:1},setTimeout,clearTimeout},{filename:'actual-select-bridge.js'});
  const get=id=>doc.getElementById(id);
@@ -88,7 +88,7 @@ test('stage chrome controls stay live while Text mode is active',async()=>{
 test('existing and reopened native text rows bind exact document font identity through the existing font control',async()=>{
  const f=await fixture(),t=target('reopened text / 雪');f.seed(t,block('Saved text'));await f.binding.refresh(undefined,true);
  const select=f.get('native-text-controls').children.find(n=>n.tagName==='SELECT');select.value='0';select.fire('change');await f.turn();
- assert.equal(f.get('text-input').value,'Saved text');const font=f.get('text-font');const asset=font.children.find(n=>n.textContent.includes('document font / 雪'));assert.ok(asset);
+ assert.equal(f.get('text-input').value,'Saved text');const font=f.get('text-font');const asset=font.children.find(n=>n.title==='document font / 雪');assert.doesNotMatch(asset.textContent,/document font/);assert.ok(asset);
  f.input('text-font',asset.value);f.apply();await f.turn();assert.equal(f.owner.log.executed.length,1);assert.deepEqual(f.owner.log.received[0].payload.patch,{font:{kind:'asset',assetId:'document font / 雪'}});
  assert.deepEqual(f.owner.log.received[0].payload.stableTarget,t);assert.deepEqual(f.owner.items.get(t.strokeId).anchorTopLeft,{x:10,y:20});assert.equal(f.owner.items.get(t.strokeId).bold,true);
 });
@@ -151,7 +151,7 @@ for(const cancel of ['Escape','pointercancel'])test(cancel+' retires pending dis
 
 test('late document font enumeration cannot overwrite the user-selected bundled font',async()=>{
  const f=await fixture(),gate=deferred();f.binding.ports.fontResources=()=>({list:()=>gate.promise});await f.click();
- const font=f.get('text-font'),bold=font.children.find(n=>n.textContent==='Roboto-Bold');assert.ok(bold);f.input('text-font',bold.value);
+ const font=f.get('text-font'),bold=font.children.find(n=>n.title==='Roboto-Bold'&&n.textContent==='Roboto Bold');assert.ok(bold);f.input('text-font',bold.value);
  gate.resolve([{assetId:'document font / 雪',name:'Imported',available:true}]);await f.turn();f.input('text-input','User chose Bold');f.apply();await f.turn();
  assert.equal(f.owner.log.executed.length,1);assert.deepEqual(f.owner.log.received[0].payload.block.font,{kind:'bundled',fontKey:'Roboto-Bold'});
 });
@@ -585,4 +585,61 @@ test('a queue that never frees gives a Text click one clear notice and no editor
  const f=await fixture(),notices=[];f.root.showToast=m=>notices.push(m);const free=await hideQueue(f);
  f.canvas.fire('pointerdown',{button:0,buttons:0,clientX:100,clientY:110});f.canvas.fire('pointerup',{button:0,buttons:0,clientX:100,clientY:110});
  await settleTurns(f,40);assert.deepEqual(notices,['The canvas is still busy - try again.']);assert.equal(f.get('text-popover').style.display,'none');await free();
+});
+
+// #2267 row D2: Text tool click on an existing native block edits it; imported fonts read by name; the popover select stays inside the popover.
+const pickText=(f,t,log=[])=>{f.root.NemoSelectCanvasIntent.pick=async(root,x,y,only)=>{log.push([x,y,only]);return t?{data:{nativeRole:'text',nativeStableTarget:{...t}}}:null;};return log;};
+test('#2267 click on an existing text block opens the popover pre-filled and Apply commits ONE edit with only the changed member',async()=>{
+ const f=await fixture(),t=target('existing-1');f.seed(t,block('Hands-on text'));const log=pickText(f,t);
+ await f.click(100,110);await f.turn();
+ assert.deepEqual(log,[[100,110,0]]);assert.equal(f.get('text-popover').style.display,'block');
+ assert.equal(f.get('text-input').value,'Hands-on text');assert.equal(f.get('text-size').value,'48');assert.equal(f.get('text-color').value,'#112233');assert.equal(f.get('text-align').value,'left');
+ const sel=f.get('text-font').children.find(n=>n.value===f.get('text-font').value);assert.equal(sel.textContent,'Roboto Regular');
+ assert.equal(f.owner.items.size,1);assert.equal(f.owner.log.executed.length,0);
+ f.input('text-size','60');f.apply();await f.turn();
+ assert.equal(f.owner.log.executed.length,1);assert.equal(f.owner.items.size,1);assert.equal(f.owner.log.received[0].payload.command,'object.text.edit');
+ assert.deepEqual(f.owner.log.received[0].payload.patch,{size:60});assert.deepEqual(f.owner.log.received[0].payload.stableTarget,t);assert.equal(f.owner.items.get(t.strokeId).text,'Hands-on text');assert.equal(f.logs.legacy,0);
+});
+test('#2267 editing the content of an existing block through the click path sends only text; Escape and Cancel publish nothing',async()=>{
+ const f=await fixture(),t=target('existing-2');f.seed(t,block('Before'));pickText(f,t);await f.click();await f.turn();
+ f.input('text-input','After');f.get('text-input').fire('keydown',{key:'Enter',metaKey:true});await f.turn();
+ assert.equal(f.owner.log.executed.length,1);assert.deepEqual(f.owner.log.received[0].payload.patch,{text:'After'});
+ const g=await fixture(),u=target('existing-3');g.seed(u,block('Keep'));pickText(g,u);await g.click();await g.turn();assert.equal(g.get('text-popover').style.display,'block');
+ g.input('text-input','Changed');g.get('text-input').fire('keydown',{key:'Escape'});await g.turn();
+ assert.equal(g.get('text-popover').style.display,'none');assert.equal(g.owner.log.executed.length,0);assert.equal(g.binding.core.snapshot().draft,null);
+ const h=await fixture(),w=target('existing-4');h.seed(w,block('Keep'));pickText(h,w);await h.click();await h.turn();h.input('text-size','70');h.get('text-cancel').fire('click');await h.turn();assert.equal(h.owner.log.executed.length,0);
+});
+test('#2267 a click that hits no text still places new text, and a drag over existing text places an area without picking',async()=>{
+ const f=await fixture(),t=target('existing-5');f.seed(t,block('Under'));const log=pickText(f,null);await f.click(100,110);await f.turn();
+ assert.equal(log.length,1);assert.equal(f.get('text-input').value,'');f.input('text-input','New');f.apply();await f.turn();
+ assert.equal(f.owner.log.received[0].payload.command,'object.text.create');
+ const g=await fixture(),u=target('existing-6');g.seed(u,block('Under'));const glog=pickText(g,u);
+ g.canvas.fire('pointerdown',{clientX:100,clientY:110});g.canvas.fire('pointermove',{clientX:300,clientY:190});g.canvas.fire('pointerup',{clientX:300,clientY:190});await g.turn();
+ assert.equal(glog.length,0);assert.ok(g.get('native-text-area-draft'));
+});
+test('#2267 a pick that cannot be proven current is a notice, never a stray new block',async()=>{
+ const f=await fixture();f.root.NemoSelectCanvasIntent.pick=async()=>undefined;await f.click();await f.turn();
+ assert.equal(f.binding.core.snapshot().draft,null);assert.equal(f.owner.log.executed.length,0);
+});
+test('#2267 popover font choices read by family/style name; the opaque asset id is the tooltip/value, never the label',async()=>{
+ const id='native-font-4e7c7544b3d9f8b8363226b33e445b01',f=await fixture(false,Desktop,{fontRows:[{assetId:id,name:'Manrope-Regular',available:true}]});
+ await f.click();await f.turn();const opts=f.get('text-font').children;
+ const imported=opts.find(n=>n.title===id);assert.ok(imported);assert.equal(imported.textContent,'Manrope Regular');
+ assert.ok(opts.every(n=>!/native-font-/.test(n.textContent)));assert.equal(opts[0].textContent,'Roboto Regular');
+ f.input('text-font',imported.value);f.input('text-input','Hello');f.apply();await f.turn();
+ assert.deepEqual(f.owner.log.received[0].payload.block.font,{kind:'asset',assetId:id});
+});
+test('#2267 applying an imported document font to an existing block sends only the font member',async()=>{
+ const id='native-font-aaaaaaaaaaaaaaaa',f=await fixture(false,Desktop,{fontRows:[{assetId:id,name:'Manrope-Regular',available:true}]}),t=target('existing-7');
+ f.seed(t,block('Existing'));pickText(f,t);await f.click();await f.turn();
+ f.input('text-font',f.get('text-font').children.find(n=>n.title===id).value);f.apply();await f.turn();
+ assert.deepEqual(f.owner.log.received[0].payload.patch,{font:{kind:'asset',assetId:id}});assert.equal(f.owner.log.received[0].payload.command,'object.text.edit');
+});
+test('#2267 the popover font select is constrained to the popover width (stylesheet rule, no inline width override)',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'../src/css/style.css'),'utf8'),html=fs.readFileSync(path.join(__dirname,'../src/index.html'),'utf8');
+ const rule=css.match(/#text-popover #text-font\{([^}]*)\}/);assert.ok(rule,'font select rule');
+ assert.match(rule[1],/min-width:0/);assert.match(rule[1],/max-width:100%/);assert.match(rule[1],/overflow:hidden/);
+ const general=css.match(/#text-popover select[^{]*\{([^}]*)\}/);assert.ok(general);assert.match(general[1],/text-overflow:ellipsis/);assert.match(css,/#text-popover \.pr\{min-width:0;\}/);
+ const tag=html.match(/<select id="text-font"[^>]*>/)[0];assert.doesNotMatch(tag,/width/);
+ assert.match(html,/<div id="text-popover"[^>]*width:230px/);
 });
