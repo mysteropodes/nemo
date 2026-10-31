@@ -8,8 +8,13 @@
 //! cell's records and order elements are re-homed with the same rules (a cell that is a key is left alone, anything stored at a promoted
 //! held cell is replaced by the copy, an in-between is promoted without a copy). Components hold no raster or text items, so there is
 //! nothing else to copy. The whole result is admitted by the one storage validator when the edit is restored into the document.
-use crate::commands::object_fill_owner::object_frame_edit_document::{promote_cells, DocumentEdit, FrameEditError};
-use crate::object_document::{FrameScope, FrameScopeKind, ObjectDocument, ObjectRecord, OrderElement, OrderScope, Presence, TimingEdit};
+use crate::commands::object_fill_owner::object_frame_edit_document::{
+    promote_cells, DocumentEdit, FrameEditError,
+};
+use crate::object_document::{
+    FrameScope, FrameScopeKind, ObjectDocument, ObjectRecord, OrderElement, OrderScope, Presence,
+    TimingEdit,
+};
 
 const SCENE: &str = "scene-root";
 
@@ -21,8 +26,16 @@ fn in_cell(record: &ObjectRecord, context: &str, layer: &str, frame: u32) -> boo
 }
 
 /// Re-home the order elements of `layer` from frame `from` to frame `to` of the plan context `context` (and drop what `to` held).
-fn move_elements(document: &mut ObjectDocument, context: &str, layer: &str, from: Option<u32>, to: u32) {
-    let Presence::Present(plan) = &mut document.composition_order else { return };
+fn move_elements(
+    document: &mut ObjectDocument,
+    context: &str,
+    layer: &str,
+    from: Option<u32>,
+    to: u32,
+) {
+    let Presence::Present(plan) = &mut document.composition_order else {
+        return;
+    };
     for ctx in plan.contexts.iter_mut().filter(|c| c.context_id == context) {
         for scope in ctx.scopes.iter_mut().filter(|s| s.frame_scope.frame == to) {
             scope.elements.retain(|element| element.layer_uid != layer);
@@ -37,10 +50,19 @@ fn move_elements(document: &mut ObjectDocument, context: &str, layer: &str, from
         if copies.is_empty() {
             continue;
         }
-        let sorted = ctx.scopes.windows(2).all(|pair| pair[0].frame_scope.frame < pair[1].frame_scope.frame);
+        let sorted = ctx
+            .scopes
+            .windows(2)
+            .all(|pair| pair[0].frame_scope.frame < pair[1].frame_scope.frame);
         match ctx.scopes.iter().position(|s| s.frame_scope.frame == to) {
             Some(at) => ctx.scopes[at].elements.extend(copies),
-            None => ctx.scopes.push(OrderScope { frame_scope: FrameScope { kind: FrameScopeKind::Authored, frame: to }, elements: copies }),
+            None => ctx.scopes.push(OrderScope {
+                frame_scope: FrameScope {
+                    kind: FrameScopeKind::Authored,
+                    frame: to,
+                },
+                elements: copies,
+            }),
         }
         if sorted {
             ctx.scopes.sort_by_key(|s| s.frame_scope.frame);
@@ -49,11 +71,20 @@ fn move_elements(document: &mut ObjectDocument, context: &str, layer: &str, from
 }
 
 /// Key every listed cell of `layer_uid` with a copy of what it showed, in `context` (`document` is that context's view).
-pub(super) fn promote(document: &ObjectDocument, context: &str, layer_uid: &str, cells: &[u32]) -> Result<DocumentEdit, FrameEditError> {
+pub(super) fn promote(
+    document: &ObjectDocument,
+    context: &str,
+    layer_uid: &str,
+    cells: &[u32],
+) -> Result<DocumentEdit, FrameEditError> {
     if context == SCENE {
         return promote_cells(document, layer_uid, cells);
     }
-    let index = document.layers.iter().position(|layer| layer.layer_uid == layer_uid).ok_or(FrameEditError::UnknownLayer)?;
+    let index = document
+        .layers
+        .iter()
+        .position(|layer| layer.layer_uid == layer_uid)
+        .ok_or(FrameEditError::UnknownLayer)?;
     let total = document.total_frames;
     if cells.iter().any(|cell| *cell >= total) {
         return Err(FrameEditError::Invalid);
@@ -61,15 +92,21 @@ pub(super) fn promote(document: &ObjectDocument, context: &str, layer_uid: &str,
     let mut next = document.clone();
     let mut changed = false;
     for &cell in cells {
-        let timing = next.layers[index].timing.value().ok_or(FrameEditError::MissingTiming)?;
+        let timing = next.layers[index]
+            .timing
+            .value()
+            .ok_or(FrameEditError::MissingTiming)?;
         let (kind, source, _) = timing.exposure(cell);
-        let TimingEdit::Changed(promoted) = timing.promote_cell(cell, total)? else { continue };
+        let TimingEdit::Changed(promoted) = timing.promote_cell(cell, total)? else {
+            continue;
+        };
         next.layers[index].timing = Presence::Present(promoted);
         changed = true;
         if kind == "interpolated" {
             continue;
         }
-        next.objects.retain(|record| !in_cell(record, context, layer_uid, cell));
+        next.objects
+            .retain(|record| !in_cell(record, context, layer_uid, cell));
         if let Some(from) = source {
             let copies: Vec<ObjectRecord> = next
                 .objects
@@ -85,5 +122,9 @@ pub(super) fn promote(document: &ObjectDocument, context: &str, layer_uid: &str,
         }
         move_elements(&mut next, context, layer_uid, source, cell);
     }
-    Ok(if changed { DocumentEdit::Changed(next) } else { DocumentEdit::NoChange })
+    Ok(if changed {
+        DocumentEdit::Changed(next)
+    } else {
+        DocumentEdit::NoChange
+    })
 }

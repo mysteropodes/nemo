@@ -367,11 +367,13 @@ fn a_copy_keyed_create_on_a_held_component_frame_copies_what_the_cell_showed() {
     assert_eq!(state(&owner), before);
 }
 
-/// #2256 review: a LOCKED component layer refuses every vector write the owner offers, exactly as a locked scene layer does (typed `unavailable`).
+/// #2256 review: a LOCKED component layer (or one whose ordered path-effect stack is active) refuses every vector write the owner offers, exactly as
+/// the scene layer does (typed `unavailable`): the owner's Drawing guard is the same kernel over the component's view.
 #[test]
-fn a_locked_component_layer_refuses_every_vector_write_like_the_scene() {
+fn a_locked_or_path_effect_component_layer_refuses_every_vector_write_like_the_scene() {
+    for (case, field, value) in [("locked", "locked", json!(true)), ("path-fx", "pathFx", json!([{"type": "zigzag"}]))] {
     let mut d = held_doc();
-    d["componentTables"]["components"]["components"][0]["layers"][0]["locked"] = json!(true);
+    d["componentTables"]["components"]["components"][0]["layers"][0][field] = value;
     let mut owner = owner_of(&d);
     let before = bytes(&owner);
     let mut moved = record_at("B", "inner", 0, "c-a");
@@ -383,8 +385,9 @@ fn a_locked_component_layer_refuses_every_vector_write_like_the_scene() {
         ("delete", delete(at("inner", 0, "c-a"))),
         ("batch", keyed(json!({"command":"object.vector.batch","ops":[{"op":"delete","stableTarget":at("inner", 0, "c-a")}]}))),
     ] {
-        let response = send(&mut owner, id, payload);
-        assert_eq!((response["ok"].clone(), response["error"]["code"].clone()), (json!(false), json!("unavailable")), "{id}: {response}");
-        assert_eq!((bytes(&owner), owner.history_depths()), (before.clone(), (0, 0)), "{id}");
+        let response = send(&mut owner, &format!("{case}-{id}"), payload);
+        assert_eq!((response["ok"].clone(), response["error"]["code"].clone()), (json!(false), json!("unavailable")), "{case} {id}: {response}");
+        assert_eq!((bytes(&owner), owner.history_depths()), (before.clone(), (0, 0)), "{case} {id}");
+    }
     }
 }
