@@ -5558,6 +5558,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-object-project-close.js",
+      "moduleId": "app.native.object.project.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2325,
+          "scriptOrdinal": 22
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-object-project-reads.js",
       "moduleId": "app.native.object.project.adapter",
       "executionClass": "document-classic",

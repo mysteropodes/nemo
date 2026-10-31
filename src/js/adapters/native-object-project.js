@@ -6,11 +6,11 @@
   var propertyBinding=typeof module==='object'&&module.exports?require('./native-object-project-properties.js'):root.NemoNativeObjectProjectProperties;
   var exposureBinding=typeof module==='object'&&module.exports?require('./native-object-open-exposure.js'):root.NemoNativeObjectOpenExposure;
   var readBinding=typeof module==='object'&&module.exports?require('./native-object-project-reads.js'):root.NemoNativeObjectProjectReads;
-  var exportBinding=typeof module==='object'&&module.exports?require('./native-object-project-export.js'):root.NemoNativeObjectProjectExport;
-  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,propertyBinding,typeof module==='object'&&module.exports?require('./native-frame-edit-contract.js'):root.NemoNativeFrameEditContract,exposureBinding,exportBinding,readBinding,typeof module==='object'&&module.exports?require('./native-object-project-entry-contract.js'):root.NemoNativeObjectProjectEntryContract);
+  var exportBinding=typeof module==='object'&&module.exports?require('./native-object-project-export.js'):root.NemoNativeObjectProjectExport;var closeBinding=typeof module==='object'&&module.exports?require('./native-object-project-close.js'):root.NemoNativeObjectProjectClose;
+  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,propertyBinding,typeof module==='object'&&module.exports?require('./native-frame-edit-contract.js'):root.NemoNativeFrameEditContract,exposureBinding,exportBinding,readBinding,typeof module==='object'&&module.exports?require('./native-object-project-entry-contract.js'):root.NemoNativeObjectProjectEntryContract,closeBinding);
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.NemoNativeObjectProject=api;
-}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,Properties,FrameEdit,Exposure,Exports,Reads,Entry){
+}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,Properties,FrameEdit,Exposure,Exports,Reads,Entry,Close){
   'use strict';
   function id(v){return typeof v==='string'&&/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(v);}
   function integer(v,min){return Number.isSafeInteger(v)&&v>=min;}
@@ -258,7 +258,7 @@
       presented: function(){return presentation;},
       notice: function(error){if(ports.notice)ports.notice(error.message);}
     });
-    var presentPreview = previewScheduling.presentPreview;
+    var presentPreview = previewScheduling.presentPreview; /* #2381: closing the project with no replacement; hooks only, the sequence lives in native-object-project-close.js */ var closeHooks={isActive:active,opening:function(){return openingRequested;},enqueue:enqueue,requestId:requestId,invoke:invokeTracked,status:status,verify:verifyOwner,retire:retireSubscription,attach:attachSubscription,fence:fence,lock:function(){var held={info:info,presentation:presentation,bounds:presentationBounds,phase:phase};openingRequested=true;openingCancelled=false;previewScheduling.clearWanted();phase='opening';presentation=null;if(ports.surfaceChanged)ports.surfaceChanged(null);return held;},restore:function(held){info=held.info;phase=held.phase;presentation=held.presentation;if(held.presentation&&ports.surfaceChanged)ports.surfaceChanged(held.presentation,held.bounds);},done:function(){info=null;presentation=null;presentationBounds=null;phase='idle';},unlock:function(){openingRequested=false;openingCancelled=false;}};
     var occlusion=typeof ports.subscribeWindowOcclusion==='function'?Exposure.occlusionWake(ports.subscribeWindowOcclusion,function(){
       if(active()&&!openingRequested)renderPreview(ports.frame?ports.frame():0);}):null;
     var renderPreview = previewScheduling.renderPreview;
@@ -408,7 +408,7 @@
     }
     function exportPng(destination,frames,onProgress,signal){return exportFrames(destination,frames,onProgress,signal,'png');}
     function exportSvg(destination,frames,onProgress,signal){return exportFrames(destination,frames,onProgress,signal,'svg');}
-    return Object.freeze({openPath:openPath,newProject:newProject,activateProject:activateProject,cancelOpen:function(){if(!openingRequested)return false;openingCancelled=true;if(openExposure)openExposure.cancel();return true;},isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
+    return Object.freeze({openPath:openPath,newProject:newProject,activateProject:activateProject,closeProject:function(){return Close.run(closeHooks);},cancelOpen:function(){if(!openingRequested)return false;openingCancelled=true;if(openExposure)openExposure.cancel();return true;},isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
       readSubscriptionGeneration:function(){return subscriptionTicket;},
       readPropertyMetadata:properties.readPropertyMetadata,readProperty:properties.readProperty,
       get editPropertyTrack(){return properties.available()?properties.editPropertyTrack:undefined;},

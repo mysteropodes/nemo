@@ -40,6 +40,7 @@ function fixture({ populated = true, nativePorts = null, nativeFileAdapter = nul
     addEventListener() {}, requestAnimationFrame(callback) { callback(); },
     NemoNativeObjectInactiveProjectTabs: require('../src/js/adapters/native-object-inactive-project-tabs.js'),
     NemoNativeObjectProjectTabsUI: require('../src/js/adapters/native-object-project-tabs-ui.js'),
+    NemoNativeObjectProjectClose: require('../src/js/adapters/native-object-project-close.js'),
     NemoNativeOpacityProjectEntry: require('../src/js/adapters/native-opacity-project-entry.js'),
     NemoNativeOpacityLegacySurface: require('../src/js/adapters/native-opacity-legacy-surface.js'),
     NemoProjectNativeSave: require('../src/js/adapters/project-native-save.js'),
@@ -184,9 +185,11 @@ test('native same-tab click and inactive close retain their existing metadata-on
   assert.equal(f.state().rows.length, 1); assert.equal(f.state().rows[0].id, f.a);
   assert.equal(JSON.stringify(owner), before);
   assert.equal(f.effects.some(x => /import|release|frame save/.test(x)), false);
+  // #2381: the last tab is no longer refused; with the owner still active and unsaved it asks first (no dialog here), so nothing is touched.
   f.effects.length = 0; f.close(f.a);
-  assert.deepEqual(f.effects, []);
-  assert.equal(f.notices.at(-1), 'hsCannotCloseLastTab');
+  assert.equal(f.effects.some(x => /import|release|frame save|Paper/.test(x)), false);
+  assert.equal(f.notices.includes('hsCannotCloseLastTab'), false);
+  assert.equal(f.state().rows.length, 1);
 });
 test('ordinary browser new-tab callback retains existing creation behavior', () => {
   const f = fixture({ populated: false });
@@ -447,7 +450,7 @@ test('real B tab click refuses activation and close removes it only after exact 
   assert.equal(f.effects.some(effect=>/import|release|frame save|Paper/.test(effect)),false);
 });
 
-test('#2373 SMProject.closeActiveTab is the tab x button path for the active tab, and the last tab stays open', async () => {
+test('#2373 SMProject.closeActiveTab is the tab x button path for the active tab, and closing the last tab is the same path as any other', async () => {
   const viaX = fixture(), viaKey = fixture();
   assert.equal(typeof viaKey.root.SMProject.closeActiveTab, 'function');
   viaX.close(viaX.a); await new Promise(setImmediate);
@@ -458,9 +461,70 @@ test('#2373 SMProject.closeActiveTab is the tab x button path for the active tab
   assert.equal(JSON.stringify(viaKey.effects), JSON.stringify(viaX.effects));
   assert.equal(JSON.stringify(viaKey.notices), JSON.stringify(viaX.notices));
   assert.equal(viaKey.state().rows.length, 1);
-  viaKey.effects.length = 0; viaKey.notices.length = 0;
-  await viaKey.root.SMProject.closeActiveTab();
-  assert.equal(viaKey.effects.length, 0);
-  assert.equal(viaKey.notices.at(-1), 'hsCannotCloseLastTab');
   assert.equal(viaKey.state().rows.length, 1);
+});
+
+// #2381: closing the last project tab (x or Cmd+W) returns to the home screen; it never refuses and never quits.
+const startHidden = f => f.document.getElementById('start-screen').classList.contains('hid');
+test('#2381 closing the only (browser) tab shows the home screen with no open project; the x button and Cmd+W do the same', async () => {
+  for (const via of ['x', 'cmd-w']) {
+    const f = fixture({ populated: false });
+    f.root.SMProject.enterEditor(); f.document.getElementById('start-screen').classList.add('hid');
+    f.close(f.b); await new Promise(setImmediate);
+    assert.equal(f.state().rows.length, 1, via);
+    f.root.SMProject.markSaved(); f.notices.length = 0;
+    const only = f.state().rows[0].id;
+    if (via === 'x') f.close(only); else await f.root.SMProject.closeActiveTab();
+    await new Promise(setImmediate);
+    assert.equal(f.state().rows.length, 0, via + ': no tab is left');
+    assert.equal(startHidden(f), false, via + ': the start screen is shown');
+    assert.equal(f.notices.includes('hsCannotCloseLastTab'), false, via);
+    assert.match(f.root.SMProject.getCurrentLabel(), /^Untitled/, via);
+    assert.equal(f.root.SMProject.isDirty(), false, via + ': nothing open, nothing unsaved');
+    f.root.SMProject.newProject({ name: 'Again', w: 320, h: 180, fps: 12 });
+    assert.equal(f.state().rows.length, 1, via + ': New works from the home screen');
+  }
+});
+test('#2381 closing the last tab with unsaved changes asks first; Cancel keeps the tab, Discard closes it', async () => {
+  const f = fixture({ populated: false });
+  f.close(f.b); await new Promise(setImmediate);
+  f.setBytes('{"project":"A","edited":true}');
+  f.root.SMProject.refreshActiveTabDirtyDot('{"project":"A","edited":true}');
+  assert.equal(f.root.SMProject.isDirty(), true);
+  f.document.getElementById('start-screen').classList.add('hid');
+  const asked = []; let answer = false;
+  f.root.confirm = message => { asked.push(message); return answer; };
+  const before = f.state().rows.length;
+  await f.root.SMProject.closeActiveTab();
+  assert.equal(asked.length, 1); assert.match(asked[0], /Unsaved changes will be lost/);
+  assert.equal(f.state().rows.length, before, 'Cancel keeps the tab'); assert.equal(startHidden(f), true, 'Cancel keeps the editor');
+  answer = true;
+  await new Promise(resolve => setTimeout(resolve, 450)); // the Cmd+W duplicate window is the shortcut adapter\'s; this call is direct
+  await f.root.SMProject.closeActiveTab();
+  assert.equal(asked.length, 2); assert.equal(f.state().rows.length, 0); assert.equal(startHidden(f), false);
+});
+test('#2381 closing the only NATIVE project releases it, shows the home screen and leaves no open project', async () => {
+  const f = await nativeInactiveTabDesktop(), session = f.root.SMProject.nativeObjectProject();
+  const asked = []; let closed = 0;
+  f.root.__TAURI__.dialog.ask = async message => { asked.push(message); return asked.length > 1; };
+  session.closeProject = async () => { closed++; f.owner.active = false; return true; };
+  f.document.getElementById('start-screen').classList.add('hid');
+  assert.equal(f.root.SMProject.isDirty(), true, 'the native project starts dirty');
+  await f.root.SMProject.closeActiveTab();
+  assert.equal(asked.length, 1); assert.equal(closed, 0, 'the prompt comes before any release');
+  assert.equal(f.state().rows.length, 1, 'Cancel keeps the tab'); assert.equal(startHidden(f), true);
+  await f.root.SMProject.closeActiveTab();
+  assert.equal(asked.length, 2); assert.equal(closed, 1);
+  assert.equal(f.state().rows.length, 0, 'no orphan tab'); assert.equal(startHidden(f), false, 'the home screen is shown');
+  assert.equal(f.root.SMProject.getOpenTabs().length, 0);
+  assert.equal(f.notices.includes('hsCannotCloseLastTab'), false);
+  assert.equal(f.effects.some(effect => /import|Paper|create layer/.test(effect)), false, 'no legacy writer is touched');
+});
+test('#2381 a native close that fails keeps the tab and the editor', async () => {
+  const f = await nativeInactiveTabDesktop(), session = f.root.SMProject.nativeObjectProject();
+  f.root.__TAURI__.dialog.ask = async () => true;
+  session.closeProject = async () => false;
+  f.document.getElementById('start-screen').classList.add('hid');
+  await f.root.SMProject.closeActiveTab();
+  assert.equal(f.state().rows.length, 1); assert.equal(startHidden(f), true);
 });
