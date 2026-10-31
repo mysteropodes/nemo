@@ -75,8 +75,8 @@ test('the project file form forwards the duration from the legacy-shaped New con
 const source = fs.readFileSync(path.join(__dirname, '../src/js/kitsu.js'), 'utf8');
 const kitsuSession = { serverUrl: 'https://kitsu.invalid', accessToken: 'fixture-token' };
 const reply = (value) => ({ ok: true, status: 200, json: async () => value, text: async () => '' });
-function nativeRoot(newProjectResult) {
-  const legacy = [], created = [];
+function nativeRoot(newProjectResult, structure) {
+  const legacy = [], created = [], built = [];
   const trap = (name) => (...args) => { legacy.push(name); };
   const state = new Proxy({ layers: [{ frames: [] }] }, { set(target, key, value) { if (!String(key).startsWith('kitsu')) legacy.push('state.' + String(key)); return Reflect.set(target, key, value); } });
   const root = { console, state, URLSearchParams, NemoKitsuService: Service,
@@ -86,19 +86,21 @@ function nativeRoot(newProjectResult) {
     createUserLayer: trap('createUserLayer'), activateUL: trap('activateUL'), loadFrame: trap('loadFrame'), renderOS: trap('renderOS'),
     renderArcs: trap('renderArcs'), updateUI: trap('updateUI'),
     SMProject: { nativeObjectProject: () => ({}), async newProject(cfg) { created.push(cfg); return newProjectResult; } },
+    NemoKitsuNativeStructure: { async build(rt) { built.push(rt.state === state); if (structure) throw structure; return { layers: [{ name: 'Rough' }, { name: 'Clean' }, { name: 'Color' }] }; } },
     __TAURI__: { http: { fetch: async () => reply([]) } } };
   root.window = root;
   vm.runInNewContext(source, root, { filename: 'src/js/kitsu.js' });
-  return { root, legacy, created, state };
+  return { root, legacy, created, state, built };
 }
 const shot = { id: 's1', name: 'SH010', data: { fps: '25', frame_in: 10, frame_out: 57 } };
 
 test('openShot creates the project natively with width, height, fps and duration and performs no legacy write', async () => {
-  const { root, legacy, created, state } = nativeRoot(true);
+  const { root, legacy, created, state, built } = nativeRoot(true);
   const result = await root.SMKitsu.openShot(kitsuSession, { id: 'p1', name: 'Proj' }, null, shot);
   assert.deepEqual(JSON.parse(JSON.stringify(created)), [{ w: 1920, h: 1080, fps: 25, name: 'Proj — SH010', totalFrames: 48 }]);
   assert.equal(result.meta.frameCount, 48);
-  assert.equal(result.meta.layerStructure, 'unavailable');
+  assert.deepEqual(Array.from(result.meta.layerStructure), ['Rough', 'Clean', 'Color']);
+  assert.deepEqual(built, [true], 'the layer structure is built once, after the project, through the native module');
   assert.deepEqual(legacy, []);
   assert.equal(state.layers.length, 1);
   assert.equal(state.layers[0].name, undefined);
@@ -120,4 +122,20 @@ test('an unreadable duration never reaches native creation', async () => {
   await assert.rejects(root.SMKitsu.openShot(kitsuSession, {}, null, { name: 'S', data: { fps: 'abc' } }), /Durée/);
   assert.equal(created.length, 0);
   assert.deepEqual(legacy, []);
+});
+
+test('a refused layer step throws, records no Kitsu shot, and still performs no legacy write', async () => {
+  const { root, legacy, created, state, built } = nativeRoot(true, new Error('Structure des calques Kitsu : étape « create Clean » refusée'));
+  await assert.rejects(root.SMKitsu.openShot(kitsuSession, { id: 'p1', name: 'Proj' }, null, shot), /create Clean/);
+  assert.equal(created.length, 1);
+  assert.equal(built.length, 1);
+  assert.deepEqual(legacy, []);
+  assert.ok(!state.kitsuShot);
+  assert.equal(state.layers.length, 1);
+});
+
+test('a refused project creation never reaches the layer structure', async () => {
+  const { root, built } = nativeRoot(false);
+  await assert.rejects(root.SMKitsu.openShot(kitsuSession, { id: 'p1', name: 'Proj' }, null, shot), /natif/);
+  assert.deepEqual(built, []);
 });
