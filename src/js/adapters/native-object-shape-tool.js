@@ -331,10 +331,10 @@
       if (!fb && (state.tool !== 'draw' || state.trimStrokeEnds && state.symmetryEnabled && state.symmetryMode !== 'radial' && !state.symmetryExtend ||
           state.drawMode !== 'front' && state.drawMode !== 'behind' ||
           // G16 option C (#2361): one seeded anchor whose dabs native stamps; the key resolves as resolveBrushPreset (a built-in,
-          // else a confirmed native catalog record). A key neither holds, and texture with symmetry or Trim, stay unavailable.
-          !state.shadowMode && state.brushPreset && state.brushPreset !== 'none' && !absent && (!(root.BRUSH_PRESETS && Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS, state.brushPreset) ||
+          // else a confirmed native catalog record). A key neither holds stays unavailable. Trim cuts the anchor before native
+          // stamps it, and each symmetry copy is an anchor of its own group and seed (native-object-draw-symmetry.js).
+          !state.shadowMode && state.brushPreset && state.brushPreset !== 'none' && !absent && !(root.BRUSH_PRESETS && Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS, state.brushPreset) ||
             root.NemoNativeCustomBrushUI && root.NemoNativeCustomBrushUI.record(root, state.brushPreset)) ||
-            state.strokeEnabled && (state.symmetryEnabled || state.trimStrokeEnds)) ||
           root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
             ? root.SMLabs.unmigratedDrawHooks().length > 0 : root.SMLabs.list().some(function(p){return p.on;}))))
         throw new Error('This brush combination is unavailable in native Drawing.');
