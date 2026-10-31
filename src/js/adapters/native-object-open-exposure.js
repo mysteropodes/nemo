@@ -19,12 +19,25 @@
     if(!['none','values','contrast','dim','mirrored','values-mirrored','contrast-mirrored','dim-mirrored'].includes(value))throw new Error('Native display filter is unavailable');
     return value;
   }
+  // Onion skin / Ghost All composed under the live frame (#2358): a closed selection in a fixed key order, so a presented frame is the
+  // same view only when the renderer echoed exactly what was asked.
+  function ghostSel(value){
+    if(value===undefined||value===null)return null;
+    var keys=['layerUid','onion','ghostAll','from','to','previousOpacity','nextOpacity','mode','previousTint','nextTint','shift'];
+    if(typeof value!=='object'||Array.isArray(value)||!Object.keys(value).every(function(k){return keys.includes(k);}))throw new Error('Native onion selection is unavailable');
+    if(typeof value.layerUid!=='string'||!value.layerUid||typeof value.onion!=='boolean'||typeof value.ghostAll!=='boolean'||!Number.isSafeInteger(value.from)||!Number.isSafeInteger(value.to)||
+      ![value.previousOpacity,value.nextOpacity].every(function(n){return Number.isFinite(n)&&n>=0&&n<=100;})||!['default','tinted','outline'].includes(value.mode))throw new Error('Native onion selection is unavailable');
+    var out={};keys.forEach(function(k){if(value[k]!==undefined)out[k]=k==='shift'&&value.shift?{x:value.shift.x,y:value.shift.y,next:value.shift.next}:value[k];});
+    return out;
+  }
+  function ghostKey(value){return JSON.stringify(ghostSel(value));}
   function requestView(request,selected){
+    if(selected.ghosts)request.ghosts=selected.ghosts;
     if(selected.mode!=='canvas')request.viewMode=selected.mode;
     if(!equalNav(selected.navigation,nav()))request.navigation=selected.navigation;
     if(selected.displayFilter!=='none')request.displayFilter=selected.displayFilter;
   }
-  function sameView(a,b){return a.mode===b.mode&&equalNav(a.navigation,b.navigation)&&a.displayFilter===b.displayFilter;}
+  function sameView(a,b){return a.mode===b.mode&&equalNav(a.navigation,b.navigation)&&a.displayFilter===b.displayFilter&&ghostKey(a.ghosts)===ghostKey(b.ghosts);}
   function projection(value,mode,navigation){
     if(!['canvas','stored-camera'].includes(mode))return null;
     var wanted;try{wanted=nav(navigation);}catch(_){return null;}
@@ -42,7 +55,7 @@
     var result={mode:mode,cameraAvailable:available,documentToComposition:forward,compositionToDocument:inverse};if(navigationValue!==undefined)result.navigation=actual;return result;
   }
   // The existing session owns desired presentation only. No geometry/camera keys live here.
-  function navigation(readMode,observe,readFilter){
+  function navigation(readMode,observe,readFilter,readGhosts){
     var owner=null,mode=null,desired=nav(),gesture=null;
     function observedBegin(kind,code){
       var tag=kind==='pan'?'pan':kind==='zoom'?'zoom':'other';
@@ -51,9 +64,10 @@
     function identity(info){return JSON.stringify([info.instanceId,info.documentId,info.lifecycleGeneration]);}
     function read(info){var next=viewMode(readMode),key=identity(info);
       if(owner!==key||mode!==next){owner=key;mode=next;desired=nav();gesture=null;}
-      return {mode:mode,navigation:nav(desired),displayFilter:displayFilter(readFilter?readFilter():undefined)};
+      var ghosts=null;try{ghosts=readGhosts?ghostSel(readGhosts(info)):null;}catch(_){ghosts=null;}
+      return {mode:mode,navigation:nav(desired),displayFilter:displayFilter(readFilter?readFilter():undefined),ghosts:ghosts};
     }
-    function matches(p,info){try{var value=read(info);return !!p&&!!p.view&&p.view.mode===value.mode&&equalNav(nav(p.view.navigation),value.navigation)&&displayFilter(p.displayFilter)===value.displayFilter;}catch(_){return false;}}
+    function matches(p,info){try{var value=read(info);return !!p&&!!p.view&&p.view.mode===value.mode&&equalNav(nav(p.view.navigation),value.navigation)&&displayFilter(p.displayFilter)===value.displayFilter&&ghostKey(p.ghosts&&p.ghosts.selected)===ghostKey(value.ghosts);}catch(_){return false;}}
     function begin(p,info,frame,mapping,shownBounds,kind,point){
       var selected=read(info),b=mapping&&mapping.cssBounds;
       if(!p||p.frame!==frame||p.view.mode!==selected.mode||!b||!shownBounds||!['x','y','width','height'].every(function(k){return Number.isFinite(b[k])&&b[k]===shownBounds[k];})||b.width<=0||b.height<=0||!['pan','zoom'].includes(kind)){
@@ -156,7 +170,7 @@
       clearWanted: function () { wanted = null; }
     });
   }
-  function inspectReceipt(receipt,ownerMatches,allowDeferred,viewMode,navigation,filter){
+  function inspectReceipt(receipt,ownerMatches,allowDeferred,viewMode,navigation,filter,wantedGhosts){
     if(!ownerMatches)return {failure:'owner'};
     if(!receipt)return {failure:'receipt'};
     var status=receipt.status;
@@ -169,12 +183,27 @@
     if(!Number.isSafeInteger(viewGeneration)||viewGeneration<1)return {failure:'view-generation'};
     var view=projection(receipt.view,viewMode||'canvas',navigation);if(!view)return {failure:'view'};
     var actual;try{actual=displayFilter(receipt.displayFilter);if(actual!==displayFilter(filter))return {failure:'display-filter'};}catch(_){return {failure:'display-filter'};}
-    return {failure:null,status:status,workId:workId,viewGeneration:viewGeneration,view:view,displayFilter:actual};
+    var ghosts;try{ghosts=ghostReceipt(receipt.ghosts,wantedGhosts);}catch(_){return {failure:'ghosts'};}
+    var done={failure:null,status:status,workId:workId,viewGeneration:viewGeneration,view:view,displayFilter:actual};
+    if(ghosts)done.ghosts=ghosts;
+    return done;
+  }
+  // What the renderer did with the onion selection: exactly the selection asked for, or nothing at all when none was asked for.
+  function ghostReceipt(value,wanted){
+    var asked=ghostSel(wanted);
+    if(!asked){if(value!==undefined)throw new Error('Native onion receipt was not requested');return null;}
+    if(!value||typeof value!=='object'||!['frames,selected,status','frames,reason,selected,status'].includes(Object.keys(value).sort().join(','))||
+      JSON.stringify(ghostSel(value.selected))!==JSON.stringify(asked)||!['composited','empty','unavailable'].includes(value.status)||
+      !Number.isSafeInteger(value.frames)||value.frames<0||(value.status==='unavailable')!==(value.reason!==undefined)||(value.reason!==undefined&&!/^[a-z_]{1,40}$/.test(value.reason)))throw new Error('Native onion receipt is unavailable');
+    var out={selected:asked,status:value.status,frames:value.frames};if(value.reason!==undefined)out.reason=value.reason;
+    return out;
   }
   function presentedFrame(receipt,request,frame){
-    return {owner:'native',status:'presented',contextId:'scene-root',frame:frame,workId:receipt.workId,
+    var shown={owner:'native',status:'presented',contextId:'scene-root',frame:frame,workId:receipt.workId,
       viewGeneration:receipt.viewGeneration,view:receipt.view,displayFilter:receipt.displayFilter,instanceId:request.instanceId,documentId:request.documentId,
       contentRevision:request.contentRevision,documentSnapshotId:request.documentSnapshotId,lifecycleGeneration:request.lifecycleGeneration};
+    if(receipt.ghosts)shown.ghosts=receipt.ghosts;
+    return shown;
   }
   function create(subscribe,guard){
     var active=true,connected=false,epoch=0,visible=null,binding=null,detached=false,waiter=null,reason=null,rejectStop;

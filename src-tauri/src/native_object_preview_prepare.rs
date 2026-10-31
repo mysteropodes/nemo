@@ -7,7 +7,7 @@ use native_engine::{
     },
     desktop_viewport::{ObjectPreviewNavigation, ObjectPreviewView},
     object_frame_packet::ObjectFrameSelector,
-    object_render_scene::{ObjectBrushAdmission, ObjectPaintPlan},
+    object_render_scene::{GhostUnderlayRequest, ObjectBrushAdmission, ObjectPaintPlan},
     object_snapshot::ObjectSnapshot,
     scheduler::{EvaluationKey, OutputSpec},
 };
@@ -19,9 +19,20 @@ pub(super) struct PreparedObjectPreview {
     pub(super) output: OutputSpec,
     pub(super) view: ObjectPreviewView,
     pub(super) navigation: ObjectPreviewNavigation,
+    /// Viewport-only onion / Ghost All settings: part of the canonical quality identity of the frame.
+    pub(super) ghosts: Option<GhostUnderlayRequest>,
 }
 
 impl PreparedObjectPreview {
+    /// The one canonical cache identity of this preview: view, navigation and the onion settings.
+    pub(super) fn quality(&self) -> String {
+        let base = self.navigation.quality(self.view);
+        match &self.ghosts {
+            Some(ghosts) => format!("{base}{}", ghosts.quality_suffix()),
+            None => base,
+        }
+    }
+
     /// Only a materialized native plan supplies resource versions. CPU admission
     /// alone is not a paint plan, scheduler key or presentation proof.
     pub(super) fn materialized_key(&self, plan: &ObjectPaintPlan) -> Result<EvaluationKey, String> {
@@ -30,7 +41,7 @@ impl PreparedObjectPreview {
             self.snapshot.snapshot_id(),
             packet.context_id(),
             packet.frame(),
-            self.navigation.quality(self.view),
+            self.quality(),
             self.output.clone(),
             plan.scene_resource_versions()
                 .map_err(|error| format!("preview scene resources: {error:?}"))?,
@@ -66,6 +77,7 @@ impl NativeObjectHost {
             output,
             view,
             ObjectPreviewNavigation::default(),
+            None,
             pending_proof_fallback,
         )
     }
@@ -75,9 +87,13 @@ impl NativeObjectHost {
         output: OutputSpec,
         view: ObjectPreviewView,
         navigation: ObjectPreviewNavigation,
+        ghosts: Option<GhostUnderlayRequest>,
         pending_proof_fallback: bool,
     ) -> Result<PreparedObjectPreview, String> {
         navigation.validate()?;
+        if let Some(ghosts) = &ghosts {
+            ghosts.validate().map_err(str::to_owned)?;
+        }
         if self.released.is_some() || self.preview.released {
             return Err("native object host was released".into());
         }
@@ -126,6 +142,7 @@ impl NativeObjectHost {
             output,
             view,
             navigation,
+            ghosts,
         })
     }
 }

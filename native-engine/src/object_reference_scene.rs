@@ -159,6 +159,7 @@ pub fn prepare_object_navigated_viewport_composition(
         media: None,
         reference,
         rasters: None,
+        ghosts: None,
     };
     crate::object_render_scene::brush_paint::attach(crate::object_render_scene::text_scene::attach(
         crate::object_render_scene::raster_scene::attach(witness, prior_images)?,
@@ -173,6 +174,25 @@ impl ObjectCompositionWitness {
             .then(|| self.camera.unwrap_or([1., 0., 0., 1., 0., 0.]))
     }
 
+    /// Compose `ghosts` under the live frame. Only a viewport witness takes them, and only the ones prepared from the
+    /// very snapshot and frame of this witness; the canonical viewport quality gains the onion identity, so the
+    /// scheduler key and the cached frame of another setting can never be mistaken for this one.
+    pub fn with_ghost_underlay(
+        mut self,
+        ghosts: Arc<crate::object_render_scene::ghost_underlay::GhostUnderlay>,
+    ) -> Result<Self, ObjectSceneError> {
+        let packet = self.plan.packet();
+        if !self.viewport || !ghosts.is_for(packet.document_snapshot_id(), packet.frame()) {
+            return Err(ObjectSceneError::WrongSnapshot);
+        }
+        let base = self.viewport_quality.take().ok_or(ObjectSceneError::WrongSnapshot)?;
+        self.viewport_quality = Some(format!("{base}{}", ghosts.request().quality_suffix()));
+        self.ghosts = Some(ghosts);
+        Ok(self)
+    }
+    pub(crate) fn ghost_underlay(&self) -> Option<&crate::object_render_scene::ghost_underlay::GhostUnderlay> {
+        self.ghosts.as_deref()
+    }
     /// Availability is sampled from this exact retained packet, never legacy UI state.
     pub fn viewport_stored_camera_available(&self) -> bool {
         self.viewport

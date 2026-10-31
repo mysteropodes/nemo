@@ -344,6 +344,14 @@ impl Compositor {
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         {
             self.last_reference_image = reference_image;
+            // Ghost images the live frame does not draw would stay resident (and charged) in the renderer's atlas
+            // for as long as it lives: start a fresh one rather than accumulating a decoded image per ghost frame.
+            if prepared
+                .ghost_underlay()
+                .is_some_and(|g| g.draws_foreign_images(prepared))
+            {
+                self.reset_object_image_cache()?;
+            }
         }
         Ok(ObjectCompositionResult {
             instance: self.instance.clone(),

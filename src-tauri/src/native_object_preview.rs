@@ -16,7 +16,7 @@ use native_engine::{
     },
     object_frame_packet::ObjectFrameSelector,
     object_render_scene::{
-        prepare_object_navigated_viewport_composition,
+        prepare_ghost_underlay, prepare_object_navigated_viewport_composition,
         prepare_scheduled_object_composition_from_witness, ObjectCompositionWitness,
     },
     resource_leases::WorkId,
@@ -227,6 +227,7 @@ impl NativeObjectHost {
             output,
             view,
             ObjectPreviewNavigation::default(),
+            None,
             pending_proof_fallback,
             operation,
         )
@@ -237,6 +238,7 @@ impl NativeObjectHost {
         output: OutputSpec,
         view: ObjectPreviewView,
         navigation: ObjectPreviewNavigation,
+        ghosts: Option<native_engine::object_render_scene::GhostUnderlayRequest>,
         pending_proof_fallback: bool,
         operation: impl FnOnce(&mut Self) -> Result<T, String>,
     ) -> Result<T, String> {
@@ -248,6 +250,7 @@ impl NativeObjectHost {
             output,
             view,
             navigation,
+            ghosts,
             pending_proof_fallback,
         )?;
         self.preview.prepared = Some(prepared);
@@ -320,7 +323,7 @@ impl NativeObjectHost {
         }
         // Cancel a different source or viewport identity before brush retirement.
         // The same immutable admission and navigation may retain deferred work.
-        let quality = prepared.navigation.quality(prepared.view);
+        let quality = prepared.quality();
         if self.preview.pending.as_ref().is_some_and(|work| {
             let key = work.key();
             key.document_snapshot_id() != prepared.snapshot.snapshot_id()
@@ -346,6 +349,7 @@ impl NativeObjectHost {
             snapshot,
             view,
             navigation,
+            ghosts,
             ..
         } = prepared;
         // T12: the frame's videos (MissingLink refused before any decode). Media is
@@ -389,6 +393,20 @@ impl NativeObjectHost {
         let vector_source = (!composition.has_scene_images() && !media.draws_video(expected.frame))
             .then(|| composition.clone());
         let composition = media.witness(expected.frame, composition)?;
+        // #2358 GHOST-UNDER: onion / Ghost All composed UNDER the live frame by the native renderer (preview only; this
+        // witness is the viewport witness, never an export). The retained vector source above is hit-test geometry and
+        // never contains ghosts.
+        let (composition, ghost_receipt) = match &ghosts {
+            Some(request) => {
+                let underlay = prepare_ghost_underlay(&snapshot, request, expected.frame);
+                let receipt = underlay.receipt();
+                let composition = composition
+                    .with_ghost_underlay(underlay)
+                    .map_err(|e| format!("preview onion composition: {e:?}"))?;
+                (composition, Some(receipt))
+            }
+            None => (composition, None),
+        };
         let key = if media.draws_video(expected.frame) {
             EvaluationKey::new(
                 key.document_snapshot_id(),
@@ -494,7 +512,11 @@ impl NativeObjectHost {
             self.preview.presented_mesh_view = Some(receipt.clone());
             self.preview.presented_vectors = vector_source;
         }
-        Ok(ObjectPresentedFrame { receipt, view })
+        Ok(ObjectPresentedFrame {
+            receipt,
+            view,
+            ghosts: ghost_receipt,
+        })
     }
 
 

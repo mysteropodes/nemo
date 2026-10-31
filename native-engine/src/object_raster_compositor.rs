@@ -42,6 +42,10 @@ impl Compositor {
             for image in prepared.raster_images().chain(prepared.brush_images()) {
                 self.renderer.mark_override_image_dirty(image);
             }
+            // #2358 GHOST-UNDER: the ghost frames' images are restored like any live native asset.
+            for image in prepared.ghost_underlay().into_iter().flat_map(|g| g.images()) {
+                self.renderer.mark_override_image_dirty(image);
+            }
         }
         // Append the whole artwork after all per-item paint, preserving stroke,
         // gradient, glyph and image transforms. No affine is applied twice.
@@ -61,6 +65,12 @@ impl Compositor {
         } else {
             &mut self.scene
         };
+        // Onion / Ghost All sit UNDER the live frame (baseline stack order): drawn first, in the same artwork scene,
+        // so the camera / viewport navigation applies to them exactly once and live pixels win where they overlap.
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        if let Some(ghosts) = prepared.ghost_underlay() {
+            ghosts.draw(scene);
+        }
         for entry in ordered_entries(prepared.plan()) {
             match entry {
                 PaintEntry::Contour(command) => {
