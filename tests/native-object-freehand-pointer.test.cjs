@@ -868,10 +868,22 @@ test('an enabled Labs draw hook with no native route refuses with a typed reason
  assert.equal(Paint.labsRefusal({SMLabs:{list:()=>[{name:'x',on:false}]}}),null);
  assert.deepEqual(Paint.labsRefusal({SMLabs:{list:()=>[{name:'x',on:true},{name:'y',on:false}]}}).hooks,['x'],'without the registry, any enabled prototype blocks, by name');
 });
-test('the bitmap brush names the enabled Labs prototypes in its refusal', () => {
+test('the bitmap brush names the enabled Labs draw hooks in its refusal, under its own code', () => {
  const Bitmap=require('../src/js/adapters/native-object-draw-bitmap.js'),state={tool:'draw',bitmapBrushOn:true,strokeEnabled:true,vectorBrush:false};
- const root={SMBitmapBrush:{bake(){}},SMLabs:{list:()=>[{name:'predictive-stroke',on:true},{name:'canvas-grid',on:false}]}};
- assert.throws(()=>Bitmap.style(root,state,{}),e=>e.code==='native-draw-labs-hook-unmigrated'&&e.hooks[0]==='predictive-stroke'&&/predictive-stroke is on/.test(e.message));
+ // predictive-stroke is migrated for native Draw, but the bitmap command runs no Labs hook: refused, not mislabelled as unmigrated.
+ const root={SMBitmapBrush:{bake(){}},SMLabs:{list:()=>[{name:'predictive-stroke',on:true},{name:'canvas-grid',on:true}],
+  enabledDrawHooks:()=>['predictive-stroke'],unmigratedDrawHooks:()=>[]}};
+ assert.throws(()=>Bitmap.style(root,state,{}),e=>e.code==='native-bitmap-brush-labs-unsupported'&&e.hooks.join()==='predictive-stroke'&&/predictive-stroke is on/.test(e.message));
+ // A view-aid prototype with no draw hook does not block the bitmap brush.
+ const aid={SMBitmapBrush:{bake(){}},SMLabs:{list:()=>[{name:'canvas-grid',on:true}],enabledDrawHooks:()=>[]}};
+ assert.equal(Bitmap.style(aid,state,{}).bitmap.tip,'soft');
+});
+test('the Labs registry lists enabled draw hooks, migrated or not, and skips view aids', () => {
+ const Model=require('../src/js/adapters/labs-registry-model.js');
+ const L=Model.create({getItem:()=>'1',setItem(){},warn(){},toast(){},describe:k=>k});
+ L.register('hooked-native',{flag:'a',onStroke(){},nativeDraw:true});L.register('hooked',{flag:'b',onPreview(){}});L.register('aid',{flag:'c'});
+ assert.deepEqual(L.enabledDrawHooks().sort(),['hooked','hooked-native']);
+ assert.deepEqual(L.unmigratedDrawHooks(),['hooked']);
 });
 test('every production Labs prototype with a draw hook declares its native route, so none is left unnamed',()=>{
  const dir=path.join(ROOT,'src/js/labs'),hooked=[];
