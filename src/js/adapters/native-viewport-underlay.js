@@ -143,6 +143,8 @@
     function nudgeSelect() {
       var overlay = root.NemoNativeSelectOverlay;
       if (overlay && typeof overlay.notify === 'function') overlay.notify(root);
+      var aids = root.NemoNativeViewAids; // #2373: the view aids map through the same presentation
+      if (aids && typeof aids.notify === 'function') aids.notify(root);
     }
     return Object.freeze({
       projectionReady: function (info) {

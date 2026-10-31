@@ -64,7 +64,7 @@
   function readMotionKeyTimelines(root,info){return readMotion(root,info,'readKeyTimelines');}
   function setKeyTimelineRows(root,layout,info){
     var view=views.get(root);
-    if(!view||!sameTimingPin(view.pin,info)||!Array.isArray(layout)||!view.rows.every(function(row,i){return row.parentNode===view.list&&row.children.length===4&&view.controls[i].every(function(n,k){return row.children[k]===n;});}))return false;
+    if(!view||!sameTimingPin(view.pin,info)||!Array.isArray(layout)||!view.rows.every(function(row,i){return row.parentNode===view.list&&row.children.length===view.controls[i].length&&view.controls[i].every(function(n,k){return row.children[k]===n;});}))return false;
     var labels=new Map();
     for(var entry of layout){
       if(!entry||typeof entry.layerUid!=='string'||labels.has(entry.layerUid)||!Array.isArray(entry.labels)||!entry.labels.every(function(v){return typeof v==='string';})||!info.layers.some(function(l){return l.layerUid===entry.layerUid;}))return false;
@@ -260,14 +260,14 @@
     seam(root).publish(root,info);
     var shyMode=typeof ports.readShyMode==='function'&&ports.readShyMode()===true,policyOwner=policyPort(ports);
     var list=node(root,'layer-list'),header=node(root,'frame-hdr'),grid=node(root,'frame-grid');
-    var previous=views.get(root),selection=root._layerSel||[];
+    var previous=views.get(root),selection=root._layerSel||[],decorKey=JSON.stringify([info.layerFolders,info.layerModelUnavailable]);
     var reuse=frameOnly===true&&previous&&previous.ports===ports&&previous.list===list&&previous.header===header&&previous.grid===grid&&
-      previous.shyMode===shyMode&&previous.inspector===root.document.getElementById('props-panel')&&previous.active===root.state.activeLayerIdx&&
+      previous.shyMode===shyMode&&previous.decorKey===decorKey&&previous.inspector===root.document.getElementById('props-panel')&&previous.active===root.state.activeLayerIdx&&
       ['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].every(function(k){return previous.pin[k]===info[k];})&&
       selection.length===previous.selection.length&&selection.every(function(value,i){return previous.selection[i]===value;})&&
-      info.layers.length===previous.metadata.length&&info.layers.every(function(layer,i){var old=previous.metadata[i];return old[0]===layer.layerUid&&old[1]===layer.name&&old[2]===layer.visible&&old[3]===layer.locked&&old[4]===layer.shy;})&&
+      info.layers.length===previous.metadata.length&&info.layers.every(function(layer,i){var old=previous.metadata[i];return old[0]===layer.layerUid&&old[1]===layer.name&&old[2]===layer.visible&&old[3]===layer.locked&&old[4]===layer.shy&&old[5]===JSON.stringify(layer);})&&
       list.children.length===previous.rows.length&&previous.rows.every(function(row,i){return list.children[i]===row&&
-        row.children.length===4&&previous.controls[i].every(function(control,k){return row.children[k]===control;});})&&
+        row.children.length===previous.controls[i].length&&previous.controls[i].every(function(control,k){return row.children[k]===control;});})&&
       header.children.length===1&&header.children[0]===previous.caption&&((root.NemoNativeLayerRangeDesktop&&root.NemoNativeLayerRangeDesktop.owns(root,grid,previous.unavailable))||(grid.children.length===1&&grid.children[0]===previous.unavailable));
     var rows,caption,unavailable;
     if(reuse){rows=previous.rows;caption=previous.caption;unavailable=previous.unavailable;}
@@ -286,7 +286,7 @@
           if(row.parentNode!==list||!views.get(root)||!views.get(root).rows.includes(row))return false;
           return setLayerPolicy(root,layer.layerUid,flag,value,info,ports);
         },
-        onOpen:function(layer){return typeof ports.openLayer==='function'&&ports.openLayer(layer.layerUid);}});
+        onOpen:function(layer){return typeof ports.openLayer==='function'&&ports.openLayer(layer.layerUid);},layerKind:root.SMLayerKind,blendLabels:root.BLEND_MODE_LABELS,matteLabel:typeof root.matteModeLabel==='function'?root.matteModeLabel:null});
       caption=createNativeObjectUiText(root,'div','');
       unavailable=createNativeObjectUiText(root,'div','Native keyframe, held-frame and tween timing is unavailable.');
       unavailable.setAttribute('role','status');unavailable.className='native-object-timing-unavailable';
@@ -300,9 +300,9 @@
       frameEditPending:function(){var controller=root.NemoNativeFrameEditController;return !!(controller&&controller.isPending());}}));
     unavailableInspector(root,ports,info);
     if(!reuse){var pin={};['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].forEach(function(k){pin[k]=info[k];});
-      views.set(root,{list:list,header:header,grid:grid,inspector:root.document.getElementById('props-panel'),rows:rows,
+      views.set(root,{decorKey:decorKey,list:list,header:header,grid:grid,inspector:root.document.getElementById('props-panel'),rows:rows,
         controls:rows.map(function(row){return Array.from(row.children);}),shyMode:shyMode,caption:caption,unavailable:unavailable,
-        ports:ports,pin:pin,active:root.state.activeLayerIdx,selection:selection.slice(),metadata:info.layers.map(function(layer){return [layer.layerUid,layer.name,layer.visible,layer.locked,layer.shy];})});}
+        ports:ports,pin:pin,active:root.state.activeLayerIdx,selection:selection.slice(),metadata:info.layers.map(function(layer){return [layer.layerUid,layer.name,layer.visible,layer.locked,layer.shy,JSON.stringify(layer)];})});}
     var field=root.document.getElementById('tl-cf');
     if(field){if(root.document.activeElement!==field)field.value=root.state.currentFrame+1;field.max=info.totalFrames;}
     ['tl-tf','info-frame'].forEach(function(id){var el=root.document.getElementById(id);if(el)el.textContent=id==='tl-tf'?info.totalFrames:root.state.currentFrame+1;});
@@ -385,7 +385,7 @@
     try{var ports=view.ports,session=ports.currentSession(),info=session&&session.info();owner=policyPort(ports);
       ready=!!owner&&!policyTasks.has(root)&&!!session&&session.isActive()&&session.blocksLegacy()===true&&sameTimingPin(view.pin,info)&&ports.projectionReady(info)===true&&confirmed(root,info,session.readPresentedObjectSession());
     }catch(_){}
-    view.controls.forEach(function(controls){controls.slice(2).forEach(function(button){button.disabled=!ready;});});
+    view.controls.forEach(function(controls){controls.slice(2,4).forEach(function(button){button.disabled=!ready;});});
     return ready;
   }
   function policyPort(ports){try{var value=typeof ports.layerPolicy==='function'&&ports.layerPolicy();return value&&typeof value.edit==='function'?value:null;}catch(_){return null;}}

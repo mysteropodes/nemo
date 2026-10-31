@@ -2437,6 +2437,7 @@
         "native_object_desktop_export_extent_tests.rs",
         "native_object_desktop_export_text_tests.rs",
         "native_object_project_tests.rs",
+        "native_object_project_info_tests.rs",
         "native_object_project_timing_tests.rs",
         "native_object_reference_tests.rs",
         "native_object_reference_preview_tests.rs",

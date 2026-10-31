@@ -47,3 +47,25 @@ test('the layer table still refuses a member that is not part of any contract',(
   const root={state:{},userLayers:[],selectedPaths:[]};
   assert.throws(()=>Files.projectView(root,{...base([{layerUid:'a',surprise:1}])}),/unsupported/);
 });
+// #2371 review: the engine emits lists and strings as stored; a valid answer must never read as "uncorrelated".
+test('decoder limits admit everything the engine can emit (long lists, empty and long strings, hundreds of rich rows)',()=>{
+  const uid=n=>'ly_'+String(n).padStart(5,'0')+'_mh3k2j9a4f';
+  const rich=n=>({layerUid:uid(n),name:'Layer '+n+' — Forme '+(n%17)+' (détail très long)',visible:true,locked:false,shy:false,
+    color:'#5FA875',parentLayerUid:n?uid(n-1):null,kind:'draw',folderId:'folder-'+(n%40),blendMode:'multiply',matteMode:'alphaInverted',
+    matteSourceLayerUid:uid(n+1),mattesMore:[{uid:uid(n+2),mode:'luma'},{uid:uid(n+3),mode:'alpha'}],isMatteSource:true,opacity:50.5,opacityAnimated:true});
+  const rows=Array.from({length:400},(_,n)=>rich(n));
+  const folders=Array.from({length:2000},(_,n)=>({folderId:'fold-'+n,collapsed:n%2===0,name:'F'+n}));
+  const read=Metadata.decode({...base(rows),layerFolders:folders,layerModelUnavailable:['linkGroup']},request);
+  assert.equal(read.layers.length,400);assert.deepEqual(read.layers[399],rows[399]);assert.equal(read.layerFolders.length,2000);
+  const many=Array.from({length:5000},(_,n)=>({uid:'s'+n,mode:''}));
+  const long='x'.repeat(1024*1024);
+  const edge=Metadata.decode(base([{layerUid:'a',blendMode:'',matteMode:'',mattesMore:many,matteSourceLayerUid:long,folderId:long,componentId:long}]),request);
+  assert.equal(edge.layers[0].mattesMore.length,5000);assert.equal(edge.layers[0].matteMode,'');assert.equal(edge.layers[0].folderId.length,long.length);
+  // The route refuses any answer over 4 MiB, so a single string past that can never be a real answer.
+  const over='y'.repeat(4*1024*1024+1);
+  for(const extra of [{folderId:over},{matteSourceLayerUid:over},{blendMode:over},{mattesMore:[{uid:'u',mode:over}]}])
+    assert.throws(()=>Metadata.decode(base([{layerUid:'a',...extra}]),request),/uncorrelated/);
+  assert.throws(()=>Metadata.decode({...base([{layerUid:'a'}]),layerFolders:[{folderId:'f',collapsed:true,name:over}]},request),/uncorrelated/);
+  // Empty ids stay refused: engine admission never lets one through.
+  assert.throws(()=>Metadata.decode(base([{layerUid:'a',mattesMore:[{uid:'',mode:'alpha'}]}]),request),/uncorrelated/);
+});

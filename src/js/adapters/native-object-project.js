@@ -482,6 +482,7 @@
     catch(error){return uiFailure(root,error);}
     // #2372: a repaint follows a tool, layer, frame or mode change; the Select overlay re-checks its context (one-shot).
     var overlay=root.NemoNativeSelectOverlay;if(overlay&&typeof overlay.notify==='function')overlay.notify(root);
+    var aids=root.NemoNativeViewAids;if(aids&&typeof aids.notify==='function')aids.notify(root); // #2373
     return true;
   }
   function selectLayerUI(root,index,preserveLayerSel,uid,expected){

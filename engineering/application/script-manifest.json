@@ -256,6 +256,7 @@
     {"src":"js/group-bridge.js"},
     {"src":"js/adapters/select-canvas-intent.js"},
     {"src":"js/adapters/native-select-overlay.js"},
+    {"src":"js/adapters/native-view-aids-ui.js"},
     {"src":"js/adapters/native-select-gesture.js"},
     {"src":"js/adapters/native-selection-steps.js"},
     {"src":"js/adapters/native-selection-style.js"},
