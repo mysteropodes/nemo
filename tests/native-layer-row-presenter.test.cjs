@@ -131,13 +131,25 @@ test('frameOnly with an unchanged revision serialises nothing and reuses every r
  assert.notStrictEqual(list.children[0],before[0],'a new content revision rebuilds');
 });
 
-test('frameOnly reuse at 2000 layers stays far below a per-layer serialisation cost',()=>{
+test('frameOnly reuse at 2000 layers does O(1) serialisation and builds no node (counted operations, not a clock)',()=>{
  const many=Array.from({length:2000},(_,i)=>({layerUid:'l'+i,name:'Layer '+i,visible:true,locked:false,shy:false}));
  const r=rootFor();paint(r,info(many),false);
+ const before=r.document.getElementById('layer-list').children.slice();
  const ports=r.ports,value=info(many);Files.projectView(r,value);r._layerSel=[0];
- const t=process.hrtime.bigint();for(let k=0;k<5;k++)assert.equal(UI.render(r,value,true,ports),true);
- const ms=Number(process.hrtime.bigint()-t)/1e6/5;
- assert.ok(ms<25,'frameOnly render of 2000 layers took '+ms.toFixed(1)+' ms');
+ // Spies: every JSON.stringify (a per-layer serialisation would add one or more per row) and every DOM node the frame advance creates.
+ const real=JSON.stringify,create=r.document.createElement;let stringified=0,created=0;
+ JSON.stringify=function(){stringified++;return real.apply(this,arguments);};
+ r.document.createElement=function(){created++;return create.apply(this,arguments);};
+ try{for(let k=0;k<5;k++)assert.equal(UI.render(r,value,true,ports),true);}
+ finally{JSON.stringify=real;r.document.createElement=create;}
+ assert.equal(stringified,0,'five frame advances over 2000 layers ran no JSON.stringify (a per-layer pass would run 10000)');
+ assert.equal(created,0,'no row or decoration node is built on a frame advance');
+ const list=r.document.getElementById('layer-list').children;
+ assert.equal(list.length,2000);assert.ok(list.every((row,i)=>row===before[i]),'all 2000 rows are the very same nodes');
+ // The spy can fail: a new revision rebuilds every row, and the same counters see it.
+ created=0;r.document.createElement=function(){created++;return create.apply(this,arguments);};
+ try{UI.render(r,(Files.projectView(r,info(many,4)),info(many,4)),true,ports);}finally{r.document.createElement=create;}
+ assert.ok(created>=2000,'a rebuild creates at least one node per layer ('+created+'), so the counter would catch a regression');
 });
 
 test('the four controls stay the first four children; flex order places the decorations around them',()=>{
