@@ -240,6 +240,17 @@
       "reason": "no executable regions in the coverage report",
       "note": "T08 Guide: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean f405eb49ebcf483c8f69e8c92e61ce26ec070401. Report SHA256 3dcfa955293ee92c79e96435fdd6ceb51f1614f4d127efdecad1a3371da699ed. All existing entries, aggregate floors, exclusions and recorded provenance are preserved."
     },
+    "nemo-mcp/src/native_component_read_contract.rs": {
+      "lines": 99.15,
+      "regions": 99.48,
+      "functions": 100,
+      "note": "#2256: observed floors from a local cargo-llvm-cov 0.9.1 run of nemo-mcp (cargo llvm-cov --json, lib and integration tests, 0 failed) on the candidate tree. Hand-added for the two new files only; all prior entries, aggregate floors and exclusions are preserved."
+    },
+    "nemo-mcp/src/native_component_read_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "#2256: cfg(test) child of native_component_read_contract.rs; hand-added with its parent, no other entry changed."
+    },
     "nemo-mcp/src/native_history_read_contract.rs": {
       "lines": 100,
       "regions": 100,

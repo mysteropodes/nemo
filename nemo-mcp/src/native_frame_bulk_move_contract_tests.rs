@@ -140,7 +140,7 @@ fn complete_schema_connects_move_after_all_original27_result_branches_and_accept
     let branches = schema["$defs"]["ResponseBase"]["properties"]["result"]["oneOf"]
         .as_array()
         .unwrap();
-    assert_eq!(branches.len(), 39);
+    assert_eq!(branches.len(), 40);
     assert_eq!(
         branches[37],
         json!({"$ref":"#/$defs/ObjectHistoryReadResult"})
