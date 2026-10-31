@@ -282,6 +282,13 @@ fn a_grouped_record_lists_the_groups_it_sits_in_outermost_first_and_a_loose_reco
     assert_eq!(path("v2"), path("vector"), "a sibling shares the inner group");
     assert_eq!(path("v3"), Some(json!([{"id":"outer","name":"Body"}])), "a direct member of the outer group alone");
     assert_eq!(path("v4"), None, "a loose stroke of a grouped layer lists none");
+    // The stored combine mode rides on the group's own entry; a legacy group without one lists none (the panel reads that as `none`).
+    doc["layers"][0]["groups"]["entries"][0]["combineMode"] = json!("subtract");
+    doc["layers"][0]["groups"]["entries"][1]["combineMode"] = json!("none");
+    let items = listing(&doc)["items"].as_array().unwrap().clone();
+    let path = |id: &str| items.iter().find(|i| i["stableTarget"]["strokeId"] == id).unwrap().get("groupPath").cloned();
+    assert_eq!(path("vector"), Some(json!([{"id":"outer","name":"Body","mode":"subtract"},{"id":"inner","mode":"none"}])), "each group lists its own stored mode");
+    assert_eq!(path("v3"), Some(json!([{"id":"outer","name":"Body","mode":"subtract"}])));
 }
 
 #[test]
