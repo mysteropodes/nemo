@@ -31,6 +31,11 @@
   function failure(win, error) {
     toast(win, (error && error.message || 'Native widget is unavailable.') + (error && error.code ? ' (' + error.code + (error.reason ? ': ' + error.reason : '') + ')' : ''));
   }
+  // True when the presentation is unreadable only because the native queue is busy.
+  function queueBusy(win) {
+    const W = win.NemoNativePresentationWait, s = session(win);
+    return !!W && !!s && W.busy((f) => s.readPresentedObjectSession(f));
+  }
   // The proof that the widgets are read from the presentation the user is looking at, at the playhead.
   function proofNow(win, method) {
     const s = session(win);
@@ -40,11 +45,13 @@
       if (!info || !p || shown.available !== true || p.owner !== 'native' || p.status !== 'presented' || p.contextId !== 'scene-root' ||
         p.frame !== win.state.currentFrame || !samePin(p, info) || !samePin(shown, info)) return null;
       const ticket = s.readSubscriptionGeneration();
-      const current = () => {
+      // #2372: the native queue hides the presentation while any command is pending (a hover read, the repaint of the last write): that is
+      // "cannot prove it right now", so a pad on screen and a drag in flight survive it; `strict` (the commit) never accepts it.
+      const current = (strict) => {
         try {
-          const live = session(win), now = live && live.readPresentedObjectSession();
+          const live = session(win), why = [], now = live && live.readPresentedObjectSession((c) => why.push(c));
           return live === s && live.isActive() && !win.state.playing && win.state.currentFrame === p.frame && samePin(live.info(), info) &&
-            live.readSubscriptionGeneration() === ticket && !!now && now.presentation === p;
+            live.readSubscriptionGeneration() === ticket && (now ? now.presentation === p : !strict && why[0] === 'queue-pending');
         } catch (_) { return false; }
       };
       return { session: s, info, presentation: p, selector: { contextId: 'scene-root', frame: p.frame }, current };
@@ -103,6 +110,7 @@
 
     function refresh() {
       const proof = proofNow(win), prior = cached;
+      if (!proof && cached && queueBusy(win)) { if (hadPads) watch(); return Promise.resolve(cached.read); } // busy is not changed: keep the pads and the drag, look again next frame
       if (!proof) { if (cached) { serial++; cached = null; cancel(); } paint(); return Promise.resolve(null); }
       const key = keyOf(proof);
       if (prior && prior.key === key && prior.proof.current()) { prior.proof = proof; paint(); return prior.promise || Promise.resolve(prior.read); }
@@ -214,11 +222,19 @@
         drag.moved = true; paint();
       } catch (_) { cancel(); }
     }
+    // The commit needs the presentation PROVEN, not merely unrefuted: wait out a busy queue (bounded), then check strictly. A real change refuses.
+    function proven(entry) {
+      const W = win.NemoNativePresentationWait;
+      if (entry.proof.current(true)) return Promise.resolve(true);
+      if (!W) return Promise.resolve(false);
+      return W.await(win, { read: (f) => { const s = session(win); return s ? s.readPresentedObjectSession(f) : null; }, notice: 'The canvas is still busy - try the pad again.',
+        holds: () => entry.proof.current() }).then((r) => r.ready && entry.proof.current(true));
+    }
     function write(entry, send) {
       const api = adapter();
       if (!api) { toast(win, 'Native widget is unavailable.'); return Promise.resolve(false); }
       busy = true;
-      return Promise.resolve().then(() => send(api, entry.proof.selector.frame)).then(() => true, (error) => { failure(win, error); return false; })
+      return proven(entry).then((ok) => (ok ? Promise.resolve().then(() => send(api, entry.proof.selector.frame)).then(() => true, (error) => { failure(win, error); return false; }) : false))
         .then((ok) => { busy = false; return refresh().then(() => ok); });
     }
     function onUp(e) {

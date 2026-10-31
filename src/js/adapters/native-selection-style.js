@@ -77,7 +77,7 @@
   }
   // ONE native batch of restyle steps for the pending edit, against the document the selection was read from.
   async function commit(root, job) {
-    var I = root.NemoSelectCanvasIntent, O = root.NemoNativeSelectOverlay, labs = route(root), now = I && I.presentedState(root);
+    var I = root.NemoSelectCanvasIntent, O = root.NemoNativeSelectOverlay, labs = route(root), now = I && (I.presentedState(root) || await I.presentedSettled(root));
     // An edit made while an earlier one of ours was committing was read from the selection before that commit re-read it: it follows the
     // fresh selection of the same items.
     if (job.commits !== state(root).commits) {
@@ -180,7 +180,7 @@
     }
     return edit(root, {}, { from: a, to: b }, 'recolor:' + a);
   }
-  function edit(root, members, recolor, own) {
+  function edit(root, members, recolor, own, waited) {
     var s = state(root), paths = selected(root);
     if (!paths.length || !route(root)) return Promise.resolve({ status: 'unavailable' });
     // A commit in flight re-reads the selection when it ends: this edit follows it instead of reading the one before.
@@ -197,6 +197,8 @@
     if (pending && (!sameSelection(pending.ids, ids) || pending.own !== own)) { flush(root); pending = null; }
     if (!pending) {
       var shown = I.presentedState(root);
+      // #2372: hidden by a pending native command: wait for the presentation (bounded, the pick context must still hold), then take the edit from the top once.
+      if (!shown && !waited && typeof I.presentedSettled === 'function') return I.presentedSettled(root).then(function () { return edit(root, members, recolor, own, true); });
       if (!shown) { notice(root, 'Restyling is not available right now.'); return Promise.resolve({ status: 'unavailable' }); }
       var job = { ids: ids, paths: paths, style: {}, layerIdx: paths[0].data.nativeLayerIndex, layerUid: paths[0].data.nativeLayerUid, ctx: ctx, pin: shown.pin, frame: shown.presentation.frame,
         symbol: (root.state && root.state.activeSymbolId) || null, commits: s.commits, timer: 0, waiting: [], own: own, last: null, recolor: null };

@@ -79,8 +79,9 @@ function fixture(options = {}) {
     }
     return vm.runInContext('JSON.parse(' + JSON.stringify(JSON.stringify(response)) + ')', context);
   }
+  let hiddenByQueue = false; // another native command is pending: the public presentation getter reports queue-pending
   const session = { info: () => info, isActive: () => active, requestId: () => 'symmetry-' + (++serial),
-    readSubscriptionGeneration: () => 1, readPresentedObjectSession: () => active && !running ? projected(info) : null,
+    readSubscriptionGeneration: () => 1, readPresentedObjectSession: why => { if (active && !running && !hiddenByQueue) return projected(info); if (active && why) why('queue-pending'); return null; },
     runResourceCommand(action) {
       running++;
       const work = tail.then(() => { const origin = info;
@@ -110,6 +111,7 @@ function fixture(options = {}) {
   root.globalThis = root; root.window = root; context = vm.createContext(root);
   const browserRoot = vm.runInContext('globalThis', context);
   ProjectFile.projectView(browserRoot, info);
+  vm.runInContext(fs.readFileSync(require.resolve('../src/js/adapters/native-presentation-wait.js'), 'utf8'), context, { filename: 'native-presentation-wait.js' });
   for (const file of filesInHtml()) vm.runInContext(fs.readFileSync(require.resolve('../src/js/' + file), 'utf8'), context, { filename: file });
   controller = root.NemoNativeSymmetryController;
   async function settled() {
@@ -134,7 +136,7 @@ function fixture(options = {}) {
     info = { ...info, documentId: 'd2', lifecycleGeneration: 2 };
     controller.willProject(info); ProjectFile.projectView(browserRoot, info);
   }
-  return { root, state, area, controller, calls, notices, metadata, settled, edits, shown, external, holdNextRead, run,
+  return { root, state, area, controller, calls, notices, metadata, hideByQueue: v => { hiddenByQueue = v; }, settled, edits, shown, external, holdNextRead, run,
     refuse: v => { refuse = v; }, refuseReads: v => { refuseReads = v; }, replaceDocument, staleEdits: n => { staleEdits = n; },
     renders: () => renders };
 }
@@ -284,4 +286,33 @@ test('an unchanged confirmed value requests no further native frame; a real chan
   assert.equal(f.shown().extend, false, 'the refused intent is restored to native truth');
   assert.ok(f.renders() >= 3 && f.renders() <= 4, 'the restoration repaints and settles: ' + f.renders());
   const settledAt = f.renders(); await turns(40); assert.equal(f.renders(), settledAt);
+});
+
+// #2372 presentation-busy-audit: the native queue hides the presentation while ANY command is pending (queue-pending).
+test('a guide gesture made while another native command hides the presentation waits for it and sends its edit once', async () => {
+  const f = fixture({ metadata: { symmetryEnabled: true } });
+  await f.controller.presented(); await f.settled();
+  f.hideByQueue(true);
+  f.root.setSymmetryMode('x');
+  await new Promise(resolve => setTimeout(resolve, 150));
+  assert.deepEqual(f.edits(), [], 'nothing is sent while the presentation is hidden');
+  assert.deepEqual(f.notices, [], 'and nothing is refused');
+  f.hideByQueue(false);
+  for (let i = 0; i < 40 && !f.edits().length; i++) await new Promise(resolve => setTimeout(resolve, 20));
+  await f.controller.whenSettled(); await f.settled();
+  assert.deepEqual(f.edits(), [{ kind: 'setMode', mode: 'x' }]);
+  assert.deepEqual(f.shown(), effective(f.metadata));
+  assert.deepEqual(f.notices, []);
+});
+
+test('a guide gesture whose document was replaced while the presentation was hidden still refuses and sends nothing', async () => {
+  const f = fixture({ metadata: { symmetryEnabled: true } });
+  await f.controller.presented(); await f.settled();
+  f.hideByQueue(true);
+  f.root.setSymmetryMode('x');
+  await new Promise(resolve => setTimeout(resolve, 80));
+  f.replaceDocument(); f.hideByQueue(false);
+  await new Promise(resolve => setTimeout(resolve, 200));
+  await f.controller.whenSettled();
+  assert.deepEqual(f.edits(), []);
 });

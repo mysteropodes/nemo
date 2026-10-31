@@ -6,6 +6,7 @@ const test = require('node:test'), assert = require('node:assert/strict');
 const Intent = require('../src/js/adapters/select-canvas-intent.js');
 const Overlay = require('../src/js/adapters/native-select-overlay.js');
 const Gesture = require('../src/js/adapters/native-select-gesture.js');
+const Wait = require('../src/js/adapters/native-presentation-wait.js');
 const Paper = require('./helpers/native-import-paper.cjs');
 
 function el(tag) {
@@ -28,7 +29,7 @@ function harness(items, options = {}) {
     async readPresentedStrokes(_selector, _pin, wanted, centres) {
       return { items: store.map((item) => { const { segments, center, ...rest } = item; return wanted(rest) ? { ...rest, segments, ...(centres && center ? { center } : {}) } : rest; }) };
     } };
-  const root = { paper, Path: paper.Path, Point: paper.Point, Matrix: paper.Matrix, state: { tool: 'select', appMode: 'anim2d', currentFrame: 0, activeLayerIdx: 0, layers: [{ layerUid: 'L' }], selectedStrokeIndices: [] },
+  const root = { NemoNativePresentationWait: Wait, paper, Path: paper.Path, Point: paper.Point, Matrix: paper.Matrix, state: { tool: 'select', appMode: 'anim2d', currentFrame: 0, activeLayerIdx: 0, layers: [{ layerUid: 'L' }], selectedStrokeIndices: [] },
     selectedPaths: [], updateUI() { if (options.busyOnRepaint) busy = true; }, SMEngineBridge: { renderNow() {} }, showToast: (t) => toasts.push(t),
     document: { body, getElementById: () => ({ getBoundingClientRect: () => ({ left: 0, top: 0, width: 200, height: 200 }) }), createElementNS: (_n, tag) => el(tag),
       addEventListener: (type, fn) => listeners.push([type, fn]), removeEventListener: (type, fn) => { const at = listeners.findIndex((l) => l[0] === type && l[1] === fn); if (at >= 0) listeners.splice(at, 1); } },
@@ -655,5 +656,21 @@ test('a click whose context changes while it waits for the presentation selects 
   setTimeout(() => { h.root.state.currentFrame = 2; h.busy(false); }, 150);
   await done; await sleep(400); await settle();
   assert.deepEqual(h.ids(), []);
+  assert.deepEqual(h.toasts, []);
+});
+
+// #2372 presentation-busy-audit: every Select-family action (Delete, Align, Transform fields, restyle) starts from presentedSettled.
+test('presentedSettled waits out the queue-pending window, and gives null when the pick context changes meanwhile', async () => {
+  const h = harness([BIG, FAR]);
+  h.root.setTimeout = (fn) => setTimeout(fn, 5);
+  h.busy(true);
+  const waiting = Intent.presentedSettled(h.root);
+  setTimeout(() => h.busy(false), 40);
+  const shown = await waiting;
+  assert.ok(shown && shown.pin, 'readable again: the state of the presented document');
+  h.busy(true);
+  const gone = Intent.presentedSettled(h.root);
+  setTimeout(() => { h.root.state.currentFrame = 2; h.busy(false); }, 40);
+  assert.equal(await gone, null, 'a changed pick context refuses');
   assert.deepEqual(h.toasts, []);
 });

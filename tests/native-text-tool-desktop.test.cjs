@@ -32,7 +32,7 @@ async function fixture(selectionIntent=false,desktopModule=Desktop,options={}){
  function shown(){const pin=f.session.info(),key=JSON.stringify([pinKeys.map(k=>pin[k]),root.state.currentFrame,root.state.cameraView,options.cameraView]);
   if(key!==presentationKey){presentationKey=key;presentation={...pin,owner:'native',status:'presented',contextId:'scene-root',frame:root.state.currentFrame,workId:'work-'+pin.contentRevision,viewGeneration:1,...(options.cameraView?{view:options.cameraView}:{})};}
   return {...pin,presentation};}
- f.session.readPresentedObjectSession=()=>running?null:shown();
+ f.session.readPresentedObjectSession=why=>{if(running){if(why)why('queue-pending');return null;}return shown();};
  const runResource=f.session.runResourceCommand;
  f.session.runResourceCommand=action=>{const origin=f.session.readPresentedObjectSession();running++;
   return runResource(async ctx=>{let live=true;const lease={...ctx,readPresentedObjectSession(){
@@ -63,6 +63,7 @@ async function fixture(selectionIntent=false,desktopModule=Desktop,options={}){
 
  const logs={legacy:0,zoom:0,selected:0};let intent;zoom.addEventListener('pointerdown',()=>logs.zoom++);canvas.addEventListener('pointerdown',()=>logs.legacy++);
  doc.getElementById('text-apply').addEventListener('click',()=>logs.legacy++);
+ root.NemoNativePresentationWait=require('../src/js/adapters/native-presentation-wait.js');root.setTimeout=fn=>setImmediate(fn);
  root.NemoNativeTextToolDesktop=desktopModule;root.NemoNativeOpacityCutover={blocksLegacy:()=>true};root.NemoSelectCanvasIntent={create(){if(!selectionIntent)throw new Error('Text reached generic native selection route');intent=require('../src/js/adapters/select-canvas-intent.js').create({context:()=> 'stable',probe:()=>Object.freeze({mode:'clear'}),select:()=>logs.selected++});return intent;}};
  const binding=desktopModule.mount(root,container,{currentSession:()=>f.session,fontResources:()=>({list:async()=>[{assetId:'document font / 雪',name:'Imported',available:true}]})});await turn();
  const script=fs.readFileSync(path.join(__dirname,'../src/js/select-bridge.js'),'utf8');
@@ -552,4 +553,36 @@ test('#2267 turned overlay composes the turn with the presented view affine and 
  assert.equal(area.style.width,'40px');assert.equal(area.style.transformOrigin,'0 0');
  const pop=f.get('text-popover'),rect=n=>({l:parseFloat(n.style.left),t:parseFloat(n.style.top)});
  assert.ok(rect(pop).t>=parseFloat(area.style.top)||rect(pop).l>=parseFloat(area.style.left),'popover is not parked on the anchor');
+});
+
+// #2372 presentation-busy-audit: the native queue hides the presentation while ANY command is pending (queue-pending).
+async function hideQueue(f){let release;const hold=new Promise(r=>release=r),busy=f.session.runResourceCommand(()=>hold);await f.turn();
+ assert.equal(f.session.readPresentedObjectSession(),null,'the queue hides the presentation');return async()=>{release();await busy;};}
+const settleTurns=async(f,n=12)=>{for(let i=0;i<n;i++)await f.turn();};
+test('a Text click during the queue-pending window waits for the presentation and opens the editor once, with no unavailable notice',async()=>{
+ const f=await fixture(),notices=[];f.root.showToast=m=>notices.push(m);const free=await hideQueue(f);
+ f.canvas.fire('pointerdown',{button:0,buttons:0,clientX:100,clientY:110});f.canvas.fire('pointerup',{button:0,buttons:0,clientX:100,clientY:110});
+ await settleTurns(f,3);assert.equal(f.binding.core.snapshot().draft,null,'held while hidden');assert.equal(f.get('text-popover').style.display,'none');
+ await free();await settleTurns(f);
+ assert.equal(f.get('text-popover').style.display,'block');assert.deepEqual(f.binding.core.snapshot().draft.block.anchorTopLeft,{x:40,y:40});
+ assert.deepEqual(notices,[]);assert.equal(f.owner.items.size,0,'opening writes nothing');
+});
+test('a Text drag whose release lands in the busy window still opens its area once',async()=>{
+ const f=await fixture(),notices=[];f.root.showToast=m=>notices.push(m);
+ f.canvas.fire('pointerdown',{button:0,buttons:1,clientX:100,clientY:110});f.canvas.fire('pointermove',{button:0,buttons:1,clientX:260,clientY:150});
+ const free=await hideQueue(f);f.canvas.fire('pointerup',{button:0,buttons:0,clientX:260,clientY:150});await settleTurns(f,3);
+ assert.equal(f.get('text-popover').style.display,'none','the release is held while hidden');
+ await free();await settleTurns(f);assert.equal(f.get('text-popover').style.display,'block');assert.deepEqual(notices,[]);assert.ok(f.binding.core.snapshot().draft.block.fixedWidth>0);
+});
+test('a Text click is dropped silently when the tool left or the playhead moved during the wait',async()=>{
+ for(const change of [r=>r.state.tool='draw',r=>r.state.currentFrame=1]){
+  const f=await fixture(),notices=[];f.root.showToast=m=>notices.push(m);const free=await hideQueue(f);
+  f.canvas.fire('pointerdown',{button:0,buttons:0,clientX:100,clientY:110});f.canvas.fire('pointerup',{button:0,buttons:0,clientX:100,clientY:110});change(f.root);
+  await free();await settleTurns(f);assert.equal(f.get('text-popover').style.display,'none');assert.equal(f.binding.core.snapshot().draft,null);assert.deepEqual(notices,[]);
+ }
+});
+test('a queue that never frees gives a Text click one clear notice and no editor',async()=>{
+ const f=await fixture(),notices=[];f.root.showToast=m=>notices.push(m);const free=await hideQueue(f);
+ f.canvas.fire('pointerdown',{button:0,buttons:0,clientX:100,clientY:110});f.canvas.fire('pointerup',{button:0,buttons:0,clientX:100,clientY:110});
+ await settleTurns(f,40);assert.deepEqual(notices,['The canvas is still busy - try again.']);assert.equal(f.get('text-popover').style.display,'none');await free();
 });
