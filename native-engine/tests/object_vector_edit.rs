@@ -28,6 +28,8 @@ mod batch_style;
 mod batch_style_detail;
 #[path = "object_vector_batch_style_preset.rs"]
 mod batch_style_preset;
+#[path = "object_vector_batch_skip.rs"]
+mod batch_skip;
 #[path = "object_vector_trim_ends.rs"]
 mod trim_ends;
 #[path = "object_vector_edit_support.rs"]
