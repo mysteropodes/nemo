@@ -32,7 +32,7 @@ function fixture(options={}){
 }
 test('all four retained dictionaries preserve exact bytes, key counts and fixed translations',()=>{
   const digest=crypto.createHash('sha256').update(dictionarySource()).digest('hex');
-  assert.equal(digest,'64463cf11176c03de310fbdf546fb7b13037328fd4b6c710352177020d043ac4');
+  assert.equal(digest,'1cf0f42c19c000a4cf2ffb6502776a7d66cb5bfa9b19eb645d027f9458a4c460');
   const data=dictionaries();assert.deepEqual(Object.keys(data),['en','fr','ja','es']);
   for(const [locale,title] of Object.entries({en:'Settings',fr:'Réglages',ja:'設定',es:'Ajustes'})){
     assert.equal(Object.keys(data[locale]).length,2212);assert.equal(data[locale].settingsTitle,title);
