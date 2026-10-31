@@ -1,7 +1,7 @@
 /* #2256: JS side of query.document.object.component.read, the read-only native component model. Pure validation; it owns no
- * document, copies no model and issues no request. One pinned read answers one of four selectors: the contexts of the
- * document (scene-root first, then every component in table order), one context's summary, a page of its layers, or the page
- * of scene layers that instance one component. Pages are at most 16 items and the native owner also cuts them by the 4096-byte
+ * document, copies no model and issues no request. One pinned read answers one of six selectors: the contexts of the
+ * document (scene-root first, then every component in table order), one context's summary, a page of its layers, the page
+ * of scene layers that instance one component, the stored duplicator descriptor of a scene layer, or (Q5) the playback facts of an instance layer. Pages are at most 16 items and the native owner also cuts them by the 4096-byte
  * response bound, so `nextCursor` (the first unread index, null at the end) is the only trustworthy end of a page. A context whose
  * summary cannot fit a page alone keeps its identity and counts and has its name cut and flagged `nameTruncated: true`.
  * A pinned read carries no expectedRevision. Mirrors nemo-mcp/src/native_component_read_contract.rs. */
@@ -12,7 +12,8 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
   const OP = 'query.document.object.component.read', SCENE = 'scene-root', MAX_PAGE = 16, MAX_ID = 128;
-  const KINDS = ['contexts', 'context', 'layers', 'instances', 'duplicator'];
+  const KINDS = ['contexts', 'context', 'layers', 'instances', 'duplicator', 'instance'];
+  const INSTANCE_MODES = ['loop', 'once', 'pingpong', 'single'];
   const DUP_MODES = ['grid', 'radial', 'path'], DUP_DIRECTIONS = ['forward', 'backward', 'centerOut', 'random'], DUP_CHANNELS = ['position', 'rotation', 'scale', 'opacity', 'hue'];
   const LAYER_KINDS = ['drawing', 'folder', 'effect', 'widget', 'null', 'instance'];
   const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
@@ -36,6 +37,8 @@
     if (selector.kind === 'contexts') { exact(selector, ['kind', 'cursor', 'limit'], 'component selector'); pageArgs(selector); return; }
     // #2256 Q4: the stored duplicator descriptor of one scene layer (its layer uid is a context-style identity).
     if (selector.kind === 'duplicator') { exact(selector, ['kind', 'layerUid'], 'component selector'); if (!idText(selector.layerUid)) fail('invalid duplicator layer uid'); return; }
+    // #2256 Q5: the playback facts of one scene component-instance layer at an outer frame.
+    if (selector.kind === 'instance') { exact(selector, ['kind', 'layerUid', 'frame'], 'component selector'); if (!idText(selector.layerUid) || !revision(selector.frame)) fail('invalid instance selector'); return; }
     if (selector.kind === 'context') exact(selector, ['kind', 'contextId'], 'component selector');
     else { exact(selector, ['kind', 'contextId', 'cursor', 'limit'], 'component selector'); pageArgs(selector); }
     if (!idText(selector.contextId)) fail('invalid component context id');
@@ -89,6 +92,15 @@
     exact(value.timeOffset, ['enabled', 'offsetFrames', 'direction'], 'duplicator timeOffset');
     if (typeof value.timeOffset.enabled !== 'boolean' || !finite(value.timeOffset.offsetFrames) || !DUP_DIRECTIONS.includes(value.timeOffset.direction)) fail('invalid duplicator timeOffset');
   }
+  // The instance view: the panel's playback fields with their baseline display defaults, the component length, and the resolved frame.
+  function instanceView(value, head, selector) {
+    exact(value, head.concat(['layerUid', 'componentId', 'mode', 'singleFrame', 'speed', 'placedAt', 'totalFrames', 'resolvedFrame', 'explicit']), 'component instance result');
+    const finite = (n) => typeof n === 'number' && Number.isFinite(n);
+    if (!idText(value.layerUid) || (selector && value.layerUid !== selector.layerUid)) fail('component read result names another layer');
+    if (!idText(value.componentId) || !INSTANCE_MODES.includes(value.mode)) fail('invalid instance component or mode');
+    if (!finite(value.singleFrame) || value.singleFrame < 0 || !finite(value.speed) || value.speed <= 0 || !finite(value.placedAt)) fail('invalid instance number');
+    if (!uint32(value.totalFrames) || !(value.resolvedFrame === null || uint32(value.resolvedFrame)) || typeof value.explicit !== 'boolean') fail('invalid instance frame facts');
+  }
   function result(operation, value, request) {
     if (operation !== OP) fail('component read operation is not declared');
     if (!value || typeof value !== 'object' || !KINDS.includes(value.kind)) fail('invalid component read result');
@@ -107,6 +119,7 @@
       pagedCall('instanceCount', instanceItem); return;
     }
     if (value.kind === 'duplicator') { duplicatorView(value, head, selector); return; }
+    if (value.kind === 'instance') { instanceView(value, head, selector); return; }
     exact(value, head.concat(['contextId', 'contextKind', 'name', 'totalFrames', 'layerCount', 'fps', 'instanceCount', 'exposedPropertyCount', 'hasCameraKeys']), 'component context result');
     sameContext();
     const scene = value.contextId === SCENE;

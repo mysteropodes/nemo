@@ -5431,7 +5431,7 @@ test('L04-M setup and convert transactions stay private owner children behind th
   assert.equal((dispatchText.match(/self\.dispatch_component_setup\(/g) || []).length, 1, 'one component dispatch body');
   const historyText = read('native-engine/src/object_component_convert_history.rs');
   assert.equal((historyText.match(/fn dispatch_component_setup\(/g) || []).length, 1);
-  for (const operation of ['component.convert', 'component.expose', 'component.place', 'duplicator.set', 'duplicator.objects', 'duplicator.path']) {
+  for (const operation of ['component.convert', 'component.expose', 'component.place', 'component.instance.set', 'duplicator.set', 'duplicator.objects', 'duplicator.path', 'duplicator.config']) {
     assert.ok(historyText.includes(`"command.document.object.${operation}"`), operation);
   }
   // Conversion is explicit only: no Motion or timeline writer reaches the plans.

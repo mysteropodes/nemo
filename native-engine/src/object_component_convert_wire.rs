@@ -149,6 +149,24 @@ object_deserialize!(DuplicatorConfigPayload {
     #[serde(default)] time_offset: Presence<TimeOffsetPayload>
 });
 
+/// `object.component.instance.set`: the Component Instance panel's closed partial edit, every member but the layer optional.
+#[derive(Debug)]
+pub(super) struct InstanceSetPayload {
+    pub(super) command: String,
+    pub(super) layer_uid: String,
+    pub(super) mode: Presence<String>,
+    pub(super) single_frame: Presence<Number>,
+    pub(super) placed_at: Presence<Number>,
+    pub(super) speed: Presence<Number>,
+    pub(super) at_frame: Presence<Number>,
+}
+object_deserialize!(InstanceSetPayload {
+    command: String, layer_uid: String,
+    #[serde(default)] mode: Presence<String>, #[serde(default)] single_frame: Presence<Number>,
+    #[serde(default)] placed_at: Presence<Number>, #[serde(default)] speed: Presence<Number>,
+    #[serde(default)] at_frame: Presence<Number>
+});
+
 /// An identity is non-empty, at most 128 bytes and carries no NUL.
 pub(super) fn id_ok(value: &str) -> bool {
     !value.is_empty() && value.len() <= MAX_ID_BYTES && !value.contains('\0')

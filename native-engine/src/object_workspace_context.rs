@@ -195,7 +195,7 @@ impl ObjectSnapshot {
     /// property record (the track belongs to the instance), and baseline `timeRemapValue` ignores expressions too. `None` leaves
     /// the entry at the first frame: no such instance of this component, or a held blank key.
     #[cfg(feature = "evaluation")]
-    fn instance_entry_frame(&self, component: &str, layer_uid: &str, outer: i64) -> Option<i64> {
+    pub(crate) fn instance_entry_frame(&self, component: &str, layer_uid: &str, outer: i64) -> Option<i64> {
         use crate::evaluation::object_component_kernels::object_component_playback::{
             evaluate_component_playback, PlaybackOutcome,
         };

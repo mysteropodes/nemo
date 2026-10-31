@@ -13,6 +13,7 @@ use crate::transaction::CompactResult;
 const OP_COMPONENT_CONVERT: &str = "command.document.object.component.convert";
 const OP_COMPONENT_EXPOSE: &str = "command.document.object.component.expose";
 const OP_COMPONENT_PLACE: &str = "command.document.object.component.place";
+const OP_COMPONENT_INSTANCE_SET: &str = "command.document.object.component.instance.set";
 const OP_DUPLICATOR_SET: &str = "command.document.object.duplicator.set";
 const OP_DUPLICATOR_OBJECTS: &str = "command.document.object.duplicator.objects";
 const OP_DUPLICATOR_PATH: &str = "command.document.object.duplicator.path";
@@ -23,6 +24,7 @@ fn kind_of(operation: &str) -> Option<SetupKind> {
         OP_COMPONENT_CONVERT => Some(SetupKind::Convert),
         OP_COMPONENT_EXPOSE => Some(SetupKind::Expose),
         OP_COMPONENT_PLACE => Some(SetupKind::Place),
+        OP_COMPONENT_INSTANCE_SET => Some(SetupKind::InstanceSet),
         OP_DUPLICATOR_SET => Some(SetupKind::DuplicatorSet),
         OP_DUPLICATOR_OBJECTS => Some(SetupKind::DuplicatorObjects),
         OP_DUPLICATOR_PATH => Some(SetupKind::DuplicatorPath),
@@ -97,6 +99,9 @@ impl NativeObjectHistory {
 #[cfg(test)]
 #[path = "../tests/object_component_convert_dispatch.rs"]
 mod dispatch_tests;
+#[cfg(test)]
+#[path = "../tests/object_component_instance_set_history.rs"]
+mod instance_history_tests;
 #[cfg(test)]
 #[path = "../tests/object_duplicator_config_history.rs"]
 mod config_history_tests;

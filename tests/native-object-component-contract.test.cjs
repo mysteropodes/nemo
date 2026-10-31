@@ -1,5 +1,5 @@
 'use strict';
-// L04-N public declaration of the seven native component and duplicator setup operations: contract, common SDK, capability
+// L04-N public declaration of the eight native component and duplicator setup operations: contract, common SDK, capability
 // files, closed schema and the baseline exposed-property keys agree. Needs the patched SDK (patch 2) and schema (patch 1).
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
 const contract = require('../src/js/adapters/native-object-component-contract.js');
@@ -19,14 +19,17 @@ const VALID = [
   // #2256 Q4: the inspector's closed partial edit; every member but the layer is optional.
   ['duplicator.config', { command: 'object.duplicator.config', layerUid: 'layer-a', mode: 'radial', rows: 3, cols: 4, spacingX: 150.5, spacingY: -20, count: 12, radius: 240, startAngle: 45,
     radialOrient: true, pathAlignTangent: false, seed: 482913, staggerRandom: { position: true, hue: false }, timeOffset: { enabled: true, offsetFrames: 2.5, direction: 'centerOut' } }],
+  // #2256 Q5: the Component Instance panel's closed partial edit of the stored playback record.
+  ['component.instance.set', { command: 'object.component.instance.set', layerUid: 'layer-a', mode: 'single', singleFrame: 9, placedAt: -4, speed: 2.5, atFrame: 12 }],
 ];
 const OPTIONAL = { 'component.expose': ['default'], 'duplicator.set': ['seed'],
-  'duplicator.config': ['mode', 'rows', 'cols', 'spacingX', 'spacingY', 'count', 'radius', 'startAngle', 'radialOrient', 'pathAlignTangent', 'seed', 'staggerRandom', 'timeOffset'] };
+  'duplicator.config': ['mode', 'rows', 'cols', 'spacingX', 'spacingY', 'count', 'radius', 'startAngle', 'radialOrient', 'pathAlignTangent', 'seed', 'staggerRandom', 'timeOffset'],
+  'component.instance.set': ['mode', 'singleFrame', 'placedAt', 'speed', 'atFrame'] };
 const envelope = (suffix, payload, extra) => Object.assign({ apiVersion: 2, requestId: 'component-1', instanceId: 'instance-A', documentId: 'document-A',
   operation: P + suffix, expectedRevision: 7, payload }, extra);
 const payloadOf = (suffix) => VALID.find(([s]) => s === suffix)[1];
 
-test('the contract admits exactly the seven declared operations, all revisioned commands', () => {
+test('the contract admits exactly the eight declared operations, all revisioned commands', () => {
   assert.deepEqual(contract.OPERATIONS, VALID.map(([s]) => P + s));
   for (const op of contract.OPERATIONS) { assert.equal(contract.admitted(op), true); assert.equal(contract.requiresRevision(op), true); }
   for (const op of ['command.document.object.layer.create', 'command.document.object.layer.policy.edit', 'command.document.object.layer.split',
@@ -202,7 +205,7 @@ test('capability descriptors and the closed transport schema declare exactly the
     declared.push(...d.operations);
   }
   assert.deepEqual(declared.slice().sort(), contract.OPERATIONS.slice().sort());
-  assert.equal(new Set(declared).size, 7);
+  assert.equal(new Set(declared).size, 8);
   assert.deepEqual([...ids].sort(), ['native.object.component', 'native.object.duplicator']);
   for (const [suffix, payload] of VALID) {
     const branches = schema.$defs.Request.oneOf.filter((b) => b.allOf[1].properties.operation.const === P + suffix);
