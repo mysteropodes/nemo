@@ -33,7 +33,7 @@ pub(crate) mod ghost_underlay;
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 pub use ghost_underlay::{
     GhostFrameSpec, GhostMode, GhostPath, GhostReceipt, GhostShift, GhostSource, GhostUnderlay,
-    GhostUnderlayRequest,
+    GhostUnderlayRequest, GhostVisual,
 };
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 pub use reference::{

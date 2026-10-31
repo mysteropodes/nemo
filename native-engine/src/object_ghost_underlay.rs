@@ -9,6 +9,8 @@
 //! evaluated ghost frame filtered to the ghosted layer. Nothing here writes, selects or touches history.
 //! This render-scene file knows only plain facts: the application layer owns the retained ghost query and hands them over
 //! through [`GhostSource`] (`tween_ghost_underlay.rs`).
+use crate::object_frame_packet::ObjectRecord;
+use crate::object_render_scene::object_scene_style_emit::PreparedItem;
 use crate::object_render_scene::{ordered_entries, ObjectCompositionWitness, PaintEntry};
 use serde::{Deserialize, Serialize};
 use vello::kurbo::{Affine, BezPath, Cap, Join, Stroke};
@@ -129,6 +131,16 @@ enum Piece {
         transform: Affine,
         alpha: f32,
     },
+    /// A produced brush dab or an evaluated component / duplicator item: the live paint kept as the baseline's
+    /// ghost, faded to the ghost opacity (and tinted like any painted path in Tinted / Outline mode).
+    Prepared {
+        item: PreparedItem,
+        path: BezPath,
+        at: Affine,
+        alpha: f32,
+        tint: Option<(Color, Option<f64>)>,
+        clear_fill: bool,
+    },
 }
 /// The prepared ghost pieces of one preview, in baseline order, plus whatever keeps their decoded resources alive.
 pub struct GhostUnderlay {
@@ -197,17 +209,18 @@ impl GhostUnderlay {
             reason: self.refusal,
         }
     }
-    /// Images this underlay draws that the live artwork does not: they stay resident in the renderer's atlas.
-    pub(crate) fn draws_foreign_images(&self, live: &ObjectCompositionWitness) -> bool {
-        let known: Vec<_> = live.raster_images().map(|i| i.data.id()).collect();
-        self.pieces
-            .iter()
-            .any(|p| matches!(p, Piece::Image { image, .. } if !known.contains(&image.data.id())))
-    }
     /// Drawn `(shapes, images)`; shapes are stored vector paths and glyph contours.
     pub(crate) fn counts(&self) -> (usize, usize) {
         let images = self.images().count();
         (self.pieces.len() - images, images)
+    }
+    /// Drawn dab / component / duplicator pieces, which `counts` also includes among its shapes.
+    #[cfg(test)]
+    pub(crate) fn prepared_count(&self) -> usize {
+        self.pieces
+            .iter()
+            .filter(|p| matches!(p, Piece::Prepared { .. }))
+            .count()
     }
     pub fn has_images(&self) -> bool {
         self.images().next().is_some()
@@ -215,8 +228,32 @@ impl GhostUnderlay {
     pub(crate) fn images(&self) -> impl Iterator<Item = &ImageData> + '_ {
         self.pieces.iter().filter_map(|p| match p {
             Piece::Image { image, .. } => Some(image),
-            Piece::Shape { .. } => None,
+            Piece::Shape { .. } | Piece::Prepared { .. } => None,
         })
+    }
+    /// Ids of the images this underlay draws that the live artwork does not: they stay resident in the renderer's atlas.
+    pub(crate) fn foreign_image_ids(&self, live: &ObjectCompositionWitness) -> Vec<u64> {
+        let known: Vec<_> = live.raster_images().map(|i| i.data.id()).collect();
+        let mut ids: Vec<u64> = self
+            .images()
+            .map(|i| i.data.id())
+            .filter(|id| !known.contains(id))
+            .collect();
+        ids.sort_unstable();
+        ids.dedup();
+        ids
+    }
+    /// Decoded bytes the underlay keeps alive (each distinct image once): what a memo of it is charged.
+    pub(crate) fn image_bytes(&self) -> usize {
+        let mut seen = Vec::new();
+        self.images()
+            .filter(|i| {
+                let fresh = !seen.contains(&i.data.id());
+                seen.push(i.data.id());
+                fresh
+            })
+            .map(|i| i.data.data().len())
+            .sum()
     }
     /// Into the artwork scene BEFORE the live paint sequence: the live frame is drawn over it.
     pub(crate) fn draw(&self, scene: &mut vello::Scene) {
@@ -248,6 +285,14 @@ impl GhostUnderlay {
                         *transform,
                     );
                 }
+                Piece::Prepared {
+                    item,
+                    path,
+                    at,
+                    alpha,
+                    tint,
+                    clear_fill,
+                } => item.draw_ghost(scene, *at, path, *alpha, *tint, *clear_fill),
             }
         }
     }
@@ -276,6 +321,15 @@ pub struct GhostFrameSpec {
     pub text_clear_fill: bool,
     pub raster_opacity: f64,
 }
+/// How an evaluated component / duplicator item is painted as a ghost, as the retained ghost query decided it for
+/// that record: the opacity, and the tint stroke `([r, g, b, a], width)` that replaces its stroke (width `None` keeps
+/// the item's own), with the fill cleared in Outline mode.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GhostVisual {
+    pub opacity: f64,
+    pub stroke: Option<([f64; 4], Option<f64>)>,
+    pub clear_fill: bool,
+}
 /// The application layer's retained ghost query seen as the plain facts the underlay is built from.
 pub trait GhostSource {
     fn layer_uid(&self) -> &str;
@@ -287,6 +341,8 @@ pub trait GhostSource {
     fn witness(&self, index: usize) -> Result<ObjectCompositionWitness, ()>;
     /// Whether the layer has any text or raster item at all, so a vector-only layer never evaluates ghost frames.
     fn has_items(&self) -> bool;
+    /// The paint policy of one evaluated component / duplicator record of the ghost frame (baseline `onionLayerItems`).
+    fn record_visual(&self, index: usize, record: &ObjectRecord) -> GhostVisual;
 }
 impl GhostUnderlay {
     /// A request the engine could not honour: no pieces, the reason kept, the identity stable.
@@ -332,7 +388,7 @@ impl GhostUnderlay {
             // Items first (they sit below the strokes drawn over them), then the stored vector geometry.
             if items && !at.all_keys {
                 if let Ok(witness) = source.witness(index) {
-                    out.collect_items(source.layer_uid(), &at, &witness);
+                    out.collect_items(source, index, &at, &witness);
                     out._keep.push(witness);
                 }
             }
@@ -359,13 +415,16 @@ impl GhostUnderlay {
         }
         out
     }
-    /// The text glyphs and images of one evaluated ghost frame that belong to the ghosted layer.
+    /// The text glyphs, images, brush dabs and evaluated component / duplicator items of one evaluated ghost frame that
+    /// belong to the ghosted layer (a derived layer owns no stored key geometry, so these ARE its ghost).
     fn collect_items(
         &mut self,
-        layer_uid: &str,
+        source: &dyn GhostSource,
+        index: usize,
         at: &GhostFrameSpec,
         witness: &ObjectCompositionWitness,
     ) {
+        let layer_uid = source.layer_uid();
         let plan = witness.plan();
         let layers = plan.packet().source_layers();
         let ours = |layer_index: usize| {
@@ -374,6 +433,19 @@ impl GhostUnderlay {
                 .is_some_and(|l| l.layer_uid() == layer_uid)
         };
         let shift = Affine::translate((at.translation[0], at.translation[1]));
+        let derived = |this: &mut Self, item: &PreparedItem, path: &BezPath, record: &ObjectRecord| {
+            let visual = source.record_visual(index, record);
+            this.pieces.push(Piece::Prepared {
+                item: item.clone(),
+                path: path.clone(),
+                at: shift,
+                alpha: visual.opacity as f32,
+                tint: visual.stroke.map(|([r, g, b, a], width)| {
+                    (Color::new([r as f32, g as f32, b as f32, a as f32]), width)
+                }),
+                clear_fill: visual.clear_fill,
+            });
+        };
         for entry in ordered_entries(plan) {
             match entry {
                 PaintEntry::Text(source) if ours(source.layer_index) => {
@@ -413,6 +485,36 @@ impl GhostUnderlay {
                             alpha: opacity * at.raster_opacity as f32,
                         });
                     }
+                }
+                // Brush-texture dabs: the baseline draws them in their own look at `op * dab opacity` (the dab's
+                // colour alpha already is its opacity), never tinted. The anchor itself is the invisible stored path.
+                PaintEntry::Dab(dab) if ours(dab.layer_index) => self.pieces.push(Piece::Prepared {
+                    item: dab.prepared.clone(),
+                    path: dab.path.clone(),
+                    at: shift,
+                    alpha: at.raster_opacity as f32,
+                    tint: None,
+                    clear_fill: false,
+                }),
+                PaintEntry::Brush(i)
+                    if plan
+                        .brush_sources()
+                        .and_then(|b| b.paints.get(i))
+                        .is_some_and(|b| ours(b.layer_index)) =>
+                {
+                    if let Ok(Some((image, transform, opacity))) = witness.brush_image(i) {
+                        self.pieces.push(Piece::Image {
+                            image: image.clone(),
+                            transform,
+                            alpha: opacity * at.raster_opacity as f32,
+                        });
+                    }
+                }
+                PaintEntry::Component(c) if ours(c.host_layer_index) => {
+                    derived(self, &c.prepared, &c.path, &c.record)
+                }
+                PaintEntry::Duplicator(d) if ours(d.layer_index) => {
+                    derived(self, &d.prepared, &d.path, &d.record)
                 }
                 _ => {}
             }
