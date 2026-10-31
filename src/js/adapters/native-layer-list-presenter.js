@@ -40,7 +40,7 @@
   }
   function percent(v){return String(Math.round(v*100)/100)+'%';}
   // Returns {before:[...nodes ahead of the name], after:[...badges after it]}; rows with no such fact get none.
-  function decorate(doc,layer,context,node,slots){
+  function decorate(doc,layer,context,node,slots,i){
     var info=context.info,kinds=context.layerKind,before=[],after=[],depth=depthOf(info,layer),folder=null;
     if(layer.kind==='folder'){
       var arrow=decor(doc,'div','lico larrow',(layer.folderCollapsed?'Folder collapsed':'Folder expanded')+' — display only, native folder collapse is unavailable');
@@ -73,6 +73,8 @@
       var ob=decor(doc,'div','lico comp-badge native-layer-opacity','Opacity: '+shown+(layer.opacityAnimated===true?' (animated — static value shown)':''));
       ob.innerHTML=BADGE+shown+'</span>';ob.style.width='auto';after.push(ob);
     }
+    // The baseline Parent cell (.lparent) comes from the caller's hook: it owns the Parent A edit, this file commits nothing.
+    if(typeof context.parentCell==='function'){var pc=context.parentCell(layer,i,node);if(pc){pc.style.order='1';after.push(pc);}}
     if(layer.kind==='component')node.className+=' is-comp';
     if(depth>0||typeof layer.folderId==='string')node.className+=' in-folder';
     if(typeof layer.folderId==='string'){
@@ -104,7 +106,7 @@
     // #2256: a double-click opens the component an instance layer instances (the baseline row dblclick); other rows ignore it.
     if(typeof context.onOpen==='function')node.addEventListener('dblclick',function(){return context.onOpen(layer,node);});
     node.hidden=context.shyMode&&layer.shy===true;node.style.display=node.hidden?'none':'flex';
-    var extra=decorate(doc,layer,context,node,slots);
+    var extra=decorate(doc,layer,context,node,slots,i);
     // The four controls stay the row's first four children (every consumer addresses them by position); the decorations follow
     // in DOM order and are placed around them with flex `order` (baseline order: arrow, dot, kind, name, badges, eye, lock, shy).
     var controls=[pick,eye,flags[0],flags[1]],decorated=extra.before.length+extra.after.length>0;
