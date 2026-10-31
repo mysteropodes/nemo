@@ -120,6 +120,59 @@ impl PreparedItem {
     }
 }
 
+impl PreparedItem {
+    /// #2358 GHOST-FIDELITY: the item as an onion / Ghost All ghost. Fill and stroke fade to `alpha`; `tint` (already
+    /// carrying its own alpha) replaces the stroke paint, keeping the item's stroke style and, when it has none or
+    /// `width` is given, the width; `clear_fill` drops the fill (Outline mode). Same order, path and transform as `draw`.
+    pub(crate) fn draw_ghost(
+        &self,
+        scene: &mut Scene,
+        transform: Affine,
+        path: &BezPath,
+        alpha: f32,
+        tint: Option<(Color, Option<f64>)>,
+        clear_fill: bool,
+    ) {
+        for step in self.order {
+            match step {
+                PaintStep::Fill if clear_fill => {}
+                PaintStep::Fill => match &self.fill {
+                    None => {}
+                    Some(PreparedFill::Solid(color)) => scene.fill(
+                        Fill::NonZero,
+                        transform,
+                        color.multiply_alpha(alpha),
+                        None,
+                        path,
+                    ),
+                    Some(PreparedFill::Gradient(gradient)) => scene.fill(
+                        Fill::NonZero,
+                        transform,
+                        &gradient.clone().multiply_alpha(alpha),
+                        None,
+                        path,
+                    ),
+                },
+                PaintStep::Stroke => match (&tint, &self.stroke) {
+                    (Some((paint, width)), own) => {
+                        let mut stroke = own
+                            .as_ref()
+                            .map_or_else(|| Stroke::new(1.), |(stroke, _)| stroke.clone());
+                        if let Some(width) = width {
+                            stroke.width = *width;
+                        }
+                        scene.stroke(&stroke, transform, *paint, None, path);
+                    }
+                    (None, Some((stroke, color))) => {
+                        scene.stroke(stroke, transform, color.multiply_alpha(alpha), None, path)
+                    }
+                    (None, None) => {}
+                },
+            }
+        }
+    }
+}
+
 fn color_of(solid: &SceneSolid) -> Result<Color, EmitError> {
     // AlphaColor<Srgb> holds straight float channels; do not quantize to RGB8.
     // The channel rule lives once, in the L07-A SceneSolid kernel.

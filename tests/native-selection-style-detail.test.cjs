@@ -97,6 +97,20 @@ test('the stroke style rewrites the dash from the width and carries the tool\'s 
   accepted(h.batches[0]);
 });
 
+test('a stroke style pick reaches only a stroked plain record: not an unstroked shape, not a ribbon (baseline applyStrokeStyle)', async () => {
+  const bare = quad('U', 70, 70, 90, 90, { style: { fill: '#112233', width: 4, opacity: 1 } });
+  const h = harness([quad('A', 10, 10, 30, 30), bare, ribbon('R', 100, 100)]);
+  await h.select(['A', 'U', 'R']);
+  Style.apply(h.root, { strokeStyle: 'dashed', dashOffset: 0, miter: 10, paintOrder: 'fillFirst' });
+  await h.fire();
+  assert.deepEqual(byId(h.batches[0]), { A: { strokeStyle: 'dashed', dashOffset: 0, miter: 10, paintOrder: 'fillFirst' } }, 'only the stroked plain record takes a step');
+  accepted(h.batches[0]);
+  // The plain miter / paint order edits (no style) still reach every non-ribbon (and the ribbon its paint order), as before.
+  Style.apply(h.root, { miter: 6, paintOrder: 'strokeFirst' });
+  await h.fire();
+  assert.deepEqual(byId(h.batches[1]), { A: { miter: 6, paintOrder: 'strokeFirst' }, U: { miter: 6, paintOrder: 'strokeFirst' }, R: { paintOrder: 'strokeFirst' } });
+});
+
 test('swapping the paints is one edit: a plain record takes both colours, a ribbon the stroke colour (the later write)', async () => {
   const h = harness([quad('A', 10, 10, 30, 30), ribbon('R', 100, 100)]);
   await h.select(['A', 'R']);

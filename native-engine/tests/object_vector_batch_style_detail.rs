@@ -268,3 +268,42 @@ fn the_stroke_style_writes_the_dash_pattern_from_the_width_and_the_dash_offset_f
     undo_to(&mut owner, 0);
     assert_eq!(state(&owner), before);
 }
+
+#[test]
+fn a_stroke_style_pick_changes_only_a_stroked_plain_record_and_nothing_of_an_unstroked_one_or_a_ribbon(
+) {
+    let mut owner = owner_of(&trio());
+    let before = state(&owner);
+    // The pick sends the offset, the miter and the paint order beside the style (the baseline's applyStrokeStyle, stroked paths only).
+    let pick = json!({"strokeStyle":"dashed","dashOffset":0,"miter":4,"paintOrder":"strokeFirst"});
+    let r = apply(&mut owner, &["s-a", "s-c"], pick.clone());
+    assert_eq!(r["ok"], true, "{r}");
+    let a = &at(&owner, "s-a")["vector"];
+    assert_eq!(a["miterLimit"], 4);
+    assert_eq!(a["paintOrder"], "strokeFirst");
+    assert_eq!(a["dashArray"], json!([10, 7.2]));
+    assert_eq!(
+        at(&owner, "s-c"),
+        before["objects"][2],
+        "an unstroked record is untouched"
+    );
+    // The same members without a style are the plain miter / paint order edits, which still reach an unstroked record.
+    let r = apply(
+        &mut owner,
+        &["s-c"],
+        json!({"miter":4,"paintOrder":"strokeFirst"}),
+    );
+    assert_eq!(r["ok"], true, "{r}");
+    assert_eq!(at(&owner, "s-c")["vector"]["miterLimit"], 4);
+    assert_eq!(at(&owner, "s-c")["vector"]["paintOrder"], "strokeFirst");
+    let mut ribbon = ribbon_doc();
+    let id = "native-stroke:1:1";
+    let was = at(&ribbon, id);
+    let r = apply(&mut ribbon, &[id], pick);
+    assert_eq!(r["ok"], true, "{r}");
+    assert_eq!(
+        at(&ribbon, id),
+        was,
+        "a ribbon is not restyled by a stroke style pick"
+    );
+}
