@@ -193,3 +193,35 @@ fn a_restyle_names_its_target_and_valid_style_members_and_its_receipt_id_is_the_
     other_layer["ops"][1]["stableTarget"]["contextId"] = json!("component:c1");
     assert!(!vector_request(VECTOR, &other_layer), "every step stays on the scene root");
 }
+
+/// #2372: a batch is atomic unless it opts in with a boolean `skipUnavailable`; only then does the receipt report `skippedSteps`.
+#[test]
+fn skip_unavailable_is_an_optional_boolean_and_only_an_opted_in_receipt_reports_skipped_steps() {
+    let step = |id: &str| json!({"op":"restyle","stableTarget":target("L1",id),"style":{"stroke":"#00ff00"}});
+    let mut batch = json!({"command":"object.vector.batch","ops":[step("s-a"),step("s-b")]});
+    assert!(vector_request(VECTOR, &batch));
+    for ok in [json!(true), json!(false)] {
+        batch["skipUnavailable"] = ok;
+        assert!(vector_request(VECTOR, &batch));
+    }
+    for bad in [json!(1), json!(0), json!("true"), json!(null), json!([true]), json!({})] {
+        batch["skipUnavailable"] = bad.clone();
+        assert!(!vector_request(VECTOR, &batch), "{bad}");
+    }
+    batch["skipUnavailable"] = json!(true);
+    let mut receipt = json!({"applied":true,"historyEntriesAdded":1,"operation":"batch","strokeId":"s-a","strokeIds":["s-a","s-b"],"skippedSteps":1});
+    assert!(vector_result(VECTOR, &batch, &receipt));
+    for bad in [json!(0), json!(2), json!(-1), json!(1.5), json!("1"), json!(true)] {
+        receipt["skippedSteps"] = bad.clone();
+        assert!(!vector_result(VECTOR, &batch, &receipt), "{bad}");
+    }
+    receipt["skippedSteps"] = json!(1);
+    batch["skipUnavailable"] = json!(false);
+    assert!(!vector_result(VECTOR, &batch, &receipt), "an atomic request never skips");
+    batch.as_object_mut().unwrap().remove("skipUnavailable");
+    assert!(!vector_result(VECTOR, &batch, &receipt), "an atomic request never skips");
+    receipt.as_object_mut().unwrap().remove("skippedSteps");
+    assert!(vector_result(VECTOR, &batch, &receipt));
+    let other = json!({"command":"object.vector.delete","stableTarget":target("L1","s-a"),"skipUnavailable":true});
+    assert!(!vector_request(VECTOR, &other), "skipUnavailable is a batch member only");
+}

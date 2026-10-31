@@ -94,6 +94,7 @@ pub(super) fn apply(
         stroke_ids: vec![target.stroke_id.clone()],
         stroke_id: target.stroke_id,
         changed,
+        skipped: 0,
     })
 }
 
