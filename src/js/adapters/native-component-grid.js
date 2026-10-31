@@ -46,13 +46,33 @@
     bar.setAttribute('aria-disabled', 'true'); bar.style.left = (range.rawInPoint * fc) + 'px'; bar.style.width = Math.max(fc, (range.rawOutPoint - range.rawInPoint + 1) * fc) + 'px';
     bar.classList.toggle('full-range', !range.hasCustomRange); bar.classList.toggle('has-timelink', range.hasTimeLink === true);
   }
+  function caption(st, frame) { return st.name + ' — Frame ' + (frame + 1) + ' / ' + st.totalFrames; }
+  // CLAUDE.md section 5bis (b): the only frame-dependent outputs of the grid are the .cur cell and the caption, so a scrub or a playback tick
+  // (frameOnly) moves those two and nothing else, provided the painted view is still what the content asks for (same rows, nodes, selection,
+  // work area, size). Anything else repaints in full. Returns true when the playhead was moved in place.
+  function moveHead(host, st, held, frame, selKey) {
+    var s = host.state, fc = Number.isFinite(host.FC) && host.FC > 0 ? host.FC : 14, list = host.document.getElementById('layer-list'), grid = host.document.getElementById('frame-grid');
+    var header = host.document.getElementById('frame-hdr');
+    if (held.rows !== st.rows || held.list !== list || held.grid !== grid || held.header !== header || held.active !== s.activeLayerIdx || held.sel !== selKey || held.waIn !== s.waIn ||
+      held.waOut !== s.waOut || held.total !== st.totalFrames || held.fc !== fc || held.name !== st.name || frame < 0 || frame >= st.totalFrames) return false;
+    if (!held.lrows.every(function (row) { return row.parentNode === list; }) || !held.frows.every(function (row) { return row.parentNode === grid; }) || held.caption.parentNode !== header) return false;
+    held.frows.forEach(function (row) {
+      if (row.nativeCells[held.frame]) row.nativeCells[held.frame].classList.remove('cur');
+      if (row.nativeCells[frame]) row.nativeCells[frame].classList.add('cur');
+    });
+    held.caption.textContent = caption(st, frame); held.frame = frame;
+    return true;
+  }
   // Paints the entered component's rows and grid. `st` is the controller's entered view ({name, totalFrames, rows}); `ports`: current() true while that
   // view is still the entered one, read(kind, layerUid) the pinned component read (a promise of the result, or null), select(index) activates a layer.
-  function paint(host, st, ports) {
+  // `frameOnly` (a scrub or playback tick, nothing but the frame changed) moves the playhead in place and starts no read.
+  function paint(host, st, ports, frameOnly) {
     var doc = host.document, list = doc.getElementById('layer-list'), header = doc.getElementById('frame-hdr'), grid = doc.getElementById('frame-grid');
     if (!list || !header || !grid) return true;
     var s = host.state, frame = s.currentFrame, fc = Number.isFinite(host.FC) && host.FC > 0 ? host.FC : 14, active = s.activeLayerIdx, sel = Array.isArray(host._layerSel) ? host._layerSel : [];
-    var asked = { rows: st.rows, frame: frame };
+    var selKey = sel.join(',');
+    if (frameOnly === true && st.gridView && moveHead(host, st, st.gridView, frame, selKey)) return true;
+    var asked = { rows: st.rows };
     var lrows = st.rows.map(function (layer, i) {
       var row = node(host, 'div', 'lrow native-component-layer' + (i === active ? ' act' : '') + (sel.indexOf(i) >= 0 && sel.length > 1 ? ' sel' : ''));
       row.dataset.layer = String(i); row.dataset.layerUid = layer.layerUid;
@@ -75,9 +95,13 @@
       return row;
     });
     list.replaceChildren.apply(list, lrows);
-    header.replaceChildren(node(host, 'div', '', st.name + ' — Frame ' + (frame + 1) + ' / ' + st.totalFrames));
+    var cap = node(host, 'div', '', caption(st, frame));
+    header.replaceChildren(cap);
     grid.replaceChildren.apply(grid, frows);
-    var current = function () { return ports.current() && st.rows === asked.rows && host.state.currentFrame === asked.frame; };
+    st.gridView = { rows: st.rows, list: list, header: header, grid: grid, lrows: lrows, frows: frows, caption: cap, active: active, sel: selKey, waIn: s.waIn, waOut: s.waOut,
+      total: st.totalFrames, fc: fc, name: st.name, frame: frame };
+    // The cells and the range are functions of the revision alone (the playhead is not an input), so an answer is applied whatever frame it lands on.
+    var current = function () { return ports.current() && st.rows === asked.rows; };
     frows.forEach(function (row, i) {
       var layer = st.rows[i];
       Promise.resolve(ports.read('cells', layer.layerUid)).then(function (runs) {

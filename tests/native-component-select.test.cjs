@@ -37,7 +37,7 @@ function world(options) {
   options = options || {};
   const paper = Paper.load(), body = el('body'), toasts = [], runs = [], sent = [], reads = [], held = { held: options.scene ? 'scene-root' : CTX };
   const SCENE_LAYERS = [{ layerUid: 'L1' }];
-  const ROWS = [{ layerUid: 'inner', name: 'Inner', locked: false, visible: true }, { layerUid: 'inner2', name: 'Inner 2', locked: false, visible: true }];
+  const ROWS = options.rows || [{ layerUid: 'inner', name: 'Inner', locked: false, visible: true }, { layerUid: 'inner2', name: 'Inner 2', locked: false, visible: true }];
   let pin = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 3, documentSnapshotId: 'native-object:d:3', canvasW: 200, canvasH: 200, layers: SCENE_LAYERS };
   const ctx = () => held.held;
   const store = (options.items || [quad(CTX, 'inner', 'a', 10, 10, 30, 30), quad(CTX, 'inner2', 'b', 50, 10, 70, 30)]).map((i) => JSON.parse(JSON.stringify(i)));
@@ -110,7 +110,7 @@ test('a move inside the component is ONE batch through the component route, nami
   const body = w.sent[0].request.payload;
   assert.equal(body.command, 'object.vector.batch');
   assert.deepEqual(body.ops.map((o) => [o.op, o.stableTarget.contextId, o.stableTarget.layerUid, o.stableTarget.strokeId]), [['reshape', CTX, 'inner', 'a']]);
-  assert.equal(body.keyframe, undefined, 'the scene-only copy key is not sent inside a component');
+  assert.equal(body.keyframe, 'copy', 'the scene\'s copy-on-write key rides the component batch: a held component frame is keyed with a copy, never the source key');
   assert.deepEqual(w.store[0].segments[0].point, [25, 15], 'the component record moved');
   assert.deepEqual(w.root.selectedPaths.map((p) => p.data.strokeId), ['a'], 'the selection is re-read from the component after the commit');
 });
@@ -134,7 +134,7 @@ test('Labs batches that are not Select\'s stay unavailable inside the component,
   const hit = await Intent.pick(w.root, 20, 20);
   const applied = await route.batchStrokes('inner', 0, [{ restyle: { stableTarget: hit.data.nativeStableTarget, style: { fill: '#ff0000ff' } } }], { skipUnavailable: true, select: true });
   assert.equal(applied.status, 'applied');
-  assert.deepEqual([w.runs, w.sent[0].request.payload.skipUnavailable, w.sent[0].request.payload.ops[0].stableTarget.contextId], [['component'], true, CTX]);
+  assert.deepEqual([w.runs, w.sent[0].request.payload.skipUnavailable, w.sent[0].request.payload.ops[0].stableTarget.contextId, w.sent[0].request.payload.keyframe], [['component'], true, CTX, 'copy']);
   const scene = world({ scene: true });
   await Labs.desktop(scene.root).batchStrokes('inner', 0, [{ delete: 'a' }]);
   assert.deepEqual([scene.runs, scene.sent[0].request.payload.keyframe], [['scene'], 'copy'], 'the scene root keeps the scene route and the copy key');
@@ -155,8 +155,8 @@ test('Delete inside the component removes the selection (and a ribbon\'s linked 
   assert.deepEqual(w.root.selectedPaths, []);
 });
 
-test('Delete leaves the key to other selections and refuses what has no stored delete; nothing is written for either', async () => {
-  const w = world();
+test('Delete leaves the key to other selections at the scene root and refuses what has no stored delete; nothing is written for either', async () => {
+  const w = world({ scene: true, items: [quad('scene-root', 'L1', 's', 10, 10, 30, 30)] });
   const hit = await Intent.pick(w.root, 20, 20); Intent.applyPick(w.root, hit, false);
   const take = (extra) => Delete.key(w.root, Object.assign({ key: 'Backspace', target: { tagName: 'DIV' }, preventDefault() {}, stopImmediatePropagation() {} }, extra));
   w.root._layerActiveExplicit = true; assert.equal(take(), null, 'a layer-row selection keeps its own Delete');
@@ -168,6 +168,34 @@ test('Delete leaves the key to other selections and refuses what has no stored d
   assert.equal(await take(), 'refused');
   assert.match(w.toasts.at(-1), /not available/);
   assert.deepEqual(w.sent, []);
+});
+
+test('Delete with nothing Select-picked INSIDE a component is refused with a notice: the legacy timeline Delete (placeholder rows) never sees the key', async () => {
+  const w = world();
+  let prevented = 0, stopped = 0;
+  const key = (extra) => Object.assign({ key: 'Delete', target: { tagName: 'DIV' }, preventDefault() { prevented++; }, stopImmediatePropagation() { stopped++; } }, extra);
+  assert.equal(await Delete.key(w.root, key()), 'refused', 'an empty selection');
+  assert.match(w.toasts.at(-1), /inside a component/);
+  w.root._layerActiveExplicit = true;
+  assert.equal(await Delete.key(w.root, key()), 'refused', 'a layer-row selection');
+  w.root._layerActiveExplicit = false; w.root._sel = { frames: [{}] };
+  assert.equal(await Delete.key(w.root, key()), 'refused', 'selected frame cells');
+  assert.deepEqual([prevented, stopped], [3, 3], 'every refused key is taken before the legacy handler');
+  w.root._sel = { frames: [] };
+  assert.equal(Delete.key(w.root, key({ target: { tagName: 'INPUT' } })), null, 'typing in a field is not a delete');
+  w.root.state.appMode = 'motion'; assert.equal(Delete.key(w.root, key()), null, 'Motion deletes keys'); w.root.state.appMode = 'anim2d';
+  w.root.state.tool = 'pen'; assert.equal(Delete.key(w.root, key()), null, 'the Pen drops its last anchor');
+  assert.deepEqual([prevented, w.sent], [3, []], 'nothing was written');
+  const scene = world({ scene: true });
+  assert.equal(Delete.key(scene.root, key()), null, 'at the scene root the timeline keeps its Delete');
+});
+
+test('a hidden or locked component layer is never picked, marqueed or read (the owner\'s facts, as in the scene)', async () => {
+  const w = world({ rows: [{ layerUid: 'inner', name: 'Inner', locked: true, visible: true }, { layerUid: 'inner2', name: 'Inner 2', locked: false, visible: false }] });
+  assert.equal(await Intent.pick(w.root, 20, 20), null, 'locked');
+  assert.equal(await Intent.pick(w.root, 60, 20), null, 'hidden');
+  assert.deepEqual(await Intent.marquee(w.root, [0, 0, 190, 190]), []);
+  assert.deepEqual(w.reads, [], 'neither layer was even read');
 });
 
 test('a document that moved on between the key and the batch deletes nothing', async () => {

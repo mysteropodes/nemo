@@ -52,8 +52,11 @@
       (scene && item.name !== null) || !uint32(item.totalFrames) || !uint32(item.layerCount)) fail('invalid component context');
   }
   function layerItem(item) {
-    exact(item, ['layerUid', 'name', 'layerKind'], 'component layer');
+    // The drawing-gate facts (visible, locked, parented, 3D, Motion-transformed) are optional on the wire; the owner always sends them (#2256).
+    exact(item, ['layerUid', 'name', 'layerKind'], 'component layer', ['visible', 'locked', 'parentLayerUid', 'threeD', 'hasMotion']);
     if (!idText(item.layerUid) || !nameOk(item.name) || !LAYER_KINDS.includes(item.layerKind)) fail('invalid component layer');
+    if (['visible', 'locked', 'threeD', 'hasMotion'].some((key) => has(item, key) && typeof item[key] !== 'boolean') ||
+      has(item, 'parentLayerUid') && item.parentLayerUid !== null && !idText(item.parentLayerUid)) fail('invalid component layer facts');
   }
   function instanceItem(item) {
     exact(item, ['layerUid'], 'component instance');

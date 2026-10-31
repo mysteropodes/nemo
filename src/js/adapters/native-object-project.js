@@ -475,7 +475,7 @@
       if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.restoreInspector)root.NemoNativeObjectUI.restoreInspector(root);
       return false;
     }
-    var entered=root.NemoNativeComponentContext;if(entered&&!session.isIndeterminate()&&entered.paint(root))return true; // #2256: an entered component paints read-only
+    var entered=root.NemoNativeComponentContext;if(entered&&!session.isIndeterminate()&&entered.paint(root,frameOnly))return true; // #2256: an entered component paints read-only
     var ports=nativeObjectUiPorts(root);
     try{if(session.isIndeterminate()||!root.NemoNativeObjectUI||root.NemoNativeObjectUI.render(root,session.info(),frameOnly,ports)!==true)
       throw new Error('Native document UI presentation is unavailable');

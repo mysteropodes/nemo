@@ -482,10 +482,10 @@ test('cancel matrix: lock, hide, frame change and undo mid-shape cancel with zer
 
 // #2256 component writes: Draw/Pen/shape create inside an entered component. The component is entered the way the workspace controller holds it
 // (presented context, its own rows); the real tool, Project session, SDK and transport run, only the native owner is simulated.
-function enter(f,id='comp-a',total=8){
+function enter(f,id='comp-a',total=8,facts={}){
  let entered={contextId:id,totalFrames:total,fps:24};
  f.root.NemoNativeComponentContext={SCENE:'scene-root',presented:()=>entered,contextId:()=>entered?entered.contextId:'scene-root',
-  layerRows:()=>entered?[{layerUid:'inner',locked:false,visible:true}]:null,frameBound:(h,pin)=>entered?entered.totalFrames:pin.totalFrames,
+  layerRows:()=>entered?[Object.assign({layerUid:'inner',locked:false,visible:true},facts)]:null,frameBound:(h,pin)=>entered?entered.totalFrames:pin.totalFrames,
   projectionReady:()=>true,revision:()=>Promise.resolve(true)};
  // The vector contract reads the held context from the page global (the same object the workspace controller owns).
  globalThis.NemoNativeComponentContext=f.root.NemoNativeComponentContext;
@@ -503,4 +503,12 @@ test('Draw inside an entered component creates in THAT component through the com
 test('a frame past the entered component is not drawable even though the scene has it',async()=>{
  const f=await fixture('rect');const leave=enter(f,'comp-a',3);f.root.state.currentFrame=5;
  const down=f.area.fire('pointerdown');assert.equal(f.calls.length,0);assert.equal(f.body.children.length,0,'no gesture started: '+down.stopped);leave();
+});
+test('a hidden, locked, parented, 3D or Motion-transformed component layer is not drawable: the gate reads the owner\'s facts like the scene',async()=>{
+ for(const facts of [{visible:false},{locked:true},{parentLayerUid:'other'},{threeD:true},{hasMotion:true}]){
+  const f=await fixture('rect');const leave=enter(f,'comp-a',8,facts);await f.session.presentPreview(2);
+  f.area.fire('pointerdown');assert.equal(f.calls.length,0,JSON.stringify(facts));assert.equal(f.body.children.length,0,'no gesture started: '+JSON.stringify(facts));leave();
+ }
+ const f=await fixture('rect');const leave=enter(f,'comp-a',8,{visible:true,locked:false,parentLayerUid:null,threeD:false,hasMotion:false});await f.session.presentPreview(2);
+ const result=await f.gesture();assert.equal(result.status,'applied','a plain visible unlocked layer still draws');leave();
 });

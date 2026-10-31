@@ -163,7 +163,7 @@ fn an_undeclared_or_vanished_context_and_foreign_layers_are_refused_with_nothing
             r
         })),
         ("frame-past", create(crec(8, ""))),
-        ("copy-key", json!({"command":"object.vector.create","record":crec(3, ""),"keyframe":"copy"})),
+        ("copy-key-on-a-key-of-another-op", json!({"command":"object.vector.replace","record":crec(0, "c-a"),"keyframe":"copy"})),
     ] {
         let response = send(&mut owner, id, payload);
         assert_eq!(response["ok"], false, "{id}: {response}");
@@ -288,4 +288,106 @@ fn select_lists_the_entered_components_records_and_reads_their_geometry() {
     assert!(component_view(&owner, CTX, "inner", false).is_err(), "the editable listing is scene-root only");
     let scene = component_view(&owner, "scene-root", "L1", true).unwrap();
     assert_eq!(scene["contextId"], "scene-root");
+}
+
+/// The ids a component cell lists in the order plan (the entered component's own stack at that frame).
+fn plan_ids(state: &Value, frame: u64) -> Vec<String> {
+    let contexts = state["compositionOrder"]["contexts"].as_array().unwrap();
+    let ctx = contexts.iter().find(|c| c["contextId"] == CTX).unwrap();
+    ctx["scopes"].as_array().unwrap().iter().filter(|s| s["frameScope"]["frame"] == frame)
+        .flat_map(|s| s["elements"].as_array().unwrap().iter().map(|e| e["strokeId"].as_str().unwrap().to_string())).collect()
+}
+fn at_frame<'a>(state: &'a Value, frame: u64, stroke: &str) -> Option<&'a Value> {
+    component(state).iter().find(|r| r["target"]["strokeId"] == stroke && r["target"]["frameScope"]["frame"] == frame)
+}
+fn held_doc() -> Value {
+    let mut d = doc();
+    d["componentTables"]["components"]["components"][0]["layers"][0]["timing"] = timing(&[0, 6]);
+    d
+}
+fn keyed(mut payload: Value) -> Value {
+    payload["keyframe"] = json!("copy");
+    payload
+}
+
+/// #2256 review: Select's move / restyle / delete on a HELD component frame copy-key the cell like the scene route: the cell becomes a key holding
+/// a copy of what it showed (same stroke ids), the edit lands on the copy, the key every held frame carries is untouched, and it is one entry.
+#[test]
+fn a_copy_keyed_select_edit_on_a_held_component_frame_edits_the_copy_not_the_source_key() {
+    for (name, op) in [
+        // As the scene's Select names them: the listed (source key) record and the shown frame; a delete names the cell it removes from.
+        ("move", json!({"op":"reshape","stableTarget":at("inner", 0, "c-a"),"matrix":[1,0,0,1,10,5],"frame":3})),
+        ("restyle", json!({"op":"restyle","stableTarget":at("inner", 0, "c-a"),"style":{"stroke":"#00ff00","width":9},"frame":3})),
+        ("delete", json!({"op":"delete","stableTarget":at("inner", 3, "c-a")})),
+    ] {
+        let mut owner = owner_of(&held_doc());
+        let before = state(&owner);
+        let plain = send(&mut owner, name, json!({"command":"object.vector.batch","ops":[op.clone()]}));
+        assert_eq!(plain["ok"], false, "{name}: without the copy key a held cell has no record to edit: {plain}");
+        assert_eq!(state(&owner), before, "{name}: refused, nothing written");
+        let response = send(&mut owner, &format!("{name}-keyed"), keyed(json!({"command":"object.vector.batch","ops":[op]})));
+        assert_eq!(response["ok"], true, "{name}: {response}");
+        assert_eq!(owner.history_depths(), (1, 0), "{name}: one history entry");
+        let after = state(&owner);
+        let layer = &after["componentTables"]["components"]["components"][0]["layers"][0];
+        assert_eq!(layer["timing"]["keys"], json!([{"frame":0},{"frame":3},{"frame":6}]), "{name}: the held cell became a key");
+        assert_eq!(at_frame(&after, 0, "c-a"), at_frame(&before, 0, "c-a"), "{name}: the source key is untouched (every held frame keeps it)");
+        assert_eq!(plan_ids(&after, 0), vec!["c-a".to_string()], "{name}");
+        match name {
+            "delete" => {
+                assert!(at_frame(&after, 3, "c-a").is_none(), "{name}: the copy is gone");
+                assert!(plan_ids(&after, 3).is_empty(), "{name}");
+            }
+            _ => {
+                let copy = at_frame(&after, 3, "c-a").unwrap_or_else(|| panic!("{name}: the copy keeps the stroke id"));
+                let source = at_frame(&after, 0, "c-a").unwrap();
+                let (c, s) = if name == "move" { (&copy["geometry"], &source["geometry"]) } else { (&copy["vector"], &source["vector"]) };
+                assert_ne!(c, s, "{name}: the copy took the edit");
+                assert_eq!(plan_ids(&after, 3), vec!["c-a".to_string()], "{name}: the copy is in the component's order");
+            }
+        }
+        assert_eq!(scene_part(&after), scene_part(&before), "{name}: the scene root is untouched");
+        undo(&mut owner);
+        assert_eq!(state(&owner), before, "{name}: one undo removes the key and the edit");
+    }
+}
+
+#[test]
+fn a_copy_keyed_create_on_a_held_component_frame_copies_what_the_cell_showed() {
+    let mut owner = owner_of(&held_doc());
+    let before = state(&owner);
+    let id = created_id(&send(&mut owner, "held", keyed(create(crec(3, "")))));
+    let after = state(&owner);
+    assert_eq!(after["componentTables"]["components"]["components"][0]["layers"][0]["timing"]["keys"], json!([{"frame":0},{"frame":3},{"frame":6}]));
+    assert!(at_frame(&after, 3, "c-a").is_some(), "the copy of the shown stroke");
+    assert!(at_frame(&after, 3, &id).is_some());
+    assert_eq!(plan_ids(&after, 3), vec!["c-a".to_string(), id]);
+    assert_eq!(owner.history_depths(), (1, 0));
+    undo(&mut owner);
+    assert_eq!(state(&owner), before);
+}
+
+/// #2256 review: a LOCKED component layer (or one whose ordered path-effect stack is active) refuses every vector write the owner offers, exactly as
+/// the scene layer does (typed `unavailable`): the owner's Drawing guard is the same kernel over the component's view.
+#[test]
+fn a_locked_or_path_effect_component_layer_refuses_every_vector_write_like_the_scene() {
+    for (case, field, value) in [("locked", "locked", json!(true)), ("path-fx", "pathFx", json!([{"type": "zigzag"}]))] {
+    let mut d = held_doc();
+    d["componentTables"]["components"]["components"][0]["layers"][0][field] = value;
+    let mut owner = owner_of(&d);
+    let before = bytes(&owner);
+    let mut moved = record_at("B", "inner", 0, "c-a");
+    moved["target"] = at("inner", 0, "c-a");
+    for (id, payload) in [
+        ("create", create(crec(0, ""))),
+        ("copy-keyed", keyed(create(crec(3, "")))),
+        ("replace", replace(moved)),
+        ("delete", delete(at("inner", 0, "c-a"))),
+        ("batch", keyed(json!({"command":"object.vector.batch","ops":[{"op":"delete","stableTarget":at("inner", 0, "c-a")}]}))),
+    ] {
+        let response = send(&mut owner, &format!("{case}-{id}"), payload);
+        assert_eq!((response["ok"].clone(), response["error"]["code"].clone()), (json!(false), json!("unavailable")), "{case} {id}: {response}");
+        assert_eq!((bytes(&owner), owner.history_depths()), (before.clone(), (0, 0)), "{case} {id}");
+    }
+    }
 }

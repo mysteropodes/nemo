@@ -416,3 +416,36 @@ fn the_scene_reports_whether_the_stored_project_camera_has_keys() {
     assert_eq!(summary(Some(json!([]))), (json!(false), json!(false)));
     assert_eq!(summary(None), (json!(false), json!(false)));
 }
+
+/// #2256 review: a layers page carries the facts the drawing gates read (hidden, locked, parented, 3D, Motion-transformed), for a component's
+/// layers as for the scene's, straight from the stored layer (the admission refuses a stored parent link, so it reads null).
+#[test]
+fn a_layers_page_carries_the_drawing_gate_facts_of_each_layer() {
+    let mut doc = world("D");
+    let comp = &mut doc["componentTables"]["components"]["components"][0];
+    let layers = comp["layers"].as_array_mut().unwrap();
+    assert!(layers.len() >= 2, "the world's first component has two layers");
+    layers[0]["visible"] = json!(false);
+    layers[0]["locked"] = json!(true);
+    layers[0]["threeD"] = json!(true);
+    let id = comp["symbolId"].as_str().unwrap().to_string();
+    let document = decode_storage_project(doc.to_string().as_bytes()).expect("the patched world is admitted");
+    let snap = ObjectSnapshot::new("cmp-instance", document).expect("snapshot");
+    let items = all_pages(&snap, json!({"kind":"layers","contextId":id}), 16);
+    assert_eq!(
+        (&items[0]["visible"], &items[0]["locked"], &items[0]["threeD"], &items[0]["parentLayerUid"], &items[0]["hasMotion"]),
+        (&json!(false), &json!(true), &json!(true), &Value::Null, &json!(false))
+    );
+    for plain in &items[1..] {
+        assert_eq!(
+            (&plain["visible"], &plain["locked"], &plain["threeD"], &plain["parentLayerUid"], &plain["hasMotion"]),
+            (&json!(true), &json!(false), &json!(false), &Value::Null, &json!(false)),
+            "a layer that stores none of the facts reads the baseline defaults"
+        );
+    }
+    let scene = all_pages(&snap, json!({"kind":"layers","contextId":"scene-root"}), 16);
+    for (item, stored) in scene.iter().zip(doc["layers"].as_array().unwrap()) {
+        assert_eq!(item["visible"], json!(stored["visible"] != json!(false)), "{item}");
+        assert_eq!(item["locked"], json!(stored["locked"] == json!(true)), "{item}");
+    }
+}

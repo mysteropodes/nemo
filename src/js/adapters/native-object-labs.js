@@ -41,7 +41,8 @@
       // Several Labs strokes as ONE native vector batch (one revision, one undo entry), keyed with what a held cell showed.
       // `options.skipUnavailable: true` lets a restyle batch skip the steps the engine cannot do (Select's multi-select edit); absent, it is atomic.
       // #2256: inside an entered component ONLY Select's batches (`options.select === true`: move, scale, rotate, restyle, delete) are made context-aware:
-      // they ride the component command route on the context the workspace controller holds, keyed with Draw's plain key (the copy key is scene-only).
+      // they ride the component command route on the context the workspace controller holds, with the scene's copy-on-write key (a held component frame
+      // is keyed with a copy of what it showed, so the edit never lands on the source key every held frame carries).
       // Every other Labs batch (sculpt, trim, pose stamps) is unavailable there rather than silently landing on the scene.
       batchStrokes: (layerUid, frame, steps, options) => {
         const Vector = vectorRoute();
@@ -49,7 +50,7 @@
         const held = heldContext(), skip = options && options.skipUnavailable === true ? { skipUnavailable: true } : {};
         if (held === 'scene-root') return Vector.create(session).batchStrokes(layerUid, frame, steps, Object.assign({ keyframe: 'copy' }, skip));
         if (!options || options.select !== true) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'component_labs_unavailable' }));
-        return Vector.create(session, () => held).batchStrokes(layerUid, frame, steps, skip);
+        return Vector.create(session, () => held).batchStrokes(layerUid, frame, steps, Object.assign({ keyframe: 'copy' }, skip));
       },
       createStroke: (layerUid, frame, dict, opacity) => {
         const Vector = vectorRoute();
