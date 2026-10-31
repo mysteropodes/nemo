@@ -153,6 +153,7 @@ pub fn prepare_object_navigated_viewport_composition(
         plan: plan.clone(),
         viewport: true,
         viewport_quality: Some(object_viewport_quality(camera_view, zoom, pan)),
+        viewport_checker: None,
         camera,
         resources: None,
         scene_effects: None,

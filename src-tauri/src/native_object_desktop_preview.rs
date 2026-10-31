@@ -27,6 +27,9 @@ pub(crate) struct ObjectPreviewReceipt {
     pub(crate) preview: NativePreviewReceipt,
     pub(crate) view: ObjectViewProjection,
     pub(crate) display_filter: ViewportDisplayFilter,
+    /// The checker was painted behind the artwork; absent when not asked for.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) alpha_checker: bool,
     /// What the renderer did with the request's onion / Ghost All settings; absent when none were asked for.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) ghosts: Option<GhostReceipt>,
@@ -81,6 +84,10 @@ pub(crate) struct ObjectPreviewRequest {
     pub(crate) navigation: ObjectPreviewNavigation,
     #[serde(default)]
     pub(crate) display_filter: ViewportDisplayFilter,
+    /// "Show transparency" (#2373): the renderer paints the baseline checker behind the artwork in place of the document
+    /// background (viewport only, never an export).
+    #[serde(default)]
+    pub(crate) alpha_checker: bool,
     /// Onion skin / Ghost All composed under the live frame by the native renderer (viewport only, never an export).
     #[serde(default)]
     pub(crate) ghosts: Option<GhostUnderlayRequest>,
@@ -171,6 +178,9 @@ pub(crate) fn admit_request(raw: &str, instance: &str) -> HostResult<ObjectPrevi
     }
     let output = request.output_spec.admit_object()?;
     request.viewport.admit_object(&output)?;
+    if request.alpha_checker && !(request.viewport.display_scale().is_finite() && request.viewport.display_scale() > 0.) {
+        return Err(host_error("invalid_request", "invalid object preview checker scale"));
+    }
     Ok(request)
 }
 
@@ -178,6 +188,8 @@ pub(crate) struct ObjectPreviewConsumer<'a> {
     owner: &'a mut NativeObjectHost,
     selector: ObjectFrameSelector<'a>,
     display_filter: ViewportDisplayFilter,
+    /// Screen px per composition px of the shown canvas when the transparency checker is asked for.
+    alpha_checker: Option<f64>,
 }
 impl ObjectPreviewConsumer<'_> {
     pub(crate) fn present<P: SurfacePort>(
@@ -191,6 +203,7 @@ impl ObjectPreviewConsumer<'_> {
             compositor,
             viewport,
             self.display_filter,
+            self.alpha_checker,
             &mut diagnostic,
         )?;
         diagnostic.finish(presented.receipt.status());
@@ -254,6 +267,7 @@ pub(crate) fn preview_with_target(
                         owner,
                         selector: selector.clone(),
                         display_filter: request.display_filter,
+                        alpha_checker: request.alpha_checker.then(|| request.viewport.display_scale()),
                     }))
                 };
                 owner.with_prepared_object_preview_for_navigation(
@@ -276,6 +290,7 @@ pub(crate) fn preview_with_target(
         },
         view: receipt.view,
         display_filter: request.display_filter,
+        alpha_checker: request.alpha_checker,
         ghosts: receipt.ghosts,
     })
 }

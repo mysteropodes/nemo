@@ -8,8 +8,8 @@ use native_engine::{
     desktop_viewport::{ObjectPreviewNavigation, ObjectPreviewView},
     object_frame_packet::ObjectFrameSelector,
     object_render_scene::{
-        GhostReceipt, GhostUnderlayRequest, ObjectBrushAdmission, ObjectCompositionWitness,
-        ObjectPaintPlan,
+        viewport_checker_quality_suffix, GhostReceipt, GhostUnderlayRequest, ObjectBrushAdmission,
+        ObjectCompositionWitness, ObjectPaintPlan,
     },
     object_snapshot::ObjectSnapshot,
     scheduler::{EvaluationKey, OutputSpec},
@@ -24,14 +24,20 @@ pub(super) struct PreparedObjectPreview {
     pub(super) navigation: ObjectPreviewNavigation,
     /// Viewport-only onion / Ghost All settings: part of the canonical quality identity of the frame.
     pub(super) ghosts: Option<GhostUnderlayRequest>,
+    /// #2373: screen px per composition px when the viewport paints the transparency checker; part of the quality identity.
+    pub(super) checker_scale: Option<f64>,
 }
 
 impl PreparedObjectPreview {
     /// The one canonical cache identity of this preview: view, navigation and the onion settings.
     pub(super) fn quality(&self) -> String {
         let base = self.navigation.quality(self.view);
-        match &self.ghosts {
+        let base = match &self.ghosts {
             Some(ghosts) => format!("{base}{}", ghosts.quality_suffix()),
+            None => base,
+        };
+        match self.checker_scale {
+            Some(scale) => format!("{base}{}", viewport_checker_quality_suffix(scale)),
             None => base,
         }
     }
@@ -146,6 +152,7 @@ impl NativeObjectHost {
             view,
             navigation,
             ghosts,
+            checker_scale: None,
         })
     }
 }

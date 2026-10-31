@@ -1,15 +1,16 @@
-/* Native view aids (#2373): Safety zones, Clip to canvas and the alpha checker on a native OBJECT project, as pure view overlays.
+/* Native view aids (#2373): Safety zones and Clip to canvas on a native OBJECT project, as pure view overlays; "Show transparency"
+ * as a pure view flag of the native presentation request.
  * The buttons #btn-safety, #btn-clip and #btn-alphabg only flipped state.* and asked the legacy scene builder (engine-bridge.js)
- * to redraw; a native object project builds no legacy scene, so the button lit up and nothing changed. The aids are now drawn as
- * two disposable SVGs over the canvas, mapped through the native presentation view (documentToComposition, like
+ * to redraw; a native object project builds no legacy scene, so the button lit up and nothing changed. Safety and Clip are drawn
+ * as two disposable SVGs over the canvas, mapped through the native presentation view (documentToComposition, like
  * native-select-overlay.js): they read the transient view flags only, send no engine command, never touch the document revision
  * and live in the DOM, so no export (native, a separate render path) can contain them.
- * Baseline look (1065e9d8 engine-bridge buildSafetyZoneItems / buildClipMaskItems / showAlphaChecker): safety rectangles inset 5%
- * (action, rgb 255,210,0) and 10% (title, rgb 255,90,90) at 200/255 alpha and 1 screen px; four #232330 bands outside the artboard
- * ("clip"); an 8 screen px checker of 222/255 tiles, capped at 4000 tiles. Limit: the native frame is already painted with the
- * document background underneath the DOM, so the checker can only DARKEN alternate tiles by the baseline step (255 -> 222); on a
- * white background that is the baseline pixel exactly, on another background it is a tint (a true replacement needs an engine
- * render option and is outside a view overlay). */
+ * Baseline look (1065e9d8 engine-bridge buildSafetyZoneItems / buildClipMaskItems): safety rectangles inset 5% (action, rgb
+ * 255,210,0) and 10% (title, rgb 255,90,90) at 200/255 alpha and 1 screen px; four #232330 bands outside the artboard ("clip").
+ * The alpha checker is NOT drawn here any more: an overlay could only tint the artwork too. It is the `alphaChecker` view flag of
+ * the preview request (native-object-project-desktop.js reads state.previewAlphaBg), and the engine paints the baseline checker
+ * behind the artwork in place of the document background, in the viewport only (an export never has it). The toggle therefore
+ * only flips the flag, mirrors the button and asks the session for one more preview. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -20,7 +21,6 @@
   var FLAGS = { clip: 'canvasClip', safety: 'safetyZones', alpha: 'previewAlphaBg' };
   var CLIP_RGB = 'rgb(35,35,48)', CLIP_SPAN = 100000;
   var ACTION_RGB = 'rgb(255,210,0)', TITLE_RGB = 'rgb(255,90,90)', ZONE_OPACITY = String(200 / 255);
-  var CHECK_PX = 8, MAX_TILES = 4000, CHECK_DARKEN = String((255 - 222) / 255);
   var states = new WeakMap();
   function stateOf(root) {
     var s = states.get(root);
@@ -32,7 +32,7 @@
   }
   function flags(root) {
     var st = root.state || {};
-    return { clip: !!st.canvasClip, safety: !!st.safetyZones, alpha: !!st.previewAlphaBg };
+    return { clip: !!st.canvasClip, safety: !!st.safetyZones };
   }
   // The current native presentation and the canvas rectangle, or null when no native object project is presented.
   function capture(root) {
@@ -60,25 +60,6 @@
       width: c.bounds.width + 'px', height: c.bounds.height + 'px' });
     return svg;
   }
-  // Screen pixels per document unit (the baseline view.zoom).
-  function zoomOf(c) { return Math.hypot(c.V[0], c.V[1]) * c.bounds.width / c.pin.canvasW; }
-  // The baseline checker grid: an 8 screen px tile, grown past that only to stay within 4000 tiles.
-  function checkerGrid(w, h, zoom) {
-    var tile = CHECK_PX / Math.max(0.001, zoom), cols = w / tile, rows = h / tile;
-    if (cols * rows > MAX_TILES) tile *= Math.sqrt((cols * rows) / MAX_TILES);
-    var nx = Math.max(1, Math.round(w / tile)), ny = Math.max(1, Math.round(h / tile));
-    return { cols: nx, rows: ny, tileW: w / nx, tileH: h / ny };
-  }
-  function checker(root, c) {
-    var w = c.pin.canvasW, h = c.pin.canvasH, g = checkerGrid(w, h, zoomOf(c)), d = [];
-    for (var cy = 0; cy < g.rows; cy++) for (var cx = 0; cx < g.cols; cx++) {
-      if ((cx + cy) % 2 !== 0) continue; // the baseline's darker tile is (cx + cy) even
-      d.push('M ' + cx * g.tileW + ' ' + cy * g.tileH + ' h ' + g.tileW + ' v ' + g.tileH + ' h ' + -g.tileW + ' Z');
-    }
-    var group = node(root, 'g', { transform: 'matrix(' + c.V.join(' ') + ')' });
-    group.appendChild(node(root, 'path', { d: d.join(' '), fill: '#000000', 'fill-opacity': CHECK_DARKEN, stroke: 'none' }));
-    return group;
-  }
   function clip(root, c) {
     var w = c.pin.canvasW, h = c.pin.canvasH, outer = rect([1, 0, 0, 1, 0, 0], -CLIP_SPAN, -CLIP_SPAN, CLIP_SPAN, CLIP_SPAN), inner = rect(c.V, 0, 0, w, h);
     var d = function (p) { return 'M ' + p.map(function (q) { return q.join(' '); }).join(' L ') + ' Z'; };
@@ -98,15 +79,14 @@
   }
   // The single (re)draw from the view flags and the current presentation; nothing is drawn when neither holds.
   function refresh(root, force) {
-    var s = stateOf(root), f = flags(root), c = (f.clip || f.safety || f.alpha) ? capture(root) : null;
+    var s = stateOf(root), f = flags(root), c = (f.clip || f.safety) ? capture(root) : null;
     if (!c) { drop(s); return; }
     var sig = JSON.stringify([f, c.V, c.bounds, c.pin.canvasW, c.pin.canvasH]);
     if (!force && sig === s.sig && (s.under || s.over)) return;
     drop(s); s.sig = sig;
-    if (f.alpha || f.clip) {
+    if (f.clip) {
       var under = surface(root, c, '10');
-      if (f.alpha) under.appendChild(checker(root, c));
-      if (f.clip) under.appendChild(clip(root, c));
+      under.appendChild(clip(root, c));
       root.document.body.appendChild(under); s.under = under;
     }
     if (f.safety) {
@@ -118,7 +98,7 @@
   // The presentation, view or canvas rectangle may have changed: redraw once on the next frame (one-shot, only while an aid is on).
   function notify(root) {
     var s = stateOf(root), f = flags(root);
-    if (s.scheduled || !(f.clip || f.safety || f.alpha || s.under || s.over) || !root.requestAnimationFrame) return;
+    if (s.scheduled || !(f.clip || f.safety || s.under || s.over) || !root.requestAnimationFrame) return;
     s.scheduled = true;
     root.requestAnimationFrame(function () { s.scheduled = false; refresh(root, false); });
   }
@@ -126,15 +106,27 @@
     var I = root.NemoSelectCanvasIntent;
     return !!(I && typeof I.objectProject === 'function' && I.objectProject(root));
   }
-  // A button click on a native object project: flip the view flag, mirror the button and redraw. Returns false when the
-  // legacy path owns the click (no native object project), so the caller keeps its own behaviour.
+  // "Show transparency" is a flag of the next preview request: ask the native session for one more frame at the current playhead
+  // (the same single call the Labs view filter makes). It is no command: no document revision, history or dirty state moves.
+  function presentAgain(root) {
+    try {
+      var P = root.NemoNativeObjectProject, session = P && typeof P.desktop === 'function' ? P.desktop(root) : null;
+      if (session && typeof session.isActive === 'function' && session.isActive() && typeof session.renderPreview === 'function') {
+        var shown = session.renderPreview(root.state.currentFrame);
+        if (shown && typeof shown.catch === 'function') shown.catch(function () {});
+      }
+    } catch (_) {}
+  }
+  // A button click on a native object project: flip the view flag, mirror the button and redraw (Safety, Clip) or present again
+  // (alpha). Returns false when the legacy path owns the click (no native object project), so the caller keeps its own behaviour.
   function toggle(root, kind, button) {
     var key = FLAGS[kind];
     if (!key || !root.state || !objectProject(root)) return false;
     root.state[key] = !root.state[key];
     if (button && button.classList) button.classList.toggle('active', !!root.state[key]);
-    refresh(root, true);
+    if (kind === 'alpha') presentAgain(root);
+    else refresh(root, true);
     return true;
   }
-  return Object.freeze({ toggle: toggle, notify: notify, refresh: function (root) { refresh(root, false); }, checkerGrid: checkerGrid });
+  return Object.freeze({ toggle: toggle, notify: notify, refresh: function (root) { refresh(root, false); } });
 }));

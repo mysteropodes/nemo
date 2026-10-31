@@ -505,3 +505,6 @@ fn gpu_camera_navigation_changes_real_pixels_cache_and_inverse_without_history_o
 
 #[path = "native_object_desktop_preview_onion_tests.rs"]
 mod onion;
+
+#[path = "native_object_desktop_preview_checker_tests.rs"]
+mod checker;
