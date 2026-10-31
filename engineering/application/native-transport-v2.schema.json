@@ -16596,6 +16596,12 @@
             "null"
           ]
         },
+        "toolsDock": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "propsPanelCollapsed": {
           "type": "boolean"
         },
@@ -16651,6 +16657,12 @@
           ]
         },
         "motionColumns": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "toolsDock": {
           "type": [
             "string",
             "null"
