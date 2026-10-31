@@ -205,6 +205,22 @@ pub(crate) fn model_members(document: &ObjectDocument) -> Map<String, Value> {
     members
 }
 
+/// Adds the row members and the top-level members to a project-info value whose `layers` array is index-aligned
+/// with `document.layers()`.
+pub(crate) fn extend_layers(document: &ObjectDocument, info: &mut Value) {
+    let rows = layer_members(document);
+    if let Some(layers) = info["layers"].as_array_mut() {
+        for (layer, extra) in layers.iter_mut().zip(rows) {
+            if let Some(object) = layer.as_object_mut() {
+                object.extend(extra);
+            }
+        }
+    }
+    if let Some(object) = info.as_object_mut() {
+        object.extend(model_members(document));
+    }
+}
+
 #[cfg(test)]
 #[path = "../tests/object_layer_read_model.rs"]
 mod tests;
