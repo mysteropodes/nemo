@@ -973,6 +973,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-selection-style.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2584,
+          "scriptOrdinal": 236
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-subselect-ui.js",
       "moduleId": "app.native.object.ui.adapter",
       "executionClass": "document-classic",
@@ -4194,6 +4206,18 @@
           "path": "src/index.html",
           "line": 2651,
           "scriptOrdinal": 301
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-vector-restyle.js",
+      "moduleId": "app.native.object.vector.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2378,
+          "scriptOrdinal": 70
         }
       ]
     },

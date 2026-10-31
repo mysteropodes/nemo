@@ -565,6 +565,7 @@ window.SM={
   // Select tool active and strokes selected, changing width/style/color/
   // cap/join restyles the selection instead of only future strokes.
   setBrushSize:function(v){
+    if(v>0&&nativeSelStyle({width:v})){state.brushSize=v;return;}
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-brush-size'))return false;
     state.brushSize=v;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){
@@ -655,6 +656,7 @@ window.SM={
   // A shape with no track at all — every shape in plain Animation 2D — takes
   // the early `false` and behaves exactly as before.
   setStrokeColor:function(v){
+    if(nativeHex(v)&&nativeSelStyle({stroke:v})){state.strokeColor=v;paintStrokeSwatches(v);return;}
     if(((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length||state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='stroke';}))&&!n20AllowLegacyWrite('timeline-selection-stroke-color'))return false;
     state.strokeColor=v;paintStrokeSwatches(v);
     if(routeColorToSelectedMotionRow('strokeColor',v)){}
@@ -664,6 +666,7 @@ window.SM={
     // combined shape (that's the whole point of this tool vs plain Select).
     else if(state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='stroke';})){pushUndo();_fsSel=_fsSel.map(function(sel){if(sel.kind!=='stroke')return sel;var arc=fsRealizeStrokeSegment(sel,userLayers[state.activeLayerIdx]);arc.strokeColor=v;return{path:arc,kind:'stroke',segStart:0,segEnd:arc.length,closed:arc.closed};});saveActiveLayerFrame();updateUI();}},
   setFillColor:function(v){
+    if(nativeHex(v)&&nativeSelStyle({fill:v})){state.fillColor=v;paintFillSwatches(v);return;}
     if(((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length||state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='fill'||s.kind==='fillregion';}))&&!n20AllowLegacyWrite('timeline-selection-fill-color'))return false;
     state.fillColor=v;paintFillSwatches(v);
     if(routeColorToSelectedMotionRow('fillColor',v)){}
@@ -859,6 +862,7 @@ window.SM={
   // silently ignores from then on.
   setPressureCurve:function(v){state.pressureCurve=['linear','sqrt','cbrt','pow2','pow3'].indexOf(v)>=0?v:'linear';state.pressureCurvePoints=null;},
   setOpacity:function(v){
+    if(isFinite(parseInt(v))&&nativeSelStyle({opacity:Math.max(0,Math.min(100,parseInt(v)))/100})){state.opacity=parseInt(v);return;}
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-opacity'))return false;
     state.opacity=parseInt(v);
     // Unlike setFillColor/setStrokeColor right above, this never applied to
@@ -3698,7 +3702,7 @@ function updateSelPropsPanel(){
     // go through setFillColor/setFillEnabled (those mutate every selected
     // path's fill, which is for user edits, not for passively reflecting
     // the existing selection).
-    var ref=selectedPaths[0];
+    var ref=nativeStyleView(selectedPaths[0]);
     if(ref){
       // Restore the rotate/scale anchor from the (re)selected stroke's OWN
       // data (2026-07, "la position du point d'ancrage n'est pas mise en
@@ -3794,6 +3798,8 @@ function updateSelPropsPanel(){
           }
         }
       }
+      // A native image or unfilled stroke shows its item opacity in the Fill opacity field (the baseline wrote it to p.opacity when no fill existed).
+      if(typeof ref.nativeOpacity==='number'&&!ref.fillColor&&!isBrushShape){var nOpEl=document.getElementById('p-opacity');if(nOpEl&&document.activeElement!==nOpEl)nOpEl.value=Math.round(ref.nativeOpacity*100);}
       // Same staleness fix for Cap/Join/Paint Order/Miter Limit/Dash Offset —
       // reflect the selected path's actual values instead of leaving
       // whatever the tool-default last was.
@@ -6344,6 +6350,23 @@ function routeColorToMotion(p,prop,hex){
   var li=userLayers.indexOf(p.parent);
   if(li<0)return false;
   return SMMotion.writeElementColorFromPicker(li,p.data.strokeId,prop,hex);
+}
+// #2372 SEL-STYLE: on a native object project the right panel restyles the Select selection through ONE native batch (adapters/native-selection-style.js),
+// never through the legacy Paper writers the n20 gates below refuse. True when the edit was handed to it (the caller then only updates the tool defaults).
+function nativeSelStyle(style){
+  var A=window.NemoNativeSelectionStyle;
+  if(!A||!A.handles(window))return false;
+  A.apply(window,style);return true;
+}
+function nativeHex(v){return typeof v==='string'&&/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v)?v:null;}
+// What updateSelPropsPanel reads from the first selected item: the style the engine listed for a native item (the presented Paper path only
+// carries placeholder paint for hit testing), shaped as the live item the panel code was written against.
+function nativeStyleView(p){
+  var A=window.NemoNativeSelectionStyle,st=A&&p?A.shown(p):null;
+  if(!st)return p;
+  var ribbon=st.role==='ribbon',data=Object.assign({},p.data);
+  if(ribbon){data.isVectorBrush=true;data.widthProfile=[{width:st.width||0}];}
+  return {id:p.id,data:data,fillColor:st.fill?new Color(st.fill):null,strokeColor:!ribbon&&st.stroke?new Color(st.stroke):null,strokeWidth:st.width||0,nativeOpacity:st.opacity};
 }
 function paintStrokeSwatches(v){
   var sw=document.getElementById('stroke-well'); if(sw)sw.style.background=v;

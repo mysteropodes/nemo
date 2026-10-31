@@ -2797,6 +2797,7 @@
         "native-subselect-ui.js",
         "native-select-overlay.js",
         "native-select-gesture.js",
+        "native-selection-style.js",
         "native-layer-list-presenter.js",
         "native-object-ui.js",
         "native-layer-range-desktop.js",
@@ -3480,7 +3481,8 @@
       "layer": "domain",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-vector-contract.js"
+        "native-object-vector-contract.js",
+        "native-object-vector-restyle.js"
       ],
       "sizeProfile": "Domain/application",
       "publicApi": [

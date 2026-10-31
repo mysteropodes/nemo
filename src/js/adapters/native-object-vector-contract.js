@@ -11,8 +11,7 @@
   'use strict';
 
   const VECTOR = 'command.document.object.vector.edit';
-  const PARAMETRIC = 'command.document.object.parametric.edit';
-  const EFFECTS = 'command.document.object.path.effects.edit';
+  const PARAMETRIC = 'command.document.object.parametric.edit', EFFECTS = 'command.document.object.path.effects.edit';
   const OPS = new Set([VECTOR, PARAMETRIC, EFFECTS]);
   const FAMILY = 'editable-vector-path';
   // Full encoded request envelopes: vector edits may carry a complete 256-anchor record, and the Fill Brush commit
@@ -294,8 +293,9 @@
         // A geometry-less clone copies any stroke shifted by `offset` (a pose stamp); by `center` rebuilds a ribbon (sculpt); by `matrix` maps any record by a record-space affine (#2372 Select).
         if (op.op === 'reshape' || op.op === 'clone') { const clone = op.op === 'clone'; exact(op, ['op', 'stableTarget'].concat(clone ? ['frame'] : []), clone ? ['geometry', 'offset', 'placement', 'keyframe'] : ['geometry', 'center', 'matrix', 'frame'], where); target(op.stableTarget, `${where}.stableTarget`, false); if (has(op, 'geometry')) geometry(op.geometry, `${where}.geometry`); if (!clone && [has(op, 'geometry'), has(op, 'center'), has(op, 'matrix')].filter(Boolean).length !== 1) fail(`${where} needs geometry, a center or a matrix`); if (has(op, 'matrix') && (!Array.isArray(op.matrix) || op.matrix.length !== 6 || !op.matrix.every(Number.isFinite))) fail(`${where}.matrix must be six finite numbers`); if (has(op, 'center')) { if (!Array.isArray(op.center) || op.center.length < 2 || op.center.length > 256) fail(`${where}.center must have 2..256 anchors`); pressure({ centerSegments: op.center }, where); } if (has(op, 'offset') && (has(op, 'geometry') || !Array.isArray(op.offset) || op.offset.length !== 2 || !op.offset.every(Number.isFinite))) fail(`${where}.offset is invalid`);
           if (has(op, 'frame') && !(Number.isSafeInteger(op.frame) && op.frame >= 0 && op.frame <= 4294967295)) fail(`${where}.frame must be a frame`); if (has(op, 'placement')) oneOf(op.placement, ['front', 'behind'], `${where}.placement`); if (has(op, 'keyframe')) oneOf(op.keyframe, ['copy'], `${where}.keyframe`); return op.stableTarget; }
+        if (op.op === 'restyle') { exact(op, ['op', 'stableTarget', 'style'], ['frame'], where); target(op.stableTarget, `${where}.stableTarget`, false); (typeof module === 'object' && module.exports ? require('./native-object-vector-restyle.js') : globalThis.NemoNativeObjectVectorRestyle).check(op, where); return op.stableTarget; }
         if (op.op === 'delete') { exact(op, ['op', 'stableTarget'], [], where); target(op.stableTarget, `${where}.stableTarget`, false); return op.stableTarget; }
-        return fail(`${where}.op must be create, copy, replace, reshape, clone or delete`);
+        return fail(`${where}.op must be create, copy, replace, reshape, clone, restyle or delete`);
       });
       targets.forEach((t, at) => { if (!t) targets[at] = targets[payloadValue[at].fromStep]; });
       if (targets.some((t) => t.contextId !== 'scene-root' || t.layerUid !== targets[0].layerUid)) fail(`${label} must stay on one scene-root layer`);

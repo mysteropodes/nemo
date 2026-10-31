@@ -68,7 +68,8 @@ impl ObjectCompositionWitness {
                     continue;
                 }
                 PaintEntry::Text(source) => {
-                    items.extend(self.text_hit_item(index, source));
+                    let style = self.plan().packet().text_records().find(|r| r.source_index() == source.source_index).and_then(|r| record::style::text(r.entry().block.color()));
+                    items.extend(self.text_hit_item(index, source).map(|item| SubselectReadItem { style, ..item }));
                     continue;
                 }
                 _ => continue,
@@ -126,6 +127,7 @@ impl ObjectCompositionWitness {
                     }),
                 brush: brush.0,
                 group: brush.1,
+                style: if hit_test { record::style::listed(r) } else { None },
             });
         }
         if items.len() > 1024 {
@@ -169,6 +171,7 @@ impl ObjectCompositionWitness {
         let bounds = [cx - w / 2.0, cy - h / 2.0, cx + w / 2.0, cy + h / 2.0];
         (bounds.iter().chain(&matrix).all(|v| v.is_finite()) && w > 0.0 && h > 0.0 && rect.width > 0.0 && rect.height > 0.0)
             .then(|| hit_item(target, bounds, matrix, "raster"))
+            .map(|item| SubselectReadItem { style: record::style::raster(record.entry().item.opacity()), ..item })
     }
     fn text_hit_item(
         &self,
@@ -274,6 +277,7 @@ fn hit_item(
         owner: None,
         brush: None,
         group: None,
+        style: None,
     }
 }
 
