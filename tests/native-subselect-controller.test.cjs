@@ -149,3 +149,43 @@ test('marquee topmost arbitration uses the pressure paint bounds and keeps cente
   f.controller.handle('move',f.event(170,90));f.controller.handle('up',f.event(170,90));await f.controller.settled();
   assert.equal((await f.controller.setPointType('smooth')).status,'refused');assert.equal(f.sent.length,0);
 });
+
+// #2372 presentation-busy-audit: the native queue hides the presentation while ANY command is pending (queue-pending).
+const ticks=async(n=4)=>{for(let i=0;i<n;i++)await new Promise(setImmediate);};
+function countReads(f){let reads=0;const orig=f.s.readSubselect;f.s.readSubselect=(...a)=>{reads++;return orig(...a);};return ()=>reads;}
+test('a Direct Select press during the queue-pending window waits for the presentation and then selects once (no unavailable notice)',async()=>{
+  const f=fixture(),reads=countReads(f);f.setBusy(true);
+  f.controller.handle('down',f.event(100,60));await ticks(3);
+  assert.equal(reads(),0,'held while the presentation is hidden');assert.deepEqual(f.notices,[]);
+  f.setBusy(false);await ticks();await f.controller.settled();
+  assert.equal(reads(),1,'the held press ran exactly once');assert.deepEqual(f.notices,[]);
+  f.drag();f.controller.handle('up',f.event(52,34));assert.equal((await f.controller.settled()).status,'applied',f.notices.join(';'));assert.equal(f.sent.length,1);
+});
+test('a held Direct Select press keeps the events that followed it: a quick click is not lost',async()=>{
+  const f=fixture(),reads=countReads(f);f.setBusy(true);
+  f.controller.handle('down',f.event(100,60));f.controller.handle('up',f.event(100,60));await ticks(2);
+  f.setBusy(false);await ticks();await f.controller.settled();
+  assert.equal(reads(),1);assert.equal(f.sent.length,0);assert.deepEqual(f.notices,[]);
+});
+test('a Direct Select drag and its selection survive the queue being busy mid-gesture, and the release still commits once',async()=>{
+  const f=fixture();await f.select();f.drag();
+  f.setBusy(true);f.controller.handle('move',f.event(55,36));f.controller.handle('up',f.event(55,36));
+  await ticks(3);assert.equal(f.sent.length,0,'not submitted while the presentation is hidden (it would be refused at dispatch)');f.setBusy(false);
+  const result=await f.controller.settled();
+  assert.equal(result.status,'applied',f.notices.join(';'));assert.equal(f.sent.length,1);
+  const g=fixture(),frames=[];g.root.requestAnimationFrame=fn=>frames.push(fn);await g.select();
+  g.setBusy(true);for(let i=0;i<3&&frames.length;i++)frames.shift()(); // the selection watcher runs while the presentation is hidden
+  g.setBusy(false);g.drag();g.controller.handle('up',g.event(52,34));assert.equal((await g.controller.settled()).status,'applied','the selection was not dropped by the busy window');
+});
+test('a real change during the wait still refuses: the tool left, or the playhead moved',async()=>{
+  const gone=fixture(),reads=countReads(gone);gone.setBusy(true);gone.controller.handle('down',gone.event(100,60));
+  gone.root.state.tool='draw';gone.setBusy(false);await ticks();
+  assert.equal(reads(),0,'the user left the tool: the held press is dropped');assert.deepEqual(gone.notices,[]);
+  const moved=fixture(),mreads=countReads(moved);moved.setBusy(true);moved.controller.handle('down',moved.event(100,60));
+  moved.root.state.currentFrame=1;moved.setBusy(false);await ticks();
+  assert.equal(mreads(),0,'the playhead moved while waiting: the press is not replayed onto another frame');assert.equal(moved.sent.length,0);
+});
+test('a queue that never frees gives one clear notice and no selection',async()=>{
+  const f=fixture(),reads=countReads(f);f.setBusy(true);f.controller.handle('down',f.event(100,60));await ticks(40);
+  assert.equal(reads(),0);assert.deepEqual(f.notices,['The canvas is still busy - try again.']);
+});

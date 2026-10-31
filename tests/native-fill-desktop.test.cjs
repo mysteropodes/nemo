@@ -158,3 +158,29 @@ test('ordinary Fill retains the real Project action-local presentation while its
  const good=await run(false);assert.equal(good.sent.length,1);assert.deepEqual(good.sent[0].payload.point,[40,30]);assert.equal(good.session.info().contentRevision,1);
  const changed=await run(true);assert.equal(changed.sent.length,0);assert.equal(changed.session.info().contentRevision,0);
 });
+
+// #2372 presentation-busy-audit: the native queue hides the presentation while ANY command is pending (queue-pending).
+function busyFill(){
+ const f=cameraPointerFixture(),toasts=[],real=f.session.readPresentedObjectSession,q={hidden:true};
+ f.root.NemoNativePresentationWait=require('../src/js/adapters/native-presentation-wait.js');f.root.setTimeout=fn=>setImmediate(fn);f.root.showToast=m=>toasts.push(m);
+ f.session.readPresentedObjectSession=why=>{if(q.hidden){if(why)why('queue-pending');return null;}return real();};
+ return {...f,toasts,q};
+}
+const spin=async(n)=>{for(let i=0;i<n;i++)await new Promise(setImmediate);};
+test('a Fill click during the queue-pending window waits for the presentation and fills once, with no unavailable notice',async()=>{
+ const f=busyFill();assert.equal(f.pointer(),true);await spin(4);
+ assert.equal(f.dispatched.length,0,'held while hidden');assert.deepEqual(f.toasts,[]);
+ f.q.hidden=false;await spin(12);
+ assert.equal(f.dispatched.length,1);assert.deepEqual(f.dispatched[0].payload.point,[100,60]);assert.equal(f.executions(),1);assert.deepEqual(f.toasts.filter(t=>/unavailable/i.test(t)),[]);
+});
+test('a Fill click whose tool left or playhead moved during the wait is dropped, and one whose view changed still refuses',async()=>{
+ for(const change of [r=>r.state.tool='draw',r=>r.state.currentFrame=4]){
+  const f=busyFill();f.pointer();change(f.root);f.q.hidden=false;await spin(12);assert.equal(f.dispatched.length,0);assert.deepEqual(f.toasts,[]);
+ }
+ const v=busyFill();v.pointer();v.root.state.cameraView=false;v.q.hidden=false;await spin(12);
+ assert.equal(v.dispatched.length,0,'a readable presentation of another view refuses');assert.deepEqual(v.toasts,['Native fill coordinates are unavailable']);
+});
+test('a queue that never frees gives a Fill click one clear notice and no fill',async()=>{
+ const f=busyFill();f.pointer();await spin(40);
+ assert.deepEqual(f.toasts,['The canvas is still busy - click again.']);assert.equal(f.dispatched.length,0);
+});

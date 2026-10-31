@@ -95,7 +95,7 @@
     }
     // Imports an already fetched file. Returns the baseline-shaped report next to the typed status of the single batch.
     async function importFile(figmaJson, opts) {
-      const begun = core.begin();
+      const begun = typeof core.beginSettled === 'function' ? await core.beginSettled() : core.begin();
       if (!begun.ok) return { status: begun.status, reason: begun.reason };
       const ctx = begun.ctx, canvas = { w: ctx.before.canvasW, h: ctx.before.canvasH };
       const plan = convert(figmaJson, opts, canvas);

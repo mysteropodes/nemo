@@ -197,7 +197,7 @@
         if (imagePending) return { status: 'busy' };
         const unresolved = uncertainImageStatus();
         if (unresolved) return unresolved;
-        const started = core.begin();
+        const started = await core.beginSettled();
         if (!started.ok) return { status: started.status, reason: started.reason };
         const ctx = started.ctx, state = root.state, symbol = state.activeSymbolId, activeLayer = state.activeLayerIdx;
         if (typeof ctx.session.readSubscriptionGeneration !== 'function') return { status: 'unavailable', reason: 'native_subscription_identity_absent' };

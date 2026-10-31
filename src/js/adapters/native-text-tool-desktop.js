@@ -200,13 +200,30 @@
       }return true;};
     b.retire=function(){if(b.retired)return;removeGuide();perspectiveRefreshNeeded=false;if(removePerspectiveRead){removePerspectiveRead();removePerspectiveRead=null;}if(b.animators)b.animators.retire();var owned=ownsUI();hide();b.retired=true;core.retire();events.forEach(function(a){a[0].removeEventListener(a[1],a[2],a[3]);});
       if(owned&&font){font.replaceChildren.apply(font,savedFonts);font.value=savedFontValue;}if(colorHexLabel.parentNode)colorHexLabel.parentNode.removeChild(colorHexLabel);if(owned&&colorParent)colorParent.style.flexWrap=colorParentWrap;if(section.parentNode)section.parentNode.removeChild(section);};
-    b.ready=function(){var c=context(true);return !!c&&!!readyPin&&Tool.samePin(c.pin,readyPin);};b.core=core;bindings.set(root,b);
+    b.mid=function(e){return !!drag&&e.pointerId===drag.id;};b.ready=function(){var c=context(true);return !!c&&!!readyPin&&Tool.samePin(c.pin,readyPin);};b.core=core;bindings.set(root,b);
     var perspectiveController=root.NemoNativePerspectiveController;
     if(perspectiveController&&typeof perspectiveController.onRead==='function')removePerspectiveRead=perspectiveController.onRead(perspectiveReadChanged);
     b.refresh();return b;
   }
+  // #2372: a press while the native queue is busy (queue-pending) waits for the presentation and replays with the events that followed it, so a click
+  // right after an edit opens the text instead of "Native Text is unavailable." (native-presentation-wait.js).
+  function gateOf(root,b){
+    var W=root.NemoNativePresentationWait,d=root.document;
+    if(!W||b.gate)return b.gate;
+    var session=function(){var s=b.ports.currentSession();return s&&typeof s.readPresentedObjectSession==='function'?s:null;};
+    return b.gate=W.gate(root,{ends:['cancelEvent'],notice:'The canvas is still busy - try again.',
+      handle:function(kind,ev){var ok=b.handle(kind,ev);if(ok&&typeof b.cancelOther==='function')b.cancelOther();return ok;},
+      begins:function(kind,ev){if(b.retired||root.state.tool!=='text'||kind==='cancelEvent')return false;if(kind!=='down')return b.mid(ev); // a move / release of a press already taken
+        return (ev.target===d.getElementById('drawing-canvas')||ev.target===d.getElementById('canvas-area'))&&ev.button===0&&ev.isPrimary===true;},
+      read:function(f){var s=session();return s?s.readPresentedObjectSession(f):null;},
+      snapshot:function(){var s=b.ports.currentSession(),i=s&&s.info(),st=root.state;return JSON.stringify([st.tool,st.currentFrame,st.activeLayerIdx,root._layerSel||null,i&&[i.instanceId,i.documentId,i.lifecycleGeneration,i.contentRevision]]);},
+      holds:function(token){return !b.retired&&root.state.tool==='text'&&this.snapshot()===token;}});
+  }
   function handle(root,method,e,cancelOtherIntent){
     var b=bindings.get(root);if(method!=='move')trace(root,'route',method,{binding:!!b});
+    if(b)b.cancelOther=cancelOtherIntent;
+    var gate=b&&b.ports&&typeof b.ports.currentSession==='function'&&gateOf(root,b);
+    if(gate&&root.state&&root.state.tool==='text')return gate.handle(method,e);
     var handled=!!b&&b.handle(method,e);
     if(handled&&typeof cancelOtherIntent==='function')cancelOtherIntent();
     return handled;

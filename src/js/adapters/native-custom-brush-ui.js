@@ -111,8 +111,10 @@
     function confirmed(result) {
       return !retired && result && ['applied-presented', 'unchanged'].includes(result.status) && result.projection === model.read();
     }
+    // #2372: an origin that is not ready only because a pending native command hides the presentation is waited out (model.readSettled), not refused.
+    async function readySoon(origin) { return ready(origin) || (!retired && !pending && !loading && !!origin && await model.readSettled() === origin); }
     async function edit(action, origin) {
-      if (!ready(origin)) { notice(root); return { status: 'unavailable' }; }
+      if (!(await readySoon(origin))) { notice(root); return { status: 'unavailable' }; }
       pending = true;
       busyStamp = stamp();
       try {

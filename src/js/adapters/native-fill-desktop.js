@@ -63,7 +63,7 @@
       const s=current(root);return !!(s&&(s.isActive()||typeof s.blocksLegacy==='function'&&s.blocksLegacy()));
     }catch(_){return true;}
   }
-  function handlePointerDown(root,event,ports){
+  function handlePointerDown(root,event,ports,late){
     if(!nativeMode(root))return false;
     const state=root.state;
     if(!state||state.tool!=='fill'||state.playing)return false;
@@ -74,6 +74,12 @@
     const Mapping=ports&&ports.mapping;
     if(!Mapping||['bounds','point','matchesView'].some(key=>typeof Mapping[key]!=='function')){toast('Native fill coordinates are unavailable');return true;}
     const owner=current(root),shown=owner&&owner.readPresentedObjectSession&&owner.readPresentedObjectSession(),info=owner&&owner.info();
+    // #2372: a click while the native queue is busy (queue-pending) waits for the presentation, then fills once - not "coordinates unavailable".
+    const W=root.NemoNativePresentationWait,read=f=>{const o=current(root);return o&&o.readPresentedObjectSession?o.readPresentedObjectSession(f):null;};
+    if(!late&&owner&&!shown&&W&&W.busy(read)){const frame=state.currentFrame,layer=state.activeLayerIdx;
+      W.await(root,{read,notice:'The canvas is still busy - click again.',holds:()=>state.tool==='fill'&&!state.playing&&current(root)===owner&&state.currentFrame===frame&&state.activeLayerIdx===layer})
+        .then(r=>{if(r.ready||r.status==='refused')handlePointerDown(root,event,ports,true);});
+      return true;}
     const rect=info&&Mapping.bounds(root,info);
     if(!shown||!shown.presentation||!rect||!PIN.every(key=>shown[key]===info[key])||shown.presentation.frame!==state.currentFrame||!Mapping.matchesView(root,shown.presentation)){toast('Native fill coordinates are unavailable');return true;}
     const captured=shown.presentation;let actionReady=null;

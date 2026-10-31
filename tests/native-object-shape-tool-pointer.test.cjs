@@ -40,7 +40,7 @@ async function fixture(tool='rect',native=true){
  const root={document:doc,state:{tool,appMode:'anim2d',currentFrame:0,strokeEnabled:true,fillEnabled:true,strokeColor:'#112233',fillColor:'#44556680',
   brushSize:4,opacity:50,strokeCap:'round',strokeStyle:'solid',miterLimit:10,dashOffset:0,paintOrder:'fillFirst'},userLayers:[],selectedPaths:[],devicePixelRatio:2,
   NemoNativeObjectProject:Project,NemoNativeObjectProjectFile:Files,NemoApplicationMcpTransport:Transport,NemoNativeApplicationAdapter:SDK,NemoNativeObjectVector:Vector,
-  NemoNativeObjectUI:{refreshTiming(){},refreshPolicy(){}},updateUI:()=>log.push('publish-'+revision),showToast:s=>log.push(s)};
+  NemoNativeObjectUI:{refreshTiming(){},refreshPolicy(){}},updateUI:()=>log.push('publish-'+revision),showToast:s=>log.push(s),setTimeout:fn=>setImmediate(fn)};
  require('./helpers/native-viewport-underlay.cjs').install(root);
  async function invoke(command,args){const q=args&&(args.request||JSON.parse(args.requestJson));
   if(command==='nemo_native_status'||command==='nemo_native_object_client_status')return {...info(),available:installed};
@@ -94,6 +94,7 @@ async function fixture(tool='rect',native=true){
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-paint.js'),'utf8'),context,{filename:'native-object-draw-paint.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-symmetry.js'),'utf8'),context,{filename:'native-object-draw-symmetry.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-bitmap.js'),'utf8'),context,{filename:'native-object-draw-bitmap.js'});
+ if(fs.existsSync(path.join(ROOT,'src/js/adapters/native-presentation-wait.js')))vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-presentation-wait.js'),'utf8'),context,{filename:'native-presentation-wait.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-shape-tool.js'),'utf8'),context,{filename:'native-object-shape-tool.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/shape-bridge.js'),'utf8'),context,{filename:'shape-bridge.js'});
  if(tool==='pen'){root.SM={setTool(t){root.state.tool=t;}};vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/pen-bridge.js'),'utf8'),context,{filename:'pen-bridge.js'});}
@@ -511,4 +512,45 @@ test('a hidden, locked, parented, 3D or Motion-transformed component layer is no
  }
  const f=await fixture('rect');const leave=enter(f,'comp-a',8,{visible:true,locked:false,parentLayerUid:null,threeD:false,hasMotion:false});await f.session.presentPreview(2);
  const result=await f.gesture();assert.equal(result.status,'applied','a plain visible unlocked layer still draws');leave();
+});
+
+// #2372 presentation-busy-audit: the native queue hides the presentation while ANY command is pending (queue-pending); a press, a drag and a
+// release must outlast it instead of being dropped or refused with a notice about something that did not happen.
+async function hide(f){const wait=gate(),busy=f.session.runResourceCommand(async()=>{await wait.promise;});await turn();
+ assert.equal(f.session.readPresentedObjectSession(),null,'the queue hides the presentation');return {free:async()=>{wait.resolve();await busy;}};}
+async function until(f,done){for(let i=0;i<80&&!done();i++)await turn();}
+const busyNotice='The canvas is still busy - try again.';
+test('a shape drawn while the queue is busy waits for the presentation and commits once',async()=>{
+ const f=await fixture(),q=await hide(f);
+ const down=f.area.fire('pointerdown');assert.equal(down.stopped,true);f.area.fire('pointermove',{clientX:240,clientY:210});f.area.fire('pointerup',{clientX:240,clientY:210});
+ for(let i=0;i<4;i++)await turn();assert.equal(f.calls.length,0,'held while hidden');assert.ok(!f.log.includes('Native Drawing is not ready.'),'no misleading refusal');
+ await q.free();await until(f,()=>f.calls.length>0);const result=await f.root.NemoNativeShapeToolController.whenSettled();
+ assert.equal(result.status,'applied');assert.equal(f.calls.length,1,'exactly one native create');assert.equal(f.records.size,1);
+ assert.deepEqual(f.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,20],[100,20],[100,80],[20,80]]);
+});
+test('a shape drag survives the queue turning busy mid-gesture and its release commits once',async()=>{
+ const f=await fixture();f.area.fire('pointerdown');f.area.fire('pointermove',{clientX:200,clientY:180});
+ const q=await hide(f);f.area.fire('pointermove',{clientX:240,clientY:210});assert.equal(f.body.children.length,1,'the drag is still drawn');f.area.fire('pointerup',{clientX:240,clientY:210});
+ await q.free();await until(f,()=>f.calls.length>0);const result=await f.root.NemoNativeShapeToolController.whenSettled();
+ assert.equal(result.status,'applied',JSON.stringify(f.log));assert.equal(f.calls.length,1);assert.equal(f.records.size,1);
+});
+test('Pen: the first click during the busy window still opens the path (replayed press and release)',async()=>{
+ const f=await fixture('pen'),q=await hide(f);f.area.fire('pointerdown',{clientX:80,clientY:90});f.area.fire('pointerup',{clientX:80,clientY:90});
+ for(let i=0;i<3;i++)await turn();assert.equal(f.root.NemoNativePenToolController.isDragging(),false,'held');
+ await q.free();await until(f,()=>f.root.NemoNativePenToolController.isDragging());assert.equal(f.root.NemoNativePenToolController.isDragging(),true);
+ f.area.fire('pointerdown',{clientX:240,clientY:90});f.area.fire('pointerup',{clientX:240,clientY:90});f.area.fire('pointerdown',{clientX:240,clientY:90});
+ const r=await f.root.NemoNativePenToolController.whenSettled();assert.equal(r.status,'applied');assert.equal(f.calls.length,1);
+});
+test('a real change during the wait still refuses: the tool left or the playhead moved (silent), or the view changed (the handler says why)',async()=>{
+ const gone=await fixture(),q=await hide(gone);gone.area.fire('pointerdown');gone.area.fire('pointerup',{clientX:240,clientY:210});gone.root.state.tool='select';
+ await q.free();for(let i=0;i<6;i++)await turn();assert.equal(gone.calls.length,0);assert.equal(gone.body.children.length,0);
+ const frame=await fixture(),r=await hide(frame);frame.area.fire('pointerdown');frame.area.fire('pointerup',{clientX:240,clientY:210});frame.root.state.currentFrame=1;
+ await r.free();for(let i=0;i<6;i++)await turn();assert.equal(frame.calls.length,0);assert.equal(frame.body.children.length,0);
+ const moved=await fixture(),m=await hide(moved);moved.area.fire('pointerdown');moved.area.fire('pointerup',{clientX:240,clientY:210});moved.root.state.cameraView=true;
+ await m.free();for(let i=0;i<6;i++)await turn();assert.equal(moved.calls.length,0,'a readable presentation of another view refuses');
+ assert.ok(moved.log.includes('Native Drawing is not ready.'),JSON.stringify(moved.log));assert.equal(moved.body.children.length,0);
+});
+test('a queue that never frees gives one clear notice and draws nothing',async()=>{
+ const f=await fixture(),q=await hide(f);f.area.fire('pointerdown');f.area.fire('pointerup',{clientX:240,clientY:210});
+ for(let i=0;i<40;i++)await turn();assert.equal(f.log.filter(x=>x===busyNotice).length,1);assert.equal(f.calls.length,0);await q.free();
 });

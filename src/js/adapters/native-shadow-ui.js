@@ -69,8 +69,10 @@
       var refresh = refreshNeeded; refreshNeeded = false; repaint();
       if (refresh && !retired) presented();
     }
+    // #2372: an origin that is not shown only because a pending native command hides the presentation is waited out (model.readSettled), not refused.
+    async function shownSoon(origin) { return shown(origin) || (!busy() && !!origin && await model.readSettled() === origin); }
     async function edit(action, origin) {
-      if (!shown(origin)) { disarm(); notice(); return { status: 'unavailable' }; }
+      if (!(await shownSoon(origin))) { disarm(); notice(); return { status: 'unavailable' }; }
       var armIntent = ++armIntentGeneration;
       busyStamp = identity(); pending = true; disarm(); repaint();
       try {
@@ -115,14 +117,17 @@
     function checkboxChange(event) {
       if (!native()) return;
       event.stopImmediatePropagation();
-      var requested = checkbox.checked, origin = model.read(); disarm();
+      var requested = checkbox.checked; disarm();
       if (!requested) { off(); return; }
-      if (!shown(origin) || !root.SMShadowBrush) { notice(); return; }
-      var list = root.SMShadowBrush.palette(), selected = list.find(function (s) {
-        return s.id === origin.shadow.settings.shadowActiveId;
-      }) || list[0];
-      if (!selected) { notice(); return; }
-      edit({ kind: 'select', ordinal: selected.ordinal }, origin);
+      // #2372: hidden only by a pending native command: wait for the presentation (model.readSettled) instead of refusing the swatch.
+      Promise.resolve(model.read() || model.readSettled()).then(function (origin) {
+        if (!shown(origin) || !root.SMShadowBrush) { notice(); return; }
+        var list = root.SMShadowBrush.palette(), selected = list.find(function (s) {
+          return s.id === origin.shadow.settings.shadowActiveId;
+        }) || list[0];
+        if (!selected) { notice(); return; }
+        edit({ kind: 'select', ordinal: selected.ordinal }, origin);
+      });
     }
     if (checkbox && typeof checkbox.addEventListener === 'function') checkbox.addEventListener('change', checkboxChange, true);
     function dispose() {
