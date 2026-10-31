@@ -4,8 +4,9 @@
  * (NemoNativeObjectComponent.workspaceTransition, the pure query.document.object.workspace.context) which context is entered, reads
  * its layers through the pinned component read, projects the read-only view fields the ordinary UI reads (playhead, frame count,
  * work area, fps, tab strip) and asks the viewport to present the entered context. It writes no document and no history entry.
- * Editing INSIDE an entered component is not offered: every action that needs the presented scene lease declines (the presented
- * context is not scene-root) and the scene editors keep `state.activeSymbolId` set. Exit restores the scene projection from the
+ * Editing INSIDE an entered component is offered to the vector family only (#2256 component writes: Draw, Pen and shape create through
+ * the component command route, which targets the context held here); every other action that needs the presented scene lease declines (the
+ * presented context is not scene-root) and the scene editors keep `state.activeSymbolId` set. Exit restores the scene projection from the
  * native truth (projectView), never from a saved copy of the rows. Legacy documents never reach this module. */
 (function (root, factory) {
   var api = factory();
@@ -44,6 +45,14 @@
     var st = live(host);
     return st ? Object.freeze({ contextId: st.contextId, totalFrames: st.totalFrames, fps: st.fps }) : null;
   }
+  // #2256 component writes. The context an edit targets is the one the workspace controller holds (the id the owner declared on enter), never a caller's
+  // text: the scene root while no component is entered. layerRows is what the drawing tools judge a layer by inside it (the owner judges lock and effects).
+  function contextId(host) { var st = live(host); return st ? st.contextId : SCENE; }
+  function layerRows(host) {
+    var st = live(host);
+    return st ? st.rows.map(function (row) { return { layerUid: row.layerUid, locked: false, visible: true }; }) : null;
+  }
+  function frameBound(host, pin) { var st = live(host); return st ? st.totalFrames : pin.totalFrames; }
   function integer(value, fallback) { return Number.isSafeInteger(value) && value >= 0 ? value : fallback; }
   // The live playhead and work area of the presented context, clamped into it (the owner refuses an out-of-range view).
   function viewNow(host) {
@@ -65,7 +74,7 @@
     var rows = [];
     all.items.forEach(function (layer) {
       rows.push({ layerUid: layer.layerUid, name: layer.name === null ? 'Layer ' + (rows.length + 1) : layer.name, layerKind: layer.layerKind,
-        visible: true, locked: true, color: '#5FA875', parentLayerUid: null, frames: [], motion: {} });
+        visible: true, locked: false, color: '#5FA875', parentLayerUid: null, frames: [], motion: {} });
     });
     return rows;
   }
@@ -286,5 +295,5 @@
     });
     return true;
   }
-  return Object.freeze({ SCENE: SCENE, presented: presented, enter: enter, exit: exit, close: close, revision: revision, projectionReady: projectionReady, openLayer: openLayer, paint: paint, renderTabs: renderTabs });
+  return Object.freeze({ SCENE: SCENE, presented: presented, contextId: contextId, layerRows: layerRows, frameBound: frameBound, enter: enter, exit: exit, close: close, revision: revision, projectionReady: projectionReady, openLayer: openLayer, paint: paint, renderTabs: renderTabs });
 }));

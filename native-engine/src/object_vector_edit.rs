@@ -29,6 +29,8 @@ pub(crate) mod order;
 mod batch_ops;
 #[path = "object_vector_create.rs"]
 mod create_ops;
+#[path = "object_vector_edit_context.rs"]
+mod context;
 use create_ops::{create, create_many, Placement};
 use crate::object_document::object_group_kernels::object_fill_trace_ops::regenerate::regenerate;
 use order::OrderEditError;
@@ -247,9 +249,6 @@ pub(super) fn same_record(before: &ObjectRecord, after: &ObjectRecord) -> bool {
     }
 }
 
-fn replace(origin: &ObjectSnapshot, record: ObjectRecord) -> Result<Edit, DispatchErrorCode> {
-    replace_in(origin.document(), record)
-}
 /// `replace` against a document being edited (an `object.vector.batch` step).
 pub(super) fn replace_in(source: &ObjectDocument, record: ObjectRecord) -> Result<Edit, DispatchErrorCode> {
     if !is_vector_record(&record) {
@@ -296,9 +295,6 @@ fn holder_depends(document: &ObjectDocument, target: &ObjectTarget) -> bool {
         })
 }
 
-fn delete(origin: &ObjectSnapshot, target: ObjectTarget) -> Result<Edit, DispatchErrorCode> {
-    delete_in(origin.document(), target)
-}
 /// `delete` against a document being edited (an `object.vector.batch` step).
 pub(super) fn delete_in(source: &ObjectDocument, target: ObjectTarget) -> Result<Edit, DispatchErrorCode> {
     check_target(source, &target)?;
@@ -349,6 +345,20 @@ impl ObjectFillOwner {
         let payload: VectorPayload =
             serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
         let origin = self.current_snapshot();
+        // A component target edits that component's own layers and records through a view of the document (#2256).
+        let context = context::context_of(
+            payload
+                .record
+                .value()
+                .map(|r| &r.target)
+                .into_iter()
+                .chain(payload.records.value().and_then(|r| r.first()).map(|r| &r.target))
+                .chain(payload.stable_target.value())
+                .chain(payload.ops.value().and_then(|ops| batch_ops::first_target(ops)).as_ref()),
+        );
+        let view = context::view(origin.document(), &context)?;
+        let base: &ObjectDocument = view.as_ref().unwrap_or_else(|| origin.document());
+        let revision = origin.content_revision();
         let target = payload
             .record
             .value()
@@ -379,37 +389,37 @@ impl ObjectFillOwner {
                 let Presence::Present(records) = payload.records else {
                     return Err(DispatchErrorCode::InvalidRequest);
                 };
-                create_many(&origin, records, placement, trim, copy_key)?
+                create_many(base, revision, records, placement, trim, copy_key)?
             }
             (
                 "object.vector.create",
                 Presence::Present(record),
                 Presence::Missing,
                 Presence::Missing,
-            ) => create(&origin, record, placement, trim, copy_key)?,
+            ) => create(base, revision, record, placement, trim, copy_key)?,
             (
                 "object.vector.replace",
                 Presence::Present(record),
                 Presence::Missing,
                 Presence::Missing,
-            ) => replace(&origin, record)?,
+            ) => replace_in(base, record)?,
             (
                 "object.vector.delete",
                 Presence::Missing,
                 Presence::Present(target),
                 Presence::Missing,
-            ) => delete(&origin, target)?,
+            ) => delete_in(base, target)?,
             (
                 "object.vector.mask.edit",
                 Presence::Missing,
                 Presence::Present(target),
                 Presence::Present(intent),
-            ) => mask_edit::apply(&origin, target, intent)?,
+            ) => mask_edit::apply(base, target, intent)?,
             ("object.vector.batch", Presence::Missing, Presence::Missing, Presence::Missing) => {
                 let Presence::Present(ops) = payload.ops else {
                     return Err(DispatchErrorCode::InvalidRequest);
                 };
-                batch_ops::batch(&origin, ops, copy_key, trim, skip_unavailable)?
+                batch_ops::batch(&origin, base, &context, ops, copy_key, trim, skip_unavailable)?
             }
             _ => return Err(DispatchErrorCode::InvalidRequest),
         };
@@ -426,6 +436,9 @@ impl ObjectFillOwner {
                 edit.document = regenerate(edit.document, &scope, stroke_id, origin.content_revision())
                     .map_err(|error| Self::fill_plan_error(&error))?;
             }
+        }
+        if view.is_some() {
+            edit.document = context::restore(edit.document, origin.document(), &context)?;
         }
         ObjectSnapshot::validate_drawing(&edit.document)
             .map_err(|_| DispatchErrorCode::InvalidRequest)?;

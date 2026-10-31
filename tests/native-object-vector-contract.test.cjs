@@ -161,7 +161,7 @@ test('a create names no stroke id; a replace and a delete name an authored one',
   assert.equal(accepts(C.VECTOR, { command: 'object.vector.replace', record: record('native-stroke:8:0', 'reference') }), false, 'reference storage is readable, never replaced');
   assert.equal(accepts(C.VECTOR, { command: 'object.vector.delete', stableTarget: target('') }), false);
   assert.doesNotThrow(() => C.record(record('native-stroke:8:0', 'reference'), false), 'the object read returns reference-scope records');
-  for (const mutate of [(t) => { t.contextId = 'other'; }, (t) => { t.layerUid = ''; }, (t) => { t.frameScope.kind = 'ghost'; }, (t) => { t.frameScope.frame = 4294967296; },
+  for (const mutate of [(t) => { t.contextId = 'two words'; }, (t) => { t.layerUid = ''; }, (t) => { t.frameScope.kind = 'ghost'; }, (t) => { t.frameScope.frame = 4294967296; },
     (t) => { t.frameScope.frame = -1; }, (t) => { t.frameScope.frame = 1.5; }, (t) => { t.extra = 1; }]) {
     const t = target('native-stroke:8:0'); mutate(t);
     assert.equal(accepts(C.VECTOR, { command: 'object.vector.delete', stableTarget: t }), false);

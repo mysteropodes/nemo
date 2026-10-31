@@ -50,6 +50,16 @@ fn pair(value: &Value) -> bool {
         .is_some_and(|parts| parts.len() == 2 && parts.iter().all(finite))
 }
 
+/// #2256: the scene root or the id of a component context. Only the native owner knows which components the document
+/// declares and refuses any other id (`not_found`); this contract bounds the shape, so a context is an id and never text.
+pub(crate) fn context(value: &Value) -> bool {
+    value.as_str().is_some_and(|text| {
+        !text.is_empty()
+            && text.len() <= 128
+            && text.chars().all(|c| c.is_ascii_alphanumeric() || "._:/-".contains(c))
+    })
+}
+
 fn target(value: &Value, create: bool) -> bool {
     let stroke = if create {
         value["strokeId"] == ""
@@ -62,7 +72,7 @@ fn target(value: &Value, create: bool) -> bool {
         &[],
     )
     .is_some()
-        && value["contextId"] == "scene-root"
+        && context(&value["contextId"])
         && opaque(&value["layerUid"])
         && stroke
         && exact(&value["frameScope"], &["kind", "frame"], &[]).is_some()

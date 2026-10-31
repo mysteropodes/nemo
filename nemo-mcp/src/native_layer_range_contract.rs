@@ -46,7 +46,7 @@ pub(super) fn result(document: &str, payload: &Value, value: &Value) -> bool {
                 && p["instanceId"]
                     .as_str()
                     .is_some_and(crate::contract::bounded_identifier)
-                && p["contextId"] == "scene-root"
+                && crate::native_contract::vector::context(&p["contextId"])
                 && [
                     "atRevision",
                     "documentSnapshotId",

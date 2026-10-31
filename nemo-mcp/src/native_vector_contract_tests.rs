@@ -482,3 +482,25 @@ fn a_well_formed_vector_receipt_cannot_bless_a_missing_or_foreign_command() {
         "echoing an unknown operation with a valid-looking native stroke is not admission"
     );
 }
+
+/// #2256: a target names the scene root or a component context id; the shape is bounded, the declared set is the owner's.
+#[test]
+fn a_target_may_name_a_component_context_id_but_never_free_text() {
+    let in_context = |context: &str| {
+        let mut t = created();
+        t["contextId"] = json!(context);
+        json!({"command":"object.vector.create","record":record(t)})
+    };
+    assert!(request(VECTOR, &in_context("comp-a")));
+    assert!(request(VECTOR, &in_context("component:c_1.v2/x")));
+    for bad in ["", "two words", "semi;colon", &"x".repeat(129)] {
+        assert!(!request(VECTOR, &in_context(bad)), "{bad:?}");
+    }
+    let mut t = stable();
+    t["contextId"] = json!("comp-a");
+    assert!(request(VECTOR, &json!({"command":"object.vector.delete","stableTarget":t})));
+    let mut mixed = created();
+    mixed["contextId"] = json!("comp-a");
+    let many = json!({"command":"object.vector.createMany","records":[record(mixed.clone()), record(created())]});
+    assert!(!request(VECTOR, &many), "createMany stays on one context");
+}

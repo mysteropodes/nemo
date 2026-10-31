@@ -289,7 +289,8 @@
           "minLength": 1
         },
         "contextId": {
-          "const": "scene-root"
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
         },
         "layerUid": {
           "type": "string",
@@ -361,7 +362,8 @@
           "minLength": 1
         },
         "contextId": {
-          "const": "scene-root"
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
         },
         "layerUid": {
           "type": "string",
@@ -588,7 +590,8 @@
           "minLength": 1
         },
         "contextId": {
-          "const": "scene-root"
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
         },
         "layerUid": {
           "type": "string",

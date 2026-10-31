@@ -18,8 +18,8 @@
   const PIN_KEYS = ['instanceId', 'documentId', 'contentRevision', 'documentSnapshotId'];
   const fault = Command.fault;
   const unavailable = (reason) => Object.freeze({ status: 'unavailable', reason });
-  function stableTarget(layerUid, frame, strokeId) {
-    return { contextId: 'scene-root', frameScope: { kind: 'authored', frame }, layerUid, strokeId };
+  function stableTarget(layerUid, frame, strokeId, contextId) {
+    return { contextId: contextId || 'scene-root', frameScope: { kind: 'authored', frame }, layerUid, strokeId };
   }
   // Maps a rejected command to a status. The faults are the shared command protocol's; a string code that is none of the local
   // ones is the owner's own refusal (stale_revision, not_found, wrong_document, locked/guarded = unavailable, ...).
@@ -50,10 +50,21 @@
     }
   }
 
-  function create(session) {
-    const commands = session ? Command.create(session, 'vector') : null;
-    function send(operation, body, options, describe) {
-      if (!commands) return Promise.resolve(unavailable('no_native_session'));
+  // `held` (optional) is the workspace controller's context: the id of the entered component, or 'scene-root'. Only create, replace and delete
+  // follow it (#2256 component writes) and only through the component command route; every other operation stays on the scene root.
+  function create(session, held) {
+    const here = () => { const id = typeof held === 'function' ? held() : 'scene-root'; return typeof id === 'string' && id ? id : 'scene-root'; };
+    const sceneCommands = session ? Command.create(session, 'vector') : null;
+    let componentCommands = null;
+    const routed = (context) => {
+      if (context === 'scene-root' || !session) return sceneCommands;
+      if (typeof session.runComponentCommand !== 'function') return null;
+      if (!componentCommands) componentCommands = Command.create(Object.freeze({ info: session.info, isActive: session.isActive, requestId: session.requestId, runResourceCommand: session.runComponentCommand.bind(session) }), 'vector');
+      return componentCommands;
+    };
+    function send(operation, body, options, describe, context) {
+      const commands = routed(context || 'scene-root');
+      if (!commands) return Promise.resolve(unavailable(context && context !== 'scene-root' ? 'component_route_unavailable' : 'no_native_session'));
       const origin = options && options.origin;
       let pinned = null;
       return commands.execute(operation, (pin) => {
@@ -74,21 +85,23 @@
       options && options.keyframe === 'copy' ? { keyframe: 'copy' } : {});
 
     function createStroke(layerUid, frame, dict, options) {
-      const map = Stroke.toRecord(dict, { layerUid, frame, strokeId: '' }, { opacity: options && options.opacity });
+      const context = here();
+      const map = Stroke.toRecord(dict, { layerUid, frame, strokeId: '', contextId: context }, { opacity: options && options.opacity });
       if (!map.ok) return Promise.resolve(mapped(map));
       return send(Contract.VECTOR, placed({ command: 'object.vector.create', record: map.record }, options), options,
-        (receipt) => ({ strokeId: receipt.strokeId, authoredStrokeId: map.authoredStrokeId, unmapped: map.unmapped }));
+        (receipt) => ({ strokeId: receipt.strokeId, authoredStrokeId: map.authoredStrokeId, unmapped: map.unmapped }), context);
     }
     // G23: several strokes (symmetry copies) on one layer and frame as one native revision and one undo entry.
     function createStrokes(layerUid, frame, dicts, options) {
       if (!Array.isArray(dicts) || dicts.length < 2) return Promise.resolve(Object.freeze({ status: 'invalid', reason: 'createStrokes needs at least two strokes' }));
-      const maps = dicts.map((dict) => Stroke.toRecord(dict, { layerUid, frame, strokeId: '' }, { opacity: options && options.opacity }));
+      const context = here();
+      const maps = dicts.map((dict) => Stroke.toRecord(dict, { layerUid, frame, strokeId: '', contextId: context }, { opacity: options && options.opacity }));
       const refused = maps.find((map) => !map.ok);
       if (refused) return Promise.resolve(mapped(refused));
       // The vector edit envelope is bounded at 64 KiB: refuse up front, typed, instead of a transport refusal.
       if (JSON.stringify(maps.map((map) => map.record)).length > 60000) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'symmetry_too_large' }));
       return send(Contract.VECTOR, placed({ command: 'object.vector.createMany', records: maps.map((map) => map.record) }, options), options,
-        (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds, unmapped: maps.map((map) => map.unmapped) }));
+        (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds, unmapped: maps.map((map) => map.unmapped) }), context);
     }
     // #2361/#2362: ordered create/replace/delete steps on one layer as one native revision and one undo entry. Each step
     // is {create: dict} | {copy: earlierStepIndex} | {replace: {strokeId, dict}} | {restyle: {stableTarget, style}} | {delete: strokeId} at `frame` (or the step's own `frame`); a create
@@ -96,10 +109,10 @@
     // The batch is atomic (any refused step refuses it whole); `options.skipUnavailable === true` lets the engine skip restyle steps it cannot do and report them (#2372).
     function batchStrokes(layerUid, frame, steps, options) {
       if (!Array.isArray(steps) || !steps.length) return Promise.resolve(Object.freeze({ status: 'invalid', reason: 'a batch needs at least one step' }));
-      const ops = [];
+      const context = here(), ops = [];
       for (const step of steps) {
         const at = step.frame === undefined ? frame : step.frame;
-        if (step.delete !== undefined) { ops.push({ op: 'delete', stableTarget: stableTarget(layerUid, at, step.delete) }); continue; }
+        if (step.delete !== undefined) { ops.push({ op: 'delete', stableTarget: stableTarget(layerUid, at, step.delete, context) }); continue; }
         // {reshape|clone: {stableTarget, geometry}}: a presented stroke's new geometry, or a new stroke from it, at `frame`
         // ({reshape: {stableTarget, center}} rebuilds a ribbon on a new centreline; {reshape: {stableTarget, matrix}} maps any record by a
         // record-space affine [a b c d e f] with its fill, copies and gradient: Select's move/scale/rotate);
@@ -114,7 +127,7 @@
         if (step.copy !== undefined) { ops.push(Object.assign({ op: 'copy', fromStep: step.copy, frame: at }, step.placement ? { placement: step.placement } : {},
           step.keyframe === 'copy' ? { keyframe: 'copy' } : {})); continue; }
         const replacing = step.replace !== undefined;
-        const map = Stroke.toRecord(replacing ? step.replace.dict : step.create, { layerUid, frame: at, strokeId: replacing ? step.replace.strokeId : '' },
+        const map = Stroke.toRecord(replacing ? step.replace.dict : step.create, { layerUid, frame: at, strokeId: replacing ? step.replace.strokeId : '', contextId: context },
           { opacity: step.opacity !== undefined ? step.opacity : options && options.opacity });
         if (!map.ok) return Promise.resolve(mapped(map));
         ops.push(replacing ? { op: 'replace', record: map.record } : Object.assign({ op: 'create', record: map.record }, step.placement ? { placement: step.placement } : {},
@@ -122,17 +135,19 @@
       }
       const body = Object.assign({ command: 'object.vector.batch', ops }, options && options.keyframe === 'copy' ? { keyframe: 'copy' } : {},
         options && options.trimEnds !== undefined ? { trimEnds: options.trimEnds } : {}, options && options.skipUnavailable === true ? { skipUnavailable: true } : {});
-      return send(Contract.VECTOR, body, options, (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds }));
+      return send(Contract.VECTOR, body, options, (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds }), context);
     }
     function replaceStroke(target, dict, options) {
       if (!target || typeof target.strokeId !== 'string' || !target.strokeId) return Promise.resolve(Object.freeze({ status: 'invalid', reason: 'a replace names the stroke it replaces' }));
-      const map = Stroke.toRecord(dict, { layerUid: target.layerUid, frame: target.frame, strokeId: target.strokeId }, { opacity: options && options.opacity });
+      const context = here();
+      const map = Stroke.toRecord(dict, { layerUid: target.layerUid, frame: target.frame, strokeId: target.strokeId, contextId: context }, { opacity: options && options.opacity });
       if (!map.ok) return Promise.resolve(mapped(map));
-      return send(Contract.VECTOR, { command: 'object.vector.replace', record: map.record }, options, (receipt) => ({ strokeId: receipt.strokeId, unmapped: map.unmapped }));
+      return send(Contract.VECTOR, { command: 'object.vector.replace', record: map.record }, options, (receipt) => ({ strokeId: receipt.strokeId, unmapped: map.unmapped }), context);
     }
     function deleteStroke(target, options) {
       const at = target || {};
-      return send(Contract.VECTOR, { command: 'object.vector.delete', stableTarget: stableTarget(at.layerUid, at.frame, at.strokeId) }, options, strokeFields);
+      const context = here();
+      return send(Contract.VECTOR, { command: 'object.vector.delete', stableTarget: stableTarget(at.layerUid, at.frame, at.strokeId, context) }, options, strokeFields, context);
     }
     function editMask(target, maskEdit, options) {
       const at = target || {};
@@ -180,7 +195,7 @@
   function desktop(host) {
     const module = host && host.NemoNativeObjectProject, session = module && module.desktop(host);
     if (!session || !session.blocksLegacy()) return null;
-    if (!bindings.has(host)) bindings.set(host, create(session));
+    if (!bindings.has(host)) bindings.set(host, create(session, () => { const c = host.NemoNativeComponentContext; return c && typeof c.contextId === 'function' ? c.contextId(host) : 'scene-root'; }));
     return bindings.get(host);
   }
   // statusOf: the shared rejected-command -> status mapping, for another command route (Fill Brush) to report alike.

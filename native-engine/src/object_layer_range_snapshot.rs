@@ -1,6 +1,7 @@
 //! Same-query, snapshot-pinned range projection for the actual native layer-bar consumer.
 //! Does not require drawing LayerTiming or invent an exposure for no-timing layers.
 use crate::object_codec::object_deserialize;
+use crate::evaluation::object_component_kernels::object_context_resolver::ContextSource;
 use crate::object_codec::object_frame_edit_range_codec::{RangeError, RangeEvaluator};
 use crate::object_snapshot::MAX_MESSAGE_BYTES;
 use crate::request_receipts::DispatchErrorCode;
@@ -51,11 +52,11 @@ impl ObjectSnapshot {
         {
             return Err(StaleRevision);
         }
-        // The original ordinary bar caller is root-only. Context providers remain separately OPEN.
-        if selector.context_id != "scene-root" {
-            return Err(Unavailable);
-        }
+        // The scene root or a declared component (#2256): the evaluator reads that context's own layers and records.
         let document = self.document();
+        let context = ContextSource::of_document(document)
+            .context(&selector.context_id)
+            .map_err(|_| Unavailable)?;
         let evaluator =
             RangeEvaluator::for_document(document, &selector.context_id, selector.frame)
                 .map_err(range_error)?;
@@ -76,8 +77,8 @@ impl ObjectSnapshot {
         {
             return Err(Unavailable);
         }
-        let layer = document
-            .layers
+        let layer = context
+            .layers()
             .iter()
             .find(|l| l.layer_uid == selector.layer_uid)
             .ok_or(DispatchErrorCode::NotFound)?;
@@ -86,7 +87,7 @@ impl ObjectSnapshot {
         let custom = range.is_some_and(|r| {
             r.in_point.value().is_some_and(Option::is_some)
                 || r.out_point.value().is_some_and(Option::is_some)
-        }) || raw.out_point < f64::from(document.total_frames - 1);
+        }) || raw.out_point < f64::from(context.total_frames() - 1);
         let linked = range
             .and_then(|r| r.time_link.value())
             .is_some_and(Option::is_some);

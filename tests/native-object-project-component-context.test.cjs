@@ -77,3 +77,25 @@ test('an action that needs the presented scene lease is refused inside a compone
   await s.presentPreview(0);
   assert.ok(await lease(), 'the lease is granted again once the scene is presented');
 });
+
+// #2256 component writes: the vector family alone has a route into the entered component.
+test('the component command route is granted the ENTERED presentation only; the resource route and the scene stay as they were', async () => {
+  const h = host();
+  let entered = null;
+  const s = await session(h, () => entered);
+  await s.presentPreview(0);
+  const via = (route) => s[route](async (ctx) => ctx.readPresentedObjectSession());
+  assert.equal(await via('runComponentCommand'), null, 'in the scene the component route has nothing to write into');
+  assert.ok(await via('runResourceCommand'), 'the scene route is unchanged');
+  entered = { contextId: 'sym_a', totalFrames: 12, fps: 12 };
+  await s.presentPreview(0);
+  const lease = await via('runComponentCommand');
+  assert.ok(lease && lease.presentation.contextId === 'sym_a', 'inside the component the route is granted the component presentation');
+  assert.equal(await via('runResourceCommand'), null, 'every other family still refuses');
+  assert.equal(await via('runFontResource'), null, 'including the font route');
+  entered = { contextId: 'sym_b', totalFrames: 12, fps: 12 };
+  assert.equal(await via('runComponentCommand'), null, 'a presentation of another context is not the held one');
+  entered = null;
+  await s.presentPreview(0);
+  assert.equal(await via('runComponentCommand'), null);
+});

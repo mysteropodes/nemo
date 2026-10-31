@@ -11,7 +11,7 @@
       exact(value,['kind','instanceId','documentId','atRevision','documentSnapshotId','contextId','layerUid','frame','range'],[],'range result');
       id(value.instanceId,'instanceId');id(value.documentId,'documentId');revision(value.atRevision,'atRevision');
       objectUid(value.documentSnapshotId);objectUid(value.layerUid);frame(value.frame);
-      if(value.contextId!=='scene-root')throw new TypeError('invalid range context');
+      if(typeof value.contextId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(value.contextId))throw new TypeError('invalid range context'); // #2256: the scene root or a component context id
       exact(value.range,['rawInPoint','rawOutPoint','inPoint','outPoint','hasCustomRange','hasTimeLink'],[],'resolved range');
       if(!['rawInPoint','rawOutPoint','inPoint','outPoint'].every(k=>Number.isFinite(value.range[k]))||
          typeof value.range.hasCustomRange!=='boolean'||typeof value.range.hasTimeLink!=='boolean')throw new TypeError('invalid resolved range');
@@ -37,7 +37,7 @@
       exact(value,['kind','instanceId','documentId','atRevision','documentSnapshotId','contextId','layerUid','frame','cells'],[],'cells result');
       id(value.instanceId,'instanceId');id(value.documentId,'documentId');revision(value.atRevision,'atRevision');
       objectUid(value.documentSnapshotId);objectUid(value.layerUid);frame(value.frame);
-      if(value.contextId!=='scene-root')throw new TypeError('invalid cells context');
+      if(typeof value.contextId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(value.contextId))throw new TypeError('invalid cells context');
       exact(value.cells,['runs','nextFrame'],[],'layer cells');
       const runs=value.cells.runs;let at=value.frame;
       if(!Array.isArray(runs)||!runs.length)throw new TypeError('invalid layer cells');

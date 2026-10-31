@@ -2,6 +2,7 @@
 //! and paged. A run is a maximal stretch whose frames answer the single-cell query identically, an interpolated
 //! frame being its own source; a run that would overflow the page budget starts the next page at `nextFrame`.
 use crate::object_codec::{object_deserialize, FrameScopeKind};
+use crate::evaluation::object_component_kernels::object_context_resolver::ContextSource;
 use crate::object_snapshot::MAX_MESSAGE_BYTES;
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
@@ -36,7 +37,9 @@ impl ObjectSnapshot {
             return Err(InvalidRequest);
         }
         let selector: CellsSelector = serde_json::from_slice(bytes).map_err(|_| InvalidRequest)?;
-        let total = self.document().total_frames;
+        // The scene root or a declared component (#2256); an undeclared context is unavailable, never guessed.
+        let context = ContextSource::of_document(self.document()).context(&selector.context_id);
+        let total = context.map_or(self.document().total_frames, |c| c.total_frames());
         if selector.view != "cells"
             || selector.at_revision > 9_007_199_254_740_991
             || selector.document_snapshot_id.is_empty()
@@ -51,20 +54,16 @@ impl ObjectSnapshot {
         {
             return Err(StaleRevision);
         }
-        if selector.context_id != "scene-root" {
-            return Err(Unavailable);
-        }
-        let layer = self
-            .document()
-            .layers
+        let context = context.map_err(|_| Unavailable)?;
+        let layer = context
+            .layers()
             .iter()
             .find(|layer| layer.layer_uid == selector.layer_uid)
             .ok_or(NotFound)?;
         // Same rule as the single-cell read: a missing timing model is not a blank row.
         let timing = layer.timing.value().ok_or(Unavailable)?;
-        let authored: HashSet<u32> = self
-            .document()
-            .objects
+        let authored: HashSet<u32> = context
+            .objects()
             .iter()
             .filter(|object| {
                 object.target.context_id == selector.context_id
