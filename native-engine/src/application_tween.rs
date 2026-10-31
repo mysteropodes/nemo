@@ -9,6 +9,8 @@ pub use ghost::{
 #[path = "tween_ghost_underlay.rs"]
 mod ghost_underlay;
 pub use ghost_underlay::prepare_ghost_underlay;
+#[cfg(test)]
+pub(crate) use ghost_underlay::prepared_frames;
 
 pub(super) fn resolution_code(kind: ResourceResolutionErrorKind) -> DispatchErrorCode {
     match kind {

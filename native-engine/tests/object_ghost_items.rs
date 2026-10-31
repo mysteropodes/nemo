@@ -77,6 +77,40 @@ fn gpu_text_and_raster_ghosts_join_the_vector_ghosts_under_the_live_frame_and_st
         "unavailable"
     );
 }
+#[test]
+fn gpu_repeated_presents_of_an_unchanged_revision_do_not_reprepare_ghost_frames_or_reset_the_image_cache(
+) {
+    use crate::application::{prepare_ghost_underlay, prepared_ghost_frames};
+    let owner = owner(&drawing());
+    let snapshot = owner.acquire_snapshot(0).unwrap();
+    let request = request("L0", GhostMode::Tinted);
+    let before = prepared_ghost_frames();
+    let first = prepare_ghost_underlay(&snapshot, &request, 7);
+    let evaluated = prepared_ghost_frames() - before;
+    assert_eq!(evaluated, 7, "one evaluated ghost frame per ghost frame");
+    assert!(first.has_images(), "the fixture ghosts raster images");
+    // Pan / zoom / repeat presents: the same prepared underlay, nothing evaluated again (the old build skipped the
+    // memo whenever the underlay held images and re-ran the whole query on every present).
+    let again = prepare_ghost_underlay(&snapshot, &request, 7);
+    assert!(std::sync::Arc::ptr_eq(&first, &again));
+    assert_eq!(prepared_ghost_frames() - before, evaluated);
+    // Another frame of the same revision re-uses the frames already evaluated: only frame 7 is new.
+    let scrubbed = prepare_ghost_underlay(&snapshot, &self::request("L0", GhostMode::Tinted), 6);
+    assert_eq!(scrubbed.receipt().status, "composited");
+    assert_eq!(prepared_ghost_frames() - before, evaluated + 1);
+    // The compositor keeps the resident ghost set: presenting the same underlay again resets nothing.
+    let mut gpu = metal();
+    let p = plan(&snapshot, 7);
+    let live = prepare_object_viewport_composition(&p, &selector(&snapshot, 7), None).unwrap();
+    let ghosted = live.with_ghost_underlay(first).unwrap();
+    render_with_quality(&mut gpu, &ghosted);
+    let resets = gpu.ghost_cache_resets();
+    assert!(resets <= 1, "a first set may reset once, got {resets}");
+    for _ in 0..3 {
+        render_with_quality(&mut gpu, &ghosted);
+    }
+    assert_eq!(gpu.ghost_cache_resets(), resets, "an unchanged ghost set never resets the image cache again");
+}
 fn render_with_quality(
     gpu: &mut crate::compositor::Compositor,
     witness: &crate::object_render_scene::ObjectCompositionWitness,

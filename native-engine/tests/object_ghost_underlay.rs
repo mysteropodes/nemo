@@ -239,3 +239,6 @@ fn ghost_request_validation_and_refusals_are_typed_and_leave_a_stable_identity()
     )
     .is_err());
 }
+
+#[path = "object_ghost_fidelity.rs"]
+mod fidelity;
