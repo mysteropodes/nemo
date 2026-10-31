@@ -32,7 +32,6 @@
       default: return null;
     }
   }
-
   // `overrides` replaces named ports (readPsd, pickFile, resizeCanvas, readText, imageRoute, videoRoute: the T12 linked-video menu/Replace route) and exists for the tests of the composition only.
   function install(root, overrides) {
     if (installed.has(root)) return installed.get(root);
