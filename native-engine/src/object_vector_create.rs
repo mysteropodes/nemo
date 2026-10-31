@@ -6,7 +6,8 @@ use crate::commands::object_fill_owner::vector_edit::{
     MAX_CREATE_MANY, MAX_SAFE_REVISION,
 };
 use crate::object_document::{ObjectDocument, ObjectRecord, Presence, TimingEdit};
-use crate::commands::object_fill_owner::object_frame_edit_document::{promote_cells, DocumentEdit};
+use crate::commands::object_fill_owner::object_frame_edit_document::DocumentEdit;
+use crate::commands::object_fill_owner::vector_edit::cells;
 use crate::request_receipts::DispatchErrorCode;
 use std::collections::HashSet;
 
@@ -154,11 +155,8 @@ pub(super) fn create_in(
     let held = document.layers.iter().find(|l| l.layer_uid == first.layer_uid).and_then(|l| l.timing.value())
             .is_some_and(|timing| matches!(timing.exposure(first.frame()).0, "held" | "unexposed"));
     if held && copy_key {
-        // The copy key promotes through the scene's frame editor; a component's cells take only Draw's plain key (below).
-        if first.context_id != "scene-root" {
-            return Err(DispatchErrorCode::Unavailable);
-        }
-        if let DocumentEdit::Changed(next) = promote_cells(&document, &first.layer_uid, &[first.frame()])
+        // The copy key promotes in the target's own context: a component's held cell is copied like the scene's (#2256).
+        if let DocumentEdit::Changed(next) = cells::promote(&document, &first.context_id, &first.layer_uid, &[first.frame()])
             .map_err(|_| DispatchErrorCode::Unavailable)?
         {
             document = next;

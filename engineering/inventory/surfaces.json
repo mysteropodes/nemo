@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "36dc8b81e8558d2de79f43f762237c7180f2bd93",
-  "describe": "36dc8b81-dirty"
+  "head": "0c9d74616303ce9e360b0ef22e2a7af98006bba5",
+  "describe": "v0.7.0-alpha.4-4391-g0c9d7461-dirty"
  },
- "inputsDigest": "997701a52bf5208b149f16af510b01e0b0682e370e7ae8a57769f09da5c1877a",
+ "inputsDigest": "b0c093e275b61a72869f6b3120d546b2d5ec600da58d27461ce1675106ec8501",
  "states": [
   "inventoried",
   "characterized",
@@ -4270,7 +4270,7 @@
     "container": "rig-assign-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 263,
+    "functionsVisited": 262,
     "via": "chain",
     "references": []
    },
@@ -4318,7 +4318,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 135,
+    "functionsVisited": 133,
     "via": "chain",
     "references": []
    },
@@ -4513,7 +4513,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 266,
+    "functionsVisited": 265,
     "via": "chain",
     "references": []
    },
@@ -8013,7 +8013,7 @@
     "container": "footage-blend-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 34,
+    "functionsVisited": 35,
     "via": "variable sel",
     "references": []
    },
@@ -25786,7 +25786,7 @@
    "source": "src/js/motion.js:9819",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 174
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -25828,7 +25828,7 @@
    "source": "src/js/motion.js:9864",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 471
+    "functionsVisited": 466
    },
    "fixtures": [
     "static-props",
@@ -28390,7 +28390,7 @@
    "source": "src/js/shapes-panel.js:738",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 100
+    "functionsVisited": 92
    },
    "fixtures": [
     "static-props",
@@ -28504,7 +28504,7 @@
    "source": "src/js/shapes-panel.js:860",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 100
+    "functionsVisited": 92
    },
    "fixtures": [
     "static-props",
@@ -30974,7 +30974,7 @@
    "source": "src/js/timeline.js:5669",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 174
+    "functionsVisited": 166
    },
    "fixtures": [
     "keyed-props",
@@ -31013,7 +31013,7 @@
    "source": "src/js/timeline.js:5700",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 471
+    "functionsVisited": 466
    },
    "fixtures": [
     "keyed-props",
@@ -32635,7 +32635,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 390
+    "functionsVisited": 395
    },
    "fixtures": [
     "media",

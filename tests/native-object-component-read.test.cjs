@@ -137,6 +137,11 @@ test('results answer their own pin, selector and page, and the model invariants 
   no({ kind: 'context', contextId: 'sym_a' }, (r) => { r.instanceCount = -1; }, 'negative count');
   no({ kind: 'context', contextId: 'scene-root' }, (r) => { r.name = 'Scene'; }, 'scene summary is unnamed');
   no({ kind: 'layers', contextId: 'sym_a', cursor: 0, limit: 16 }, (r) => { r.items[0].layerKind = 'mystery'; }, 'layer kind');
+  // The drawing-gate facts are optional booleans (the parent a uid or null); anything else is refused.
+  for (const [key, value] of [['visible', 'yes'], ['locked', 1], ['threeD', null], ['hasMotion', 'no'], ['parentLayerUid', 7], ['parentLayerUid', '']]) {
+    no({ kind: 'layers', contextId: 'sym_a', cursor: 0, limit: 16 }, (r) => { r.items[0][key] = value; }, 'layer fact ' + key + ' = ' + String(value));
+  }
+  run({ kind: 'layers', contextId: 'sym_a', cursor: 0, limit: 16 }, (r) => { Object.assign(r.items[0], { visible: false, locked: true, parentLayerUid: null, threeD: true, hasMotion: false }); }); // admitted
   no({ kind: 'layers', contextId: 'sym_a', cursor: 0, limit: 16 }, (r) => { r.contextId = 'sym_b'; }, 'layers of another context');
   no({ kind: 'instances', contextId: 'sym_a', cursor: 0, limit: 16 }, (r) => { r.items[0].extra = 1; }, 'closed instance item');
   assert.throws(() => contract.result('query.document.object', {}), TypeError);

@@ -12,7 +12,8 @@
 //! mixed selection is one entry.
 use crate::commands::object_fill_owner::vector_edit::create_ops::{copy_key as keyframe_copy, create_in, trim_records, Placement};
 use crate::commands::object_fill_owner::vector_edit::{delete_in, is_vector_record, replace_in, Edit, VectorEditKind};
-use crate::commands::object_fill_owner::object_frame_edit_document::{promote_cells, DocumentEdit};
+use crate::commands::object_fill_owner::object_frame_edit_document::DocumentEdit;
+use crate::commands::object_fill_owner::vector_edit::cells;
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_boolean_ops::stack::Scope;
 use crate::object_document::object_group_kernels::object_fill_trace_ops::regenerate::regenerate;
@@ -373,10 +374,6 @@ pub(super) fn batch(origin: &ObjectSnapshot, base: &ObjectDocument, context: &st
     // batch (the baseline freezes all its targets before stamping any): a later step never copies an earlier one, and a
     // replace or delete on a held cell edits that cell's copy (same stroke ids), never the key it held.
     if keyed.contains(&true) {
-        // A component's cells are keyed by the plain Draw rule only; the copy keys of the Labs creators stay scene-only.
-        if context != "scene-root" {
-            return Err(DispatchErrorCode::Unavailable);
-        }
         // One promotion per layer a keyed step touches (#2372: a selection may span layers, each with its own timing).
         let mut layers: Vec<String> = Vec::new();
         for (op, _) in ops.iter().zip(&keyed).filter(|(_, keyed)| **keyed) {
@@ -399,7 +396,8 @@ pub(super) fn batch(origin: &ObjectSnapshot, base: &ObjectDocument, context: &st
                 }
             }
             if !plain.is_empty() {
-                if let DocumentEdit::Changed(next) = promote_cells(&document, &layer, &plain).map_err(|_| InvalidRequest)? {
+                // The copy key promotes in the batch's own context: a component's held cell is copied like the scene's (#2256).
+                if let DocumentEdit::Changed(next) = cells::promote(&document, context, &layer, &plain).map_err(|_| InvalidRequest)? {
                     document = next;
                 }
             }

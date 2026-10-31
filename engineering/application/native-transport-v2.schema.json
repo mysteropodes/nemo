@@ -18745,6 +18745,25 @@
                       "null",
                       "instance"
                     ]
+                  },
+                  "visible": {
+                    "type": "boolean"
+                  },
+                  "locked": {
+                    "type": "boolean"
+                  },
+                  "parentLayerUid": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 128
+                  },
+                  "threeD": {
+                    "type": "boolean"
+                  },
+                  "hasMotion": {
+                    "type": "boolean"
                   }
                 }
               }

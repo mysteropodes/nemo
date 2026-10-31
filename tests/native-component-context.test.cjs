@@ -31,7 +31,7 @@ function readAnswer(m, request) {
     .concat(Object.entries(m.comps).map(([id, c]) => ({ contextId: id, contextKind: 'component', name: c.name, totalFrames: c.totalFrames, layerCount: c.layers.length })));
   if (s.kind === 'contexts') return page(all, 'contextCount');
   const comp = m.comps[s.contextId];
-  const rows = (list) => list.map(([layerUid, name, layerKind]) => ({ layerUid, name, layerKind }));
+  const rows = (list) => list.map(([layerUid, name, layerKind, facts]) => Object.assign({ layerUid, name, layerKind }, facts));
   if (s.kind === 'layers') return page(rows(comp ? comp.layers : SCENE_LAYERS), 'layerCount', { contextId: s.contextId });
   return page(comp.instances.map((layerUid) => ({ layerUid })), 'instanceCount', { contextId: s.contextId });
 }
@@ -316,7 +316,7 @@ test('the entered grid shows the component\'s OWN frames and range from the pinn
   const before = calls.filter((c) => c[0] === 'cells' && c[1] === 'ia').length; // a refused read (ib) is asked again, an answered row is not
   f.host.state.currentFrame = 3; f.host.updateUI(); await settle();
   assert.equal(calls.filter((c) => c[0] === 'cells' && c[1] === 'ia').length, before, 'a scrub re-reads no row of the same revision');
-  assert.ok(calls.some((c) => c[0] === 'range' && c[2] === 3), 'the range is asked at the playhead frame');
+  assert.deepEqual(calls.filter((c) => c[0] === 'range').map((c) => c[1]).sort(), ['ia', 'ib'], 'the in/out range is read once per layer and revision: the playhead is not an input');
   // A read that lands after the context was left paints nothing.
   let late; f.session.readLayerCells = () => new Promise((resolve) => { late = resolve; });
   f.m.revision = 8; Context.revision(f.host, f.session.info()); await settle();
@@ -465,4 +465,61 @@ test('when the retries and the exit both fail the context is fenced: later revis
   assert.equal(await Context.exit(f.host), true);
   assert.equal(f.host.state.activeSymbolId, null);
   assert.equal(Context.fault(f.host), null);
+});
+
+// A component with a key at 0, a held span and a range; the playhead moves with frameOnly (CLAUDE.md section 5bis (b)).
+async function enteredWithReads() {
+  const f = fixture(), calls = [];
+  const runs = [[0, 1, 'key', null, true, false], [1, 11, 'held', 0, true, false]];
+  f.session.readLayerCells = async (uid) => { calls.push(['cells', uid]); return runs; };
+  f.session.readLayerRange = async (uid, frame) => { calls.push(['range', uid, frame]); return { kind: 'layerRange', range: { rawInPoint: 2, rawOutPoint: 9, inPoint: 2, outPoint: 9, hasCustomRange: true, hasTimeLink: false } }; };
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  return Object.assign(f, { calls });
+}
+test('a scrub or playback tick (frameOnly) moves the playhead in place: the grid is not rebuilt and no read starts', async () => {
+  const f = await enteredWithReads();
+  const doc = f.host.document, grid = doc.getElementById('frame-grid'), list = doc.getElementById('layer-list'), hdr = doc.getElementById('frame-hdr');
+  const nodes = () => [...grid.children, ...list.children, ...hdr.children, ...grid.children.flatMap((r) => r.children)];
+  const before = nodes(), asked = f.calls.length;
+  assert.equal(f.calls.filter((c) => c[0] === 'range').length, 2, 'the range of both layers was read on entry');
+  assert.ok(grid.children[0].children.some((c) => c.className.includes('layer-inout-bar')), 'the in/out bar is painted');
+  for (let frame = 1; frame < 12; frame += 1) {
+    f.host.state.currentFrame = frame;
+    assert.equal(f.host.NemoNativeComponentContext.paint(f.host, true), true);
+    await settle();
+    assert.equal(grid.children[0].children[frame].className.split(' ').includes('cur'), true, 'the playhead cell follows frame ' + frame);
+    assert.equal(grid.children[0].children.filter((c) => c.className.split(' ').includes('cur')).length, 1, 'exactly one current cell');
+    assert.match(hdr.children[0].textContent, new RegExp('Frame ' + (frame + 1) + ' / 12$'));
+    assert.equal(doc.getElementById('tl-cf').value, frame + 1);
+  }
+  assert.deepEqual(nodes(), before, 'every row, cell and caption node is the one painted on entry (no rebuild)');
+  assert.equal(f.calls.length, asked, 'no read started during the scrub');
+  assert.ok(grid.children[0].children.some((c) => c.className.includes('layer-inout-bar')), 'the bar survives the scrub');
+});
+test('a repaint of changed content rebuilds the grid but asks no read for an answered row (cells and range are cached per revision)', async () => {
+  const f = await enteredWithReads();
+  const doc = f.host.document, grid = doc.getElementById('frame-grid'), asked = f.calls.length;
+  const first = grid.children[0];
+  f.host._layerSel = [1]; f.host.state.activeLayerIdx = 1; f.host.state.currentFrame = 3;
+  assert.equal(f.host.NemoNativeComponentContext.paint(f.host, true), true, 'a selection change with frameOnly still repaints in full');
+  await settle();
+  assert.notEqual(grid.children[0], first, 'the grid was rebuilt');
+  assert.equal(grid.children[1].className.split(' ').includes('act'), true);
+  assert.equal(f.calls.length, asked, 'the rebuilt rows took the cached cells and range');
+  assert.equal(grid.children[0].children[0].className.split(' ').includes('kf-full'), true, 'the cells are painted from the cache');
+  assert.ok(grid.children[1].children.some((c) => c.className.includes('layer-inout-bar')), 'the bar is painted from the cache');
+  f.m.revision = 8; Context.revision(f.host, f.session.info()); await settle();
+  assert.ok(f.calls.length > asked, 'a new revision reads again');
+});
+test('the entered rows carry the owner\'s hidden / locked / parent / 3D / Motion facts that the drawing gates read', async () => {
+  const f = fixture();
+  f.m.comps.sym_a.layers = [['ia', 'Inner A', 'drawing', { visible: false, locked: true, parentLayerUid: 'ib', threeD: true, hasMotion: true }], ['ib', 'Inner B', 'drawing', { visible: true, locked: false, parentLayerUid: null, threeD: false, hasMotion: false }]];
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  const rows = Context.layerRows(f.host);
+  assert.deepEqual(rows[0], { layerUid: 'ia', locked: true, visible: false, parentLayerUid: 'ib', threeD: true, hasMotion: true });
+  assert.deepEqual(rows[1], { layerUid: 'ib', locked: false, visible: true, parentLayerUid: null, threeD: false, hasMotion: false });
+  assert.deepEqual(Context.layers(f.host).map((r) => [r.layerUid, r.name, r.locked, r.visible]), [['ia', 'Inner A', true, false], ['ib', 'Inner B', false, true]]);
+  assert.deepEqual(f.host.state.layers.map((r) => [r.locked, r.visible, r.parentLayerUid, r.threeD]), [[true, false, 'ib', true], [false, true, null, false]]);
 });

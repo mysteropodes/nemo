@@ -44,7 +44,7 @@ fn layers_result() -> Value {
     with(
         head("layers"),
         json!({"contextId":"sym_a","layerCount":2,"cursor":0,"nextCursor":null,"items":[
-            {"layerUid":"ly_a","name":"Inner A","layerKind":"drawing"},
+            {"layerUid":"ly_a","name":"Inner A","layerKind":"drawing","visible":false,"locked":true,"parentLayerUid":null,"threeD":false,"hasMotion":true},
             {"layerUid":"ly_b","name":null,"layerKind":"widget"}]}),
     )
 }
@@ -139,6 +139,12 @@ fn published_schema_declares_the_forbidden_revision_request_and_closed_shapes() 
     let mut bad = answer(layers_result());
     bad["result"]["items"][0]["layerKind"] = json!("mystery");
     assert!(!validator.is_valid(&bad));
+    // The drawing-gate facts are booleans (the parent a uid or null); an unknown member is still refused.
+    for (key, value) in [("visible", json!("yes")), ("locked", json!(1)), ("threeD", json!(null)), ("hasMotion", json!("no")), ("parentLayerUid", json!(7)), ("extra", json!(true))] {
+        let mut bad = answer(layers_result());
+        bad["result"]["items"][0][key] = value;
+        assert!(!validator.is_valid(&bad), "{key}");
+    }
     let mut bad = answer(context_result());
     bad["result"]["fps"] = json!(0);
     assert!(!validator.is_valid(&bad));
@@ -293,6 +299,11 @@ fn result_answers_its_own_request_pin_kind_and_page() {
     let mut bad = layers_result();
     bad["items"][0]["layerKind"] = json!("mystery");
     assert!(!result(&layers_payload, &bad));
+    for (key, value) in [("visible", json!("yes")), ("locked", json!(1)), ("threeD", json!(null)), ("hasMotion", json!("no")), ("parentLayerUid", json!(7)), ("extra", json!(true))] {
+        let mut bad = layers_result();
+        bad["items"][0][key] = value;
+        assert!(!result(&layers_payload, &bad), "{key}");
+    }
     let scene_instances =
         payload_of(&json!({"kind":"instances","contextId":"scene-root","cursor":0,"limit":4}));
     let mut bad = instances_result();

@@ -3,8 +3,8 @@
  * batch rides the component command route on the context the workspace controller holds; the scene is untouched). Every selected record is deleted
  * with its linked fill; the families that have no stored delete here (texture and bitmap brush strokes, whose dabs would be orphaned) are refused with
  * a notice and nothing is written. The selection is re-read from the native listing first, so the batch names what the owner shows now, against the
- * document the key press found: a document that moved on writes nothing. Layer-row and frame-cell selections keep their own Delete (this module
- * leaves the key alone for them), and it owns no document state and has no fallback writer. */
+ * document the key press found: a document that moved on writes nothing. Layer-row and frame-cell selections keep their own Delete on the scene root (this module
+ * leaves the key alone for them; inside a component the key is refused with a notice, never handed to the legacy handler), and it owns no document state and has no fallback writer. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -59,12 +59,24 @@
     if (root.SMEngineBridge && typeof root.SMEngineBridge.renderNow === 'function') root.SMEngineBridge.renderNow();
     return 'applied';
   }
+  // #2256 review: inside an entered component a Delete with nothing picked would reach the legacy timeline Delete, whose rows are the component's
+  // placeholder rows (frame cells, layers, anchors of a scene it is not showing). Deleting those is not offered natively there yet, so the key is
+  // taken and refused with a notice; it never reaches the legacy handler. Pen keeps its own last-anchor Delete (the pen tool consumes it first).
+  function enteredRefusal(root, e) {
+    var I = root.NemoSelectCanvasIntent, C = root.NemoNativeComponentContext, st = root.state;
+    if (!I || !I.objectProject(root) || !C || typeof C.contextId !== 'function' || C.contextId(root) === 'scene-root') return null;
+    if (st && st.appMode === 'motion') return null; // Motion deletes keys, not frames or layers
+    if (st && st.tool === 'pen' && !(root._sel && Array.isArray(root._sel.frames) && root._sel.frames.length)) return null;
+    e.preventDefault(); e.stopImmediatePropagation();
+    notice(root, 'Deleting frames or layers inside a component is not available yet.');
+    return Promise.resolve('refused');
+  }
   // The keydown (document capture, so the timeline's legacy Delete never sees a key this module takes). Resolves to the outcome, or null when not taken.
   function key(root, e) {
     if (!e || (e.key !== 'Delete' && e.key !== 'Backspace') || e.defaultPrevented) return null;
     if (e.target && (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable)) return null;
     var sel = picked(root);
-    if (!sel) return null;
+    if (!sel) return enteredRefusal(root, e);
     e.preventDefault(); e.stopImmediatePropagation();
     if (busy.has(root)) return Promise.resolve('busy');
     busy.add(root);

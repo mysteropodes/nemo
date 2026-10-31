@@ -141,6 +141,16 @@ test('fewer than two (align) or three (distribute) items does nothing, silently,
   assert.deepEqual([...h.toasts, ...one.toasts, ...h.legacy, ...one.legacy], []);
 });
 
+test('a stroke id repeated on two layers keeps each item its own translation', async () => {
+  // stroke ids are unique within a layer only; both items are 's' here
+  const h = harness([quad('L1', 's', 10, 10, 30, 30), quad('L2', 's', 50, 20, 90, 60)]);
+  await h.select();
+  await h.align('left');
+  assert.equal(h.batches.length, 1);
+  const byLayer = Object.fromEntries(h.batches[0].steps.map((s) => [s.reshape.stableTarget.layerUid, s.reshape.matrix.slice(4)]));
+  assert.deepEqual(byLayer, { L2: [-40, 0] }, 'only the L2 item moves, by its own delta; the L1 item already sits at the left edge');
+});
+
 test('an already aligned selection writes nothing', async () => {
   const h = harness([quad('L1', 'a', 10, 10, 30, 30), quad('L2', 'b', 10, 50, 40, 60)]);
   await h.select();

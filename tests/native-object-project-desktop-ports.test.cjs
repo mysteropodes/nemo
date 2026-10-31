@@ -243,6 +243,13 @@ test('cached UI metadata callback is stable and delegates to the current sole Pr
   await assert.rejects(captured[0].readPropertyMetadata(old));
   assert.equal((await captured[0].readPropertyMetadata(selector(f))).documentId,f.session.info().documentId);
 });
+test('an entered component receives the frameOnly flag of the repaint (the scrub contract reaches its own paint)',async()=>{
+  const f=await fixture();await f.open();const seen=[];
+  f.root.NemoNativeComponentContext={paint:(_r,frameOnly)=>{seen.push(frameOnly);return true;}};
+  f.root.NemoNativeObjectUI.render=()=>{throw new Error('the scene paint must not run');};
+  assert.equal(Project.paintUI(f.root,true),true);assert.equal(Project.paintUI(f.root,false),true);assert.equal(Project.paintUI(f.root),true);
+  assert.deepEqual(seen,[true,false,undefined]);
+});
 test('metadata exact selector and SDK view validation reject malformed inputs before transport or owner changes',async()=>{
   const f=fixture();await f.open();const pin=retained(f),good=selector(f),bad=[null,[],{...good,extra:true}];
   for(const key of Object.keys(good)){const q={...good};delete q[key];bad.push(q);}

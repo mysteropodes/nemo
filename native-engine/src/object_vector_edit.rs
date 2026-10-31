@@ -31,6 +31,8 @@ mod batch_ops;
 mod create_ops;
 #[path = "object_vector_edit_context.rs"]
 mod context;
+#[path = "object_vector_edit_cells.rs"]
+mod cells;
 use create_ops::{create, create_many, Placement};
 use crate::object_document::object_group_kernels::object_fill_trace_ops::regenerate::regenerate;
 use order::OrderEditError;
