@@ -12,6 +12,7 @@
   function snap(start,p){const x=p[0]-start[0],y=p[1]-start[1],distance=Math.sqrt(x*x+y*y),angle=Math.round(Math.atan2(y,x)/(Math.PI/4))*(Math.PI/4);return [start[0]+Math.cos(angle)*distance,start[1]+Math.sin(angle)*distance];}
   const consume=e=>{if(e.stopImmediatePropagation)e.stopImmediatePropagation();if(e.preventDefault)e.preventDefault();};
   function create(root){
+    const RESTORE_TRIES=20,RESTORE_MS=60;
     let selection=null,drag=null,marquee=null,overlay=null,pending=null,uncertain=null,recovering=false,readToken=0,previewToken=0,previewBusy=false,previewNext=null,retired=false;
     let watching=false;
     let settled=Promise.resolve({status:'idle'});
@@ -143,18 +144,27 @@
     }
     // Index of the same vertices after the edit: an insert selects the new vertex (curve + 1, appended for the closing curve), a delete removes what was selected.
     function remap(keep,count){const k=keep.intent;let idx=keep.indices;if(k.kind==='insert')idx=[k.curve+1];else if(k.kind==='delete')idx=[];return idx.filter(i=>i<count);}
+    // After a commit the info pin moves to the new revision before the canvas presents it, and hover reads re-present it again: capture() and load() then
+    // refuse as stale for a few frames. That is "not yet", never "gone", so the re-read is retried (bounded) until the new revision is presented (#2356).
     async function restore(keep){const token=++readToken,Wait=root.NemoNativePresentationWait,read=f=>{const x=session();return x?x.readPresentedObjectSession(f):null;},
-      holds=()=>token===readToken&&!retired&&native()&&root.state.tool==='subselect'&&root.state.currentFrame===keep.selector.frame;
-      if(!holds())return null;
-      if(!read()&&!(Wait&&await Wait.until(root,{readPresentedObjectSession:read},()=>!!read(),holds)))return null;
-      if(!holds())return null;
-      let t;try{t=capture();}catch(_){return null;}
-      if(t.session!==keep.session||t.selector.layerUid!==keep.selector.layerUid||t.selector.frame!==keep.selector.frame)return null;
-      const items=await load(t,token);if(!items||token!==readToken||selection)return null;
-      // A held frame is promoted by its first edit, which re-scopes the record to the current frame: match the record, not its frame scope.
-      const item=items.find(i=>i.stableTarget.strokeId===keep.stableTarget.strokeId&&i.stableTarget.layerUid===keep.stableTarget.layerUid&&i.stableTarget.contextId===keep.stableTarget.contextId);
-      if(!item)return null;
-      selection={...t,item,indices:remap(keep,item.segments.length)};draw(selection,item.segments);return selection;
+      holds=()=>token===readToken&&!retired&&!selection&&native()&&root.state.tool==='subselect'&&root.state.currentFrame===keep.selector.frame,
+      sleep=ms=>new Promise(done=>(root.setTimeout||setTimeout)(done,ms));
+      for(let attempt=0;attempt<RESTORE_TRIES;attempt++){
+        if(attempt)await sleep(RESTORE_MS);
+        if(!holds())return null;
+        if(!read()&&!(Wait&&await Wait.until(root,{readPresentedObjectSession:read},()=>!!read(),holds)))continue;
+        if(!holds())return null;
+        let t;try{t=capture();}catch(_){continue;}
+        if(t.session!==keep.session||t.selector.layerUid!==keep.selector.layerUid||t.selector.frame!==keep.selector.frame)return null;
+        let items;try{items=await load(t,token);}catch(_){items=null;}
+        if(token!==readToken||selection)return null;
+        if(!items)continue;
+        // A held frame is promoted by its first edit, which re-scopes the record to the current frame: match the record, not its frame scope.
+        const item=items.find(i=>i.stableTarget.strokeId===keep.stableTarget.strokeId&&i.stableTarget.layerUid===keep.stableTarget.layerUid&&i.stableTarget.contextId===keep.stableTarget.contextId);
+        if(!item)return null;
+        selection={...t,item,indices:remap(keep,item.segments.length)};draw(selection,item.segments);return selection;
+      }
+      return null;
     }
     function start(e,t,hit){
       const group=hit.key==='point'&&t.indices.includes(hit.index)&&t.indices.length>1;
