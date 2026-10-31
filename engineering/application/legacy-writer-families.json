@@ -211,19 +211,12 @@
       "kinds": []
     },
     {
-      "family": "selection-style",
-      "authority": "unavailable",
-      "entries": {},
-      "kinds": [
-        "timeline-mask-feather"
-      ]
-    },
-    {
       "family": "selection-style-native",
       "authority": "native",
       "capability": "native-object-vector",
       "entries": {},
       "kinds": [
+        "timeline-mask-feather",
         "timeline-selection-brush-preset",
         "timeline-selection-brush-size",
         "timeline-selection-dash-offset",

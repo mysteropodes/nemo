@@ -99,3 +99,12 @@ pub(crate) fn text(color: &str) -> Option<Value> {
         .map_or(1.0, |a| f64::from(a) / 255.0);
     Some(json!({"fill": color.to_lowercase(), "opacity": alpha}))
 }
+/// A mask shows its mode (an unknown spelling renders as `add`, as the mask consumer reads it) and the layer's shared feather.
+pub(crate) fn mask(mode: Option<&str>, feather: f64) -> Option<Value> {
+    let mode = match mode {
+        Some("subtract") => "subtract",
+        Some("intersect") => "intersect",
+        _ => "add",
+    };
+    feather.is_finite().then(|| json!({"maskMode": mode, "maskFeather": feather.max(0.0)}))
+}

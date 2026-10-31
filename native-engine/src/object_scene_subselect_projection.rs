@@ -30,6 +30,10 @@ pub(crate) fn layer_chain(
     let chain = chains.chain(index).map_err(|failure| failure.reason())?;
     Ok(chain.iter().fold(Affine::IDENTITY, |outer, entry| affine(entry) * outer).as_coeffs())
 }
+/// True when the record's layer has an active path-effect stack (what the editable read refuses, the hit-test listing leaves out).
+pub(crate) fn has_path_fx(packet: &ObjectFramePacket, record: &ObjectRecord) -> bool {
+    record_layer_has_active_path_fx(packet, record)
+}
 pub(crate) fn matrices(
     packet: &ObjectFramePacket,
     index: usize,
@@ -40,6 +44,22 @@ pub(crate) fn matrices_with_preview(
     packet: &ObjectFramePacket,
     index: usize,
     preview: Option<&ObjectRecord>,
+) -> Result<BTreeMap<usize, [f64; 6]>, &'static str> {
+    layer_matrices(packet, index, preview, false)
+}
+/// #2372 hit-test listing of a layer that holds masks or path effects: they are no reason to refuse the layer (the editable read
+/// still does), the listing names each mask and leaves a path-effect record out item by item.
+pub(crate) fn matrices_hit(
+    packet: &ObjectFramePacket,
+    index: usize,
+) -> Result<BTreeMap<usize, [f64; 6]>, &'static str> {
+    layer_matrices(packet, index, None, true)
+}
+fn layer_matrices(
+    packet: &ObjectFramePacket,
+    index: usize,
+    preview: Option<&ObjectRecord>,
+    hit: bool,
 ) -> Result<BTreeMap<usize, [f64; 6]>, &'static str> {
     let layer = &packet.source_layers()[index];
     if layer.three_d.value() == Some(&true)
@@ -71,7 +91,7 @@ pub(crate) fn matrices_with_preview(
     for source in &sources {
         record::admit(packet.snapshot().document(), source.record())
             .map_err(|_| "Subselect geometry consumer is unavailable")?;
-        if source.record().is_mask() || record_layer_has_active_path_fx(packet, source.record()) {
+        if !hit && (source.record().is_mask() || record_layer_has_active_path_fx(packet, source.record())) {
             return Err("Subselect mask or path effect is unavailable");
         }
         rest.push(if let Some(edited) = preview.filter(|r| r.target == source.record().target) {
@@ -126,10 +146,8 @@ pub(crate) fn hit_matrices(
         return Err("Subselect requires an ordinary undeformed 2D Drawing layer");
     }
     let sources: Vec<_> = packet.records().filter(|s| s.source_layer_index() == index).collect();
-    if sources.iter().any(|s| {
-        s.record().is_mask()
-            || (!is_vector_record(s.record()) && s.record().family != "closed-solid-fill-cubic-path")
-    }) {
+    // A mask is listed as a mask (#2372); a record that is neither a vector nor a solid fill still has no shared pose.
+    if sources.iter().any(|s| !is_vector_record(s.record()) && s.record().family != "closed-solid-fill-cubic-path") {
         return Err("Subselect mask or path effect is unavailable");
     }
     let chain = chains.chain(index).map_err(|failure| failure.reason())?;

@@ -184,7 +184,7 @@ test('every selection-style setter offers a native selection to the adapter befo
   assert.ok(TIMELINE.includes('strokeCap:st.cap,strokeJoin:st.join,miterLimit:st.miter,dashOffset:st.dashOffset'), 'the panel shows the listed stroke details');
 });
 
-test('the kinds are declared native for the vector capability and only the mask feather stays unavailable', () => {
+test('the kinds, the mask feather included, are declared native for the vector capability', () => {
   const doc = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'engineering', 'application', 'legacy-writer-families.json'), 'utf8'));
   const family = (name) => doc.families.find((f) => f.family === name);
   const native = family('selection-style-native');
@@ -193,5 +193,6 @@ test('the kinds are declared native for the vector capability and only the mask 
   for (const kind of ['fill-enabled', 'stroke-enabled', 'stroke-cap', 'stroke-join', 'miter-limit', 'paint-order', 'dash-offset', 'stroke-style', 'swap-paint', 'brush-preset', 'smooth-stroke']) {
     assert.ok(native.kinds.includes('timeline-selection-' + kind), kind);
   }
-  assert.deepEqual(family('selection-style').kinds, ['timeline-mask-feather']);
+  assert.ok(native.kinds.includes('timeline-mask-feather'), 'the mask feather restyles natively (#2372 SEL-MASK)');
+  assert.equal(family('selection-style'), undefined, 'no selection style kind is left unavailable');
 });

@@ -115,7 +115,7 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
                 && (!hit
                     || (i["bounds"].as_array().is_some_and(|b| {
                         b.len() == 4 && b.iter().all(|v| v.as_f64().is_some_and(f64::is_finite))
-                    }) && ["plain", "ribbon", "fill", "shape", "brush", "raster", "text"].contains(&i["role"].as_str().unwrap_or(""))
+                    }) && ["plain", "ribbon", "fill", "shape", "brush", "raster", "text", "mask"].contains(&i["role"].as_str().unwrap_or(""))
                         && i.get("role").is_some()
                         && i["filled"].is_boolean()
                         && i.get("strokeWidth").is_none_or(|w| w.as_f64().is_some_and(|w| w.is_finite() && w >= 0.0))
@@ -327,7 +327,7 @@ fn listed_style(v: &Value) -> bool {
     let hex = |s: &Value| s.as_str().and_then(|s| s.strip_prefix('#')).is_some_and(|d| [6, 8].contains(&d.len()) && d.bytes().all(|b| b.is_ascii_hexdigit()));
     let one_of = |s: &Value, set: &[&str]| s.as_str().is_some_and(|s| set.contains(&s));
     let number = |n: &Value| n.as_f64().is_some_and(f64::is_finite);
-    exact(v, &[], &["fill", "stroke", "width", "opacity", "cap", "join", "miter", "dashOffset", "paintOrder"]).is_some_and(|o| !o.is_empty())
+    exact(v, &[], &["fill", "stroke", "width", "opacity", "cap", "join", "miter", "dashOffset", "paintOrder", "maskMode", "maskFeather"]).is_some_and(|o| !o.is_empty())
         && v.get("fill").is_none_or(hex)
         && v.get("stroke").is_none_or(hex)
         && v.get("width").is_none_or(|w| w.as_f64().is_some_and(|w| w.is_finite() && w > 0.0))
@@ -337,4 +337,6 @@ fn listed_style(v: &Value) -> bool {
         && v.get("miter").is_none_or(|m| m.as_f64().is_some_and(|m| m.is_finite() && m >= 0.0))
         && v.get("dashOffset").is_none_or(number)
         && v.get("paintOrder").is_none_or(|p| one_of(p, &["fillFirst", "strokeFirst"]))
+        && v.get("maskMode").is_none_or(|m| one_of(m, &["add", "subtract", "intersect"]))
+        && v.get("maskFeather").is_none_or(|f| f.as_f64().is_some_and(|f| f.is_finite() && f >= 0.0))
 }

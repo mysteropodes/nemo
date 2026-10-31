@@ -217,6 +217,8 @@
         nativeOwner: item.owner, nativeBrush: item.brush, nativeGroup: item.group, nativeStyle: item.style };
       // The record's stored boxAngle (baseline serP/desP data.boxAngle) turned by the presented matrix when that is a pure similarity, so the
       // oriented box is drawn in world space after a frame change, an undo or a reload.
+      // #2372 SEL-MASK: a listed mask is the selection the Mask panel edits (the baseline mask Path carried data.isMask / maskMode / maskFeather).
+      if (item.role === 'mask') { path.data.isMask = true; path.data.maskMode = item.style && item.style.maskMode || 'add'; path.data.maskFeather = item.style && item.style.maskFeather || 0; }
       var mx = item.matrix, sim = mx[0] * mx[3] - mx[1] * mx[2] > 0 && Math.abs(mx[0] - mx[3]) < 1e-6 * (Math.abs(mx[0]) + 1) && Math.abs(mx[1] + mx[2]) < 1e-6 * (Math.abs(mx[1]) + 1);
       if (item.boxAngle) path.data.boxAngle = (item.boxAngle + (sim ? Math.atan2(mx[1], mx[0]) * 180 / Math.PI : 0)) % 360;
       // #2267: a text block's stored turn is in its listed map (its record space is the unturned frame), so its box is turned by that angle.
