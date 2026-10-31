@@ -8782,9 +8782,48 @@ function textPropsRoot(){
   var allMatch=selectedPaths.every(function(p){return p.data&&p.data.groupId===first.data.groupId;});
   return allMatch?root:null;
 }
+// #2372 insp-text-props: with ONE native text block selected on a native object project the same tp-* section shows that block's stored settings
+// (the native text inspect read) and each change commits as ONE object.text.edit (adapters/native-text-props-panel.js), never a vector-text rebuild.
+var NATIVE_TEXT_SCRUB_FIELDS=['tp-size','tp-letter-spacing','tp-line-height','tp-word-spacing','tp-fixed-width'];
+function nativeTextOwned(){var N=window.NemoNativeTextPropsPanel;return !!N&&N.owns(window);}
+function nativeTextEdit(field,value){if(!nativeTextOwned())return false;window.NemoNativeTextPropsPanel.edit(window,field,value);return true;}
+function markNativeTextScrubFields(own){
+  NATIVE_TEXT_SCRUB_FIELDS.forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el)return;
+    if(own)el.dataset.nativeOpacityScrub='static';
+    else if(el.dataset.nativeOpacityScrub==='static')delete el.dataset.nativeOpacityScrub;
+  });
+}
+function fillNativeTextProps(b){
+  var active=document.activeElement,fam=b.font&&b.font.kind==='bundled'?String(b.font.fontKey).replace(/-(Bold|Regular)$/,''):'';
+  function put(id,v,prop){var el=document.getElementById(id);if(el&&active!==el)el[prop||'value']=v;return el;}
+  put('tp-content',b.text||'');
+  put('tp-font',fam);
+  put('tp-size',b.size||48);
+  var colorEl=put('tp-color',(b.color||'#000000').slice(0,7));
+  if(colorEl)colorEl.dataset.hex8=b.color||'#000000';
+  document.querySelectorAll('.tp-align-btn').forEach(function(x){x.classList.toggle('ac',x.dataset.val===(b.align||'left'));});
+  document.querySelectorAll('.tp-style-btn').forEach(function(x){x.classList.toggle('ac',!!b[x.dataset.flag]);});
+  document.querySelectorAll('.tp-case-btn').forEach(function(x){x.classList.toggle('ac',x.dataset.val===(b.textCase||'none'));});
+  put('tp-letter-spacing',b.letterSpacing||0);
+  put('tp-line-height',b.lineHeightMult||1.25);
+  put('tp-word-spacing',b.wordSpacing||0);
+  var fixed=typeof b.fixedWidth==='number'&&b.fixedWidth>0;
+  document.querySelectorAll('.tp-width-btn').forEach(function(x){x.classList.toggle('ac',(x.dataset.val==='fixed')===fixed);});
+  var fw=document.getElementById('tp-fixed-width');
+  if(fw){fw.style.display=fixed?'':'none';if(active!==fw)fw.value=fixed?b.fixedWidth:300;}
+}
 function updateTextPropsPanel(){
   var sec=document.getElementById('text-props-sec');
   if(!sec)return;
+  var nativeText=nativeTextOwned();
+  markNativeTextScrubFields(nativeText);
+  if(nativeText){
+    sec.style.display='';
+    window.NemoNativeTextPropsPanel.sync(window,fillNativeTextProps);
+    return;
+  }
   var root=textPropsRoot();
   sec.style.display=root?'':'none';
   if(!root)return;
@@ -8831,6 +8870,7 @@ function updateTextPropsPanel(){
 // than flooding the undo stack per intermediate value (the exact bug
 // already found and fixed once this session for the easing-curve drag).
 function applyTextPropsEdit(){
+  if(nativeTextOwned())return; // a native text block commits through nativeTextEdit, never the vector rebuild below
   var root=textPropsRoot();
   if(!root||!window.SMVectorText)return;
   var d=root.data;
@@ -8893,30 +8933,31 @@ function applyTextPropsEdit(){
 (function(){
   var contentEl=document.getElementById('tp-content');
   if(!contentEl)return; // this file is also loaded in contexts without the full panel markup
-  contentEl.addEventListener('blur',applyTextPropsEdit);
-  ['tp-font','tp-size','tp-color','tp-letter-spacing','tp-line-height','tp-word-spacing','tp-fixed-width'].forEach(function(id){
-    document.getElementById(id).addEventListener('change',applyTextPropsEdit);
+  contentEl.addEventListener('blur',function(){if(!nativeTextEdit('text',contentEl.value))applyTextPropsEdit();});
+  [['tp-font','font'],['tp-size','size'],['tp-color','color'],['tp-letter-spacing','letterSpacing'],['tp-line-height','lineHeightMult'],['tp-word-spacing','wordSpacing'],['tp-fixed-width','fixedWidth']].forEach(function(f){
+    var el=document.getElementById(f[0]);
+    el.addEventListener('change',function(){if(!nativeTextEdit(f[1],el.value))applyTextPropsEdit();});
   });
   document.querySelectorAll('.tp-align-btn').forEach(function(b){
     b.addEventListener('click',function(){
       document.querySelectorAll('.tp-align-btn').forEach(function(o){o.classList.toggle('ac',o===b);});
-      applyTextPropsEdit();
+      if(!nativeTextEdit('align',b.dataset.val))applyTextPropsEdit();
     });
   });
   document.querySelectorAll('.tp-style-btn').forEach(function(b){
-    b.addEventListener('click',function(){b.classList.toggle('ac');applyTextPropsEdit();});
+    b.addEventListener('click',function(){b.classList.toggle('ac');if(!nativeTextEdit(b.dataset.flag,b.classList.contains('ac')))applyTextPropsEdit();});
   });
   document.querySelectorAll('.tp-case-btn').forEach(function(b){
     b.addEventListener('click',function(){
       document.querySelectorAll('.tp-case-btn').forEach(function(o){o.classList.toggle('ac',o===b);});
-      applyTextPropsEdit();
+      if(!nativeTextEdit('textCase',b.dataset.val))applyTextPropsEdit();
     });
   });
   document.querySelectorAll('.tp-width-btn').forEach(function(b){
     b.addEventListener('click',function(){
       document.querySelectorAll('.tp-width-btn').forEach(function(o){o.classList.toggle('ac',o===b);});
       document.getElementById('tp-fixed-width').style.display=(b.dataset.val==='fixed')?'':'none';
-      applyTextPropsEdit();
+      if(!nativeTextEdit('fixedWidth',b.dataset.val==='fixed'?(parseFloat(document.getElementById('tp-fixed-width').value)||300):null))applyTextPropsEdit();
     });
   });
   // Live Google Fonts (2026-08-28) — "+" reveals a name field instead of
@@ -8958,7 +8999,7 @@ function applyTextPropsEdit(){
           fontSel.appendChild(opt);
         }
         fontSel.value=value;
-        applyTextPropsEdit();
+        if(!nativeTextEdit('font',value))applyTextPropsEdit();
         if(window.showToast)showToast(SM.t('toastGoogleFontAdded').replace('{family}',family),'success');
       }).catch(function(e){
         fontAddConfirm.disabled=false;fontAddInput.disabled=false;
