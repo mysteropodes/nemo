@@ -313,14 +313,7 @@ impl Compositor {
             self.last_reference_image = None;
         }
         self.scene.reset();
-        // #2373: a viewport witness may carry the transparency checker. It replaces the artboard background BEHIND the viewport
-        // reference and the artwork (the baseline bottom item), under the same camera / navigation; export witnesses never have one.
-        if let Some(checker) = prepared.viewport_checker() {
-            checker.draw(
-                &mut self.scene,
-                prepared.camera_matrix().map_or(Affine::IDENTITY, Affine::new),
-            );
-        }
+        prepared.paint_viewport_checker(&mut self.scene); // #2373: only a viewport witness has one; BEHIND reference and artwork
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         if let Some((image, transform, opacity)) = prepared.reference_image() {
             // Retain identity before fallible rendering, including error/unwind.
@@ -513,10 +506,6 @@ pub(super) mod scheduled_tests;
 #[cfg(all(test, feature = "history", feature = "project_media_codec"))]
 #[path = "../tests/object_project_background.rs"]
 mod project_background_tests;
-
-#[cfg(all(test, feature = "history", feature = "application", feature = "project_media_codec"))]
-#[path = "../tests/object_viewport_checker.rs"]
-mod viewport_checker_tests;
 
 // L07-J (#2113): Metal readback of the brush producer's pinned scene (inside the compositor tree for the private scene/target).
 #[cfg(test)]

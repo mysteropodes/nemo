@@ -115,7 +115,11 @@ impl ObjectCompositionWitness {
         Ok(self)
     }
 
-    pub(crate) fn viewport_checker(&self) -> Option<&ViewportChecker> {
-        self.viewport_checker.as_ref()
+    /// The checker as the bottom item of `scene`, under the witness' own camera / navigation (the baseline artboard rect): behind a
+    /// viewport reference and the artwork. Nothing for a witness without one, which is every export witness.
+    pub(crate) fn paint_viewport_checker(&self, scene: &mut vello::Scene) {
+        if let Some(checker) = &self.viewport_checker {
+            checker.draw(scene, self.camera.map_or(Affine::IDENTITY, Affine::new));
+        }
     }
 }

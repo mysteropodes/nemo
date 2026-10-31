@@ -485,3 +485,7 @@ impl NativeRgba8Readback {
 fn align_to(value: u32, alignment: u32) -> u32 {
     value.div_ceil(alignment) * alignment
 }
+
+#[cfg(all(test, feature = "history", feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_viewport_checker.rs"]
+mod viewport_checker_tests;
