@@ -100,5 +100,14 @@
     out.isVectorBrush=true;out.centerSegments=cs;delete out.isFillShape;
     return shadow(out,style.shadowSwatch,false,style.brushSize);
   }
-  return Object.freeze({textureRibbon:textureRibbon,texturePlain:texturePlain,shadow:shadow,shadowStyle:shadowStyle,shade:shade,fitRecord:fitRecord,fillBrush:fillBrush});
+  // A Labs prototype whose draw hook (onStroke/onPreview) has no native route is named in a typed, user-visible refusal
+  // (code + hooks), never dropped: Labs.unmigratedDrawHooks() lists them. Without that registry, any enabled prototype blocks.
+  function labsRefusal(root){
+    var L=root.SMLabs;if(!L)return null;
+    var names=typeof L.unmigratedDrawHooks==='function'?L.unmigratedDrawHooks():L.list().filter(function(p){return p.on;}).map(function(p){return p.name;});
+    if(!names.length)return null;
+    var error=new Error('Native Drawing cannot apply the Labs draw hook'+(names.length>1?'s':'')+' '+names.join(', ')+' yet. Turn '+(names.length>1?'them':'it')+' off in Labs to draw.');
+    error.code='native-draw-labs-hook-unmigrated';error.hooks=names.slice();return error;
+  }
+  return Object.freeze({labsRefusal:labsRefusal,textureRibbon:textureRibbon,texturePlain:texturePlain,shadow:shadow,shadowStyle:shadowStyle,shade:shade,fitRecord:fitRecord,fillBrush:fillBrush});
 }));

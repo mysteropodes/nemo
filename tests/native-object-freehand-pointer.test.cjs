@@ -104,6 +104,7 @@ async function fixture(tool='draw',native=true,options={}){
  // Required like the Fill desktop: its command payload must be built in the SDK's own realm.
  root.NemoNativeDrawBitmap=require('../src/js/adapters/native-object-draw-bitmap.js');
  root.NemoNativeFillDesktop=require('../src/js/adapters/native-fill-desktop.js');
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-resize.js'),'utf8'),context,{filename:'native-object-draw-resize.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-shape-tool.js'),'utf8'),context,{filename:'native-object-shape-tool.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/draw-bridge.js'),'utf8'),context,{filename:'draw-bridge.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/shape-bridge.js'),'utf8'),context,{filename:'shape-bridge.js'});
@@ -811,4 +812,72 @@ test('Trim Stroke Ends on a textured stroke asks native to trim the anchor, whic
 test('a texture preset still refuses a key neither the built-ins nor the catalog hold, with symmetry too',async()=>{
  const f=await fixture();Object.assign(f.root.state,{brushPreset:'not-a-preset',symmetryEnabled:true,symmetryMode:'y',symmetryExtend:true});
  send(f,'pointerdown',20,20);send(f,'pointerup',60,50);assert.equal(f.calls.length,0);
+});
+
+// #2361: Alt+drag brush resize (draw-bridge.js `sizing` @1065e9d8): 0.5px of size per px of drag, clamped to 1..80, a live
+// circle at the press point, the Size field mirrored, a toast at release, and no stroke, command or revision.
+function sizeField(f){const field={value:'4'},was=f.doc.getElementById;f.doc.getElementById=id=>id==='p-sw'?field:was(id);return field;}
+test('Alt+drag resizes the brush with the baseline math and a live circle, committing no stroke and no revision',async()=>{
+ for(const tool of ['draw','fillbrush']){
+  const f=await fixture(tool),field=sizeField(f),revision=f.info().contentRevision;
+  const e=send(f,'pointerdown',60,40,{altKey:true});assert.equal(e.stopped,true);assert.equal(e.prevented,true);
+  assert.equal(f.body.children.length,1,'the circle');const circle=f.body.children[0].children[0];
+  assert.deepEqual([circle.attributes.cx,circle.attributes.cy].map(Number),[120,80]);assert.equal(Number(circle.attributes.r),4/2*2,'size/2 document units, 2px each');
+  const baseline=fs.readFileSync(path.join(ROOT,'src/js/draw-bridge.js'),'utf8');
+  assert.match(baseline,/Math\.max\(1, Math\.min\(80, sizeStartVal \+ \(e\.clientX - sizeStartX\) \* 0\.5\)\)/,'the legacy gesture this one mirrors');
+  const drag=dx=>send(f,'pointermove',(120+dx)/2,40);
+  for(const dx of [40,-8,1000,-1000,-6]){
+   drag(dx);const want=Math.max(1,Math.min(80,4+dx*0.5));
+   assert.equal(f.root.state.brushSize,want,tool+' dx '+dx);assert.equal(field.value,Math.round(want));assert.equal(Number(circle.attributes.r),want/2*2);
+  }
+  drag(40);send(f,'pointerup',100,40);
+  assert.equal(f.body.children.length,0,'the circle goes at release');assert.equal(f.log.at(-1),'Taille du pinceau : 24px');
+  assert.equal(f.root.state.brushSize,24);assert.equal(f.calls.length,0);assert.equal(f.records.size,0);assert.equal(f.info().contentRevision,revision);
+  assert.equal(f.paper.project.activeLayer.children.length,0);assert.equal(f.undos.length,0);
+  // The next ordinary stroke is drawn with the resized brush.
+  send(f,'pointerdown',20,20);send(f,'pointermove',45,30);send(f,'pointerup',100,80);
+  if(tool==='draw'){assert.equal((await settled(f)).status,'applied');assert.equal(f.calls[0].payload.record.vector.strokeWidth,24);}
+ }
+});
+test('Alt+drag only resizes: release without a move keeps the size, a cancel keeps the last size, and an unready canvas says so',async()=>{
+ const f=await fixture(),field=sizeField(f);
+ send(f,'pointerdown',60,40,{altKey:true});send(f,'pointerup',60,40,{altKey:true});
+ assert.equal(f.root.state.brushSize,4);assert.equal(f.log.at(-1),'Taille du pinceau : 4px');assert.equal(f.body.children.length,0);
+ send(f,'pointerdown',60,40,{altKey:true});send(f,'pointermove',80,40);send(f,'pointercancel',80,40);
+ assert.equal(f.root.state.brushSize,24);assert.equal(f.body.children.length,0);assert.equal(f.calls.length,0);assert.equal(field.value,24);
+ f.root.state.playing=true;f.root.state.brushSize=4;
+ const e=send(f,'pointerdown',60,40,{altKey:true});assert.equal(e.prevented,true);assert.equal(f.body.children.length,0);
+ send(f,'pointermove',80,40);assert.equal(f.root.state.brushSize,4);assert.equal(f.log.at(-1),'Native brush resize is unavailable.');assert.equal(f.calls.length,0);
+});
+// #2361: every Labs draw hook without a native route is a typed refusal that names it (Labs.unmigratedDrawHooks).
+test('an enabled Labs draw hook with no native route refuses with a typed reason that names it, and nothing is drawn',async()=>{
+ const Paint=require('../src/js/adapters/native-object-draw-paint.js');
+ const f=await fixture(),protos={'bulb-hook':{onPreview(){}},'ink-hook':{onStroke(){}},'migrated':{onStroke(){},nativeDraw:true},'view-aid':{}};
+ f.root.SMLabs={isOn:()=>true,list:()=>Object.keys(protos).map(name=>({name,on:true})),
+  unmigratedDrawHooks:()=>Object.keys(protos).filter(n=>(protos[n].onStroke||protos[n].onPreview)&&!protos[n].nativeDraw)};
+ const refusal=Paint.labsRefusal(f.root);assert.equal(refusal.code,'native-draw-labs-hook-unmigrated');assert.deepEqual(refusal.hooks,['bulb-hook','ink-hook']);
+ assert.match(refusal.message,/bulb-hook, ink-hook/);
+ send(f,'pointerdown',20,20);send(f,'pointermove',45,30);send(f,'pointerup',100,80);
+ assert.equal(f.calls.length,0);assert.ok(f.log.some(m=>/Labs draw hooks bulb-hook, ink-hook/.test(m)),f.log.join('|'));
+ const fb=await fixture('fillbrush');Object.assign(fb.root.state,{fillBrushMode:'above',fillBrushSize:40});
+ fb.root.SMLabs={list:()=>[{name:'solo',on:true}],unmigratedDrawHooks:()=>['solo']};
+ send(fb,'pointerdown',20,20);send(fb,'pointerup',60,50);assert.equal(fb.calls.length,0);assert.ok(fb.log.some(m=>/Labs draw hook solo yet/.test(m)),fb.log.join('|'));
+ f.root.SMLabs.unmigratedDrawHooks=()=>[];send(f,'pointerdown',20,20);send(f,'pointermove',45,30);send(f,'pointerup',100,80);
+ assert.equal((await settled(f)).status,'applied','once the hook is off (or migrated) native Drawing is available');
+ assert.equal(Paint.labsRefusal({}),null);
+ assert.equal(Paint.labsRefusal({SMLabs:{list:()=>[{name:'x',on:false}]}}),null);
+ assert.deepEqual(Paint.labsRefusal({SMLabs:{list:()=>[{name:'x',on:true},{name:'y',on:false}]}}).hooks,['x'],'without the registry, any enabled prototype blocks, by name');
+});
+test('the bitmap brush names the enabled Labs prototypes in its refusal', () => {
+ const Bitmap=require('../src/js/adapters/native-object-draw-bitmap.js'),state={tool:'draw',bitmapBrushOn:true,strokeEnabled:true,vectorBrush:false};
+ const root={SMBitmapBrush:{bake(){}},SMLabs:{list:()=>[{name:'predictive-stroke',on:true},{name:'canvas-grid',on:false}]}};
+ assert.throws(()=>Bitmap.style(root,state,{}),e=>e.code==='native-draw-labs-hook-unmigrated'&&e.hooks[0]==='predictive-stroke'&&/predictive-stroke is on/.test(e.message));
+});
+test('every production Labs prototype with a draw hook declares its native route, so none is left unnamed',()=>{
+ const dir=path.join(ROOT,'src/js/labs'),hooked=[];
+ for(const name of fs.readdirSync(dir).filter(n=>n.endsWith('.js'))){
+  const text=fs.readFileSync(path.join(dir,name),'utf8');
+  if(/^\s*(onStroke|onPreview)\s*[:(]/m.test(text)||/\bonStroke:\s|\bonPreview:\s/.test(text))hooked.push([name,/nativeDraw:\s*true/.test(text)]);
+ }
+ assert.deepEqual(hooked.sort(),[['multiframe-draw.js',true],['predictive-stroke.js',true]],'a new draw hook needs a native route or the typed refusal above names it');
 });
