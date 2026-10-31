@@ -703,6 +703,7 @@ window.SM={
     });
   },
   setFillEnabled:function(v){
+    if((v?nativeHex(state.fillColor)&&nativeSelStyle({fillEnabled:true,fillWith:state.fillColor}):nativeSelStyle({fillEnabled:false}))){state.fillEnabled=v;window.SM._syncFillEnabledUI(v);return;}
     if(((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length||state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='fill'||s.kind==='fillregion';}))&&!n20AllowLegacyWrite('timeline-selection-fill-enabled'))return false;
     state.fillEnabled=v;window.SM._syncFillEnabledUI(v);
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)return;p.fillColor=v?state.fillColor:null;});saveActiveLayerFrame();updateUI();}
@@ -712,6 +713,7 @@ window.SM={
   // the quick phdr toggle button since disabling stroke without it required
   // opening the color popover and hunting for "None".
   setStrokeEnabled:function(v){
+    if((v?nativeHex(state.strokeColor)&&nativeSelStyle({strokeEnabled:true,strokeWith:state.strokeColor}):nativeSelStyle({strokeEnabled:false}))){state.strokeEnabled=v;window.SM._syncStrokeEnabledUI(v);return;}
     if(((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length||state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='stroke';}))&&!n20AllowLegacyWrite('timeline-selection-stroke-enabled'))return false;
     state.strokeEnabled=v;window.SM._syncStrokeEnabledUI(v);
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){
@@ -737,6 +739,9 @@ window.SM={
   // selectedPaths on their own). Fill's enabled/disabled state is left
   // alone; only the color VALUES swap.
   swapStrokeFill:function(){
+    // #2372 SEL-STYLE2: a native selection takes the two swapped colours as ONE edit (the stroke colour wins on a ribbon, as the baseline's later write did).
+    var sw=state.strokeColor,fw=state.fillColor;
+    if(nativeHex(sw)&&nativeHex(fw)&&nativeSelStyle({fill:sw,stroke:fw})){state.fillColor=sw;state.strokeColor=fw;paintFillSwatches(sw);paintStrokeSwatches(fw);return;}
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-swap-paint'))return false;
     var s=state.strokeColor,f=state.fillColor;
     window.SM.setFillColor(s);
@@ -744,7 +749,12 @@ window.SM={
   },
   setFillBrushSize:function(v){state.fillBrushSize=Math.max(1,parseInt(v)||40);},
   setBrushPreset:function(v){
-    if(window.__TAURI__&&window.__TAURI__.core)return window.NemoNativeCustomBrushUI?NemoNativeCustomBrushUI.select(window,v):false;
+    if(window.__TAURI__&&window.__TAURI__.core){
+      var picked=window.NemoNativeCustomBrushUI?NemoNativeCustomBrushUI.select(window,v):false;
+      // #2372 SEL-STYLE2: the picked preset also re-textures a native selection (one edit; the engine leaves ribbons and unstroked records as they are).
+      if(picked!==false)nativeSelStyle({brushPreset:state.brushPreset||'none'});
+      return picked;
+    }
     state.brushPreset=v||'none';
     // Restore the saved diameter for a custom preset (feedback #73 — see
     // brush-editor.js's own comment on savedBrushSize for why this is
@@ -780,17 +790,17 @@ window.SM={
     }
   },
   setSmoothing:function(v){state.smoothing=v;},setStabilizer:function(v){state.stabilizer=parseInt(v);},
-  setStrokeCap:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-stroke-cap'))return false;state.strokeCap=v;
+  setStrokeCap:function(v){if(nativeSelStyle({cap:v})){state.strokeCap=v;return;}if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-stroke-cap'))return false;state.strokeCap=v;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(!(p.data&&p.data.isVectorBrush))p.strokeCap=v;});saveActiveLayerFrame();}},
-  setStrokeJoin:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-stroke-join'))return false;state.strokeJoin=v;
+  setStrokeJoin:function(v){if(nativeSelStyle({join:v})){state.strokeJoin=v;return;}if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-stroke-join'))return false;state.strokeJoin=v;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(!(p.data&&p.data.isVectorBrush))p.strokeJoin=v;});saveActiveLayerFrame();}},
-  setMiterLimit:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-miter-limit'))return false;state.miterLimit=Math.max(1,parseFloat(v)||10);
+  setMiterLimit:function(v){if(nativeSelStyle({miter:Math.max(1,parseFloat(v)||10)})){state.miterLimit=Math.max(1,parseFloat(v)||10);return;}if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-miter-limit'))return false;state.miterLimit=Math.max(1,parseFloat(v)||10);
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(!(p.data&&p.data.isVectorBrush))p.miterLimit=state.miterLimit;});saveActiveLayerFrame();}},
-  setPaintOrder:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-paint-order'))return false;state.paintOrder=v;
+  setPaintOrder:function(v){if(nativeSelStyle({paintOrder:v})){state.paintOrder=v;return;}if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-paint-order'))return false;state.paintOrder=v;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){p.data=p.data||{};p.data.paintOrder=v;});saveActiveLayerFrame();updateUI();}},
-  setDashOffset:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-dash-offset'))return false;state.dashOffset=parseFloat(v)||0;
+  setDashOffset:function(v){if(nativeSelStyle({dashOffset:parseFloat(v)||0})){state.dashOffset=parseFloat(v)||0;return;}if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-dash-offset'))return false;state.dashOffset=parseFloat(v)||0;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(!(p.data&&p.data.isVectorBrush)&&p.dashArray&&p.dashArray.length)p.dashOffset=state.dashOffset;});saveActiveLayerFrame();}},
-  setStrokeStyle:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-stroke-style'))return false;state.strokeStyle=v;
+  setStrokeStyle:function(v){if(nativeSelStyle({strokeStyle:v,dashOffset:state.dashOffset||0,miter:state.miterLimit||10,paintOrder:state.paintOrder||'fillFirst'})){state.strokeStyle=v;return;}if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-stroke-style'))return false;state.strokeStyle=v;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(!(p.data&&p.data.isVectorBrush)&&p.strokeColor)applyStrokeStyle(p);});saveActiveLayerFrame();updateUI();}},
   // One-shot "smooth this already-drawn stroke more" action (Stroke panel's
   // Smooth+Apply), distinct from Tool Options' Smooth which only shapes NEW
@@ -806,6 +816,7 @@ window.SM={
   // survives even as the centerline geometry itself gets smoother.
   smoothSelectedStroke:function(amount){
     if(!((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length))return;
+    if(nativeSelStyle({smooth:Math.max(0,parseFloat(amount)||0)}))return;
     if(!n20AllowLegacyWrite('timeline-selection-smooth-stroke'))return false;
     amount=Math.max(0,parseFloat(amount)||0);
     // No Apply button anymore (2026-07: "plus besoin du bouton apply pour
@@ -6368,7 +6379,9 @@ function nativeStyleView(p){
   if(!st)return p;
   var ribbon=st.role==='ribbon',data=Object.assign({},p.data);
   if(ribbon){data.isVectorBrush=true;data.widthProfile=[{width:st.width||0}];}
-  return {id:p.id,data:data,fillColor:st.fill?new Color(st.fill):null,strokeColor:!ribbon&&st.stroke?new Color(st.stroke):null,strokeWidth:st.width||0,nativeOpacity:st.opacity};
+  if(st.paintOrder)data.paintOrder=st.paintOrder;
+  return {id:p.id,data:data,fillColor:st.fill?new Color(st.fill):null,strokeColor:!ribbon&&st.stroke?new Color(st.stroke):null,strokeWidth:st.width||0,nativeOpacity:st.opacity,
+    strokeCap:st.cap,strokeJoin:st.join,miterLimit:st.miter,dashOffset:st.dashOffset};
 }
 function paintStrokeSwatches(v){
   var sw=document.getElementById('stroke-well'); if(sw)sw.style.background=v;

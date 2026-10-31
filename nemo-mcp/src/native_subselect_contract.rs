@@ -321,12 +321,20 @@ pub(super) fn result(document_id: &str, p: &Value, r: &Value) -> bool {
 #[path = "native_subselect_contract_tests.rs"]
 mod tests;
 
-/// #2372: the style a panel shows for a listed item, each member optional: hex `fill` / `stroke`, a positive `width`, an `opacity` in 0..1.
+/// #2372: the style a panel shows for a listed item, each member optional: hex `fill` / `stroke`, a positive `width`, an `opacity` in 0..1,
+/// and (SEL-STYLE2) the stroke details `cap`, `join`, `miter`, `dashOffset` and `paintOrder`.
 fn listed_style(v: &Value) -> bool {
     let hex = |s: &Value| s.as_str().and_then(|s| s.strip_prefix('#')).is_some_and(|d| [6, 8].contains(&d.len()) && d.bytes().all(|b| b.is_ascii_hexdigit()));
-    exact(v, &[], &["fill", "stroke", "width", "opacity"]).is_some_and(|o| !o.is_empty())
+    let one_of = |s: &Value, set: &[&str]| s.as_str().is_some_and(|s| set.contains(&s));
+    let number = |n: &Value| n.as_f64().is_some_and(f64::is_finite);
+    exact(v, &[], &["fill", "stroke", "width", "opacity", "cap", "join", "miter", "dashOffset", "paintOrder"]).is_some_and(|o| !o.is_empty())
         && v.get("fill").is_none_or(hex)
         && v.get("stroke").is_none_or(hex)
         && v.get("width").is_none_or(|w| w.as_f64().is_some_and(|w| w.is_finite() && w > 0.0))
         && v.get("opacity").is_none_or(|o| o.as_f64().is_some_and(|o| (0.0..=1.0).contains(&o)))
+        && v.get("cap").is_none_or(|c| one_of(c, &["butt", "round", "square"]))
+        && v.get("join").is_none_or(|j| one_of(j, &["miter", "round", "bevel"]))
+        && v.get("miter").is_none_or(|m| m.as_f64().is_some_and(|m| m.is_finite() && m >= 0.0))
+        && v.get("dashOffset").is_none_or(number)
+        && v.get("paintOrder").is_none_or(|p| one_of(p, &["fillFirst", "strokeFirst"]))
 }

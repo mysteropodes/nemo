@@ -5,6 +5,7 @@ const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 const Intent = require('../src/js/adapters/select-canvas-intent.js');
 const Style = require('../src/js/adapters/native-selection-style.js');
+const Steps = require('../src/js/adapters/native-selection-steps.js');
 const Contract = require('../src/js/adapters/native-object-vector-contract.js');
 const Subselect = require('../src/js/adapters/native-subselect-contract.js');
 const Paper = require('./helpers/native-import-paper.cjs');
@@ -33,7 +34,7 @@ function harness(items, options = {}) {
       pin = { ...pin, contentRevision: pin.contentRevision + 1, documentSnapshotId: 's' + (pin.contentRevision + 1) };
       return { status: 'applied' };
     } }) },
-    NemoSelectCanvasIntent: Intent };
+    NemoSelectCanvasIntent: Intent, NemoNativeSelectionSteps: Steps };
   const h = { root, toasts, batches, store, timers,
     async select(ids) { const layers = await Intent.layerPaths(root, (item) => ids.includes(item.stableTarget.strokeId), false, 0); root.selectedPaths = layers.paths; },
     // The quiet timer of the pending edit fires.
