@@ -157,7 +157,7 @@ test('ordinary palette uses the actual application SDK and preserves duplicate I
   assert.deepEqual(h.metadata(), before); assert.equal(h.edits().length, 0);
   const count = h.calls.length; await h.ready(); assert.equal(h.calls.length, count);
   assert.equal(h.elements['btn-palette-new'].disabled, false);
-  assert.equal(h.elements['btn-palette-replace'].disabled, true); assert.equal(h.elements['btn-palette-swap'].disabled, true);
+  assert.equal(h.elements['btn-palette-replace'].disabled, true); assert.equal(h.elements['btn-palette-swap'].disabled, false, 'Swap is native since #2372 PAL-APPLY');
 });
 
 test('ordinary palette presentation collects complete summaries and active colors across bounded SDK pages', async () => {
@@ -187,7 +187,7 @@ test('ordinary create, rename, duplicate, select and delete submit field-specifi
 test('ordinary add, remove and drag reorder colors use one-based native positions and confirmed readback', async () => {
   const h = fixture(); await h.ready(); h.elements['btn-palette-add-fill'].fire('click'); await h.settled();
   assert.deepEqual(h.edits().at(-1).payload.action, { kind: 'appendColor', ordinal: 1, color: '#aBc' });
-  h.swatches()[1].fire('contextmenu'); h.menus.at(-1)[0].action(); await h.settled();
+  h.swatches()[1].fire('contextmenu'); h.menus.at(-1).find(x => x.label === 'Retirer de la palette').action(); await h.settled();
   assert.deepEqual(h.edits().at(-1).payload.action, { kind: 'removeColor', ordinal: 1, index: 2 });
   const before = h.metadata(); h.swatches()[0].fire('dragstart');
   assert.deepEqual(h.metadata(), before); const count = h.edits().length;
