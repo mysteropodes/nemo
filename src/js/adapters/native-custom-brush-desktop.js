@@ -86,7 +86,7 @@
     async function refresh(expected) {
       cache = null; var stamp = capture();
       if (expected && !same(expected, stamp.info)) throw fault('stale_revision');
-      var data = await stamp.session.runResourceCommand(async function (context) {
+      var data = await (stamp.session.runResourceQuery || stamp.session.runResourceCommand).call(stamp.session, async function (context) {
         return collect(stamp,context);
       });
       guard(stamp);
