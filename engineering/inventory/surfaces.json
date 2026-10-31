@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "9968fe6d3688807aa24bb36a272c28fedeedb30a",
-  "describe": "v0.7.0-alpha.4-4344-g9968fe6d-dirty"
+  "head": "d55b121d362bda3d37b04972550a816fdf8db5df",
+  "describe": "v0.7.0-alpha.4-4349-gd55b121d-dirty"
  },
- "inputsDigest": "2bae9078330cee2091d2d38a40ff959bcb0584a44eb24487b7c0d61fab7c5167",
+ "inputsDigest": "765e45e34e2679bc162684b2a503f5fb23246d81a1a0ec9d106a61c4e06b3efa",
  "states": [
   "inventoried",
   "characterized",
@@ -181,7 +181,7 @@
   },
   "SM": {
    "file": "src/js/timeline.js",
-   "line": 11642,
+   "line": 11662,
    "members": 0
   },
   "SMKitsu": {
@@ -361,7 +361,7 @@
   },
   "SMShapeGroup": {
    "file": "src/js/timeline.js",
-   "line": 10050,
+   "line": 10070,
    "members": 0
   },
   "SMTrackerPanel": {
@@ -429,7 +429,7 @@
    "capability": "Menu",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:9090 initAppMenu()"
+    "src/js/timeline.js:9110 initAppMenu()"
    ],
    "events": [
     "click"
@@ -601,7 +601,7 @@
    "capability": "New layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11159"
+    "src/js/timeline.js:11179"
    ],
    "events": [
     "click"
@@ -646,7 +646,7 @@
    "capability": "Show transparency — preview the canvas background as alpha (checkerboard) instead of its solid color, while editing",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10564"
+    "src/js/timeline.js:10584"
    ],
    "events": [
     "click"
@@ -729,7 +729,7 @@
    "capability": "Forcer le cache de lecture (normalement automatique si la lecture décroche)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10893"
+    "src/js/timeline.js:10913"
    ],
    "events": [
     "click"
@@ -769,7 +769,7 @@
    "capability": "Exclude — keep everything except the overlap (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:10479 wireBoolBtn()"
+    "src/js/timeline.js:10499 wireBoolBtn()"
    ],
    "events": [
     "click"
@@ -817,7 +817,7 @@
    "capability": "Intersect — keep only the overlapping area (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:10479 wireBoolBtn()"
+    "src/js/timeline.js:10499 wireBoolBtn()"
    ],
    "events": [
     "click"
@@ -865,7 +865,7 @@
    "capability": "Subtract — cut later shapes out of the first (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:10479 wireBoolBtn()"
+    "src/js/timeline.js:10499 wireBoolBtn()"
    ],
    "events": [
     "click"
@@ -913,7 +913,7 @@
    "capability": "Union — merge shapes into one (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:10479 wireBoolBtn()"
+    "src/js/timeline.js:10499 wireBoolBtn()"
    ],
    "events": [
     "click"
@@ -1134,7 +1134,7 @@
    "capability": "Hide artwork outside the canvas bounds — off by default, so you can see and work with content that spills over the edge",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10544"
+    "src/js/timeline.js:10564"
    ],
    "events": [
     "click"
@@ -1176,7 +1176,7 @@
    "capability": "Exclude — keep everything except the overlap (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11390"
+    "src/js/timeline.js:11410"
    ],
    "events": [
     "click"
@@ -1208,8 +1208,8 @@
     "functionsVisited": 93,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11341 updateCombinePanel()",
-     "src/js/timeline.js:11356 updateCombinePanel()"
+     "src/js/timeline.js:11361 updateCombinePanel()",
+     "src/js/timeline.js:11376 updateCombinePanel()"
     ]
    },
    "fixtures": [
@@ -1228,7 +1228,7 @@
    "capability": "Flatten",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11405"
+    "src/js/timeline.js:11425"
    ],
    "events": [
     "click"
@@ -1275,7 +1275,7 @@
    "capability": "Intersect — keep only the overlapping area (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11390"
+    "src/js/timeline.js:11410"
    ],
    "events": [
     "click"
@@ -1307,8 +1307,8 @@
     "functionsVisited": 93,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11341 updateCombinePanel()",
-     "src/js/timeline.js:11356 updateCombinePanel()"
+     "src/js/timeline.js:11361 updateCombinePanel()",
+     "src/js/timeline.js:11376 updateCombinePanel()"
     ]
    },
    "fixtures": [
@@ -1327,7 +1327,7 @@
    "capability": "Remove from group",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11398"
+    "src/js/timeline.js:11418"
    ],
    "events": [
     "click"
@@ -1374,7 +1374,7 @@
    "capability": "Subtract — cut later shapes out of the first (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11390"
+    "src/js/timeline.js:11410"
    ],
    "events": [
     "click"
@@ -1406,8 +1406,8 @@
     "functionsVisited": 93,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11341 updateCombinePanel()",
-     "src/js/timeline.js:11356 updateCombinePanel()"
+     "src/js/timeline.js:11361 updateCombinePanel()",
+     "src/js/timeline.js:11376 updateCombinePanel()"
     ]
    },
    "fixtures": [
@@ -1426,7 +1426,7 @@
    "capability": "Union — merge shapes into one (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11390"
+    "src/js/timeline.js:11410"
    ],
    "events": [
     "click"
@@ -1458,8 +1458,8 @@
     "functionsVisited": 93,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11341 updateCombinePanel()",
-     "src/js/timeline.js:11356 updateCombinePanel()"
+     "src/js/timeline.js:11361 updateCombinePanel()",
+     "src/js/timeline.js:11376 updateCombinePanel()"
     ]
    },
    "fixtures": [
@@ -1478,7 +1478,7 @@
    "capability": "Convert layer to component",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11173"
+    "src/js/timeline.js:11193"
    ],
    "events": [
     "click"
@@ -1520,7 +1520,7 @@
    "capability": "Bake into layer",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11175"
+    "src/js/timeline.js:11195"
    ],
    "events": [
     "click"
@@ -1566,7 +1566,7 @@
    "capability": "Edit component…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11174"
+    "src/js/timeline.js:11194"
    ],
    "events": [
     "click"
@@ -1611,7 +1611,7 @@
    "capability": "Preview window…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11074 initCompPreview()"
+    "src/js/timeline.js:11094 initCompPreview()"
    ],
    "events": [
     "click"
@@ -1696,7 +1696,7 @@
    "capability": "Cycle — repeats the selected frame range N times (walk cycles)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:8986 initCycleAndPropagate()"
+    "src/js/timeline.js:9006 initCycleAndPropagate()"
    ],
    "events": [
     "click"
@@ -1743,7 +1743,7 @@
    "capability": "Link width/height (keep proportions)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10177"
+    "src/js/timeline.js:10197"
    ],
    "events": [
     "click"
@@ -1782,7 +1782,7 @@
    "capability": "Delete active layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11171"
+    "src/js/timeline.js:11191"
    ],
    "events": [
     "click"
@@ -1827,7 +1827,7 @@
    "capability": "+ Effector",
    "area": "effects-masks",
    "handler": [
-    "src/js/timeline.js:11224"
+    "src/js/timeline.js:11244"
    ],
    "events": [
     "click"
@@ -1871,7 +1871,7 @@
    "capability": "Edit source shape…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11245"
+    "src/js/timeline.js:11265"
    ],
    "events": [
     "click"
@@ -1902,7 +1902,7 @@
     "functionsVisited": 138,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7467 updateDuplicatorPanel()"
+     "src/js/timeline.js:7487 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -1919,7 +1919,7 @@
    "capability": "New random seed",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11215"
+    "src/js/timeline.js:11235"
    ],
    "events": [
     "click"
@@ -1965,7 +1965,7 @@
    "capability": "Duplicate active layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11172"
+    "src/js/timeline.js:11192"
    ],
    "events": [
     "click"
@@ -2010,7 +2010,7 @@
    "capability": "Edit the curve…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:10535"
+    "src/js/timeline.js:10555"
    ],
    "events": [
     "click"
@@ -2096,7 +2096,7 @@
    "capability": "export",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11485"
+    "src/js/timeline.js:11505"
    ],
    "events": [
     "click"
@@ -2122,7 +2122,7 @@
     "functionsVisited": 15,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:9146 action()"
+     "src/js/timeline.js:9166 action()"
     ]
    },
    "fixtures": [
@@ -2138,7 +2138,7 @@
    "capability": "Go to first frame",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11136"
+    "src/js/timeline.js:11156"
    ],
    "events": [
     "click"
@@ -2206,7 +2206,7 @@
     "container": "p-fillpropagate-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 477,
+    "functionsVisited": 478,
     "via": "variable propBtn",
     "references": []
    },
@@ -2224,7 +2224,7 @@
    "capability": "Fit — fit the canvas to the viewport",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10817"
+    "src/js/timeline.js:10837"
    ],
    "events": [
     "click"
@@ -2294,7 +2294,7 @@
     "via": "chain",
     "references": [
      "src/js/images.js:758",
-     "src/js/timeline.js:7290 updateFootagePanel()"
+     "src/js/timeline.js:7310 updateFootagePanel()"
     ]
    },
    "fixtures": [
@@ -2310,7 +2310,7 @@
    "capability": "Ghost all keyframes — shows every keyframe of the active layer at once",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10892"
+    "src/js/timeline.js:10912"
    ],
    "events": [
     "click"
@@ -2340,7 +2340,7 @@
     "via": "chain",
     "references": [
      "src/js/timeline.js:536 toggleGhostAll()",
-     "src/js/timeline.js:3978 selectGhostAll()"
+     "src/js/timeline.js:3983 selectGhostAll()"
     ]
    },
    "fixtures": [
@@ -2356,7 +2356,7 @@
    "capability": "Select all keyframes' content to move/transform together",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10982"
+    "src/js/timeline.js:11002"
    ],
    "events": [
     "click"
@@ -2472,7 +2472,7 @@
     "functionsVisited": 123,
     "via": "variable histBtn",
     "references": [
-     "src/js/timeline.js:9117 action()"
+     "src/js/timeline.js:9137 action()"
     ]
    },
    "fixtures": [
@@ -2561,7 +2561,7 @@
     "functionsVisited": 232,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:9119 action()"
+     "src/js/timeline.js:9139 action()"
     ]
    },
    "fixtures": [
@@ -2587,7 +2587,7 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "reason": "helper parameter has no proved registration or unchanged returned lookup (reassignment, shadowing or unsupported return flow)",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:9121 action())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:9141 action())",
    "source": "src/index.html:1627",
    "meta": {
     "data": {},
@@ -2597,7 +2597,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:9121 action()"
+     "src/js/timeline.js:9141 action()"
     ]
    },
    "fixtures": [
@@ -2645,7 +2645,7 @@
     "via": "chain",
     "references": [
      "src/js/images.js:705",
-     "src/js/timeline.js:9120 action()"
+     "src/js/timeline.js:9140 action()"
     ]
    },
    "fixtures": [
@@ -2685,7 +2685,7 @@
     "functionsVisited": 20,
     "via": "helper el()",
     "references": [
-     "src/js/timeline.js:9106 action()"
+     "src/js/timeline.js:9126 action()"
     ]
    },
    "fixtures": [
@@ -2726,7 +2726,7 @@
     "functionsVisited": 17,
     "via": "helper el()",
     "references": [
-     "src/js/timeline.js:9168 action()"
+     "src/js/timeline.js:9188 action()"
     ]
    },
    "fixtures": [
@@ -2741,7 +2741,7 @@
    "capability": "Go to last frame",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11140"
+    "src/js/timeline.js:11160"
    ],
    "events": [
     "click"
@@ -2781,7 +2781,7 @@
    "capability": "Analyse and apply",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11097 initLipSync()"
+    "src/js/timeline.js:11117 initLipSync()"
    ],
    "events": [
     "click"
@@ -2809,7 +2809,7 @@
     "container": "comp-instance-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 494,
+    "functionsVisited": 495,
     "via": "variable btn",
     "references": []
    },
@@ -2827,8 +2827,8 @@
    "capability": "Loop playback (work area) — right-click for ping-pong",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11040",
-    "src/js/timeline.js:11041"
+    "src/js/timeline.js:11060",
+    "src/js/timeline.js:11061"
    ],
    "events": [
     "click",
@@ -2898,7 +2898,7 @@
     "container": "mask-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 433,
+    "functionsVisited": 434,
     "via": "chain",
     "references": []
    },
@@ -2914,8 +2914,8 @@
    "capability": "Flou de mouvement de la composition — clic droit : échantillons et obturateur",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:9044 bindMotionBlur()",
-    "src/js/timeline.js:9045 bindMotionBlur()"
+    "src/js/timeline.js:9064 bindMotionBlur()",
+    "src/js/timeline.js:9065 bindMotionBlur()"
    ],
    "events": [
     "click",
@@ -3343,7 +3343,7 @@
    "capability": "Next frame",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11139"
+    "src/js/timeline.js:11159"
    ],
    "events": [
     "click"
@@ -3462,9 +3462,9 @@
    "capability": "Onion skin on/off (O)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10891",
-    "src/js/timeline.js:11048 initOnionPopover()",
-    "src/js/timeline.js:11131 initOnionTintShift()"
+    "src/js/timeline.js:10911",
+    "src/js/timeline.js:11068 initOnionPopover()",
+    "src/js/timeline.js:11151 initOnionTintShift()"
    ],
    "events": [
     "click",
@@ -3505,7 +3505,7 @@
    "capability": "Onion skin outlines only",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10996"
+    "src/js/timeline.js:11016"
    ],
    "events": [
     "click"
@@ -3763,7 +3763,7 @@
    "capability": "Previous frame",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11137"
+    "src/js/timeline.js:11157"
    ],
    "events": [
     "click"
@@ -3803,7 +3803,7 @@
    "capability": "Play / Stop (Enter)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11138"
+    "src/js/timeline.js:11158"
    ],
    "events": [
     "click"
@@ -3852,7 +3852,7 @@
    "capability": "Corner",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10472"
+    "src/js/timeline.js:10492"
    ],
    "events": [
     "click"
@@ -3898,7 +3898,7 @@
    "capability": "Smooth",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10473"
+    "src/js/timeline.js:10493"
    ],
    "events": [
     "click"
@@ -3944,7 +3944,7 @@
    "capability": "Symmetric",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10474"
+    "src/js/timeline.js:10494"
    ],
    "events": [
     "click"
@@ -4073,7 +4073,7 @@
    "capability": "Reset View — restore zoom/pan/rotation to default",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10818"
+    "src/js/timeline.js:10838"
    ],
    "events": [
     "click"
@@ -4138,7 +4138,7 @@
     "container": "revision-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 282,
+    "functionsVisited": 283,
     "via": "chain",
     "references": []
    },
@@ -4182,7 +4182,7 @@
     "container": "revision-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 282,
+    "functionsVisited": 283,
     "via": "chain",
     "references": []
    },
@@ -4199,7 +4199,7 @@
    "capability": "All",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10989"
+    "src/js/timeline.js:11009"
    ],
    "events": [
     "click"
@@ -4242,7 +4242,7 @@
    "capability": "Auto-assign",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11284"
+    "src/js/timeline.js:11304"
    ],
    "events": [
     "click"
@@ -4290,7 +4290,7 @@
    "capability": "Commit pose",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11314"
+    "src/js/timeline.js:11334"
    ],
    "events": [
     "click"
@@ -4338,7 +4338,7 @@
    "capability": "2. Auto-assign shapes to bones (by proximity, Shapper-style)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11278"
+    "src/js/timeline.js:11298"
    ],
    "events": [
     "click"
@@ -4367,8 +4367,8 @@
     "functionsVisited": 183,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11266 renderRigModeUI()",
-     "src/js/timeline.js:11271 renderRigModeUI()"
+     "src/js/timeline.js:11286 renderRigModeUI()",
+     "src/js/timeline.js:11291 renderRigModeUI()"
     ]
    },
    "fixtures": [
@@ -4387,7 +4387,7 @@
    "capability": "1. Draw new bones",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11278"
+    "src/js/timeline.js:11298"
    ],
    "events": [
     "click"
@@ -4416,8 +4416,8 @@
     "functionsVisited": 183,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11266 renderRigModeUI()",
-     "src/js/timeline.js:11271 renderRigModeUI()"
+     "src/js/timeline.js:11286 renderRigModeUI()",
+     "src/js/timeline.js:11291 renderRigModeUI()"
     ]
    },
    "fixtures": [
@@ -4436,7 +4436,7 @@
    "capability": "3. Move / pose the bones already drawn",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11278"
+    "src/js/timeline.js:11298"
    ],
    "events": [
     "click"
@@ -4465,8 +4465,8 @@
     "functionsVisited": 183,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11266 renderRigModeUI()",
-     "src/js/timeline.js:11271 renderRigModeUI()"
+     "src/js/timeline.js:11286 renderRigModeUI()",
+     "src/js/timeline.js:11291 renderRigModeUI()"
     ]
    },
    "fixtures": [
@@ -4485,7 +4485,7 @@
    "capability": "Reset",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11319"
+    "src/js/timeline.js:11339"
    ],
    "events": [
     "click"
@@ -4533,7 +4533,7 @@
    "capability": "Rulers — drag out from the top/left bar to place a guide; drag a guide back onto its bar to remove it",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10549"
+    "src/js/timeline.js:10569"
    ],
    "events": [
     "click"
@@ -4557,7 +4557,7 @@
     "functionsVisited": 34,
     "via": "variable _btnRulers",
     "references": [
-     "src/js/timeline.js:10845 action()"
+     "src/js/timeline.js:10865 action()"
     ]
    },
    "fixtures": [
@@ -4573,7 +4573,7 @@
    "capability": "Broadcast-safe overlay guides: 90% action-safe / 80% title-safe margins, standard TV/film safe areas",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10545"
+    "src/js/timeline.js:10565"
    ],
    "events": [
     "click"
@@ -4719,10 +4719,10 @@
     "functionsVisited": 23,
     "via": "variable btn",
     "references": [
-     "src/js/timeline.js:9133 action()",
-     "src/js/timeline.js:9149 action()",
-     "src/js/timeline.js:9151 action()",
-     "src/js/timeline.js:9156 action()"
+     "src/js/timeline.js:9153 action()",
+     "src/js/timeline.js:9169 action()",
+     "src/js/timeline.js:9171 action()",
+     "src/js/timeline.js:9176 action()"
     ]
    },
    "fixtures": []
@@ -4734,7 +4734,7 @@
    "capability": "Show/hide Shadow Brush guide lines across all layers and components",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10983"
+    "src/js/timeline.js:11003"
    ],
    "events": [
     "click"
@@ -4776,7 +4776,7 @@
    "capability": "Hide “shy” layers (right-click a layer to mark it)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:9058 bindShy()"
+    "src/js/timeline.js:9078 bindShy()"
    ],
    "events": [
     "click"
@@ -4822,7 +4822,7 @@
    "capability": "Link width/height (keep proportions)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10410"
+    "src/js/timeline.js:10430"
    ],
    "events": [
     "click"
@@ -4861,7 +4861,7 @@
    "capability": "Animate text…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8708 updateTextActionsPanel()"
+    "src/js/timeline.js:8728 updateTextActionsPanel()"
    ],
    "events": [
     "click"
@@ -4905,7 +4905,7 @@
    "capability": "Split by character",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8703 updateTextActionsPanel()"
+    "src/js/timeline.js:8723 updateTextActionsPanel()"
    ],
    "events": [
     "click"
@@ -4950,7 +4950,7 @@
    "capability": "Personnaliser les boutons visibles de la barre",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10927 initToolbarCustomization()"
+    "src/js/timeline.js:10947 initToolbarCustomization()"
    ],
    "events": [
     "click"
@@ -5202,7 +5202,7 @@
    "capability": "Tween (T)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10890"
+    "src/js/timeline.js:10910"
    ],
    "events": [
     "click"
@@ -5288,7 +5288,7 @@
    "capability": "Show/hide easing curves under layers with tweens — click a segment to edit it individually. Inside the editor: click empty space to add a point, double-click a point to remove it",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:10981"
+    "src/js/timeline.js:11001"
    ],
    "events": [
     "click"
@@ -5335,7 +5335,7 @@
    "capability": "Fill color",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10062"
+    "src/js/timeline.js:10082"
    ],
    "events": [
     "input"
@@ -5365,10 +5365,10 @@
     "functionsVisited": 84,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:10063",
+     "src/js/timeline.js:10083",
      "src/js/tools.js:7593 onMouseDown()",
-     "src/js/timeline.js:3945 updateFsSelPanel()",
-     "src/js/timeline.js:6448 paintFillSwatches()",
+     "src/js/timeline.js:3950 updateFsSelPanel()",
+     "src/js/timeline.js:6468 paintFillSwatches()",
      "src/js/viewtools-bridge.js:140 setColorUI()"
     ]
    },
@@ -5386,7 +5386,7 @@
    "capability": "Stroke color",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10070"
+    "src/js/timeline.js:10090"
    ],
    "events": [
     "input"
@@ -5416,11 +5416,11 @@
     "functionsVisited": 95,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:10071",
+     "src/js/timeline.js:10091",
      "src/js/tools.js:7590 onMouseDown()",
      "src/js/tools.js:7592 onMouseDown()",
-     "src/js/timeline.js:3957 updateFsSelPanel()",
-     "src/js/timeline.js:6438 paintStrokeSwatches()",
+     "src/js/timeline.js:3962 updateFsSelPanel()",
+     "src/js/timeline.js:6458 paintStrokeSwatches()",
      "src/js/viewtools-bridge.js:136 setColorUI()"
     ]
    },
@@ -5438,7 +5438,7 @@
    "capability": "Delete this comment",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:7979 initCommentPopover()"
+    "src/js/timeline.js:7999 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -5466,10 +5466,10 @@
     "container": "comment-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 423,
+    "functionsVisited": 424,
     "via": "variable delBtn",
     "references": [
-     "src/js/timeline.js:7872 openCommentPopover()"
+     "src/js/timeline.js:7892 openCommentPopover()"
     ]
    },
    "fixtures": [
@@ -5495,7 +5495,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7875 openCommentPopover())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7895 openCommentPopover())",
    "source": "src/index.html:2078",
    "meta": {
     "data": {},
@@ -5505,8 +5505,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7875 openCommentPopover()",
-     "src/js/timeline.js:7945 initCommentPopover()"
+     "src/js/timeline.js:7895 openCommentPopover()",
+     "src/js/timeline.js:7965 initCommentPopover()"
     ]
    },
    "fixtures": [
@@ -5530,7 +5530,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7868 openCommentPopover())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7888 openCommentPopover())",
    "source": "src/index.html:2090",
    "meta": {
     "data": {},
@@ -5540,8 +5540,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7868 openCommentPopover()",
-     "src/js/timeline.js:7950 initCommentPopover()"
+     "src/js/timeline.js:7888 openCommentPopover()",
+     "src/js/timeline.js:7970 initCommentPopover()"
     ]
    },
    "fixtures": [
@@ -5565,7 +5565,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7868 openCommentPopover())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7888 openCommentPopover())",
    "source": "src/index.html:2087",
    "meta": {
     "data": {},
@@ -5575,8 +5575,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7868 openCommentPopover()",
-     "src/js/timeline.js:7950 initCommentPopover()"
+     "src/js/timeline.js:7888 openCommentPopover()",
+     "src/js/timeline.js:7970 initCommentPopover()"
     ]
    },
    "fixtures": [
@@ -5591,7 +5591,7 @@
    "capability": "⏺ Record actions",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:7905 initCommentPopover()"
+    "src/js/timeline.js:7925 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -5615,7 +5615,7 @@
     "functionsVisited": 15,
     "via": "variable recordBtn",
     "references": [
-     "src/js/timeline.js:7798 updateRecordUI()"
+     "src/js/timeline.js:7818 updateRecordUI()"
     ]
    },
    "fixtures": [
@@ -5641,7 +5641,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7871 openCommentPopover())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7891 openCommentPopover())",
    "source": "src/index.html:2109",
    "meta": {
     "data": {},
@@ -5651,9 +5651,9 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7871 openCommentPopover()",
-     "src/js/timeline.js:7966 initCommentPopover()",
-     "src/js/timeline.js:7969 initCommentPopover()"
+     "src/js/timeline.js:7891 openCommentPopover()",
+     "src/js/timeline.js:7986 initCommentPopover()",
+     "src/js/timeline.js:7989 initCommentPopover()"
     ]
    },
    "fixtures": [
@@ -5670,7 +5670,7 @@
    "capability": "Save",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:7963 initCommentPopover()"
+    "src/js/timeline.js:7983 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -5698,7 +5698,7 @@
     "container": "comment-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 439,
+    "functionsVisited": 440,
     "via": "variable saveBtn",
     "references": []
    },
@@ -5716,7 +5716,7 @@
    "capability": "Save as feedback",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:7938 initCommentPopover()"
+    "src/js/timeline.js:7958 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -5756,7 +5756,7 @@
    "capability": "comment shot input",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:7922 initCommentPopover()"
+    "src/js/timeline.js:7942 initCommentPopover()"
    ],
    "events": [
     "change"
@@ -5804,7 +5804,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7867 openCommentPopover())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7887 openCommentPopover())",
    "source": "src/index.html:2063",
    "meta": {
     "data": {},
@@ -5814,11 +5814,11 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7867 openCommentPopover()",
-     "src/js/timeline.js:7883 openCommentPopover()",
-     "src/js/timeline.js:7943 initCommentPopover()",
-     "src/js/timeline.js:7966 initCommentPopover()",
-     "src/js/timeline.js:7968 initCommentPopover()",
+     "src/js/timeline.js:7887 openCommentPopover()",
+     "src/js/timeline.js:7903 openCommentPopover()",
+     "src/js/timeline.js:7963 initCommentPopover()",
+     "src/js/timeline.js:7986 initCommentPopover()",
+     "src/js/timeline.js:7988 initCommentPopover()",
      "src/js/tutorial.js:1121 measure()"
     ]
    },
@@ -5836,7 +5836,7 @@
    "capability": "Main-timeline frame at which this instance's own timeline starts",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11179"
+    "src/js/timeline.js:11199"
    ],
    "events": [
     "change"
@@ -5869,7 +5869,7 @@
     "functionsVisited": 59,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7310 updateCompInstancePanel()"
+     "src/js/timeline.js:7330 updateCompInstancePanel()"
     ]
    },
    "fixtures": [
@@ -5886,7 +5886,7 @@
    "capability": "comp playmode",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11176"
+    "src/js/timeline.js:11196"
    ],
    "events": [
     "change"
@@ -5917,7 +5917,7 @@
     "functionsVisited": 73,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7304 updateCompInstancePanel()"
+     "src/js/timeline.js:7324 updateCompInstancePanel()"
     ]
    },
    "fixtures": [
@@ -5934,7 +5934,7 @@
    "capability": "comp singleframe",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11177"
+    "src/js/timeline.js:11197"
    ],
    "events": [
     "change"
@@ -5967,7 +5967,7 @@
     "functionsVisited": 59,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7308 updateCompInstancePanel()"
+     "src/js/timeline.js:7328 updateCompInstancePanel()"
     ]
    },
    "fixtures": [
@@ -5983,7 +5983,7 @@
    "capability": "comp speed",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11178"
+    "src/js/timeline.js:11198"
    ],
    "events": [
     "change"
@@ -6016,7 +6016,7 @@
     "functionsVisited": 59,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7309 updateCompInstancePanel()"
+     "src/js/timeline.js:7329 updateCompInstancePanel()"
     ]
    },
    "fixtures": [
@@ -6076,7 +6076,7 @@
    "capability": "dup anim direction",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11220"
+    "src/js/timeline.js:11240"
    ],
    "events": [
     "change"
@@ -6107,7 +6107,7 @@
     "functionsVisited": 54,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7458 updateDuplicatorPanel()"
+     "src/js/timeline.js:7478 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6124,7 +6124,7 @@
    "capability": "dup anim enabled",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11218"
+    "src/js/timeline.js:11238"
    ],
    "events": [
     "change"
@@ -6155,7 +6155,7 @@
     "functionsVisited": 54,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7455 updateDuplicatorPanel()"
+     "src/js/timeline.js:7475 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6172,7 +6172,7 @@
    "capability": "Frames of offset between each copy",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11219"
+    "src/js/timeline.js:11239"
    ],
    "events": [
     "change"
@@ -6205,7 +6205,7 @@
     "functionsVisited": 56,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7457 updateDuplicatorPanel()"
+     "src/js/timeline.js:7477 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6222,7 +6222,7 @@
    "capability": "dup cols",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11205 wireNum()"
+    "src/js/timeline.js:11225 wireNum()"
    ],
    "events": [
     "change"
@@ -6255,7 +6255,7 @@
     "functionsVisited": 57,
     "via": "helper wireNum()",
     "references": [
-     "src/js/timeline.js:7436 updateDuplicatorPanel()"
+     "src/js/timeline.js:7456 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6272,7 +6272,7 @@
    "capability": "dup count",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11205 wireNum()"
+    "src/js/timeline.js:11225 wireNum()"
    ],
    "events": [
     "change"
@@ -6305,7 +6305,7 @@
     "functionsVisited": 57,
     "via": "helper wireNum()",
     "references": [
-     "src/js/timeline.js:7439 updateDuplicatorPanel()"
+     "src/js/timeline.js:7459 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6322,7 +6322,7 @@
    "capability": "dup mode",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11206"
+    "src/js/timeline.js:11226"
    ],
    "events": [
     "change"
@@ -6353,7 +6353,7 @@
     "functionsVisited": 53,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7427 updateDuplicatorPanel()"
+     "src/js/timeline.js:7447 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6370,7 +6370,7 @@
    "capability": "dup path align",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11213"
+    "src/js/timeline.js:11233"
    ],
    "events": [
     "change"
@@ -6401,7 +6401,7 @@
     "functionsVisited": 53,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7443 updateDuplicatorPanel()"
+     "src/js/timeline.js:7463 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6418,7 +6418,7 @@
    "capability": "dup path layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11214"
+    "src/js/timeline.js:11234"
    ],
    "events": [
     "change"
@@ -6449,7 +6449,7 @@
     "functionsVisited": 53,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7459 updateDuplicatorPanel()"
+     "src/js/timeline.js:7479 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6465,7 +6465,7 @@
    "capability": "dup radial orient",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11212"
+    "src/js/timeline.js:11232"
    ],
    "events": [
     "change"
@@ -6496,7 +6496,7 @@
     "functionsVisited": 53,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7442 updateDuplicatorPanel()"
+     "src/js/timeline.js:7462 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6513,7 +6513,7 @@
    "capability": "dup radius",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11205 wireNum()"
+    "src/js/timeline.js:11225 wireNum()"
    ],
    "events": [
     "change"
@@ -6546,7 +6546,7 @@
     "functionsVisited": 57,
     "via": "helper wireNum()",
     "references": [
-     "src/js/timeline.js:7440 updateDuplicatorPanel()"
+     "src/js/timeline.js:7460 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6563,7 +6563,7 @@
    "capability": "dup rand hue",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11243 wireRand()"
+    "src/js/timeline.js:11263 wireRand()"
    ],
    "events": [
     "change"
@@ -6594,7 +6594,7 @@
     "functionsVisited": 53,
     "via": "helper wireRand()",
     "references": [
-     "src/js/timeline.js:7450 updateDuplicatorPanel()"
+     "src/js/timeline.js:7470 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6611,7 +6611,7 @@
    "capability": "dup rand op",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11243 wireRand()"
+    "src/js/timeline.js:11263 wireRand()"
    ],
    "events": [
     "change"
@@ -6642,7 +6642,7 @@
     "functionsVisited": 53,
     "via": "helper wireRand()",
     "references": [
-     "src/js/timeline.js:7449 updateDuplicatorPanel()"
+     "src/js/timeline.js:7469 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6659,7 +6659,7 @@
    "capability": "dup rand pos",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11243 wireRand()"
+    "src/js/timeline.js:11263 wireRand()"
    ],
    "events": [
     "change"
@@ -6690,7 +6690,7 @@
     "functionsVisited": 53,
     "via": "helper wireRand()",
     "references": [
-     "src/js/timeline.js:7446 updateDuplicatorPanel()"
+     "src/js/timeline.js:7466 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6707,7 +6707,7 @@
    "capability": "dup rand rot",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11243 wireRand()"
+    "src/js/timeline.js:11263 wireRand()"
    ],
    "events": [
     "change"
@@ -6738,7 +6738,7 @@
     "functionsVisited": 53,
     "via": "helper wireRand()",
     "references": [
-     "src/js/timeline.js:7447 updateDuplicatorPanel()"
+     "src/js/timeline.js:7467 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6755,7 +6755,7 @@
    "capability": "dup rand scale",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11243 wireRand()"
+    "src/js/timeline.js:11263 wireRand()"
    ],
    "events": [
     "change"
@@ -6786,7 +6786,7 @@
     "functionsVisited": 53,
     "via": "helper wireRand()",
     "references": [
-     "src/js/timeline.js:7448 updateDuplicatorPanel()"
+     "src/js/timeline.js:7468 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6803,7 +6803,7 @@
    "capability": "dup rows",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11205 wireNum()"
+    "src/js/timeline.js:11225 wireNum()"
    ],
    "events": [
     "change"
@@ -6836,7 +6836,7 @@
     "functionsVisited": 57,
     "via": "helper wireNum()",
     "references": [
-     "src/js/timeline.js:7435 updateDuplicatorPanel()"
+     "src/js/timeline.js:7455 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6853,7 +6853,7 @@
    "capability": "dup seed",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11205 wireNum()"
+    "src/js/timeline.js:11225 wireNum()"
    ],
    "events": [
     "change"
@@ -6886,7 +6886,7 @@
     "functionsVisited": 57,
     "via": "helper wireNum()",
     "references": [
-     "src/js/timeline.js:7444 updateDuplicatorPanel()"
+     "src/js/timeline.js:7464 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6903,7 +6903,7 @@
    "capability": "dup source add",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:7510 renderDuplicatorSourcePool()"
+    "src/js/timeline.js:7530 renderDuplicatorSourcePool()"
    ],
    "events": [
     "change"
@@ -6948,7 +6948,7 @@
    "capability": "Spacing between copies (px)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11205 wireNum()"
+    "src/js/timeline.js:11225 wireNum()"
    ],
    "events": [
     "change"
@@ -6981,7 +6981,7 @@
     "functionsVisited": 57,
     "via": "helper wireNum()",
     "references": [
-     "src/js/timeline.js:7437 updateDuplicatorPanel()"
+     "src/js/timeline.js:7457 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6998,7 +6998,7 @@
    "capability": "dup spacingy",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11205 wireNum()"
+    "src/js/timeline.js:11225 wireNum()"
    ],
    "events": [
     "change"
@@ -7031,7 +7031,7 @@
     "functionsVisited": 57,
     "via": "helper wireNum()",
     "references": [
-     "src/js/timeline.js:7438 updateDuplicatorPanel()"
+     "src/js/timeline.js:7458 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -7048,7 +7048,7 @@
    "capability": "Start angle (degrees)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:11205 wireNum()"
+    "src/js/timeline.js:11225 wireNum()"
    ],
    "events": [
     "change"
@@ -7081,7 +7081,7 @@
     "functionsVisited": 57,
     "via": "helper wireNum()",
     "references": [
-     "src/js/timeline.js:7441 updateDuplicatorPanel()"
+     "src/js/timeline.js:7461 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -7096,7 +7096,7 @@
    "capability": "alpha",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11498"
+    "src/js/timeline.js:11518"
    ],
    "events": [
     "click"
@@ -7120,7 +7120,7 @@
     "functionsVisited": 0,
     "via": "container delegation #export-modal",
     "references": [
-     "src/js/timeline.js:11516"
+     "src/js/timeline.js:11536"
     ]
    },
    "fixtures": [
@@ -7137,7 +7137,7 @@
    "capability": "Cancel",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11505"
+    "src/js/timeline.js:11525"
    ],
    "events": [
     "click"
@@ -7177,7 +7177,7 @@
    "capability": "format",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11468"
+    "src/js/timeline.js:11488"
    ],
    "events": [
     "change"
@@ -7217,7 +7217,7 @@
    "capability": "h",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11476"
+    "src/js/timeline.js:11496"
    ],
    "events": [
     "input"
@@ -7258,7 +7258,7 @@
    "capability": "include shadow",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11498"
+    "src/js/timeline.js:11518"
    ],
    "events": [
     "click"
@@ -7282,7 +7282,7 @@
     "functionsVisited": 0,
     "via": "container delegation #export-modal",
     "references": [
-     "src/js/timeline.js:11521"
+     "src/js/timeline.js:11541"
     ]
    },
    "fixtures": [
@@ -7299,7 +7299,7 @@
    "capability": "range",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11498"
+    "src/js/timeline.js:11518"
    ],
    "events": [
     "click"
@@ -7323,7 +7323,7 @@
     "functionsVisited": 0,
     "via": "container delegation #export-modal",
     "references": [
-     "src/js/timeline.js:11421"
+     "src/js/timeline.js:11441"
     ]
    },
    "fixtures": [
@@ -7339,7 +7339,7 @@
    "capability": "Export",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11513"
+    "src/js/timeline.js:11533"
    ],
    "events": [
     "click"
@@ -7382,7 +7382,7 @@
    "capability": "Vector content — scaling stays crisp at any factor",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11469"
+    "src/js/timeline.js:11489"
    ],
    "events": [
     "change"
@@ -7421,7 +7421,7 @@
    "capability": "w",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11475"
+    "src/js/timeline.js:11495"
    ],
    "events": [
     "input"
@@ -7462,7 +7462,7 @@
    "capability": "&times;",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11497"
+    "src/js/timeline.js:11517"
    ],
    "events": [
     "click"
@@ -7500,7 +7500,7 @@
    "capability": "↻ Refresh",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:9429 initGithubFeedbackUI()"
+    "src/js/timeline.js:9449 initGithubFeedbackUI()"
    ],
    "events": [
     "click"
@@ -7539,7 +7539,7 @@
    "capability": "&times;",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:9428 initGithubFeedbackUI()"
+    "src/js/timeline.js:9448 initGithubFeedbackUI()"
    ],
    "events": [
     "click"
@@ -7576,7 +7576,7 @@
    "capability": "📋 Open feedback board",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:9427 initGithubFeedbackUI()"
+    "src/js/timeline.js:9447 initGithubFeedbackUI()"
    ],
    "events": [
     "click"
@@ -7610,7 +7610,7 @@
    "capability": "Pull the team's feedback",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:9233 initFeedbackUI()"
+    "src/js/timeline.js:9253 initFeedbackUI()"
    ],
    "events": [
     "click"
@@ -7835,7 +7835,7 @@
    "capability": "Enable/disable fill",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10115"
+    "src/js/timeline.js:10135"
    ],
    "events": [
     "click"
@@ -7865,7 +7865,7 @@
     "functionsVisited": 77,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:3935 updateFsSelPanel()",
+     "src/js/timeline.js:3940 updateFsSelPanel()",
      "src/js/timeline.js:698 _syncFillEnabledUI()"
     ]
    },
@@ -7883,7 +7883,7 @@
    "capability": "Enable/disable fill",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10068"
+    "src/js/timeline.js:10088"
    ],
    "events": [
     "click"
@@ -7939,7 +7939,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7282 updateFootagePanel())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7302 updateFootagePanel())",
    "source": "src/index.html:1383",
    "meta": {
     "data": {},
@@ -7949,7 +7949,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7282 updateFootagePanel()"
+     "src/js/timeline.js:7302 updateFootagePanel()"
     ]
    },
    "fixtures": []
@@ -7970,7 +7970,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7259 updateFootagePanel())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7279 updateFootagePanel())",
    "source": "src/index.html:1381",
    "meta": {
     "data": {},
@@ -7980,7 +7980,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7259 updateFootagePanel()"
+     "src/js/timeline.js:7279 updateFootagePanel()"
     ]
    },
    "fixtures": []
@@ -7992,7 +7992,7 @@
    "capability": "footage interp mode",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:7271 updateFootagePanel()"
+    "src/js/timeline.js:7291 updateFootagePanel()"
    ],
    "events": [
     "change"
@@ -8040,7 +8040,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7246 updateFootagePanel())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7266 updateFootagePanel())",
    "source": "src/index.html:1377",
    "meta": {
     "data": {},
@@ -8050,7 +8050,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7246 updateFootagePanel()"
+     "src/js/timeline.js:7266 updateFootagePanel()"
     ]
    },
    "fixtures": []
@@ -8071,7 +8071,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7250 updateFootagePanel())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7270 updateFootagePanel())",
    "source": "src/index.html:1378",
    "meta": {
     "data": {},
@@ -8081,8 +8081,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7250 updateFootagePanel()",
-     "src/js/timeline.js:7251 updateFootagePanel()"
+     "src/js/timeline.js:7270 updateFootagePanel()",
+     "src/js/timeline.js:7271 updateFootagePanel()"
     ]
    },
    "fixtures": []
@@ -8103,7 +8103,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7258 updateFootagePanel())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7278 updateFootagePanel())",
    "source": "src/index.html:1380",
    "meta": {
     "data": {},
@@ -8113,7 +8113,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7258 updateFootagePanel()"
+     "src/js/timeline.js:7278 updateFootagePanel()"
     ]
    },
    "fixtures": []
@@ -8149,7 +8149,7 @@
     "functionsVisited": 3,
     "via": "container delegation #settings-modal",
     "references": [
-     "src/js/timeline.js:9419 initGithubFeedbackUI()"
+     "src/js/timeline.js:9439 initGithubFeedbackUI()"
     ]
    },
    "fixtures": []
@@ -8161,7 +8161,7 @@
    "capability": "Save",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:9423 initGithubFeedbackUI()"
+    "src/js/timeline.js:9443 initGithubFeedbackUI()"
    ],
    "events": [
     "click"
@@ -8661,7 +8661,7 @@
    "capability": "lip end",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11085 initLipSync()"
+    "src/js/timeline.js:11105 initLipSync()"
    ],
    "events": [
     "input"
@@ -8687,8 +8687,8 @@
     "functionsVisited": 8,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:7342 renderLipSyncPanel()",
-     "src/js/timeline.js:11089 initLipSync()"
+     "src/js/timeline.js:7362 renderLipSyncPanel()",
+     "src/js/timeline.js:11109 initLipSync()"
     ]
    },
    "fixtures": [
@@ -8705,7 +8705,7 @@
    "capability": "lip hold",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11085 initLipSync()"
+    "src/js/timeline.js:11105 initLipSync()"
    ],
    "events": [
     "input"
@@ -8731,8 +8731,8 @@
     "functionsVisited": 8,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:7345 renderLipSyncPanel()",
-     "src/js/timeline.js:11091 initLipSync()"
+     "src/js/timeline.js:7365 renderLipSyncPanel()",
+     "src/js/timeline.js:11111 initLipSync()"
     ]
    },
    "fixtures": [
@@ -8749,7 +8749,7 @@
    "capability": "lip sens",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11085 initLipSync()"
+    "src/js/timeline.js:11105 initLipSync()"
    ],
    "events": [
     "input"
@@ -8775,8 +8775,8 @@
     "functionsVisited": 8,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:7345 renderLipSyncPanel()",
-     "src/js/timeline.js:11090 initLipSync()"
+     "src/js/timeline.js:7365 renderLipSyncPanel()",
+     "src/js/timeline.js:11110 initLipSync()"
     ]
    },
    "fixtures": [
@@ -8793,7 +8793,7 @@
    "capability": "lip start",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:11085 initLipSync()"
+    "src/js/timeline.js:11105 initLipSync()"
    ],
    "events": [
     "input"
@@ -8819,8 +8819,8 @@
     "functionsVisited": 8,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:7342 renderLipSyncPanel()",
-     "src/js/timeline.js:11088 initLipSync()"
+     "src/js/timeline.js:7362 renderLipSyncPanel()",
+     "src/js/timeline.js:11108 initLipSync()"
     ]
    },
    "fixtures": [
@@ -8835,7 +8835,7 @@
    "capability": "lip track",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11095 initLipSync()"
+    "src/js/timeline.js:11115 initLipSync()"
    ],
    "events": [
     "change"
@@ -8859,7 +8859,7 @@
     "functionsVisited": 5,
     "via": "variable sel",
     "references": [
-     "src/js/timeline.js:7329 renderLipSyncPanel()"
+     "src/js/timeline.js:7349 renderLipSyncPanel()"
     ]
    },
    "fixtures": [
@@ -9378,7 +9378,7 @@
    "capability": "±1",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11028"
+    "src/js/timeline.js:11048"
    ],
    "events": [
     "click"
@@ -9416,7 +9416,7 @@
    "capability": "±2",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11029"
+    "src/js/timeline.js:11049"
    ],
    "events": [
     "click"
@@ -9454,7 +9454,7 @@
    "capability": "±5",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11030"
+    "src/js/timeline.js:11050"
    ],
    "events": [
     "click"
@@ -9492,7 +9492,7 @@
    "capability": "All",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11031"
+    "src/js/timeline.js:11051"
    ],
    "events": [
     "click"
@@ -9715,7 +9715,7 @@
    "capability": "Normal",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10693 initBlendDropdown()"
+    "src/js/timeline.js:10713 initBlendDropdown()"
    ],
    "events": [
     "click"
@@ -9757,7 +9757,7 @@
    "capability": "brushpreset",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10494"
+    "src/js/timeline.js:10514"
    ],
    "events": [
     "change"
@@ -9844,7 +9844,7 @@
    "capability": "cap grp",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10240 wireIconGroup()"
+    "src/js/timeline.js:10260 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -9870,10 +9870,10 @@
     "functionsVisited": 24,
     "via": "helper wireIconGroup()",
     "references": [
-     "src/js/timeline.js:3702 _restoreDrawingDefaults()",
-     "src/js/timeline.js:3845 updateSelPropsPanel()",
-     "src/js/timeline.js:10256",
-     "src/js/timeline.js:10324 syncStrokePropsForVectorBrush()"
+     "src/js/timeline.js:3703 _restoreDrawingDefaults()",
+     "src/js/timeline.js:3849 updateSelPropsPanel()",
+     "src/js/timeline.js:10276",
+     "src/js/timeline.js:10344 syncStrokePropsForVectorBrush()"
     ]
    },
    "fixtures": [
@@ -9890,7 +9890,7 @@
    "capability": "cbg",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10543"
+    "src/js/timeline.js:10563"
    ],
    "events": [
     "input"
@@ -9931,8 +9931,8 @@
    "capability": "ch",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10197",
-    "src/js/timeline.js:10542"
+    "src/js/timeline.js:10217",
+    "src/js/timeline.js:10562"
    ],
    "events": [
     "input",
@@ -9959,7 +9959,7 @@
     "functionsVisited": 30,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:10193"
+     "src/js/timeline.js:10213"
     ]
    },
    "fixtures": [
@@ -10213,7 +10213,7 @@
    "capability": "current outline",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11003"
+    "src/js/timeline.js:11023"
    ],
    "events": [
     "change"
@@ -10256,8 +10256,8 @@
    "capability": "cw",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10189",
-    "src/js/timeline.js:10541"
+    "src/js/timeline.js:10209",
+    "src/js/timeline.js:10561"
    ],
    "events": [
     "input",
@@ -10284,7 +10284,7 @@
     "functionsVisited": 30,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:10201"
+     "src/js/timeline.js:10221"
     ]
    },
    "fixtures": [
@@ -10301,7 +10301,7 @@
    "capability": "Shifts the dash pattern along the stroke — only visible when Style is Dashed or Dotted",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10225"
+    "src/js/timeline.js:10245"
    ],
    "events": [
     "change"
@@ -10331,8 +10331,8 @@
     "functionsVisited": 17,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:3705 _restoreDrawingDefaults()",
-     "src/js/timeline.js:3848 updateSelPropsPanel()"
+     "src/js/timeline.js:3706 _restoreDrawingDefaults()",
+     "src/js/timeline.js:3852 updateSelPropsPanel()"
     ]
    },
    "fixtures": [
@@ -10349,7 +10349,7 @@
    "capability": "Front = new strokes on top, Behind = new strokes under existing artwork",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10531"
+    "src/js/timeline.js:10551"
    ],
    "events": [
     "change"
@@ -10388,7 +10388,7 @@
    "capability": "erasersize",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10492"
+    "src/js/timeline.js:10512"
    ],
    "events": [
     "input"
@@ -10431,7 +10431,7 @@
    "capability": "Dégradé de fill — sélectionne une seule forme avec l'outil Sélection",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8952 initFillGradientButton()"
+    "src/js/timeline.js:8972 initFillGradientButton()"
    ],
    "events": [
     "click"
@@ -10455,7 +10455,7 @@
     "functionsVisited": 20,
     "via": "variable btn",
     "references": [
-     "src/js/timeline.js:8970 syncFillGradientButton()"
+     "src/js/timeline.js:8990 syncFillGradientButton()"
     ]
    },
    "fixtures": [
@@ -10472,8 +10472,8 @@
    "capability": "Hex code — type to change",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10142",
-    "src/js/timeline.js:10169"
+    "src/js/timeline.js:10162",
+    "src/js/timeline.js:10189"
    ],
    "events": [
     "change",
@@ -10504,7 +10504,7 @@
     "functionsVisited": 123,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:6449 paintFillSwatches()"
+     "src/js/timeline.js:6469 paintFillSwatches()"
     ]
    },
    "fixtures": [
@@ -10521,7 +10521,7 @@
    "capability": "fill on",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10064"
+    "src/js/timeline.js:10084"
    ],
    "events": [
     "change"
@@ -10570,7 +10570,7 @@
    "capability": "fillbrushmode grp",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10240 wireIconGroup()"
+    "src/js/timeline.js:10260 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -10596,7 +10596,7 @@
     "functionsVisited": 24,
     "via": "helper wireIconGroup()",
     "references": [
-     "src/js/timeline.js:10259"
+     "src/js/timeline.js:10279"
     ]
    },
    "fixtures": [
@@ -10613,7 +10613,7 @@
    "capability": "fillbrushsize",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10493"
+    "src/js/timeline.js:10513"
    ],
    "events": [
     "input"
@@ -10682,7 +10682,7 @@
     "container": "p-fillgapclose-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 393,
+    "functionsVisited": 394,
     "via": "variable gcSel",
     "references": [
      "src/js/timeline.js:3613 updatePropsContext()"
@@ -10829,8 +10829,8 @@
     "via": "variable onCb",
     "references": [
      "src/js/gradient-bridge.js:63 renderGradientPanel()",
-     "src/js/timeline.js:8949 initFillGradientButton()",
-     "src/js/timeline.js:8971 syncFillGradientButton()",
+     "src/js/timeline.js:8969 initFillGradientButton()",
+     "src/js/timeline.js:8991 syncFillGradientButton()",
      "src/js/tutorial.js:1269 check()"
     ]
    },
@@ -10848,7 +10848,7 @@
    "capability": "harmonize tween",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10889"
+    "src/js/timeline.js:10909"
    ],
    "events": [
     "change"
@@ -11071,8 +11071,8 @@
    "capability": "join grp",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10240 wireIconGroup()",
-    "src/js/timeline.js:10264"
+    "src/js/timeline.js:10260 wireIconGroup()",
+    "src/js/timeline.js:10284"
    ],
    "events": [
     "click"
@@ -11098,12 +11098,12 @@
     "functionsVisited": 24,
     "via": "helper wireIconGroup()",
     "references": [
-     "src/js/timeline.js:3702 _restoreDrawingDefaults()",
-     "src/js/timeline.js:3845 updateSelPropsPanel()",
-     "src/js/timeline.js:10257",
-     "src/js/timeline.js:10263 syncMiterLimitEnabled()",
-     "src/js/timeline.js:10284 syncJoinEnabledForGradient()",
-     "src/js/timeline.js:10324 syncStrokePropsForVectorBrush()"
+     "src/js/timeline.js:3703 _restoreDrawingDefaults()",
+     "src/js/timeline.js:3849 updateSelPropsPanel()",
+     "src/js/timeline.js:10277",
+     "src/js/timeline.js:10283 syncMiterLimitEnabled()",
+     "src/js/timeline.js:10304 syncJoinEnabledForGradient()",
+     "src/js/timeline.js:10344 syncStrokePropsForVectorBrush()"
     ]
    },
    "fixtures": [
@@ -11215,7 +11215,7 @@
    "capability": "maskmode",
    "area": "effects-masks",
    "handler": [
-    "src/js/timeline.js:10539"
+    "src/js/timeline.js:10559"
    ],
    "events": [
     "change"
@@ -11252,7 +11252,7 @@
    "capability": "Add = union with this layer's other masks · Subtract = punches a hole · Intersect = keeps only the overlap",
    "area": "effects-masks",
    "handler": [
-    "src/js/timeline.js:10540"
+    "src/js/timeline.js:10560"
    ],
    "events": [
     "change"
@@ -11289,7 +11289,7 @@
    "capability": "None",
    "area": "effects-masks",
    "handler": [
-    "src/js/timeline.js:10803 initMatteDropdown()"
+    "src/js/timeline.js:10823 initMatteDropdown()"
    ],
    "events": [
     "click"
@@ -11316,7 +11316,7 @@
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3427 updatePropsContext()",
-     "src/js/timeline.js:6994 action()"
+     "src/js/timeline.js:7014 action()"
     ]
    },
    "fixtures": [
@@ -11331,7 +11331,7 @@
    "capability": "Miter limit — how far a sharp Join:Miter corner can extend before falling back to a bevel",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10224"
+    "src/js/timeline.js:10244"
    ],
    "events": [
     "change"
@@ -11361,10 +11361,10 @@
     "functionsVisited": 18,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:3704 _restoreDrawingDefaults()",
-     "src/js/timeline.js:3847 updateSelPropsPanel()",
-     "src/js/timeline.js:10263 syncMiterLimitEnabled()",
-     "src/js/timeline.js:10290 syncJoinEnabledForGradient()"
+     "src/js/timeline.js:3705 _restoreDrawingDefaults()",
+     "src/js/timeline.js:3851 updateSelPropsPanel()",
+     "src/js/timeline.js:10283 syncMiterLimitEnabled()",
+     "src/js/timeline.js:10310 syncJoinEnabledForGradient()"
     ]
    },
    "fixtures": [
@@ -11477,7 +11477,7 @@
    "capability": "om follow",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11035"
+    "src/js/timeline.js:11055"
    ],
    "events": [
     "change"
@@ -11515,7 +11515,7 @@
    "capability": "omode",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11108"
+    "src/js/timeline.js:11128"
    ],
    "events": [
     "change"
@@ -11539,7 +11539,7 @@
     "functionsVisited": 16,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:10998"
+     "src/js/timeline.js:11018"
     ]
    },
    "fixtures": [
@@ -11555,7 +11555,7 @@
    "capability": "onion shift next",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11128 initOnionTintShift()"
+    "src/js/timeline.js:11148 initOnionTintShift()"
    ],
    "events": [
     "change"
@@ -11595,7 +11595,7 @@
    "capability": "Zero",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11129 initOnionTintShift()"
+    "src/js/timeline.js:11149 initOnionTintShift()"
    ],
    "events": [
     "click"
@@ -11635,7 +11635,7 @@
    "capability": "Horizontal ghost offset",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11128 initOnionTintShift()"
+    "src/js/timeline.js:11148 initOnionTintShift()"
    ],
    "events": [
     "input"
@@ -11677,7 +11677,7 @@
    "capability": "Vertical ghost offset",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11128 initOnionTintShift()"
+    "src/js/timeline.js:11148 initOnionTintShift()"
    ],
    "events": [
     "input"
@@ -11719,7 +11719,7 @@
    "capability": "Tint for next frames",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11122 initOnionTintShift()"
+    "src/js/timeline.js:11142 initOnionTintShift()"
    ],
    "events": [
     "input"
@@ -11759,7 +11759,7 @@
    "capability": "Tint for previous frames",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11121 initOnionTintShift()"
+    "src/js/timeline.js:11141 initOnionTintShift()"
    ],
    "events": [
     "input"
@@ -11799,7 +11799,7 @@
    "capability": "Default",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11123 initOnionTintShift()"
+    "src/js/timeline.js:11143 initOnionTintShift()"
    ],
    "events": [
     "click"
@@ -11842,7 +11842,7 @@
    "capability": "onop",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11135"
+    "src/js/timeline.js:11155"
    ],
    "events": [
     "input"
@@ -11882,8 +11882,8 @@
    "capability": "opacity",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10219",
-    "src/js/timeline.js:10220"
+    "src/js/timeline.js:10239",
+    "src/js/timeline.js:10240"
    ],
    "events": [
     "input",
@@ -11913,8 +11913,8 @@
     "functionsVisited": 82,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:3837 updateSelPropsPanel()",
-     "src/js/timeline.js:6454 paintFillSwatches()"
+     "src/js/timeline.js:3841 updateSelPropsPanel()",
+     "src/js/timeline.js:6474 paintFillSwatches()"
     ]
    },
    "fixtures": [
@@ -11931,7 +11931,7 @@
    "capability": "opop",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11134"
+    "src/js/timeline.js:11154"
    ],
    "events": [
     "input"
@@ -11971,7 +11971,7 @@
    "capability": "paintorder grp",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10240 wireIconGroup()"
+    "src/js/timeline.js:10260 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -11997,9 +11997,9 @@
     "functionsVisited": 24,
     "via": "helper wireIconGroup()",
     "references": [
-     "src/js/timeline.js:3703 _restoreDrawingDefaults()",
-     "src/js/timeline.js:3846 updateSelPropsPanel()",
-     "src/js/timeline.js:10258"
+     "src/js/timeline.js:3704 _restoreDrawingDefaults()",
+     "src/js/timeline.js:3850 updateSelPropsPanel()",
+     "src/js/timeline.js:10278"
     ]
    },
    "fixtures": [
@@ -12016,7 +12016,7 @@
    "capability": "Pressure response: sqrt/cbrt = a light touch already widens the line (soft felt-tip), pow2/pow3 = you must press hard to thicken it (hard pencil)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:10534"
+    "src/js/timeline.js:10554"
    ],
    "events": [
     "change"
@@ -12057,7 +12057,7 @@
    "capability": "pinv",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10536"
+    "src/js/timeline.js:10556"
    ],
    "events": [
     "change"
@@ -12096,7 +12096,7 @@
    "capability": "Width at full pressure (% of brush size)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10533"
+    "src/js/timeline.js:10553"
    ],
    "events": [
     "input"
@@ -12137,7 +12137,7 @@
    "capability": "Width at zero pressure (% of brush size)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10532"
+    "src/js/timeline.js:10552"
    ],
    "events": [
     "input"
@@ -12178,7 +12178,7 @@
    "capability": "poststroke smooth",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10232"
+    "src/js/timeline.js:10252"
    ],
    "events": [
     "change"
@@ -12401,7 +12401,7 @@
    "capability": "resamp",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10886"
+    "src/js/timeline.js:10906"
    ],
    "events": [
     "input"
@@ -12442,7 +12442,7 @@
    "capability": "shadowmode",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10538"
+    "src/js/timeline.js:10558"
    ],
    "events": [
     "change"
@@ -12487,7 +12487,7 @@
    "capability": "skipmanual",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10888"
+    "src/js/timeline.js:10908"
    ],
    "events": [
     "change"
@@ -12526,7 +12526,7 @@
    "capability": "Simplifies the curve AFTER the fact (fewer points, more efficient stroke) — has no effect on shakiness while drawing, that's what Stabilizer above handles. At 0: the point count isn't reduced, but the stroke can still look visibly smoothed if Stabilizer is enabled.",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10221"
+    "src/js/timeline.js:10241"
    ],
    "events": [
     "input"
@@ -12569,7 +12569,7 @@
    "capability": "Smooths POSITION live while you draw (corrects hand shake) — acts BEFORE the stroke is laid down, independent of Smooth below. Off/Low/Medium/High: classic sliding average. Quill: physical spring-damper model (Google ink-stroke-modeler, like rnote), catches up to the tip on release. Set this to Off if you want a stroke that follows your hand pixel-perfectly.",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10222"
+    "src/js/timeline.js:10242"
    ],
    "events": [
     "change"
@@ -12755,7 +12755,7 @@
    "capability": "step",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10887"
+    "src/js/timeline.js:10907"
    ],
    "events": [
     "change"
@@ -12794,8 +12794,8 @@
    "capability": "Stroke opacity (color alpha)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10165",
-    "src/js/timeline.js:10166"
+    "src/js/timeline.js:10185",
+    "src/js/timeline.js:10186"
    ],
    "events": [
     "input",
@@ -12828,7 +12828,7 @@
     "functionsVisited": 99,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:6440 paintStrokeSwatches()"
+     "src/js/timeline.js:6460 paintStrokeSwatches()"
     ]
    },
    "fixtures": [
@@ -12845,8 +12845,8 @@
    "capability": "Hex code — type to change",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10148",
-    "src/js/timeline.js:10169"
+    "src/js/timeline.js:10168",
+    "src/js/timeline.js:10189"
    ],
    "events": [
     "change",
@@ -12877,7 +12877,7 @@
     "functionsVisited": 135,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:6439 paintStrokeSwatches()"
+     "src/js/timeline.js:6459 paintStrokeSwatches()"
     ]
    },
    "fixtures": [
@@ -12894,8 +12894,8 @@
    "capability": "strokegrad along",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10084",
-    "src/js/timeline.js:10292"
+    "src/js/timeline.js:10104",
+    "src/js/timeline.js:10312"
    ],
    "events": [
     "change"
@@ -12925,8 +12925,8 @@
     "functionsVisited": 55,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:3824 updateSelPropsPanel()",
-     "src/js/timeline.js:10285 syncJoinEnabledForGradient()"
+     "src/js/timeline.js:3828 updateSelPropsPanel()",
+     "src/js/timeline.js:10305 syncJoinEnabledForGradient()"
     ]
    },
    "fixtures": [
@@ -12952,7 +12952,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:3830 updateSelPropsPanel())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:3834 updateSelPropsPanel())",
    "source": "src/index.html:941",
    "meta": {
     "data": {},
@@ -12962,8 +12962,8 @@
     "hiddenAtLoad": false,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:3830 updateSelPropsPanel()",
-     "src/js/timeline.js:10098"
+     "src/js/timeline.js:3834 updateSelPropsPanel()",
+     "src/js/timeline.js:10118"
     ]
    },
    "fixtures": [
@@ -12980,7 +12980,7 @@
    "capability": "strokegrad from c",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10096"
+    "src/js/timeline.js:10116"
    ],
    "events": [
     "input"
@@ -13010,8 +13010,8 @@
     "functionsVisited": 55,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:3829 updateSelPropsPanel()",
-     "src/js/timeline.js:10088"
+     "src/js/timeline.js:3833 updateSelPropsPanel()",
+     "src/js/timeline.js:10108"
     ]
    },
    "fixtures": [
@@ -13037,7 +13037,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:3832 updateSelPropsPanel())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:3836 updateSelPropsPanel())",
    "source": "src/index.html:942",
    "meta": {
     "data": {},
@@ -13047,8 +13047,8 @@
     "hiddenAtLoad": false,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:3832 updateSelPropsPanel()",
-     "src/js/timeline.js:10106"
+     "src/js/timeline.js:3836 updateSelPropsPanel()",
+     "src/js/timeline.js:10126"
     ]
    },
    "fixtures": [
@@ -13065,7 +13065,7 @@
    "capability": "strokegrad to c",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10104"
+    "src/js/timeline.js:10124"
    ],
    "events": [
     "input"
@@ -13095,8 +13095,8 @@
     "functionsVisited": 55,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:3831 updateSelPropsPanel()",
-     "src/js/timeline.js:10089"
+     "src/js/timeline.js:3835 updateSelPropsPanel()",
+     "src/js/timeline.js:10109"
     ]
    },
    "fixtures": [
@@ -13113,7 +13113,7 @@
    "capability": "strokestyle",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10223"
+    "src/js/timeline.js:10243"
    ],
    "events": [
     "change"
@@ -13143,7 +13143,9 @@
     "functionsVisited": 44,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:10334 syncStrokePropsForVectorBrush()"
+     "src/js/timeline.js:3709 _restoreDrawingDefaults()",
+     "src/js/timeline.js:6448 nativeStyleReadback()",
+     "src/js/timeline.js:10354 syncStrokePropsForVectorBrush()"
     ]
    },
    "fixtures": [
@@ -13160,7 +13162,7 @@
    "capability": "Stroke width (px) — also drives Bitmap Brush dab size",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10052"
+    "src/js/timeline.js:10072"
    ],
    "events": [
     "change"
@@ -13198,8 +13200,8 @@
      "src/js/brush-menu-bridge.js:241 buildBitmapParams()",
      "src/js/draw-bridge.js:617 onMove()",
      "src/js/timeline.js:770 setBrushPreset()",
-     "src/js/timeline.js:3706 _restoreDrawingDefaults()",
-     "src/js/timeline.js:3863 updateSelPropsPanel()",
+     "src/js/timeline.js:3707 _restoreDrawingDefaults()",
+     "src/js/timeline.js:3868 updateSelPropsPanel()",
      "src/js/tools.js:7595 onMouseDown()",
      "src/js/viewtools-bridge.js:186 pick()",
      "src/js/viewtools-bridge.js:189 pick()"
@@ -13219,7 +13221,7 @@
    "capability": "taper",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10537"
+    "src/js/timeline.js:10557"
    ],
    "events": [
     "change"
@@ -13393,7 +13395,7 @@
    "capability": "vecbrush",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10338"
+    "src/js/timeline.js:10358"
    ],
    "events": [
     "change"
@@ -14198,8 +14200,8 @@
     "via": "chain",
     "references": [
      "src/js/timeline.js:694 _syncFillEnabledUI()",
-     "src/js/timeline.js:3944 updateFsSelPanel()",
-     "src/js/timeline.js:6447 paintFillSwatches()",
+     "src/js/timeline.js:3949 updateFsSelPanel()",
+     "src/js/timeline.js:6467 paintFillSwatches()",
      "src/js/tools.js:7593 onMouseDown()",
      "src/js/viewtools-bridge.js:141 setColorUI()"
     ]
@@ -14218,7 +14220,7 @@
    "capability": "pm fill c",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10063"
+    "src/js/timeline.js:10083"
    ],
    "events": [
     "input"
@@ -14249,8 +14251,8 @@
     "via": "chain",
     "references": [
      "src/js/tools.js:7593 onMouseDown()",
-     "src/js/timeline.js:3945 updateFsSelPanel()",
-     "src/js/timeline.js:6448 paintFillSwatches()",
+     "src/js/timeline.js:3950 updateFsSelPanel()",
+     "src/js/timeline.js:6468 paintFillSwatches()",
      "src/js/viewtools-bridge.js:140 setColorUI()"
     ]
    },
@@ -14292,8 +14294,8 @@
     "functionsVisited": 69,
     "via": "exported ColorPicker.wireColorSwatches()",
     "references": [
-     "src/js/timeline.js:3956 updateFsSelPanel()",
-     "src/js/timeline.js:6437 paintStrokeSwatches()",
+     "src/js/timeline.js:3961 updateFsSelPanel()",
+     "src/js/timeline.js:6457 paintStrokeSwatches()",
      "src/js/tools.js:7590 onMouseDown()",
      "src/js/tools.js:7592 onMouseDown()",
      "src/js/viewtools-bridge.js:137 setColorUI()"
@@ -14313,7 +14315,7 @@
    "capability": "pm stroke c",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10071"
+    "src/js/timeline.js:10091"
    ],
    "events": [
     "input"
@@ -14345,8 +14347,8 @@
     "references": [
      "src/js/tools.js:7590 onMouseDown()",
      "src/js/tools.js:7592 onMouseDown()",
-     "src/js/timeline.js:3957 updateFsSelPanel()",
-     "src/js/timeline.js:6438 paintStrokeSwatches()",
+     "src/js/timeline.js:3962 updateFsSelPanel()",
+     "src/js/timeline.js:6458 paintStrokeSwatches()",
      "src/js/viewtools-bridge.js:136 setColorUI()"
     ]
    },
@@ -14541,7 +14543,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 172,
+    "functionsVisited": 173,
     "via": "variable roleEl",
     "references": [
      "src/js/adapters/settings-preferences-ui.js:42 syncProfileFields()"
@@ -14556,7 +14558,7 @@
    "capability": "proj fps",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10815"
+    "src/js/timeline.js:10835"
    ],
    "events": [
     "change"
@@ -14596,7 +14598,7 @@
    "capability": "proj frames",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10816"
+    "src/js/timeline.js:10836"
    ],
    "events": [
     "change"
@@ -14673,7 +14675,7 @@
     "references": [
      "src/js/adapters/native-object-project-tabs-ui.js:93 render()",
      "src/js/project.js:661",
-     "src/js/timeline.js:9102 action()"
+     "src/js/timeline.js:9122 action()"
     ]
    },
    "fixtures": [
@@ -14722,7 +14724,7 @@
    "capability": "Collapse panel",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11641 initPropsPanelCollapse()"
+    "src/js/timeline.js:11661 initPropsPanelCollapse()"
    ],
    "events": [
     "click"
@@ -14746,7 +14748,7 @@
     "functionsVisited": 9,
     "via": "variable btn",
     "references": [
-     "src/js/timeline.js:11634 syncPropsPanelCollapseTitle()"
+     "src/js/timeline.js:11654 syncPropsPanelCollapseTitle()"
     ]
    },
    "fixtures": [
@@ -14841,7 +14843,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:11299)",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:11319)",
    "source": "src/index.html:1588",
    "meta": {
     "data": {},
@@ -14851,7 +14853,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:11299"
+     "src/js/timeline.js:11319"
     ]
    },
    "fixtures": [
@@ -14876,7 +14878,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:11298)",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:11318)",
    "source": "src/index.html:1587",
    "meta": {
     "data": {},
@@ -14886,7 +14888,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:11298"
+     "src/js/timeline.js:11318"
     ]
    },
    "fixtures": [
@@ -14926,7 +14928,7 @@
     "references": [
      "src/js/adapters/native-object-rig-canvas.js:32",
      "src/js/rig-bridge.js:194 panelSoftness()",
-     "src/js/timeline.js:11293"
+     "src/js/timeline.js:11313"
     ]
    },
    "fixtures": [
@@ -14965,7 +14967,7 @@
     "functionsVisited": 0,
     "references": [
      "src/js/rig-bridge.js:193 panelRotate()",
-     "src/js/timeline.js:11292"
+     "src/js/timeline.js:11312"
     ]
    },
    "fixtures": [
@@ -15009,7 +15011,7 @@
      "src/js/adapters/native-object-rig-canvas.js:31",
      "src/js/engine-bridge.js:3663 buildRigPreviewItems()",
      "src/js/rig-bridge.js:192 panelDefaultRadius()",
-     "src/js/timeline.js:11291"
+     "src/js/timeline.js:11311"
     ]
    },
    "fixtures": [
@@ -15374,8 +15376,8 @@
    "capability": "Height",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10353 wireLiveXformField()",
-    "src/js/timeline.js:10357 wireLiveXformField()"
+    "src/js/timeline.js:10373 wireLiveXformField()",
+    "src/js/timeline.js:10377 wireLiveXformField()"
    ],
    "events": [
     "input",
@@ -15404,8 +15406,8 @@
     "functionsVisited": 77,
     "via": "helper wireLiveXformField()",
     "references": [
-     "src/js/timeline.js:3922 updateSelPropsPanel()",
-     "src/js/timeline.js:10419"
+     "src/js/timeline.js:3927 updateSelPropsPanel()",
+     "src/js/timeline.js:10439"
     ]
    },
    "fixtures": [
@@ -15422,8 +15424,8 @@
    "capability": "Rotation relative to selection state (degrees)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10353 wireLiveXformField()",
-    "src/js/timeline.js:10357 wireLiveXformField()"
+    "src/js/timeline.js:10373 wireLiveXformField()",
+    "src/js/timeline.js:10377 wireLiveXformField()"
    ],
    "events": [
     "input",
@@ -15452,7 +15454,7 @@
     "functionsVisited": 77,
     "via": "helper wireLiveXformField()",
     "references": [
-     "src/js/timeline.js:3923 updateSelPropsPanel()"
+     "src/js/timeline.js:3928 updateSelPropsPanel()"
     ]
    },
    "fixtures": [
@@ -15469,8 +15471,8 @@
    "capability": "Width",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10353 wireLiveXformField()",
-    "src/js/timeline.js:10357 wireLiveXformField()"
+    "src/js/timeline.js:10373 wireLiveXformField()",
+    "src/js/timeline.js:10377 wireLiveXformField()"
    ],
    "events": [
     "input",
@@ -15499,8 +15501,8 @@
     "functionsVisited": 77,
     "via": "helper wireLiveXformField()",
     "references": [
-     "src/js/timeline.js:3921 updateSelPropsPanel()",
-     "src/js/timeline.js:10430"
+     "src/js/timeline.js:3926 updateSelPropsPanel()",
+     "src/js/timeline.js:10450"
     ]
    },
    "fixtures": [
@@ -15517,8 +15519,8 @@
    "capability": "X — drag to scrub, click to type",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10353 wireLiveXformField()",
-    "src/js/timeline.js:10357 wireLiveXformField()"
+    "src/js/timeline.js:10373 wireLiveXformField()",
+    "src/js/timeline.js:10377 wireLiveXformField()"
    ],
    "events": [
     "input",
@@ -15547,7 +15549,7 @@
     "functionsVisited": 77,
     "via": "helper wireLiveXformField()",
     "references": [
-     "src/js/timeline.js:3919 updateSelPropsPanel()"
+     "src/js/timeline.js:3924 updateSelPropsPanel()"
     ]
    },
    "fixtures": [
@@ -15564,8 +15566,8 @@
    "capability": "Y — drag to scrub, click to type",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10353 wireLiveXformField()",
-    "src/js/timeline.js:10357 wireLiveXformField()"
+    "src/js/timeline.js:10373 wireLiveXformField()",
+    "src/js/timeline.js:10377 wireLiveXformField()"
    ],
    "events": [
     "input",
@@ -15594,7 +15596,7 @@
     "functionsVisited": 77,
     "via": "helper wireLiveXformField()",
     "references": [
-     "src/js/timeline.js:3920 updateSelPropsPanel()"
+     "src/js/timeline.js:3925 updateSelPropsPanel()"
     ]
    },
    "fixtures": [
@@ -15802,7 +15804,7 @@
    "capability": "Enable/disable stroke",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10116"
+    "src/js/timeline.js:10136"
    ],
    "events": [
     "click"
@@ -15832,7 +15834,7 @@
     "functionsVisited": 82,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:3935 updateFsSelPanel()",
+     "src/js/timeline.js:3940 updateFsSelPanel()",
      "src/js/timeline.js:704 _syncStrokeEnabledUI()"
     ]
    },
@@ -15850,7 +15852,7 @@
    "capability": "Enable/disable stroke",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10069"
+    "src/js/timeline.js:10089"
    ],
    "events": [
     "click"
@@ -16052,7 +16054,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8032 resetTextPopoverFields())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8052 resetTextPopoverFields())",
    "source": "src/index.html:2005",
    "meta": {
     "data": {},
@@ -16062,8 +16064,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:8032 resetTextPopoverFields()",
-     "src/js/timeline.js:8515 commitText()"
+     "src/js/timeline.js:8052 resetTextPopoverFields()",
+     "src/js/timeline.js:8535 commitText()"
     ]
    },
    "fixtures": [
@@ -16080,7 +16082,7 @@
    "capability": "Place text",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8567 initTextPopover()"
+    "src/js/timeline.js:8587 initTextPopover()"
    ],
    "events": [
     "click"
@@ -16108,7 +16110,7 @@
     "container": "text-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 514,
+    "functionsVisited": 515,
     "via": "variable save",
     "references": []
    },
@@ -16126,7 +16128,7 @@
    "capability": "Cancel",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8568 initTextPopover()"
+    "src/js/timeline.js:8588 initTextPopover()"
    ],
    "events": [
     "click"
@@ -16174,7 +16176,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8033 resetTextPopoverFields())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8053 resetTextPopoverFields())",
    "source": "src/index.html:2002",
    "meta": {
     "data": {},
@@ -16184,8 +16186,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:8033 resetTextPopoverFields()",
-     "src/js/timeline.js:8516 commitText()"
+     "src/js/timeline.js:8053 resetTextPopoverFields()",
+     "src/js/timeline.js:8536 commitText()"
     ]
    },
    "fixtures": [
@@ -16211,7 +16213,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8031 resetTextPopoverFields())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8051 resetTextPopoverFields())",
    "source": "src/index.html:1997",
    "meta": {
     "data": {},
@@ -16221,8 +16223,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:8031 resetTextPopoverFields()",
-     "src/js/timeline.js:8514 commitText()"
+     "src/js/timeline.js:8051 resetTextPopoverFields()",
+     "src/js/timeline.js:8534 commitText()"
     ]
    },
    "fixtures": [
@@ -16239,7 +16241,7 @@
    "capability": "text input",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8577 initTextPopover()"
+    "src/js/timeline.js:8597 initTextPopover()"
    ],
    "events": [
     "keydown"
@@ -16269,11 +16271,11 @@
     "functionsVisited": 96,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:8029 resetTextPopoverFields()",
-     "src/js/timeline.js:8039 openTextPopover()",
-     "src/js/timeline.js:8049 openTextPopoverForBox()",
-     "src/js/timeline.js:8066 openTextPopoverForEdit()",
-     "src/js/timeline.js:8511 commitText()",
+     "src/js/timeline.js:8049 resetTextPopoverFields()",
+     "src/js/timeline.js:8059 openTextPopover()",
+     "src/js/timeline.js:8069 openTextPopoverForBox()",
+     "src/js/timeline.js:8086 openTextPopoverForEdit()",
+     "src/js/timeline.js:8531 commitText()",
      "src/js/tutorial.js:83 measureTextInputLength()"
     ]
    },
@@ -16300,7 +16302,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8030 resetTextPopoverFields())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8050 resetTextPopoverFields())",
    "source": "src/index.html:1996",
    "meta": {
     "data": {
@@ -16312,8 +16314,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:8030 resetTextPopoverFields()",
-     "src/js/timeline.js:8513 commitText()"
+     "src/js/timeline.js:8050 resetTextPopoverFields()",
+     "src/js/timeline.js:8533 commitText()"
     ]
    },
    "fixtures": [
@@ -16330,7 +16332,7 @@
    "capability": "cf",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11148"
+    "src/js/timeline.js:11168"
    ],
    "events": [
     "change"
@@ -16378,7 +16380,7 @@
    "capability": "fps",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11141"
+    "src/js/timeline.js:11161"
    ],
    "events": [
     "change"
@@ -16418,7 +16420,7 @@
    "capability": "total",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11142"
+    "src/js/timeline.js:11162"
    ],
    "events": [
     "change"
@@ -16507,7 +16509,7 @@
    "capability": "Comment",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -16536,7 +16538,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -16554,7 +16556,7 @@
    "capability": "Color",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8854"
+    "src/js/timeline.js:8874"
    ],
    "events": [
     "change"
@@ -16582,11 +16584,11 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 497,
+    "functionsVisited": 498,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:8764 updateTextPropsPanel()",
-     "src/js/timeline.js:8800 applyTextPropsEdit()"
+     "src/js/timeline.js:8784 updateTextPropsPanel()",
+     "src/js/timeline.js:8820 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -16603,7 +16605,7 @@
    "capability": "Text content",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8852"
+    "src/js/timeline.js:8872"
    ],
    "events": [
     "blur"
@@ -16631,11 +16633,11 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 497,
+    "functionsVisited": 498,
     "via": "variable contentEl",
     "references": [
-     "src/js/timeline.js:8753 updateTextPropsPanel()",
-     "src/js/timeline.js:8793 applyTextPropsEdit()"
+     "src/js/timeline.js:8773 updateTextPropsPanel()",
+     "src/js/timeline.js:8813 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -16652,7 +16654,7 @@
    "capability": "tp fixed width",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8854"
+    "src/js/timeline.js:8874"
    ],
    "events": [
     "change"
@@ -16682,12 +16684,12 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 497,
+    "functionsVisited": 498,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:8777 updateTextPropsPanel()",
-     "src/js/timeline.js:8814 applyTextPropsEdit()",
-     "src/js/timeline.js:8874"
+     "src/js/timeline.js:8797 updateTextPropsPanel()",
+     "src/js/timeline.js:8834 applyTextPropsEdit()",
+     "src/js/timeline.js:8894"
     ]
    },
    "fixtures": [
@@ -16704,7 +16706,7 @@
    "capability": "Font",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8854"
+    "src/js/timeline.js:8874"
    ],
    "events": [
     "change"
@@ -16732,12 +16734,12 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 497,
+    "functionsVisited": 498,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:8760 updateTextPropsPanel()",
-     "src/js/timeline.js:8798 applyTextPropsEdit()",
-     "src/js/timeline.js:8900 confirmAddGoogleFont()"
+     "src/js/timeline.js:8780 updateTextPropsPanel()",
+     "src/js/timeline.js:8818 applyTextPropsEdit()",
+     "src/js/timeline.js:8920 confirmAddGoogleFont()"
     ]
    },
    "fixtures": [
@@ -16754,7 +16756,7 @@
    "capability": "Add a Google Font by name",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8887"
+    "src/js/timeline.js:8907"
    ],
    "events": [
     "click"
@@ -16793,7 +16795,7 @@
    "capability": "Add",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8925"
+    "src/js/timeline.js:8945"
    ],
    "events": [
     "click"
@@ -16839,7 +16841,7 @@
    "capability": "tp font add input",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8926"
+    "src/js/timeline.js:8946"
    ],
    "events": [
     "keydown"
@@ -16883,7 +16885,7 @@
    "capability": "tp letter spacing",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8854"
+    "src/js/timeline.js:8874"
    ],
    "events": [
     "change"
@@ -16913,11 +16915,11 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 497,
+    "functionsVisited": 498,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:8769 updateTextPropsPanel()",
-     "src/js/timeline.js:8808 applyTextPropsEdit()"
+     "src/js/timeline.js:8789 updateTextPropsPanel()",
+     "src/js/timeline.js:8828 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -16934,7 +16936,7 @@
    "capability": "tp line height",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8854"
+    "src/js/timeline.js:8874"
    ],
    "events": [
     "change"
@@ -16964,11 +16966,11 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 497,
+    "functionsVisited": 498,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:8771 updateTextPropsPanel()",
-     "src/js/timeline.js:8809 applyTextPropsEdit()"
+     "src/js/timeline.js:8791 updateTextPropsPanel()",
+     "src/js/timeline.js:8829 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -16985,7 +16987,7 @@
    "capability": "Size (px)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8854"
+    "src/js/timeline.js:8874"
    ],
    "events": [
     "change"
@@ -17015,11 +17017,11 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 497,
+    "functionsVisited": 498,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:8762 updateTextPropsPanel()",
-     "src/js/timeline.js:8799 applyTextPropsEdit()"
+     "src/js/timeline.js:8782 updateTextPropsPanel()",
+     "src/js/timeline.js:8819 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -17036,7 +17038,7 @@
    "capability": "tp word spacing",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8854"
+    "src/js/timeline.js:8874"
    ],
    "events": [
     "change"
@@ -17066,11 +17068,11 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 497,
+    "functionsVisited": 498,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:8773 updateTextPropsPanel()",
-     "src/js/timeline.js:8810 applyTextPropsEdit()"
+     "src/js/timeline.js:8793 updateTextPropsPanel()",
+     "src/js/timeline.js:8830 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -17433,7 +17435,7 @@
    "capability": "zoom scrub",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10824"
+    "src/js/timeline.js:10844"
    ],
    "events": [
     "input"
@@ -17483,7 +17485,7 @@
    "capability": "Align bottom",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10467"
+    "src/js/timeline.js:10487"
    ],
    "events": [
     "click"
@@ -17530,7 +17532,7 @@
    "capability": "Align center horizontally",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10467"
+    "src/js/timeline.js:10487"
    ],
    "events": [
     "click"
@@ -17577,7 +17579,7 @@
    "capability": "Align center vertically",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10467"
+    "src/js/timeline.js:10487"
    ],
    "events": [
     "click"
@@ -17624,7 +17626,7 @@
    "capability": "Align left",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10467"
+    "src/js/timeline.js:10487"
    ],
    "events": [
     "click"
@@ -17671,7 +17673,7 @@
    "capability": "Align right",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10467"
+    "src/js/timeline.js:10487"
    ],
    "events": [
     "click"
@@ -17718,7 +17720,7 @@
    "capability": "Align top",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10467"
+    "src/js/timeline.js:10487"
    ],
    "events": [
     "click"
@@ -17765,7 +17767,7 @@
    "capability": "Distribute horizontally",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10470"
+    "src/js/timeline.js:10490"
    ],
    "events": [
     "click"
@@ -17812,7 +17814,7 @@
    "capability": "Distribute vertically",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10470"
+    "src/js/timeline.js:10490"
    ],
    "events": [
     "click"
@@ -18006,7 +18008,7 @@
    "capability": "🐞",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:7897 initCommentPopover()"
+    "src/js/timeline.js:7917 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -18045,7 +18047,7 @@
    "capability": "💡",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:7897 initCommentPopover()"
+    "src/js/timeline.js:7917 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -18084,7 +18086,7 @@
    "capability": "⚡",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:7897 initCommentPopover()"
+    "src/js/timeline.js:7917 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -18123,7 +18125,7 @@
    "capability": "✨",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:7897 initCommentPopover()"
+    "src/js/timeline.js:7917 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -18162,7 +18164,7 @@
    "capability": "Butt",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10240 wireIconGroup()"
+    "src/js/timeline.js:10260 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18203,7 +18205,7 @@
    "capability": "Round",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10240 wireIconGroup()"
+    "src/js/timeline.js:10260 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18244,7 +18246,7 @@
    "capability": "Square",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10240 wireIconGroup()"
+    "src/js/timeline.js:10260 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18285,7 +18287,7 @@
    "capability": "Above — on top of existing fills",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10240 wireIconGroup()"
+    "src/js/timeline.js:10260 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18326,7 +18328,7 @@
    "capability": "Below — behind existing fills (background patch)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10240 wireIconGroup()"
+    "src/js/timeline.js:10260 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18367,7 +18369,7 @@
    "capability": "Merge — unite with any existing fill it overlaps",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10240 wireIconGroup()"
+    "src/js/timeline.js:10260 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18408,7 +18410,7 @@
    "capability": "Bevel",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10240 wireIconGroup()"
+    "src/js/timeline.js:10260 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18449,7 +18451,7 @@
    "capability": "Miter",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10240 wireIconGroup()"
+    "src/js/timeline.js:10260 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18490,7 +18492,7 @@
    "capability": "Round",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10240 wireIconGroup()"
+    "src/js/timeline.js:10260 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18531,7 +18533,7 @@
    "capability": "Fill in front of Stroke",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10240 wireIconGroup()"
+    "src/js/timeline.js:10260 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18572,7 +18574,7 @@
    "capability": "Stroke in front of Fill",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10240 wireIconGroup()"
+    "src/js/timeline.js:10260 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -19325,7 +19327,7 @@
    "capability": "Ellipse",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -19354,7 +19356,7 @@
     "container": "shape-tool-stack",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -19372,7 +19374,7 @@
    "capability": "Line (U in Animation 2D — Motion mode reserves U to reveal animated properties)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -19401,7 +19403,7 @@
     "container": "shape-tool-stack",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -19419,7 +19421,7 @@
    "capability": "Rectangle",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -19448,7 +19450,7 @@
     "container": "shape-tool-stack",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -19466,7 +19468,7 @@
    "capability": "Speech bubble — rounded rect with an auto tail, drag to size (D)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -19495,7 +19497,7 @@
     "container": "shape-tool-stack",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -19513,7 +19515,7 @@
    "capability": "Star / Polygon — drag to size, adjust point count / inner radius / corner rounding in the panel (K)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -19542,7 +19544,7 @@
     "container": "shape-tool-stack",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -19560,7 +19562,7 @@
    "capability": "Scene",
    "area": "unclassified",
    "handler": [
-    "src/js/timeline.js:7200 renderSymbolTabs()"
+    "src/js/timeline.js:7220 renderSymbolTabs()"
    ],
    "events": [],
    "exposure": [
@@ -19571,8 +19573,8 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unavailable-with-reason",
-   "reason": "static placeholder: #symbol-tabs is emptied and rebuilt at runtime by src/js/timeline.js:7200 renderSymbolTabs(); the live controls are created and bound there",
-   "nextGate": "none for the static markup; characterize the runtime-built controls through src/js/timeline.js:7200 renderSymbolTabs()",
+   "reason": "static placeholder: #symbol-tabs is emptied and rebuilt at runtime by src/js/timeline.js:7220 renderSymbolTabs(); the live controls are created and bound there",
+   "nextGate": "none for the static markup; characterize the runtime-built controls through src/js/timeline.js:7220 renderSymbolTabs()",
    "source": "src/index.html:2129",
    "meta": {
     "data": {
@@ -19595,7 +19597,7 @@
    "capability": "B",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8863"
+    "src/js/timeline.js:8883"
    ],
    "events": [
     "click"
@@ -19643,7 +19645,7 @@
    "capability": "I",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8863"
+    "src/js/timeline.js:8883"
    ],
    "events": [
     "click"
@@ -19691,7 +19693,7 @@
    "capability": "S",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8863"
+    "src/js/timeline.js:8883"
    ],
    "events": [
     "click"
@@ -19739,7 +19741,7 @@
    "capability": "U",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8863"
+    "src/js/timeline.js:8883"
    ],
    "events": [
     "click"
@@ -19787,7 +19789,7 @@
    "capability": "Auto width",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8872"
+    "src/js/timeline.js:8892"
    ],
    "events": [
     "click"
@@ -19835,7 +19837,7 @@
    "capability": "Ab",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8866"
+    "src/js/timeline.js:8886"
    ],
    "events": [
     "click"
@@ -19883,7 +19885,7 @@
    "capability": "Center",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8857"
+    "src/js/timeline.js:8877"
    ],
    "events": [
     "click"
@@ -19931,7 +19933,7 @@
    "capability": "Fixed width",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8872"
+    "src/js/timeline.js:8892"
    ],
    "events": [
     "click"
@@ -19979,7 +19981,7 @@
    "capability": "Left",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8857"
+    "src/js/timeline.js:8877"
    ],
    "events": [
     "click"
@@ -20027,7 +20029,7 @@
    "capability": "aa",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8866"
+    "src/js/timeline.js:8886"
    ],
    "events": [
     "click"
@@ -20075,7 +20077,7 @@
    "capability": "Aa",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8866"
+    "src/js/timeline.js:8886"
    ],
    "events": [
     "click"
@@ -20123,7 +20125,7 @@
    "capability": "Right",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8857"
+    "src/js/timeline.js:8877"
    ],
    "events": [
     "click"
@@ -20171,7 +20173,7 @@
    "capability": "AA",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8866"
+    "src/js/timeline.js:8886"
    ],
    "events": [
     "click"
@@ -20219,7 +20221,7 @@
    "capability": "Brush",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -20248,7 +20250,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -20266,7 +20268,7 @@
    "capability": "Eraser (E in Animation 2D — Motion mode reserves E to reveal Effects)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -20295,7 +20297,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -20313,7 +20315,7 @@
    "capability": "Eyedropper",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -20342,7 +20344,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -20360,7 +20362,7 @@
    "capability": "Fill",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -20389,7 +20391,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -20407,7 +20409,7 @@
    "capability": "Fill Brush",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -20436,7 +20438,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -20454,7 +20456,7 @@
    "capability": "Fill/Stroke Select — click a fill or a stroke segment to select it independently (M in Animation 2D — Motion mode reserves M to reveal Mattes)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -20483,7 +20485,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -20501,7 +20503,7 @@
    "capability": "Hand",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -20530,7 +20532,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -20548,7 +20550,7 @@
    "capability": "Pen",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -20577,7 +20579,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -20595,7 +20597,7 @@
    "capability": "Rig — 3 steps in the panel: 1. Draw (click=anchor, drag=curve) 2. Assign (link shapes to bones) 3. Move (drag an anchor to pose) (S in Animation 2D — Motion mode reserves S for Scale)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -20624,7 +20626,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -20642,7 +20644,7 @@
    "capability": "Rotate canvas",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -20671,7 +20673,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -20689,7 +20691,7 @@
    "capability": "Select",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -20718,7 +20720,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -20736,7 +20738,7 @@
    "capability": "Subselect (nodes)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -20765,7 +20767,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -20783,7 +20785,7 @@
    "capability": "Text",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -20812,7 +20814,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -20830,7 +20832,7 @@
    "capability": "Zoom",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10033"
+    "src/js/timeline.js:10053"
    ],
    "events": [
     "click"
@@ -20859,7 +20861,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 167,
+    "functionsVisited": 168,
     "via": "callback b",
     "references": []
    },
@@ -20877,7 +20879,7 @@
    "capability": "Bottom-center",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10451"
+    "src/js/timeline.js:10471"
    ],
    "events": [
     "click"
@@ -20923,7 +20925,7 @@
    "capability": "Bottom-left",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10451"
+    "src/js/timeline.js:10471"
    ],
    "events": [
     "click"
@@ -20969,7 +20971,7 @@
    "capability": "Bottom-right",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10451"
+    "src/js/timeline.js:10471"
    ],
    "events": [
     "click"
@@ -21015,7 +21017,7 @@
    "capability": "Center",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10451"
+    "src/js/timeline.js:10471"
    ],
    "events": [
     "click"
@@ -21061,7 +21063,7 @@
    "capability": "Middle-left",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10451"
+    "src/js/timeline.js:10471"
    ],
    "events": [
     "click"
@@ -21107,7 +21109,7 @@
    "capability": "Middle-right",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10451"
+    "src/js/timeline.js:10471"
    ],
    "events": [
     "click"
@@ -21153,7 +21155,7 @@
    "capability": "Top-center",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10451"
+    "src/js/timeline.js:10471"
    ],
    "events": [
     "click"
@@ -21199,7 +21201,7 @@
    "capability": "Top-left",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10451"
+    "src/js/timeline.js:10471"
    ],
    "events": [
     "click"
@@ -21245,7 +21247,7 @@
    "capability": "Top-right",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10451"
+    "src/js/timeline.js:10471"
    ],
    "events": [
     "click"
@@ -22798,7 +22800,7 @@
    "source": "src/js/labs/command-palette.js:13",
    "meta": {
     "i18n": "labsCmdToolBrush",
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": []
   },
@@ -22831,7 +22833,7 @@
    "source": "src/js/labs/command-palette.js:16",
    "meta": {
     "i18n": "labsCmdToolBucket",
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": []
   },
@@ -22864,7 +22866,7 @@
    "source": "src/js/labs/command-palette.js:23",
    "meta": {
     "i18n": "labsCmdToolCamera",
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": []
   },
@@ -22897,7 +22899,7 @@
    "source": "src/js/labs/command-palette.js:24",
    "meta": {
     "i18n": "labsCmdToolComment",
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": []
   },
@@ -22930,7 +22932,7 @@
    "source": "src/js/labs/command-palette.js:15",
    "meta": {
     "i18n": "labsCmdToolEraser",
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": []
   },
@@ -22963,7 +22965,7 @@
    "source": "src/js/labs/command-palette.js:17",
    "meta": {
     "i18n": "labsCmdToolFillBrush",
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": []
   },
@@ -22996,7 +22998,7 @@
    "source": "src/js/labs/command-palette.js:21",
    "meta": {
     "i18n": "labsCmdToolHand",
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": []
   },
@@ -23029,7 +23031,7 @@
    "source": "src/js/labs/command-palette.js:14",
    "meta": {
     "i18n": "labsCmdToolPen",
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": []
   },
@@ -23062,7 +23064,7 @@
    "source": "src/js/labs/command-palette.js:18",
    "meta": {
     "i18n": "labsCmdToolSelect",
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": []
   },
@@ -23095,7 +23097,7 @@
    "source": "src/js/labs/command-palette.js:19",
    "meta": {
     "i18n": "labsCmdToolSubselect",
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": []
   },
@@ -23128,7 +23130,7 @@
    "source": "src/js/labs/command-palette.js:20",
    "meta": {
     "i18n": "labsCmdToolText",
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": []
   },
@@ -23161,7 +23163,7 @@
    "source": "src/js/labs/command-palette.js:22",
    "meta": {
     "i18n": "labsCmdToolZoom",
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": []
   },
@@ -27629,7 +27631,7 @@
    "source": "src/js/select-bridge.js:3194",
    "meta": {
     "i18n": null,
-    "functionsVisited": 282
+    "functionsVisited": 283
    },
    "fixtures": [
     "static-props",
@@ -27786,7 +27788,7 @@
    "source": "src/js/select-bridge.js:3111",
    "meta": {
     "i18n": null,
-    "functionsVisited": 412
+    "functionsVisited": 413
    },
    "fixtures": [
     "static-props",
@@ -28274,7 +28276,7 @@
    "source": "src/js/select-bridge.js:3201",
    "meta": {
     "i18n": null,
-    "functionsVisited": 282
+    "functionsVisited": 283
    },
    "fixtures": [
     "static-props",
@@ -29163,7 +29165,7 @@
    "capability": "Chemin : ",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6180 buildFollowPathMenuItems()"
+    "src/js/timeline.js:6185 buildFollowPathMenuItems()"
    ],
    "events": [
     "click"
@@ -29184,7 +29186,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6180",
+   "source": "src/js/timeline.js:6185",
    "meta": {
     "i18n": null,
     "functionsVisited": 188
@@ -29202,7 +29204,7 @@
    "capability": "Chemin : Aucun",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6172 buildFollowPathMenuItems()"
+    "src/js/timeline.js:6177 buildFollowPathMenuItems()"
    ],
    "events": [
     "click"
@@ -29223,7 +29225,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6172",
+   "source": "src/js/timeline.js:6177",
    "meta": {
     "i18n": null,
     "functionsVisited": 188
@@ -29241,7 +29243,7 @@
    "capability": "Matte : Aucune (retirer)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6254 buildMatteMenuItems()"
+    "src/js/timeline.js:6259 buildMatteMenuItems()"
    ],
    "events": [
     "click"
@@ -29262,7 +29264,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6254",
+   "source": "src/js/timeline.js:6259",
    "meta": {
     "i18n": null,
     "functionsVisited": 190
@@ -29280,7 +29282,7 @@
    "capability": "Source : ",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6266 buildMatteMenuItems()"
+    "src/js/timeline.js:6271 buildMatteMenuItems()"
    ],
    "events": [
     "click"
@@ -29301,7 +29303,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6266",
+   "source": "src/js/timeline.js:6271",
    "meta": {
     "i18n": null,
     "functionsVisited": 190
@@ -29319,7 +29321,7 @@
    "capability": "Parent A : ",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6129 buildParentMenuItems()"
+    "src/js/timeline.js:6134 buildParentMenuItems()"
    ],
    "events": [
     "click"
@@ -29340,7 +29342,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6129",
+   "source": "src/js/timeline.js:6134",
    "meta": {
     "i18n": null,
     "functionsVisited": 204
@@ -29358,7 +29360,7 @@
    "capability": "Parent A : Aucun (parentage libre)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6122 buildParentMenuItems()"
+    "src/js/timeline.js:6127 buildParentMenuItems()"
    ],
    "events": [
     "click"
@@ -29379,7 +29381,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6122",
+   "source": "src/js/timeline.js:6127",
    "meta": {
     "i18n": null,
     "functionsVisited": 204
@@ -29397,7 +29399,7 @@
    "capability": "Parent B : ",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6152 buildParentMenuItems()"
+    "src/js/timeline.js:6157 buildParentMenuItems()"
    ],
    "events": [
     "click"
@@ -29418,7 +29420,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6152",
+   "source": "src/js/timeline.js:6157",
    "meta": {
     "i18n": null,
     "functionsVisited": 193
@@ -29436,7 +29438,7 @@
    "capability": "Parent B : Aucun",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6145 buildParentMenuItems()"
+    "src/js/timeline.js:6150 buildParentMenuItems()"
    ],
    "events": [
     "click"
@@ -29457,7 +29459,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6145",
+   "source": "src/js/timeline.js:6150",
    "meta": {
     "i18n": null,
     "functionsVisited": 193
@@ -29475,7 +29477,7 @@
    "capability": "Link time to: ",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6211 buildTimeLinkMenuItems()"
+    "src/js/timeline.js:6216 buildTimeLinkMenuItems()"
    ],
    "events": [
     "click"
@@ -29495,7 +29497,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6211",
+   "source": "src/js/timeline.js:6216",
    "meta": {
     "i18n": "ctxLinkTimeToPrefix",
     "functionsVisited": 158
@@ -29513,7 +29515,7 @@
    "capability": "Time: None (unlink, position kept)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6203 buildTimeLinkMenuItems()"
+    "src/js/timeline.js:6208 buildTimeLinkMenuItems()"
    ],
    "events": [
     "click"
@@ -29534,7 +29536,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6203",
+   "source": "src/js/timeline.js:6208",
    "meta": {
     "i18n": "ctxTimeNoneUnlink",
     "functionsVisited": 189
@@ -29552,7 +29554,7 @@
    "capability": "Break apart the component",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6941 renderLayerList()"
+    "src/js/timeline.js:6961 renderLayerList()"
    ],
    "events": [
     "click"
@@ -29573,7 +29575,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6941",
+   "source": "src/js/timeline.js:6961",
    "meta": {
     "i18n": "ctxBreakApartComponent",
     "functionsVisited": 131
@@ -29591,7 +29593,7 @@
    "capability": "Break apart the group",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6953 renderLayerList()"
+    "src/js/timeline.js:6973 renderLayerList()"
    ],
    "events": [
     "click"
@@ -29612,7 +29614,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6953",
+   "source": "src/js/timeline.js:6973",
    "meta": {
     "i18n": "ctxBreakApartGroup",
     "functionsVisited": 131
@@ -29630,7 +29632,7 @@
    "capability": "Convert to component",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6940 renderLayerList()"
+    "src/js/timeline.js:6960 renderLayerList()"
    ],
    "events": [
     "click"
@@ -29648,7 +29650,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6940",
+   "source": "src/js/timeline.js:6960",
    "meta": {
     "i18n": "ctxConvertToComponent",
     "functionsVisited": 36
@@ -29666,7 +29668,7 @@
    "capability": "Cut at the playhead  (⌘⇧D)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6934 renderLayerList()"
+    "src/js/timeline.js:6954 renderLayerList()"
    ],
    "events": [
     "click"
@@ -29687,7 +29689,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6934",
+   "source": "src/js/timeline.js:6954",
    "meta": {
     "i18n": "ctxCutAtPlayhead",
     "functionsVisited": 201
@@ -29705,7 +29707,7 @@
    "capability": "Delete the layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6923 renderLayerList()"
+    "src/js/timeline.js:6943 renderLayerList()"
    ],
    "events": [
     "click"
@@ -29726,7 +29728,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6923",
+   "source": "src/js/timeline.js:6943",
    "meta": {
     "i18n": "ctxDeleteLayer",
     "functionsVisited": 202
@@ -29744,7 +29746,7 @@
    "capability": "Duplicate the layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6922 renderLayerList()"
+    "src/js/timeline.js:6942 renderLayerList()"
    ],
    "events": [
     "click"
@@ -29765,7 +29767,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6922",
+   "source": "src/js/timeline.js:6942",
    "meta": {
     "i18n": "ctxDuplicateLayer",
     "functionsVisited": 98
@@ -29783,7 +29785,7 @@
    "capability": "Edit Fill",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6949 renderLayerList()"
+    "src/js/timeline.js:6969 renderLayerList()"
    ],
    "events": [
     "click"
@@ -29803,7 +29805,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6949",
+   "source": "src/js/timeline.js:6969",
    "meta": {
     "i18n": "ctxEditFill",
     "functionsVisited": 102
@@ -29821,7 +29823,7 @@
    "capability": "Edit Line",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6948 renderLayerList()"
+    "src/js/timeline.js:6968 renderLayerList()"
    ],
    "events": [
     "click"
@@ -29841,7 +29843,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6948",
+   "source": "src/js/timeline.js:6968",
    "meta": {
     "i18n": "ctxEditLine",
     "functionsVisited": 102
@@ -29859,7 +29861,7 @@
    "capability": "Edit Shadow",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6950 renderLayerList()"
+    "src/js/timeline.js:6970 renderLayerList()"
    ],
    "events": [
     "click"
@@ -29879,7 +29881,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6950",
+   "source": "src/js/timeline.js:6970",
    "meta": {
     "i18n": "ctxEditShadow",
     "functionsVisited": 102
@@ -29897,7 +29899,7 @@
    "capability": "Group into a folder",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6927 renderLayerList()"
+    "src/js/timeline.js:6947 renderLayerList()"
    ],
    "events": [
     "click"
@@ -29916,7 +29918,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6927",
+   "source": "src/js/timeline.js:6947",
    "meta": {
     "i18n": "ctxGroupIntoFolder",
     "functionsVisited": 140
@@ -29934,7 +29936,7 @@
    "capability": "Group (Line/Fill/Shadow)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6947 renderLayerList()"
+    "src/js/timeline.js:6967 renderLayerList()"
    ],
    "events": [
     "click"
@@ -29952,7 +29954,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6947",
+   "source": "src/js/timeline.js:6967",
    "meta": {
     "i18n": "ctxGroupLFS",
     "functionsVisited": 16
@@ -29970,7 +29972,7 @@
    "capability": "Insert a layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6909 renderLayerList()"
+    "src/js/timeline.js:6929 renderLayerList()"
    ],
    "events": [
     "click"
@@ -29988,7 +29990,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6909",
+   "source": "src/js/timeline.js:6929",
    "meta": {
     "i18n": "ctxInsertLayer",
     "functionsVisited": 103
@@ -30006,7 +30008,7 @@
    "capability": "Insert an effect layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6912 renderLayerList()"
+    "src/js/timeline.js:6932 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30027,7 +30029,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6912",
+   "source": "src/js/timeline.js:6932",
    "meta": {
     "i18n": "ctxInsertLayerEffect",
     "functionsVisited": 73
@@ -30045,7 +30047,7 @@
    "capability": "Insert a folder",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6911 renderLayerList()"
+    "src/js/timeline.js:6931 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30066,7 +30068,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6911",
+   "source": "src/js/timeline.js:6931",
    "meta": {
     "i18n": "ctxInsertLayerFolder",
     "functionsVisited": 95
@@ -30084,7 +30086,7 @@
    "capability": "Insert a Guide layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6913 renderLayerList()"
+    "src/js/timeline.js:6933 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30105,7 +30107,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6913",
+   "source": "src/js/timeline.js:6933",
    "meta": {
     "i18n": "ctxInsertLayerGuide",
     "functionsVisited": 73
@@ -30123,7 +30125,7 @@
    "capability": "Joystick layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6914 renderLayerList()"
+    "src/js/timeline.js:6934 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30141,7 +30143,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6914",
+   "source": "src/js/timeline.js:6934",
    "meta": {
     "i18n": "ctxInsertLayerJoystick",
     "functionsVisited": 17
@@ -30159,7 +30161,7 @@
    "capability": "Insert a Null layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6910 renderLayerList()"
+    "src/js/timeline.js:6930 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30180,7 +30182,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6910",
+   "source": "src/js/timeline.js:6930",
    "meta": {
     "i18n": "ctxInsertLayerNull",
     "functionsVisited": 94
@@ -30198,7 +30200,7 @@
    "capability": "Slider layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6915 renderLayerList()"
+    "src/js/timeline.js:6935 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30216,7 +30218,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6915",
+   "source": "src/js/timeline.js:6935",
    "meta": {
     "i18n": "ctxInsertLayerSlider",
     "functionsVisited": 17
@@ -30234,7 +30236,7 @@
    "capability": "Blend mode",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6970 renderLayerList()"
+    "src/js/timeline.js:6990 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30254,7 +30256,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6970",
+   "source": "src/js/timeline.js:6990",
    "meta": {
     "i18n": "ctxLayerBlend",
     "functionsVisited": 171
@@ -30272,7 +30274,7 @@
    "capability": "Matte source…",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6983 renderLayerList()"
+    "src/js/timeline.js:7003 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30293,7 +30295,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6983",
+   "source": "src/js/timeline.js:7003",
    "meta": {
     "i18n": "ctxMatteSource",
     "functionsVisited": 391
@@ -30311,7 +30313,7 @@
    "capability": "Appearance…",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6956 renderLayerList()"
+    "src/js/timeline.js:6976 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30331,7 +30333,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6956",
+   "source": "src/js/timeline.js:6976",
    "meta": {
     "i18n": "ctxMenuAppearance",
     "functionsVisited": 173
@@ -30349,7 +30351,7 @@
    "capability": "Insert…",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6908 renderLayerList()"
+    "src/js/timeline.js:6928 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30367,7 +30369,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6908",
+   "source": "src/js/timeline.js:6928",
    "meta": {
     "i18n": "ctxMenuInsert",
     "functionsVisited": 105
@@ -30385,7 +30387,7 @@
    "capability": "Line / Fill / Shadow…",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6944 renderLayerList()"
+    "src/js/timeline.js:6964 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30403,7 +30405,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6944",
+   "source": "src/js/timeline.js:6964",
    "meta": {
     "i18n": "ctxMenuLFS",
     "functionsVisited": 30
@@ -30421,7 +30423,7 @@
    "capability": "Organise…",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6936 renderLayerList()"
+    "src/js/timeline.js:6956 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30442,7 +30444,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6936",
+   "source": "src/js/timeline.js:6956",
    "meta": {
     "i18n": "ctxMenuOrganise",
     "functionsVisited": 130
@@ -30460,7 +30462,7 @@
    "capability": "Merge the selected layers",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6937 renderLayerList()"
+    "src/js/timeline.js:6957 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30481,7 +30483,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6937",
+   "source": "src/js/timeline.js:6957",
    "meta": {
     "i18n": "ctxMergeSelectedLayers",
     "functionsVisited": 129
@@ -30499,7 +30501,7 @@
    "capability": "Object-mode Duplicator…",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6928 renderLayerList()"
+    "src/js/timeline.js:6948 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30520,7 +30522,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6928",
+   "source": "src/js/timeline.js:6948",
    "meta": {
     "i18n": "ctxObjectDuplicatorEllipsis",
     "functionsVisited": 173
@@ -30538,7 +30540,7 @@
    "capability": "Propagate Fill to the other frames",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6951 renderLayerList()"
+    "src/js/timeline.js:6971 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30559,7 +30561,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6951",
+   "source": "src/js/timeline.js:6971",
    "meta": {
     "i18n": "ctxPropagateFillOtherFrames",
     "functionsVisited": 122
@@ -30577,7 +30579,7 @@
    "capability": "Propagate Shadow to the other frames",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6952 renderLayerList()"
+    "src/js/timeline.js:6972 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30598,7 +30600,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6952",
+   "source": "src/js/timeline.js:6972",
    "meta": {
     "i18n": "ctxPropagateShadowOtherFrames",
     "functionsVisited": 122
@@ -30616,7 +30618,7 @@
    "capability": "Remove from the folder",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6938 renderLayerList()"
+    "src/js/timeline.js:6958 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30637,7 +30639,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6938",
+   "source": "src/js/timeline.js:6958",
    "meta": {
     "i18n": "ctxRemoveFromFolder",
     "functionsVisited": 390
@@ -30655,7 +30657,7 @@
    "capability": "Remove from the folder (parent)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6939 renderLayerList()"
+    "src/js/timeline.js:6959 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30676,7 +30678,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6939",
+   "source": "src/js/timeline.js:6959",
    "meta": {
     "i18n": "ctxRemoveFromFolderParent",
     "functionsVisited": 173
@@ -30694,7 +30696,7 @@
    "capability": "Split into layers (one shape per layer)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6933 renderLayerList()"
+    "src/js/timeline.js:6953 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30713,7 +30715,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6933",
+   "source": "src/js/timeline.js:6953",
    "meta": {
     "i18n": "ctxSplitIntoLayers",
     "functionsVisited": 35
@@ -30731,7 +30733,7 @@
    "capability": "Split into Stroke/Fill/Shadow (3 linked layers, shared keyframes)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6945 renderLayerList()"
+    "src/js/timeline.js:6965 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30749,7 +30751,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6945",
+   "source": "src/js/timeline.js:6965",
    "meta": {
     "i18n": "ctxSplitStrokeFillShadow",
     "functionsVisited": 28
@@ -30767,7 +30769,7 @@
    "capability": "Unlink this layer from the Stroke/Fill/Shadow group",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6946 renderLayerList()"
+    "src/js/timeline.js:6966 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30788,7 +30790,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6946",
+   "source": "src/js/timeline.js:6966",
    "meta": {
     "i18n": "ctxUnlinkFromLFSGroup",
     "functionsVisited": 391
@@ -30806,7 +30808,7 @@
    "capability": "Widget settings…",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6921 renderLayerList()"
+    "src/js/timeline.js:6941 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30824,7 +30826,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6921",
+   "source": "src/js/timeline.js:6941",
    "meta": {
     "i18n": "ctxWidgetSettingsEllipsis",
     "functionsVisited": 71
@@ -30842,7 +30844,7 @@
    "capability": "Dissoudre le dossier",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6610 renderLayerList()"
+    "src/js/timeline.js:6630 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30861,7 +30863,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6610",
+   "source": "src/js/timeline.js:6630",
    "meta": {
     "i18n": null,
     "functionsVisited": 131
@@ -30879,7 +30881,7 @@
    "capability": "Rename",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6925 renderLayerList()"
+    "src/js/timeline.js:6945 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30897,7 +30899,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6925",
+   "source": "src/js/timeline.js:6945",
    "meta": {
     "i18n": "elementsRename",
     "functionsVisited": 87
@@ -30915,7 +30917,7 @@
    "capability": "Renommer le dossier",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:6609 renderLayerList()"
+    "src/js/timeline.js:6629 renderLayerList()"
    ],
    "events": [
     "click"
@@ -30933,7 +30935,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:6609",
+   "source": "src/js/timeline.js:6629",
    "meta": {
     "i18n": null,
     "functionsVisited": 154
@@ -30951,7 +30953,7 @@
    "capability": "Rename",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:5664 renderShapeTreeRowsInto()"
+    "src/js/timeline.js:5669 renderShapeTreeRowsInto()"
    ],
    "events": [
     "click"
@@ -30969,7 +30971,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5664",
+   "source": "src/js/timeline.js:5669",
    "meta": {
     "i18n": "elementsRename",
     "functionsVisited": 166
@@ -30987,7 +30989,7 @@
    "capability": "Rename",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:5695 renderShapeTreeRowsInto()"
+    "src/js/timeline.js:5700 renderShapeTreeRowsInto()"
    ],
    "events": [
     "click"
@@ -31008,7 +31010,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5695",
+   "source": "src/js/timeline.js:5700",
    "meta": {
     "i18n": "elementsRename",
     "functionsVisited": 466
@@ -31026,7 +31028,7 @@
    "capability": "Select",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:5696 renderShapeTreeRowsInto()"
+    "src/js/timeline.js:5701 renderShapeTreeRowsInto()"
    ],
    "events": [
     "click"
@@ -31045,7 +31047,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5696",
+   "source": "src/js/timeline.js:5701",
    "meta": {
     "i18n": "elementsSelect",
     "functionsVisited": 78
@@ -31063,7 +31065,7 @@
    "capability": "Select members",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:5665 renderShapeTreeRowsInto()"
+    "src/js/timeline.js:5670 renderShapeTreeRowsInto()"
    ],
    "events": [
     "click"
@@ -31082,7 +31084,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5665",
+   "source": "src/js/timeline.js:5670",
    "meta": {
     "i18n": "elementsSelectMembers",
     "functionsVisited": 78
@@ -31100,7 +31102,7 @@
    "capability": "Ungroup",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:5666 renderShapeTreeRowsInto()"
+    "src/js/timeline.js:5671 renderShapeTreeRowsInto()"
    ],
    "events": [
     "click"
@@ -31121,7 +31123,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5666",
+   "source": "src/js/timeline.js:5671",
    "meta": {
     "i18n": "elementsUngroup",
     "functionsVisited": 540
@@ -31139,7 +31141,7 @@
    "capability": "Delete",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:5697 renderShapeTreeRowsInto()"
+    "src/js/timeline.js:5702 renderShapeTreeRowsInto()"
    ],
    "events": [
     "click"
@@ -31160,7 +31162,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5697",
+   "source": "src/js/timeline.js:5702",
    "meta": {
     "i18n": "fxDelete",
     "functionsVisited": 578
@@ -31178,7 +31180,7 @@
    "capability": "Copy",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:5407"
+    "src/js/timeline.js:5412"
    ],
    "events": [
     "click"
@@ -31192,7 +31194,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5407",
+   "source": "src/js/timeline.js:5412",
    "meta": {
     "i18n": "btnCopy",
     "functionsVisited": 25
@@ -31210,7 +31212,7 @@
    "capability": "Clear the keyframe",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:5416"
+    "src/js/timeline.js:5421"
    ],
    "events": [
     "click"
@@ -31230,7 +31232,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5416",
+   "source": "src/js/timeline.js:5421",
    "meta": {
     "i18n": "ctxClearKeyframe",
     "functionsVisited": 80
@@ -31248,7 +31250,7 @@
    "capability": "Convert to keyframes",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:5415"
+    "src/js/timeline.js:5420"
    ],
    "events": [
     "click"
@@ -31269,7 +31271,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5415",
+   "source": "src/js/timeline.js:5420",
    "meta": {
     "i18n": "ctxConvertToKeyframes",
     "functionsVisited": 126
@@ -31287,7 +31289,7 @@
    "capability": "Cut",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:5408"
+    "src/js/timeline.js:5413"
    ],
    "events": [
     "click"
@@ -31308,7 +31310,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5408",
+   "source": "src/js/timeline.js:5413",
    "meta": {
     "i18n": "ctxCut",
     "functionsVisited": 101
@@ -31326,7 +31328,7 @@
    "capability": "Duplicate the selection",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:5410"
+    "src/js/timeline.js:5415"
    ],
    "events": [
     "click"
@@ -31344,7 +31346,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5410",
+   "source": "src/js/timeline.js:5415",
    "meta": {
     "i18n": "ctxDuplicateSelection",
     "functionsVisited": 30
@@ -31362,7 +31364,7 @@
    "capability": "Edit this tween's curve…",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:5405"
+    "src/js/timeline.js:5410"
    ],
    "events": [
     "click"
@@ -31380,7 +31382,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5405",
+   "source": "src/js/timeline.js:5410",
    "meta": {
     "i18n": "ctxEditTweenCurve",
     "functionsVisited": 57
@@ -31396,6 +31398,384 @@
    "kind": "menu",
    "surface": "dynamic menu",
    "capability": "Insert a blank keyframe",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/timeline.js:5419"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "render": 2,
+    "selection": 3,
+    "native": 3,
+    "animation": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/timeline.js:5419",
+   "meta": {
+    "i18n": "ctxInsertBlankKeyframe",
+    "functionsVisited": 93
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "menu:timeline.js:top:ctxinsertframe",
+   "kind": "menu",
+   "surface": "dynamic menu",
+   "capability": "Insert a frame",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/timeline.js:5417"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "history": 2,
+    "animation": 2,
+    "persist": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/timeline.js:5417",
+   "meta": {
+    "i18n": "ctxInsertFrame",
+    "functionsVisited": 33
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "menu:timeline.js:top:ctxinsertkeyframe",
+   "kind": "menu",
+   "surface": "dynamic menu",
+   "capability": "Insert a keyframe",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/timeline.js:5418"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "animation": 1,
+    "persist": 2,
+    "history": 2,
+    "render": 2,
+    "selection": 3,
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/timeline.js:5418",
+   "meta": {
+    "i18n": "ctxInsertKeyframe",
+    "functionsVisited": 104
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "menu:timeline.js:top:ctxinsertlayer",
+   "kind": "menu",
+   "surface": "dynamic menu",
+   "capability": "Insert a layer",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/timeline.js:11182"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "render": 2,
+    "history": 3,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/timeline.js:11182",
+   "meta": {
+    "i18n": "ctxInsertLayer",
+    "functionsVisited": 103
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "menu:timeline.js:top:ctxinsertlayereffect",
+   "kind": "menu",
+   "surface": "dynamic menu",
+   "capability": "Insert an effect layer",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/timeline.js:11185"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "render": 2,
+    "selection": 3,
+    "native": 3,
+    "animation": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/timeline.js:11185",
+   "meta": {
+    "i18n": "ctxInsertLayerEffect",
+    "functionsVisited": 73
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "menu:timeline.js:top:ctxinsertlayerfolder",
+   "kind": "menu",
+   "surface": "dynamic menu",
+   "capability": "Insert a folder",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/timeline.js:11184"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "animation": 2,
+    "render": 2,
+    "selection": 3,
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/timeline.js:11184",
+   "meta": {
+    "i18n": "ctxInsertLayerFolder",
+    "functionsVisited": 95
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "menu:timeline.js:top:ctxinsertlayerguide",
+   "kind": "menu",
+   "surface": "dynamic menu",
+   "capability": "Insert a Guide layer",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/timeline.js:11186"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "render": 2,
+    "selection": 3,
+    "native": 3,
+    "animation": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/timeline.js:11186",
+   "meta": {
+    "i18n": "ctxInsertLayerGuide",
+    "functionsVisited": 73
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "menu:timeline.js:top:ctxinsertlayerjoystick",
+   "kind": "menu",
+   "surface": "dynamic menu",
+   "capability": "Joystick layer",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/timeline.js:11187"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 3,
+    "history": 3,
+    "render": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/timeline.js:11187",
+   "meta": {
+    "i18n": "ctxInsertLayerJoystick",
+    "functionsVisited": 17
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "menu:timeline.js:top:ctxinsertlayernull",
+   "kind": "menu",
+   "surface": "dynamic menu",
+   "capability": "Insert a Null layer",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/timeline.js:11183"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "animation": 2,
+    "render": 2,
+    "selection": 3,
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/timeline.js:11183",
+   "meta": {
+    "i18n": "ctxInsertLayerNull",
+    "functionsVisited": 94
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "menu:timeline.js:top:ctxinsertlayerslider",
+   "kind": "menu",
+   "surface": "dynamic menu",
+   "capability": "Slider layer",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/timeline.js:11188"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 3,
+    "history": 3,
+    "render": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/timeline.js:11188",
+   "meta": {
+    "i18n": "ctxInsertLayerSlider",
+    "functionsVisited": 17
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "menu:timeline.js:top:ctxpaste",
+   "kind": "menu",
+   "surface": "dynamic menu",
+   "capability": "Paste",
    "area": "timeline-layers-frames",
    "handler": [
     "src/js/timeline.js:5414"
@@ -31421,384 +31801,6 @@
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/timeline.js:5414",
    "meta": {
-    "i18n": "ctxInsertBlankKeyframe",
-    "functionsVisited": 93
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "menu:timeline.js:top:ctxinsertframe",
-   "kind": "menu",
-   "surface": "dynamic menu",
-   "capability": "Insert a frame",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/timeline.js:5412"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "history": 2,
-    "animation": 2,
-    "persist": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5412",
-   "meta": {
-    "i18n": "ctxInsertFrame",
-    "functionsVisited": 33
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "menu:timeline.js:top:ctxinsertkeyframe",
-   "kind": "menu",
-   "surface": "dynamic menu",
-   "capability": "Insert a keyframe",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/timeline.js:5413"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 1,
-    "persist": 2,
-    "history": 2,
-    "render": 2,
-    "selection": 3,
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5413",
-   "meta": {
-    "i18n": "ctxInsertKeyframe",
-    "functionsVisited": 104
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "menu:timeline.js:top:ctxinsertlayer",
-   "kind": "menu",
-   "surface": "dynamic menu",
-   "capability": "Insert a layer",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/timeline.js:11162"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "history": 3,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:11162",
-   "meta": {
-    "i18n": "ctxInsertLayer",
-    "functionsVisited": 103
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "menu:timeline.js:top:ctxinsertlayereffect",
-   "kind": "menu",
-   "surface": "dynamic menu",
-   "capability": "Insert an effect layer",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/timeline.js:11165"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "render": 2,
-    "selection": 3,
-    "native": 3,
-    "animation": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:11165",
-   "meta": {
-    "i18n": "ctxInsertLayerEffect",
-    "functionsVisited": 73
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "menu:timeline.js:top:ctxinsertlayerfolder",
-   "kind": "menu",
-   "surface": "dynamic menu",
-   "capability": "Insert a folder",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/timeline.js:11164"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "animation": 2,
-    "render": 2,
-    "selection": 3,
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:11164",
-   "meta": {
-    "i18n": "ctxInsertLayerFolder",
-    "functionsVisited": 95
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "menu:timeline.js:top:ctxinsertlayerguide",
-   "kind": "menu",
-   "surface": "dynamic menu",
-   "capability": "Insert a Guide layer",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/timeline.js:11166"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "render": 2,
-    "selection": 3,
-    "native": 3,
-    "animation": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:11166",
-   "meta": {
-    "i18n": "ctxInsertLayerGuide",
-    "functionsVisited": 73
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "menu:timeline.js:top:ctxinsertlayerjoystick",
-   "kind": "menu",
-   "surface": "dynamic menu",
-   "capability": "Joystick layer",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/timeline.js:11167"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 3,
-    "history": 3,
-    "render": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:11167",
-   "meta": {
-    "i18n": "ctxInsertLayerJoystick",
-    "functionsVisited": 17
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "menu:timeline.js:top:ctxinsertlayernull",
-   "kind": "menu",
-   "surface": "dynamic menu",
-   "capability": "Insert a Null layer",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/timeline.js:11163"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "animation": 2,
-    "render": 2,
-    "selection": 3,
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:11163",
-   "meta": {
-    "i18n": "ctxInsertLayerNull",
-    "functionsVisited": 94
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "menu:timeline.js:top:ctxinsertlayerslider",
-   "kind": "menu",
-   "surface": "dynamic menu",
-   "capability": "Slider layer",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/timeline.js:11168"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 3,
-    "history": 3,
-    "render": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:11168",
-   "meta": {
-    "i18n": "ctxInsertLayerSlider",
-    "functionsVisited": 17
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "menu:timeline.js:top:ctxpaste",
-   "kind": "menu",
-   "surface": "dynamic menu",
-   "capability": "Paste",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/timeline.js:5409"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "render": 2,
-    "selection": 3,
-    "native": 3,
-    "animation": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5409",
-   "meta": {
     "i18n": "ctxPaste",
     "functionsVisited": 102
    },
@@ -31815,7 +31817,7 @@
    "capability": "Generate / redo the tween",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:5424"
+    "src/js/timeline.js:5429"
    ],
    "events": [
     "click"
@@ -31836,7 +31838,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5424",
+   "source": "src/js/timeline.js:5429",
    "meta": {
     "i18n": "ctxRegenerateTween",
     "functionsVisited": 228
@@ -31854,7 +31856,7 @@
    "capability": "Delete the frames",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:5453"
+    "src/js/timeline.js:5458"
    ],
    "events": [
     "click"
@@ -31875,7 +31877,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5453",
+   "source": "src/js/timeline.js:5458",
    "meta": {
     "i18n": "ctxRemoveFrames",
     "functionsVisited": 92
@@ -31893,7 +31895,7 @@
    "capability": "Fit",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10840"
+    "src/js/timeline.js:10860"
    ],
    "events": [
     "click"
@@ -31907,7 +31909,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:10840",
+   "source": "src/js/timeline.js:10860",
    "meta": {
     "i18n": null,
     "functionsVisited": 7
@@ -31925,7 +31927,7 @@
    "capability": "Propager ce remplissage → toutes les frames",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:5436"
+    "src/js/timeline.js:5441"
    ],
    "events": [
     "click"
@@ -31946,10 +31948,10 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5436",
+   "source": "src/js/timeline.js:5441",
    "meta": {
     "i18n": null,
-    "functionsVisited": 470
+    "functionsVisited": 471
    },
    "fixtures": [
     "keyed-props",
@@ -31964,7 +31966,7 @@
    "capability": "Reset View (100%)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10841"
+    "src/js/timeline.js:10861"
    ],
    "events": [
     "click"
@@ -31978,7 +31980,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:10841",
+   "source": "src/js/timeline.js:10861",
    "meta": {
     "i18n": null,
     "functionsVisited": 5
@@ -31996,7 +31998,7 @@
    "capability": "Supprimer le tween",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:5405"
+    "src/js/timeline.js:5410"
    ],
    "events": [
     "click"
@@ -32016,7 +32018,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:5405",
+   "source": "src/js/timeline.js:5410",
    "meta": {
     "i18n": null,
     "functionsVisited": 79
@@ -34911,7 +34913,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "c",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -34952,7 +34954,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "b",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -34993,7 +34995,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "l",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -35034,7 +35036,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "e",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -35075,7 +35077,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "i",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -35116,7 +35118,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "g",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -35157,7 +35159,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "n",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -35198,7 +35200,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "m",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -35239,7 +35241,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "h",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -35280,7 +35282,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "u",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -35321,7 +35323,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "p",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -35852,7 +35854,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "r",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -35893,7 +35895,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "s",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -35934,7 +35936,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "w",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -35975,7 +35977,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "v",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -36016,7 +36018,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "d",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -36057,7 +36059,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "q",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -36098,7 +36100,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "a",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -36139,7 +36141,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "t",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -36180,7 +36182,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "o",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -36221,7 +36223,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "z",
     "cat": null,
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
