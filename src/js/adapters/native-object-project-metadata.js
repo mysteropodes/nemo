@@ -13,13 +13,17 @@
   var MAX_INFO=4*1024*1024;
   function str(v){return typeof v==='string'&&v.length<=MAX_INFO;}
   function text(v){return str(v)&&v.length>0;}
+  // A stack travels in a row only up to the engine's 4096-byte row bound (EFFECTS_ROW_BYTES), so even the smallest entry
+  // ({"type":"a","enabled":true}, 27 bytes) gives at most ~150 entries: 256 is above that, so an engine answer never trips it.
+  // A longer stack reaches here as `effectsOversize` / `pathFxOversize`, which are admitted as flags.
+  var MAX_STACK=256;
   function rowModel(l){
     return (!has(l,'kind')||KINDS.indexOf(l.kind)>=0)&&(!has(l,'folderCollapsed')||typeof l.folderCollapsed==='boolean')&&
       ['folderId','componentId','matteSourceLayerUid'].every(function(k){return !has(l,k)||text(l[k]);})&&
       ['blendMode','matteMode'].every(function(k){return !has(l,k)||str(l[k]);})&&
       (!has(l,'mattesMore')||Array.isArray(l.mattesMore)&&l.mattesMore.length<=MAX_INFO&&l.mattesMore.every(function(m){return m&&Object.keys(m).length===2&&text(m.uid)&&str(m.mode);}))&&
       ['isMatteSource','opacityAnimated','effectsOversize','pathFxOversize'].every(function(k){return !has(l,k)||l[k]===true;})&&
-      (!has(l,'effects')||Array.isArray(l.effects)&&l.effects.length>0&&l.effects.length<=32&&!has(l,'effectsOversize')&&l.effects.every(function(e){return e&&typeof e==='object'&&!Array.isArray(e)&&text(e.type)&&typeof e.enabled==='boolean';}))&&(!has(l,'pathFx')||Array.isArray(l.pathFx)&&l.pathFx.length>0&&l.pathFx.length<=256&&!has(l,'pathFxOversize')&&l.pathFx.every(function(e){return e&&typeof e==='object'&&!Array.isArray(e)&&text(e.type);}))&&(!has(l,'opacity')||Number.isFinite(l.opacity));
+      (!has(l,'effects')||Array.isArray(l.effects)&&l.effects.length>0&&l.effects.length<=MAX_STACK&&!has(l,'effectsOversize')&&l.effects.every(function(e){return e&&typeof e==='object'&&!Array.isArray(e)&&str(e.type)&&typeof e.enabled==='boolean';}))&&(!has(l,'pathFx')||Array.isArray(l.pathFx)&&l.pathFx.length>0&&l.pathFx.length<=MAX_STACK&&!has(l,'pathFxOversize')&&l.pathFx.every(function(e){return e&&typeof e==='object'&&!Array.isArray(e)&&text(e.type);}))&&(!has(l,'opacity')||Number.isFinite(l.opacity));
   }
   function topModel(v){
     return (!has(v,'layerFolders')||Array.isArray(v.layerFolders)&&v.layerFolders.length<=MAX_INFO&&v.layerFolders.every(function(f){

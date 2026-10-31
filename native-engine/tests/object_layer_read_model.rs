@@ -444,7 +444,7 @@ fn a_stored_effect_stack_is_carried_in_its_row_until_the_row_or_document_bound()
     assert_eq!(got[2]["effects"], stack);
     assert!(got[2].get("effectsOversize").is_none());
     // Past the per-row bound the stack is named oversize, never truncated.
-    let many: Vec<Value> = (0..30)
+    let many: Vec<Value> = (0..45)
         .map(|i| json!({"type":format!("effect-{i:04}-{}", "x".repeat(60)),"enabled":true,"p1":i}))
         .collect();
     let big = flat(json!([{"layerUid":"big","effects":many}]), json!({}));
@@ -469,11 +469,43 @@ fn a_stored_path_effect_stack_is_carried_in_its_row_until_the_row_bound() {
     assert!(got[1].get("pathFx").is_none(), "an empty stack is absent");
     assert_eq!(got[2]["pathFx"], stack);
     assert!(got[2].get("pathFxOversize").is_none());
-    let many: Vec<Value> = (0..60)
+    let many: Vec<Value> = (0..100)
         .map(|i| json!({"type":"zigzag","enabled":true,"p1":i,"p2":1.5,"p3":2.5}))
         .collect();
     let big = flat(json!([{"layerUid":"big","pathFx":many}]), json!({}));
     let got = rows(&big);
     assert!(got[0].get("pathFx").is_none());
     assert_eq!(got[0]["pathFxOversize"], json!(true));
+}
+
+/// #2372: the read bound is at least what an edit can write. A full 32-entry stack of baseline panel entries (all eight
+/// parameters, the longest built-in type name) and a ~60-entry path-effect stack both stay listed, and a stack past the
+/// bound degrades to a flagged row beside intact neighbours instead of failing the whole table.
+#[test]
+fn stacks_an_edit_can_write_stay_readable_and_oversize_degrades_to_a_flag() {
+    let effect = |i: usize| {
+        json!({"type":"chromaticAberration","enabled":true,"p1":i as f64 + 0.25,"p2":0.5,"p3":0.125,"p4":100,
+            "p5":0.333333,"p6":0.75,"p7":12.5,"p8":0.1})
+    };
+    let at_limit: Vec<Value> = (0..30).map(effect).collect();
+    let edit_bytes = serde_json::to_string(&json!(at_limit)).unwrap().len();
+    assert!(edit_bytes > 2048 && edit_bytes + 215 <= 4096, "{edit_bytes}");
+    let fx: Vec<Value> = (0..60)
+        .map(|i| json!({"type":"zigzag","enabled":true,"p1":i,"p2":1.5,"p3":2.5}))
+        .collect();
+    let huge: Vec<Value> = (0..200).map(effect).collect();
+    let document = flat(
+        json!([{"layerUid":"full","effects":at_limit,"pathFx":fx},
+            {"layerUid":"after","effects":[{"type":"blur","enabled":true}]},
+            {"layerUid":"huge","effects":huge,"pathFx":[{"type":"zigzag"}]}]),
+        json!({}),
+    );
+    let got = rows(&document);
+    assert_eq!(got[0]["effects"].as_array().unwrap().len(), 30);
+    assert_eq!(got[0]["pathFx"].as_array().unwrap().len(), 60);
+    assert!(got[0].get("effectsOversize").is_none() && got[0].get("pathFxOversize").is_none());
+    assert_eq!(got[1]["effects"].as_array().unwrap().len(), 1);
+    assert_eq!(got[2]["effectsOversize"], json!(true));
+    assert!(got[2].get("effects").is_none());
+    assert_eq!(got[2]["pathFx"].as_array().unwrap().len(), 1);
 }

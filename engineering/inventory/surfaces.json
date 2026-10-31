@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "0c9d74616303ce9e360b0ef22e2a7af98006bba5",
-  "describe": "v0.7.0-alpha.4-4391-g0c9d7461-dirty"
+  "head": "9f7d155af9b83b20d015d2f4532b1770aa029978",
+  "describe": "v0.7.0-alpha.4-4394-g9f7d155a-dirty"
  },
- "inputsDigest": "b0c093e275b61a72869f6b3120d546b2d5ec600da58d27461ce1675106ec8501",
+ "inputsDigest": "b663b52ecd41945ec393d279142da4d52d32b8bcad8a3d522a2a648959f2ee7b",
  "states": [
   "inventoried",
   "characterized",
@@ -4270,7 +4270,7 @@
     "container": "rig-assign-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 262,
+    "functionsVisited": 266,
     "via": "chain",
     "references": []
    },
@@ -4318,7 +4318,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 133,
+    "functionsVisited": 137,
     "via": "chain",
     "references": []
    },
@@ -4513,7 +4513,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 265,
+    "functionsVisited": 269,
     "via": "chain",
     "references": []
    },
@@ -9530,7 +9530,7 @@
    "capability": "+ Add Effect…",
    "area": "effects-masks",
    "handler": [
-    "src/js/effects-panel.js:876 init()"
+    "src/js/effects-panel.js:877 init()"
    ],
    "events": [
     "click"
@@ -14127,7 +14127,7 @@
    "capability": "path fx add",
    "area": "effects-masks",
    "handler": [
-    "src/js/effects-panel.js:856 renderPathFxList()"
+    "src/js/effects-panel.js:857 renderPathFxList()"
    ],
    "events": [
     "change"
@@ -14151,7 +14151,7 @@
     "container": "path-fx-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 44,
+    "functionsVisited": 48,
     "via": "variable add",
     "references": []
    },
@@ -32635,7 +32635,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 395
+    "functionsVisited": 397
    },
    "fixtures": [
     "media",
