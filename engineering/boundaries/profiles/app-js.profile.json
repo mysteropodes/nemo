@@ -2872,6 +2872,7 @@
         "native-object-project-properties.js",
         "native-object-open-exposure.js",
         "native-object-project-export.js",
+        "native-object-project-close.js",
         "native-object-project-entry-contract.js"
       ],
       "sizeProfile": "Platform/engine adapter",
