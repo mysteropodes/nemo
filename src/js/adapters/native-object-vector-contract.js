@@ -15,8 +15,7 @@
   const OPS = new Set([VECTOR, PARAMETRIC, EFFECTS]);
   const FAMILY = 'editable-vector-path';
   // Full encoded request envelopes: vector edits may carry a complete 256-anchor record, and the Fill Brush commit
-  // (an edit-contract operation) a 256-segment outline; every other operation keeps the default bound. Replies remain
-  // bounded separately.
+  // (an edit-contract operation) a 256-segment outline; every other operation keeps the default bound. Replies remain bounded separately.
   const MAX_REQUEST_BYTES = 4096, ENGINE_VECTOR_REQUEST_BYTES = 65536, FILL_BRUSH = 'command.document.object.fill.brush';
   // #2361: a bitmap-brush Draw stroke carries a whole anchor record (its PNG is a staged file, never request bytes).
   const BITMAP_STROKE = 'command.document.object.brush.bitmap.stroke';
@@ -55,10 +54,7 @@
     value.forEach((part, at) => num(part, `${label}[${at}]`));
   }
 
-  // #2256: a component context is admitted only when it is the one the workspace controller holds (the id the owner declared on enter), never free text.
-  function heldContext(id) {
-    try { const c = typeof globalThis === 'object' ? globalThis.NemoNativeComponentContext : undefined; return typeof id === 'string' && !!id && !!c && typeof c.contextId === 'function' && c.contextId(globalThis) === id; } catch (_) { return false; }
-  }
+  function heldContext(id) { try { const c = typeof globalThis === 'object' ? globalThis.NemoNativeComponentContext : undefined; return typeof id === 'string' && !!id && !!c && typeof c.contextId === 'function' && c.contextId(globalThis) === id; } catch (_) { return false; } } // #2256: only the component the workspace holds
   function target(value, label, create) {
     exact(value, ['contextId', 'frameScope', 'layerUid', 'strokeId'], [], label);
     if (value.contextId !== 'scene-root' && !heldContext(value.contextId)) fail(`${label}.contextId is not admitted`); // #2256: the scene root or the component the workspace holds
