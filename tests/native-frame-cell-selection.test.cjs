@@ -133,7 +133,7 @@ test('actual metadata presenter mounts and retires the helper after caption refr
   const info=make.metadata();make.UI.render(root,info,false,make.fixturePorts(root));
   const header=root.document.nodes.get('frame-hdr'),caption=header.children[0],grid=root.document.nodes.get('frame-grid').children[0],old=caption.children[0];
   assert.equal(header.children.length,1);assert.equal(old.className,'native-frame-selection-strip');
-  make.UI.render(root,info,true,make.fixturePorts(root));assert.equal(header.children[0],caption);assert.notEqual(caption.children[0],old);
+  make.UI.render(root,info,true,make.fixturePorts(root));assert.equal(header.children[0],caption);assert.equal(caption.children[0],old,'a frame-only render keeps the mounted strip (#2371)');
   assert.equal(root.document.nodes.get('frame-grid').children[0],grid);assert.equal(root._sel,selection);assert.deepEqual(selection.frames,[]);
   make.UI.restoreInspector(root);assert.equal(retired,1);
 });
