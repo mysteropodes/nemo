@@ -197,7 +197,7 @@ test('chrome, cancellation, Escape and lost capture remain usable or abort witho
   send(f,'pointerup',60,50);assert.equal(f.calls.length,0,action);assert.equal(f.body.children.length,0,action);assert.equal(f.paper.project.activeLayer.children.length,0);}
 });
 test('unsupported brush cells are explicit without native or legacy fallback',async()=>{
- const cases=[s=>Object.assign(s,{tool:'fillbrush',fillBrushMode:'front',fillBrushSize:40}),s=>s.bitmapBrushOn=true,s=>s.brushPreset='my-custom-brush',s=>Object.assign(s,{brushPreset:'charcoal-smooth',symmetryEnabled:true}),
+ const cases=[s=>Object.assign(s,{tool:'fillbrush',fillBrushMode:'front',fillBrushSize:40}),s=>s.bitmapBrushOn=true,s=>s.brushPreset='my-custom-brush',
   // With stop-at-axis symmetry the original trims the whole stroke before clipping; native would trim the clipped one.
   s=>Object.assign(s,{trimStrokeEnds:true,symmetryEnabled:true,symmetryExtend:false}),
   // Plain-stroke symmetry commits natively since G23 (#2361); with a pressure brush it stays refused.
@@ -748,4 +748,67 @@ test('cancel matrix: a second pointer during a stroke is ignored; the first poin
  assert.equal(f.calls.length,0);assert.equal(f.body.children.length,1,'the stroke is still being drawn');
  send(f,'pointerup',80,65);assert.equal((await settled(f)).status,'applied');assert.equal(f.calls.length,1);
  assert.deepEqual(f.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,20],[45,30],[80,65]],'none of the other pointer samples joined');
+});
+
+// #2361 draw-texture-symmetry-trim: a built-in preset with symmetry or Trim commits natively. The baseline copies the anchor
+// (symmetry-bridge.js adoptFreshIdentity drops its brush group) and trims it before any dab is stamped; native stamps each anchor's
+// dabs from its own group and seed (seededRng, never Math.random), so every copy is an anchor of its own in the ONE createMany.
+const SEED_ID=/^bg[0-9a-z]+_[0-9]+(_c[0-9]+)?$/;
+async function textured(over,pen){
+ const f=await fixture();f.root.BRUSH_PRESETS={'charcoal-smooth':{},'chalk-round':{}};Object.assign(f.root.state,{brushPreset:'charcoal-smooth'},over);
+ if(pen){send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:.4});}
+ else{send(f,'pointerdown',20,20);send(f,'pointermove',50,30);send(f,'pointerup',100,80);}
+ await settled(f);return f;
+}
+test('a textured plain stroke with mirror symmetry sends the anchor and its mirror in one createMany, each seeded and grouped',async()=>{
+ for(const fillEnabled of [true,false]){
+  const f=await textured({fillEnabled,symmetryEnabled:true,symmetryMode:'y',symmetryExtend:true});
+  assert.equal(f.calls.length,1,f.log.join(','));const q=plain(f.calls[0].payload);
+  assert.deepEqual([q.command,q.records.length],['object.vector.createMany',2],'one revision and one undo for the whole mirrored stroke');
+  const [a,b]=q.records.map(r=>r.vectorExt.brushTexture);
+  for(const t of [a,b]){assert.equal(t.brushTexturePreset,'charcoal-smooth');assert.match(t.brushGroupId,SEED_ID);assert.ok(Number.isInteger(t.strokeSeed)&&t.strokeSeed>=0&&t.strokeSeed<=0xFFFFFFFF);
+   if(fillEnabled)assert.equal(t.preTextureStroke,'#112233ff');else assert.equal(t.preTextureOpacity,0.5);}
+  assert.notEqual(a.brushGroupId,b.brushGroupId,'the copy is a group of its own');assert.notEqual(a.strokeSeed,b.strokeSeed,'and has its own seed');
+  assert.ok(q.records.every(r=>r.vector.opacity===(fillEnabled?0.5:0)),'every anchor is camouflaged as the drawn one');
+  const mx=q.records[1].geometry.segments.map(s=>s.point.x);assert.ok(Math.min(...mx)>160&&Math.max(...q.records[0].geometry.segments.map(s=>s.point.x))<160);
+ }
+});
+test('textured symmetry copies derive their seed from the drawn stroke deterministically and radial copies each get their own group',async()=>{
+ const f=await textured({fillEnabled:false,symmetryEnabled:true,symmetryMode:'radial',symmetryExtend:false,symmetryRadialSectors:4,symmetryRadialCenter:{x:160,y:90}});
+ assert.equal(f.calls.length,1,f.log.join(','));const q=plain(f.calls[0].payload);assert.equal(q.records.length,4);
+ const t=q.records.map(r=>r.vectorExt.brushTexture);
+ assert.equal(new Set(t.map(x=>x.brushGroupId)).size,4,'four groups');assert.equal(new Set(t.map(x=>x.strokeSeed)).size,4,'four seeds');
+ // The same drawn stroke gives the same copies' seeds again (no Math.random in the derivation).
+ const Symmetry=require('../src/js/adapters/native-object-draw-symmetry.js'),root={state:{symmetryEnabled:true,symmetryMode:'radial',symmetryRadialSectors:4,symmetryRadialCenter:{x:160,y:90}}};
+ const dict={segments:[{point:[20,20],handleIn:[0,0],handleOut:[0,0]},{point:[50,30],handleIn:[0,0],handleOut:[0,0]}],closed:false,brushTexturePreset:'p',brushGroupId:'bg1_2',strokeSeed:12345,opacity:0};
+ const run=()=>Symmetry.copies(root,dict,{canvasW:320,canvasH:180},null).map(d=>[d.brushGroupId,d.strokeSeed]);
+ assert.deepEqual(run(),run());assert.deepEqual(run()[0],['bg1_2',12345],'the drawn stroke keeps its own identity, first in the stack');
+ assert.deepEqual(run().slice(1).map(x=>x[0]),['bg1_2_c3','bg1_2_c2','bg1_2_c1'],'copy n-1 down to copy 1 above it');
+ assert.equal(dict.brushGroupId,'bg1_2');assert.equal(dict.strokeSeed,12345);
+});
+test('a textured pressure ribbon with symmetry mirrors the hidden ribbon anchor with its own seed and keeps each linked fill plain',async()=>{
+ const f=await textured({vectorBrush:true,fillEnabled:true,symmetryEnabled:true,symmetryMode:'y',symmetryExtend:true},true);
+ assert.equal(f.calls.length,1,f.log.join(','));const q=plain(f.calls[0].payload);
+ assert.deepEqual([q.command,q.records.length],['object.vector.createMany',4]);
+ const [fill0,ribbon0,fill1,ribbon1]=q.records;
+ assert.equal(fill0.vectorExt.brushTexture,undefined);assert.equal(fill1.vectorExt.brushTexture,undefined);
+ const [a,b]=[ribbon0,ribbon1].map(r=>r.vectorExt.brushTexture);
+ assert.deepEqual([a.brushTexturePreset,b.brushTexturePreset,a.preTextureOpacity,b.preTextureOpacity,ribbon0.vector.opacity,ribbon1.vector.opacity],['charcoal-smooth','charcoal-smooth',0.5,0.5,0,0]);
+ assert.notEqual(a.brushGroupId,b.brushGroupId);assert.notEqual(a.strokeSeed,b.strokeSeed);
+});
+test('Trim Stroke Ends on a textured stroke asks native to trim the anchor, which then stamps its dabs, with and without symmetry',async()=>{
+ const one=await textured({trimStrokeEnds:true,trimStrokeEndsMax:24});
+ assert.equal(one.calls.length,1,one.log.join(','));const q=plain(one.calls[0].payload);
+ assert.deepEqual([q.command,q.trimEnds],['object.vector.create',24]);assert.equal(q.record.vectorExt.brushTexture.brushTexturePreset,'charcoal-smooth');
+ const sym=await textured({trimStrokeEnds:true,trimStrokeEndsMax:24,symmetryEnabled:true,symmetryMode:'y',symmetryExtend:true});
+ const m=plain(sym.calls[0].payload);assert.deepEqual([m.command,m.trimEnds,m.records.length],['object.vector.createMany',24,2]);
+ assert.ok(m.records.every(r=>r.vectorExt.brushTexture.brushTexturePreset==='charcoal-smooth'));
+ const ribbon=await textured({vectorBrush:true,trimStrokeEnds:true,trimStrokeEndsMax:24},true);
+ assert.equal(ribbon.calls[0].payload.trimEnds,24);
+ const stop=await fixture();stop.root.BRUSH_PRESETS={'charcoal-smooth':{}};Object.assign(stop.root.state,{brushPreset:'charcoal-smooth',trimStrokeEnds:true,symmetryEnabled:true,symmetryExtend:false});
+ send(stop,'pointerdown',20,20);send(stop,'pointerup',60,50);assert.equal(stop.calls.length,0,'stop-at-axis Trim keeps refusing: the original trims the whole stroke before the clip');
+});
+test('a texture preset still refuses a key neither the built-ins nor the catalog hold, with symmetry too',async()=>{
+ const f=await fixture();Object.assign(f.root.state,{brushPreset:'not-a-preset',symmetryEnabled:true,symmetryMode:'y',symmetryExtend:true});
+ send(f,'pointerdown',20,20);send(f,'pointerup',60,50);assert.equal(f.calls.length,0);
 });

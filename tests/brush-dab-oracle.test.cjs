@@ -87,3 +87,28 @@ test('representative presets, seeds and a pressure profile reproduce the oracle 
     });
   }
 });
+
+test('the mirrored seeded stroke cases are the baseline stamper over the drawn curve and its copy, with the seed the symmetry adapter derives', () => {
+  const run = stamper();
+  const Symmetry = require('../src/js/adapters/native-object-draw-symmetry.js');
+  assert.equal(oracle.mirrorCases.length, 8);
+  const flat = (v) => JSON.parse(JSON.stringify(v)); // the JSON oracle stores -0 as 0
+  const mirror = flat(oracle.paths.curve.segments.map(([p, i, o]) => [[200 - p[0], p[1]], [-i[0], i[1]], [-o[0], o[1]]]));
+  assert.deepEqual(oracle.paths.curveMirror.segments, mirror, 'the copy path is the drawn curve reflected across x = 100');
+  const root = { state: { symmetryEnabled: true, symmetryMode: 'y', symmetryExtend: true, symmetryAxis: { x1: 100, y1: 0, x2: 100, y2: 200 } } };
+  for (const c of oracle.mirrorCases) {
+    if (c.path === 'curveMirror') {
+      const drawn = { segments: oracle.paths.curve.segments.map(([p, i, o]) => ({ point: p.slice(), handleIn: i.slice(), handleOut: o.slice() })), closed: false,
+        brushTexturePreset: c.preset, brushGroupId: 'bg1_1', strokeSeed: c.drawnSeed };
+      const copy = Symmetry.copies(root, drawn, { canvasW: 200, canvasH: 200 }, null)[1];
+      assert.equal(copy.strokeSeed, c.seed, `${c.id}: the adapter derives the copy seed`);
+      assert.deepEqual(flat(copy.segments.map((s) => [s.point, s.handleIn, s.handleOut])), oracle.paths.curveMirror.segments, `${c.id}: the adapter reflects the curve`);
+    }
+    const dabs = JSON.parse(run(oracle.paths[c.path], c.preset, c.width, c.seed, null));
+    assert.equal(dabs.length, c.count, c.id);
+    dabs.slice(0, oracle.full).forEach((d, i) => {
+      assert.deepEqual(d.parts.map((p) => ({ closed: p.closed, segments: p.segments.map((s) => s.map(r6)) })), c.dabs[i].parts, `${c.id} dab ${i}`);
+      assert.equal(r6(d.opacity), c.dabs[i].opacity, `${c.id} dab ${i} opacity`);
+    });
+  }
+});

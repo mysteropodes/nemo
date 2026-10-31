@@ -233,3 +233,62 @@ fn a_captured_stamp_without_its_handles_has_no_catalog_preset() {
     let record: BrushPresetRecord = serde_json::from_value(preset).unwrap();
     assert_eq!(from_catalog(&record), None, "the baseline reads s.handleOut[0] and throws");
 }
+
+/// #2361 draw-texture-symmetry-trim: a mirrored stroke's copy is an anchor of its own group and seed (the seed the native
+/// symmetry adapter derives from the drawn stroke's). Native stamps the drawn curve and its reflection, each with its own
+/// seed, as the baseline stamper does over the same two paths: every dab of both, dab for dab on the first eight and by
+/// summary on the rest; the copy's dabs are its own, not the drawn stroke's mirrored.
+#[test]
+fn a_mirrored_seeded_stroke_stamps_the_drawn_curve_and_its_copy_each_from_its_own_seed() {
+    let o = oracle();
+    let cases = o["mirrorCases"].as_array().unwrap();
+    assert_eq!(cases.len(), 8);
+    let full = o["full"].as_u64().unwrap() as usize;
+    for pair in cases.chunks(2) {
+        let (drawn, copy) = (&pair[0], &pair[1]);
+        assert_eq!((drawn["path"].as_str(), copy["path"].as_str()), (Some("curve"), Some("curveMirror")));
+        assert_ne!(drawn["seed"], copy["seed"], "{}: the copy has its own seed", copy["id"]);
+        let mut stamped = Vec::new();
+        for case in pair {
+            let id = case["id"].as_str().unwrap();
+            let dabs = stamp(&o, case);
+            assert_eq!(dabs.len() as u64, case["count"].as_u64().unwrap(), "{id}");
+            for (i, dab) in dabs.iter().enumerate() {
+                let row = case["summary"][i].as_array().unwrap();
+                let n = dab.path.segments.len() as f64;
+                let centre = [
+                    dab.path.segments.iter().map(|s| s.p[0]).sum::<f64>() / n,
+                    dab.path.segments.iter().map(|s| s.p[1]).sum::<f64>() / n,
+                ];
+                assert!(
+                    near(centre[0], f(&row[0]), 1.5e-3)
+                        && near(centre[1], f(&row[1]), 1.5e-3)
+                        && near(dab.opacity, f(&row[7]), 1.5e-3)
+                        && near(dab.value_delta, f(&row[6]), 1.5e-3),
+                    "{id} dab {i}: {centre:?} {} {} != {row:?}",
+                    dab.opacity,
+                    dab.value_delta
+                );
+                if i < full {
+                    let segments = case["dabs"][i]["parts"][0]["segments"].as_array().unwrap();
+                    assert_eq!(segments.len(), dab.path.segments.len(), "{id} dab {i}");
+                    for (s, e) in dab.path.segments.iter().zip(segments) {
+                        let got = [s.p[0], s.p[1], s.h_in[0], s.h_in[1], s.h_out[0], s.h_out[1]];
+                        assert!(
+                            got.iter().zip(e.as_array().unwrap()).all(|(g, e)| near(*g, f(e), 1.5e-6)),
+                            "{id} dab {i}: {got:?} != {e}"
+                        );
+                    }
+                }
+            }
+            stamped.push(dabs);
+        }
+        // The same seed over the mirror image is not the copy: the drawn stroke's own seed gives other dabs.
+        let mut reseeded = copy.clone();
+        reseeded["seed"] = drawn["seed"].clone();
+        let same_seed = stamp(&o, &reseeded);
+        let moved = same_seed.len() != stamped[1].len()
+            || same_seed.iter().zip(&stamped[1]).any(|(a, b)| !near(a.value_delta, b.value_delta, 1e-9) || !near(a.opacity, b.opacity, 1e-9));
+        assert!(moved, "{}: a copy stamped with the drawn seed would repeat the drawn stroke's jitter", copy["id"]);
+    }
+}
