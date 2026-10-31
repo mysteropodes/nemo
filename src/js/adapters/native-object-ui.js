@@ -288,7 +288,7 @@
           if(row.parentNode!==list||!views.get(root)||!views.get(root).rows.includes(row))return false;
           return setLayerPolicy(root,layer.layerUid,flag,value,info,ports);
         },
-        onOpen:function(layer){return typeof ports.openLayer==='function'&&ports.openLayer(layer.layerUid);},parentCell:root.NemoNativeLayerParent?function(layer,i){return root.NemoNativeLayerParent.cell(root,info,layer,i);}:null,layerKind:root.SMLayerKind,blendLabels:root.BLEND_MODE_LABELS,matteLabel:typeof root.matteModeLabel==='function'?root.matteModeLabel:null});
+        onOpen:function(layer){return typeof ports.openLayer==='function'&&ports.openLayer(layer.layerUid);},parentCell:root.NemoNativeLayerParent?function(layer,i,row){return root.NemoNativeLayerParent.cell(root,info,layer,i,row);}:null,layerKind:root.SMLayerKind,blendLabels:root.BLEND_MODE_LABELS,matteLabel:typeof root.matteModeLabel==='function'?root.matteModeLabel:null});
       caption=createNativeObjectUiText(root,'div','');
       unavailable=createNativeObjectUiText(root,'div','Native keyframe, held-frame and tween timing is unavailable.');
       unavailable.setAttribute('role','status');unavailable.className='native-object-timing-unavailable';

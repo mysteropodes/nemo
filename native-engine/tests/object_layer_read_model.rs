@@ -154,6 +154,15 @@ fn blend_and_matte_facts_are_copied_and_a_source_is_marked() {
 }
 
 #[test]
+fn the_stored_link_source_and_follow_target_are_reported() {
+    let rows = rows(&flat(
+        json!([{"layerUid":"lead"},{"layerUid":"linked","range":{"timeLink":{"uid":"lead"}},
+            "followPath":{"targetLayerUid":"lead","align":true}}]), json!({})));
+    assert_eq!((&rows[1]["timeLinkUid"], &rows[1]["followPathUid"]), (&json!("lead"), &json!("lead")));
+    assert!(rows[0].get("timeLinkUid").is_none() && rows[0].get("followPathUid").is_none());
+}
+
+#[test]
 fn static_opacity_is_reported_and_an_animated_track_is_flagged() {
     let target = |uid: &str| json!({"contextId":"scene-root","layerUid":uid});
     let layers = [

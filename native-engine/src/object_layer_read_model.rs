@@ -8,7 +8,7 @@
 //! Row additions (all optional except `kind`): `kind` (the `layer-kind.js` `keyOf` taxonomy, or `unknown` when the stored
 //! content contradicts itself), `folderCollapsed` (a folder layer's stored state), `folderId` (organisational membership),
 //! `componentId` (the symbol an instance layer places), `blendMode`, `matteMode`, `matteSourceLayerUid`, `mattesMore`,
-//! `isMatteSource`, `opacity` (the static value), `opacityAnimated`, and (#2372) `effects` (the layer's stored effect stack, so the
+//! `isMatteSource`, `timeLinkUid` and `followPathUid` (#2372: the stored Link time source and Follow path target), `opacity` (the static value), `opacityAnimated`, and (#2372) `effects` (the layer's stored effect stack, so the
 //! effects panel can send a complete replacement) or `effectsOversize` when the stack is past the row or document bound, and the same for the path-effect stack (`pathFx`, `pathFxOversize`). Top level: `layerFolders` (the organisational folder
 //! rows) and `layerModelUnavailable`. The colour label stays the existing `color` row member.
 use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
@@ -223,6 +223,18 @@ pub(crate) fn layer_members(document: &ObjectDocument) -> Vec<Map<String, Value>
             }
             if sources.contains(&index) {
                 row.insert("isMatteSource".into(), json!(true));
+            }
+            // #2372: the stored Link time source and Follow path target, so the layer menus can mark the current pick.
+            if let Some(link) = layer
+                .range
+                .value()
+                .and_then(|range| range.time_link.value())
+                .and_then(Option::as_ref)
+            {
+                row.insert("timeLinkUid".into(), json!(link.uid));
+            }
+            if let Some(follow) = layer.follow_path.value().and_then(Option::as_ref) {
+                row.insert("followPathUid".into(), json!(follow.target_layer_uid()));
             }
             if let Some(stack) = layer.effects().filter(|stack| !stack.is_empty()) {
                 carry_stack(&mut row, stack, "effects", "effectsOversize", &mut effects_budget);

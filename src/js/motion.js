@@ -3746,7 +3746,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   function setLayerFollowPath(li, targetUid) {
     var ld = state.layers[li];
     if (!ld) return;
-    if (window.nativeLayerParent && window.nativeLayerParent()) { if (window.showToast) showToast('Follow Path is not available on a native project yet.'); return; }
+    var natP = window.nativeLayerParent && window.nativeLayerParent();
+    if (natP) { natP.api.followPathSet(window, natP.adapter, li, targetUid || null, function () { renderLayerList(); renderTimeline(); }); return; }
     if (!targetUid) { ld.followPath = null; if (window.SMEngineBridge) SMEngineBridge.renderNow(); return; }
     if (targetUid === ensureLayerUid(ld)) return; // can't follow itself
     ld.followPath = { targetLayerUid: targetUid, align: (ld.followPath && ld.followPath.align) || false };
@@ -8493,7 +8494,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   function setLayerTimeLink(li, targetIdx, mode, srcAnchor) {
     var ld = state.layers[li], src = state.layers[targetIdx];
     if (!ld || !src || targetIdx === li) return false;
-    if (window.nativeLayerParent && window.nativeLayerParent()) { if (window.showToast) showToast('Parent in Time is not available on a native project yet.'); return false; }
+    var natP = window.nativeLayerParent && window.nativeLayerParent();
+    if (natP) { natP.api.timeLinkSet(window, natP.adapter, li, targetIdx, mode || 'both', srcAnchor, function () { renderLayerList(); renderTimeline(); }); return true; }
     if (timeLinkWouldCycle(li, targetIdx)) { if (window.showToast) showToast(SM.t('toastLinkImpossibleCycle')); return false; }
     pushUndo();
     mode = mode || 'both';
