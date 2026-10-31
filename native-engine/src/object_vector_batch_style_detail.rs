@@ -272,7 +272,7 @@ pub(super) fn preset(
     key: &str,
     catalog: Option<&ProjectPresetCatalog>,
 ) -> Result<Vec<ObjectRecord>, DispatchErrorCode> {
-    use crate::evaluation::brush_dab::presets::{builtin, from_catalog};
+    use crate::object_document::brush_dab::presets::{builtin, from_catalog};
     use DispatchErrorCode::InvalidRequest;
     let ext = existing.vector_ext.value();
     let body = existing.vector().ok_or(InvalidRequest)?;

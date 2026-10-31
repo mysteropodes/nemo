@@ -1308,6 +1308,7 @@
         "object_vector_batch_box_angle.rs",
         "object_vector_batch_style.rs",
         "object_vector_batch_style_detail.rs",
+        "object_vector_batch_style_preset.rs",
         "object_vector_trim_ends.rs",
         "object_vector_edit_limits.rs",
         "object_vector_edit_lock.rs",
