@@ -6,16 +6,16 @@ use super::support::*;
 use crate::history::NativeObjectHistory;
 use serde_json::{json, Value};
 
-fn batch(ops: Vec<Value>) -> Value {
+pub(super) fn batch(ops: Vec<Value>) -> Value {
     json!({"command":"object.vector.batch","ops":ops})
 }
-fn target(frame: u32, stroke: &str) -> Value {
+pub(super) fn target(frame: u32, stroke: &str) -> Value {
     json!({"contextId":"scene-root","frameScope":{"kind":"authored","frame":frame},"layerUid":"L1","strokeId":stroke})
 }
-fn restyle(id: &str, style: Value) -> Value {
+pub(super) fn restyle(id: &str, style: Value) -> Value {
     json!({"op":"restyle","stableTarget":target(0, id),"style":style})
 }
-fn mixed() -> Value {
+pub(super) fn mixed() -> Value {
     let mut doc = document(
         1,
         vec![
@@ -29,20 +29,20 @@ fn mixed() -> Value {
             "color":"#112233","align":"left","anchorTopLeft":{"x":10,"y":20}}}]});
     doc
 }
-fn at(owner: &NativeObjectHistory, id: &str) -> Value {
+pub(super) fn at(owner: &NativeObjectHistory, id: &str) -> Value {
     objects(&state(owner))
         .iter()
         .find(|r| r["target"]["strokeId"] == id)
         .unwrap()
         .clone()
 }
-fn close(v: &Value, want: f64) -> bool {
+pub(super) fn close(v: &Value, want: f64) -> bool {
     v.as_f64().is_some_and(|v| (v - want).abs() < 1e-9)
 }
-fn paint(v: &Value) -> [f64; 4] {
+pub(super) fn paint(v: &Value) -> [f64; 4] {
     ["r", "g", "b", "a"].map(|k| v[k].as_f64().unwrap())
 }
-fn byte(n: u8) -> f64 {
+pub(super) fn byte(n: u8) -> f64 {
     f64::from(n) / 255.0
 }
 
@@ -180,7 +180,7 @@ fn a_text_block_takes_a_fill_as_its_colour_and_an_opacity_as_its_alpha() {
     );
 }
 
-fn ribbon_doc() -> NativeObjectHistory {
+pub(super) fn ribbon_doc() -> NativeObjectHistory {
     let mut owner = owner_of(&document(1, seeds(), None));
     let companion = pressure_record(
         [0.2, 0.4, 0.6],
@@ -310,7 +310,7 @@ fn a_ribbon_is_inked_by_its_fill_and_takes_either_colour_member_but_not_two_that
     assert_eq!(both["error"]["code"], "invalid_request", "{both}");
 }
 
-fn refused(doc: &Value, ops: Vec<Value>, code: &str) {
+pub(super) fn refused(doc: &Value, ops: Vec<Value>, code: &str) {
     let mut owner = owner_of(doc);
     let before = state(&owner);
     let r = send(&mut owner, "refused", batch(ops.clone()));

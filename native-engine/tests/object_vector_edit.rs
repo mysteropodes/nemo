@@ -22,6 +22,10 @@ mod batch_items;
 mod batch_box_angle;
 #[path = "object_vector_batch_style.rs"]
 mod batch_style;
+#[path = "object_vector_batch_style_detail.rs"]
+mod batch_style_detail;
+#[path = "object_vector_batch_style_preset.rs"]
+mod batch_style_preset;
 #[path = "object_vector_trim_ends.rs"]
 mod trim_ends;
 #[path = "object_vector_edit_support.rs"]

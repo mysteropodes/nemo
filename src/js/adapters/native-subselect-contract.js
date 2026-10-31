@@ -8,10 +8,13 @@
   const integer=(v,max)=>Number.isSafeInteger(v)&&v>=0&&(max===undefined||v<=max),point=v=>Array.isArray(v)&&v.length===2&&v.every(Number.isFinite);
   const indices=v=>Array.isArray(v)&&v.length>0&&v.length<=256&&v.every(n=>integer(n,255))&&new Set(v).size===v.length;
   const fail=message=>{throw new TypeError(message);};
-  // #2372 SEL-STYLE: the style a panel shows for a listed item, each member optional: hex fill / stroke, a positive width, an opacity in 0..1.
+  // #2372 SEL-STYLE: the style a panel shows for a listed item, each member optional: hex fill / stroke, a positive width, an opacity in 0..1,
+  // and (SEL-STYLE2) the stroke details cap, join, miter, dashOffset, paintOrder.
   const hexColour=v=>typeof v==='string'&&/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v);
-  const listedStyle=v=>exact(v,[],['fill','stroke','width','opacity'])&&Object.keys(v).length>0&&(!own(v,'fill')||hexColour(v.fill))&&(!own(v,'stroke')||hexColour(v.stroke))&&
-    (!own(v,'width')||typeof v.width==='number'&&Number.isFinite(v.width)&&v.width>0)&&(!own(v,'opacity')||typeof v.opacity==='number'&&v.opacity>=0&&v.opacity<=1);
+  const finite=v=>typeof v==='number'&&Number.isFinite(v);
+  const listedStyle=v=>exact(v,[],['fill','stroke','width','opacity','cap','join','miter','dashOffset','paintOrder'])&&Object.keys(v).length>0&&(!own(v,'fill')||hexColour(v.fill))&&(!own(v,'stroke')||hexColour(v.stroke))&&
+    (!own(v,'width')||finite(v.width)&&v.width>0)&&(!own(v,'opacity')||finite(v.opacity)&&v.opacity>=0&&v.opacity<=1)&&(!own(v,'cap')||['butt','round','square'].includes(v.cap))&&
+    (!own(v,'join')||['miter','round','bevel'].includes(v.join))&&(!own(v,'miter')||finite(v.miter)&&v.miter>=0)&&(!own(v,'dashOffset')||finite(v.dashOffset))&&(!own(v,'paintOrder')||['fillFirst','strokeFirst'].includes(v.paintOrder));
   function target(v){return exact(v,['contextId','layerUid','frameScope','strokeId'])&&v.contextId==='scene-root'&&
     ['layerUid','strokeId'].every(k=>typeof v[k]==='string'&&v[k].length>0)&&exact(v.frameScope,['kind','frame'])&&
     ['authored','reference'].includes(v.frameScope.kind)&&integer(v.frameScope.frame,4294967295);}

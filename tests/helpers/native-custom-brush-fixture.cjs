@@ -131,7 +131,7 @@ async function fixture(initial,options={}){
       source=source.slice(start,end+3)+'\n'+extract(source,'resolveBrushPreset')+'\n'+extract(source,'applyBrushTexture');
     }else if(file==='timeline.js'){
       const start=source.indexOf('  setBrushPreset:function('),end=source.indexOf('\n  setSmoothing:',start);assert(start>=0&&end>start);
-      source='Object.assign(SM,{'+source.slice(start,end)+'});\n'+extract(source,'applyVectorBrushToSelection');
+      source='var nativeSelStyle=function(){return false;};Object.assign(SM,{'+source.slice(start,end)+'});\n'+extract(source,'applyVectorBrushToSelection');
     }
     vm.runInContext(source,context,{filename:file});
   }

@@ -215,18 +215,7 @@
       "authority": "unavailable",
       "entries": {},
       "kinds": [
-        "timeline-mask-feather",
-        "timeline-selection-brush-preset",
-        "timeline-selection-dash-offset",
-        "timeline-selection-fill-enabled",
-        "timeline-selection-miter-limit",
-        "timeline-selection-paint-order",
-        "timeline-selection-smooth-stroke",
-        "timeline-selection-stroke-cap",
-        "timeline-selection-stroke-enabled",
-        "timeline-selection-stroke-join",
-        "timeline-selection-stroke-style",
-        "timeline-selection-swap-paint"
+        "timeline-mask-feather"
       ]
     },
     {
@@ -235,10 +224,21 @@
       "capability": "native-object-vector",
       "entries": {},
       "kinds": [
+        "timeline-selection-brush-preset",
         "timeline-selection-brush-size",
+        "timeline-selection-dash-offset",
         "timeline-selection-fill-color",
+        "timeline-selection-fill-enabled",
+        "timeline-selection-miter-limit",
         "timeline-selection-opacity",
-        "timeline-selection-stroke-color"
+        "timeline-selection-paint-order",
+        "timeline-selection-smooth-stroke",
+        "timeline-selection-stroke-cap",
+        "timeline-selection-stroke-color",
+        "timeline-selection-stroke-enabled",
+        "timeline-selection-stroke-join",
+        "timeline-selection-stroke-style",
+        "timeline-selection-swap-paint"
       ]
     },
     {

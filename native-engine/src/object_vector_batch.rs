@@ -27,6 +27,8 @@ mod items;
 mod transform;
 #[path = "object_vector_batch_style.rs"]
 mod style;
+#[path = "object_vector_batch_style_detail.rs"]
+mod detail;
 
 /// One batch is a bounded gesture, never a document rewrite; the encoded request stays under the vector budget.
 pub(crate) const MAX_BATCH_OPS: usize = 64;
@@ -166,7 +168,7 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<
                 swaps.push(Some(swap));
                 continue;
             }
-            for (at, mut record) in style::restyle(origin.document(), &target, &style)?.into_iter().enumerate() {
+            for (at, mut record) in style::restyle(origin.document(), &target, &style, origin.project().and_then(|p| p.project().custom_brush_presets()))?.into_iter().enumerate() {
                 record.target.frame_scope.frame = frame.unwrap_or(target.frame_scope.frame);
                 companion.push(at > 0);
                 swaps.push(None);

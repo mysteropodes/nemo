@@ -177,7 +177,8 @@ fn a_record_image_and_text_list_the_style_a_panel_shows() {
     doc["objects"][0]["vector"] = json!({"stroke":{"kind":"solid","r":0.0,"g":1.0,"b":0.0,"a":1.0},"hasRealStroke":true,"strokeWidth":6,
         "strokeCap":"butt","strokeJoin":"miter","miterLimit":10,"dashOffset":0,"opacity":1});
     let items = listing(&doc)["items"].as_array().unwrap().clone();
-    assert_eq!(items[0]["style"], json!({"fill":"#ff000080","stroke":"#00ff00","width":6.0,"opacity":0.5019607843137255}));
+    assert_eq!(items[0]["style"], json!({"fill":"#ff000080","stroke":"#00ff00","width":6.0,"opacity":0.5019607843137255,
+        "cap":"butt","join":"miter","miter":10.0,"dashOffset":0.0}));
     assert_eq!(items[1]["role"], "text");
     assert!(items[1]["style"]["fill"].as_str().is_some_and(|c| c.starts_with('#')), "a text block lists its colour: {}", items[1]);
     assert_eq!(items[2]["style"], json!({"opacity":1.0}), "an image lists its opacity");
@@ -186,7 +187,11 @@ fn a_record_image_and_text_list_the_style_a_panel_shows() {
     doc["objects"][0]["vector"]["hasRealStroke"] = json!(false);
     doc["objects"][0]["vector"]["stroke"] = Value::Null;
     doc["objects"][0]["vector"]["opacity"] = json!(0.25);
-    assert_eq!(listing(&doc)["items"][0]["style"], json!({"width":6.0,"opacity":0.25}));
+    assert_eq!(listing(&doc)["items"][0]["style"], json!({"width":6.0,"opacity":0.25,"cap":"butt","join":"miter","miter":10.0,"dashOffset":0.0}));
+    // SEL-STYLE2: the paint order is listed for the panel too.
+    doc["objects"][0]["vector"]["paintOrder"] = json!("strokeFirst");
+    let style = listing(&doc)["items"][0]["style"].clone();
+    assert_eq!(style["paintOrder"], "strokeFirst");
 }
 
 #[test]
