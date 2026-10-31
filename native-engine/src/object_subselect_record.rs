@@ -291,7 +291,8 @@ pub(crate) fn param_shape(record: &ObjectRecord) -> Option<serde_json::Value> {
 /// How many enclosing groups a listed record names (the innermost ones): one record's listing must stay inside the 4096-byte page.
 const GROUP_PATH_DEPTH: usize = 4;
 /// #2376 hit-test listing: the vector groups a stroke sits in, outermost first, from the layer's group table: its innermost group (the
-/// member tag) then each `parent` up, each `{id, name?}`. None for a loose stroke. A parent cycle ends the walk where it repeats.
+/// member tag) then each `parent` up, each `{id, name?, mode?}` (`mode` is the stored combine mode, absent on a legacy group that reads as
+/// `none`). None for a loose stroke. A parent cycle ends the walk where it repeats.
 pub(crate) fn group_path(table: &crate::object_document::GroupTable, stroke_id: &str) -> Option<Vec<serde_json::Value>> {
     let mut gid = table.members.iter().find(|m| m.stroke_id == stroke_id)?.group_id.as_str();
     let mut chain: Vec<&str> = Vec::new();
@@ -302,6 +303,9 @@ pub(crate) fn group_path(table: &crate::object_document::GroupTable, stroke_id: 
         let mut listed = serde_json::json!({ "id": gid });
         if let Some(name) = entry.and_then(|e| e.name.value()) {
             listed["name"] = serde_json::json!(name);
+        }
+        if let Some(mode) = entry.and_then(|e| e.combine_mode.value()) {
+            listed["mode"] = serde_json::json!(mode);
         }
         path.push(listed);
         match entry.and_then(|e| e.parent.value()) {

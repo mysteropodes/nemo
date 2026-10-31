@@ -61,11 +61,15 @@ function harness(options) {
   const spy = Object.assign({}, Intent, { applyPick: (root, item, shift) => { picks.push([item && item.data.strokeId, !!shift]); return Intent.applyPick(root, item, shift); } });
   const verdicts = o.verdicts || {};
   const intent = { rename: async (i) => { calls.push(['rename', JSON.parse(JSON.stringify(i))]); return verdicts.rename || { ok: true, applied: true }; },
-    ungroup: async (i) => { calls.push(['ungroup', JSON.parse(JSON.stringify(i))]); return verdicts.ungroup || { ok: true, applied: true }; } };
+    ungroup: async (i) => { calls.push(['ungroup', JSON.parse(JSON.stringify(i))]); return verdicts.ungroup || { ok: true, applied: true }; },
+    setMode: async (i) => { calls.push(['setMode', JSON.parse(JSON.stringify(i))]); return verdicts.setMode || { ok: true, applied: true }; } };
   const win = { document: doc, state, paper, Path: paper.Path, Point: paper.Point, Matrix: paper.Matrix, selectedPaths: [], ICO_GROUP: '<svg id="g"/>', ICO_IMAGE: '<svg id="i"/>',
+    ICO_COMBINE_NONE: '<svg id="none"/>', ICO_COMBINE_UNITE: '<svg id="unite"/>', ICO_COMBINE_EXCLUDE: '<svg id="exclude"/>',
+    icoCombineSubtract: (uid) => '<svg id="subtract-' + uid + '"/>', icoCombineIntersect: (uid) => '<svg id="intersect-' + uid + '"/>',
     updateUI() { updates.push(revision); }, SMEngineBridge: { renderNow() {} }, showToast: (t) => toasts.push(t), showContextMenu: (x, y, entries) => { win.menu = entries; },
     SM: { t: (k) => ({ hdrElements: 'Elements', autoNameShape: 'Shape', autoNameStroke: 'Stroke', autoNameGroup: 'Group', autoNameText: 'Text', elementsRename: 'Rename',
-      elementsSelect: 'Select', elementsSelectMembers: 'Select members', elementsUngroup: 'Ungroup', elementsPanelEmpty: 'No elements' }[k] || k) },
+      elementsSelect: 'Select', elementsSelectMembers: 'Select members', elementsUngroup: 'Ungroup', elementsPanelEmpty: 'No elements',
+      combineUnion: 'Union', combineSubtract: 'Subtract', combineIntersect: 'Intersect', combineExclude: 'Exclude', combineNone: 'Remove combine' }[k] || k) },
     NemoNativeObjectProject: { desktop: () => session, selectLayerUI: () => true }, NemoSelectCanvasIntent: Intent, NemoNativeShapeTreeModel: Model,
     NemoNativeViewportUnderlay: { canvasMapping: { point: (e) => ({ x: e.clientX, y: e.clientY }) } } };
   const panel = Shape.create(win, { canvas: () => spy, intent: () => intent });
@@ -128,7 +132,7 @@ test('a row click selects the item as a Select-tool click does (applyPick on a f
 test('Select members selects every member of the group (nested ones included); a group click does the same', async () => {
   const h = await shown(harness());
   row(h, gid('outer')).fire('contextmenu');
-  assert.deepEqual(h.win.menu.filter((m) => m.label).map((m) => m.label), ['Rename', 'Select members', 'Ungroup']);
+  assert.deepEqual(h.win.menu.filter((m) => m.label).map((m) => m.label), ['Rename', 'Select members', 'Union', 'Subtract', 'Intersect', 'Exclude', 'Remove combine ✓', 'Ungroup']);
   h.win.menu.find((m) => m.label === 'Select members').action(); await settle();
   assert.deepEqual(h.selected(), ['v1', 'v2', 'v3'], 'the three leaves, in listing order');
   assert.deepEqual(h.picks.map((p) => p[1]), [false, true, true], 'one replacing pick then additions');
@@ -231,4 +235,62 @@ test('the legacy renderer yields to the native presenter and writes nothing (sha
   vm.runInContext(src, ctx);
   win.renderShapesPanel();
   assert.deepEqual(writes, [], 'a native project is never rendered by the legacy Elements panel');
+});
+
+// ---- the combine-mode badge and menu (#2376, baseline shapes-panel.js Combined Shape) ----
+const moded = (mode) => ITEMS().map((i) => ({ ...i, groupPath: i.groupPath && i.groupPath.map((g) => (g.id === 'outer' ? { ...g, mode } : g)) }));
+const badge = (h, id) => row(h, gid(id)).querySelector('.motion-combine-badge');
+
+test('a group row wears the baseline combine badge for the mode the native listing carries; a legacy group (no mode) reads none', async () => {
+  const h = harness(); h.set(moded('subtract')); await shown(h);
+  const b = badge(h, 'outer');
+  assert.equal(b.className, 'lico motion-combine-badge'); assert.equal(b.innerHTML_set, '<svg id="subtract-outer"/>'); assert.equal(b.title, 'Subtract'); assert.equal(b.dataset.mode, 'subtract');
+  row(h, gid('outer')).querySelector('.larrow').fire('click');
+  assert.equal(badge(h, 'inner').dataset.mode, 'none'); assert.equal(badge(h, 'inner').innerHTML_set, '<svg id="none"/>'); assert.equal(badge(h, 'inner').title, 'Remove combine');
+  assert.equal(h.calls.length, 0, 'showing a mode writes nothing');
+  assert.equal(Model.build(moded('unite').map(({ segments, ...i }) => i), { shape: 'S', stroke: 'T', group: 'G', text: 'X', image: 'I' }).find((r) => r.gid === 'outer').mode, 'unite');
+});
+
+test('a badge click cycles to the next mode as ONE group.mode.set and does not select the row', async () => {
+  const h = harness(); h.set(moded('subtract')); await shown(h);
+  badge(h, 'outer').fire('click'); await settle();
+  assert.deepEqual(h.calls, [['setMode', { layerUid: 'L', contextId: 'scene-root', groupId: 'outer', mode: 'intersect' }]]);
+  assert.deepEqual(h.picks, [], 'the click is the badge\'s, not the row\'s'); assert.equal(h.updates.length, 1);
+  const h2 = await shown(harness());
+  badge(h2, 'outer').fire('click'); await settle();
+  assert.equal(h2.calls[0][1].mode, 'unite', 'none -> unite (the baseline cycle order)');
+});
+
+test('the group menu lists the five modes with a check on the current one; a choice is exactly one request, the current one sends nothing', async () => {
+  const h = harness(); h.set(moded('exclude')); await shown(h);
+  row(h, gid('outer')).fire('contextmenu');
+  assert.deepEqual(h.win.menu.filter((m) => m.label).map((m) => m.label), ['Rename', 'Select members', 'Union', 'Subtract', 'Intersect', 'Exclude ✓', 'Remove combine', 'Ungroup']);
+  h.win.menu.find((m) => m.label === 'Exclude ✓').action(); await settle();
+  assert.equal(h.calls.length, 0, 'choosing the stored mode is a no-op');
+  h.win.menu.find((m) => m.label === 'Subtract').action(); await settle();
+  assert.deepEqual(h.calls, [['setMode', { layerUid: 'L', contextId: 'scene-root', groupId: 'outer', mode: 'subtract' }]]);
+  h.win.menu.find((m) => m.label === 'Remove combine').action(); await settle();
+  assert.deepEqual(h.calls.map((c) => c[1].mode), ['subtract', 'none']);
+});
+
+test('after a revision the badge repaints from the new listing; a refused mode change toasts and keeps the old badge', async () => {
+  const h = harness({ verdicts: { setMode: { ok: false, code: 'unavailable' } } }); h.set(moded('unite')); await shown(h);
+  badge(h, 'outer').fire('click'); await settle();
+  assert.match(h.toasts.at(-1), /combine mode could not be changed/); assert.equal(h.updates.length, 0); assert.equal(badge(h, 'outer').dataset.mode, 'unite');
+  h.set(moded('subtract')); h.bump(); h.panel.refresh(false); await settle();
+  assert.equal(badge(h, 'outer').dataset.mode, 'subtract', 'the new revision changes the badge'); assert.equal(h.reads.length, 2);
+  const stale = harness({ verdicts: { setMode: { ok: false, code: 'stale_revision' } } }); await shown(stale);
+  badge(stale, 'outer').fire('click'); await settle(); assert.match(stale.toasts.at(-1), /changed/);
+});
+
+test('the real group intent builds the exact group.mode.set request the native contract admits', async () => {
+  const sent = [];
+  const ports = { pin: () => ({ instanceId: 'i', documentId: 'd', contentRevision: 7 }), requestId: (l) => l + '-1', declared: (op) => Contract.admitted(op),
+    submit: async (request) => { sent.push(request); return { apiVersion: 2, requestId: request.requestId, ok: true, contentRevision: 8, result: { applied: true, historyEntriesAdded: 1 } }; } };
+  const h = harness(); h.set(moded('none'));
+  const panel = Shape.create(h.win, { canvas: () => Intent, intent: () => GroupIntent.createGroupIntent(ports) });
+  panel.mount(h.container); await settle();
+  badge(h, 'outer').fire('click'); await settle();
+  assert.deepEqual(sent.map((r) => [r.operation, r.expectedRevision, r.payload]), [
+    ['command.document.object.group.mode.set', 7, { command: 'object.group.mode.set', layerUid: 'L', contextId: 'scene-root', groupId: 'outer', mode: 'unite' }]]);
 });

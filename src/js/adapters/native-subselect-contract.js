@@ -76,8 +76,9 @@
     const members=v&&typeof v==='object'&&!Array.isArray(v)&&SHAPE_MEMBERS[v.kind];
     return !!members&&Object.keys(v).every(k=>k==='kind'||members.includes(k)&&typeof v[k]==='number'&&Number.isFinite(v[k]));
   }
-  // #2376: the vector groups a listed record sits in, outermost first: one to four bounded ids, each with an optional bounded name.
-  const groupPath=v=>Array.isArray(v)&&v.length>=1&&v.length<=4&&v.every(g=>exact(g,['id'],['name'])&&typeof g.id==='string'&&g.id.length>0&&bytes(g.id)<=128&&(!own(g,'name')||typeof g.name==='string'&&bytes(g.name)<=256));
+  // #2376: the vector groups a listed record sits in, outermost first: one to four bounded ids, each with an optional bounded name and an optional combine mode.
+  const COMBINE_MODES=['none','unite','subtract','intersect','exclude'];
+  const groupPath=v=>Array.isArray(v)&&v.length>=1&&v.length<=4&&v.every(g=>exact(g,['id'],['name','mode'])&&typeof g.id==='string'&&g.id.length>0&&bytes(g.id)<=128&&(!own(g,'name')||typeof g.name==='string'&&bytes(g.name)<=256)&&(!own(g,'mode')||COMBINE_MODES.includes(g.mode)));
   function viewResult(r){
     if(!exact(r,['kind','atRevision','documentSnapshotId','contextId','layerUid','frame','workId','viewGeneration','cursor','total','nextCursor','items','preview'],['hitTest'])||own(r,'hitTest')&&r.hitTest!==true||
       typeof r.preview!=='boolean'||!integer(r.total,1024)||!integer(r.cursor,r.total)||!Array.isArray(r.items)||r.items.length>8||r.cursor+r.items.length>r.total)fail('Invalid subselect selection page');
