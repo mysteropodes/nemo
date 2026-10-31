@@ -51,6 +51,8 @@
             ['locked','shy'].includes(k)?row[k]===(layer[k]===true):!Object.prototype.hasOwnProperty.call(layer,k)||row[k]===layer[k];
         });});
   }
+  // #2371: read-model members the layer table admits (validated by native-object-project-metadata.js; the presenter reads info.layers).
+  var MODEL_ROW_KEYS=['kind','folderCollapsed','folderId','componentId','blendMode','matteMode','matteSourceLayerUid','mattesMore','isMatteSource','opacity','opacityAnimated'];
   function layerTable(layers){
     if(!Array.isArray(layers))throw new Error('Native layer table is invalid');
     var seen=new Set(),next=[];
@@ -58,7 +60,7 @@
       var layer=layers[i];
       if(!layer||typeof layer.layerUid!=='string'||!layer.layerUid||seen.has(layer.layerUid))
         throw new Error('Native layer identity is invalid');
-      if(Object.keys(layer).some(function(k){return !['layerUid','name','visible','locked','shy','color','parentLayerUid','widget'].includes(k);}))
+      if(Object.keys(layer).some(function(k){return !['layerUid','name','visible','locked','shy','color','parentLayerUid','widget'].concat(MODEL_ROW_KEYS).includes(k);}))
         throw new Error('Native layer metadata is unsupported');
       if(Object.prototype.hasOwnProperty.call(layer,'name')&&typeof layer.name!=='string')throw new Error('Native layer name is invalid');
       if(Object.prototype.hasOwnProperty.call(layer,'visible')&&typeof layer.visible!=='boolean')throw new Error('Native layer visibility is invalid');

@@ -39,6 +39,9 @@ impl InactiveProject {
 
 #[path = "object_reference_dispatch.rs"]
 mod reference_dispatch;
+// #2371: kind, folder, component, matte, blend and opacity facts for the layer rows.
+#[path = "object_layer_read_model.rs"]
+mod layer_read_model;
 // L06-H (lane #2112): asset attach / remove commands.
 #[path = "object_raster_asset_dispatch.rs"]
 #[allow(dead_code)]
@@ -449,11 +452,13 @@ fn project_snapshot_info(
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect();
+    let model = layer_read_model::layer_members(project.drawing());
     let layers: Vec<_> = project
         .drawing()
         .layers
         .iter()
-        .map(|layer| {
+        .zip(model)
+        .map(|(layer, model)| {
             let mut info = serde_json::json!({"layerUid": layer.layer_uid()});
             if let Some(name) = layer.name() {
                 info["name"] = serde_json::json!(name);
@@ -478,6 +483,9 @@ fn project_snapshot_info(
             if layer.widget().is_some() {
                 info["widget"] = serde_json::json!(true);
             }
+            info.as_object_mut()
+                .expect("layer row is an object")
+                .extend(model);
             info
         })
         .collect();
@@ -488,11 +496,15 @@ fn project_snapshot_info(
             "opacity":image.opacity(), "offsetFrames":image.offset_frames()}),
     };
     let (width, height) = project.project().canvas_dimensions();
+    let model_members = layer_read_model::model_members(project.drawing());
     let mut info = serde_json::json!({"documentSnapshotId":snapshot.snapshot_id(),
         "contentRevision":snapshot.content_revision(), "documentDigest":digest,
         "byteCount":bytes.len(), "canvasW":width, "canvasH":height,
         "fps":project.project().fps(), "totalFrames":project.drawing().total_frames,
         "layers":layers, "reference":reference});
+    info.as_object_mut()
+        .expect("project info is an object")
+        .extend(model_members);
     if let Some(background) = project.project().canvas_background() {
         info["canvasBg"] = background.into();
     }
