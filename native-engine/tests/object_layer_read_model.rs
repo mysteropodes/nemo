@@ -160,6 +160,17 @@ fn the_stored_link_source_and_follow_target_are_reported() {
             "followPath":{"targetLayerUid":"lead","align":true}}]), json!({})));
     assert_eq!((&rows[1]["timeLinkUid"], &rows[1]["followPathUid"]), (&json!("lead"), &json!("lead")));
     assert!(rows[0].get("timeLinkUid").is_none() && rows[0].get("followPathUid").is_none());
+    // the orient toggle is reported when set, and only then
+    assert_eq!(rows[1]["followPathAlign"], json!(true));
+    assert!(rows[0].get("followPathAlign").is_none());
+}
+
+#[test]
+fn an_unaligned_follow_reports_its_target_without_the_align_flag() {
+    let rows = rows(&flat(
+        json!([{"layerUid":"lead"},{"layerUid":"unaligned","followPath":{"targetLayerUid":"lead","align":false}}]), json!({})));
+    assert_eq!(rows[1]["followPathUid"], json!("lead"));
+    assert!(rows[1].get("followPathAlign").is_none());
 }
 
 #[test]

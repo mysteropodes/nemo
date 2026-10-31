@@ -5,7 +5,7 @@
 //! between the layer's resolved edges and the source's, so the layer stays exactly where it was and only starts
 //! following. Unlinking bakes the edges the link resolved to into hard `inPoint` / `outPoint`, so the layer keeps its range
 //! ("Time: None (unlink, position kept)"). Following a path stores `followPath = {targetLayerUid, align}`, carrying the
-//! stored `align` over like the baseline setter and dropping it on a clear. Each is one candidate document; a refusal
+//! stored `align` over like the baseline setter (an explicit `align` authors it) and dropping it on a clear. Each is one candidate document; a refusal
 //! (self, unknown or foreign layer, time-link cycle, a target that carries no path, a v1 document, a range that cannot be
 //! resolved) is typed and changes nothing. The kernel owns no history or id state.
 use crate::commands::object_fill_owner::layer_lifecycle::parent::{
@@ -246,12 +246,14 @@ fn unlink(
     Ok(sealed(candidate, request.layer_uid))
 }
 
-/// `setLayerFollowPath(li, targetUid)`: `target` `None` is "Chemin : Aucun".
+/// `setLayerFollowPath(li, targetUid)`: `target` `None` is "Chemin : Aucun" (an `align` is ignored there, the clear drops it).
+/// `align` `None` keeps the stored orient toggle; `Some` authors it (the Align button of the Motion Path row).
 pub(crate) fn plan_follow_path(
     document: &ObjectDocument,
     context_id: &str,
     layer_uid: &str,
     target: Option<&str>,
+    align: Option<bool>,
 ) -> Result<LifecyclePlan, LifecycleError> {
     let index = index_of(document, layer_uid)?;
     let current = document.layers[index]
@@ -278,10 +280,11 @@ pub(crate) fn plan_follow_path(
             "a folder, Null or effect layer carries no path to follow",
         ));
     }
-    if current.is_some_and(|c| c.target_layer_uid() == target) {
+    let kept = current.is_some_and(FollowPathRecord::align);
+    let align = align.unwrap_or(kept);
+    if current.is_some_and(|c| c.target_layer_uid() == target && c.align() == align) {
         return Ok(LifecyclePlan::unchanged(document, None));
     }
-    let align = current.is_some_and(FollowPathRecord::align);
     let mut candidate = document.clone();
     candidate.layers[index].follow_path =
         Presence::Present(Some(FollowPathRecord::authored(target.to_owned(), align)));

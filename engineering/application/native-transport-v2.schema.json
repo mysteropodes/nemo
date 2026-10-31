@@ -22567,6 +22567,9 @@
               "const": null
             }
           ]
+        },
+        "align": {
+          "type": "boolean"
         }
       }
     },

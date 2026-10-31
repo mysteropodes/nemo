@@ -18,7 +18,7 @@
     if(!View||!container||!ports||!ports.document||typeof ports.query!=='function'||typeof ports.readContext!=='function'||typeof ports.readSelection!=='function')throw new TypeError('Native Motion panel ports are unavailable');
     var doc=ports.document,retired=false,serial=0,client=View.createConsumer(ports),accepted=null;
     var propertySet=null,mode='all',contentOnly=false,collapsed=false,search='',scope='inspector',rowBindings=[],valueEditors=[],loading=false;
-    var expressionRows=[],expressionFlight=null,expressionWanted=false,expressionScope=null;
+    var expressionRows=[],expressionFlight=null,expressionWanted=false,expressionScope=null,linkRows=[];
     var maxPages=ports.pageBudget===undefined?Infinity:ports.pageBudget;
     if(maxPages!==Infinity&&(!Number.isSafeInteger(maxPages)||maxPages<1))throw new TypeError('Invalid explicit native Motion read budget');
     var section=make('section',''),toolbar=make('div',''),status=make('div',''),body=make('div',''),controls=[];
@@ -149,7 +149,7 @@
     function savePreference(){try{if(ports.writePreference)ports.writePreference('nemo-motion-filter',mode);}catch(_){}}
     function button(label,action){var node=make('button',label);node.type='button';node.addEventListener('click',action);toolbar.appendChild(node);controls.push([node,action]);return node;}
     function clearValues(){valueEditors.forEach(function(editor){editor.dispose();});valueEditors=[];}
-    function clearBody(){releaseExpressionRows();clearValues();clearKeys();rowBindings.forEach(function(pair){pair[0].removeEventListener(pair[2]||'click',pair[1]);});rowBindings=[];body.replaceChildren();}
+    function clearBody(){linkRows.forEach(function(item){try{item.dispose();}catch(_){}});linkRows=[];releaseExpressionRows();clearValues();clearKeys();rowBindings.forEach(function(pair){pair[0].removeEventListener(pair[2]||'click',pair[1]);});rowBindings=[];body.replaceChildren();}
     // Interim element names: the native read model carries no element names yet (read-model gap), so derive
     // "<kind> <n>" from the stable strokeId prefix and the element's 1-based ordinal among its layer's elements.
     function elementLabel(t){
@@ -262,12 +262,15 @@
     function paintRows(){
       if(!validAccepted()){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}
       if(['errors','effects','mattes'].includes(mode)){clearBody();notify('This Motion filter is unavailable.');return false;}
-      var fragment=make('div',''),unknown=false,nextBindings=[],nextValues=[],nextExpressions=[],nextRows=new Map(),lastLayer=null;
+      var fragment=make('div',''),unknown=false,nextBindings=[],nextValues=[],nextExpressions=[],nextRows=new Map(),lastLayer=null,nextLinks=[];
+      // The Path and Time rows (baseline Parent/Follow Path/Time block) belong to ONE active layer, never to a multi-layer selection.
+      var onlyLayer=new Set(accepted.groups.map(function(g){return key({contextId:g.target.contextId,layerUid:g.target.layerUid});})).size===1;
       if(!accepted.groups.length){var none=make('div',tr('noLayerSelected','No layer selected'));none.className='motion-props-layername';fragment.appendChild(none);}
       accepted.groups.forEach(function(group){
         var filtered=filteredRows(group);unknown=unknown||filtered.unknown;
         var target=group.target,layerKey=JSON.stringify([target.contextId,target.layerUid]);
-        if(layerKey!==lastLayer){lastLayer=layerKey;var name=make('div',labelTarget({contextId:target.contextId,layerUid:target.layerUid},accepted.token));name.className='motion-props-layername';name.dataset.layerUid=target.layerUid;fragment.appendChild(name);}
+        if(layerKey!==lastLayer){lastLayer=layerKey;var name=make('div',labelTarget({contextId:target.contextId,layerUid:target.layerUid},accepted.token));name.className='motion-props-layername';name.dataset.layerUid=target.layerUid;fragment.appendChild(name);
+          if(onlyLayer&&typeof ports.layerLinkRows==='function'){try{var linked=ports.layerLinkRows({contextId:target.contextId,layerUid:target.layerUid});if(linked){fragment.appendChild(linked.node);nextLinks.push(linked);}}catch(_){}}}
         var isElement=target.strokeId!==undefined,title=make('div',''),label=make('span',isElement?tr('hdrTransformElement','Transform (element)'):tr('hdrTransform','Transform'));
         title.className='lrow motion-group-row';title.dataset.targetKey=key(target);if(isElement)label.title=labelTarget(target,accepted.token);title.appendChild(label);
         // Baseline hide-unanimated funnel: same persisted nemo-motion-filter preference, 'animated' <-> 'all'.
@@ -313,7 +316,7 @@
       // Unsupported native families do not become an empty global-U result.
       if(appendRevealLimits(fragment))unknown=true;
       if(!validAccepted()){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}
-      rowBindings.forEach(function(pair){pair[0].removeEventListener(pair[2]||'click',pair[1]);});rowBindings=nextBindings;clearValues();body.replaceChildren(fragment);rowIndex=nextRows;replaceDrawers();
+      rowBindings.forEach(function(pair){pair[0].removeEventListener(pair[2]||'click',pair[1]);});rowBindings=nextBindings;clearValues();linkRows.forEach(function(item){try{item.dispose();}catch(_){}});linkRows=nextLinks;body.replaceChildren(fragment);rowIndex=nextRows;replaceDrawers();
       nextValues.forEach(function(item){var editor=Value.create(item.container,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,dimLabels:ports.dimLabels,translate:ports.translate,get editProperty(){return item.row.property==='order'?null:ports.editProperty;},openKeys:item.openKeys},item.target,item.row);valueEditors.push(editor);Promise.resolve(editor.refresh()).catch(function(){editor.cancel();});});
       expressionRows=nextExpressions;refreshExpressionStates();
       notify('');return true;
@@ -347,7 +350,7 @@
       try{token=View.captureContext(ports.readContext());selection=selectionInfo();}catch(_){token=null;}
       if(!token){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}
       if(!force&&accepted&&current(accepted.token,ticket,accepted.selection.signature)){
-        try{var wanted=wantedTargets(accepted.targets,selection);if(accepted.groupKey===groupKey(wanted)){if(repaint)return paint();refreshExpressionStates();return true;}}catch(_){}
+        try{var wanted=wantedTargets(accepted.targets,selection);if(accepted.groupKey===groupKey(wanted)){if(repaint)return paint();refreshExpressionStates();linkRows.forEach(function(item){try{item.refresh();}catch(_){}});return true;}}catch(_){}
       }
       ticket=++serial;setLoading(true);accepted=null;clearBody();notify('Loading properties…');
       try{
