@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "84eea91a70bb530b517212e4e7af6062097f1abb",
-  "describe": "v0.7.0-alpha.4-4574-g84eea91a-dirty"
+  "head": "aec73f4ddfce48775ec2487a176953a85c814904",
+  "describe": "v0.7.0-alpha.4-4577-gaec73f4d-dirty"
  },
- "inputsDigest": "f67168ca6d490441430a46113a9c4322d0337924931c819467cbecbda05437a0",
+ "inputsDigest": "d28ab8ce20ea84e3dbaa0123d01d327609899b702d1314761ffd31331ea2cdf7",
  "states": [
   "inventoried",
   "characterized",
@@ -22197,7 +22197,7 @@
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
    "source": "src/js/labs/timeline-markers.js:82",
    "meta": {
-    "functionsVisited": 22
+    "functionsVisited": 23
    },
    "fixtures": []
   },
