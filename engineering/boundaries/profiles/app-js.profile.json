@@ -3489,18 +3489,6 @@
       ]
     },
     {
-      "id": "app.native.object.vector.restyle",
-      "layer": "domain",
-      "dir": "src/js/adapters",
-      "files": [
-        "native-object-vector-restyle.js"
-      ],
-      "sizeProfile": "Domain/application",
-      "publicApi": [
-        "native-object-vector-restyle.js"
-      ]
-    },
-    {
       "id": "app.native.object.vector.stroke",
       "layer": "domain",
       "dir": "src/js/adapters",

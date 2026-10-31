@@ -4210,18 +4210,6 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-vector-restyle.js",
-      "moduleId": "app.native.object.vector.restyle",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2379,
-          "scriptOrdinal": 71
-        }
-      ]
-    },
-    {
       "path": "src/js/adapters/native-object-vector-contract.js",
       "moduleId": "app.native.object.vector.contract",
       "executionClass": "document-classic",
