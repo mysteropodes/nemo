@@ -189,9 +189,11 @@ impl ObjectSnapshot {
     }
 
     /// Motion `enterComponentLayer`: the component frame the instance layer `layer_uid` shows at the scene frame `outer`, from the
-    /// playback kernel the renderer itself uses (placement, speed, play mode, trim, the outer component-frame keys). `None` leaves the
-    /// entry at the first frame: no such instance of this component, a held blank key, or a Time Remap (it needs the expression
-    /// runtime's sampler, which a pure view query does not have).
+    /// playback kernel the renderer itself uses (placement, speed, play mode, trim, the outer component-frame keys). A Time Remap
+    /// is read as baseline `resolveSymbolFrameIdx` reads it: the instance's own keyed track sampled raw at the playhead; a track
+    /// without keys falls through to the play mode. No expression can drive it: the native document refuses a `timeRemap`
+    /// property record (the track belongs to the instance), and baseline `timeRemapValue` ignores expressions too. `None` leaves
+    /// the entry at the first frame: no such instance of this component, or a held blank key.
     #[cfg(feature = "evaluation")]
     fn instance_entry_frame(&self, component: &str, layer_uid: &str, outer: i64) -> Option<i64> {
         use crate::evaluation::object_component_kernels::object_component_playback::{
@@ -201,7 +203,7 @@ impl ObjectSnapshot {
         use crate::evaluation::object_scene_style_kernels::object_scene_producer_component_select::playback_input;
         let source = ContextSource::of_document(self.document());
         let instance = source.instance(layer_uid)?;
-        if instance.symbol_id() != component || instance.time_remap().is_some() {
+        if instance.symbol_id() != component {
             return None;
         }
         let host = source.context("scene-root").ok()?.layer(layer_uid)?.1;
@@ -212,7 +214,10 @@ impl ObjectSnapshot {
             .total_frames();
         let frame = u32::try_from(outer).ok()?;
         let input = playback_input(instance, host, frame).ok()?;
-        match evaluate_component_playback(&input, f64::from(total), outer, None) {
+        let remap = instance
+            .time_remap()
+            .and_then(|track| crate::object_frame_packet::sample_scalar_keys_raw(&track.keys, outer as f64));
+        match evaluate_component_playback(&input, f64::from(total), outer, remap) {
             PlaybackOutcome::Blank => None,
             PlaybackOutcome::Frame(resolved) => {
                 let raw = resolved.raw();

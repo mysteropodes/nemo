@@ -295,9 +295,10 @@
     function currentPresentation(origin,ticket,inContext){var held=ports.context&&ports.context();return !openingRequested&&!synchronizing&&active()&&origin&&(inContext?!!held&&origin.presentation.contextId===held.contextId:!held)&&origin.presentation===presentation&&view.matches(presentation,info)&&same(info,origin)&&ticket===subscriptionTicket&&
       (!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&
       typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true;}
-    function runFontResource(action,inContext){if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native font owner busy or unavailable'));
+    // #2256: the resource route (composition settings, comments, brushes, font import, every scene editor) is scene-only: refused while a component is entered, at submit AND at dispatch (a command queued before the entry must not run after it). Only the component route (`inContext`, the vector family) is granted the entered presentation.
+    function runFontResource(action,inContext){if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native font owner busy or unavailable'));if(!inContext&&!sceneRoot())return insideComponent();
       var submitted=epoch(info),origin=freeze(presentedSession()),ticket=subscriptionTicket;
-      return enqueue(async function(){guardEpoch(submitted);var running=true;
+      return enqueue(async function(){guardEpoch(submitted);if(!inContext&&!sceneRoot())return insideComponent();var running=true;
         try{return await action({
           // Read-only and action-local: only this operation's own pending entry is exempted.
           // Captured presentation/subscription identity must survive; the public getter stays fenced.

@@ -96,6 +96,9 @@ function fixture(options) {
     requests.push(clone(request));
     if (options.hold && request.operation === 'query.document.object.workspace.context' && request.payload.action.kind === options.hold.kind) await options.hold.promise;
     const base = { apiVersion: 2, requestId: request.requestId, instanceId: 'instance-A', documentId: 'document-A', contentRevision: m.revision };
+    if (m.failRefresh > 0 && request.operation === 'query.document.object.workspace.context' && request.payload.action.kind === 'refresh') {
+      m.failRefresh -= 1; return Object.assign(base, { ok: false, error: { code: 'unavailable', message: 'the owner could not answer' } });
+    }
     const result = request.operation === 'query.document.object.workspace.context' ? workspaceAnswer(m, request) : readAnswer(m, request);
     return result ? Object.assign(base, { ok: true, result }) : Object.assign(base, { ok: false, error: { code: 'not_found', message: 'no such context' } });
   } });
@@ -335,4 +338,56 @@ test('the layer-row double-click enters at the frame the instance shows at the p
   await f.host.SM.exitToScene();
   f.row(2).fire('dblclick'); await settle();
   assert.equal(f.host.state.currentFrame, 5, 'an out-of-range resolution is clamped into the component (6 frames)');
+});
+
+// #2256 review of #2660: a refresh that failed must not be acknowledged. The revision is recorded only once the context was re-read; until
+// then projectionReady() is false (the rows, tabs and frame count are stale), the refresh is retried a bounded number of times, and when
+// the retries run out the scene is shown with a notice instead of a stale entered view.
+async function enteredAt8(f) {
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  f.m.revision = 8; f.m.comps.sym_a.layers.push(['id', 'Inner D', 'drawing']);
+  return f;
+}
+const refreshes = (f) => f.workspaceRequests().filter((r) => r.payload.action.kind === 'refresh').length;
+
+test('a failed refresh does not acknowledge the revision: it is retried, and only the successful retry makes the projection ready', async () => {
+  const f = fixture(), timers = [];
+  f.host.setTimeout = (fn, ms) => { timers.push({ fn, ms }); };
+  await enteredAt8(f); f.m.failRefresh = 1;
+  const info = f.session.info();
+  Context.revision(f.host, info); await settle();
+  assert.equal(refreshes(f), 1, 'the first refresh failed');
+  assert.equal(Context.projectionReady(f.host, info), false, 'the stale rows are not a ready projection');
+  assert.deepEqual(f.host.state.layers.map((l) => l.layerUid), ['ia', 'ib'], 'nothing was applied from the failed answer');
+  assert.equal(timers.length, 1, 'one backoff pause is pending');
+  timers.shift().fn(); await settle();
+  assert.equal(refreshes(f), 2);
+  assert.equal(Context.projectionReady(f.host, info), true, 'acknowledged once the context was re-read');
+  assert.deepEqual(f.host.state.layers.map((l) => l.layerUid), ['ia', 'ib', 'id']);
+  assert.equal(f.host.state.activeSymbolId, 'sym_a', 'the component stays entered');
+});
+
+test('when every retry fails the scene is shown with a notice, after a bounded number of asks', async () => {
+  const f = fixture(), pauses = [];
+  f.host.setTimeout = (fn, ms) => { pauses.push(ms); fn(); };
+  await enteredAt8(f); f.m.failRefresh = Infinity;
+  const info = f.session.info();
+  Context.revision(f.host, info); await settle();
+  assert.equal(refreshes(f), 4, 'the first ask and three retries, never more');
+  assert.deepEqual(pauses, [100, 300, 900], 'with a growing pause');
+  assert.equal(f.host.state.activeSymbolId, null, 'back on the scene');
+  assert.deepEqual(f.host.state.layers.map((l) => l.layerUid), ['L1', 'L2', 'L3']);
+  assert.match(f.toasts.join('|'), /could not be refreshed/);
+  assert.equal(Context.projectionReady(f.host, info), false, 'no entered context is claimed ready');
+});
+
+test('a failed refresh inside a publication rides the same retry and exit (the lease is the publication the queue runs)', async () => {
+  const f = fixture();
+  f.host.setTimeout = (fn) => { fn(); };
+  await enteredAt8(f); f.m.failRefresh = Infinity;
+  await f.session.runResourceCommand((lease) => Context.revision(f.host, f.session.info(), lease));
+  assert.equal(refreshes(f), 4);
+  assert.equal(f.host.state.activeSymbolId, null);
+  assert.match(f.toasts.join('|'), /could not be refreshed/);
 });

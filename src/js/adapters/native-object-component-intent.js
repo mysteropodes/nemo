@@ -118,6 +118,11 @@
     if (typeof session.runFontResource === 'function') return session.runFontResource.bind(session);
     return null;
   }
+  // #2256: a pinned READ changes nothing, so it rides the component route (the queue, without the scene-only edit guard of the resource
+  // route): the entered context's own exit, refresh and layer reads must keep working while a component is presented.
+  function readRouteOf(session) {
+    return session && typeof session.runComponentCommand === 'function' ? session.runComponentCommand.bind(session) : routeOf(session);
+  }
   function portsFromSession(session) {
     const present = () => !!session && typeof session.isActive === 'function' && session.isActive() === true;
     return {
@@ -125,11 +130,11 @@
       declared: (operation) => contract.admitted(operation) && present() && routeOf(session) !== null,
       requestId: (label) => session.requestId(label),
       // #2256: a pinned read goes through the same single resource queue as the commands and reconciles nothing (it changes nothing).
-      readDeclared: () => present() && routeOf(session) !== null,
+      readDeclared: () => present() && readRouteOf(session) !== null,
       async read(request) {
         let started = false;
         try {
-          return await routeOf(session)(async (ctx) => { started = true; return ctx.dispatch(request); });
+          return await readRouteOf(session)(async (ctx) => { started = true; return ctx.dispatch(request); });
         } catch (error) {
           if (!started) throw Object.assign(new Error(String(error && error.message || error)), { notSent: true, reason: 'native_project_busy' });
           throw error;
