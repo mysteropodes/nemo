@@ -2454,7 +2454,7 @@ test('production core, lexical, and public Motion writers stop before touching J
     pushUndoLayers() { throw new Error('pushUndoLayers must not be reached'); } };
   lexical.window = lexical;
   const lexicalBytes = JSON.stringify(selectedPath);
-  vm.runInNewContext(`${extractFunction(tweenSource, 'pushUndo')}\n${extractFunction(timelineSource, 'commitCornerEdit')}\n` +
+  vm.runInNewContext(`${extractFunction(tweenSource, 'pushUndo')}\n${extractFunction(timelineSource, 'nativeParamOwned')}\n${extractFunction(timelineSource, 'commitCornerEdit')}\n` +
     `${extractFunction(motionSource, 'setSelectedEaseInfluence')}\n` +
     `${extractFunction(motionSource, 'colorSelectedKeys')}\n${extractFunction(motionSource, 'subdivideKeys')}\n` +
     'this.__writers = { commitCornerEdit, setSelectedEaseInfluence, colorSelectedKeys, subdivideKeys };',
