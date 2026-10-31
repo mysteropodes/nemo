@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "afe2c8fc5b585c0b39fd610761a8b1a1f364d3c0",
-  "describe": "v0.7.0-alpha.4-4520-gafe2c8fc-dirty"
+  "head": "80fed7b6f10b1a70e56f549e12d232239bc6e678",
+  "describe": "v0.7.0-alpha.4-4522-g80fed7b6-dirty"
  },
- "inputsDigest": "fb66c98e0fa6931c6b6d732d9e2d09616fade76508685396ab2cbce8907b505c",
+ "inputsDigest": "5668df2b26961a2d8f8d9049147067fb60d071b6627c464ce103e937afd43a43",
  "states": [
   "inventoried",
   "characterized",
@@ -146,7 +146,7 @@
   },
   "SMEffectKeys": {
    "file": "src/js/effects-panel.js",
-   "line": 483,
+   "line": 479,
    "members": 4
   },
   "SMEngineBridge": {
@@ -9594,7 +9594,7 @@
    "capability": "+ Add Effect…",
    "area": "effects-masks",
    "handler": [
-    "src/js/effects-panel.js:883 init()"
+    "src/js/effects-panel.js:877 init()"
    ],
    "events": [
     "click"
@@ -9619,7 +9619,7 @@
     "container": "effects-stack-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 83,
+    "functionsVisited": 76,
     "via": "variable addBtn",
     "references": [
      "src/js/tutorial.js:1310 check()"
@@ -14239,7 +14239,7 @@
    "capability": "path fx add",
    "area": "effects-masks",
    "handler": [
-    "src/js/effects-panel.js:863 renderPathFxList()"
+    "src/js/effects-panel.js:857 renderPathFxList()"
    ],
    "events": [
     "change"
@@ -22634,7 +22634,7 @@
    "capability": "+ New custom shader…",
    "area": "effects-masks",
    "handler": [
-    "src/js/effects-panel.js:381 openCustom()"
+    "src/js/effects-panel.js:378 openCustom()"
    ],
    "events": [
     "click"
@@ -22648,10 +22648,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/effects-panel.js:381",
+   "source": "src/js/effects-panel.js:378",
    "meta": {
     "i18n": null,
-    "functionsVisited": 29
+    "functionsVisited": 21
    },
    "fixtures": [
     "masks-alpha",
