@@ -2923,6 +2923,9 @@ function updateMaskPanel(){
 }
 document.getElementById('p-mask-mode').addEventListener('change',function(){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask)return;
+  // #2372 MASK-NATIVE-REST: on a native object project the mode restyles THIS mask as ONE native batch entry (one history entry).
+  if(p.data.nativeStableTarget&&nativeSelStyle({maskMode:this.value}))return;
+  if(!n20AllowLegacyWrite('timeline-mask-mode'))return false;
   pushUndo();p.data.maskMode=this.value;
   saveActiveLayerFrame();if(window.SMEngineBridge)SMEngineBridge.renderNow();
 });
@@ -2941,6 +2944,9 @@ document.getElementById('p-mask-feather').addEventListener('input',function(){
 });
 document.getElementById('btn-mask-unset').addEventListener('click',function(){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask)return;
+  // #2372 MASK-NATIVE-REST: "Remove as mask" turns the native mask back into a normal shape (geometry and paint kept) in ONE batch entry.
+  if(p.data.nativeStableTarget&&nativeSelStyle({unmask:true}))return;
+  if(!n20AllowLegacyWrite('timeline-mask-unset'))return false;
   pushUndo();
   delete p.data.isMask;delete p.data.maskMode;delete p.data.maskFeather;
   saveActiveLayerFrame();updateUI();if(window.SMEngineBridge)SMEngineBridge.renderNow();

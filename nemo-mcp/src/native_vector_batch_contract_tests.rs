@@ -172,13 +172,16 @@ fn a_restyle_names_its_target_and_valid_style_members_and_its_receipt_id_is_the_
     // SEL-STYLE2: the switches, stroke details, preset and feather.
     for ok in [json!({"fillEnabled":true,"fill":"#ff0000"}), json!({"fillEnabled":false}), json!({"strokeEnabled":true,"stroke":"#00ff0080"}),
         json!({"cap":"square","join":"bevel","miter":4,"dashOffset":-3,"paintOrder":"strokeFirst","strokeStyle":"dashed"}),
-        json!({"brushPreset":"charcoal-pencil"}), json!({"brushPreset":"none"}), json!({"maskFeather":12.5})] {
+        json!({"brushPreset":"charcoal-pencil"}), json!({"brushPreset":"none"}), json!({"maskFeather":12.5}),
+        json!({"maskMode":"add"}), json!({"maskMode":"subtract"}), json!({"maskMode":"intersect"}), json!({"unmask":true})] {
         assert!(vector_request(VECTOR, &batch(vec![step(ok.clone())])), "{ok}");
     }
     for bad in [json!({"fillEnabled":true}), json!({"strokeEnabled":true}), json!({"fillEnabled":"yes","fill":"#ff0000"}), json!({"cap":"flat"}),
         json!({"join":"sharp"}), json!({"miter":0.5}), json!({"miter":5000}), json!({"paintOrder":"fill-stroke"}), json!({"strokeStyle":"wavy"}),
         json!({"brushPreset":""}), json!({"brushPreset":7}), json!({"maskFeather":501}), json!({"maskFeather":-1}),
-        json!({"brushPreset":"chalk-round","cap":"round"}), json!({"brushPreset":"chalk-round","maskFeather":1}), json!({"maskFeather":3,"fill":"#ff0000"})] {
+        json!({"brushPreset":"chalk-round","cap":"round"}), json!({"brushPreset":"chalk-round","maskFeather":1}), json!({"maskFeather":3,"fill":"#ff0000"}),
+        json!({"maskMode":"xor"}), json!({"maskMode":null}), json!({"maskMode":"add","unmask":true}), json!({"maskMode":"add","maskFeather":2}),
+        json!({"unmask":false}), json!({"unmask":"true"}), json!({"unmask":true,"fill":"#ff0000"})] {
         assert!(!vector_request(VECTOR, &batch(vec![step(bad.clone())])), "{bad}");
     }
     let mut no_style = good.clone();

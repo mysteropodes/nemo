@@ -92,3 +92,75 @@ test('the Mask panel reads a native mask and routes its feather natively before 
   const native = doc.families.find((f) => f.family === 'selection-style-native');
   assert.ok(native.authority === 'native' && native.kinds.includes('timeline-mask-feather'));
 });
+
+// MASK-NATIVE-REST: the Mask panel's mode select and "Remove as mask" button, run through the REAL listener bodies of timeline.js.
+const vm = require('node:vm');
+function listener(id, type) {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'js', 'timeline.js'), 'utf8');
+  const head = `document.getElementById('${id}').addEventListener('${type}',function(){`, at = src.indexOf(head);
+  assert.ok(at >= 0, id);
+  return src.slice(at + head.length, src.indexOf('\n});', at));
+}
+function panel(id, type, scope) {
+  const calls = [], body = listener(id, type);
+  const ctx = vm.createContext(Object.assign({ calls, legacy: [], pushUndo() { calls.push('legacy:pushUndo'); }, saveActiveLayerFrame() { calls.push('legacy:save'); }, updateUI() {}, SMEngineBridge: { renderNow() {} },
+    window: { SMEngineBridge: null }, n20AllowLegacyWrite: (kind) => { calls.push('gate:' + kind); return false; } }, scope));
+  return { calls, run: (self) => vm.runInContext(`(function(){${body}})`, ctx).call(self) };
+}
+
+test('the Mask panel mode select on a native mask is ONE native restyle batch with the maskMode member alone, never a legacy write', async () => {
+  const h = harness([MASK, CONTENT]);
+  h.root.selectedPaths = [await Intent.pick(h.root, 350, 350)];
+  h.root.NemoNativeSelectOverlay.show(h.root);
+  const sent = [];
+  const p = panel('p-mask-mode', 'change', { selectedPaths: h.root.selectedPaths, nativeSelStyle: (style) => { sent.push(style); return Style.apply(h.root, style), true; } });
+  p.run({ value: 'intersect' });
+  await h.fire();
+  assert.deepEqual(JSON.parse(JSON.stringify(sent)), [{ maskMode: 'intersect' }]);
+  assert.equal(h.batches.length, 1, 'one batch is one history entry');
+  assert.deepEqual(h.batches[0].steps, [{ restyle: { stableTarget: target('mask'), style: { maskMode: 'intersect' } } }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(p.calls)), [], 'no legacy checkpoint or gate is reached');
+  Contract.payload(Contract.VECTOR, { command: 'object.vector.batch', ops: h.batches[0].steps.map((s) => ({ op: 'restyle', stableTarget: s.restyle.stableTarget, style: s.restyle.style, frame: 0 })) });
+});
+
+test('Remove as mask on a native mask is ONE native restyle batch with the unmask member alone', async () => {
+  const h = harness([MASK, CONTENT]);
+  h.root.selectedPaths = [await Intent.pick(h.root, 350, 350)];
+  h.root.NemoNativeSelectOverlay.show(h.root);
+  const p = panel('btn-mask-unset', 'click', { selectedPaths: h.root.selectedPaths, nativeSelStyle: (style) => { Style.apply(h.root, style); return true; } });
+  p.run({});
+  await h.fire();
+  assert.equal(h.batches.length, 1);
+  assert.deepEqual(h.batches[0].steps, [{ restyle: { stableTarget: target('mask'), style: { unmask: true } } }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(p.calls)), []);
+  Contract.payload(Contract.VECTOR, { command: 'object.vector.batch', ops: h.batches[0].steps.map((s) => ({ op: 'restyle', stableTarget: s.restyle.stableTarget, style: s.restyle.style, frame: 0 })) });
+});
+
+test('without a native route the mode and unmask handlers are gated, not written (the legacy gate follows the native route)', () => {
+  for (const [id, type, kind] of [['p-mask-mode', 'change', 'timeline-mask-mode'], ['btn-mask-unset', 'click', 'timeline-mask-unset']]) {
+    const mask = { data: { isMask: true, maskMode: 'add', nativeStableTarget: target('m') } };
+    const p = panel(id, type, { selectedPaths: [mask], nativeSelStyle: () => false });
+    p.run({ value: 'subtract' });
+    assert.deepEqual(JSON.parse(JSON.stringify(p.calls)), ['gate:' + kind], id + ': refused by the legacy gate, nothing written');
+    assert.equal(mask.data.maskMode, 'add');
+    assert.equal(mask.data.isMask, true);
+  }
+  const doc = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'engineering', 'application', 'legacy-writer-families.json'), 'utf8'));
+  const native = doc.families.find((f) => f.family === 'selection-style-native');
+  assert.ok(['timeline-mask-mode', 'timeline-mask-unset'].every((k) => native.kinds.includes(k)), 'both kinds are declared native');
+});
+
+test('mode and unmask reach masks only, are edits of their own, and are validated', async () => {
+  const h = harness([MASK, CONTENT]);
+  const mask = await Intent.pick(h.root, 350, 350), content = await Intent.pick(h.root, 150, 150);
+  assert.deepEqual(Steps.restyleSteps([mask, content], { maskMode: 'add' }).map((s) => [s.restyle.stableTarget.strokeId, s.restyle.style]), [['mask', { maskMode: 'add' }]]);
+  assert.deepEqual(Steps.restyleSteps([mask, content], { unmask: true }).map((s) => [s.restyle.stableTarget.strokeId, s.restyle.style]), [['mask', { unmask: true }]]);
+  assert.deepEqual(Steps.restyleSteps([content], { unmask: true }), []);
+  assert.equal(Steps.alone({ maskMode: 'add' }), 'maskMode');
+  assert.equal(Steps.alone({ unmask: true }), 'unmask');
+  for (const bad of [{ maskMode: 'xor' }, { maskMode: 3 }, { unmask: false }, { unmask: 'true' }]) assert.equal(Steps.valid(bad), null, JSON.stringify(bad));
+  for (const good of [{ maskMode: 'subtract' }, { unmask: true }]) assert.deepEqual(Steps.valid(good), good);
+  const wrap = (style) => () => Contract.payload(Contract.VECTOR, { command: 'object.vector.batch', ops: [{ op: 'restyle', stableTarget: target('m'), style, frame: 0 }] });
+  for (const ok of [{ maskMode: 'intersect' }, { unmask: true }]) wrap(ok)();
+  for (const bad of [{ maskMode: 'xor' }, { unmask: false }, { maskMode: 'add', unmask: true }, { maskMode: 'add', maskFeather: 1 }, { unmask: true, fill: '#ff0000' }]) assert.throws(wrap(bad), TypeError, JSON.stringify(bad));
+});

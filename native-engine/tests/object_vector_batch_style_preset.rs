@@ -1,6 +1,6 @@
-//! #2372 SEL-STYLE2: the brush preset and the mask feather members of a `restyle` step (each an edit of its own), and the malformed detail
-//! members: one entry for the selection, undo exact, ineligible families left alone, what the engine cannot stamp a typed refusal.
-use super::batch_style::{at, paint, refused, restyle, ribbon_doc};
+//! #2372 SEL-STYLE2 / MASK-NATIVE-REST: the brush preset, mask feather, mask mode and unmask members of a `restyle` step (each an edit of
+//! its own), a Select move of a mask, and the malformed detail members: one entry for the selection, undo exact, ineligible families left alone, what the engine cannot stamp a typed refusal.
+use super::batch_style::{at, batch, paint, refused, restyle, ribbon_doc, target};
 use super::batch_style_detail::{apply, trio, undo_to};
 use super::support::*;
 use serde_json::{json, Value};
@@ -248,6 +248,88 @@ fn a_mask_feather_is_the_layers_shared_value_every_mask_of_the_cell_takes_it() {
         vec![restyle("m1", json!({"maskFeather":501}))],
         "invalid_request",
     );
+}
+
+#[test]
+fn a_mask_mode_is_the_named_masks_own_one_entry_for_the_selection_and_undo_is_exact() {
+    let mut owner = owner_of(&masks());
+    let before = state(&owner);
+    let r = apply(&mut owner, &["m1", "m2"], json!({"maskMode":"subtract"}));
+    assert_eq!(r["ok"], true, "{r}");
+    assert_eq!(r["result"]["strokeIds"], json!(["m1", "m2"]));
+    assert_eq!(owner.history_depths(), (1, 0), "one entry for the selection");
+    for id in ["m1", "m2"] {
+        assert_eq!(at(&owner, id)["vectorExt"]["maskMode"], "subtract", "{id}");
+    }
+    assert_eq!(at(&owner, "m2")["vectorExt"]["maskFeather"], 7, "the feather is left as it was");
+    assert_eq!(at(&owner, "plain"), before["objects"][1]);
+    assert_eq!(at(&owner, "other-layer"), before["objects"][3]);
+    let one = apply(&mut owner, &["m1"], json!({"maskMode":"intersect"}));
+    assert_eq!(one["ok"], true, "{one}");
+    assert_eq!(at(&owner, "m1")["vectorExt"]["maskMode"], "intersect");
+    assert_eq!(at(&owner, "m2")["vectorExt"]["maskMode"], "subtract", "a mode is per mask, never the layer's");
+    undo_to(&mut owner, 0);
+    assert_eq!(state(&owner), before);
+    for (id, style, code) in [
+        ("plain", json!({"maskMode":"add"}), "unavailable"),
+        ("m1", json!({"maskMode":"xor"}), "invalid_request"),
+        ("m1", json!({"maskMode":null}), "invalid_request"),
+        ("m1", json!({"maskMode":"add","maskFeather":3}), "invalid_request"),
+        ("m1", json!({"maskMode":"add","unmask":true}), "invalid_request"),
+        ("m1", json!({"maskMode":"add","fill":"#ff0000"}), "invalid_request"),
+    ] {
+        refused(&masks(), vec![restyle(id, style)], code);
+    }
+}
+
+#[test]
+fn unmask_turns_the_named_mask_back_into_a_normal_shape_and_keeps_its_geometry_and_paint() {
+    let mut owner = owner_of(&masks());
+    let before = state(&owner);
+    let r = apply(&mut owner, &["m1"], json!({"unmask":true}));
+    assert_eq!(r["ok"], true, "{r}");
+    assert_eq!(owner.history_depths(), (1, 0));
+    let (was, now) = (&before["objects"][0], at(&owner, "m1"));
+    assert!(now.get("vectorExt").is_none_or(|e| e.get("isMask").is_none() && e.get("maskMode").is_none() && e.get("maskFeather").is_none()), "{now}");
+    for key in ["geometry", "fill", "vector", "family", "target"] {
+        assert_eq!(now[key], was[key], "{key} is kept");
+    }
+    assert_eq!(at(&owner, "m2"), before["objects"][2], "the other mask of the layer stays a mask");
+    undo_to(&mut owner, 0);
+    assert_eq!(state(&owner), before);
+    // A mask's other extension members survive the unmask (only the three mask tags go).
+    let mut doc = masks();
+    doc["objects"][0]["vectorExt"] = json!({"isMask":true,"maskMode":"add","maskFeather":0,"boxAngle":30});
+    let mut owner = owner_of(&doc);
+    assert_eq!(apply(&mut owner, &["m1"], json!({"unmask":true}))["ok"], true);
+    assert_eq!(at(&owner, "m1")["vectorExt"], json!({"boxAngle":30}));
+    for (id, style, code) in [
+        ("plain", json!({"unmask":true}), "unavailable"),
+        ("m1", json!({"unmask":false}), "invalid_request"),
+        ("m1", json!({"unmask":"true"}), "invalid_request"),
+        ("m1", json!({"unmask":true,"maskFeather":2}), "invalid_request"),
+        ("m1", json!({"unmask":true,"opacity":0.5}), "invalid_request"),
+    ] {
+        refused(&masks(), vec![restyle(id, style)], code);
+    }
+}
+
+#[test]
+fn a_mask_moved_by_a_select_matrix_stays_a_mask_in_one_entry_and_undo_is_exact() {
+    let mut owner = owner_of(&masks());
+    let before = state(&owner);
+    let step = json!({"op":"reshape","stableTarget":target(0, "m1"),"matrix":[1.0,0.0,0.0,1.0,25.0,-5.0]});
+    let r = send(&mut owner, "move-mask", batch(vec![step]));
+    assert_eq!(r["ok"], true, "{r}");
+    assert_eq!(r["result"]["strokeIds"], json!(["m1"]));
+    assert_eq!(owner.history_depths(), (1, 0));
+    let (was, now) = (&before["objects"][0], at(&owner, "m1"));
+    assert_eq!(now["vectorExt"], was["vectorExt"], "its mask tags are kept");
+    let moved = |g: &Value, k: &str| g["geometry"]["segments"][0]["point"][k].as_f64().unwrap();
+    assert!((moved(&now, "x") - moved(was, "x") - 25.0).abs() < 1e-9 && (moved(&now, "y") - moved(was, "y") + 5.0).abs() < 1e-9, "{now}");
+    assert_eq!(at(&owner, "m2"), before["objects"][2], "another mask is not moved");
+    undo_to(&mut owner, 0);
+    assert_eq!(state(&owner), before);
 }
 
 #[test]
