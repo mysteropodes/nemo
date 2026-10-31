@@ -1,8 +1,8 @@
 //! #2371: every layer-row fact is read from its native record; a fact with no storage is absent, never invented.
+use super::{layer_members, model_members};
 use crate::history::object_history::NativeObjectHistory;
 use crate::object_codec::decode_storage_project;
 use crate::object_document::ObjectDocument;
-use super::{layer_members, model_members};
 use serde_json::{json, Map, Value};
 
 #[path = "object_component_convert_fixture.rs"]
@@ -93,8 +93,7 @@ fn raster_and_text_items_classify_footage_text_and_contradiction() {
 fn vector_content_keeps_a_layer_a_drawing_even_beside_a_raster() {
     let layers = [fixture::layer("ly_a", "A", &[(0, "s1")])];
     let mut value = fixture::document(&layers, json!({}));
-    value["items"] =
-        json!({"raster":[raster("ly_a","r0","img-1")]});
+    value["items"] = json!({"raster":[raster("ly_a","r0","img-1")]});
     value["compositionOrder"]["contexts"][0]["scopes"][0]["elements"]
         .as_array_mut()
         .unwrap()
@@ -143,7 +142,10 @@ fn blend_and_matte_facts_are_copied_and_a_source_is_marked() {
     assert_eq!(rows[0]["isMatteSource"], json!(true));
     // `none` is a stored mode but not an active matte, so its source is not marked by that layer.
     assert_eq!(rows[3]["matteMode"], json!("none"));
-    assert_eq!(rows[4]["mattesMore"], json!([{"uid":"extra","mode":"alpha"}]));
+    assert_eq!(
+        rows[4]["mattesMore"],
+        json!([{"uid":"extra","mode":"alpha"}])
+    );
     assert_eq!(rows[2]["isMatteSource"], json!(true));
     // A stored null blend is not a named blend.
     assert!(rows[5].get("blendMode").is_none());
@@ -205,7 +207,13 @@ fn typed_gaps_name_exactly_what_has_no_native_storage() {
     let document = flat(json!([{"layerUid":"a"}]), json!({}));
     assert_eq!(
         model_members(&document)["layerModelUnavailable"],
-        json!(["linkGroup", "kind:camera", "kind:guide", "kind:montage", "kind:video"])
+        json!([
+            "linkGroup",
+            "kind:camera",
+            "kind:guide",
+            "kind:montage",
+            "kind:video"
+        ])
     );
 }
 

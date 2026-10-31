@@ -60,9 +60,7 @@ fn content_by_layer(document: &ObjectDocument) -> HashMap<&str, Content<'_>> {
     }
     for entry in items.text_entries() {
         if entry.target.context_id == SCENE_CONTEXT {
-            map.entry(entry.target.layer_uid.as_str())
-                .or_default()
-                .text = true;
+            map.entry(entry.target.layer_uid.as_str()).or_default().text = true;
         }
     }
     map
