@@ -67,6 +67,12 @@
       typeof v.layerUid!=='string'||!v.layerUid||typeof v.workId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(v.workId)||
       !integer(v.frame,4294967295)||!integer(v.viewGeneration)||!v.viewGeneration||!integer(v.cursor,1024)||!integer(v.limit,8)||!v.limit||own(v,'preview')&&(!exact(v.preview,['stableTarget','intent'])||!target(v.preview.stableTarget)||!intent(v.preview.intent)))fail('Invalid subselect presentation selector');
   }
+  // #2372: a listed dynamic shape is its kind and the finite members that kind owns (never the generator box): the body object.parametric.set takes back.
+  const SHAPE_MEMBERS={rect:['tl','tr','br','bl'],ellipse:['startAngle','sweep','innerRadius'],star:['pointCount','innerRatio','cornerRadius']};
+  function paramShape(v){
+    const members=v&&typeof v==='object'&&!Array.isArray(v)&&SHAPE_MEMBERS[v.kind];
+    return !!members&&Object.keys(v).every(k=>k==='kind'||members.includes(k)&&typeof v[k]==='number'&&Number.isFinite(v[k]));
+  }
   function viewResult(r){
     if(!exact(r,['kind','atRevision','documentSnapshotId','contextId','layerUid','frame','workId','viewGeneration','cursor','total','nextCursor','items','preview'],['hitTest'])||own(r,'hitTest')&&r.hitTest!==true||
       typeof r.preview!=='boolean'||!integer(r.total,1024)||!integer(r.cursor,r.total)||!Array.isArray(r.items)||r.items.length>8||r.cursor+r.items.length>r.total)fail('Invalid subselect selection page');
@@ -74,7 +80,7 @@
     for(const item of r.items){
       // A hit-test listing (#2362) gives every painted record its bounds, role and fill flag instead of a paint count; a raster image
       // or text block (#2372) is listed too, its bounds the painted rect/glyph box and its count 0 (no editable geometry).
-      if(own(r,'hitTest')?!exact(item,['stableTarget','closed','count','matrix','bounds','role','filled'],['strokeWidth','owner','brush','group','boxAngle','style'])||typeof item.filled!=='boolean'||own(item,'strokeWidth')&&!(typeof item.strokeWidth==='number'&&Number.isFinite(item.strokeWidth)&&item.strokeWidth>=0)||own(item,'boxAngle')&&!(typeof item.boxAngle==='number'&&Number.isFinite(item.boxAngle))||own(item,'style')&&!listedStyle(item.style)||!Array.isArray(item.bounds)||item.bounds.length!==4||!item.bounds.every(Number.isFinite)||
+      if(own(r,'hitTest')?!exact(item,['stableTarget','closed','count','matrix','bounds','role','filled'],['strokeWidth','owner','brush','group','boxAngle','style','paramShape'])||typeof item.filled!=='boolean'||own(item,'paramShape')&&!paramShape(item.paramShape)||own(item,'strokeWidth')&&!(typeof item.strokeWidth==='number'&&Number.isFinite(item.strokeWidth)&&item.strokeWidth>=0)||own(item,'boxAngle')&&!(typeof item.boxAngle==='number'&&Number.isFinite(item.boxAngle))||own(item,'style')&&!listedStyle(item.style)||!Array.isArray(item.bounds)||item.bounds.length!==4||!item.bounds.every(Number.isFinite)||
         !['plain','ribbon','fill','shape','brush','raster','text','mask'].includes(item.role)||own(item,'owner')&&(item.role!=='fill'||typeof item.owner!=='string'||!item.owner)||own(item,'brush')&&!['anchor','copy','bitmap'].includes(item.brush)||own(item,'group')&&(!own(item,'brush')||typeof item.group!=='string'||!item.group):!exact(item,['stableTarget','closed','count','matrix'],['paintCount']))fail('Invalid native subselect item');
       if(!target(item.stableTarget,r.contextId)||item.stableTarget.contextId!==r.contextId||item.stableTarget.layerUid!==r.layerUid||typeof item.closed!=='boolean'||
         !integer(item.count,256)||own(item,'paintCount')&&(!integer(item.paintCount,256)||item.paintCount<2||item.closed!==false)||!Array.isArray(item.matrix)||item.matrix.length!==6||!item.matrix.every(Number.isFinite))fail('Invalid native subselect transform');

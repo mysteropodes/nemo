@@ -280,6 +280,14 @@ pub(crate) fn stored_box_angle(record: &ObjectRecord) -> Option<f64> {
         .and_then(serde_json::Number::as_f64)
         .filter(|a| a.is_finite() && *a != 0.0)
 }
+/// #2372 hit-test listing: the record's `paramShape` (the declared intent of a dynamic rectangle, ellipse or star) without its generator `box`,
+/// which is the body `object.parametric.set` takes back; None for a record that has none.
+pub(crate) fn param_shape(record: &ObjectRecord) -> Option<serde_json::Value> {
+    let shape = record.vector_ext.value()?.param_shape.value()?;
+    let mut listed = serde_json::to_value(shape).ok()?;
+    listed.as_object_mut()?.remove("box");
+    Some(listed)
+}
 /// #2362 hit-test listing: what a painted record is, so a reader can tell a ribbon's linked fill or a derived shape
 /// from a plain stroke without the record itself.
 pub(crate) fn hit_role(record: &ObjectRecord) -> &'static str {

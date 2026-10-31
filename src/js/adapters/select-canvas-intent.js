@@ -222,6 +222,8 @@
       // The record's stored boxAngle (baseline serP/desP data.boxAngle) turned by the presented matrix when that is a pure similarity, so the
       // oriented box is drawn in world space after a frame change, an undo or a reload.
       // #2372 SEL-MASK: a listed mask is the selection the Mask panel edits (the baseline mask Path carried data.isMask / maskMode / maskFeather).
+      // #2372 insp-parametric: a dynamic rectangle / ellipse / star carries its listed parameters as the baseline Paper item's data.paramShape, which the Rounded corners, Ellipse arc and Star panels show.
+      if (item.paramShape) path.data.paramShape = JSON.parse(JSON.stringify(item.paramShape));
       if (item.role === 'mask') { path.data.isMask = true; path.data.maskMode = item.style && item.style.maskMode || 'add'; path.data.maskFeather = item.style && item.style.maskFeather || 0; }
       var mx = item.matrix, sim = mx[0] * mx[3] - mx[1] * mx[2] > 0 && Math.abs(mx[0] - mx[3]) < 1e-6 * (Math.abs(mx[0]) + 1) && Math.abs(mx[1] + mx[2]) < 1e-6 * (Math.abs(mx[1]) + 1);
       if (item.boxAngle) path.data.boxAngle = (item.boxAngle + (sim ? Math.atan2(mx[1], mx[0]) * 180 / Math.PI : 0)) % 360;

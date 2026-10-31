@@ -985,6 +985,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-parametric-panel.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2591,
+          "scriptOrdinal": 237
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-selection-style.js",
       "moduleId": "app.native.object.ui.adapter",
       "executionClass": "document-classic",
