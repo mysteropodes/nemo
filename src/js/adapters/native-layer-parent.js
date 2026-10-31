@@ -44,7 +44,10 @@
       if (!Number.isInteger(frame) || frame < 0) return Promise.reject(fault('invalid_request', 'The playhead frame is invalid', { reason: 'local_validation' }));
       return commands.execute(Contract.PARENT_SET, () => ({ command: 'object.layer.parent.set', contextId: ROOT_CONTEXT, layerUid: uid, parentLayerUid: parent, frame }));
     }
-    return Object.freeze({ layerUid: uidOf, parentUidOf, descendants, setParent, rowKind: (index) => { const row = rowAt(index); return row && row.kind || null; } });
+    const indexOf = (uid) => rows(session.info()).findIndex((row) => row.layerUid === uid);
+    const nameOf = (index) => { const row = rowAt(index); return row ? (typeof row.name === 'string' && row.name ? row.name : 'Layer ' + (index + 1)) : null; };
+    return Object.freeze({ layerUid: uidOf, parentUidOf, descendants, setParent, indexOf, nameOf, count: () => rows(session.info()).length,
+      rowKind: (index) => { const row = rowAt(index); return row && row.kind || null; } });
   }
 
   // What a refusal says to the person: the owner's code, in the words of the menu's own cases.
@@ -80,17 +83,17 @@
 
   // The Parent A picker menu (layer-list parent cell and the Layer Properties panel share it). Parent B has no native model.
   function parentMenuItems(host, adapter, li, onChanged) {
-    const layers = host.state.layers, bad = adapter.descendants(li), current = adapter.parentUidOf(li);
+    const bad = adapter.descendants(li), current = adapter.parentUidOf(li);
     const items = [{ label: 'Parent A : Aucun (parentage libre)', disabled: !current, action: () => { pick(host, adapter, li, null, onChanged); } }];
-    layers.forEach((other, oi) => {
-      if (oi === li) return; // a layer can't parent itself
+    for (let oi = 0, n = adapter.count(); oi < n; oi += 1) {
+      if (oi === li) continue; // a layer can't parent itself
       const uid = adapter.layerUid(oi), folder = adapter.rowKind(oi) === 'folder';
       items.push({
-        label: 'Parent A : ' + (other.name || ('Layer ' + (oi + 1))) + (bad.has(oi) ? '  (descendant)' : '') + (folder ? '  (dossier)' : ''),
+        label: 'Parent A : ' + adapter.nameOf(oi) + (bad.has(oi) ? '  (descendant)' : '') + (folder ? '  (dossier)' : ''),
         disabled: !uid || bad.has(oi) || folder || current === uid,
         action: () => { pick(host, adapter, li, oi, onChanged); },
       });
-    });
+    }
     items.push({ sep: true });
     items.push({ label: 'Parent B (indisponible sur un projet natif)', disabled: true });
     return items;
@@ -100,8 +103,75 @@
     toast(host, notice);
     return [{ label, disabled: true }];
   }
+  // The baseline layer-row Parent cell (.lparent: pickwhip .lpick + label; 1065e9d8 buildParentCell) for a NATIVE row: the label is the
+  // native parent's name (or the dash), the pickwhip drag and the click menu are the Parent A edit above, a right-click clears it.
+  // Parent B has no native model, so the label never shows it and the menu lists it disabled.
+  function startPickwhip(host, adapter, li, fromEl, ev, onChanged) {
+    ev.stopPropagation(); ev.preventDefault();
+    const doc = host.document, bad = adapter.descendants(li), box = fromEl.getBoundingClientRect();
+    const ox = box.left + box.width / 2, oy = box.top + box.height / 2, line = doc.createElement('div');
+    line.className = 'lpick-line'; doc.body.appendChild(line);
+    let hover = null;
+    const paint = (x, y) => {
+      const dx = x - ox, dy = y - oy;
+      line.style.left = ox + 'px'; line.style.top = oy + 'px'; line.style.width = Math.sqrt(dx * dx + dy * dy) + 'px';
+      line.style.transform = 'rotate(' + Math.atan2(dy, dx) + 'rad)';
+    };
+    const rowUnder = (x, y) => {
+      const el = doc.elementFromPoint(x, y), row = el && el.closest ? el.closest('.native-object-layer') : null;
+      const idx = row && row.dataset ? adapter.indexOf(row.dataset.layerUid) : -1;
+      return idx < 0 || idx === li || bad.has(idx) || adapter.rowKind(idx) === 'folder' ? null : { row, idx };
+    };
+    const onMove = (e) => {
+      paint(e.clientX, e.clientY);
+      const t = rowUnder(e.clientX, e.clientY);
+      if (hover && (!t || t.row !== hover.row)) hover.row.classList.remove('pick-target');
+      if (t && (!hover || t.row !== hover.row)) t.row.classList.add('pick-target');
+      hover = t;
+    };
+    const cleanup = () => {
+      doc.removeEventListener('mousemove', onMove, true); doc.removeEventListener('mouseup', onUp, true); doc.removeEventListener('keydown', onKey, true);
+      if (hover) hover.row.classList.remove('pick-target');
+      line.remove();
+    };
+    const onUp = (e) => {
+      const t = rowUnder(e.clientX, e.clientY);
+      cleanup();
+      if (t) parentChosen(host, adapter, li, t.idx, onChanged); // dropped on nothing / itself / a descendant / a folder: no command
+    };
+    const onKey = (e) => { if (e.key === 'Escape') cleanup(); };
+    doc.addEventListener('mousemove', onMove, true); doc.addEventListener('mouseup', onUp, true); doc.addEventListener('keydown', onKey, true);
+    paint(ev.clientX, ev.clientY);
+  }
+  function cell(host, info, layer, li) {
+    const adapter = desktop(host), doc = host.document, uid = layer && layer.parentLayerUid;
+    const pIdx = text(uid) && Array.isArray(info.layers) ? info.layers.findIndex((row) => row.layerUid === uid) : -1;
+    const pName = pIdx >= 0 ? (typeof info.layers[pIdx].name === 'string' && info.layers[pIdx].name ? info.layers[pIdx].name : 'Layer ' + (pIdx + 1)) : null;
+    const node = doc.createElement('div'), pickwhip = doc.createElement('span'), label = doc.createElement('span');
+    const t = host.SM && typeof host.SM.t === 'function' ? host.SM.t('titleDragLayerSetParentA') : null;
+    const changed = () => { if (typeof host.renderLayerList === 'function') host.renderLayerList(); if (typeof host.renderTimeline === 'function') host.renderTimeline(); };
+    node.className = 'lparent' + (pName ? '' : ' none'); pickwhip.className = 'lpick';
+    pickwhip.title = t && t !== 'titleDragLayerSetParentA' ? t : 'Drag onto a layer to set it as the parent (A)';
+    label.textContent = pName || '—';
+    node.title = pName ? 'Parent : ' + pName + ' — cliquer pour changer' : 'Aucun parent — cliquer pour en choisir un';
+    node.appendChild(pickwhip); node.appendChild(label);
+    node.dataset.nativeParentCell = 'true';
+    pickwhip.addEventListener('mousedown', (e) => { if (adapter) startPickwhip(host, adapter, li, pickwhip, e, changed); });
+    node.addEventListener('mousedown', (e) => { e.stopPropagation(); });
+    node.addEventListener('click', (e) => {
+      e.stopPropagation(); e.preventDefault();
+      if (!adapter || typeof host.showContextMenu !== 'function') return;
+      const r = node.getBoundingClientRect();
+      host.showContextMenu(r.left, r.bottom + 2, parentMenuItems(host, adapter, li, changed));
+    });
+    node.addEventListener('contextmenu', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (adapter && adapter.parentUidOf(li)) parentCleared(host, adapter, li, changed);
+    });
+    return node;
+  }
   function parentCleared(host, adapter, li, onChanged) { return pick(host, adapter, li, null, onChanged); }
   function parentChosen(host, adapter, li, parentIndex, onChanged) { return pick(host, adapter, li, parentIndex, onChanged); }
 
-  return Object.freeze({ create, desktop, refusalText, parentMenuItems, unavailableItems, parentCleared, parentChosen });
+  return Object.freeze({ create, desktop, refusalText, parentMenuItems, unavailableItems, parentCleared, parentChosen, cell, startPickwhip });
 }));
