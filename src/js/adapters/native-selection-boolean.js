@@ -10,17 +10,14 @@
  * selection or an absent owner is a notice and a resolved status, never a throw. After the edit the style source (or, for a combine, the
  * whole selection) is selected again. */
 (function (root, factory) {
-  var commonjs = typeof module === 'object' && module.exports;
-  // The intent modules load after this one in the page, so a browser resolves them from the host at call time; node has them here.
-  var api = factory(commonjs ? { group: require('./native-object-group-intent.js'), component: require('./native-object-component-intent.js'), contract: require('./native-object-edit-contract.js') } : {});
-  if (commonjs) module.exports = api;
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
   else root.NemoNativeSelectionBoolean = api;
-}(typeof globalThis === 'object' ? globalThis : this, function (modules) {
+}(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
   var MODES = ['unite', 'subtract', 'intersect', 'exclude'], PINS = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
   var VECTOR_ONLY = { raster: 'images', text: 'text' };
   var jobs = new WeakMap(), intents = new WeakMap();
-  function lib(host, name, key) { return host[name] || modules[key] || null; }
   function notice(host, text) { if (typeof host.showToast === 'function') try { host.showToast(text); } catch (_) {} }
   // The app's own wording where it has one, English otherwise.
   function said(host, key, fallback) {
@@ -38,12 +35,13 @@
     return (host.selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget && Number.isInteger(p.data.nativeLayerIndex) && p.data.strokeId; });
   }
   function idsOf(paths) { return paths.map(function (p) { return p.data.strokeId; }); }
+  // The intent modules load after this one in the page, so they are read from the host at call time.
   // The group intent over this session's ports: pin / requestId / submit are the session's resource route (one dispatch, then a reconcile),
   // `declared` is the native edit contract's. Bound once per session.
   function intentFor(host, s) {
     if (intents.has(s)) return intents.get(s);
-    var Group = lib(host, 'NemoNativeObjectGroupIntent', 'group'), Component = lib(host, 'NemoNativeObjectComponentIntent', 'component');
-    var Contract = lib(host, 'NemoNativeObjectEditContract', 'contract');
+    var Group = host.NemoNativeObjectGroupIntent, Component = host.NemoNativeObjectComponentIntent;
+    var Contract = host.NemoNativeObjectEditContract;
     if (!Group || !Component || !Contract || typeof Component.portsFromSession !== 'function') return null;
     var base = Component.portsFromSession(s);
     var made = Group.createGroupIntent({

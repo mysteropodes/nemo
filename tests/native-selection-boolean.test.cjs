@@ -8,6 +8,7 @@ const fs = require('node:fs'), path = require('node:path'), vm = require('node:v
 const Intent = require('../src/js/adapters/select-canvas-intent.js');
 const Overlay = require('../src/js/adapters/native-select-overlay.js');
 const Gesture = require('../src/js/adapters/native-select-gesture.js');
+const GroupIntent = require('../src/js/adapters/native-object-group-intent.js'), ComponentIntent = require('../src/js/adapters/native-object-component-intent.js'), EditContract = require('../src/js/adapters/native-object-edit-contract.js');
 const Boolean_ = require('../src/js/adapters/native-selection-boolean.js');
 const Paper = require('./helpers/native-import-paper.cjs');
 
@@ -75,7 +76,8 @@ function harness(items = SAME_LAYER, opts = {}) {
     requestAnimationFrame: () => {}, pushUndo() { legacy.push('pushUndo'); throw new Error('native authority denied legacy history checkpoint'); },
     NemoNativeObjectProject: { desktop: () => session, selectLayerUI: () => true },
     NemoNativeViewportUnderlay: { canvasMapping: { point: (e) => ({ x: e.clientX, y: e.clientY }), transform: () => [1, 0, 0, 1, 0, 0] } },
-    NemoSelectCanvasIntent: Intent, NemoNativeSelectOverlay: Overlay, NemoNativeSelectGesture: Gesture };
+    NemoSelectCanvasIntent: Intent, NemoNativeSelectOverlay: Overlay, NemoNativeSelectGesture: Gesture,
+    NemoNativeObjectGroupIntent: GroupIntent, NemoNativeObjectComponentIntent: ComponentIntent, NemoNativeObjectEditContract: EditContract };
   if (adapter) root.NemoNativeSelectionBoolean = Boolean_;
   const intent = Intent.create({
     context: () => JSON.stringify([root.state.tool, root.state.activeLayerIdx, (root.selectedPaths || []).map((p) => p.data.strokeId)]),
