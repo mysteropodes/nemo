@@ -689,6 +689,7 @@
     list.innerHTML = '';
     var t = effectsTarget();
     var effects = nfx().stack() || (t && t.obj.effects) || [];
+    nfx().flag(list);
     effects.forEach(function (eff, idx) {
       var row = document.createElement('div');
       row.className = 'fx-row' + (eff.enabled ? '' : ' disabled') + (expandedIdx === idx ? ' expanded' : '');

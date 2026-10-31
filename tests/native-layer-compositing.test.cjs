@@ -290,6 +290,39 @@ test('effects panel on native: the stack comes from the native row, and add / to
   assert.deepEqual(p.toasts, []);
 });
 
+// #2372: the read bound (engine EFFECTS_ROW_BYTES = 4096) is at least what an edit can leave behind.
+const BIG = (i) => ({ type: 'chromaticAberration', enabled: true, p1: i + 0.25, p2: 0.5, p3: 0.125, p4: 100, p5: 0.333333, p6: 0.75, p7: 12.5, p8: 0.1 });
+test('a stack at the edit limit stays editable, and an edit that would leave it unlistable is refused with a clear notice', async () => {
+  const stack = Array.from({ length: 29 }, (_, i) => BIG(i));
+  assert.ok(JSON.stringify(stack).length > 2048 && JSON.stringify(stack).length < 3840, 'past the old 2048 read bound, inside the edit bound');
+  const h = panelHarness({ layers: [{ layerUid: 'F', name: 'F', visible: true, effects: stack }] });
+  h.context.updateEffectsPanel();
+  assert.equal(h.list().children.length, 29, 'every effect is listed');
+  h.context.addEffectToActiveLayer('blur');
+  await settle();
+  assert.equal(h.sent.length, 1, 'the add that still fits is one native edit');
+  assert.equal(h.sent[0].payload.effects.length, 30);
+  assert.ok(JSON.stringify(h.sent[0].request || h.sent[0]).length <= 4096, 'the request stays inside the dispatcher bound');
+  const full = panelHarness({ layers: [{ layerUid: 'F', name: 'F', visible: true, effects: Array.from({ length: 30 }, (_, i) => BIG(i)) }] });
+  full.context.addEffectToActiveLayer('chromaticAberration');
+  await settle();
+  assert.equal(full.sent.length, 0, 'nothing is sent');
+  assert.deepEqual(full.toasts, ["No room for more effects: this layer's effect stack is full."]);
+  await assert.rejects(full.adapter.addEffect(0, BIG(99)), (error) => error.code === 'invalid_request' && error.reason === 'effects_bytes');
+  const tiny = harness({ layers: [{ layerUid: 'T', effects: Array.from({ length: 32 }, () => ({ type: 'blur', enabled: true })) }] });
+  tiny.adapter.toggleEffect(0, 31);
+  await settle();
+  assert.equal(tiny.sent.length, 1, 'a 32-entry stack of small entries is still editable');
+});
+
+test('effects panel on native: an oversize row is flagged in the list, not shown as an empty stack', () => {
+  const p = panelHarness();
+  p.state.activeLayerIdx = 3;
+  p.context.updateEffectsPanel();
+  assert.equal(p.list().children.length, 1);
+  assert.equal(p.list().children[0].textContent, 'This effect stack is too large to list or edit natively.');
+});
+
 test('effects panel on native: an oversize stack and a refusal both say so and never fall back to the legacy writer', async () => {
   const big = panelHarness();
   big.state.activeLayerIdx = 3;
