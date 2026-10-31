@@ -8,7 +8,7 @@ const base=layers=>({apiVersion:2,requestId:'model',instanceId:'instance',docume
   contentRevision:0,documentSnapshotId:'snapshot-0',documentDigest:'a'.repeat(64),byteCount:1000,canvasW:320,canvasH:180,
   fps:24,totalFrames:24,reference:null,undoDepth:0,redoDepth:0,layers});
 const FULL={layerUid:'m',name:'M',visible:true,kind:'component',folderCollapsed:true,folderId:'f1',componentId:'sym',
-  blendMode:'multiply',matteMode:'luma',matteSourceLayerUid:'src',mattesMore:[{uid:'x',mode:'alpha'}],isMatteSource:true,
+  blendMode:'multiply',matteMode:'luma',matteSourceLayerUid:'src',timeLinkUid:'lead',followPathUid:'guide',mattesMore:[{uid:'x',mode:'alpha'}],isMatteSource:true,
   opacity:42.5,opacityAnimated:true};
 test('every read-model member is copied into a frozen row and the top-level members beside it',()=>{
   const raw={...base([FULL,{layerUid:'plain'}]),layerFolders:[{folderId:'f1',collapsed:false,name:'F'},{folderId:'f2',collapsed:true}],
@@ -26,7 +26,7 @@ test('a read without the model keeps its exact earlier shape (no invented member
 });
 test('malformed members are refused before any UI projection',()=>{
   const bad=[{kind:'folderish'},{kind:3},{folderCollapsed:'yes'},{folderId:''},{componentId:7},{blendMode:null},{matteMode:[]},
-    {matteSourceLayerUid:''},{mattesMore:{}},{mattesMore:[{uid:'x'}]},{mattesMore:[{uid:'x',mode:'a',extra:1}]},
+    {matteSourceLayerUid:''},{timeLinkUid:''},{followPathUid:7},{mattesMore:{}},{mattesMore:[{uid:'x'}]},{mattesMore:[{uid:'x',mode:'a',extra:1}]},
     {isMatteSource:false},{opacityAnimated:1},{opacity:'50'},{opacity:Infinity},{opacity:NaN}];
   for(const extra of bad)assert.throws(()=>Metadata.decode(base([{layerUid:'a',...extra}]),request),/uncorrelated/,JSON.stringify(extra));
   for(const top of [{layerFolders:{}},{layerFolders:[{folderId:'',collapsed:true}]},{layerFolders:[{folderId:'f',collapsed:1}]},

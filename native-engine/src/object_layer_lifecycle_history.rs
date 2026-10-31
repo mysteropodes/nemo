@@ -12,6 +12,8 @@ const OP_LAYER_DUPLICATE: &str = "command.document.object.layer.duplicate";
 const OP_LAYER_RENAME: &str = "command.document.object.layer.rename";
 const OP_LAYER_REORDER: &str = "command.document.object.layer.reorder";
 const OP_LAYER_PARENT: &str = "command.document.object.layer.parent.set";
+const OP_LAYER_TIME_LINK: &str = "command.document.object.layer.timeLink.set";
+const OP_LAYER_FOLLOW_PATH: &str = "command.document.object.layer.followPath.set";
 
 impl NativeObjectHistory {
     pub(crate) fn prepare_layer_delete_json(
@@ -44,6 +46,18 @@ impl NativeObjectHistory {
     ) -> Result<PreparedLayerLifecycle, DispatchErrorCode> {
         self.owner.prepare_layer_parent_json(bytes)
     }
+    pub(crate) fn prepare_layer_time_link_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedLayerLifecycle, DispatchErrorCode> {
+        self.owner.prepare_layer_time_link_json(bytes)
+    }
+    pub(crate) fn prepare_layer_follow_path_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedLayerLifecycle, DispatchErrorCode> {
+        self.owner.prepare_layer_follow_path_json(bytes)
+    }
     pub(crate) fn commit_layer_lifecycle(
         &mut self,
         candidate: PreparedLayerLifecycle,
@@ -68,6 +82,8 @@ impl NativeObjectHistory {
                 | OP_LAYER_RENAME
                 | OP_LAYER_REORDER
                 | OP_LAYER_PARENT
+                | OP_LAYER_TIME_LINK
+                | OP_LAYER_FOLLOW_PATH
         )
     }
     /// Prepare and commit one lifecycle operation for the dispatcher, which has
@@ -90,6 +106,8 @@ impl NativeObjectHistory {
             OP_LAYER_RENAME => self.prepare_layer_rename_json(&bytes),
             OP_LAYER_REORDER => self.prepare_layer_reorder_json(&bytes),
             OP_LAYER_PARENT => self.prepare_layer_parent_json(&bytes),
+            OP_LAYER_TIME_LINK => self.prepare_layer_time_link_json(&bytes),
+            OP_LAYER_FOLLOW_PATH => self.prepare_layer_follow_path_json(&bytes),
             _ => Err(DispatchErrorCode::InvalidRequest),
         };
         let candidate = prepared.map_err(|code| {

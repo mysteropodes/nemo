@@ -34,19 +34,20 @@ function element(tagName) {
   Object.defineProperty(el, 'innerHTML', { set() { this.replaceChildren(); } });
   return el;
 }
-function layers(parentOfC) {
-  return [{ layerUid: 'L-a', name: 'Alpha', visible: true, kind: 'draw' }, { layerUid: 'L-b', name: 'Beta', visible: true, kind: 'draw', parentLayerUid: 'L-a' },
+function layers(parentOfC, extra) {
+  const rows = [{ layerUid: 'L-a', name: 'Alpha', visible: true, kind: 'draw' }, { layerUid: 'L-b', name: 'Beta', visible: true, kind: 'draw', parentLayerUid: 'L-a' },
     Object.assign({ layerUid: 'L-c', name: 'Gamma', visible: true, kind: 'draw' }, parentOfC ? { parentLayerUid: parentOfC } : {}), { layerUid: 'L-f', name: 'Folder', visible: true, kind: 'folder' }];
+  return rows.map((row) => Object.assign(row, extra && extra[row.layerUid]));
 }
-function info(revision, parentOfC) {
+function info(revision, parentOfC, extra) {
   return { apiVersion: 2, instanceId: 'instance-A', documentId: 'document-A', lifecycleGeneration: 1, contentRevision: revision, documentSnapshotId: 'snap-' + revision,
-    documentDigest: '4'.repeat(64), byteCount: 1000, canvasW: 320, canvasH: 180, fps: 24, totalFrames: 24, reference: null, undoDepth: 0, redoDepth: 0, layers: layers(parentOfC) };
+    documentDigest: '4'.repeat(64), byteCount: 1000, canvasW: 320, canvasH: 180, fps: 24, totalFrames: 24, reference: null, undoDepth: 0, redoDepth: 0, layers: layers(parentOfC, extra) };
 }
 function harness(options = {}) {
   const sent = [], toasts = [], menus = [], listeners = {};
   const nodes = new Map(['layer-list', 'frame-hdr', 'frame-grid', 'tl-cf', 'tl-tf', 'info-frame', 'info-badge', 'info-strokes', 'info-sel'].map((id) => [id, Object.assign(element('div'), { id })]));
   const body = element('body');
-  let pinned = info(4, undefined), under = null;
+  let pinned = info(4, undefined, options.rows), under = null;
   const session = { info: () => pinned, isActive: () => true, blocksLegacy: () => true, requestId: (label) => label + '-' + (sent.length + 1),
     runResourceCommand: (action) => action({
       async dispatch(request) {
@@ -62,7 +63,7 @@ function harness(options = {}) {
     showContextMenu: (x, y, items) => menus.push({ x, y, items }), nativeCompositingRefresh() {} };
   const ports = { projectionReady: (i) => Files.projectionReadyForUI(root, i), currentSession: () => null, selectLayer: () => true, repaint: () => true, readShyMode: () => false };
   const paint = () => { Files.projectView(root, pinned); assert.equal(UI.render(root, pinned, false, ports), true); return Array.from(nodes.get('layer-list').children); };
-  root.renderLayerList = () => { pinned = info(pinned.contentRevision, pinned.layers[2].parentLayerUid); paint(); };
+  root.renderLayerList = () => { pinned = info(pinned.contentRevision, pinned.layers[2].parentLayerUid, options.rows); paint(); };
   return { root, sent, toasts, menus, listeners, paint, session, setUnder: (v) => { under = v; }, confirm(revision, parentOfC) { pinned = info(revision, parentOfC); } };
 }
 const cellOf = (row) => Array.from(row.children).find((n) => n.dataset && n.dataset.nativeParentCell === 'true');
@@ -154,4 +155,33 @@ test('a refused pick says why and sends no second command', async () => {
   await settle();
   assert.equal(h.sent.length, 1);
   assert.match(h.toasts[0], /rotated or scaled/);
+});
+
+test('right-clicking a native row offers Link time and Follow path; each pick is one command and the stored picks are marked', async () => {
+  const h = harness({ rows: { 'L-b': { timeLinkUid: 'L-a' }, 'L-c': { followPathUid: 'L-a' } } }), rows = h.paint();
+  h.root.state.currentFrame = 9;
+  let prevented = 0;
+  rows[2].fire('contextmenu', { clientX: 50, clientY: 60, preventDefault() { prevented += 1; } });
+  assert.equal(prevented, 1);
+  assert.equal(h.menus.length, 1);
+  assert.deepEqual([h.menus[0].x, h.menus[0].y], [58, 68]);
+  const [time, follow] = h.menus[0].items;
+  assert.equal(time.label, 'Parent in Time — lier le temps à…');
+  assert.equal(follow.label, 'Chemin (Follow Path)…');
+  time.action();
+  assert.equal(h.menus.length, 2);
+  const links = h.menus[1].items;
+  assert.equal(links[0].disabled, true, 'Gamma has no time link to clear');
+  links.find((i) => /Link time to: Alpha/.test(i.label || '')).action();
+  await settle();
+  assert.deepEqual(plain(h.sent[0].payload), { command: 'object.layer.timeLink.set', contextId: 'scene-root', layerUid: 'L-c', sourceLayerUid: 'L-a', frame: 9, mode: 'both' });
+  follow.action();
+  const paths = h.menus[2].items;
+  assert.equal(paths[0].disabled, false, 'Gamma follows Alpha');
+  assert.equal(paths.find((i) => i.label === 'Chemin : Alpha').disabled, true, 'the stored target');
+  assert.equal(paths.find((i) => /Chemin : Folder/.test(i.label)).disabled, true, 'a folder carries no path');
+  paths.find((i) => i.label === 'Chemin : Beta').action();
+  await settle();
+  assert.deepEqual(plain(h.sent[1].payload), { command: 'object.layer.followPath.set', contextId: 'scene-root', layerUid: 'L-c', targetLayerUid: 'L-b' });
+  assert.equal(h.sent.length, 2);
 });
