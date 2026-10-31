@@ -3260,7 +3260,12 @@
     // color is a natural v2 (needs its own swatch row; these two reuse the
     // fully generic Transform row renderer with zero new UI code, see
     // propsFor's own comment, motion.js).
-    if (state.activeSymbolId && selectedPaths.length === 1 && p0.data && p0.data.strokeId && window.SM && window.SM.exposeSymbolProperty) {
+    // #2256: on a native object project the same entries are the native expose command (native-component-expose-ui.js), never the legacy writer.
+    var nativeExpose = window.NemoNativeComponentExposeUI ? window.NemoNativeComponentExposeUI.menuItems(window, selectedPaths) : null;
+    if (nativeExpose) {
+      if (nativeExpose.length) items.push({ sep: true });
+      nativeExpose.forEach(function (entry) { items.push(entry); });
+    } else if (state.activeSymbolId && selectedPaths.length === 1 && p0.data && p0.data.strokeId && window.SM && window.SM.exposeSymbolProperty) {
       items.push({ sep: true });
       items.push({
         label: 'Exposer l\'opacité comme propriété de Component…', action: function () {
