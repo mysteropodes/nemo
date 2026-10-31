@@ -218,7 +218,7 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'object_render_scene::ObjectBrushAdmission', 'export_job::export_object_frames_with_materializer',
       'history::ImportAssetSource',
       'desktop_viewport::ViewportDisplayFilter', 'object_render_scene::GhostUnderlayRequest',
-      'object_render_scene::GhostReceipt', 'object_render_scene::viewport_checker_quality_suffix', 'application::prepare_ghost_underlay', 'application::release_ghost_caches'],
+      'object_render_scene::GhostReceipt', 'object_render_scene::viewport_checker_quality_suffix', 'object_render_scene::viewport_outline_quality_suffix', 'application::prepare_ghost_underlay', 'application::release_ghost_caches'],
     'rust.desktop.media': [
       'native_media_frame_export::NativeVideoDecoder', 'native_media_frame_export::NativeVideoInfo'],
   });

@@ -1,6 +1,7 @@
 //! The raster branch of the existing object compositor, preserving pinned paint order and cache ownership.
 use crate::compositor::object_compositor::prepare_command;
 use crate::compositor::{Compositor, CompositorError};
+use crate::object_render_scene::object_scene_style_emit::PreparedItem;
 use crate::object_render_scene::{ordered_entries, ObjectCompositionWitness, PaintEntry};
 use vello::kurbo::Affine;
 /// T12: the layered path draws solid layers only, so a video is refused, never omitted.
@@ -96,14 +97,16 @@ impl Compositor {
         if let Some(ghosts) = prepared.ghost_underlay() {
             ghosts.draw(scene);
         }
+        // #2372: the viewport-only Current frame outline (an export witness has none): vector items, not text, video or images.
+        let outline = prepared.viewport_outline();
         for entry in ordered_entries(prepared.plan()) {
             match entry {
                 PaintEntry::Contour(command) => {
-                    prepare_command(command)?.draw(scene, Affine::IDENTITY, command.path())
+                    paint_item(&prepare_command(command)?, scene, command.path(), outline)
                 }
                 PaintEntry::Text(source) => source.draw(scene),
                 PaintEntry::Component(source) => {
-                    source.prepared.draw(scene, Affine::IDENTITY, &source.path)
+                    paint_item(&source.prepared, scene, &source.path, outline)
                 }
                 // T12: a video slot draws only from its decoded frame, never blank.
                 PaintEntry::Video(index) => {
@@ -115,7 +118,7 @@ impl Compositor {
                     scene.draw_image(&brush, transform);
                 }
                 PaintEntry::Duplicator(source) => {
-                    source.prepared.draw(scene, Affine::IDENTITY, &source.path)
+                    paint_item(&source.prepared, scene, &source.path, outline)
                 }
                 PaintEntry::Dab(dab) => dab.prepared.draw(scene, Affine::IDENTITY, &dab.path),
                 #[cfg(all(feature = "application", feature = "project_media_codec"))]
@@ -169,6 +172,19 @@ impl Compositor {
     }
 }
 
+/// One vector item: as authored, or as the baseline outline when the viewport asked for it.
+fn paint_item(
+    item: &PreparedItem,
+    scene: &mut vello::Scene,
+    path: &vello::kurbo::BezPath,
+    outline: Option<f64>,
+) {
+    match outline {
+        Some(width) => item.draw_outline(scene, Affine::IDENTITY, path, width),
+        None => item.draw(scene, Affine::IDENTITY, path),
+    }
+}
+
 /// A layered GPU result needs its own final whole-image camera pass; do not
 /// pretend that transforming only the flat source paints covers that path.
 pub(super) fn check_layered_camera(
@@ -177,6 +193,11 @@ pub(super) fn check_layered_camera(
     if prepared.camera_matrix().is_some() {
         return Err(CompositorError::new(
             "stored camera with layered effects is unavailable",
+        ));
+    }
+    if prepared.viewport_outline().is_some() {
+        return Err(CompositorError::new(
+            "current frame outline with layered effects is unavailable",
         ));
     }
     Ok(())

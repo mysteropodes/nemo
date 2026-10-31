@@ -11113,6 +11113,8 @@ var currentOutlineChk=document.getElementById('p-current-outline');
 if(currentOutlineChk){
   currentOutlineChk.checked=!!state.currentFrameOutline;
   currentOutlineChk.addEventListener('change',function(){
+    // #2372: on a native object project the flag rides the next preview request (view-only; a refusal unchecks the box).
+    if(window.NemoNativeViewAids&&window.NemoNativeViewAids.toggle(window,'outline',this))return;
     state.currentFrameOutline=this.checked;
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
   });
