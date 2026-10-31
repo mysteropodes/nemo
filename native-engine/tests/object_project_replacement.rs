@@ -200,7 +200,7 @@ fn blank_project_preserves_explicit_settings_and_five_second_baseline_after_reop
         assert_eq!(
             info["layers"],
             json!([{"layerUid":"layer-1","name":"Layer 1","visible":true,
-            "locked":false,"color":"#5FA875","parentLayerUid":null}]),
+            "locked":false,"color":"#5FA875","parentLayerUid":null,"kind":"draw"}]),
             "file-info publishes native layer defaults; timing keeps its own read"
         );
         let reopened = NativeObjectHistory::from_project_file("new", &bytes).unwrap();
