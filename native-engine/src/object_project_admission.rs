@@ -265,6 +265,8 @@ mod perspective_read;
 mod symmetry_read;
 #[path = "object_project_shadow_read.rs"]
 mod shadow_read;
+#[path = "object_project_camera_read.rs"]
+mod camera_read;
 #[path = "object_project_workspace_read.rs"]
 mod workspace_read;
 

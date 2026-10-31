@@ -39,6 +39,8 @@ pub(crate) mod perspective;
 pub(crate) mod placement;
 #[path = "native_project_settings_contract.rs"]
 pub(crate) mod settings;
+#[path = "native_camera_contract.rs"]
+pub(crate) mod camera;
 #[path = "native_shadow_contract.rs"]
 pub(crate) mod shadow;
 #[path = "native_workspace_contract.rs"]
@@ -129,6 +131,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
             | palette::READ
             | guide::READ
             | shadow::READ
+            | camera::READ
             | perspective::READ
             | settings::symmetry::READ
             | workspace::READ
@@ -205,6 +208,7 @@ fn request_check(operation: &str, payload: &Value) -> Option<bool> {
         palette::READ | palette::EDIT => palette::request(operation, payload),
         guide::READ | guide::EDIT => guide::request(operation, payload),
         shadow::READ | shadow::EDIT => shadow::request(operation, payload),
+        camera::READ => camera::request(operation, payload),
         perspective::READ | perspective::EDIT => perspective::request(operation, payload),
         settings::symmetry::READ | settings::symmetry::EDIT => settings::symmetry::request(operation, payload),
         workspace::READ | workspace::EDIT => workspace::request(operation, payload),
@@ -423,6 +427,7 @@ fn result_validator(operation: &str) -> Option<ResultValidator> {
         perspective::READ | perspective::EDIT => |o, d, p, r| perspective::result(o, d, p, r),
         settings::symmetry::READ | settings::symmetry::EDIT => |o, d, p, r| settings::symmetry::result(o, d, p, r),
         shadow::READ | shadow::EDIT => |o, d, p, r| shadow::result(o, d, p, r),
+        camera::READ => |o, d, p, r| camera::result(o, d, p, r),
         guide::READ | guide::EDIT => |o, d, p, r| guide::result(o, d, p, r),
         op if brush::owns(op) => |o, _, p, r| brush::result(o, p, r),
         text_read::OP => |_, d, p, r| text_read::result(d, p, r),
