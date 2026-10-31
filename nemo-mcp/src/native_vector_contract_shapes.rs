@@ -146,7 +146,7 @@ pub(super) fn shape(value: &Value, for_set: bool) -> bool {
     })
 }
 
-fn gradient(value: &Value) -> bool {
+pub(super) fn gradient(value: &Value) -> bool {
     let number = |v: &Value| {
         v.as_f64()
             .is_some_and(|n| n.is_finite() && (n as f32).is_finite())

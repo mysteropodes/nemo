@@ -19,6 +19,7 @@ use crate::commands::object_fill_owner::vector_edit::batch_ops::style::{
 };
 use crate::object_document::{
     BrushTexture, ObjectDocument, ObjectRecord, Presence, ProjectPresetCatalog, SolidFill,
+    StoredGradient, VectorExt,
 };
 use crate::request_receipts::DispatchErrorCode;
 use serde_json::Number;
@@ -44,6 +45,7 @@ pub(super) struct Detail {
     mask_feather: Option<f64>,
     mask_mode: Option<String>,
     unmask: bool,
+    gradient: Option<Option<StoredGradient>>,
 }
 
 /// A member that names one of `allowed`.
@@ -79,7 +81,22 @@ impl Detail {
                     .ok_or(DispatchErrorCode::InvalidRequest)
             })
             .transpose()?;
+        // `fillGradient` is a stored two-stop gradient (or null, back to the flat fill); its stop colours are `#rrggbb[aa]` like every restyle colour.
+        let gradient = style
+            .fill_gradient
+            .value()
+            .map(|next| {
+                next.as_ref()
+                    .map(|g| {
+                        (g.valid() && g.stops.iter().all(|s| parse(&s.color).is_ok()))
+                            .then(|| g.clone())
+                            .ok_or(DispatchErrorCode::InvalidRequest)
+                    })
+                    .transpose()
+            })
+            .transpose()?;
         Ok(Self {
+            gradient,
             fill_enabled: style.fill_enabled.value().copied(),
             stroke_enabled: style.stroke_enabled.value().copied(),
             cap: choice(&style.cap, &CAPS)?,
@@ -109,6 +126,7 @@ impl Detail {
             + usize::from(self.mask_feather.is_some())
             + usize::from(self.mask_mode.is_some())
             + usize::from(self.unmask)
+            + usize::from(self.gradient.is_some())
     }
     /// Any member that is not a preset or a feather.
     pub(super) fn has_plain(&self) -> bool {
@@ -139,6 +157,10 @@ impl Detail {
     }
     pub(super) fn unmask(&self) -> bool {
         self.unmask
+    }
+    /// The fill gradient edit: `Some(Some(g))` stores `g`, `Some(None)` returns to the flat fill.
+    pub(super) fn gradient(&self) -> Option<Option<&StoredGradient>> {
+        self.gradient.as_ref().map(Option::as_ref)
     }
 }
 
@@ -398,6 +420,52 @@ fn stamp(
                 brush_texture: Presence::Present(texture),
                 ..Default::default()
             })
+        }
+    }
+    Ok(vec![record])
+}
+
+/// The fill gradient of `existing` set to `next` (baseline `toggleGradient`, 1065e9d8 gradient-bridge.js): turning one on also makes the flat
+/// fill its first stop's colour (the fallback every consumer without a gradient draws), an edit of a gradient already there leaves the flat
+/// fill alone, and `None` drops the gradient and keeps the flat fill. A pressure ribbon, a mask, a bitmap brush and a stamped dab take none.
+pub(super) fn gradient(
+    existing: &ObjectRecord,
+    next: Option<&StoredGradient>,
+) -> Result<Vec<ObjectRecord>, DispatchErrorCode> {
+    let ext = existing.vector_ext.value();
+    if is_mask(existing)
+        || ext.is_some_and(|e| {
+            !e.pressure.missing()
+                || !e.bitmap_brush.missing()
+                || e.brush_texture
+                    .value()
+                    .is_some_and(|t| t.is_brush_texture_copy.value() == Some(&true))
+        })
+    {
+        return Err(DispatchErrorCode::Unavailable);
+    }
+    let had = ext.is_some_and(|e| !e.fill_gradient.missing());
+    let mut record = existing.clone();
+    match next {
+        Some(g) => {
+            if !had {
+                record.fill = Presence::Present(Some(parse(&g.stops[0].color)?));
+            }
+            match record.vector_ext.value_mut() {
+                Some(e) => e.fill_gradient = Presence::Present(g.clone()),
+                None => {
+                    record.vector_ext = Presence::Present(VectorExt {
+                        fill_gradient: Presence::Present(g.clone()),
+                        ..Default::default()
+                    })
+                }
+            }
+        }
+        None => {
+            clear_gradient(&mut record);
+            if record.vector_ext.value().is_some_and(VectorExt::is_empty) {
+                record.vector_ext = Presence::Missing;
+            }
         }
     }
     Ok(vec![record])

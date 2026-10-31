@@ -218,7 +218,7 @@
       // baseline did a filled Paper item); an unfilled plain stroke only on its line.
       path.strokeColor = [0, 0, 0]; path.strokeWidth = Math.max(1, worldStrokeWidth(item)); if (item.closed && (item.role !== 'plain' || item.filled === true)) path.fillColor = [0, 0, 0];
       path.data = { strokeId: item.stableTarget.strokeId, nativeStableTarget: item.stableTarget, nativeRole: item.role, nativeRibbon: item.role === 'ribbon', nativeMatrix: item.matrix,
-        nativeOwner: item.owner, nativeBrush: item.brush, nativeGroup: item.group, nativeStyle: item.style };
+        nativeOwner: item.owner, nativeBrush: item.brush, nativeGroup: item.group, nativeStyle: item.style, nativeBounds: item.bounds };
       // The record's stored boxAngle (baseline serP/desP data.boxAngle) turned by the presented matrix when that is a pure similarity, so the
       // oriented box is drawn in world space after a frame change, an undo or a reload.
       // #2372 SEL-MASK: a listed mask is the selection the Mask panel edits (the baseline mask Path carried data.isMask / maskMode / maskFeather).

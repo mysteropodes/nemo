@@ -16,7 +16,7 @@ use crate::commands::object_fill_owner::vector_edit::batch_ops::ribbon;
 use crate::commands::object_fill_owner::vector_edit::is_vector_record;
 use crate::object_document::{
     object_deserialize, CenterSegment, ObjectDocument, ObjectRecord, ObjectTarget, Presence,
-    ProjectPresetCatalog, SolidFill, WidthStop,
+    ProjectPresetCatalog, SolidFill, StoredGradient, WidthStop,
 };
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
@@ -41,6 +41,7 @@ pub(super) struct Style {
     pub(super) mask_feather: Presence<Number>,
     pub(super) mask_mode: Presence<String>,
     pub(super) unmask: Presence<bool>,
+    pub(super) fill_gradient: Presence<Option<StoredGradient>>,
 }
 object_deserialize!(Style {
     #[serde(default)] fill: Presence<String>,
@@ -58,7 +59,8 @@ object_deserialize!(Style {
     #[serde(default)] brush_preset: Presence<String>,
     #[serde(default)] mask_feather: Presence<Number>,
     #[serde(default)] mask_mode: Presence<String>,
-    #[serde(default)] unmask: Presence<bool>
+    #[serde(default)] unmask: Presence<bool>,
+    #[serde(default)] fill_gradient: Presence<Option<StoredGradient>>
 });
 
 /// A validated style: parsed colours and finite numbers in range.
@@ -228,6 +230,9 @@ pub(super) fn restyle(
     }
     if style.detail.unmask() {
         return detail::unmask(existing);
+    }
+    if let Some(gradient) = style.detail.gradient() {
+        return detail::gradient(existing, gradient);
     }
     let ext = existing.vector_ext.value();
     let texture = ext.and_then(|e| e.brush_texture.value());

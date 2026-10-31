@@ -14,7 +14,7 @@
 //! or item; its receipt id is the named target. A batch is atomic: any step the engine refuses refuses it whole. Only a request that
 //! sets the boolean `skipUnavailable` restyles what it can; the receipt then adds `skippedSteps` (1 to one less than the steps) and
 //! still lists one id per step.
-use super::shapes::{anchor, geometry, record_shape};
+use super::shapes::{anchor, geometry, gradient, record_shape};
 use super::target;
 use crate::native_contract::exact;
 use serde_json::Value;
@@ -72,13 +72,14 @@ fn hex(v: &Value) -> bool {
 /// A restyle's members: at least one of a hex `fill` / `stroke`, a `width` in (0, 10000], an `opacity` in [0, 1] (#2372) and the
 /// SEL-STYLE2 members: the `fillEnabled` / `strokeEnabled` switches (turning one on names its colour), `cap`, `join`, a `miter` in
 /// [1, 1000], a `dashOffset`, a `paintOrder`, a `strokeStyle`, a `brushPreset` key and a `maskFeather` in [0, 500]; a preset or a feather
-/// stands alone. `maskMode` (add, subtract, intersect) and `unmask` (only `true`) are mask edits of their own and stand alone too.
+/// stands alone. `maskMode` (add, subtract, intersect) and `unmask` (only `true`) are mask edits of their own and stand alone too, and so is
+/// `fillGradient` (#2372): a stored two-stop gradient whose stop colours are `#rrggbb[aa]`, or `null` for the flat fill.
 fn style(v: &Value) -> bool {
     let one_of = |k: &str, set: &[&str]| v.get(k).is_none_or(|s| s.as_str().is_some_and(|s| set.contains(&s)));
     let range = |k: &str, lo: f64, hi: f64| v.get(k).is_none_or(|n| n.as_f64().is_some_and(|n| (lo..=hi).contains(&n)));
     let flag = |k: &str| v.get(k).is_none_or(Value::is_boolean);
-    let alone = ["brushPreset", "maskFeather", "maskMode", "unmask"].iter().filter(|k| v.get(**k).is_some()).count();
-    exact(v, &[], &["fill", "stroke", "width", "opacity", "fillEnabled", "strokeEnabled", "cap", "join", "miter", "dashOffset", "paintOrder", "strokeStyle", "brushPreset", "maskFeather", "maskMode", "unmask"]).is_some_and(|o| !o.is_empty() && (alone == 0 || o.len() == 1))
+    let alone = ["brushPreset", "maskFeather", "maskMode", "unmask", "fillGradient"].iter().filter(|k| v.get(**k).is_some()).count();
+    exact(v, &[], &["fill", "stroke", "width", "opacity", "fillEnabled", "strokeEnabled", "cap", "join", "miter", "dashOffset", "paintOrder", "strokeStyle", "brushPreset", "maskFeather", "maskMode", "unmask", "fillGradient"]).is_some_and(|o| !o.is_empty() && (alone == 0 || o.len() == 1))
         && v.get("fill").is_none_or(hex)
         && v.get("stroke").is_none_or(hex)
         && v.get("width").is_none_or(|w| w.as_f64().is_some_and(|w| w > 0.0 && w <= 10_000.0))
@@ -97,6 +98,7 @@ fn style(v: &Value) -> bool {
         && range("maskFeather", 0.0, 500.0)
         && one_of("maskMode", &["add", "subtract", "intersect"])
         && v.get("unmask").is_none_or(|u| u == true)
+        && v.get("fillGradient").is_none_or(|g| g.is_null() || (gradient(g) && g["stops"].as_array().is_some_and(|s| s.iter().all(|s| s["color"].as_str().is_some_and(|c| [7, 9].contains(&c.len()))))))
 }
 
 /// Every step's addressed target; a copy addresses its source's layer and must name an earlier create or copy.

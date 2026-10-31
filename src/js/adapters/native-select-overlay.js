@@ -140,6 +140,9 @@
         });
       }
     }
+    // #2372 native-fill-gradient: the Fill row's gradient gizmo (line, end handles, stop diamonds) joins the selection's drawing.
+    var gizmo = root.NemoNativeFillGradient;
+    if (shown && gizmo && typeof gizmo.draw === 'function') gizmo.draw(root, svg, c, shown);
     if (s.prev && s.prev.marquee) {
       var m = s.prev.marquee;
       svg.appendChild(polygon(root, c.V, { corners: [[m[0], m[1]], [m[2], m[1]], [m[2], m[3]], [m[0], m[3]]] }, { fill: 'rgba(74,158,255,0.08)', stroke: BLUE, 'stroke-opacity': '0.9', 'stroke-width': '1' }));

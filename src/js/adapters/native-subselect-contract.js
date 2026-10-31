@@ -12,11 +12,14 @@
   // and (SEL-STYLE2) the stroke details cap, join, miter, dashOffset, paintOrder, and (INSP-READBACK) strokeStyle and a texture anchor's brushPreset.
   const hexColour=v=>typeof v==='string'&&/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v);
   const finite=v=>typeof v==='number'&&Number.isFinite(v);
-  const listedStyle=v=>exact(v,[],['fill','stroke','width','opacity','cap','join','miter','dashOffset','paintOrder','strokeStyle','brushPreset','maskMode','maskFeather'])&&Object.keys(v).length>0&&(!own(v,'fill')||hexColour(v.fill))&&(!own(v,'stroke')||hexColour(v.stroke))&&
+  // #2372 native-fill-gradient: the record's stored two-stop gradient (record-space ends, stops as stored), the body a restyle step's fillGradient takes back.
+  const listedGradient=g=>exact(g,['kind','from','to','stops'])&&['linear','radial'].includes(g.kind)&&[g.from,g.to].every(a=>Array.isArray(a)&&a.length===2&&a.every(finite))&&
+    Array.isArray(g.stops)&&g.stops.length===2&&g.stops.every(t=>exact(t,['offset','color'])&&finite(t.offset)&&/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(t.color));
+  const listedStyle=v=>exact(v,[],['fill','stroke','width','opacity','cap','join','miter','dashOffset','paintOrder','strokeStyle','brushPreset','maskMode','maskFeather','fillGradient'])&&Object.keys(v).length>0&&(!own(v,'fill')||hexColour(v.fill))&&(!own(v,'stroke')||hexColour(v.stroke))&&
     (!own(v,'width')||finite(v.width)&&v.width>0)&&(!own(v,'opacity')||finite(v.opacity)&&v.opacity>=0&&v.opacity<=1)&&(!own(v,'cap')||['butt','round','square'].includes(v.cap))&&
     (!own(v,'join')||['miter','round','bevel'].includes(v.join))&&(!own(v,'miter')||finite(v.miter)&&v.miter>=0)&&(!own(v,'dashOffset')||finite(v.dashOffset))&&(!own(v,'paintOrder')||['fillFirst','strokeFirst'].includes(v.paintOrder))&&
     (!own(v,'strokeStyle')||['solid','dashed','dotted'].includes(v.strokeStyle))&&(!own(v,'brushPreset')||typeof v.brushPreset==='string'&&v.brushPreset.length>0&&v.brushPreset.length<=96)&&
-    (!own(v,'maskMode')||['add','subtract','intersect'].includes(v.maskMode))&&(!own(v,'maskFeather')||finite(v.maskFeather)&&v.maskFeather>=0);
+    (!own(v,'maskMode')||['add','subtract','intersect'].includes(v.maskMode))&&(!own(v,'maskFeather')||finite(v.maskFeather)&&v.maskFeather>=0)&&(!own(v,'fillGradient')||listedGradient(v.fillGradient));
   // #2256: a presented-stroke VIEW may name the entered component the workspace controller holds (never free text); the edit intent stays on the scene root.
   const viewContext=id=>{if(id==='scene-root')return true;try{const c=globalThis.NemoNativeComponentContext;return typeof id==='string'&&!!id&&!!c&&typeof c.contextId==='function'&&c.contextId(globalThis)===id;}catch(_){return false;}};
   function target(v,context){return exact(v,['contextId','layerUid','frameScope','strokeId'])&&v.contextId===(context||'scene-root')&&
