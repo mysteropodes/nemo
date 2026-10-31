@@ -11,6 +11,8 @@ use serde_json::Number;
 
 #[path = "object_property_bake_edit.rs"]
 mod bake_edit;
+#[path = "object_property_control_edit.rs"]
+mod control_edit;
 #[path = "object_property_curve_edits.rs"]
 mod curves;
 #[path = "object_property_preset_apply.rs"]
@@ -43,6 +45,36 @@ enum PropertyAction {
         frame: Number,
         animated: bool,
     },
+    // D18-B: declaration edits of the holder's expression controls; `property` is the control key.
+    #[serde(rename_all = "camelCase")]
+    AddControl {
+        control_type: String,
+        name: String,
+    },
+    RenameControl {
+        name: String,
+    },
+    RemoveControl {},
+    MoveControl {
+        direction: i64,
+    },
+}
+impl PropertyAction {
+    fn control(&self) -> Option<control_edit::ControlOp<'_>> {
+        use control_edit::ControlOp;
+        Some(match self {
+            Self::AddControl { control_type, name } => ControlOp::Add {
+                kind: control_type,
+                name,
+            },
+            Self::RenameControl { name } => ControlOp::Rename { name },
+            Self::RemoveControl {} => ControlOp::Remove,
+            Self::MoveControl { direction } => ControlOp::Move {
+                direction: *direction,
+            },
+            _ => return None,
+        })
+    }
 }
 #[derive(Debug)]
 struct PropertyPayload {
@@ -274,6 +306,9 @@ impl ObjectFillOwner {
         if matches!(payload.property.as_str(), "order" | "timeRemap") {
             return Err(DispatchErrorCode::Unavailable);
         }
+        if let Some(op) = payload.action.control() {
+            return Self::apply_control_edit(origin, document, &payload.target, &payload.property, op);
+        }
         let mut holders = document
             .property_holders
             .value()
@@ -319,6 +354,11 @@ impl ObjectFillOwner {
             });
         let before = record.clone();
         match payload.action {
+            // Taken above, before any metadata lookup: a control edit has no value record.
+            PropertyAction::AddControl { .. }
+            | PropertyAction::RenameControl { .. }
+            | PropertyAction::RemoveControl {}
+            | PropertyAction::MoveControl { .. } => return Err(DispatchErrorCode::Internal),
             PropertyAction::SetExpression { expression } => {
                 record.expression = expression.map_or(Presence::Missing, Presence::Present);
             }

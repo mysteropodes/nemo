@@ -4486,6 +4486,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-motion-control-rows.js",
+      "moduleId": "app.native.layer-parent.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2682,
+          "scriptOrdinal": 331
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-path-effects-ui.js",
       "moduleId": "app.native.path-effects.ui.adapter",
       "executionClass": "document-classic",
