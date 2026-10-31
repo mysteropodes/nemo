@@ -74,8 +74,9 @@
         var lp=document.getElementById('layer-panel');
         if(lp)lp.dataset.motionColumns=ws.motionColumns;
       }
-      // Unknown spellings are ignored by the dock port: the layout stays as it is.
-      if(typeof ws.toolsDock==='string'){var dp=dockPort();if(dp)dp.apply(ws.toolsDock);}
+      // Unknown spellings are ignored by the dock port: the layout stays as it is. A record WITHOUT a dock (capture always writes one, so
+      // this is an older revision) is the default dock: undo to it must move the panel back instead of leaving it where it was (#2256).
+      var dp=dockPort();if(dp)dp.apply(typeof ws.toolsDock==='string'?ws.toolsDock:'left');
       // The canvas sizes itself from a window resize (see the panel drag
       // handlers above, which fire one for the same reason).
       window.dispatchEvent(new Event('resize'));

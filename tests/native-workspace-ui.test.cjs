@@ -294,7 +294,8 @@ test('tools dock refusal rolls back to the previous dock and storage; reopen/und
   assert.equal(f.root.NemoToolsDock.read(), 'top'); assert.equal(f.storage.get('nemo-tools-dock'), 'top'); assert.equal(f.metadata().toolsDock, 'top');
   assert.equal(f.checkpoints(), 0);
   const g = await fixture({ layerPanelWidth: '1px' }, false, true); dragDock(g, 'right'); await g.settled();
-  g.history(-1); await g.settled(); assert.equal(g.root.NemoToolsDock.read(), 'right', 'record without toolsDock preserves the current layout');
+  g.history(-1); await g.settled(); assert.equal(g.root.NemoToolsDock.read(), 'left', 'undo to a record without toolsDock restores the default dock (#2256)');
+  assert.equal(g.elements['tools-panel'].classList.contains('tools-dock-right'), false);
   g.replace({ toolsDock: 'left' }); await g.settled(); assert.equal(g.root.NemoToolsDock.read(), 'left');
   g.replace({ toolsDock: 'diagonal' }); await g.settled(); assert.equal(g.root.NemoToolsDock.read(), 'left', 'unknown saved spelling is ignored, never applied');
   assert.equal(g.edits().length, 1, 'projection never captures');

@@ -98,6 +98,9 @@ function fixture(options) {
     requests.push(clone(request));
     if (options.hold && request.operation === 'query.document.object.workspace.context' && request.payload.action.kind === options.hold.kind) await options.hold.promise;
     const base = { apiVersion: 2, requestId: request.requestId, instanceId: 'instance-A', documentId: 'document-A', contentRevision: m.revision };
+    if (m.failExit && request.operation === 'query.document.object.workspace.context' && request.payload.action.kind === 'exit') {
+      return Object.assign(base, { ok: false, error: { code: 'unavailable', message: 'the owner could not exit' } });
+    }
     if (m.failRefresh > 0 && request.operation === 'query.document.object.workspace.context' && request.payload.action.kind === 'refresh') {
       m.failRefresh -= 1; return Object.assign(base, { ok: false, error: { code: 'unavailable', message: 'the owner could not answer' } });
     }
@@ -431,4 +434,35 @@ test('a failed refresh inside a publication rides the same retry and exit (the l
   assert.equal(refreshes(f), 4);
   assert.equal(f.host.state.activeSymbolId, null);
   assert.match(f.toasts.join('|'), /could not be refreshed/);
+});
+
+// #2256 review of #2668/#2669: retries AND the exit failed. The context is fenced (typed unavailable state, one toast) and later revisions
+// do not repeat the ladder of pauses on the publication queue; the next user action lifts the fence.
+test('when the retries and the exit both fail the context is fenced: later revisions neither pause nor ask again until a user action', async () => {
+  const f = fixture(), pauses = [];
+  f.host.setTimeout = (fn, ms) => { pauses.push(ms); fn(); };
+  await enteredAt8(f); f.m.failRefresh = Infinity; f.m.failExit = true;
+  const exits = () => f.workspaceRequests().filter((r) => r.payload.action.kind === 'exit').length;
+  await f.session.runResourceCommand((lease) => Context.revision(f.host, f.session.info(), lease));
+  assert.deepEqual(pauses, [100, 300, 900], 'the first revision ran the whole ladder once');
+  assert.equal(refreshes(f), 4);
+  assert.ok(exits() >= 1, 'the exit was tried');
+  assert.equal(f.host.state.activeSymbolId, 'sym_a', 'the exit failed: the component stays entered (fenced)');
+  assert.deepEqual(Context.fault(f.host), { code: 'unavailable', revision: 8 }, 'the typed unavailable state');
+  const toasts = f.toasts.length, asked = f.requests.length;
+  f.m.revision = 9;
+  const t0 = Date.now();
+  await f.session.runResourceCommand((lease) => Context.revision(f.host, f.session.info(), lease));
+  await f.session.runResourceCommand((lease) => Context.revision(f.host, f.session.info(), lease));
+  Context.revision(f.host, f.session.info()); await settle();
+  assert.deepEqual(pauses, [100, 300, 900], 'no further pause');
+  assert.equal(f.requests.length, asked, 'no further ask of the owner');
+  assert.equal(f.toasts.length, toasts, 'the unavailable notice is shown once');
+  assert.ok(Date.now() - t0 < 500, 'the publication queue is not held');
+  assert.equal(Context.projectionReady(f.host, f.session.info()), false, 'the stale view is still not a ready projection');
+  // The next user action lifts the fence: the exit works again and the scene is shown.
+  f.m.failExit = false;
+  assert.equal(await Context.exit(f.host), true);
+  assert.equal(f.host.state.activeSymbolId, null);
+  assert.equal(Context.fault(f.host), null);
 });
