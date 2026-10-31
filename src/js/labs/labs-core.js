@@ -32,4 +32,5 @@
   L.onStrokeCommitted=model.onStrokeCommitted;
   L.buildDrawPreviewExtras=model.buildDrawPreviewExtras;
   L.unmigratedDrawHooks=model.unmigratedDrawHooks;
+  L.enabledDrawHooks=model.enabledDrawHooks;
 })();

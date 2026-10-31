@@ -82,6 +82,14 @@
       return (p.onStroke || p.onPreview) && !p.nativeDraw && isOn(n);
     });
   };
+  // Every enabled prototype with a draw hook, migrated or not: the native bitmap-brush command runs no Labs hook, so it
+  // refuses while any of these is on. Prototypes without a draw hook (view aids) never block drawing.
+  L.enabledDrawHooks = function () {
+    return Object.keys(protos).filter(function (n) {
+      var p = protos[n];
+      return (p.onStroke || p.onPreview) && isOn(n);
+    });
+  };
   L.buildDrawPreviewExtras = function (samples, overlayItemFor) {
     var out = [];
     Object.keys(protos).forEach(function (n) {
