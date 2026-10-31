@@ -19,17 +19,17 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "94e1f5e1a22e54cd32c211a8a626dc187f651ca3",
-    "sourceRootTree": "9d9ee954b41285a7b5869c6be067c986fa123162",
+    "candidateCommit": "a2588e3d3827399761b48014d7ff6687641048c3",
+    "sourceRootTree": "81dbadf054907ee4828afae24de55f8ce5f2c450",
     "applicationTree": {
       "path": "src/js",
       "gitTree": "b0d5589f201089fb320e36ebc8425b5eef3ed9b1",
-      "lastChangedCommit": "94e1f5e1a22e54cd32c211a8a626dc187f651ca3"
+      "lastChangedCommit": "a2588e3d3827399761b48014d7ff6687641048c3"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "2ecd41ebe2ed3713fc14bb6d7cdd50a979d0c72d",
-      "sha256": "5c0107bd140f028080c015171e997d973c56d5ac1af14de50daa7051c3b1a879",
+      "gitBlob": "5a564c17212d9eaf2a2a25bd66b834457e3787d8",
+      "sha256": "b1d7cd5304938d24ba39fd43178d873f4524cbdca4b4e77548c6c5c4d41e1d13",
       "lastChangedCommit": "f606f3b2ea60c6bf5cdb7d031b8c54b3b60d291a"
     },
     "inventoryDigest": {
@@ -43,7 +43,7 @@
         "gitBlob": "ab3f6ad442f3cee0bb27cf7b299e2fef4d698335",
         "sha256": "dd532744c89ed5d21a5c4a9fa04bb1b4b3c1684393de49048d1905508baf69fd",
         "moduleCount": 307,
-        "basedOnCommit": "94e1f5e1a22e54cd32c211a8a626dc187f651ca3"
+        "basedOnCommit": "a2588e3d3827399761b48014d7ff6687641048c3"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -1315,8 +1315,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2544,
-          "scriptOrdinal": 199
+          "line": 2545,
+          "scriptOrdinal": 200
         }
       ]
     },
@@ -1376,8 +1376,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2542,
-          "scriptOrdinal": 197
+          "line": 2543,
+          "scriptOrdinal": 198
         }
       ]
     },
@@ -1388,8 +1388,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2543,
-          "scriptOrdinal": 198
+          "line": 2544,
+          "scriptOrdinal": 199
         }
       ]
     },
@@ -5564,8 +5564,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2545,
-          "scriptOrdinal": 200
+          "line": 2542,
+          "scriptOrdinal": 197
         }
       ]
     },
