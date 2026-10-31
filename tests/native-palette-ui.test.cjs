@@ -91,7 +91,9 @@ function fixture(options = {}) {
     return vm.runInContext('JSON.parse(' + JSON.stringify(JSON.stringify(response)) + ')', context);
   }
   const session = { info: () => info, isActive: () => active, requestId: () => 'palette-' + (++serial),
-    readSubscriptionGeneration: () => ticket, readPresentedObjectSession: () => active && !running && publicPresentation ? projected(info) : null,
+    readSubscriptionGeneration: () => ticket, readPresentedObjectSession: refused => {
+      if (!publicPresentation && active && typeof refused === 'function') refused('queue-pending');
+      return active && !running && publicPresentation ? projected(info) : null; },
     runResourceCommand(action) {
       running++;
       const work = tail.then(() => { const origin = info;
@@ -113,7 +115,7 @@ function fixture(options = {}) {
     setFillColor() { throw Error('legacy fill writer'); }, setStrokeColor() { throw Error('legacy stroke writer'); } },
     NemoNativeObjectProject: { desktop: () => session },
     NemoNativeObjectProjectFile: { projectionReadyForUI: (valueRoot, value) => active && !running && ProjectFile.projectionReadyForUI(valueRoot, value) },
-    showToast: text => notices.push(text), prompt: () => prompts.shift(),
+    showToast: text => notices.push(text), prompt: () => prompts.shift(), setTimeout: (fn, ms) => ms ? setImmediate(fn) : setTimeout(fn, 0),
     showContextMenu: (x, y, items) => menus.push(items), addEventListener() {},
     localStorage: { getItem: () => null, setItem() {} }, pushUndo() { throw Error('legacy history'); } };
   root.window = root; root.globalThis = root; context = vm.createContext(root);
@@ -121,7 +123,7 @@ function fixture(options = {}) {
   function project() { presentation = { ...info, owner: 'native', status: 'presented' }; ProjectFile.projectView(browserRoot, info); }
   project();
   // The ordinary panel loads first, as it does in src/index.html.
-  for (const file of ['palette-panel.js', 'adapters/native-palette-contract.js', 'adapters/native-application.js',
+  for (const file of ['palette-panel.js', 'adapters/native-presentation-wait.js', 'adapters/native-palette-contract.js', 'adapters/native-application.js',
     'adapters/native-palette-desktop.js', 'adapters/native-palette-ui.js'])
     vm.runInContext(fs.readFileSync(require.resolve('../src/js/' + file), 'utf8'), context, { filename: file });
   controller = root.NemoNativePaletteController; document.fire('DOMContentLoaded');
@@ -333,4 +335,27 @@ test('palette uses full project readiness and retains narrow immutable authority
   f.repairProjection(); await f.controller.presented(); await f.settled();
   assert.ok(f.controller.read());
   assert.equal(f.edits().length, 0, 'restoring readiness does not replay a gesture');
+});
+
+// #2372: the create / rename / remove prompts read their origin while the native queue hides the presentation (queue-pending): they wait (bounded) and then prompt.
+const ticks = async (n = 6) => { for (let i = 0; i < n; i++) await new Promise(done => setImmediate(done)); };
+test('queue-pending: create, rename and remove prompt once the hidden presentation returns, then write once each', async () => {
+  const h = fixture(); await h.ready(); const asked = [];
+  h.root.prompt = (text, initial) => { asked.push(text); return h.prompts.shift(); };
+  h.present(false); h.prompts.push('Waited'); h.elements['btn-palette-new'].fire('click'); await ticks(3);
+  assert.deepEqual(asked, [], 'no prompt while the presentation is hidden'); assert.deepEqual(h.notices, []); assert.equal(h.edits().length, 0);
+  h.present(true); await ticks(); await h.settled(); assert.equal(asked.length, 1); assert.equal(h.edits().length, 1); assert.deepEqual(h.notices, []);
+  await h.ready(); const first = h.tabs()[0]; h.present(false); h.prompts.push('Renamed'); first.fire('dblclick'); await ticks(3);
+  assert.equal(asked.length, 1); h.present(true); await ticks(); await h.settled(); assert.equal(asked.length, 2); assert.equal(h.edits().length, 2);
+  await h.ready(); const menuTab = h.tabs()[1]; menuTab.fire('contextmenu'); const remove = h.menus.at(-1).find(x => x.label === 'Supprimer').action;
+  h.present(false); remove(); await ticks(3); assert.equal(h.edits().length, 2); h.present(true); await ticks(); await h.settled();
+  assert.equal(h.edits().length, 3); assert.deepEqual(h.notices, []);
+});
+test('queue-pending: a real change while the prompt origin waits still refuses; a queue that never frees gives one notice', async () => {
+  const h = fixture(); await h.ready(); const asked = []; h.root.prompt = () => { asked.push(1); return 'x'; };
+  h.present(false); const tab = h.tabs()[0]; tab.fire('dblclick'); await ticks(2); h.replace(); h.present(true); await ticks(); await h.settled();
+  assert.equal(asked.length, 0); assert.equal(h.edits().length, 0); assert.equal(h.notices.length, 1);
+  const g = fixture(); await g.ready(); g.root.prompt = () => { asked.push(1); return 'x'; };
+  g.present(false); g.elements['btn-palette-new'].fire('click'); await ticks(40);
+  assert.equal(asked.length, 0); assert.equal(g.edits().length, 0); assert.equal(g.notices.length, 1);
 });

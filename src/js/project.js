@@ -394,18 +394,33 @@
     try{return nativeInactiveTabs.canReplaceActiveProject()===true&&
       typeof nativeSavedUI.nativeObject.canOpen==='function'&&nativeSavedUI.nativeObject.canOpen()===true;}catch(_){return false;}
   }
-  function nativeNewPin(){
-    var p=window.NemoNativeObjectProject.desktop(window).readPresentedObjectSession();if(!p)throw new Error('Native editor return is unavailable');
+  function nativeNewReader(f){return window.NemoNativeObjectProject.desktop(window).readPresentedObjectSession(f);}
+  function nativeNewPin(p){
+    p=p||nativeNewReader();if(!p)throw new Error('Native editor return is unavailable');
     return Object.freeze({tabId:activeTabId,instanceId:p.instanceId,documentId:p.documentId,contentRevision:p.contentRevision,documentSnapshotId:p.documentSnapshotId,lifecycleGeneration:p.lifecycleGeneration});
+  }
+  // #2372: the native queue hides the presentation while ANY command is pending (a hover read, the last edit's repaint): "cannot prove it right now", not "changed".
+  // The return pin is waited for (bounded, native-presentation-wait.js) in that window only; any other reason, and a context that moved on, are not waited out.
+  var nativeNewWait=0;
+  function nativeNewBusy(){var W=window.NemoNativePresentationWait;try{return !!W&&W.busy(nativeNewReader);}catch(_){return false;}}
+  function nativeNewPinSoon(holds){return window.NemoNativePresentationWait.await(window,{read:nativeNewReader,holds:holds});}
+  function restoreNativeNew(context,current){
+    if(nativeNewReturn&&!context.submitted&&!context.inFlight&&nativeNewAllowed()&&Object.keys(nativeNewReturn).every(function(k){return current[k]===nativeNewReturn[k];})){
+      nativeNewReturn=null;hideStartScreen();SMProjectEntry.repaint();return true;
+    }
+    return false;
   }
   function cancelNativeNew(context){
     if(!nativeNewReturn)return;
-    try{
-      var current=nativeNewPin();
-      if(!context.submitted&&!context.inFlight&&nativeNewAllowed()&&Object.keys(nativeNewReturn).every(function(k){return current[k]===nativeNewReturn[k];})){
-        nativeNewReturn=null;hideStartScreen();SMProjectEntry.repaint();return true;
+    try{if(restoreNativeNew(context,nativeNewPin()))return true;}
+    catch(_){
+      if(nativeNewBusy()){
+        var token=++nativeNewWait,pinned=nativeNewReturn;
+        nativeNewPinSoon(function(){return token===nativeNewWait&&nativeNewReturn===pinned;}).then(function(r){
+          if(token===nativeNewWait&&r.ready)try{restoreNativeNew(context,nativeNewPin(r.value));}catch(_){}
+        });
       }
-    }catch(_){}
+    }
     showStartScreen();return false;
   }
   var newProjectGeneration=0;window.SMProject={nativeTabs:nativeInactiveTabs,nativeObjectProject:function(){return nativeSavedUI&&nativeSavedUI.nativeObject||null;},save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg,isCurrent,onCreationFailure){
@@ -603,10 +618,25 @@
         return tabAddNotice('New project unavailable — close the inactive project or finish the pending project operation first.');
       // Native New replaces the active project through its existing form and
       // confirmation; it never snapshots the document into a JavaScript tab.
-      try{if(document.getElementById('start-screen').classList.contains('hid')&&nativeSavedUI.nativeObject.isActive())nativeNewReturn=nativeNewPin();}catch(_){return tabAddNotice('New project unavailable — the native editor is not ready.');}
-      tabAddNotice('');showStartScreen();document.getElementById('start-new').click();
-      if(nativeSavedUI.nativeObject.isActive())showToast('Creating a new project replaces the current project.');
-      return true;
+      var unready='New project unavailable — the native editor is not ready.';
+      var enter=function(){
+        tabAddNotice('');showStartScreen();document.getElementById('start-new').click();
+        if(nativeSavedUI.nativeObject.isActive())showToast('Creating a new project replaces the current project.');
+        return true;
+      };
+      try{if(document.getElementById('start-screen').classList.contains('hid')&&nativeSavedUI.nativeObject.isActive())nativeNewReturn=nativeNewPin();}
+      catch(_){
+        if(!nativeNewBusy())return tabAddNotice(unready);
+        var token=++nativeNewWait,tab=activeTabId;
+        nativeNewPinSoon(function(){return token===nativeNewWait&&tab===activeTabId&&document.getElementById('start-screen').classList.contains('hid');}).then(function(r){
+          if(token!==nativeNewWait)return;
+          if(!r.ready){if(r.status!=='changed')tabAddNotice(unready);return;}
+          try{nativeNewReturn=nativeNewPin(r.value);}catch(_){tabAddNotice(unready);return;}
+          enter();
+        });
+        return true;
+      }
+      return enter();
     }
     var generation=++tabAddGeneration,initialTab=activeTabId,initialName=currentName,initialPath=currentPath;function denied(){return generation===tabAddGeneration&&activeTabId===initialTab&&currentName===initialName&&currentPath===initialPath?tabAddNotice('New project unavailable — native admission was denied.'):false;}
     function admitted(ok){

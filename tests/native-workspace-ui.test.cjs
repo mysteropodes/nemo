@@ -51,7 +51,7 @@ function dragDock(f, edge) {
   f.doc.fire('pointermove', { clientX: a + 1, clientY: a + 1 }); f.doc.fire('pointerup', { clientX: a + 1, clientY: a + 1 });
 }
 // Controlled native metadata, resource-queue, DOM and file ports. These are not installed/native acceptance receipts.
-async function fixture(initial, browser = false, dock = false) {
+async function fixture(initial, browser = false, dock = false, wait = false) {
   const ids = ['tl-resize', 'timeline-area', 'layer-panel-resize', 'layer-panel', 'tools-panel-resize', 'tools-panel', 'props-panel-resize', 'props-panel', 'props-panel-collapse-btn'];
   const elements = Object.fromEntries(ids.map(id => [id, node(id)])), events = node('window'), doc = node('document'), body = node('body');
   elements['layer-panel'].style.width = '180px'; elements['tools-panel'].style.width = '70px';
@@ -65,7 +65,7 @@ async function fixture(initial, browser = false, dock = false) {
     (!selector.includes('drag-over') || n.classList.contains('drag-over-sec')) && (!selector.includes('floating') || n.classList.contains('floating')));
   doc.querySelector = selector => doc.querySelectorAll(selector)[0] || null; doc.elementFromPoint = () => elements.transform;
   const storage = new Map(), notices = [], calls = [], history = [copy(initial)]; let historyAt = 0, revision = 0, serial = 0, running = 0;
-  let metadata = copy(initial), active = true, refused = false, ticket = 1, held = null, tail = Promise.resolve(), controller, context;
+  let queueHidden = false, metadata = copy(initial), active = true, refused = false, ticket = 1, held = null, tail = Promise.resolve(), controller, context;
   let info = { apiVersion: 2, available: true, kind: 'native-object', instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0',
     canvasW: 320, canvasH: 180, fps: 24, totalFrames: 40, layers: [{ layerUid: 'drawing', visible: true }] };
   const shown = pin => ({ ...pin, presentation: { ...pin, owner: 'native', status: 'presented', frame: 0, contextId: 'scene-root', viewGeneration: 1, workId: 'work-' + pin.documentSnapshotId } });
@@ -92,7 +92,9 @@ async function fixture(initial, browser = false, dock = false) {
     return vm.runInContext('JSON.parse(' + JSON.stringify(JSON.stringify(response)) + ')', context);
   }
   const session = { info: () => info, isActive: () => active, requestId: () => 'workspace-' + (++serial), readSubscriptionGeneration: () => ticket,
-    readPresentedObjectSession: () => active && !running ? shown(info) : null,
+    readPresentedObjectSession: refused => {
+      if (queueHidden) { if (typeof refused === 'function') refused('queue-pending'); return null; }
+      return active && !running ? shown(info) : null; },
     captureSaveSession() {
       const origin = info, observed = tail, generation = ticket;
       return async () => {
@@ -112,6 +114,7 @@ async function fixture(initial, browser = false, dock = false) {
   root.NemoNativeObjectProject = { desktop: () => session };
   root.NemoNativeObjectProjectFile = { projectionReadyForUI: (valueRoot, value) => active && !running && ProjectFile.projectionReadyForUI(valueRoot, value) };
   root.window = root; root.globalThis = root; context = vm.createContext(root);
+  if (wait) { root.setTimeout = fn => setImmediate(fn); vm.runInContext(fs.readFileSync(require.resolve('../src/js/adapters/native-presentation-wait.js'), 'utf8'), context); }
   const browserRoot = vm.runInContext('globalThis', context);
   function project() { ProjectFile.projectView(browserRoot, info); }
   if (!browser) project();
@@ -142,7 +145,7 @@ async function fixture(initial, browser = false, dock = false) {
     edits: () => calls.filter(q => q.operation === C.EDIT), checkpoints: () => history.length - 1,
     resize(kind, move = true) { const handle = elements[{ layer: 'layer-panel-resize', tools: 'tools-panel-resize', props: 'props-panel-resize', timeline: 'tl-resize' }[kind]];
       handle.fire('mousedown', { clientX: 100, clientY: 200 }); if (move) events.fire('mousemove', { clientX: 125, clientY: 170 }); events.fire('mouseup'); },
-    refuse() { refused = true; }, hold() { let resolve; held = new Promise(r => resolve = r); return resolve; },
+    hide(value) { queueHidden = value; }, refuse() { refused = true; }, hold() { let resolve; held = new Promise(r => resolve = r); return resolve; },
     fullInfo: () => info, projectionReady: value => ProjectFile.projectionReadyForUI(browserRoot, value),
     drift() { root.state.canvasW++; }, repairProjection: project,
     replace(value) { metadata = copy(value); revision++; info = { ...info, documentId: 'other', lifecycleGeneration: info.lifecycleGeneration + 1,
@@ -306,4 +309,25 @@ test('tools dock port refuses unknown spellings and capture omits toolsDock when
   assert.equal(f.root.NemoToolsDock.read(), 'left');
   assert.equal(f.root.SMWorkspace.capture().toolsDock, 'left');
   const plain = await fixture(); assert.equal('toolsDock' in plain.root.SMWorkspace.capture(), false);
+});
+
+// #2372: a layout gesture whose origin is read while the native queue hides the presentation (queue-pending) waits for it instead of refusing.
+const ticks = async (n = 6) => { for (let i = 0; i < n; i++) await new Promise(done => setImmediate(done)); };
+test('queue-pending: a resize begun and released while the presentation is hidden captures once when it returns', async () => {
+  const f = await fixture(undefined, false, false, true), before = f.elements['layer-panel'].style.width;
+  f.hide(true); f.resize('layer'); await ticks(3);
+  assert.equal(f.edits().length, 0); assert.deepEqual(f.notices, []); assert.equal(f.elements['layer-panel'].style.width, before);
+  f.hide(false); await f.settled(); await ticks();
+  assert.equal(f.edits().length, 1); assert.equal(f.checkpoints(), 1); assert.deepEqual(f.notices, []);
+  assert.equal(f.elements['layer-panel'].style.width, f.metadata().layerPanelWidth);
+});
+test('queue-pending: a real change while the origin waits still refuses with no write', async () => {
+  const f = await fixture(undefined, false, false, true);
+  f.hide(true); f.resize('layer'); await ticks(2); f.replace({ layerPanelWidth: 222 }); f.hide(false); await f.settled(); await ticks();
+  assert.equal(f.edits().length, 0); assert.equal(f.checkpoints(), 0); assert.equal(f.notices.length, 1);
+});
+test('queue-pending: a queue that never frees gives one notice and no write', async () => {
+  const f = await fixture(undefined, false, false, true);
+  f.hide(true); f.resize('layer'); await ticks(40);
+  assert.equal(f.edits().length, 0); assert.equal(f.notices.length, 1);
 });
