@@ -2906,7 +2906,10 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 /* Native layer rows stay one line: the layer name truncates instead of wrapping under its Hide/Lock/Shy pills. */
 .native-object-layer{gap:3px;align-items:center;min-width:0;margin:1px 0;}
 .native-object-layer>button{flex:none;}
-.native-object-layer>button:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.native-object-layer>button:first-of-type{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+/* #2371: display-only decorations of a native layer row (baseline .lico/.lkind/.comp-badge rules apply); the folder indent matches .lrow.in-folder. */
+.native-object-layer.in-folder{padding-left:16px;}
+.native-object-layer>[data-native-layer-decor]{flex:none;}
 /* Badges, panel buttons and shortcut pills never break their label over two rows. */
 .badge,.pbtn,.sc{white-space:nowrap;}
 /* The status-bar help is one line, truncated, never a second row inside the 20px bar. */
