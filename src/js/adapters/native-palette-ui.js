@@ -81,26 +81,38 @@
       } finally { pending = false; settled(); }
     }
     function id() { return 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e4); }
+    // #2372: a prompt's origin that is not shown only because a pending native command hides the presentation is waited out (model.readSettled, bounded) before the
+    // prompt opens; a presentation that really changed (the sealed projection dropped, another value) or a queue that never frees refuses with ONE notice.
+    function withOrigin(origin, run) {
+      if (origin && shown(origin)) return run(origin);
+      if (busy()) { notice(); return; }
+      return model.readSettled().then(function (value) {
+        if (!value || busy() || (origin && value !== origin)) { notice(); return; }
+        return run(value);
+      });
+    }
     function create() {
-      var origin = model.read();
-      if (!shown(origin)) { notice(); return; }
-      var name = root.prompt('Nom de la nouvelle palette :', 'Palette ' + (origin.palette.palettes.length + 1));
-      if (name === null) return;
-      return edit({ kind: 'create', id: id(), name: name.trim() || 'Palette' }, origin);
+      return withOrigin(model.read(), function (origin) {
+        var name = root.prompt('Nom de la nouvelle palette :', 'Palette ' + (origin.palette.palettes.length + 1));
+        if (name === null) return;
+        return edit({ kind: 'create', id: id(), name: name.trim() || 'Palette' }, origin);
+      });
     }
     function rename(summary, origin) {
-      if (!shown(origin)) { notice(); return; }
-      var name = root.prompt('Renommer la palette :', summary.name);
-      if (name === null || !name.trim()) return;
-      return edit({ kind: 'rename', ordinal: summary.ordinal, name: name.trim() }, origin);
+      return withOrigin(origin, function (shownOrigin) {
+        var name = root.prompt('Renommer la palette :', summary.name);
+        if (name === null || !name.trim()) return;
+        return edit({ kind: 'rename', ordinal: summary.ordinal, name: name.trim() }, shownOrigin);
+      });
     }
     function duplicate(summary, origin) {
       return edit({ kind: 'duplicate', ordinal: summary.ordinal, id: id(), name: summary.name + ' copie' }, origin);
     }
     function remove(summary, origin) {
-      if (!shown(origin)) { notice(); return; }
-      if (origin.palette.palettes.length <= 1) { notice('Keep at least one palette.'); return; }
-      return edit({ kind: 'remove', ordinal: summary.ordinal }, origin);
+      return withOrigin(origin, function (shownOrigin) {
+        if (shownOrigin.palette.palettes.length <= 1) { notice('Keep at least one palette.'); return; }
+        return edit({ kind: 'remove', ordinal: summary.ordinal }, shownOrigin);
+      });
     }
     function append(color) {
       var origin = model.read(), active = origin && origin.palette.active;

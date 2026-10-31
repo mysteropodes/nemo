@@ -224,6 +224,7 @@ function toggleProps(force){
     function owns(token) {
       var next = owner(); return !!token && !!next && token.session === next.session && same(token.info, next.info) && token.ticket === next.ticket;
     }
+    function hiddenByQueue() { var Wait = root.NemoNativePresentationWait; return !!Wait && Wait.busy(model.read); }
     function notice() { if (!retired && root.showToast) root.showToast('Workspace change is unavailable or unconfirmed. Wait for synchronization before trying again.'); }
     function rollback(token) {
       // Retire only this still-owned DOM draft, even if its native pin was just replaced.
@@ -251,7 +252,9 @@ function toggleProps(force){
       catch (_) { rollback(token); notice(); return { status: 'unavailable' }; }
       rollback(token);
       if (equal) return { status: 'unchanged', applied: false };
-      if (retired || pending || loading || !owns(token) || !token.origin || model.read() !== token.origin) {
+      if (retired || pending || loading || !owns(token) || !token.origin) { notice(); return { status: 'unavailable' }; }
+      // #2372: an origin that is not readable only because a pending native command hides the presentation is waited out (bounded), then compared strictly.
+      if (model.read() !== token.origin && !(hiddenByQueue() && await model.readSettled() === token.origin && !retired && !pending && !loading && owns(token))) {
         notice(); return { status: 'unavailable' };
       }
       pending = true; busyStamp = owner();
@@ -279,7 +282,8 @@ function toggleProps(force){
       release: function (source) { if (gesture && gesture.source === source) gesture = null; },
       begin: function (source) {
         if (retired) return false; if (presenter.isApplying()) return;
-        cancel(); var token = owner(), origin = !pending && !loading ? model.read() : null;
+        // #2372: a begin while the queue hides the presentation keeps the last applied projection as its origin; settle re-proves it strictly before any write.
+        cancel(); var token = owner(), origin = !pending && !loading ? model.read() || (hiddenByQueue() ? lastApplied : null) : null;
         if (!token || !origin || origin !== lastApplied) { notice(); return false; }
         token.saved = presenter.snapshot(); token.before = presenter.api.capture(); token.source = source; token.origin = origin;
         gesture = token; return true;

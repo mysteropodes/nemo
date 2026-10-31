@@ -532,3 +532,43 @@ test('pending Save As retains its original UI ticket and refuses replacement bef
     assert.deepEqual(f.meta(),{name:'Original',path:null});assert.equal(f.ui.isDirty(),true);
   }finally{gate.resolve();await Promise.allSettled([preview,saving]);}
 });
+
+// #2372: the New-project return pin is read while the native queue may hide the presentation (queue-pending): it waits (bounded), never drops silently.
+function queueHidden(app){
+  const real=Project.desktop(app.window),state={hidden:false},proxy={};
+  for(const key of Object.keys(real))proxy[key]=typeof real[key]==='function'?real[key].bind(real):real[key];
+  proxy.readPresentedObjectSession=f=>{if(state.hidden){if(typeof f==='function')f('queue-pending');return null;}return real.readPresentedObjectSession(f);};
+  app.window.NemoNativeObjectProject={...Project,desktop:()=>proxy};
+  app.window.NemoNativePresentationWait=require('../src/js/adapters/native-presentation-wait.js');
+  app.window.NemoNativeNewReturnPin=require('../src/js/adapters/native-new-return-pin.js');
+  app.window.setTimeout=(fn,ms)=>ms?setImmediate(fn):setTimeout(fn,0);
+  return state;
+}
+const alertText=app=>{const bar=app.element('project-tabs-bar');const node=bar.children.find(n=>n.getAttribute&&n.getAttribute('role')==='alert');return node?node.textContent:'';};
+test('queue-pending: New waits for the return pin, then opens the form and Cancel still restores the unchanged editor',async()=>{
+  const h=host(),app=ordinary(h);await app.project.openPath('/old.json');const hide=queueHidden(app);
+  hide.hidden=true;assert.equal(nativeNewEntry(app,'plus'),true);await turn();await turn();
+  assert.notEqual(app.element('start-newpanel').style.display,'block','the form waits for the pin');assert.equal(app.startScreen.classList.contains('hid'),true);
+  assert.equal(alertText(app),'');
+  hide.hidden=false;await turn();await turn();await turn();
+  assert.equal(app.element('start-newpanel').style.display,'block');assert.equal(app.startScreen.classList.contains('hid'),false);
+  assert.equal(app.toasts.filter(t=>t==='Creating a new project replaces the current project.').length,1);
+  app.element('np-cancel').listeners.click();
+  assert.equal(app.startScreen.classList.contains('hid'),true,'the captured pin restores the editor');assert.equal(h.info().documentId,'document-1');
+});
+test('queue-pending: Cancel on the New form waits for the pin instead of leaving the start screen up',async()=>{
+  const h=host(),app=ordinary(h);await app.project.openPath('/old.json');const hide=queueHidden(app);
+  nativeNewEntry(app,'plus');assert.equal(app.element('start-newpanel').style.display,'block');
+  hide.hidden=true;app.element('np-cancel').listeners.click();await turn();
+  assert.equal(app.startScreen.classList.contains('hid'),false,'still waiting');
+  hide.hidden=false;await turn();await turn();await turn();
+  assert.equal(app.startScreen.classList.contains('hid'),true);assert.equal(h.info().documentId,'document-1');
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,1,'no replacement');
+});
+test('queue-pending: a context change while New waits drops it silently; a queue that never frees gives one notice',async()=>{
+  const h=host(),app=ordinary(h);await app.project.openPath('/old.json');const hide=queueHidden(app);
+  hide.hidden=true;nativeNewEntry(app,'plus');await turn();app.startScreen.classList.remove('hid');hide.hidden=false;await turn();await turn();await turn();
+  assert.notEqual(app.element('start-newpanel').style.display,'block');assert.equal(alertText(app),'');
+  app.startScreen.classList.add('hid');hide.hidden=true;nativeNewEntry(app,'plus');for(let i=0;i<40;i++)await turn();
+  assert.notEqual(app.element('start-newpanel').style.display,'block');assert.equal(alertText(app),'New project unavailable — the native editor is not ready.');
+});
