@@ -3562,6 +3562,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/project-close-shortcut.js",
+      "moduleId": "app.project.close.shortcut.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2545,
+          "scriptOrdinal": 201
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/updater-platform.js",
       "moduleId": "app.updater.platform.adapter",
       "executionClass": "document-classic",
