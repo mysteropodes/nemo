@@ -285,6 +285,7 @@
         "object_vector_batch_transform.rs",
         "object_vector_batch_style.rs",
         "object_vector_batch_style_detail.rs",
+        "object_vector_batch_style_gradient.rs",
         "object_vector_trim.rs",
         "object_vector_edit_order.rs",
         "object_vector_edit_context.rs",

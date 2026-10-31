@@ -12,6 +12,7 @@
 //! A bitmap brush, a stamped brush dab, a texture anchor's stroke colour, a texture anchor's opacity without a fill, and a width on
 //! an anchor whose copies are stored are refused (`Unavailable`): their image derives from more than the record.
 use crate::commands::object_fill_owner::vector_edit::batch_ops::detail::{self, Detail};
+use crate::commands::object_fill_owner::vector_edit::batch_ops::gradient;
 use crate::commands::object_fill_owner::vector_edit::batch_ops::ribbon;
 use crate::commands::object_fill_owner::vector_edit::is_vector_record;
 use crate::object_document::{
@@ -232,7 +233,7 @@ pub(super) fn restyle(
         return detail::unmask(existing);
     }
     if let Some(gradient) = style.detail.gradient() {
-        return detail::gradient(existing, gradient);
+        return gradient::gradient(existing, gradient);
     }
     let ext = existing.vector_ext.value();
     let texture = ext.and_then(|e| e.brush_texture.value());
