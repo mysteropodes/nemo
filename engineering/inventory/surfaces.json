@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "7e5d840986bbeb90877a32765db14211610731fa",
-  "describe": "v0.7.0-alpha.4-4225-g7e5d8409-dirty"
+  "head": "09374432eb6a4aa4450f68533296d70deaf4f041",
+  "describe": "v0.7.0-alpha.4-4228-g09374432-dirty"
  },
- "inputsDigest": "ad8576bfd2a99b174da350186197fdba3954f4d1885e27b4134128f468699b38",
+ "inputsDigest": "7cf630c09dbad5789b2eed34bb15c4f6ed881583b628dcbaab37c274337d5d31",
  "states": [
   "inventoried",
   "characterized",
@@ -13183,6 +13183,7 @@
     "via": "chain",
     "references": [
      "src/js/adapters/native-custom-brush-ui.js:58 select()",
+     "src/js/adapters/native-object-draw-resize.js:29 field()",
      "src/js/brush-menu-bridge.js:201 buildVectorParams()",
      "src/js/brush-menu-bridge.js:241 buildBitmapParams()",
      "src/js/draw-bridge.js:617 onMove()",
