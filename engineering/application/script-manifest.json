@@ -269,6 +269,7 @@
     {"src":"js/adapters/native-selection-delete.js"},
     {"src":"js/select-bridge.js"},
     {"src":"js/adapters/native-subselect-ui.js"},
+    {"src":"js/adapters/native-presentation-wait.js"},
     {"src":"js/subselect-bridge.js"},
     {"src":"js/adapters/native-object-draw-paint.js"},
     {"src":"js/adapters/native-object-draw-symmetry.js"},

@@ -88,8 +88,9 @@
       if (typeof ports.publish === 'function' && ports.publish(projection) !== true) throw fault();
       guard(stamp); cache = { stamp: stamp, value: projection }; return projection;
     }
+    var hidden = false;
     function read(onRefusal) {
-      var code = null;
+      var code = null; hidden = false;
       function failed(value) { if (code === null) code = value; }
       function refused() {
         if (typeof onRefusal === 'function') try { onRefusal(code || 'unknown'); } catch (_) {}
@@ -98,7 +99,8 @@
       try {
         if (!cache) failed('cache-empty');
         else if (current(cache.stamp, failed)) {
-          var shown = cache.stamp.session.readPresentedObjectSession();
+          var why = null, shown = cache.stamp.session.readPresentedObjectSession(function (c) { why = c; });
+          hidden = !shown && why === 'queue-pending'; // the diagnostic codes below stay as they were; only the edit's wait reads this
           if (!presented(shown, cache.stamp.info)) failed(shown ? 'presentation-mismatch' : 'presentation-missing');
           else if (available(cache.stamp, failed)) return cache.value;
           return refused(); // Temporary presentation refusal still retains the same sealed cache.
@@ -106,8 +108,15 @@
       } catch (_) { failed('exception'); }
       cache = null; return refused();
     }
+    // #2372: the native queue hides the presentation while ANY command is pending (the previous edit's repaint, a hover read). An edit that finds it hidden
+    // waits for it (bounded, native-presentation-wait.js) before judging the cache; a presentation that really changed still refuses as stale.
+    function readSettled() {
+      var first = read(), W = typeof globalThis === 'object' ? globalThis.NemoNativePresentationWait : null;
+      if (first || !W || !cache) return Promise.resolve(first);
+      return W.await(null, { read: function (cb) { var v = read(); if (!v && typeof cb === 'function') cb(hidden ? 'queue-pending' : 'presentation-missing'); return v; }, holds: function () { return !!cache; } }).then(function (r) { return r.ready ? r.value : null; });
+    }
     async function edit(value, expected) {
-      var intent = Contract.action(value), shown = read();
+      var intent = Contract.action(value), shown = await readSettled();
       if (!expected || shown !== expected) throw fault('stale_revision');
       invalidate(); var stamp = capture(), receipt = null, after = null;
       if (!same(expected.info, stamp.info)) throw fault('stale_revision');
@@ -134,7 +143,7 @@
         return Object.freeze({ status: receipt ? 'applied-unconfirmed' : 'unconfirmed', applied: receipt ? receipt.result.applied : null, code: error && error.code || 'unavailable' });
       }
     }
-    return Object.freeze({ refresh: refresh, read: read, edit: edit, invalidate: invalidate,
+    return Object.freeze({ refresh: refresh, read: read, readSettled: readSettled, edit: edit, invalidate: invalidate,
       dispose: function () { retired = true; invalidate(); } });
   }
   return Object.freeze({ create: create });

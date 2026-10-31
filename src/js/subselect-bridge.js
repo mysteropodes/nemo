@@ -35,16 +35,19 @@
         !M||!M.matchesView(root,shown.presentation)||shown.presentation.frame!==st.currentFrame||shown.presentation.contextId!=='scene-root'||
         !root.NemoNativeObjectProjectFile||root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||!mode())throw new Error('Native subselect is unavailable in this mode.');
       return {session:s,pin:pin,presentation:shown.presentation,selector:{contextId:'scene-root',layerUid:layer(pin),frame:st.currentFrame},bounds:bounds(pin)};}
-    function current(t,lease){try{const s=session(),pin=s&&s.info(),shown=lease?lease.readPresentedObjectSession():s&&s.readPresentedObjectSession();
-      return !retired&&!t.cancelled&&s===t.session&&s.isActive()&&s.blocksLegacy()&&same(pin,t.pin)&&shown&&shown.presentation===t.presentation&&same(shown,t.pin)&&
+    // #2372: the native queue hides the presentation while ANY command is pending (a hover read, the repaint of the last edit). That is "cannot prove it
+    // right now", not "it changed": a gesture or selection survives it, and every write re-proves the presentation through its dispatch lease (admitted).
+    function current(t,lease){try{const s=session(),pin=s&&s.info(),why=[],shown=lease?lease.readPresentedObjectSession():s&&s.readPresentedObjectSession(c=>why.push(c)),unproven=!lease&&!shown&&why[0]==='queue-pending';
+      return !retired&&!t.cancelled&&s===t.session&&s.isActive()&&s.blocksLegacy()&&same(pin,t.pin)&&(shown?shown.presentation===t.presentation&&same(shown,t.pin):unproven)&&
         root.state.tool==='subselect'&&mode()&&root.state.currentFrame===t.selector.frame&&layer(pin)===t.selector.layerUid&&
-        (lease||mapping().matchesView(root,t.presentation))&&root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)===true&&JSON.stringify(bounds(pin))===JSON.stringify(t.bounds);
+        (lease||unproven||mapping().matchesView(root,t.presentation))&&root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)===true&&JSON.stringify(bounds(pin))===JSON.stringify(t.bounds);
     }catch(_){return false;}}
     function point(e,t){const p=mapping().point(e,{bounds:t.bounds,canvasW:t.pin.canvasW,canvasH:t.pin.canvasH,presentation:t.presentation});return [p.x,p.y];}
     function client(p,t){const q=map(mapping().transform({presentation:t.presentation},false),p);return [t.bounds.left+q[0]*t.bounds.width/t.pin.canvasW,t.bounds.top+q[1]*t.bounds.height/t.pin.canvasH];}
     function clear(){if(overlay){overlay.remove();overlay=null;}}
+    function grab(el,id){try{if(el.setPointerCapture)el.setPointerCapture(id);}catch(_){/* a press replayed after its release has no pointer left to capture */}}
     function release(t){try{if(t&&t.capture&&t.capture.releasePointerCapture)t.capture.releasePointerCapture(t.pointer);}catch(_){}}
-    function cancel(clearSelection){if(drag)drag.cancelled=true;if(marquee)marquee.cancelled=true;if(selection)selection.cancelled=true;release(drag);release(marquee);++readToken;++previewToken;previewNext=null;drag=null;marquee=null;clear();if(clearSelection)selection=null;refreshUI();return {status:'cancelled'};}
+    function cancel(clearSelection){if(gate)gate.cancel();if(drag)drag.cancelled=true;if(marquee)marquee.cancelled=true;if(selection)selection.cancelled=true;release(drag);release(marquee);++readToken;++previewToken;previewNext=null;drag=null;marquee=null;clear();if(clearSelection)selection=null;refreshUI();return {status:'cancelled'};}
     function node(tag,attrs){const n=root.document.createElementNS('http://www.w3.org/2000/svg',tag);Object.keys(attrs).forEach(k=>n.setAttribute(k,attrs[k]));return n;}
     function watch(){if(watching||!root.requestAnimationFrame)return;watching=true;root.requestAnimationFrame(()=>{watching=false;if(pending)return;if((selection&&!current(selection))||(marquee&&!current(marquee))){cancel(true);return;}if(selection||marquee)watch();});}
     function draw(t,segments,previewMatrix){clear();if(!current(t))return;watch();
@@ -108,14 +111,18 @@
       })};
       const command=root.NemoNativeObjectVectorCommand.create(guarded,'subselect',root.NemoNativeSubselectContract);
       clear();++previewToken;previewNext=null;
-      pending=command.execute(root.NemoNativeSubselectContract.EDIT,pin=>{if(!same(pin,t.pin))throw new Error('Subselect revision changed.');return {command:'object.subselect.edit',stableTarget:t.item.stableTarget,atFrame:t.selector.frame,intent:intent};});
+      const send=()=>command.execute(root.NemoNativeSubselectContract.EDIT,pin=>{if(!same(pin,t.pin))throw new Error('Subselect revision changed.');return {command:'object.subselect.edit',stableTarget:t.item.stableTarget,atFrame:t.selector.frame,intent:intent};});
+      // The Project records the presentation a command is SUBMITTED under and the queue hides it while any command is pending: an edit submitted in that window is
+      // refused at dispatch. Wait (bounded) until it is readable, then submit; a real change meanwhile ends the edit with no write (native-presentation-wait.js).
+      const Wait=root.NemoNativePresentationWait,read=f=>{const x=session();return x?x.readPresentedObjectSession(f):null;};
+      pending=Wait&&Wait.busy(read)?Wait.until(root,{readPresentedObjectSession:read},()=>!!read(),()=>current(t),{notice:'The canvas is still busy - the edit was not applied.'}).then(ok=>ok?send():{applied:false}):send();
       refreshUI();settled=pending.then(receipt=>{cancel(true);return {status:receipt.applied?'applied':'noop',receipt};},error=>{cancel(true);notice(error);if(error&&error.code==='subselect_command_indeterminate'){uncertain=error;return {status:'indeterminate',error};}return {status:'refused',error};}).finally(()=>{pending=null;refreshUI();});return settled;
     }
     function start(e,t,hit){
       const group=hit.key==='point'&&t.indices.includes(hit.index)&&t.indices.length>1;
       t.dragIndices=group?t.indices.slice():[hit.index];t.pairedPoint=null;
       if(hit.key==='point'&&!group)t.indices=e.shiftKey?Array.from(new Set(t.indices.concat(hit.index))):[hit.index];
-      t.hit=hit;t.start=inverse(t.item.matrix,point(e,t));t.clientStart=[e.clientX,e.clientY];t.pointer=e.pointerId;t.alt=e.altKey;t.intent=null;drag=t;t.capture=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(t.capture.setPointerCapture)t.capture.setPointerCapture(t.pointer);draw(t,t.item.segments);
+      t.hit=hit;t.start=inverse(t.item.matrix,point(e,t));t.clientStart=[e.clientX,e.clientY];t.pointer=e.pointerId;t.alt=e.altKey;t.intent=null;drag=t;t.capture=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');grab(t.capture,t.pointer);draw(t,t.item.segments);
     }
     function down(e){if(pending||drag)return;
       // A fresh gesture supersedes an earlier marquee even when its read has not
@@ -126,7 +133,7 @@
         if(e.altKey){const hit=hitItem(e,selection,selection.item,true);if(hit&&hit.time!==undefined){commit(selection,{kind:'insert',curve:hit.curve,time:hit.time});return;}}}
       const token=++readToken;const origin={...e,clientX:e.clientX,clientY:e.clientY,pointerId:e.pointerId,altKey:e.altKey,shiftKey:e.shiftKey};
       const box={...t,start:point(e,t),end:point(e,t),pointer:e.pointerId,target:selection&&current(selection)?selection:null,items:null,moved:false,ended:false};marquee=box;
-      box.capture=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(box.capture.setPointerCapture)box.capture.setPointerCapture(box.pointer);watch();refreshUI();
+      box.capture=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');grab(box.capture,box.pointer);watch();refreshUI();
       settled=load(t,token).then(items=>{if(!items||marquee!==box)return {status:'cancelled'};let chosen=null;for(const item of items)if(hitItem(origin,t,item))chosen=item;
         if(!chosen){box.items=items;if(box.ended)return finishMarquee(box);if(box.moved)drawMarquee(box);return {status:'marquee'};}
         marquee=null;release(box);selection={...t,item:chosen,indices:[]};draw(selection,chosen.segments);return {status:'selected'};
@@ -149,6 +156,11 @@
     function handle(kind,e){if(!native()||root.state.tool!=='subselect')return false;
       const d=root.document,canvas=e.target===d.getElementById('drawing-canvas')||e.target===d.getElementById('canvas-area');if(!canvas&&!drag&&!marquee)return false;consume(e);
       try{if(kind==='lost'){if(drag||marquee&&!marquee.ended)cancel(false);}else if(kind==='cancel')cancel(false);else if(kind==='down')down(e);else if(kind==='move')move(e);else if(kind==='up')up(e);}catch(error){cancel(true);notice(error);}return true;}
+    // #2372: a press while the queue is busy waits for the presentation and replays with the events that followed it (native-presentation-wait.js).
+    const Wait=root.NemoNativePresentationWait,onCanvas=e=>{const d=root.document;return e.target===d.getElementById('drawing-canvas')||e.target===d.getElementById('canvas-area');},
+      gate=Wait&&Wait.gate(root,{handle,notice:'The canvas is still busy - try again.',begins:(k,e)=>native()&&root.state.tool==='subselect'&&!pending&&!drag&&onCanvas(e)&&!e.button,
+        read:f=>{const s=session();return s?s.readPresentedObjectSession(f):null;},snapshot:()=>{const s=session(),i=s&&s.info(),st=root.state;return JSON.stringify([st.tool,st.currentFrame,st.activeLayerIdx,root._layerSel||null,i&&[i.instanceId,i.documentId,i.lifecycleGeneration,i.contentRevision]]);},
+        holds(token){return !retired&&native()&&root.state.tool==='subselect'&&this.snapshot()===token;}});
     function deleteFrames(){
       if(pending||uncertain){notice(new Error('Resolve the previous subselect command before another edit.'));return;}
       cancel(true);
@@ -166,7 +178,7 @@
         if(root.state.appMode==='anim2d'&&root._sel&&Array.isArray(root._sel.frames)&&root._sel.frames.length)deleteFrames();
         else action({kind:'delete'});return true;}return false;}
     function recover(){if(!uncertain||pending)return Promise.resolve({status:'unavailable'});const prior=uncertain;recovering=true;pending=Promise.resolve().then(()=>prior.replay());settled=pending.then(receipt=>{uncertain=null;return {status:'reconciled',receipt};},error=>{notice(error);return {status:'indeterminate',error};}).finally(()=>{pending=null;recovering=false;});return settled;}
-    return Object.freeze({handle,key,recover,selectionState,cancel:()=>cancel(true),setPointType:type=>action({kind:'pointType',pointType:type}),scale:(scale,anchor)=>action({kind:'scale',scale,anchor}),rotate:(degrees,center)=>action({kind:'rotate',degrees,center}),settled:()=>settled,
+    return Object.freeze({handle:gate?gate.handle:handle,key,recover,selectionState,cancel:()=>cancel(true),setPointType:type=>action({kind:'pointType',pointType:type}),scale:(scale,anchor)=>action({kind:'scale',scale,anchor}),rotate:(degrees,center)=>action({kind:'rotate',degrees,center}),settled:()=>settled,
       dispose:()=>{retired=true;cancel(true);}});
   }
   function install(root){const init=()=>{const controller=create(root);root.NemoNativeSubselectController=controller;const d=root.document,target=d.getElementById('canvas-area')||d.getElementById('drawing-canvas');if(!target)return;

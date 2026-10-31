@@ -82,6 +82,8 @@
       if (typeof ports.publish === 'function' && ports.publish(projection) !== true) throw fault();
       guard(stamp); cache = { stamp: stamp, value: projection }; return projection;
     }
+    // The Shadow cache is dropped while a pending native command hides the presentation, on purpose: the completion fanout re-reads the Shadow metadata once it is
+    // visible again (tests/native-guide-production.test.cjs pins both that re-read and read() === null meanwhile), so an edit cannot wait on a retained cache here.
     function read() {
       try {
         if (cache && current(cache.stamp) && presented(cache.stamp.session.readPresentedObjectSession(), cache.stamp.info) &&
@@ -89,8 +91,15 @@
       } catch (_) {}
       cache = null; return null;
     }
+    // #2372: the native queue hides the presentation while ANY command is pending (the previous edit's repaint, a hover read). An edit that finds it hidden
+    // waits for it (bounded, native-presentation-wait.js) before judging the cache; a presentation that really changed still refuses as stale.
+    function readSettled() {
+      var first = read(), W = typeof globalThis === 'object' ? globalThis.NemoNativePresentationWait : null;
+      if (first || !W || !cache) return Promise.resolve(first);
+      return W.await(null, { read: read, holds: function () { return !!cache; } }).then(function (r) { return r.ready ? r.value : null; });
+    }
     async function edit(value, expected) {
-      var intent = Contract.action(value), shown = read();
+      var intent = Contract.action(value), shown = await readSettled();
       if (!expected || shown !== expected) throw fault('stale_revision');
       invalidate(); var stamp = capture(), receipt = null, after = null;
       if (!same(expected.info, stamp.info)) throw fault('stale_revision');
@@ -117,7 +126,7 @@
         return Object.freeze({ status: receipt ? 'applied-unconfirmed' : 'unconfirmed', applied: receipt ? receipt.result.applied : null, code: error && error.code || 'unavailable' });
       }
     }
-    return Object.freeze({ refresh: refresh, read: read, edit: edit, invalidate: invalidate,
+    return Object.freeze({ refresh: refresh, read: read, readSettled: readSettled, edit: edit, invalidate: invalidate,
       dispose: function () { retired = true; invalidate(); } });
   }
   return Object.freeze({ create: create });

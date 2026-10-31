@@ -2829,6 +2829,7 @@
         "native-selection-boolean.js",
         "native-selection-transform.js",
         "native-selection-align.js",
+        "native-presentation-wait.js",
         "native-selection-delete.js",
         "native-layer-list-presenter.js",
         "native-object-ui.js",

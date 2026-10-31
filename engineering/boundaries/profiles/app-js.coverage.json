@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "3d1ec3df4c7fa28a6993640aa2279a8efab9b24a",
-    "sourceRootTree": "bf1d69431a525522413d8441a316695d93f11fed",
+    "candidateCommit": "f59976a60f5ec26f992ce6486753b76f550fd275",
+    "sourceRootTree": "2bd19bcac3dd5ed1eb6f5459629ec1c3960aaf25",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "c715be37ab73df384eadcd28953a099f6d4bb7df",
-      "lastChangedCommit": "3d1ec3df4c7fa28a6993640aa2279a8efab9b24a"
+      "gitTree": "3953913e4f20d2a220aa770f286685aeea408304",
+      "lastChangedCommit": "f59976a60f5ec26f992ce6486753b76f550fd275"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "38735b0345f078035cc75ee7c38ebef28ac75ec1",
-      "sha256": "ebedc3255fa75b8912d74aeaff80e8b455736f2600cbeb7f9d18f924bbba6009",
+      "gitBlob": "d3af76cead1616536d29901e799a974c91be6e34",
+      "sha256": "facf1425f0755987ddc165073afed04f9a2abd7e4d2ee84f87502eea5c0f79ab",
       "lastChangedCommit": "f606f3b2ea60c6bf5cdb7d031b8c54b3b60d291a"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "d4ede9cbf069e847b3612a743d75dffab57ad17deb8bf18148f45bd115b3672d"
+      "value": "6b81be4820019aab85a5690dd54371f06bbb275fab65e91e068a591c2e56bed1"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "e0cc68ddb711f9e35bb19aa50b9564e9ece6788f",
-        "sha256": "68ca47434d148a291d81f188d91d1ce3294d614d7938d8ed358096b94518d178",
+        "gitBlob": "12ccb300d428c72367dd1374af3d34e82caf06d6",
+        "sha256": "d9218b0ce3707fbe6b8553072d99e8d7d57d23942e486a062d488b596ff522ba",
         "moduleCount": 307,
-        "basedOnCommit": "3d1ec3df4c7fa28a6993640aa2279a8efab9b24a"
+        "basedOnCommit": "f59976a60f5ec26f992ce6486753b76f550fd275"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -1003,8 +1003,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2592,
-          "scriptOrdinal": 244
+          "line": 2591,
+          "scriptOrdinal": 237
         }
       ]
     },
@@ -1027,8 +1027,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2593,
-          "scriptOrdinal": 245
+          "line": 2592,
+          "scriptOrdinal": 244
         }
       ]
     },
@@ -1039,8 +1039,20 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2595,
-          "scriptOrdinal": 247
+          "line": 2594,
+          "scriptOrdinal": 246
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-presentation-wait.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2598,
+          "scriptOrdinal": 250
         }
       ]
     },
@@ -1051,8 +1063,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2594,
-          "scriptOrdinal": 246
+          "line": 2593,
+          "scriptOrdinal": 245
         }
       ]
     },
@@ -1075,8 +1087,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2598,
-          "scriptOrdinal": 250
+          "line": 2597,
+          "scriptOrdinal": 249
         }
       ]
     },
@@ -3187,8 +3199,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2597,
-          "scriptOrdinal": 249
+          "line": 2596,
+          "scriptOrdinal": 248
         }
       ]
     },
@@ -4648,8 +4660,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2596,
-          "scriptOrdinal": 248
+          "line": 2595,
+          "scriptOrdinal": 247
         }
       ]
     },
