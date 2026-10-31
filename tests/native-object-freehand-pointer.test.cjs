@@ -32,10 +32,11 @@ async function fixture(tool='draw',native=true,options={}){
  area.appendChild(canvas);area.appendChild(pills);pills.appendChild(fit);pills.appendChild(pill);pill.appendChild(zoom);area.appendChild(ruler);
  doc.readyState='complete';doc.body=body;doc.getElementById=id=>({'drawing-canvas':canvas,'canvas-area':area,'zoom-scrub':zoom,'canvas-fit-btn':fit,'ruler-h':ruler}[id]||null);
  doc.createElementNS=()=>new Element();doc.documentElement={clientWidth:1200,clientHeight:900};
+ const flags={locked:false,visible:true},undos=[];
  const info=()=>({apiVersion:2,instanceId:'instance-A',documentId:'document-'+generation,lifecycleGeneration:generation,contentRevision:revision,
   documentSnapshotId:'native-object:document-'+generation+':'+revision,documentDigest:String(revision%10).repeat(64),byteCount:1000,
   canvasW:320,canvasH:180,totalFrames:16,fps:24,undoDepth:revision,redoDepth:0,reference:null,
-  layers:[{layerUid:'L1',name:'Drawing',visible:true,locked:false,shy:false,color:'#5FA875',parentLayerUid:null}]});
+  layers:[{layerUid:'L1',name:'Drawing',visible:flags.visible,locked:flags.locked,shy:false,color:'#5FA875',parentLayerUid:null}]});
  const root={document:doc,state:{tool,appMode:'anim2d',currentFrame:0,strokeEnabled:true,fillEnabled:true,strokeColor:'#112233',fillColor:'#44556680',
   brushSize:4,opacity:50,strokeCap:'round',strokeJoin:'round',strokeStyle:'solid',miterLimit:10,dashOffset:0,paintOrder:'fillFirst',
   vectorBrush:false,smoothing:0,stabilizer:0,taperEnds:false,drawMode:'front',brushPreset:'none',pressureMin:5,pressureMax:170,pressureInvert:false,pressureCurve:'linear',brushAngle:0,brushAngleFactor:0},userLayers:[],selectedPaths:[],devicePixelRatio:2,
@@ -52,6 +53,8 @@ async function fixture(tool='draw',native=true,options={}){
    if(q.action==='subscribe'){binding=q.binding;return q.binding;}
    if(q.action==='acknowledge'){if(ack)await ack.promise;return null;}if(q.action==='disconnect')return null;
   }
+  if(command==='nemo_native_object_dispatch'){assert.equal(q.operation,'command.document.object.undo');undos.push(revision);revision++;
+   return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true}};}
   assert.equal(command,'nemo_native_dispatch');calls.push(structuredClone(q));
   if(q.operation==='command.document.object.fill.brush'||q.operation==='command.document.object.brush.bitmap.stroke'){assert.equal(q.expectedRevision,revision);revision++;
    return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1}};}
@@ -104,7 +107,7 @@ async function fixture(tool='draw',native=true,options={}){
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-shape-tool.js'),'utf8'),context,{filename:'native-object-shape-tool.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/draw-bridge.js'),'utf8'),context,{filename:'draw-bridge.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/shape-bridge.js'),'utf8'),context,{filename:'shape-bridge.js'});
- return {perspectiveMode:value=>perspectiveMode=value,root,context,paper,advance:(ms=16)=>clock+=ms,session,area,canvas,zoom,fit,ruler,doc,body,calls,records,log,events,info,setRect:r=>rect=r,refuse:code=>refusal=code,hold:g=>hold=g,mutate:fn=>replyChange=fn,
+ return {perspectiveMode:value=>perspectiveMode=value,root,context,paper,advance:(ms=16)=>clock+=ms,session,area,canvas,zoom,fit,ruler,doc,body,calls,records,log,events,info,flags,undos,setRect:r=>rect=r,refuse:code=>refusal=code,hold:g=>hold=g,mutate:fn=>replyChange=fn,
   async external(g){ack=g;const from=revision;revision++;return events.get('nemo-native-revision')({payload:{instanceId:'instance-A',documentId:info().documentId,lifecycleGeneration:generation,requestId:'external-'+revision,fromRevision:from,toRevision:revision}});},
   async gesture(end={clientX:240,clientY:210}){area.fire('pointerdown');area.fire('pointermove',end);area.fire('pointerup',end);return root.NemoNativeFreehandToolController.whenSettled();}};
 }
@@ -704,4 +707,45 @@ test('a mirrored or rotated pressure ribbon commits each copy with its own centr
  pen(stop);await settled(stop);assert.equal(stop.calls.length,1,stop.log.join(','));const sq=plain(stop.calls[0].payload);
  assert.equal(sq.records.length,4);assert.deepEqual(sq.records[1].geometry,ribbon0.geometry);
  assert.deepEqual(sq.records[1].vectorExt.pressure.centerSegments,c0);
+});
+
+// #2361 draw-cancel-matrix (freehand). Baseline draw-bridge.js @1065e9d8 keeps one module-level `dragging`/`samples` and onUp/commitStroke
+// consult neither the tool, the frame, the layer's lock/visibility nor the history. Cells the baseline decides on purpose are matched;
+// the rest are baseline accidents (a stroke written into a locked layer, into whichever frame is current at release, or after a
+// history step) that the native owner cannot reproduce: it writes only the pinned layer/frame/revision it started on, so those cancel.
+async function released(f,next){const control=f;send(control,'pointerdown',20,20);send(control,'pointermove',45,30);if(next)next(control);return send(control,'pointerup',80,65);}
+test('cancel matrix: a tool switch mid-stroke still commits the one stroke on release, as draw-bridge keeps dragging (#2361)',async()=>{
+ const ref=await fixture();await released(ref);assert.equal((await settled(ref)).status,'applied');
+ for(const next of ['select','hand','eraser']){
+  const f=await fixture();await released(f,c=>{c.root.state.tool=next;});
+  assert.equal((await settled(f)).status,'applied',next);assert.equal(f.calls.length,1,next);assert.equal(f.session.info().contentRevision,1,'exactly one revision');
+  assert.deepEqual(f.calls[0].payload.record.geometry,ref.calls[0].payload.record.geometry,'the stroke is the one drawn, not a refit');
+  assert.equal(f.body.children.length,0,'the draft is cleared');assert.equal(f.area.captured.size,0,'capture released');assert.equal(f.root.state.tool,next);
+ }
+});
+test('cancel matrix: a layer locked or hidden mid-stroke cancels with zero revisions; the baseline writes into the locked layer, the native owner refuses (#2361)',async()=>{
+ for(const [key,value] of [['locked',true],['visible',false]]){
+  const f=await fixture();send(f,'pointerdown',20,20);send(f,'pointermove',45,30);f.flags[key]=value;const wait=gate();wait.resolve();await f.external(wait);
+  const toasts=f.log.length;send(f,'pointerup',80,65);await settled(f);
+  assert.equal(f.calls.length,0,key);assert.equal(f.undos.length,0,key);assert.equal(f.body.children.length,0,key);assert.equal(f.session.info().contentRevision,1,'only the external change');
+  send(f,'pointerdown',20,20);assert.equal(f.body.children.length,0,'a press on the unavailable layer starts nothing');assert.ok(f.log.length>toasts,'and says so');assert.equal(f.calls.length,0);
+ }
+});
+test('cancel matrix: undo mid-stroke drops the stroke, undo while the commit is pending runs after it (#2361)',async()=>{
+ // Mid-stroke the revision moves under the pin, so the stroke cancels (the baseline would still commit it after the step).
+ let f=await fixture();send(f,'pointerdown',20,20);send(f,'pointermove',45,30);await f.session.historyFromUi('undo');send(f,'pointerup',80,65);await settled(f);
+ assert.equal(f.calls.length,0);assert.equal(f.undos.length,1);assert.equal(f.body.children.length,0);
+ // A commit already pending is one revision on the existing queue; the undo queues behind it and removes exactly that stroke.
+ f=await fixture();const wait=gate();f.hold(wait);send(f,'pointerdown',20,20);send(f,'pointermove',45,30);send(f,'pointerup',80,65);await turn();
+ assert.equal(f.calls.length,1);const undone=f.session.historyFromUi('undo');await turn();assert.equal(f.undos.length,0,'not before the stroke settles');
+ wait.resolve();assert.equal((await settled(f)).status,'applied');await undone;
+ assert.equal(f.calls.length,1,'one stroke');assert.deepEqual(f.undos,[1],'undone on top of its revision');assert.equal(f.session.info().contentRevision,2);
+});
+test('cancel matrix: a second pointer during a stroke is ignored; the first pointer still commits exactly one stroke (#2361)',async()=>{
+ const f=await fixture();send(f,'pointerdown',20,20);send(f,'pointermove',45,30);
+ const second={pointerId:2,isPrimary:false};
+ for(const kind of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture'])assert.equal(send(f,kind,100,100,second).stopped,true,kind+' of the other pointer is consumed');
+ assert.equal(f.calls.length,0);assert.equal(f.body.children.length,1,'the stroke is still being drawn');
+ send(f,'pointerup',80,65);assert.equal((await settled(f)).status,'applied');assert.equal(f.calls.length,1);
+ assert.deepEqual(f.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,20],[45,30],[80,65]],'none of the other pointer samples joined');
 });
