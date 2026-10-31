@@ -323,3 +323,30 @@ fn bounded_capture_cannot_publish_a_candidate_the_actual_project_encoder_cannot_
     assert_eq!(o.content_revision(), 0);
     assert_eq!(o.history_depths(), (0, 0));
 }
+#[test]
+fn optional_tools_dock_is_one_checkpoint_and_round_trips_through_save_and_read() {
+    let mut o = owner(json!({"workspace":captured()}));
+    let mut docked = captured();
+    docked["toolsDock"] = json!("right");
+    capture(&mut o, "dock-right", docked.clone());
+    assert_eq!(o.content_revision(), 1);
+    assert_eq!(
+        read(&pin(&o), request(&pin(&o), "dock"))["result"]["result"]["workspace"],
+        docked
+    );
+    let reopened = NativeObjectHistory::from_project_file("reopened", &saved(&o)).unwrap();
+    assert_eq!(
+        read(&pin(&reopened), request(&pin(&reopened), "reopened"))["result"]["result"]["workspace"],
+        docked
+    );
+    assert_eq!(
+        capture(&mut o, "dock-same", docked)["result"],
+        json!({"applied":false,"historyEntriesAdded":0})
+    );
+    o.undo(1).unwrap();
+    assert!(
+        read(&pin(&o), request(&pin(&o), "undone"))["result"]["result"]["workspace"]
+            .get("toolsDock")
+            .is_none()
+    );
+}

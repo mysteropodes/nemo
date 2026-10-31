@@ -7,6 +7,7 @@
   var DOCK_KEY = 'nemo-tools-dock';
   var DOCKS = ['top', 'right', 'bottom']; // 'left' is the default, no class needed
 
+  function validDock(pos) { return pos === 'left' || DOCKS.indexOf(pos) >= 0; }
   function applyDock(pos) {
     var panel = document.getElementById('tools-panel');
     var area = document.getElementById('top-area');
@@ -49,6 +50,30 @@
   // this script tag runs (it's placed after the body markup).
   applyDock(currentDock());
 
+  // Dock read/apply port for the project workspace (native-workspace-ui.js):
+  // the dock position is project metadata on native projects, so capture,
+  // rollback and projection all go through these two calls. apply() refuses
+  // anything but the four known spellings and leaves the layout untouched.
+  function readDock() {
+    var panel = document.getElementById('tools-panel');
+    if (!panel) return null;
+    for (var i = 0; i < DOCKS.length; i++) if (panel.classList.contains('tools-dock-' + DOCKS[i])) return DOCKS[i];
+    return 'left';
+  }
+  window.NemoToolsDock = Object.freeze({
+    read: readDock,
+    apply: function (pos) { if (!validDock(pos) || !document.getElementById('tools-panel')) return false; applyDock(pos); return true; }
+  });
+  // A drop is one workspace gesture: begin (native may refuse), re-dock, then
+  // settle captures the result as a single workspace edit (or rolls it back).
+  function commitDock(pos) {
+    var ws = window.SMWorkspace;
+    if (ws && typeof ws.begin === 'function' && ws.begin('toolsDock') === false) return false;
+    applyDock(pos);
+    if (ws && typeof ws.settle === 'function') ws.settle('toolsDock');
+    return true;
+  }
+
   var zonesEl = null, dragging = false;
   function buildZones() {
     var area = document.getElementById('top-area');
@@ -83,7 +108,7 @@
     if (!dragging) return;
     dragging = false;
     var hit = e ? zoneAt(e.clientX, e.clientY) : null;
-    if (hit) applyDock(hit.dataset.dock);
+    if (hit) commitDock(hit.dataset.dock);
     if (zonesEl) { zonesEl.remove(); zonesEl = null; }
     document.removeEventListener('pointermove', onMove);
     document.removeEventListener('pointerup', endDrag);
