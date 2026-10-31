@@ -1002,6 +1002,23 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-selection-transform.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+      "path": "src/js/adapters/native-selection-transform.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2589,
+          "scriptOrdinal": 241
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-view-aids-ui.js",
       "moduleId": "app.native.object.ui.adapter",
       "executionClass": "document-classic",
