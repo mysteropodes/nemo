@@ -274,7 +274,7 @@
     }
     else if (key === 'stableTarget') target(payloadValue, label, false);
     else if (key === 'ops') {
-      // #2361/#2362: 1..64 ordered create/replace/delete steps on one scene-root layer, one revision and one undo entry.
+      // #2361/#2362: 1..64 ordered create/replace/delete steps on scene-root layers (#2372: a Select may span layers; a trimEnds batch is one layer), one revision and one undo entry.
       if (!Array.isArray(payloadValue) || payloadValue.length < 1 || payloadValue.length > 64) fail(`${label} must hold 1 to 64 steps`);
       const targets = payloadValue.map((op, at) => {
         const where = `${label}[${at}]`;
@@ -298,7 +298,7 @@
         return fail(`${where}.op must be create, copy, replace, reshape, clone, restyle or delete`);
       });
       targets.forEach((t, at) => { if (!t) targets[at] = targets[payloadValue[at].fromStep]; });
-      if (targets.some((t) => t.contextId !== 'scene-root' || t.layerUid !== targets[0].layerUid)) fail(`${label} must stay on one scene-root layer`);
+      if (targets.some((t) => t.contextId !== 'scene-root')) fail(`${label} must stay on the scene root`);
     }
     else if (key === 'maskEdit') {
       if (!plain(payloadValue)) fail(`${label} must be an object`);
@@ -330,7 +330,7 @@
     if (has(value, 'placement')) oneOf(value.placement, ['front', 'behind'], `${value.command}.placement`);
     if (has(value, 'trimEnds') && !(typeof value.trimEnds === 'number' && Number.isFinite(value.trimEnds) && value.trimEnds > 0)) fail(`${value.command}.trimEnds is invalid`);
     // A batch trims only when every step creates (the drawn stroke, its copies and its multi-frame stamps share one cut).
-    if (has(value, 'trimEnds') && value.command === 'object.vector.batch' && Array.isArray(value.ops) && value.ops.some((op) => !plain(op) || (op.op !== 'create' && op.op !== 'copy'))) fail('object.vector.batch.trimEnds needs create steps only');
+    if (has(value, 'trimEnds') && value.command === 'object.vector.batch' && Array.isArray(value.ops) && value.ops.some((op) => !plain(op) || (op.op !== 'create' && op.op !== 'copy'))) fail('object.vector.batch.trimEnds needs create steps only'); if (has(value, 'trimEnds') && value.command === 'object.vector.batch' && Array.isArray(value.ops) && new Set(value.ops.filter((op) => op.record && op.record.target).map((op) => op.record.target.layerUid)).size > 1) fail('object.vector.batch.trimEnds stays on one layer');
     // keyframe: 'copy' keys a held cell with what it showed (the Labs creators' ensureKeyframe()); absent is Draw's empty key.
     if (has(value, 'keyframe') && value.keyframe !== 'copy') fail(`${value.command} keyframe must be 'copy'`);
     entry[1].forEach((key) => member(value.command, key, value[key]));

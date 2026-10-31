@@ -114,15 +114,18 @@ test('an edit made while a commit runs waits for it and follows the selection it
   assert.doesNotMatch(h.toasts.join('|'), /changed/);
 });
 
-test('a selection across layers keeps the refusal and says why; a ribbon given two colours takes the one written last', async () => {
+test('a selection across layers restyles in ONE batch (MULTI-LAYER); a ribbon given two colours takes the one written last', async () => {
   const h = harness([quad('A', 10, 10, 30, 30), quad('R', 40, 40, 90, 60, { role: 'ribbon', style: { fill: '#101010', width: 8, opacity: 1 } })]);
   await h.select(['A']);
   const second = (await Intent.layerPaths(h.root, (item) => item.stableTarget.strokeId === 'R', false, 0)).paths[0];
   second.data.nativeLayerIndex = 1; second.data.nativeLayerUid = 'M';
   h.root.selectedPaths = h.root.selectedPaths.concat([second]); h.root.NemoNativeSelectOverlay.show(h.root);
-  assert.deepEqual(await Style.apply(h.root, { fill: '#ff0000' }), { status: 'unavailable' });
-  assert.match(h.toasts.join('|'), /one layer at a time/);
-  assert.equal(h.batches.length, 0, 'one native batch is one layer: a restyle never splits into several undo entries');
+  const spanning = Style.apply(h.root, { fill: '#ff0000' });
+  await h.fire();
+  assert.deepEqual(await spanning, { status: 'applied' });
+  assert.doesNotMatch(h.toasts.join('|'), /one layer at a time/);
+  assert.equal(h.batches.length, 1, 'one native batch for both layers: a restyle is one undo entry');
+  assert.deepEqual(h.batches[0].steps.map((s) => s.restyle.stableTarget.strokeId), ['A', 'R']);
   // A ribbon given a fill colour and then a different stroke colour in one window is inked by the later write, as the baseline's two setters were.
   for (const [order, expected] of [[[{ fill: '#ff0000' }, { stroke: '#00ff00' }], { stroke: '#00ff00' }], [[{ stroke: '#00ff00' }, { fill: '#ff0000' }], { fill: '#ff0000' }]]) {
     const r = harness([quad('R', 40, 40, 90, 60, { role: 'ribbon', style: { fill: '#101010', width: 8, opacity: 1 } })]);
