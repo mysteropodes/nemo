@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "e15a5727b6cca10a0456651b7e6528201a884367",
-  "describe": "v0.7.0-alpha.4-4565-ge15a5727-dirty"
+  "head": "fd66599691b27a40ef1570b4985e81975c924b23",
+  "describe": "v0.7.0-alpha.4-4567-gfd665996-dirty"
  },
- "inputsDigest": "a1cf04eb7f323d63dd294b33cdb12c0f0c2f847f1a01b3eb8b10b04d302a6bcd",
+ "inputsDigest": "44c69eed45f69939293ffd59f6a18ff0bc414b0fb643a08ab3cf8b80fe6a9a27",
  "states": [
   "inventoried",
   "characterized",
@@ -231,7 +231,7 @@
   },
   "SMMotionGraph": {
    "file": "src/js/motion-graph.js",
-   "line": 521,
+   "line": 512,
    "members": 3
   },
   "SMMotion": {
@@ -3199,8 +3199,8 @@
    "capability": "Éditeur de courbes (Maj+F3) — clic droit : valeur/vitesse · Alt+clic : figer l'échelle",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion-graph.js:485",
-    "src/js/motion-graph.js:489"
+    "src/js/motion-graph.js:477",
+    "src/js/motion-graph.js:481"
    ],
    "events": [
     "click",
@@ -3227,10 +3227,10 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 76,
+    "functionsVisited": 72,
     "via": "variable b",
     "references": [
-     "src/js/motion-graph.js:465 toggle()",
+     "src/js/motion-graph.js:457 toggle()",
      "src/js/motion.js:13210 setAppMode()"
     ]
    },
