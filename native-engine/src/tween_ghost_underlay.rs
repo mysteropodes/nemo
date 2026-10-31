@@ -5,8 +5,8 @@ use crate::application::{TweenGhostKind, TweenGhostRead};
 use crate::object_document::bitmap_brush::rgba;
 use crate::object_frame_packet::ObjectRecord;
 use crate::object_render_scene::{
-    GhostFrameSpec, GhostPath, GhostSource, GhostUnderlay, GhostUnderlayRequest, GhostVisual,
-    ObjectCompositionWitness,
+    ordered_entries, GhostFrameSpec, GhostPath, GhostSource, GhostUnderlay, GhostUnderlayRequest,
+    GhostVisual, ObjectCompositionWitness, PaintEntry,
 };
 use crate::request_receipts::{DispatchErrorCode as Code, GhostFrames};
 use crate::revision::ObjectSnapshot;
@@ -15,6 +15,7 @@ use std::sync::{Arc, Mutex, Weak};
 struct Source<'a> {
     read: &'a TweenGhostRead,
     items: bool,
+    brush_items: bool,
     revision: Weak<dyn std::any::Any + Send + Sync>,
 }
 impl GhostSource for Source<'_> {
@@ -30,6 +31,7 @@ impl GhostSource for Source<'_> {
         GhostFrameSpec {
             translation: frame.translation,
             all_keys: frame.kind == TweenGhostKind::AllKeys,
+            key_outline: frame.key_outline(),
             text_opacity: text.opacity,
             text_stroke: text.stroke.map(|s| (s, text.stroke_width.unwrap_or(1.))),
             text_clear_fill: text.clear_fill,
@@ -57,7 +59,12 @@ impl GhostSource for Source<'_> {
         }
         #[cfg(test)]
         PREPARED_FRAMES.with(|n| n.set(n.get() + 1));
-        let witness = self.read.prepare_frame(index).map_err(|_| ())?;
+        let witness = if self.read.frames()[index].kind == TweenGhostKind::AllKeys {
+            self.read.prepare_key_frame(index)
+        } else {
+            self.read.prepare_frame(index)
+        }
+        .map_err(|_| ())?;
         witness_keep(&self.revision, frame, &witness);
         Ok(witness)
     }
@@ -72,6 +79,20 @@ impl GhostSource for Source<'_> {
     fn has_items(&self) -> bool {
         self.items
     }
+    fn has_brush_items(&self) -> bool {
+        self.brush_items
+    }
+}
+/// Whether the ghosted layer has produced brush paint that only an evaluated frame shows: a seeded brush-texture
+/// anchor (its dabs are stamped at evaluation, never stored) or a bitmap brush stroke.
+fn layer_has_brush_items(snapshot: &ObjectSnapshot, layer_uid: &str) -> bool {
+    snapshot.document().objects().iter().any(|r| {
+        r.target.layer_uid() == layer_uid
+            && (crate::evaluation::brush_dab::paint::is_seeded_anchor(r)
+                || r.vector_ext
+                    .value()
+                    .is_some_and(|ext| ext.bitmap_brush.value().is_some()))
+    })
 }
 /// Whether the ghosted layer has anything the evaluated ghost frame draws beyond stored key geometry: text or raster
 /// items, seeded brush-texture anchors (their dabs are produced, never stored) or a derived layer (component or
@@ -93,10 +114,7 @@ fn layer_has_items(snapshot: &ObjectSnapshot, layer_uid: &str) -> bool {
         || document
             .duplicator_set()
             .is_some_and(|d| d.duplicator("scene-root", layer_uid).is_some())
-        || document.objects().iter().any(|r| {
-            r.target.layer_uid() == layer_uid
-                && crate::evaluation::brush_dab::paint::is_seeded_anchor(r)
-        })
+        || layer_has_brush_items(snapshot, layer_uid)
 }
 
 type Revision = Weak<dyn std::any::Any + Send + Sync>;
@@ -136,9 +154,15 @@ struct Evaluated {
 /// scrub step re-uses the frames the previous step already evaluated and decoded.
 static EVALUATED: Mutex<Vec<Evaluated>> = Mutex::new(Vec::new());
 
+/// Bytes one `PathEl` of a retained plan costs, and the fixed cost of one paint entry (record, style, order slot).
+const PATH_EL_BYTES: usize = 56;
+const ENTRY_BYTES: usize = 256;
+/// What an evaluated frame keeps alive: its decoded images (each distinct one once) plus an estimate of the plan's
+/// own vector data (every contour / glyph / dab / component path and paint entry), so a heavy vector document is
+/// charged although it decodes no image.
 fn witness_bytes(witness: &ObjectCompositionWitness) -> usize {
     let mut seen = Vec::new();
-    witness
+    let images: usize = witness
         .raster_images()
         .chain(witness.brush_images())
         .filter(|i| {
@@ -147,7 +171,31 @@ fn witness_bytes(witness: &ObjectCompositionWitness) -> usize {
             fresh
         })
         .map(|i| i.data.data().len())
-        .sum()
+        .sum();
+    let path = |p: &vello::kurbo::BezPath| p.elements().len() * PATH_EL_BYTES;
+    let plan: usize = ordered_entries(witness.plan())
+        .map(|entry| {
+            ENTRY_BYTES
+                + match entry {
+                    // The closed contour and the drawn path both stay resident.
+                    PaintEntry::Contour(c) => path(c.path()) * 2,
+                    PaintEntry::Text(t) => t
+                        .item
+                        .painted()
+                        .map(|(c, _)| path(c.contour.path()))
+                        .sum(),
+                    PaintEntry::Component(c) => path(&c.path),
+                    PaintEntry::Duplicator(d) => path(&d.path),
+                    PaintEntry::Dab(d) => path(&d.path),
+                    _ => 0,
+                }
+        })
+        .sum();
+    images + plan
+}
+/// The document an evaluated frame belongs to.
+fn document_of(witness: &ObjectCompositionWitness) -> &str {
+    witness.plan().packet().snapshot().document_id()
 }
 fn witness_hit(revision: &Revision, frame: u32) -> Option<ObjectCompositionWitness> {
     let mut memo = EVALUATED.lock().ok()?;
@@ -160,27 +208,45 @@ fn witness_hit(revision: &Revision, frame: u32) -> Option<ObjectCompositionWitne
     memo.insert(0, entry);
     Some(witness)
 }
-fn witness_keep(revision: &Revision, frame: u32, witness: &ObjectCompositionWitness) {
-    let bytes = witness_bytes(witness);
-    if bytes > MEMO_IMAGE_BYTES {
+/// Admit one evaluated frame to `memo`: entries of another revision of the SAME document are dropped now (a ghost
+/// frame of a superseded revision is never asked for again, and each entry holds its whole snapshot alive), then the
+/// set is trimmed to `budget` bytes (images and estimated plan data) and `WITNESS_ENTRIES` entries, newest first.
+fn admit_witness(memo: &mut Vec<Evaluated>, entry: Evaluated, budget: usize) {
+    if entry.bytes > budget {
         return;
     }
+    let document = document_of(&entry.witness).to_owned();
+    memo.retain(|m| {
+        m.revision.strong_count() > 0
+            && (Weak::ptr_eq(&m.revision, &entry.revision) || document_of(&m.witness) != document)
+    });
+    memo.insert(0, entry);
+    let (mut total, mut kept) = (0usize, 0usize);
+    memo.retain(|m| {
+        total += m.bytes;
+        kept += 1;
+        total <= budget && kept <= WITNESS_ENTRIES
+    });
+}
+fn witness_keep(revision: &Revision, frame: u32, witness: &ObjectCompositionWitness) {
+    let entry = Evaluated {
+        revision: revision.clone(),
+        frame,
+        witness: witness.clone(),
+        bytes: witness_bytes(witness),
+    };
     if let Ok(mut memo) = EVALUATED.lock() {
-        memo.insert(
-            0,
-            Evaluated {
-                revision: revision.clone(),
-                frame,
-                witness: witness.clone(),
-                bytes,
-            },
-        );
-        let (mut total, mut kept) = (0usize, 0usize);
-        memo.retain(|m| {
-            total += m.bytes;
-            kept += 1;
-            total <= MEMO_IMAGE_BYTES && kept <= WITNESS_ENTRIES
-        });
+        admit_witness(&mut memo, entry, MEMO_IMAGE_BYTES);
+    }
+}
+/// The document was closed or replaced: nothing the ghost caches hold can be asked for again, and every evaluated
+/// frame keeps its whole snapshot alive, so both memos are emptied now instead of waiting for the next ghost request.
+pub fn release_ghost_caches() {
+    if let Ok(mut memo) = EVALUATED.lock() {
+        memo.clear();
+    }
+    if let Ok(mut memo) = MEMO.lock() {
+        memo.clear();
     }
 }
 
@@ -214,10 +280,12 @@ pub fn prepare_ghost_underlay(
     let underlay = Arc::new(match snapshot.query_tween_ghosts_json(&key) {
         Ok(read) => {
             let items = layer_has_items(snapshot, &request.layer_uid);
+            let brush_items = layer_has_brush_items(snapshot, &request.layer_uid);
             GhostUnderlay::build(
                 &Source {
                     read: &read,
                     items,
+                    brush_items,
                     revision: revision.clone(),
                 },
                 request,

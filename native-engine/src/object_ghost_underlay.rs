@@ -317,8 +317,11 @@ pub struct GhostPath {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GhostFrameSpec {
     pub translation: [f64; 2],
-    /// A Ghost All key frame: stored vector geometry only (its text and rasters are not ghosted).
+    /// A Ghost All key frame: stored vector geometry, plus the produced brush items (dabs, bitmap brush paint) of the
+    /// evaluated key frame; its text, rasters, components and duplicator copies are not ghosted (baseline `renderGhostAll`).
     pub all_keys: bool,
+    /// The Ghost All outline paint `[r, g, b, a]` (alpha already scaled), `Some` exactly on an `all_keys` frame.
+    pub key_outline: Option<[f64; 4]>,
     /// Glyph fill opacity, and the Outline-mode stroke `([r, g, b, a], width)` that replaces the fill.
     pub text_opacity: f64,
     pub text_stroke: Option<([f64; 4], f64)>,
@@ -345,6 +348,9 @@ pub trait GhostSource {
     fn witness(&self, index: usize) -> Result<ObjectCompositionWitness, ()>;
     /// Whether the layer has any text or raster item at all, so a vector-only layer never evaluates ghost frames.
     fn has_items(&self) -> bool;
+    /// Whether the layer has produced brush paint (seeded brush-texture anchors, bitmap brushes) that only the
+    /// evaluated frame shows, so Ghost All key frames of other layers never evaluate.
+    fn has_brush_items(&self) -> bool;
     /// The paint policy of one evaluated component / duplicator record of the ghost frame (baseline `onionLayerItems`).
     fn record_visual(&self, index: usize, record: &ObjectRecord) -> GhostVisual;
 }
@@ -384,13 +390,15 @@ impl GhostUnderlay {
             refusal: None,
             _keep: Vec::new(),
         };
-        let items = source.has_items();
+        let (items, brush_items) = (source.has_items(), source.has_brush_items());
         let mut segments = 0usize;
         for index in 0..source.frame_count() {
             let at = source.frame(index);
             let shift = Affine::translate((at.translation[0], at.translation[1]));
-            // Items first (they sit below the strokes drawn over them), then the stored vector geometry.
-            if items && !at.all_keys {
+            // Items first (they sit below the strokes drawn over them), then the stored vector geometry. A Ghost All
+            // key frame evaluates only for the brush paint stored geometry cannot show.
+            let evaluates = if at.all_keys { brush_items } else { items };
+            if evaluates {
                 if let Ok(witness) = source.witness(index) {
                     out.collect_items(source, index, &at, &witness);
                     out._keep.push(witness);

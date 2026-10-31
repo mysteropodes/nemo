@@ -1026,6 +1026,7 @@
         "object_ghost_underlay.rs",
         "object_ghost_items.rs",
         "object_ghost_fidelity.rs",
+        "object_ghost_all_keys.rs",
         "object_compositor.rs",
         "object_scheduled_compositor.rs",
         "object_scheduled_scene_witness.rs",
