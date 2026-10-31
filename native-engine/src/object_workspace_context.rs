@@ -38,7 +38,11 @@ struct Wire<'a> {
     scene_view: Option<View>,
 }
 enum Action<'a> {
-    Enter { id: &'a str, entry: Option<i64> },
+    Enter {
+        id: &'a str,
+        entry: Option<i64>,
+        from: Option<&'a str>,
+    },
     Exit,
     Close { id: &'a str },
     Refresh,
@@ -92,14 +96,37 @@ fn wire(value: &Value) -> Option<Wire<'_>> {
 fn action(value: &Value) -> Option<Action<'_>> {
     match value.get("kind")?.as_str()? {
         "enter" => {
-            let object = exact(value, &["kind", "contextId", "entryFrame"])?;
+            // `fromLayerUid` (optional) names the scene instance layer being entered: the owner resolves the component frame that
+            // instance shows at the held playhead (`resolveSymbolFrameIdx`) and enters there. It never combines with an explicit entry frame.
+            let object = value.as_object()?;
+            let with_from = object.contains_key("fromLayerUid");
+            exact(
+                value,
+                if with_from {
+                    &["kind", "contextId", "entryFrame", "fromLayerUid"][..]
+                } else {
+                    &["kind", "contextId", "entryFrame"][..]
+                },
+            )?;
             let entry = match &object["entryFrame"] {
                 Value::Null => None,
                 other => Some(uint32(other)?),
             };
+            let from = if with_from {
+                match &object["fromLayerUid"] {
+                    Value::Null => None,
+                    other => Some(id(other)?),
+                }
+            } else {
+                None
+            };
+            if entry.is_some() && from.is_some() {
+                return None;
+            }
             Some(Action::Enter {
                 id: id(&object["contextId"])?,
                 entry,
+                from,
             })
         }
         "close" => Some(Action::Close {
@@ -161,6 +188,40 @@ impl ObjectSnapshot {
         }
     }
 
+    /// Motion `enterComponentLayer`: the component frame the instance layer `layer_uid` shows at the scene frame `outer`, from the
+    /// playback kernel the renderer itself uses (placement, speed, play mode, trim, the outer component-frame keys). `None` leaves the
+    /// entry at the first frame: no such instance of this component, a held blank key, or a Time Remap (it needs the expression
+    /// runtime's sampler, which a pure view query does not have).
+    #[cfg(feature = "evaluation")]
+    fn instance_entry_frame(&self, component: &str, layer_uid: &str, outer: i64) -> Option<i64> {
+        use crate::evaluation::object_component_kernels::object_component_playback::{
+            evaluate_component_playback, PlaybackOutcome,
+        };
+        use crate::evaluation::object_component_kernels::object_context_resolver::ContextSource;
+        use crate::evaluation::object_scene_style_kernels::object_scene_producer_component_select::playback_input;
+        let source = ContextSource::of_document(self.document());
+        let instance = source.instance(layer_uid)?;
+        if instance.symbol_id() != component || instance.time_remap().is_some() {
+            return None;
+        }
+        let host = source.context("scene-root").ok()?.layer(layer_uid)?.1;
+        let total = source
+            .components()
+            .iter()
+            .find(|c| c.symbol_id() == component)?
+            .total_frames();
+        let frame = u32::try_from(outer).ok()?;
+        let input = playback_input(instance, host, frame).ok()?;
+        match evaluate_component_playback(&input, f64::from(total), outer, None) {
+            PlaybackOutcome::Blank => None,
+            PlaybackOutcome::Frame(resolved) => {
+                let raw = resolved.raw();
+                raw.is_finite()
+                    .then(|| raw.floor().clamp(0.0, f64::from(total.saturating_sub(1))) as i64)
+            }
+        }
+    }
+
     #[cfg(not(feature = "evaluation"))]
     fn workspace_answer(
         &self,
@@ -195,8 +256,18 @@ impl ObjectSnapshot {
             })
             .collect();
         let find = |context: &str| catalog.iter().find(|c| c.context_id == context);
-        let bounded =
-            |v: &View, total: i64| v.frame < total && v.work_in <= v.work_out && v.work_out < total;
+        // The held view is clamped into the context as it is NOW: an Undo or an agent edit may have shrunk the entered
+        // component (or the scene) under a playhead and work area it still holds. Leaving or closing must always work, so a
+        // view beyond the frame count is brought back inside it; only a work area that is not ordered is malformed.
+        let ordered = |v: &View| v.work_in <= v.work_out;
+        let clamped = |v: &View, total: i64| {
+            let last = (total - 1).max(0);
+            View {
+                frame: v.frame.min(last),
+                work_in: v.work_in.min(last),
+                work_out: v.work_out.min(last),
+            }
+        };
         let scene_state = |v: &View| WorkspaceView {
             current_frame: v.frame,
             wa_in: v.work_in,
@@ -210,47 +281,50 @@ impl ObjectSnapshot {
         let mut gone = false;
         let mut state = match (wire.active, &wire.scene_view) {
             (Some(active), Some(scene)) => {
-                if !bounded(scene, scene_total) {
+                if !ordered(scene) || !ordered(&wire.view) {
                     return Err(DispatchErrorCode::InvalidRequest);
                 }
+                let scene = clamped(scene, scene_total);
                 match find(active) {
-                    Some(info) if bounded(&wire.view, info.total_frames) => WorkspaceState {
-                        active: Some(ActiveContext {
-                            context_id: active.to_owned(),
-                            saved_scene_view: scene_state(scene),
-                        }),
-                        open_tabs: wire.tabs.iter().map(|t| (*t).to_owned()).collect(),
-                        view: WorkspaceView {
-                            current_frame: wire.view.frame,
-                            wa_in: wire.view.work_in,
-                            wa_out: wire.view.work_out,
-                            active_layer_idx: 0,
-                            total_frames: info.total_frames,
-                            fps: info
-                                .fps
-                                .filter(|f| *f != 0.0 && !f.is_nan())
-                                .unwrap_or(scene_fps),
-                        },
-                    },
-                    Some(_) => return Err(DispatchErrorCode::InvalidRequest),
+                    Some(info) => {
+                        let held = clamped(&wire.view, info.total_frames);
+                        WorkspaceState {
+                            active: Some(ActiveContext {
+                                context_id: active.to_owned(),
+                                saved_scene_view: scene_state(&scene),
+                            }),
+                            open_tabs: wire.tabs.iter().map(|t| (*t).to_owned()).collect(),
+                            view: WorkspaceView {
+                                current_frame: held.frame,
+                                wa_in: held.work_in,
+                                wa_out: held.work_out,
+                                active_layer_idx: 0,
+                                total_frames: info.total_frames,
+                                fps: info
+                                    .fps
+                                    .filter(|f| *f != 0.0 && !f.is_nan())
+                                    .unwrap_or(scene_fps),
+                            },
+                        }
+                    }
                     None => {
                         gone = true;
                         WorkspaceState {
                             active: None,
                             open_tabs: wire.tabs.iter().map(|t| (*t).to_owned()).collect(),
-                            view: scene_state(scene),
+                            view: scene_state(&scene),
                         }
                     }
                 }
             }
             _ => {
-                if !bounded(&wire.view, scene_total) {
+                if !ordered(&wire.view) {
                     return Err(DispatchErrorCode::InvalidRequest);
                 }
                 WorkspaceState {
                     active: None,
                     open_tabs: wire.tabs.iter().map(|t| (*t).to_owned()).collect(),
-                    view: scene_state(&wire.view),
+                    view: scene_state(&clamped(&wire.view, scene_total)),
                 }
             }
         };
@@ -260,7 +334,8 @@ impl ObjectSnapshot {
         // The kernel clears a selection the session keeps itself (a native selection is JS view state).
         let mut selection = Vec::new();
         let outcome = match action {
-            Action::Enter { id, entry } => {
+            Action::Enter { id, entry, from } => {
+                let entry = entry.or_else(|| from.and_then(|layer| self.instance_entry_frame(id, layer, wire.view.frame)));
                 match state.enter_context(&catalog, &mut selection, id, entry) {
                     EnterOutcome::Entered => "entered",
                     EnterOutcome::AlreadyActive => "already_active",
@@ -288,11 +363,22 @@ impl ObjectSnapshot {
             }
         };
         let shown = |v: &WorkspaceView| json!({"frame":v.current_frame,"workIn":v.wa_in,"workOut":v.wa_out});
-        let tabs: Vec<String> = state
+        let mut tabs: Vec<String> = state
             .visible_tabs(&catalog)
             .into_iter()
             .map(|tab| tab.context_id)
             .collect();
+        // The baseline strip had no cap, the wire does (MAX_TABS): a ninth tab evicts the oldest tab that is not the active one,
+        // so the answer is always one the caller can send back.
+        while tabs.len() > MAX_TABS {
+            let active = state.active_context_id();
+            match tabs.iter().position(|tab| Some(tab.as_str()) != active) {
+                Some(oldest) => {
+                    tabs.remove(oldest);
+                }
+                None => break,
+            }
+        }
         let result = json!({"atRevision":self.content_revision(),"documentSnapshotId":self.snapshot_id(),
             "outcome":outcome,
             "contextId":state.active_context_id().unwrap_or("scene-root"),

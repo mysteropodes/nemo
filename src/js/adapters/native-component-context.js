@@ -17,6 +17,7 @@
   var entered = new WeakMap(); // host -> the entered context's read-side view; absent while the scene is presented
   var names = new WeakMap();   // host -> {key, map}: the component names the tab strip shows
   var busy = new WeakSet();
+  var queued = new WeakSet(); // a revision that arrived while a transition was in flight: the context is re-read once that transition is done
 
   function session(host) {
     try {
@@ -50,15 +51,16 @@
     var frame = Math.min(integer(s.currentFrame, 0), last), lo = Math.min(integer(s.waIn, 0), last), hi = Math.min(integer(s.waOut, last), last);
     return { frame: frame, workIn: Math.min(lo, hi), workOut: Math.max(lo, hi) };
   }
-  async function readNames(host, c, info) {
+  // `via` (optional) is the lease of a publication that already runs inside the project queue (see revision).
+  async function readNames(host, c, info, via) {
     var held = names.get(host), key = keyOf(info);
     if (!held || held.key !== key) { held = { key: key, map: {} }; names.set(host, held); }
-    var all = await c.listContexts();
+    var all = await c.listContexts(via);
     if (all.ok) all.contexts.forEach(function (ctx) { if (ctx.contextKind === 'component') held.map[ctx.contextId] = typeof ctx.name === 'string' && ctx.name ? ctx.name : ctx.contextId; });
     return held.map;
   }
-  async function readRows(c, contextId) {
-    var all = await c.listLayers(contextId);
+  async function readRows(c, contextId, via) {
+    var all = await c.listLayers(contextId, via);
     if (!all.ok) return null;
     var rows = [];
     all.items.forEach(function (layer) {
@@ -102,7 +104,7 @@
     repaint(host);
   }
   // Back to the scene projection, from the native truth. The frame is the scene playhead the owner restored.
-  async function applyExited(host, res, saved) {
+  async function applyExited(host, res, saved, lease) {
     var st = entered.get(host);
     entered.delete(host);
     var s = session(host), info = s && s.info(), file = host.NemoNativeObjectProjectFile;
@@ -110,7 +112,7 @@
     var frame = Math.min(res.workspace.view.frame, info.totalFrames - 1), keep = saved || (st ? st.saved : null);
     try { file.projectView(host, info, { frame: frame, layerUids: keep ? keep.layerUids : [], activeLayerUid: keep ? keep.activeLayerUid : null, anchorLayerUid: keep ? keep.anchorLayerUid : null }); }
     catch (_) { file.projectView(host, info, null); frame = 0; }
-    await present(host, frame);
+    if (!lease) await present(host, frame); // inside a publication the revision's own frame is presented next, with the scene context
     repaint(host);
   }
 
@@ -120,22 +122,38 @@
     return Promise.resolve().then(work).catch(function (error) {
       toast(host, 'Native component context: ' + (error && error.message || 'unavailable'));
       return false;
-    }).then(function (done) { busy.delete(host); return done; });
+    }).then(function (done) {
+      busy.delete(host);
+      if (queued.delete(host)) guarded(host, function () { return refresh(host, null); });
+      return done;
+    });
   }
-  // enterSymbol(symId)
-  function enter(host, contextId, entryFrame) {
+  // A transition that read a pin the project moved off is asked again (the answer was discarded, nothing was applied).
+  async function transition(c, action, view, via) {
+    var res;
+    for (var attempt = 0; attempt < 3; attempt += 1) {
+      res = await c.workspaceTransition(action, view, via);
+      if (res.ok || res.code !== 'stale_revision') return res;
+    }
+    return res;
+  }
+  // enterSymbol(symId). `layerUid` (optional) is the instance layer entered: the owner starts at the component frame that instance shows at
+  // the scene playhead (Motion enterComponentLayer: resolveSymbolFrameIdx), where a plain tab or SM.enterSymbol starts at the first frame.
+  function enter(host, contextId, entryFrame, layerUid) {
     return guarded(host, async function () {
       var c = intent(host), s = session(host);
       if (!c || !s || !s.info()) { toast(host, 'Native component context is unavailable.'); return false; }
       var saved = selectedUids(host);
-      var res = await c.workspaceTransition({ kind: 'enter', contextId: contextId, entryFrame: Number.isSafeInteger(entryFrame) ? entryFrame : null }, viewNow(host));
+      var action = { kind: 'enter', contextId: contextId, entryFrame: Number.isSafeInteger(entryFrame) ? entryFrame : null };
+      if (typeof layerUid === 'string' && layerUid && action.entryFrame === null) action.fromLayerUid = layerUid;
+      var res = await transition(c, action, viewNow(host));
       if (!res.ok) { if (res.code !== 'not_found') toast(host, 'Native component context: ' + (res.reason || res.code)); return false; }
       if (res.outcome === 'refused_nested') { toast(host, t(host, 'toastNestedComponentsUnsupported', 'Close the component first.')); return false; }
       if (res.outcome !== 'entered') return false;
       try { await applyEntered(host, res, saved); } catch (error) {
         // The owner entered the context but it could not be presented: leave it again rather than show a half-entered view.
         entered.delete(host);
-        var back = await c.workspaceTransition({ kind: 'exit' }, res.workspace.view);
+        var back = await transition(c, { kind: 'exit' }, res.workspace.view);
         if (back.ok) await applyExited(host, back, saved).catch(function () { return null; });
         throw error;
       }
@@ -147,9 +165,10 @@
     return guarded(host, async function () {
       var c = intent(host);
       if (!c || !live(host)) return false;
-      var res = await c.workspaceTransition({ kind: 'exit' }, viewNow(host));
+      var res = await transition(c, { kind: 'exit' }, viewNow(host));
       if (!res.ok) { toast(host, 'Native component context: ' + (res.reason || res.code)); return false; }
-      if (res.outcome !== 'exited') return false;
+      // A component that vanished under the user (deleted by Undo or an agent) answers not_in_context: the scene is shown all the same.
+      if (res.outcome !== 'exited' && res.outcome !== 'not_in_context') return false;
       await applyExited(host, res);
       return true;
     });
@@ -159,29 +178,52 @@
     return guarded(host, async function () {
       var c = intent(host), was = live(host);
       if (!c) return false;
-      var res = await c.workspaceTransition({ kind: 'close', contextId: contextId }, viewNow(host));
+      var res = await transition(c, { kind: 'close', contextId: contextId }, viewNow(host));
       if (!res.ok) { toast(host, 'Native component context: ' + (res.reason || res.code)); return false; }
       if (was && res.workspace.activeContextId === null) await applyExited(host, res);
       else if (res.outcome === 'closed') repaint(host);
       return res.outcome === 'closed';
     });
   }
-  // A revision moved on (Undo, an agent edit): a context that vanished is left, the others re-read their layers.
-  function revision(host, info) {
+  // The entered context after a refresh answer: its frame count, fps, tabs, layers and the owner's clamped playhead and work area.
+  function projectRefreshed(host, st, res, rows) {
+    var s = host.state, view = res.workspace.view, count = rows ? rows.length : st.rows.length;
+    if (rows) st.rows = rows;
+    st.totalFrames = res.totalFrames; st.fps = res.fps; st.tabs = res.workspace.openTabs;
+    s.openSymbolTabs = st.tabs.slice(); s.layers = st.rows; s.totalFrames = st.totalFrames; s.fps = st.fps;
+    s.waIn = view.workIn; s.waOut = view.workOut; s.currentFrame = view.frame; s.activeLayerIdx = Math.min(integer(s.activeLayerIdx, 0), Math.max(0, count - 1));
+    host._curFrame = view.frame; host._totalF = st.totalFrames; host._waIn = view.workIn; host._waOut = view.workOut;
+    host._layerSel = (Array.isArray(host._layerSel) ? host._layerSel : []).filter(function (i) { return i < count; });
+  }
+  // Re-read the entered context against the current revision: a context that vanished is left, the others re-read their layers.
+  async function refresh(host, lease) {
+    var c = intent(host), was = entered.get(host);
+    if (!c || !was) return false;
+    var res = await transition(c, { kind: 'refresh' }, viewNow(host), lease);
+    if (!res.ok) return false;
+    if (res.outcome === 'context_gone') { await applyExited(host, res, null, lease); toast(host, 'The component no longer exists.'); return true; }
+    var rows = await readRows(c, was.contextId, lease);
+    if (entered.get(host) !== was) return false; // left (or replaced) while the layers were read
+    await readNames(host, c, session(host).info(), lease).catch(function () { return null; });
+    projectRefreshed(host, was, res, rows);
+    repaint(host);
+    return true;
+  }
+  // A revision moved on (Undo, an MCP edit). `lease` is the publication the project queue is running: the refresh rides it, so the
+  // context, frame count and layers are settled BEFORE the frame of this revision is presented (a shrunk or deleted component is
+  // never asked for a frame it no longer has). Without a lease the refresh is queued behind any transition in flight, never dropped.
+  function revision(host, info, lease) {
     var st = live(host);
-    if (!st || st.revision === info.contentRevision) return;
+    if (!st || st.revision === info.contentRevision) return Promise.resolve(true);
     st.revision = info.contentRevision;
-    guarded(host, async function () {
-      var c = intent(host), was = entered.get(host);
-      if (!c || !was) return false;
-      var res = await c.workspaceTransition({ kind: 'refresh' }, viewNow(host));
-      if (!res.ok) return false;
-      if (res.outcome === 'context_gone') { await applyExited(host, res); toast(host, 'The component no longer exists.'); return true; }
-      var rows = await readRows(c, was.contextId);
-      if (rows) { was.rows = rows; host.state.layers = rows; }
-      repaint(host);
-      return true;
-    });
+    if (lease) return refresh(host, lease).catch(function (error) { toast(host, 'Native component context: ' + (error && error.message || 'unavailable')); return false; }).then(function () { return true; });
+    if (busy.has(host)) { queued.add(host); return Promise.resolve(true); }
+    return guarded(host, function () { return refresh(host, null); }).then(function () { return true; });
+  }
+  // The final projection check of a revision synchronization while a component is presented: same owner, same revision.
+  function projectionReady(host, info) {
+    var st = live(host);
+    return !!st && !!info && st.key === keyOf(info) && st.revision === info.contentRevision;
   }
   // Double-click on an instance layer: the component it instances (scene layers are read, never guessed).
   async function openLayer(host, layerUid) {
@@ -193,7 +235,7 @@
       var ctx = all.contexts[i];
       if (ctx.contextKind !== 'component') continue;
       var found = await c.listInstances(ctx.contextId);
-      if (found.ok && found.items.some(function (item) { return item.layerUid === layerUid; })) return enter(host, ctx.contextId, null);
+      if (found.ok && found.items.some(function (item) { return item.layerUid === layerUid; })) return enter(host, ctx.contextId, null, layerUid);
     }
     return false;
   }
@@ -244,5 +286,5 @@
     });
     return true;
   }
-  return Object.freeze({ SCENE: SCENE, presented: presented, enter: enter, exit: exit, close: close, revision: revision, openLayer: openLayer, paint: paint, renderTabs: renderTabs });
+  return Object.freeze({ SCENE: SCENE, presented: presented, enter: enter, exit: exit, close: close, revision: revision, projectionReady: projectionReady, openLayer: openLayer, paint: paint, renderTabs: renderTabs });
 }));

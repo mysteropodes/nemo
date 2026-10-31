@@ -228,7 +228,6 @@ fn only_this_snapshot_is_answered_and_a_malformed_request_is_invalid() {
     let bad = |workspace: Value, action: Value| refused(&snap, workspace, action);
     let nine: Vec<String> = (0..9).map(|n| format!("t{n}")).collect();
     for (workspace, action) in [
-        (scene(24, json!([])), enter("sym_comp")),
         (scene(0, json!(nine)), enter("sym_comp")),
         (scene(0, json!(["sym_comp", "sym_comp"])), enter("sym_comp")),
         (
@@ -236,7 +235,7 @@ fn only_this_snapshot_is_answered_and_a_malformed_request_is_invalid() {
             json!({"kind":"exit"}),
         ),
         (
-            inside("sym_comp", json!(["sym_comp"]), 12, 0),
+            json!({"activeContextId":"sym_comp","openTabs":["sym_comp"],"view":view(0, 5, 2),"sceneView":view(0, 0, 23)}),
             json!({"kind":"exit"}),
         ),
         (inside("sym_comp", json!([]), 0, 0), json!({"kind":"exit"})),
@@ -336,4 +335,106 @@ mod presentation {
             ObjectScheduleScope::Unsupported
         ));
     }
+}
+
+#[test]
+fn a_view_beyond_a_shrunk_context_is_clamped_so_leaving_and_closing_always_work() {
+    // Undo or an agent edit shrank sym_comp (12 frames) and the scene (24) under the playhead and work area the caller holds.
+    let snap = snapshot();
+    let held = json!({"activeContextId":"sym_comp","openTabs":["sym_comp"],"view":view(40, 2, 50),"sceneView":view(300, 5, 400)});
+    let refreshed = answer(&snap, held.clone(), json!({"kind":"refresh"}));
+    assert_eq!(refreshed["outcome"], "refreshed");
+    assert_eq!(refreshed["workspace"]["view"], view(11, 2, 11), "the entered view is brought inside the component");
+    assert_eq!(refreshed["workspace"]["sceneView"], view(23, 5, 23), "the saved scene view is brought inside the scene");
+    let exited = answer(&snap, held.clone(), json!({"kind":"exit"}));
+    assert_eq!(exited["outcome"], "exited");
+    assert_eq!(exited["contextId"], "scene-root");
+    assert_eq!(exited["workspace"]["view"], view(23, 5, 23));
+    let closed = answer(&snap, held, json!({"kind":"close","contextId":"sym_comp"}));
+    assert_eq!(closed["outcome"], "closed");
+    assert_eq!(closed["workspace"]["activeContextId"], Value::Null);
+    // A scene view past the scene is clamped as well; a work area that is not ordered is still malformed.
+    let scene_only = answer(&snap, json!({"activeContextId":null,"openTabs":[],"view":view(99, 0, 99),"sceneView":null}), json!({"kind":"refresh"}));
+    assert_eq!(scene_only["workspace"]["view"], view(23, 0, 23));
+}
+
+#[test]
+fn a_ninth_open_tab_evicts_the_oldest_tab_that_is_not_the_active_one() {
+    // Nine declared components: sym_comp plus eight renamed copies of it (ids are rewritten consistently).
+    let mut doc: Value = serde_json::from_str(world_json("D")).unwrap();
+    let first = doc["componentTables"]["components"]["components"][0].clone();
+    for n in 0..8 {
+        let text = first
+            .to_string()
+            .replace("sym_comp", &format!("sym_x{n}"))
+            .replace("ly_comp_", &format!("ly_x{n}_"))
+            .replace("s_comp_", &format!("s_x{n}_"));
+        doc["componentTables"]["components"]["components"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::from_str(&text).unwrap());
+        let objects = first["objects"].as_array().unwrap().len();
+        assert!(objects > 0);
+    }
+    let snap = snapshot_from(&doc);
+    let mut tabs = vec!["sym_comp".to_owned(), "sym_comp_b".to_owned()];
+    tabs.extend((0..6).map(|n| format!("sym_x{n}")));
+    assert_eq!(tabs.len(), 8);
+    let out = answer(&snap, scene(0, json!(tabs)), enter("sym_x6"));
+    let listed = out["workspace"]["openTabs"].as_array().unwrap();
+    assert_eq!(listed.len(), 8, "the strip never exceeds the wire cap");
+    assert!(!listed.contains(&json!("sym_comp")), "the oldest tab is evicted");
+    assert_eq!(listed.last().unwrap(), "sym_x6");
+    assert_eq!(out["workspace"]["activeContextId"], "sym_x6");
+    // The answer is one the caller can send straight back.
+    let again = answer(&snap, out["workspace"].clone(), json!({"kind":"refresh"}));
+    assert_eq!(again["outcome"], "refreshed");
+    // The active tab is never the one evicted, even when it is the oldest.
+    let mut held = tabs.clone();
+    held.insert(0, "sym_x7".to_owned());
+    held.truncate(8);
+    let active_oldest = json!({"activeContextId":"sym_x7","openTabs":held,"view":view(0, 0, 11),"sceneView":view(0, 0, 23)});
+    let kept = answer(&snap, active_oldest, enter("sym_x7"));
+    assert_eq!(kept["outcome"], "already_active");
+}
+
+fn enter_from(id: &str, layer: &str) -> Value {
+    json!({"kind":"enter","contextId":id,"entryFrame":null,"fromLayerUid":layer})
+}
+
+#[test]
+fn entering_from_an_instance_layer_starts_at_the_frame_that_instance_shows_at_the_playhead() {
+    // Expected values come from the baseline `resolveSymbolFrameIdx` (app.js) applied by hand to the world's instances of the
+    // 12-frame sym_comp: loop (placed at 4), once, ping-pong, single frame 5 and a doubled speed.
+    let snap = snapshot();
+    let at = |layer: &str, playhead: u64| {
+        let out = answer(&snap, scene(playhead, json!([])), enter_from("sym_comp", layer));
+        assert_eq!(out["outcome"], "entered");
+        out["workspace"]["view"]["frame"].as_u64().unwrap()
+    };
+    assert_eq!(at("ly_comp_loop", 10), 6, "loop: (10 - 4) % 12");
+    assert_eq!(at("ly_comp_loop", 2), 0, "before the placement the instance shows its first frame");
+    assert_eq!(at("ly_comp_loop", 20), 4, "loop wraps: (20 - 4) % 12");
+    assert_eq!(at("ly_comp_once", 7), 7, "once plays from frame 0");
+    assert_eq!(at("ly_comp_once", 20), 11, "once holds on the last frame");
+    assert_eq!(at("ly_comp_ping", 13), 9, "ping-pong: cycle 22, position 13 comes back as 22 - 13");
+    assert_eq!(at("ly_comp_single", 17), 5, "single shows its fixed frame");
+    assert_eq!(at("ly_comp_speed", 7), 2, "speed 2: (7 * 2) % 12");
+    // The work area is still the whole component and the scene view is still saved exactly.
+    let out = answer(&snap, scene(10, json!([])), enter_from("sym_comp", "ly_comp_loop"));
+    assert_eq!(out["workspace"]["view"], view(6, 0, 11));
+    assert_eq!(out["workspace"]["sceneView"], view(10, 0, 23));
+}
+
+#[test]
+fn an_unknown_or_foreign_instance_enters_at_the_first_frame_and_an_explicit_entry_frame_cannot_be_combined() {
+    let snap = snapshot();
+    for layer in ["no_such_layer", "ly_compb_loop"] {
+        let out = answer(&snap, scene(10, json!([])), enter_from("sym_comp", layer));
+        assert_eq!(out["workspace"]["view"]["frame"], 0, "{layer} is not an instance of sym_comp");
+    }
+    let both = json!({"kind":"enter","contextId":"sym_comp","entryFrame":3,"fromLayerUid":"ly_comp_loop"});
+    assert_eq!(refused(&snap, scene(0, json!([])), both), DispatchErrorCode::InvalidRequest);
+    let malformed = json!({"kind":"enter","contextId":"sym_comp","entryFrame":null,"fromLayerUid":""});
+    assert_eq!(refused(&snap, scene(0, json!([])), malformed), DispatchErrorCode::InvalidRequest);
 }

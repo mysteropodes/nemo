@@ -18686,6 +18686,18 @@
                       "maximum": 4294967295
                     }
                   ]
+                },
+                "fromLayerUid": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  ]
                 }
               }
             },

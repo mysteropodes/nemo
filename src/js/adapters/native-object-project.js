@@ -86,7 +86,7 @@
         stage('inspect');var next=await inspect();
         if(ticket!==subscriptionTicket||next.contentRevision!==event.toRevision)
           throw new Error('Native object revision inspection is uncorrelated');
-        stage('publication');if(await ports.publishRevision(next)!==true)throw new Error('Native object UI publication is unconfirmed');
+        stage('publication');if(await ports.publishRevision(next,lease())!==true)throw new Error('Native object UI publication is unconfirmed');
         stage('present');await present(ports.frame?ports.frame():0,next,{subscriptionId:binding.subscriptionId,event:event});
         stage('final-projection');
         if(ticket!==subscriptionTicket||!same(info,next)||!ports.projectionReady(next))
@@ -262,23 +262,29 @@
     var occlusion=typeof ports.subscribeWindowOcclusion==='function'?Exposure.occlusionWake(ports.subscribeWindowOcclusion,function(){
       if(active()&&!openingRequested)renderPreview(ports.frame?ports.frame():0);}):null;
     var renderPreview = previewScheduling.renderPreview;
-    function changed(){if(ports.changed)ports.changed(info);}
+    // #2256: the lease a revision publication rides while the project queue is held (an entered component re-reads itself through it).
+    function lease(){return {dispatch:function(request){return raw('nemo_native_dispatch',request);}};}
+    function changed(){return ports.changed?ports.changed(info,lease()):undefined;}
+    // #2256: ONE guard for every document write: nothing is edited while a component is presented (the presented context is not scene-root).
+    function sceneRoot(){var ctx=ports.context?ports.context():null;return !ctx&&(!presentation||presentation.contextId===undefined||presentation.contextId==='scene-root');}
+    function insideComponent(){return Promise.reject(new Error('Native edits are not available inside a component; return to the Scene first'));}
     function mutation(makeRequest,command,needsPresentation,historyAction){
       if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
       if(synchronizing)return Promise.reject(new Error('Native object revision synchronization is in progress'));
+      if(!historyAction&&!sceneRoot())return insideComponent();
       var submitted=epoch(info),origin=needsPresentation?freeze(presentedSession()):null,ticket=subscriptionTicket;return enqueue(async function(){
       guardEpoch(submitted);var pin=requireActive(),request=needsPresentation?Desktop.withActionPresentation(origin,function(){return pending===1&&currentPresentation(origin,ticket)&&
         origin.presentation.frame===(ports.frame?ports.frame():0);},function(lease){return makeRequest(pin,lease);}):makeRequest(pin);presentation=null;
       var receipt;
       try{receipt=await raw(command,request);}catch(error){
         // A transport error cannot establish whether a native command committed.
-        try{await inspect();changed();}catch(unknown){throw fence(unknown);}
+        try{await inspect();await changed();}catch(unknown){throw fence(unknown);}
         try{await present(ports.frame?ports.frame():0);}catch(unpresented){if(!historyAction&&ports.notice)ports.notice(unpresented.message);}
         throw error;
       }
       if(!receipt||receipt.apiVersion!==2||receipt.requestId!==request.requestId||receipt.instanceId!==pin.instanceId||
         receipt.documentId!==pin.documentId||!integer(receipt.contentRevision,pin.contentRevision)||typeof receipt.ok!=='boolean')throw fence(new Error('Native mutation response is uncorrelated'));
-      try{await inspect();changed();}catch(unknown){throw fence(unknown);}
+      try{await inspect();await changed();}catch(unknown){throw fence(unknown);}
       if(!receipt.ok){
         try{await present(ports.frame?ports.frame():0);}catch(unpresented){if(!historyAction&&ports.notice)ports.notice(unpresented.message);}
         throw new Error('Native command refused: '+(receipt.error&&receipt.error.code||'unavailable'));
@@ -297,7 +303,7 @@
           readPresentedObjectSession:function(){return running&&pending===1&&currentPresentation(origin,ticket)?origin:null;},
           dispatch:function(request){guardEpoch(submitted);return raw('nemo_native_dispatch',request);},
           reconcile:async function(revision){guardEpoch(submitted);var next;try{next=await inspect();guardEpoch(submitted);if(revision!==undefined&&next.contentRevision!==revision)throw new Error('Native font import revision is uncorrelated');}catch(error){throw fence(error);}
-            changed();await present(ports.frame?ports.frame():0,next);return next;}});
+            await changed();await present(ports.frame?ports.frame():0,next);return next;}});
         }finally{running=false;}});}
     function reference(action){return mutation(function(pin){return {apiVersion:2,requestId:requestId('reference'),instanceId:pin.instanceId,
       documentId:pin.documentId,lifecycleGeneration:pin.lifecycleGeneration,expectedRevision:pin.contentRevision,
@@ -343,6 +349,7 @@
         payload:{command:'object.project.settings.edit',action:action}};
     },'nemo_native_dispatch');}
     function setLayerVisibility(layerUid,visible){
+      if(!sceneRoot())return insideComponent();
       if(typeof visible!=='boolean')return Promise.reject(new Error('Native layer visibility target or value is invalid'));
       return visibilityIntent(layerUid,visible);
     }
@@ -385,9 +392,12 @@
         synchronizing:synchronizing,subscribed:!!subscription,presentationCurrent:active()&&!synchronizing&&presentation&&same(info,presentation),
         get presented(){return presentedSession();},dispatchAvailable:typeof ports.dispatchApplication==='function',
         get projectionReady(){return typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true;},
+        get sceneRoot(){return sceneRoot();},
         get subscriptionActive(){return typeof ports.subscriptionActive==='function'&&ports.subscriptionActive()===true;}};}});
     function exportFrames(destination,frames,onProgress,signal,format){
       if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
+      // #2256: the frame range, fps and work area the export reads belong to the entered component, never to the scene it would render.
+      if(!sceneRoot())return Promise.reject(new Error('Export is not available inside a component; return to the Scene first'));
       if(!Exports||typeof Exports.run!=='function')return Promise.reject(new Error('Native object export adapter is unavailable'));
       var submitted=epoch(info);return Exports.run({
         enqueue:function(action){return enqueue(function(){guardEpoch(submitted);return action(requireActive());});},
@@ -403,17 +413,17 @@
       get editProperty(){return properties.available()?properties.editProperty:undefined;},
       info:function(){return info;},requestId:requestId,runFontResource:runFontResource,runResourceCommand:runFontResource,reference:reference,historyFromUi:function(action){return history(action);},jumpHistory:history,readHistory:function(offset){try{return reads.readHistory(requireActive(),offset);}catch(error){return Promise.reject(error);}},setLayerVisibility:setLayerVisibility,readLayerTiming:reads.readLayerTiming,readLayerRange:reads.readLayerRange,readLayerPlacement:reads.readLayerPlacement,readLayerCells:reads.readLayerCells,readImageMesh:reads.readImageMesh,readWidgets:reads.readWidgets,readGhosts:reads.readGhosts,readRig:reads.readRig,readRigWeights:reads.readRigWeights,readSubselect:reads.readSubselect,readPresentedStrokes:reads.readPresentedStrokes,previewSubselect:reads.previewSubselect,
       get editLayerPolicy(){return typeof ports.dispatchApplication==='function'&&(!ports.policyAvailable||ports.policyAvailable()===true)&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
-        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editLayerPolicy:undefined;},
+        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&sceneRoot()?editLayerPolicy:undefined;},
       get editFrames(){return FrameEdit&&typeof ports.dispatchApplication==='function'&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
-        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editFrames:undefined;},
+        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&sceneRoot()?editFrames:undefined;},
       get editProjectSettings(){return subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
-        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editProjectSettings:undefined;},
+        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&sceneRoot()?editProjectSettings:undefined;},
       get createLayer(){return subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
-        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?createLayer:undefined;},
+        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&sceneRoot()?createLayer:undefined;},
       get importBatch(){return subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
-        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?importBatch:undefined;},
+        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&sceneRoot()?importBatch:undefined;},
       get toggleLayerVisibility(){return subscription&&!synchronizing&&active()&&ports.projectionReady(info)&&
-        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?toggleLayerVisibility:undefined;},
+        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&sceneRoot()?toggleLayerVisibility:undefined;},
       beginViewportNavigation:function(kind,point){return active()&&!openingRequested&&!synchronizing&&presentation&&same(info,presentation)&&(!ports.projectionReady||ports.projectionReady(info))&&(!ports.subscriptionActive||ports.subscriptionActive())?view.begin(presentation,info,ports.frame(),ports.mapping(info),presentationBounds,kind,point):(openDiagnostic('navigation-begin','owner-unavailable'),null);},updateViewportNavigation:function(token,point,factor,target){try{if(!active()||openingRequested||synchronizing||!presentation||!same(info,presentation)||ports.projectionReady&&!ports.projectionReady(info)||ports.subscriptionActive&&!ports.subscriptionActive())throw new Error('Native navigation owner is unavailable');view.update(token,info,ports.frame(),ports.mapping(info),point,factor,target);openDiagnostic('navigation-update','view-updated');return renderPreview(ports.frame());}catch(error){openDiagnostic('navigation-update','rejected');return Promise.reject(error);}},presentPreview:presentPreview,renderPreview:renderPreview,exportPng:exportPng,exportSvg:exportSvg,readPresentedObjectSession:presentedSession,
       captureSaveSession:capturePresentationSession,capturePresentationSession:capturePresentationSession,acquirePin:acquirePin,savePinned:function(request){return raw('nemo_native_object_save_as',request);},
       getNativeIdentity:function(){if(phase==='idle')return null;var pin=requireActive();return {documentId:pin.documentId,generation:pin.lifecycleGeneration};},
