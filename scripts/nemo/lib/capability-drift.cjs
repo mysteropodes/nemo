@@ -32,6 +32,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { ROOT, exists } = require('./util.cjs');
 const { validate, eachSchemaExample, collectDefs, deepDiff } = require('./capability-schema.cjs');
+const raw = require('./capability-raw-client.cjs');
 const { STATUS } = require('./receipt.cjs');
 
 // Every schema whose embedded examples must hold. value-contract-v1 carries
@@ -57,6 +58,7 @@ const CHECKS = [
   'capability-transport-copies',
   'schema-examples',
   'native-capability-catalog',
+  'native-raw-client-allowlist',
 ];
 
 function pass(reason, extra) { return Object.assign({ status: STATUS.PASS, reason }, extra); }
@@ -72,6 +74,7 @@ function paths(root) {
     nativeTransport: path.join(app, 'native-transport-v2.schema.json'),
     rust: path.join(root, 'nemo-mcp', 'src', 'capabilities.rs'),
     descriptorSchema: path.join(app, 'capability-v1.schema.json'),
+    nativeSchema: path.join(app, 'capability-v2.schema.json'),
     transport: path.join(app, 'transport-v1.schema.json'),
   };
 }
@@ -355,6 +358,20 @@ function checkNativeCatalog(root) {
     : pass(`${files.length} native declaration(s), ${ops.size} operation(s), equal to the v2 transport union`);
 }
 
+// 9. Tauri raw-client allowlist (CS1b-a/#2363): OPERATIONS in native_object_client.rs
+//    must equal the descriptors' `rawClient` set (logic in capability-raw-client.cjs).
+function checkRawClient(root) {
+  root = root || ROOT;
+  const p = paths(root);
+  if (!exists(p.nativeSchema)) return fail(`missing ${rel(p.nativeSchema, root)}`);
+  const descriptors = [];
+  for (const f of nativeDescriptorFiles(root)) {
+    try { descriptors.push({ name: rel(f, root), d: readJsonFile(f) }); } catch (e) { return fail(`${rel(f, root)}: invalid JSON (${e.message})`); }
+  }
+  const r = raw.check(root, descriptors, readJsonFile(p.nativeSchema), exists(p.nativeTransport) ? readJsonFile(p.nativeTransport) : null);
+  return r.problems.length ? fail(r.problems.slice(0, 8).join('; ')) : pass(r.summary);
+}
+
 // Produce every declared sub-check plus the catalog the receipt records.
 // Order follows CHECKS so the printed block is stable between runs.
 function capabilityChecks(root) {
@@ -373,6 +390,7 @@ function capabilityChecks(root) {
     'capability-transport-copies': checkTransportCopies(root),
     'schema-examples': checkSchemaExamples(root),
     'native-capability-catalog': checkNativeCatalog(root),
+    'native-raw-client-allowlist': checkRawClient(root),
   };
   return { results, catalog: cat };
 }
@@ -390,6 +408,7 @@ module.exports = {
   checkTransportCopies,
   checkSchemaExamples,
   checkNativeCatalog,
+  checkRawClient,
   nativeDescriptorFiles,
   declaredSources,
   descriptorFiles,

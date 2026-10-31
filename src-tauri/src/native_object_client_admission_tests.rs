@@ -1,6 +1,6 @@
 //! Strict raw-client negatives and actual owner/lifecycle availability fences.
 use crate::application_mcp::{
-    object_client::{client_status, dispatch_raw},
+    object_client::{client_status, dispatch_raw, OPERATIONS},
     object_client_tests::*,
 };
 use crate::{
@@ -280,4 +280,110 @@ fn actual_release_reinstall_changes_incarnation_and_never_replays_into_new_owner
             .unwrap()
             > status["lifecycleGeneration"].as_u64().unwrap()
     );
+}
+
+/// Operation -> revisionDelta for every `rawClient` flag in the given descriptors.
+fn raw_client_flags(descriptors: &[Value]) -> Result<std::collections::BTreeMap<String, u64>, String> {
+    let mut flags = std::collections::BTreeMap::new();
+    for descriptor in descriptors {
+        let id = descriptor["id"].as_str().unwrap_or("?");
+        let Some(raw) = descriptor.get("rawClient") else {
+            continue;
+        };
+        for (operation, meta) in raw.as_object().ok_or(format!("{id}: rawClient is not an object"))? {
+            let delta = meta["revisionDelta"]
+                .as_u64()
+                .ok_or(format!("{id}: {operation} has no revisionDelta"))?;
+            let declared = |key: &str| {
+                descriptor[key]
+                    .as_array()
+                    .is_some_and(|ops| ops.iter().any(|v| v == operation.as_str()))
+            };
+            if !declared("operations") && !declared("hostOperations") {
+                return Err(format!("{id}: {operation} is flagged but not declared"));
+            }
+            if flags.insert(operation.clone(), delta).is_some() {
+                return Err(format!("{operation} is flagged twice"));
+            }
+        }
+    }
+    Ok(flags)
+}
+/// The same bytes nemo-mcp/build.rs embeds, read from the declaration directory.
+fn declarations() -> Vec<Value> {
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../engineering/application/capabilities-v2");
+    let mut files: Vec<_> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
+        .collect();
+    files.sort();
+    assert!(files.len() > 40, "declaration directory not found");
+    files
+        .iter()
+        .map(|path| serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap())
+        .collect()
+}
+fn raw_client_allowlist_drift(descriptors: &[Value]) -> Result<(), String> {
+    let flags = raw_client_flags(descriptors)?;
+    let listed: std::collections::BTreeSet<_> = OPERATIONS.iter().copied().collect();
+    let flagged: std::collections::BTreeSet<_> = flags.keys().map(String::as_str).collect();
+    if listed.len() != OPERATIONS.len() || listed != flagged {
+        return Err(format!("OPERATIONS {listed:?} != flagged {flagged:?}"));
+    }
+    Ok(())
+}
+#[test]
+fn raw_client_allowlist_equals_the_capability_declared_rawclient_set() {
+    let descriptors = declarations();
+    raw_client_allowlist_drift(&descriptors).unwrap();
+    let flags = raw_client_flags(&descriptors).unwrap();
+    for operation in OPERATIONS {
+        let delta = flags[operation];
+        // Reads never advance the revision; every command is one transaction.
+        assert_eq!(delta, u64::from(operation.starts_with("command.")), "{operation}");
+    }
+}
+#[test]
+fn raw_client_host_operations_stay_out_of_the_public_registration() {
+    let descriptors = declarations();
+    let registered: Vec<&Value> = descriptors
+        .iter()
+        .flat_map(|d| d["operations"].as_array().unwrap())
+        .collect();
+    let mut host = 0;
+    for descriptor in &descriptors {
+        for operation in descriptor["hostOperations"].as_array().into_iter().flatten() {
+            host += 1;
+            assert!(!registered.contains(&operation), "{operation}");
+            assert!(OPERATIONS.contains(&operation.as_str().unwrap()), "{operation}");
+        }
+    }
+    assert_eq!(host, 2);
+}
+#[test]
+fn raw_client_allowlist_drift_is_caught_in_both_directions() {
+    let real = declarations();
+    // Unflag one operation: OPERATIONS now lists an operation nothing declares.
+    for operation in OPERATIONS {
+        let mut unflagged = real.clone();
+        for descriptor in &mut unflagged {
+            if let Some(raw) = descriptor.get_mut("rawClient").and_then(Value::as_object_mut) {
+                raw.remove(operation);
+            }
+        }
+        assert!(raw_client_allowlist_drift(&unflagged).is_err(), "unflag {operation}");
+    }
+    // Flag an extra declared operation: a flag the allowlist does not honour.
+    let mut extra = real.clone();
+    let target = extra
+        .iter_mut()
+        .find(|d| d["id"] == "native.object.fill")
+        .unwrap();
+    target["rawClient"]["command.document.object.fill.trace"] = json!({"revisionDelta":1});
+    assert!(raw_client_allowlist_drift(&extra).is_err());
+    // A flag on an operation its descriptor never declares is itself invalid.
+    let mut ghost = real;
+    ghost[0]["rawClient"] = json!({"command.document.object.ghost":{"revisionDelta":1}});
+    assert!(raw_client_flags(&ghost).is_err());
 }
