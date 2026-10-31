@@ -12,14 +12,6 @@
 //! the scene reports whether the project camera has keys. A page is cut by `limit` AND by the 4096-byte response bound; a
 //! layer or instance that cannot fit alone is a typed `unavailable`, but a CONTEXT whose summary cannot fit alone keeps its
 //! id and counts and has its name cut at a character boundary and flagged `nameTruncated: true`, so a listing walks past it.
-#[cfg(feature = "evaluation")]
-use crate::object_document::object_component_record_kernels::object_duplicator_records::{
-    DuplicatorDescriptor, StaggerRandom,
-};
-#[cfg(feature = "evaluation")]
-use crate::object_document::Presence;
-#[cfg(feature = "evaluation")]
-use serde_json::Number;
 use crate::object_snapshot::{ObjectSnapshot, ReadAdmission, MAX_MESSAGE_BYTES};
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
 use serde_json::{json, Value};
@@ -119,45 +111,6 @@ fn selector(payload: &Value) -> Option<Selector<'_>> {
         }
         _ => None,
     }
-}
-
-/// `x || fallback` over a stored number (zero and absent both show the fallback), as the baseline panel fills its fields.
-#[cfg(feature = "evaluation")]
-fn shown(slot: &Presence<Number>, fallback: u32) -> Number {
-    match slot.value() {
-        Some(n) if n.as_f64().is_some_and(|v| v != 0.0) => n.clone(),
-        _ => Number::from(fallback),
-    }
-}
-#[cfg(feature = "evaluation")]
-fn shown_flag(slot: &Presence<bool>) -> bool {
-    slot.value() == Some(&true)
-}
-
-/// What the panel displays for a stored descriptor (`updateDuplicatorPanel`): every member resolved with the baseline
-/// display default (`mode||'grid'`, `rows||1`, `cols||1`, `count||1`, the others `||0`, the checkboxes `!!`,
-/// `timeOffset.offsetFrames` 1 and `direction||'forward'` when unset, `sourceMode` `shape` unless `objects`).
-#[cfg(feature = "evaluation")]
-fn config_view(layer_uid: &str, d: &DuplicatorDescriptor) -> serde_json::Value {
-    let random = d.stagger_random.value();
-    let flag = |pick: fn(&StaggerRandom) -> &Presence<bool>| random.is_some_and(|r| shown_flag(pick(r)));
-    let time = d.time_offset.value();
-    serde_json::json!({
-        "layerUid": layer_uid,
-        "mode": d.mode.value().filter(|m| !m.is_empty()).map_or("grid", String::as_str),
-        "rows": shown(&d.rows, 1), "cols": shown(&d.cols, 1),
-        "spacingX": shown(&d.spacing_x, 0), "spacingY": shown(&d.spacing_y, 0),
-        "count": shown(&d.count, 1), "radius": shown(&d.radius, 0), "startAngle": shown(&d.start_angle, 0),
-        "radialOrient": shown_flag(&d.radial_orient), "pathAlignTangent": shown_flag(&d.path_align_tangent),
-        "pathLayerUid": d.path_layer_uid().filter(|p| !p.is_empty()),
-        "seed": shown(&d.seed, 0),
-        "sourceMode": if d.source_mode.value().map(String::as_str) == Some("objects") { "objects" } else { "shape" },
-        "staggerRandom": {"position": flag(|r| &r.position), "rotation": flag(|r| &r.rotation),
-            "scale": flag(|r| &r.scale), "opacity": flag(|r| &r.opacity), "hue": flag(|r| &r.hue)},
-        "timeOffset": {"enabled": time.is_some_and(|t| shown_flag(&t.enabled)),
-            "offsetFrames": time.and_then(|t| t.offset_frames.value().cloned()).unwrap_or_else(|| Number::from(1_u32)),
-            "direction": time.and_then(|t| t.direction.value()).filter(|d| !d.is_empty()).map_or("forward", String::as_str)},
-    })
 }
 
 impl ObjectSnapshot {
@@ -285,18 +238,12 @@ impl ObjectSnapshot {
                     return self.component_bounded(response);
                 }
                 Selector::Duplicator { layer_uid } => {
-                    use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
-                                        let record = self
+                    let view = self
                         .document()
-                        .duplicator_set()
-                        .and_then(|set| set.duplicator(SCENE_CONTEXT, layer_uid))
+                        .scene_duplicator_view(layer_uid)
                         .ok_or(DispatchErrorCode::NotFound)?;
                     let mut result = self.component_head("duplicator");
-                    for (key, value) in config_view(layer_uid, &record.duplicator)
-                        .as_object()
-                        .into_iter()
-                        .flatten()
-                    {
+                    for (key, value) in view.as_object().into_iter().flatten() {
                         result[key] = value.clone();
                     }
                     return self.component_bounded(self.component_envelope(request, result));
