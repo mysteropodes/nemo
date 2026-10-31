@@ -2870,6 +2870,7 @@ function syncDocFields(){
 // that CHANGED CONTENT must not pass frameOnly — the panel refreshes below
 // still run either way, only the wholesale timeline rebuild is skipped.
 function updateUI(frameOnly){
+  if(window.NemoNativeInspectorUnavailable)window.NemoNativeInspectorUnavailable.sync(window); // #2372 UNAVAIL-NOTICES: mark/unmark the controls with no native owner
   if(window.NemoNativeObjectProject&&window.NemoNativeObjectProject.paintUI(window,frameOnly))return;
   syncDocFields();
   // countOnly: this is only ever read for .length just below.
@@ -3983,6 +3984,8 @@ function updateFsSelPanel(){
 // edits get routed back to each proxy's own frame instead of the current one).
 var _ghostProxyActive=false;
 function selectGhostAll(){
+  // #2372 UNAVAIL-NOTICES: multi-frame ghost selection has no native owner - one stable notice, before pushUndo / desP / any Paper write.
+  if(window.NemoNativeInspectorUnavailable&&window.NemoNativeInspectorUnavailable.refuse(window,'btn-ghost-select'))return;
   // Used to silently no-op unless Ghost All (btn-ghost-all) had already
   // been turned on first — an invisible prerequisite (the button looked
   // identically clickable either way, `disabled` had no CSS styling of its
@@ -6136,8 +6139,8 @@ function startParentPickwhip(li,fromEl,ev){
 // Parent B picker menu contain," so the two surfaces can never drift apart
 // (CLAUDE.md §3). `onChanged()` fires after every write, before the caller's
 // own re-render — each surface refreshes only what it actually shows.
-// #2372 U12: on a native object project Parent A is one native edit (command.document.object.layer.parent.set); Parent B,
-// Parent in Time and Follow Path report unavailable. The adapter keeps all the logic (src/js/adapters/native-layer-parent.js).
+// #2372 U12: on a native object project Parent A, Link time and Follow path are each one native edit (command.document.object.layer.
+// parent.set / timeLink.set / followPath.set); Parent B reports unavailable. The adapter keeps all the logic (src/js/adapters/native-layer-parent.js).
 function nativeLayerParent(){try{var a=window.NemoNativeLayerParent,d=a&&typeof a.desktop==='function'?a.desktop(window):null;return d?{api:a,adapter:d}:null;}catch(_){return null;}}
 window.nativeLayerParent=nativeLayerParent;
 function buildParentMenuItems(li,ld,onChanged){
@@ -6193,7 +6196,7 @@ window.buildParentMenuItems=buildParentMenuItems;
 // comment explains why a cycle here just means each side ignores the
 // other's contribution, not infinite recursion).
 function buildFollowPathMenuItems(li,ld,onChanged){
-  var natP=nativeLayerParent();if(natP)return natP.api.unavailableItems(window,'Chemin indisponible (projet natif)','Follow Path has no native owner yet.');
+  var natP=nativeLayerParent();if(natP)return natP.api.followPathMenuItems(window,natP.adapter,li,onChanged);
   var M=window.SMMotion;
   if(!M||!M.setLayerFollowPath)return [{label:'Chemin indisponible',disabled:true}];
   var items=[{label:'Chemin : Aucun',disabled:!(ld.followPath&&ld.followPath.targetLayerUid),action:function(){
@@ -6225,7 +6228,7 @@ window.buildFollowPathMenuItems=buildFollowPathMenuItems;
 // here — 'in'/'out'-only refinement stays on the existing Temps-row select
 // and the on-bar anchor dots.
 function buildTimeLinkMenuItems(li,ld,onChanged){
-  var natP=nativeLayerParent();if(natP)return natP.api.unavailableItems(window,SM.t('ctxParentInTimeUnavailable'),'Parent in Time has no native owner yet.');
+  var natP=nativeLayerParent();if(natP)return natP.api.timeLinkMenuItems(window,natP.adapter,li,onChanged);
   var M=window.SMMotion;
   if(!M||!M.setLayerTimeLink)return [{label:SM.t('ctxParentInTimeUnavailable'),disabled:true}];
   var items=[{label:SM.t('ctxTimeNoneUnlink'),disabled:!ld.timeLink,action:function(){
@@ -10170,7 +10173,9 @@ document.getElementById('pm-stroke-c').addEventListener('input',function(){var v
 // tool's own default when nothing is selected) — this is a per-shape
 // property with no meaningful "future stroke" default the way a flat
 // color has.
-function applyStrokeGradAlongToSelection(mutate){
+function applyStrokeGradAlongToSelection(mutate,id){
+  // #2372 UNAVAIL-NOTICES: no native record slot for a stroke gradient along the path - notice, no pushUndo / saveActiveLayerFrame.
+  if(window.NemoNativeInspectorUnavailable&&window.NemoNativeInspectorUnavailable.refuse(window,id||'p-strokegrad-along'))return;
   if(!selectedPaths.length)return;
   pushUndo();
   selectedPaths.forEach(function(p){mutate(p);});
@@ -10179,6 +10184,7 @@ function applyStrokeGradAlongToSelection(mutate){
 }
 document.getElementById('p-strokegrad-along').addEventListener('change',function(){
   var on=this.checked;
+  if(window.NemoNativeInspectorUnavailable&&window.NemoNativeInspectorUnavailable.refuse(window,'p-strokegrad-along')){this.checked=!on;return;}
   applyStrokeGradAlongToSelection(function(p){
     if(on){
       var fromC=document.getElementById('p-strokegrad-from-c').value;
@@ -10187,23 +10193,25 @@ document.getElementById('p-strokegrad-along').addEventListener('change',function
     }else{
       delete p.data.strokeGradientAlongPath;
     }
-  });
+  },'p-strokegrad-along');
 });
 document.getElementById('p-strokegrad-from-c').addEventListener('input',function(){
   var v=this.value;
+  if(window.NemoNativeInspectorUnavailable&&window.NemoNativeInspectorUnavailable.refuse(window,'p-strokegrad-from-c'))return;
   document.getElementById('p-strokegrad-from').style.background=v;
   applyStrokeGradAlongToSelection(function(p){
     if(!p.data.strokeGradientAlongPath)return;
     p.data.strokeGradientAlongPath.from=v;
-  });
+  },'p-strokegrad-from-c');
 });
 document.getElementById('p-strokegrad-to-c').addEventListener('input',function(){
   var v=this.value;
+  if(window.NemoNativeInspectorUnavailable&&window.NemoNativeInspectorUnavailable.refuse(window,'p-strokegrad-to-c'))return;
   document.getElementById('p-strokegrad-to').style.background=v;
   applyStrokeGradAlongToSelection(function(p){
     if(!p.data.strokeGradientAlongPath)return;
     p.data.strokeGradientAlongPath.to=v;
-  });
+  },'p-strokegrad-to-c');
 });
 // Figma-style color row (2026-07, "les couleurs ça peut être un système
 // comme [Figma]") — inline eye toggles + editable hex/alpha text fields
@@ -10543,19 +10551,27 @@ function renderXformAnchorGrid(){
     btn.classList.toggle('xa-active',!state.xformAnchorCustom&&btn.dataset.key===state.xformAnchorKey);
   });
 }
-document.querySelectorAll('#xform-anchor-grid .xa-dot').forEach(function(btn){
-  btn.addEventListener('click',function(e){
-    e.stopPropagation();
-    state.xformAnchorKey=btn.dataset.key;
-    state.xformAnchorCustom=null; // explicit preset pick always wins back over a custom point
+// #2372 xform-anchor-grid: on a native selection the pivot is a session preference only (selection-transform read() derives the anchor from state),
+// so a pick never stamps the strokes nor reaches saveActiveLayerFrame (a legacy writer a native project refuses).
+function xformAnchorPick(key){
+  var NS=window.NemoNativeSelectionStyle,own=!!NS&&NS.handles(window);
+  state.xformAnchorKey=key;
+  state.xformAnchorCustom=null; // explicit preset pick always wins back over a custom point
+  if(!own){
     // Persist per-stroke (2026-07, same fix as select-bridge.js's canvas
     // Alt-drag path) so picking a preset here ALSO survives a deselect+
     // reselect, not just the canvas gesture.
-    selectedPaths.forEach(function(p){if(p&&p.data){p.data.xformAnchorKey=btn.dataset.key;delete p.data.xformAnchorCustom;}});
+    selectedPaths.forEach(function(p){if(p&&p.data){p.data.xformAnchorKey=key;delete p.data.xformAnchorCustom;}});
     if(selectedPaths.length)saveActiveLayerFrame();
-    renderXformAnchorGrid();
-    if(window.renderTransformHandles)renderTransformHandles();
-    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  }
+  renderXformAnchorGrid();
+  if(window.renderTransformHandles)renderTransformHandles();
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
+document.querySelectorAll('#xform-anchor-grid .xa-dot').forEach(function(btn){
+  btn.addEventListener('click',function(e){
+    e.stopPropagation();
+    xformAnchorPick(btn.dataset.key);
   });
 });
 renderXformAnchorGrid();

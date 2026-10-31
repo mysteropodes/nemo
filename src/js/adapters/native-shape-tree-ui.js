@@ -3,6 +3,8 @@
  *   - a row click selects exactly as a Select-tool click does (select-canvas-intent.applyPick on a freshly read presented path);
  *   - "Select members" selects every member of a group; Shift/Alt extends the selection (the baseline's toggle rule);
  *   - Rename on a group is command.document.object.group.rename; on a plain shape the native record has no name, so it reports unavailable;
+ *   - the combine-mode badge on a group row shows its stored mode (the listing's groupPath mode); a click cycles to the next mode and the row
+ *     menu sets a chosen one, each one command.document.object.group.mode.set (one history entry, a refusal toasts, nothing is written locally);
  *   - Ungroup is command.document.object.group.ungroup (one history entry) and dissolves the group's own level - the engine dissolves the
  *     OUTERMOST group of the member it is given, so only a top-level group is offered; a nested one reports unavailable.
  * It owns no document state and never reaches the legacy writer (shapes-panel.js stays refused). Refresh follows the project pin (revision),
@@ -18,6 +20,11 @@
   const pinKey = (pin) => (pin ? PINS.map((k) => pin[k]).join('|') : '');
   const ARROWS = { open: '▾', closed: '▸' };
   const bindings = new WeakMap();
+  // The baseline's COMBINE_CYCLE (shapes-panel.js): 'none' is the neutral state the badge cycles through; the menu lists the four real modes then 'none'.
+  const COMBINE_CYCLE = ['none', 'unite', 'subtract', 'intersect', 'exclude'];
+  const COMBINE_KEYS = { unite: 'combineUnion', subtract: 'combineSubtract', intersect: 'combineIntersect', exclude: 'combineExclude', none: 'combineNone' };
+  const COMBINE_WORDS = { unite: 'Union', subtract: 'Subtract', intersect: 'Intersect', exclude: 'Exclude', none: 'Remove combine' };
+  const nextMode = (mode) => COMBINE_CYCLE[(Math.max(0, COMBINE_CYCLE.indexOf(mode)) + 1) % COMBINE_CYCLE.length];
 
   function create(win, deps) {
     const D = deps || {};
@@ -109,6 +116,19 @@
       if (node.parent) { notice('Only a top-level group can be ungrouped here — ungroup the outer group first.'); return; }
       edit('ungroup', { strokeIds: [node.memberIds[0]] }, { failed: 'The group could not be ungrouped.' });
     }
+    function setMode(node, mode) {
+      if (entered()) { notice('Combine modes cannot be changed inside a component here.'); return; }
+      if (mode === node.mode) return;
+      edit('setMode', { groupId: node.gid, mode }, { failed: 'The combine mode could not be changed.' });
+    }
+    const modeLabel = (mode) => say(COMBINE_KEYS[mode] || COMBINE_KEYS.none, COMBINE_WORDS[mode] || COMBINE_WORDS.none);
+    function modeIcon(mode, gid) {
+      if (mode === 'unite') return win.ICO_COMBINE_UNITE || '';
+      if (mode === 'subtract') return typeof win.icoCombineSubtract === 'function' ? win.icoCombineSubtract(gid) : '';
+      if (mode === 'intersect') return typeof win.icoCombineIntersect === 'function' ? win.icoCombineIntersect(gid) : '';
+      if (mode === 'exclude') return win.ICO_COMBINE_EXCLUDE || '';
+      return win.ICO_COMBINE_NONE || '';
+    }
     function shapeRename() { notice('Renaming a shape is not available on a native project yet — only groups can be renamed.'); }
 
     // ---- rows ----------------------------------------------------------------------------------------------------------------------------------
@@ -163,12 +183,20 @@
       const swatch = el('div', 'motion-elem-swatch icon');
       swatch.innerHTML = win.ICO_GROUP || '';
       row.appendChild(arrow); row.appendChild(swatch); row.appendChild(el('div', 'lnm', node.name));
+      // The baseline's Combined Shape badge: .lico, so a click here never arms the row; it cycles to the next mode.
+      const badge = el('div', 'lico motion-combine-badge');
+      badge.innerHTML = modeIcon(node.mode, node.gid); badge.title = modeLabel(node.mode); badge.dataset.mode = node.mode;
+      badge.addEventListener('click', (e) => { e.stopPropagation(); setMode(node, nextMode(node.mode)); });
+      row.appendChild(badge);
+      const modeItem = (mode) => ({ label: modeLabel(mode) + (node.mode === mode ? ' ✓' : ''), action: () => setMode(node, mode) });
       const rename = () => startRename(row, node.name, (v) => renameGroup(node, v));
       row.addEventListener('click', (e) => { select(node.memberIds, e.shiftKey || e.altKey); });
       row.addEventListener('dblclick', (e) => { e.stopPropagation(); rename(); });
       row.addEventListener('contextmenu', (e) => menu(e, [
         { label: say('elementsRename', 'Rename'), action: rename },
         { label: say('elementsSelectMembers', 'Select members'), action: () => select(node.memberIds, false) },
+        { sep: true },
+        modeItem('unite'), modeItem('subtract'), modeItem('intersect'), modeItem('exclude'), modeItem('none'),
         { sep: true },
         { label: say('elementsUngroup', 'Ungroup'), action: () => ungroup(node) },
       ]));
@@ -256,7 +284,7 @@
       if (section && section.parentNode) section.parentNode.removeChild(section);
       section = null; list = null; view = null; shown = '';
     }
-    return Object.freeze({ mount, refresh, retire, select, ungroup, renameGroup, node: () => section, state: () => view });
+    return Object.freeze({ mount, refresh, retire, select, ungroup, renameGroup, setMode, node: () => section, state: () => view });
   }
 
   // The page-level entry point native-object-ui.js calls on every inspector paint; it answers the binding, or null when the page cannot host it.

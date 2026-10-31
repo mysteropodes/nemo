@@ -9,7 +9,7 @@
   var installed = new WeakMap();
   function install(root) {
     if (installed.has(root)) return installed.get(root);
-    var retired = false, loading = null, pending = false, drag = null, highlight = null;
+    var retired = false, loading = null, pending = false, drag = null, highlight = null, armed = false, source = null, replacing = false;
     var projectionEpoch = 0, refreshNeeded = false, busyStamp = null, failedRead = null;
     var identityKeys = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
     var document = root.document;
@@ -71,7 +71,7 @@
     async function shownSoon(origin) { return shown(origin) || (!busy() && !!origin && await model.readSettled() === origin); }
     async function edit(action, origin) {
       if (!(await shownSoon(origin))) { notice(); return { status: 'unavailable' }; }
-      busyStamp = identity(); pending = true; drag = null; render();
+      busyStamp = identity(); pending = true; drag = null; armed = false; source = null; render();
       try {
         var result = await model.edit(action, origin);
         if (!['applied-presented', 'unchanged'].includes(result.status)) notice();
@@ -145,6 +145,40 @@
       if (!shown(model.read()) || !SM || typeof SM.swapStrokeFill !== 'function') { notice(); return false; }
       SM.swapStrokeFill(); return true;
     }
+    // #2372 PAL-REPLACE: "Replace in layer" (baseline palette-panel.js: arm Replace, click the SOURCE swatch, click the TARGET swatch). Scope "frame" (the active layer at
+    // the current frame) is ONE native restyle batch (NemoNativeSelectionStyle.recolourLayer); "layer" and "selection" span frames, which the engine has no command for
+    // yet, so they are disabled and refuse. Nothing here touches Paper or a legacy writer.
+    var NO_SCOPE = 'Replacing across frames is not available yet';
+    function t(key, fallback) { var SM = root.SM, text = SM && typeof SM.t === 'function' ? SM.t(key) : null; return text && text !== key ? text : (fallback || key); }
+    function scope() {
+      var node = element('palette-replace-scope'), value = node && node.value;
+      if (!value) try { value = root.localStorage.getItem('nemo-palette-replace-scope'); } catch (_) {}
+      return value || 'frame';
+    }
+    function disarm() { armed = false; source = null; render(); }
+    function arm(from) {
+      if (scope() !== 'frame') { disarm(); notice(NO_SCOPE); return false; }
+      armed = true; source = from; render(); notice(from ? t('hsClickTargetColor') : t('hsPaletteReplaceHint')); return true;
+    }
+    function toggleReplace() {
+      var origin = model.read();
+      if (armed) { disarm(); return false; }
+      if (!shown(origin) || !origin.palette.active) { notice(); return false; }
+      return arm(null);
+    }
+    async function replaceColor(origin, from, to) {
+      disarm();
+      var Style = root.NemoNativeSelectionStyle;
+      if (scope() !== 'frame') { notice(NO_SCOPE); return { status: 'unavailable' }; }
+      if (!shown(origin) || !Style || typeof Style.recolourLayer !== 'function' || replacing) { notice(); return { status: 'unavailable' }; }
+      replacing = true;
+      try {
+        var res = await Style.recolourLayer(root, from, to);
+        if (res.status === 'applied' && res.count) notice(res.count + t('toastColorsReplacedSuffix', ' colour(s) replaced'));
+        else if (res.status === 'nomatch') notice(t('toastColorNoMatchInScope', 'No match in the chosen scope'));
+        return res;
+      } catch (_) { notice('The colours could not be replaced.'); return { status: 'unavailable' }; } finally { replacing = false; }
+    }
     function tabs(parent, origin) {
       var active = origin.palette.active;
       origin.palette.palettes.forEach(function (summary) {
@@ -168,13 +202,19 @@
       if (!active) { parent.textContent = 'Select a palette, or create one.'; return; }
       active.colors.forEach(function (item) {
         var selected = typeof highlight === 'string' && highlight.toLowerCase() === item.color.toLowerCase();
-        var node = button(parent, 'palette-swatch' + (selected ? ' sel-match' : ''), item.color);
+        var node = button(parent, 'palette-swatch' + (armed && source === item.color ? ' armed' : '') + (selected ? ' sel-match' : ''), item.color);
         node.style.setProperty('--sw-color', item.color); node.setAttribute('aria-label', item.color);
-        node.addEventListener('click', function (event) { applyColor(origin, item.color, event && event.shiftKey ? 'stroke' : 'fill'); });
+        node.addEventListener('click', function (event) {
+          if (!armed) { applyColor(origin, item.color, event && event.shiftKey ? 'stroke' : 'fill'); return; }
+          if (source === null) { source = item.color; render(); return; }
+          replaceColor(origin, source, item.color);
+        });
         node.addEventListener('contextmenu', function (event) {
           menu(event, [
             { label: 'Utiliser comme Fill', action: function () { applyColor(origin, item.color, 'fill'); } },
             { label: 'Utiliser comme Stroke', action: function () { applyColor(origin, item.color, 'stroke'); } },
+            { sep: true },
+            { label: 'Remplacer dans le calque\u2026', disabled: !shown(origin), action: function () { arm(item.color); } },
             { sep: true },
             { label: 'Retirer de la palette', action: function () {
               edit({ kind: 'removeColor', ordinal: active.summary.ordinal, index: item.index }, origin);
@@ -204,10 +244,18 @@
       ['btn-palette-new', 'btn-palette-add-fill', 'btn-palette-add-stroke'].forEach(function (key) {
         var node = element(key); if (node) node.disabled = !ready || key !== 'btn-palette-new' && !active;
       });
-      // Replace stays off until its native consumer lands; Swap needs only a shown palette.
-      ['btn-palette-replace', 'palette-replace-scope'].forEach(function (key) {
-        var node = element(key); if (node) node.disabled = true;
-      });
+      // Replace needs a shown palette with colours to pick; only the "frame" scope has a native command, the two cross-frame scopes are listed but disabled.
+      var replaceNode = element('btn-palette-replace'), scopeNode = element('palette-replace-scope');
+      if (!ready && armed) { armed = false; source = null; }
+      if (replaceNode) {
+        replaceNode.disabled = !ready || !active; if (replaceNode.classList) replaceNode.classList.toggle('active', armed);
+        if (!replaceNode.dataset.baseTitle) replaceNode.dataset.baseTitle = replaceNode.title;
+        replaceNode.title = armed ? (source ? 'Remplacer : clique la couleur CIBLE' : 'Remplacer : clique la couleur SOURCE') : replaceNode.dataset.baseTitle;
+      }
+      if (scopeNode) {
+        scopeNode.disabled = !ready;
+        Array.prototype.forEach.call(scopeNode.options || [], function (option) { if (option.value !== 'frame') { option.disabled = true; option.title = NO_SCOPE; } });
+      }
       var swapNode = element('btn-palette-swap'); if (swapNode) swapNode.disabled = !ready;
       if (wrap) { wrap.textContent = ''; if (ready) tabs(wrap, origin); }
       if (grid) {
@@ -239,13 +287,14 @@
       }).finally(function () { loading = null; settled(); });
       render(); return loading;
     }
-    var controller = Object.freeze({ read: model.read, edit: edit, create: create, append: append, swap: swap, render: render,
+    var controller = Object.freeze({ read: model.read, edit: edit, create: create, append: append, swap: swap, toggleReplace: toggleReplace, replaceColor: replaceColor, render: render,
       presented: presented, isPending: function () { return pending || !!loading; },
-      willProject: function () { projectionEpoch++; failedRead = null; drag = null; if (!pending) model.invalidate(); render(); },
+      willProject: function () { projectionEpoch++; failedRead = null; drag = null; armed = false; source = null; if (!pending) model.invalidate(); render(); },
       dispose: function () { retired = true; failedRead = null; refreshNeeded = false; drag = null; model.dispose(); render(); }
     });
     installed.set(root, controller); root.NemoNativePaletteController = controller;
     if (typeof root.addEventListener === 'function') root.addEventListener('pagehide', controller.dispose, { once: true });
+    if (document && typeof document.addEventListener === 'function') document.addEventListener('keydown', function (event) { if (armed && event && event.key === 'Escape') disarm(); });
     render(); return controller;
   }
   return Object.freeze({ install: install });

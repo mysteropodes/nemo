@@ -98,6 +98,17 @@ pub(crate) enum LifecycleError {
     ParentRefused(String),
     /// #2372 U12: keeping the world pose is not exactly computable; the reason is a fixed phrase.
     PoseUnavailable(&'static str),
+    /// #2372: a layer cannot take its own time or follow its own path.
+    LinkSelf(String),
+    /// #2372: the source's time-link chain already runs through the layer.
+    LinkCycle {
+        layer_uid: String,
+        source_uid: String,
+    },
+    /// #2372: the link names a target the baseline menu would not list (context, kind, document version, mode).
+    LinkRefused(&'static str),
+    /// #2372: the range to seed or bake is not exactly computable; the reason is a fixed phrase.
+    LinkUnavailable(&'static str),
     Policy {
         op: LayerOp,
         layer_uid: String,

@@ -35,7 +35,7 @@ fn chain_of<'a>(document: &'a ObjectDocument, start: Option<&'a str>) -> Option<
 }
 
 /// The edited context must list both layers when the document has an order plan; without one only the root exists.
-fn in_context(document: &ObjectDocument, context_id: &str, uids: [&str; 2]) -> bool {
+pub(crate) fn in_context(document: &ObjectDocument, context_id: &str, uids: [&str; 2]) -> bool {
     match document.composition_order.value() {
         None => context_id == "scene-root",
         Some(plan) => plan
@@ -157,8 +157,6 @@ fn shift_position(
     frame: u32,
     shift: [f64; 2],
 ) -> Result<(), LifecycleError> {
-    use crate::object_document::{PropertyHolder, PropertyHolderTarget, PropertyRecord};
-    use serde_json::Number;
     let animated = snapshot
         .document()
         .property_holders()
@@ -180,14 +178,31 @@ fn shift_position(
         ));
     }
     let now = pose::position(snapshot, context_id, layer_uid, frame)?;
-    // Whole values stay integers, like every stored position the editor wrote.
-    let number = |v: f64| {
-        if v.fract() == 0.0 && v.abs() < 9e15 {
-            return Ok(Number::from(v as i64));
-        }
-        Number::from_f64(v).ok_or(LifecycleError::PoseUnavailable("position is not finite"))
-    };
-    let value = vec![number(now[0] + shift[0])?, number(now[1] + shift[1])?];
+    let value = vec![
+        static_number(now[0] + shift[0])?,
+        static_number(now[1] + shift[1])?,
+    ];
+    set_static_value(candidate, context_id, layer_uid, "position", value);
+    Ok(())
+}
+
+/// Whole values stay integers, like every stored value the editor wrote.
+pub(crate) fn static_number(v: f64) -> Result<serde_json::Number, LifecycleError> {
+    if v.fract() == 0.0 && v.abs() < 9e15 {
+        return Ok(serde_json::Number::from(v as i64));
+    }
+    serde_json::Number::from_f64(v).ok_or(LifecycleError::PoseUnavailable("a value is not finite"))
+}
+
+/// Writes the static value of one layer-level property record, creating the holder and the record when absent.
+pub(crate) fn set_static_value(
+    candidate: &mut ObjectDocument,
+    context_id: &str,
+    layer_uid: &str,
+    property: &str,
+    value: Vec<serde_json::Number>,
+) {
+    use crate::object_document::{PropertyHolder, PropertyHolderTarget, PropertyRecord};
     let mut holders = candidate
         .property_holders
         .value()
@@ -218,18 +233,17 @@ fn shift_position(
     match holder
         .properties
         .iter_mut()
-        .find(|p| p.property() == "position")
+        .find(|p| p.property() == property)
     {
         Some(record) => record.static_value = Presence::Present(value),
         None => holder.properties.push(PropertyRecord {
-            property: "position".to_owned(),
+            property: property.to_owned(),
             static_value: Presence::Present(value),
             track: Presence::Missing,
             expression: Presence::Missing,
         }),
     }
     candidate.property_holders = Presence::Present(holders);
-    Ok(())
 }
 
 /// `setLayerParent(li, parentUid)`: `parent` `None` is the menu's "Parent A : Aucun (parentage libre)".

@@ -79,6 +79,8 @@ pub(crate) fn label_for(operation: &str, payload: &Value) -> String {
         "layer.rename" => "Rename Layer",
         "layer.reorder" => "Reorder Layers",
         "layer.parent.set" => "Set Layer Parent",
+        "layer.timeLink.set" => "Link Layer Time",
+        "layer.followPath.set" => "Set Layer Follow Path",
         "layer.split" => "Split Layer",
         "layer.cut" => "Cut Layer",
         "layer.policy.edit" => "Layer Settings",

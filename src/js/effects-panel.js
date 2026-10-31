@@ -264,7 +264,7 @@
       var prev = document.createElement('div');
       prev.className = 'fx-prev' + (item.preview ? ' fx-prev-' + item.preview : ' fx-prev-generic');
       var lbl = document.createElement('span'); lbl.textContent = item.label;
-      row.appendChild(prev); row.appendChild(lbl);
+      row.appendChild(prev); row.appendChild(lbl); if (item.unavailable) { row.title = item.unavailable; row.setAttribute('aria-disabled', 'true'); row.dataset.nativeUnavailable = '1'; }
       row.addEventListener('click', function (e) { e.stopPropagation(); closeAddMenu(); item.action(); });
       sub.appendChild(row);
     });
@@ -375,7 +375,7 @@
       var items = (state.customEffects || []).map(function (c) {
         return { label: c.name, preview: c.id, action: function () { addEffect('custom:' + c.id); } };
       });
-      items.push({ label: '+ New custom shader…', preview: null, action: function () { if (window.openCustomEffectEditor) window.openCustomEffectEditor(null); } });
+      items.push((function (u, it) { return u ? u.menuItem(window, 'new-custom-shader', it) : it; })(window.NemoNativeInspectorUnavailable, { label: '+ New custom shader…', preview: null, action: function () { if (window.openCustomEffectEditor) window.openCustomEffectEditor(null); } })); // #2372 UNAVAIL-NOTICES
       openSubmenu(customRow, items);
     };
     customRow.addEventListener('mouseenter', openCustom);
@@ -722,7 +722,7 @@
         edit.addEventListener('click', function (e) {
           e.stopPropagation();
           var def = customDefFor(eff.type);
-          if (def && window.openCustomEffectEditor) window.openCustomEffectEditor(def);
+          if (def && window.openCustomEffectEditor && !(window.NemoNativeInspectorUnavailable && window.NemoNativeInspectorUnavailable.refuse(window, 'new-custom-shader'))) window.openCustomEffectEditor(def);
         });
         edit.addEventListener('contextmenu', function (e) { e.stopPropagation(); });
         row.appendChild(edit);
@@ -733,7 +733,7 @@
         row.addEventListener('contextmenu', function (e) {
           e.preventDefault(); e.stopPropagation();
           var def = customDefFor(eff.type);
-          if (def && window.openCustomEffectEditor) window.openCustomEffectEditor(def);
+          if (def && window.openCustomEffectEditor && !(window.NemoNativeInspectorUnavailable && window.NemoNativeInspectorUnavailable.refuse(window, 'new-custom-shader'))) window.openCustomEffectEditor(def);
         });
       }
       var del = document.createElement('div'); del.className = 'fx-row-del'; del.textContent = '×'; del.title = window.SM.t('fxDelete');

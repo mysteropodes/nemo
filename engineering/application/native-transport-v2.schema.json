@@ -8117,6 +8117,40 @@
             {
               "properties": {
                 "operation": {
+                  "const": "command.document.object.layer.timeLink.set"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerTimeLinkSetPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.followPath.set"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerFollowPathSetPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
                   "const": "command.document.object.tween.split"
                 },
                 "payload": {
@@ -22645,6 +22679,99 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 4294967295
+        }
+      }
+    },
+    "ObjectLayerTimeLinkSetPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUid",
+        "sourceLayerUid",
+        "frame"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.timeLink.set"
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "sourceLayerUid": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            {
+              "const": null
+            }
+          ]
+        },
+        "mode": {
+          "enum": [
+            "both",
+            "in",
+            "out"
+          ]
+        },
+        "srcAnchor": {
+          "enum": [
+            "in",
+            "out"
+          ]
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      }
+    },
+    "ObjectLayerFollowPathSetPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUid",
+        "targetLayerUid"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.followPath.set"
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "targetLayerUid": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            {
+              "const": null
+            }
+          ]
         }
       }
     },

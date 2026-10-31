@@ -239,12 +239,13 @@ fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
         assert!(!public_read(&q, &item), "paramShape {bad} is refused");
     }
     // #2376: a listed record names the groups it sits in, outermost first: one to four bounded ids with an optional bounded name.
-    for good in [json!([{"id":"g1"}]), json!([{"id":"outer","name":"Body"},{"id":"inner"}]), json!([{"id":"a"},{"id":"b"},{"id":"c"},{"id":"d","name":""}])] {
+    for good in [json!([{"id":"g1"}]), json!([{"id":"outer","name":"Body"},{"id":"inner"}]), json!([{"id":"a"},{"id":"b"},{"id":"c"},{"id":"d","name":""}]),
+        json!([{"id":"g","mode":"none"}]), json!([{"id":"o","name":"Body","mode":"unite"},{"id":"i","mode":"subtract"}]), json!([{"id":"g","mode":"intersect"}, {"id":"h","mode":"exclude"}])] {
         let mut item = r.clone();
         item["items"][0]["groupPath"] = good.clone();
         assert!(public_read(&q, &item), "groupPath {good} is legal in a hit-test listing");
     }
-    for bad in [json!([]), json!({"id":"g"}), json!("g"), json!([{"id":""}]), json!([{"id":7}]), json!([{"id":"g","name":3}]), json!([{"id":"g","mode":"unite"}]),
+    for bad in [json!([]), json!({"id":"g"}), json!("g"), json!([{"id":""}]), json!([{"id":7}]), json!([{"id":"g","name":3}]), json!([{"id":"g","mode":"overlay"}]), json!([{"id":"g","mode":"Unite"}]), json!([{"id":"g","mode":3}]),
         json!([{"name":"x"}]), json!([{"id":"a"},{"id":"b"},{"id":"c"},{"id":"d"},{"id":"e"}]), json!([{"id":"x".repeat(129)}]), json!([{"id":"g","name":"n".repeat(257)}]), json!(null)] {
         let mut item = r.clone();
         item["items"][0]["groupPath"] = bad.clone();

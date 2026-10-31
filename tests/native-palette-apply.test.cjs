@@ -39,13 +39,13 @@ test('click paints Fill and enables it when off; Shift+click paints Stroke; hex 
   const on = fixture(); on.swatches()[1].fire('click'); assert.deepEqual(on.calls, [['fill', '#112233']], 'fill already on: no second write');
   assert.deepEqual(h.notices, []);
 });
-test('swatch menu offers Fill and Stroke before Retirer', () => {
+test('swatch menu offers Fill and Stroke, then Replace in layer (#2372 PAL-REPLACE), before Retirer', () => {
   const h = fixture(); h.swatches()[1].fire('contextmenu');
-  const items = h.menus.at(-1).filter(i => !i.sep); assert.deepEqual(items.map(i => i.label), ['Utiliser comme Fill', 'Utiliser comme Stroke', 'Retirer de la palette']);
+  const items = h.menus.at(-1).filter(i => !i.sep); assert.deepEqual(items.map(i => i.label), ['Utiliser comme Fill', 'Utiliser comme Stroke', 'Remplacer dans le calque…', 'Retirer de la palette']);
   items[0].action(); items[1].action(); assert.deepEqual(h.calls, [['fill', '#112233'], ['stroke', '#112233']]);
 });
-test('Swap is enabled with a shown palette, replace stays off, and the controller swaps once through SM.swapStrokeFill', () => {
-  const h = fixture(); assert.equal(h.elements['btn-palette-swap'].disabled, false); assert.equal(h.elements['btn-palette-replace'].disabled, true);
+test('Swap is enabled with a shown palette, replace is on (PAL-REPLACE), and the controller swaps once through SM.swapStrokeFill', () => {
+  const h = fixture(); assert.equal(h.elements['btn-palette-swap'].disabled, false); assert.equal(h.elements['btn-palette-replace'].disabled, false);
   assert.equal(h.controller.swap(), true); assert.deepEqual(h.calls, [['swap']]);
 });
 test('a palette that is not shown, a replaced read or an invalid colour refuses with one notice and writes nothing', () => {
