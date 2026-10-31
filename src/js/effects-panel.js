@@ -785,10 +785,9 @@
   // une seule liste laisserait croire qu'on peut intercaler un flou entre
   // deux déformations de contour, ce qui est faux — le flou travaille sur
   // des pixels que la déformation n'a pas encore produits.
-  function pathFxHost() {
-    var ld = activeLayer();
-    return (ld && !ld.isNullLayer) ? ld : null;
-  }
+  // #2372: native projects draw and edit this section in native-path-effects-ui.js (never the legacy ld.pathFx writer).
+  function npfx() { return window.NemoNativePathEffectsUi ? window.NemoNativePathEffectsUi.panel(window) : { on: function () { return false; }, render: function () { return false; } }; }
+  function pathFxHost() { var ld = activeLayer(); return (ld && !ld.isNullLayer && !npfx().on()) ? ld : null; }
   function pathFxPushUndo() { if (typeof pushUndo === 'function') pushUndo(); }
   function pathFxChanged() {
     // Surtout PAS de saveActiveLayerFrame ici : les objets vivants portent la
@@ -808,7 +807,7 @@
   }
   function renderPathFxList() {
     var list = document.getElementById('path-fx-list');
-    if (!list || !window.SMPathFx) return;
+    if (!list || !window.SMPathFx || npfx().render()) return;
     var ld = pathFxHost();
     var wrap = document.getElementById('path-fx-sec');
     if (wrap) wrap.style.display = ld ? '' : 'none';
@@ -855,11 +854,12 @@
     if (add && !add._wired) {
       add._wired = true;
       add.addEventListener('change', function () {
-        if (!add.value) return;
+        if (!add.value || npfx().on()) return; // native: the adapter's own listener takes the pick
         addPathFx(add.value);
         add.value = '';
       });
       SMPathFx.TYPES.forEach(function (t) {
+        if (add.querySelector('option[value="' + t.id + '"]')) return;
         var o = document.createElement('option');
         o.value = t.id; o.textContent = window.SM.t(t.label);
         add.appendChild(o);

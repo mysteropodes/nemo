@@ -452,3 +452,28 @@ fn a_stored_effect_stack_is_carried_in_its_row_until_the_row_or_document_bound()
     assert!(got[0].get("effects").is_none());
     assert_eq!(got[0]["effectsOversize"], json!(true));
 }
+
+/// #2372: the path-effects panel resends the whole `pathFx` stack, so a row carries it as stored (absent, null and numeric members
+/// stay distinct) until the row bound; an empty stack is absent and a stack past the bound is named oversize.
+#[test]
+fn a_stored_path_effect_stack_is_carried_in_its_row_until_the_row_bound() {
+    let stack = json!([{"type":"zigzag","enabled":false,"p1":4,"p2":null},{"type":"roughen"}]);
+    let document = flat(
+        json!([{"layerUid":"plain"},
+            {"layerUid":"empty","pathFx":[]},
+            {"layerUid":"fx","pathFx":stack}]),
+        json!({}),
+    );
+    let got = rows(&document);
+    assert!(got[0].get("pathFx").is_none());
+    assert!(got[1].get("pathFx").is_none(), "an empty stack is absent");
+    assert_eq!(got[2]["pathFx"], stack);
+    assert!(got[2].get("pathFxOversize").is_none());
+    let many: Vec<Value> = (0..60)
+        .map(|i| json!({"type":"zigzag","enabled":true,"p1":i,"p2":1.5,"p3":2.5}))
+        .collect();
+    let big = flat(json!([{"layerUid":"big","pathFx":many}]), json!({}));
+    let got = rows(&big);
+    assert!(got[0].get("pathFx").is_none());
+    assert_eq!(got[0]["pathFxOversize"], json!(true));
+}
