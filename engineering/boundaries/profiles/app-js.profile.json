@@ -3481,12 +3481,23 @@
       "layer": "domain",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-vector-contract.js",
-        "native-object-vector-restyle.js"
+        "native-object-vector-contract.js"
       ],
       "sizeProfile": "Domain/application",
       "publicApi": [
         "native-object-vector-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.object.vector.restyle",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-vector-restyle.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-vector-restyle.js"
       ]
     },
     {

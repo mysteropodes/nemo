@@ -4211,7 +4211,7 @@
     },
     {
       "path": "src/js/adapters/native-object-vector-restyle.js",
-      "moduleId": "app.native.object.vector.contract",
+      "moduleId": "app.native.object.vector.restyle",
       "executionClass": "document-classic",
       "loadSites": [
         {

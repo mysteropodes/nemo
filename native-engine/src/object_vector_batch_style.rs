@@ -11,7 +11,10 @@
 //! an anchor whose copies are stored are refused (`Unavailable`): their image derives from more than the record.
 use crate::commands::object_fill_owner::vector_edit::batch_ops::ribbon;
 use crate::commands::object_fill_owner::vector_edit::is_vector_record;
-use crate::object_document::{object_deserialize, CenterSegment, ObjectDocument, ObjectRecord, ObjectTarget, Presence, SolidFill, WidthStop};
+use crate::object_document::{
+    object_deserialize, CenterSegment, ObjectDocument, ObjectRecord, ObjectTarget, Presence,
+    SolidFill, WidthStop,
+};
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use serde_json::Number;
@@ -50,9 +53,15 @@ pub(super) fn num(v: f64) -> Result<Number, DispatchErrorCode> {
 
 /// `#rrggbb` / `#rrggbbaa` as the solid paint the record stores (channels 0..1, alpha 1 when omitted).
 fn parse(hex: &str) -> Result<SolidFill, DispatchErrorCode> {
-    let digits = hex.strip_prefix('#').filter(|d| [6, 8].contains(&d.len()) && d.bytes().all(|b| b.is_ascii_hexdigit()));
+    let digits = hex
+        .strip_prefix('#')
+        .filter(|d| [6, 8].contains(&d.len()) && d.bytes().all(|b| b.is_ascii_hexdigit()));
     let digits = digits.ok_or(DispatchErrorCode::InvalidRequest)?;
-    let byte = |at: usize| u8::from_str_radix(&digits[at..at + 2], 16).map(|v| f64::from(v) / 255.0).map_err(|_| DispatchErrorCode::InvalidRequest);
+    let byte = |at: usize| {
+        u8::from_str_radix(&digits[at..at + 2], 16)
+            .map(|v| f64::from(v) / 255.0)
+            .map_err(|_| DispatchErrorCode::InvalidRequest)
+    };
     Ok(SolidFill {
         kind: "solid".into(),
         r: num(byte(0)?)?,
@@ -65,15 +74,29 @@ fn parse(hex: &str) -> Result<SolidFill, DispatchErrorCode> {
 impl Style {
     pub(super) fn checked(&self) -> Result<Checked, DispatchErrorCode> {
         use DispatchErrorCode::InvalidRequest;
-        let number = |n: &Presence<Number>| n.value().map(|n| n.as_f64().filter(|v| v.is_finite()).ok_or(InvalidRequest)).transpose();
+        let number = |n: &Presence<Number>| {
+            n.value()
+                .map(|n| n.as_f64().filter(|v| v.is_finite()).ok_or(InvalidRequest))
+                .transpose()
+        };
         let checked = Checked {
-            fill: self.fill.value().map(|h| Ok::<_, DispatchErrorCode>((parse(h)?, h.clone()))).transpose()?,
+            fill: self
+                .fill
+                .value()
+                .map(|h| Ok::<_, DispatchErrorCode>((parse(h)?, h.clone())))
+                .transpose()?,
             stroke: self.stroke.value().map(|h| parse(h)).transpose()?,
             width: number(&self.width)?,
             opacity: number(&self.opacity)?,
         };
-        let sound = checked.width.is_none_or(|w| w > 0.0 && w <= 10_000.0) && checked.opacity.is_none_or(|o| (0.0..=1.0).contains(&o));
-        if !sound || (checked.fill.is_none() && checked.stroke.is_none() && checked.width.is_none() && checked.opacity.is_none()) {
+        let sound = checked.width.is_none_or(|w| w > 0.0 && w <= 10_000.0)
+            && checked.opacity.is_none_or(|o| (0.0..=1.0).contains(&o));
+        if !sound
+            || (checked.fill.is_none()
+                && checked.stroke.is_none()
+                && checked.width.is_none()
+                && checked.opacity.is_none())
+        {
             return Err(InvalidRequest);
         }
         Ok(checked)
@@ -87,14 +110,34 @@ fn with_alpha(mut paint: SolidFill, alpha: f64) -> Result<SolidFill, DispatchErr
 
 /// The peak of the profile the ribbon renders from (the dense width profile, else the anchor widths): the size the baseline reads.
 fn peak(center: &[CenterSegment], profile: Option<&[WidthStop]>) -> f64 {
-    let widths = profile.filter(|p| !p.is_empty()).map(|p| p.iter().map(|s| s.width.as_f64().unwrap_or(0.0)).collect::<Vec<_>>());
-    widths.unwrap_or_else(|| center.iter().map(|c| c.width.as_f64().unwrap_or(0.0)).collect()).into_iter().fold(0.0, f64::max)
+    let widths = profile.filter(|p| !p.is_empty()).map(|p| {
+        p.iter()
+            .map(|s| s.width.as_f64().unwrap_or(0.0))
+            .collect::<Vec<_>>()
+    });
+    widths
+        .unwrap_or_else(|| {
+            center
+                .iter()
+                .map(|c| c.width.as_f64().unwrap_or(0.0))
+                .collect()
+        })
+        .into_iter()
+        .fold(0.0, f64::max)
 }
 
 /// The ribbon at `existing` with every width scaled so its peak is `width`, rebuilt from its centreline with its linked fill.
-fn resized(source: &ObjectDocument, existing: &ObjectRecord, width: f64) -> Result<(ObjectRecord, Option<ObjectRecord>), DispatchErrorCode> {
+fn resized(
+    source: &ObjectDocument,
+    existing: &ObjectRecord,
+    width: f64,
+) -> Result<(ObjectRecord, Option<ObjectRecord>), DispatchErrorCode> {
     use DispatchErrorCode::{InvalidRequest, Unavailable};
-    let pressure = existing.vector_ext.value().and_then(|e| e.pressure.value()).ok_or(InvalidRequest)?;
+    let pressure = existing
+        .vector_ext
+        .value()
+        .and_then(|e| e.pressure.value())
+        .ok_or(InvalidRequest)?;
     let center = pressure.center_segments.value().ok_or(Unavailable)?;
     let profile = pressure.width_profile.value();
     let top = peak(center, profile.map(Vec::as_slice));
@@ -105,10 +148,22 @@ fn resized(source: &ObjectDocument, existing: &ObjectRecord, width: f64) -> Resu
     };
     let moved = center
         .iter()
-        .map(|c| Ok(CenterSegment { point: c.point.clone(), handle_in: c.handle_in.clone(), handle_out: c.handle_out.clone(), width: scale(&c.width)? }))
+        .map(|c| {
+            Ok(CenterSegment {
+                point: c.point.clone(),
+                handle_in: c.handle_in.clone(),
+                handle_out: c.handle_out.clone(),
+                width: scale(&c.width)?,
+            })
+        })
         .collect::<Result<Vec<_>, DispatchErrorCode>>()?;
     let mut scaled = existing.clone();
-    if let Some(stops) = scaled.vector_ext.value_mut().and_then(|e| e.pressure.value_mut()).and_then(|p| p.width_profile.value_mut()) {
+    if let Some(stops) = scaled
+        .vector_ext
+        .value_mut()
+        .and_then(|e| e.pressure.value_mut())
+        .and_then(|p| p.width_profile.value_mut())
+    {
         for stop in stops {
             stop.width = scale(&stop.width)?;
         }
@@ -117,15 +172,25 @@ fn resized(source: &ObjectDocument, existing: &ObjectRecord, width: f64) -> Resu
 }
 
 /// The records `target` becomes under `style` (the named one first, then a ribbon's re-synced linked fill).
-pub(super) fn restyle(source: &ObjectDocument, target: &ObjectTarget, style: &Checked) -> Result<Vec<ObjectRecord>, DispatchErrorCode> {
+pub(super) fn restyle(
+    source: &ObjectDocument,
+    target: &ObjectTarget,
+    style: &Checked,
+) -> Result<Vec<ObjectRecord>, DispatchErrorCode> {
     use DispatchErrorCode::{InvalidRequest, NotFound, Unavailable};
-    let existing = source.objects.iter().find(|r| &r.target == target).ok_or(NotFound)?;
+    let existing = source
+        .objects
+        .iter()
+        .find(|r| &r.target == target)
+        .ok_or(NotFound)?;
     if !is_vector_record(existing) {
         return Err(InvalidRequest);
     }
     let ext = existing.vector_ext.value();
     let texture = ext.and_then(|e| e.brush_texture.value());
-    if ext.is_some_and(|e| !e.bitmap_brush.missing()) || texture.is_some_and(|t| t.is_brush_texture_copy.value() == Some(&true)) {
+    if ext.is_some_and(|e| !e.bitmap_brush.missing())
+        || texture.is_some_and(|t| t.is_brush_texture_copy.value() == Some(&true))
+    {
         return Err(Unavailable);
     }
     let group = texture.and_then(|t| t.brush_group_id.value());
@@ -134,12 +199,22 @@ pub(super) fn restyle(source: &ObjectDocument, target: &ObjectTarget, style: &Ch
             r.target.context_id == target.context_id
                 && r.target.layer_uid == target.layer_uid
                 && r.target.frame_scope == target.frame_scope
-                && r.vector_ext.value().and_then(|e| e.brush_texture.value()).is_some_and(|t| t.is_brush_texture_copy.value() == Some(&true) && t.brush_group_id.value() == Some(g))
+                && r.vector_ext
+                    .value()
+                    .and_then(|e| e.brush_texture.value())
+                    .is_some_and(|t| {
+                        t.is_brush_texture_copy.value() == Some(&true)
+                            && t.brush_group_id.value() == Some(g)
+                    })
         })
     });
     // An anchor hides its own outline (an opacity of 0, or no stroke) while its dabs show: a stroke colour or an opacity that is not
     // a fill alpha would bring the outline back, and a width has dabs of its own to follow.
-    if texture.is_some() && (style.stroke.is_some() || (style.opacity.is_some() && existing.solid_fill().is_none()) || (style.width.is_some() && stored_copies)) {
+    if texture.is_some()
+        && (style.stroke.is_some()
+            || (style.opacity.is_some() && existing.solid_fill().is_none())
+            || (style.width.is_some() && stored_copies))
+    {
         return Err(Unavailable);
     }
     let ribbon_ink = ext.is_some_and(|e| !e.pressure.missing());
@@ -163,7 +238,11 @@ pub(super) fn restyle(source: &ObjectDocument, target: &ObjectTarget, style: &Ch
             body.stroke_width = num(width)?;
         }
     }
-    let ink = style.stroke.as_ref().or(style.fill.as_ref().map(|(paint, _)| paint)).filter(|_| ribbon_ink);
+    let ink = style
+        .stroke
+        .as_ref()
+        .or(style.fill.as_ref().map(|(paint, _)| paint))
+        .filter(|_| ribbon_ink);
     if let Some(paint) = ink {
         record.fill = Presence::Present(Some(paint.clone()));
     } else if let Some((paint, _)) = style.fill.as_ref().filter(|_| !ribbon_ink) {
