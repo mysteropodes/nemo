@@ -3688,6 +3688,7 @@ function _restoreDrawingDefaults(){
 // type/boolean-op rows) — visibility itself is now owned by
 // updatePropsContext(), called separately.
 function updateSelPropsPanel(){
+  markNativeScrubFields();
   if((state.tool!=='select'&&state.tool!=='subselect')||!selectedPaths.length){_selPropsSig='';return;}
   // Subselect + vertices picked: show/drive THEIR bounds, not the whole
   // path's (activeXformBounds/Vertex mode, wired further down alongside
@@ -6370,6 +6371,27 @@ function nativeSelStyle(style){
   var A=window.NemoNativeSelectionStyle;
   if(!A||!A.handles(window))return false;
   A.apply(window,style);return true;
+}
+// The numeric fields a native Select selection owns scrub on ui.js's static path (one change at release, no legacy checkpoint, no live writes): the
+// legacy path pushes an undo before it raises _scrubLiveActive, which a native project refuses, so a paused drag would commit mid-gesture and again at release.
+var NATIVE_SCRUB_FIELDS=['p-sw','p-opacity','p-stroke-alpha','p-poststroke-smooth','p-miterlimit','p-dashoffset'];
+function markNativeScrubFields(){
+  var A=window.NemoNativeSelectionStyle,own=!!A&&A.handles(window);
+  NATIVE_SCRUB_FIELDS.forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el)return;
+    if(own)el.dataset.nativeOpacityScrub='static';
+    else if(el.dataset.nativeOpacityScrub==='static')delete el.dataset.nativeOpacityScrub;
+  });
+}
+// A field marked static gets ONE 'change' at the end of a scrub and no 'input'; a typed edit fires 'input' first and 'change' after. The change of a typed
+// edit has been applied already (nativeTypedInput recorded its value), so only a scrub's change is applied here.
+var _nativeTyped={};
+function nativeTypedInput(el){_nativeTyped[el.id]=el.value;}
+function nativeScrubChange(el,apply){
+  var typed=_nativeTyped[el.id];delete _nativeTyped[el.id];
+  if(el.dataset.nativeOpacityScrub!=='static'||typed===el.value)return;
+  apply();
 }
 function nativeHex(v){return typeof v==='string'&&/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v)?v:null;}
 // What updateSelPropsPanel reads from the first selected item: the style the engine listed for a native item (the presented Paper path only
@@ -10101,13 +10123,15 @@ document.getElementById('p-stroke-hex').addEventListener('change',function(){
 // "opacity" field the way Fill does (#p-opacity), so its Figma-style
 // opacity% box writes straight into the stroke COLOR's own hex8 alpha
 // byte instead, keeping RGB untouched.
-document.getElementById('p-stroke-alpha').addEventListener('input',function(){
-  var pct=Math.max(0,Math.min(100,parseInt(this.value)||0));
+function applyStrokeAlphaField(el){
+  var pct=Math.max(0,Math.min(100,parseInt(el.value)||0));
   var rgb=(state.strokeColor||'#000000').replace('#','').slice(0,6);
   var a=Math.round(pct/100*255).toString(16).padStart(2,'0').toUpperCase();
   window.SM.setStrokeColor('#'+rgb+(pct<100?a:''));
   if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);
-});
+}
+document.getElementById('p-stroke-alpha').addEventListener('input',function(){nativeTypedInput(this);applyStrokeAlphaField(this);});
+document.getElementById('p-stroke-alpha').addEventListener('change',function(){nativeScrubChange(this,function(){applyStrokeAlphaField(this);}.bind(this));});
 ['p-fill-hex','p-stroke-hex'].forEach(function(id){
   var el=document.getElementById(id);
   el.addEventListener('keydown',function(e){if(e.key==='Enter')this.blur();});
@@ -10160,7 +10184,8 @@ if(window.ColorPicker){
     {wrap:'pm-fill',input:'pm-fill-c',onNone:function(){window.SM.setFillEnabled(false);},onEyedrop:function(){window.SM.setTool('eyedropper');}},
   ]);
 }
-document.getElementById('p-opacity').addEventListener('input',function(){window.SM.setOpacity(this.value);});
+document.getElementById('p-opacity').addEventListener('input',function(){nativeTypedInput(this);window.SM.setOpacity(this.value);});
+document.getElementById('p-opacity').addEventListener('change',function(){nativeScrubChange(this,function(){window.SM.setOpacity(this.value);}.bind(this));});
 document.getElementById('p-smooth').addEventListener('input',function(){window.SM.setSmoothing(parseInt(this.value));});
 document.getElementById('p-stab').addEventListener('change',function(){window.SM.setStabilizer(this.value);});
 document.getElementById('p-strokestyle').addEventListener('change',function(){window.SM.setStrokeStyle(this.value);});

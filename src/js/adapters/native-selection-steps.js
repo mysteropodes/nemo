@@ -40,7 +40,8 @@
   function alone(style) { return ALONE.filter(function (k) { return style[k] !== undefined; })[0] || null; }
 
   // The `restyle` style for one selected path, or null when the edit has nothing for it (the baseline skipped it).
-  function styleFor(path, s) {
+  // `last` names the colour member written last in the edit ('fill' | 'stroke'): a ribbon is inked by one colour, so the later write wins.
+  function styleFor(path, s, last) {
     var role = path.data.nativeRole, out = {}, copy = function (k) { if (s[k] !== undefined) out[k] = s[k]; };
     if (alone(s)) {
       // A preset restamps a plain stroke; a ribbon and an image are not eligible (the baseline filtered them out).
@@ -60,15 +61,16 @@
     }
     copy('paintOrder');
     if (ribbon) {
-      // A ribbon's ink is its fill; the stroke colour (the later write of a swap) wins over a fill colour of the same edit.
-      if (out.stroke !== undefined) delete out.fill;
+      // A ribbon's ink is its fill; of a fill and a stroke colour in one edit the later write wins (a swap writes the stroke after the fill).
+      if (out.stroke !== undefined && out.fill !== undefined && last === 'fill') delete out.stroke;
+      else if (out.stroke !== undefined) delete out.fill;
       delete out.fillEnabled;
     } else DETAIL.forEach(copy);
     return Object.keys(out).length ? out : null;
   }
-  function restyleSteps(paths, style) {
+  function restyleSteps(paths, style, last) {
     return paths.map(function (p) {
-      var st = styleFor(p, style);
+      var st = styleFor(p, style, last);
       return st && { restyle: { stableTarget: p.data.nativeStableTarget, style: st } };
     }).filter(Boolean);
   }

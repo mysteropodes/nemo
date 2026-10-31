@@ -9,6 +9,7 @@ const Steps = require('../src/js/adapters/native-selection-steps.js');
 const Contract = require('../src/js/adapters/native-object-vector-contract.js');
 const Subselect = require('../src/js/adapters/native-subselect-contract.js');
 const Paper = require('./helpers/native-import-paper.cjs');
+const overlayStub = require('./helpers/native-selection-overlay-stub.cjs');
 
 const seg = (x, y) => ({ point: [x, y], handleIn: [0, 0], handleOut: [0, 0] });
 const quad = (id, x0, y0, x1, y1, extra) => ({ stableTarget: { contextId: 'scene-root', layerUid: 'L', frameScope: { kind: 'authored', frame: 0 }, strokeId: id },
@@ -33,9 +34,9 @@ function harness(items) {
     buildCenterSegmentsFromRawStroke: (pts, widths) => [{ point: [pts[0].x, pts[0].y], handleIn: [0, 0], handleOut: [3, 0], width: widths[0] }, { point: [pts[pts.length - 1].x, pts[pts.length - 1].y], handleIn: [-3, 0], handleOut: [0, 0], width: widths[widths.length - 1] }],
     NemoNativeObjectProject: { desktop: () => session, selectLayerUI: () => true },
     NemoNativeObjectLabs: { desktop: () => ({ batchStrokes: async (layerUid, frame, steps) => { batches.push({ layerUid, frame, steps: JSON.parse(JSON.stringify(steps)) }); return { status: 'applied' }; } }) },
-    NemoSelectCanvasIntent: Intent, NemoNativeSelectionSteps: Steps };
+    NemoSelectCanvasIntent: Intent, NemoNativeSelectionSteps: Steps, NemoNativeSelectOverlay: overlayStub(Intent) };
   return { root, toasts, batches, timers,
-    async select(ids) { const layers = await Intent.layerPaths(root, (item) => ids.includes(item.stableTarget.strokeId), false, 0); root.selectedPaths = layers.paths; },
+    async select(ids) { const layers = await Intent.layerPaths(root, (item) => ids.includes(item.stableTarget.strokeId), false, 0); root.selectedPaths = layers.paths; root.NemoNativeSelectOverlay.show(root); },
     fire: async () => { const fns = timers.splice(0).filter(Boolean); fns.forEach((fn) => fn()); await settle(); } };
 }
 const asOps = (steps, frame = 0) => steps.map((s) => (s.restyle ? { op: 'restyle', stableTarget: s.restyle.stableTarget, style: s.restyle.style, frame }

@@ -96,7 +96,12 @@
   // The single (re)draw. A part whose context no longer holds is dropped here, so show/hover/the watcher cannot disagree.
   function refresh(root, force) {
     var s = state(root), c = capture(root), paths = root.selectedPaths;
-    if (s.sel && (!c || s.sel.ctx !== c.ctx || s.sel.paths !== paths || s.sel.count !== paths.length)) { s.sel = null; force = true; }
+    if (s.sel && (!c || s.sel.ctx !== c.ctx || s.sel.paths !== paths || s.sel.count !== paths.length)) {
+      s.sel = null; force = true;
+      // The context the selection was drawn for ended (frame, layer, tool): an edit of it still waiting in the style panel commits now (RV6-STYLE).
+      var style = root.NemoNativeSelectionStyle;
+      if (style && typeof style.flush === 'function') style.flush(root);
+    }
     if (s.hov && (!c || s.hov.ctx !== c.ctx)) { s.hov = null; force = true; }
     if (s.prev && (!c || s.prev.ctx !== c.ctx)) { s.prev = null; force = true; }
     if (!s.sel && !s.hov && !s.prev) { remove(s); return; }
