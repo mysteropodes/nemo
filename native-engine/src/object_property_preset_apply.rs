@@ -5,6 +5,10 @@
 //! authored keys (frame, value, hold, lock, curve points, handles) and its static value. A property the preset
 //! does not animate or fix is cleared, exactly as the replaced object would have dropped it. Expressions are
 //! never touched (the baseline keeps them outside `motion`), and `order`/`timeRemap` have other owners.
+//! Layer kind is irrelevant: the five transform properties are layer-level catalog metadata (baseline `propsFor`
+//! lists the same `PROPS` for every layer holder), so Null, Folder, Effect, 3D and folder-member layers all accept the
+//! whole preset. Only an absent layer (NotFound) or a malformed payload refuses; anything the transform does not own is
+//! dropped by the JS adapter and reported to the user, never sent here.
 //! The payload is the full authored track, so nothing is sampled, inferred or kept in a second store.
 use crate::commands::{ObjectFillOwner, PreparedPropertyEdit};
 use crate::object_document::{
