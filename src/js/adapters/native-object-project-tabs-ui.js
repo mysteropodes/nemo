@@ -116,5 +116,13 @@
     var el=root.document.querySelector('.project-tab[data-tab="'+activeTabId+'"]');
     if(el)el.classList.toggle('dirty',dirty());
   }
-  return Object.freeze({bind:bind,render:render,rename:rename,refreshDirty:refreshDirty});
+  // The tab already holding this file, if any: the active tab by the live path, any other by the path stored on its row.
+  // Opening a file that is already open focuses that tab instead of preparing a second copy of it.
+  function findOpen(current,path){
+    if(typeof path!=='string'||!path)return null;
+    if(current.path===path)return {tab:current.tabs.find(function(t){return t.id===current.activeTabId;})||null,active:true};
+    var other=current.tabs.find(function(t){return t.id!==current.activeTabId&&t.path===path;});
+    return other?{tab:other,active:false}:null;
+  }
+  return Object.freeze({bind:bind,render:render,rename:rename,refreshDirty:refreshDirty,findOpen:findOpen});
 }));

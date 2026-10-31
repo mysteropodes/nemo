@@ -25,6 +25,10 @@ struct SaveRequest {
     destination_path: String,
     #[serde(default)]
     cancelled_before_dispatch: bool,
+    /// In-place Save of an already-titled project: atomically replace an existing regular
+    /// file at the destination. Absent or false keeps the no-replace new-file publication.
+    #[serde(default)]
+    replace: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -258,6 +262,19 @@ fn save_with_authority<A: PublicationAuthority>(
         if !authority.allows(&destination, &staged) {
             return Err(std::io::Error::other("publication scope revoked"));
         }
+        if request.replace {
+            // In-place Save: rename is an atomic replace. Only a regular file (or nothing) may
+            // be replaced; a directory or symlink at the destination is refused.
+            match fs::symlink_metadata(&destination) {
+                Ok(meta) if !meta.is_file() => {
+                    return Err(std::io::Error::other("replace target is not a regular file"))
+                }
+                Ok(_) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error),
+            }
+            return fs::rename(&staged, &destination);
+        }
         // Atomic no-replace publication. Scope/check/open/link are still separate
         // path operations: adversarial parent/staging replacement is not solved.
         fs::hard_link(&staged, &destination)
@@ -268,7 +285,8 @@ fn save_with_authority<A: PublicationAuthority>(
         error.details = Some(json!({"published":false,"cleanupPending":!cleaned}));
         return Err(error);
     }
-    let cleaned = effect("cleanup", &staged).is_ok() && cleanup(&staged, &file);
+    // A replace renamed the staged file onto the destination: nothing is left to clean.
+    let cleaned = effect("cleanup", &staged).is_ok() && (request.replace || cleanup(&staged, &file));
     Ok(SaveReceipt {
         api_version: request.api_version,
         request_id: request.request_id,

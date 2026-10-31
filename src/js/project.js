@@ -196,6 +196,12 @@
   }
   async function openPath(path){
     if(!nativeSavedUI.allowOpen()){try{window.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__&&window.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__('allow-open-refused');}catch(_){}return false;}
+    var already=nativeTabsUI.findOpen(readNativeTabsUI(),path);
+    if(already&&already.tab){
+      hideStartScreen();
+      if(already.active){showToast('Already open: '+window.SMProjectDocument.baseName(path));return true;}
+      return switchToTab(already.tab.id);
+    }
     if(nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.isActive())return nativeInactiveTabs.openPath(path);
     if(p39bUseInactiveEntry())return inactiveEntry.openPath(path);
     if(!tauriOk())return;
