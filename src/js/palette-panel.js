@@ -311,7 +311,11 @@
     if (newBtn) newBtn.addEventListener('click', newPalette);
     var swapBtn = document.getElementById('btn-palette-swap');
     if (swapBtn) swapBtn.addEventListener('click', function () {
-      if (paletteNativeBlocked(true)) return;
+      if (paletteNativeBlocked(false)) {
+        var controller = window.NemoNativePaletteController;
+        if (controller && controller.swap) controller.swap(); else paletteNativeBlocked(true);
+        return;
+      }
       var f = currentHex('fill'), s = currentHex('stroke');
       window.SM.setFillColor(s); window.SM.setStrokeColor(f);
     });
