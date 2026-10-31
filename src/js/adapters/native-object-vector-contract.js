@@ -332,7 +332,7 @@
     // A batch trims only when every step creates (the drawn stroke, its copies and its multi-frame stamps share one cut).
     if (has(value, 'trimEnds') && value.command === 'object.vector.batch' && Array.isArray(value.ops) && value.ops.some((op) => !plain(op) || (op.op !== 'create' && op.op !== 'copy'))) fail('object.vector.batch.trimEnds needs create steps only');
     // A trimmed batch is cut against one cell, so it stays on one layer (#2372 lets every other batch span layers).
-    if (has(value, 'trimEnds') && value.command === 'object.vector.batch' && Array.isArray(value.ops) && new Set(value.ops.map((op) => op.record && op.record.target && op.record.target.layerUid)).size > 1) fail('object.vector.batch.trimEnds stays on one layer');
+    if (has(value, 'trimEnds') && value.command === 'object.vector.batch' && Array.isArray(value.ops) && new Set(value.ops.filter((op) => op.record && op.record.target).map((op) => op.record.target.layerUid)).size > 1) fail('object.vector.batch.trimEnds stays on one layer');
     // keyframe: 'copy' keys a held cell with what it showed (the Labs creators' ensureKeyframe()); absent is Draw's empty key.
     if (has(value, 'keyframe') && value.keyframe !== 'copy') fail(`${value.command} keyframe must be 'copy'`);
     entry[1].forEach((key) => member(value.command, key, value[key]));
