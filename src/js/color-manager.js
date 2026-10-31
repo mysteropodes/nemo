@@ -34,7 +34,30 @@
     map[key].count++;
   }
 
+  // Native object project (#2372 insp-recolour): the document is the engine's, so the panel reads the colours the engine LISTED for the selected items
+  // and recolours them as one native restyle batch; there is no Paper item to read, no pushUndo (it refuses a native project) and no layer-wide write.
+  function nativeSelection() { return window.NemoNativeSelectionStyle && window.NemoNativeSelectionStyle.native(window) ? window.NemoNativeSelectionStyle : null; }
+  function nativeToast(text) { if (window.showToast) showToast(text); }
+  function nativeColors(A) {
+    var listed = A.colours(window);
+    if (listed) return listed;
+    var map = {};
+    if (window.state && state.canvasBg) addColor(map, state.canvasBg); // the one project colour a native project can still change without a selection
+    return Object.keys(map).map(function (k) { return map[k]; });
+  }
+  function nativeRecolor(A, oldHex, newHex) {
+    if (window.selectedPaths && selectedPaths.length) {
+      if (!A.handles(window)) { nativeToast('Recolouring is not available right now.'); return; }
+      A.applyRecolor(window, oldHex, newHex);
+      return;
+    }
+    if (window.state && state.canvasBg && state.canvasBg.toUpperCase() === oldHex.toUpperCase() && window.SM && SM.setCanvasBg) { SM.setCanvasBg(newHex); return; }
+    nativeToast('Select the items to recolour \u2014 recolouring a whole layer is not available on native projects yet.');
+  }
+
   function computeUsedColors() {
+    var A = nativeSelection();
+    if (A) return nativeColors(A);
     var map = {};
     if (window.selectedPaths && selectedPaths.length) {
       selectedPaths.forEach(function (p) {
@@ -87,6 +110,8 @@
   // selection if one exists, project-wide (persisted data + every live
   // on-canvas layer) otherwise.
   function recolorColor(oldHex, newHex) {
+    var A = nativeSelection();
+    if (A) { nativeRecolor(A, oldHex, newHex); return; }
     pushUndo();
     var oldNorm = oldHex.toUpperCase();
     if (window.selectedPaths && selectedPaths.length) {
@@ -327,6 +352,8 @@
     }
     _hadSel = hasSelNow;
   }
+
+  window.SMColorManager = { computeUsedColors: computeUsedColors, recolorColor: recolorColor };
 
   function init() {
     var sec = document.getElementById('selected-colors-sec');
