@@ -81,26 +81,38 @@
       } finally { pending = false; settled(); }
     }
     function id() { return 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e4); }
+    // #2372: a prompt's origin that is not shown only because a pending native command hides the presentation is waited out (model.readSettled, bounded) before the
+    // prompt opens; a presentation that really changed (the sealed projection dropped, another value) or a queue that never frees refuses with ONE notice.
+    function withOrigin(origin, run) {
+      if (origin && shown(origin)) return run(origin);
+      if (busy()) { notice(); return; }
+      return model.readSettled().then(function (value) {
+        if (!value || busy() || (origin && value !== origin)) { notice(); return; }
+        return run(value);
+      });
+    }
     function create() {
-      var origin = model.read();
-      if (!shown(origin)) { notice(); return; }
-      var name = root.prompt('Nom de la nouvelle palette :', 'Palette ' + (origin.palette.palettes.length + 1));
-      if (name === null) return;
-      return edit({ kind: 'create', id: id(), name: name.trim() || 'Palette' }, origin);
+      return withOrigin(model.read(), function (origin) {
+        var name = root.prompt('Nom de la nouvelle palette :', 'Palette ' + (origin.palette.palettes.length + 1));
+        if (name === null) return;
+        return edit({ kind: 'create', id: id(), name: name.trim() || 'Palette' }, origin);
+      });
     }
     function rename(summary, origin) {
-      if (!shown(origin)) { notice(); return; }
-      var name = root.prompt('Renommer la palette :', summary.name);
-      if (name === null || !name.trim()) return;
-      return edit({ kind: 'rename', ordinal: summary.ordinal, name: name.trim() }, origin);
+      return withOrigin(origin, function (shownOrigin) {
+        var name = root.prompt('Renommer la palette :', summary.name);
+        if (name === null || !name.trim()) return;
+        return edit({ kind: 'rename', ordinal: summary.ordinal, name: name.trim() }, shownOrigin);
+      });
     }
     function duplicate(summary, origin) {
       return edit({ kind: 'duplicate', ordinal: summary.ordinal, id: id(), name: summary.name + ' copie' }, origin);
     }
     function remove(summary, origin) {
-      if (!shown(origin)) { notice(); return; }
-      if (origin.palette.palettes.length <= 1) { notice('Keep at least one palette.'); return; }
-      return edit({ kind: 'remove', ordinal: summary.ordinal }, origin);
+      return withOrigin(origin, function (shownOrigin) {
+        if (shownOrigin.palette.palettes.length <= 1) { notice('Keep at least one palette.'); return; }
+        return edit({ kind: 'remove', ordinal: summary.ordinal }, shownOrigin);
+      });
     }
     function append(color) {
       var origin = model.read(), active = origin && origin.palette.active;
@@ -109,6 +121,29 @@
         notice(root.SM && root.SM.t ? root.SM.t('toastAlreadyInPalette') : 'Color is already in this palette.'); return;
       }
       return edit({ kind: 'appendColor', ordinal: active.summary.ordinal, color: color }, origin);
+    }
+    // #2372 PAL-APPLY: a swatch paints through the app's own colour setters, which hand a Select / Direct Select selection to NemoNativeSelectionStyle (one
+    // coalesced native restyle) and otherwise only set the tool defaults. Baseline: click = Fill (enabling it when off), Shift+click / "Stroke" = Stroke.
+    // Shorthand hex (#abc) is widened so it takes the native path; anything else is refused. Never a legacy setter and never Paper.
+    function paintable(hex) {
+      var m = typeof hex === 'string' && /^#([0-9a-fA-F]{3,4})$/.exec(hex);
+      if (m) hex = '#' + m[1].replace(/./g, '$&$&');
+      return typeof hex === 'string' && /^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(hex) ? hex : null;
+    }
+    function applyColor(origin, hex, kind) {
+      var SM = root.SM, paint = paintable(hex);
+      if (!shown(origin) || !paint || !SM) { notice(); return false; }
+      if (kind === 'stroke') SM.setStrokeColor(paint);
+      else {
+        SM.setFillColor(paint);
+        if (root.state && !root.state.fillEnabled && typeof SM.setFillEnabled === 'function') SM.setFillEnabled(true);
+      }
+      return true;
+    }
+    function swap() {
+      var SM = root.SM;
+      if (!shown(model.read()) || !SM || typeof SM.swapStrokeFill !== 'function') { notice(); return false; }
+      SM.swapStrokeFill(); return true;
     }
     function tabs(parent, origin) {
       var active = origin.palette.active;
@@ -135,12 +170,16 @@
         var selected = typeof highlight === 'string' && highlight.toLowerCase() === item.color.toLowerCase();
         var node = button(parent, 'palette-swatch' + (selected ? ' sel-match' : ''), item.color);
         node.style.setProperty('--sw-color', item.color); node.setAttribute('aria-label', item.color);
-        // Applying/replacing object colors requires its own admitted native consumer.
-        node.addEventListener('click', function () { notice('Applying palette colors is unavailable.'); });
+        node.addEventListener('click', function (event) { applyColor(origin, item.color, event && event.shiftKey ? 'stroke' : 'fill'); });
         node.addEventListener('contextmenu', function (event) {
-          menu(event, [{ label: 'Retirer de la palette', action: function () {
-            edit({ kind: 'removeColor', ordinal: active.summary.ordinal, index: item.index }, origin);
-          } }]);
+          menu(event, [
+            { label: 'Utiliser comme Fill', action: function () { applyColor(origin, item.color, 'fill'); } },
+            { label: 'Utiliser comme Stroke', action: function () { applyColor(origin, item.color, 'stroke'); } },
+            { sep: true },
+            { label: 'Retirer de la palette', action: function () {
+              edit({ kind: 'removeColor', ordinal: active.summary.ordinal, index: item.index }, origin);
+            } }
+          ]);
         });
         node.draggable = true;
         node.addEventListener('dragstart', function (event) {
@@ -165,9 +204,11 @@
       ['btn-palette-new', 'btn-palette-add-fill', 'btn-palette-add-stroke'].forEach(function (key) {
         var node = element(key); if (node) node.disabled = !ready || key !== 'btn-palette-new' && !active;
       });
-      ['btn-palette-replace', 'btn-palette-swap', 'palette-replace-scope'].forEach(function (key) {
+      // Replace stays off until its native consumer lands; Swap needs only a shown palette.
+      ['btn-palette-replace', 'palette-replace-scope'].forEach(function (key) {
         var node = element(key); if (node) node.disabled = true;
       });
+      var swapNode = element('btn-palette-swap'); if (swapNode) swapNode.disabled = !ready;
       if (wrap) { wrap.textContent = ''; if (ready) tabs(wrap, origin); }
       if (grid) {
         grid.textContent = ''; grid.setAttribute('role', ready ? 'group' : 'status');
@@ -198,7 +239,7 @@
       }).finally(function () { loading = null; settled(); });
       render(); return loading;
     }
-    var controller = Object.freeze({ read: model.read, edit: edit, create: create, append: append, render: render,
+    var controller = Object.freeze({ read: model.read, edit: edit, create: create, append: append, swap: swap, render: render,
       presented: presented, isPending: function () { return pending || !!loading; },
       willProject: function () { projectionEpoch++; failedRead = null; drag = null; if (!pending) model.invalidate(); render(); },
       dispose: function () { retired = true; failedRead = null; refreshNeeded = false; drag = null; model.dispose(); render(); }

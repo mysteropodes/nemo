@@ -87,6 +87,17 @@ pub(crate) enum LifecycleError {
     RevisionOutOfRange,
     IdUnavailable,
     TooManyLayers,
+    /// #2372 U12: a layer cannot be its own parent.
+    ParentSelf(String),
+    /// #2372 U12: the parent would sit below the layer in its own chain.
+    ParentCycle {
+        layer_uid: String,
+        parent_uid: String,
+    },
+    /// #2372 U12: folders and the layers outside the edited context are not parents.
+    ParentRefused(String),
+    /// #2372 U12: keeping the world pose is not exactly computable; the reason is a fixed phrase.
+    PoseUnavailable(&'static str),
     Policy {
         op: LayerOp,
         layer_uid: String,

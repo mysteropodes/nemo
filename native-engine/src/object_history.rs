@@ -168,6 +168,9 @@ mod object_layer_lifecycle_controls;
 #[path = "../tests/object_layer_lifecycle_payloads.rs"]
 mod object_layer_lifecycle_payloads;
 #[cfg(test)]
+#[path = "../tests/object_layer_parent_set.rs"]
+mod object_layer_parent_set;
+#[cfg(test)]
 #[path = "../tests/object_layer_lifecycle_scenario.rs"]
 mod object_layer_lifecycle_scenario;
 #[cfg(test)]

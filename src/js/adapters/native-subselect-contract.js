@@ -12,11 +12,14 @@
   // and (SEL-STYLE2) the stroke details cap, join, miter, dashOffset, paintOrder, and (INSP-READBACK) strokeStyle and a texture anchor's brushPreset.
   const hexColour=v=>typeof v==='string'&&/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v);
   const finite=v=>typeof v==='number'&&Number.isFinite(v);
-  const listedStyle=v=>exact(v,[],['fill','stroke','width','opacity','cap','join','miter','dashOffset','paintOrder','strokeStyle','brushPreset','maskMode','maskFeather'])&&Object.keys(v).length>0&&(!own(v,'fill')||hexColour(v.fill))&&(!own(v,'stroke')||hexColour(v.stroke))&&
+  // #2372 native-fill-gradient: the record's stored two-stop gradient (record-space ends, stops as stored), the body a restyle step's fillGradient takes back.
+  const listedGradient=g=>exact(g,['kind','from','to','stops'])&&['linear','radial'].includes(g.kind)&&[g.from,g.to].every(a=>Array.isArray(a)&&a.length===2&&a.every(finite))&&
+    Array.isArray(g.stops)&&g.stops.length===2&&g.stops.every(t=>exact(t,['offset','color'])&&finite(t.offset)&&/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(t.color));
+  const listedStyle=v=>exact(v,[],['fill','stroke','width','opacity','cap','join','miter','dashOffset','paintOrder','strokeStyle','brushPreset','maskMode','maskFeather','fillGradient'])&&Object.keys(v).length>0&&(!own(v,'fill')||hexColour(v.fill))&&(!own(v,'stroke')||hexColour(v.stroke))&&
     (!own(v,'width')||finite(v.width)&&v.width>0)&&(!own(v,'opacity')||finite(v.opacity)&&v.opacity>=0&&v.opacity<=1)&&(!own(v,'cap')||['butt','round','square'].includes(v.cap))&&
     (!own(v,'join')||['miter','round','bevel'].includes(v.join))&&(!own(v,'miter')||finite(v.miter)&&v.miter>=0)&&(!own(v,'dashOffset')||finite(v.dashOffset))&&(!own(v,'paintOrder')||['fillFirst','strokeFirst'].includes(v.paintOrder))&&
     (!own(v,'strokeStyle')||['solid','dashed','dotted'].includes(v.strokeStyle))&&(!own(v,'brushPreset')||typeof v.brushPreset==='string'&&v.brushPreset.length>0&&v.brushPreset.length<=96)&&
-    (!own(v,'maskMode')||['add','subtract','intersect'].includes(v.maskMode))&&(!own(v,'maskFeather')||finite(v.maskFeather)&&v.maskFeather>=0);
+    (!own(v,'maskMode')||['add','subtract','intersect'].includes(v.maskMode))&&(!own(v,'maskFeather')||finite(v.maskFeather)&&v.maskFeather>=0)&&(!own(v,'fillGradient')||listedGradient(v.fillGradient));
   // #2256: a presented-stroke VIEW may name the entered component the workspace controller holds (never free text); the edit intent stays on the scene root.
   const viewContext=id=>{if(id==='scene-root')return true;try{const c=globalThis.NemoNativeComponentContext;return typeof id==='string'&&!!id&&!!c&&typeof c.contextId==='function'&&c.contextId(globalThis)===id;}catch(_){return false;}};
   function target(v,context){return exact(v,['contextId','layerUid','frameScope','strokeId'])&&v.contextId===(context||'scene-root')&&
@@ -73,6 +76,8 @@
     const members=v&&typeof v==='object'&&!Array.isArray(v)&&SHAPE_MEMBERS[v.kind];
     return !!members&&Object.keys(v).every(k=>k==='kind'||members.includes(k)&&typeof v[k]==='number'&&Number.isFinite(v[k]));
   }
+  // #2376: the vector groups a listed record sits in, outermost first: one to four bounded ids, each with an optional bounded name.
+  const groupPath=v=>Array.isArray(v)&&v.length>=1&&v.length<=4&&v.every(g=>exact(g,['id'],['name'])&&typeof g.id==='string'&&g.id.length>0&&bytes(g.id)<=128&&(!own(g,'name')||typeof g.name==='string'&&bytes(g.name)<=256));
   function viewResult(r){
     if(!exact(r,['kind','atRevision','documentSnapshotId','contextId','layerUid','frame','workId','viewGeneration','cursor','total','nextCursor','items','preview'],['hitTest'])||own(r,'hitTest')&&r.hitTest!==true||
       typeof r.preview!=='boolean'||!integer(r.total,1024)||!integer(r.cursor,r.total)||!Array.isArray(r.items)||r.items.length>8||r.cursor+r.items.length>r.total)fail('Invalid subselect selection page');
@@ -80,7 +85,7 @@
     for(const item of r.items){
       // A hit-test listing (#2362) gives every painted record its bounds, role and fill flag instead of a paint count; a raster image
       // or text block (#2372) is listed too, its bounds the painted rect/glyph box and its count 0 (no editable geometry).
-      if(own(r,'hitTest')?!exact(item,['stableTarget','closed','count','matrix','bounds','role','filled'],['strokeWidth','owner','brush','group','boxAngle','style','paramShape'])||typeof item.filled!=='boolean'||own(item,'paramShape')&&!paramShape(item.paramShape)||own(item,'strokeWidth')&&!(typeof item.strokeWidth==='number'&&Number.isFinite(item.strokeWidth)&&item.strokeWidth>=0)||own(item,'boxAngle')&&!(typeof item.boxAngle==='number'&&Number.isFinite(item.boxAngle))||own(item,'style')&&!listedStyle(item.style)||!Array.isArray(item.bounds)||item.bounds.length!==4||!item.bounds.every(Number.isFinite)||
+      if(own(r,'hitTest')?!exact(item,['stableTarget','closed','count','matrix','bounds','role','filled'],['strokeWidth','owner','brush','group','boxAngle','style','paramShape','groupPath'])||typeof item.filled!=='boolean'||own(item,'paramShape')&&!paramShape(item.paramShape)||own(item,'groupPath')&&!groupPath(item.groupPath)||own(item,'strokeWidth')&&!(typeof item.strokeWidth==='number'&&Number.isFinite(item.strokeWidth)&&item.strokeWidth>=0)||own(item,'boxAngle')&&!(typeof item.boxAngle==='number'&&Number.isFinite(item.boxAngle))||own(item,'style')&&!listedStyle(item.style)||!Array.isArray(item.bounds)||item.bounds.length!==4||!item.bounds.every(Number.isFinite)||
         !['plain','ribbon','fill','shape','brush','raster','text','mask'].includes(item.role)||own(item,'owner')&&(item.role!=='fill'||typeof item.owner!=='string'||!item.owner)||own(item,'brush')&&!['anchor','copy','bitmap'].includes(item.brush)||own(item,'group')&&(!own(item,'brush')||typeof item.group!=='string'||!item.group):!exact(item,['stableTarget','closed','count','matrix'],['paintCount']))fail('Invalid native subselect item');
       if(!target(item.stableTarget,r.contextId)||item.stableTarget.contextId!==r.contextId||item.stableTarget.layerUid!==r.layerUid||typeof item.closed!=='boolean'||
         !integer(item.count,256)||own(item,'paintCount')&&(!integer(item.paintCount,256)||item.paintCount<2||item.closed!==false)||!Array.isArray(item.matrix)||item.matrix.length!==6||!item.matrix.every(Number.isFinite))fail('Invalid native subselect transform');

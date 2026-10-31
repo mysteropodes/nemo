@@ -111,9 +111,12 @@
       var old = nativeDrag; nativeDrag = null;
       if (old && old.suspended) { old.suspended = false; old.engine.resume(); old.engine.renderNow(); }
     }
+    // #2372: a presentation hidden only by the native queue (queue-pending) is "cannot prove it right now", not "changed": a drag in progress survives it, and the
+    // release still re-proves the origin strictly (edit -> shownSoon) before anything is written. A real change drops the sealed projection, so this is false then.
+    function hiddenByQueue() { var Wait = root.NemoNativePresentationWait; return !!Wait && Wait.busy(model.read); }
     function dragCurrent(drag) {
       var rect = bounds(), c = controller;
-      return !retired && c && c.read() === drag.origin && !c.isPending() && engineOn() && root.SMEngineBridge === drag.engine &&
+      return !retired && c && (c.read() === drag.origin || hiddenByQueue()) && !c.isPending() && engineOn() && root.SMEngineBridge === drag.engine &&
         root.state.tool === drag.tool && root.state.currentFrame === drag.frame && rect &&
         ['left', 'top', 'width', 'height'].every(function (key) { return rect[key] === drag.rect[key]; });
     }
@@ -167,20 +170,41 @@
         { kind: 'move', ordinal: drag.ordinal, x: w[0], y: w[1] };
       edit(action, drag.origin);
     }
+    // #2372: a press that finds the presentation hidden by the queue is held with the move / release that follow it and replayed once it is readable
+    // (native-presentation-wait.js); a real change meanwhile (tool, frame, pin) drops it. Only a press can start waiting, so move / release skip the gate unless one is held.
+    var gateOf = null;
+    function gate() {
+      var Wait = root.NemoNativePresentationWait;
+      if (!gateOf && Wait) gateOf = Wait.gate(root, {
+        handle: function (kind, event) {
+          if (kind === 'down') nativeDown(event); else if (kind === 'move') nativeMove(event); else if (kind === 'up') nativeUp(event);
+          else if (!nativeDrag || event.pointerId === nativeDrag.pointer) cancelNative();
+        },
+        begins: function (kind, event) { return kind === 'down' && !retired && !nativeDrag && engineOn() && root.state.tool === 'perspective' && event.button === 0; },
+        read: model.read, snapshot: function () { return { tool: root.state.tool, frame: root.state.currentFrame, stamp: identity() }; },
+        holds: function (token) {
+          var next = identity();
+          return !retired && root.state.tool === token.tool && root.state.currentFrame === token.frame && !!next && !changed(token.stamp, next);
+        }, notice: 'The canvas is still busy - try again.' });
+      return gateOf;
+    }
+    function routed(kind, direct) {
+      return function (event) { var g = gate(); return g && (kind === 'down' || g.waiting()) ? g.handle(kind, event) : direct(event); };
+    }
     var controller = Object.freeze({ read: model.read, readForCommand: model.readForCommand, edit: edit, presented: presented,
       onRead: function (listener) {
         if (retired || typeof listener !== 'function') throw new TypeError('Perspective read listener unavailable');
         readListeners.add(listener); return function () { readListeners.delete(listener); };
       },
-      point: nativePoint, scale: nativeScale, pointerDown: nativeDown, pointerMove: nativeMove, pointerUp: nativeUp,
-      pointerCancel: function (event) { if (!nativeDrag || event.pointerId === nativeDrag.pointer) cancelNative(); },
-      cancelPointer: cancelNative, readGhost: function () {
+      point: nativePoint, scale: nativeScale, pointerDown: routed('down', nativeDown), pointerMove: routed('move', nativeMove), pointerUp: routed('up', nativeUp),
+      pointerCancel: routed('cancel', function (event) { if (!nativeDrag || event.pointerId === nativeDrag.pointer) cancelNative(); }),
+      cancelPointer: function () { if (gateOf) gateOf.cancel(); cancelNative(); }, readGhost: function () {
         if (nativeDrag && !dragCurrent(nativeDrag)) cancelNative();
         return nativeDrag ? nativeDrag.ghost : null;
       },
       isPending: function () { return pending || !!loading; },
       willProject: function () { projectionEpoch++; cancelGesture(); if (!pending) model.invalidate(); repaint(); },
-      dispose: function () { retired = true; refreshNeeded = false; readListeners.clear(); cancelGesture(); model.dispose();
+      dispose: function () { retired = true; if (gateOf) gateOf.cancel(); refreshNeeded = false; readListeners.clear(); cancelGesture(); model.dispose();
         if (typeof root.removeEventListener === 'function') root.removeEventListener('pagehide', controller.dispose); repaint(); }
     });
     installed.set(root, controller); root.NemoNativePerspectiveController = controller;

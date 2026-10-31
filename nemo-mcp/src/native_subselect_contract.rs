@@ -109,7 +109,7 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
             exact(
                 i,
                 &["stableTarget", "closed", "count", "matrix"],
-                if hit { &["bounds", "role", "filled", "strokeWidth", "owner", "brush", "group", "boxAngle", "style", "paramShape"] } else { &["paintCount"] },
+                if hit { &["bounds", "role", "filled", "strokeWidth", "owner", "brush", "group", "boxAngle", "style", "paramShape", "groupPath"] } else { &["paintCount"] },
             )
             .is_some()
                 && (!hit
@@ -122,6 +122,7 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
                         && i.get("boxAngle").is_none_or(|a| a.as_f64().is_some_and(f64::is_finite))
                         && i.get("style").is_none_or(listed_style)
                         && i.get("paramShape").is_none_or(listed_param_shape)
+                        && i.get("groupPath").is_none_or(listed_group_path)
                         && i.get("bounds").is_some()
                         && i.get("owner").is_none_or(|o| i["role"] == "fill" && o.as_str().is_some_and(|s| !s.is_empty()))
                         && i.get("brush").is_none_or(|b| ["anchor", "copy", "bitmap"].contains(&b.as_str().unwrap_or("")))
@@ -328,7 +329,7 @@ fn listed_style(v: &Value) -> bool {
     let hex = |s: &Value| s.as_str().and_then(|s| s.strip_prefix('#')).is_some_and(|d| [6, 8].contains(&d.len()) && d.bytes().all(|b| b.is_ascii_hexdigit()));
     let one_of = |s: &Value, set: &[&str]| s.as_str().is_some_and(|s| set.contains(&s));
     let number = |n: &Value| n.as_f64().is_some_and(f64::is_finite);
-    exact(v, &[], &["fill", "stroke", "width", "opacity", "cap", "join", "miter", "dashOffset", "paintOrder", "strokeStyle", "brushPreset", "maskMode", "maskFeather"]).is_some_and(|o| !o.is_empty())
+    exact(v, &[], &["fill", "stroke", "width", "opacity", "cap", "join", "miter", "dashOffset", "paintOrder", "strokeStyle", "brushPreset", "maskMode", "maskFeather", "fillGradient"]).is_some_and(|o| !o.is_empty())
         && v.get("fill").is_none_or(hex)
         && v.get("stroke").is_none_or(hex)
         && v.get("width").is_none_or(|w| w.as_f64().is_some_and(|w| w.is_finite() && w > 0.0))
@@ -342,6 +343,24 @@ fn listed_style(v: &Value) -> bool {
         && v.get("brushPreset").is_none_or(|p| p.as_str().is_some_and(|p| !p.is_empty() && p.len() <= 96))
         && v.get("maskMode").is_none_or(|m| one_of(m, &["add", "subtract", "intersect"]))
         && v.get("maskFeather").is_none_or(|f| f.as_f64().is_some_and(|f| f.is_finite() && f >= 0.0))
+        && v.get("fillGradient").is_none_or(listed_gradient)
+}
+
+/// #2372 native-fill-gradient: a record's stored two-stop gradient as listed (linear or radial, two finite record-space ends, two stops each
+/// with a finite offset and a `#rrggbb[aa]` colour), the body a `restyle` step's `fillGradient` takes back.
+fn listed_gradient(v: &Value) -> bool {
+    let number = |n: &Value| n.as_f64().is_some_and(|n| n.is_finite() && (n as f32).is_finite());
+    exact(v, &["kind", "from", "to", "stops"], &[]).is_some()
+        && v["kind"].as_str().is_some_and(|k| k == "linear" || k == "radial")
+        && ["from", "to"].iter().all(|k| v[*k].as_array().is_some_and(|p| p.len() == 2 && p.iter().all(number)))
+        && v["stops"].as_array().is_some_and(|stops| {
+            stops.len() == 2
+                && stops.iter().all(|s| {
+                    exact(s, &["offset", "color"], &[]).is_some()
+                        && number(&s["offset"])
+                        && s["color"].as_str().and_then(|c| c.strip_prefix('#')).is_some_and(|d| [3, 6, 8].contains(&d.len()) && d.bytes().all(|b| b.is_ascii_hexdigit()))
+                })
+        })
 }
 
 /// #2372: the `paramShape` a listed dynamic rectangle, ellipse or star carries: a `kind` and only the finite numeric members its kind owns
@@ -354,4 +373,17 @@ fn listed_param_shape(v: &Value) -> bool {
         _ => return false,
     };
     exact(v, &["kind"], members).is_some_and(|o| o.iter().all(|(k, n)| k == "kind" || n.as_f64().is_some_and(f64::is_finite)))
+}
+
+/// #2376: the `groupPath` of a listed record: one to four enclosing groups, outermost first, each a bounded `id` with an optional bounded
+/// `name` and nothing else (the Elements panel builds its tree from it).
+fn listed_group_path(v: &Value) -> bool {
+    v.as_array().is_some_and(|path| {
+        (1..=4).contains(&path.len())
+            && path.iter().all(|g| {
+                exact(g, &["id"], &["name"]).is_some()
+                    && g["id"].as_str().is_some_and(|id| !id.is_empty() && id.len() <= 128)
+                    && g.get("name").is_none_or(|n| n.as_str().is_some_and(|n| n.len() <= 256))
+            })
+    })
 }

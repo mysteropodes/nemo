@@ -307,3 +307,57 @@ fn a_stroke_style_pick_changes_only_a_stroked_plain_record_and_nothing_of_an_uns
         "a ribbon is not restyled by a stroke style pick"
     );
 }
+
+fn ramp(first: &str) -> Value {
+    json!({"kind":"linear","from":[0,5],"to":[10,5],"stops":[{"offset":0,"color":first},{"offset":1,"color":"#0000ffcc"}]})
+}
+
+#[test]
+fn a_fill_gradient_turns_on_with_the_first_stop_as_the_flat_fill_and_off_back_to_that_flat_fill_in_one_entry_each() {
+    // Baseline toggleGradient: on stores the gradient and makes the flat fill its first stop; off deletes the gradient and keeps that flat fill.
+    let mut owner = owner_of(&trio());
+    let before = state(&owner);
+    let on = apply(&mut owner, &["s-b"], json!({"fillGradient": ramp("#ff000080")}));
+    assert_eq!(on["ok"], true, "{on}");
+    assert_eq!(owner.history_depths(), (1, 0));
+    let b = at(&owner, "s-b");
+    assert_eq!(b["vectorExt"]["fillGradient"], ramp("#ff000080"), "stored as sent, stop order and alpha kept");
+    assert_eq!(paint(&b["fill"]), [1.0, 0.0, 0.0, byte(128)], "the flat fallback is the first stop");
+    assert_eq!(at(&owner, "s-a"), before["objects"][0], "only the named record changes");
+    // A later edit of the stored gradient leaves the flat fill where it was.
+    let edit = apply(&mut owner, &["s-b"], json!({"fillGradient": ramp("#00ff00")}));
+    assert_eq!(edit["ok"], true, "{edit}");
+    assert_eq!(owner.history_depths(), (2, 0));
+    assert_eq!(paint(&at(&owner, "s-b")["fill"]), [1.0, 0.0, 0.0, byte(128)]);
+    assert_eq!(at(&owner, "s-b")["vectorExt"]["fillGradient"], ramp("#00ff00"));
+    let off = apply(&mut owner, &["s-b"], json!({"fillGradient": null}));
+    assert_eq!(off["ok"], true, "{off}");
+    assert_eq!(owner.history_depths(), (3, 0));
+    assert!(at(&owner, "s-b").get("vectorExt").is_none(), "the empty extension is dropped");
+    assert_eq!(paint(&at(&owner, "s-b")["fill"]), [1.0, 0.0, 0.0, byte(128)]);
+    undo_to(&mut owner, 0);
+    assert_eq!(state(&owner), before, "undo restores every record exactly");
+    assert_eq!(state(&owner_of(&state(&owner))), state(&owner), "the saved document reopens unchanged");
+}
+
+#[test]
+fn a_fill_gradient_edit_stands_alone_and_a_ribbon_a_malformed_gradient_or_a_short_colour_are_refused_with_nothing_written() {
+    let mut owner = owner_of(&trio());
+    let before = state(&owner);
+    for style in [
+        json!({"fillGradient": ramp("#ff0000"), "fill": "#00ff00"}),
+        json!({"fillGradient": ramp("#ff0000"), "opacity": 0.5}),
+        json!({"fillGradient": ramp("#f00")}),
+        json!({"fillGradient": {"kind":"conic","from":[0,0],"to":[1,0],"stops":[{"offset":0,"color":"#ff0000"},{"offset":1,"color":"#0000ff"}]}}),
+        json!({"fillGradient": {"kind":"linear","from":[0,0],"to":[1,0],"stops":[{"offset":0,"color":"#ff0000"}]}}),
+    ] {
+        let r = apply(&mut owner, &["s-b"], style.clone());
+        assert_eq!(r["error"]["code"], "invalid_request", "{style}: {r}");
+    }
+    assert_eq!(state(&owner), before);
+    let mut ribbon = ribbon_doc();
+    let was = state(&ribbon);
+    let r = apply(&mut ribbon, &["native-stroke:1:1"], json!({"fillGradient": ramp("#ff0000")}));
+    assert_eq!(r["error"]["code"], "unavailable", "a pressure ribbon has no gradient consumer: {r}");
+    assert_eq!(state(&ribbon), was);
+}

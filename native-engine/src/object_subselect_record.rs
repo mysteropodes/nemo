@@ -288,6 +288,31 @@ pub(crate) fn param_shape(record: &ObjectRecord) -> Option<serde_json::Value> {
     listed.as_object_mut()?.remove("box");
     Some(listed)
 }
+/// How many enclosing groups a listed record names (the innermost ones): one record's listing must stay inside the 4096-byte page.
+const GROUP_PATH_DEPTH: usize = 4;
+/// #2376 hit-test listing: the vector groups a stroke sits in, outermost first, from the layer's group table: its innermost group (the
+/// member tag) then each `parent` up, each `{id, name?}`. None for a loose stroke. A parent cycle ends the walk where it repeats.
+pub(crate) fn group_path(table: &crate::object_document::GroupTable, stroke_id: &str) -> Option<Vec<serde_json::Value>> {
+    let mut gid = table.members.iter().find(|m| m.stroke_id == stroke_id)?.group_id.as_str();
+    let mut chain: Vec<&str> = Vec::new();
+    let mut path = Vec::new();
+    while !chain.contains(&gid) && chain.len() < 32 {
+        chain.push(gid);
+        let entry = table.entries.iter().find(|e| e.gid == gid);
+        let mut listed = serde_json::json!({ "id": gid });
+        if let Some(name) = entry.and_then(|e| e.name.value()) {
+            listed["name"] = serde_json::json!(name);
+        }
+        path.push(listed);
+        match entry.and_then(|e| e.parent.value()) {
+            Some(parent) => gid = parent.as_str(),
+            None => break,
+        }
+    }
+    path.truncate(GROUP_PATH_DEPTH);
+    path.reverse();
+    Some(path)
+}
 /// #2362 hit-test listing: what a painted record is, so a reader can tell a ribbon's linked fill or a derived shape
 /// from a plain stroke without the record itself.
 pub(crate) fn hit_role(record: &ObjectRecord) -> &'static str {
