@@ -314,15 +314,11 @@
     });
     return out;
   }
-  // New "Combiner" action — creates a non-destructive combine-group from the
-  // current selection, or (if the selection already IS one existing group's
-  // full membership) just updates that group's combine mode. mode is one of
-  // 'unite'/'subtract'/'intersect'/'exclude'.
+  // "Combiner": a non-destructive combine-group from the selection (or, when the selection IS one group's membership, a mode change);
+  // mode is 'unite'/'subtract'/'intersect'/'exclude'.
   function combineSelection(mode) {
-    // #2372 insp-boolean-ops: on a native object project the owner creates (or re-modes) the combine group in ONE sealed transaction; the
-    // legacy ld.groups writer below and its pushUndo (refused on a native project) are never reached.
-    var nativeBool = window.NemoNativeSelectionBoolean;
-    if (nativeBool && nativeBool.native(window)) { nativeBool.combine(window, mode); return; }
+    // #2372 insp-boolean-ops: a native object project's owner makes the group in ONE sealed transaction; the legacy writer below never runs.
+    var nativeBool = window.NemoNativeSelectionBoolean; if (nativeBool && nativeBool.native(window)) { nativeBool.combine(window, mode); return; }
     if ((state.tool !== 'select' && state.tool !== 'subselect') || !window.selectedPaths || selectedPaths.length < 2) {
       if (window.showToast) showToast(SM.t('toastSelectAtLeast2ShapesToCombine'));
       return;
