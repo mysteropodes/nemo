@@ -112,5 +112,44 @@
     if (!bindings.has(host)) bindings.set(host, create(session));
     return bindings.get(host);
   }
-  return Object.freeze({ create, desktop, BLEND, MATTE });
+  // The effects panel's native hooks (src/js/effects-panel.js). Each action is ONE native compositing edit; the panel is
+  // re-rendered from the confirmed project info afterwards. Every hook answers false when no native project is active, so
+  // the caller keeps its legacy path; per-element effects and keyed parameters have no native owner and report unavailable.
+  const panels = new WeakMap();
+  function panel(host) {
+    if (panels.has(host)) return panels.get(host);
+    const live = () => { try { return desktop(host); } catch (_) { return null; } };
+    const at = () => host.state.activeLayerIdx;
+    const toast = (message) => { if (typeof host.showToast === 'function') host.showToast(message); };
+    const redraw = () => { try { if (typeof host.updateEffectsPanel === 'function') host.updateEffectsPanel(); } catch (_) { /* presentation only */ } };
+    function refused(error) {
+      const why = error && error.reason;
+      toast(why === 'effects_oversize' ? 'This effect stack is too large to edit natively.' : error && error.code === 'not_found' && host.SM ? host.SM.t('hsSelectLayerFirst') : 'Native effect stack command was refused.');
+    }
+    function run(make, after) {
+      const comp = live();
+      if (!comp) return false;
+      make(comp, at()).then(() => { if (after) after((comp.stackOf(at()) || []).length); redraw(); }, (error) => { refused(error); redraw(); });
+      return true;
+    }
+    const api = Object.freeze({
+      on: () => live() !== null,
+      stack: () => { const comp = live(); return comp ? (comp.stackOf(at()) || []) : null; },
+      add: (type, d, after) => run((comp, i) => comp.addEffect(i, { type, enabled: true, p1: d[0], p2: d[1], p3: d[2], p4: d[3], p5: d[4], p6: d[5], p7: d[6], p8: d[7] }), after),
+      toggle: (at2) => run((comp, i) => comp.toggleEffect(i, at2)),
+      remove: (at2, after) => run((comp, i) => comp.removeEffect(i, at2), after),
+      keyed() { if (!live()) return false; toast('Keyed effect parameters are not available on native projects yet.'); return true; },
+      param(at2, key, value, isKeyed) {
+        const comp = live();
+        if (!comp) return false;
+        const effect = (comp.stackOf(at()) || [])[at2];
+        if (effect && isKeyed(effect, key)) return api.keyed();
+        comp.setEffectParam(at(), at2, key, value).catch(refused);
+        return true;
+      },
+    });
+    panels.set(host, api);
+    return api;
+  }
+  return Object.freeze({ create, desktop, panel, BLEND, MATTE });
 }));

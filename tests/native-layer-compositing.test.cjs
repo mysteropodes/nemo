@@ -259,9 +259,6 @@ function panelHarness(options = {}) {
     selectedPaths: [], Path: function Path() {}, CompoundPath: function CompoundPath() {} };
   context.window = context;
   context.window.addEventListener = () => {};
-  // timeline.js owns the shared native gate; load just that block.
-  const text = source('timeline.js');
-  vm.runInNewContext(text.slice(text.indexOf('function nativeCompositing()'), text.indexOf('window.nativeCompositing=nativeCompositing;')) + 'window.nativeCompositing=nativeCompositing;', context);
   vm.runInNewContext(source('effects-panel.js'), context, { filename: 'effects-panel.js' });
   return Object.assign(h, { context, state, toasts, list: () => byId('effects-list'), section: () => byId('effects-stack-sec') });
 }
@@ -332,4 +329,28 @@ test('the closed schema and the contract accept and refuse the same compositing 
     // The contract additionally refuses a matteMoreSet that sets nothing only in the owner, so it may be wider there.
     if (!(extra.edit === 'matteMoreSet' && extra.index === undefined)) assert.equal(contract, expected, 'contract ' + JSON.stringify(extra));
   }
+});
+
+test('panel hooks: parameter edits send one stack edit, keyed parameters and keying report unavailable, and no native project answers false', async () => {
+  const p = panelHarness();
+  const hooks = Compositing.panel(p.context);
+  const keyed = (eff, key) => !!(eff.keys && eff.keys[key]);
+  assert.equal(hooks.on(), true);
+  assert.equal(hooks.param(0, 'p1', 8, keyed), true);
+  await settle();
+  assert.equal(p.sent.length, 1);
+  assert.equal(p.sent[0].payload.effects[0].p1, 8);
+  assert.equal(hooks.param(1, 'p1', 8, keyed), true, 'a keyed parameter is claimed by the native path');
+  await settle();
+  assert.equal(p.sent.length, 1, 'but nothing is written');
+  assert.deepEqual(p.toasts, ['Keyed effect parameters are not available on native projects yet.']);
+  assert.equal(hooks.keyed(), true);
+  const none = Compositing.panel({ state: { activeLayerIdx: 0 }, NemoNativeObjectProject: { desktop: () => null } });
+  assert.equal(none.on(), false);
+  assert.equal(none.stack(), null);
+  assert.equal(none.add('blur', [0, 0, 0, 0, 0, 0, 0, 0]), false);
+  assert.equal(none.toggle(0), false);
+  assert.equal(none.remove(0), false);
+  assert.equal(none.keyed(), false);
+  assert.equal(none.param(0, 'p1', 1, keyed), false);
 });

@@ -22259,8 +22259,8 @@
           "oneOf": [
             {
               "type": "number",
-              "minimum": -1000000000.0,
-              "maximum": 1000000000.0
+              "minimum": -1000000000,
+              "maximum": 1000000000
             },
             {
               "const": null
@@ -22271,8 +22271,8 @@
           "oneOf": [
             {
               "type": "number",
-              "minimum": -1000000000.0,
-              "maximum": 1000000000.0
+              "minimum": -1000000000,
+              "maximum": 1000000000
             },
             {
               "const": null
@@ -22283,8 +22283,8 @@
           "oneOf": [
             {
               "type": "number",
-              "minimum": -1000000000.0,
-              "maximum": 1000000000.0
+              "minimum": -1000000000,
+              "maximum": 1000000000
             },
             {
               "const": null
@@ -22295,8 +22295,8 @@
           "oneOf": [
             {
               "type": "number",
-              "minimum": -1000000000.0,
-              "maximum": 1000000000.0
+              "minimum": -1000000000,
+              "maximum": 1000000000
             },
             {
               "const": null
@@ -22307,8 +22307,8 @@
           "oneOf": [
             {
               "type": "number",
-              "minimum": -1000000000.0,
-              "maximum": 1000000000.0
+              "minimum": -1000000000,
+              "maximum": 1000000000
             },
             {
               "const": null
@@ -22319,8 +22319,8 @@
           "oneOf": [
             {
               "type": "number",
-              "minimum": -1000000000.0,
-              "maximum": 1000000000.0
+              "minimum": -1000000000,
+              "maximum": 1000000000
             },
             {
               "const": null
@@ -22331,8 +22331,8 @@
           "oneOf": [
             {
               "type": "number",
-              "minimum": -1000000000.0,
-              "maximum": 1000000000.0
+              "minimum": -1000000000,
+              "maximum": 1000000000
             },
             {
               "const": null
@@ -22343,8 +22343,8 @@
           "oneOf": [
             {
               "type": "number",
-              "minimum": -1000000000.0,
-              "maximum": 1000000000.0
+              "minimum": -1000000000,
+              "maximum": 1000000000
             },
             {
               "const": null

@@ -6248,21 +6248,11 @@ window.matteSourceIndicesInUse=matteSourceIndicesInUse;
 // confirmed with Cyril). Picking a source with no mode set defaults the
 // mode to 'alpha' so the pick has a visible effect immediately.
 function buildMatteMenuItems(li,ld,onChanged){
-  var nat=nativeCompositing(); // #2372: native projects write one compositing edit per pick; the stored values come from the project info
-  if(nat){
-    var natItems=[{label:'Matte : Aucune (retirer)',disabled:nat.matteOf(li)==='none',action:function(){
-      nat.setMatteMode(li,'none').then(function(){onChanged();nativeCompositingRefresh();},nativeCompositingRefused);
-    }}];
-    state.layers.forEach(function(other,oi){
-      var uid=oi===li?null:nat.layerUid(oi);if(!uid)return; // a layer can't matte itself
-      var cur=nat.sourceOf(li)===uid;
-      natItems.push({label:'Source : '+(other.name||('Layer '+(oi+1)))+(cur?'  \u2713':''),disabled:cur,action:function(){
-        nat.setMatteSource(li,uid).then(function(){onChanged();nativeCompositingRefresh();},nativeCompositingRefused);
-      }});
-    });
-    return natItems;
-  }
-  var items=[{label:'Matte : Aucune (retirer)',disabled:!ld.matteMode,action:function(){
+  // #2372: on a native project each pick is one native compositing edit and the stored values are read from the project info.
+  var nat=nativeCompositing();
+  function viaNative(promise){promise.then(function(){onChanged();nativeCompositingRefresh();},nativeCompositingRefused);}
+  var items=[{label:'Matte : Aucune (retirer)',disabled:nat?nat.matteOf(li)==='none':!ld.matteMode,action:function(){
+    if(nat){viaNative(nat.setMatteMode(li,'none'));return;}
     pushUndo();
     delete ld.matteMode;delete ld.matteSourceLayerUid;delete ld.mattesMore;
     onChanged();
@@ -6270,12 +6260,14 @@ function buildMatteMenuItems(li,ld,onChanged){
   }}];
   state.layers.forEach(function(other,oi){
     if(oi===li)return; // a layer can't matte itself
-    var uid=(window.SMMotion&&SMMotion.ensureLayerUid)?SMMotion.ensureLayerUid(other):(other.layerUid||(other.layerUid='ly_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6)));
-    var isCur=ld.matteSourceLayerUid===uid;
+    var uid=nat?nat.layerUid(oi):((window.SMMotion&&SMMotion.ensureLayerUid)?SMMotion.ensureLayerUid(other):(other.layerUid||(other.layerUid='ly_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6))));
+    if(!uid)return;
+    var isCur=(nat?nat.sourceOf(li):ld.matteSourceLayerUid)===uid;
     items.push({
       label:'Source : '+(other.name||('Layer '+(oi+1)))+(isCur?'  ✓':''),
       disabled:isCur,
       action:function(){
+        if(nat){viaNative(nat.setMatteSource(li,uid));return;}
         pushUndo();
         ld.matteSourceLayerUid=uid;
         if(!ld.matteMode||ld.matteMode==='none')ld.matteMode='alpha';
@@ -10587,18 +10579,18 @@ if(_btnAlphaBg){
 // no-op stub (rather than deleted outright) since labs-float-panel.js's
 // cycleMode still calls it after a Symmetry mode change.
 window.syncSymmetryPanelVisibility=function(){};
-// Custom blend-mode dropdown (feedback #17): hovering an option in the open
-// list applies that blend mode to the active layer IMMEDIATELY as a live
-// canvas preview; clicking commits it (with undo), while closing any other
-// way (outside click, Escape, re-click on the field) reverts to the mode
-// the layer had when the list opened. A native <select> can't do this: its
-// open popup is OS-rendered and exposes no per-option hover events.
 // #2372: on a native object project the blend and matte pickers write ONE native compositing edit on commit and never touch
 // the legacy layer model; a hover is a UI-local label preview only (no document, ld or engine write).
 function nativeCompositing(){try{var a=window.NemoNativeObjectLayerCompositing;return a&&typeof a.desktop==='function'?a.desktop(window):null;}catch(_){return null;}}
 function nativeCompositingRefused(){if(window.showToast)showToast('Native layer compositing command was refused.');}
 function nativeCompositingRefresh(){try{if(window.SMMotion&&SMMotion.renderMotionPropsPanel)SMMotion.renderMotionPropsPanel();if(window.renderLayerList)renderLayerList();if(window.renderTimeline)renderTimeline();}catch(_){}}
 window.nativeCompositing=nativeCompositing;window.nativeCompositingRefused=nativeCompositingRefused;window.nativeCompositingRefresh=nativeCompositingRefresh;
+// Custom blend-mode dropdown (feedback #17): hovering an option in the open
+// list applies that blend mode to the active layer IMMEDIATELY as a live
+// canvas preview; clicking commits it (with undo), while closing any other
+// way (outside click, Escape, re-click on the field) reverts to the mode
+// the layer had when the list opened. A native <select> can't do this: its
+// open popup is OS-rendered and exposes no per-option hover events.
 var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overlay:'Overlay',darken:'Darken',lighten:'Lighten',colorDodge:'Color Dodge',colorBurn:'Color Burn',hardLight:'Hard Light',softLight:'Soft Light',difference:'Difference',exclusion:'Exclusion',hue:'Hue',saturation:'Saturation',color:'Color',luminosity:'Luminosity'};
 (function initBlendDropdown(){
   var dd=document.getElementById('p-blendmode');if(!dd)return;
