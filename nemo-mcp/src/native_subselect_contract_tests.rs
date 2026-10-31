@@ -228,14 +228,16 @@ fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
     // #2372 SEL-STYLE: the style a panel shows is optional, with hex colours, a positive width and an opacity in 0..1.
     for good in [json!({"fill":"#ff000080","stroke":"#00ff00","width":6.0,"opacity":0.5}), json!({"opacity":0}), json!({"fill":"#112233"}),
         json!({"cap":"square","join":"bevel","miter":4.0,"dashOffset":-2.5,"paintOrder":"strokeFirst"}),
-        json!({"maskMode":"subtract","maskFeather":12.5}), json!({"maskMode":"add","maskFeather":0})] {
+        json!({"maskMode":"subtract","maskFeather":12.5}), json!({"maskMode":"add","maskFeather":0}),
+        json!({"strokeStyle":"dotted","brushPreset":"chalk-round"}), json!({"strokeStyle":"solid"})] {
         let mut item = r.clone();
         item["items"][0]["style"] = good.clone();
         assert!(public_read(&q, &item), "style {good} is legal in a hit-test listing");
     }
     for bad in [json!({}), json!({"fill":"red"}), json!({"fill":null}), json!({"width":0}), json!({"opacity":2}), json!({"colour":"#000000"}), json!("#000000"),
         json!({"cap":"flat"}), json!({"join":"sharp"}), json!({"miter":-1}), json!({"paintOrder":"x"}),
-        json!({"maskMode":"xor"}), json!({"maskMode":null}), json!({"maskFeather":-1}), json!({"maskFeather":"3"})] {
+        json!({"maskMode":"xor"}), json!({"maskMode":null}), json!({"maskFeather":-1}), json!({"maskFeather":"3"}),
+        json!({"strokeStyle":"wavy"}), json!({"strokeStyle":null}), json!({"brushPreset":""}), json!({"brushPreset":7})] {
         let mut item = r.clone();
         item["items"][0]["style"] = bad.clone();
         assert!(!public_read(&q, &item), "style {bad} is refused");

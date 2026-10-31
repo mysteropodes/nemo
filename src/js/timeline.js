@@ -3684,6 +3684,7 @@ function _snapshotDrawingDefaults(){
     strokeCap:state.strokeCap,strokeJoin:state.strokeJoin,
     miterLimit:state.miterLimit,dashOffset:state.dashOffset,
     paintOrder:state.paintOrder,brushSize:state.brushSize,
+    strokeStyle:state.strokeStyle,brushPreset:state.brushPreset,
   };
 }
 function _restoreDrawingDefaults(){
@@ -3704,6 +3705,9 @@ function _restoreDrawingDefaults(){
   var _mlEl=document.getElementById('p-miterlimit');if(_mlEl)_mlEl.value=state.miterLimit;
   var _doEl=document.getElementById('p-dashoffset');if(_doEl)_doEl.value=state.dashOffset;
   var _swEl=document.getElementById('p-sw');if(_swEl)_swEl.value=Math.round(state.brushSize);
+  // The Stroke Style and brush preset are drawing defaults too: a selection's readback (nativeStyleReadback) must not leak into the next stroke.
+  if(d.strokeStyle!==undefined){state.strokeStyle=d.strokeStyle;var _ssEl=document.getElementById('p-strokestyle');if(_ssEl)_ssEl.value=state.strokeStyle;}
+  if(d.brushPreset!==undefined){state.brushPreset=d.brushPreset;if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(state.brushPreset);}
 }
 // Populates the Transform section's fields (position/size/rotation/point-
 // type/boolean-op rows) — visibility itself is now owned by
@@ -3846,6 +3850,7 @@ function updateSelPropsPanel(){
         paintIconGroup('p-paintorder-grp',state.paintOrder);syncMiterLimitEnabled();
         document.getElementById('p-miterlimit').value=state.miterLimit;
         document.getElementById('p-dashoffset').value=state.dashOffset;
+        nativeStyleReadback(ref);
       }
       // Stroke Width staleness fix (2026-08-21, feedback #34: "tous les
       // paramètres stroke ne fonctionnent pas pour modifié la stroke") —
@@ -6248,7 +6253,11 @@ window.matteSourceIndicesInUse=matteSourceIndicesInUse;
 // confirmed with Cyril). Picking a source with no mode set defaults the
 // mode to 'alpha' so the pick has a visible effect immediately.
 function buildMatteMenuItems(li,ld,onChanged){
-  var items=[{label:'Matte : Aucune (retirer)',disabled:!ld.matteMode,action:function(){
+  // #2372: on a native project each pick is one native compositing edit and the stored values are read from the project info.
+  var nat=nativeCompositing();
+  function viaNative(promise){promise.then(function(){onChanged();nativeCompositingRefresh();},nativeCompositingRefused);}
+  var items=[{label:'Matte : Aucune (retirer)',disabled:nat?nat.matteOf(li)==='none':!ld.matteMode,action:function(){
+    if(nat){viaNative(nat.setMatteMode(li,'none'));return;}
     pushUndo();
     delete ld.matteMode;delete ld.matteSourceLayerUid;delete ld.mattesMore;
     onChanged();
@@ -6256,12 +6265,14 @@ function buildMatteMenuItems(li,ld,onChanged){
   }}];
   state.layers.forEach(function(other,oi){
     if(oi===li)return; // a layer can't matte itself
-    var uid=(window.SMMotion&&SMMotion.ensureLayerUid)?SMMotion.ensureLayerUid(other):(other.layerUid||(other.layerUid='ly_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6)));
-    var isCur=ld.matteSourceLayerUid===uid;
+    var uid=nat?nat.layerUid(oi):((window.SMMotion&&SMMotion.ensureLayerUid)?SMMotion.ensureLayerUid(other):(other.layerUid||(other.layerUid='ly_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6))));
+    if(!uid)return;
+    var isCur=(nat?nat.sourceOf(li):ld.matteSourceLayerUid)===uid;
     items.push({
       label:'Source : '+(other.name||('Layer '+(oi+1)))+(isCur?'  ✓':''),
       disabled:isCur,
       action:function(){
+        if(nat){viaNative(nat.setMatteSource(li,uid));return;}
         pushUndo();
         ld.matteSourceLayerUid=uid;
         if(!ld.matteMode||ld.matteMode==='none')ld.matteMode='alpha';
@@ -6424,7 +6435,22 @@ function nativeStyleView(p){
   if(ribbon){data.isVectorBrush=true;data.widthProfile=[{width:st.width||0}];}
   if(st.paintOrder)data.paintOrder=st.paintOrder;
   return {id:p.id,data:data,fillColor:st.fill?new Color(st.fill):null,strokeColor:!ribbon&&st.stroke?new Color(st.stroke):null,strokeWidth:st.width||0,nativeOpacity:st.opacity,
-    strokeCap:st.cap,strokeJoin:st.join,miterLimit:st.miter,dashOffset:st.dashOffset};
+    strokeCap:st.cap,strokeJoin:st.join,miterLimit:st.miter,dashOffset:st.dashOffset,nativeListed:true,strokeStyle:st.strokeStyle,
+    brushPreset:st.role==='plain'||st.role==='brush'?st.brushPreset||'none':undefined};
+}
+// #2372 INSP-READBACK: the Stroke Style and brush preset controls show the listed selection's own values (the engine reads the style back from the dash
+// pattern and names a texture anchor's preset), not the tool defaults left by the last pick. Passive display: neither goes through the setters
+// (they would re-apply onto the selection). A legacy path (no listed style) is left as it was.
+function nativeStyleReadback(ref){
+  if(!ref||!ref.nativeListed)return;
+  if(typeof ref.strokeStyle==='string'){
+    state.strokeStyle=ref.strokeStyle;
+    var ss=document.getElementById('p-strokestyle');if(ss)ss.value=ref.strokeStyle;
+  }
+  if(typeof ref.brushPreset==='string'){
+    state.brushPreset=ref.brushPreset;
+    if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(ref.brushPreset);
+  }
 }
 function paintStrokeSwatches(v){
   var sw=document.getElementById('stroke-well'); if(sw)sw.style.background=v;
@@ -10573,6 +10599,12 @@ if(_btnAlphaBg){
 // no-op stub (rather than deleted outright) since labs-float-panel.js's
 // cycleMode still calls it after a Symmetry mode change.
 window.syncSymmetryPanelVisibility=function(){};
+// #2372: on a native object project the blend and matte pickers write ONE native compositing edit on commit and never touch
+// the legacy layer model; a hover is a UI-local label preview only (no document, ld or engine write).
+function nativeCompositing(){try{var a=window.NemoNativeObjectLayerCompositing;return a&&typeof a.desktop==='function'?a.desktop(window):null;}catch(_){return null;}}
+function nativeCompositingRefused(){if(window.showToast)showToast('Native layer compositing command was refused.');}
+function nativeCompositingRefresh(){try{if(window.SMMotion&&SMMotion.renderMotionPropsPanel)SMMotion.renderMotionPropsPanel();if(window.renderLayerList)renderLayerList();if(window.renderTimeline)renderTimeline();}catch(_){}}
+window.nativeCompositing=nativeCompositing;window.nativeCompositingRefused=nativeCompositingRefused;window.nativeCompositingRefresh=nativeCompositingRefresh;
 // Custom blend-mode dropdown (feedback #17): hovering an option in the open
 // list applies that blend mode to the active layer IMMEDIATELY as a live
 // canvas preview; clicking commits it (with undo), while closing any other
@@ -10586,6 +10618,7 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
   var origMode=null; // layer's mode when the list opened — the revert target while previewing
   function currentLd(){return state.layers[state.activeLayerIdx];}
   function applyPreview(v){
+    if(nativeCompositing()){dd.textContent=BLEND_MODE_LABELS[v]||v;return;} // #2372: native hover = label only
     var ld=currentLd();if(!ld)return;
     // Keyed layers (feedback #207, Duik-inspired hold-only Blend keys) skip
     // the live hover preview here — layerBlendModeAt (motion.js) ignores
@@ -10614,6 +10647,7 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
     // #207), not the (irrelevant once keyed) static field.
     var keyedAtOpen=!!(ld.blendKeys&&ld.blendKeys.length);
     origMode=keyedAtOpen?((window.SMMotion&&SMMotion.layerBlendModeAt)?SMMotion.layerBlendModeAt(state.activeLayerIdx,state.currentFrame):(ld.blendMode||'normal')):(ld.blendMode||'normal');
+    var natOpen=nativeCompositing();if(natOpen)origMode=natOpen.blendOf(state.activeLayerIdx);
     pop.innerHTML='';
     Object.keys(BLEND_MODE_LABELS).forEach(function(v){
       var it=document.createElement('div');
@@ -10622,6 +10656,12 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
       it.addEventListener('mouseenter',function(){applyPreview(v);});
       it.addEventListener('click',function(e){
         e.stopPropagation();
+        var nat=nativeCompositing();
+        if(nat){ // #2372: one native edit, no ld write, no pushUndo
+          var from=origMode;origMode=null;close(false);
+          nat.setBlend(state.activeLayerIdx,v).then(function(){setLabel(v);nativeCompositingRefresh();},function(){setLabel(from||'normal');nativeCompositingRefused();});
+          return;
+        }
         var ld2=currentLd();if(!ld2){close(false);return;}
         if(ld2.blendKeys&&ld2.blendKeys.length){
           // Duik-style hold key: SNAP the mode at the current frame instead
@@ -10703,6 +10743,7 @@ function matteModeLabel(mode){
   var origMode=null;
   function currentLd(){return state.layers[state.activeLayerIdx];}
   function applyPreview(v){
+    if(nativeCompositing()){dd.textContent=matteModeLabel(v)||v;return;} // #2372: native hover = label only
     var ld=currentLd();if(!ld)return;
     ld.matteMode=v==='none'?undefined:v;
     window._sceneVersion=(window._sceneVersion||0)+1;
@@ -10735,6 +10776,7 @@ function matteModeLabel(mode){
       return;
     }
     origMode=ld.matteMode||'none';
+    var natOpen=nativeCompositing();if(natOpen)origMode=natOpen.matteOf(state.activeLayerIdx);
     pop.innerHTML='';
     MATTE_MODES.forEach(function(v){
       var it=document.createElement('div');
@@ -10743,6 +10785,12 @@ function matteModeLabel(mode){
       it.addEventListener('mouseenter',function(){applyPreview(v);});
       it.addEventListener('click',function(e){
         e.stopPropagation();
+        var nat=nativeCompositing();
+        if(nat){ // #2372: one native edit (None clears the matte; a pick freezes the adjacent source in the same write)
+          var from=origMode;origMode=null;close(false);
+          nat.setMatteMode(state.activeLayerIdx,v).then(function(){setLabel(v);nativeCompositingRefresh();},function(){setLabel(from||'none');nativeCompositingRefused();});
+          return;
+        }
         var ld2=currentLd();if(ld2)ld2.matteMode=origMode==='none'?undefined:origMode;
         pushUndo();
         applyPreview(v);

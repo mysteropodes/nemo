@@ -2862,6 +2862,7 @@
         "native-selection-style.js",
         "native-selection-boolean.js",
         "native-selection-transform.js",
+        "native-selection-align.js",
         "native-selection-delete.js",
         "native-layer-list-presenter.js",
         "native-object-ui.js",
@@ -3492,6 +3493,30 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-object-motion-preset.js"
+      ]
+    },
+    {
+      "id": "app.native.object.layer-compositing.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-layer-compositing.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-layer-compositing.js"
+      ]
+    },
+    {
+      "id": "app.native.path-effects.ui.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-path-effects-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-path-effects-ui.js"
       ]
     },
     {

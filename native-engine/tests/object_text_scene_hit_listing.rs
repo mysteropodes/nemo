@@ -178,7 +178,7 @@ fn a_record_image_and_text_list_the_style_a_panel_shows() {
         "strokeCap":"butt","strokeJoin":"miter","miterLimit":10,"dashOffset":0,"opacity":1});
     let items = listing(&doc)["items"].as_array().unwrap().clone();
     assert_eq!(items[0]["style"], json!({"fill":"#ff000080","stroke":"#00ff00","width":6.0,"opacity":0.5019607843137255,
-        "cap":"butt","join":"miter","miter":10.0,"dashOffset":0.0}));
+        "cap":"butt","join":"miter","miter":10.0,"dashOffset":0.0,"strokeStyle":"solid"}));
     assert_eq!(items[1]["role"], "text");
     assert!(items[1]["style"]["fill"].as_str().is_some_and(|c| c.starts_with('#')), "a text block lists its colour: {}", items[1]);
     assert_eq!(items[2]["style"], json!({"opacity":1.0}), "an image lists its opacity");
@@ -187,11 +187,38 @@ fn a_record_image_and_text_list_the_style_a_panel_shows() {
     doc["objects"][0]["vector"]["hasRealStroke"] = json!(false);
     doc["objects"][0]["vector"]["stroke"] = Value::Null;
     doc["objects"][0]["vector"]["opacity"] = json!(0.25);
-    assert_eq!(listing(&doc)["items"][0]["style"], json!({"width":6.0,"opacity":0.25,"cap":"butt","join":"miter","miter":10.0,"dashOffset":0.0}));
+    assert_eq!(listing(&doc)["items"][0]["style"], json!({"width":6.0,"opacity":0.25,"cap":"butt","join":"miter","miter":10.0,"dashOffset":0.0,"strokeStyle":"solid"}));
     // SEL-STYLE2: the paint order is listed for the panel too.
     doc["objects"][0]["vector"]["paintOrder"] = json!("strokeFirst");
     let style = listing(&doc)["items"][0]["style"].clone();
     assert_eq!(style["paintOrder"], "strokeFirst");
+}
+
+#[test]
+fn a_record_lists_the_stroke_style_its_dash_pattern_reads_back_as_and_an_anchor_its_preset() {
+    // #2372 INSP-READBACK: the panel's Stroke Style and brush preset show the selection's own values (strokeStyle writes [on, off] * width).
+    let styled = |dash: Value, width: f64, ext: Value| {
+        let mut doc = drawing();
+        doc["objects"][0]["family"] = json!("editable-vector-path");
+        doc["objects"][0]["vector"] = json!({"stroke":{"kind":"solid","r":0.0,"g":1.0,"b":0.0,"a":1.0},"hasRealStroke":true,"strokeWidth":width,
+            "strokeCap":"butt","strokeJoin":"miter","miterLimit":10,"dashOffset":0,"opacity":1});
+        if !dash.is_null() {
+            doc["objects"][0]["vector"]["dashArray"] = dash;
+        }
+        if !ext.is_null() {
+            doc["objects"][0]["vectorExt"] = ext;
+        }
+        listing(&doc)["items"][0]["style"].clone()
+    };
+    assert_eq!(styled(Value::Null, 4.0, Value::Null)["strokeStyle"], "solid");
+    assert_eq!(styled(json!([10.0, 7.2]), 4.0, Value::Null)["strokeStyle"], "dashed");
+    assert_eq!(styled(json!([2.0, 4.8]), 4.0, Value::Null)["strokeStyle"], "dotted");
+    assert!(styled(json!([3.0, 3.0]), 4.0, Value::Null).get("strokeStyle").is_none(), "a hand-made dash names no style");
+    assert!(styled(Value::Null, 4.0, Value::Null).get("brushPreset").is_none(), "a plain stroke has no preset");
+    let anchor = json!({"brushTexture":{"brushGroupId":"g","brushTexturePreset":"chalk-round","preTextureOpacity":1}});
+    assert_eq!(styled(Value::Null, 4.0, anchor)["brushPreset"], "chalk-round");
+    let dab = json!({"brushTexture":{"brushGroupId":"g","isBrushTextureCopy":true}});
+    assert!(styled(Value::Null, 4.0, dab).get("brushPreset").is_none(), "a dab carries no preset of its own");
 }
 
 #[test]

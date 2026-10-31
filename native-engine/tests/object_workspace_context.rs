@@ -490,8 +490,25 @@ fn a_time_remap_without_keys_falls_back_to_the_play_mode_like_the_baseline_null(
 #[test]
 fn a_time_remap_cannot_be_driven_by_an_expression_so_the_keyed_track_is_always_the_answer() {
     // The document admits no `timeRemap` property record (the track belongs to the instance), so an expression has nowhere to live.
-    let mut doc: Value = serde_json::from_str(world_json("D")).unwrap();
-    doc["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"ly_comp_loop"},
-        "properties":[{"property":"timeRemap","expression":{"enabled":true,"code":"5"}}]}]);
-    assert!(decode_storage_project(doc.to_string().as_bytes()).is_err());
+    // The holder is otherwise valid (a resolvable layer, a `static` value, a well-formed expression): the SAME holder on a property
+    // the catalog owns decodes, so the refusal below is about Time Remap and nothing else.
+    let holder = |property: &str| {
+        let mut doc: Value = serde_json::from_str(world_json("D")).unwrap();
+        doc["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"ly_comp_loop"},
+            "properties":[{"property":property,"static":[0],"expression":{"enabled":true,"code":"5"}}]}]);
+        decode_storage_project(doc.to_string().as_bytes())
+    };
+    assert!(
+        holder("rotation").is_ok(),
+        "the same holder with an admitted property decodes"
+    );
+    let refused = holder("timeRemap").expect_err("an expression on Time Remap is refused");
+    assert_eq!(
+        refused.kind(),
+        crate::object_codec::ObjectCodecErrorKind::Unsupported
+    );
+    assert_eq!(
+        refused.message(),
+        "property belongs to its existing order or remap owner"
+    );
 }

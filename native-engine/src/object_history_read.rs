@@ -81,6 +81,7 @@ pub(crate) fn label_for(operation: &str, payload: &Value) -> String {
         "layer.split" => "Split Layer",
         "layer.cut" => "Cut Layer",
         "layer.policy.edit" => "Layer Settings",
+        "layer.compositing.edit" => "Layer Compositing",
         "layer.range.drag" => "Move Layer Range",
         "layer.key.promote" => "Insert Keyframe",
         "layer.key.blank" => "Blank Keyframe",

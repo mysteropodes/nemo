@@ -73,7 +73,7 @@ function fixture(hostname = 'nemo.example') {
 
 test('public feedback API and local trust transitions stay outside project state', async () => {
   const f = fixture(), api = f.api;
-  assert.deepEqual(Object.keys(api), ['logAction', 'recentClickTrail', 'actionLogMark', 'clickLogMark',
+  assert.deepEqual(Object.keys(api), ['logAction', 'logNativeCommand', 'recentClickTrail', 'actionLogMark', 'clickLogMark',
     'actionTrailSince', 'clickTrailSince', 'submitFeedback', 'readAllLocal', 'checkIncomingFeedback',
     'importIncoming', 'pullAllIncoming', 'approveFeedback', 'resolveFeedback', 'deleteFeedback',
     'githubTriageToken', 'setGithubTriageToken', 'fetchGithubIssues', 'approveGithubIssue',
@@ -297,4 +297,29 @@ test('only an explicit submit publishes: logging, reading and pulling never reac
   const published = f.requests.filter(r => r.url.startsWith(WORKER));
   assert.equal(published.length, 1, 'one explicit submit is one Worker publication');
   assert.equal(published[0].url, WORKER + '/issue');
+});
+
+test('native commands enter the same ring buffer as operation/frame/layer uid only, never exported content', () => {
+  const f = fixture(), api = f.api, ctx = f.context;
+  ctx.state.actionLog = [];
+  const edit = { operation: 'command.document.object.property.edit', payload: { property: 'position',
+    target: { contextId: 'scene-root', layerUid: 'L-7', strokeId: 'S-1', frameScope: { kind: 'authored', frame: 12 } }, value: { secret: 'doc-content' } } };
+  api.logNativeCommand(edit); api.logNativeCommand(edit);
+  api.logNativeCommand({ operation: 'command.document.object.layer.visibility.set', payload: { layerUid: 'L-9', visible: false } });
+  api.logNativeCommand({ operation: 'command.document.object.property.track.edit', payload: { selections: [{ property: 'opacity',
+    target: { layerUid: 'L-3', frameScope: { frame: 4 } } }] } });
+  api.logNativeCommand({ action: { kind: 'select', layerUid: 'L-2' } });
+  api.logNativeCommand({ operation: 'transaction.commit', payload: { transactionId: 't1' } });
+  api.logNativeCommand(null); api.logNativeCommand({ payload: {} });
+  const trail = plain(api.actionTrailSince(0)).map(({ tool, frame, layer, count }) => ({ tool, frame, layer, count }));
+  assert.deepEqual(trail, [
+    { tool: 'native:property.edit', frame: 12, layer: 'L-7', count: 2 },
+    { tool: 'native:layer.visibility.set', frame: 7, layer: 'L-9', count: 1 },
+    { tool: 'native:property.track.edit', frame: 4, layer: 'L-3', count: 1 },
+    { tool: 'native:reference.select', frame: 7, layer: 'L-2', count: 1 },
+    { tool: 'native:transaction.commit', frame: 7, layer: null, count: 1 },
+  ]);
+  assert.equal(JSON.stringify(api.actionTrailSince(0)).includes('doc-content'), false);
+  for (let i = 0; i < 160; i++) api.logNativeCommand({ operation: 'command.document.apply', payload: { frame: i } });
+  assert.equal(api.actionLogMark(), 150);
 });

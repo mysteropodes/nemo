@@ -109,7 +109,7 @@
       if (!smoothed) { notice(root, 'Could not read the strokes to smooth just now.'); return { status: 'unavailable' }; }
       if (I.pickContext(root) !== job.ctx) { notice(root, 'The selection changed \u2014 nothing was restyled.'); return { status: 'stale' }; }
       layerUid = smoothed.layerUid; frame = smoothed.frame; steps = smoothed.steps;
-    } else steps = S.restyleSteps(apply, job.style, job.last);
+    } else steps = job.recolor ? S.recolourSteps(apply, job.recolor.from, job.recolor.to) : S.restyleSteps(apply, job.style, job.last);
     if (!steps.length) return { status: 'noop' };
     if (JSON.stringify(steps).length > MAX_BYTES) { notice(root, 'Too much to restyle at once — select fewer items.'); return { status: 'too_large' }; }
     var result;
@@ -157,11 +157,20 @@
   // Records a style edit of the current selection: the members named (fill / stroke as #rrggbb[aa], width, opacity 0..1) replace those of the
   // pending edit of the same selection; the commit follows when the edits stop. Resolves with { status } once committed.
   function apply(root, style) {
-    var s = state(root), S = root.NemoNativeSelectionSteps, members = S && S.valid(style), paths = selected(root);
-    if (!members) return Promise.resolve({ status: 'invalid' });
+    var S = root.NemoNativeSelectionSteps, members = S && S.valid(style);
+    return members ? edit(root, members, null, S.alone(members)) : Promise.resolve({ status: 'invalid' });
+  }
+  // The Selected Colors panel's recolour (#2372 insp-recolour): every fill or stroke of the selection equal to `from` becomes `to`, as ONE restyle batch.
+  // Coalesced like any panel edit (a picker drag or an opacity scrub fires many times); a recolour of another colour is an edit of its own.
+  function applyRecolor(root, from, to) {
+    var S = root.NemoNativeSelectionSteps, a = S && S.key(from), b = S && S.key(to), ok = /^#[0-9a-f]{6}([0-9a-f]{2})?$/;
+    return ok.test(a) && ok.test(b) ? edit(root, {}, { from: a, to: b }, 'recolor:' + a) : Promise.resolve({ status: 'invalid' });
+  }
+  function edit(root, members, recolor, own) {
+    var s = state(root), paths = selected(root);
     if (!paths.length || !route(root)) return Promise.resolve({ status: 'unavailable' });
     // A commit in flight re-reads the selection when it ends: this edit follows it instead of reading the one before.
-    if (s.inflight) return s.chain.then(function () { return apply(root, style); });
+    if (s.inflight) return s.chain.then(function () { return edit(root, members, recolor, own); });
     var I = root.NemoSelectCanvasIntent, ids = paths.map(function (p) { return p.data.strokeId; }), ctx = I && I.pickContext(root), pending = s.pending;
     // The selection must be the one drawn for this frame, layer and tool: a selection that outlived a context change is dropped, never restyled.
     if (!(owns(root) || (pending && pending.ctx === ctx && sameSelection(pending.ids, ids)))) {
@@ -170,23 +179,32 @@
       return Promise.resolve({ status: 'unavailable' });
     }
     if (ids.length > MAX_STEPS) { notice(root, 'Too many items to restyle at once (' + MAX_STEPS + ' at most).'); return Promise.resolve({ status: 'too_large' }); }
-    var own = S.alone(members);
     // A preset and a smooth are edits of their own: whatever is pending is committed first, and the next edit starts afresh.
     if (pending && (!sameSelection(pending.ids, ids) || pending.own !== own)) { flush(root); pending = null; }
     if (!pending) {
       var shown = I.presentedState(root);
       if (!shown) { notice(root, 'Restyling is not available right now.'); return Promise.resolve({ status: 'unavailable' }); }
       var job = { ids: ids, paths: paths, style: {}, layerIdx: paths[0].data.nativeLayerIndex, layerUid: paths[0].data.nativeLayerUid, ctx: ctx, pin: shown.pin, frame: shown.presentation.frame,
-        symbol: (root.state && root.state.activeSymbolId) || null, commits: s.commits, timer: 0, waiting: [], own: own, last: null };
+        symbol: (root.state && root.state.activeSymbolId) || null, commits: s.commits, timer: 0, waiting: [], own: own, last: null, recolor: null };
       job.done = function (r) { job.waiting.forEach(function (w) { w(r); }); };
       s.pending = pending = job;
     }
     Object.assign(pending.style, members);
+    if (recolor) pending.recolor = recolor;
     // A ribbon is inked by one colour: when the fill and the stroke colour differ in one window the later write wins, as the baseline's two setters did.
     if (members.stroke !== undefined) pending.last = 'stroke'; else if (members.fill !== undefined) pending.last = 'fill';
     var waiting = new Promise(function (resolve) { pending.waiting.push(resolve); });
     arm(root, pending);
     return waiting;
   }
-  return Object.freeze({ apply: apply, flush: flush, handles: handles, shown: shown });
+  // True on a native object project (the panel's writes then go through the engine, never a Paper item).
+  function native(root) { return !!route(root); }
+  // The colours of the selected native items, most used first, as the Selected Colors panel lists them; null when no native item is selected.
+  function colours(root) {
+    var S = root.NemoNativeSelectionSteps, paths = selected(root), map = {};
+    if (!S || !paths.length) return null;
+    paths.forEach(function (p) { S.coloursOf(p).forEach(function (c) { (map[c] = map[c] || { hex: c, count: 0 }).count++; }); });
+    return Object.keys(map).map(function (c) { return map[c]; }).sort(function (a, b) { return b.count - a.count; });
+  }
+  return Object.freeze({ apply: apply, applyRecolor: applyRecolor, colours: colours, native: native, flush: flush, handles: handles, shown: shown });
 }));

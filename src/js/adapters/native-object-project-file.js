@@ -61,7 +61,7 @@
         });});
   }
   // #2371: read-model members the layer table admits (validated by native-object-project-metadata.js; the presenter reads info.layers).
-  var MODEL_ROW_KEYS=['kind','folderCollapsed','folderId','componentId','blendMode','matteMode','matteSourceLayerUid','mattesMore','isMatteSource','opacity','opacityAnimated'];
+  var MODEL_ROW_KEYS=['kind','folderCollapsed','folderId','componentId','blendMode','matteMode','matteSourceLayerUid','mattesMore','isMatteSource','opacity','opacityAnimated','effects','effectsOversize','pathFx','pathFxOversize'];
   function layerTable(layers){
     if(!Array.isArray(layers))throw new Error('Native layer table is invalid');
     var seen=new Set(),next=[];

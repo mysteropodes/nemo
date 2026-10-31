@@ -156,6 +156,8 @@
   var expandedIdx = -1; // which row (if any) is showing its param editor
 
   function activeLayer() { return state.layers[state.activeLayerIdx]; }
+  // #2372: native projects edit the layer's stack through ONE native compositing edit per action (never the legacy writer).
+  function nfx() { return window.NemoNativeObjectLayerCompositing.panel(window); }
 
   // Per-ELEMENT effects (2026-07, "possible de différencié les effet par
   // éléments sélectionné si j'applique un effet sur un élément select alors
@@ -168,6 +170,7 @@
   // tool is active — no separate manual toggle, matches gradient-bridge's
   // own automatic-by-selection precedent.
   function singleSelectedElement() {
+    if (nfx().on()) return null; // per-element effects have no native owner: the panel targets the layer stack
     if ((state.tool !== 'select' && state.tool !== 'subselect') || !window.selectedPaths || selectedPaths.length !== 1) return null;
     var p = selectedPaths[0];
     return (p instanceof Path || p instanceof CompoundPath) ? p : null;
@@ -194,10 +197,8 @@
   // painted behind it. singleSelectedElement()/effectsTarget() above target
   // selectedPaths[0] exclusively, so every mutation below was writing
   // data.effects onto the ribbon ONLY — visually the effect appeared to
-  // "skip the fill" because the fill is a wholly separate item that never
-  // received it. Called after every mutation rather than made part of
-  // effectsTarget() itself, since that function returns BEFORE the caller
-  // actually mutates t.obj.effects.
+  // "skip the fill" because the fill is a wholly separate item that never received it. Called after every
+  // mutation, not from effectsTarget() (which returns BEFORE the caller mutates t.obj.effects).
   function syncCompanionEffects(t) {
     if (!t || !t.isElement || !t.item) return;
     var layer = userLayers[state.activeLayerIdx];
@@ -245,17 +246,9 @@
     return (EFFECT_DEFAULTS[type] || [0, 0, 0, 0]).concat([0, 0, 0, 0, 0, 0, 0, 0]).slice(0, 8);
   }
 
-  // Categorized flyout menu with preview thumbnails (2026-07 rewrite —
-  // feedback: "on a pas de préviz vignette et de sous menu. Pense bien
-  // l'architecture ui qui marcherait le mieux"). Replaces the plain
-  // <select>+<optgroup> (functional but no visual preview and no real
-  // nested-menu structure) with a two-level flyout matching how AE/most
-  // desktop apps present a categorized "Add Effect" menu: a category list
-  // that opens a submenu of preview tiles (small CSS-approximation
-  // thumbnail + label) to the side. Built FRESH every time it's opened
-  // (not cached) since which categories/custom effects are available can
-  // change between opens (adjustment vs ordinary layer, a shader just
-  // authored, etc).
+  // Categorized flyout menu with preview thumbnails (2026-07 rewrite, replaces the plain <select>+<optgroup>): a
+  // category list that opens a submenu of preview tiles, like AE's "Add Effect". Built FRESH on every open (not
+  // cached) since the available categories/custom effects change (adjustment vs ordinary layer, a new shader).
   var addMenuEl = null, subMenuEl = null;
   function closeAddMenu() {
     if (addMenuEl) { addMenuEl.remove(); addMenuEl = null; }
@@ -431,6 +424,7 @@
   window.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAddMenu(); });
 
   function addEffect(type) {
+    if (nfx().add(type, defaultsArrFor(type), function (n) { expandedIdx = n - 1; })) return;
     var t = effectsTarget(); if (!t) return;
     pushUndo();
     if (!t.obj.effects) t.obj.effects = [];
@@ -442,6 +436,7 @@
   }
   window.addEffectToActiveLayer = addEffect; // custom-effects.js calls this right after authoring a brand-new shader
   function toggleEnabled(idx) {
+    if (nfx().toggle(idx)) return;
     var t = effectsTarget(); if (!t || !t.obj.effects || !t.obj.effects[idx]) return;
     pushUndo();
     t.obj.effects[idx].enabled = !t.obj.effects[idx].enabled;
@@ -449,6 +444,7 @@
     saveActiveLayerFrame(); renderEffectsSection(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   function deleteEffect(idx) {
+    if (nfx().remove(idx, function () { if (expandedIdx === idx) expandedIdx = -1; else if (expandedIdx > idx) expandedIdx--; })) return;
     var t = effectsTarget(); if (!t || !t.obj.effects) return;
     pushUndo();
     t.obj.effects.splice(idx, 1);
@@ -534,6 +530,7 @@
   // freezes the value the animation had reached rather than snapping back to
   // whatever the static field last held.
   function toggleParamKeying(idx, key) {
+    if (nfx().keyed()) return;
     var t = effectsTarget(); if (!t || !t.obj.effects || !t.obj.effects[idx]) return;
     var eff = t.obj.effects[idx];
     pushUndo();
@@ -572,6 +569,7 @@
     return best !== null;
   }
   function toggleKeyHere(idx, key) {
+    if (nfx().keyed()) return;
     var t = effectsTarget(); if (!t || !t.obj.effects || !t.obj.effects[idx]) return;
     var eff = t.obj.effects[idx];
     if (!paramKeyed(eff, key)) return;
@@ -596,6 +594,7 @@
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   function setParam(idx, key, raw) {
+    if (nfx().param(idx, key, raw, paramKeyed)) return;
     var t = effectsTarget(); if (!t || !t.obj.effects || !t.obj.effects[idx]) return;
     var eff = t.obj.effects[idx];
     pushUndo();
@@ -689,7 +688,7 @@
     if (!list) return;
     list.innerHTML = '';
     var t = effectsTarget();
-    var effects = (t && t.obj.effects) || [];
+    var effects = nfx().stack() || (t && t.obj.effects) || [];
     effects.forEach(function (eff, idx) {
       var row = document.createElement('div');
       row.className = 'fx-row' + (eff.enabled ? '' : ' disabled') + (expandedIdx === idx ? ' expanded' : '');
@@ -769,7 +768,7 @@
     // invisible until you happen to click the header. The header is the only
     // thing on screen when collapsed, so that is where the count belongs.
     var t = effectsTarget();
-    var n = (t && t.obj && t.obj.effects) ? t.obj.effects.length : 0;
+    var n = (nfx().stack() || (t && t.obj && t.obj.effects) || []).length;
     var hdr = sec.querySelector('.phdr');
     if (hdr) {
       var badge = hdr.querySelector('.fx-count');
@@ -786,10 +785,9 @@
   // une seule liste laisserait croire qu'on peut intercaler un flou entre
   // deux déformations de contour, ce qui est faux — le flou travaille sur
   // des pixels que la déformation n'a pas encore produits.
-  function pathFxHost() {
-    var ld = activeLayer();
-    return (ld && !ld.isNullLayer) ? ld : null;
-  }
+  // #2372: native projects draw and edit this section in native-path-effects-ui.js (never the legacy ld.pathFx writer).
+  function npfx() { return window.NemoNativePathEffectsUi ? window.NemoNativePathEffectsUi.panel(window) : { on: function () { return false; }, render: function () { return false; } }; }
+  function pathFxHost() { var ld = activeLayer(); return (ld && !ld.isNullLayer && !npfx().on()) ? ld : null; }
   function pathFxPushUndo() { if (typeof pushUndo === 'function') pushUndo(); }
   function pathFxChanged() {
     // Surtout PAS de saveActiveLayerFrame ici : les objets vivants portent la
@@ -809,7 +807,7 @@
   }
   function renderPathFxList() {
     var list = document.getElementById('path-fx-list');
-    if (!list || !window.SMPathFx) return;
+    if (!list || !window.SMPathFx || npfx().render()) return;
     var ld = pathFxHost();
     var wrap = document.getElementById('path-fx-sec');
     if (wrap) wrap.style.display = ld ? '' : 'none';
@@ -856,11 +854,12 @@
     if (add && !add._wired) {
       add._wired = true;
       add.addEventListener('change', function () {
-        if (!add.value) return;
+        if (!add.value || npfx().on()) return; // native: the adapter's own listener takes the pick
         addPathFx(add.value);
         add.value = '';
       });
       SMPathFx.TYPES.forEach(function (t) {
+        if (add.querySelector('option[value="' + t.id + '"]')) return;
         var o = document.createElement('option');
         o.value = t.id; o.textContent = window.SM.t(t.label);
         add.appendChild(o);
