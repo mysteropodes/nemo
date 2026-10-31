@@ -751,8 +751,7 @@
     }
   }
   function renderShapesPanel() {
-    if (window.NemoNativeShapeTree && window.NemoNativeShapeTree.owns(window)) return; // #2376: a native object project lists its elements through the native presenter
-    var list = document.getElementById('shapes-list');
+    if (window.NemoNativeShapeTree && window.NemoNativeShapeTree.owns(window)) return; var list = document.getElementById('shapes-list'); // #2376: a native object project lists its elements through the native presenter
     if (!list) return;
     list.innerHTML = '';
     if (!window.SMMotion || !window.SMMotion.buildShapeTree) return;
