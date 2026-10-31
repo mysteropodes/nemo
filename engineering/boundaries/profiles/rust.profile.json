@@ -281,6 +281,7 @@
         "object_vector_create.rs",
         "object_vector_batch.rs",
         "object_vector_batch_ribbon.rs",
+        "object_vector_batch_layers.rs",
         "object_vector_batch_items.rs",
         "object_vector_batch_transform.rs",
         "object_vector_batch_style.rs",

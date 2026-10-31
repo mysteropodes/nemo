@@ -6,7 +6,8 @@
  * record-space matrix the engine applies (it rebuilds a ribbon from its centreline and re-syncs its linked fill, carries a texture
  * anchor's dabs and a gradient's end points, keeps a shape's box). It holds no document state and writes nothing while the pointer
  * moves: Escape, a lost capture or a stale document ends the gesture with no write. Baseline (1065e9d8 select-bridge onDown/onMove/onUp):
- * Shift on a corner scales proportionally, Alt scales from the box centre, Shift snaps a rotation to 15 degrees, Shift on the press extends
+ * A selection may span layers (a marquee reads every visible unlocked layer, a Shift pick adds from another): its move / scale / rotate is still ONE
+ * batch, each step naming its own layer. Shift on a corner scales proportionally, Alt scales from the box centre, Shift snaps a rotation to 15 degrees, Shift on the press extends
  * the selection. An image and a text block go in the same batch as a record-space matrix in their own frame (the listing's bounds and
  * matrix): the engine moves the image's stored centre, scales its size and turns its rotation (a mesh bound to it follows) and re-anchors
  * a text block and scales its size, fixed width and spacing as the baseline resize did. An image or a text block takes a move, a scale
@@ -178,38 +179,38 @@
       if (O) O.show(root);
       if (typeof root.updateUI === 'function') root.updateUI();
     }
-    // ONE native batch of reshapes for the whole selection, against the document the drag began on.
+    // ONE native batch of reshapes for the whole selection (its items may sit on several layers: every step names its own layer), against the
+    // document the drag began on.
     async function commit() {
-      var bad = unsupported(g.sel), ids = g.sel.map(function (p) { return p.data.strokeId; }), layerIdx = g.sel.length ? g.sel[0].data.nativeLayerIndex : undefined;
+      var bad = unsupported(g.sel), ids = g.sel.map(function (p) { return p.data.strokeId; }), unread = g.sel.some(function (p) { return !Number.isInteger(p.data.nativeLayerIndex); });
       if (bad) return notice(root, 'Transforming ' + bad + ' is not available on native projects yet.');
-      if (!ids.length || layerIdx === undefined || g.sel.some(function (p) { return p.data.nativeLayerIndex !== layerIdx; })) return notice(root, 'Select items of one layer to transform them.');
+      if (!ids.length || unread) return notice(root, 'Select items to transform them.');
       if (ids.length > MAX_STEPS) return notice(root, 'Too many items to transform at once (' + MAX_STEPS + ' at most).');
       var m = g.matrix, cannot = unstorable(root, g.sel, m), now = I.presentedState(root), route = root.NemoNativeObjectLabs && root.NemoNativeObjectLabs.desktop(root);
       if (cannot) return notice(root, cannot + ' is not available on native projects yet.');
       if (!now || !samePin(now.pin, g.pin) || now.presentation.frame !== g.frame || I.pickContext(root) !== g.ctx) return notice(root, 'The document changed during the drag — nothing was changed.');
       if (!route) return notice(root, 'Transforming is not available right now.');
-      var layers = await I.layerPaths(root, function (item) { return ids.indexOf(item.stableTarget.strokeId) >= 0; }, false, layerIdx);
+      var layers = await I.reread(root, g.sel, false);
       var again = I.presentedState(root);
-      if (!layers || layers.paths.length !== ids.length || !again || !samePin(again.pin, g.pin)) return notice(root, 'The document changed during the drag — nothing was changed.');
+      if (!layers || !layers.complete || !again || !samePin(again.pin, g.pin)) return notice(root, 'The document changed during the drag — nothing was changed.');
       var result;
       var steps;
       try { steps = I.transformSteps(root, layers.paths, m); } catch (_) { steps = null; }
       if (steps && JSON.stringify(steps).length > MAX_BYTES) return notice(root, 'Too much to transform at once \u2014 select fewer items.');
       try { result = steps ? await route.batchStrokes(layers.layerUid, layers.frame, steps) : null; } catch (_) { result = null; }
       if (!result || result.status !== 'applied') return notice(root, 'The transform could not be applied.');
-      await reselect(ids, layerIdx);
+      await reselect(ids);
     }
     // The committed strokes as fresh presented paths (the old transient ones hold the geometry from before). A vector record's box angle comes
     // back from the engine's listing (the turn was stored in the same batch); an image or text block has no stored one, so it keeps the session's.
-    async function reselect(ids, layerIdx) {
+    async function reselect(ids) {
       var angles = {}, fresh = null;
       g.sel.forEach(function (p) { angles[p.data.strokeId] = (p.data.boxAngle || 0) + (g.kind === 'rotate' ? g.angle : 0); });
       for (var tries = 0; tries < 2 && !fresh; tries++) {
         if (tries) await new Promise(function (done) { (root.setTimeout || setTimeout)(done, 120); });
-        try { fresh = await I.layerPaths(root, function (item) { return ids.indexOf(item.stableTarget.strokeId) >= 0; }, false, layerIdx); } catch (_) { fresh = null; }
+        try { fresh = await I.reread(root, g.sel, false); } catch (_) { fresh = null; }
       }
-      root.selectedPaths = fresh ? fresh.paths.sort(function (a, b) { return ids.indexOf(a.data.strokeId) - ids.indexOf(b.data.strokeId); })
-        .map(function (p) { if (angles[p.data.strokeId] && (p.data.nativeRole === 'raster' || p.data.nativeRole === 'text')) p.data.boxAngle = angles[p.data.strokeId] % 360; return p; }) : [];
+      root.selectedPaths = fresh ? fresh.paths.map(function (p) { if (angles[p.data.strokeId] && (p.data.nativeRole === 'raster' || p.data.nativeRole === 'text')) p.data.boxAngle = angles[p.data.strokeId] % 360; return p; }) : [];
       root.state.selectedStrokeIndices = [];
     }
     async function end(ev) {

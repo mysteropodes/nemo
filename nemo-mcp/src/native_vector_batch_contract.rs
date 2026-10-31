@@ -1,4 +1,5 @@
-//! `object.vector.batch` (#2361, #2362): ordered create, replace and delete steps on ONE scene-root layer, applied by the
+//! `object.vector.batch` (#2361, #2362): ordered create, replace and delete steps on scene-root layers (one or, since #2372, several: a
+//! Select spanning layers is one batch; only a `trimEnds` batch is one layer), applied by the
 //! native owner as one revision and one undo entry. Shapes are the single commands' own; the receipt lists one stroke id
 //! per step, in order: an owner-allocated id for a create, the step's named target for a replace or delete. A `copy` step
 //! (multiframe stamps) is an earlier create's record again on another frame: a create in every respect but its size. A
@@ -127,7 +128,8 @@ pub(super) fn request(payload: &Value) -> bool {
             let targets = targets(ops);
             (1..=MAX_OPS).contains(&ops.len())
                 && targets.is_some_and(|targets| {
-                    targets.iter().all(|t| t["contextId"] == "scene-root" && t["layerUid"] == targets[0]["layerUid"])
+                    targets.iter().all(|t| t["contextId"] == "scene-root")
+                        && (payload.get("trimEnds").is_none() || targets.iter().all(|t| t["layerUid"] == targets[0]["layerUid"]))
                 })
         })
 }
