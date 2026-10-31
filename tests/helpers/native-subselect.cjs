@@ -5,7 +5,8 @@ const Command=require('../../src/js/adapters/native-object-vector-command.js'),P
 function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
 function fixture(){
   const paper=Paper.load(),rect={left:0,top:0,right:200,bottom:200,width:200,height:200},stage={getBoundingClientRect:()=>rect,setPointerCapture(){},releasePointerCapture(){}};
-  const dom=()=>({style:{},setAttribute(){},appendChild(){},remove(){}}),notices=[],sent=[],previews=[];
+  let live=0;const liveLog=[];/* overlays on screen after every attach/remove: a 0 between an edit and its restore is a visible blink (#2356) */
+  const dom=()=>({style:{},setAttribute(){},appendChild(){},remove(){if(this.attached){this.attached=false;liveLog.push(--live);}}}),body={appendChild(n){n.attached=true;liveLog.push(++live);}},notices=[],sent=[],previews=[];
   let lagReads=0,lagged=null;/* the canvas presents a new revision some reads after the info pin moved (installed #2356) */
   let pin={instanceId:'i',documentId:'d',lifecycleGeneration:1,contentRevision:0,documentSnapshotId:'native-object:d:0',canvasW:200,canvasH:200,layers:[{layerUid:'L'}]};
   let presentation={...pin,owner:'native',status:'presented',contextId:'scene-root',frame:0,workId:'native-work-1',viewGeneration:1};
@@ -19,12 +20,12 @@ function fixture(){
       dispatch:async q=>{sent.push(q);if(transportFailures>0){transportFailures--;throw Error('Transport lost');}return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:q.expectedRevision+1,ok:true,result:{applied:true,historyEntriesAdded:1}};},
       reconcile:async revision=>{if(reconcileFailure)throw Error('Owner read unavailable');pin={...pin,contentRevision:revision,documentSnapshotId:`native-object:d:${revision}`};const next={...presentation,...pin};if(lagReads>0)lagged=next;else presentation=next;}});}finally{queued=false;}}};
   const root={paper,setTimeout:fn=>setImmediate(fn),NemoNativePresentationWait:require('../../src/js/adapters/native-presentation-wait.js'),state:{tool:'subselect',appMode:'anim2d',currentFrame:0,activeLayerIdx:0,layers:[{layerUid:'L'}]},_layerSel:[0],showToast:m=>notices.push(m),
-    document:{getElementById:()=>stage,createElementNS:dom,body:dom(),documentElement:{clientWidth:200,clientHeight:200,classList:{contains:()=>true},style:{getPropertyValue:k=>String(k.endsWith('right')||k.endsWith('bottom')?200:0)}}},
+    document:{getElementById:()=>stage,createElementNS:dom,body,documentElement:{clientWidth:200,clientHeight:200,classList:{contains:()=>true},style:{getPropertyValue:k=>String(k.endsWith('right')||k.endsWith('bottom')?200:0)}}},
     NemoNativeObjectProject:{desktop:()=>s},NemoNativeObjectProjectFile:{projectionReadyForUI:()=>true},NemoNativeObjectVectorCommand:Command,NemoNativeSubselectContract:Contract,
     NemoNativeViewportUnderlay:{canvasMapping:{point:e=>({x:e.clientX,y:e.clientY}),transform:()=>[1,0,0,1,0,0],matchesView:()=>!!s.readPresentedObjectSession()}}};
   const controller=Bridge.create(root),event=(x,y,extra={})=>({clientX:x,clientY:y,pointerId:1,target:stage,preventDefault(){},stopImmediatePropagation(){},...extra});
   async function select(){controller.handle('down',event(100,60));await controller.settled();assert.equal(paper.project.activeLayer.children.length,0);}
   function drag(){controller.handle('down',event(40,24));controller.handle('move',event(52,34));}
-  return {root,s,controller,event,setBusy:v=>busy=v,select,drag,sent,previews,notices,item,paper,setFrame:n=>{root.state.currentFrame=n;presentation={...presentation,frame:n};},setItems:v=>items=v,lagPresentation:n=>{lagReads=n;},setGate:g=>gate=g,failTransport:count=>{transportFailures=count;reconcileFailure=true;},allowRecovery:()=>{reconcileFailure=false;},setReadGate:g=>readGate=g,replace:()=>{pin={...pin,documentId:'replacement',documentSnapshotId:'native-object:replacement:0'};presentation={...presentation,...pin};}};
+  return {liveLog:()=>liveLog.splice(0),live:()=>live,root,s,controller,event,setBusy:v=>busy=v,select,drag,sent,previews,notices,item,paper,setFrame:n=>{root.state.currentFrame=n;presentation={...presentation,frame:n};},setItems:v=>items=v,lagPresentation:n=>{lagReads=n;},setGate:g=>gate=g,failTransport:count=>{transportFailures=count;reconcileFailure=true;},allowRecovery:()=>{reconcileFailure=false;},setReadGate:g=>readGate=g,replace:()=>{pin={...pin,documentId:'replacement',documentSnapshotId:'native-object:replacement:0'};presentation={...presentation,...pin};}};
 }
 module.exports={fixture,deferred};
