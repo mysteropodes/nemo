@@ -237,6 +237,7 @@ impl NativeObjectHost {
             ViewportDisplayFilter::None,
             None,
             None,
+            false,
             &mut (),
         )
     }
@@ -249,6 +250,7 @@ impl NativeObjectHost {
         display_filter: ViewportDisplayFilter,
         alpha_checker: Option<f64>,
         current_outline: Option<f64>,
+        hide_shadow_guides: bool,
         observer: &mut dyn crate::native_dispatch::ObjectPreviewObserver,
     ) -> Result<ObjectPresentedFrame, String> {
         let mut prepared = self
@@ -259,6 +261,7 @@ impl NativeObjectHost {
         // #2373: the checker is part of the canonical quality identity of this frame, like the onion settings.
         prepared.checker_scale = alpha_checker;
         prepared.outline_scale = current_outline; // #2372, likewise
+        prepared.hide_shadow_guides = hide_shadow_guides; // #2373, likewise
         self.preview.presented_mesh_view = None;
         self.preview.presented_vectors = None;
         if self.released.is_some() || self.preview.released || self.preview.blocked.is_some() {
@@ -355,7 +358,7 @@ impl NativeObjectHost {
         // #2358 GHOST-UNDER: onion / Ghost All composed UNDER the live frame (preview witness only, never an export).
         let (composition, ghost_receipt) = prepare::attach_ghosts(composition, ghosts.as_ref(), &snapshot, expected.frame)?;
         // #2373 checker / #2372 outline: view-only aids of this viewport witness (never the retained hit-test source).
-        let composition = prepare::attach_view_aids(composition, key.output_spec().dimensions(), alpha_checker, current_outline)?;
+        let composition = prepare::attach_view_aids(composition, key.output_spec().dimensions(), alpha_checker, current_outline, hide_shadow_guides)?;
         let key = if media.draws_video(expected.frame) {
             EvaluationKey::new(
                 key.document_snapshot_id(),

@@ -45,7 +45,7 @@ function rootFor({ native, ids = IDS.filter((id) => id !== 'new-custom-shader') 
 }
 
 test('the table covers every control without a native owner, one stable sentence each, and leaves #btn-grad-add-stop to its own toast', () => {
-  assert.deepEqual(Object.keys(Unavailable.TABLE).sort(), IDS.slice().sort());
+  assert.deepEqual(Object.keys(Unavailable.TABLE).sort(), IDS.concat(['btn-mgraph', 'btn-revision-view']).sort());
   for (const id of IDS) {
     const notice = Unavailable.noticeFor(id);
     assert.match(notice, /^[A-Z][^.]*not available on this project yet\.$/, id);
