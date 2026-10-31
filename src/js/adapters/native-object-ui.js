@@ -260,12 +260,14 @@
     seam(root).publish(root,info);
     var shyMode=typeof ports.readShyMode==='function'&&ports.readShyMode()===true,policyOwner=policyPort(ports);
     var list=node(root,'layer-list'),header=node(root,'frame-hdr'),grid=node(root,'frame-grid');
-    var previous=views.get(root),selection=root._layerSel||[],decorKey=JSON.stringify([info.layerFolders,info.layerModelUnavailable]);
+    var previous=views.get(root),selection=root._layerSel||[];
     var reuse=frameOnly===true&&previous&&previous.ports===ports&&previous.list===list&&previous.header===header&&previous.grid===grid&&
-      previous.shyMode===shyMode&&previous.decorKey===decorKey&&previous.inspector===root.document.getElementById('props-panel')&&previous.active===root.state.activeLayerIdx&&
+      previous.shyMode===shyMode&&previous.inspector===root.document.getElementById('props-panel')&&previous.active===root.state.activeLayerIdx&&
       ['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].every(function(k){return previous.pin[k]===info[k];})&&
       selection.length===previous.selection.length&&selection.every(function(value,i){return previous.selection[i]===value;})&&
-      info.layers.length===previous.metadata.length&&info.layers.every(function(layer,i){var old=previous.metadata[i];return old[0]===layer.layerUid&&old[1]===layer.name&&old[2]===layer.visible&&old[3]===layer.locked&&old[4]===layer.shy&&old[5]===JSON.stringify(layer);})&&
+      // Every row/decoration fact lives in the info object, which the session replaces on each revision; the pin above
+      // (contentRevision + documentSnapshotId) is therefore the content key. No per-frame serialisation (CLAUDE.md 5bis b).
+      info.layers.length===previous.layerCount&&
       list.children.length===previous.rows.length&&previous.rows.every(function(row,i){return list.children[i]===row&&
         row.children.length===previous.controls[i].length&&previous.controls[i].every(function(control,k){return row.children[k]===control;});})&&
       header.children.length===1&&header.children[0]===previous.caption&&((root.NemoNativeLayerRangeDesktop&&root.NemoNativeLayerRangeDesktop.owns(root,grid,previous.unavailable))||(grid.children.length===1&&grid.children[0]===previous.unavailable));
@@ -300,9 +302,9 @@
       frameEditPending:function(){var controller=root.NemoNativeFrameEditController;return !!(controller&&controller.isPending());}}));
     unavailableInspector(root,ports,info);
     if(!reuse){var pin={};['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].forEach(function(k){pin[k]=info[k];});
-      views.set(root,{decorKey:decorKey,list:list,header:header,grid:grid,inspector:root.document.getElementById('props-panel'),rows:rows,
+      views.set(root,{layerCount:info.layers.length,list:list,header:header,grid:grid,inspector:root.document.getElementById('props-panel'),rows:rows,
         controls:rows.map(function(row){return Array.from(row.children);}),shyMode:shyMode,caption:caption,unavailable:unavailable,
-        ports:ports,pin:pin,active:root.state.activeLayerIdx,selection:selection.slice(),metadata:info.layers.map(function(layer){return [layer.layerUid,layer.name,layer.visible,layer.locked,layer.shy,JSON.stringify(layer)];})});}
+        ports:ports,pin:pin,active:root.state.activeLayerIdx,selection:selection.slice()});}
     var field=root.document.getElementById('tl-cf');
     if(field){if(root.document.activeElement!==field)field.value=root.state.currentFrame+1;field.max=info.totalFrames;}
     ['tl-tf','info-frame'].forEach(function(id){var el=root.document.getElementById(id);if(el)el.textContent=id==='tl-tf'?info.totalFrames:root.state.currentFrame+1;});

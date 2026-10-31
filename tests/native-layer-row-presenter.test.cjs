@@ -112,9 +112,32 @@ test('frameOnly keeps the decorated rows; a changed decoration fact rebuilds the
  paint(r,info(ROWS),false);const before=list.children.slice();
  paint(r,info(ROWS),true);
  assert.ok(list.children.every((row,i)=>row===before[i]),'a frame change reuses every row, decorations included');
- paint(r,info(ROWS.map((l,i)=>i===2?{...l,opacity:25}:{...l})),true);
+ paint(r,info(ROWS.map((l,i)=>i===2?{...l,opacity:25}:{...l}),4),true);
  assert.notStrictEqual(list.children[2],before[2],'a new opacity fact is shown');
  assert.ok(H.project(list.children[2]).nodes.some(n=>/native-layer-opacity/.test(n.cls)&&/25%/.test(n.html)));
+});
+
+test('frameOnly with an unchanged revision serialises nothing and reuses every row; a new revision rebuilds',()=>{
+ const r=rootFor(),list=r.document.getElementById('layer-list');
+ paint(r,info(ROWS),false);const before=list.children.slice();
+ const real=JSON.stringify;let calls=0;JSON.stringify=function(){calls++;return real.apply(this,arguments);};
+ try{
+  const ports=r.ports,value=info(ROWS);Files.projectView(r,value);r._layerSel=[0];
+  assert.equal(UI.render(r,value,true,ports),true);
+  assert.equal(calls,0,'a frame advance runs no JSON.stringify over the layer rows or folders');
+ }finally{JSON.stringify=real;}
+ assert.ok(list.children.every((row,i)=>row===before[i]),'every row is reused');
+ paint(r,info(ROWS,4),true);
+ assert.notStrictEqual(list.children[0],before[0],'a new content revision rebuilds');
+});
+
+test('frameOnly reuse at 2000 layers stays far below a per-layer serialisation cost',()=>{
+ const many=Array.from({length:2000},(_,i)=>({layerUid:'l'+i,name:'Layer '+i,visible:true,locked:false,shy:false}));
+ const r=rootFor();paint(r,info(many),false);
+ const ports=r.ports,value=info(many);Files.projectView(r,value);r._layerSel=[0];
+ const t=process.hrtime.bigint();for(let k=0;k<5;k++)assert.equal(UI.render(r,value,true,ports),true);
+ const ms=Number(process.hrtime.bigint()-t)/1e6/5;
+ assert.ok(ms<25,'frameOnly render of 2000 layers took '+ms.toFixed(1)+' ms');
 });
 
 test('the four controls stay the first four children; flex order places the decorations around them',()=>{
