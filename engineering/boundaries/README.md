@@ -18,6 +18,10 @@ The checker, ratchet, CLI, discovery, coverage and application-policy suites run
 (the adopted-graph edge counts, native-engine port grants and source-shape guards) as one child
 `node --test`, so `npm test` and the JS unit job catch pin drift on the PR that causes it (#2348).
 When a reviewed PR legitimately adds an edge or port, update the policy JSON and these pins together.
+Every other `scripts/nemo/*.test.cjs` suite has its own `tests/nemo-*.test.cjs` entry
+(`tests/nemo-script-suites.test.cjs` covers the family-acceptance, inventory `--check`, legacy surface id,
+parity matrix and app-pin refresher suites, and fails when a new suite is left outside every entry).
+None needs a built app or the network, so there is no opt-out; add a new suite's entry in the same PR (#2348).
 Pull-request validation runs the standard `scripts/nemo/ci.cjs boundaries` lane. That lane
 requires every current `scripts/nemo/**/*.cjs` source in the tooling profile, enforces its
 dependency rules and protected-base size ratchet, then enforces the adopted application

@@ -44,7 +44,7 @@ test('refresh fills every derived pin and leaves policy and membership untouched
     assert.match(pv.inventoryDigest.value, /^[a-f0-9]{64}$/); assert.equal(pv.profiles[0].basedOnCommit, 'c0ffee');
     for (const key of Object.keys(before)) if (key !== 'provenance') assert.deepEqual(after[key], before[key], key);
     assert.deepEqual(driftedPins(text, text), []);
-    assert.ok(driftedPins(raw, text).includes('inventoryDigest.value'));
+    assert.ok(driftedPins(raw, text).includes('provenance.inventoryDigest.value'));
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
