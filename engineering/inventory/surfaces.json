@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "cd087d46afe8bfecc4e717e67c101f654a89bc1f",
-  "describe": "v0.7.0-alpha.4-4078-gcd087d46-dirty"
+  "head": "ce42f811a27675bbe042b69f4f70162a0538a8c3",
+  "describe": "v0.7.0-alpha.4-4081-gce42f811-dirty"
  },
- "inputsDigest": "d09e42e3b93e161cd39f62e9984dadcc43e26a82c32819743fa64d5ee0bfe7af",
+ "inputsDigest": "865724c0bfbc0a378db79b90400e780b72c2437f7f9bb2c8b7d5cfbbe06410c3",
  "states": [
   "inventoried",
   "characterized",
@@ -453,7 +453,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 138,
+    "functionsVisited": 139,
     "via": "variable btn",
     "references": []
    },
@@ -584,7 +584,7 @@
     "container": "layer-ctrls",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 146,
+    "functionsVisited": 147,
     "via": "variable input",
     "references": []
    },
@@ -1028,7 +1028,7 @@
     "container": "camera-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 48,
+    "functionsVisited": 49,
     "via": "variable addKey",
     "references": [
      "src/js/camera.js:603 updateCameraPanel()"
@@ -2553,7 +2553,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 229,
+    "functionsVisited": 230,
     "via": "chain",
     "references": [
      "src/js/timeline.js:9032 action()"
@@ -4674,7 +4674,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 71,
+    "functionsVisited": 72,
     "via": "chain",
     "references": []
    },
@@ -4882,7 +4882,7 @@
     "container": "p-textanim-add-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 96,
+    "functionsVisited": 97,
     "via": "variable animBtn",
     "references": []
    },
@@ -7663,7 +7663,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 96,
+    "functionsVisited": 97,
     "via": "variable importBtn",
     "references": []
    },
@@ -14647,7 +14647,7 @@
     "container": "project-tabs-bar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 202,
+    "functionsVisited": 203,
     "via": "chain",
     "references": [
      "src/js/adapters/native-object-project-tabs-ui.js:93 render()",
@@ -22353,7 +22353,7 @@
    "source": "src/js/effects-panel.js:385",
    "meta": {
     "i18n": null,
-    "functionsVisited": 22
+    "functionsVisited": 23
    },
    "fixtures": [
     "masks-alpha",
@@ -23415,7 +23415,7 @@
    "source": "src/js/layer-inout.js:1572",
    "meta": {
     "i18n": null,
-    "functionsVisited": 33
+    "functionsVisited": 34
    },
    "fixtures": [
     "static-props",
@@ -25171,7 +25171,7 @@
    "source": "src/js/motion.js:362",
    "meta": {
     "i18n": "ctrlMenuAddEllipsis",
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -26676,7 +26676,7 @@
    "source": "src/js/motion.js:10993",
    "meta": {
     "i18n": "ctxColorKeysEllipsis",
-    "functionsVisited": 52
+    "functionsVisited": 53
    },
    "fixtures": [
     "static-props",
@@ -26956,7 +26956,7 @@
    "source": "src/js/motion.js:10991",
    "meta": {
     "i18n": "ctxFlipOrder",
-    "functionsVisited": 290
+    "functionsVisited": 291
    },
    "fixtures": [
     "static-props",
@@ -27513,7 +27513,7 @@
    "source": "src/js/rig-widget.js:514",
    "meta": {
     "i18n": "widgetMenuAxisRangePrefix",
-    "functionsVisited": 200
+    "functionsVisited": 201
    },
    "fixtures": [
     "static-props",
@@ -27553,7 +27553,7 @@
    "source": "src/js/rig-widget.js:528",
    "meta": {
     "i18n": "widgetMenuSizeEllipsis",
-    "functionsVisited": 200
+    "functionsVisited": 201
    },
    "fixtures": [
     "static-props",
@@ -27632,7 +27632,7 @@
    "source": "src/js/select-bridge.js:3249",
    "meta": {
     "i18n": null,
-    "functionsVisited": 96
+    "functionsVisited": 97
    },
    "fixtures": [
     "static-props",
@@ -28014,7 +28014,7 @@
    "source": "src/js/select-bridge.js:3134",
    "meta": {
     "i18n": "ctxMaskImageWithShape",
-    "functionsVisited": 11
+    "functionsVisited": 12
    },
    "fixtures": [
     "static-props",
@@ -30222,7 +30222,7 @@
    "source": "src/js/timeline.js:6885",
    "meta": {
     "i18n": "ctxLayerBlend",
-    "functionsVisited": 169
+    "functionsVisited": 170
    },
    "fixtures": [
     "keyed-props",
@@ -30299,7 +30299,7 @@
    "source": "src/js/timeline.js:6871",
    "meta": {
     "i18n": "ctxMenuAppearance",
-    "functionsVisited": 171
+    "functionsVisited": 172
    },
    "fixtures": [
     "keyed-props",
@@ -32197,7 +32197,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:616",
    "meta": {
-    "functionsVisited": 7
+    "functionsVisited": 8
    },
    "fixtures": [
     "media",
@@ -32253,7 +32253,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:545",
    "meta": {
-    "functionsVisited": 14
+    "functionsVisited": 15
    },
    "fixtures": [
     "media",
@@ -32393,7 +32393,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:218",
    "meta": {
-    "functionsVisited": 63
+    "functionsVisited": 64
    },
    "fixtures": [
     "media",
@@ -32421,7 +32421,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:226",
    "meta": {
-    "functionsVisited": 8
+    "functionsVisited": 9
    },
    "fixtures": [
     "media",
@@ -32910,7 +32910,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:235",
    "meta": {
-    "functionsVisited": 9
+    "functionsVisited": 10
    },
    "fixtures": [
     "media",
@@ -33151,7 +33151,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:170",
    "meta": {
-    "functionsVisited": 24
+    "functionsVisited": 25
    },
    "fixtures": [
     "media",
@@ -33247,7 +33247,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:374",
    "meta": {
-    "functionsVisited": 8
+    "functionsVisited": 9
    },
    "fixtures": [
     "media",
@@ -33315,7 +33315,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:393",
    "meta": {
-    "functionsVisited": 172
+    "functionsVisited": 173
    },
    "fixtures": [
     "media",
@@ -33702,7 +33702,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:183",
    "meta": {
-    "functionsVisited": 8
+    "functionsVisited": 9
    },
    "fixtures": [
     "media",
@@ -33879,7 +33879,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:431",
    "meta": {
-    "functionsVisited": 11
+    "functionsVisited": 12
    },
    "fixtures": [
     "media",
@@ -33965,7 +33965,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:561",
    "meta": {
-    "functionsVisited": 7
+    "functionsVisited": 8
    },
    "fixtures": [
     "media",
@@ -34153,7 +34153,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:586",
    "meta": {
-    "functionsVisited": 17
+    "functionsVisited": 18
    },
    "fixtures": [
     "media",
@@ -34188,7 +34188,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:590",
    "meta": {
-    "functionsVisited": 428
+    "functionsVisited": 429
    },
    "fixtures": [
     "media",
@@ -34218,7 +34218,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:597",
    "meta": {
-    "functionsVisited": 7
+    "functionsVisited": 8
    },
    "fixtures": [
     "media",

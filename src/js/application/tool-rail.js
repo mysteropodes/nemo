@@ -36,7 +36,7 @@
       });
     }
     function onOutsideDown(e){if(flyoutEl&&!flyoutEl.contains(e.target))close();}
-    function onKey(e){if(e.key==='Escape')close();}
+    function onKey(e){if(e.key==='Escape'&&flyoutEl){e.stopPropagation();close();}}
     function disarm(){
       if(armTimer!==null){clearTimer(armTimer);armTimer=null;}
       if(!armed)return;
