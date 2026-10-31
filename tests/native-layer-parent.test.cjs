@@ -126,7 +126,7 @@ test('the Parent A menu on native: None and each layer are native edits at the p
 });
 
 test('a refused Parent A pick says why and refreshes nothing', async () => {
-  for (const [code, pattern] of [['unavailable', /rotated or scaled/], ['invalid_request', /cycle/], ['not_found', /no longer/], ['stale_revision', /refused/]]) {
+  for (const [code, pattern] of [['unavailable', /kept in place natively/], ['invalid_request', /cycle/], ['not_found', /no longer/], ['stale_revision', /refused/]]) {
     const t = timelineHarness({ refuse: code });
     let changed = 0;
     t.context.buildParentMenuItems(0, t.state.layers[0], () => { changed += 1; }).find((item) => /Null/.test(item.label || '')).action();

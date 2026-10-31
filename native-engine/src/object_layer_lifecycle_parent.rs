@@ -5,13 +5,20 @@
 //! This kernel admits the same graph (existing parent, same context, no folder, no cycle) and keeps the pose at `frame`
 //! by the one case it can prove exactly: every ancestor in the old and the new chain is a pure translation there, so the
 //! displacement is the difference of the two translation sums whatever the pivots are. A rotated or scaled ancestor
-//! needs an evaluated pivot; an expression-driven ancestor or a keyed child Position cannot be folded into one static
-//! value. Each of those is a typed refusal, never a silent jump. The kernel owns no history or id state.
+//! needs its evaluated pivot, which the commands layer cannot reach: the read-queries facade
+//! (`object_parent_pivot_read.rs`) answers it, and `object_layer_lifecycle_parent_keep.rs` solves the child's whole
+//! Position, Rotation and Scale from it, exactly. An expression-driven ancestor, a keyed child Position, Rotation or
+//! Scale that has to change, a layer without an evaluated pivot, a collapsed or skewing chain are typed refusals,
+//! never a silent jump. The kernel owns no history or id state.
 use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::{
     index_of, LifecycleError, LifecyclePlan,
 };
 use crate::object_document::{ObjectDocument, Presence};
+use crate::object_snapshot::object_parent_pivot_read::layer_pivot_bases;
 use crate::object_snapshot::ObjectSnapshot;
+
+#[path = "object_layer_lifecycle_parent_keep.rs"]
+mod keep;
 
 /// Largest ancestor count the chain walks visit (the D30 bound the render chain shares).
 const CHAIN_LIMIT: usize = 64;
@@ -51,6 +58,7 @@ pub(crate) fn in_context(document: &ObjectDocument, context_id: &str, uids: [&st
 
 mod pose {
     use super::{LifecycleError, ObjectSnapshot};
+    use crate::commands::object_fill_owner::layer_lifecycle::parent::keep::Pose;
     use crate::object_document::{ObjectDocument, Presence, PropertyHolderTarget};
 
     const MOTION: [&str; 4] = ["position", "anchor", "rotation", "scale"];
@@ -89,15 +97,17 @@ mod pose {
         })
     }
 
-    /// Sum of the translations of `chain` at `frame`; a rotation, a scale or an unsampleable pose refuses.
+    /// Sum of the translations of `chain` at `frame`; `None` when a rotation or a scale makes the sum insufficient
+    /// (the evaluated pivots are then needed); an expression or an unsampleable pose refuses.
     pub(super) fn translation(
         snapshot: &ObjectSnapshot,
         context_id: &str,
         chain: &[&str],
         frame: u32,
-    ) -> Result<[f64; 2], LifecycleError> {
+    ) -> Result<Option<[f64; 2]>, LifecycleError> {
         const NOT_SAMPLEABLE: &str = "a parent pose is not sampleable";
         let mut sum = [0.0, 0.0];
+        let mut plain = true;
         for uid in chain {
             let t = target(context_id, uid);
             if expression_driven(snapshot.document(), &t) {
@@ -116,15 +126,48 @@ mod pose {
             if [px, py, rot, sx, sy].iter().any(|v| !v.is_finite()) {
                 return Err(LifecycleError::PoseUnavailable(NOT_SAMPLEABLE));
             }
-            if rot != 0.0 || sx != 100.0 || sy != 100.0 {
-                return Err(LifecycleError::PoseUnavailable(
-                    "a rotated or scaled parent needs its evaluated pivot",
-                ));
-            }
+            plain &= rot == 0.0 && sx == 100.0 && sy == 100.0;
             sum[0] += px;
             sum[1] += py;
         }
-        Ok(sum)
+        Ok(plain.then_some(sum))
+    }
+
+    /// The full stored Motion of one layer at `frame` with its evaluated pivot base; an expression refuses.
+    pub(super) fn full(
+        snapshot: &ObjectSnapshot,
+        context_id: &str,
+        layer_uid: &str,
+        frame: u32,
+        base: [f64; 2],
+    ) -> Result<Pose, LifecycleError> {
+        const WHAT: &str = "a layer pose in the parent chain is not sampleable";
+        let t = target(context_id, layer_uid);
+        if expression_driven(snapshot.document(), &t) {
+            return Err(LifecycleError::PoseUnavailable(
+                "an expression-driven layer cannot be kept in place",
+            ));
+        }
+        let err = || LifecycleError::PoseUnavailable(WHAT);
+        let pair = |key: &str| -> Result<[f64; 2], LifecycleError> {
+            sample(snapshot, &t, key, frame, WHAT)?
+                .try_into()
+                .map_err(|_| err())
+        };
+        let (position, anchor, scale) = (pair("position")?, pair("anchor")?, pair("scale")?);
+        let rotation = match sample(snapshot, &t, "rotation", frame, WHAT)?[..] {
+            [v] => v,
+            _ => return Err(err()),
+        };
+        if ![position, anchor, scale]
+            .iter()
+            .flatten()
+            .chain([&rotation])
+            .all(|v| v.is_finite())
+        {
+            return Err(err());
+        }
+        Ok(Pose { position, anchor, rotation, scale, base })
     }
 
     pub(super) fn position(
@@ -148,6 +191,25 @@ mod pose {
     }
 }
 
+/// True when `property` of the layer-level holder carries keys or an expression (one static value cannot absorb a change).
+fn animated(snapshot: &ObjectSnapshot, context_id: &str, layer_uid: &str, property: &str) -> bool {
+    snapshot
+        .document()
+        .property_holders()
+        .is_some_and(|holders| {
+            holders.iter().any(|h| {
+                h.target().context_id() == context_id
+                    && h.target().layer_uid() == layer_uid
+                    && h.target().stroke_id().is_none()
+                    && h.properties().iter().any(|p| {
+                        p.property() == property
+                            && (p.track.value().is_some_and(|t| !t.keys.is_empty())
+                                || p.expression.value().is_some())
+                    })
+            })
+        })
+}
+
 /// Writes the child's static Position; a keyed or expression-driven Position refuses (one value cannot hold the shift).
 fn shift_position(
     snapshot: &ObjectSnapshot,
@@ -157,22 +219,7 @@ fn shift_position(
     frame: u32,
     shift: [f64; 2],
 ) -> Result<(), LifecycleError> {
-    let animated = snapshot
-        .document()
-        .property_holders()
-        .is_some_and(|holders| {
-            holders.iter().any(|h| {
-                h.target().context_id() == context_id
-                    && h.target().layer_uid() == layer_uid
-                    && h.target().stroke_id().is_none()
-                    && h.properties().iter().any(|p| {
-                        p.property() == "position"
-                            && (p.track.value().is_some_and(|t| !t.keys.is_empty())
-                                || p.expression.value().is_some())
-                    })
-            })
-        });
-    if animated {
+    if animated(snapshot, context_id, layer_uid, "position") {
         return Err(LifecycleError::PoseUnavailable(
             "an animated child Position cannot absorb the shift",
         ));
@@ -183,6 +230,61 @@ fn shift_position(
         static_number(now[1] + shift[1])?,
     ];
     set_static_value(candidate, context_id, layer_uid, "position", value);
+    Ok(())
+}
+
+/// A rotated or scaled ancestor: the evaluated pivots (read-queries facade) let the whole chain be solved, so the
+/// child keeps every world point through Position, Rotation and Scale. A property that is keyed and has to change refuses.
+fn keep_affine(
+    snapshot: &ObjectSnapshot,
+    candidate: &mut ObjectDocument,
+    at: (&str, &str, u32),
+    chains: [&[&str]; 2],
+) -> Result<(), LifecycleError> {
+    let (context_id, layer_uid, frame) = at;
+    let mut uids: Vec<&str> = vec![layer_uid];
+    for uid in chains.iter().flat_map(|c| c.iter()) {
+        if !uids.contains(uid) {
+            uids.push(uid);
+        }
+    }
+    let bases = layer_pivot_bases(snapshot, context_id, &uids, frame)
+        .map_err(LifecycleError::PoseUnavailable)?;
+    let poses = uids
+        .iter()
+        .zip(bases)
+        .map(|(uid, base)| pose::full(snapshot, context_id, uid, frame, base))
+        .collect::<Result<Vec<_>, _>>()?;
+    let chain = |uids_of: &[&str]| -> Vec<keep::Pose> {
+        uids_of
+            .iter()
+            .filter_map(|u| uids.iter().position(|x| x == u).map(|i| poses[i]))
+            .collect()
+    };
+    let child = poses[0];
+    let kept = keep::keep_world_pose(&child, &chain(chains[0]), &chain(chains[1]))
+        .map_err(|r| LifecycleError::PoseUnavailable(r.reason()))?;
+    let changed = |was: &[f64], now: &[f64]| was.iter().zip(now).any(|(a, b)| (a - b).abs() > 1e-9);
+    let writes = [
+        ("position", &child.position[..], &kept.position[..]),
+        ("rotation", &[child.rotation][..], &[kept.rotation][..]),
+        ("scale", &child.scale[..], &kept.scale[..]),
+    ];
+    for (property, was, now) in writes {
+        if !changed(was, now) {
+            continue;
+        }
+        if animated(snapshot, context_id, layer_uid, property) {
+            return Err(LifecycleError::PoseUnavailable(
+                "an animated child Position, Rotation or Scale cannot absorb the shift",
+            ));
+        }
+        let value = now
+            .iter()
+            .map(|v| static_number(*v))
+            .collect::<Result<Vec<_>, _>>()?;
+        set_static_value(candidate, context_id, layer_uid, property, value);
+    }
     Ok(())
 }
 
@@ -291,16 +393,13 @@ pub(crate) fn plan_parent(
     if old != new {
         let before = pose::translation(snapshot, context_id, &old, frame)?;
         let after = pose::translation(snapshot, context_id, &new, frame)?;
-        let shift = [before[0] - after[0], before[1] - after[1]];
-        if shift[0].abs() > 1e-9 || shift[1].abs() > 1e-9 {
-            shift_position(
-                snapshot,
-                &mut candidate,
-                context_id,
-                layer_uid,
-                frame,
-                shift,
-            )?;
+        if let (Some(before), Some(after)) = (before, after) {
+            let shift = [before[0] - after[0], before[1] - after[1]];
+            if shift[0].abs() > 1e-9 || shift[1].abs() > 1e-9 {
+                shift_position(snapshot, &mut candidate, context_id, layer_uid, frame, shift)?;
+            }
+        } else {
+            keep_affine(snapshot, &mut candidate, (context_id, layer_uid, frame), [&old, &new])?;
         }
     }
     candidate.layers[index].parent_layer_uid = Presence::Present(parent.map(str::to_owned));

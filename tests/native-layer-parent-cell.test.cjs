@@ -154,7 +154,7 @@ test('a refused pick says why and sends no second command', async () => {
   h.menus[0].items.find((i) => /Gamma/.test(i.label || '')).action();
   await settle();
   assert.equal(h.sent.length, 1);
-  assert.match(h.toasts[0], /rotated or scaled/);
+  assert.match(h.toasts[0], /kept in place natively/);
 });
 
 test('right-clicking a native row offers Link time and Follow path; each pick is one command and the stored picks are marked', async () => {

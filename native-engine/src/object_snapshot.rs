@@ -21,6 +21,9 @@ pub(crate) mod object_rig_edit_read;
 #[path = "object_rig_pose_read.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_rig_pose_read;
+// #2372: the evaluated parent pivot bases of Parent A keeping the world pose (commands may not import evaluation).
+#[path = "object_parent_pivot_read.rs"]
+pub(crate) mod object_parent_pivot_read;
 // L03-L (#2109): image-mesh retopology through the evaluation kernel (commands may not import it).
 #[path = "object_image_mesh_edit_read.rs"]
 #[allow(dead_code)]

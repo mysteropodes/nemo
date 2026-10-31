@@ -174,6 +174,10 @@ mod object_layer_link_set;
 #[cfg(test)]
 #[path = "../tests/object_layer_parent_set.rs"]
 mod object_layer_parent_set;
+// #2372: Parent A under a rotated or scaled ancestor, checked against the real renderer's world points.
+#[cfg(all(test, feature = "export_job"))]
+#[path = "../tests/object_layer_parent_keep_world.rs"]
+mod object_layer_parent_keep_world;
 #[cfg(test)]
 #[path = "../tests/object_layer_lifecycle_scenario.rs"]
 mod object_layer_lifecycle_scenario;
