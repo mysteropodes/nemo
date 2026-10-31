@@ -2,7 +2,7 @@
 //! or `#rrggbbaa`, `width` the stroke width (a ribbon's peak width, the size the baseline panel read), `opacity` the alpha of the solid
 //! fill, else the item opacity. A member the record does not have is absent. A pressure ribbon paints with its fill, so that is its
 //! `fill`; it has no `stroke`.
-use crate::object_document::{ObjectRecord, SolidFill};
+use crate::object_document::{ObjectRecord, SolidFill, VectorBody};
 use serde_json::{json, Map, Value};
 
 /// `#rrggbb`, with the alpha byte appended when the paint is not opaque.
@@ -69,7 +69,8 @@ pub(crate) fn listed(record: &ObjectRecord) -> Option<Value> {
     (!out.is_empty()).then_some(Value::Object(out))
 }
 
-/// #2372 SEL-STYLE2: the stroke details the panel reflects (a ribbon is a filled outline: its paint order only).
+/// #2372 SEL-STYLE2: the stroke details the panel reflects (a ribbon is a filled outline: its paint order only). INSP-READBACK adds the
+/// Stroke Style (`strokeStyle`, read back from the dash pattern) and a texture anchor's `brushPreset`.
 fn details(record: &ObjectRecord, out: &mut Map<String, Value>) {
     let Some(body) = record.vector() else { return };
     let ext = record.vector_ext.value();
@@ -85,6 +86,35 @@ fn details(record: &ObjectRecord, out: &mut Map<String, Value>) {
         if let Some(offset) = body.dash_offset.value().and_then(|n| n.as_f64()) {
             out.insert("dashOffset".into(), json!(offset));
         }
+        if let Some(kind) = stroke_style(body) {
+            out.insert("strokeStyle".into(), json!(kind));
+        }
+    }
+    // A texture anchor names the preset it was stamped with (a dab is a copy of one, a bitmap brush has its own panel).
+    if let Some(texture) = ext
+        .and_then(|e| e.brush_texture.value())
+        .filter(|t| t.is_brush_texture_copy.value() != Some(&true))
+    {
+        if let Some(preset) = texture.brush_texture_preset.value() {
+            out.insert("brushPreset".into(), json!(preset));
+        }
+    }
+}
+
+/// The Stroke Style the panel shows: the dash pattern read back the way `strokeStyle` writes it (`[on, off] * width`, dashed 2.5 / 1.8,
+/// dotted 0.5 / 1.2); no pattern is `solid`, a pattern of another shape (a hand-made dash) names no style.
+fn stroke_style(body: &VectorBody) -> Option<&'static str> {
+    let dashes: Vec<f64> = match body.dash_array.value() {
+        None => return Some("solid"),
+        Some(d) if d.is_empty() => return Some("solid"),
+        Some(d) => d.iter().filter_map(|n| n.as_f64()).collect(),
+    };
+    let width = body.stroke_width.as_f64().filter(|w| w.is_finite() && *w > 0.0)?;
+    let near = |value: f64, factor: f64| (value - width * factor).abs() <= width * 0.01 + 1e-9;
+    match dashes.as_slice() {
+        [on, off] if near(*on, 2.5) && near(*off, 1.8) => Some("dashed"),
+        [on, off] if near(*on, 0.5) && near(*off, 1.2) => Some("dotted"),
+        _ => None,
     }
 }
 

@@ -322,12 +322,12 @@ pub(super) fn result(document_id: &str, p: &Value, r: &Value) -> bool {
 mod tests;
 
 /// #2372: the style a panel shows for a listed item, each member optional: hex `fill` / `stroke`, a positive `width`, an `opacity` in 0..1,
-/// and (SEL-STYLE2) the stroke details `cap`, `join`, `miter`, `dashOffset` and `paintOrder`.
+/// and (SEL-STYLE2) the stroke details `cap`, `join`, `miter`, `dashOffset`, `paintOrder`, `strokeStyle` and (INSP-READBACK) a texture anchor's `brushPreset`.
 fn listed_style(v: &Value) -> bool {
     let hex = |s: &Value| s.as_str().and_then(|s| s.strip_prefix('#')).is_some_and(|d| [6, 8].contains(&d.len()) && d.bytes().all(|b| b.is_ascii_hexdigit()));
     let one_of = |s: &Value, set: &[&str]| s.as_str().is_some_and(|s| set.contains(&s));
     let number = |n: &Value| n.as_f64().is_some_and(f64::is_finite);
-    exact(v, &[], &["fill", "stroke", "width", "opacity", "cap", "join", "miter", "dashOffset", "paintOrder", "maskMode", "maskFeather"]).is_some_and(|o| !o.is_empty())
+    exact(v, &[], &["fill", "stroke", "width", "opacity", "cap", "join", "miter", "dashOffset", "paintOrder", "strokeStyle", "brushPreset", "maskMode", "maskFeather"]).is_some_and(|o| !o.is_empty())
         && v.get("fill").is_none_or(hex)
         && v.get("stroke").is_none_or(hex)
         && v.get("width").is_none_or(|w| w.as_f64().is_some_and(|w| w.is_finite() && w > 0.0))
@@ -337,6 +337,8 @@ fn listed_style(v: &Value) -> bool {
         && v.get("miter").is_none_or(|m| m.as_f64().is_some_and(|m| m.is_finite() && m >= 0.0))
         && v.get("dashOffset").is_none_or(number)
         && v.get("paintOrder").is_none_or(|p| one_of(p, &["fillFirst", "strokeFirst"]))
+        && v.get("strokeStyle").is_none_or(|s| one_of(s, &["solid", "dashed", "dotted"]))
+        && v.get("brushPreset").is_none_or(|p| p.as_str().is_some_and(|p| !p.is_empty() && p.len() <= 96))
         && v.get("maskMode").is_none_or(|m| one_of(m, &["add", "subtract", "intersect"]))
         && v.get("maskFeather").is_none_or(|f| f.as_f64().is_some_and(|f| f.is_finite() && f >= 0.0))
 }
