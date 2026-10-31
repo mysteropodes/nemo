@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "d2887662d5de1713a5e4e7da2ffe561f040f13fe",
-  "describe": "v0.7.0-alpha.4-4961-gd2887662d-dirty"
+  "head": "f98c2fe0e895f0e5ca7b2315a5f0c053e951c573",
+  "describe": "v0.7.0-alpha.4-4973-gf98c2fe0e-dirty"
  },
- "inputsDigest": "07fdc9228e593369e67b99da8cc5868f841be3b77cdcdcd678e57362a7db0bf5",
+ "inputsDigest": "87400584dad85ead98a8bbb90954eac57ffa9f5c43c068ab51ca2ca7b9f9d553",
  "states": [
   "inventoried",
   "characterized",
@@ -14836,7 +14836,7 @@
     "functionsVisited": 239,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-project-tabs-ui.js:99 render()",
+     "src/js/adapters/native-object-project-tabs-ui.js:120 render()",
      "src/js/project.js:661",
      "src/js/timeline.js:9202 action()"
     ]
