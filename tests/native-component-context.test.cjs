@@ -449,6 +449,13 @@ test('when the retries and the exit both fail the context is fenced: later revis
   assert.ok(exits() >= 1, 'the exit was tried');
   assert.equal(f.host.state.activeSymbolId, 'sym_a', 'the exit failed: the component stays entered (fenced)');
   assert.deepEqual(Context.fault(f.host), { code: 'unavailable', revision: 8 }, 'the typed unavailable state');
+  // The fence is visible, persistently: the entered tab is marked unavailable with an explanatory title, and no other tab is.
+  const strip = () => f.host.document.getElementById('symbol-tabs').children.filter((tab) => /\bsym-tab\b/.test(tab.className));
+  const marked = () => strip().filter((tab) => /\bunavail\b/.test(tab.className));
+  assert.equal(marked().length, 1, 'one tab is marked unavailable');
+  assert.ok(/\bact\b/.test(marked()[0].className) && /could not be refreshed/.test(marked()[0].title) && marked()[0].attributes['aria-disabled'] === 'true', 'the entered tab, titled');
+  f.host.renderSymbolTabs();
+  assert.equal(marked().length, 1, 'still marked after any later repaint of the strip');
   const toasts = f.toasts.length, asked = f.requests.length;
   f.m.revision = 9;
   const t0 = Date.now();
@@ -465,6 +472,22 @@ test('when the retries and the exit both fail the context is fenced: later revis
   assert.equal(await Context.exit(f.host), true);
   assert.equal(f.host.state.activeSymbolId, null);
   assert.equal(Context.fault(f.host), null);
+  assert.equal(marked().length, 0, 'the mark is gone with the fence');
+});
+
+test('the unavailable mark is lifted by a row click and by closing the component, and shows no other tab as unavailable', async () => {
+  const f = fixture();
+  f.host.setTimeout = (fn) => { fn(); };
+  const fenced = async () => { await enteredAt8(f); f.m.failRefresh = Infinity; f.m.failExit = true; await f.session.runResourceCommand((lease) => Context.revision(f.host, f.session.info(), lease)); };
+  const marks = () => f.host.document.getElementById('symbol-tabs').children.filter((tab) => /\bunavail\b/.test(tab.className)).length;
+  await fenced();
+  assert.equal(marks(), 1);
+  assert.equal(Context.selectLayer(f.host, 0), true, 'a row click');
+  assert.equal(Context.fault(f.host), null);
+  assert.equal(marks(), 0, 'the click lifted the mark');
+  f.m.failRefresh = 0; f.m.failExit = false;
+  await Context.exit(f.host);
+  assert.equal(marks(), 0);
 });
 
 // A component with a key at 0, a held span and a range; the playhead moves with frameOnly (CLAUDE.md section 5bis (b)).

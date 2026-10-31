@@ -66,7 +66,7 @@
   function selectLayer(host, index) {
     var st = live(host);
     if (!st || !Number.isSafeInteger(index) || index < 0 || index >= st.rows.length) return false;
-    st.fault = null;
+    unfence(host);
     host.state.activeLayerIdx = index; host._layerSel = [index]; host._layerSelAnchor = index; host.selectedPaths = []; host.state.selectedStrokeIndices = [];
     repaint(host);
     return true;
@@ -244,6 +244,7 @@
   }
   // A failed refresh is asked again after these pauses (bounded), then the scene is shown instead of a stale entered view.
   var RETRY_MS = [100, 300, 900];
+  var UNAVAILABLE = 'This component could not be refreshed and may be out of date. Exit, close it or click a layer to try again.';
   function pause(host, ms) { return new Promise(function (resolve) { (typeof host.setTimeout === 'function' ? host.setTimeout : setTimeout)(resolve, ms); }); }
   // Retries ran out: leave the context for the scene (the owner's exit, applied from the native truth) and say so.
   async function giveUp(host, lease) {
@@ -262,8 +263,10 @@
   // Retries AND the exit both failed: the context is fenced with a typed unavailable state (the toast above is its one message) and is not
   // asked again by later revisions: every one of them would repeat the whole ladder of pauses on the publication queue. The next user action
   // (exit, close, a row click, entering a context) lifts the fence, so a recovered owner is asked once more then.
-  function fence(st, target) { st.fault = Object.freeze({ code: 'unavailable', revision: target }); }
-  function unfence(host) { var st = entered.get(host); if (st && st.fault) st.fault = null; }
+  // The tab strip shows the fence (the entered tab is marked unavailable, with a title) until a user action lifts it; the strip alone is redrawn.
+  function tabs(host) { try { if (typeof host.renderSymbolTabs === 'function') host.renderSymbolTabs(); } catch (_) { /* presentation only */ } }
+  function fence(host, st, target) { st.fault = Object.freeze({ code: 'unavailable', revision: target }); tabs(host); }
+  function unfence(host) { var st = entered.get(host); if (st && st.fault) { st.fault = null; tabs(host); } }
   // The fence of the entered context, or null: { code: 'unavailable', revision }.
   function fault(host) { var st = live(host); return st && st.fault ? st.fault : null; }
   // Re-read the entered context until it is settled. The revision is acknowledged (`st.revision`) ONLY once a refresh succeeded: until then
@@ -280,7 +283,7 @@
     }
     if (!st || live(host) !== st) return true;
     var left = await giveUp(host, lease);
-    if (!left && live(host) === st) fence(st, target);
+    if (!left && live(host) === st) fence(host, st, target);
     return left;
   }
   // A revision moved on (Undo, an MCP edit). `lease` is the publication the project queue is running: the refresh rides it, so the
@@ -363,7 +366,9 @@
     scene.addEventListener('click', function () { if (live(host)) exit(host); });
     bar.appendChild(scene);
     tabs.forEach(function (id) {
-      var tab = node(host, 'div', '', 'sym-tab' + (active === id ? ' act' : '')), x = node(host, 'span', '×', 'sym-tab-x');
+      var fenced = active === id && !!fault(host);
+      var tab = node(host, 'div', '', 'sym-tab' + (active === id ? ' act' : '') + (fenced ? ' unavail' : '')), x = node(host, 'span', '×', 'sym-tab-x');
+      if (fenced) { tab.title = UNAVAILABLE; tab.setAttribute('aria-disabled', 'true'); }
       tab.appendChild(node(host, 'span', map[id] || id)); tab.appendChild(x);
       tab.addEventListener('click', function (e) { if (e.target !== x) enter(host, id, null); });
       x.addEventListener('click', function (e) { e.stopPropagation(); close(host, id); });

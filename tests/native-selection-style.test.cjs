@@ -218,32 +218,42 @@ test('the panel setters route a native selection to the adapter first and the pa
   assert.ok(TIMELINE.includes('var ref=nativeStyleView(selectedPaths[0]);'), 'the panel reads the selection through the listed style');
 });
 
-test('the Stroke panel shows the listed Stroke Style and brush preset of the selection and the draw defaults come back on the draw tool (#2372 INSP-READBACK)', () => {
+test('the Stroke panel shows the listed Stroke Style and brush preset of the selection without ever writing the draw defaults (#2372 INSP-READBACK)', () => {
   class Color { constructor(v) { this.value = v; } }
   const elements = { 'p-strokestyle': { value: 'solid' } }, painted = [];
   const sandbox = { window: { NemoNativeSelectionStyle: { handles: () => true, shown: Style.shown }, BrushPresetPicker: { paintButton: (k) => painted.push(k) } }, Color, Object, state: { strokeStyle: 'solid', brushPreset: 'none' },
     document: { getElementById: (id) => elements[id] || null } };
   vm.createContext(sandbox);
-  vm.runInContext(['nativeStyleView', 'nativeStyleReadback'].map(extract).join('\n') + '\nthis.f={nativeStyleView,nativeStyleReadback};', sandbox);
+  vm.runInContext('var _styleReadbackShown=false;\n' + ['nativeStyleView', 'nativeStyleReadback', 'nativeStyleReadbackEnd'].map(extract).join('\n') + '\nthis.f={nativeStyleView,nativeStyleReadback,nativeStyleReadbackEnd};', sandbox);
   const view = (role, style) => sandbox.f.nativeStyleView({ id: 1, data: { strokeId: 'S', nativeRole: role, nativeStyle: style } });
-  // A dashed plain stroke: the select and the state follow it; no preset listed reads as None.
+  const defaults = () => [sandbox.state.strokeStyle, sandbox.state.brushPreset];
+  // A dashed plain stroke: the control follows it; the draw defaults (state) are never written; no preset listed reads as None.
   sandbox.f.nativeStyleReadback(view('plain', { stroke: '#445566', width: 4, opacity: 1, strokeStyle: 'dashed' }));
-  assert.deepEqual([elements['p-strokestyle'].value, sandbox.state.strokeStyle, sandbox.state.brushPreset, painted], ['dashed', 'dashed', 'none', ['none']]);
+  assert.deepEqual([elements['p-strokestyle'].value, defaults(), painted], ['dashed', ['solid', 'none'], ['none']]);
   // A texture anchor: its preset is shown, the style of its centreline too.
   sandbox.f.nativeStyleReadback(view('brush', { width: 4, opacity: 1, strokeStyle: 'dotted', brushPreset: 'chalk-round' }));
-  assert.deepEqual([elements['p-strokestyle'].value, sandbox.state.brushPreset, painted[1]], ['dotted', 'chalk-round', 'chalk-round']);
+  assert.deepEqual([elements['p-strokestyle'].value, painted[1], defaults()], ['dotted', 'chalk-round', ['solid', 'none']]);
   // A hand-made dash lists no style: the control keeps what it showed. A ribbon (or an image) has no preset to show.
   sandbox.f.nativeStyleReadback(view('plain', { stroke: '#445566', width: 4, opacity: 1 }));
-  assert.equal(sandbox.state.strokeStyle, 'dotted');
+  assert.equal(elements['p-strokestyle'].value, 'dotted');
   assert.equal(view('ribbon', { fill: '#101010', width: 8, opacity: 1, brushPreset: 'chalk-round' }).brushPreset, undefined, 'a ribbon is not eligible for a preset');
   assert.equal(view('raster', { opacity: 1 }).brushPreset, undefined);
-  // A legacy path (no listed style) is read as it was.
-  sandbox.state.strokeStyle = 'dashed'; elements['p-strokestyle'].value = 'dashed';
+  // Select is left (tool change, Motion / Anim mode switch, selection cleared): the controls repaint from the untouched defaults, once.
+  sandbox.f.nativeStyleReadbackEnd();
+  assert.deepEqual([elements['p-strokestyle'].value, painted.slice(3), defaults()], ['solid', ['none'], ['solid', 'none']], 'the draw defaults are back on screen and in state');
+  sandbox.f.nativeStyleReadbackEnd();
+  assert.equal(painted.length, 4, 'nothing repaints when no readback was shown');
+  // A legacy path (no listed style) is read as it was and starts no readback.
+  elements['p-strokestyle'].value = 'dashed';
   sandbox.f.nativeStyleReadback({ id: 2, data: {}, strokeStyle: 'dotted' });
-  assert.deepEqual([sandbox.state.strokeStyle, elements['p-strokestyle'].value], ['dashed', 'dashed']);
-  // The panel calls it from the cap / join / dash block and the draw tool brings its own defaults back.
+  sandbox.f.nativeStyleReadbackEnd();
+  assert.deepEqual([defaults(), elements['p-strokestyle'].value], [['solid', 'none'], 'dashed']);
+  // The panel reads the style back where it reads the cap and the dash offset, and EVERY way out of Select ends it.
   assert.ok(TIMELINE.includes('document.getElementById(\'p-dashoffset\').value=state.dashOffset;\n        nativeStyleReadback(ref);'), 'the panel reads the style back where it reads the cap and the dash offset');
-  assert.ok(TIMELINE.includes('strokeStyle:state.strokeStyle,brushPreset:state.brushPreset,') && TIMELINE.includes('state.brushPreset=d.brushPreset;'), 'the drawing defaults keep the style and the preset');
+  assert.ok(TIMELINE.includes("_selPropsSig='';nativeStyleReadbackEnd();return;"), 'no selection (or another tool) ends the readback on every updateUI, Motion / Anim mode switches included');
+  assert.ok(TIMELINE.includes("if(t!=='select'&&t!=='subselect')nativeStyleReadbackEnd();"), 'a tool change ends it at once');
+  const body = TIMELINE.slice(TIMELINE.indexOf('function nativeStyleReadback('), TIMELINE.indexOf('function nativeStyleReadbackEnd('));
+  assert.ok(!/state\.(strokeStyle|brushPreset)\s*=/.test(body), 'the readback never assigns a drawing default');
 });
 
 test('the panel opts its multi-select restyle in to skipping the steps the engine cannot do; the adapter batch is atomic otherwise (#2372)', async () => {

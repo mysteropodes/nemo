@@ -162,9 +162,23 @@
   }
   // The Selected Colors panel's recolour (#2372 insp-recolour): every fill or stroke of the selection equal to `from` becomes `to`, as ONE restyle batch.
   // Coalesced like any panel edit (a picker drag or an opacity scrub fires many times); a recolour of another colour is an edit of its own.
+  // The panel's row moves its from-colour to the colour it just sent (baseline: the synchronous recolour re-rendered the row), so a drag arrives as a
+  // CHAIN, each event starting from the previous event's `to`: while the edit is pending the chain extends it (the colours the items still show are the
+  // chain's first `from`), and once it has committed the items show the chain's last colour, which the next event starts from.
   function applyRecolor(root, from, to) {
     var S = root.NemoNativeSelectionSteps, a = S && S.key(from), b = S && S.key(to), ok = /^#[0-9a-f]{6}([0-9a-f]{2})?$/;
-    return ok.test(a) && ok.test(b) ? edit(root, {}, { from: a, to: b }, 'recolor:' + a) : Promise.resolve({ status: 'invalid' });
+    if (!(ok.test(a) && ok.test(b))) return Promise.resolve({ status: 'invalid' });
+    var s = state(root);
+    // The edit follows a commit in flight, then decides against the pending edit it finds.
+    if (s.inflight) return s.chain.then(function () { return applyRecolor(root, from, to); });
+    var p = s.pending;
+    if (p && p.recolor) {
+      if (a === p.recolor.from) return edit(root, {}, { from: a, to: b }, p.own); // the same colour edited again: the later target wins
+      // A continuation extends the pending edit unless the intermediate colour is also worn by another listed item: that one is a different group the
+      // baseline would have recoloured together with this one only AFTER merging, so the pending edit commits first and this one follows it.
+      if (a === p.recolor.to && !p.paths.some(function (path) { return S.coloursOf(path).indexOf(a) >= 0; })) return edit(root, {}, { from: p.recolor.from, to: b }, p.own);
+    }
+    return edit(root, {}, { from: a, to: b }, 'recolor:' + a);
   }
   function edit(root, members, recolor, own) {
     var s = state(root), paths = selected(root);

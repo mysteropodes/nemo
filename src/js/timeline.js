@@ -483,6 +483,7 @@ window.SM={
     if(_wasDrawTool&&!_isDrawTool)_snapshotDrawingDefaults();
     state.tool=t;renderArcs();
     if(_isDrawTool&&!_wasDrawTool)_restoreDrawingDefaults();
+    if(t!=='select'&&t!=='subselect')nativeStyleReadbackEnd();
     if(_camToolChanged)renderTimeline();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
     if(window.SMShapeGroup)SMShapeGroup.ensureFront(t);
@@ -3714,7 +3715,7 @@ function _restoreDrawingDefaults(){
 // updatePropsContext(), called separately.
 function updateSelPropsPanel(){
   markNativeScrubFields();markNativeXformFields();
-  if((state.tool!=='select'&&state.tool!=='subselect')||!selectedPaths.length){_selPropsSig='';return;}
+  if((state.tool!=='select'&&state.tool!=='subselect')||!selectedPaths.length){_selPropsSig='';nativeStyleReadbackEnd();return;}
   // Subselect + vertices picked: show/drive THEIR bounds, not the whole
   // path's (activeXformBounds/Vertex mode, wired further down alongside
   // wireLiveXformField) — 2026-07, "la position du panneau doivent driver
@@ -6439,18 +6440,27 @@ function nativeStyleView(p){
     brushPreset:st.role==='plain'||st.role==='brush'?st.brushPreset||'none':undefined};
 }
 // #2372 INSP-READBACK: the Stroke Style and brush preset controls show the listed selection's own values (the engine reads the style back from the dash
-// pattern and names a texture anchor's preset), not the tool defaults left by the last pick. Passive display: neither goes through the setters
-// (they would re-apply onto the selection). A legacy path (no listed style) is left as it was.
+// pattern and names a texture anchor's preset), not the tool defaults left by the last pick. DISPLAY ONLY: state.strokeStyle / state.brushPreset are the
+// drawing defaults of the next stroke and are never written here, so no path out of Select (tool change, Motion/Anim mode switch, selection cleared) can
+// leak the selection's values into the next stroke; nativeStyleReadbackEnd() repaints the two controls from the defaults when the selection stops driving them.
+// Neither goes through the setters (they would re-apply onto the selection). A legacy path (no listed style) is left as it was.
+var _styleReadbackShown=false;
 function nativeStyleReadback(ref){
   if(!ref||!ref.nativeListed)return;
   if(typeof ref.strokeStyle==='string'){
-    state.strokeStyle=ref.strokeStyle;
     var ss=document.getElementById('p-strokestyle');if(ss)ss.value=ref.strokeStyle;
+    _styleReadbackShown=true;
   }
   if(typeof ref.brushPreset==='string'){
-    state.brushPreset=ref.brushPreset;
     if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(ref.brushPreset);
+    _styleReadbackShown=true;
   }
+}
+function nativeStyleReadbackEnd(){
+  if(!_styleReadbackShown)return;
+  _styleReadbackShown=false;
+  var ss=document.getElementById('p-strokestyle');if(ss&&state.strokeStyle!==undefined)ss.value=state.strokeStyle;
+  if(window.BrushPresetPicker&&state.brushPreset!==undefined)window.BrushPresetPicker.paintButton(state.brushPreset);
 }
 function paintStrokeSwatches(v){
   var sw=document.getElementById('stroke-well'); if(sw)sw.style.background=v;

@@ -1895,6 +1895,9 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 .sym-tab::before{content:'';width:9px;height:9px;border-radius:50%;background:#3a3942;flex-shrink:0;transition:background .12s;}
 .sym-tab.act{color:var(--text);background:transparent;border-bottom:none;font-weight:600;}
 .sym-tab.act::before{background:var(--green);}
+.sym-tab.unavail{color:var(--red);}
+.sym-tab.unavail::before{background:var(--red);}
+.sym-tab.unavail span:first-child{text-decoration:line-through;text-decoration-color:var(--red);}
 .sym-tab .sym-tab-x{font-size:12px;line-height:1;color:var(--text-dim);}
 .sym-tab .sym-tab-x:hover{color:var(--text);}
 .lico.comp-badge{color:var(--accent);}
