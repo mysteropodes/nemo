@@ -973,6 +973,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-selection-steps.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2584,
+          "scriptOrdinal": 236
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-selection-style.js",
       "moduleId": "app.native.object.ui.adapter",
       "executionClass": "document-classic",

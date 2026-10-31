@@ -65,7 +65,27 @@ pub(crate) fn listed(record: &ObjectRecord) -> Option<Value> {
     if let Some(opacity) = opacity.filter(|o| o.is_finite()) {
         out.insert("opacity".into(), json!(opacity));
     }
+    details(record, &mut out);
     (!out.is_empty()).then_some(Value::Object(out))
+}
+
+/// #2372 SEL-STYLE2: the stroke details the panel reflects (a ribbon is a filled outline: its paint order only).
+fn details(record: &ObjectRecord, out: &mut Map<String, Value>) {
+    let Some(body) = record.vector() else { return };
+    let ext = record.vector_ext.value();
+    if let Some(order) = body.paint_order.value() {
+        out.insert("paintOrder".into(), json!(order));
+    }
+    if ext.is_none_or(|e| e.pressure.missing()) {
+        out.insert("cap".into(), json!(body.stroke_cap));
+        out.insert("join".into(), json!(body.stroke_join));
+        if let Some(limit) = body.miter_limit.value().and_then(|n| n.as_f64()) {
+            out.insert("miter".into(), json!(limit));
+        }
+        if let Some(offset) = body.dash_offset.value().and_then(|n| n.as_f64()) {
+            out.insert("dashOffset".into(), json!(offset));
+        }
+    }
 }
 
 /// A raster image shows its opacity; a text block its colour and the colour's alpha.

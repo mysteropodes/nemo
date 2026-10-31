@@ -66,13 +66,32 @@ fn step(op: &Value) -> Option<&Value> {
 fn hex(v: &Value) -> bool {
     v.as_str().and_then(|s| s.strip_prefix('#')).is_some_and(|d| [6, 8].contains(&d.len()) && d.bytes().all(|b| b.is_ascii_hexdigit()))
 }
-/// A restyle's members: at least one of a hex `fill` / `stroke`, a `width` in (0, 10000] and an `opacity` in [0, 1].
+/// A restyle's members: at least one of a hex `fill` / `stroke`, a `width` in (0, 10000], an `opacity` in [0, 1] (#2372) and the
+/// SEL-STYLE2 members: the `fillEnabled` / `strokeEnabled` switches (turning one on names its colour), `cap`, `join`, a `miter` in
+/// [1, 1000], a `dashOffset`, a `paintOrder`, a `strokeStyle`, a `brushPreset` key and a `maskFeather` in [0, 500]; a preset or a feather
+/// stands alone.
 fn style(v: &Value) -> bool {
-    exact(v, &[], &["fill", "stroke", "width", "opacity"]).is_some_and(|o| !o.is_empty())
+    let one_of = |k: &str, set: &[&str]| v.get(k).is_none_or(|s| s.as_str().is_some_and(|s| set.contains(&s)));
+    let range = |k: &str, lo: f64, hi: f64| v.get(k).is_none_or(|n| n.as_f64().is_some_and(|n| (lo..=hi).contains(&n)));
+    let flag = |k: &str| v.get(k).is_none_or(Value::is_boolean);
+    let alone = ["brushPreset", "maskFeather"].iter().filter(|k| v.get(**k).is_some()).count();
+    exact(v, &[], &["fill", "stroke", "width", "opacity", "fillEnabled", "strokeEnabled", "cap", "join", "miter", "dashOffset", "paintOrder", "strokeStyle", "brushPreset", "maskFeather"]).is_some_and(|o| !o.is_empty() && (alone == 0 || o.len() == 1))
         && v.get("fill").is_none_or(hex)
         && v.get("stroke").is_none_or(hex)
         && v.get("width").is_none_or(|w| w.as_f64().is_some_and(|w| w > 0.0 && w <= 10_000.0))
         && v.get("opacity").is_none_or(|o| o.as_f64().is_some_and(|o| (0.0..=1.0).contains(&o)))
+        && flag("fillEnabled")
+        && flag("strokeEnabled")
+        && (v["fillEnabled"] != true || v.get("fill").is_some())
+        && (v["strokeEnabled"] != true || v.get("stroke").is_some())
+        && one_of("cap", &["butt", "round", "square"])
+        && one_of("join", &["miter", "round", "bevel"])
+        && range("miter", 1.0, 1000.0)
+        && range("dashOffset", -1.0e6, 1.0e6)
+        && one_of("paintOrder", &["fillFirst", "strokeFirst"])
+        && one_of("strokeStyle", &["solid", "dashed", "dotted"])
+        && v.get("brushPreset").is_none_or(|k| k.as_str().is_some_and(|k| !k.is_empty() && k.len() <= 96 && !k.chars().any(char::is_control)))
+        && range("maskFeather", 0.0, 500.0)
 }
 
 /// Every step's addressed target; a copy addresses its source's layer and must name an earlier create or copy.

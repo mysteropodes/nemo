@@ -44,6 +44,10 @@
   function nonNegative(value, label) { if (num(value, label) < 0) fail(`${label} must not be negative`); return value; }
   function unit(value, label) { const v = num(value, label); if (v < 0 || v > 1) fail(`${label} must be within 0..1`); return v; }
   function oneOf(value, list, label) { if (!list.includes(value)) fail(`${label} is not admitted`); return value; }
+  // #2372 restyle members (SEL-STYLE2: switches, stroke details, preset, feather): a paint switched on names its colour; a preset or a feather stands alone.
+  const HEX = (v, l) => { if (!/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v)) fail(`${l} must be a hex colour`); }, FLAG = (v, l) => { if (typeof v !== 'boolean') fail(`${l} must be a boolean`); }, ENUM = (list) => (v, l) => oneOf(v, list, l), RANGE = (lo, hi) => (v, l) => { if (num(v, l) < lo || v > hi) fail(`${l} is out of range`); };
+  const STYLE = { fill: HEX, stroke: HEX, width: RANGE(1e-9, 10000), opacity: unit, fillEnabled: FLAG, strokeEnabled: FLAG, cap: ENUM(CAPS), join: ENUM(JOINS), miter: RANGE(1, 1000), dashOffset: RANGE(-1e6, 1e6), paintOrder: ENUM(ORDERS), strokeStyle: ENUM(['solid', 'dashed', 'dotted']), maskFeather: RANGE(0, 500), brushPreset: (v, l) => { if (typeof v !== 'string' || !v.length || v.length > 96 || /[\u0000-\u001f\u007f]/.test(v)) fail(`${l} is invalid`); } };
+  const restyleStyle = (st, label) => { const keys = Object.keys(st); if (!keys.length || st.fillEnabled === true && !has(st, 'fill') || st.strokeEnabled === true && !has(st, 'stroke') || keys.length > 1 && (has(st, 'brushPreset') || has(st, 'maskFeather'))) fail(`${label} is invalid`); keys.forEach((k) => STYLE[k](st[k], `${label}.${k}`)); };
   function opaque(value, label) { if (typeof value !== 'string' || !value.length) fail(`${label} must be a non-empty string`); return value; }
   function frame(value, label) { if (!Number.isSafeInteger(value) || value < 0 || value > MAX_FRAME) fail(`${label} must be a native u32 frame`); return value; }
   function pair(value, label) {
@@ -54,17 +58,14 @@
   function target(value, label, create) {
     exact(value, ['contextId', 'frameScope', 'layerUid', 'strokeId'], [], label);
     if (value.contextId !== 'scene-root') fail(`${label}.contextId is not admitted`);
-    exact(value.frameScope, ['kind', 'frame'], [], `${label}.frameScope`);
-    oneOf(value.frameScope.kind, ['authored', 'reference'], `${label}.frameScope.kind`);
-    frame(value.frameScope.frame, `${label}.frameScope.frame`);
-    opaque(value.layerUid, `${label}.layerUid`);
+    exact(value.frameScope, ['kind', 'frame'], [], `${label}.frameScope`); oneOf(value.frameScope.kind, ['authored', 'reference'], `${label}.frameScope.kind`);
+    frame(value.frameScope.frame, `${label}.frameScope.frame`); opaque(value.layerUid, `${label}.layerUid`);
     // A created record names no stroke id: the owner allocates it and the caller cannot choose it.
     if (create === true) { if (value.strokeId !== '') fail(`${label}.strokeId must be empty for a create`); } else opaque(value.strokeId, `${label}.strokeId`);
   }
   function point(value, label) { exact(value, ['x', 'y'], [], label); num(value.x, `${label}.x`); num(value.y, `${label}.y`); }
   function solid(value, label) {
-    exact(value, ['kind', 'r', 'g', 'b', 'a'], [], label);
-    if (value.kind !== 'solid') fail(`${label}.kind must be solid`);
+    exact(value, ['kind', 'r', 'g', 'b', 'a'], [], label); if (value.kind !== 'solid') fail(`${label}.kind must be solid`);
     ['r', 'g', 'b', 'a'].forEach((key) => unit(value[key], `${label}.${key}`));
   }
   function geometry(value, label) {
@@ -93,8 +94,7 @@
       dashes.forEach((dash, at) => { total += nonNegative(dash, `${label}.dashArray[${at}]`); });
       if (!(total > 0 && Number.isFinite(total))) fail(`${label}.dashArray needs a positive finite length`);
     }
-    if (has(value, 'dashOffset')) num(value.dashOffset, `${label}.dashOffset`);
-    if (has(value, 'paintOrder')) oneOf(value.paintOrder, ORDERS, `${label}.paintOrder`);
+    if (has(value, 'dashOffset')) num(value.dashOffset, `${label}.dashOffset`); if (has(value, 'paintOrder')) oneOf(value.paintOrder, ORDERS, `${label}.paintOrder`);
     unit(value.opacity, `${label}.opacity`);
   }
   function pressure(value, label) {
@@ -293,7 +293,7 @@
         // A geometry-less clone copies any stroke shifted by `offset` (a pose stamp); by `center` rebuilds a ribbon (sculpt); by `matrix` maps any record by a record-space affine (#2372 Select).
         if (op.op === 'reshape' || op.op === 'clone') { const clone = op.op === 'clone'; exact(op, ['op', 'stableTarget'].concat(clone ? ['frame'] : []), clone ? ['geometry', 'offset', 'placement', 'keyframe'] : ['geometry', 'center', 'matrix', 'frame'], where); target(op.stableTarget, `${where}.stableTarget`, false); if (has(op, 'geometry')) geometry(op.geometry, `${where}.geometry`); if (!clone && [has(op, 'geometry'), has(op, 'center'), has(op, 'matrix')].filter(Boolean).length !== 1) fail(`${where} needs geometry, a center or a matrix`); if (has(op, 'matrix') && (!Array.isArray(op.matrix) || op.matrix.length !== 6 || !op.matrix.every(Number.isFinite))) fail(`${where}.matrix must be six finite numbers`); if (has(op, 'center')) { if (!Array.isArray(op.center) || op.center.length < 2 || op.center.length > 256) fail(`${where}.center must have 2..256 anchors`); pressure({ centerSegments: op.center }, where); } if (has(op, 'offset') && (has(op, 'geometry') || !Array.isArray(op.offset) || op.offset.length !== 2 || !op.offset.every(Number.isFinite))) fail(`${where}.offset is invalid`);
           if (has(op, 'frame') && !(Number.isSafeInteger(op.frame) && op.frame >= 0 && op.frame <= 4294967295)) fail(`${where}.frame must be a frame`); if (has(op, 'placement')) oneOf(op.placement, ['front', 'behind'], `${where}.placement`); if (has(op, 'keyframe')) oneOf(op.keyframe, ['copy'], `${where}.keyframe`); return op.stableTarget; }
-        if (op.op === 'restyle') { exact(op, ['op', 'stableTarget', 'style'], ['frame'], where); target(op.stableTarget, `${where}.stableTarget`, false); const st = exact(op.style, [], ['fill', 'stroke', 'width', 'opacity'], `${where}.style`); /* #2372: only the style named, at least one member */ if (!Object.keys(st).length || ['fill', 'stroke'].some((k) => has(st, k) && !/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(st[k])) || (has(st, 'width') && !(num(st.width, `${where}.style.width`) > 0 && st.width <= 10000))) fail(`${where}.style is invalid`); if (has(st, 'opacity')) unit(st.opacity, `${where}.style.opacity`); if (has(op, 'frame')) frame(op.frame, `${where}.frame`); return op.stableTarget; }
+        if (op.op === 'restyle') { exact(op, ['op', 'stableTarget', 'style'], ['frame'], where); target(op.stableTarget, `${where}.stableTarget`, false); restyleStyle(exact(op.style, [], Object.keys(STYLE), `${where}.style`), `${where}.style`); if (has(op, 'frame')) frame(op.frame, `${where}.frame`); return op.stableTarget; }
         if (op.op === 'delete') { exact(op, ['op', 'stableTarget'], [], where); target(op.stableTarget, `${where}.stableTarget`, false); return op.stableTarget; }
         return fail(`${where}.op must be create, copy, replace, reshape, clone, restyle or delete`);
       });
