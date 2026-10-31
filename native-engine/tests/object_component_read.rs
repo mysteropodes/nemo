@@ -327,6 +327,40 @@ fn an_item_that_cannot_fit_the_response_alone_is_unavailable_never_truncated() {
 }
 
 #[test]
+fn a_context_whose_summary_cannot_fit_alone_is_cut_and_flagged_and_the_listing_goes_on() {
+    let mut doc = world("D2");
+    let wide = "é\u{1F600}x".repeat(1500);
+    doc["componentTables"]["components"]["components"][0]["name"] = json!(wide);
+    let document =
+        decode_storage_project(doc.to_string().as_bytes()).expect("a long component name is admitted");
+    let snap = ObjectSnapshot::new("cmp-wide", document).unwrap();
+    let ids = ["scene-root", "sym_comp", "sym_comp_b", "sym_1788000123456_5000"];
+    // The oversized context asked for alone: kept, its name a whole-character prefix, flagged, the cursor moves past it.
+    let alone = answer(&snap, json!({"kind":"contexts","cursor":1,"limit":1}));
+    let item = &alone["items"][0];
+    assert_eq!(item["contextId"], ids[1]);
+    assert_eq!(item["nameTruncated"], true);
+    let kept = item["name"].as_str().expect("a cut name stays a string");
+    assert!(!kept.is_empty() && kept.len() < wide.len() && wide.starts_with(kept));
+    assert_eq!(item["totalFrames"], doc["componentTables"]["components"]["components"][0]["totalFrames"]);
+    assert_eq!(alone["nextCursor"], 2);
+    // A listing from the top walks past it: every context once, only the oversized one flagged, the others untouched.
+    let walked = all_pages(&snap, json!({"kind":"contexts"}), 16);
+    assert_eq!(strings(&Value::Array(walked.clone()), "contextId"), ids);
+    let flagged: Vec<&Value> = walked.iter().filter(|c| c.get("nameTruncated").is_some()).collect();
+    assert_eq!(flagged.len(), 1);
+    assert_eq!(flagged[0]["contextId"], ids[1]);
+    // The cut is the longest that fits: one more character would not.
+    let more = kept.chars().count() + 1;
+    let mut probe = alone.clone();
+    probe["items"][0]["name"] = json!(wide.chars().take(more).collect::<String>());
+    let envelope = snap.dispatch(request(&snap, json!({"kind":"contexts","cursor":1,"limit":1}))).unwrap();
+    let mut grown = envelope.clone();
+    grown.result = Some(probe);
+    assert!(serde_json::to_vec(&grown).unwrap().len() > 4096);
+}
+
+#[test]
 fn a_long_name_cuts_the_page_early_and_the_cursor_resumes_without_loss() {
     let mut doc = world("D");
     let long = "n".repeat(900);

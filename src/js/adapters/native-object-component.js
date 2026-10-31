@@ -17,6 +17,7 @@
   'use strict';
 
   const SCENE = 'scene-root';
+  const LIST_ATTEMPTS = 3; // restarts of a context listing the project moved under
   const OP = (suffix) => contract.PREFIX + suffix;
   const fail = core.failure;
   const has = (value, key) => !!value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key);
@@ -95,9 +96,11 @@
     // #2256: the read-only native component model (contexts, one context's summary, its layers, the scene layers that instance it),
     // pinned to the presented revision and snapshot. Reads nothing from the legacy symbols table and opens no context. A response
     // is judged by the read contract at this edge, and an answer is discarded when the project moved on while it was read.
-    function read(selector) { return pinned(reads, 'component.read', 'component-read', () => ({ selector: JSON.parse(JSON.stringify(selector)) })); }
+    // `want` ({contentRevision, documentSnapshotId}, optional) is the pin a LATER page of one listing must still be at: when the
+    // project has moved off it the read is refused as stale_revision without being sent, so pages never mix two revisions.
+    function read(selector, want) { return pinned(reads, 'component.read', 'component-read', () => ({ selector: JSON.parse(JSON.stringify(selector)) }), want); }
     // One pinned, single-route read of a pure native query (no expectedRevision, no reconcile) judged by its contract.
-    function pinned(mod, operation, label, extra) {
+    function pinned(mod, operation, label, extra, want) {
       return runner.exclusive(async () => {
         const unavailable = (reason, more) => fail(operation, 'unavailable', Object.assign({ reason }, more));
         if (!mod || typeof ports.read !== 'function' || typeof ports.readDeclared !== 'function') return unavailable('component_read_unavailable');
@@ -107,6 +110,7 @@
         let pin = null;
         try { pin = ports.pin(); } catch (_) { pin = null; }
         if (!pin || typeof pin.instanceId !== 'string' || typeof pin.documentId !== 'string' || !Number.isSafeInteger(pin.contentRevision) || typeof pin.documentSnapshotId !== 'string') return unavailable('no_presented_native_session');
+        if (want && (pin.contentRevision !== want.contentRevision || pin.documentSnapshotId !== want.documentSnapshotId)) return fail(operation, 'stale_revision', { stale: true, reason: 'listing_pin_moved' });
         let request;
         try {
           const body = Object.assign({ atRevision: pin.contentRevision, documentSnapshotId: pin.documentSnapshotId }, extra());
@@ -160,19 +164,39 @@
       held = { instanceId: answer.instanceId, documentId: answer.documentId, workspace: next.workspace };
       return Object.freeze({ ok: true, operation, outcome: next.outcome, contextId: next.contextId, totalFrames: next.totalFrames, fps: next.fps, workspace: next.workspace, revision: answer.revision });
     }
-    // Every context of the document in order (scene-root first), following nextCursor; bounded so a malformed owner cannot loop.
-    async function listContexts() {
-      const operation = 'component.contexts', items = [];
-      let cursor = 0;
+    // Every item of one paged component listing in order, following nextCursor; bounded so a malformed owner cannot loop.
+    // One listing is ONE revision: the first page fixes the pin and every later page must still be at it. When the project moves
+    // between pages (a convert or delete would skip or duplicate an item) the listing restarts from cursor 0, a bounded number
+    // of times, then answers a typed stale refusal; a mixed list is never returned.
+    async function listPagesAt(operation, base) {
+      const items = [];
+      let cursor = 0, want = null;
       for (let guard = 0; guard < 64; guard += 1) {
-        const page = await read({ kind: 'contexts', cursor, limit: reads ? reads.MAX_PAGE : 16 });
+        const page = await read(Object.assign({}, base, { cursor, limit: reads ? reads.MAX_PAGE : 16 }), want);
         if (!page.ok) return fail(operation, page.code, { reason: page.reason, message: page.message, stale: page.stale });
+        if (!want) want = { contentRevision: page.result.atRevision, documentSnapshotId: page.result.documentSnapshotId };
         items.push(...page.result.items);
-        if (page.result.nextCursor === null) return Object.freeze({ ok: true, operation, revision: page.revision, contexts: Object.freeze(items) });
+        if (page.result.nextCursor === null) return Object.freeze({ ok: true, operation, revision: want.contentRevision, items: Object.freeze(items) });
         cursor = page.result.nextCursor;
       }
       return fail(operation, 'unavailable', { reason: 'component_pages_unbounded' });
     }
+    async function listPages(operation, base) {
+      let last = null;
+      for (let attempt = 0; attempt < LIST_ATTEMPTS; attempt += 1) {
+        last = await listPagesAt(operation, base);
+        if (last.ok || last.stale !== true) return last;
+      }
+      return fail(operation, 'stale_revision', { stale: true, reason: 'component_list_unstable', message: last && last.message });
+    }
+    // Every context of the document in order (scene-root first); a name the owner had to cut carries nameTruncated: true.
+    async function listContexts() {
+      const out = await listPages('component.contexts', { kind: 'contexts' });
+      return out.ok ? Object.freeze({ ok: true, operation: out.operation, revision: out.revision, contexts: out.items }) : out;
+    }
+    // All layers of one context / all scene layers instancing one component, from one revision.
+    function listLayers(contextId) { return listPages('component.layers', { kind: 'layers', contextId }); }
+    function listInstances(contextId) { return listPages('component.instances', { kind: 'instances', contextId }); }
 
     // The same typed refusal, reported under the operation the caller asked for.
     function refail(operation, failed) { return fail(operation, failed.code, { reason: failed.reason, message: failed.message }); }
@@ -238,7 +262,7 @@
     }
     return Object.freeze({
       convert, convertLayer: (layerUid) => convert([layerUid]), place, expose,
-      readModel, storyboard, enter, exit, read, listContexts, workspaceTransition, workspaceNow,
+      readModel, storyboard, enter, exit, read, listContexts, listLayers, listInstances, workspaceTransition, workspaceNow,
     });
   }
 
