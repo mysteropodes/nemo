@@ -1,5 +1,4 @@
 //! Typed scheduling admission; both snapshot kinds share one work/lease owner.
-use crate::evaluation::object_component_kernels::object_context_resolver::ContextSource;
 use crate::resource_leases::{
     FrameTerminalStatus, LeaseBundle, LeaseError, LeaseId, PublicationDisposition,
     ResourceLeaseManager, ScheduleReceipt, ViewGeneration, WorkId,
@@ -48,13 +47,12 @@ impl ObjectSchedulePins {
         }
         // #2256: scene-root or a component the snapshot declares (an entered component is presented by the viewport);
         // the frame is bounded by that context's own frame count. Any other id is not a context.
-        let Ok(context) = ContextSource::of_document(snapshot.document()).context(&self.context_id)
-        else {
+        let Some(frames) = snapshot.declared_context_frames(&self.context_id) else {
             return Err(ScheduleError::InvalidKey(
                 "object scheduling requires a declared context",
             ));
         };
-        if self.frame >= context.total_frames() {
+        if self.frame >= frames {
             return Err(ScheduleError::InvalidKey(
                 "object frame is outside the retained document range",
             ));

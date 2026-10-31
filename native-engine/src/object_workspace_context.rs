@@ -118,6 +118,17 @@ fn request_parts(payload: &Value) -> Option<(Wire<'_>, Action<'_>)> {
 }
 
 impl ObjectSnapshot {
+    /// The frame count of a context this snapshot DECLARES (`scene-root` or a component), else `None`: the one question the
+    /// viewport scheduler asks before it presents a context, answered by the resolver so no caller reads component tables.
+    #[cfg(feature = "evaluation")]
+    pub(crate) fn declared_context_frames(&self, context_id: &str) -> Option<u32> {
+        use crate::evaluation::object_component_kernels::object_context_resolver::ContextSource;
+        ContextSource::of_document(self.document())
+            .context(context_id)
+            .ok()
+            .map(|context| context.total_frames())
+    }
+
     pub(crate) fn dispatch_workspace_context(
         &self,
         request: &OpacityRequest,
