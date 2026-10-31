@@ -9222,6 +9222,23 @@
         {
           "allOf": [
             {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.object.workspace.context"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectWorkspaceContextPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
               "$ref": "#/$defs/RequiredRevisionRequest"
             },
             {
@@ -10146,6 +10163,9 @@
             },
             {
               "$ref": "#/$defs/ObjectComponentReadResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectWorkspaceContextResult"
             }
           ]
         },
@@ -18503,6 +18523,10 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 4294967295
+                  },
+                  "nameTruncated": {
+                    "const": true,
+                    "description": "Present only when the owner cut an oversized component name to fit the page."
                   }
                 }
               }
@@ -18743,6 +18767,242 @@
         }
       ],
       "description": "One answer of the component read, pinned to the request: atRevision and documentSnapshotId equal the request and the response contentRevision. nextCursor is the first unread index, null at the end."
+    },
+    "ObjectWorkspaceContextView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame",
+        "workIn",
+        "workOut"
+      ],
+      "properties": {
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "workIn": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "workOut": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      }
+    },
+    "ObjectWorkspaceContextState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "activeContextId",
+        "openTabs",
+        "view",
+        "sceneView"
+      ],
+      "properties": {
+        "activeContextId": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          ]
+        },
+        "openTabs": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "view": {
+          "$ref": "#/$defs/ObjectWorkspaceContextView"
+        },
+        "sceneView": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/ObjectWorkspaceContextView"
+            }
+          ]
+        }
+      },
+      "description": "The session workspace the caller holds: the entered component context (null for the scene), the open tabs, the playhead and work area of the presented context and, while a component is entered, the saved scene view. Session view state: never a document member and never stored by the native owner."
+    },
+    "ObjectWorkspaceContextPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "workspace",
+        "action"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "workspace": {
+          "$ref": "#/$defs/ObjectWorkspaceContextState"
+        },
+        "action": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "contextId",
+                "entryFrame"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "enter"
+                },
+                "contextId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "entryFrame": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    }
+                  ]
+                },
+                "fromLayerUid": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "exit"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "contextId"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "close"
+                },
+                "contextId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "refresh"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "Enter or leave a component context of the pinned snapshot (enterSymbol / exitToScene / closeSymbolTab as pure view-state): the caller sends the workspace it holds and one action; the native owner applies the baseline rules against the contexts the snapshot declares and answers the new workspace. A context that is not declared is not_found; entering the active context is a no-op and entering from inside another component is refused as nested. No document mutation, revision or history entry."
+    },
+    "ObjectWorkspaceContextResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "outcome",
+        "contextId",
+        "totalFrames",
+        "fps",
+        "workspace"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "outcome": {
+          "enum": [
+            "entered",
+            "already_active",
+            "refused_nested",
+            "exited",
+            "not_in_context",
+            "closed",
+            "close_noop",
+            "refreshed",
+            "context_gone"
+          ]
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "totalFrames": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "fps": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "workspace": {
+          "$ref": "#/$defs/ObjectWorkspaceContextState"
+        }
+      }
     },
     "ObjectClipboardCopyPayload": {
       "type": "object",

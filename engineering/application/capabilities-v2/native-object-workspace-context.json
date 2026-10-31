@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object-workspace-context",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "query.document.object.workspace.context"
+  ],
+  "input": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectWorkspaceContextPayload"
+  },
+  "output": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectWorkspaceContextResult"
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "readPolicy": "Pure view-state transition of the workspace: enter a declared component context (enterSymbol), leave it (exitToScene), close its tab (closeSymbolTab) or refresh a held workspace whose component may have vanished. The caller sends the workspace it holds (activeContextId or null, at most 8 unique open tabs, the playhead and work area of the presented context and, while a component is entered, the saved scene view) with the exact atRevision and documentSnapshotId pins and one action; any other pin is stale_revision. The native owner rebuilds the WorkspaceState kernel from the held workspace and the contexts the snapshot declares and applies the baseline rules: entering the active context is a no-op (already_active), entering from inside another component is refused as nested (refused_nested, state unchanged), an undeclared context or scene-root is not_found, entry resets the playhead to 0 (or to the clamped entryFrame) and the work area to [0, totalFrames - 1] of the component and takes the component fps or else the scene fps, exit restores the saved scene view exactly and keeps the tab open, closing the active tab exits first, and a held active context that no longer exists is exited first (refresh reports context_gone). The answer carries the presented context (contextId, totalFrames, fps) and the new workspace; tabs of contexts that no longer exist are not listed. A 4096-byte response bound applies. No document mutation, no revision publication, no history entry, no stored state: the viewport presents the context the caller then requests, and writes inside an entered component are a separate owner.",
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Bounded original request bytes and complete correlated response; at most 8 open tabs of at most 128 bytes each."
+  },
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Enter the component of a pinned document; replace example pins with the actual discovery snapshot",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "workspace-context",
+        "instanceId": "workspace-context-fixture",
+        "documentId": "native-object-document-1",
+        "operation": "query.document.object.workspace.context",
+        "payload": {
+          "atRevision": 3,
+          "documentSnapshotId": "native-object:native-object-document-1:3",
+          "workspace": {
+            "activeContextId": null,
+            "openTabs": [],
+            "view": {
+              "frame": 5,
+              "workIn": 0,
+              "workOut": 23
+            },
+            "sceneView": null
+          },
+          "action": {
+            "kind": "enter",
+            "contextId": "native-component:1:0",
+            "entryFrame": null
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "workspace-context",
+        "instanceId": "workspace-context-fixture",
+        "documentId": "native-object-document-1",
+        "contentRevision": 3,
+        "ok": true,
+        "result": {
+          "atRevision": 3,
+          "documentSnapshotId": "native-object:native-object-document-1:3",
+          "outcome": "entered",
+          "contextId": "native-component:1:0",
+          "totalFrames": 12,
+          "fps": 24.0,
+          "workspace": {
+            "activeContextId": "native-component:1:0",
+            "openTabs": [
+              "native-component:1:0"
+            ],
+            "view": {
+              "frame": 0,
+              "workIn": 0,
+              "workOut": 11
+            },
+            "sceneView": {
+              "frame": 5,
+              "workIn": 0,
+              "workOut": 23
+            }
+          }
+        }
+      }
+    }
+  ]
+}

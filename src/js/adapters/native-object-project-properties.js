@@ -23,7 +23,7 @@
   }
   function create(ports){
     function ready(state){return !!state&&state.active&&!state.opening&&state.pending===0&&!state.synchronizing&&state.subscribed&&
-      !!state.presented&&state.dispatchAvailable&&state.projectionReady&&state.subscriptionActive;}
+      !!state.presented&&state.sceneRoot!==false&&state.dispatchAvailable&&state.projectionReady&&state.subscriptionActive;}
     function available(){return ready(ports.state());}
     async function read(selector,kind){
       var fields=['instanceId','documentId','atRevision','documentSnapshotId','view'];
@@ -64,7 +64,7 @@
         // pending includes this queued action. The ordinary mutation path owns
         // its eventual inspect/publication/presentation, without a second queue.
         if(!state.active||state.opening||state.synchronizing||!state.subscribed||!state.presentationCurrent||
-          !state.dispatchAvailable||!state.projectionReady||!state.subscriptionActive)
+          !state.dispatchAvailable||!state.projectionReady||!state.subscriptionActive||state.sceneRoot===false)
           throw new Error('Native property edit owner or presentation is unavailable');
         return {apiVersion:2,requestId:ports.requestId(track?'property-track':'property'),instanceId:current.instanceId,documentId:current.documentId,
           operation:track?'command.document.object.property.track.edit':'command.document.object.property.edit',expectedRevision:current.contentRevision,payload:copied};

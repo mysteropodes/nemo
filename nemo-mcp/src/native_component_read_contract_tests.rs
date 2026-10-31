@@ -113,10 +113,7 @@ fn published_schema_declares_the_forbidden_revision_request_and_closed_shapes() 
     let branches = schema["$defs"]["ResponseBase"]["properties"]["result"]["oneOf"]
         .as_array()
         .unwrap();
-    assert_eq!(
-        branches.last().unwrap(),
-        &json!({"$ref":"#/$defs/ObjectComponentReadResult"})
-    );
+    assert!(branches.contains(&json!({"$ref":"#/$defs/ObjectComponentReadResult"})));
     for (selector, result) in good_cases() {
         assert!(
             validator.is_valid(&envelope(selector.clone())),
@@ -243,6 +240,21 @@ fn result_answers_its_own_request_pin_kind_and_page() {
     let mut bad = contexts_result();
     bad["items"][0]["name"] = json!("Scene");
     assert!(!result(&contexts_payload, &bad));
+    // An oversized component name cut by the owner is flagged `nameTruncated: true`; nothing else is admitted.
+    let mut cut = contexts_result();
+    cut["items"][1]["nameTruncated"] = json!(true);
+    assert!(result(&contexts_payload, &cut));
+    for flag in [json!(false), json!("yes"), json!(1), Value::Null] {
+        let mut bad = cut.clone();
+        bad["items"][1]["nameTruncated"] = flag;
+        assert!(!result(&contexts_payload, &bad));
+    }
+    let mut bad = cut.clone();
+    bad["items"][0]["nameTruncated"] = json!(true);
+    assert!(!result(&contexts_payload, &bad), "the scene has no name to cut");
+    let mut bad = cut.clone();
+    bad["items"][1]["name"] = Value::Null;
+    assert!(!result(&contexts_payload, &bad), "an absent name is not truncated");
     // A page longer than its limit.
     let mut over = contexts_payload.clone();
     over["selector"]["limit"] = json!(1);

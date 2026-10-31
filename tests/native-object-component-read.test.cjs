@@ -66,7 +66,10 @@ function owner(options = {}) {
     async read(request) {
       if (options.busy) throw Object.assign(new Error('busy'), { notSent: true, reason: 'native_project_busy' });
       if (options.drop) throw new Error(options.drop);
-      return sdk.dispatch(request);
+      const out = await sdk.dispatch(request);
+      state.reads = (state.reads || 0) + 1;
+      if (options.moveAtRead && options.moveAtRead(state.reads)) state.revision += 1; // the project moves right after this answer
+      return out;
     },
   };
   return { ports, state, sdk, intent: component.createComponentIntent(ports, {}) };
@@ -111,6 +114,7 @@ test('results answer their own pin, selector and page, and the model invariants 
   const contexts = { kind: 'contexts', cursor: 0, limit: 16 };
   run(contexts); run({ kind: 'context', contextId: 'sym_a' }); run({ kind: 'layers', contextId: 'sym_a', cursor: 0, limit: 16 }); run({ kind: 'instances', contextId: 'sym_a', cursor: 0, limit: 16 });
   run({ kind: 'context', contextId: 'scene-root' });
+  run(contexts, (r) => { r.items[1].nameTruncated = true; }); // an oversized component name the owner cut
   const no = (selector, mutate, label) => assert.throws(() => run(selector, mutate), TypeError, label);
   no(contexts, (r) => { r.atRevision = 8; }, 'foreign revision');
   no(contexts, (r) => { r.documentSnapshotId = 'foreign'; }, 'foreign snapshot');
@@ -122,6 +126,9 @@ test('results answer their own pin, selector and page, and the model invariants 
   no(contexts, (r) => { r.items[0].contextId = 'sym_x'; r.items[0].contextKind = 'component'; }, 'first is the scene');
   no(contexts, (r) => { r.items[1].contextId = 'scene-root'; r.items[1].contextKind = 'scene'; }, 'scene only first');
   no(contexts, (r) => { r.items[0].name = 'Scene'; }, 'scene is unnamed');
+  for (const flag of [false, 'true', 1, null]) no(contexts, (r) => { r.items[1].nameTruncated = flag; }, 'truncation flag is only ever true: ' + String(flag));
+  no(contexts, (r) => { r.items[0].nameTruncated = true; }, 'the scene has no name to cut');
+  no(contexts, (r) => { r.items[1].name = null; r.items[1].nameTruncated = true; }, 'an absent name is not truncated');
   no(contexts, (r) => { r.items.length = 3; r.items.push(...r.items.slice(0, 1)); r.contextCount = 1; }, 'beyond the total');
   no({ kind: 'contexts', cursor: 0, limit: 1 }, (r) => { r.items.push(clone(r.items[0])); r.contextCount = 5; r.nextCursor = 2; }, 'beyond the limit');
   no({ kind: 'context', contextId: 'sym_a' }, (r) => { r.contextId = 'sym_b'; }, 'other context');
@@ -268,4 +275,55 @@ test('the declaration, schema, composition and load order agree', () => {
   assert.ok(at('native-application.js') < at('native-object-component.js'));
   assert.equal(OP in {}, false);
   assert.equal(component.OPERATIONS.includes(OP), false, 'the read is not a command of the component adapter');
+});
+
+test('listContexts reads every page from ONE revision: a move between pages restarts the listing, never mixes two', async () => {
+  const o = owner({ pageSize: 1, moveAtRead: (n) => n === 1 });
+  const out = await o.intent.listContexts();
+  assert.equal(out.ok, true);
+  assert.deepEqual(out.contexts.map((item) => item.contextId), ['scene-root', 'sym_a', 'sym_b'], 'no context skipped or duplicated');
+  assert.equal(out.revision, 8, 'reported under the revision the whole list was read at');
+  const sent = o.state.sent.map((r) => [r.payload.selector.cursor, r.payload.atRevision]);
+  assert.deepEqual(sent, [[0, 7], [0, 8], [1, 8], [2, 8]], 'the stale page 2 was never sent; the restart is whole and uniformly pinned');
+  assert.ok(o.state.sent.slice(1).every((r) => r.payload.documentSnapshotId === SNAP(8)));
+});
+
+test('listContexts gives up after bounded restarts with a typed stale refusal, and sends no unpinned page', async () => {
+  const o = owner({ pageSize: 1, moveAtRead: () => true });
+  const out = await o.intent.listContexts();
+  assert.deepEqual([out.ok, out.code, out.stale, out.reason], [false, 'stale_revision', true, 'component_list_unstable']);
+  assert.equal(o.state.sent.length, 3, 'one first page per attempt, three attempts');
+  assert.ok(o.state.sent.every((r) => r.payload.selector.cursor === 0));
+  // A refusal that is not staleness is not retried.
+  const refused = owner({ pageSize: 1, reply: (req, base) => Object.assign(base, { ok: false, error: { code: 'not_found', message: 'gone' } }) });
+  const gone = await refused.intent.listContexts();
+  assert.deepEqual([gone.ok, gone.code, gone.stale === true], [false, 'not_found', false]);
+  assert.equal(refused.state.sent.length, 1);
+});
+
+test('layers and instances listings are pinned the same way', async () => {
+  const o = owner({ pageSize: 1, moveAtRead: (n) => n === 1 });
+  const layers = await o.intent.listLayers('sym_a');
+  assert.equal(layers.ok, true);
+  assert.deepEqual(layers.items.map((item) => item.layerUid), ['ia', 'ib']);
+  const instances = await owner({ pageSize: 1 }).intent.listInstances('sym_a');
+  assert.deepEqual(instances.items.map((item) => item.layerUid), ['L2', 'L3']);
+  assert.equal((await owner({ pageSize: 1, moveAtRead: () => true }).intent.listLayers('sym_a')).code, 'stale_revision');
+});
+
+test('a context whose name the owner had to cut is listed, flagged, and paging continues past it', async () => {
+  const cut = (req, base, state) => {
+    const plan = answer(req, state);
+    plan.result.items.forEach((item) => { if (item.contextId === 'sym_a') { item.name = 'Comp'; item.nameTruncated = true; } });
+    return Object.assign(base, { ok: true, result: plan.result });
+  };
+  const o = owner({ pageSize: 1, reply: cut });
+  const out = await o.intent.listContexts();
+  assert.equal(out.ok, true);
+  assert.deepEqual(out.contexts.map((item) => item.contextId), ['scene-root', 'sym_a', 'sym_b']);
+  assert.deepEqual(out.contexts.map((item) => item.nameTruncated === true), [false, true, false]);
+  assert.equal(out.contexts[1].name, 'Comp');
+  // A forged flag is refused at the edge like any other unknown member.
+  const forged = owner({ reply: (req, base, state) => { const plan = answer(req, state); plan.result.items[0].nameTruncated = true; return Object.assign(base, { ok: true, result: plan.result }); } });
+  assert.equal((await forged.intent.listContexts()).code, 'transport_failed');
 });

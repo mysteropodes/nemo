@@ -17,7 +17,8 @@ function element(tagName){
     appendChild(k){if(k.parentNode)k.parentNode.removeChild(k);kids.push(k);k.parentNode=this;return k;},
     removeChild(k){kids.splice(kids.indexOf(k),1);k.parentNode=null;},
     querySelector:()=>null,contains(k){while(k){if(k===this)return true;k=k.parentNode;}return false;},
-    click(){return listeners.click&&listeners.click({target:this,preventDefault(){},stopPropagation(){}});}};
+    click(){return listeners.click&&listeners.click({target:this,preventDefault(){},stopPropagation(){}});},
+    fire(type){return listeners[type]&&listeners[type]({target:this,preventDefault(){},stopPropagation(){}});}};
   Object.defineProperty(el,'className',{get:()=>[...classes].join(' '),set(v){classes.clear();String(v).split(/\s+/).filter(Boolean).forEach(x=>classes.add(x));}});
   Object.defineProperty(el,'children',{get:()=>collection(kids)});
   Object.defineProperty(el,'innerHTML',{set(){this.replaceChildren();}});
@@ -58,5 +59,17 @@ test('layer list DOM through the presenter seam is identical to the pre-seam cha
   const expected=JSON.parse(fs.readFileSync(FIXTURE,'utf8'));
   assert.deepEqual(CASES.map(c=>c.name),Object.keys(expected));
   for(const c of CASES)assert.deepEqual(render(c),expected[c.name],c.name);
+});
+// #2256: the baseline row double-click opens the component an instance layer instances; the list only forwards the row's uid.
+test('a double-click on a native layer row asks the open port for that layer',()=>{
+  const opened=[];
+  const ports=c=>({projectionReady:i=>Files.projectionReadyForUI(c,i),currentSession:()=>null,selectLayer:()=>true,repaint:()=>true,readShyMode:()=>false,
+    openLayer:uid=>{opened.push(uid);return true;}});
+  const root={state:{currentFrame:0,activeLayerIdx:0},userLayers:[],document:documentFor(),_layerSel:[],NemoNativeObjectProjectFile:Files,NemoNativeObjectUI:UI};
+  const info=metadata([A,B,C]);Files.projectView(root,info);
+  assert.equal(UI.render(root,info,false,ports(root)),true);
+  const rows=root.document.nodes.get('layer-list').children;
+  rows[1].fire('dblclick');rows[0].fire('dblclick');
+  assert.deepEqual(opened,['B','opaque A:雪'],'the uid of the double-clicked row, never an index');
 });
 module.exports={CASES,render};

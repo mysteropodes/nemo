@@ -27,7 +27,15 @@
     });
     root._totalF=s.totalFrames;root._waIn=s.waIn;root._waOut=s.waOut;
   }
+  // #2256: while a component is presented the rows on screen are ITS rows, so a revision is judged against the entered context
+  // (same owner, same revision, layers re-read) and not against the scene projection, which is held aside until the scene returns.
+  function enteredView(root){var c=root.NemoNativeComponentContext;return !!c&&typeof c.presented==='function'&&!!c.presented(root);}
+  function enteredMatches(root,info){
+    var pin=projections.get(root);
+    return !!pin&&!!info&&['instanceId','documentId','lifecycleGeneration'].every(function(k){return pin[k]===info[k];})&&root.NemoNativeComponentContext.projectionReady(root,info)===true;
+  }
   function projectionMatches(root,info){
+    if(enteredView(root))return enteredMatches(root,info);
     var pin=projections.get(root),rows=root.state&&root.state.layers;
     return !!pin&&!!info&&['instanceId','documentId','lifecycleGeneration'].every(function(k){return pin[k]===info[k];})&&
       Array.isArray(rows)&&Array.isArray(info.layers)&&rows.length===info.layers.length&&
@@ -41,6 +49,7 @@
   }
   function projectionReadyForUI(root,info){
     var pin=projections.get(root),next;
+    if(enteredView(root))return enteredMatches(root,info);
     try{validateSettings(info);next=layerTable(info&&info.layers);}catch(_){return false;}
     return projectionMatches(root,info)&&['contentRevision','documentSnapshotId'].every(function(k){return pin[k]===info[k];})&&settingsMatch(pin,info)&&
       ['canvasW','canvasH','fps','totalFrames'].every(function(k){return root.state[k]===info[k];})&&
@@ -51,6 +60,8 @@
             ['locked','shy'].includes(k)?row[k]===(layer[k]===true):!Object.prototype.hasOwnProperty.call(layer,k)||row[k]===layer[k];
         });});
   }
+  // #2371: read-model members the layer table admits (validated by native-object-project-metadata.js; the presenter reads info.layers).
+  var MODEL_ROW_KEYS=['kind','folderCollapsed','folderId','componentId','blendMode','matteMode','matteSourceLayerUid','mattesMore','isMatteSource','opacity','opacityAnimated'];
   function layerTable(layers){
     if(!Array.isArray(layers))throw new Error('Native layer table is invalid');
     var seen=new Set(),next=[];
@@ -58,7 +69,7 @@
       var layer=layers[i];
       if(!layer||typeof layer.layerUid!=='string'||!layer.layerUid||seen.has(layer.layerUid))
         throw new Error('Native layer identity is invalid');
-      if(Object.keys(layer).some(function(k){return !['layerUid','name','visible','locked','shy','color','parentLayerUid','widget'].includes(k);}))
+      if(Object.keys(layer).some(function(k){return !['layerUid','name','visible','locked','shy','color','parentLayerUid','widget'].concat(MODEL_ROW_KEYS).includes(k);}))
         throw new Error('Native layer metadata is unsupported');
       if(Object.prototype.hasOwnProperty.call(layer,'name')&&typeof layer.name!=='string')throw new Error('Native layer name is invalid');
       if(Object.prototype.hasOwnProperty.call(layer,'visible')&&typeof layer.visible!=='boolean')throw new Error('Native layer visibility is invalid');
