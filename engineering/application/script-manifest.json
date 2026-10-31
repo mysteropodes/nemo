@@ -213,6 +213,7 @@
     {"src":"js/adapters/native-object-recovery.js"},
     {"src":"js/adapters/native-object-recovery-resume.js"},
     {"src":"js/adapters/native-object-recovery-cleanup.js"},
+    {"src":"js/adapters/native-object-project-close.js"},
     {"src":"js/adapters/project-dirty-baseline.js"},
     {"src":"js/adapters/project-native-version-restore.js"},
     {"src":"js/adapters/native-opacity-project-entry.js"},

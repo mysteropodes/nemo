@@ -19,8 +19,28 @@
   function sameView(a,b){return a.frame===b.frame&&a.activeLayerUid===b.activeLayerUid&&
     a.anchorLayerUid===b.anchorLayerUid&&a.layerUids.length===b.layerUids.length&&
     a.layerUids.every(function(uid,index){return uid===b.layerUids[index];});}
+  // #2381: closing the only tab. The unsaved-changes prompt comes first; the project is then released and the home screen shown.
+  function closeLast(root,ports){
+    var closer=null;
+    return function(){
+      var Close=root.NemoNativeObjectProjectClose;if(!Close)return ports.notice('The last tab cannot be closed');
+      if(!closer)closer=Close.create({
+        native:function(){var file=ports.file();return !!file&&file.isActive();},
+        current:function(){var now=ports.read();return now.tabs.length+':'+now.activeTabId;},isDirty:ports.dirty,notice:ports.notice,
+        confirmDiscard:function(){var msg='Unsaved changes will be lost. Close the project?',tauri=root.__TAURI__;
+          try{
+            if(tauri&&tauri.dialog&&typeof tauri.dialog.ask==='function')return tauri.dialog.ask(msg,{title:'Unsaved changes',kind:'warning',okLabel:'Discard and close',cancelLabel:'Cancel'});
+            if(typeof root.confirm==='function')return Promise.resolve(root.confirm(msg));
+          }catch(_){}
+          return Promise.resolve(false);},
+        closeNative:function(){return ports.file().closeProject();},closeLegacy:ports.closeLegacy,
+        finish:function(){ports.read().tabs.splice(0);ports.activateTab(null,null,'Untitled');ports.saved();ports.render();ports.showStart();}
+      });
+      return closer();
+    };
+  }
   function bind(root,ports){
-    return root.NemoNativeObjectInactiveProjectTabs.create(root,{
+    var inactive=root.NemoNativeObjectInactiveProjectTabs.create(root,{
       focusOpen:function(path){
         var open=findOpen(ports.read(),path);if(!open||!open.tab)return null;
         ports.hideStart();
@@ -94,6 +114,7 @@
         ports.activateTab(to.id,to.path||null,to.name);ports.render();return true;
       }
     });
+    return Object.freeze(Object.assign({},inactive,{closeLast:closeLast(root,ports)}));
   }
   function render(root,ports){
     var add=root.document.getElementById('project-tab-add');

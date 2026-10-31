@@ -29,7 +29,7 @@
   function readNativeTabsUI(){return {tabs:tabs,activeTabId:activeTabId,path:currentPath,name:currentName};}
   var nativeInactiveTabs=nativeTabsUI.bind(window,{read:readNativeTabsUI,makeId:makeTabId,
     file:function(){return nativeSavedUI&&nativeSavedUI.nativeObject;},dirty:isDirty,notice:tabAddNotice,render:renderTabBar,
-    activateTab:function(id,path,name){activeTabId=id;currentPath=path;currentName=name;updateCurrentLabel();},switchTab:switchToTab,hideStart:hideStartScreen
+    activateTab:function(id,path,name){activeTabId=id;currentPath=path;currentName=name;updateCurrentLabel();},switchTab:switchToTab,hideStart:hideStartScreen,showStart:showStartScreen,saved:function(){nativeNewReturn=null;tabAddNotice('');try{markSaved(projectJSON());}catch(e){}},closeLegacy:function(){return afterMaybe(releaseNative('tab-close'),function(admitted){if(admitted===false){tabAddNotice('Closing the project is unavailable in this build.');return false;}newProjectNow({w:1920,h:1080,fps:24,name:'Untitled'});return true;});}
   });
   function p39bUseInactiveEntry(){try{var native=window.NemoNativeOpacityCutover;return !!activeTabId&&(native?native.blocksLegacy()!==false:'NemoNativeOpacityProject' in window);}catch(_){return !!activeTabId;}}
 
@@ -618,7 +618,7 @@
   }
   function closeTab(id){
     var idx=tabs.findIndex(function(t){return t.id===id;});if(idx<0)return;if(tabs[idx].nativeInactiveProject)return nativeInactiveTabs.close(tabs[idx].nativeInactiveProject);
-    if(tabs.length===1){showToast(SM.t('hsCannotCloseLastTab'));return;}
+    if(tabs.length===1)return nativeInactiveTabs.closeLast(); // #2381: closing the only project returns to the home screen
     if(tabs[idx].nativePreparation)return inactiveEntry.close(tabs[idx].nativePreparation);
     var wasActive=id===activeTabId;
     function closed(){tabs.splice(idx,1);renderTabBar();}

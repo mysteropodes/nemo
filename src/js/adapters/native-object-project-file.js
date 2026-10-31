@@ -229,6 +229,22 @@
         baseline=null;ports.failed(error);ports.repaint();return false;
       }finally{opening=false;}
     }
+    // #2381: close the active project with no replacement. The caller has already asked about unsaved changes.
+    async function closeProject(){
+      if(saving||opening||!session.isActive()||typeof session.closeProject!=='function')return false;
+      opening=true;
+      var previous=session.info();
+      try{
+        await session.closeProject();
+        if(previous)discardRecovery(previous.documentId);
+        baseline=null;baselines=new Map();initials=new Map();
+        ports.repaint();
+        return true;
+      }catch(error){
+        if(error&&error.details&&error.details.disposition==='notDispatched'){(ports.closeFailed||ports.refused)(error);return false;}
+        baseline=null;(ports.closeFailed||ports.failed)(error);ports.repaint();return false;
+      }finally{opening=false;}
+    }
     // destination: an application request's path (#2510) in place of the picker; the same workflow otherwise.
     // replace: true is the in-place Save of a titled project (the host renames over the existing file); it never applies to a picker choice.
     async function saveAs(destination,mode){
@@ -258,7 +274,7 @@
         // The slot a resumed session replaces: sent as `supersedes` with its first own write (#2360 R3).
         supersedes:info&&recoveredSlots.get(info.documentId)||null};
     }
-    return Object.freeze({openPath:openPath,openRecovered:openRecovered,newProject:newProject,activateProject:activateProject,saveAs:saveAs,recoveryPin:recoveryPin,
+    return Object.freeze({openPath:openPath,openRecovered:openRecovered,newProject:newProject,activateProject:activateProject,closeProject:closeProject,saveAs:saveAs,recoveryPin:recoveryPin,
       canOpen:function(){return !saving&&!opening&&(!session.blocksLegacy()||session.isActive());},
       isDirty:function(){var info=session.info();return !session.isActive()&&session.blocksLegacy()||!baseline||!info||info.documentDigest!==baseline;}});
   }
@@ -330,9 +346,10 @@
           written&&written.receipt&&written.receipt.published?'File written; current saved status was not confirmed.':'Save cancelled or unavailable. Choose a new file path.');
       },
       refused:function(error){ports.notice('Could not open native project: '+(error.message||error));},
+      closeFailed:function(error){ports.notice('Could not close the project: '+(error.message||error));},
       failed:function(error){ports.show();ports.notice('Could not open native project: '+(error.message||error));}
     },root.NemoNativeObjectSaveAsWorkflow,root.NemoNativeObjectSavedAcknowledgement);
-    return Object.freeze({isActive:session.blocksLegacy,recoveryPin:ui.recoveryPin,canOpen:ui.canOpen,isDirty:ui.isDirty,saveAs:ui.saveAs,openPath:ui.openPath,openRecovered:ui.openRecovered,newProject:ui.newProject,activateProject:ui.activateProject});
+    return Object.freeze({isActive:session.blocksLegacy,recoveryPin:ui.recoveryPin,canOpen:ui.canOpen,isDirty:ui.isDirty,saveAs:ui.saveAs,openPath:ui.openPath,openRecovered:ui.openRecovered,newProject:ui.newProject,activateProject:ui.activateProject,closeProject:ui.closeProject});
   }
   return Object.freeze({create:create,projectView:projectView,bind:bind,
     projectionReadyForUI:projectionReadyForUI,
