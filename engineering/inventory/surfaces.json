@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "f59976a60f5ec26f992ce6486753b76f550fd275",
-  "describe": "v0.7.0-alpha.4-4453-gf59976a6-dirty"
+  "head": "c78c8d39ba7284d72643162e59bbf1cf608e1eb2",
+  "describe": "v0.7.0-alpha.4-4456-gc78c8d39-dirty"
  },
- "inputsDigest": "cdb78de8c7115eabe60c61a1034b069c953feb63554a447f3f9914194898c5ee",
+ "inputsDigest": "1966cec966f149549d24054ee4463e56db51785ca3eb5dd70f9e50bdafcaeb99",
  "states": [
   "inventoried",
   "characterized",
@@ -55,10 +55,10 @@
    "native": 263,
    "export": 5,
    "animation": 435,
-   "history": 350,
+   "history": 348,
    "selection": 370,
-   "render": 463,
-   "persist": 393
+   "render": 461,
+   "persist": 391
   }
  },
  "fixturesByArea": {
@@ -4804,7 +4804,7 @@
     "functionsVisited": 140,
     "via": "variable b",
     "references": [
-     "src/js/adapters/native-object-ui.js:373 setShyMode()",
+     "src/js/adapters/native-object-ui.js:375 setShyMode()",
      "src/js/motion.js:13204 setAppMode()",
      "src/js/timeline.js:1271 toggleLayerShy()"
     ]
@@ -9911,7 +9911,7 @@
     "functionsVisited": 27,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:319 renderNativeObjectUiMetadata()"
+     "src/js/adapters/native-object-ui.js:321 renderNativeObjectUiMetadata()"
     ]
    },
    "fixtures": [
@@ -12257,7 +12257,7 @@
     "functionsVisited": 37,
     "via": "variable trig",
     "references": [
-     "src/js/adapters/native-object-ui.js:175 unavailableInspector()",
+     "src/js/adapters/native-object-ui.js:176 unavailableInspector()",
      "src/js/reference-bridge.js:362 syncUI()",
      "src/js/reference-bridge.js:431 openOptions()"
     ]
@@ -16368,7 +16368,7 @@
     "functionsVisited": 5,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:308 renderNativeObjectUiMetadata()",
+     "src/js/adapters/native-object-ui.js:310 renderNativeObjectUiMetadata()",
      "src/js/app.js:5100 syncInput()",
      "src/js/timeline.js:247 updatePlayhead()",
      "src/js/timeline.js:2879 updateUI()"
@@ -28383,10 +28383,7 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "persist": 3,
-    "history": 3,
-    "animation": 3,
-    "render": 3
+    "animation": 3
    },
    "platforms": "browser and desktop",
    "status": "inventoried",
@@ -28394,7 +28391,7 @@
    "source": "src/js/shapes-panel.js:738",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 92
+    "functionsVisited": 66
    },
    "fixtures": [
     "static-props",
@@ -28448,7 +28445,7 @@
    "capability": "Break text into shapes",
    "area": "drawing-selection",
    "handler": [
-    "src/js/shapes-panel.js:855 renderNode()"
+    "src/js/shapes-panel.js:856 renderNode()"
    ],
    "events": [
     "click"
@@ -28467,10 +28464,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/shapes-panel.js:855",
+   "source": "src/js/shapes-panel.js:856",
    "meta": {
     "i18n": "elementsExplodeText",
-    "functionsVisited": 159
+    "functionsVisited": 160
    },
    "fixtures": [
     "static-props",
@@ -28486,7 +28483,7 @@
    "capability": "Rename",
    "area": "drawing-selection",
    "handler": [
-    "src/js/shapes-panel.js:860 renderNode()"
+    "src/js/shapes-panel.js:861 renderNode()"
    ],
    "events": [
     "click"
@@ -28497,18 +28494,15 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "persist": 3,
-    "history": 3,
-    "animation": 3,
-    "render": 3
+    "animation": 3
    },
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/shapes-panel.js:860",
+   "source": "src/js/shapes-panel.js:861",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 92
+    "functionsVisited": 66
    },
    "fixtures": [
     "static-props",
@@ -28524,7 +28518,7 @@
    "capability": "Select members",
    "area": "drawing-selection",
    "handler": [
-    "src/js/shapes-panel.js:853 renderNode()"
+    "src/js/shapes-panel.js:854 renderNode()"
    ],
    "events": [
     "click"
@@ -28543,7 +28537,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/shapes-panel.js:853",
+   "source": "src/js/shapes-panel.js:854",
    "meta": {
     "i18n": "elementsSelectMembers",
     "functionsVisited": 87
@@ -28562,7 +28556,7 @@
    "capability": "Select members",
    "area": "drawing-selection",
    "handler": [
-    "src/js/shapes-panel.js:861 renderNode()"
+    "src/js/shapes-panel.js:862 renderNode()"
    ],
    "events": [
     "click"
@@ -28581,7 +28575,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/shapes-panel.js:861",
+   "source": "src/js/shapes-panel.js:862",
    "meta": {
     "i18n": "elementsSelectMembers",
     "functionsVisited": 87
@@ -28600,7 +28594,7 @@
    "capability": "Ungroup",
    "area": "drawing-selection",
    "handler": [
-    "src/js/shapes-panel.js:869 renderNode()"
+    "src/js/shapes-panel.js:870 renderNode()"
    ],
    "events": [
     "click"
@@ -28621,10 +28615,10 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/shapes-panel.js:869",
+   "source": "src/js/shapes-panel.js:870",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 312
+    "functionsVisited": 316
    },
    "fixtures": [
     "static-props",
@@ -30263,7 +30257,7 @@
    "source": "src/js/timeline.js:7014",
    "meta": {
     "i18n": "ctxLayerBlend",
-    "functionsVisited": 172
+    "functionsVisited": 173
    },
    "fixtures": [
     "keyed-props",
@@ -30340,7 +30334,7 @@
    "source": "src/js/timeline.js:7000",
    "meta": {
     "i18n": "ctxMenuAppearance",
-    "functionsVisited": 174
+    "functionsVisited": 175
    },
    "fixtures": [
     "keyed-props",
