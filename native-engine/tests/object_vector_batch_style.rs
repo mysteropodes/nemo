@@ -415,3 +415,63 @@ fn brush_families_the_engine_cannot_restyle_are_refused_by_type_and_a_plain_anch
     );
     assert_eq!(at(&owner, "anchor")["vector"]["strokeWidth"], 9);
 }
+
+#[test]
+fn a_restyle_on_a_held_frame_keys_that_cell_and_leaves_the_key_untouched() {
+    let mut doc = mixed();
+    doc["layers"][0]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+        "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+    let mut owner = owner_of(&doc);
+    let before = state(&owner);
+    let held = |id: &str| json!({"op":"restyle","stableTarget":target(0, id),"style":{"fill":"#00ff00","opacity":0.5},"frame":4});
+    let mut payload = batch(vec![held("s-b"), held("txt")]);
+    let refused = send(&mut owner, "no-copy-key", payload.clone());
+    assert_eq!(
+        refused["ok"], false,
+        "without the copy key a held cell has no record to edit: {refused}"
+    );
+    payload["keyframe"] = json!("copy");
+    let r = send(&mut owner, "held", payload);
+    assert_eq!(r["ok"], true, "{r}");
+    let now = state(&owner);
+    let in_cell = |frame: u64, id: &str| {
+        objects(&now)
+            .iter()
+            .find(|r| {
+                r["target"]["frameScope"]["frame"].as_u64() == Some(frame)
+                    && r["target"]["strokeId"] == id
+            })
+            .cloned()
+            .unwrap()
+    };
+    assert_eq!(
+        in_cell(0, "s-b"),
+        objects(&before)[0],
+        "the held key keeps its style"
+    );
+    assert_eq!(
+        paint(&in_cell(4, "s-b")["fill"]),
+        [0.0, 1.0, 0.0, 0.5],
+        "the cell's copy takes the new one"
+    );
+    let texts = now["items"]["text"].as_array().unwrap();
+    let colours: Vec<_> = texts
+        .iter()
+        .map(|t| {
+            (
+                t["target"]["frameScope"]["frame"].as_u64().unwrap(),
+                t["block"]["color"].as_str().unwrap().to_string(),
+            )
+        })
+        .collect();
+    assert!(
+        colours.contains(&(0, "#112233".into())) && colours.contains(&(4, "#00ff0080".into())),
+        "{colours:?}"
+    );
+    owner.undo(owner.content_revision()).unwrap();
+    assert_eq!(
+        state(&owner),
+        before,
+        "one undo removes the key and the restyle"
+    );
+}
