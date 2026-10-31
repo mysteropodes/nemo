@@ -98,6 +98,14 @@ test('the ruler playhead and its flag follow the native frame on full and frame-
   assert.deepEqual([head.style.left,flag.textContent],['60px',3]);
   root.state.currentFrame=1;UI.render(root,metadata(),true,fixturePorts(root));assert.deepEqual([head.style.left,flag.textContent],['30px',2]);
 });
+test('the ruler strip mount is told when a render is frame-only AND reused its rows, never otherwise (#2371)',()=>{
+  const root=view(),seen=[];root.NemoNativeFrameCellSelection={mount(win,caption,info,ports){seen.push(ports.frameOnly);return true;},retire(){}};
+  const ports=fixturePorts(root);root.state.currentFrame=1;UI.render(root,metadata(),true,ports);   // first paint: nothing to reuse yet
+  root.state.currentFrame=2;UI.render(root,metadata(),true,ports);                                   // playback tick
+  root.state.currentFrame=3;UI.render(root,metadata(),false,ports);                                  // full render
+  root.state.currentFrame=4;root._layerSel=[0,1];UI.render(root,metadata(),true,ports);                // selection changed under a frame-only caller
+  assert.deepEqual(seen,[false,true,false,false]);
+});
 test('the Swatches section stays shown beside the native inspector only when the native palette controller renders it (#2378)',()=>{
   for(const palette of [true,false]){const root=view(),panel=element(),swatches=element(),other=element();swatches.id='swatches-sec';panel.appendChild(swatches);panel.appendChild(other);
     if(palette)root.NemoNativePaletteController={};root.document.nodes.set('props-panel',panel);UI.render(root,metadata(),false,fixturePorts(root));
