@@ -62,13 +62,16 @@
       out.fillEnabled = s.fillEnabled;
       if (s.fillEnabled) out.fill = s.fill !== undefined ? s.fill : s.fillWith;
     }
-    copy('paintOrder');
+    // A Stroke Style pick was the baseline's applyStrokeStyle, which ran only on a stroked path that is not a ribbon (isVectorBrush): its dash,
+    // offset, miter and paint order reach nothing else. The record lists a stroke colour only while it has a real stroke.
+    var pick = s.strokeStyle !== undefined && (ribbon || !(path.data.nativeStyle && path.data.nativeStyle.stroke) && s.strokeEnabled !== true);
+    if (!pick) copy('paintOrder');
     if (ribbon) {
       // A ribbon's ink is its fill; of a fill and a stroke colour in one edit the later write wins (a swap writes the stroke after the fill).
       if (out.stroke !== undefined && out.fill !== undefined && last === 'fill') delete out.stroke;
       else if (out.stroke !== undefined) delete out.fill;
       delete out.fillEnabled;
-    } else DETAIL.forEach(copy);
+    } else DETAIL.forEach(function (k) { if (!(pick && ['miter', 'dashOffset', 'strokeStyle'].indexOf(k) >= 0)) copy(k); });
     return Object.keys(out).length ? out : null;
   }
   function restyleSteps(paths, style, last) {
