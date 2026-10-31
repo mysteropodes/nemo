@@ -2368,6 +2368,18 @@
       ]
     },
     {
+      "id": "app.native.object.duplicator.ui.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-duplicator-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-duplicator-ui.js"
+      ]
+    },
+    {
       "id": "app.native.object.edit.contract",
       "layer": "domain",
       "dir": "src/js/adapters",

@@ -1426,6 +1426,7 @@
         "object_layer_lifecycle_scenario.rs",
         "object_layer_lifecycle_topology.rs",
         "object_layer_follow_path_set.rs",
+        "object_layer_read_model_duplicator.rs",
         "object_layer_link_set.rs",
         "object_layer_parent_set.rs",
         "object_layer_parent_keep_math.rs",

@@ -8,7 +8,7 @@
 //! Row additions (all optional except `kind`): `kind` (the `layer-kind.js` `keyOf` taxonomy, or `unknown` when the stored
 //! content contradicts itself), `folderCollapsed` (a folder layer's stored state), `folderId` (organisational membership),
 //! `componentId` (the symbol an instance layer places), `blendMode`, `matteMode`, `matteSourceLayerUid`, `mattesMore`,
-//! `isMatteSource`, `timeLinkUid` and `followPathUid` (#2372: the stored Link time source and Follow path target), `followPathAlign` (true only: the orient toggle of that path), `opacity` (the static value), `opacityAnimated`, and (#2372) `effects` (the layer's stored effect stack, so the
+//! `isMatteSource`, `timeLinkUid` and `followPathUid` (#2372: the stored Link time source and Follow path target), `followPathAlign` (true only: the orient toggle of that path), `hasDuplicator` (true only: the layer hosts a stored duplicator) with `dupSourceMode` (`shape` or `objects`, as that duplicator stores it), `opacity` (the static value), `opacityAnimated`, and (#2372) `effects` (the layer's stored effect stack, so the
 //! effects panel can send a complete replacement) or `effectsOversize` when the stack is past the row or document bound, and the same for the path-effect stack (`pathFx`, `pathFxOversize`). Top level: `layerFolders` (the organisational folder
 //! rows) and `layerModelUnavailable`. The colour label stays the existing `color` row member.
 use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
@@ -153,6 +153,20 @@ pub(crate) fn layer_members(document: &ObjectDocument) -> Vec<Map<String, Value>
                 .collect()
         })
         .unwrap_or_default();
+    // #2256: the layers that host a duplicator and its source mode (the baseline `ld.duplicator` / `.sourceMode`, `shape` when unset).
+    let hosts: HashMap<&str, &str> = document
+        .duplicator_set()
+        .map(|set| {
+            set.duplicators
+                .iter()
+                .filter(|d| d.context_id == SCENE_CONTEXT)
+                .map(|d| {
+                    let mode = d.duplicator.source_mode.value().map_or("shape", String::as_str);
+                    (d.layer_uid.as_str(), if mode == "objects" { "objects" } else { "shape" })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
     let sources = matte_sources_in_use(document);
     let opacity: HashMap<&str, &crate::object_document::PropertyRecord> = document
         .property_holders()
@@ -239,6 +253,10 @@ pub(crate) fn layer_members(document: &ObjectDocument) -> Vec<Map<String, Value>
                     row.insert("followPathAlign".into(), json!(true));
                 }
             }
+            if let Some(mode) = hosts.get(uid) {
+                row.insert("hasDuplicator".into(), json!(true));
+                row.insert("dupSourceMode".into(), json!(mode));
+            }
             if let Some(stack) = layer.effects().filter(|stack| !stack.is_empty()) {
                 carry_stack(&mut row, stack, "effects", "effectsOversize", &mut effects_budget);
             }
@@ -301,3 +319,6 @@ pub(crate) fn extend_layers(document: &ObjectDocument, info: &mut Value) {
 #[cfg(test)]
 #[path = "../tests/object_layer_read_model.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "../tests/object_layer_read_model_duplicator.rs"]
+mod duplicator_tests;
