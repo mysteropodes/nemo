@@ -105,7 +105,14 @@
     if(typeof context.onOpen==='function')node.addEventListener('dblclick',function(){return context.onOpen(layer,node);});
     node.hidden=context.shyMode&&layer.shy===true;node.style.display=node.hidden?'none':'flex';
     var extra=decorate(doc,layer,context,node,slots);
-    node.replaceChildren.apply(node,extra.before.concat([pick],extra.after,[eye,flags[0],flags[1]]));
+    // The four controls stay the row's first four children (every consumer addresses them by position); the decorations follow
+    // in DOM order and are placed around them with flex `order` (baseline order: arrow, dot, kind, name, badges, eye, lock, shy).
+    var controls=[pick,eye,flags[0],flags[1]],decorated=extra.before.length+extra.after.length>0;
+    if(decorated){
+      extra.before.forEach(function(n,k){n.style.order=String(k-extra.before.length);});pick.style.order='0';
+      extra.after.forEach(function(n){n.style.order='1';});[eye,flags[0],flags[1]].forEach(function(n){n.style.order='2';});
+    }
+    node.replaceChildren.apply(node,controls.concat(extra.before,extra.after));
     return node;
   }
   function render(list,context){

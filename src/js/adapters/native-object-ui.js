@@ -64,14 +64,14 @@
   function readMotionKeyTimelines(root,info){return readMotion(root,info,'readKeyTimelines');}
   function setKeyTimelineRows(root,layout,info){
     var view=views.get(root);
-    if(!view||!sameTimingPin(view.pin,info)||!Array.isArray(layout)||!view.rows.every(function(row,i){return row.parentNode===view.list&&controlsOf(row).length===4&&view.controls[i].every(function(n,k){return controlsOf(row)[k]===n;});}))return false;
+    if(!view||!sameTimingPin(view.pin,info)||!Array.isArray(layout)||!view.rows.every(function(row,i){return row.parentNode===view.list&&row.children.length===view.controls[i].length&&view.controls[i].every(function(n,k){return row.children[k]===n;});}))return false;
     var labels=new Map();
     for(var entry of layout){
       if(!entry||typeof entry.layerUid!=='string'||labels.has(entry.layerUid)||!Array.isArray(entry.labels)||!entry.labels.every(function(v){return typeof v==='string';})||!info.layers.some(function(l){return l.layerUid===entry.layerUid;}))return false;
       labels.set(entry.layerUid,entry.labels);
     }
     view.rows.forEach(function(row,i){
-      var lines=labels.get(info.layers[i].layerUid)||[],pick=controlsOf(row)[0],name=info.layers[i].name===undefined?info.layers[i].layerUid:info.layers[i].name;
+      var lines=labels.get(info.layers[i].layerUid)||[],pick=row.children[0],name=info.layers[i].name===undefined?info.layers[i].layerUid:info.layers[i].name;
       row.style.height=((1+lines.length)*22)+'px';row.style.alignItems=lines.length?'flex-start':'';
       pick.style.height=lines.length?'100%':'';pick.style.alignSelf=lines.length?'stretch':'';
       pick.style.paddingTop=lines.length?'0':'';pick.style.paddingBottom=lines.length?'0':'';
@@ -267,7 +267,7 @@
       selection.length===previous.selection.length&&selection.every(function(value,i){return previous.selection[i]===value;})&&
       info.layers.length===previous.metadata.length&&info.layers.every(function(layer,i){var old=previous.metadata[i];return old[0]===layer.layerUid&&old[1]===layer.name&&old[2]===layer.visible&&old[3]===layer.locked&&old[4]===layer.shy&&old[5]===JSON.stringify(layer);})&&
       list.children.length===previous.rows.length&&previous.rows.every(function(row,i){return list.children[i]===row&&
-        controlsOf(row).length===4&&previous.controls[i].every(function(control,k){return controlsOf(row)[k]===control;});})&&
+        row.children.length===previous.controls[i].length&&previous.controls[i].every(function(control,k){return row.children[k]===control;});})&&
       header.children.length===1&&header.children[0]===previous.caption&&((root.NemoNativeLayerRangeDesktop&&root.NemoNativeLayerRangeDesktop.owns(root,grid,previous.unavailable))||(grid.children.length===1&&grid.children[0]===previous.unavailable));
     var rows,caption,unavailable;
     if(reuse){rows=previous.rows;caption=previous.caption;unavailable=previous.unavailable;}
@@ -301,7 +301,7 @@
     unavailableInspector(root,ports,info);
     if(!reuse){var pin={};['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].forEach(function(k){pin[k]=info[k];});
       views.set(root,{decorKey:decorKey,list:list,header:header,grid:grid,inspector:root.document.getElementById('props-panel'),rows:rows,
-        controls:rows.map(controlsOf),shyMode:shyMode,caption:caption,unavailable:unavailable,
+        controls:rows.map(function(row){return Array.from(row.children);}),shyMode:shyMode,caption:caption,unavailable:unavailable,
         ports:ports,pin:pin,active:root.state.activeLayerIdx,selection:selection.slice(),metadata:info.layers.map(function(layer){return [layer.layerUid,layer.name,layer.visible,layer.locked,layer.shy,JSON.stringify(layer)];})});}
     var field=root.document.getElementById('tl-cf');
     if(field){if(root.document.activeElement!==field)field.value=root.state.currentFrame+1;field.max=info.totalFrames;}
@@ -326,7 +326,6 @@
     if(root.SMImageMeshUI&&typeof root.SMImageMeshUI.refresh==='function')root.SMImageMeshUI.refresh();
     return true;
   }
-  function controlsOf(row){/* the four controls; #2371 decorations are display nodes */return Array.from(row.children).filter(function(c){return !(c.dataset&&c.dataset.nativeLayerDecor);});}
   // The default layer-list presenter mounts lazily; a replacement registered first wins.
   function seam(root){var api=Seam||root.NemoPresenterSeam;if(!api)throw new Error('Native document UI is unavailable: presenter seam');return api;}
   // A replacement presenter registered before the first paint of its root wins; otherwise the default mounts (mountRows).
@@ -381,12 +380,12 @@
     });
   }
   function refreshPolicy(root){
-    var view=views.get(root);if(!view||view.list!==root.document.getElementById('layer-list')||!view.rows.every(function(row,i){return row.parentNode===view.list&&view.controls[i].every(function(control,k){return controlsOf(row)[k]===control;});}))return false;
+    var view=views.get(root);if(!view||view.list!==root.document.getElementById('layer-list')||!view.rows.every(function(row,i){return row.parentNode===view.list&&view.controls[i].every(function(control,k){return row.children[k]===control;});}))return false;
     var ready=false,owner=null;
     try{var ports=view.ports,session=ports.currentSession(),info=session&&session.info();owner=policyPort(ports);
       ready=!!owner&&!policyTasks.has(root)&&!!session&&session.isActive()&&session.blocksLegacy()===true&&sameTimingPin(view.pin,info)&&ports.projectionReady(info)===true&&confirmed(root,info,session.readPresentedObjectSession());
     }catch(_){}
-    view.controls.forEach(function(controls){controls.slice(2).forEach(function(button){button.disabled=!ready;});});
+    view.controls.forEach(function(controls){controls.slice(2,4).forEach(function(button){button.disabled=!ready;});});
     return ready;
   }
   function policyPort(ports){try{var value=typeof ports.layerPolicy==='function'&&ports.layerPolicy();return value&&typeof value.edit==='function'?value:null;}catch(_){return null;}}

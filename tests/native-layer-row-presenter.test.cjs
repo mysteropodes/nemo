@@ -117,10 +117,14 @@ test('frameOnly keeps the decorated rows; a changed decoration fact rebuilds the
  assert.ok(H.project(list.children[2]).nodes.some(n=>/native-layer-opacity/.test(n.cls)&&/25%/.test(n.html)));
 });
 
-test('the four controls stay addressable beside the decorations (pick is the first control, not the first child)',()=>{
+test('the four controls stay the first four children; flex order places the decorations around them',()=>{
  const r=rootFor(),list=r.document.getElementById('layer-list');
  paint(r,info(ROWS),false);
- const row=list.children[1],controls=Array.from(row.children).filter(c=>!(c.dataset&&c.dataset.nativeLayerDecor));
- assert.equal(controls.length,4);assert.equal(controls[0].textContent,'Open — Visible');
- assert.ok(row.children.indexOf(controls[0])>0,'decorations precede the name');
+ const row=list.children[1],kids=row.children;
+ assert.deepEqual(kids.slice(0,4).map(c=>c.dataset.nativeLayerDecor),[undefined,undefined,undefined,undefined]);
+ assert.equal(kids[0].textContent,'Open \u2014 Visible');
+ const decor=kids.slice(4);assert.ok(decor.length>=3&&decor.every(c=>c.dataset.nativeLayerDecor==='true'));
+ assert.ok(decor.slice(0,3).every(c=>Number(c.style.order)<0),'arrow, dot and kind icon sit before the name');
+ assert.equal(kids[0].style.order,'0');assert.ok(kids.slice(1,4).every(c=>c.style.order==='2'),'eye, lock and shy follow the badges');
+ const plain=rowsFor([{layerUid:'x'}])[0];assert.equal(plain.children[0].style.order,undefined,'an undecorated row sets no order');
 });
