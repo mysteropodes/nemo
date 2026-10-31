@@ -29,9 +29,7 @@
   function readNativeTabsUI(){return {tabs:tabs,activeTabId:activeTabId,path:currentPath,name:currentName};}
   var nativeInactiveTabs=nativeTabsUI.bind(window,{read:readNativeTabsUI,makeId:makeTabId,
     file:function(){return nativeSavedUI&&nativeSavedUI.nativeObject;},dirty:isDirty,notice:tabAddNotice,render:renderTabBar,
-    activateTab:function(id,path,name){activeTabId=id;currentPath=path;currentName=name;updateCurrentLabel();},
-    // Opening a file that already has a tab focuses that tab (see findOpen in the tabs UI adapter).
-    switchTab:function(id){return switchToTab(id);},hideStart:function(){hideStartScreen();}
+    activateTab:function(id,path,name){activeTabId=id;currentPath=path;currentName=name;updateCurrentLabel();},switchTab:switchToTab,hideStart:hideStartScreen
   });
   function p39bUseInactiveEntry(){try{var native=window.NemoNativeOpacityCutover;return !!activeTabId&&(native?native.blocksLegacy()!==false:'NemoNativeOpacityProject' in window);}catch(_){return !!activeTabId;}}
 

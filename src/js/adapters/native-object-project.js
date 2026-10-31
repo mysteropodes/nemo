@@ -146,9 +146,7 @@
         function current(){if(openingCancelled)throw new Error('Native project Open was cancelled');if(openExposure)openExposure.assertActive();if(!reconciling&&transition&&transition.isCurrent&&transition.isCurrent()!==true){
           if(dispatched)throw new Error('Native project request changed after dispatch');
           throw localRefusal('Native project request was cancelled');}}
-        // A tab switch keeps the previous frame on the surface until the next presentation replaces it (present() or a failure path);
-        // clearing it here showed the Paper canvas for the duration of the switch.
-        phase='opening';presentation=null;if(ports.surfaceChanged&&!(source.retainedProject&&priorPresentation))ports.surfaceChanged(null);
+        phase='opening';presentation=null;if(ports.surfaceChanged&&!(source.retainedProject&&priorPresentation))ports.surfaceChanged(null);// tab switch: keep the previous frame until present() replaces it
         try{
           openExposure=Exposure.create(ports.subscribeWindowOcclusion,current);current();await openExposure.connect();
           await openExposure.join(retireSubscription);
