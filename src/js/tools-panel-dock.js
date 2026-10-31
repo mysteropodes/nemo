@@ -67,7 +67,7 @@
   // A drop is one workspace gesture: begin (native may refuse), re-dock, then
   // settle captures the result as a single workspace edit (or rolls it back).
   function commitDock(pos) {
-    var ws = window.SMWorkspace;
+    var ui = window.NemoNativeWorkspaceUI, ws = ui && typeof ui.workspace === 'function' ? ui.workspace(window) : null;
     if (ws && typeof ws.begin === 'function' && ws.begin('toolsDock') === false) return false;
     applyDock(pos);
     if (ws && typeof ws.settle === 'function') ws.settle('toolsDock');

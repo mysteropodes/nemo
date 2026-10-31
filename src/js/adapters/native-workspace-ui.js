@@ -294,5 +294,7 @@ function toggleProps(force){
     installed.set(root, controller); root.NemoNativeWorkspaceController = controller;
     root.addEventListener('pagehide', controller.dispose, { once: true }); presented(); return controller;
   }
-  return Object.freeze({ presentation: presentation, motionColumns: motionColumns, bindMotion: bindMotion, install: install });
+  // The presentation gate (begin/settle/capture) of one root, for gestures owned by other scripts such as the tools dock drop.
+  function workspace(root) { var presenter = presenters.get(root); return presenter ? presenter.api : null; }
+  return Object.freeze({ presentation: presentation, workspace: workspace, motionColumns: motionColumns, bindMotion: bindMotion, install: install });
 }));
