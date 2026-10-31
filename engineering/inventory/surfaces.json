@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "36f1b072bd399bb25d5e9964db8ea780072fb82e",
-  "describe": "v0.7.0-alpha.4-4369-g36f1b072-dirty"
+  "head": "d46df7bac6c0a672b64c0406f9452dde40e87309",
+  "describe": "v0.7.0-alpha.4-4374-gd46df7ba-dirty"
  },
- "inputsDigest": "1890c20262c197228ade0d6f8532b02f8e6753a9ddd3347faeebc449b8c31498",
+ "inputsDigest": "5b4abc3113884d056233119ba9c33052273a2466f5413ff991f4ad3c1993938d",
  "states": [
   "inventoried",
   "characterized",
@@ -14127,7 +14127,7 @@
    "capability": "path fx add",
    "area": "effects-masks",
    "handler": [
-    "src/js/effects-panel.js:857 renderPathFxList()"
+    "src/js/effects-panel.js:856 renderPathFxList()"
    ],
    "events": [
     "change"
@@ -14151,7 +14151,7 @@
     "container": "path-fx-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 14,
+    "functionsVisited": 44,
     "via": "variable add",
     "references": []
    },
