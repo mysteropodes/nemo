@@ -377,6 +377,7 @@
         "object_audio_track_edit_owner.rs",
         "object_fill_trace_owner.rs",
         "object_fill_brush_owner.rs",
+        "object_property_action.rs",
         "object_property_bake_edit.rs",
         "object_property_control_edit.rs",
         "object_text_animator_commands.rs",

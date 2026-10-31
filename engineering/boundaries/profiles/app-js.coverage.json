@@ -4487,7 +4487,7 @@
     },
     {
       "path": "src/js/adapters/native-motion-control-rows.js",
-      "moduleId": "app.native.layer-parent.adapter",
+      "moduleId": "app.native.motion.properties.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {

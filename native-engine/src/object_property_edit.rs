@@ -6,9 +6,12 @@ use crate::object_document::{
 };
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
+use action::{deserialize_action, PropertyAction};
 use serde::Deserialize;
 use serde_json::Number;
 
+#[path = "object_property_action.rs"]
+mod action;
 #[path = "object_property_bake_edit.rs"]
 mod bake_edit;
 #[path = "object_property_control_edit.rs"]
@@ -20,62 +23,6 @@ mod preset_apply;
 #[path = "object_property_track_edit.rs"]
 mod track_edit;
 
-#[derive(Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
-enum PropertyAction {
-    // Private producer only. Public property intents keep refusing expression edits.
-    #[serde(skip_deserializing)]
-    SetExpression {
-        expression: Option<OrderExpression>,
-    },
-    SetValue {
-        frame: Number,
-        values: Vec<Number>,
-    },
-    SetKey {
-        frame: Number,
-        values: Vec<Number>,
-        #[serde(default, rename = "curvePoints")]
-        curve_points: Presence<Option<Vec<OrderCurvePoint>>>,
-    },
-    RemoveKey {
-        frame: Number,
-    },
-    SetAnimated {
-        frame: Number,
-        animated: bool,
-    },
-    // D18-B: declaration edits of the holder's expression controls; `property` is the control key.
-    #[serde(rename_all = "camelCase")]
-    AddControl {
-        control_type: String,
-        name: String,
-    },
-    RenameControl {
-        name: String,
-    },
-    RemoveControl {},
-    MoveControl {
-        direction: i64,
-    },
-}
-impl PropertyAction {
-    fn control(&self) -> Option<control_edit::ControlOp<'_>> {
-        use control_edit::ControlOp;
-        Some(match self {
-            Self::AddControl { control_type, name } => ControlOp::Add {
-                kind: control_type,
-                name,
-            },
-            Self::RenameControl { name } => ControlOp::Rename { name },
-            Self::RemoveControl {} => ControlOp::Remove,
-            Self::MoveControl { direction } => ControlOp::Move {
-                direction: *direction,
-            },
-            _ => return None,
-        })
-    }
-}
 #[derive(Debug)]
 struct PropertyPayload {
     command: String,
@@ -103,25 +50,6 @@ object_deserialize!(ExpressionPayload {
     #[serde(default)] expression: Presence<Option<OrderExpression>>
 });
 
-// Internally tagged enum derives also admit positional sequences. Require a
-// map before the derive sees original fields, preserving duplicate rejection.
-fn deserialize_action<'de, D, T>(deserializer: D) -> Result<T, D::Error>
-where
-    D: serde::Deserializer<'de>,
-    T: Deserialize<'de>,
-{
-    struct MapOnly<T>(std::marker::PhantomData<T>);
-    impl<'de, T: Deserialize<'de>> serde::de::Visitor<'de> for MapOnly<T> {
-        type Value = T;
-        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.write_str("a property action object")
-        }
-        fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<T, A::Error> {
-            T::deserialize(serde::de::value::MapAccessDeserializer::new(map))
-        }
-    }
-    deserializer.deserialize_map(MapOnly(std::marker::PhantomData))
-}
 
 /// The origin and proposed document cannot be forged by callers.
 #[derive(Debug, Clone)]
@@ -307,7 +235,13 @@ impl ObjectFillOwner {
             return Err(DispatchErrorCode::Unavailable);
         }
         if let Some(op) = payload.action.control() {
-            return Self::apply_control_edit(origin, document, &payload.target, &payload.property, op);
+            return Self::apply_control_edit(
+                origin,
+                document,
+                &payload.target,
+                &payload.property,
+                op,
+            );
         }
         let mut holders = document
             .property_holders

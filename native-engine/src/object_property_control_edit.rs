@@ -11,6 +11,7 @@
 //!   the removal `unavailable`: the axis must never be left dangling.
 //! - A move past either end changes nothing (no revision, no history, redo preserved).
 //! - No saved-format change: the `controls` list and the property records already exist.
+use crate::commands::object_fill_owner::property_edit::action::ControlOp;
 use crate::commands::{ObjectFillOwner, PreparedPropertyEdit};
 use crate::object_document::{
     ExpressionControl, ObjectDocument, Presence, PropertyHolder, PropertyHolderTarget,
@@ -23,15 +24,6 @@ use serde_json::Number;
 const TYPES: [&str; 5] = ["number", "checkbox", "angle", "point", "color"];
 const MAX_NAME_CHARS: usize = 128;
 const MAX_KEY_BYTES: usize = 128;
-
-/// The closed control intents; the key travels as the request's `property`.
-#[derive(Debug, Clone, Copy)]
-pub(super) enum ControlOp<'a> {
-    Add { kind: &'a str, name: &'a str },
-    Rename { name: &'a str },
-    Remove,
-    Move { direction: i64 },
-}
 
 /// Baseline `CONTROL_DEFAULT`.
 fn default_for(kind: &str) -> Vec<Number> {

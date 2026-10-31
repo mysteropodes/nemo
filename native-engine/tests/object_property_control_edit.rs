@@ -15,7 +15,10 @@ fn owner() -> NativeObjectHistory {
 /// Refused requests keep their revision, so every request needs its own id (a reused id replays).
 fn next_id() -> String {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-    format!("e{}", NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+    format!(
+        "e{}",
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    )
 }
 
 fn edit_on(owner: &mut NativeObjectHistory, layer: &str, key: &str, action: Value) -> Value {
@@ -290,7 +293,11 @@ fn a_widget_axis_control_cannot_be_removed_but_can_be_renamed_and_moved() {
         json!({"kind":"moveControl","direction":1})
     )));
     let layers = wire(&o)["layers"].clone();
-    let layer = layers.as_array().unwrap().iter().find(|l| l["layerUid"] == UID);
+    let layer = layers
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|l| l["layerUid"] == UID);
     assert_eq!(layer.unwrap()["widget"]["x"]["key"], json!(axis_x));
     // A control the widget does not bind removes normally, the axes stay resolvable.
     assert!(applied(&edit_on(
