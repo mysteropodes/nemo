@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "007014d3882ef7df18b6bc0c4b4ee54c37da76a3",
-  "describe": "v0.7.0-alpha.4-4492-g007014d3-dirty"
+  "head": "47772a970db3e2bc4849f1d761cfbbb2e479863a",
+  "describe": "v0.7.0-alpha.4-4495-g47772a97-dirty"
  },
- "inputsDigest": "bcab2914e9e0a9cf3168d4f1d3f0de1d1bb41067755f013b601e64a5a8b3ce9f",
+ "inputsDigest": "b9f13647744090a83fd03babb6a1db69b34ba70629c7cdd4598a9c05da90a441",
  "states": [
   "inventoried",
   "characterized",
@@ -52,13 +52,13 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 257,
+   "native": 270,
    "export": 5,
    "animation": 428,
-   "history": 373,
-   "selection": 394,
-   "render": 482,
-   "persist": 417
+   "history": 379,
+   "selection": 403,
+   "render": 488,
+   "persist": 423
   }
  },
  "fixturesByArea": {
@@ -786,8 +786,8 @@
     "history": 2,
     "selection": 2,
     "render": 2,
-    "animation": 3,
-    "native": 3
+    "native": 3,
+    "animation": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -799,7 +799,7 @@
     "container": "sp-boolean-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 158,
+    "functionsVisited": 127,
     "via": "helper wireBoolBtn()",
     "references": []
    },
@@ -834,8 +834,8 @@
     "history": 2,
     "selection": 2,
     "render": 2,
-    "animation": 3,
-    "native": 3
+    "native": 3,
+    "animation": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -847,7 +847,7 @@
     "container": "sp-boolean-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 158,
+    "functionsVisited": 127,
     "via": "helper wireBoolBtn()",
     "references": []
    },
@@ -882,8 +882,8 @@
     "history": 2,
     "selection": 2,
     "render": 2,
-    "animation": 3,
-    "native": 3
+    "native": 3,
+    "animation": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -895,7 +895,7 @@
     "container": "sp-boolean-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 158,
+    "functionsVisited": 127,
     "via": "helper wireBoolBtn()",
     "references": []
    },
@@ -930,8 +930,8 @@
     "history": 2,
     "selection": 2,
     "render": 2,
-    "animation": 3,
-    "native": 3
+    "native": 3,
+    "animation": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -943,7 +943,7 @@
     "container": "sp-boolean-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 158,
+    "functionsVisited": 127,
     "via": "helper wireBoolBtn()",
     "references": []
    },
@@ -1879,7 +1879,7 @@
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 197,
+    "functionsVisited": 193,
     "via": "chain",
     "references": []
    },
@@ -2230,7 +2230,7 @@
     "container": "p-fillpropagate-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 479,
+    "functionsVisited": 474,
     "via": "variable propBtn",
     "references": []
    },
@@ -2493,7 +2493,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 125,
+    "functionsVisited": 123,
     "via": "variable histBtn",
     "references": [
      "src/js/timeline.js:9213 action()"
@@ -2833,7 +2833,7 @@
     "container": "comp-instance-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 498,
+    "functionsVisited": 479,
     "via": "variable btn",
     "references": []
    },
@@ -2922,7 +2922,7 @@
     "container": "mask-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 438,
+    "functionsVisited": 431,
     "via": "chain",
     "references": []
    },
@@ -3685,7 +3685,7 @@
     "container": "swatches-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 60,
+    "functionsVisited": 62,
     "via": "variable newBtn",
     "references": [
      "src/js/adapters/native-palette-ui.js:204 render()",
@@ -4939,7 +4939,7 @@
     "container": "p-textanim-add-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 97,
+    "functionsVisited": 87,
     "via": "variable animBtn",
     "references": []
    },
@@ -5013,6 +5013,10 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
+    "persist": 3,
+    "history": 3,
+    "selection": 3,
+    "render": 3,
     "native": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
@@ -5025,7 +5029,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 116,
+    "functionsVisited": 98,
     "via": "variable trigger",
     "references": []
    },
@@ -5791,7 +5795,7 @@
     "container": "comment-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 97,
+    "functionsVisited": 87,
     "via": "variable saveFbBtn",
     "references": []
    },
@@ -7682,7 +7686,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 57,
+    "functionsVisited": 47,
     "via": "variable pullBtn",
     "references": []
    },
@@ -7720,7 +7724,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 97,
+    "functionsVisited": 91,
     "via": "variable importBtn",
     "references": []
    },
@@ -10264,7 +10268,7 @@
     "container": "corners-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 73,
+    "functionsVisited": 65,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2983 updateCornersPanel()",
@@ -11280,7 +11284,7 @@
     "container": "mask-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 220,
+    "functionsVisited": 211,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2921 updateMaskPanel()"
@@ -11993,7 +11997,7 @@
     "container": "fill-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 84,
+    "functionsVisited": 77,
     "via": "chain",
     "references": [
      "src/js/timeline.js:3855 updateSelPropsPanel()",
@@ -12913,7 +12917,7 @@
     "container": "stroke-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 101,
+    "functionsVisited": 93,
     "via": "chain",
     "references": [
      "src/js/timeline.js:6495 paintStrokeSwatches()"
@@ -13292,8 +13296,9 @@
      "src/js/timeline.js:3721 _restoreDrawingDefaults()",
      "src/js/timeline.js:3882 updateSelPropsPanel()",
      "src/js/tools.js:7599 onMouseDown()",
-     "src/js/viewtools-bridge.js:186 pick()",
-     "src/js/viewtools-bridge.js:189 pick()"
+     "src/js/viewtools-bridge.js:159 setBrushSize()",
+     "src/js/viewtools-bridge.js:198 pick()",
+     "src/js/viewtools-bridge.js:201 pick()"
     ]
    },
    "fixtures": [
@@ -13543,9 +13548,11 @@
     "history": 1,
     "persist": 2,
     "render": 2,
+    "selection": 3,
+    "native": 3,
     "animation": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1076",
@@ -13557,7 +13564,7 @@
     "container": "p-widget-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 190,
+    "functionsVisited": 162,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:566 renderWidgetPanel()"
@@ -13593,9 +13600,11 @@
     "history": 1,
     "persist": 2,
     "render": 2,
+    "selection": 3,
+    "native": 3,
     "animation": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1075",
@@ -13607,7 +13616,7 @@
     "container": "p-widget-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 190,
+    "functionsVisited": 162,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:566 renderWidgetPanel()"
@@ -13690,9 +13699,11 @@
     "history": 1,
     "persist": 2,
     "render": 2,
+    "selection": 3,
+    "native": 3,
     "animation": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1081",
@@ -13704,7 +13715,7 @@
     "container": "p-widget-xrange-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 190,
+    "functionsVisited": 162,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:570 renderWidgetPanel()"
@@ -13740,9 +13751,11 @@
     "history": 1,
     "persist": 2,
     "render": 2,
+    "selection": 3,
+    "native": 3,
     "animation": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1080",
@@ -13754,7 +13767,7 @@
     "container": "p-widget-xrange-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 190,
+    "functionsVisited": 162,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:570 renderWidgetPanel()"
@@ -13790,9 +13803,11 @@
     "history": 1,
     "persist": 2,
     "render": 2,
+    "selection": 3,
+    "native": 3,
     "animation": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1085",
@@ -13804,7 +13819,7 @@
     "container": "p-widget-xrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 190,
+    "functionsVisited": 162,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:570 renderWidgetPanel()"
@@ -13887,9 +13902,11 @@
     "history": 1,
     "persist": 2,
     "render": 2,
+    "selection": 3,
+    "native": 3,
     "animation": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1091",
@@ -13901,7 +13918,7 @@
     "container": "p-widget-yrange-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 190,
+    "functionsVisited": 162,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:580 renderWidgetPanel()"
@@ -13937,9 +13954,11 @@
     "history": 1,
     "persist": 2,
     "render": 2,
+    "selection": 3,
+    "native": 3,
     "animation": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1090",
@@ -13951,7 +13970,7 @@
     "container": "p-widget-yrange-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 190,
+    "functionsVisited": 162,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:580 renderWidgetPanel()"
@@ -13987,9 +14006,11 @@
     "history": 1,
     "persist": 2,
     "render": 2,
+    "selection": 3,
+    "native": 3,
     "animation": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1095",
@@ -14001,7 +14022,7 @@
     "container": "p-widget-yrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 190,
+    "functionsVisited": 162,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:580 renderWidgetPanel()"
@@ -15478,9 +15499,13 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "selection": 3
+    "selection": 3,
+    "persist": 3,
+    "history": 3,
+    "render": 3,
+    "native": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:450",
@@ -15492,7 +15517,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 76,
+    "functionsVisited": 50,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3941 updateSelPropsPanel()",
@@ -15526,9 +15551,13 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "selection": 3
+    "selection": 3,
+    "persist": 3,
+    "history": 3,
+    "render": 3,
+    "native": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:451",
@@ -15540,7 +15569,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 76,
+    "functionsVisited": 50,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3942 updateSelPropsPanel()"
@@ -15573,9 +15602,13 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "selection": 3
+    "selection": 3,
+    "persist": 3,
+    "history": 3,
+    "render": 3,
+    "native": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:450",
@@ -15587,7 +15620,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 76,
+    "functionsVisited": 50,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3940 updateSelPropsPanel()",
@@ -15621,9 +15654,13 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "selection": 3
+    "selection": 3,
+    "persist": 3,
+    "history": 3,
+    "render": 3,
+    "native": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:444",
@@ -15635,7 +15672,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 76,
+    "functionsVisited": 50,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3938 updateSelPropsPanel()"
@@ -15668,9 +15705,13 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "selection": 3
+    "selection": 3,
+    "persist": 3,
+    "history": 3,
+    "render": 3,
+    "native": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:444",
@@ -15682,7 +15723,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 76,
+    "functionsVisited": 50,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3939 updateSelPropsPanel()"
@@ -16199,7 +16240,7 @@
     "container": "text-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 509,
+    "functionsVisited": 506,
     "via": "variable save",
     "references": []
    },
@@ -16883,7 +16924,7 @@
     "container": "tp-font-add-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 156,
+    "functionsVisited": 150,
     "via": "variable fontAddConfirm",
     "references": []
    },
@@ -17438,7 +17479,7 @@
     "container": "web-changelog-row",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 61,
+    "functionsVisited": 52,
     "via": "variable toggle",
     "references": []
    },
@@ -18050,7 +18091,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 26,
+    "functionsVisited": 14,
     "via": "callback btn",
     "references": []
    },
@@ -18089,7 +18130,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 26,
+    "functionsVisited": 14,
     "via": "callback btn",
     "references": []
    },
@@ -18128,7 +18169,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 26,
+    "functionsVisited": 14,
     "via": "callback btn",
     "references": []
    },
@@ -18167,7 +18208,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 26,
+    "functionsVisited": 14,
     "via": "callback btn",
     "references": []
    },
@@ -19136,7 +19177,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 28,
+    "functionsVisited": 16,
     "via": "callback tab",
     "references": []
    },
@@ -19172,7 +19213,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 28,
+    "functionsVisited": 16,
     "via": "callback tab",
     "references": []
    },
@@ -19208,7 +19249,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 28,
+    "functionsVisited": 16,
     "via": "callback tab",
     "references": []
    },
@@ -19244,7 +19285,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 28,
+    "functionsVisited": 16,
     "via": "callback tab",
     "references": []
    },
@@ -19280,7 +19321,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 28,
+    "functionsVisited": 16,
     "via": "callback tab",
     "references": []
    },
@@ -19316,7 +19357,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 28,
+    "functionsVisited": 16,
     "via": "callback tab",
     "references": []
    },
@@ -19352,7 +19393,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 28,
+    "functionsVisited": 16,
     "via": "callback tab",
     "references": []
    },
@@ -19388,7 +19429,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 28,
+    "functionsVisited": 16,
     "via": "callback tab",
     "references": []
    },
@@ -22193,7 +22234,7 @@
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
    "source": "src/js/labs/timeline-zoom.js:220",
    "meta": {
-    "functionsVisited": 49
+    "functionsVisited": 38
    },
    "fixtures": []
   },
@@ -22273,7 +22314,7 @@
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
    "source": "src/js/labs/view-filter.js:46",
    "meta": {
-    "functionsVisited": 29
+    "functionsVisited": 16
    },
    "fixtures": []
   },
@@ -23435,7 +23476,7 @@
    "source": "src/js/layer-inout.js:1566",
    "meta": {
     "i18n": null,
-    "functionsVisited": 39
+    "functionsVisited": 27
    },
    "fixtures": [
     "static-props",
@@ -23473,7 +23514,7 @@
    "source": "src/js/layer-inout.js:1564",
    "meta": {
     "i18n": null,
-    "functionsVisited": 39
+    "functionsVisited": 27
    },
    "fixtures": [
     "static-props",
@@ -23511,7 +23552,7 @@
    "source": "src/js/layer-inout.js:1565",
    "meta": {
     "i18n": null,
-    "functionsVisited": 39
+    "functionsVisited": 27
    },
    "fixtures": [
     "static-props",
@@ -25916,7 +25957,7 @@
    "source": "src/js/motion.js:10528",
    "meta": {
     "i18n": "ctxDeleteThisKey",
-    "functionsVisited": 538
+    "functionsVisited": 534
    },
    "fixtures": [
     "static-props",
@@ -27878,7 +27919,7 @@
    "source": "src/js/select-bridge.js:3249",
    "meta": {
     "i18n": null,
-    "functionsVisited": 97
+    "functionsVisited": 87
    },
    "fixtures": [
     "static-props",
@@ -28823,7 +28864,7 @@
    "source": "src/js/shapes-panel.js:869",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 313
+    "functionsVisited": 307
    },
    "fixtures": [
     "static-props",
@@ -32154,7 +32195,7 @@
    "source": "src/js/timeline.js:5455",
    "meta": {
     "i18n": null,
-    "functionsVisited": 472
+    "functionsVisited": 466
    },
    "fixtures": [
     "keyed-props",
@@ -32838,7 +32879,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 398
+    "functionsVisited": 397
    },
    "fixtures": [
     "media",
@@ -33555,7 +33596,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:393",
    "meta": {
-    "functionsVisited": 171
+    "functionsVisited": 144
    },
    "fixtures": [
     "media",
