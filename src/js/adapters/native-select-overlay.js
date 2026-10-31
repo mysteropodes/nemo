@@ -93,18 +93,25 @@
     return node(root, 'polygon', line(root, Object.assign({ points: box.corners.map(function (c) { return at(V, c[0], c[1]).join(','); }).join(' ') }, extra)));
   }
   function remove(s) { if (s.svg) { s.svg.remove(); s.svg = null; } s.sig = ''; }
+  // The pick context now. Unlike capture() it needs no readable presentation, so a selection's end (tool, frame, layer or revision
+  // change) is told apart from the presentation merely being unreadable for a moment.
+  function ctxNow(root) { try { return root.NemoSelectCanvasIntent.pickContext(root); } catch (_) { return null; } }
   // The single (re)draw. A part whose context no longer holds is dropped here, so show/hover/the watcher cannot disagree.
+  // The native queue reports no presentation while any command is pending (the pick's own repaint, a hover read): that is
+  // "cannot draw yet", never "selection ended" - the parts are kept, the svg is hidden and a bounded retry redraws it once readable.
   function refresh(root, force) {
-    var s = state(root), c = capture(root), paths = root.selectedPaths;
-    if (s.sel && (!c || s.sel.ctx !== c.ctx || s.sel.paths !== paths || s.sel.count !== paths.length)) {
+    var s = state(root), c = capture(root), paths = root.selectedPaths, ctx = ctxNow(root);
+    if (s.sel && (ctx !== s.sel.ctx || s.sel.paths !== paths || s.sel.count !== paths.length)) {
       s.sel = null; force = true;
       // The context the selection was drawn for ended (frame, layer, tool): an edit of it still waiting in the style panel commits now (RV6-STYLE).
       var style = root.NemoNativeSelectionStyle;
       if (style && typeof style.flush === 'function') style.flush(root);
     }
-    if (s.hov && (!c || s.hov.ctx !== c.ctx)) { s.hov = null; force = true; }
-    if (s.prev && (!c || s.prev.ctx !== c.ctx)) { s.prev = null; force = true; }
-    if (!s.sel && !s.hov && !s.prev) { remove(s); return; }
+    if (s.hov && ctx !== s.hov.ctx) { s.hov = null; force = true; }
+    if (s.prev && ctx !== s.prev.ctx) { s.prev = null; force = true; }
+    if (!s.sel && !s.hov && !s.prev) { remove(s); s.retry = 0; return; }
+    if (!c) { remove(s); if ((s.retry = (s.retry || 0) + 1) <= 40) notify(root); return; }
+    s.retry = 0;
     var sig = JSON.stringify([c.V, c.bounds, c.pin.canvasW, c.pin.canvasH]);
     if (!force && s.svg && sig === s.sig) return;
     remove(s); s.sig = sig;
@@ -142,7 +149,7 @@
   // Something the overlay maps through may have changed (a new presentation or view from the viewport underlay, a UI repaint
   // after a tool, layer, frame or mode change, a window resize): redraw in place, or drop what no longer holds. Event driven
   // and one-shot: a single frame callback is queued only while something is drawn and is never re-armed, so an idle selection
-  // costs no per-frame work. The callback runs after the presenting call has returned, so the presentation is settled.
+  // costs no per-frame work (a presentation still unreadable re-arms it, at most 40 frames). The callback runs after the presenting call has returned.
   function notify(root) {
     var s = state(root);
     if (s.scheduled || (!s.svg && !s.sel && !s.hov && !s.prev) || !root.requestAnimationFrame) return;
@@ -151,8 +158,8 @@
   }
   // The selection changed (applyPick): redraw from root.selectedPaths; an empty selection draws nothing.
   function show(root) {
-    var s = state(root), c = capture(root), paths = root.selectedPaths;
-    s.sel = c && Array.isArray(paths) && paths.length ? { paths: paths, count: paths.length, ctx: c.ctx } : null;
+    var s = state(root), paths = root.selectedPaths, ctx = ctxNow(root);
+    s.sel = ctx !== null && Array.isArray(paths) && paths.length ? { paths: paths, count: paths.length, ctx: ctx } : null; // kept while the presentation is unreadable; refresh draws it when it is
     s.hov = null;
     refresh(root, true);
   }
@@ -162,8 +169,8 @@
   // A drag in flight (#2372): `spec` is { paths } (the transformed copies of the selection, drawn with their box and handles)
   // and/or { marquee: [x0, y0, x1, y1] } in world space; null ends it. Nothing here writes the document.
   function preview(root, spec) {
-    var s = state(root), c = capture(root);
-    s.prev = spec && c ? { paths: spec.paths || null, marquee: spec.marquee || null, ctx: c.ctx } : null;
+    var s = state(root), ctx = ctxNow(root);
+    s.prev = spec && ctx !== null ? { paths: spec.paths || null, marquee: spec.marquee || null, ctx: ctx } : null;
     refresh(root, true);
   }
   // Hover box of one picked path (null clears). A path already selected shows its selection box instead.
