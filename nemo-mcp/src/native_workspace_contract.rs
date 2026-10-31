@@ -4,7 +4,7 @@ use crate::contract::bounded_identifier;
 use serde_json::{Map, Value};
 pub(crate) const READ: &str = "query.document.object.project.workspace.read";
 pub(crate) const EDIT: &str = "command.document.object.project.workspace.edit";
-const FIELDS: [&str; 7] = [
+const FIELDS: [&str; 8] = [
     "layerPanelWidth",
     "toolsPanelWidth",
     "propsPanelWidth",
@@ -12,6 +12,7 @@ const FIELDS: [&str; 7] = [
     "timelineHeight",
     "panelOrder",
     "motionColumns",
+    "toolsDock",
 ];
 fn exact<'a>(
     value: &'a Value,
@@ -38,6 +39,13 @@ fn workspace(value: &Value, capture: bool) -> bool {
                 || value
                     .as_array()
                     .is_some_and(|items| items.iter().all(Value::is_string))
+        }
+        // Writes name a known dock; reads stay raw like motionColumns.
+        "toolsDock" => {
+            value.is_null()
+                || value.as_str().is_some_and(|dock| {
+                    !capture || matches!(dock, "top" | "right" | "bottom" | "left")
+                })
         }
         _ => value.is_null() || value.is_string(),
     })

@@ -33,7 +33,7 @@
     "maxReadResponseBytes": 4096,
     "policy": "Complete4096-byte pinned response or typed refusal; no count-only/truncated record, raw document, path or resource payload."
   },
-  "semantics": "Existing workspace layout-settle capture and pinned raw read use the native document/history owner. Four resize mouseups, docked section drop, original collapse callback and actual motion-columns change capture six mandatory fields plus optional raw motionColumns. No mousemove, open/restore, Save or picker capture. No movement and identical captures add no command/checkpoint. Missing, partial, null and empty fields preserve original presentation semantics; unavailable projection refuses separately. UI rollback and drag geometry are transient. Original Save uses its authoritative pin. Source-only candidate; installed layout/history/save-reopen acceptance remains open.",
+  "semantics": "Existing workspace layout-settle capture and pinned raw read use the native document/history owner. Four resize mouseups, docked section drop, original collapse callback and actual motion-columns change capture six mandatory fields plus optional raw motionColumns and optional toolsDock (top, right, bottom, left or null on write; raw on read; unknown spellings are never applied). No mousemove, open/restore, Save or picker capture. No movement and identical captures add no command/checkpoint. Missing, partial, null and empty fields preserve original presentation semantics; unavailable projection refuses separately. UI rollback and drag geometry are transient. Original Save uses its authoritative pin. Source-only candidate; installed layout/history/save-reopen acceptance remains open.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",
