@@ -316,6 +316,17 @@ test('object project Play: the identity is the whole project info, and only its 
   assert.deepEqual(verifyFixedClockSteps(r.events, { start: 0, waIn: 0, waOut: 3, loop: true, steps: 5 }).failures, []);
 });
 
+test('a looping run stopped by the operator: only the in-flight step superseded by Stop may return false', () => {
+  const step = (frame, result) => ({ event: 'play-step', frame, ...(result === undefined ? {} : { result }) });
+  const run = [1, 2, 3, 0].flatMap(f => [step(f), step(f, true)]);
+  const stopped = [...run, step(1), { event: 'play-stop' }, step(1, false)];
+  const v = verifyFixedClockSteps(stopped, { start: 0, waIn: 0, waOut: 3, loop: true });
+  assert.deepEqual(v.failures, []); assert.equal(v.stoppedInFlight, true); assert.deepEqual(v.observed, [1, 2, 3, 0]);
+  // a false return before Stop, or a false return that is not the last step, still fails
+  assert.equal(verifyFixedClockSteps([...run, step(1), step(1, false), { event: 'play-stop' }], { start: 0, waIn: 0, waOut: 3, loop: true }).ok, false);
+  assert.equal(verifyFixedClockSteps([step(1), step(1, false), ...run.slice(2), { event: 'play-stop' }], { start: 0, waIn: 0, waOut: 3, loop: true }).ok, false);
+});
+
 test('the bootstrap accepts opacity and object document ids and still refuses malformed ones', async () => {
   const ok = id => { const { observer } = observerHarness({}); return observer.ready.then(() => {
     observer.record({ event: 'host-receipt', documentId: id }); return observer.inspect().dropped === 0; }); };
