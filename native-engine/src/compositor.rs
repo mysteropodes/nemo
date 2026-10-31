@@ -489,3 +489,7 @@ fn align_to(value: u32, alignment: u32) -> u32 {
 #[cfg(all(test, feature = "history", feature = "application", feature = "project_media_codec"))]
 #[path = "../tests/object_viewport_checker.rs"]
 mod viewport_checker_tests;
+
+#[cfg(all(test, feature = "history", feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_viewport_outline.rs"]
+mod viewport_outline_tests;

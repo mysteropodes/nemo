@@ -38,8 +38,10 @@
     if(selected.displayFilter!=='none')request.displayFilter=selected.displayFilter;
     // "Show transparency" (#2373): the renderer paints the checker behind the artwork; a view flag, never a command.
     if(selected.alphaChecker)request.alphaChecker=true;
+    // "Current frame outline" (#2372): the renderer draws the presented frame's items as outlines; a view flag, never a command.
+    if(selected.currentOutline)request.currentOutline=true;
   }
-  function sameView(a,b){return a.mode===b.mode&&equalNav(a.navigation,b.navigation)&&a.displayFilter===b.displayFilter&&!!a.alphaChecker===!!b.alphaChecker&&ghostKey(a.ghosts)===ghostKey(b.ghosts);}
+  function sameView(a,b){return a.mode===b.mode&&equalNav(a.navigation,b.navigation)&&a.displayFilter===b.displayFilter&&!!a.alphaChecker===!!b.alphaChecker&&!!a.currentOutline===!!b.currentOutline&&ghostKey(a.ghosts)===ghostKey(b.ghosts);}
   function projection(value,mode,navigation){
     if(!['canvas','stored-camera'].includes(mode))return null;
     var wanted;try{wanted=nav(navigation);}catch(_){return null;}
@@ -57,7 +59,7 @@
     var result={mode:mode,cameraAvailable:available,documentToComposition:forward,compositionToDocument:inverse};if(navigationValue!==undefined)result.navigation=actual;return result;
   }
   // The existing session owns desired presentation only. No geometry/camera keys live here.
-  function navigation(readMode,observe,readFilter,readGhosts,readChecker){
+  function navigation(readMode,observe,readFilter,readGhosts,readChecker,readOutline){
     var owner=null,mode=null,desired=nav(),gesture=null;
     function observedBegin(kind,code){
       var tag=kind==='pan'?'pan':kind==='zoom'?'zoom':'other';
@@ -68,9 +70,10 @@
       if(owner!==key||mode!==next){owner=key;mode=next;desired=nav();gesture=null;}
       var ghosts=null;try{ghosts=readGhosts?ghostSel(readGhosts(info)):null;}catch(_){ghosts=null;}
       var checker=false;try{checker=readChecker?readChecker(info)===true:false;}catch(_){checker=false;}
-      return {mode:mode,navigation:nav(desired),displayFilter:displayFilter(readFilter?readFilter():undefined),ghosts:ghosts,alphaChecker:checker};
+      var outline=false;try{outline=readOutline?readOutline(info)===true:false;}catch(_){outline=false;}
+      return {mode:mode,navigation:nav(desired),displayFilter:displayFilter(readFilter?readFilter():undefined),ghosts:ghosts,alphaChecker:checker,currentOutline:outline};
     }
-    function matches(p,info){try{var value=read(info);return !!p&&!!p.view&&p.view.mode===value.mode&&equalNav(nav(p.view.navigation),value.navigation)&&displayFilter(p.displayFilter)===value.displayFilter&&(p.alphaChecker===true)===value.alphaChecker&&ghostKey(p.ghosts&&p.ghosts.selected)===ghostKey(value.ghosts);}catch(_){return false;}}
+    function matches(p,info){try{var value=read(info);return !!p&&!!p.view&&p.view.mode===value.mode&&equalNav(nav(p.view.navigation),value.navigation)&&displayFilter(p.displayFilter)===value.displayFilter&&(p.alphaChecker===true)===value.alphaChecker&&(p.currentOutline===true)===value.currentOutline&&ghostKey(p.ghosts&&p.ghosts.selected)===ghostKey(value.ghosts);}catch(_){return false;}}
     function begin(p,info,frame,mapping,shownBounds,kind,point){
       var selected=read(info),b=mapping&&mapping.cssBounds;
       if(!p||p.frame!==frame||p.view.mode!==selected.mode||!b||!shownBounds||!['x','y','width','height'].every(function(k){return Number.isFinite(b[k])&&b[k]===shownBounds[k];})||b.width<=0||b.height<=0||!['pan','zoom'].includes(kind)){
@@ -173,7 +176,7 @@
       clearWanted: function () { wanted = null; }
     });
   }
-  function inspectReceipt(receipt,ownerMatches,allowDeferred,viewMode,navigation,filter,wantedGhosts,wantedChecker){
+  function inspectReceipt(receipt,ownerMatches,allowDeferred,viewMode,navigation,filter,wantedGhosts,wantedChecker,wantedOutline){
     if(!ownerMatches)return {failure:'owner'};
     if(!receipt)return {failure:'receipt'};
     var status=receipt.status;
@@ -189,9 +192,12 @@
     var ghosts;try{ghosts=ghostReceipt(receipt.ghosts,wantedGhosts);}catch(_){return {failure:'ghosts'};}
     // The checker is echoed only when asked for, and then exactly: anything else is a renderer that did not do what was asked.
     if(wantedChecker===true?receipt.alphaChecker!==true:receipt.alphaChecker!==undefined)return {failure:'alpha-checker'};
+    // Likewise the outline mode (#2372): echoed only when asked for, and then exactly.
+    if(wantedOutline===true?receipt.currentOutline!==true:receipt.currentOutline!==undefined)return {failure:'current-outline'};
     var done={failure:null,status:status,workId:workId,viewGeneration:viewGeneration,view:view,displayFilter:actual};
     if(ghosts)done.ghosts=ghosts;
     if(wantedChecker===true)done.alphaChecker=true;
+    if(wantedOutline===true)done.currentOutline=true;
     return done;
   }
   // What the renderer did with the onion selection: exactly the selection asked for, or nothing at all when none was asked for.
@@ -210,6 +216,7 @@
       contentRevision:request.contentRevision,documentSnapshotId:request.documentSnapshotId,lifecycleGeneration:request.lifecycleGeneration};
     if(receipt.ghosts)shown.ghosts=receipt.ghosts;
     if(receipt.alphaChecker===true)shown.alphaChecker=true;
+    if(receipt.currentOutline===true)shown.currentOutline=true;
     return shown;
   }
   function create(subscribe,guard){
