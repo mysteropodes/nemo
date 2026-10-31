@@ -22,6 +22,8 @@
     // The vector route of the host window (or of this realm when bound directly).
     const vectorRoute = () => (host && host.NemoNativeObjectVector) || root.NemoNativeObjectVector;
     const commands = Command.create(session, 'labs');
+    // The context the workspace controller holds: the entered component's id, or the scene root.
+    const heldContext = () => { const c = host && host.NemoNativeComponentContext; return c && typeof c.contextId === 'function' ? c.contextId(host) : 'scene-root'; };
     const run = (operation, body) => commands.execute(operation, () => Object.assign({ command: Contract.commandOf(operation) }, body));
     return Object.freeze({
       layerInfo: (index) => { const info = session.info(); return info && info.layers ? info.layers[index] || null : null; },
@@ -38,10 +40,16 @@
       // (the Labs creators' ensureKeyframe(), not Draw's empty key).
       // Several Labs strokes as ONE native vector batch (one revision, one undo entry), keyed with what a held cell showed.
       // `options.skipUnavailable: true` lets a restyle batch skip the steps the engine cannot do (Select's multi-select edit); absent, it is atomic.
+      // #2256: inside an entered component ONLY Select's batches (`options.select === true`: move, scale, rotate, restyle, delete) are made context-aware:
+      // they ride the component command route on the context the workspace controller holds, keyed with Draw's plain key (the copy key is scene-only).
+      // Every other Labs batch (sculpt, trim, pose stamps) is unavailable there rather than silently landing on the scene.
       batchStrokes: (layerUid, frame, steps, options) => {
         const Vector = vectorRoute();
         if (!Vector) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'no_vector_route' }));
-        return Vector.create(session).batchStrokes(layerUid, frame, steps, options && options.skipUnavailable === true ? { keyframe: 'copy', skipUnavailable: true } : { keyframe: 'copy' });
+        const held = heldContext(), skip = options && options.skipUnavailable === true ? { skipUnavailable: true } : {};
+        if (held === 'scene-root') return Vector.create(session).batchStrokes(layerUid, frame, steps, Object.assign({ keyframe: 'copy' }, skip));
+        if (!options || options.select !== true) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'component_labs_unavailable' }));
+        return Vector.create(session, () => held).batchStrokes(layerUid, frame, steps, skip);
       },
       createStroke: (layerUid, frame, dict, opacity) => {
         const Vector = vectorRoute();

@@ -20,7 +20,7 @@
   function create(ports){
     if(!Properties||typeof Properties.create!=='function')throw new Error('Native project property ports are unavailable');
     if(!Exposure||typeof Exposure.navigation!=='function'||typeof Exposure.previewScheduling!=='function')throw new Error('Native project view ports are unavailable');
-    var previewFailures=new WeakMap(),view=Exposure.navigation(ports.viewMode,openDiagnostic,ports.displayFilter,ports.ghosts),phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,openingRequested=false;
+    var previewFailures=new WeakMap(),view=Exposure.navigation(ports.viewMode,openDiagnostic,ports.displayFilter,ports.ghosts,ports.alphaChecker),phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,openingRequested=false;
     var subscription=null,subscriptionTicket=0,synchronizing=false,openAttempt=null,revisionAttempt=null,presentationBounds=null,openExposure=null,openingCancelled=false;
     var observation=Desktop.attemptObserver(function(){return ports.invoke.apply(ports,arguments);},openDiagnostic,
       function(){return openAttempt;},function(){return revisionAttempt;},previewFailures),invokeTracked=observation.invoke;
@@ -232,7 +232,7 @@
       if(revisionSync)request.revisionSync=revisionSync;
       var bounds=Object.assign({},request.viewport.cssBounds);
       var receipt;
-      function inspect(value,allowDeferred){try{return Exposure.inspectReceipt(value,['opening','native'].includes(phase)&&same(info,request)&&(allowSuperseded||Exposure.sameView(selected,view.read(info))),allowDeferred,mode,selected.navigation,selected.displayFilter,selected.ghosts);}
+      function inspect(value,allowDeferred){try{return Exposure.inspectReceipt(value,['opening','native'].includes(phase)&&same(info,request)&&(allowSuperseded||Exposure.sameView(selected,view.read(info))),allowDeferred,mode,selected.navigation,selected.displayFilter,selected.ghosts,selected.alphaChecker);}
         catch(error){throw previewFailure('receipt-access',error);}}
       try{receipt=exposure?await exposure.run(function(){return raw('nemo_native_object_preview',request);},function(){return verifyOwner(pin);},inspect):inspect(await raw('nemo_native_object_preview',request),!!occlusion&&!revisionSync);}
       catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw error;}
@@ -295,9 +295,10 @@
     function currentPresentation(origin,ticket,inContext){var held=ports.context&&ports.context();return !openingRequested&&!synchronizing&&active()&&origin&&(inContext?!!held&&origin.presentation.contextId===held.contextId:!held)&&origin.presentation===presentation&&view.matches(presentation,info)&&same(info,origin)&&ticket===subscriptionTicket&&
       (!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&
       typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true;}
-    function runFontResource(action,inContext){if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native font owner busy or unavailable'));
+    // #2256: the resource route (composition settings, comments, brushes, font import, every scene editor) is scene-only: refused while a component is entered, at submit AND at dispatch (a command queued before the entry must not run after it). Only the component route (`inContext`, the vector family) is granted the entered presentation.
+    function runFontResource(action,inContext){if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native font owner busy or unavailable'));if(!inContext&&!sceneRoot())return insideComponent();
       var submitted=epoch(info),origin=freeze(presentedSession()),ticket=subscriptionTicket;
-      return enqueue(async function(){guardEpoch(submitted);var running=true;
+      return enqueue(async function(){guardEpoch(submitted);if(!inContext&&!sceneRoot())return insideComponent();var running=true;
         try{return await action({
           // Read-only and action-local: only this operation's own pending entry is exempted.
           // Captured presentation/subscription identity must survive; the public getter stays fenced.

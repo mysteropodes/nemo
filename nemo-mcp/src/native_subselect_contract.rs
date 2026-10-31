@@ -32,7 +32,7 @@ pub(super) fn view_request(p: &Value) -> bool {
                 && intent(&p["intent"])
         })
         && v["kind"] == "subselect"
-        && v["contextId"] == "scene-root"
+        && crate::native_contract::vector::context(&v["contextId"])
         && v["layerUid"].as_str().is_some_and(|s| !s.is_empty())
         && v["workId"]
             .as_str()
@@ -125,7 +125,7 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
                         && i.get("owner").is_none_or(|o| i["role"] == "fill" && o.as_str().is_some_and(|s| !s.is_empty()))
                         && i.get("brush").is_none_or(|b| ["anchor", "copy", "bitmap"].contains(&b.as_str().unwrap_or("")))
                         && i.get("group").is_none_or(|g| i.get("brush").is_some() && g.as_str().is_some_and(|s| !s.is_empty()))))
-                && super::target(&i["stableTarget"])
+                && super::view_target(&i["stableTarget"])
                 && i["stableTarget"]["contextId"] == r["contextId"]
                 && i["stableTarget"]["layerUid"] == r["layerUid"]
                 && i["closed"].is_boolean()
@@ -232,7 +232,7 @@ pub(super) fn request(v: &Value) -> bool {
         && v["documentSnapshotId"]
             .as_str()
             .is_some_and(|s| !s.is_empty())
-        && super::target(&v["stableTarget"])
+        && super::view_target(&v["stableTarget"])
         && exact(&v["subselect"], &["cursor", "limit"], &["preview", "paint", "hitTest", "center"]).is_some()
         // #2362 sculpt: `center` reads a ribbon's centreline and widths, on a hit-test read only.
         && v["subselect"].get("center").is_none_or(|c| c == true && v["subselect"]["hitTest"] == true)

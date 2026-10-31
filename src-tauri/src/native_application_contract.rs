@@ -349,6 +349,11 @@ impl ViewportInput {
         self.mapping()
     }
 
+    /// CSS px per composition px of the shown canvas element: the baseline screen scale before the view zoom (#2373 checker).
+    pub(crate) fn display_scale(&self) -> f64 {
+        self.css_bounds.width / f64::from(self.composition_extent.width)
+    }
+
     fn mapping(self) -> HostResult<ViewportMapping> {
         ViewportMapping::new(
             CssBounds {

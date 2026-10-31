@@ -2862,6 +2862,7 @@
         "native-selection-style.js",
         "native-selection-boolean.js",
         "native-selection-transform.js",
+        "native-selection-delete.js",
         "native-layer-list-presenter.js",
         "native-object-ui.js",
         "native-layer-range-desktop.js",
@@ -2891,6 +2892,7 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
+        "native-component-grid.js",
         "native-component-context.js"
       ],
       "sizeProfile": "Platform/engine adapter",

@@ -61,8 +61,9 @@ function workspaceAnswer(m, request) {
 // A tiny DOM: enough for the presenter row, the paint and the tab strip (events dispatched through real listeners).
 function element(tag) {
   const listeners = {}, kids = [], classes = new Set();
-  const el = { tagName: tag, style: {}, dataset: {}, attributes: {}, textContent: '', type: '', value: '', hidden: false, disabled: false, parentNode: null,
-    classList: { add: (x) => classes.add(x), remove: (x) => classes.delete(x), contains: (x) => classes.has(x) },
+  const el = { tagName: tag, style: { setProperty(k, v) { this[k] = v; } }, dataset: {}, attributes: {}, textContent: '', type: '', value: '', hidden: false, disabled: false, parentNode: null,
+    classList: { add: (x) => classes.add(x), remove: (x) => classes.delete(x), contains: (x) => classes.has(x), toggle: (x, on) => (on ? classes.add(x) : classes.delete(x)) },
+    querySelector(sel) { const cls = sel.replace(/^\./, ''); return kids.find((k) => k.className.split(' ').includes(cls)) || null; },
     setAttribute(k, v) { this.attributes[k] = String(v); }, addEventListener(k, f) { (listeners[k] = listeners[k] || []).push(f); },
     replaceChildren(...next) { kids.splice(0).forEach((k) => { k.parentNode = null; }); next.forEach((k) => this.appendChild(k)); },
     appendChild(k) { if (k.parentNode) k.parentNode.removeChild(k); kids.push(k); k.parentNode = this; return k; },
@@ -75,7 +76,8 @@ function element(tag) {
 }
 function documentFor() {
   const nodes = new Map(['layer-list', 'frame-hdr', 'frame-grid', 'tl-cf', 'tl-tf', 'info-frame', 'playhead', 'playhead-flag', 'symbol-tabs'].map((id) => [id, Object.assign(element('div'), { id })]));
-  return { nodes, activeElement: null, getElementById: (id) => nodes.get(id) || null, createElement: element };
+  const doc = { nodes, activeElement: null, getElementById: (id) => nodes.get(id) || null, createElement: (tag) => Object.assign(element(tag), { ownerDocument: doc }) };
+  return doc;
 }
 // The real renderSymbolTabs of timeline.js, run against the fake page (window = the host).
 function realRenderSymbolTabs(host) {
@@ -96,6 +98,9 @@ function fixture(options) {
     requests.push(clone(request));
     if (options.hold && request.operation === 'query.document.object.workspace.context' && request.payload.action.kind === options.hold.kind) await options.hold.promise;
     const base = { apiVersion: 2, requestId: request.requestId, instanceId: 'instance-A', documentId: 'document-A', contentRevision: m.revision };
+    if (m.failRefresh > 0 && request.operation === 'query.document.object.workspace.context' && request.payload.action.kind === 'refresh') {
+      m.failRefresh -= 1; return Object.assign(base, { ok: false, error: { code: 'unavailable', message: 'the owner could not answer' } });
+    }
     const result = request.operation === 'query.document.object.workspace.context' ? workspaceAnswer(m, request) : readAnswer(m, request);
     return result ? Object.assign(base, { ok: true, result }) : Object.assign(base, { ok: false, error: { code: 'not_found', message: 'no such context' } });
   } });
@@ -263,19 +268,58 @@ test('a component that vanished (Undo) is left on the next revision, the others 
   assert.deepEqual(f.tabs(), [{ text: 'Scene', act: true }], 'the tab of a context that no longer exists is not listed');
 });
 
-test('an entered component paints read-only: its layers, no scene paint, nothing to click', async () => {
+test('an entered component paints its own timeline: baseline rows, no scene paint, a layer row activates the layer', async () => {
   const f = fixture();
   f.composed.bindPolicyEntries();
   f.row(1).fire('dblclick'); await settle();
-  const list = f.host.document.getElementById('layer-list');
+  const list = f.host.document.getElementById('layer-list'), grid = f.host.document.getElementById('frame-grid');
   assert.deepEqual(list.children.map((r) => r.dataset.layerUid), ['ia', 'ib']);
-  assert.ok(list.children.every((r) => r.children[0].disabled === true), 'component rows cannot be picked');
+  assert.ok(list.children.every((r) => r.className.split(' ').includes('lrow')), 'the baseline .lrow rhythm');
+  assert.deepEqual(grid.children.map((r) => r.dataset.layerUid), ['ia', 'ib'], 'one .frow per .lrow, in the same order (CLAUDE.md section 11)');
+  assert.ok(grid.children.every((r) => r.className.split(' ').includes('frow') && r.children.length === 12), 'a baseline cell per component frame');
   assert.match(f.host.document.getElementById('frame-hdr').children[0].textContent, /^Comp A — Frame 1 \/ 12$/);
-  assert.match(f.host.document.getElementById('frame-grid').children[0].textContent, /read-only/);
   assert.equal(f.host.document.getElementById('tl-tf').textContent, 12);
   assert.equal(f.effects.includes('scene-paint'), false, 'the scene paint is skipped inside a component');
   f.host.state.currentFrame = 4; f.host.updateUI();
   assert.match(f.host.document.getElementById('frame-hdr').children[0].textContent, /Frame 5 \/ 12/);
+  assert.ok(f.host.document.getElementById('frame-grid').children[0].children[4].className.split(' ').includes('cur'), 'the playhead cell follows the frame');
+  f.host.document.getElementById('layer-list').children[1].fire('click'); await settle();
+  assert.equal(f.host.state.activeLayerIdx, 1, 'a row click activates the component layer');
+  assert.deepEqual(f.host._layerSel, [1]);
+  assert.ok(f.host.document.getElementById('layer-list').children[1].className.split(' ').includes('act'));
+});
+
+test('the entered grid shows the component\'s OWN frames and range from the pinned timing reads, never the scene\'s, and drops a stale answer', async () => {
+  const f = fixture(), calls = [];
+  // The runs the owner answers for the component's layer `ia`: a key with content, a held span, a tween, a blank key, a held empty tail (12 frames).
+  const runs = [[0, 1, 'key', null, true, false], [1, 3, 'held', 0, true, false], [4, 2, 'interpolated', null, true, false], [6, 1, 'key', null, false, false], [7, 5, 'held', 6, false, false]];
+  f.session.readLayerCells = async (uid, pin) => { calls.push(['cells', uid, pin.contentRevision]); return uid === 'ia' ? runs : null; };
+  f.session.readLayerRange = async (uid, frame) => { calls.push(['range', uid, frame]); return { kind: 'layerRange', range: { rawInPoint: 2, rawOutPoint: 9, inPoint: 2, outPoint: 9, hasCustomRange: true, hasTimeLink: false } }; };
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  const grid = f.host.document.getElementById('frame-grid'), classes = (row, at) => grid.children[row].children[at].className.split(' ');
+  assert.deepEqual(calls.filter((c) => c[0] === 'cells').map((c) => c[1]).sort(), ['ia', 'ib'], 'one cells read per component layer');
+  assert.ok(classes(0, 0).includes('kf-full') && classes(0, 0).length > 0, 'a key with content');
+  assert.ok(classes(0, 2).includes('span-full') && !classes(0, 2).includes('span-end'), 'a held span');
+  assert.ok(classes(0, 3).includes('span-full') && classes(0, 3).includes('span-end'), 'the last held cell before the tween ends the span');
+  assert.ok(classes(0, 4).includes('tw'), 'a tween cell');
+  assert.ok(classes(0, 6).includes('kf-empty'), 'a blank key');
+  assert.ok(classes(0, 8).includes('span-empty'), 'a held empty tail');
+  assert.equal(grid.children[1].children[0].className.split(' ').includes('kf-full'), false, 'a refused read leaves the row blank');
+  assert.deepEqual(f.host.state.layers[0].frames.map((x) => x.isKeyframe).slice(0, 8), [true, false, false, false, false, false, true, false], 'the row frames the legacy readers see');
+  assert.equal(f.host.state.layers[0].frames.length, 12);
+  const bar = grid.children[0].children.find((c) => c.className.includes('layer-inout-bar'));
+  assert.ok(bar && bar.style.left === '28px' && bar.attributes['aria-disabled'] === 'true', 'the read-only in/out bar from the component range read');
+  const before = calls.filter((c) => c[0] === 'cells' && c[1] === 'ia').length; // a refused read (ib) is asked again, an answered row is not
+  f.host.state.currentFrame = 3; f.host.updateUI(); await settle();
+  assert.equal(calls.filter((c) => c[0] === 'cells' && c[1] === 'ia').length, before, 'a scrub re-reads no row of the same revision');
+  assert.ok(calls.some((c) => c[0] === 'range' && c[2] === 3), 'the range is asked at the playhead frame');
+  // A read that lands after the context was left paints nothing.
+  let late; f.session.readLayerCells = () => new Promise((resolve) => { late = resolve; });
+  f.m.revision = 8; Context.revision(f.host, f.session.info()); await settle();
+  await f.host.SM.exitToScene(); await settle();
+  late(runs); await settle();
+  assert.equal(f.host.state.activeSymbolId, null);
 });
 
 test('a revision that arrives while another transition is in flight is queued, not dropped: the context is re-read once it is done', async () => {
@@ -335,4 +379,56 @@ test('the layer-row double-click enters at the frame the instance shows at the p
   await f.host.SM.exitToScene();
   f.row(2).fire('dblclick'); await settle();
   assert.equal(f.host.state.currentFrame, 5, 'an out-of-range resolution is clamped into the component (6 frames)');
+});
+
+// #2256 review of #2660: a refresh that failed must not be acknowledged. The revision is recorded only once the context was re-read; until
+// then projectionReady() is false (the rows, tabs and frame count are stale), the refresh is retried a bounded number of times, and when
+// the retries run out the scene is shown with a notice instead of a stale entered view.
+async function enteredAt8(f) {
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  f.m.revision = 8; f.m.comps.sym_a.layers.push(['id', 'Inner D', 'drawing']);
+  return f;
+}
+const refreshes = (f) => f.workspaceRequests().filter((r) => r.payload.action.kind === 'refresh').length;
+
+test('a failed refresh does not acknowledge the revision: it is retried, and only the successful retry makes the projection ready', async () => {
+  const f = fixture(), timers = [];
+  f.host.setTimeout = (fn, ms) => { timers.push({ fn, ms }); };
+  await enteredAt8(f); f.m.failRefresh = 1;
+  const info = f.session.info();
+  Context.revision(f.host, info); await settle();
+  assert.equal(refreshes(f), 1, 'the first refresh failed');
+  assert.equal(Context.projectionReady(f.host, info), false, 'the stale rows are not a ready projection');
+  assert.deepEqual(f.host.state.layers.map((l) => l.layerUid), ['ia', 'ib'], 'nothing was applied from the failed answer');
+  assert.equal(timers.length, 1, 'one backoff pause is pending');
+  timers.shift().fn(); await settle();
+  assert.equal(refreshes(f), 2);
+  assert.equal(Context.projectionReady(f.host, info), true, 'acknowledged once the context was re-read');
+  assert.deepEqual(f.host.state.layers.map((l) => l.layerUid), ['ia', 'ib', 'id']);
+  assert.equal(f.host.state.activeSymbolId, 'sym_a', 'the component stays entered');
+});
+
+test('when every retry fails the scene is shown with a notice, after a bounded number of asks', async () => {
+  const f = fixture(), pauses = [];
+  f.host.setTimeout = (fn, ms) => { pauses.push(ms); fn(); };
+  await enteredAt8(f); f.m.failRefresh = Infinity;
+  const info = f.session.info();
+  Context.revision(f.host, info); await settle();
+  assert.equal(refreshes(f), 4, 'the first ask and three retries, never more');
+  assert.deepEqual(pauses, [100, 300, 900], 'with a growing pause');
+  assert.equal(f.host.state.activeSymbolId, null, 'back on the scene');
+  assert.deepEqual(f.host.state.layers.map((l) => l.layerUid), ['L1', 'L2', 'L3']);
+  assert.match(f.toasts.join('|'), /could not be refreshed/);
+  assert.equal(Context.projectionReady(f.host, info), false, 'no entered context is claimed ready');
+});
+
+test('a failed refresh inside a publication rides the same retry and exit (the lease is the publication the queue runs)', async () => {
+  const f = fixture();
+  f.host.setTimeout = (fn) => { fn(); };
+  await enteredAt8(f); f.m.failRefresh = Infinity;
+  await f.session.runResourceCommand((lease) => Context.revision(f.host, f.session.info(), lease));
+  assert.equal(refreshes(f), 4);
+  assert.equal(f.host.state.activeSymbolId, null);
+  assert.match(f.toasts.join('|'), /could not be refreshed/);
 });

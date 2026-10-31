@@ -16656,6 +16656,12 @@
             "null"
           ]
         },
+        "toolsDock": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "propsPanelCollapsed": {
           "type": "boolean"
         },
@@ -16711,6 +16717,12 @@
           ]
         },
         "motionColumns": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "toolsDock": {
           "type": [
             "string",
             "null"
@@ -21444,7 +21456,9 @@
               "const": "subselect"
             },
             "contextId": {
-              "const": "scene-root"
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$",
+              "description": "#2256: the scene root or the id of the declared component context the viewport presents; the host answers only the presented one."
             },
             "layerUid": {
               "type": "string",
@@ -21668,7 +21682,9 @@
               "const": "rig"
             },
             "contextId": {
-              "const": "scene-root"
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$",
+              "description": "#2256: the scene root or the id of the declared component context the viewport presents; the host answers only the presented one."
             },
             "frame": {
               "type": "integer",

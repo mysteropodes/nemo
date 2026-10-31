@@ -116,11 +116,14 @@
     var status = await root.NemoNativeSelectGesture.commitMatrix(root, paths, spec.m, {
       pin: at.pin, gone: 'The selection changed — nothing was transformed.', angle: spec.angle || 0,
       stale: function () { return I.pickContext(root) !== job.ctx; } });
+    var kept = root.state ? (root.state.selRotAccum || 0) : 0;
     if (status !== 'applied') return { status: status };
     s.commits += 1; // after the re-read: an edit that follows sees the fresh selection, never the one before this commit
     if (O && typeof O.show === 'function') O.show(root);
-    if (typeof root.updateUI === 'function') root.updateUI(); // a new selection resets the panel's accumulated angle...
-    if (spec.rot !== undefined && root.state) { root.state.selRotAccum = spec.rot; if (typeof root.updateUI === 'function') root.updateUI(); } // ...which the turn just made keeps
+    if (typeof root.updateUI === 'function') root.updateUI(); // the re-read items are new objects, so the panel resets its accumulated angle...
+    // ...but it is the same selection: a move, resize or nudge keeps the angle (baseline never re-read), a turn keeps the one it just made.
+    var angle = spec.rot !== undefined ? spec.rot : kept;
+    if (root.state && root.state.selRotAccum !== angle) { root.state.selRotAccum = angle; if (typeof root.updateUI === 'function') root.updateUI(); }
     if (root.SMEngineBridge && typeof root.SMEngineBridge.renderNow === 'function') root.SMEngineBridge.renderNow();
     return { status: 'applied' };
   }

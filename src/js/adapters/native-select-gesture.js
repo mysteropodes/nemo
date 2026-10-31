@@ -123,7 +123,7 @@
     if (steps && JSON.stringify(steps).length > MAX_BYTES) { notice(root, 'Too much to transform at once \u2014 select fewer items.'); return 'refused'; }
     if (o.cancelled && o.cancelled()) return 'cancelled'; // Escape between the release and the send still cancels; once sent, the write is not cancellable (undo reverts it)
     if (o.release) o.release();
-    try { result = steps ? await route.batchStrokes(layers.layerUid, layers.frame, steps) : null; } catch (_) { result = null; }
+    try { result = steps ? await route.batchStrokes(layers.layerUid, layers.frame, steps, { select: true }) : null; } catch (_) { result = null; }
     if (!result || result.status !== 'applied') { notice(root, 'The transform could not be applied.'); return 'failed'; }
     await reselect(root, sel, o.angle);
     return 'applied';

@@ -6,7 +6,8 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
   var READ = 'query.document.object.project.workspace.read', EDIT = 'command.document.object.project.workspace.edit';
-  var fields = ['layerPanelWidth', 'toolsPanelWidth', 'propsPanelWidth', 'propsPanelCollapsed', 'timelineHeight', 'panelOrder', 'motionColumns'];
+  var fields = ['layerPanelWidth', 'toolsPanelWidth', 'propsPanelWidth', 'propsPanelCollapsed', 'timelineHeight', 'panelOrder', 'motionColumns', 'toolsDock'];
+  var DOCKS = ['top', 'right', 'bottom', 'left'];
   var has = function (value, key) { return Object.prototype.hasOwnProperty.call(value, key); };
   function fail() { throw new TypeError('Invalid native workspace contract'); }
   function data(value) {
@@ -34,7 +35,7 @@
     }
   }
   function workspace(value, capture) {
-    exact(value, capture ? fields.slice(0, 6) : [], capture ? ['motionColumns'] : fields);
+    exact(value, capture ? fields.slice(0, 6) : [], capture ? fields.slice(6) : fields);
     Object.keys(value).forEach(function (key) {
       var item = value[key];
       if (key === 'propsPanelCollapsed') { if (typeof item !== 'boolean') fail(); }
@@ -47,6 +48,9 @@
             if (!descriptor || !has(descriptor, 'value')) fail(); text(descriptor.value);
           }
         }
+      } else if (key === 'toolsDock') {
+        // Writes must be a known dock; reads stay raw like motionColumns so an odd saved spelling cannot make the record unreadable.
+        if (item !== null) { text(item); if (capture && !DOCKS.includes(item)) fail(); }
       } else if (item !== null) text(item);
     });
     var copy = {};

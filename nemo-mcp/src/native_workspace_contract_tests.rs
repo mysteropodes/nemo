@@ -123,3 +123,21 @@ fn complete_wire_budget_and_history_receipt_stay_closed() {
     q.payload["action"]["workspace"]["motionColumns"] = json!("x".repeat(4096));
     assert!(q.validate_input().is_err());
 }
+#[test]
+fn tools_dock_capture_names_a_known_dock_or_null_and_read_stays_raw() {
+    for dock in [json!("top"), json!("right"), json!("bottom"), json!("left"), Value::Null] {
+        let mut value = fields();
+        value["toolsDock"] = dock;
+        let q = edit(value);
+        assert!(q.validate_input().is_ok());
+        assert!(q.validate().is_ok());
+    }
+    for dock in [json!("diagonal"), json!(""), json!("LEFT"), json!(3), json!([])] {
+        let mut value = fields();
+        value["toolsDock"] = dock;
+        assert!(edit(value).validate_input().is_err());
+    }
+    let q = query();
+    let raw = json!({"workspacePresent":true,"workspace":{"toolsDock":"saved-elsewhere"}});
+    assert!(wire(&q, &response(&q, raw)));
+}

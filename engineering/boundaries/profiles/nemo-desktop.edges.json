@@ -492,6 +492,7 @@
           "desktop_viewport::ViewportDisplayFilter",
           "object_render_scene::GhostUnderlayRequest",
           "object_render_scene::GhostReceipt",
+          "object_render_scene::viewport_checker_quality_suffix",
           "application::prepare_ghost_underlay",
           "application::release_ghost_caches"
         ],

@@ -4,15 +4,16 @@
  * (NemoNativeObjectComponent.workspaceTransition, the pure query.document.object.workspace.context) which context is entered, reads
  * its layers through the pinned component read, projects the read-only view fields the ordinary UI reads (playhead, frame count,
  * work area, fps, tab strip) and asks the viewport to present the entered context. It writes no document and no history entry.
- * Editing INSIDE an entered component is offered to the vector family only (#2256 component writes: Draw, Pen and shape create through
- * the component command route, which targets the context held here); every other action that needs the presented scene lease declines (the
+ * Editing INSIDE an entered component is offered to the vector family only (#2256 component writes: Draw, Pen and shape create, and Select's
+ * pick, move / scale / rotate, restyle and Delete, through the component command route, which targets the context held here; the timeline
+ * paints the component's own frames and range from the pinned timing reads of that context, native-component-grid.js); every other action that needs the presented scene lease declines (the
  * presented context is not scene-root) and the scene editors keep `state.activeSymbolId` set. Exit restores the scene projection from the
  * native truth (projectView), never from a saved copy of the rows. Legacy documents never reach this module. */
 (function (root, factory) {
-  var api = factory();
+  var api = factory(typeof module === 'object' && module.exports ? require('./native-component-grid.js') : root.NemoNativeComponentGrid);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.NemoNativeComponentContext = api;
-}(typeof globalThis === 'object' ? globalThis : this, function () {
+}(typeof globalThis === 'object' ? globalThis : this, function (Grid) {
   'use strict';
   var SCENE = 'scene-root';
   var entered = new WeakMap(); // host -> the entered context's read-side view; absent while the scene is presented
@@ -53,6 +54,21 @@
     return st ? st.rows.map(function (row) { return { layerUid: row.layerUid, locked: false, visible: true }; }) : null;
   }
   function frameBound(host, pin) { var st = live(host); return st ? st.totalFrames : pin.totalFrames; }
+  // #2256: what a pinned timing read of the held context is judged by: the component's own id, frame count and layer uids (null at the scene root).
+  function readScope(host) {
+    var st = live(host);
+    return st ? Object.freeze({ contextId: st.contextId, totalFrames: st.totalFrames, layerUids: Object.freeze(st.rows.map(function (row) { return row.layerUid; })) }) : null;
+  }
+  // The entered rows with their names (what the Select adapters walk as the layer list of the context).
+  function layers(host) { var st = live(host); return st ? st.rows.map(function (row) { return Object.freeze({ layerUid: row.layerUid, name: row.name, locked: false, visible: true }); }) : null; }
+  // Row click: the component's layer becomes the active (and only selected) one. The layer table of a component is read-only here; this is a view choice.
+  function selectLayer(host, index) {
+    var st = live(host);
+    if (!st || !Number.isSafeInteger(index) || index < 0 || index >= st.rows.length) return false;
+    host.state.activeLayerIdx = index; host._layerSel = [index]; host._layerSelAnchor = index; host.selectedPaths = []; host.state.selectedStrokeIndices = [];
+    repaint(host);
+    return true;
+  }
   function integer(value, fallback) { return Number.isSafeInteger(value) && value >= 0 ? value : fallback; }
   // The live playhead and work area of the presented context, clamped into it (the owner refuses an out-of-range view).
   function viewNow(host) {
@@ -133,7 +149,7 @@
       return false;
     }).then(function (done) {
       busy.delete(host);
-      if (queued.delete(host)) guarded(host, function () { return refresh(host, null); });
+      if (queued.delete(host)) guarded(host, function () { var s = session(host), i = s && s.info(); return i ? settle(host, null, i.contentRevision) : false; });
       return done;
     });
   }
@@ -205,29 +221,60 @@
     host._layerSel = (Array.isArray(host._layerSel) ? host._layerSel : []).filter(function (i) { return i < count; });
   }
   // Re-read the entered context against the current revision: a context that vanished is left, the others re-read their layers.
+  // Resolves true once the context is settled (refreshed, gone, or no longer entered) and false when the owner could not answer.
   async function refresh(host, lease) {
     var c = intent(host), was = entered.get(host);
-    if (!c || !was) return false;
+    if (!was) return true;
+    if (!c) return false;
     var res = await transition(c, { kind: 'refresh' }, viewNow(host), lease);
     if (!res.ok) return false;
     if (res.outcome === 'context_gone') { await applyExited(host, res, null, lease); toast(host, 'The component no longer exists.'); return true; }
     var rows = await readRows(c, was.contextId, lease);
-    if (entered.get(host) !== was) return false; // left (or replaced) while the layers were read
+    if (entered.get(host) !== was) return true; // left (or replaced) while the layers were read
     await readNames(host, c, session(host).info(), lease).catch(function () { return null; });
     projectRefreshed(host, was, res, rows);
     repaint(host);
     return true;
   }
+  // A failed refresh is asked again after these pauses (bounded), then the scene is shown instead of a stale entered view.
+  var RETRY_MS = [100, 300, 900];
+  function pause(host, ms) { return new Promise(function (resolve) { (typeof host.setTimeout === 'function' ? host.setTimeout : setTimeout)(resolve, ms); }); }
+  // Retries ran out: leave the context for the scene (the owner's exit, applied from the native truth) and say so.
+  async function giveUp(host, lease) {
+    var c = intent(host);
+    try {
+      var res = c ? await transition(c, { kind: 'exit' }, viewNow(host), lease) : null;
+      if (res && res.ok && (res.outcome === 'exited' || res.outcome === 'not_in_context')) {
+        await applyExited(host, res, null, lease);
+        toast(host, 'The component could not be refreshed; back to the Scene.');
+        return true;
+      }
+    } catch (_) { /* reported below: the entered view stays fenced (projectionReady is false) */ }
+    toast(host, 'Native component context: the component could not be refreshed.');
+    return false;
+  }
+  // Re-read the entered context until it is settled. The revision is acknowledged (`st.revision`) ONLY once a refresh succeeded: until then
+  // projectionReady() is false, so the viewport never presents a revision over rows, tabs and a frame count that are stale.
+  async function settle(host, lease, target) {
+    var st = live(host);
+    for (var attempt = 0; attempt <= RETRY_MS.length; attempt += 1) {
+      if (!st || live(host) !== st) return true; // left, closed or replaced meanwhile: nothing left to settle
+      var ok = false;
+      try { ok = await refresh(host, lease); } catch (_) { ok = false; }
+      if (ok) { if (live(host) === st) st.revision = target; return true; }
+      if (attempt < RETRY_MS.length) await pause(host, RETRY_MS[attempt]);
+    }
+    return st && live(host) === st ? giveUp(host, lease) : true;
+  }
   // A revision moved on (Undo, an MCP edit). `lease` is the publication the project queue is running: the refresh rides it, so the
   // context, frame count and layers are settled BEFORE the frame of this revision is presented (a shrunk or deleted component is
   // never asked for a frame it no longer has). Without a lease the refresh is queued behind any transition in flight, never dropped.
   function revision(host, info, lease) {
-    var st = live(host);
-    if (!st || st.revision === info.contentRevision) return Promise.resolve(true);
-    st.revision = info.contentRevision;
-    if (lease) return refresh(host, lease).catch(function (error) { toast(host, 'Native component context: ' + (error && error.message || 'unavailable')); return false; }).then(function () { return true; });
+    var st = live(host), target = info.contentRevision;
+    if (!st || st.revision === target) return Promise.resolve(true);
+    if (lease) return settle(host, lease, target).then(function () { return true; });
     if (busy.has(host)) { queued.add(host); return Promise.resolve(true); }
-    return guarded(host, function () { return refresh(host, null); }).then(function () { return true; });
+    return guarded(host, function () { return settle(host, null, target); }).then(function () { return true; });
   }
   // The final projection check of a revision synchronization while a component is presented: same owner, same revision.
   function projectionReady(host, info) {
@@ -250,24 +297,30 @@
   }
 
   function node(host, tag, text, cls) { var el = host.document.createElement(tag); el.textContent = text; if (cls) el.className = cls; return el; }
-  // The read-side paint of an entered component (the scene paint is skipped: its pins and rows are the scene's).
+  // The pinned timing read of the entered component (cells: the whole row; range: the layer's in/out at the playhead frame). The reads consult the
+  // held context themselves; a read the owner refuses answers null and the row stays blank.
+  function timingPort(host, st) {
+    return {
+      current: function () { return live(host) === st; },
+      select: function (index) { selectLayer(host, index); },
+      read: function (kind, layerUid) {
+        var s = session(host), info = s && s.info();
+        if (!info || typeof s.readLayerCells !== 'function' || typeof s.readLayerRange !== 'function') return null;
+        if (kind !== 'cells') return s.readLayerRange(layerUid, host.state.currentFrame, info);
+        // A row's cells are a function of the revision alone (the playhead is not an input), so a scrub reads each row once per revision.
+        if (!st.cells || st.cells.revision !== info.contentRevision) st.cells = { revision: info.contentRevision, rows: new Map() };
+        var held = st.cells;
+        if (held.rows.has(layerUid)) return Promise.resolve(held.rows.get(layerUid));
+        return Promise.resolve(s.readLayerCells(layerUid, info)).then(function (runs) { if (runs && st.cells === held) held.rows.set(layerUid, runs); return runs; });
+      },
+    };
+  }
+  // The paint of an entered component (the scene paint is skipped: its pins and rows are the scene's). The grid is the component's own timeline.
   function paint(host) {
     var st = live(host);
     if (!st) return false;
-    var doc = host.document, list = doc.getElementById('layer-list'), header = doc.getElementById('frame-hdr'), grid = doc.getElementById('frame-grid');
-    if (!list || !header || !grid) return true;
-    var rows = st.rows.map(function (layer) {
-      var row = node(host, 'div', '', 'native-object-layer native-component-layer');
-      row.dataset.layerUid = layer.layerUid; row.style.display = 'flex';
-      var pick = node(host, 'button', layer.name + ' — ' + layer.layerKind); pick.type = 'button'; pick.disabled = true; pick.style.flex = '1'; pick.style.textAlign = 'left';
-      pick.setAttribute('aria-label', layer.name + ' (' + layer.layerUid + ')');
-      row.appendChild(pick); return row;
-    });
-    list.replaceChildren.apply(list, rows);
-    var frame = host.state.currentFrame;
-    header.replaceChildren(node(host, 'div', st.name + ' — Frame ' + (frame + 1) + ' / ' + st.totalFrames));
-    var note = node(host, 'div', 'Component layers are read-only here: editing inside a component is not available yet.', 'native-object-timing-unavailable');
-    note.setAttribute('role', 'status'); grid.replaceChildren(note);
+    if (Grid) Grid.paint(host, st, timingPort(host, st));
+    var doc = host.document, frame = host.state.currentFrame;
     var field = doc.getElementById('tl-cf');
     if (field) { if (doc.activeElement !== field) field.value = frame + 1; field.max = st.totalFrames; }
     ['tl-tf', 'info-frame'].forEach(function (id) { var el = doc.getElementById(id); if (el) el.textContent = id === 'tl-tf' ? st.totalFrames : frame + 1; });
@@ -295,5 +348,5 @@
     });
     return true;
   }
-  return Object.freeze({ SCENE: SCENE, presented: presented, contextId: contextId, layerRows: layerRows, frameBound: frameBound, enter: enter, exit: exit, close: close, revision: revision, projectionReady: projectionReady, openLayer: openLayer, paint: paint, renderTabs: renderTabs });
+  return Object.freeze({ SCENE: SCENE, presented: presented, contextId: contextId, layerRows: layerRows, layers: layers, readScope: readScope, selectLayer: selectLayer, frameBound: frameBound, enter: enter, exit: exit, close: close, revision: revision, projectionReady: projectionReady, openLayer: openLayer, paint: paint, renderTabs: renderTabs });
 }));
