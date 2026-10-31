@@ -2320,6 +2320,18 @@
       ]
     },
     {
+      "id": "app.native.object.workspace.context.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-workspace-context-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-workspace-context-contract.js"
+      ]
+    },
+    {
       "id": "app.native.object.component.intent",
       "layer": "domain",
       "dir": "src/js/adapters",
@@ -2833,6 +2845,30 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-component-convert-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.component.context.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-component-context.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-component-context.js"
+      ]
+    },
+    {
+      "id": "app.native.component.enter.ui.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-component-enter-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-component-enter-ui.js"
       ]
     },
     {

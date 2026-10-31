@@ -150,7 +150,7 @@ fn public_examples_validate_without_dropping_guide_shadow_or_any_earlier_schema_
     let branches = schema["$defs"]["ResponseBase"]["properties"]["result"]["oneOf"]
         .as_array()
         .unwrap();
-    assert_eq!(branches.len(), 40);
+    assert_eq!(branches.len(), 41);
     assert_eq!(
         branches[37],
         json!({"$ref":"#/$defs/ObjectHistoryReadResult"})

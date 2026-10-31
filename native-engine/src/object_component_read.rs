@@ -9,8 +9,9 @@
 //! The pin is `(atRevision, documentSnapshotId)` of this snapshot; any other pin is `stale_revision`. An undeclared context
 //! id is `not_found`. `instances` answers for a component only: the scene is not instanced by anything. A component record
 //! natively carries no camera keys (they belong to an owner that does not exist yet), so its `hasCameraKeys` is false;
-//! the scene reports whether the project camera has keys. A page is cut by `limit` AND by the 4096-byte response bound; an
-//! item that cannot fit alone is a typed `unavailable`, never a truncated name.
+//! the scene reports whether the project camera has keys. A page is cut by `limit` AND by the 4096-byte response bound; a
+//! layer or instance that cannot fit alone is a typed `unavailable`, but a CONTEXT whose summary cannot fit alone keeps its
+//! id and counts and has its name cut at a character boundary and flagged `nameTruncated: true`, so a listing walks past it.
 use crate::object_snapshot::{ObjectSnapshot, ReadAdmission, MAX_MESSAGE_BYTES};
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
 use serde_json::{json, Value};
@@ -295,14 +296,17 @@ impl ObjectSnapshot {
             } else {
                 Value::Null
             };
-            if serde_json::to_vec(&self.component_envelope(request, page.clone()))
-                .map_err(|_| DispatchErrorCode::Internal)?
-                .len()
-                > MAX_MESSAGE_BYTES
-            {
-                taken.pop();
+            if self.component_page_too_big(request, &page)? {
+                let item = taken.pop().unwrap_or(Value::Null);
                 if taken.is_empty() {
-                    return Err(DispatchErrorCode::Unavailable);
+                    // Only a context summary may be cut: its name is trimmed, flagged, and paging goes on past it.
+                    let next = page["nextCursor"].clone();
+                    let trimmed =
+                        self.component_trimmed_context(request, &mut page, item, next.clone())?;
+                    taken.push(trimmed);
+                    page["items"] = json!(taken);
+                    page["nextCursor"] = next;
+                    break;
                 }
                 page["items"] = json!(taken);
                 page["nextCursor"] = json!(at);
@@ -314,6 +318,66 @@ impl ObjectSnapshot {
             page["nextCursor"] = Value::Null;
         }
         self.component_bounded(self.component_envelope(request, page))
+    }
+
+    #[cfg(feature = "evaluation")]
+    fn component_page_too_big(
+        &self,
+        request: &OpacityRequest,
+        page: &Value,
+    ) -> Result<bool, DispatchErrorCode> {
+        serde_json::to_vec(&self.component_envelope(request, page.clone()))
+            .map(|bytes| bytes.len() > MAX_MESSAGE_BYTES)
+            .map_err(|_| DispatchErrorCode::Internal)
+    }
+
+    /// A context summary that cannot fit a page alone keeps its identity and counts but loses the tail of its name: the
+    /// longest whole-character prefix that fits is kept and `nameTruncated: true` says so, so a listing still walks past
+    /// it. Any other oversized item (a layer) stays a typed `unavailable`. On success `page` holds the trimmed item.
+    #[cfg(feature = "evaluation")]
+    fn component_trimmed_context(
+        &self,
+        request: &OpacityRequest,
+        page: &mut Value,
+        item: Value,
+        next: Value,
+    ) -> Result<Value, DispatchErrorCode> {
+        let Some(name) = item["name"]
+            .as_str()
+            .filter(|_| page["kind"] == "contexts")
+            .map(str::to_owned)
+        else {
+            return Err(DispatchErrorCode::Unavailable);
+        };
+        let boundaries: Vec<usize> = name
+            .char_indices()
+            .map(|(at, _)| at)
+            .chain(std::iter::once(name.len()))
+            .collect();
+        let with = |kept: usize| {
+            let mut cut = item.clone();
+            cut["name"] = json!(&name[..boundaries[kept]]);
+            cut["nameTruncated"] = json!(true);
+            cut
+        };
+        let (mut low, mut high) = (0usize, boundaries.len() - 1);
+        let mut best: Option<Value> = None;
+        while low <= high {
+            let mid = low + (high - low) / 2;
+            let candidate = with(mid);
+            page["items"] = json!([candidate.clone()]);
+            page["nextCursor"] = next.clone();
+            if self.component_page_too_big(request, page)? {
+                if mid == 0 {
+                    break;
+                }
+                high = mid - 1;
+            } else {
+                best = Some(candidate);
+                low = mid + 1;
+            }
+        }
+        best.ok_or(DispatchErrorCode::Unavailable)
     }
 
     #[cfg(feature = "evaluation")]

@@ -7191,7 +7191,9 @@ function finishLayerReorder(){
 window.addEventListener('mouseup',finishLayerReorder);
 window.addEventListener('pointerup',finishLayerReorder);
 function renderSymbolTabs(){
-  var bar=document.getElementById('symbol-tabs');if(!bar)return;bar.innerHTML='';
+  var bar=document.getElementById('symbol-tabs');if(!bar)return;
+  if(window.NemoNativeComponentContext&&window.NemoNativeComponentContext.renderTabs(window,bar))return; // a native document: the tabs are the native workspace's
+  bar.innerHTML='';
   var scene=document.createElement('div');scene.className='sym-tab'+((state.activeSymbolId||state.activeMontageViewId)?'':' act');scene.textContent='Scene';
   scene.addEventListener('click',function(){
     if(state.activeSymbolId)window.SM.exitToScene();

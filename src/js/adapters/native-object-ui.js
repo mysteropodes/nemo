@@ -285,7 +285,8 @@
         onPolicy:function(layer,flag,value,row){
           if(row.parentNode!==list||!views.get(root)||!views.get(root).rows.includes(row))return false;
           return setLayerPolicy(root,layer.layerUid,flag,value,info,ports);
-        }});
+        },
+        onOpen:function(layer){return typeof ports.openLayer==='function'&&ports.openLayer(layer.layerUid);}});
       caption=createNativeObjectUiText(root,'div','');
       unavailable=createNativeObjectUiText(root,'div','Native keyframe, held-frame and tween timing is unavailable.');
       unavailable.setAttribute('role','status');unavailable.className='native-object-timing-unavailable';

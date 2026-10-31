@@ -121,7 +121,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
     matches!(
         operation,
         "query.document.object"
-            | history_read::OP | object_component::read::OP
+            | history_read::OP | object_component::read::OP | object_component::workspace::OP
             | text_read::OP
             | metadata::OP
             | property_read::OP

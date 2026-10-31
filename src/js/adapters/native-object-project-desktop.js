@@ -271,6 +271,8 @@
     function publishRevision(info){
       settingsDiagnostic(root,'metadata',info);
       settingsNotice('willProject',info);
+      // #2256: inside an entered component the scene rows are not the projected rows; the context re-verifies itself instead.
+      var entered=root.NemoNativeComponentContext;if(entered&&entered.presented(root)){entered.revision(root,info);root.updateUI();return true;}
       if(!root.NemoNativeObjectProjectFile||!root.NemoNativeObjectProjectFile.refreshLayerTable(root,info))
         throw new Error('Native object row projection is uncorrelated');
       if(typeof root.updateUI!=='function')throw new Error('Native document UI publication is unavailable');
@@ -280,6 +282,7 @@
       return true;
     }
     return Object.assign({},root.NemoNativeViewportUnderlay.desktop(root),{invoke:invokeProjectObserved,publishRevision:publishRevision,
+      context:function(){var c=root.NemoNativeComponentContext;return c?c.presented(root):null;},
       viewMode:function(){return root.state&&root.state.cameraView===true?'stored-camera':'canvas';},
       // The held mirror check (#2374) rides the same final-surface transform as the color check.
       // #2358: onion skin / Ghost All composed under the live frame by the native renderer; the selection rides every preview request.

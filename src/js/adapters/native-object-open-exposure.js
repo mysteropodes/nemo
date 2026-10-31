@@ -199,7 +199,7 @@
     return out;
   }
   function presentedFrame(receipt,request,frame){
-    var shown={owner:'native',status:'presented',contextId:'scene-root',frame:frame,workId:receipt.workId,
+    var shown={owner:'native',status:'presented',contextId:request.contextId,frame:frame,workId:receipt.workId,
       viewGeneration:receipt.viewGeneration,view:receipt.view,displayFilter:receipt.displayFilter,instanceId:request.instanceId,documentId:request.documentId,
       contentRevision:request.contentRevision,documentSnapshotId:request.documentSnapshotId,lifecycleGeneration:request.lifecycleGeneration};
     if(receipt.ghosts)shown.ghosts=receipt.ghosts;
