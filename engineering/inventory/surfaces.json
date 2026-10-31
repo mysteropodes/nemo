@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "a222c5e605bc91a9e23c113d0ccc18055825f94a",
-  "describe": "v0.7.0-alpha.4-4256-ga222c5e6-dirty"
+  "head": "8ef248d2fae1dd47ddf9e597584c214489d070a0",
+  "describe": "v0.7.0-alpha.4-4261-g8ef248d2-dirty"
  },
- "inputsDigest": "de885d477bffb6bf1b7aa35cef1880aeae8a3f1e86af22958d03de3d3534c821",
+ "inputsDigest": "9dd6ad9dafdfc52589cd4391c68c0a0e17ef1cbf0232cf052f9f0699d0002669",
  "states": [
   "inventoried",
   "characterized",
@@ -2464,7 +2464,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 122,
+    "functionsVisited": 123,
     "via": "variable histBtn",
     "references": [
      "src/js/timeline.js:9111 action()"
@@ -4968,7 +4968,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 127,
+    "functionsVisited": 126,
     "via": "variable trigger",
     "references": []
    },
@@ -8289,7 +8289,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 31,
+    "functionsVisited": 30,
     "via": "chain",
     "references": [
      "src/js/images.js:249 importImages()"
@@ -9171,7 +9171,7 @@
     "container": "start-newpanel",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 95,
+    "functionsVisited": 94,
     "via": "chain",
     "references": []
    },
@@ -10183,7 +10183,7 @@
     "container": "corners-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 70,
+    "functionsVisited": 71,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2982 updateCornersPanel()",
@@ -11900,7 +11900,7 @@
     "container": "fill-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 81,
+    "functionsVisited": 82,
     "via": "chain",
     "references": [
      "src/js/timeline.js:3837 updateSelPropsPanel()",
@@ -12815,7 +12815,7 @@
     "container": "stroke-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 98,
+    "functionsVisited": 99,
     "via": "chain",
     "references": [
      "src/js/timeline.js:6434 paintStrokeSwatches()"
@@ -17353,7 +17353,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 31,
+    "functionsVisited": 30,
     "via": "chain",
     "references": [
      "src/js/images.js:625 importVideo()",
@@ -17396,7 +17396,7 @@
     "container": "web-changelog-row",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 77,
+    "functionsVisited": 76,
     "via": "variable toggle",
     "references": []
    },
@@ -17444,7 +17444,7 @@
     "functionsVisited": 251,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-project-desktop.js:352 presented()",
+     "src/js/adapters/native-object-project-desktop.js:353 presented()",
      "src/js/app.js:536 updZoom()",
      "src/js/tools.js:7114 show()"
     ]
@@ -22230,7 +22230,7 @@
    "source": "src/js/adapters/native-palette-ui.js:139",
    "meta": {
     "i18n": null,
-    "functionsVisited": 58
+    "functionsVisited": 57
    },
    "fixtures": [
     "static-props",
@@ -27525,7 +27525,7 @@
    "source": "src/js/rig-widget.js:514",
    "meta": {
     "i18n": "widgetMenuAxisRangePrefix",
-    "functionsVisited": 201
+    "functionsVisited": 200
    },
    "fixtures": [
     "static-props",
@@ -27565,7 +27565,7 @@
    "source": "src/js/rig-widget.js:528",
    "meta": {
     "i18n": "widgetMenuSizeEllipsis",
-    "functionsVisited": 201
+    "functionsVisited": 200
    },
    "fixtures": [
     "static-props",
