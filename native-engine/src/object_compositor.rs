@@ -490,6 +490,10 @@ mod render_vector_export_parity;
 #[cfg(test)]
 #[path = "../tests/render_vector_pixels.rs"]
 mod render_vector_pixels;
+// #2361: Metal readback of a textured pressure ribbon and its dabs (inside the compositor tree for the private target).
+#[cfg(test)]
+#[path = "../tests/object_brush_dab_pixels.rs"]
+mod object_brush_dab_pixels;
 #[cfg(test)]
 #[path = "../tests/object_compositor.rs"]
 mod tests;
