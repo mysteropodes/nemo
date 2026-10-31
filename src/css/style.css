@@ -1883,7 +1883,7 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 #statusbar{height:20px;flex-shrink:0;background:transparent;border-top:none;display:flex;align-items:center;justify-content:space-between;padding:0 6px;font-size:10.5px;color:rgba(236,234,231,.4);font-weight:500;}
 #statusbar>span:first-child{display:flex;gap:16px;}
 .sc{background:transparent;color:rgba(236,234,231,.6);font-weight:700;padding:0;border-radius:0;font-family:inherit;font-size:10.5px;margin:0 3px 0 0;}
-#toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel3);color:var(--text);padding:6px 16px;border-radius:6px;font-size:11px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:100;border:1px solid var(--border);}
+#toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel3);color:var(--text);padding:6px 16px;border-radius:6px;font-size:11px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:10000;border:1px solid var(--border);}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 ::-webkit-scrollbar{width:6px;height:6px;}
 ::-webkit-scrollbar-track{background:var(--bg);}

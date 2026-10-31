@@ -1,5 +1,7 @@
 //! #2510: which path a project request admits, and where it must lie.
-use crate::application_mcp::project_scope::{inside, refusal, target, ApplicationRequest, Target};
+use crate::application_mcp::project_scope::{
+    admit_open_file_with, inside, refusal, target, ApplicationRequest, Target,
+};
 use serde_json::json;
 use std::path::PathBuf;
 
@@ -118,4 +120,50 @@ fn a_refused_path_answers_a_typed_reply_with_the_request_identity() {
         value["error"],
         json!({"code": "invalid_request", "message": "outside"})
     );
+}
+
+// #2269: a recent entry or a recovery generation is not dialog-picked, so the open routes (which consult only the
+// dynamic scope) refused it. It is admitted as one file, inside the static roots, exactly like an MCP project.open.
+#[test]
+fn an_unpicked_project_file_inside_the_roots_is_admitted_alone() {
+    let dir = temp();
+    let file = dir.join("Recent.json");
+    let sibling = dir.join("Sibling.json");
+    std::fs::write(&file, "{}").unwrap();
+    std::fs::write(&sibling, "{}").unwrap();
+    let app = tauri::test::mock_app();
+    let scope = tauri::fs::Scope::new(&app, &Default::default()).unwrap();
+    assert!(!scope.is_allowed(&file), "not granted before admission");
+    let roots = [dir.parent().unwrap().to_path_buf()];
+    let admitted = admit_open_file_with(file.to_str().unwrap(), &roots, |path| {
+        scope.allow_file(path).map_err(|error| error.to_string())
+    })
+    .unwrap();
+    assert_eq!(admitted, file);
+    assert!(scope.is_allowed(&file));
+    assert!(!scope.is_allowed(&sibling), "only the named file is granted");
+}
+
+#[test]
+fn an_unpicked_project_path_that_is_missing_relative_outside_or_not_a_file_is_not_admitted() {
+    let dir = temp();
+    let file = dir.join("Inside.json");
+    std::fs::write(&file, "{}").unwrap();
+    let roots = [dir.clone()];
+    let refuse = |raw: &str, roots: &[PathBuf]| {
+        let mut granted = false;
+        let result = admit_open_file_with(raw, roots, |_| {
+            granted = true;
+            Ok(())
+        });
+        assert!(result.is_err(), "{raw}");
+        assert!(!granted, "nothing is granted for {raw}");
+    };
+    refuse(dir.join("absent.json").to_str().unwrap(), &roots);
+    refuse("relative/Recent.json", &roots);
+    refuse(&format!("{}/../x.json", dir.display()), &roots);
+    refuse(dir.to_str().unwrap(), &roots);
+    refuse(file.to_str().unwrap(), &[PathBuf::from("/nonexistent-root")]);
+    refuse("/etc/hosts", &roots);
+    refuse("/tmp/a\0b.json", &roots);
 }
