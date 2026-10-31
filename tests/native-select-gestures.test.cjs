@@ -586,3 +586,74 @@ test('the overlay selection still ends when its context really changes while the
   h.busy(true); h.root.state.currentFrame = 4; Overlay.notify(h.root); h.runFrames();
   assert.equal(Overlay.selectionContext(h.root), null);
 });
+
+// #2372 click feedback. The native queue reports no presentation while any command is pending (the press's own read, a hover read, the
+// previous pick's repaint) and that window outlasts one short retry: the click's pick was dropped (first click showed no box, an empty
+// click did not clear the selection). A click now waits the window out.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const hasBox = (h) => { const s = h.svg(); return !!s && s.parentNode === h.body && s.children.some((c) => c.tag === 'polygon'); };
+
+test('the FIRST click on an unselected shape shows its box although the presentation is unreadable for a while after the press', async () => {
+  const h = harness([BIG, FAR]);
+  h.busy(true); // the queue is busy right after the press (presentedState null)
+  h.press(35, 35); await settle();
+  const done = h.release(35, 35);
+  setTimeout(() => h.busy(false), 300); // longer than the single 120 ms retry the click used to get
+  await done; await sleep(500); await settle();
+  assert.deepEqual(h.ids(), ['A'], 'the click selected the shape');
+  assert.deepEqual(h.toasts, []);
+  h.runFrames();
+  assert.ok(hasBox(h), 'the selection box is drawn');
+  assert.equal(h.svg().children.filter((c) => c.tag === 'rect').length, 8, 'with its 8 handles');
+});
+
+test('a click on empty canvas clears the selection and hides the box although the presentation is unreadable for a while', async () => {
+  const h = harness([BIG, FAR]);
+  await h.select(35, 35); h.runFrames();
+  assert.deepEqual(h.ids(), ['A']); assert.ok(hasBox(h));
+  h.busy(true);
+  h.press(5, 195); await settle();
+  const done = h.release(5, 195);
+  setTimeout(() => h.busy(false), 300);
+  await done; await sleep(500); await settle(); h.runFrames();
+  assert.deepEqual(h.ids(), [], 'the selection is cleared');
+  assert.ok(!h.svg() || h.svg().parentNode !== h.body, 'the box is hidden');
+  assert.equal(h.root.state.selectedStrokeIndices.length, 0);
+});
+
+test('a Shift click on empty canvas keeps the selection and its box, busy or not', async () => {
+  for (const busy of [false, true]) {
+    const h = harness([BIG, FAR]);
+    await h.select(35, 35); h.runFrames();
+    h.busy(busy);
+    h.press(5, 195, { shiftKey: true }); await settle();
+    const done = h.release(5, 195, { shiftKey: true });
+    setTimeout(() => h.busy(false), 300);
+    await done; await sleep(500); await settle(); h.runFrames();
+    assert.deepEqual(h.ids(), ['A'], `kept (busy ${busy})`);
+    assert.ok(hasBox(h), `box kept (busy ${busy})`);
+  }
+});
+
+test('a presentation that never becomes readable ends the click with ONE notice and leaves the selection alone', async () => {
+  const h = harness([BIG, FAR]);
+  await h.select(35, 35);
+  h.root.setTimeout = (fn) => setTimeout(fn, 1);
+  h.busy(true);
+  h.press(5, 195); await settle();
+  await h.release(5, 195); await sleep(200); await settle();
+  assert.deepEqual(h.ids(), ['A'], 'an unprovable pick is not an empty click');
+  assert.equal(h.toasts.length, 1);
+  assert.match(h.toasts[0], /Could not read the canvas/);
+});
+
+test('a click whose context changes while it waits for the presentation selects nothing', async () => {
+  const h = harness([BIG, FAR]);
+  h.busy(true);
+  h.press(35, 35); await settle();
+  const done = h.release(35, 35);
+  setTimeout(() => { h.root.state.currentFrame = 2; h.busy(false); }, 150);
+  await done; await sleep(400); await settle();
+  assert.deepEqual(h.ids(), []);
+  assert.deepEqual(h.toasts, []);
+});
