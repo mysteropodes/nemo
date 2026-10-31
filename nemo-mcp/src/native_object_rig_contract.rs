@@ -328,3 +328,7 @@ mod receipt_tests;
 #[cfg(test)]
 #[path = "native_object_tween_contract_tests.rs"]
 mod tween_tests;
+
+#[cfg(test)]
+#[path = "native_object_link_contract_tests.rs"]
+mod link_tests;
