@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "544a52ba51eb46b561a1f7e0efb6a996a3626351",
-  "describe": "v0.7.0-alpha.4-4379-g544a52ba-dirty"
+  "head": "6cbc3334202a1544430dae0bc14eb57ab6f8ee2a",
+  "describe": "v0.7.0-alpha.4-4384-g6cbc3334-dirty"
  },
- "inputsDigest": "31fb025a8def4b635d8c3aab1e93586d5905c4be80cf3f23b37fb87d6592c5d9",
+ "inputsDigest": "2d09885bbbfb43a14d8ccfb694ecc6df1f8bba875e73a92c1b2022df021e59af",
  "states": [
   "inventoried",
   "characterized",
@@ -32635,7 +32635,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 395
+    "functionsVisited": 390
    },
    "fixtures": [
     "media",
