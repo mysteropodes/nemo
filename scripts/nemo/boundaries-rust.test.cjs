@@ -569,7 +569,7 @@ test('N25C2e raw bootstrap is registered with exact codec and test-only edges', 
   assert.match(shell, /mod native_object_bootstrap;/);
   assert.match(shell, /native_object_bootstrap::nemo_native_object_bootstrap,/);
   assert.match(raw, /request_json: String/);
-  assert.match(raw, /require_main\(&window\)\?;\s*let admitted = if let Some\(request\) =[\s\S]*?admission::new_request\(&request_json\)\.filter\(\|request\| request\.replace\.is_some\(\)\)[\s\S]*?else if let Some\(request\) =[\s\S]*?reopen::file_request\(&request_json\)\.filter\(\|request\| request\.replace\.is_some\(\)\)/);
+  assert.match(raw, /require_main\(&window\)\?;\s*reopen::admit_source\(&app, &state, &request_json\);\s*let admitted = if let Some\(request\) =[\s\S]*?admission::new_request\(&request_json\)\.filter\(\|request\| request\.replace\.is_some\(\)\)[\s\S]*?else if let Some\(request\) =[\s\S]*?reopen::file_request\(&request_json\)\.filter\(\|request\| request\.replace\.is_some\(\)\)/);
   assert.match(raw, /replace::prepare\(&state, request, \|path\|[\s\S]*?try_fs_scope\(\)[\s\S]*?scope\.is_allowed\(path\)/);
   assert.match(raw, /reopen::bootstrap_request\(&state, &request_json, \|path\|[\s\S]*?try_fs_scope\(\)[\s\S]*?scope\.is_allowed\(path\)/);
   const reopen = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_object_reopen.rs'), 'utf8');
