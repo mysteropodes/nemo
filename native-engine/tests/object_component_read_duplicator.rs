@@ -6,7 +6,10 @@ use super::*;
 use serde_json::{json, Value};
 
 fn snapshot(descriptor: Value) -> ObjectSnapshot {
-    let layers = [layer("ly_dup", "Host", &[(0, "h1")]), layer("ly_plain", "Plain", &[(0, "x1")])];
+    let layers = [
+        layer("ly_dup", "Host", &[(0, "h1")]),
+        layer("ly_plain", "Plain", &[(0, "x1")]),
+    ];
     let tables = json!({"duplicators":duplicator_table(&[("ly_dup", descriptor)])});
     let document = decode(&document(&layers, json!({"componentTables":tables})));
     ObjectSnapshot::new("dup-read", document).expect("snapshot")
@@ -23,10 +26,12 @@ fn ask(snapshot: &ObjectSnapshot, layer_uid: &str) -> ResponseEnvelope {
 
 #[test]
 fn a_stored_descriptor_is_shown_member_by_member() {
-    let snap = snapshot(json!({"mode":"radial","rows":4,"cols":5,"spacingX":12.5,"spacingY":-3,"count":9,"radius":321,
+    let snap = snapshot(
+        json!({"mode":"radial","rows":4,"cols":5,"spacingX":12.5,"spacingY":-3,"count":9,"radius":321,
         "startAngle":30,"radialOrient":true,"pathLayerUid":null,"pathAlignTangent":true,"seed":4242,
         "staggerRandom":{"position":true,"hue":true},
-        "timeOffset":{"enabled":true,"offsetFrames":3,"direction":"centerOut"},"sourceMode":"objects"}));
+        "timeOffset":{"enabled":true,"offsetFrames":3,"direction":"centerOut"},"sourceMode":"objects"}),
+    );
     let response = ask(&snap, "ly_dup");
     assert!(response.ok, "{:?}", response.error);
     let result = response.result.unwrap();
@@ -54,8 +59,13 @@ fn an_unauthored_descriptor_shows_the_baseline_display_defaults() {
         assert_eq!(&result[key], want, "{key}");
     }
     // `dup.rows||1`: a stored zero shows the fallback, as the baseline field does.
-    let zero = ask(&snapshot(json!({"rows":0,"cols":0,"count":0})), "ly_dup").result.unwrap();
-    assert_eq!((&zero["rows"], &zero["cols"], &zero["count"]), (&json!(1), &json!(1), &json!(1)));
+    let zero = ask(&snapshot(json!({"rows":0,"cols":0,"count":0})), "ly_dup")
+        .result
+        .unwrap();
+    assert_eq!(
+        (&zero["rows"], &zero["cols"], &zero["count"]),
+        (&json!(1), &json!(1), &json!(1))
+    );
 }
 
 #[test]
@@ -64,22 +74,36 @@ fn a_layer_without_a_duplicator_or_an_unknown_layer_is_not_found_and_a_stale_pin
     for uid in ["ly_plain", "nope"] {
         let response = ask(&snap, uid);
         assert!(!response.ok && response.result.is_none(), "{uid}");
-        assert_eq!(response.error.unwrap().code(), crate::request_receipts::DispatchErrorCode::NotFound, "{uid}");
+        assert_eq!(
+            response.error.unwrap().code(),
+            crate::request_receipts::DispatchErrorCode::NotFound,
+            "{uid}"
+        );
     }
-    let stale: OpacityRequest = serde_json::from_value(json!({"apiVersion":2,"requestId":"dup-read",
+    let stale: OpacityRequest =
+        serde_json::from_value(json!({"apiVersion":2,"requestId":"dup-read",
         "instanceId":snap.instance_id(),"documentId":snap.document_id(),
         "operation":"query.document.object.component.read",
         "payload":{"atRevision":snap.content_revision() + 1,"documentSnapshotId":snap.snapshot_id(),
             "selector":{"kind":"duplicator","layerUid":"ly_dup"}}}))
-    .unwrap();
-    assert_eq!(snap.dispatch(stale).unwrap().error.unwrap().code(), crate::request_receipts::DispatchErrorCode::StaleRevision);
-    for selector in [json!({"kind":"duplicator"}), json!({"kind":"duplicator","layerUid":""}),
-        json!({"kind":"duplicator","layerUid":"ly_dup","cursor":0})] {
+        .unwrap();
+    assert_eq!(
+        snap.dispatch(stale).unwrap().error.unwrap().code(),
+        crate::request_receipts::DispatchErrorCode::StaleRevision
+    );
+    for selector in [
+        json!({"kind":"duplicator"}),
+        json!({"kind":"duplicator","layerUid":""}),
+        json!({"kind":"duplicator","layerUid":"ly_dup","cursor":0}),
+    ] {
         let bad: OpacityRequest = serde_json::from_value(json!({"apiVersion":2,"requestId":"dup-read",
             "instanceId":snap.instance_id(),"documentId":snap.document_id(),
             "operation":"query.document.object.component.read",
             "payload":{"atRevision":snap.content_revision(),"documentSnapshotId":snap.snapshot_id(),"selector":selector}}))
         .unwrap();
-        assert_eq!(snap.dispatch(bad).unwrap().error.unwrap().code(), crate::request_receipts::DispatchErrorCode::InvalidRequest);
+        assert_eq!(
+            snap.dispatch(bad).unwrap().error.unwrap().code(),
+            crate::request_receipts::DispatchErrorCode::InvalidRequest
+        );
     }
 }

@@ -41,17 +41,45 @@ fn apply_edit(document: &ObjectDocument, edit: &ConfigEdit) -> SetupPlan {
 #[test]
 fn each_member_is_applied_and_every_other_member_keeps_its_stored_bytes() {
     let cases: Vec<(ConfigEdit, &str, Value)> = vec![
-        (edit_with(|e| e.mode = Some("radial".into())), "mode", json!("radial")),
+        (
+            edit_with(|e| e.mode = Some("radial".into())),
+            "mode",
+            json!("radial"),
+        ),
         (edit_with(|e| e.rows = Some(5.0)), "rows", json!(5)),
         (edit_with(|e| e.cols = Some(7.0)), "cols", json!(7)),
-        (edit_with(|e| e.spacing_x = Some(33.5)), "spacingX", json!(33.5)),
-        (edit_with(|e| e.spacing_y = Some(-12.0)), "spacingY", json!(-12)),
+        (
+            edit_with(|e| e.spacing_x = Some(33.5)),
+            "spacingX",
+            json!(33.5),
+        ),
+        (
+            edit_with(|e| e.spacing_y = Some(-12.0)),
+            "spacingY",
+            json!(-12),
+        ),
         (edit_with(|e| e.count = Some(40.0)), "count", json!(40)),
         (edit_with(|e| e.radius = Some(310.0)), "radius", json!(310)),
-        (edit_with(|e| e.start_angle = Some(45.0)), "startAngle", json!(45)),
-        (edit_with(|e| e.radial_orient = Some(true)), "radialOrient", json!(true)),
-        (edit_with(|e| e.path_align_tangent = Some(false)), "pathAlignTangent", json!(false)),
-        (edit_with(|e| e.seed = Some(999_999)), "seed", json!(999_999)),
+        (
+            edit_with(|e| e.start_angle = Some(45.0)),
+            "startAngle",
+            json!(45),
+        ),
+        (
+            edit_with(|e| e.radial_orient = Some(true)),
+            "radialOrient",
+            json!(true),
+        ),
+        (
+            edit_with(|e| e.path_align_tangent = Some(false)),
+            "pathAlignTangent",
+            json!(false),
+        ),
+        (
+            edit_with(|e| e.seed = Some(999_999)),
+            "seed",
+            json!(999_999),
+        ),
     ];
     let before = world(full());
     for (edit, key, expected) in cases {
@@ -64,7 +92,11 @@ fn each_member_is_applied_and_every_other_member_keeps_its_stored_bytes() {
         rest.as_object_mut().unwrap().remove(key);
         original.as_object_mut().unwrap().remove(key);
         assert_eq!(rest, original, "{key}: no other member moves");
-        assert_eq!(decode(&wire(&plan.document)), plan.document, "{key}: round trip");
+        assert_eq!(
+            decode(&wire(&plan.document)),
+            plan.document,
+            "{key}: round trip"
+        );
     }
 }
 
@@ -72,16 +104,29 @@ fn each_member_is_applied_and_every_other_member_keeps_its_stored_bytes() {
 fn the_nested_stagger_and_time_offset_members_edit_one_channel_at_a_time() {
     let before = world(full());
     let stagger = edit_with(|e| {
-        e.stagger_random = Some(StaggerEdit { hue: Some(true), ..StaggerEdit::default() });
+        e.stagger_random = Some(StaggerEdit {
+            hue: Some(true),
+            ..StaggerEdit::default()
+        });
     });
     let after = stored(&apply_edit(&before, &stagger).document);
-    assert_eq!(after["staggerRandom"], json!({"position":false,"rotation":false,"scale":false,"opacity":false,"hue":true}));
+    assert_eq!(
+        after["staggerRandom"],
+        json!({"position":false,"rotation":false,"scale":false,"opacity":false,"hue":true})
+    );
     assert_eq!(after["timeOffset"], full()["timeOffset"]);
     let time = edit_with(|e| {
-        e.time_offset = Some(TimeEdit { offset_frames: Some(2.5), direction: Some("centerOut".into()), ..TimeEdit::default() });
+        e.time_offset = Some(TimeEdit {
+            offset_frames: Some(2.5),
+            direction: Some("centerOut".into()),
+            ..TimeEdit::default()
+        });
     });
     let after = stored(&apply_edit(&before, &time).document);
-    assert_eq!(after["timeOffset"], json!({"enabled":false,"offsetFrames":2.5,"direction":"centerOut"}));
+    assert_eq!(
+        after["timeOffset"],
+        json!({"enabled":false,"offsetFrames":2.5,"direction":"centerOut"})
+    );
     assert_eq!(after["staggerRandom"], full()["staggerRandom"]);
 }
 
@@ -89,10 +134,21 @@ fn the_nested_stagger_and_time_offset_members_edit_one_channel_at_a_time() {
 fn a_never_authored_stagger_or_time_offset_starts_from_the_baseline_lazy_literal() {
     let before = world(json!({"mode":"grid"}));
     let stagger = edit_with(|e| {
-        e.stagger_random = Some(StaggerEdit { rotation: Some(true), ..StaggerEdit::default() });
+        e.stagger_random = Some(StaggerEdit {
+            rotation: Some(true),
+            ..StaggerEdit::default()
+        });
     });
-    assert_eq!(stored(&apply_edit(&before, &stagger).document)["staggerRandom"], json!({"rotation":true}));
-    let time = edit_with(|e| e.time_offset = Some(TimeEdit { enabled: Some(true), ..TimeEdit::default() }));
+    assert_eq!(
+        stored(&apply_edit(&before, &stagger).document)["staggerRandom"],
+        json!({"rotation":true})
+    );
+    let time = edit_with(|e| {
+        e.time_offset = Some(TimeEdit {
+            enabled: Some(true),
+            ..TimeEdit::default()
+        })
+    });
     assert_eq!(
         stored(&apply_edit(&before, &time).document)["timeOffset"],
         json!({"enabled":true,"offsetFrames":1,"direction":"forward"})
@@ -101,7 +157,10 @@ fn a_never_authored_stagger_or_time_offset_starts_from_the_baseline_lazy_literal
         e.stagger_random = Some(StaggerEdit::default());
         e.time_offset = Some(TimeEdit::default());
     });
-    assert!(!apply_edit(&before, &empty).changed, "naming nothing creates nothing");
+    assert!(
+        !apply_edit(&before, &empty).changed,
+        "naming nothing creates nothing"
+    );
 }
 
 #[test]
@@ -115,10 +174,18 @@ fn values_are_clamped_to_the_baseline_wire_num_bounds() {
         (edit_with(|e| e.count = Some(9999.0)), "count", json!(500)),
         (edit_with(|e| e.count = Some(0.2)), "count", json!(1)),
         (edit_with(|e| e.count = Some(12.5)), "count", json!(12.5)),
-        (edit_with(|e| e.spacing_x = Some(-1.0e6)), "spacingX", json!(-1_000_000)),
+        (
+            edit_with(|e| e.spacing_x = Some(-1.0e6)),
+            "spacingX",
+            json!(-1_000_000),
+        ),
     ];
     for (edit, key, expected) in cases {
-        assert_eq!(stored(&apply_edit(&before, &edit).document)[key], expected, "{key}");
+        assert_eq!(
+            stored(&apply_edit(&before, &edit).document)[key],
+            expected,
+            "{key}"
+        );
     }
 }
 
@@ -132,7 +199,11 @@ fn an_edit_that_changes_nothing_publishes_nothing() {
         e.spacing_x = Some(150.0);
         e.seed = Some(17);
         e.radial_orient = Some(false);
-        e.time_offset = Some(TimeEdit { enabled: Some(false), offset_frames: Some(1.0), direction: Some("forward".into()) });
+        e.time_offset = Some(TimeEdit {
+            enabled: Some(false),
+            offset_frames: Some(1.0),
+            direction: Some("forward".into()),
+        });
     });
     let plan = apply_edit(&before, &same);
     assert!(!plan.changed);
@@ -155,18 +226,34 @@ fn refusals_are_typed_and_nothing_is_edited() {
         SetupError::UnknownLayer("nope".into())
     );
     let bad_mode = edit_with(|e| e.mode = Some("spiral".into()));
-    assert_eq!(plan_duplicator_config(&before, "ly_dup", &bad_mode).unwrap_err(), SetupError::ConfigInvalid);
+    assert_eq!(
+        plan_duplicator_config(&before, "ly_dup", &bad_mode).unwrap_err(),
+        SetupError::ConfigInvalid
+    );
     let bad_direction = edit_with(|e| {
-        e.time_offset = Some(TimeEdit { direction: Some("sideways".into()), ..TimeEdit::default() });
+        e.time_offset = Some(TimeEdit {
+            direction: Some("sideways".into()),
+            ..TimeEdit::default()
+        });
     });
-    assert_eq!(plan_duplicator_config(&before, "ly_dup", &bad_direction).unwrap_err(), SetupError::ConfigInvalid);
+    assert_eq!(
+        plan_duplicator_config(&before, "ly_dup", &bad_direction).unwrap_err(),
+        SetupError::ConfigInvalid
+    );
     for seed in [1_000_000_u64, u64::from(u32::MAX)] {
         let wide = edit_with(|e| e.seed = Some(seed));
-        assert_eq!(plan_duplicator_config(&before, "ly_dup", &wide).unwrap_err(), SetupError::SeedRange, "{seed}");
+        assert_eq!(
+            plan_duplicator_config(&before, "ly_dup", &wide).unwrap_err(),
+            SetupError::SeedRange,
+            "{seed}"
+        );
     }
     for seed in [0_u64, 999_999] {
         let ok = edit_with(|e| e.seed = Some(seed));
-        assert!(plan_duplicator_config(&before, "ly_dup", &ok).is_ok(), "{seed}");
+        assert!(
+            plan_duplicator_config(&before, "ly_dup", &ok).is_ok(),
+            "{seed}"
+        );
     }
 }
 

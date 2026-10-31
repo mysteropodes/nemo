@@ -118,7 +118,11 @@ fn apply(descriptor: &mut DuplicatorDescriptor, edit: &ConfigEdit) -> Result<(),
     set_number(&mut descriptor.seed, edit.seed.map(|s| s as f64), None);
     set_flag(&mut descriptor.radial_orient, edit.radial_orient);
     set_flag(&mut descriptor.path_align_tangent, edit.path_align_tangent);
-    if let Some(stagger) = edit.stagger_random.as_ref().filter(|s| **s != StaggerEdit::default()) {
+    if let Some(stagger) = edit
+        .stagger_random
+        .as_ref()
+        .filter(|s| **s != StaggerEdit::default())
+    {
         let created = || StaggerRandom {
             position: Presence::Missing,
             rotation: Presence::Missing,
@@ -134,7 +138,11 @@ fn apply(descriptor: &mut DuplicatorDescriptor, edit: &ConfigEdit) -> Result<(),
             set_flag(&mut slot.hue, stagger.hue);
         });
     }
-    if let Some(time) = edit.time_offset.as_ref().filter(|t| **t != TimeEdit::default()) {
+    if let Some(time) = edit
+        .time_offset
+        .as_ref()
+        .filter(|t| **t != TimeEdit::default())
+    {
         let created = || TimeOffset {
             enabled: Presence::Present(false),
             offset_frames: Presence::Present(Number::from(1_u32)),

@@ -28,7 +28,10 @@ fn every_member_is_optional_and_bounded_by_its_kind() {
         json!({"timeOffset":{"enabled":true,"offsetFrames":-2,"direction":"random"}}),
     ] {
         assert!(request(CONFIG, &config(ok.clone())), "{ok}");
-        assert!(crate::native_contract::validate_request(CONFIG, &config(ok.clone())), "{ok}");
+        assert!(
+            crate::native_contract::validate_request(CONFIG, &config(ok.clone())),
+            "{ok}"
+        );
     }
     for bad in [
         json!({"mode":"spiral"}),
@@ -59,35 +62,70 @@ fn every_member_is_optional_and_bounded_by_its_kind() {
     let mut anonymous = config(json!({}));
     anonymous.as_object_mut().unwrap().remove("layerUid");
     assert!(!request(CONFIG, &anonymous));
-    assert!(!request(CONFIG, &json!({"command":"object.duplicator.set","layerUid":"layer-a"})));
+    assert!(!request(
+        CONFIG,
+        &json!({"command":"object.duplicator.set","layerUid":"layer-a"})
+    ));
 }
 
 #[test]
 fn the_shipped_schema_and_the_capability_descriptor_declare_the_same_closed_payload() {
-    let schema: Value = serde_json::from_str(include_str!("../../engineering/application/native-transport-v2.schema.json")).unwrap();
+    let schema: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/native-transport-v2.schema.json"
+    ))
+    .unwrap();
     let payload = &schema["$defs"]["ObjectDuplicatorConfigPayload"];
     assert_eq!(payload["additionalProperties"], false);
     assert_eq!(payload["required"], json!(["command", "layerUid"]));
-    let mut members: Vec<&str> = payload["properties"].as_object().unwrap().keys().map(String::as_str).collect();
+    let mut members: Vec<&str> = payload["properties"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
     members.sort_unstable();
-    let mut table: Vec<&str> = SPECS.iter().find(|row| row.0 == "duplicator.config").unwrap().3.split(' ')
-        .map(|m| m.split(':').next().unwrap()).collect();
+    let mut table: Vec<&str> = SPECS
+        .iter()
+        .find(|row| row.0 == "duplicator.config")
+        .unwrap()
+        .3
+        .split(' ')
+        .map(|m| m.split(':').next().unwrap())
+        .collect();
     table.push("command");
     table.sort_unstable();
-    assert_eq!(members, table, "the schema and the table name the same members");
+    assert_eq!(
+        members, table,
+        "the schema and the table name the same members"
+    );
     let requests = schema["$defs"]["Request"]["oneOf"].as_array().unwrap();
-    let branches = requests.iter().filter(|b| b["allOf"][1]["properties"]["operation"]["const"] == CONFIG).count();
+    let branches = requests
+        .iter()
+        .filter(|b| b["allOf"][1]["properties"]["operation"]["const"] == CONFIG)
+        .count();
     assert_eq!(branches, 1);
-    let descriptor: Value = serde_json::from_str(include_str!("../../engineering/application/capabilities-v2/native-object-duplicator.json")).unwrap();
-    assert!(descriptor["operations"].as_array().unwrap().contains(&json!(CONFIG)));
+    let descriptor: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/capabilities-v2/native-object-duplicator.json"
+    ))
+    .unwrap();
+    assert!(descriptor["operations"]
+        .as_array()
+        .unwrap()
+        .contains(&json!(CONFIG)));
 }
 
 #[test]
 fn the_duplicator_read_selector_names_one_layer_and_nothing_else() {
-    for selector in [json!({"kind":"duplicator","layerUid":"layer-a"}), json!({"kind":"duplicator","layerUid":"x".repeat(128)})] {
+    for selector in [
+        json!({"kind":"duplicator","layerUid":"layer-a"}),
+        json!({"kind":"duplicator","layerUid":"x".repeat(128)}),
+    ] {
         let payload = json!({"atRevision":7,"documentSnapshotId":"native-object:document:7","selector":selector});
         assert!(read::request(&payload), "{payload}");
-        assert!(crate::native_contract::validate_request(READ, &payload), "{payload}");
+        assert!(
+            crate::native_contract::validate_request(READ, &payload),
+            "{payload}"
+        );
     }
     for selector in [
         json!({"kind":"duplicator"}),
@@ -125,7 +163,10 @@ fn a_malformed_duplicator_view_is_not_an_answer() {
         patch("pathLayerUid", json!("")),
         patch("sourceMode", json!("pool")),
         patch("staggerRandom", json!({"position":true})),
-        patch("timeOffset", json!({"enabled":false,"offsetFrames":1,"direction":"sideways"})),
+        patch(
+            "timeOffset",
+            json!({"enabled":false,"offsetFrames":1,"direction":"sideways"}),
+        ),
         patch("kind", json!("context")),
         patch("atRevision", json!(8)),
     ] {
