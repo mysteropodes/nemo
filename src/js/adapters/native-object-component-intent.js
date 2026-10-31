@@ -124,6 +124,17 @@
       pin: () => (present() ? session.info() : null),
       declared: (operation) => contract.admitted(operation) && present() && routeOf(session) !== null,
       requestId: (label) => session.requestId(label),
+      // #2256: a pinned read goes through the same single resource queue as the commands and reconciles nothing (it changes nothing).
+      readDeclared: () => present() && routeOf(session) !== null,
+      async read(request) {
+        let started = false;
+        try {
+          return await routeOf(session)(async (ctx) => { started = true; return ctx.dispatch(request); });
+        } catch (error) {
+          if (!started) throw Object.assign(new Error(String(error && error.message || error)), { notSent: true, reason: 'native_project_busy' });
+          throw error;
+        }
+      },
       async submit(request) {
         let started = false;
         const route = routeOf(session);

@@ -21,9 +21,13 @@
     if(!(state.tool==='draw'&&state.bitmapBrushOn&&state.strokeEnabled&&!state.vectorBrush&&!state.shadowMode))return out;
     if(!root.SMBitmapBrush||typeof root.SMBitmapBrush.bake!=='function')fail('The bitmap brush is unavailable in native Drawing.');
     // Symmetry copies, Trim, Mask and Labs would each need the companion to follow the anchor: not native yet.
-    if(state.symmetryEnabled||state.trimStrokeEnds||state.maskMode||
-        root.SMLabs&&root.SMLabs.list().some(function(p){return p.on;}))
-      fail('This bitmap brush combination is unavailable in native Drawing.');
+    // The bitmap command runs no Labs draw hook (migrated or not), so any enabled one blocks it; view-aid prototypes do not.
+    var L=root.SMLabs,labs=!L?[]:typeof L.enabledDrawHooks==='function'?L.enabledDrawHooks():L.list().filter(function(p){return p.on;}).map(function(p){return p.name;});
+    if(state.symmetryEnabled||state.trimStrokeEnds||state.maskMode||labs.length){
+      var error=new Error('This bitmap brush combination is unavailable in native Drawing'+(labs.length?' while the Labs prototype'+(labs.length>1?'s':'')+' '+labs.join(', ')+' '+(labs.length>1?'are':'is')+' on.':'.'));
+      if(labs.length){error.code='native-bitmap-brush-labs-unsupported';error.hooks=labs;}
+      throw error;
+    }
     out.bitmap={tip:state.bitmapTip||'soft',spacing:state.bitmapSpacing!=null?state.bitmapSpacing:15,
       scatter:state.bitmapScatter!=null?state.bitmapScatter:20,opacity:(state.bitmapOpacity!=null?state.bitmapOpacity:100)/100,
       pressure:!!state.bitmapPressure};

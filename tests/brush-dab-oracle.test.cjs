@@ -87,3 +87,100 @@ test('representative presets, seeds and a pressure profile reproduce the oracle 
     });
   }
 });
+
+test('the mirrored seeded stroke cases are the baseline stamper over the drawn curve and its copy, with the seed the symmetry adapter derives', () => {
+  const run = stamper();
+  const Symmetry = require('../src/js/adapters/native-object-draw-symmetry.js');
+  assert.equal(oracle.mirrorCases.length, 8);
+  const flat = (v) => JSON.parse(JSON.stringify(v)); // the JSON oracle stores -0 as 0
+  const mirror = flat(oracle.paths.curve.segments.map(([p, i, o]) => [[200 - p[0], p[1]], [-i[0], i[1]], [-o[0], o[1]]]));
+  assert.deepEqual(oracle.paths.curveMirror.segments, mirror, 'the copy path is the drawn curve reflected across x = 100');
+  const root = { state: { symmetryEnabled: true, symmetryMode: 'y', symmetryExtend: true, symmetryAxis: { x1: 100, y1: 0, x2: 100, y2: 200 } } };
+  for (const c of oracle.mirrorCases) {
+    if (c.path === 'curveMirror') {
+      const drawn = { segments: oracle.paths.curve.segments.map(([p, i, o]) => ({ point: p.slice(), handleIn: i.slice(), handleOut: o.slice() })), closed: false,
+        brushTexturePreset: c.preset, brushGroupId: 'bg1_1', strokeSeed: c.drawnSeed };
+      const copy = Symmetry.copies(root, drawn, { canvasW: 200, canvasH: 200 }, null)[1];
+      assert.equal(copy.strokeSeed, c.seed, `${c.id}: the adapter derives the copy seed`);
+      assert.deepEqual(flat(copy.segments.map((s) => [s.point, s.handleIn, s.handleOut])), oracle.paths.curveMirror.segments, `${c.id}: the adapter reflects the curve`);
+    }
+    const dabs = JSON.parse(run(oracle.paths[c.path], c.preset, c.width, c.seed, null));
+    assert.equal(dabs.length, c.count, c.id);
+    dabs.slice(0, oracle.full).forEach((d, i) => {
+      assert.deepEqual(d.parts.map((p) => ({ closed: p.closed, segments: p.segments.map((s) => s.map(r6)) })), c.dabs[i].parts, `${c.id} dab ${i}`);
+      assert.equal(r6(d.opacity), c.dabs[i].opacity, `${c.id} dab ${i} opacity`);
+    });
+  }
+});
+
+// A pressure ribbon with a texture preset (draw-bridge.js ribbon branch + applyBrushTexture + serP/desP @1065e9d8): three
+// pressure profiles at fixed seeds, the baseline anchor dictionary, its dabs, its reload, and certified pixel probes.
+test('the ribbon cases are the pinned baseline run over three pressure profiles', () => {
+  assert.match(oracle.ribbonGeneratorSha256, /^[0-9a-f]{64}$/);
+  assert.deepEqual(oracle.ribbonCases.map((c) => c.id), ['swell', 'taper-out', 'steady-light']);
+  assert.deepEqual(oracle.ribbonCases.map((c) => c.count), [22, 37, 15]);
+  for (const c of oracle.ribbonCases) {
+    assert.equal(c.summary.length, c.count, c.id);
+    assert.equal(c.dabs.length, Math.min(oracle.full, c.count), c.id);
+    assert.ok(c.pixels.dabProbes.length >= 18, c.id + ' dab probes');
+  }
+  assert.ok(oracle.ribbonCases.reduce((n, c) => n + c.pixels.hiddenProbes.length, 0) >= 16, 'probes where only the hidden ribbon would paint');
+});
+
+test('the native camouflage turns the baseline pre-texture ribbon into the baseline anchor, member for member', () => {
+  const Paint = require('../src/js/adapters/native-object-draw-paint.js');
+  for (const c of oracle.ribbonCases) {
+    const out = JSON.parse(JSON.stringify(c.before));
+    assert.equal(out.opacity, c.opacity, c.id + ' the ribbon is drawn at the Opacity setting');
+    Paint.textureRibbon(out, c.preset);
+    const { brushGroupId, strokeSeed, ...made } = out; // random per stroke; the baseline's seed is not serialized
+    const { brushGroupId: baselineGroup, ...baseline } = c.anchor;
+    assert.match(brushGroupId, /^bg[0-9a-z]+_[0-9]+$/, c.id);
+    assert.match(baselineGroup, /^bg[0-9a-z]+_[0-9]+$/, c.id);
+    assert.ok(Number.isInteger(strokeSeed) && strokeSeed >= 0 && strokeSeed <= 0xFFFFFFFF, c.id);
+    assert.deepEqual(made, baseline, c.id + ' camouflage: fill kept, stroke null, opacity 0, preTextureOpacity, preset');
+    assert.deepEqual([baseline.opacity, baseline.preTextureOpacity, baseline.strokeColor, baseline.fillColor, baseline.preTextureStroke],
+      [0, c.opacity, null, c.ink, undefined], c.id);
+  }
+});
+
+test('the baseline reload keeps the ribbon anchor hidden and strokeless, and the native record round-trips it', () => {
+  const Stroke = require('../src/js/adapters/native-object-vector-stroke.js');
+  const Contract = require('../src/js/adapters/native-object-vector-contract.js');
+  for (const c of oracle.ribbonCases) {
+    // serP -> desP -> serP: no '#ffffff' outline resurrects, the anchor stays opacity 0 with its remembered opacity.
+    assert.deepEqual([c.reloaded.strokeColor, c.reloaded.opacity, c.reloaded.fill, c.reloaded.preTextureOpacity], [null, 0, c.ink, c.opacity], c.id);
+    assert.deepEqual(c.reloaded.dict, c.anchor, c.id + ' serP(desP(serP(path))) is stable');
+    const mapped = Stroke.toRecord(Object.assign(JSON.parse(JSON.stringify(c.anchor)), { strokeSeed: c.seed }), { layerUid: 'L1', frame: 0 });
+    assert.equal(mapped.ok, true, c.id + JSON.stringify(mapped));
+    assert.deepEqual(mapped.unmapped, [], c.id);
+    assert.deepEqual(JSON.parse(JSON.stringify(mapped.record)), c.record, c.id + ' the record the oracle stamps');
+    assert.doesNotThrow(() => Contract.payload(Contract.VECTOR, { command: 'object.vector.create', record: mapped.record }), c.id);
+    const back = Stroke.toDict(mapped.record);
+    for (const key of ['strokeColor', 'fillColor', 'opacity', 'hasRealStroke', 'isVectorBrush', 'preTextureOpacity', 'brushTexturePreset', 'closed'])
+      assert.deepEqual(back[key], c.anchor[key], c.id + ' ' + key);
+    assert.equal(back.strokeSeed, c.seed, c.id);
+    assert.deepEqual(back.centerSegments, c.anchor.centerSegments, c.id + ' centreline');
+    assert.deepEqual(back.widthProfile, c.anchor.widthProfile, c.id + ' profile');
+    assert.deepEqual(Stroke.toRecord(back, { layerUid: 'L1', frame: 0 }).record, mapped.record, c.id + ' fixed point');
+  }
+});
+
+test('the in-tree stamper along each ribbon centreline at the mean profile width reproduces the baseline dabs', () => {
+  const run = stamper();
+  for (const c of oracle.ribbonCases) {
+    const spec = { segments: c.anchor.centerSegments.map((s) => [s.point, s.handleIn, s.handleOut]) };
+    const width = c.anchor.widthProfile.reduce((sum, p) => sum + p.width, 0) / c.anchor.widthProfile.length;
+    const dabs = JSON.parse(run(spec, c.preset, width, c.seed, c.anchor.widthProfile));
+    assert.equal(dabs.length, c.count, c.id);
+    dabs.slice(0, oracle.full).forEach((d, i) => {
+      assert.deepEqual(d.parts.map((p) => ({ closed: p.closed, segments: p.segments.map((s) => s.map(r6)) })), c.dabs[i].parts, `${c.id} dab ${i}`);
+      assert.equal(r6(d.opacity), c.dabs[i].opacity, `${c.id} dab ${i} opacity`);
+    });
+    dabs.forEach((d, i) => {
+      const pts = d.parts.flatMap((p) => p.segments.map((s) => [r6(s[0]), r6(s[1])]));
+      const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]), mean = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+      assert.deepEqual([mean(xs), mean(ys), Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), r6(d.opacity)].map(r3), c.summary[i], `${c.id} dab ${i} extent`);
+    });
+  }
+});

@@ -235,3 +235,33 @@ fn a_mirrored_ribbon_pair_lands_beside_the_drawn_pair_in_one_create_many() {
     assert_eq!(state(&owner), before, "one undo removes both pairs");
     assert_eq!(state(&owner_of(&after)), after, "both pairs reopen unchanged");
 }
+
+fn anchor(label: &str, group: &str, seed: u64) -> Value {
+    let mut record = record_at(label, "L1", 0, "");
+    record["vectorExt"] = json!({"brushTexture":{"brushGroupId":group,"brushTexturePreset":"charcoal-smooth","preTextureOpacity":1,"strokeSeed":seed}});
+    record
+}
+
+/// #2361 draw-texture-symmetry-trim: a mirrored textured stroke (the anchor and its copy, each a seeded anchor of its own
+/// brush group) lands in ONE revision and ONE undo, keeps every texture member as sent, and the saved document reopens
+/// unchanged with both anchors.
+#[test]
+fn a_mirrored_textured_stroke_is_one_revision_and_one_undo_with_each_anchor_keeping_its_group_and_seed() {
+    let mut owner = owner_of(&document(1, seeds(), None));
+    let before = state(&owner);
+    let response = send(&mut owner, "t", many(vec![anchor("A", "bg1_1", 11), anchor("B", "bg1_1_c1", 4294967295)]));
+    assert_eq!(response["ok"], true, "{response}");
+    assert_eq!((response["contentRevision"].clone(), response["result"]["historyEntriesAdded"].clone()), (json!(1), json!(1)));
+    let after = state(&owner);
+    let made: Vec<&Value> = objects(&after).iter().filter(|o| o["target"]["strokeId"].as_str().unwrap().starts_with("native-stroke:")).collect();
+    assert_eq!(made.len(), 2);
+    let tags: Vec<&Value> = made.iter().map(|o| &o["vectorExt"]["brushTexture"]).collect();
+    assert_eq!(tags[0], &json!({"brushGroupId":"bg1_1","brushTexturePreset":"charcoal-smooth","preTextureOpacity":1,"strokeSeed":11}));
+    assert_eq!(tags[1], &json!({"brushGroupId":"bg1_1_c1","brushTexturePreset":"charcoal-smooth","preTextureOpacity":1,"strokeSeed":4294967295u64}));
+    assert_eq!(owner.history_depths(), (1, 0));
+    owner.undo(1).unwrap();
+    assert_eq!(state(&owner), before, "one undo removes the stroke and its mirror");
+    owner.redo(2).unwrap();
+    assert_eq!(state(&owner), after);
+    assert_eq!(state(&owner_of(&after)), after, "the saved document reopens with both anchors");
+}

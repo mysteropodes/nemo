@@ -176,6 +176,53 @@ fn a_textured_pressure_ribbon_stamps_along_its_centreline_through_its_profile() 
     }
 }
 
+/// An oracle ribbon record (the baseline anchor as the native mapping writes it) placed as the fixture's anchor.
+fn oracle_ribbon(case: &Value) -> Value {
+    let mut record = case["record"].clone();
+    record["target"] = json!({"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},"layerUid":"L0","strokeId":"anchor"});
+    record
+}
+
+#[test]
+fn a_baseline_pressure_ribbon_stamps_the_baseline_dabs_for_three_pressure_profiles() {
+    let oracle: Value = serde_json::from_str(ORACLE).unwrap();
+    let cases = oracle["ribbonCases"].as_array().unwrap();
+    assert_eq!(cases.len(), 3);
+    for case in cases {
+        let id = case["id"].as_str().unwrap();
+        let plan = plan_of(oracle_ribbon(case)).unwrap();
+        let entries: Vec<PaintEntry<'_>> = ordered_entries(&plan).collect();
+        assert!(matches!(entries[0], PaintEntry::Contour(_)), "{id}: the hidden ribbon anchor first");
+        let dabs: Vec<_> = entries[1..].iter().map(|e| match e { PaintEntry::Dab(d) => *d, _ => panic!("a dab") }).collect();
+        assert_eq!(dabs.len() as u64, case["count"].as_u64().unwrap(), "{id}: the baseline count along the centreline");
+        // The last dab painted is the first one made. Every dab: anchor centroid, extent and opacity; the first eight: every anchor.
+        for (made, dab) in dabs.iter().rev().enumerate() {
+            let got: Vec<[f64; 2]> = dab.svg_contour.as_ref().unwrap().segments().iter().map(|s| s.point).collect();
+            let mean = |axis: usize| got.iter().map(|p| p[axis]).sum::<f64>() / got.len() as f64;
+            let lo = |axis: usize| got.iter().map(|p| p[axis]).fold(f64::INFINITY, f64::min);
+            let hi = |axis: usize| got.iter().map(|p| p[axis]).fold(f64::NEG_INFINITY, f64::max);
+            let want = &case["summary"][made];
+            let have = [mean(0), mean(1), lo(0), lo(1), hi(0), hi(1), dab.svg_rgba.unwrap()[3]];
+            for (k, h) in have.iter().enumerate() {
+                assert!((h - want[k].as_f64().unwrap()).abs() <= 1.5e-3, "{id} dab {made} summary[{k}]: {h} != {want}");
+            }
+            if made < oracle["full"].as_u64().unwrap() as usize {
+                let exact: Vec<[f64; 2]> = case["dabs"][made]["parts"][0]["segments"].as_array().unwrap().iter()
+                    .map(|s| [s[0].as_f64().unwrap(), s[1].as_f64().unwrap()]).collect();
+                assert_eq!(got.len(), exact.len(), "{id} dab {made}");
+                for (g, w) in got.iter().zip(&exact) {
+                    assert!((g[0] - w[0]).abs() <= 1.5e-6 && (g[1] - w[1]).abs() <= 1.5e-6, "{id} dab {made}: {g:?} != {w:?}");
+                }
+                // The dab colour is the ribbon ink jittered by the dab's value delta, rounded to 8 bits by the oracle.
+                let rgba = dab.svg_rgba.unwrap();
+                for k in 0..3 {
+                    assert!((rgba[k] * 255.0 - case["dabs"][made]["fill"][k].as_f64().unwrap()).abs() <= 0.51, "{id} dab {made} channel {k}");
+                }
+            }
+        }
+    }
+}
+
 fn dab_points(plan: &ObjectPaintPlan) -> Vec<Vec<[f64; 2]>> {
     ordered_entries(plan).skip(1).map(|e| match e {
         PaintEntry::Dab(d) => d.svg_contour.as_ref().unwrap().segments().iter().map(|s| s.point).collect(),
@@ -236,4 +283,45 @@ fn a_custom_catalog_preset_stamps_from_the_project_and_an_unknown_key_stays_unav
     let mut other = serde_json::Map::new();
     other.insert("another".to_owned(), case["preset"].clone());
     assert_eq!(plan_posed(vec![anchor], None, Some(Value::Object(other))).err(), Some(ObjectPaintPlanError::Unavailable));
+}
+
+/// #2361 draw-texture-symmetry-trim: a mirrored textured stroke is two seeded anchors of their own groups; each paints the
+/// dabs the baseline stamper makes for its path and seed (`mirrorCases` of the oracle), the drawn anchor's first and then the
+/// copy's, and an anchor Trim cut short paints the dabs of the shorter path.
+#[test]
+fn a_mirrored_textured_stroke_paints_each_anchors_own_dabs_and_a_trimmed_anchor_paints_the_shorter_stroke() {
+    let oracle: Value = serde_json::from_str(ORACLE).unwrap();
+    let case = |id: &str| oracle["mirrorCases"].as_array().unwrap().iter().find(|c| c["id"] == id).unwrap().clone();
+    let (drawn, copy) = (case("chalk-round/curve/drawn"), case("chalk-round/curveMirror/copy"));
+    let anchor = |id: &str, path: &Value, group: &str, seed: u64| {
+        let mut record = line_record(Some(json!({"brushGroupId":group,"brushTexturePreset":"chalk-round","preTextureOpacity":1,"strokeSeed":seed})), false);
+        record["target"]["strokeId"] = json!(id);
+        record["geometry"]["segments"] = path["segments"].as_array().unwrap().iter()
+            .map(|s| json!({"point":{"x":s[0][0],"y":s[0][1]},"handleIn":{"x":s[1][0],"y":s[1][1]},"handleOut":{"x":s[2][0],"y":s[2][1]}})).collect();
+        record["vector"]["strokeWidth"] = drawn["width"].clone();
+        record
+    };
+    let plan = plan_of_records(vec![
+        anchor("a", &oracle["paths"]["curve"], "bg1_1", drawn["seed"].as_u64().unwrap()),
+        anchor("b", &oracle["paths"]["curveMirror"], "bg1_1_c1", copy["seed"].as_u64().unwrap()),
+    ]).unwrap();
+    let entries: Vec<PaintEntry<'_>> = ordered_entries(&plan).collect();
+    let (n0, n1) = (drawn["count"].as_u64().unwrap() as usize, copy["count"].as_u64().unwrap() as usize);
+    assert_eq!(entries.len(), 2 + n0 + n1, "two anchors and each one's own dabs");
+    assert!(matches!(entries[0], PaintEntry::Contour(_)) && matches!(entries[1 + n0], PaintEntry::Contour(_)), "each anchor then its dabs");
+    // The copy's first-made dab is its last painted: it must be the baseline's first dab for the mirrored path and its seed.
+    let first_made = match entries[entries.len() - 1] { PaintEntry::Dab(d) => d, _ => panic!("a dab") };
+    let got: Vec<[f64; 2]> = first_made.svg_contour.as_ref().unwrap().segments().iter().map(|s| s.point).collect();
+    let want: Vec<[f64; 2]> = copy["dabs"][0]["parts"][0]["segments"].as_array().unwrap().iter()
+        .map(|s| [s[0].as_f64().unwrap(), s[1].as_f64().unwrap()]).collect();
+    assert_eq!(got.len(), want.len());
+    for (g, w) in got.iter().zip(&want) {
+        assert!((g[0] - w[0]).abs() <= 1.5e-6 && (g[1] - w[1]).abs() <= 1.5e-6, "{g:?} != {w:?}");
+    }
+    // Trim shortens the stored anchor; the dabs are stamped from what is stored.
+    let mut cut = anchor("t", &oracle["paths"]["line"], "bg2", 3);
+    let full = ordered_entries(&plan_of_records(vec![cut.clone()]).unwrap()).count();
+    cut["geometry"]["segments"][1]["point"]["x"] = json!(100.0);
+    let shorter = ordered_entries(&plan_of_records(vec![cut]).unwrap()).count();
+    assert!(shorter < full, "{shorter} dabs on the cut anchor, {full} on the whole one");
 }

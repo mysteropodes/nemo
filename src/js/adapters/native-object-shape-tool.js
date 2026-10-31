@@ -2,9 +2,10 @@
  * the existing vector client and Project resource queue own every committed command. */
 (function(root,factory){var node=typeof module==='object'&&module.exports;
   var api=factory(node?require('./native-object-draw-paint.js'):root.NemoNativeDrawPaint,node?require('./native-object-draw-symmetry.js'):root.NemoNativeDrawSymmetry,
-    node?require('./native-object-draw-bitmap.js'):root.NemoNativeDrawBitmap);
+    node?require('./native-object-draw-bitmap.js'):root.NemoNativeDrawBitmap,
+    node?require('./native-object-draw-resize.js'):root.NemoNativeDrawResize);
   if(node)module.exports=api;else root.NemoNativeObjectShapeTool=api;
-}(typeof globalThis==='object'?globalThis:this,function(Paint,Symmetry,Bitmap){
+}(typeof globalThis==='object'?globalThis:this,function(Paint,Symmetry,Bitmap,Resize){
   'use strict';
   var tools=['line','rect','ellipse'],shapeTools=tools.concat(['star','speechbubble']);
   var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
@@ -15,7 +16,7 @@
   var linkedCompanions=new WeakMap();
   function consume(e){if(e&&e.stopImmediatePropagation)e.stopImmediatePropagation();if(e&&e.preventDefault)e.preventDefault();}
   function create(root,ports){
-    var Mapping=ports.mapping;
+    var Mapping=ports.mapping,sizer=ports.freehand&&Resize?Resize.create(root,{Mapping:Mapping,session:session,bounds:bounds,scale:presentedScale,notice:notice,consume:consume}):null; // Alt+drag brush resize: UI state only
     var admitted=ports.freehand?['draw','fillbrush']:ports.pen?['pen']:tools,handled=ports.freehand?['draw','fillbrush']:ports.pen?['pen']:shapeTools;
     var drag=null,pending=null,uncertain=null,overlay=null,retired=false,settled=Promise.resolve({status:'idle'});
     function session(){return root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);}
@@ -96,10 +97,13 @@
       var t={perspective:perspective,session:s,pin:pin,presentation:shown.presentation,frame:frame,tool:state.tool,layerUid:selection(pin),sel:JSON.stringify(root._layerSel),style:style(state.tool,perspective),bounds:bounds(pin),pointer:e.pointerId,cancelled:false};
       t.behind=root.state.drawMode==='behind';t.start=point(e,t);t.scale=presentedScale(t);if(ports.freehand)t.samples=ports.begin(t.start,e,t);return t;
     }
+    // draw-bridge/shape-bridge @1065e9d8 keep the tool the gesture began with: a tool switch mid-drag still commits on release.
+    // The brush style reads state.tool, so it is checked as that tool; a Pen gesture keeps its own switch rule (finalizePen).
+    function styleAs(t,proof){var s=root.state,was=s.tool;if(ports.pen||was===t.tool)return style(t.tool,proof);s.tool=t.tool;try{return style(t.tool,proof);}finally{s.tool=was;}}
     function current(t,requirePresentation,lease){
       try{var s=session(),pin=s&&s.info();
-        if(retired||t.cancelled||requirePresentation&&!Mapping.matchesView(root,t.presentation)||s!==t.session||!s.isActive()||!s.blocksLegacy()||!same(pin,t.pin)||root.state.currentFrame!==t.frame||!t.finished&&root.state.tool!==t.tool||selection(pin)!==t.layerUid||JSON.stringify(root._layerSel)!==t.sel||
-            root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||JSON.stringify(style(t.tool,requirePresentation?undefined:t.perspective))!==JSON.stringify(t.style)||JSON.stringify(bounds(pin))!==JSON.stringify(t.bounds))return false;
+        if(retired||t.cancelled||requirePresentation&&!Mapping.matchesView(root,t.presentation)||s!==t.session||!s.isActive()||!s.blocksLegacy()||!same(pin,t.pin)||root.state.currentFrame!==t.frame||ports.pen&&!t.finished&&root.state.tool!==t.tool||selection(pin)!==t.layerUid||JSON.stringify(root._layerSel)!==t.sel||
+            root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||JSON.stringify(styleAs(t,requirePresentation?undefined:t.perspective))!==JSON.stringify(t.style)||JSON.stringify(bounds(pin))!==JSON.stringify(t.bounds))return false;
         // Public presentation is hidden by this action's own pending entry.
         // Its existing lease still verifies the exact origin, view and subscription.
         var shown=requirePresentation?s.readPresentedObjectSession():lease&&typeof lease.readPresentedObjectSession==='function'&&lease.readPresentedObjectSession();
@@ -108,7 +112,7 @@
     }
     function clear(){if(overlay){overlay.remove();overlay=null;}}
     function release(t){try{var el=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(el.releasePointerCapture)el.releasePointerCapture(t.pointer);}catch(_){} }
-    function cancel(){if(drag){var t=drag;drag=null;t.cancelled=true;clear();release(t);}return {status:'cancelled'};}
+    function cancel(){if(sizer)sizer.cancel();if(drag){var t=drag;drag=null;t.cancelled=true;clear();release(t);}return {status:'cancelled'};}
     function endpoint(t,e){var end=point(e,t);return !ports.freehand&&e.shiftKey?ports.constrain(t.tool,t.start,end):end;}
     function dictionary(t,end,final){
       if(ports.pen){
@@ -257,6 +261,7 @@
     function handle(kind,e){
       if(retired)return false;
       if(ports.pen)return penHandle(kind,e);
+      if(sizer&&sizer.active())return sizer.handle(kind,e);
       // Chrome controls share the capture ancestor. Handle their event without
       // consuming it or falling through to the legacy shape handler.
       if(kind==='down'&&!stageOrigin(e))return !!drag||nativeMode()&&handled.includes(root.state.tool);
@@ -277,7 +282,7 @@
       }
       if(!nativeMode()||!handled.includes(root.state.tool))return false;
       if(!stageOrigin(e))return true;
-      consume(e);if(kind!=='down'||pending)return true;
+      consume(e);if(kind==='down'&&sizer&&e.altKey)return sizer.begin(e);if(kind!=='down'||pending)return true;
       if(uncertain){var owner=session(),pin=owner&&owner.info();
         if(owner===uncertain.session&&pin&&['instanceId','documentId','lifecycleGeneration'].every(function(k){return pin[k]===uncertain.pin[k];})){notice('Reopen the native project before drawing again; the previous result is unconfirmed.');return true;}
         uncertain=null;
@@ -289,6 +294,9 @@
     }
     function key(e){
       if(e.key==='Escape'&&drag){consume(e);cancel();}
+      // timeline.js onKeyDown @1065e9d8: Undo with an open Pen path pops the path's own pushUndo entry, so the path goes and no
+      // earlier edit is undone. A focused field keeps its text undo.
+      else if(ports.pen&&drag&&!pending&&(e.metaKey||e.ctrlKey)&&!e.shiftKey&&String(e.key).toLowerCase()==='z'&&!/^(INPUT|SELECT|TEXTAREA)$/.test(e.target&&e.target.tagName||'')&&!(e.target&&e.target.isContentEditable)){consume(e);cancel();}
       else if(ports.pen&&e.key==='Enter'&&drag&&!pending){consume(e);finish();}
       // timeline.js @1065e9d8: Backspace/Delete drops the last anchor; the last one ends the gesture.
       else if(ports.pen&&(e.key==='Backspace'||e.key==='Delete')&&drag&&!pending){consume(e);
@@ -313,8 +321,9 @@
       var state=root.state,fb=state.tool==='fillbrush';
       // Fill Brush (draw-bridge's isFillBrush branch) draws no texture, bitmap or Trim and ignores drawMode. Labs runs its
       // hooks on the placed path: predictive skips a fill shape, multi-frame stamps the merged result (native, at commit).
-      if (fb && (['above','below','merge'].indexOf(state.fillBrushMode) < 0 || root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
-          ? root.SMLabs.unmigratedDrawHooks().length > 0 : root.SMLabs.list().some(function(p){return p.on;})))) throw new Error('This Fill Brush combination is unavailable in native Drawing.');
+      var labs = Paint.labsRefusal(root); // a named, typed reason for each unmigrated Labs draw hook (never a silent drop)
+      if (labs) throw labs;
+      if (fb && ['above','below','merge'].indexOf(state.fillBrushMode) < 0) throw new Error('This Fill Brush combination is unavailable in native Drawing.');
       // A key a confirmed, settled native catalog lacks draws plain, as the baseline's resolveBrushPreset null does (applyBrushTexture
       // returns the path untouched). An unknown or changing catalog cannot tell a deleted key from a new one: unavailable.
       var CB=root.NemoNativeCustomBrushUI,cbc=CB&&CB.controller(root),key=state.brushPreset,absent=!fb&&!state.shadowMode&&!!key&&key!=='none'&&
@@ -325,12 +334,10 @@
       if (!fb && (state.tool !== 'draw' || state.trimStrokeEnds && state.symmetryEnabled && state.symmetryMode !== 'radial' && !state.symmetryExtend ||
           state.drawMode !== 'front' && state.drawMode !== 'behind' ||
           // G16 option C (#2361): one seeded anchor whose dabs native stamps; the key resolves as resolveBrushPreset (a built-in,
-          // else a confirmed native catalog record). A key neither holds, and texture with symmetry or Trim, stay unavailable.
-          !state.shadowMode && state.brushPreset && state.brushPreset !== 'none' && !absent && (!(root.BRUSH_PRESETS && Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS, state.brushPreset) ||
-            root.NemoNativeCustomBrushUI && root.NemoNativeCustomBrushUI.record(root, state.brushPreset)) ||
-            state.strokeEnabled && (state.symmetryEnabled || state.trimStrokeEnds)) ||
-          root.SMLabs && (typeof root.SMLabs.unmigratedDrawHooks === 'function'
-            ? root.SMLabs.unmigratedDrawHooks().length > 0 : root.SMLabs.list().some(function(p){return p.on;}))))
+          // else a confirmed native catalog record). A key neither holds stays unavailable. Trim cuts the anchor before native
+          // stamps it, and each symmetry copy is an anchor of its own group and seed (native-object-draw-symmetry.js).
+          !state.shadowMode && state.brushPreset && state.brushPreset !== 'none' && !absent && !(root.BRUSH_PRESETS && Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS, state.brushPreset) ||
+            root.NemoNativeCustomBrushUI && root.NemoNativeCustomBrushUI.record(root, state.brushPreset))))
         throw new Error('This brush combination is unavailable in native Drawing.');
       if (typeof state.vectorBrush !== 'boolean' || typeof state.strokeEnabled !== 'boolean' || typeof state.fillEnabled !== 'boolean' ||
           !fb && !state.strokeEnabled && !state.fillEnabled)

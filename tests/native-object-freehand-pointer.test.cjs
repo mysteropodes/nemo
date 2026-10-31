@@ -32,10 +32,11 @@ async function fixture(tool='draw',native=true,options={}){
  area.appendChild(canvas);area.appendChild(pills);pills.appendChild(fit);pills.appendChild(pill);pill.appendChild(zoom);area.appendChild(ruler);
  doc.readyState='complete';doc.body=body;doc.getElementById=id=>({'drawing-canvas':canvas,'canvas-area':area,'zoom-scrub':zoom,'canvas-fit-btn':fit,'ruler-h':ruler}[id]||null);
  doc.createElementNS=()=>new Element();doc.documentElement={clientWidth:1200,clientHeight:900};
+ const flags={locked:false,visible:true},undos=[];
  const info=()=>({apiVersion:2,instanceId:'instance-A',documentId:'document-'+generation,lifecycleGeneration:generation,contentRevision:revision,
   documentSnapshotId:'native-object:document-'+generation+':'+revision,documentDigest:String(revision%10).repeat(64),byteCount:1000,
   canvasW:320,canvasH:180,totalFrames:16,fps:24,undoDepth:revision,redoDepth:0,reference:null,
-  layers:[{layerUid:'L1',name:'Drawing',visible:true,locked:false,shy:false,color:'#5FA875',parentLayerUid:null}]});
+  layers:[{layerUid:'L1',name:'Drawing',visible:flags.visible,locked:flags.locked,shy:false,color:'#5FA875',parentLayerUid:null}]});
  const root={document:doc,state:{tool,appMode:'anim2d',currentFrame:0,strokeEnabled:true,fillEnabled:true,strokeColor:'#112233',fillColor:'#44556680',
   brushSize:4,opacity:50,strokeCap:'round',strokeJoin:'round',strokeStyle:'solid',miterLimit:10,dashOffset:0,paintOrder:'fillFirst',
   vectorBrush:false,smoothing:0,stabilizer:0,taperEnds:false,drawMode:'front',brushPreset:'none',pressureMin:5,pressureMax:170,pressureInvert:false,pressureCurve:'linear',brushAngle:0,brushAngleFactor:0},userLayers:[],selectedPaths:[],devicePixelRatio:2,
@@ -52,6 +53,8 @@ async function fixture(tool='draw',native=true,options={}){
    if(q.action==='subscribe'){binding=q.binding;return q.binding;}
    if(q.action==='acknowledge'){if(ack)await ack.promise;return null;}if(q.action==='disconnect')return null;
   }
+  if(command==='nemo_native_object_dispatch'){assert.equal(q.operation,'command.document.object.undo');undos.push(revision);revision++;
+   return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true}};}
   assert.equal(command,'nemo_native_dispatch');calls.push(structuredClone(q));
   if(q.operation==='command.document.object.fill.brush'||q.operation==='command.document.object.brush.bitmap.stroke'){assert.equal(q.expectedRevision,revision);revision++;
    return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1}};}
@@ -101,10 +104,11 @@ async function fixture(tool='draw',native=true,options={}){
  // Required like the Fill desktop: its command payload must be built in the SDK's own realm.
  root.NemoNativeDrawBitmap=require('../src/js/adapters/native-object-draw-bitmap.js');
  root.NemoNativeFillDesktop=require('../src/js/adapters/native-fill-desktop.js');
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-resize.js'),'utf8'),context,{filename:'native-object-draw-resize.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-shape-tool.js'),'utf8'),context,{filename:'native-object-shape-tool.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/draw-bridge.js'),'utf8'),context,{filename:'draw-bridge.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/shape-bridge.js'),'utf8'),context,{filename:'shape-bridge.js'});
- return {perspectiveMode:value=>perspectiveMode=value,root,context,paper,advance:(ms=16)=>clock+=ms,session,area,canvas,zoom,fit,ruler,doc,body,calls,records,log,events,info,setRect:r=>rect=r,refuse:code=>refusal=code,hold:g=>hold=g,mutate:fn=>replyChange=fn,
+ return {perspectiveMode:value=>perspectiveMode=value,root,context,paper,advance:(ms=16)=>clock+=ms,session,area,canvas,zoom,fit,ruler,doc,body,calls,records,log,events,info,flags,undos,setRect:r=>rect=r,refuse:code=>refusal=code,hold:g=>hold=g,mutate:fn=>replyChange=fn,
   async external(g){ack=g;const from=revision;revision++;return events.get('nemo-native-revision')({payload:{instanceId:'instance-A',documentId:info().documentId,lifecycleGeneration:generation,requestId:'external-'+revision,fromRevision:from,toRevision:revision}});},
   async gesture(end={clientX:240,clientY:210}){area.fire('pointerdown');area.fire('pointermove',end);area.fire('pointerup',end);return root.NemoNativeFreehandToolController.whenSettled();}};
 }
@@ -194,7 +198,7 @@ test('chrome, cancellation, Escape and lost capture remain usable or abort witho
   send(f,'pointerup',60,50);assert.equal(f.calls.length,0,action);assert.equal(f.body.children.length,0,action);assert.equal(f.paper.project.activeLayer.children.length,0);}
 });
 test('unsupported brush cells are explicit without native or legacy fallback',async()=>{
- const cases=[s=>Object.assign(s,{tool:'fillbrush',fillBrushMode:'front',fillBrushSize:40}),s=>s.bitmapBrushOn=true,s=>s.brushPreset='my-custom-brush',s=>Object.assign(s,{brushPreset:'charcoal-smooth',symmetryEnabled:true}),
+ const cases=[s=>Object.assign(s,{tool:'fillbrush',fillBrushMode:'front',fillBrushSize:40}),s=>s.bitmapBrushOn=true,s=>s.brushPreset='my-custom-brush',
   // With stop-at-axis symmetry the original trims the whole stroke before clipping; native would trim the clipped one.
   s=>Object.assign(s,{trimStrokeEnds:true,symmetryEnabled:true,symmetryExtend:false}),
   // Plain-stroke symmetry commits natively since G23 (#2361); with a pressure brush it stays refused.
@@ -524,6 +528,23 @@ test('a textured pressure ribbon commits one seeded, hidden ribbon anchor; its l
  }
 });
 
+// #2361 ribbon + texture A/B: the committed ribbon record carries the camouflage the baseline applyBrushTexture writes (the oracle's
+// serP of a hidden pressure ribbon in the same ink and Opacity), with the seed and group the fixed Math.random derives.
+test('a textured pressure ribbon commits the oracle camouflage: ink fill kept, no stroke, opacity 0, remembered opacity, seeded preset',async()=>{
+ const oracle=JSON.parse(fs.readFileSync(path.join(__dirname,'native-object-vector-fixtures','brush-dab-oracle.json'),'utf8'));
+ for(const c of oracle.ribbonCases){
+  const f=await fixture();f.root.BRUSH_PRESETS={[c.preset]:{}};Object.assign(f.root.state,{brushPreset:c.preset,vectorBrush:true,fillEnabled:false});
+  vm.runInContext('Math.random=function(){return .25;}',f.context);
+  send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:0});
+  await settled(f);assert.equal(f.calls.length,1);const r=plain(f.calls[0].payload.record);
+  assert.deepEqual(r.fill,c.record.fill,c.id+' the ribbon stays the ink fill');
+  assert.deepEqual(r.vector,c.record.vector,c.id+' no stroke, butt/miter defaults, opacity 0');
+  const {brushGroupId,...tags}=r.vectorExt.brushTexture;assert.match(brushGroupId,/^bg[0-9a-z]+_250000$/,c.id);
+  assert.deepEqual(tags,{brushTexturePreset:c.preset,preTextureOpacity:c.opacity,strokeSeed:1073741823},c.id);
+  assert.equal(r.geometry.closed,true);assert.deepEqual(Object.keys(r.vectorExt).sort(),['brushTexture','pressure']);
+ }
+});
+
 // #2361 Shadow Brush: applyShadowBrushTag @1065e9d8 over draw-bridge's commitStroke. The active swatch inks a plain
 // stroke (max(1, width), round ends) or, for the Stroke-off pressure fill, fills it; a ribbon goes back to its open
 // centreline; Shadow mode draws neither texture nor linked fill. Every record keeps its channel and swatch.
@@ -704,4 +725,188 @@ test('a mirrored or rotated pressure ribbon commits each copy with its own centr
  pen(stop);await settled(stop);assert.equal(stop.calls.length,1,stop.log.join(','));const sq=plain(stop.calls[0].payload);
  assert.equal(sq.records.length,4);assert.deepEqual(sq.records[1].geometry,ribbon0.geometry);
  assert.deepEqual(sq.records[1].vectorExt.pressure.centerSegments,c0);
+});
+
+// #2361 draw-cancel-matrix (freehand). Baseline draw-bridge.js @1065e9d8 keeps one module-level `dragging`/`samples` and onUp/commitStroke
+// consult neither the tool, the frame, the layer's lock/visibility nor the history. Cells the baseline decides on purpose are matched;
+// the rest are baseline accidents (a stroke written into a locked layer, into whichever frame is current at release, or after a
+// history step) that the native owner cannot reproduce: it writes only the pinned layer/frame/revision it started on, so those cancel.
+async function released(f,next){const control=f;send(control,'pointerdown',20,20);send(control,'pointermove',45,30);if(next)next(control);return send(control,'pointerup',80,65);}
+test('cancel matrix: a tool switch mid-stroke still commits the one stroke on release, as draw-bridge keeps dragging (#2361)',async()=>{
+ const ref=await fixture();await released(ref);assert.equal((await settled(ref)).status,'applied');
+ for(const next of ['select','hand','eraser']){
+  const f=await fixture();await released(f,c=>{c.root.state.tool=next;});
+  assert.equal((await settled(f)).status,'applied',next);assert.equal(f.calls.length,1,next);assert.equal(f.session.info().contentRevision,1,'exactly one revision');
+  assert.deepEqual(f.calls[0].payload.record.geometry,ref.calls[0].payload.record.geometry,'the stroke is the one drawn, not a refit');
+  assert.equal(f.body.children.length,0,'the draft is cleared');assert.equal(f.area.captured.size,0,'capture released');assert.equal(f.root.state.tool,next);
+ }
+});
+test('cancel matrix: a layer locked or hidden mid-stroke cancels with zero revisions; the baseline writes into the locked layer, the native owner refuses (#2361)',async()=>{
+ for(const [key,value] of [['locked',true],['visible',false]]){
+  const f=await fixture();send(f,'pointerdown',20,20);send(f,'pointermove',45,30);f.flags[key]=value;const wait=gate();wait.resolve();await f.external(wait);
+  const toasts=f.log.length;send(f,'pointerup',80,65);await settled(f);
+  assert.equal(f.calls.length,0,key);assert.equal(f.undos.length,0,key);assert.equal(f.body.children.length,0,key);assert.equal(f.session.info().contentRevision,1,'only the external change');
+  send(f,'pointerdown',20,20);assert.equal(f.body.children.length,0,'a press on the unavailable layer starts nothing');assert.ok(f.log.length>toasts,'and says so');assert.equal(f.calls.length,0);
+ }
+});
+test('cancel matrix: undo mid-stroke drops the stroke, undo while the commit is pending runs after it (#2361)',async()=>{
+ // Mid-stroke the revision moves under the pin, so the stroke cancels (the baseline would still commit it after the step).
+ let f=await fixture();send(f,'pointerdown',20,20);send(f,'pointermove',45,30);await f.session.historyFromUi('undo');send(f,'pointerup',80,65);await settled(f);
+ assert.equal(f.calls.length,0);assert.equal(f.undos.length,1);assert.equal(f.body.children.length,0);
+ // A commit already pending is one revision on the existing queue; the undo queues behind it and removes exactly that stroke.
+ f=await fixture();const wait=gate();f.hold(wait);send(f,'pointerdown',20,20);send(f,'pointermove',45,30);send(f,'pointerup',80,65);await turn();
+ assert.equal(f.calls.length,1);const undone=f.session.historyFromUi('undo');await turn();assert.equal(f.undos.length,0,'not before the stroke settles');
+ wait.resolve();assert.equal((await settled(f)).status,'applied');await undone;
+ assert.equal(f.calls.length,1,'one stroke');assert.deepEqual(f.undos,[1],'undone on top of its revision');assert.equal(f.session.info().contentRevision,2);
+});
+test('cancel matrix: a second pointer during a stroke is ignored; the first pointer still commits exactly one stroke (#2361)',async()=>{
+ const f=await fixture();send(f,'pointerdown',20,20);send(f,'pointermove',45,30);
+ const second={pointerId:2,isPrimary:false};
+ for(const kind of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture'])assert.equal(send(f,kind,100,100,second).stopped,true,kind+' of the other pointer is consumed');
+ assert.equal(f.calls.length,0);assert.equal(f.body.children.length,1,'the stroke is still being drawn');
+ send(f,'pointerup',80,65);assert.equal((await settled(f)).status,'applied');assert.equal(f.calls.length,1);
+ assert.deepEqual(f.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,20],[45,30],[80,65]],'none of the other pointer samples joined');
+});
+
+// #2361 draw-texture-symmetry-trim: a built-in preset with symmetry or Trim commits natively. The baseline copies the anchor
+// (symmetry-bridge.js adoptFreshIdentity drops its brush group) and trims it before any dab is stamped; native stamps each anchor's
+// dabs from its own group and seed (seededRng, never Math.random), so every copy is an anchor of its own in the ONE createMany.
+const SEED_ID=/^bg[0-9a-z]+_[0-9]+(_c[0-9]+)?$/;
+async function textured(over,pen){
+ const f=await fixture();f.root.BRUSH_PRESETS={'charcoal-smooth':{},'chalk-round':{}};Object.assign(f.root.state,{brushPreset:'charcoal-smooth'},over);
+ if(pen){send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:.4});}
+ else{send(f,'pointerdown',20,20);send(f,'pointermove',50,30);send(f,'pointerup',100,80);}
+ await settled(f);return f;
+}
+test('a textured plain stroke with mirror symmetry sends the anchor and its mirror in one createMany, each seeded and grouped',async()=>{
+ for(const fillEnabled of [true,false]){
+  const f=await textured({fillEnabled,symmetryEnabled:true,symmetryMode:'y',symmetryExtend:true});
+  assert.equal(f.calls.length,1,f.log.join(','));const q=plain(f.calls[0].payload);
+  assert.deepEqual([q.command,q.records.length],['object.vector.createMany',2],'one revision and one undo for the whole mirrored stroke');
+  const [a,b]=q.records.map(r=>r.vectorExt.brushTexture);
+  for(const t of [a,b]){assert.equal(t.brushTexturePreset,'charcoal-smooth');assert.match(t.brushGroupId,SEED_ID);assert.ok(Number.isInteger(t.strokeSeed)&&t.strokeSeed>=0&&t.strokeSeed<=0xFFFFFFFF);
+   if(fillEnabled)assert.equal(t.preTextureStroke,'#112233ff');else assert.equal(t.preTextureOpacity,0.5);}
+  assert.notEqual(a.brushGroupId,b.brushGroupId,'the copy is a group of its own');assert.notEqual(a.strokeSeed,b.strokeSeed,'and has its own seed');
+  assert.ok(q.records.every(r=>r.vector.opacity===(fillEnabled?0.5:0)),'every anchor is camouflaged as the drawn one');
+  const mx=q.records[1].geometry.segments.map(s=>s.point.x);assert.ok(Math.min(...mx)>160&&Math.max(...q.records[0].geometry.segments.map(s=>s.point.x))<160);
+ }
+});
+test('textured symmetry copies derive their seed from the drawn stroke deterministically and radial copies each get their own group',async()=>{
+ const f=await textured({fillEnabled:false,symmetryEnabled:true,symmetryMode:'radial',symmetryExtend:false,symmetryRadialSectors:4,symmetryRadialCenter:{x:160,y:90}});
+ assert.equal(f.calls.length,1,f.log.join(','));const q=plain(f.calls[0].payload);assert.equal(q.records.length,4);
+ const t=q.records.map(r=>r.vectorExt.brushTexture);
+ assert.equal(new Set(t.map(x=>x.brushGroupId)).size,4,'four groups');assert.equal(new Set(t.map(x=>x.strokeSeed)).size,4,'four seeds');
+ // The same drawn stroke gives the same copies' seeds again (no Math.random in the derivation).
+ const Symmetry=require('../src/js/adapters/native-object-draw-symmetry.js'),root={state:{symmetryEnabled:true,symmetryMode:'radial',symmetryRadialSectors:4,symmetryRadialCenter:{x:160,y:90}}};
+ const dict={segments:[{point:[20,20],handleIn:[0,0],handleOut:[0,0]},{point:[50,30],handleIn:[0,0],handleOut:[0,0]}],closed:false,brushTexturePreset:'p',brushGroupId:'bg1_2',strokeSeed:12345,opacity:0};
+ const run=()=>Symmetry.copies(root,dict,{canvasW:320,canvasH:180},null).map(d=>[d.brushGroupId,d.strokeSeed]);
+ assert.deepEqual(run(),run());assert.deepEqual(run()[0],['bg1_2',12345],'the drawn stroke keeps its own identity, first in the stack');
+ assert.deepEqual(run().slice(1).map(x=>x[0]),['bg1_2_c3','bg1_2_c2','bg1_2_c1'],'copy n-1 down to copy 1 above it');
+ assert.equal(dict.brushGroupId,'bg1_2');assert.equal(dict.strokeSeed,12345);
+});
+test('a textured pressure ribbon with symmetry mirrors the hidden ribbon anchor with its own seed and keeps each linked fill plain',async()=>{
+ const f=await textured({vectorBrush:true,fillEnabled:true,symmetryEnabled:true,symmetryMode:'y',symmetryExtend:true},true);
+ assert.equal(f.calls.length,1,f.log.join(','));const q=plain(f.calls[0].payload);
+ assert.deepEqual([q.command,q.records.length],['object.vector.createMany',4]);
+ const [fill0,ribbon0,fill1,ribbon1]=q.records;
+ assert.equal(fill0.vectorExt.brushTexture,undefined);assert.equal(fill1.vectorExt.brushTexture,undefined);
+ const [a,b]=[ribbon0,ribbon1].map(r=>r.vectorExt.brushTexture);
+ assert.deepEqual([a.brushTexturePreset,b.brushTexturePreset,a.preTextureOpacity,b.preTextureOpacity,ribbon0.vector.opacity,ribbon1.vector.opacity],['charcoal-smooth','charcoal-smooth',0.5,0.5,0,0]);
+ assert.notEqual(a.brushGroupId,b.brushGroupId);assert.notEqual(a.strokeSeed,b.strokeSeed);
+});
+test('Trim Stroke Ends on a textured stroke asks native to trim the anchor, which then stamps its dabs, with and without symmetry',async()=>{
+ const one=await textured({trimStrokeEnds:true,trimStrokeEndsMax:24});
+ assert.equal(one.calls.length,1,one.log.join(','));const q=plain(one.calls[0].payload);
+ assert.deepEqual([q.command,q.trimEnds],['object.vector.create',24]);assert.equal(q.record.vectorExt.brushTexture.brushTexturePreset,'charcoal-smooth');
+ const sym=await textured({trimStrokeEnds:true,trimStrokeEndsMax:24,symmetryEnabled:true,symmetryMode:'y',symmetryExtend:true});
+ const m=plain(sym.calls[0].payload);assert.deepEqual([m.command,m.trimEnds,m.records.length],['object.vector.createMany',24,2]);
+ assert.ok(m.records.every(r=>r.vectorExt.brushTexture.brushTexturePreset==='charcoal-smooth'));
+ const ribbon=await textured({vectorBrush:true,trimStrokeEnds:true,trimStrokeEndsMax:24},true);
+ assert.equal(ribbon.calls[0].payload.trimEnds,24);
+ const stop=await fixture();stop.root.BRUSH_PRESETS={'charcoal-smooth':{}};Object.assign(stop.root.state,{brushPreset:'charcoal-smooth',trimStrokeEnds:true,symmetryEnabled:true,symmetryExtend:false});
+ send(stop,'pointerdown',20,20);send(stop,'pointerup',60,50);assert.equal(stop.calls.length,0,'stop-at-axis Trim keeps refusing: the original trims the whole stroke before the clip');
+});
+test('a texture preset still refuses a key neither the built-ins nor the catalog hold, with symmetry too',async()=>{
+ const f=await fixture();Object.assign(f.root.state,{brushPreset:'not-a-preset',symmetryEnabled:true,symmetryMode:'y',symmetryExtend:true});
+ send(f,'pointerdown',20,20);send(f,'pointerup',60,50);assert.equal(f.calls.length,0);
+});
+
+// #2361: Alt+drag brush resize (draw-bridge.js `sizing` @1065e9d8): 0.5px of size per px of drag, clamped to 1..80, a live
+// circle at the press point, the Size field mirrored, a toast at release, and no stroke, command or revision.
+function sizeField(f){const field={value:'4'},was=f.doc.getElementById;f.doc.getElementById=id=>id==='p-sw'?field:was(id);return field;}
+test('Alt+drag resizes the brush with the baseline math and a live circle, committing no stroke and no revision',async()=>{
+ for(const tool of ['draw','fillbrush']){
+  const f=await fixture(tool),field=sizeField(f),revision=f.info().contentRevision;
+  const e=send(f,'pointerdown',60,40,{altKey:true});assert.equal(e.stopped,true);assert.equal(e.prevented,true);
+  assert.equal(f.body.children.length,1,'the circle');const circle=f.body.children[0].children[0];
+  assert.deepEqual([circle.attributes.cx,circle.attributes.cy].map(Number),[120,80]);assert.equal(Number(circle.attributes.r),4/2*2,'size/2 document units, 2px each');
+  const baseline=fs.readFileSync(path.join(ROOT,'src/js/draw-bridge.js'),'utf8');
+  assert.match(baseline,/Math\.max\(1, Math\.min\(80, sizeStartVal \+ \(e\.clientX - sizeStartX\) \* 0\.5\)\)/,'the legacy gesture this one mirrors');
+  const drag=dx=>send(f,'pointermove',(120+dx)/2,40);
+  for(const dx of [40,-8,1000,-1000,-6]){
+   drag(dx);const want=Math.max(1,Math.min(80,4+dx*0.5));
+   assert.equal(f.root.state.brushSize,want,tool+' dx '+dx);assert.equal(field.value,Math.round(want));assert.equal(Number(circle.attributes.r),want/2*2);
+  }
+  drag(40);send(f,'pointerup',100,40);
+  assert.equal(f.body.children.length,0,'the circle goes at release');assert.equal(f.log.at(-1),'Taille du pinceau : 24px');
+  assert.equal(f.root.state.brushSize,24);assert.equal(f.calls.length,0);assert.equal(f.records.size,0);assert.equal(f.info().contentRevision,revision);
+  assert.equal(f.paper.project.activeLayer.children.length,0);assert.equal(f.undos.length,0);
+  // The next ordinary stroke is drawn with the resized brush.
+  send(f,'pointerdown',20,20);send(f,'pointermove',45,30);send(f,'pointerup',100,80);
+  if(tool==='draw'){assert.equal((await settled(f)).status,'applied');assert.equal(f.calls[0].payload.record.vector.strokeWidth,24);}
+ }
+});
+test('Alt+drag only resizes: release without a move keeps the size, a cancel keeps the last size, and an unready canvas says so',async()=>{
+ const f=await fixture(),field=sizeField(f);
+ send(f,'pointerdown',60,40,{altKey:true});send(f,'pointerup',60,40,{altKey:true});
+ assert.equal(f.root.state.brushSize,4);assert.equal(f.log.at(-1),'Taille du pinceau : 4px');assert.equal(f.body.children.length,0);
+ send(f,'pointerdown',60,40,{altKey:true});send(f,'pointermove',80,40);send(f,'pointercancel',80,40);
+ assert.equal(f.root.state.brushSize,24);assert.equal(f.body.children.length,0);assert.equal(f.calls.length,0);assert.equal(field.value,24);
+ f.root.state.playing=true;f.root.state.brushSize=4;
+ const e=send(f,'pointerdown',60,40,{altKey:true});assert.equal(e.prevented,true);assert.equal(f.body.children.length,0);
+ send(f,'pointermove',80,40);assert.equal(f.root.state.brushSize,4);assert.equal(f.log.at(-1),'Native brush resize is unavailable.');assert.equal(f.calls.length,0);
+});
+// #2361: every Labs draw hook without a native route is a typed refusal that names it (Labs.unmigratedDrawHooks).
+test('an enabled Labs draw hook with no native route refuses with a typed reason that names it, and nothing is drawn',async()=>{
+ const Paint=require('../src/js/adapters/native-object-draw-paint.js');
+ const f=await fixture(),protos={'bulb-hook':{onPreview(){}},'ink-hook':{onStroke(){}},'migrated':{onStroke(){},nativeDraw:true},'view-aid':{}};
+ f.root.SMLabs={isOn:()=>true,list:()=>Object.keys(protos).map(name=>({name,on:true})),
+  unmigratedDrawHooks:()=>Object.keys(protos).filter(n=>(protos[n].onStroke||protos[n].onPreview)&&!protos[n].nativeDraw)};
+ const refusal=Paint.labsRefusal(f.root);assert.equal(refusal.code,'native-draw-labs-hook-unmigrated');assert.deepEqual(refusal.hooks,['bulb-hook','ink-hook']);
+ assert.match(refusal.message,/bulb-hook, ink-hook/);
+ send(f,'pointerdown',20,20);send(f,'pointermove',45,30);send(f,'pointerup',100,80);
+ assert.equal(f.calls.length,0);assert.ok(f.log.some(m=>/Labs draw hooks bulb-hook, ink-hook/.test(m)),f.log.join('|'));
+ const fb=await fixture('fillbrush');Object.assign(fb.root.state,{fillBrushMode:'above',fillBrushSize:40});
+ fb.root.SMLabs={list:()=>[{name:'solo',on:true}],unmigratedDrawHooks:()=>['solo']};
+ send(fb,'pointerdown',20,20);send(fb,'pointerup',60,50);assert.equal(fb.calls.length,0);assert.ok(fb.log.some(m=>/Labs draw hook solo yet/.test(m)),fb.log.join('|'));
+ f.root.SMLabs.unmigratedDrawHooks=()=>[];send(f,'pointerdown',20,20);send(f,'pointermove',45,30);send(f,'pointerup',100,80);
+ assert.equal((await settled(f)).status,'applied','once the hook is off (or migrated) native Drawing is available');
+ assert.equal(Paint.labsRefusal({}),null);
+ assert.equal(Paint.labsRefusal({SMLabs:{list:()=>[{name:'x',on:false}]}}),null);
+ assert.deepEqual(Paint.labsRefusal({SMLabs:{list:()=>[{name:'x',on:true},{name:'y',on:false}]}}).hooks,['x'],'without the registry, any enabled prototype blocks, by name');
+});
+test('the bitmap brush names the enabled Labs draw hooks in its refusal, under its own code', () => {
+ const Bitmap=require('../src/js/adapters/native-object-draw-bitmap.js'),state={tool:'draw',bitmapBrushOn:true,strokeEnabled:true,vectorBrush:false};
+ // predictive-stroke is migrated for native Draw, but the bitmap command runs no Labs hook: refused, not mislabelled as unmigrated.
+ const root={SMBitmapBrush:{bake(){}},SMLabs:{list:()=>[{name:'predictive-stroke',on:true},{name:'canvas-grid',on:true}],
+  enabledDrawHooks:()=>['predictive-stroke'],unmigratedDrawHooks:()=>[]}};
+ assert.throws(()=>Bitmap.style(root,state,{}),e=>e.code==='native-bitmap-brush-labs-unsupported'&&e.hooks.join()==='predictive-stroke'&&/predictive-stroke is on/.test(e.message));
+ // A view-aid prototype with no draw hook does not block the bitmap brush.
+ const aid={SMBitmapBrush:{bake(){}},SMLabs:{list:()=>[{name:'canvas-grid',on:true}],enabledDrawHooks:()=>[]}};
+ assert.equal(Bitmap.style(aid,state,{}).bitmap.tip,'soft');
+});
+test('the Labs registry lists enabled draw hooks, migrated or not, and skips view aids', () => {
+ const Model=require('../src/js/adapters/labs-registry-model.js');
+ const L=Model.create({getItem:()=>'1',setItem(){},warn(){},toast(){},describe:k=>k});
+ L.register('hooked-native',{flag:'a',onStroke(){},nativeDraw:true});L.register('hooked',{flag:'b',onPreview(){}});L.register('aid',{flag:'c'});
+ assert.deepEqual(L.enabledDrawHooks().sort(),['hooked','hooked-native']);
+ assert.deepEqual(L.unmigratedDrawHooks(),['hooked']);
+});
+test('every production Labs prototype with a draw hook declares its native route, so none is left unnamed',()=>{
+ const dir=path.join(ROOT,'src/js/labs'),hooked=[];
+ for(const name of fs.readdirSync(dir).filter(n=>n.endsWith('.js'))){
+  const text=fs.readFileSync(path.join(dir,name),'utf8');
+  if(/^\s*(onStroke|onPreview)\s*[:(]/m.test(text)||/\bonStroke:\s|\bonPreview:\s/.test(text))hooked.push([name,/nativeDraw:\s*true/.test(text)]);
+ }
+ assert.deepEqual(hooked.sort(),[['multiframe-draw.js',true],['predictive-stroke.js',true]],'a new draw hook needs a native route or the typed refusal above names it');
 });
