@@ -85,8 +85,9 @@ test('the hit-test listing admits the mask role with its mode and feather and re
 test('the Mask panel reads a native mask and routes its feather natively before any legacy writer', () => {
   const timeline = fs.readFileSync(path.join(__dirname, '..', 'src', 'js', 'timeline.js'), 'utf8');
   const feather = timeline.slice(timeline.indexOf("document.getElementById('p-mask-feather').addEventListener"), timeline.indexOf("document.getElementById('btn-mask-unset')"));
-  assert.ok(feather.includes("nativeSelStyle({maskFeather:"), 'the native batch is the first route');
-  assert.ok(feather.indexOf('nativeSelStyle(') < feather.indexOf("n20AllowLegacyWrite('timeline-mask-feather')"), 'and the legacy gate only follows');
+  assert.ok(feather.includes("nativeSelStyle({maskFeather:"), 'the native batch is committed by the change listener');
+  assert.ok(feather.indexOf("addEventListener('change'") > feather.indexOf("addEventListener('input'"), 'after the legacy input listener');
+  assert.ok(feather.indexOf('handles(window))return') < feather.indexOf("n20AllowLegacyWrite('timeline-mask-feather')"), 'the legacy gate only follows the native early return');
   assert.ok(timeline.includes("p.data.nativeStableTarget&&typeof p.data.maskFeather==='number'"), 'the panel shows the listed feather');
   const doc = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'engineering', 'application', 'legacy-writer-families.json'), 'utf8'));
   const native = doc.families.find((f) => f.family === 'selection-style-native');
@@ -163,4 +164,38 @@ test('mode and unmask reach masks only, are edits of their own, and are validate
   const wrap = (style) => () => Contract.payload(Contract.VECTOR, { command: 'object.vector.batch', ops: [{ op: 'restyle', stableTarget: target('m'), style, frame: 0 }] });
   for (const ok of [{ maskMode: 'intersect' }, { unmask: true }]) wrap(ok)();
   for (const bad of [{ maskMode: 'xor' }, { unmask: false }, { maskMode: 'add', unmask: true }, { maskMode: 'add', maskFeather: 1 }, { unmask: true, fill: '#ff0000' }]) assert.throws(wrap(bad), TypeError, JSON.stringify(bad));
+});
+
+// MASK-REVIEW (#2372): content under a mask stays pickable whatever the listing order; the feather field is a static native scrub.
+test('content under a mask stays pickable when the mask is listed AFTER it; the mask is grabbed by its outline or where nothing is under it', async () => {
+  for (const items of [[CONTENT, MASK], [MASK, CONTENT]]) {
+    const h = harness(items), id = (x, y) => Intent.pick(h.root, x, y).then((p) => p && p.data.strokeId);
+    assert.equal(await id(250, 250), 'content', 'inside both: the content under the mask wins');
+    assert.equal(await id(150, 150), 'content');
+    assert.equal(await id(350, 350), 'mask', 'inside the mask with nothing under it: the mask');
+    assert.equal(await id(200, 250), 'mask', "on the mask's own outline over the content: the mask is grabbed");
+    assert.equal(await id(50, 50), null);
+  }
+});
+
+test('the Mask panel feather field is a static native scrub and is committed on change, never per keystroke', async () => {
+  const timeline = fs.readFileSync(path.join(__dirname, '..', 'src', 'js', 'timeline.js'), 'utf8');
+  assert.match(timeline, /var NATIVE_SCRUB_FIELDS=\[[^\]]*'p-mask-feather'/);
+  const h = harness([MASK, CONTENT]);
+  h.root.selectedPaths = [await Intent.pick(h.root, 350, 350)];
+  h.root.NemoNativeSelectOverlay.show(h.root);
+  const sent = [], scope = { selectedPaths: h.root.selectedPaths, nativeSelStyle: (style) => { sent.push(style); Style.apply(h.root, style); return true; } };
+  const win = { NemoNativeSelectionStyle: { handles: () => true } };
+  const input = panel('p-mask-feather', 'input', Object.assign({ window: win }, scope)), change = panel('p-mask-feather', 'change', scope);
+  input.run({ value: '1' }); input.run({ value: '12' });
+  await h.fire();
+  assert.deepEqual(sent, [], 'typing alone writes nothing');
+  assert.deepEqual(JSON.parse(JSON.stringify(input.calls)), [], 'and reaches no legacy gate');
+  change.run({ value: '12' });
+  await h.fire();
+  assert.deepEqual(JSON.parse(JSON.stringify(sent)), [{ maskFeather: 12 }]);
+  assert.equal(h.batches.length, 1, "'12' is one history entry");
+  assert.deepEqual(h.batches[0].steps, [{ restyle: { stableTarget: target('mask'), style: { maskFeather: 12 } } }]);
+  change.run({ value: '9999' });
+  assert.deepEqual(JSON.parse(JSON.stringify(sent[1])), { maskFeather: 500 }, 'clamped to the contract maximum');
 });
