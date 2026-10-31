@@ -51,6 +51,7 @@ impl ObjectCompositionWitness {
             subselect::matrices_with_preview(packet, index, edited.as_ref())?
         };
         let mut items = Vec::new();
+        let mut uneditable = 0usize;
         // Preserve the native paint order so hit testing can choose the last hit, just like the visible stack.
         // The editable listing is contour-only; the hit-test listing is the whole mixed order (#2372), so a raster image
         // and a text block take their place in the stack.
@@ -111,10 +112,19 @@ impl ObjectCompositionWitness {
                 .unwrap_or_else(|| source.record());
             // #2362 hit-test listing: every painted record, counted on its painted geometry, never refused for
             // being outside the editable scope (Select and the Labs knife only read it).
+            // #2356: the editable listing omits a record that has no editable points (a brush, textured or pressure stroke
+            // whose anchors are refused) instead of failing the whole layer, so one such record never blocks vertex editing
+            // of its neighbours; its per-item geometry read stays refused.
             let count = if hit_test {
                 r.geometry.segments.len()
             } else {
-                record::anchors(r).map_err(|_| "Subselect target geometry is unavailable")?.len()
+                match record::anchors(r) {
+                    Ok(anchors) => anchors.len(),
+                    Err(_) => {
+                        uneditable += 1;
+                        continue;
+                    }
+                }
             };
             let matrix = *matrices
                 .get(&source.source_object_index())
@@ -163,6 +173,10 @@ impl ObjectCompositionWitness {
             });
         }
         flush(&mut items, usize::MAX);
+        // A layer whose every contour is non-editable keeps the whole-layer refusal (nothing there can be vertex-edited).
+        if !hit_test && uneditable > 0 && items.is_empty() {
+            return Err("Subselect target geometry is unavailable");
+        }
         // #2376: every listed record names the vector groups it sits in (the layer's own group table), for the Elements panel.
         if let Some(table) = hit_test.then(|| packet.source_layers()[index].groups.value()).flatten() {
             for item in &mut items {

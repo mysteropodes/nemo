@@ -82,8 +82,18 @@
       overlay.setAttribute('viewBox','0 0 '+t.pin.canvasW+' '+t.pin.canvasH);overlay.setAttribute('preserveAspectRatio','none');
       overlay.appendChild(node('polygon',{points:corners.map(p=>p.join(',')).join(' '),fill:'rgba(255,184,108,.08)',stroke:'#ffb86c','stroke-width':1,'stroke-dasharray':'4 3','vector-effect':'non-scaling-stroke'}));
     }
+    // #2356: the editable listing omits a record that has no editable points (a brush, textured or pressure stroke). A plain click that
+    // selected nothing therefore says so when it landed on such a record, instead of clearing without a word. The hit-test listing is read
+    // (no geometry paged) only for that click; any failure of this courtesy read stays silent.
+    function uneditableNotice(t){const s=t.session;if(!s||typeof s.readPresentedStrokes!=='function'||!t.items)return Promise.resolve(false);const token=readToken,key=i=>JSON.stringify(i.stableTarget),own=new Set(t.items.map(key));
+      return Promise.resolve().then(()=>s.readPresentedStrokes({contextId:t.selector.contextId,layerUid:t.selector.layerUid,frame:t.selector.frame},t.pin,()=>false)).then(data=>{
+        if(token!==readToken||retired||!data||!data.presentation||data.presentation!==t.presentation)return false;
+        const hit=(data.items||[]).find(i=>!own.has(key(i))&&['plain','ribbon','fill','shape','brush'].includes(i.role)&&Array.isArray(i.bounds)&&i.bounds.length===4&&Array.isArray(i.matrix)&&(()=>{
+          const m=i.matrix,b=i.bounds,pad=4+(i.strokeWidth||0)/2,xs=[],ys=[];[[b[0],b[1]],[b[2],b[1]],[b[0],b[3]],[b[2],b[3]]].forEach(c=>{const q=map(m,c);xs.push(q[0]);ys.push(q[1]);});
+          return t.start[0]>=Math.min(...xs)-pad&&t.start[0]<=Math.max(...xs)+pad&&t.start[1]>=Math.min(...ys)-pad&&t.start[1]<=Math.max(...ys)+pad;})());
+        if(hit)notice(new Error('This stroke has no editable points.'));return !!hit;}).catch(()=>false);}
     function finishMarquee(t){if(marquee!==t||!current(t)){cancel(true);return {status:'cancelled'};}
-      marquee=null;release(t);if(!t.moved){cancel(true);return {status:'cleared'};}
+      marquee=null;release(t);if(!t.moved){cancel(true);return uneditableNotice(t).then(()=>({status:'cleared'}));}
       const r=rectangle(t);let item=t.target&&t.target.item;
       if(!item)for(const candidate of t.items){const curve=path(candidate);try{
         const Matrix=root.Matrix||(root.paper&&root.paper.Matrix);curve.transform(new Matrix(...candidate.matrix));if(curve.bounds.intersects(r))item=candidate;
