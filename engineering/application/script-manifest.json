@@ -400,6 +400,8 @@
     {"src":"js/adapters/native-frame-cell-selection.js"},
     {"src":"js/application/script-native-writes.js"},
     {"src":"js/application/script-native-drain.js"},
+    {"src":"js/application/script-native-reads.js"},
+    {"src":"js/application/script-native-run.js"},
     {"src":"js/application/script-native-api.js"},
     {"src":"js/application/presenter-seam.js"},
     {"src":"js/application/app-menu-targets.js"},
