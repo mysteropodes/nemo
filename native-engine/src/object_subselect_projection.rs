@@ -43,6 +43,8 @@ impl ObjectCompositionWitness {
                 || packet.text_records().any(|r| r.layer_index() == index));
         let matrices = if shared {
             subselect::hit_matrices(packet, index, &self.plan().native_parent_chains())?
+        } else if hit_test {
+            subselect::matrices_hit(packet, index)?
         } else {
             subselect::matrices_with_preview(packet, index, edited.as_ref())?
         };
@@ -60,9 +62,32 @@ impl ObjectCompositionWitness {
         // anchor anyway), so a layer of many textured strokes stays inside the listing bound. A copy whose anchor is absent
         // from the layer is listed as itself.
         let dabs = if hit_test { dab_bounds(self, index, &matrices) } else { DabBounds::default() };
+        // #2372: masks are no paint command (they clip), so the hit-test listing adds each one as a `mask` item in record order,
+        // beside the content it masks. A layer's path effects reshape what its records paint, so those records are left out item
+        // by item (the editable read still refuses the layer).
+        let mut masks: std::collections::VecDeque<_> = if hit_test {
+            packet.records().filter(|s| s.source_layer_index() == index && s.record().is_mask()).collect()
+        } else {
+            Default::default()
+        };
+        let feather = masks.iter().filter_map(|s| s.record().mask_feather()).filter(|f| f.is_finite() && *f > 0.0).fold(0.0, f64::max);
+        let faded = |source: &crate::object_frame_packet::ObjectFrameRecord<'_>| hit_test && subselect::has_path_fx(packet, source.record());
+        let mut flush = |items: &mut Vec<SubselectReadItem>, before: usize| {
+            while masks.front().is_some_and(|m| m.source_object_index() < before) {
+                let source = masks.pop_front().unwrap();
+                if faded(&source) {
+                    continue;
+                }
+                let Some(matrix) = matrices.get(&source.source_object_index()).copied() else { continue };
+                items.push(mask_item(source.record(), matrix, feather));
+            }
+        };
         for entry in ordered {
             let command = match entry {
-                PaintEntry::Contour(command) if command.source().source_layer_index() == index => command,
+                PaintEntry::Contour(command) if command.source().source_layer_index() == index => {
+                    flush(&mut items, command.source().source_object_index());
+                    command
+                }
                 PaintEntry::Raster(at) => {
                     items.extend(self.raster_hit_item(index, at));
                     continue;
@@ -75,6 +100,9 @@ impl ObjectCompositionWitness {
                 _ => continue,
             };
             let source = command.source();
+            if faded(&source) {
+                continue;
+            }
             let r = edited
                 .as_ref()
                 .filter(|r| r.target == source.record().target)
@@ -130,6 +158,7 @@ impl ObjectCompositionWitness {
                 style: if hit_test { record::style::listed(r) } else { None },
             });
         }
+        flush(&mut items, usize::MAX);
         if items.len() > 1024 {
             return Err("Subselect layer exceeds the selection bound");
         }
@@ -141,6 +170,26 @@ impl ObjectCompositionWitness {
             preview,
         )
         .with_hit_test(hit_test))
+    }
+}
+
+/// #2372: a mask in the hit-test listing, with its outline bounds and the mode and (layer-shared) feather the Mask panel shows.
+fn mask_item(r: &crate::object_frame_packet::ObjectRecord, matrix: [f64; 6], feather: f64) -> SubselectReadItem {
+    SubselectReadItem {
+        stable_target: r.target.clone(),
+        closed: r.geometry.closed,
+        count: r.geometry.segments.len(),
+        paint_count: None,
+        matrix,
+        bounds: Some(record::painted_bounds(r)),
+        role: Some("mask"),
+        filled: Some(r.geometry.closed),
+        stroke_width: Some(0.0),
+        box_angle: None,
+        owner: None,
+        brush: None,
+        group: None,
+        style: record::style::mask(r.mask_mode(), feather),
     }
 }
 

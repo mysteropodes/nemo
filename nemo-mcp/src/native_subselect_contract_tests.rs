@@ -227,13 +227,15 @@ fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
     }
     // #2372 SEL-STYLE: the style a panel shows is optional, with hex colours, a positive width and an opacity in 0..1.
     for good in [json!({"fill":"#ff000080","stroke":"#00ff00","width":6.0,"opacity":0.5}), json!({"opacity":0}), json!({"fill":"#112233"}),
-        json!({"cap":"square","join":"bevel","miter":4.0,"dashOffset":-2.5,"paintOrder":"strokeFirst"})] {
+        json!({"cap":"square","join":"bevel","miter":4.0,"dashOffset":-2.5,"paintOrder":"strokeFirst"}),
+        json!({"maskMode":"subtract","maskFeather":12.5}), json!({"maskMode":"add","maskFeather":0})] {
         let mut item = r.clone();
         item["items"][0]["style"] = good.clone();
         assert!(public_read(&q, &item), "style {good} is legal in a hit-test listing");
     }
     for bad in [json!({}), json!({"fill":"red"}), json!({"fill":null}), json!({"width":0}), json!({"opacity":2}), json!({"colour":"#000000"}), json!("#000000"),
-        json!({"cap":"flat"}), json!({"join":"sharp"}), json!({"miter":-1}), json!({"paintOrder":"x"})] {
+        json!({"cap":"flat"}), json!({"join":"sharp"}), json!({"miter":-1}), json!({"paintOrder":"x"}),
+        json!({"maskMode":"xor"}), json!({"maskMode":null}), json!({"maskFeather":-1}), json!({"maskFeather":"3"})] {
         let mut item = r.clone();
         item["items"][0]["style"] = bad.clone();
         assert!(!public_read(&q, &item), "style {bad} is refused");
@@ -244,6 +246,12 @@ fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
         item["items"][0]["count"] = json!(0);
         assert!(public_read(&q, &item), "an image or text block is listed too (#2372): {role}");
     }
+    // #2372 SEL-MASK: a mask is listed as a mask, with the geometry a path has.
+    let mut mask = r.clone();
+    mask["items"][0]["role"] = json!("mask");
+    assert!(public_read(&q, &mask), "a mask is listed (#2372)");
+    mask["items"][0]["role"] = json!("clip");
+    assert!(!public_read(&q, &mask), "an unknown role is refused");
     // #2372: a brush's anchor, one of its copies or a bitmap brush says so, with the group they share.
     for brush in ["anchor", "copy", "bitmap"] {
         let mut item = r.clone();
