@@ -51,7 +51,7 @@ test('the SDK seam composes the contract without growing the file and the sessio
   assert.match(sdk, /root\.NemoNativeObjectItemContract/);
   assert.match(sdk, /item \? item\.compose\(base\) : base/);
   assert.ok(nonblank('src/js/adapters/native-application.js') <= 500);
-  assert.match(read('src/js/adapters/native-object-project.js'), /runFontResource:runFontResource,runResourceCommand:runFontResource,/);
+  assert.match(read('src/js/adapters/native-object-project.js'), /runResourceCommand:function\(action\)\{return runFontResource\(action\);\},runComponentCommand:function\(action\)\{return runFontResource\(action,true\);\},/);
   assert.ok(nonblank('src/js/adapters/native-object-project.js') <= 500);
 });
 

@@ -194,7 +194,12 @@ fn a_restyle_names_its_target_and_valid_style_members_and_its_receipt_id_is_the_
     other_layer["ops"][1]["stableTarget"] = target("L2", "s-b");
     assert!(vector_request(VECTOR, &other_layer), "a Select batch may span layers (#2372)");
     other_layer["ops"][1]["stableTarget"]["contextId"] = json!("component:c1");
-    assert!(!vector_request(VECTOR, &other_layer), "every step stays on the scene root");
+    assert!(!vector_request(VECTOR, &other_layer), "every step stays on ONE context (#2256)");
+    other_layer["ops"][0]["stableTarget"]["contextId"] = json!("component:c1");
+    assert!(vector_request(VECTOR, &other_layer), "a batch inside one declared component is admitted (#2256)");
+    other_layer["ops"][0]["stableTarget"]["contextId"] = json!("has space");
+    other_layer["ops"][1]["stableTarget"]["contextId"] = json!("has space");
+    assert!(!vector_request(VECTOR, &other_layer), "a context is an id, never arbitrary text");
 }
 
 /// #2372: a batch is atomic unless it opts in with a boolean `skipUnavailable`; only then does the receipt report `skippedSteps`.

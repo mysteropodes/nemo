@@ -83,6 +83,29 @@ fn content_kind(content: Option<&Content<'_>>) -> &'static str {
     }
 }
 
+/// Baseline `matteSourceIndicesInUse` (`timeline.js`, 1065e9d8): the layer indices consumed as a matte SOURCE.
+/// An active matte (any mode but empty/`none`) names its source by `matteSourceLayerUid` (first other layer with that
+/// uid; a dangling or self reference resolves to nothing, so that matte marks no source); a matte with no stored uid
+/// falls back to the legacy implicit adjacency, the layer below (`i + 1`). Only the first matte counts: baseline never
+/// consulted `mattesMore` here, so a layer used only as an additional matte source carries no badge.
+fn matte_sources_in_use(document: &ObjectDocument) -> HashSet<usize> {
+    let layers = document.layers();
+    // One uid index per info build: a per-matte linear scan made this O(layers x matted layers) on every revision sync.
+    let mut by_uid: HashMap<&str, usize> = HashMap::with_capacity(layers.len());
+    for (index, layer) in layers.iter().enumerate() {
+        by_uid.entry(layer.layer_uid()).or_insert(index);
+    }
+    let mut used = HashSet::new();
+    for (index, layer) in layers.iter().enumerate().filter(|(_, l)| l.matte_on()) {
+        let source = match layer.matte_source_uid().filter(|uid| !uid.is_empty()) {
+            Some(uid) => by_uid.get(uid).copied().filter(|other| *other != index),
+            None => Some(index + 1).filter(|below| *below < layers.len()),
+        };
+        used.extend(source);
+    }
+    used
+}
+
 /// One extra-member map per layer, index-aligned with `document.layers()`.
 pub(crate) fn layer_members(document: &ObjectDocument) -> Vec<Map<String, Value>> {
     let content = content_by_layer(document);
@@ -96,11 +119,7 @@ pub(crate) fn layer_members(document: &ObjectDocument) -> Vec<Map<String, Value>
                 .collect()
         })
         .unwrap_or_default();
-    let mut sources: HashSet<&str> = HashSet::new();
-    for layer in document.layers().iter().filter(|l| l.matte_on()) {
-        sources.extend(layer.matte_source_uid());
-        sources.extend(layer.mattes_more().iter().map(|m| m.uid.as_str()));
-    }
+    let sources = matte_sources_in_use(document);
     let opacity: HashMap<&str, &crate::object_document::PropertyRecord> = document
         .property_holders()
         .unwrap_or_default()
@@ -116,7 +135,8 @@ pub(crate) fn layer_members(document: &ObjectDocument) -> Vec<Map<String, Value>
     document
         .layers()
         .iter()
-        .map(|layer| {
+        .enumerate()
+        .map(|(index, layer)| {
             let uid = layer.layer_uid();
             let instance = document
                 .component_set()
@@ -166,7 +186,7 @@ pub(crate) fn layer_members(document: &ObjectDocument) -> Vec<Map<String, Value>
                     .collect();
                 row.insert("mattesMore".into(), Value::Array(more));
             }
-            if sources.contains(uid) {
+            if sources.contains(&index) {
                 row.insert("isMatteSource".into(), json!(true));
             }
             if let Some(record) = opacity.get(uid) {

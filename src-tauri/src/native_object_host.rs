@@ -19,7 +19,7 @@ use inactive_requests::InactiveRequest;
 #[path = "native_object_retained_tabs.rs"]
 mod retained_tabs;
 use retained_tabs::ParkedProject;
-pub(crate) use retained_tabs::PreparedRetainedActivation;
+pub(crate) use retained_tabs::{PreparedRetainedActivation, PROJECT_INFO_LIMIT_BYTES};
 
 #[path = "native_object_font.rs"]
 mod font_assets;

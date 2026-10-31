@@ -176,6 +176,32 @@
         }
       }
     },
+    "ObjectContextTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contextId",
+        "frameScope",
+        "layerUid",
+        "strokeId"
+      ],
+      "properties": {
+        "contextId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$",
+          "description": "#2256: the scene root or the id of a component context the document declares; the native owner refuses any other."
+        },
+        "frameScope": {
+          "$ref": "#/$defs/ObjectFrameScope"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "strokeId": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        }
+      }
+    },
     "ObjectPoint": {
       "type": "object",
       "additionalProperties": false,
@@ -840,7 +866,7 @@
           "const": "editable-vector-path"
         },
         "target": {
-          "$ref": "#/$defs/ObjectTarget"
+          "$ref": "#/$defs/ObjectContextTarget"
         },
         "geometry": {
           "$ref": "#/$defs/ObjectVectorGeometry"
@@ -868,7 +894,9 @@
       ],
       "properties": {
         "contextId": {
-          "const": "scene-root"
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$",
+          "description": "#2256: the scene root or the id of a component context the document declares; the native owner refuses any other."
         },
         "frameScope": {
           "$ref": "#/$defs/ObjectFrameScope"
@@ -1017,7 +1045,7 @@
           "const": "object.vector.delete"
         },
         "stableTarget": {
-          "$ref": "#/$defs/ObjectTarget"
+          "$ref": "#/$defs/ObjectContextTarget"
         }
       }
     },
@@ -1086,7 +1114,7 @@
           "const": "object.vector.mask.edit"
         },
         "stableTarget": {
-          "$ref": "#/$defs/ObjectTarget"
+          "$ref": "#/$defs/ObjectContextTarget"
         },
         "maskEdit": {
           "$ref": "#/$defs/ObjectVectorMaskEdit"
@@ -1164,7 +1192,7 @@
                     "const": "delete"
                   },
                   "stableTarget": {
-                    "$ref": "#/$defs/ObjectTarget"
+                    "$ref": "#/$defs/ObjectContextTarget"
                   }
                 }
               }
@@ -1184,7 +1212,7 @@
           "description": "Optional (absent or false = atomic: any step the engine refuses refuses the whole batch with nothing written). true lets restyle steps the engine cannot do (a texture anchor the edit would unhide) be skipped while the rest apply; the receipt then reports skippedSteps. A batch whose every step is skipped is still refused."
         }
       },
-      "description": "#2361/#2362: 1..64 ordered create/replace/delete steps on scene-root layers (one or, for a Select spanning layers, several; a trimEnds batch is one layer) as one revision and one undo entry; the native owner refuses the whole batch when any step is refused."
+      "description": "#2361/#2362: 1..64 ordered create/replace/delete steps on the layers of ONE context, the scene root or a declared component (one or, for a Select spanning layers, several; a trimEnds batch is one layer) as one revision and one undo entry; the native owner refuses the whole batch when any step is refused."
     },
     "ObjectVectorEditPayload": {
       "oneOf": [
@@ -13059,7 +13087,8 @@
           "minLength": 1
         },
         "contextId": {
-          "const": "scene-root"
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
         },
         "layerUid": {
           "type": "string",
@@ -13326,7 +13355,8 @@
           "minLength": 1
         },
         "contextId": {
-          "const": "scene-root"
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
         },
         "layerUid": {
           "type": "string",
@@ -13435,7 +13465,8 @@
           "minLength": 1
         },
         "contextId": {
-          "const": "scene-root"
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
         },
         "layerUid": {
           "type": "string",
@@ -19918,7 +19949,7 @@
           "const": "editable-vector-path"
         },
         "target": {
-          "$ref": "#/$defs/ObjectTarget"
+          "$ref": "#/$defs/ObjectContextTarget"
         },
         "geometry": {
           "$ref": "#/$defs/ObjectVectorGeometry"

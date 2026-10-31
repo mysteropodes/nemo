@@ -15,8 +15,7 @@
   const OPS = new Set([VECTOR, PARAMETRIC, EFFECTS]);
   const FAMILY = 'editable-vector-path';
   // Full encoded request envelopes: vector edits may carry a complete 256-anchor record, and the Fill Brush commit
-  // (an edit-contract operation) a 256-segment outline; every other operation keeps the default bound. Replies remain
-  // bounded separately.
+  // (an edit-contract operation) a 256-segment outline; every other operation keeps the default bound. Replies remain bounded separately.
   const MAX_REQUEST_BYTES = 4096, ENGINE_VECTOR_REQUEST_BYTES = 65536, FILL_BRUSH = 'command.document.object.fill.brush';
   // #2361: a bitmap-brush Draw stroke carries a whole anchor record (its PNG is a staged file, never request bytes).
   const BITMAP_STROKE = 'command.document.object.brush.bitmap.stroke';
@@ -55,9 +54,10 @@
     value.forEach((part, at) => num(part, `${label}[${at}]`));
   }
 
+  function heldContext(id) { try { const c = typeof globalThis === 'object' ? globalThis.NemoNativeComponentContext : undefined; return typeof id === 'string' && !!id && !!c && typeof c.contextId === 'function' && c.contextId(globalThis) === id; } catch (_) { return false; } } // #2256: only the component the workspace holds
   function target(value, label, create) {
     exact(value, ['contextId', 'frameScope', 'layerUid', 'strokeId'], [], label);
-    if (value.contextId !== 'scene-root') fail(`${label}.contextId is not admitted`);
+    if (value.contextId !== 'scene-root' && !heldContext(value.contextId)) fail(`${label}.contextId is not admitted`); // #2256: the scene root or the component the workspace holds
     exact(value.frameScope, ['kind', 'frame'], [], `${label}.frameScope`); oneOf(value.frameScope.kind, ['authored', 'reference'], `${label}.frameScope.kind`);
     frame(value.frameScope.frame, `${label}.frameScope.frame`); opaque(value.layerUid, `${label}.layerUid`);
     // A created record names no stroke id: the owner allocates it and the caller cannot choose it.
@@ -274,7 +274,7 @@
     }
     else if (key === 'stableTarget') target(payloadValue, label, false);
     else if (key === 'ops') {
-      // #2361/#2362: 1..64 ordered create/replace/delete steps on scene-root layers (#2372: a Select may span layers; a trimEnds batch is one layer), one revision and one undo entry.
+      // #2361/#2362: 1..64 ordered create/replace/delete steps on the layers of one context (#2372: a Select may span layers; a trimEnds batch is one layer), one revision and one undo entry.
       if (!Array.isArray(payloadValue) || payloadValue.length < 1 || payloadValue.length > 64) fail(`${label} must hold 1 to 64 steps`);
       const targets = payloadValue.map((op, at) => {
         const where = `${label}[${at}]`;
@@ -298,7 +298,7 @@
         return fail(`${where}.op must be create, copy, replace, reshape, clone, restyle or delete`);
       });
       targets.forEach((t, at) => { if (!t) targets[at] = targets[payloadValue[at].fromStep]; });
-      if (targets.some((t) => t.contextId !== 'scene-root')) fail(`${label} must stay on the scene root`);
+      if (targets.some((t) => t.contextId !== targets[0].contextId)) fail(`${label} must stay on one context`);
     }
     else if (key === 'maskEdit') {
       if (!plain(payloadValue)) fail(`${label} must be an object`);

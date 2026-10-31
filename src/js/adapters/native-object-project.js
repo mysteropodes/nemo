@@ -291,16 +291,17 @@
       }
       await present(ports.frame?ports.frame():0);return receipt;
     });}
-    function currentPresentation(origin,ticket){return !openingRequested&&!synchronizing&&active()&&origin&&!(ports.context&&ports.context())&&origin.presentation===presentation&&view.matches(presentation,info)&&same(info,origin)&&ticket===subscriptionTicket&&
+    // #2256: `inContext` (the component command route of the vector family only) accepts the presentation of the ENTERED context, never another.
+    function currentPresentation(origin,ticket,inContext){var held=ports.context&&ports.context();return !openingRequested&&!synchronizing&&active()&&origin&&(inContext?!!held&&origin.presentation.contextId===held.contextId:!held)&&origin.presentation===presentation&&view.matches(presentation,info)&&same(info,origin)&&ticket===subscriptionTicket&&
       (!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&
       typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true;}
-    function runFontResource(action){if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native font owner busy or unavailable'));
+    function runFontResource(action,inContext){if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native font owner busy or unavailable'));
       var submitted=epoch(info),origin=freeze(presentedSession()),ticket=subscriptionTicket;
       return enqueue(async function(){guardEpoch(submitted);var running=true;
         try{return await action({
           // Read-only and action-local: only this operation's own pending entry is exempted.
           // Captured presentation/subscription identity must survive; the public getter stays fenced.
-          readPresentedObjectSession:function(){return running&&pending===1&&currentPresentation(origin,ticket)?origin:null;},
+          readPresentedObjectSession:function(){return running&&pending===1&&currentPresentation(origin,ticket,inContext)?origin:null;},
           dispatch:function(request){guardEpoch(submitted);return raw('nemo_native_dispatch',request);},
           reconcile:async function(revision){guardEpoch(submitted);var next;try{next=await inspect();guardEpoch(submitted);if(revision!==undefined&&next.contentRevision!==revision)throw new Error('Native font import revision is uncorrelated');}catch(error){throw fence(error);}
             await changed();await present(ports.frame?ports.frame():0,next);return next;}});
@@ -411,7 +412,7 @@
       readPropertyMetadata:properties.readPropertyMetadata,readProperty:properties.readProperty,
       get editPropertyTrack(){return properties.available()?properties.editPropertyTrack:undefined;},
       get editProperty(){return properties.available()?properties.editProperty:undefined;},
-      info:function(){return info;},requestId:requestId,runFontResource:runFontResource,runResourceCommand:runFontResource,reference:reference,historyFromUi:function(action){return history(action);},jumpHistory:history,readHistory:function(offset){try{return reads.readHistory(requireActive(),offset);}catch(error){return Promise.reject(error);}},setLayerVisibility:setLayerVisibility,readLayerTiming:reads.readLayerTiming,readLayerRange:reads.readLayerRange,readLayerPlacement:reads.readLayerPlacement,readLayerCells:reads.readLayerCells,readImageMesh:reads.readImageMesh,readWidgets:reads.readWidgets,readGhosts:reads.readGhosts,readRig:reads.readRig,readRigWeights:reads.readRigWeights,readSubselect:reads.readSubselect,readPresentedStrokes:reads.readPresentedStrokes,previewSubselect:reads.previewSubselect,
+      info:function(){return info;},requestId:requestId,runFontResource:function(action){return runFontResource(action);},runResourceCommand:function(action){return runFontResource(action);},runComponentCommand:function(action){return runFontResource(action,true);},reference:reference,historyFromUi:function(action){return history(action);},jumpHistory:history,readHistory:function(offset){try{return reads.readHistory(requireActive(),offset);}catch(error){return Promise.reject(error);}},setLayerVisibility:setLayerVisibility,readLayerTiming:reads.readLayerTiming,readLayerRange:reads.readLayerRange,readLayerPlacement:reads.readLayerPlacement,readLayerCells:reads.readLayerCells,readImageMesh:reads.readImageMesh,readWidgets:reads.readWidgets,readGhosts:reads.readGhosts,readRig:reads.readRig,readRigWeights:reads.readRigWeights,readSubselect:reads.readSubselect,readPresentedStrokes:reads.readPresentedStrokes,previewSubselect:reads.previewSubselect,
       get editLayerPolicy(){return typeof ports.dispatchApplication==='function'&&(!ports.policyAvailable||ports.policyAvailable()===true)&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&sceneRoot()?editLayerPolicy:undefined;},
       get editFrames(){return FrameEdit&&typeof ports.dispatchApplication==='function'&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
@@ -481,6 +482,7 @@
     catch(error){return uiFailure(root,error);}
     // #2372: a repaint follows a tool, layer, frame or mode change; the Select overlay re-checks its context (one-shot).
     var overlay=root.NemoNativeSelectOverlay;if(overlay&&typeof overlay.notify==='function')overlay.notify(root);
+    var aids=root.NemoNativeViewAids;if(aids&&typeof aids.notify==='function')aids.notify(root); // #2373
     return true;
   }
   function selectLayerUI(root,index,preserveLayerSel,uid,expected){
