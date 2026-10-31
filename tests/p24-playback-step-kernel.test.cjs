@@ -254,6 +254,13 @@ test('verifier rejects a skipped or repeated frame and a failed step', () => {
   assert.equal(verifyFixedClockSteps([step(1), step(1, true), step(1), step(1, true)], { start: 0, waIn: 0, waOut: 3 }).ok, false);
   assert.equal(verifyFixedClockSteps([step(1), step(1, false)], { start: 0, waIn: 0, waOut: 3 }).ok, false);
   assert.equal(verifyFixedClockSteps([], { start: 0, waIn: 0, waOut: 3 }).ok, false);
+  // A non-looping run stopped early (operator Stop or stall) must not pass on its matching prefix.
+  assert.equal(verifyFixedClockSteps([step(1), step(1, true)], { start: 0, waIn: 0, waOut: 3 }).ok, false);
+  // A looping run must cover at least one wrap of the work area unless --steps says otherwise.
+  const wrap = [1, 2, 3, 0].flatMap(f => [step(f), step(f, true)]);
+  assert.equal(verifyFixedClockSteps(wrap, { start: 0, waIn: 0, waOut: 3, loop: true }).ok, true);
+  assert.equal(verifyFixedClockSteps(wrap.slice(0, 4), { start: 0, waIn: 0, waOut: 3, loop: true }).ok, false);
+  assert.equal(verifyFixedClockSteps(wrap.slice(0, 4), { start: 0, waIn: 0, waOut: 3, loop: true, steps: 2 }).ok, true);
 });
 
 test('without the opt-in flag the observer exposes no clock and Play keeps requestAnimationFrame', async () => {

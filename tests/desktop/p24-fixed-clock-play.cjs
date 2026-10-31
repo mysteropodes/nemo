@@ -27,10 +27,16 @@ function verifyFixedClockSteps(events, spec) {
   const requests = events.filter(e => e.event === 'play-step' && e.result === undefined);
   const returns = events.filter(e => e.event === 'play-step' && e.result !== undefined);
   const observed = requests.map(e => e.frame);
-  const expected = expectedFrames({ ...spec, steps: spec.steps ?? (observed.length || 1) });
+  // A non-looping run is finite: the kernel's whole sequence must be requested, so a run that stalls or is
+  // stopped early fails. A looping or ping-pong run ends only when the operator stops it, so it must cover
+  // --steps requests when given, else at least one full pass of the work area (one wrap or reversal).
+  const finite = !spec.loop && !spec.ping;
+  const want = spec.steps ?? (finite ? undefined : Math.max(observed.length, spec.waOut - spec.waIn + 1));
+  const expected = expectedFrames({ ...spec, ...(want === undefined ? {} : { steps: want }) });
   const failures = [];
   if (!observed.length) failures.push('no play-step request was observed');
   if (observed.length > expected.length) failures.push('more requests than the kernel allows');
+  if (observed.length < expected.length) failures.push(`run ended after ${observed.length} of ${expected.length} expected requests`);
   const n = Math.min(observed.length, expected.length);
   for (let i = 0; i < n; i++) if (observed[i] !== expected[i]) { failures.push(`request ${i}: ${observed[i]} != ${expected[i]}`); break; }
   if (returns.length !== requests.length || returns.some(e => e.result !== true)) failures.push('a step did not return a presented frame');
