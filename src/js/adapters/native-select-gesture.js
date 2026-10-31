@@ -88,6 +88,46 @@
     return [la, lb, lb, ld, ax - la * ax - lb * ay, ay - lb * ax - ld * ay];
   }
   var identity = function (m) { return Math.abs(m[0] - 1) + Math.abs(m[1]) + Math.abs(m[2]) + Math.abs(m[3] - 1) + Math.abs(m[4]) + Math.abs(m[5]) < 1e-9; };
+  // The committed strokes as fresh presented paths (the old transient ones hold the geometry from before). A vector record's box angle comes
+  // back from the engine's listing (the turn was stored in the same batch); an image or text block has no stored one, so it keeps the session's.
+  async function reselect(root, sel, angle) {
+    var I = root.NemoSelectCanvasIntent, angles = {}, fresh = null;
+    sel.forEach(function (p) { angles[p.data.strokeId] = (p.data.boxAngle || 0) + (angle || 0); });
+    for (var tries = 0; tries < 2 && !fresh; tries++) {
+      if (tries) await new Promise(function (done) { (root.setTimeout || setTimeout)(done, 120); });
+      try { fresh = await I.reread(root, sel, false); } catch (_) { fresh = null; }
+    }
+    root.selectedPaths = fresh ? fresh.paths.map(function (p) { if (angles[p.data.strokeId] && (p.data.nativeRole === 'raster' || p.data.nativeRole === 'text')) p.data.boxAngle = angles[p.data.strokeId] % 360; return p; }) : [];
+    root.state.selectedStrokeIndices = [];
+  }
+  // ONE native batch of reshapes for the whole selection `sel` (its items may sit on several layers: every step names its own layer), the world
+  // affine `m` in each record's own space, against the document `o.pin` names. Used by the drag release and by the inspector's Transform fields
+  // and the arrow-key nudge (#2372 insp-transform-fields). `o`: { pin, gone (the notice for a document that moved on), angle (degrees of a turn, for a box angle that has no stored form), stale()
+  // (true when the document, frame, layer or selection moved on), cancelled() (Escape between the release and the send), release() (before the
+  // send) }. Resolves to 'applied', or to the refusal ('refused' / 'stale' / 'failed' / 'cancelled'); a refusal has already toasted.
+  async function commitMatrix(root, sel, m, o) {
+    o = o || {};
+    var gone = o.gone || 'The document changed during the drag \u2014 nothing was changed.';
+    var I = root.NemoSelectCanvasIntent, bad = unsupported(sel), ids = sel.map(function (p) { return p.data.strokeId; }), unread = sel.some(function (p) { return !Number.isInteger(p.data.nativeLayerIndex); });
+    if (bad) { notice(root, 'Transforming ' + bad + ' is not available on native projects yet.'); return 'refused'; }
+    if (!ids.length || unread) { notice(root, 'Select items to transform them.'); return 'refused'; }
+    if (ids.length > MAX_STEPS) { notice(root, 'Too many items to transform at once (' + MAX_STEPS + ' at most).'); return 'refused'; }
+    var cannot = unstorable(root, sel, m), route = root.NemoNativeObjectLabs && root.NemoNativeObjectLabs.desktop(root);
+    if (cannot) { notice(root, cannot + ' is not available on native projects yet.'); return 'refused'; }
+    if (o.stale && o.stale()) { notice(root, gone); return 'stale'; }
+    if (!route) { notice(root, 'Transforming is not available right now.'); return 'refused'; }
+    var layers = await I.reread(root, sel, false), again = I.presentedState(root);
+    if (!layers || !layers.complete || !again || !samePin(again.pin, o.pin)) { notice(root, gone); return 'stale'; }
+    var result, steps;
+    try { steps = I.transformSteps(root, layers.paths, m); } catch (_) { steps = null; }
+    if (steps && JSON.stringify(steps).length > MAX_BYTES) { notice(root, 'Too much to transform at once \u2014 select fewer items.'); return 'refused'; }
+    if (o.cancelled && o.cancelled()) return 'cancelled'; // Escape between the release and the send still cancels; once sent, the write is not cancellable (undo reverts it)
+    if (o.release) o.release();
+    try { result = steps ? await route.batchStrokes(layers.layerUid, layers.frame, steps) : null; } catch (_) { result = null; }
+    if (!result || result.status !== 'applied') { notice(root, 'The transform could not be applied.'); return 'failed'; }
+    await reselect(root, sel, o.angle);
+    return 'applied';
+  }
   function begin(root, e, abort) {
     var I = root.NemoSelectCanvasIntent, O = root.NemoNativeSelectOverlay, st = root.state, shown = I && st && st.tool === 'select' && st.appMode !== 'motion' && I.presentedState(root);
     if (!shown) return null;
@@ -193,41 +233,9 @@
       if (O) O.show(root);
       if (typeof root.updateUI === 'function') root.updateUI();
     }
-    // ONE native batch of reshapes for the whole selection (its items may sit on several layers: every step names its own layer), against the
-    // document the drag began on.
-    async function commit() {
-      var bad = unsupported(g.sel), ids = g.sel.map(function (p) { return p.data.strokeId; }), unread = g.sel.some(function (p) { return !Number.isInteger(p.data.nativeLayerIndex); });
-      if (bad) return notice(root, 'Transforming ' + bad + ' is not available on native projects yet.');
-      if (!ids.length || unread) return notice(root, 'Select items to transform them.');
-      if (ids.length > MAX_STEPS) return notice(root, 'Too many items to transform at once (' + MAX_STEPS + ' at most).');
-      var m = g.matrix, cannot = unstorable(root, g.sel, m), route = root.NemoNativeObjectLabs && root.NemoNativeObjectLabs.desktop(root);
-      if (cannot) return notice(root, cannot + ' is not available on native projects yet.');
-      if (stale()) return notice(root, 'The document changed during the drag — nothing was changed.');
-      if (!route) return notice(root, 'Transforming is not available right now.');
-      var layers = await I.reread(root, g.sel, false);
-      var again = I.presentedState(root);
-      if (!layers || !layers.complete || !again || !samePin(again.pin, g.pin)) return notice(root, 'The document changed during the drag — nothing was changed.');
-      var result;
-      var steps;
-      try { steps = I.transformSteps(root, layers.paths, m); } catch (_) { steps = null; }
-      if (steps && JSON.stringify(steps).length > MAX_BYTES) return notice(root, 'Too much to transform at once \u2014 select fewer items.');
-      if (g.cancelled) return; // Escape between the release and the send still cancels; once sent, the write is not cancellable (undo reverts it)
-      listen(false);
-      try { result = steps ? await route.batchStrokes(layers.layerUid, layers.frame, steps) : null; } catch (_) { result = null; }
-      if (!result || result.status !== 'applied') return notice(root, 'The transform could not be applied.');
-      await reselect(ids);
-    }
-    // The committed strokes as fresh presented paths (the old transient ones hold the geometry from before). A vector record's box angle comes
-    // back from the engine's listing (the turn was stored in the same batch); an image or text block has no stored one, so it keeps the session's.
-    async function reselect(ids) {
-      var angles = {}, fresh = null;
-      g.sel.forEach(function (p) { angles[p.data.strokeId] = (p.data.boxAngle || 0) + (g.kind === 'rotate' ? g.angle : 0); });
-      for (var tries = 0; tries < 2 && !fresh; tries++) {
-        if (tries) await new Promise(function (done) { (root.setTimeout || setTimeout)(done, 120); });
-        try { fresh = await I.reread(root, g.sel, false); } catch (_) { fresh = null; }
-      }
-      root.selectedPaths = fresh ? fresh.paths.map(function (p) { if (angles[p.data.strokeId] && (p.data.nativeRole === 'raster' || p.data.nativeRole === 'text')) p.data.boxAngle = angles[p.data.strokeId] % 360; return p; }) : [];
-      root.state.selectedStrokeIndices = [];
+    // The release commits through commitMatrix (shared with the inspector's Transform fields and the arrow-key nudge).
+    function commit() {
+      return commitMatrix(root, g.sel, g.matrix, { pin: g.pin, stale: stale, cancelled: function () { return g.cancelled; }, release: function () { listen(false); }, angle: g.kind === 'rotate' ? g.angle : 0 });
     }
     async function end(ev) {
       if (g.cancelled || !g.active) return cancel();
@@ -251,5 +259,5 @@
     return { move: move, end: end, cancel: cancel, owns: function () { return !!handle; } };
   }
   function bind(root) { return Object.freeze({ begin: function (e, abort) { return begin(root, e, abort); } }); }
-  return Object.freeze({ bind: bind, begin: begin, hitHandle: hitHandle, matrixOf: matrixOf, unsupported: unsupported, unstorable: unstorable });
+  return Object.freeze({ bind: bind, begin: begin, hitHandle: hitHandle, matrixOf: matrixOf, commitMatrix: commitMatrix, unsupported: unsupported, unstorable: unstorable });
 }));

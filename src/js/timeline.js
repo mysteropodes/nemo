@@ -3709,7 +3709,7 @@ function _restoreDrawingDefaults(){
 // type/boolean-op rows) — visibility itself is now owned by
 // updatePropsContext(), called separately.
 function updateSelPropsPanel(){
-  markNativeScrubFields();
+  markNativeScrubFields();markNativeXformFields();
   if((state.tool!=='select'&&state.tool!=='subselect')||!selectedPaths.length){_selPropsSig='';return;}
   // Subselect + vertices picked: show/drive THEIR bounds, not the whole
   // path's (activeXformBounds/Vertex mode, wired further down alongside
@@ -9848,6 +9848,9 @@ function onKeyDown(event){
     var nudgeStep=event.shiftKey?10:1;
     var ndx=k==='ArrowLeft'?-nudgeStep:k==='ArrowRight'?nudgeStep:0;
     var ndy=k==='ArrowUp'?-nudgeStep:k==='ArrowDown'?nudgeStep:0;
+    // #2372 insp-transform-fields: on a native object project the nudge is ONE native batch per press (or a notice saying why not), never the
+    // legacy writer below whose history checkpoint a native project refuses.
+    if(window.NemoNativeSelectionTransform&&NemoNativeSelectionTransform.native(window)){NemoNativeSelectionTransform.nudge(window,ndx,ndy,{repeat:!!event.repeat});return;}
     // Motion (2026-09 QA sweep): the canvas drag of this same selection
     // writes the layer's Motion Position (select-bridge's motion branch),
     // never the geometry — a nudge went straight to selPropsApplyMove and
@@ -10341,8 +10344,42 @@ document.getElementById('p-vecbrush').addEventListener('change',function(){windo
 // one per tick.
 function wireLiveXformField(id,apply){
   var el=document.getElementById(id),started=false;
-  el.addEventListener('input',function(){apply(this,started);started=true;});
-  el.addEventListener('change',function(){started=false;});
+  el.addEventListener('input',function(){
+    if(nativeXformOwned()){nativeTypedInput(this);nativeXformEdit(id,this);return;}
+    apply(this,started);started=true;
+  });
+  el.addEventListener('change',function(){
+    if(nativeXformOwned()){nativeScrubChange(this,function(){nativeXformEdit(id,el);});started=false;return;}
+    started=false;
+  });
+}
+// #2372 insp-transform-fields: on a native object project the fields commit the Select selection through ONE native batch
+// (adapters/native-selection-transform.js, coalesced per field), never through selPropsApply* whose history checkpoint a native project refuses.
+var NATIVE_XFORM_FIELDS={'sp-x':'x','sp-y':'y','sp-w':'w','sp-h':'h','sp-rot':'rot'};
+// The Transform fields scrub like the style ones on a native project: one change at release -> one native batch.
+function markNativeXformFields(){
+  var T=window.NemoNativeSelectionTransform,own=!!T&&T.native(window)&&selectedPaths.length>0;
+  Object.keys(NATIVE_XFORM_FIELDS||{}).forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el)return;
+    if(own)el.dataset.nativeOpacityScrub='static';
+    else if(el.dataset.nativeOpacityScrub==='static')delete el.dataset.nativeOpacityScrub;
+  });
+}
+function nativeXformOwned(){var T=window.NemoNativeSelectionTransform;return !!T&&T.native(window);}
+function nativeXformRead(){
+  var b=xformSelBounds();if(!b)return null;
+  var a=xformAnchorPoint(b);
+  return {bounds:{x:b.x,y:b.y,width:b.width,height:b.height},anchor:{x:a.x,y:a.y},rotAccum:state.selRotAccum||0};
+}
+function nativeXformEdit(id,el){
+  var T=window.NemoNativeSelectionTransform,field=NATIVE_XFORM_FIELDS[id],v=parseFloat(el.value);
+  if((field==='w'||field==='h')&&_spSizeLockOn){
+    // the locked partner field follows at once, as the baseline did (the batch itself is committed when the typing stops)
+    var b=xformSelBounds(),other=document.getElementById(field==='w'?'sp-h':'sp-w');
+    if(b&&other&&b.width>=0.01&&b.height>=0.01){var f=Math.max(0.01,v||(field==='w'?b.width:b.height))/(field==='w'?b.width:b.height);other.value=Math.round((field==='w'?b.height:b.width)*f);}
+  }
+  T.edit(window,{field:field,value:v,lock:_spSizeLockOn,vertex:activeXformVertexMode(),read:nativeXformRead});
 }
 // Subselect tool + at least one vertex picked (_nodeSel) drives THOSE
 // vertices' bounds/move/scale/rotate instead of the whole path's — 2026-07,
