@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object-component-read",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "query.document.object.component.read"
+  ],
+  "input": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectComponentReadPayload"
+  },
+  "output": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectComponentReadResult"
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "readPolicy": "Read the component model of the pinned immutable snapshot through the context resolver: the contexts the document declares (scene-root first, then every component in table order), one context's summary (name, fps, totalFrames, layerCount, instanceCount, exposedPropertyCount, hasCameraKeys), a page of its layers (layerUid, name, layerKind) and, for a component, a page of the scene layers that instance it in document order. A page holds at most 16 items and is also cut when the next item would exceed the 4096-byte response bound; nextCursor names the first unread index, null at the end; an item that cannot fit alone is unavailable, never truncated. A component record carries no camera keys natively, so its hasCameraKeys is false; the scene reports whether the project camera has keys. Exact atRevision and documentSnapshotId pins are required (a retained older snapshot answers its own pin); any other pin is stale_revision. An undeclared contextId is not_found; instances of scene-root is invalid_request. No mutation, revision publication, read receipt, context entry or mirror: opening a component context is a separate view-state command.",
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Bounded original request bytes and complete correlated response; at most 16 items per page, cut earlier by the response byte bound."
+  },
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Component model of a pinned document; replace example pins with the actual discovery snapshot",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "component-read",
+        "instanceId": "component-read-fixture",
+        "documentId": "native-object-document-1",
+        "operation": "query.document.object.component.read",
+        "payload": {
+          "atRevision": 3,
+          "documentSnapshotId": "native-object:native-object-document-1:3",
+          "selector": {
+            "kind": "contexts",
+            "cursor": 0,
+            "limit": 16
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "component-read",
+        "instanceId": "component-read-fixture",
+        "documentId": "native-object-document-1",
+        "contentRevision": 3,
+        "ok": true,
+        "result": {
+          "atRevision": 3,
+          "documentSnapshotId": "native-object:native-object-document-1:3",
+          "kind": "contexts",
+          "contextCount": 2,
+          "cursor": 0,
+          "items": [
+            {
+              "contextId": "scene-root",
+              "contextKind": "scene",
+              "name": null,
+              "totalFrames": 24,
+              "layerCount": 3
+            },
+            {
+              "contextId": "native-component:1:0",
+              "contextKind": "component",
+              "name": "Layer 1 (Comp)",
+              "totalFrames": 12,
+              "layerCount": 1
+            }
+          ],
+          "nextCursor": null
+        }
+      }
+    }
+  ]
+}

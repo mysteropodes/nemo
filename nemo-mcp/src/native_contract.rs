@@ -46,6 +46,8 @@ pub(crate) mod workspace;
 
 #[path = "native_comments_contract.rs"]
 pub(crate) mod comments;
+#[path = "native_component_read_contract.rs"]
+pub(crate) mod component_read;
 
 #[path = "native_diagnostics_contract.rs"]
 mod diagnostics;
@@ -122,6 +124,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
         operation,
         "query.document.object"
             | history_read::OP
+            | component_read::OP
             | text_read::OP
             | metadata::OP
             | property_read::OP
@@ -189,6 +192,7 @@ pub(crate) fn has_request_validator(operation: &str) -> bool {
 fn request_check(operation: &str, payload: &Value) -> Option<bool> {
     Some(match operation {
         history_read::OP => history_read::request(payload),
+        component_read::OP => component_read::request(payload),
         font::IMPORT | font::QUERY => font::request(operation, payload),
         brush::PUBLISH | brush::QUERY => brush::request(operation, payload),
         "query.document.object" => object::request(payload),
@@ -413,6 +417,7 @@ fn result_validator(operation: &str) -> Option<ResultValidator> {
     Some(match operation {
         // Routed before request validation in validate_result; listed for routing.
         history_read::OP => |_, _, p, r| history_read::result(p, r),
+        component_read::OP => |_, _, p, r| component_read::result(p, r),
         font::IMPORT | font::QUERY => |o, _, p, r| font::result(o, p, r),
         property_read::OP => |_, d, p, r| property_read::result(d, p, r),
         composition::READ | composition::EDIT => |o, d, p, r| composition::result(o, d, p, r),

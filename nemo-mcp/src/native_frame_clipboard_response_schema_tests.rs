@@ -70,7 +70,7 @@ fn complete_transport_schema_reaches_one_clipboard_result_branch_without_copy_cu
         "#/$defs/ObjectFrameBulkMoveResult",
         "#/$defs/ObjectProjectCompositionReadResult",
     ];
-    assert_eq!(branches.len(), retained.len() + 10);
+    assert_eq!(branches.len(), retained.len() + 11);
     assert_eq!(
         branches[37],
         json!({"$ref":"#/$defs/ObjectHistoryReadResult"})

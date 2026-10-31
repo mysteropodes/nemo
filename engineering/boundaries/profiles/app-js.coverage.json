@@ -3766,6 +3766,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-object-component-read-contract.js",
+      "moduleId": "app.native.object.component.read.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-object-component-intent.js",
       "moduleId": "app.native.object.component.intent",
       "executionClass": "document-classic",

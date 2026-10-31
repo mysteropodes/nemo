@@ -63,6 +63,9 @@ mod text_read;
 mod text_read_tests;
 #[path = "object_timing_snapshot.rs"]
 mod timing;
+// #2256: the read-only component model (contexts, layers, instances) over the context resolver.
+#[path = "object_component_read.rs"]
+mod component_read;
 // L03-M (#2109): widget write planning through the evaluation kernel (commands may not import it).
 #[path = "object_widget_read.rs"]
 pub(crate) mod widget_read;
@@ -280,6 +283,9 @@ impl ObjectSnapshot {
         }
         if request.operation == "query.document.object.property.metadata" {
             return self.dispatch_property_metadata(&request);
+        }
+        if request.operation == component_read::OPERATION {
+            return self.dispatch_component_read(&request);
         }
         if request.operation == "query.document.object.property.read" {
             return self.dispatch_property_read(&request);

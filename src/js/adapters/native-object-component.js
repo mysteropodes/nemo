@@ -8,10 +8,11 @@
   const commonjs = typeof module === 'object' && module.exports;
   const contract = commonjs ? require('./native-object-component-contract.js') : root.NemoNativeObjectComponentContract;
   const core = commonjs ? require('./native-object-component-intent.js') : root.NemoNativeObjectComponentIntent;
-  const api = factory(contract, core);
+  const reads = commonjs ? require('./native-object-component-read-contract.js') : root.NemoNativeObjectComponentReadContract;
+  const api = factory(contract, core, reads);
   if (commonjs) module.exports = api;
   else root.NemoNativeObjectComponent = api;
-}(typeof globalThis === 'object' ? globalThis : this, function (contract, core) {
+}(typeof globalThis === 'object' ? globalThis : this, function (contract, core, reads) {
   'use strict';
 
   const SCENE = 'scene-root';
@@ -90,6 +91,59 @@
       return runner.run(OP('component.expose'), input, 'component-expose');
     }
 
+    // #2256: the read-only native component model (contexts, one context's summary, its layers, the scene layers that instance it),
+    // pinned to the presented revision and snapshot. Reads nothing from the legacy symbols table and opens no context. A response
+    // is judged by the read contract at this edge, and an answer is discarded when the project moved on while it was read.
+    function read(selector) {
+      return runner.exclusive(async () => {
+        const operation = 'component.read';
+        const unavailable = (reason, extra) => fail(operation, 'unavailable', Object.assign({ reason }, extra));
+        if (!reads || typeof ports.read !== 'function' || typeof ports.readDeclared !== 'function') return unavailable('component_read_unavailable');
+        let declared = false;
+        try { declared = ports.readDeclared(reads.OP) === true; } catch (_) { declared = false; }
+        if (!declared) return unavailable('native_declaration_absent');
+        let pin = null;
+        try { pin = ports.pin(); } catch (_) { pin = null; }
+        if (!pin || typeof pin.instanceId !== 'string' || typeof pin.documentId !== 'string' || !Number.isSafeInteger(pin.contentRevision) || typeof pin.documentSnapshotId !== 'string') return unavailable('no_presented_native_session');
+        let request;
+        try {
+          const body = { atRevision: pin.contentRevision, documentSnapshotId: pin.documentSnapshotId, selector: JSON.parse(JSON.stringify(selector)) };
+          reads.payload(reads.OP, body);
+          const requestId = ports.requestId('component-read');
+          if (typeof requestId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(requestId)) throw new TypeError('request id is not a bounded identifier');
+          request = { apiVersion: 2, requestId, instanceId: pin.instanceId, documentId: pin.documentId, operation: reads.OP, payload: body };
+        } catch (error) { return fail(operation, 'invalid_request', { reason: String(error && error.message || error) }); }
+        let response;
+        try { response = await ports.read(request); } catch (error) {
+          if (error && error.notSent === true) return unavailable(error.reason || 'native_project_busy', { requestId: request.requestId });
+          return fail(operation, 'transport_failed', { requestId: request.requestId, message: String(error && error.message || error) });
+        }
+        if (!response || response.requestId !== request.requestId || typeof response.ok !== 'boolean') return fail(operation, 'transport_failed', { requestId: request.requestId, message: 'uncorrelated native response' });
+        if (!response.ok) {
+          const code = response.error && response.error.code || 'unavailable';
+          return fail(operation, code, { requestId: request.requestId, stale: code === 'stale_revision', message: response.error && response.error.message });
+        }
+        try { reads.correlate(request, response); } catch (bad) { return fail(operation, 'transport_failed', { requestId: request.requestId, message: 'uncorrelated native read: ' + bad.message }); }
+        let after = null;
+        try { after = ports.pin(); } catch (_) { after = null; }
+        if (!after || after.contentRevision !== pin.contentRevision || after.documentSnapshotId !== pin.documentSnapshotId) return fail(operation, 'stale_revision', { requestId: request.requestId, stale: true });
+        return Object.freeze({ ok: true, operation, requestId: request.requestId, revision: response.contentRevision, result: detach(response.result) });
+      });
+    }
+    // Every context of the document in order (scene-root first), following nextCursor; bounded so a malformed owner cannot loop.
+    async function listContexts() {
+      const operation = 'component.contexts', items = [];
+      let cursor = 0;
+      for (let guard = 0; guard < 64; guard += 1) {
+        const page = await read({ kind: 'contexts', cursor, limit: reads ? reads.MAX_PAGE : 16 });
+        if (!page.ok) return fail(operation, page.code, { reason: page.reason, message: page.message, stale: page.stale });
+        items.push(...page.result.items);
+        if (page.result.nextCursor === null) return Object.freeze({ ok: true, operation, revision: page.revision, contexts: Object.freeze(items) });
+        cursor = page.result.nextCursor;
+      }
+      return fail(operation, 'unavailable', { reason: 'component_pages_unbounded' });
+    }
+
     // The same typed refusal, reported under the operation the caller asked for.
     function refail(operation, failed) { return fail(operation, failed.code, { reason: failed.reason, message: failed.message }); }
     async function readModel() {
@@ -154,7 +208,7 @@
     }
     return Object.freeze({
       convert, convertLayer: (layerUid) => convert([layerUid]), place, expose,
-      readModel, storyboard, enter, exit,
+      readModel, storyboard, enter, exit, read, listContexts,
     });
   }
 
