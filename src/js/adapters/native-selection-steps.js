@@ -77,6 +77,25 @@
     } else DETAIL.forEach(function (k) { if (!(pick && ['miter', 'dashOffset', 'strokeStyle'].indexOf(k) >= 0)) copy(k); });
     return Object.keys(out).length ? out : null;
   }
+  // A colour as the panel and the engine compare it: lower case, the opaque alpha byte dropped (#rrggbbff is #rrggbb).
+  function key(c) { var h = typeof c === 'string' ? c.toLowerCase() : ''; return /^#[0-9a-f]{8}$/.test(h) && h.slice(7) === 'ff' ? h.slice(0, 7) : h; }
+  // The colours one listed item shows the Selected Colors panel: its fill and (outside a ribbon, which is inked by its fill) its stroke; a mask shows none.
+  function coloursOf(path) {
+    var st = path.data.nativeStyle || {}, role = path.data.nativeRole;
+    if (role === 'mask' || role === 'raster') return [];
+    return [key(st.fill)].concat(role === 'ribbon' || path.data.nativeRibbon === true ? [] : [key(st.stroke)]).filter(function (c) { return HEX.test(c); });
+  }
+  // Selected Colors panel recolour (baseline color-manager recolorColor): every fill or stroke of a selected item that equals `from` becomes `to`, alpha
+  // byte included (the colour is the whole #rrggbb[aa]); an item with no match gets no step.
+  function recolourSteps(paths, from, to) {
+    return paths.map(function (p) {
+      var st = p.data.nativeStyle || {}, m = {}, ribbon = p.data.nativeRole === 'ribbon' || p.data.nativeRibbon === true;
+      if (key(st.fill) === from) m.fill = to;
+      if (!ribbon && key(st.stroke) === from) m.stroke = to;
+      var style = Object.keys(m).length ? styleFor(p, m, 'stroke') : null;
+      return style && { restyle: { stableTarget: p.data.nativeStableTarget, style: style } };
+    }).filter(Boolean);
+  }
   function restyleSteps(paths, style, last) {
     return paths.map(function (p) {
       var st = styleFor(p, style, last);
@@ -101,5 +120,5 @@
     });
     return { layerUid: fresh.layerUid, frame: fresh.frame, steps: I.reshapeSteps(touched) };
   }
-  return Object.freeze({ valid: valid, alone: alone, styleFor: styleFor, restyleSteps: restyleSteps, smoothSteps: smoothSteps });
+  return Object.freeze({ valid: valid, alone: alone, styleFor: styleFor, restyleSteps: restyleSteps, key: key, coloursOf: coloursOf, recolourSteps: recolourSteps, smoothSteps: smoothSteps });
 }));
