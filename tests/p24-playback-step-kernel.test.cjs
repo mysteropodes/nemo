@@ -209,13 +209,13 @@ function observerHarness({ fixedClock }) {
     listen: async () => () => {} });
   return { observer, events, sequences };
 }
-async function playUnderClock({ fixedClock, waOut, loop = false, ping = false, documentId = 'native-document-1', stopAfter = 0 }) {
+async function playUnderClock({ fixedClock, waOut, loop = false, ping = false, documentId = 'native-document-1', stopAfter = 0, extra = {} }) {
   const { observer, events, sequences } = observerHarness({ fixedClock });
   await observer.ready;
   const state = { playing: false, playDir: 1, currentFrame: 0, fps: 24, waIn: 0, waOut, loopPlayback: loop, pingPongPlayback: ping };
   const written = [], rafs = [];
   const owner = { isActive: () => true, blocksLegacy: () => true,
-    identity: () => ({ instanceId: '00000000-0000-4000-8000-000000000002', documentId, contentRevision: 0 }) };
+    identity: () => ({ instanceId: '00000000-0000-4000-8000-000000000002', documentId, contentRevision: 0, ...extra }) };
   const window = { NemoTestPlayObserver: observer, NemoNativeOpacityCutover: owner,
     SMAudio: { onPlayStart() {}, onLoop() {} },
     requestAnimationFrame: fn => { rafs.push(fn); return rafs.length; }, cancelAnimationFrame() {} };
@@ -301,6 +301,19 @@ test('object project Play under the fixed clock: a no-loop run publishes 1..W an
   const verdict = verifyFixedClockSteps(r.events, { start: 0, waIn: 0, waOut: 4 });
   assert.deepEqual(verdict.failures, []);
   assert.deepEqual(verdict.observed, [1, 2, 3, 4]);
+});
+
+test('object project Play: the identity is the whole project info, and only its pins reach the collector', async () => {
+  // A native object project's identity() is its project info: layers, canvas, timing... (installed run at 854b3d88
+  // logged only 'ready' because play-start carried these members, snapshot() dropped it and the sink refused the rest).
+  const info = { lifecycleGeneration: 1, documentSnapshotId: 'native-object:native-object-document-7:0', canvasW: 320, canvasH: 180,
+    fps: 24, totalFrames: 4, layers: [{ layerUid: 'L1', name: 'Layer 1', visible: true }], layerFolders: [], layerModelUnavailable: ['linkGroup'] };
+  const r = await playUnderClock({ fixedClock: true, waOut: 3, loop: true, documentId: OBJECT_DOC, stopAfter: 5, extra: info });
+  assert.equal(r.observer.inspect().dropped, 0, 'no event dropped');
+  assert.deepEqual(r.sequences, r.sequences.map((_, i) => i + 1));
+  const start = r.events.find(e => e.event === 'play-start');
+  assert.deepEqual(Object.keys(start).sort(), ['contentRevision', 'documentId', 'documentSnapshotId', 'event', 'instanceId', 'lifecycleGeneration', 'runGeneration']);
+  assert.deepEqual(verifyFixedClockSteps(r.events, { start: 0, waIn: 0, waOut: 3, loop: true, steps: 5 }).failures, []);
 });
 
 test('the bootstrap accepts opacity and object document ids and still refuses malformed ones', async () => {
