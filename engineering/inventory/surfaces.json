@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "acc738e907d10ecf94c6ebe23503e28ebc89b620",
-  "describe": "v0.7.0-alpha.4-5031-gacc738e90-dirty"
+  "head": "44a73431b6875276e1ed5b7c4f0d0dab0c50c9f5",
+  "describe": "v0.7.0-alpha.4-5033-g44a73431b-dirty"
  },
- "inputsDigest": "88766e43525ef866b8325dff4676e0d7d19bd8c408e453e359cc1531655f4050",
+ "inputsDigest": "d192f9b7780c296df9e349ed4d8fade5aa3dd2ab047a420231ba0118cf09936c",
  "states": [
   "inventoried",
   "characterized",
@@ -26,17 +26,17 @@
   "native"
  ],
  "counts": {
-  "total": 924,
+  "total": 922,
   "byKind": {
    "dom": 485,
    "labs": 36,
-   "menu": 277,
+   "menu": 275,
    "sdk": 76,
    "shortcut": 50
   },
   "byStatus": {
    "inventoried": 886,
-   "unmapped": 37,
+   "unmapped": 35,
    "unavailable-with-reason": 1
   },
   "byArea": {
@@ -44,7 +44,7 @@
    "drawing-selection": 270,
    "media-import-export": 52,
    "timeline-layers-frames": 175,
-   "animation-rigs-expressions": 159,
+   "animation-rigs-expressions": 157,
    "effects-masks": 10,
    "preferences-workspace": 42,
    "unclassified": 11,
@@ -22572,76 +22572,6 @@
     "functionsVisited": 21
    },
    "fixtures": []
-  },
-  {
-   "id": "menu:adapters/native-motion-layer-link-rows.js:build",
-   "kind": "menu",
-   "surface": "dynamic menu (build)",
-   "capability": "  ",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/adapters/native-motion-layer-link-rows.js:144 build()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason",
-   "source": "src/js/adapters/native-motion-layer-link-rows.js:144",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:adapters/native-motion-layer-link-rows.js:sourceItems",
-   "kind": "menu",
-   "surface": "dynamic menu (sourceItems)",
-   "capability": "  ",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/adapters/native-motion-layer-link-rows.js:139 sourceItems()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason",
-   "source": "src/js/adapters/native-motion-layer-link-rows.js:139",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
   },
   {
    "id": "menu:adapters/native-palette-ui.js:colors:remplacer-dans-le-calque-u2026",
