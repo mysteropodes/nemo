@@ -133,7 +133,7 @@
       return false;
     }).then(function (done) {
       busy.delete(host);
-      if (queued.delete(host)) guarded(host, function () { return refresh(host, null); });
+      if (queued.delete(host)) guarded(host, function () { var s = session(host), i = s && s.info(); return i ? settle(host, null, i.contentRevision) : false; });
       return done;
     });
   }
@@ -205,29 +205,60 @@
     host._layerSel = (Array.isArray(host._layerSel) ? host._layerSel : []).filter(function (i) { return i < count; });
   }
   // Re-read the entered context against the current revision: a context that vanished is left, the others re-read their layers.
+  // Resolves true once the context is settled (refreshed, gone, or no longer entered) and false when the owner could not answer.
   async function refresh(host, lease) {
     var c = intent(host), was = entered.get(host);
-    if (!c || !was) return false;
+    if (!was) return true;
+    if (!c) return false;
     var res = await transition(c, { kind: 'refresh' }, viewNow(host), lease);
     if (!res.ok) return false;
     if (res.outcome === 'context_gone') { await applyExited(host, res, null, lease); toast(host, 'The component no longer exists.'); return true; }
     var rows = await readRows(c, was.contextId, lease);
-    if (entered.get(host) !== was) return false; // left (or replaced) while the layers were read
+    if (entered.get(host) !== was) return true; // left (or replaced) while the layers were read
     await readNames(host, c, session(host).info(), lease).catch(function () { return null; });
     projectRefreshed(host, was, res, rows);
     repaint(host);
     return true;
   }
+  // A failed refresh is asked again after these pauses (bounded), then the scene is shown instead of a stale entered view.
+  var RETRY_MS = [100, 300, 900];
+  function pause(host, ms) { return new Promise(function (resolve) { (typeof host.setTimeout === 'function' ? host.setTimeout : setTimeout)(resolve, ms); }); }
+  // Retries ran out: leave the context for the scene (the owner's exit, applied from the native truth) and say so.
+  async function giveUp(host, lease) {
+    var c = intent(host);
+    try {
+      var res = c ? await transition(c, { kind: 'exit' }, viewNow(host), lease) : null;
+      if (res && res.ok && (res.outcome === 'exited' || res.outcome === 'not_in_context')) {
+        await applyExited(host, res, null, lease);
+        toast(host, 'The component could not be refreshed; back to the Scene.');
+        return true;
+      }
+    } catch (_) { /* reported below: the entered view stays fenced (projectionReady is false) */ }
+    toast(host, 'Native component context: the component could not be refreshed.');
+    return false;
+  }
+  // Re-read the entered context until it is settled. The revision is acknowledged (`st.revision`) ONLY once a refresh succeeded: until then
+  // projectionReady() is false, so the viewport never presents a revision over rows, tabs and a frame count that are stale.
+  async function settle(host, lease, target) {
+    var st = live(host);
+    for (var attempt = 0; attempt <= RETRY_MS.length; attempt += 1) {
+      if (!st || live(host) !== st) return true; // left, closed or replaced meanwhile: nothing left to settle
+      var ok = false;
+      try { ok = await refresh(host, lease); } catch (_) { ok = false; }
+      if (ok) { if (live(host) === st) st.revision = target; return true; }
+      if (attempt < RETRY_MS.length) await pause(host, RETRY_MS[attempt]);
+    }
+    return st && live(host) === st ? giveUp(host, lease) : true;
+  }
   // A revision moved on (Undo, an MCP edit). `lease` is the publication the project queue is running: the refresh rides it, so the
   // context, frame count and layers are settled BEFORE the frame of this revision is presented (a shrunk or deleted component is
   // never asked for a frame it no longer has). Without a lease the refresh is queued behind any transition in flight, never dropped.
   function revision(host, info, lease) {
-    var st = live(host);
-    if (!st || st.revision === info.contentRevision) return Promise.resolve(true);
-    st.revision = info.contentRevision;
-    if (lease) return refresh(host, lease).catch(function (error) { toast(host, 'Native component context: ' + (error && error.message || 'unavailable')); return false; }).then(function () { return true; });
+    var st = live(host), target = info.contentRevision;
+    if (!st || st.revision === target) return Promise.resolve(true);
+    if (lease) return settle(host, lease, target).then(function () { return true; });
     if (busy.has(host)) { queued.add(host); return Promise.resolve(true); }
-    return guarded(host, function () { return refresh(host, null); }).then(function () { return true; });
+    return guarded(host, function () { return settle(host, null, target); }).then(function () { return true; });
   }
   // The final projection check of a revision synchronization while a component is presented: same owner, same revision.
   function projectionReady(host, info) {
