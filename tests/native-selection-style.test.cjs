@@ -175,8 +175,8 @@ test('the hit-test listing contract admits the optional style and refuses a malf
   const target = quad('A', 0, 0, 1, 1).stableTarget;
   const result = (style) => ({ kind: 'subselect', contextId: 'scene-root', layerUid: 'L', frame: 0, workId: 'native-work-1', viewGeneration: 1, cursor: 0, hitTest: true, atRevision: 7, documentSnapshotId: 'native-object:document:7', total: 1, nextCursor: null, preview: false,
     items: [{ stableTarget: target, closed: true, count: 4, matrix: [1, 0, 0, 1, 0, 0], bounds: [0, 0, 1, 1], role: 'plain', filled: true, ...(style === undefined ? {} : { style }) }] });
-  for (const good of [undefined, { fill: '#112233' }, { fill: '#11223380', stroke: '#445566', width: 4, opacity: 0.5 }, { opacity: 0 }]) Subselect.viewResult(result(good));
-  for (const bad of [{}, { fill: 'red' }, { fill: null }, { width: 0 }, { opacity: 2 }, { colour: '#000000' }, '#000000']) {
+  for (const good of [undefined, { fill: '#112233' }, { fill: '#11223380', stroke: '#445566', width: 4, opacity: 0.5 }, { opacity: 0 }, { strokeStyle: 'dashed', brushPreset: 'chalk-round' }]) Subselect.viewResult(result(good));
+  for (const bad of [{}, { fill: 'red' }, { fill: null }, { width: 0 }, { opacity: 2 }, { colour: '#000000' }, '#000000', { strokeStyle: 'wavy' }, { strokeStyle: null }, { brushPreset: '' }, { brushPreset: 7 }]) {
     assert.throws(() => Subselect.viewResult(result(bad)), TypeError, JSON.stringify(bad));
   }
 });
@@ -216,6 +216,34 @@ test('the panel setters route a native selection to the adapter first and the pa
     assert.ok(head.includes(first), setter + ' hands a native selection over before the legacy gate');
   }
   assert.ok(TIMELINE.includes('var ref=nativeStyleView(selectedPaths[0]);'), 'the panel reads the selection through the listed style');
+});
+
+test('the Stroke panel shows the listed Stroke Style and brush preset of the selection and the draw defaults come back on the draw tool (#2372 INSP-READBACK)', () => {
+  class Color { constructor(v) { this.value = v; } }
+  const elements = { 'p-strokestyle': { value: 'solid' } }, painted = [];
+  const sandbox = { window: { NemoNativeSelectionStyle: { handles: () => true, shown: Style.shown }, BrushPresetPicker: { paintButton: (k) => painted.push(k) } }, Color, Object, state: { strokeStyle: 'solid', brushPreset: 'none' },
+    document: { getElementById: (id) => elements[id] || null } };
+  vm.createContext(sandbox);
+  vm.runInContext(['nativeStyleView', 'nativeStyleReadback'].map(extract).join('\n') + '\nthis.f={nativeStyleView,nativeStyleReadback};', sandbox);
+  const view = (role, style) => sandbox.f.nativeStyleView({ id: 1, data: { strokeId: 'S', nativeRole: role, nativeStyle: style } });
+  // A dashed plain stroke: the select and the state follow it; no preset listed reads as None.
+  sandbox.f.nativeStyleReadback(view('plain', { stroke: '#445566', width: 4, opacity: 1, strokeStyle: 'dashed' }));
+  assert.deepEqual([elements['p-strokestyle'].value, sandbox.state.strokeStyle, sandbox.state.brushPreset, painted], ['dashed', 'dashed', 'none', ['none']]);
+  // A texture anchor: its preset is shown, the style of its centreline too.
+  sandbox.f.nativeStyleReadback(view('brush', { width: 4, opacity: 1, strokeStyle: 'dotted', brushPreset: 'chalk-round' }));
+  assert.deepEqual([elements['p-strokestyle'].value, sandbox.state.brushPreset, painted[1]], ['dotted', 'chalk-round', 'chalk-round']);
+  // A hand-made dash lists no style: the control keeps what it showed. A ribbon (or an image) has no preset to show.
+  sandbox.f.nativeStyleReadback(view('plain', { stroke: '#445566', width: 4, opacity: 1 }));
+  assert.equal(sandbox.state.strokeStyle, 'dotted');
+  assert.equal(view('ribbon', { fill: '#101010', width: 8, opacity: 1, brushPreset: 'chalk-round' }).brushPreset, undefined, 'a ribbon is not eligible for a preset');
+  assert.equal(view('raster', { opacity: 1 }).brushPreset, undefined);
+  // A legacy path (no listed style) is read as it was.
+  sandbox.state.strokeStyle = 'dashed'; elements['p-strokestyle'].value = 'dashed';
+  sandbox.f.nativeStyleReadback({ id: 2, data: {}, strokeStyle: 'dotted' });
+  assert.deepEqual([sandbox.state.strokeStyle, elements['p-strokestyle'].value], ['dashed', 'dashed']);
+  // The panel calls it from the cap / join / dash block and the draw tool brings its own defaults back.
+  assert.ok(TIMELINE.includes('document.getElementById(\'p-dashoffset\').value=state.dashOffset;\n        nativeStyleReadback(ref);'), 'the panel reads the style back where it reads the cap and the dash offset');
+  assert.ok(TIMELINE.includes('strokeStyle:state.strokeStyle,brushPreset:state.brushPreset,') && TIMELINE.includes('state.brushPreset=d.brushPreset;'), 'the drawing defaults keep the style and the preset');
 });
 
 test('the panel opts its multi-select restyle in to skipping the steps the engine cannot do; the adapter batch is atomic otherwise (#2372)', async () => {
