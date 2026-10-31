@@ -1,13 +1,11 @@
 //! Owner-held work only: GPU and surface remain borrowed from the caller.
 use crate::native_dispatch::{NativeObjectHost, NativeReleaseProgress};
 use native_engine::desktop_viewport::{
-    ObjectPresentedFrame, ObjectPreviewNavigation, ObjectPreviewView, ObjectViewProjection,
+    ObjectPresentedFrame, ObjectPreviewView, ObjectViewProjection,
     ViewportDisplayFilter,
 };
 use native_engine::{
-    application::{
-        prepare_ghost_underlay, ApplicationReleaseReceipt, ObjectBrushRuntime, ObjectMotionFrameControl,
-    },
+    application::{ApplicationReleaseReceipt, ObjectBrushRuntime, ObjectMotionFrameControl},
     compositor::Compositor,
     desktop_viewport::{
         DesktopViewportHost, ObjectViewportFrame, PresentationReceipt, SurfacePort, ViewportStatus,
@@ -216,54 +214,6 @@ impl NativeObjectHost {
         )
     }
 
-    pub(crate) fn with_prepared_object_preview_for_view<T>(
-        &mut self,
-        expected: &ObjectFrameSelector<'_>,
-        output: OutputSpec,
-        view: ObjectPreviewView,
-        pending_proof_fallback: bool,
-        operation: impl FnOnce(&mut Self) -> Result<T, String>,
-    ) -> Result<T, String> {
-        self.with_prepared_object_preview_for_navigation(
-            expected,
-            output,
-            view,
-            ObjectPreviewNavigation::default(),
-            None,
-            pending_proof_fallback,
-            operation,
-        )
-    }
-    pub(crate) fn with_prepared_object_preview_for_navigation<T>(
-        &mut self,
-        expected: &ObjectFrameSelector<'_>,
-        output: OutputSpec,
-        view: ObjectPreviewView,
-        navigation: ObjectPreviewNavigation,
-        ghosts: Option<native_engine::object_render_scene::GhostUnderlayRequest>,
-        pending_proof_fallback: bool,
-        operation: impl FnOnce(&mut Self) -> Result<T, String>,
-    ) -> Result<T, String> {
-        if self.preview.prepared.is_some() {
-            return Err("native object preview preparation is already borrowed".into());
-        }
-        let prepared = self.prepare_object_preview_navigation(
-            expected,
-            output,
-            view,
-            navigation,
-            ghosts,
-            pending_proof_fallback,
-        )?;
-        self.preview.prepared = Some(prepared);
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(self)));
-        self.preview.prepared = None;
-        match result {
-            Ok(result) => result,
-            Err(payload) => std::panic::resume_unwind(payload),
-        }
-    }
-
     pub(crate) fn present_prepared_object_preview<P: SurfacePort>(
         &mut self,
         expected: &ObjectFrameSelector<'_>,
@@ -395,20 +345,8 @@ impl NativeObjectHost {
         let vector_source = (!composition.has_scene_images() && !media.draws_video(expected.frame))
             .then(|| composition.clone());
         let composition = media.witness(expected.frame, composition)?;
-        // #2358 GHOST-UNDER: onion / Ghost All composed UNDER the live frame by the native renderer (preview only; this
-        // witness is the viewport witness, never an export). The retained vector source above is hit-test geometry and
-        // never contains ghosts.
-        let (composition, ghost_receipt) = match &ghosts {
-            Some(request) => {
-                let underlay = prepare_ghost_underlay(&snapshot, request, expected.frame);
-                let receipt = underlay.receipt();
-                let composition = composition
-                    .with_ghost_underlay(underlay)
-                    .map_err(|e| format!("preview onion composition: {e:?}"))?;
-                (composition, Some(receipt))
-            }
-            None => (composition, None),
-        };
+        // #2358 GHOST-UNDER: onion / Ghost All composed UNDER the live frame (preview witness only, never an export).
+        let (composition, ghost_receipt) = prepare::attach_ghosts(composition, ghosts.as_ref(), &snapshot, expected.frame)?;
         let key = if media.draws_video(expected.frame) {
             EvaluationKey::new(
                 key.document_snapshot_id(),
@@ -514,11 +452,7 @@ impl NativeObjectHost {
             self.preview.presented_mesh_view = Some(receipt.clone());
             self.preview.presented_vectors = vector_source;
         }
-        Ok(ObjectPresentedFrame {
-            receipt,
-            view,
-            ghosts: ghost_receipt,
-        })
+        Ok(ObjectPresentedFrame { receipt, view, ghosts: ghost_receipt })
     }
 
 
