@@ -4920,6 +4920,25 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-eyedropper.js",
+      "moduleId": "app.native.eyedropper",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2577,
+          "scriptOrdinal": 1
+        }
+      ],
+      "sourceEvidence": [
+        {
+          "path": "src/index.html",
+          "line": 2577,
+          "role": "actual ordered classic script load of the native Eyedropper adapter; installed acceptance remains open"
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-palette-ui.js",
       "moduleId": "app.native.palette.ui",
       "executionClass": "document-classic",

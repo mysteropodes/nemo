@@ -3855,6 +3855,18 @@
       ]
     },
     {
+      "id": "app.native.eyedropper",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-eyedropper.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-eyedropper.js"
+      ]
+    },
+    {
       "id": "app.native.palette.ui",
       "layer": "adapters",
       "dir": "src/js/adapters",

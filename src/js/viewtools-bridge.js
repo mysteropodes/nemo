@@ -154,6 +154,18 @@
     return (hit && hit.item instanceof Path) ? hit.item : null;
   }
 
+  var NATIVE_PICK_PORTS = {
+    setColor: setColorUI,
+    setBrushSize: function (w) { state.brushSize = w; var sw = document.getElementById('p-sw'); if (sw) sw.value = Math.round(w); },
+    selectPreset: function (key) { if (window.BrushPresetPicker) window.BrushPresetPicker.selectPreset(key); },
+    toast: function (text) { if (typeof showToast === 'function') showToast(text); }
+  };
+  function nativePick(e) {
+    var A = window.NemoNativeEyedropper;
+    if (A) A.pickAt(window, NATIVE_PICK_PORTS, e.clientX, e.clientY);
+    else NATIVE_PICK_PORTS.toast('Nothing to pick here');
+  }
+
   function pick(e) {
     var hitEp = hitPickable(e.clientX, e.clientY);
     if (!hitEp) return;
@@ -213,6 +225,13 @@
       e.preventDefault();
       nativeRotateGesture = true;
       if (typeof showToast === 'function') showToast(NATIVE_ROTATE_NOTICE);
+      return;
+    }
+    if (!state.playing && !state.spaceDown && state.tool === 'eyedropper' && nativeOwned()) {
+      // #2372: a native object project holds no Paper items; the pick reads the engine's hit-test listing (adapters/native-eyedropper.js), read-only.
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      nativePick(e);
       return;
     }
     if (shouldPan()) {
@@ -297,7 +316,7 @@
       // stopImmediatePropagation/preventDefault: this isn't a gesture, just
       // a read-only "is there anything under the cursor right now" check so
       // the cursor can hint whether a click would actually pick something.
-      if (shouldPick()) {
+      if (shouldPick() && !nativeOwned()) { // native: the listing read is async, so no per-move hover hint
         var hovering = !!hitPickable(e.clientX, e.clientY);
         if (hovering !== pickHover) {
           pickHover = hovering;
