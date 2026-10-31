@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "1a367eae76ba83b09086482dfa091eb303577376",
+    "candidateCommit": "2a1a6885ea8acd9564f415004b143d1318b569da",
     "sourceRootTree": "6939e02f442cc2059cd82ee5df165f7ee6a69d34",
     "applicationTree": {
       "path": "src/js",
       "gitTree": "a74661117f0a84bdc3beff4663e10897a6ce2c60",
-      "lastChangedCommit": "1a367eae76ba83b09086482dfa091eb303577376"
+      "lastChangedCommit": "2a1a6885ea8acd9564f415004b143d1318b569da"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -43,7 +43,7 @@
         "gitBlob": "6bfd294ce670cb99b8d419cfea754002978e0d19",
         "sha256": "b73caddf68f0078b124afe5037d93f9e59e9d0eca02ab511f589e8ab2707aafc",
         "moduleCount": 307,
-        "basedOnCommit": "1a367eae76ba83b09086482dfa091eb303577376"
+        "basedOnCommit": "2a1a6885ea8acd9564f415004b143d1318b569da"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -121,13 +121,13 @@
   "bootstrapObservations": {
     "path": "src/index.html",
     "scriptOrdinalConvention": "One-based order of all script start tags, including inline and excluded vendor tags.",
-    "totalScriptTags": 382,
-    "externalClassicTags": 379,
+    "totalScriptTags": 379,
+    "externalClassicTags": 376,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
     "retainedClassicTags": 372,
     "retainedModuleTags": 2,
-    "classicTagsUnderSrcJsIncludingVendors": 378,
+    "classicTagsUnderSrcJsIncludingVendors": 375,
     "inlineScripts": [
       {
         "path": "src/index.html",
@@ -3928,7 +3928,7 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2384,
+          "line": 2385,
           "scriptOrdinal": 76
         }
       ]
@@ -4156,8 +4156,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2693,
-          "scriptOrdinal": 343
+          "line": 2698,
+          "scriptOrdinal": 347
         }
       ]
     },
@@ -4888,7 +4888,7 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2367,
+          "line": 2368,
           "scriptOrdinal": 59
         }
       ]
