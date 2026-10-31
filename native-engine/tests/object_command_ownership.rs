@@ -29,7 +29,7 @@ const ROUTED_ELSEWHERE: &[(&str, &str)] = &[
     ),
     (
         "command.document.object.brush.bitmap.publish",
-        "object_brush_read.rs and read_queries.rs (brush store publication route)",
+        "object_brush_bitmap_route.rs (ObjectBrushRuntime::dispatch_bitmap_resource: the host routes the brush resource publish/read to the session-owned brush store before the object command chain)",
     ),
     (
         "command.document.object.brush.bitmap.stroke",

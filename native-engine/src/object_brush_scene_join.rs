@@ -230,6 +230,9 @@ pub(crate) fn prepare_object_render_scene_with_brush(
         brushes: Some(Arc::new(brushes)),
     })
 }
+// #2361: the host route of the bitmap-brush resource operations over this runtime's charged store.
+#[path = "object_brush_bitmap_route.rs"]
+pub(crate) mod bitmap_route;
 #[cfg(all(test, feature = "application", feature = "project_media_codec"))]
 #[path = "../tests/object_brush_scene_join.rs"]
 mod tests;
