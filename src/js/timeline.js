@@ -10494,8 +10494,8 @@ document.getElementById('p-maskmode-type').addEventListener('change',function(){
 document.getElementById('p-cw').addEventListener('change',function(){window.SM.setCanvasSize(parseInt(this.value),_dimsLockRatio?Math.max(1,Math.round(parseFloat(this.value)/_dimsLockRatio)):state.canvasH);});
 document.getElementById('p-ch').addEventListener('change',function(){window.SM.setCanvasSize(_dimsLockRatio?Math.max(1,Math.round(parseFloat(this.value)*_dimsLockRatio)):state.canvasW,parseInt(this.value));});
 document.getElementById('p-cbg').addEventListener('input',function(){var c=this.dataset.hex8;window.SM.setCanvasBg(c&&c.slice(0,7).toLowerCase()===this.value.toLowerCase()?c:this.value);});
-document.getElementById('btn-clip').addEventListener('click',function(){window.SM.setCanvasClip(!state.canvasClip);this.classList.toggle('active',state.canvasClip);});
-document.getElementById('btn-safety').addEventListener('click',function(){window.SM.setSafetyZones(!state.safetyZones);this.classList.toggle('active',state.safetyZones);});
+document.getElementById('btn-clip').addEventListener('click',function(){if(window.NemoNativeViewAids&&window.NemoNativeViewAids.toggle(window,'clip',this))return;window.SM.setCanvasClip(!state.canvasClip);this.classList.toggle('active',state.canvasClip);});
+document.getElementById('btn-safety').addEventListener('click',function(){if(window.NemoNativeViewAids&&window.NemoNativeViewAids.toggle(window,'safety',this))return;window.SM.setSafetyZones(!state.safetyZones);this.classList.toggle('active',state.safetyZones);});
 var _btnRulers=document.getElementById('btn-rulers');
 if(_btnRulers){
   _btnRulers.classList.toggle('active',!!state.rulersOn);
@@ -10515,6 +10515,7 @@ if(_btnRulers){
 var _btnAlphaBg=document.getElementById('btn-alphabg');
 if(_btnAlphaBg){
   _btnAlphaBg.addEventListener('click',function(){
+    if(window.NemoNativeViewAids&&window.NemoNativeViewAids.toggle(window,'alpha',this))return;
     state.previewAlphaBg=!state.previewAlphaBg;
     this.classList.toggle('active',state.previewAlphaBg);
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
