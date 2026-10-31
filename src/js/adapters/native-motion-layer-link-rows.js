@@ -8,10 +8,10 @@
  * layer-policy edit (flag keyLock) against the pin the menu was built from, so a stale menu cannot commit. */
 (function (root, factory) {
   const commonjs = typeof module === 'object' && module.exports;
-  const api = factory(commonjs ? require('./native-layer-parent.js') : null, commonjs ? require('./native-motion-key-lock-menu.js') : null);
+  const api = factory(commonjs ? require('./native-layer-parent.js') : null);
   if (commonjs) module.exports = api;
   else root.NemoNativeMotionLayerLinkRows = api;
-}(typeof globalThis === 'object' ? globalThis : this, function (ParentModule, LockMenuModule) {
+}(typeof globalThis === 'object' ? globalThis : this, function (ParentModule) {
   'use strict';
   const ROOT_CONTEXT = 'scene-root', BARE = ['folder', 'null', 'effect'];
   const tr = (host, key, fallback) => { const value = host.SM && typeof host.SM.t === 'function' ? host.SM.t(key) : null; return typeof value === 'string' && value && value !== key ? value : fallback; };
@@ -89,7 +89,7 @@
       return row;
     }
     function lockRow() {
-      const Menu = LockMenuModule || host.NemoNativeMotionKeyLockMenu;
+      const Menu = host.NemoNativeMotionKeyLockMenu; // a sibling module of the Motion properties adapter: reached through the host, not imported
       if (!Menu) return null;
       const row = make(host, 'div', 'lrow motion-prop-row'), label = make(host, 'span', '', Menu.title(host));
       label.style.minWidth = '70px';

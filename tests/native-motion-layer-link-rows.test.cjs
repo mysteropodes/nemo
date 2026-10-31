@@ -75,7 +75,7 @@ function harness(options = {}) {
   };
   Object.defineProperty(session, 'editLayerPolicy', { get: () => editLayerPolicy, enumerable: true });
   const throws = (name) => () => { throw new Error('LEGACY ' + name); };
-  const host = { document: { createElement: element }, state: { currentFrame: 9 }, NemoNativeObjectProject: { desktop: () => session },
+  const host = { NemoNativeMotionKeyLockMenu: LockMenu, document: { createElement: element }, state: { currentFrame: 9 }, NemoNativeObjectProject: { desktop: () => session },
     showToast: (m) => toasts.push(m), showContextMenu: (x, y, items) => menus.push({ x, y, items }), nativeCompositingRefresh: () => refreshed.push('refresh'),
     setLayerFollowPath: throws('setLayerFollowPath'), setLayerTimeLink: throws('setLayerTimeLink'), pushUndo: throws('pushUndo'), unlinkTimeLinkPreserveRange: throws('unlink'), setLayerKeyLock: throws('setLayerKeyLock') };
   return { host, sent, toasts, menus, refreshed, pin, policy, adapter: Parent.create(session) };
