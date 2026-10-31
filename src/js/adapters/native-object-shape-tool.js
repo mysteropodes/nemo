@@ -383,7 +383,7 @@
         samples.push([w[0],w[1],filters.width(pressure)]);
       }
     }
-    var fitRecord=Paint.fitRecord; // native-object-draw-paint.js: a record holds 2..256 anchors (#2343 B1)
+    function fitRecord(path){return Paint.fitRecord(path);} // native-object-draw-paint.js: a record holds 2..256 anchors (#2343 B1)
     function nativeDictionary(raw,style) {
       if(raw.length<2)return null;
       if(raw.some(function(s){return !s.every(Number.isFinite);}))throw new Error('Brush samples must stay finite.');
