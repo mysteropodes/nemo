@@ -34,6 +34,8 @@ mod batch_style_preset;
 mod batch_skip;
 #[path = "object_vector_trim_ends.rs"]
 mod trim_ends;
+#[path = "object_vector_trim_clip.rs"]
+mod trim_clip;
 #[path = "object_vector_edit_support.rs"]
 mod support;
 use support::*;

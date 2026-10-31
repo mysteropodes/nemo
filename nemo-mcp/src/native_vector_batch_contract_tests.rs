@@ -27,6 +27,14 @@ fn a_batch_names_admitted_steps_on_one_layer_and_its_receipt_follows_them() {
     assert!(vector_request(VECTOR, &copy));
     let creates = json!({"command":"object.vector.batch","trimEnds":24,"ops":[{"op":"create","record":record("L1","")}]});
     assert!(vector_request(VECTOR, &creates), "an all-create batch may trim");
+    let mut clipped = creates.clone();
+    clipped["trimClip"] = json!({"axis":[60.0,0.0,60.0,100.0],"mirrors":[[0,1]]});
+    assert!(vector_request(VECTOR, &clipped), "a trimmed batch may clip its mirror at the axis");
+    clipped.as_object_mut().unwrap().remove("trimEnds");
+    assert!(!vector_request(VECTOR, &clipped), "the clip runs after a trim: it needs one");
+    clipped["trimEnds"] = json!(24);
+    clipped["trimClip"]["mirrors"] = json!([]);
+    assert!(!vector_request(VECTOR, &clipped));
     let mut own = payload.clone();
     own["ops"][1]["keyframe"] = json!("copy");
     assert!(vector_request(VECTOR, &own), "a create may carry its own copy key");

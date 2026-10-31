@@ -83,6 +83,41 @@ fn trim_ends_is_an_optional_positive_limit_on_the_two_creates_only() {
 }
 
 #[test]
+fn trim_clip_is_a_well_formed_axis_clip_beside_trim_ends_on_the_creates_and_the_batch() {
+    let clip = json!({"axis":[60.0,0.0,60.0,100.0],"mirrors":[[0,1]]});
+    let many = json!({"command":"object.vector.createMany","records":[record(), record()],"trimEnds":24,"trimClip":clip});
+    assert!(request(VECTOR, &many));
+    let mut one = many.clone();
+    one["command"] = json!("object.vector.create");
+    one["record"] = record();
+    one.as_object_mut().unwrap().remove("records");
+    assert!(request(VECTOR, &one));
+    let with = |f: &dyn Fn(&mut serde_json::Value)| {
+        let mut payload = many.clone();
+        f(&mut payload);
+        request(VECTOR, &payload)
+    };
+    assert!(!with(&|p| { p.as_object_mut().unwrap().remove("trimEnds"); }), "needs trimEnds");
+    for (name, bad) in [
+        ("short axis", json!({"axis":[60.0,0.0,60.0],"mirrors":[[0,1]]})),
+        ("text axis", json!({"axis":[60.0,0.0,60.0,"100"],"mirrors":[[0,1]]})),
+        ("no mirrors", json!({"axis":[60.0,0.0,60.0,100.0],"mirrors":[]})),
+        ("no axis", json!({"mirrors":[[0,1]]})),
+        ("odd pair", json!({"axis":[60.0,0.0,60.0,100.0],"mirrors":[[0]]})),
+        ("negative index", json!({"axis":[60.0,0.0,60.0,100.0],"mirrors":[[0,-1]]})),
+        ("fractional index", json!({"axis":[60.0,0.0,60.0,100.0],"mirrors":[[0,1.5]]})),
+        ("reused index", json!({"axis":[60.0,0.0,60.0,100.0],"mirrors":[[0,1],[1,2]]})),
+        ("same index", json!({"axis":[60.0,0.0,60.0,100.0],"mirrors":[[1,1]]})),
+        ("extra member", json!({"axis":[60.0,0.0,60.0,100.0],"mirrors":[[0,1]],"extend":true})),
+        ("not an object", json!(null)),
+    ] {
+        assert!(!with(&|p| p["trimClip"] = bad.clone()), "{name}");
+    }
+    let delete = json!({"command":"object.vector.delete","stableTarget":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":3},"layerUid":"L1","strokeId":"s"},"trimClip":clip});
+    assert!(!request(VECTOR, &delete));
+}
+
+#[test]
 fn keyframe_copy_is_an_optional_member_of_the_two_creates_only() {
     let records = json!([record(), record()]);
     for command in ["object.vector.create", "object.vector.createMany"] {

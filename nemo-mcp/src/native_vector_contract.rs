@@ -117,6 +117,24 @@ fn mask_edit(value: &Value) -> bool {
     }
 }
 
+/// `trimClip` (#2361): the stop-at-axis clip a mirror takes after Trim Stroke Ends, as `{axis, mirrors}`: four finite axis
+/// numbers and 1..=32 `[drawn, mirror]` pairs of record indices, each index used once. Valid only beside `trimEnds`; absent is
+/// valid. The one native owner checks the indices against the records.
+pub(crate) fn trim_clip(payload: &Value) -> bool {
+    let Some(clip) = payload.get("trimClip") else {
+        return true;
+    };
+    let pairs = clip["mirrors"].as_array();
+    let index = |v: &Value| v.as_u64().filter(|n| u32::try_from(*n).is_ok());
+    let used: Vec<Option<u64>> = pairs.into_iter().flatten().flat_map(|p| p.as_array().filter(|p| p.len() == 2).into_iter().flatten().map(index)).collect();
+    exact(clip, &["axis", "mirrors"], &[]).is_some()
+        && payload.get("trimEnds").is_some()
+        && clip["axis"].as_array().is_some_and(|axis| axis.len() == 4 && axis.iter().all(finite))
+        && pairs.is_some_and(|p| (1..=32).contains(&p.len()) && p.iter().all(|pair| pair.as_array().is_some_and(|pair| pair.len() == 2)))
+        && used.iter().all(Option::is_some)
+        && used.iter().collect::<std::collections::HashSet<_>>().len() == used.len()
+}
+
 pub(crate) fn request(operation: &str, payload: &Value) -> bool {
     let Some(command) = payload["command"].as_str() else {
         return false;
@@ -132,7 +150,8 @@ pub(crate) fn request(operation: &str, payload: &Value) -> bool {
     let creates = |extra: &[&str]| {
         let mut keys = vec!["command"];
         keys.extend_from_slice(extra);
-        exact(payload, &keys, &["placement", "trimEnds", "keyframe"]).is_some()
+        exact(payload, &keys, &["placement", "trimEnds", "trimClip", "keyframe"]).is_some()
+            && trim_clip(payload)
             && payload
                 .get("placement")
                 .is_none_or(|p| p == "front" || p == "behind")

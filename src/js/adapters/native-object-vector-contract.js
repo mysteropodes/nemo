@@ -323,13 +323,13 @@
     if (!OPS.has(operation)) fail('native vector operation is not declared');
     if (!plain(value) || !has(COMMANDS, value.command) || COMMANDS[value.command][0] !== operation) fail(`${operation} command is invalid`);
     const entry = COMMANDS[value.command];
-    // G15: the two creates take an optional placement (absent = front; behind = under the layer's artwork)
-    // and an optional trimEnds limit (the baseline trimStrokeEndsMax; finite, above zero).
+    // G15: the two creates take an optional placement (absent = front; behind = under the layer's artwork) and an optional trimEnds limit (the baseline trimStrokeEndsMax; finite, above zero).
+    const trimClipOk = (v) => { const c = v.trimClip, p = plain(c) ? c.mirrors : null, u = Array.isArray(p) ? [].concat(...p.map((q) => (Array.isArray(q) && q.length === 2 ? q : [null]))) : []; return has(v, 'trimEnds') && plain(c) && Object.keys(c).every((k) => k === 'axis' || k === 'mirrors') && Array.isArray(c.axis) && c.axis.length === 4 && c.axis.every((n) => typeof n === 'number' && Number.isFinite(n)) && Array.isArray(p) && p.length >= 1 && p.length <= 32 && u.every((n) => Number.isInteger(n) && n >= 0 && n < 2 ** 32) && new Set(u).size === u.length; }; // #2361 trimClip (a mirror's stop-at-axis clip after the trim): the axis [x1, y1, x2, y2] and 1..32 [drawn, mirror] record indices, each used once; needs trimEnds.
     const creates = value.command === 'object.vector.create' || value.command === 'object.vector.createMany';
-    exact(value, ['command', ...entry[1]], creates ? ['placement', 'trimEnds', 'keyframe'] : value.command === 'object.vector.batch' ? ['keyframe', 'trimEnds', 'skipUnavailable'] : [], operation);
+    exact(value, ['command', ...entry[1]], creates ? ['placement', 'trimEnds', 'trimClip', 'keyframe'] : value.command === 'object.vector.batch' ? ['keyframe', 'trimEnds', 'trimClip', 'skipUnavailable'] : [], operation);
     if (has(value, 'placement')) oneOf(value.placement, ['front', 'behind'], `${value.command}.placement`);
     if (has(value, 'trimEnds') && !(typeof value.trimEnds === 'number' && Number.isFinite(value.trimEnds) && value.trimEnds > 0)) fail(`${value.command}.trimEnds is invalid`);
-    // A batch trims only when every step creates (the drawn stroke, its copies and its multi-frame stamps share one cut).
+    if (has(value, 'trimClip') && !trimClipOk(value)) fail(`${value.command}.trimClip is invalid`); // A batch trims only when every step creates (the drawn stroke, its copies and its multi-frame stamps share one cut), below.
     if (has(value, 'trimEnds') && value.command === 'object.vector.batch' && Array.isArray(value.ops) && value.ops.some((op) => !plain(op) || (op.op !== 'create' && op.op !== 'copy'))) fail('object.vector.batch.trimEnds needs create steps only'); if (has(value, 'trimEnds') && value.command === 'object.vector.batch' && Array.isArray(value.ops) && new Set(value.ops.filter((op) => op.record && op.record.target).map((op) => op.record.target.layerUid)).size > 1) fail('object.vector.batch.trimEnds stays on one layer');
     // keyframe: 'copy' keys a held cell with what it showed (the Labs creators' ensureKeyframe()); absent is Draw's empty key.
     if (has(value, 'keyframe') && value.keyframe !== 'copy') fail(`${value.command} keyframe must be 'copy'`); if (has(value, 'skipUnavailable') && typeof value.skipUnavailable !== 'boolean') fail(`${value.command} skipUnavailable must be a boolean`); // #2372: a batch is atomic unless this opts in

@@ -270,6 +270,23 @@ test('trimEnds is an optional finite positive limit on the two creates and refus
   assert.equal(accepts(replace[0], { ...replace[1], trimEnds: 24 }), false);
 });
 
+test('trimClip is a well-formed stop-at-axis clip beside trimEnds on the creates and the all-create batch (#2361)', () => {
+  const create = COMMANDS.find(([, p]) => p.command === 'object.vector.create');
+  const clip = { axis: [60, 0, 60, 100], mirrors: [[0, 1]] };
+  const base = { ...create[1], trimEnds: 24 };
+  assert.equal(accepts(create[0], { ...base, trimClip: clip }), true);
+  assert.equal(accepts(create[0], { ...create[1], trimClip: clip }), false, 'needs trimEnds');
+  for (const bad of [{ ...clip, axis: [60, 0, 60] }, { ...clip, axis: [60, 0, 60, '100'] }, { ...clip, axis: [60, 0, 60, Infinity] }, { ...clip, mirrors: [] }, { ...clip, mirrors: [[0]] },
+    { ...clip, mirrors: [[0, -1]] }, { ...clip, mirrors: [[0, 1.5]] }, { ...clip, mirrors: [[0, 1], [1, 2]] }, { ...clip, mirrors: [[1, 1]] }, { ...clip, extend: true }, { axis: clip.axis }, null, 'clip']) {
+    assert.equal(accepts(create[0], { ...base, trimClip: bad }), false, JSON.stringify(bad));
+  }
+  const replace = COMMANDS.find(([, p]) => p.command === 'object.vector.replace');
+  assert.equal(accepts(replace[0], { ...replace[1], trimEnds: 24, trimClip: clip }), false);
+  const batch = (extra) => ({ command: 'object.vector.batch', ops: [{ op: 'create', record: create[1].record }, { op: 'create', record: create[1].record }], ...extra });
+  assert.equal(accepts(create[0], batch({ trimEnds: 24, trimClip: clip })), true);
+  assert.equal(accepts(create[0], batch({ trimClip: clip })), false);
+});
+
 test('a batch reshape takes new geometry or a ribbon centreline (#2362 sculpt), never both or neither', () => {
   const EDIT = 'command.document.object.vector.edit';
   const anchor = (x) => ({ point: { x, y: 2 }, handleIn: { x: 0, y: 0 }, handleOut: { x: 3, y: 0 }, width: 6.5 });
