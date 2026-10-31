@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "6a94ff085ab9164f3cea96fd811464b312914480",
-  "describe": "v0.7.0-alpha.4-4998-g6a94ff085-dirty"
+  "head": "5d7251ec7c4e95f7d57275e1a121abeeb5ea2f59",
+  "describe": "v0.7.0-alpha.4-5001-g5d7251ec7-dirty"
  },
- "inputsDigest": "5909565f56d4a1277da4f64e8fe1fcc49b912eabe8075f3b0e2380ec7599e934",
+ "inputsDigest": "c9b65b47148a9dd0cae84dc4ffcff00b7374bde3d1ef9233053b061477161dc8",
  "states": [
   "inventoried",
   "characterized",
@@ -22446,7 +22446,7 @@
    "capability": "Chemin : ",
    "area": "unclassified",
    "handler": [
-    "src/js/adapters/native-layer-parent.js:207 followPathMenuItems()"
+    "src/js/adapters/native-layer-parent.js:220 followPathMenuItems()"
    ],
    "events": [
     "click"
@@ -22460,7 +22460,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-layer-parent.js:207",
+   "source": "src/js/adapters/native-layer-parent.js:220",
    "meta": {
     "i18n": null,
     "functionsVisited": 23
@@ -22474,7 +22474,7 @@
    "capability": "Chemin : Aucun",
    "area": "unclassified",
    "handler": [
-    "src/js/adapters/native-layer-parent.js:203 followPathMenuItems()"
+    "src/js/adapters/native-layer-parent.js:216 followPathMenuItems()"
    ],
    "events": [
     "click"
@@ -22488,7 +22488,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-layer-parent.js:203",
+   "source": "src/js/adapters/native-layer-parent.js:216",
    "meta": {
     "i18n": null,
     "functionsVisited": 23
@@ -22502,7 +22502,7 @@
    "capability": "Parent A : ",
    "area": "unclassified",
    "handler": [
-    "src/js/adapters/native-layer-parent.js:142 parentMenuItems()"
+    "src/js/adapters/native-layer-parent.js:155 parentMenuItems()"
    ],
    "events": [
     "click"
@@ -22516,7 +22516,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-layer-parent.js:142",
+   "source": "src/js/adapters/native-layer-parent.js:155",
    "meta": {
     "i18n": null,
     "functionsVisited": 3
@@ -22530,7 +22530,7 @@
    "capability": "Parent A : Aucun (parentage libre)",
    "area": "unclassified",
    "handler": [
-    "src/js/adapters/native-layer-parent.js:138 parentMenuItems()"
+    "src/js/adapters/native-layer-parent.js:151 parentMenuItems()"
    ],
    "events": [
     "click"
@@ -22544,7 +22544,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-layer-parent.js:138",
+   "source": "src/js/adapters/native-layer-parent.js:151",
    "meta": {
     "i18n": null,
     "functionsVisited": 3
@@ -22558,7 +22558,7 @@
    "capability": "Chemin (Follow Path)…",
    "area": "unclassified",
    "handler": [
-    "src/js/adapters/native-layer-parent.js:224 rowMenu()"
+    "src/js/adapters/native-layer-parent.js:237 rowMenu()"
    ],
    "events": [
     "click"
@@ -22572,7 +22572,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-layer-parent.js:224",
+   "source": "src/js/adapters/native-layer-parent.js:237",
    "meta": {
     "i18n": null,
     "functionsVisited": 21
