@@ -48,6 +48,10 @@ pub(crate) struct SubselectReadItem {
     /// record has none; an image lists its opacity and a text block its colour and the colour's alpha.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) style: Option<serde_json::Value>,
+    /// Hit-test listing only (#2372): a dynamic rectangle, ellipse or star's declared intent (`kind` and the members its kind owns, never the
+    /// generator `box`), the very body `object.parametric.set` takes back. Absent for a record without a `paramShape`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) param_shape: Option<serde_json::Value>,
 }
 #[derive(Debug, Clone)]
 pub struct SubselectReadProjection {

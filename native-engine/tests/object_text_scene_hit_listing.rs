@@ -233,6 +233,30 @@ fn a_record_lists_its_stored_box_angle_and_an_unturned_record_or_an_image_lists_
 }
 
 #[test]
+fn a_dynamic_shape_lists_its_parameters_without_the_generator_box_and_every_other_item_lists_none() {
+    // #2372 insp-parametric: the Rounded corners / Ellipse arc / Star panels read their current values from the listing and send the body back.
+    let listed = |ext: Value| {
+        let mut doc = drawing();
+        doc["objects"][0]["family"] = json!("editable-vector-path");
+        doc["objects"][0]["vector"] = json!({"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"butt","strokeJoin":"miter",
+            "miterLimit":10,"dashOffset":0,"opacity":1});
+        if !ext.is_null() {
+            doc["objects"][0]["vectorExt"] = ext;
+        }
+        listing(&doc)["items"].as_array().unwrap().clone()
+    };
+    let rect = json!({"kind":"rect","tl":6,"tr":6,"br":0,"bl":2.5,"box":{"x1":0,"y1":0,"x2":10,"y2":10}});
+    let items = listed(json!({"paramShape":rect}));
+    assert_eq!(items[0]["paramShape"], json!({"kind":"rect","tl":6,"tr":6,"br":0,"bl":2.5}), "the kind and its members, never the box");
+    assert!(items[1].get("paramShape").is_none() && items[2].get("paramShape").is_none(), "a text block and an image carry none");
+    let star = json!({"kind":"star","pointCount":7,"innerRatio":0.4,"cornerRadius":1,"box":{"x1":0,"y1":0,"x2":10,"y2":10}});
+    assert_eq!(listed(json!({"paramShape":star}))[0]["paramShape"], json!({"kind":"star","pointCount":7,"innerRatio":0.4,"cornerRadius":1}));
+    let ellipse = json!({"kind":"ellipse","startAngle":15,"sweep":300,"innerRadius":0.2});
+    assert_eq!(listed(json!({"paramShape":ellipse}))[0]["paramShape"], ellipse, "a shape without a box lists as stored");
+    assert!(listed(Value::Null)[0].get("paramShape").is_none(), "an ordinary record lists none");
+}
+
+#[test]
 fn a_posed_layer_lists_its_image_and_text_in_their_stored_frame_with_the_pose_as_the_map() {
     // #2372: record space is the stored item's own frame, so a Select matrix conjugated with the listing's map is what the
     // item's batch transform applies to the stored centre / anchor.
@@ -345,6 +369,7 @@ fn worst_case_items(count: usize, id_len: usize) -> Vec<crate::object_snapshot::
                 brush: None,
                 group: None,
                 style: None,
+                param_shape: None,
             }
         })
         .collect()

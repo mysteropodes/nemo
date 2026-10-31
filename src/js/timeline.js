@@ -2988,6 +2988,7 @@ document.getElementById('p-corners-link').addEventListener('change',function(){
 });
 function commitCornerEdit(which,val){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='rect')return;
+  if(nativeParamOwned(p))return; // #2372 insp-parametric: a native shape commits on 'change' (nativeParamChange), never per keystroke through a history checkpoint
   pushUndo();
   var ps=p.data.paramShape;
   var v=Math.max(0,parseFloat(val)||0);
@@ -2998,6 +2999,7 @@ function commitCornerEdit(which,val){
 }
 ['tl','tr','br','bl'].forEach(function(which){
   document.getElementById('p-corner-'+which).addEventListener('input',function(){commitCornerEdit(which,this.value);});
+  document.getElementById('p-corner-'+which).addEventListener('change',function(){nativeParamChange(which,this.value,document.getElementById('p-corners-link').checked);});
 });
 // Dynamic shapes, Ellipse (2026-08-18) — same panel pattern as Coins:
 // shown for exactly one selected path that's EITHER already a dynamic
@@ -3028,12 +3030,14 @@ function updateEllipseArcPanel(){
 }
 document.getElementById('btn-ellipse-arc-convert').addEventListener('click',function(){
   var p=selectedPaths[0];if(!p)return;
+  if(nativeParamConvert(p))return;
   pushUndo();
   window.convertToDynamicEllipse(p);
   saveActiveLayerFrame();updateEllipseArcPanel();if(window.SMEngineBridge)SMEngineBridge.renderNow();
 });
 function commitArcEdit(field,val,isPercent){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='ellipse')return;
+  if(nativeParamOwned(p))return;
   pushUndo();
   var ps=p.data.paramShape;
   var v=parseFloat(val)||0;
@@ -3044,6 +3048,7 @@ function commitArcEdit(field,val,isPercent){
 document.getElementById('p-arc-start').addEventListener('input',function(){commitArcEdit('startAngle',this.value,false);});
 document.getElementById('p-arc-sweep').addEventListener('input',function(){commitArcEdit('sweep',this.value,false);});
 document.getElementById('p-arc-inner').addEventListener('input',function(){commitArcEdit('innerRadius',this.value,true);});
+[['p-arc-start','startAngle'],['p-arc-sweep','sweep'],['p-arc-inner','innerRadius']].forEach(function(f){document.getElementById(f[0]).addEventListener('change',function(){nativeParamChange(f[1],this.value);});});
 // Dynamic shapes, Star/Polygon (2026-08-18) — same panel pattern as
 // Coins/Camembert. pointCount stays a plain field (no stopwatch/Motion
 // row) — a fractional point count between two integer keyframes has no
@@ -3065,6 +3070,7 @@ function updateStarPanel(){
 }
 function commitStarEdit(field,val,isPercent){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='star')return;
+  if(nativeParamOwned(p))return;
   pushUndo();
   var ps=p.data.paramShape;
   var v=parseFloat(val)||0;
@@ -3077,6 +3083,13 @@ function commitStarEdit(field,val,isPercent){
 document.getElementById('p-star-points').addEventListener('input',function(){commitStarEdit('pointCount',this.value);});
 document.getElementById('p-star-inner').addEventListener('input',function(){commitStarEdit('innerRatio',this.value);});
 document.getElementById('p-star-corner').addEventListener('input',function(){commitStarEdit('cornerRadius',this.value);});
+[['p-star-points','pointCount'],['p-star-inner','innerRatio'],['p-star-corner','cornerRadius']].forEach(function(f){document.getElementById(f[0]).addEventListener('change',function(){nativeParamChange(f[1],this.value);});});
+// #2372 insp-parametric: on a native object project the Rounded corners / Ellipse arc / Star fields commit the selected dynamic shape through ONE
+// native parametric edit (adapters/native-parametric-panel.js): a typed value on change (Enter / blur), a scrub once at release (the fields are marked
+// static below), never a Paper rebuild or a history checkpoint a native project refuses.
+function nativeParamOwned(p){var N=window.NemoNativeParametricPanel;return !!N&&N.owns(window,p);}
+function nativeParamChange(field,raw,linked){var p=selectedPaths[0];if(nativeParamOwned(p))window.NemoNativeParametricPanel.edit(window,field,raw,{linked:linked});}
+function nativeParamConvert(p){var N=window.NemoNativeParametricPanel;if(!N||!p.data||!p.data.nativeStableTarget)return false;N.convertUnavailable(window);return true;}
 // Team review Accept/Reject panel — shown when exactly one selected item is
 // either an active (non-ghost) revision (data.revisionParentId) or a
 // delete-revision ghost (data.isRevisionGhost && revisionAction==='delete').
@@ -6407,7 +6420,8 @@ function nativeSelStyle(style){
 }
 // The numeric fields a native Select selection owns scrub on ui.js's static path (one change at release, no legacy checkpoint, no live writes): the
 // legacy path pushes an undo before it raises _scrubLiveActive, which a native project refuses, so a paused drag would commit mid-gesture and again at release.
-var NATIVE_SCRUB_FIELDS=['p-sw','p-opacity','p-stroke-alpha','p-poststroke-smooth','p-miterlimit','p-dashoffset','p-mask-feather'];
+var NATIVE_SCRUB_FIELDS=['p-sw','p-opacity','p-stroke-alpha','p-poststroke-smooth','p-miterlimit','p-dashoffset','p-mask-feather',
+  'p-corner-tl','p-corner-tr','p-corner-br','p-corner-bl','p-arc-start','p-arc-sweep','p-arc-inner','p-star-points','p-star-inner','p-star-corner'];
 function markNativeScrubFields(){
   var A=window.NemoNativeSelectionStyle,own=!!A&&A.handles(window);
   NATIVE_SCRUB_FIELDS.forEach(function(id){
