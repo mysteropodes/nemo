@@ -431,7 +431,13 @@
   // a record-space matrix (six numbers however many anchors it has), which also carries its linked fill, texture copies, gradient end
   // points and shape box. `paths` are fresh presented paths (untransformed) and `m` the world affine.
   function transformSteps(root, paths, m) {
-    return paths.map(function (p) { return { reshape: { stableTarget: p.data.nativeStableTarget, matrix: inRecordSpace(p.data.nativeMatrix, m) } }; });
+    // `m` may be a function of the item (align / distribute give each its own translation): an item it answers null for is left out.
+    var out = [];
+    paths.forEach(function (p) {
+      var own = typeof m === 'function' ? m(p) : m;
+      if (own) out.push({ reshape: { stableTarget: p.data.nativeStableTarget, matrix: inRecordSpace(p.data.nativeMatrix, own) } });
+    });
+    return out;
   }
 
   // What a pick depends on: a repaint may re-project the layer rows (the pointer context counts those) but a pick still

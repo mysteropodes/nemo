@@ -38,10 +38,12 @@
   // The transform an image or a text block has no stored form for, as a label (null when every one can take `m`, the world affine): the
   // matrix is read in each item's own frame (the presented matrix conjugated), where an image takes a move, a scale along its axes and a
   // turn (text the same, #2267).
+  // `m` is one world affine for every item, or (align / distribute, #2372) a function giving each item its own, or null to leave it out.
+  function matrixFor(m, p) { return typeof m === 'function' ? m(p) : m; }
   function unstorable(root, paths, m) {
     var conj = root.NemoSelectCanvasIntent && root.NemoSelectCanvasIntent.inRecordSpace, found = [];
     paths.forEach(function (p) {
-      var role = p.data && p.data.nativeRole, r = (role === 'raster' || role === 'text') && conj ? conj(p.data.nativeMatrix, m) : null;
+      var role = p.data && p.data.nativeRole, own = matrixFor(m, p), r = own && (role === 'raster' || role === 'text') && conj ? conj(p.data.nativeMatrix, own) : null;
       if (!r) return;
       var det = r[0] * r[3] - r[1] * r[2];
       if (det < 0) found.push(role === 'text' ? 'Flipping text' : 'Flipping images');
@@ -104,7 +106,7 @@
   // affine `m` in each record's own space, against the document `o.pin` names. Used by the drag release and by the inspector's Transform fields
   // and the arrow-key nudge (#2372 insp-transform-fields). `o`: { pin, gone (the notice for a document that moved on), angle (degrees of a turn, for a box angle that has no stored form), stale()
   // (true when the document, frame, layer or selection moved on), cancelled() (Escape between the release and the send), release() (before the
-  // send) }. Resolves to 'applied', or to the refusal ('refused' / 'stale' / 'failed' / 'cancelled'); a refusal has already toasted.
+  // send) }. `m` may be a function of the item (see matrixFor): the steps are then one per item that has a matrix. Resolves to 'applied', or to the refusal ('refused' / 'stale' / 'failed' / 'cancelled'); a refusal has already toasted.
   async function commitMatrix(root, sel, m, o) {
     o = o || {};
     var gone = o.gone || 'The document changed during the drag \u2014 nothing was changed.';
@@ -120,6 +122,7 @@
     if (!layers || !layers.complete || !again || !samePin(again.pin, o.pin)) { notice(root, gone); return 'stale'; }
     var result, steps;
     try { steps = I.transformSteps(root, layers.paths, m); } catch (_) { steps = null; }
+    if (steps && !steps.length) return 'noop'; // every item's matrix was null: nothing to write
     if (steps && JSON.stringify(steps).length > MAX_BYTES) { notice(root, 'Too much to transform at once \u2014 select fewer items.'); return 'refused'; }
     if (o.cancelled && o.cancelled()) return 'cancelled'; // Escape between the release and the send still cancels; once sent, the write is not cancellable (undo reverts it)
     if (o.release) o.release();
