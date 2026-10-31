@@ -751,6 +751,7 @@
     }
   }
   function renderShapesPanel() {
+    if (window.NemoNativeShapeTree && window.NemoNativeShapeTree.owns(window)) return; // #2376: a native object project lists its elements through the native presenter
     var list = document.getElementById('shapes-list');
     if (!list) return;
     list.innerHTML = '';

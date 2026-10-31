@@ -159,9 +159,16 @@ impl ObjectCompositionWitness {
                 group: brush.1,
                 style: if hit_test { record::style::listed(r) } else { None },
                 param_shape: if hit_test { record::param_shape(r) } else { None },
+                group_path: None,
             });
         }
         flush(&mut items, usize::MAX);
+        // #2376: every listed record names the vector groups it sits in (the layer's own group table), for the Elements panel.
+        if let Some(table) = hit_test.then(|| packet.source_layers()[index].groups.value()).flatten() {
+            for item in &mut items {
+                item.group_path = record::group_path(table, &item.stable_target.stroke_id);
+            }
+        }
         if items.len() > 1024 {
             return Err("Subselect layer exceeds the selection bound");
         }
@@ -194,6 +201,7 @@ fn mask_item(r: &crate::object_frame_packet::ObjectRecord, matrix: [f64; 6], fea
         group: None,
         style: record::style::mask(r.mask_mode(), feather),
         param_shape: None,
+        group_path: None,
     }
 }
 
@@ -332,6 +340,7 @@ fn hit_item(
         group: None,
         style: None,
         param_shape: None,
+        group_path: None,
     }
 }
 

@@ -238,6 +238,18 @@ fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
         item["items"][0]["paramShape"] = bad.clone();
         assert!(!public_read(&q, &item), "paramShape {bad} is refused");
     }
+    // #2376: a listed record names the groups it sits in, outermost first: one to four bounded ids with an optional bounded name.
+    for good in [json!([{"id":"g1"}]), json!([{"id":"outer","name":"Body"},{"id":"inner"}]), json!([{"id":"a"},{"id":"b"},{"id":"c"},{"id":"d","name":""}])] {
+        let mut item = r.clone();
+        item["items"][0]["groupPath"] = good.clone();
+        assert!(public_read(&q, &item), "groupPath {good} is legal in a hit-test listing");
+    }
+    for bad in [json!([]), json!({"id":"g"}), json!("g"), json!([{"id":""}]), json!([{"id":7}]), json!([{"id":"g","name":3}]), json!([{"id":"g","mode":"unite"}]),
+        json!([{"name":"x"}]), json!([{"id":"a"},{"id":"b"},{"id":"c"},{"id":"d"},{"id":"e"}]), json!([{"id":"x".repeat(129)}]), json!([{"id":"g","name":"n".repeat(257)}]), json!(null)] {
+        let mut item = r.clone();
+        item["items"][0]["groupPath"] = bad.clone();
+        assert!(!public_read(&q, &item), "groupPath {bad} is refused");
+    }
     // #2372 SEL-STYLE: the style a panel shows is optional, with hex colours, a positive width and an opacity in 0..1.
     for good in [json!({"fill":"#ff000080","stroke":"#00ff00","width":6.0,"opacity":0.5}), json!({"opacity":0}), json!({"fill":"#112233"}),
         json!({"cap":"square","join":"bevel","miter":4.0,"dashOffset":-2.5,"paintOrder":"strokeFirst"}),

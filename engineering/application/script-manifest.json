@@ -269,6 +269,8 @@
     {"src":"js/select-bridge.js"},
     {"src":"js/adapters/native-subselect-ui.js"},
     {"src":"js/adapters/native-presentation-wait.js"},
+    {"src":"js/adapters/native-shape-tree-model.js"},
+    {"src":"js/adapters/native-shape-tree-ui.js"},
     {"src":"js/subselect-bridge.js"},
     {"src":"js/adapters/native-object-draw-paint.js"},
     {"src":"js/adapters/native-object-draw-symmetry.js"},
