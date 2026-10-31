@@ -368,6 +368,8 @@
             root.NemoNativeObjectUI.refreshTiming(root);
           if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshPolicy)root.NemoNativeObjectUI.refreshPolicy(root);
           if(root.SMImageMeshUI&&typeof root.SMImageMeshUI.refresh==='function')root.SMImageMeshUI.refresh();
+          // #2255: widget pads are re-read at every presented revision too, or a widget made elsewhere (MCP, another tab's undo) stays undrawn.
+          if(root.NemoNativeObjectWidgetUI&&typeof root.NemoNativeObjectWidgetUI.desktop==='function')root.NemoNativeObjectWidgetUI.desktop(root).refresh();
           // A frame paint can precede native completion and leave Motion unavailable.
           // Refresh its existing inspector only after the current frame is presented.
           if(shown&&root.state&&root.state.appMode==='motion'&&shown.frame===root.state.currentFrame&&

@@ -547,6 +547,13 @@ test('a vertex commit keeps Edit points, the Mesh panel and the handles while th
   assert.deepEqual(h.messages, []);
 });
 
+test('a presented revision also re-reads the widget pads, so a widget made through MCP is drawn without another UI action (#2255)', async () => {
+  const h = composedMesh(true, undefined, async () => {}, true); let reads = 0;
+  h.root.NemoNativeObjectWidgetUI = { desktop: win => { assert.equal(win, h.root); return { refresh() { reads++; return Promise.resolve(null); } }; } };
+  await h.open(); await meshTurn(); await new Promise(done => setTimeout(done, 0)); await meshTurn();
+  assert.ok(reads > 0, 'the actual desktop presentation completion re-read the widget pads');
+});
+
 test('picking the image on the canvas selects its layer row, which feeds the Mesh panel (#2372)', async () => {
   const Intent = require('../src/js/adapters/select-canvas-intent.js');
   const h = composedMesh(); await h.open();
