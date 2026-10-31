@@ -451,7 +451,7 @@
   }
   // #2372: a pick that resolves undefined (the presentation could not be proven current) or throws is not "nothing under the cursor" (null, which clears).
   // The native queue reports no presentation while ANY command is pending - the press's own read, a hover read, the repaint of the previous pick - so the
-  // pick is waited out with the shared bounded wait (native-presentation-wait.js: about a second, abandoned the moment `ctx`, the pickContext captured at
+  // pick is waited out with the shared bounded wait (native-presentation-wait.js: the first read and 16 retries, about a second, abandoned the moment `ctx`, the pickContext captured at
   // the click, no longer holds) before saying so instead of dropping the click: neither the first click's box nor an empty click's clear may be lost to it.
   // `I` is the intent API in use (its pick/applyPick); `retried` is kept for callers and ignored.
   function resolvePick(root, I, intent, shift, ctx) {
@@ -460,7 +460,7 @@
     var apply = function (item) { try { I.applyPick(root, item, shift); } catch (_) {} };
     var read = function () { return I.pick(root, intent.x, intent.y); };
     if (!W) return read().then(function (item) { if (item !== undefined && I.pickContext(root) === ctx) apply(item); }, unavailable);
-    return W.await(root, { read: read, ready: function (v) { return v !== undefined; }, holds: function () { return I.pickContext(root) === ctx; }, notice: text })
+    return W.await(root, { read: read, ready: function (v) { return v !== undefined; }, holds: function () { return I.pickContext(root) === ctx; }, notice: text }, { tries: 17 })
       .then(function (r) { if (r.ready) apply(r.value); else if (r.status === 'refused') unavailable(); });
   }
   // #2372: presentedState once the queue stops hiding the presentation - the shared bounded wait; null when it never does, or when the pick context (tool, frame, layer,

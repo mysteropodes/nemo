@@ -38,7 +38,8 @@
       if (files.some(file => !file || typeof file.name !== 'string' || !file.name ||
           !(file.type === 'image/png' || /\.png$/i.test(file.name)))) return { status: 'unavailable', reason: 'native_png_only' };
       if (detectSequence(files.map(file => file.name)).isSeq) return { status: 'unavailable', reason: 'native_sequence_unavailable' };
-      const started = typeof ports.core.beginSettled === 'function' ? await ports.core.beginSettled() : ports.core.begin();
+      let started = ports.core.begin();
+      if (!started.ok && started.reason === 'no_presented_native_session' && typeof ports.core.beginSettled === 'function') started = await ports.core.beginSettled();
       if (!started.ok) return { status: started.status, reason: started.reason };
       const ctx = started.ctx, state = ports.state(), symbol = state.activeSymbolId, activeLayer = state.activeLayerIdx;
       const uid = ports.activeLayerUid(), layer = ctx.before.layers.find(row => row.layerUid === uid);

@@ -46,7 +46,7 @@
     if (bad) { notice(root, 'Deleting ' + bad + ' is not available on native projects yet.'); return 'refused'; }
     if (sel.length > MAX_STEPS / 2) { notice(root, 'Too many items to delete at once (' + MAX_STEPS / 2 + ' at most).'); return 'refused'; }
     if (!route || sel.some(function (p) { return !Number.isInteger(p.data.nativeLayerIndex); })) { notice(root, 'Deleting is not available right now.'); return 'refused'; }
-    var before = await I.presentedSettled(root), layers = before && await I.reread(root, sel, false), again = await I.presentedSettled(root);
+    var before = I.presentedState(root) || await I.presentedSettled(root), layers = before && await I.reread(root, sel, false), again = I.presentedState(root) || await I.presentedSettled(root);
     if (!layers || !layers.complete || !again || !samePin(again.pin, before.pin)) { notice(root, 'The document changed — nothing was deleted.'); return 'stale'; }
     var steps = stepsOf(layers.paths);
     if (steps.length > MAX_STEPS || JSON.stringify(steps).length > MAX_BYTES) { notice(root, 'Too much to delete at once — select fewer items.'); return 'refused'; }

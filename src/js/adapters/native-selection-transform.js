@@ -107,7 +107,7 @@
   // ONE native batch for the job, against the document the selection was read from.
   async function execute(root, job) {
     var s = state(root), I = root.NemoSelectCanvasIntent, O = root.NemoNativeSelectOverlay;
-    var paths = selected(root), ids = idsOf(paths), at = I && await I.presentedSettled(root);
+    var paths = selected(root), ids = idsOf(paths), at = I && (I.presentedState(root) || await I.presentedSettled(root)); // #2372: waits only when the queue hides the presentation
     // An edit made while an earlier one of ours was committing was read before that commit re-read the selection: it follows the fresh one.
     if (job.commits !== s.commits) { if (same(ids, job.ids)) job.ctx = I.pickContext(root); }
     if (!at || !paths.length || !same(ids, job.ids) || I.pickContext(root) !== job.ctx) { notice(root, 'The selection changed — nothing was transformed.'); return { status: 'stale' }; }

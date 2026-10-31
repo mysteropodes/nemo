@@ -197,7 +197,8 @@
         if (imagePending) return { status: 'busy' };
         const unresolved = uncertainImageStatus();
         if (unresolved) return unresolved;
-        const started = await core.beginSettled();
+        let started = core.begin(); // #2372: only a presentation hidden by the queue waits; a readable one keeps the original microtask order
+        if (!started.ok && started.reason === 'no_presented_native_session') started = await core.beginSettled();
         if (!started.ok) return { status: started.status, reason: started.reason };
         const ctx = started.ctx, state = root.state, symbol = state.activeSymbolId, activeLayer = state.activeLayerIdx;
         if (typeof ctx.session.readSubscriptionGeneration !== 'function') return { status: 'unavailable', reason: 'native_subscription_identity_absent' };

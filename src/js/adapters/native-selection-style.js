@@ -77,7 +77,7 @@
   }
   // ONE native batch of restyle steps for the pending edit, against the document the selection was read from.
   async function commit(root, job) {
-    var I = root.NemoSelectCanvasIntent, O = root.NemoNativeSelectOverlay, labs = route(root), now = I && await I.presentedSettled(root);
+    var I = root.NemoSelectCanvasIntent, O = root.NemoNativeSelectOverlay, labs = route(root), now = I && (I.presentedState(root) || await I.presentedSettled(root));
     // An edit made while an earlier one of ours was committing was read from the selection before that commit re-read it: it follows the
     // fresh selection of the same items.
     if (job.commits !== state(root).commits) {

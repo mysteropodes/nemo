@@ -82,17 +82,12 @@
       if (typeof ports.publish === 'function' && ports.publish(projection) !== true) throw fault();
       guard(stamp); cache = { stamp: stamp, value: projection }; return projection;
     }
-    // #2372: a presentation hidden by a PENDING native command (queue-pending) is "cannot prove it right now", not "changed": read() stays null - it authorizes input,
-    // so it never answers while work is pending - but the sealed projection is kept (only a real change drops it); an edit waits for the presentation (readSettled).
-    function read(onRefusal) {
+    // The Shadow cache is dropped while a pending native command hides the presentation, on purpose: the completion fanout re-reads the Shadow metadata once it is
+    // visible again (tests/native-guide-production.test.cjs pins both that re-read and read() === null meanwhile), so an edit cannot wait on a retained cache here.
+    function read() {
       try {
-        if (cache && current(cache.stamp)) {
-          var why = null, shown = cache.stamp.session.readPresentedObjectSession(function (c) { why = c; });
-          if (presented(shown, cache.stamp.info) && available(cache.stamp)) return cache.value;
-          if (!shown && why === 'queue-pending' && available(cache.stamp)) {
-            if (typeof onRefusal === 'function') try { onRefusal(why); } catch (_) {} return null;
-          }
-        }
+        if (cache && current(cache.stamp) && presented(cache.stamp.session.readPresentedObjectSession(), cache.stamp.info) &&
+            available(cache.stamp)) return cache.value;
       } catch (_) {}
       cache = null; return null;
     }

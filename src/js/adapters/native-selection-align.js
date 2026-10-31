@@ -76,7 +76,7 @@
       if (paths.length < need || modes.indexOf(mode) < 0) return 'noop'; // the baseline did nothing for fewer items
       var why = refusal(root, paths);
       if (why) { notice(root, why); return 'unavailable'; }
-      var I = root.NemoSelectCanvasIntent, O = root.NemoNativeSelectOverlay, ctx = I.pickContext(root), at = await I.presentedSettled(root);
+      var I = root.NemoSelectCanvasIntent, O = root.NemoNativeSelectOverlay, ctx = I.pickContext(root), at = I.presentedState(root) || await I.presentedSettled(root);
       var boxes = paths.map(box);
       if (!at || boxes.some(function (b) { return !b; })) { notice(root, 'Aligning is not available right now.'); return 'unavailable'; }
       var deltas = kind === 'align' ? alignDeltas(boxes, mode) : distributeDeltas(boxes, mode), byId = {}, moved = 0;
