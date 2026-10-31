@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "8588164a64f53a0489b4f8c41a5cf33fef0b935d",
-  "describe": "v0.7.0-alpha.4-4551-g8588164a-dirty"
+  "head": "599079f39e941c780c15b8ba214dd44c76ec2d1b",
+  "describe": "v0.7.0-alpha.4-4553-g599079f3-dirty"
  },
- "inputsDigest": "0e7d91e200f1a616af14fa196112e2c0202a9d01ab3c39c9aa882acff1a6ae16",
+ "inputsDigest": "3265189c848c68de8d021e64305ce43c9e968963841ebf314a1bb91a29a41646",
  "states": [
   "inventoried",
   "characterized",
@@ -321,7 +321,7 @@
   },
   "SMSelectBridge": {
    "file": "src/js/select-bridge.js",
-   "line": 3570,
+   "line": 3561,
    "members": 4
   },
   "SMShadowBrush": {
@@ -28519,6 +28519,43 @@
    "capability": "Exposer l\\'opacité comme propriété de Component…",
    "area": "drawing-selection",
    "handler": [
+    "src/js/select-bridge.js:3261 onContext()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "history": 1,
+    "animation": 2,
+    "persist": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/select-bridge.js:3261",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 34
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "menu:select-bridge.js:onContext:exposer-la-visibilite-comme-propriete-de-compone",
+   "kind": "menu",
+   "surface": "dynamic menu (onContext)",
+   "capability": "Exposer la visibilité comme propriété de Component…",
+   "area": "drawing-selection",
+   "handler": [
     "src/js/select-bridge.js:3270 onContext()"
    ],
    "events": [
@@ -28538,43 +28575,6 @@
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/select-bridge.js:3270",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 34
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "menu:select-bridge.js:onContext:exposer-la-visibilite-comme-propriete-de-compone",
-   "kind": "menu",
-   "surface": "dynamic menu (onContext)",
-   "capability": "Exposer la visibilité comme propriété de Component…",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/select-bridge.js:3279 onContext()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "history": 1,
-    "animation": 2,
-    "persist": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3279",
    "meta": {
     "i18n": null,
     "functionsVisited": 33
