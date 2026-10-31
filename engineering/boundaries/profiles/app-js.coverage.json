@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "cf9bf4b8c575f522f0515a2c88bada830be9f95d",
-    "sourceRootTree": "c555373f07feb02c0597300c6705623e80aa39e7",
+    "candidateCommit": "98f4c5cbaf212593b6436120e32b71f8c1008358",
+    "sourceRootTree": "7cda328cb42293276133c241fd237bc23e965d8b",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "3a0b469273cef83b41f7d514f637b6eedb8e1f1c",
-      "lastChangedCommit": "cf9bf4b8c575f522f0515a2c88bada830be9f95d"
+      "gitTree": "51b6cfad2d355cd667435a7fc7a03ae42d4fd2b2",
+      "lastChangedCommit": "98f4c5cbaf212593b6436120e32b71f8c1008358"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "4c243508c94e5eb92df816863adcb014689297e7",
-      "sha256": "3208c915a9312adba1370d4c1f2a6a72e7bb32e46fabf6a1757ca47931920ecb",
+      "gitBlob": "60562c9d99439a6cec39ca237ac220418f6406fc",
+      "sha256": "93c63fe2f32ce0b94aa80c6408f2287c4aa69f833ba3e3e4e84e1ecbb8830b1a",
       "lastChangedCommit": "f606f3b2ea60c6bf5cdb7d031b8c54b3b60d291a"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "0f12ed5c63ab2b2055628092d77cd59ebc412800e658aa18956c4e0caeb03ba8"
+      "value": "7cf570b2cbb7e0532f919d352777c59af1e5593c1a24dc101f2388fa10ca8fc4"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "6bfd294ce670cb99b8d419cfea754002978e0d19",
-        "sha256": "b73caddf68f0078b124afe5037d93f9e59e9d0eca02ab511f589e8ab2707aafc",
+        "gitBlob": "ab3f6ad442f3cee0bb27cf7b299e2fef4d698335",
+        "sha256": "dd532744c89ed5d21a5c4a9fa04bb1b4b3c1684393de49048d1905508baf69fd",
         "moduleCount": 307,
-        "basedOnCommit": "cf9bf4b8c575f522f0515a2c88bada830be9f95d"
+        "basedOnCommit": "98f4c5cbaf212593b6436120e32b71f8c1008358"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -121,13 +121,13 @@
   "bootstrapObservations": {
     "path": "src/index.html",
     "scriptOrdinalConvention": "One-based order of all script start tags, including inline and excluded vendor tags.",
-    "totalScriptTags": 379,
-    "externalClassicTags": 376,
+    "totalScriptTags": 380,
+    "externalClassicTags": 377,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
-    "retainedClassicTags": 372,
+    "retainedClassicTags": 373,
     "retainedModuleTags": 2,
-    "classicTagsUnderSrcJsIncludingVendors": 375,
+    "classicTagsUnderSrcJsIncludingVendors": 376,
     "inlineScripts": [
       {
         "path": "src/index.html",
@@ -691,8 +691,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2585,
-          "scriptOrdinal": 236
+          "line": 2586,
+          "scriptOrdinal": 237
         }
       ]
     },
@@ -703,8 +703,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2713,
-          "scriptOrdinal": 362
+          "line": 2714,
+          "scriptOrdinal": 363
         }
       ]
     },
@@ -715,8 +715,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2714,
-          "scriptOrdinal": 363
+          "line": 2715,
+          "scriptOrdinal": 364
         }
       ]
     },
@@ -727,8 +727,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2396,
-          "scriptOrdinal": 86
+          "line": 2397,
+          "scriptOrdinal": 87
         }
       ]
     },
@@ -739,8 +739,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2398,
-          "scriptOrdinal": 87
+          "line": 2399,
+          "scriptOrdinal": 88
         }
       ]
     },
@@ -751,8 +751,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2473,
-          "scriptOrdinal": 146
+          "line": 2474,
+          "scriptOrdinal": 147
         }
       ]
     },
@@ -763,8 +763,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2646,
-          "scriptOrdinal": 295
+          "line": 2647,
+          "scriptOrdinal": 296
         }
       ]
     },
@@ -775,8 +775,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2716,
-          "scriptOrdinal": 365
+          "line": 2717,
+          "scriptOrdinal": 366
         }
       ]
     },
@@ -787,25 +787,13 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2333,
-          "scriptOrdinal": 30
+          "line": 2334,
+          "scriptOrdinal": 31
         }
       ]
     },
     {
       "path": "src/js/adapters/native-object-recovery.js",
-      "moduleId": "app.native.object.recovery.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2539,
-          "scriptOrdinal": 194
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-recovery-resume.js",
       "moduleId": "app.native.object.recovery.adapter",
       "executionClass": "document-classic",
       "loadSites": [
@@ -817,7 +805,7 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-recovery-cleanup.js",
+      "path": "src/js/adapters/native-object-recovery-resume.js",
       "moduleId": "app.native.object.recovery.adapter",
       "executionClass": "document-classic",
       "loadSites": [
@@ -829,20 +817,20 @@
       ]
     },
     {
-      "path": "src/js/application/presenter-seam.js",
-      "moduleId": "app.presenter.seam",
+      "path": "src/js/adapters/native-object-recovery-cleanup.js",
+      "moduleId": "app.native.object.recovery.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2727,
-          "scriptOrdinal": 373
+          "line": 2542,
+          "scriptOrdinal": 197
         }
       ]
     },
     {
-      "path": "src/js/application/app-menu-targets.js",
-      "moduleId": "app.menu.targets",
+      "path": "src/js/application/presenter-seam.js",
+      "moduleId": "app.presenter.seam",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -853,56 +841,8 @@
       ]
     },
     {
-      "path": "src/js/application/keyboard-arbiter.js",
-      "moduleId": "app.keyboard.arbiter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2449,
-          "scriptOrdinal": 129
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/tool-holds.js",
-      "moduleId": "app.tool.holds",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2450,
-          "scriptOrdinal": 130
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/tool-rail.js",
-      "moduleId": "app.tool.rail",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2451,
-          "scriptOrdinal": 131
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/shortcut-pane.js",
-      "moduleId": "app.shortcut.pane",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2452,
-          "scriptOrdinal": 132
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/shortcut-targets.js",
-      "moduleId": "app.shortcut.targets",
+      "path": "src/js/application/app-menu-targets.js",
+      "moduleId": "app.menu.targets",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -913,8 +853,56 @@
       ]
     },
     {
-      "path": "src/js/application/project-lifecycle.js",
-      "moduleId": "app.project.lifecycle",
+      "path": "src/js/application/keyboard-arbiter.js",
+      "moduleId": "app.keyboard.arbiter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2450,
+          "scriptOrdinal": 130
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/tool-holds.js",
+      "moduleId": "app.tool.holds",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2451,
+          "scriptOrdinal": 131
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/tool-rail.js",
+      "moduleId": "app.tool.rail",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2452,
+          "scriptOrdinal": 132
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/shortcut-pane.js",
+      "moduleId": "app.shortcut.pane",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2453,
+          "scriptOrdinal": 133
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/shortcut-targets.js",
+      "moduleId": "app.shortcut.targets",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -925,8 +913,8 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-layer-list-presenter.js",
-      "moduleId": "app.native.object.ui.adapter",
+      "path": "src/js/application/project-lifecycle.js",
+      "moduleId": "app.project.lifecycle",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -937,187 +925,31 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-layer-list-presenter.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2732,
+          "scriptOrdinal": 378
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-object-ui.js",
       "moduleId": "app.native.object.ui.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2334,
-          "scriptOrdinal": 31
+          "line": 2335,
+          "scriptOrdinal": 32
         }
       ]
     },
     {
       "path": "src/js/adapters/native-select-overlay.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2593,
-          "scriptOrdinal": 244
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-component-expose-ui.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2377,
-          "scriptOrdinal": 68
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-select-gesture.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2595,
-          "scriptOrdinal": 246
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-selection-steps.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2596,
-          "scriptOrdinal": 247
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-parametric-panel.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2600,
-          "scriptOrdinal": 251
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-text-props-panel.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2601,
-          "scriptOrdinal": 252
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-inspector-unavailable.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2598,
-          "scriptOrdinal": 249
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-fill-gradient.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2599,
-          "scriptOrdinal": 250
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-selection-style.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2597,
-          "scriptOrdinal": 248
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-selection-boolean.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2602,
-          "scriptOrdinal": 253
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-selection-align.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2604,
-          "scriptOrdinal": 255
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-presentation-wait.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2608,
-          "scriptOrdinal": 259
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-new-return-pin.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2611,
-          "scriptOrdinal": 262
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-selection-transform.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2603,
-          "scriptOrdinal": 254
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-view-aids-ui.js",
       "moduleId": "app.native.object.ui.adapter",
       "executionClass": "document-classic",
       "loadSites": [
@@ -1129,7 +961,127 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-shape-tree-model.js",
+      "path": "src/js/adapters/native-component-expose-ui.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2378,
+          "scriptOrdinal": 69
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-select-gesture.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2596,
+          "scriptOrdinal": 247
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-selection-steps.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2597,
+          "scriptOrdinal": 248
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-parametric-panel.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2601,
+          "scriptOrdinal": 252
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-text-props-panel.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2602,
+          "scriptOrdinal": 253
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-inspector-unavailable.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2599,
+          "scriptOrdinal": 250
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-fill-gradient.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2600,
+          "scriptOrdinal": 251
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-selection-style.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2598,
+          "scriptOrdinal": 249
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-selection-boolean.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2603,
+          "scriptOrdinal": 254
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-selection-align.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2605,
+          "scriptOrdinal": 256
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-presentation-wait.js",
       "moduleId": "app.native.object.ui.adapter",
       "executionClass": "document-classic",
       "loadSites": [
@@ -1141,7 +1093,43 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-shape-tree-ui.js",
+      "path": "src/js/adapters/native-new-return-pin.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2612,
+          "scriptOrdinal": 263
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-selection-transform.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2604,
+          "scriptOrdinal": 255
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-view-aids-ui.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2595,
+          "scriptOrdinal": 246
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-shape-tree-model.js",
       "moduleId": "app.native.object.ui.adapter",
       "executionClass": "document-classic",
       "loadSites": [
@@ -1153,14 +1141,26 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-shape-tree-ui.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2611,
+          "scriptOrdinal": 262
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-subselect-ui.js",
       "moduleId": "app.native.object.ui.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2607,
-          "scriptOrdinal": 258
+          "line": 2608,
+          "scriptOrdinal": 259
         }
       ]
     },
@@ -1207,8 +1207,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2331,
-          "scriptOrdinal": 28
+          "line": 2332,
+          "scriptOrdinal": 29
         }
       ]
     },
@@ -1219,8 +1219,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2340,
-          "scriptOrdinal": 37
+          "line": 2341,
+          "scriptOrdinal": 38
         }
       ]
     },
@@ -1231,8 +1231,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2704,
-          "scriptOrdinal": 353
+          "line": 2705,
+          "scriptOrdinal": 354
         }
       ]
     },
@@ -1243,8 +1243,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2707,
-          "scriptOrdinal": 356
+          "line": 2708,
+          "scriptOrdinal": 357
         }
       ]
     },
@@ -1255,8 +1255,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2343,
-          "scriptOrdinal": 40
+          "line": 2344,
+          "scriptOrdinal": 41
         }
       ]
     },
@@ -1267,8 +1267,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2344,
-          "scriptOrdinal": 41
+          "line": 2345,
+          "scriptOrdinal": 42
         }
       ]
     },
@@ -1279,8 +1279,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2457,
-          "scriptOrdinal": 137
+          "line": 2458,
+          "scriptOrdinal": 138
         }
       ]
     },
@@ -1291,8 +1291,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2706,
-          "scriptOrdinal": 355
+          "line": 2707,
+          "scriptOrdinal": 356
         }
       ]
     },
@@ -1303,8 +1303,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2545,
-          "scriptOrdinal": 200
+          "line": 2546,
+          "scriptOrdinal": 201
         }
       ]
     },
@@ -1315,8 +1315,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2544,
-          "scriptOrdinal": 199
+          "line": 2545,
+          "scriptOrdinal": 200
         }
       ]
     },
@@ -1327,8 +1327,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2705,
-          "scriptOrdinal": 354
+          "line": 2706,
+          "scriptOrdinal": 355
         }
       ]
     },
@@ -1339,8 +1339,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2715,
-          "scriptOrdinal": 364
+          "line": 2716,
+          "scriptOrdinal": 365
         }
       ]
     },
@@ -1364,8 +1364,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2538,
-          "scriptOrdinal": 193
+          "line": 2539,
+          "scriptOrdinal": 194
         }
       ]
     },
@@ -1376,8 +1376,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2542,
-          "scriptOrdinal": 197
+          "line": 2543,
+          "scriptOrdinal": 198
         }
       ]
     },
@@ -1388,8 +1388,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2543,
-          "scriptOrdinal": 198
+          "line": 2544,
+          "scriptOrdinal": 199
         }
       ]
     },
@@ -1400,8 +1400,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2592,
-          "scriptOrdinal": 243
+          "line": 2593,
+          "scriptOrdinal": 244
         }
       ]
     },
@@ -1412,8 +1412,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2403,
-          "scriptOrdinal": 92
+          "line": 2404,
+          "scriptOrdinal": 93
         }
       ]
     },
@@ -1424,8 +1424,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2461,
-          "scriptOrdinal": 141
+          "line": 2462,
+          "scriptOrdinal": 142
         }
       ]
     },
@@ -1436,8 +1436,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2346,
-          "scriptOrdinal": 43
+          "line": 2347,
+          "scriptOrdinal": 44
         }
       ]
     },
@@ -1448,8 +1448,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2482,
-          "scriptOrdinal": 153
+          "line": 2483,
+          "scriptOrdinal": 154
         }
       ]
     },
@@ -1460,8 +1460,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2485,
-          "scriptOrdinal": 155
+          "line": 2486,
+          "scriptOrdinal": 156
         }
       ]
     },
@@ -1472,8 +1472,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2355,
-          "scriptOrdinal": 46
+          "line": 2356,
+          "scriptOrdinal": 47
         }
       ]
     },
@@ -1484,8 +1484,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2710,
-          "scriptOrdinal": 359
+          "line": 2711,
+          "scriptOrdinal": 360
         }
       ]
     },
@@ -1556,8 +1556,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2341,
-          "scriptOrdinal": 38
+          "line": 2342,
+          "scriptOrdinal": 39
         }
       ]
     },
@@ -1616,8 +1616,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2342,
-          "scriptOrdinal": 39
+          "line": 2343,
+          "scriptOrdinal": 40
         }
       ]
     },
@@ -1628,8 +1628,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2483,
-          "scriptOrdinal": 154
+          "line": 2484,
+          "scriptOrdinal": 155
         }
       ]
     },
@@ -1640,8 +1640,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2576,
-          "scriptOrdinal": 227
+          "line": 2577,
+          "scriptOrdinal": 228
         }
       ]
     },
@@ -1652,8 +1652,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2448,
-          "scriptOrdinal": 128
+          "line": 2449,
+          "scriptOrdinal": 129
         }
       ]
     },
@@ -1677,8 +1677,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2568,
-          "scriptOrdinal": 220
+          "line": 2569,
+          "scriptOrdinal": 221
         }
       ]
     },
@@ -1689,8 +1689,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2572,
-          "scriptOrdinal": 224
+          "line": 2573,
+          "scriptOrdinal": 225
         }
       ]
     },
@@ -1701,8 +1701,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2517,
-          "scriptOrdinal": 175
+          "line": 2518,
+          "scriptOrdinal": 176
         }
       ]
     },
@@ -1713,8 +1713,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2586,
-          "scriptOrdinal": 237
+          "line": 2587,
+          "scriptOrdinal": 238
         }
       ]
     },
@@ -1725,8 +1725,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2587,
-          "scriptOrdinal": 238
+          "line": 2588,
+          "scriptOrdinal": 239
         }
       ]
     },
@@ -1737,8 +1737,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2712,
-          "scriptOrdinal": 361
+          "line": 2713,
+          "scriptOrdinal": 362
         }
       ]
     },
@@ -1749,8 +1749,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2711,
-          "scriptOrdinal": 360
+          "line": 2712,
+          "scriptOrdinal": 361
         }
       ]
     },
@@ -1761,8 +1761,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2513,
-          "scriptOrdinal": 171
+          "line": 2514,
+          "scriptOrdinal": 172
         }
       ]
     },
@@ -1773,8 +1773,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2394,
-          "scriptOrdinal": 85
+          "line": 2395,
+          "scriptOrdinal": 86
         }
       ]
     },
@@ -1785,8 +1785,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2588,
-          "scriptOrdinal": 239
+          "line": 2589,
+          "scriptOrdinal": 240
         }
       ]
     },
@@ -1797,8 +1797,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2392,
-          "scriptOrdinal": 83
+          "line": 2393,
+          "scriptOrdinal": 84
         }
       ]
     },
@@ -1809,8 +1809,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2393,
-          "scriptOrdinal": 84
+          "line": 2394,
+          "scriptOrdinal": 85
         }
       ]
     },
@@ -1821,8 +1821,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2459,
-          "scriptOrdinal": 139
+          "line": 2460,
+          "scriptOrdinal": 140
         }
       ]
     },
@@ -1833,8 +1833,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2526,
-          "scriptOrdinal": 181
+          "line": 2527,
+          "scriptOrdinal": 182
         }
       ]
     },
@@ -1857,8 +1857,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2532,
-          "scriptOrdinal": 187
+          "line": 2533,
+          "scriptOrdinal": 188
         }
       ]
     },
@@ -1869,8 +1869,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2535,
-          "scriptOrdinal": 190
+          "line": 2536,
+          "scriptOrdinal": 191
         }
       ]
     },
@@ -1881,8 +1881,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2472,
-          "scriptOrdinal": 145
+          "line": 2473,
+          "scriptOrdinal": 146
         }
       ]
     },
@@ -1893,8 +1893,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2471,
-          "scriptOrdinal": 144
+          "line": 2472,
+          "scriptOrdinal": 145
         }
       ]
     },
@@ -1905,8 +1905,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2462,
-          "scriptOrdinal": 142
+          "line": 2463,
+          "scriptOrdinal": 143
         }
       ]
     },
@@ -1917,8 +1917,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2345,
-          "scriptOrdinal": 42
+          "line": 2346,
+          "scriptOrdinal": 43
         }
       ]
     },
@@ -1929,8 +1929,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2470,
-          "scriptOrdinal": 143
+          "line": 2471,
+          "scriptOrdinal": 144
         }
       ]
     },
@@ -1948,8 +1948,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2351,
-          "scriptOrdinal": 44
+          "line": 2352,
+          "scriptOrdinal": 45
         }
       ]
     },
@@ -1960,8 +1960,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2353,
-          "scriptOrdinal": 45
+          "line": 2354,
+          "scriptOrdinal": 46
         }
       ]
     },
@@ -1972,8 +1972,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2590,
-          "scriptOrdinal": 241
+          "line": 2591,
+          "scriptOrdinal": 242
         }
       ]
     },
@@ -1990,8 +1990,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2502,
-          "scriptOrdinal": 160
+          "line": 2503,
+          "scriptOrdinal": 161
         }
       ]
     },
@@ -2002,8 +2002,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2527,
-          "scriptOrdinal": 182
+          "line": 2528,
+          "scriptOrdinal": 183
         }
       ]
     },
@@ -2014,8 +2014,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2577,
-          "scriptOrdinal": 228
+          "line": 2578,
+          "scriptOrdinal": 229
         }
       ]
     },
@@ -2026,8 +2026,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2619,
-          "scriptOrdinal": 270
+          "line": 2620,
+          "scriptOrdinal": 271
         }
       ]
     },
@@ -2038,8 +2038,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2400,
-          "scriptOrdinal": 89
+          "line": 2401,
+          "scriptOrdinal": 90
         }
       ]
     },
@@ -2050,8 +2050,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2499,
-          "scriptOrdinal": 159
+          "line": 2500,
+          "scriptOrdinal": 160
         }
       ],
       "additionalContexts": [
@@ -2077,8 +2077,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2494,
-          "scriptOrdinal": 158
+          "line": 2495,
+          "scriptOrdinal": 159
         }
       ]
     },
@@ -2089,8 +2089,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2489,
-          "scriptOrdinal": 156
+          "line": 2490,
+          "scriptOrdinal": 157
         }
       ]
     },
@@ -2101,8 +2101,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2490,
-          "scriptOrdinal": 157
+          "line": 2491,
+          "scriptOrdinal": 158
         }
       ]
     },
@@ -2113,8 +2113,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2552,
-          "scriptOrdinal": 207
+          "line": 2553,
+          "scriptOrdinal": 208
         }
       ]
     },
@@ -2131,8 +2131,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2621,
-          "scriptOrdinal": 272
+          "line": 2622,
+          "scriptOrdinal": 273
         }
       ]
     },
@@ -2143,8 +2143,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2573,
-          "scriptOrdinal": 225
+          "line": 2574,
+          "scriptOrdinal": 226
         }
       ]
     },
@@ -2167,8 +2167,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2582,
-          "scriptOrdinal": 233
+          "line": 2583,
+          "scriptOrdinal": 234
         }
       ]
     },
@@ -2179,8 +2179,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2591,
-          "scriptOrdinal": 242
+          "line": 2592,
+          "scriptOrdinal": 243
         }
       ]
     },
@@ -2191,8 +2191,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2553,
-          "scriptOrdinal": 208
+          "line": 2554,
+          "scriptOrdinal": 209
         }
       ]
     },
@@ -2203,8 +2203,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2456,
-          "scriptOrdinal": 136
+          "line": 2457,
+          "scriptOrdinal": 137
         }
       ]
     },
@@ -2215,8 +2215,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2445,
-          "scriptOrdinal": 125
+          "line": 2446,
+          "scriptOrdinal": 126
         }
       ]
     },
@@ -2227,8 +2227,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2564,
-          "scriptOrdinal": 216
+          "line": 2565,
+          "scriptOrdinal": 217
         }
       ]
     },
@@ -2239,8 +2239,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2563,
-          "scriptOrdinal": 215
+          "line": 2564,
+          "scriptOrdinal": 216
         }
       ]
     },
@@ -2251,8 +2251,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2558,
-          "scriptOrdinal": 213
+          "line": 2559,
+          "scriptOrdinal": 214
         }
       ]
     },
@@ -2263,8 +2263,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2557,
-          "scriptOrdinal": 212
+          "line": 2558,
+          "scriptOrdinal": 213
         }
       ]
     },
@@ -2293,8 +2293,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2435,
-          "scriptOrdinal": 115
+          "line": 2436,
+          "scriptOrdinal": 116
         }
       ]
     },
@@ -2305,8 +2305,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2420,
-          "scriptOrdinal": 100
+          "line": 2421,
+          "scriptOrdinal": 101
         }
       ]
     },
@@ -2353,8 +2353,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2422,
-          "scriptOrdinal": 102
+          "line": 2423,
+          "scriptOrdinal": 103
         }
       ]
     },
@@ -2365,8 +2365,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2436,
-          "scriptOrdinal": 116
+          "line": 2437,
+          "scriptOrdinal": 117
         }
       ]
     },
@@ -2377,8 +2377,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2438,
-          "scriptOrdinal": 118
+          "line": 2439,
+          "scriptOrdinal": 119
         }
       ]
     },
@@ -2389,8 +2389,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2424,
-          "scriptOrdinal": 104
+          "line": 2425,
+          "scriptOrdinal": 105
         }
       ]
     },
@@ -2401,8 +2401,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2413,
-          "scriptOrdinal": 93
+          "line": 2414,
+          "scriptOrdinal": 94
         }
       ]
     },
@@ -2413,8 +2413,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2414,
-          "scriptOrdinal": 94
+          "line": 2415,
+          "scriptOrdinal": 95
         }
       ]
     },
@@ -2425,8 +2425,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2441,
-          "scriptOrdinal": 121
+          "line": 2442,
+          "scriptOrdinal": 122
         }
       ]
     },
@@ -2437,8 +2437,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2442,
-          "scriptOrdinal": 122
+          "line": 2443,
+          "scriptOrdinal": 123
         }
       ]
     },
@@ -2449,8 +2449,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2439,
-          "scriptOrdinal": 119
+          "line": 2440,
+          "scriptOrdinal": 120
         }
       ]
     },
@@ -2461,8 +2461,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2440,
-          "scriptOrdinal": 120
+          "line": 2441,
+          "scriptOrdinal": 121
         }
       ]
     },
@@ -2473,8 +2473,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2417,
-          "scriptOrdinal": 97
+          "line": 2418,
+          "scriptOrdinal": 98
         }
       ]
     },
@@ -2521,8 +2521,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2428,
-          "scriptOrdinal": 108
+          "line": 2429,
+          "scriptOrdinal": 109
         }
       ]
     },
@@ -2533,8 +2533,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2419,
-          "scriptOrdinal": 99
+          "line": 2420,
+          "scriptOrdinal": 100
         }
       ]
     },
@@ -2545,8 +2545,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2416,
-          "scriptOrdinal": 96
+          "line": 2417,
+          "scriptOrdinal": 97
         }
       ]
     },
@@ -2575,8 +2575,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2427,
-          "scriptOrdinal": 107
+          "line": 2428,
+          "scriptOrdinal": 108
         }
       ]
     },
@@ -2587,8 +2587,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2418,
-          "scriptOrdinal": 98
+          "line": 2419,
+          "scriptOrdinal": 99
         }
       ]
     },
@@ -2599,8 +2599,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2433,
-          "scriptOrdinal": 113
+          "line": 2434,
+          "scriptOrdinal": 114
         }
       ]
     },
@@ -2611,8 +2611,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2415,
-          "scriptOrdinal": 95
+          "line": 2416,
+          "scriptOrdinal": 96
         }
       ]
     },
@@ -2623,8 +2623,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2434,
-          "scriptOrdinal": 114
+          "line": 2435,
+          "scriptOrdinal": 115
         }
       ]
     },
@@ -2635,8 +2635,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2432,
-          "scriptOrdinal": 112
+          "line": 2433,
+          "scriptOrdinal": 113
         }
       ]
     },
@@ -2647,8 +2647,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2423,
-          "scriptOrdinal": 103
+          "line": 2424,
+          "scriptOrdinal": 104
         }
       ]
     },
@@ -2713,8 +2713,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2431,
-          "scriptOrdinal": 111
+          "line": 2432,
+          "scriptOrdinal": 112
         }
       ]
     },
@@ -2761,8 +2761,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2421,
-          "scriptOrdinal": 101
+          "line": 2422,
+          "scriptOrdinal": 102
         }
       ]
     },
@@ -2791,8 +2791,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2437,
-          "scriptOrdinal": 117
+          "line": 2438,
+          "scriptOrdinal": 118
         }
       ]
     },
@@ -2803,8 +2803,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2429,
-          "scriptOrdinal": 109
+          "line": 2430,
+          "scriptOrdinal": 110
         }
       ]
     },
@@ -2815,8 +2815,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2430,
-          "scriptOrdinal": 110
+          "line": 2431,
+          "scriptOrdinal": 111
         }
       ]
     },
@@ -2827,8 +2827,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2425,
-          "scriptOrdinal": 105
+          "line": 2426,
+          "scriptOrdinal": 106
         }
       ]
     },
@@ -2839,8 +2839,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2510,
-          "scriptOrdinal": 168
+          "line": 2511,
+          "scriptOrdinal": 169
         }
       ]
     },
@@ -2851,8 +2851,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2458,
-          "scriptOrdinal": 138
+          "line": 2459,
+          "scriptOrdinal": 139
         }
       ]
     },
@@ -2863,8 +2863,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2511,
-          "scriptOrdinal": 169
+          "line": 2512,
+          "scriptOrdinal": 170
         }
       ]
     },
@@ -2875,8 +2875,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2446,
-          "scriptOrdinal": 126
+          "line": 2447,
+          "scriptOrdinal": 127
         }
       ]
     },
@@ -2887,8 +2887,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2531,
-          "scriptOrdinal": 186
+          "line": 2532,
+          "scriptOrdinal": 187
         }
       ]
     },
@@ -2899,8 +2899,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2444,
-          "scriptOrdinal": 124
+          "line": 2445,
+          "scriptOrdinal": 125
         }
       ]
     },
@@ -2911,8 +2911,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2512,
-          "scriptOrdinal": 170
+          "line": 2513,
+          "scriptOrdinal": 171
         }
       ]
     },
@@ -2923,8 +2923,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2569,
-          "scriptOrdinal": 221
+          "line": 2570,
+          "scriptOrdinal": 222
         }
       ]
     },
@@ -2935,8 +2935,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2505,
-          "scriptOrdinal": 163
+          "line": 2506,
+          "scriptOrdinal": 164
         }
       ]
     },
@@ -2947,8 +2947,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2571,
-          "scriptOrdinal": 223
+          "line": 2572,
+          "scriptOrdinal": 224
         }
       ]
     },
@@ -2959,25 +2959,13 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2474,
-          "scriptOrdinal": 147
+          "line": 2475,
+          "scriptOrdinal": 148
         }
       ]
     },
     {
       "path": "src/js/adapters/native-motion-property-panel.js",
-      "moduleId": "app.native.motion.properties.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2477,
-          "scriptOrdinal": 150
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-motion-property-binding.js",
       "moduleId": "app.native.motion.properties.adapter",
       "executionClass": "document-classic",
       "loadSites": [
@@ -2989,8 +2977,8 @@
       ]
     },
     {
-      "path": "src/js/motion.js",
-      "moduleId": "app.motion",
+      "path": "src/js/adapters/native-motion-property-binding.js",
+      "moduleId": "app.native.motion.properties.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -3001,332 +2989,20 @@
       ]
     },
     {
+      "path": "src/js/motion.js",
+      "moduleId": "app.motion",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2480,
+          "scriptOrdinal": 153
+        }
+      ]
+    },
+    {
       "path": "src/js/native-video-bridge.js",
       "moduleId": "app.native.video.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2523,
-          "scriptOrdinal": 178
-        }
-      ]
-    },
-    {
-      "path": "src/js/nemo-panel.js",
-      "moduleId": "app.nemo.panel",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2506,
-          "scriptOrdinal": 164
-        }
-      ]
-    },
-    {
-      "path": "src/js/nemo-plugin.js",
-      "moduleId": "app.nemo.plugin",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2508,
-          "scriptOrdinal": 166
-        }
-      ]
-    },
-    {
-      "path": "src/js/nemo-script.js",
-      "moduleId": "app.nemo.script",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2507,
-          "scriptOrdinal": 165
-        }
-      ]
-    },
-    {
-      "path": "src/js/p2p-contacts.js",
-      "moduleId": "app.p2p.contacts",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2516,
-          "scriptOrdinal": 174
-        }
-      ]
-    },
-    {
-      "path": "src/js/palette-panel.js",
-      "moduleId": "app.palette.panel",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2525,
-          "scriptOrdinal": 180
-        }
-      ]
-    },
-    {
-      "path": "src/js/path-fx.js",
-      "moduleId": "app.path.fx",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2530,
-          "scriptOrdinal": 185
-        }
-      ]
-    },
-    {
-      "path": "src/js/pen-bridge.js",
-      "moduleId": "app.pen.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2622,
-          "scriptOrdinal": 273
-        }
-      ]
-    },
-    {
-      "path": "src/js/perspective-bridge.js",
-      "moduleId": "app.perspective.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2580,
-          "scriptOrdinal": 231
-        }
-      ]
-    },
-    {
-      "path": "src/js/playback-cache.js",
-      "moduleId": "app.playback.cache",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2579,
-          "scriptOrdinal": 230
-        }
-      ]
-    },
-    {
-      "path": "src/js/project-document.js",
-      "moduleId": "app.project.document",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2447,
-          "scriptOrdinal": 127
-        }
-      ]
-    },
-    {
-      "path": "src/js/project-entry.js",
-      "moduleId": "app.project.entry",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2537,
-          "scriptOrdinal": 192
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-project-tabs-ui.js",
-      "moduleId": "app.native.object.inactive-project-tabs.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2546,
-          "scriptOrdinal": 201
-        }
-      ]
-    },
-    {
-      "path": "src/js/project.js",
-      "moduleId": "app.project",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2547,
-          "scriptOrdinal": 202
-        }
-      ]
-    },
-    {
-      "path": "src/js/psd-import-bridge.js",
-      "moduleId": "app.psd.import.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2567,
-          "scriptOrdinal": 219
-        }
-      ]
-    },
-    {
-      "path": "src/js/reference-bridge.js",
-      "moduleId": "app.reference.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2518,
-          "scriptOrdinal": 176
-        }
-      ]
-    },
-    {
-      "path": "src/js/render-manager.js",
-      "moduleId": "app.render.manager",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2401,
-          "scriptOrdinal": 90
-        }
-      ]
-    },
-    {
-      "path": "src/js/rig-bridge.js",
-      "moduleId": "app.rig.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2623,
-          "scriptOrdinal": 274
-        }
-      ]
-    },
-    {
-      "path": "src/js/rig-widget.js",
-      "moduleId": "app.rig.widget",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2565,
-          "scriptOrdinal": 217
-        }
-      ]
-    },
-    {
-      "path": "src/js/rive-export.js",
-      "moduleId": "app.rive.export",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2402,
-          "scriptOrdinal": 91
-        }
-      ]
-    },
-    {
-      "path": "src/js/rulers-bridge.js",
-      "moduleId": "app.rulers.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2620,
-          "scriptOrdinal": 271
-        }
-      ]
-    },
-    {
-      "path": "src/js/second-viewer.js",
-      "moduleId": "app.second.viewer",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2578,
-          "scriptOrdinal": 229
-        }
-      ]
-    },
-    {
-      "path": "src/js/select-bridge.js",
-      "moduleId": "app.select.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2606,
-          "scriptOrdinal": 257
-        }
-      ]
-    },
-    {
-      "path": "src/js/shader-effects-library.js",
-      "moduleId": "app.shader.effects.library",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2529,
-          "scriptOrdinal": 184
-        }
-      ]
-    },
-    {
-      "path": "src/js/shadow-brush-bridge.js",
-      "moduleId": "app.shadow.brush.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2589,
-          "scriptOrdinal": 240
-        }
-      ]
-    },
-    {
-      "path": "src/js/shape-bridge.js",
-      "moduleId": "app.shape.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2618,
-          "scriptOrdinal": 269
-        }
-      ]
-    },
-    {
-      "path": "src/js/shapes-panel.js",
-      "moduleId": "app.shapes.panel",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2503,
-          "scriptOrdinal": 161
-        }
-      ]
-    },
-    {
-      "path": "src/js/storyboard.js",
-      "moduleId": "app.storyboard",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -3337,14 +3013,338 @@
       ]
     },
     {
+      "path": "src/js/nemo-panel.js",
+      "moduleId": "app.nemo.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2507,
+          "scriptOrdinal": 165
+        }
+      ]
+    },
+    {
+      "path": "src/js/nemo-plugin.js",
+      "moduleId": "app.nemo.plugin",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2509,
+          "scriptOrdinal": 167
+        }
+      ]
+    },
+    {
+      "path": "src/js/nemo-script.js",
+      "moduleId": "app.nemo.script",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2508,
+          "scriptOrdinal": 166
+        }
+      ]
+    },
+    {
+      "path": "src/js/p2p-contacts.js",
+      "moduleId": "app.p2p.contacts",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2517,
+          "scriptOrdinal": 175
+        }
+      ]
+    },
+    {
+      "path": "src/js/palette-panel.js",
+      "moduleId": "app.palette.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2526,
+          "scriptOrdinal": 181
+        }
+      ]
+    },
+    {
+      "path": "src/js/path-fx.js",
+      "moduleId": "app.path.fx",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2531,
+          "scriptOrdinal": 186
+        }
+      ]
+    },
+    {
+      "path": "src/js/pen-bridge.js",
+      "moduleId": "app.pen.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2623,
+          "scriptOrdinal": 274
+        }
+      ]
+    },
+    {
+      "path": "src/js/perspective-bridge.js",
+      "moduleId": "app.perspective.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2581,
+          "scriptOrdinal": 232
+        }
+      ]
+    },
+    {
+      "path": "src/js/playback-cache.js",
+      "moduleId": "app.playback.cache",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2580,
+          "scriptOrdinal": 231
+        }
+      ]
+    },
+    {
+      "path": "src/js/project-document.js",
+      "moduleId": "app.project.document",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2448,
+          "scriptOrdinal": 128
+        }
+      ]
+    },
+    {
+      "path": "src/js/project-entry.js",
+      "moduleId": "app.project.entry",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2538,
+          "scriptOrdinal": 193
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-project-tabs-ui.js",
+      "moduleId": "app.native.object.inactive-project-tabs.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2547,
+          "scriptOrdinal": 202
+        }
+      ]
+    },
+    {
+      "path": "src/js/project.js",
+      "moduleId": "app.project",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2548,
+          "scriptOrdinal": 203
+        }
+      ]
+    },
+    {
+      "path": "src/js/psd-import-bridge.js",
+      "moduleId": "app.psd.import.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2568,
+          "scriptOrdinal": 220
+        }
+      ]
+    },
+    {
+      "path": "src/js/reference-bridge.js",
+      "moduleId": "app.reference.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2519,
+          "scriptOrdinal": 177
+        }
+      ]
+    },
+    {
+      "path": "src/js/render-manager.js",
+      "moduleId": "app.render.manager",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2402,
+          "scriptOrdinal": 91
+        }
+      ]
+    },
+    {
+      "path": "src/js/rig-bridge.js",
+      "moduleId": "app.rig.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2624,
+          "scriptOrdinal": 275
+        }
+      ]
+    },
+    {
+      "path": "src/js/rig-widget.js",
+      "moduleId": "app.rig.widget",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2566,
+          "scriptOrdinal": 218
+        }
+      ]
+    },
+    {
+      "path": "src/js/rive-export.js",
+      "moduleId": "app.rive.export",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2403,
+          "scriptOrdinal": 92
+        }
+      ]
+    },
+    {
+      "path": "src/js/rulers-bridge.js",
+      "moduleId": "app.rulers.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2621,
+          "scriptOrdinal": 272
+        }
+      ]
+    },
+    {
+      "path": "src/js/second-viewer.js",
+      "moduleId": "app.second.viewer",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2579,
+          "scriptOrdinal": 230
+        }
+      ]
+    },
+    {
+      "path": "src/js/select-bridge.js",
+      "moduleId": "app.select.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2607,
+          "scriptOrdinal": 258
+        }
+      ]
+    },
+    {
+      "path": "src/js/shader-effects-library.js",
+      "moduleId": "app.shader.effects.library",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2530,
+          "scriptOrdinal": 185
+        }
+      ]
+    },
+    {
+      "path": "src/js/shadow-brush-bridge.js",
+      "moduleId": "app.shadow.brush.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2590,
+          "scriptOrdinal": 241
+        }
+      ]
+    },
+    {
+      "path": "src/js/shape-bridge.js",
+      "moduleId": "app.shape.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2619,
+          "scriptOrdinal": 270
+        }
+      ]
+    },
+    {
+      "path": "src/js/shapes-panel.js",
+      "moduleId": "app.shapes.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2504,
+          "scriptOrdinal": 162
+        }
+      ]
+    },
+    {
+      "path": "src/js/storyboard.js",
+      "moduleId": "app.storyboard",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2525,
+          "scriptOrdinal": 180
+        }
+      ]
+    },
+    {
       "path": "src/js/stroke-modeler.js",
       "moduleId": "app.stroke.modeler",
       "executionClass": "document-classic",
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2357,
-          "scriptOrdinal": 48
+          "line": 2358,
+          "scriptOrdinal": 49
         }
       ]
     },
@@ -3355,8 +3355,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2612,
-          "scriptOrdinal": 263
+          "line": 2613,
+          "scriptOrdinal": 264
         }
       ]
     },
@@ -3373,8 +3373,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2581,
-          "scriptOrdinal": 232
+          "line": 2582,
+          "scriptOrdinal": 233
         }
       ]
     },
@@ -3385,8 +3385,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2566,
-          "scriptOrdinal": 218
+          "line": 2567,
+          "scriptOrdinal": 219
         }
       ]
     },
@@ -3397,8 +3397,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2504,
-          "scriptOrdinal": 162
+          "line": 2505,
+          "scriptOrdinal": 163
         }
       ]
     },
@@ -3409,8 +3409,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2460,
-          "scriptOrdinal": 140
+          "line": 2461,
+          "scriptOrdinal": 141
         }
       ],
       "additionalContexts": [
@@ -3436,8 +3436,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2514,
-          "scriptOrdinal": 172
+          "line": 2515,
+          "scriptOrdinal": 173
         }
       ]
     },
@@ -3448,8 +3448,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2453,
-          "scriptOrdinal": 133
+          "line": 2454,
+          "scriptOrdinal": 134
         }
       ]
     },
@@ -3460,8 +3460,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2454,
-          "scriptOrdinal": 134
+          "line": 2455,
+          "scriptOrdinal": 135
         }
       ]
     },
@@ -3472,8 +3472,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2443,
-          "scriptOrdinal": 123
+          "line": 2444,
+          "scriptOrdinal": 124
         }
       ]
     },
@@ -3484,8 +3484,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2360,
-          "scriptOrdinal": 51
+          "line": 2361,
+          "scriptOrdinal": 52
         }
       ]
     },
@@ -3496,8 +3496,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2534,
-          "scriptOrdinal": 189
+          "line": 2535,
+          "scriptOrdinal": 190
         }
       ]
     },
@@ -3508,8 +3508,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2533,
-          "scriptOrdinal": 188
+          "line": 2534,
+          "scriptOrdinal": 189
         }
       ]
     },
@@ -3520,8 +3520,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2570,
-          "scriptOrdinal": 222
+          "line": 2571,
+          "scriptOrdinal": 223
         }
       ]
     },
@@ -3532,8 +3532,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2625,
-          "scriptOrdinal": 276
+          "line": 2626,
+          "scriptOrdinal": 277
         }
       ]
     },
@@ -3544,8 +3544,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2356,
-          "scriptOrdinal": 47
+          "line": 2357,
+          "scriptOrdinal": 48
         }
       ]
     },
@@ -3568,8 +3568,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2548,
-          "scriptOrdinal": 203
+          "line": 2549,
+          "scriptOrdinal": 204
         }
       ]
     },
@@ -3580,8 +3580,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2549,
-          "scriptOrdinal": 204
+          "line": 2550,
+          "scriptOrdinal": 205
         }
       ]
     },
@@ -3592,8 +3592,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2554,
-          "scriptOrdinal": 209
+          "line": 2555,
+          "scriptOrdinal": 210
         }
       ]
     },
@@ -3604,8 +3604,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2555,
-          "scriptOrdinal": 210
+          "line": 2556,
+          "scriptOrdinal": 211
         }
       ]
     },
@@ -3616,8 +3616,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2362,
-          "scriptOrdinal": 53
+          "line": 2363,
+          "scriptOrdinal": 54
         }
       ]
     },
@@ -3628,8 +3628,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2363,
-          "scriptOrdinal": 54
+          "line": 2364,
+          "scriptOrdinal": 55
         }
       ]
     },
@@ -3640,8 +3640,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2364,
-          "scriptOrdinal": 55
+          "line": 2365,
+          "scriptOrdinal": 56
         }
       ]
     },
@@ -3652,8 +3652,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2391,
-          "scriptOrdinal": 82
+          "line": 2392,
+          "scriptOrdinal": 83
         }
       ]
     },
@@ -3664,8 +3664,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2536,
-          "scriptOrdinal": 191
+          "line": 2537,
+          "scriptOrdinal": 192
         }
       ]
     },
@@ -3676,8 +3676,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2574,
-          "scriptOrdinal": 226
+          "line": 2575,
+          "scriptOrdinal": 227
         }
       ]
     },
@@ -3699,8 +3699,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2584,
-          "scriptOrdinal": 235
+          "line": 2585,
+          "scriptOrdinal": 236
         }
       ]
     },
@@ -3724,8 +3724,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2426,
-          "scriptOrdinal": 106
+          "line": 2427,
+          "scriptOrdinal": 107
         }
       ]
     },
@@ -3736,8 +3736,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2719,
-          "scriptOrdinal": 367
+          "line": 2720,
+          "scriptOrdinal": 368
         }
       ]
     },
@@ -3748,8 +3748,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2717,
-          "scriptOrdinal": 366
+          "line": 2718,
+          "scriptOrdinal": 367
         }
       ]
     },
@@ -3760,8 +3760,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2335,
-          "scriptOrdinal": 32
+          "line": 2336,
+          "scriptOrdinal": 33
         }
       ]
     },
@@ -3772,8 +3772,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2336,
-          "scriptOrdinal": 33
+          "line": 2337,
+          "scriptOrdinal": 34
         }
       ]
     },
@@ -3784,8 +3784,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2337,
-          "scriptOrdinal": 34
+          "line": 2338,
+          "scriptOrdinal": 35
         }
       ]
     },
@@ -3796,8 +3796,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2338,
-          "scriptOrdinal": 35
+          "line": 2339,
+          "scriptOrdinal": 36
         }
       ]
     },
@@ -3808,8 +3808,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2455,
-          "scriptOrdinal": 135
+          "line": 2456,
+          "scriptOrdinal": 136
         }
       ]
     },
@@ -3832,8 +3832,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2380,
-          "scriptOrdinal": 71
+          "line": 2381,
+          "scriptOrdinal": 72
         }
       ]
     },
@@ -3844,8 +3844,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2701,
-          "scriptOrdinal": 350
+          "line": 2702,
+          "scriptOrdinal": 351
         }
       ]
     },
@@ -3856,8 +3856,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2381,
-          "scriptOrdinal": 72
+          "line": 2382,
+          "scriptOrdinal": 73
         }
       ]
     },
@@ -3868,8 +3868,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2702,
-          "scriptOrdinal": 351
+          "line": 2703,
+          "scriptOrdinal": 352
         }
       ]
     },
@@ -3880,8 +3880,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2703,
-          "scriptOrdinal": 352
+          "line": 2704,
+          "scriptOrdinal": 353
         }
       ]
     },
@@ -3892,8 +3892,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2382,
-          "scriptOrdinal": 73
+          "line": 2383,
+          "scriptOrdinal": 74
         }
       ]
     },
@@ -3904,8 +3904,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2383,
-          "scriptOrdinal": 74
+          "line": 2384,
+          "scriptOrdinal": 75
         }
       ]
     },
@@ -3916,8 +3916,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2384,
-          "scriptOrdinal": 75
+          "line": 2385,
+          "scriptOrdinal": 76
         }
       ]
     },
@@ -3928,8 +3928,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2385,
-          "scriptOrdinal": 76
+          "line": 2386,
+          "scriptOrdinal": 77
         }
       ]
     },
@@ -3940,8 +3940,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2386,
-          "scriptOrdinal": 77
+          "line": 2387,
+          "scriptOrdinal": 78
         }
       ]
     },
@@ -3952,8 +3952,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2367,
-          "scriptOrdinal": 58
+          "line": 2368,
+          "scriptOrdinal": 59
         }
       ]
     },
@@ -3964,8 +3964,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2643,
-          "scriptOrdinal": 292
+          "line": 2644,
+          "scriptOrdinal": 293
         }
       ]
     },
@@ -3976,8 +3976,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2644,
-          "scriptOrdinal": 293
+          "line": 2645,
+          "scriptOrdinal": 294
         }
       ]
     },
@@ -3988,8 +3988,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2685,
-          "scriptOrdinal": 334
+          "line": 2686,
+          "scriptOrdinal": 335
         }
       ]
     },
@@ -4000,8 +4000,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2686,
-          "scriptOrdinal": 335
+          "line": 2687,
+          "scriptOrdinal": 336
         }
       ]
     },
@@ -4012,8 +4012,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2687,
-          "scriptOrdinal": 336
+          "line": 2688,
+          "scriptOrdinal": 337
         }
       ]
     },
@@ -4024,8 +4024,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2688,
-          "scriptOrdinal": 337
+          "line": 2689,
+          "scriptOrdinal": 338
         }
       ]
     },
@@ -4036,8 +4036,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2626,
-          "scriptOrdinal": 277
+          "line": 2627,
+          "scriptOrdinal": 278
         }
       ]
     },
@@ -4048,8 +4048,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2627,
-          "scriptOrdinal": 278
+          "line": 2628,
+          "scriptOrdinal": 279
         }
       ]
     },
@@ -4060,8 +4060,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2378,
-          "scriptOrdinal": 69
+          "line": 2379,
+          "scriptOrdinal": 70
         }
       ]
     },
@@ -4072,8 +4072,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2379,
-          "scriptOrdinal": 70
+          "line": 2380,
+          "scriptOrdinal": 71
         }
       ]
     },
@@ -4084,8 +4084,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2689,
-          "scriptOrdinal": 338
+          "line": 2690,
+          "scriptOrdinal": 339
         }
       ]
     },
@@ -4096,8 +4096,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2691,
-          "scriptOrdinal": 340
+          "line": 2692,
+          "scriptOrdinal": 341
         }
       ]
     },
@@ -4108,8 +4108,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2694,
-          "scriptOrdinal": 343
+          "line": 2695,
+          "scriptOrdinal": 344
         }
       ]
     },
@@ -4120,8 +4120,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2692,
-          "scriptOrdinal": 341
+          "line": 2693,
+          "scriptOrdinal": 342
         }
       ]
     },
@@ -4132,8 +4132,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2695,
-          "scriptOrdinal": 344
+          "line": 2696,
+          "scriptOrdinal": 345
         }
       ]
     },
@@ -4144,8 +4144,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2696,
-          "scriptOrdinal": 345
+          "line": 2697,
+          "scriptOrdinal": 346
         }
       ]
     },
@@ -4156,8 +4156,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2698,
-          "scriptOrdinal": 347
+          "line": 2699,
+          "scriptOrdinal": 348
         }
       ]
     },
@@ -4168,8 +4168,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2700,
-          "scriptOrdinal": 349
+          "line": 2701,
+          "scriptOrdinal": 350
         }
       ]
     },
@@ -4180,8 +4180,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2699,
-          "scriptOrdinal": 348
+          "line": 2700,
+          "scriptOrdinal": 349
         }
       ]
     },
@@ -4204,8 +4204,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2339,
-          "scriptOrdinal": 36
+          "line": 2340,
+          "scriptOrdinal": 37
         }
       ]
     },
@@ -4216,8 +4216,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2708,
-          "scriptOrdinal": 357
+          "line": 2709,
+          "scriptOrdinal": 358
         }
       ]
     },
@@ -4228,25 +4228,13 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2709,
-          "scriptOrdinal": 358
+          "line": 2710,
+          "scriptOrdinal": 359
         }
       ]
     },
     {
       "path": "src/js/adapters/native-media-export-core.js",
-      "moduleId": "app.native.media.export.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2628,
-          "scriptOrdinal": 279
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-media-export-contract.js",
       "moduleId": "app.native.media.export.contract",
       "executionClass": "document-classic",
       "loadSites": [
@@ -4258,20 +4246,20 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-rig-contract.js",
-      "moduleId": "app.native.object.rig.contract",
+      "path": "src/js/adapters/native-media-export-contract.js",
+      "moduleId": "app.native.media.export.contract",
       "executionClass": "document-classic",
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2365,
-          "scriptOrdinal": 56
+          "line": 2630,
+          "scriptOrdinal": 281
         }
       ]
     },
     {
-      "path": "src/js/adapters/native-object-rig-seam.js",
-      "moduleId": "app.native.object.rig.seam",
+      "path": "src/js/adapters/native-object-rig-contract.js",
+      "moduleId": "app.native.object.rig.contract",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4282,20 +4270,20 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-rig-command.js",
-      "moduleId": "app.native.object.rig.command",
+      "path": "src/js/adapters/native-object-rig-seam.js",
+      "moduleId": "app.native.object.rig.seam",
       "executionClass": "document-classic",
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2667,
-          "scriptOrdinal": 316
+          "line": 2367,
+          "scriptOrdinal": 58
         }
       ]
     },
     {
-      "path": "src/js/adapters/native-object-image-mesh.js",
-      "moduleId": "app.native.object.image.mesh.adapter",
+      "path": "src/js/adapters/native-object-rig-command.js",
+      "moduleId": "app.native.object.rig.command",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4306,8 +4294,8 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-widget.js",
-      "moduleId": "app.native.object.widget.adapter",
+      "path": "src/js/adapters/native-object-image-mesh.js",
+      "moduleId": "app.native.object.image.mesh.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4318,8 +4306,8 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-widget-ui.js",
-      "moduleId": "app.native.object.widget.ui.adapter",
+      "path": "src/js/adapters/native-object-widget.js",
+      "moduleId": "app.native.object.widget.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4330,32 +4318,8 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-history-read-contract.js",
-      "moduleId": "app.native.history.read.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2642,
-          "scriptOrdinal": 291
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-history-ui.js",
-      "moduleId": "app.native.object.history.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2672,
-          "scriptOrdinal": 321
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-ghost-ui.js",
-      "moduleId": "app.native.object.ghost.ui.adapter",
+      "path": "src/js/adapters/native-object-widget-ui.js",
+      "moduleId": "app.native.object.widget.ui.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4366,8 +4330,20 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-rig-ui.js",
-      "moduleId": "app.native.object.rig.ui.adapter",
+      "path": "src/js/adapters/native-history-read-contract.js",
+      "moduleId": "app.native.history.read.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2643,
+          "scriptOrdinal": 292
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-history-ui.js",
+      "moduleId": "app.native.object.history.ui.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4378,8 +4354,20 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-rig-weights-ui.js",
-      "moduleId": "app.native.object.rig.weights.ui.adapter",
+      "path": "src/js/adapters/native-object-ghost-ui.js",
+      "moduleId": "app.native.object.ghost.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2672,
+          "scriptOrdinal": 321
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-rig-ui.js",
+      "moduleId": "app.native.object.rig.ui.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4390,8 +4378,8 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-rig-canvas.js",
-      "moduleId": "app.native.object.rig.canvas.adapter",
+      "path": "src/js/adapters/native-object-rig-weights-ui.js",
+      "moduleId": "app.native.object.rig.weights.ui.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4402,8 +4390,8 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-labs.js",
-      "moduleId": "app.native.object.labs.adapter",
+      "path": "src/js/adapters/native-object-rig-canvas.js",
+      "moduleId": "app.native.object.rig.canvas.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4414,8 +4402,8 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-motion-preset.js",
-      "moduleId": "app.native.object.motion-preset.adapter",
+      "path": "src/js/adapters/native-object-labs.js",
+      "moduleId": "app.native.object.labs.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4426,8 +4414,8 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-layer-compositing.js",
-      "moduleId": "app.native.object.layer-compositing.adapter",
+      "path": "src/js/adapters/native-object-motion-preset.js",
+      "moduleId": "app.native.object.motion-preset.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4438,8 +4426,8 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-layer-parent.js",
-      "moduleId": "app.native.layer-parent.adapter",
+      "path": "src/js/adapters/native-object-layer-compositing.js",
+      "moduleId": "app.native.object.layer-compositing.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4450,7 +4438,7 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-motion-layer-link-rows.js",
+      "path": "src/js/adapters/native-layer-parent.js",
       "moduleId": "app.native.layer-parent.adapter",
       "executionClass": "document-classic",
       "loadSites": [
@@ -4462,8 +4450,8 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-path-effects-ui.js",
-      "moduleId": "app.native.path-effects.ui.adapter",
+      "path": "src/js/adapters/native-motion-layer-link-rows.js",
+      "moduleId": "app.native.layer-parent.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4474,8 +4462,8 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-rig.js",
-      "moduleId": "app.native.object.rig.adapter",
+      "path": "src/js/adapters/native-path-effects-ui.js",
+      "moduleId": "app.native.path-effects.ui.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4486,8 +4474,8 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-tween.js",
-      "moduleId": "app.native.object.tween.adapter",
+      "path": "src/js/adapters/native-object-rig.js",
+      "moduleId": "app.native.object.rig.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4498,8 +4486,8 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-tween-ui.js",
-      "moduleId": "app.native.object.tween.ui",
+      "path": "src/js/adapters/native-object-tween.js",
+      "moduleId": "app.native.object.tween.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4510,20 +4498,20 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-vector-contract.js",
-      "moduleId": "app.native.object.vector.contract",
+      "path": "src/js/adapters/native-object-tween-ui.js",
+      "moduleId": "app.native.object.tween.ui",
       "executionClass": "document-classic",
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2387,
-          "scriptOrdinal": 78
+          "line": 2685,
+          "scriptOrdinal": 334
         }
       ]
     },
     {
-      "path": "src/js/adapters/native-object-vector-stroke.js",
-      "moduleId": "app.native.object.vector.stroke",
+      "path": "src/js/adapters/native-object-vector-contract.js",
+      "moduleId": "app.native.object.vector.contract",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4534,8 +4522,8 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-vector-command.js",
-      "moduleId": "app.native.object.vector.command",
+      "path": "src/js/adapters/native-object-vector-stroke.js",
+      "moduleId": "app.native.object.vector.stroke",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4546,8 +4534,8 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-vector.js",
-      "moduleId": "app.native.object.vector.adapter",
+      "path": "src/js/adapters/native-object-vector-command.js",
+      "moduleId": "app.native.object.vector.command",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4558,14 +4546,26 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-object-vector.js",
+      "moduleId": "app.native.object.vector.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2391,
+          "scriptOrdinal": 82
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-property-contract.js",
       "moduleId": "app.native.application.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2645,
-          "scriptOrdinal": 294
+          "line": 2646,
+          "scriptOrdinal": 295
         }
       ]
     },
@@ -4588,8 +4588,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2475,
-          "scriptOrdinal": 148
+          "line": 2476,
+          "scriptOrdinal": 149
         }
       ]
     },
@@ -4600,25 +4600,13 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2476,
-          "scriptOrdinal": 149
+          "line": 2477,
+          "scriptOrdinal": 150
         }
       ]
     },
     {
       "path": "src/js/adapters/native-object-draw-paint.js",
-      "moduleId": "app.native.object.shape.tool",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2613,
-          "scriptOrdinal": 264
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-object-draw-symmetry.js",
       "moduleId": "app.native.object.shape.tool",
       "executionClass": "document-classic",
       "loadSites": [
@@ -4630,7 +4618,7 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-draw-bitmap.js",
+      "path": "src/js/adapters/native-object-draw-symmetry.js",
       "moduleId": "app.native.object.shape.tool",
       "executionClass": "document-classic",
       "loadSites": [
@@ -4642,7 +4630,7 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-draw-resize.js",
+      "path": "src/js/adapters/native-object-draw-bitmap.js",
       "moduleId": "app.native.object.shape.tool",
       "executionClass": "document-classic",
       "loadSites": [
@@ -4654,7 +4642,7 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-object-shape-tool.js",
+      "path": "src/js/adapters/native-object-draw-resize.js",
       "moduleId": "app.native.object.shape.tool",
       "executionClass": "document-classic",
       "loadSites": [
@@ -4662,6 +4650,18 @@
           "path": "src/index.html",
           "line": 2617,
           "scriptOrdinal": 268
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-shape-tool.js",
+      "moduleId": "app.native.object.shape.tool",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2618,
+          "scriptOrdinal": 269
         }
       ]
     },
@@ -4684,8 +4684,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2632,
-          "scriptOrdinal": 281
+          "line": 2633,
+          "scriptOrdinal": 282
         }
       ]
     },
@@ -4696,8 +4696,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2650,
-          "scriptOrdinal": 299
+          "line": 2651,
+          "scriptOrdinal": 300
         }
       ]
     },
@@ -4708,8 +4708,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2651,
-          "scriptOrdinal": 300
+          "line": 2652,
+          "scriptOrdinal": 301
         }
       ]
     },
@@ -4720,8 +4720,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2652,
-          "scriptOrdinal": 301
+          "line": 2653,
+          "scriptOrdinal": 302
         }
       ]
     },
@@ -4744,8 +4744,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2399,
-          "scriptOrdinal": 88
+          "line": 2400,
+          "scriptOrdinal": 89
         }
       ]
     },
@@ -4756,8 +4756,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2647,
-          "scriptOrdinal": 296
+          "line": 2648,
+          "scriptOrdinal": 297
         }
       ]
     },
@@ -4768,8 +4768,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2370,
-          "scriptOrdinal": 61
+          "line": 2371,
+          "scriptOrdinal": 62
         }
       ]
     },
@@ -4780,8 +4780,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2371,
-          "scriptOrdinal": 62
+          "line": 2372,
+          "scriptOrdinal": 63
         }
       ]
     },
@@ -4792,37 +4792,13 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2373,
-          "scriptOrdinal": 64
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-component-grid.js",
-      "moduleId": "app.native.component.context.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
           "line": 2374,
           "scriptOrdinal": 65
         }
       ]
     },
     {
-      "path": "src/js/adapters/native-selection-delete.js",
-      "moduleId": "app.native.object.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2605,
-          "scriptOrdinal": 256
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-component-context.js",
+      "path": "src/js/adapters/native-component-grid.js",
       "moduleId": "app.native.component.context.adapter",
       "executionClass": "document-classic",
       "loadSites": [
@@ -4834,8 +4810,20 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-component-enter-ui.js",
-      "moduleId": "app.native.component.enter.ui.adapter",
+      "path": "src/js/adapters/native-selection-delete.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2606,
+          "scriptOrdinal": 257
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-component-context.js",
+      "moduleId": "app.native.component.context.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
@@ -4846,14 +4834,26 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-component-enter-ui.js",
+      "moduleId": "app.native.component.enter.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2377,
+          "scriptOrdinal": 68
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-layer-playhead-cut-ui.js",
       "moduleId": "app.native.object.ui.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2372,
-          "scriptOrdinal": 63
+          "line": 2373,
+          "scriptOrdinal": 64
         }
       ]
     },
@@ -4864,8 +4864,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2649,
-          "scriptOrdinal": 298
+          "line": 2650,
+          "scriptOrdinal": 299
         }
       ]
     },
@@ -4876,8 +4876,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2332,
-          "scriptOrdinal": 29
+          "line": 2333,
+          "scriptOrdinal": 30
         }
       ]
     },
@@ -4888,8 +4888,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2368,
-          "scriptOrdinal": 59
+          "line": 2369,
+          "scriptOrdinal": 60
         }
       ]
     },
@@ -4900,8 +4900,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2369,
-          "scriptOrdinal": 60
+          "line": 2370,
+          "scriptOrdinal": 61
         }
       ]
     },
@@ -4912,8 +4912,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2509,
-          "scriptOrdinal": 167
+          "line": 2510,
+          "scriptOrdinal": 168
         }
       ]
     },
@@ -4924,8 +4924,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2648,
-          "scriptOrdinal": 297
+          "line": 2649,
+          "scriptOrdinal": 298
         }
       ]
     },
@@ -4936,8 +4936,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2720,
-          "scriptOrdinal": 368
+          "line": 2721,
+          "scriptOrdinal": 369
         }
       ]
     },
@@ -4948,8 +4948,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2721,
-          "scriptOrdinal": 369
+          "line": 2722,
+          "scriptOrdinal": 370
         }
       ]
     },
@@ -4960,8 +4960,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2633,
-          "scriptOrdinal": 282
+          "line": 2634,
+          "scriptOrdinal": 283
         }
       ]
     },
@@ -4972,8 +4972,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2653,
-          "scriptOrdinal": 302
+          "line": 2654,
+          "scriptOrdinal": 303
         }
       ]
     },
@@ -4984,8 +4984,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2654,
-          "scriptOrdinal": 303
+          "line": 2655,
+          "scriptOrdinal": 304
         }
       ]
     },
@@ -4996,8 +4996,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2634,
-          "scriptOrdinal": 283
+          "line": 2635,
+          "scriptOrdinal": 284
         }
       ],
       "sourceEvidence": [
@@ -5015,8 +5015,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2655,
-          "scriptOrdinal": 304
+          "line": 2656,
+          "scriptOrdinal": 305
         }
       ],
       "sourceEvidence": [
@@ -5034,8 +5034,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2583,
-          "scriptOrdinal": 234
+          "line": 2584,
+          "scriptOrdinal": 235
         }
       ],
       "sourceEvidence": [
@@ -5053,8 +5053,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2663,
-          "scriptOrdinal": 312
+          "line": 2664,
+          "scriptOrdinal": 313
         }
       ],
       "sourceEvidence": [
@@ -5072,8 +5072,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2635,
-          "scriptOrdinal": 284
+          "line": 2636,
+          "scriptOrdinal": 285
         }
       ],
       "sourceEvidence": [
@@ -5091,8 +5091,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2656,
-          "scriptOrdinal": 305
+          "line": 2657,
+          "scriptOrdinal": 306
         }
       ],
       "sourceEvidence": [
@@ -5110,8 +5110,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2664,
-          "scriptOrdinal": 313
+          "line": 2665,
+          "scriptOrdinal": 314
         }
       ],
       "sourceEvidence": [
@@ -5129,8 +5129,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2636,
-          "scriptOrdinal": 285
+          "line": 2637,
+          "scriptOrdinal": 286
         }
       ],
       "sourceEvidence": [
@@ -5148,8 +5148,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2657,
-          "scriptOrdinal": 306
+          "line": 2658,
+          "scriptOrdinal": 307
         }
       ],
       "sourceEvidence": [
@@ -5167,8 +5167,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2665,
-          "scriptOrdinal": 314
+          "line": 2666,
+          "scriptOrdinal": 315
         }
       ],
       "sourceEvidence": [
@@ -5186,8 +5186,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2637,
-          "scriptOrdinal": 286
+          "line": 2638,
+          "scriptOrdinal": 287
         }
       ],
       "sourceEvidence": [
@@ -5205,8 +5205,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2658,
-          "scriptOrdinal": 307
+          "line": 2659,
+          "scriptOrdinal": 308
         }
       ],
       "sourceEvidence": [
@@ -5224,8 +5224,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2666,
-          "scriptOrdinal": 315
+          "line": 2667,
+          "scriptOrdinal": 316
         }
       ],
       "sourceEvidence": [
@@ -5243,8 +5243,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2638,
-          "scriptOrdinal": 287
+          "line": 2639,
+          "scriptOrdinal": 288
         }
       ],
       "sourceEvidence": [
@@ -5262,8 +5262,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2732,
-          "scriptOrdinal": 378
+          "line": 2733,
+          "scriptOrdinal": 379
         }
       ],
       "sourceEvidence": [
@@ -5281,8 +5281,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2733,
-          "scriptOrdinal": 379
+          "line": 2734,
+          "scriptOrdinal": 380
         }
       ],
       "sourceEvidence": [
@@ -5300,8 +5300,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2639,
-          "scriptOrdinal": 288
+          "line": 2640,
+          "scriptOrdinal": 289
         }
       ]
     },
@@ -5312,8 +5312,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2659,
-          "scriptOrdinal": 308
+          "line": 2660,
+          "scriptOrdinal": 309
         }
       ]
     },
@@ -5336,8 +5336,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2640,
-          "scriptOrdinal": 289
+          "line": 2641,
+          "scriptOrdinal": 290
         }
       ]
     },
@@ -5348,8 +5348,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2660,
-          "scriptOrdinal": 309
+          "line": 2661,
+          "scriptOrdinal": 310
         }
       ]
     },
@@ -5360,8 +5360,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2358,
-          "scriptOrdinal": 49
+          "line": 2359,
+          "scriptOrdinal": 50
         }
       ]
     },
@@ -5372,8 +5372,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2641,
-          "scriptOrdinal": 290
+          "line": 2642,
+          "scriptOrdinal": 291
         }
       ]
     },
@@ -5384,8 +5384,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2661,
-          "scriptOrdinal": 310
+          "line": 2662,
+          "scriptOrdinal": 311
         }
       ]
     },
@@ -5396,8 +5396,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2662,
-          "scriptOrdinal": 311
+          "line": 2663,
+          "scriptOrdinal": 312
         }
       ]
     },
@@ -5408,8 +5408,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2359,
-          "scriptOrdinal": 50
+          "line": 2360,
+          "scriptOrdinal": 51
         }
       ]
     },
@@ -5420,8 +5420,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2556,
-          "scriptOrdinal": 211
+          "line": 2557,
+          "scriptOrdinal": 212
         }
       ]
     },
@@ -5432,8 +5432,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2515,
-          "scriptOrdinal": 173
+          "line": 2516,
+          "scriptOrdinal": 174
         }
       ]
     },
@@ -5444,8 +5444,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2550,
-          "scriptOrdinal": 205
+          "line": 2551,
+          "scriptOrdinal": 206
         }
       ]
     },
@@ -5456,8 +5456,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2551,
-          "scriptOrdinal": 206
+          "line": 2552,
+          "scriptOrdinal": 207
         }
       ]
     },
@@ -5468,8 +5468,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2624,
-          "scriptOrdinal": 275
+          "line": 2625,
+          "scriptOrdinal": 276
         }
       ]
     },
@@ -5480,8 +5480,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2528,
-          "scriptOrdinal": 183
+          "line": 2529,
+          "scriptOrdinal": 184
         }
       ]
     },
@@ -5492,8 +5492,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2690,
-          "scriptOrdinal": 339
+          "line": 2691,
+          "scriptOrdinal": 340
         }
       ]
     },
@@ -5504,8 +5504,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2693,
-          "scriptOrdinal": 342
+          "line": 2694,
+          "scriptOrdinal": 343
         }
       ]
     },
@@ -5516,8 +5516,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2697,
-          "scriptOrdinal": 346
+          "line": 2698,
+          "scriptOrdinal": 347
         }
       ]
     },
@@ -5540,8 +5540,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2723,
-          "scriptOrdinal": 370
+          "line": 2724,
+          "scriptOrdinal": 371
         }
       ]
     },
@@ -5552,8 +5552,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2725,
-          "scriptOrdinal": 371
+          "line": 2726,
+          "scriptOrdinal": 372
         }
       ]
     },
@@ -5564,8 +5564,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2325,
-          "scriptOrdinal": 22
+          "line": 2331,
+          "scriptOrdinal": 28
         }
       ]
     },
@@ -5612,8 +5612,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2726,
-          "scriptOrdinal": 372
+          "line": 2727,
+          "scriptOrdinal": 373
         }
       ]
     }

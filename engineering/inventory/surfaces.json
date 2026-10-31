@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "cf9bf4b8c575f522f0515a2c88bada830be9f95d",
-  "describe": "v0.7.0-alpha.4-4949-gcf9bf4b8c-dirty"
+  "head": "98f4c5cbaf212593b6436120e32b71f8c1008358",
+  "describe": "v0.7.0-alpha.4-4952-g98f4c5cba-dirty"
  },
- "inputsDigest": "8c9bbeb8b5fc644128399a941fc2d1f97203adbf285e96591b9324a6503afe11",
+ "inputsDigest": "4f2d524a5babd67794d0deaf65b177a81d2aed58fe8014df7b214814d0f35ecb",
  "states": [
   "inventoried",
   "characterized",
@@ -2468,7 +2468,7 @@
    "capability": "history",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:733 initStartScreen()"
+    "src/js/project.js:757 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3334,7 +3334,7 @@
    "capability": "new",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:730 initStartScreen()"
+    "src/js/project.js:754 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3411,7 +3411,7 @@
    "capability": "open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:729 initStartScreen()"
+    "src/js/project.js:753 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4707,7 +4707,7 @@
    "capability": "save",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:727 initStartScreen()"
+    "src/js/project.js:751 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4747,7 +4747,7 @@
    "capability": "saveas",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:728 initStartScreen()"
+    "src/js/project.js:752 initStartScreen()"
    ],
    "events": [
     "click"
@@ -7901,7 +7901,7 @@
    "capability": "file input",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:734 initStartScreen()"
+    "src/js/project.js:758 initStartScreen()"
    ],
    "events": [
     "change"
@@ -14806,7 +14806,7 @@
    "capability": "New project (new tab)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:661"
+    "src/js/project.js:685"
    ],
    "events": [
     "click"
@@ -14837,7 +14837,7 @@
     "via": "chain",
     "references": [
      "src/js/adapters/native-object-project-tabs-ui.js:99 render()",
-     "src/js/project.js:661",
+     "src/js/project.js:685",
      "src/js/timeline.js:9201 action()"
     ]
    },
