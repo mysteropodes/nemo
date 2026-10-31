@@ -33,6 +33,8 @@
       button.addEventListener('click',function(){return context.onPolicy(layer,flag,!on,node);});
       return button;
     });
+    // #2256: a double-click opens the component an instance layer instances (the baseline row dblclick); other rows ignore it.
+    if(typeof context.onOpen==='function')node.addEventListener('dblclick',function(){return context.onOpen(layer,node);});
     node.hidden=context.shyMode&&layer.shy===true;node.style.display=node.hidden?'none':'flex';
     node.replaceChildren(pick,eye,flags[0],flags[1]);
     return node;

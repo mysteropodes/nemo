@@ -113,10 +113,7 @@ fn published_schema_declares_the_forbidden_revision_request_and_closed_shapes() 
     let branches = schema["$defs"]["ResponseBase"]["properties"]["result"]["oneOf"]
         .as_array()
         .unwrap();
-    assert_eq!(
-        branches.last().unwrap(),
-        &json!({"$ref":"#/$defs/ObjectComponentReadResult"})
-    );
+    assert!(branches.contains(&json!({"$ref":"#/$defs/ObjectComponentReadResult"})));
     for (selector, result) in good_cases() {
         assert!(
             validator.is_valid(&envelope(selector.clone())),

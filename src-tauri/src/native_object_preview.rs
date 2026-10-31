@@ -470,6 +470,10 @@ mod lifecycle_tests;
 mod tests;
 
 #[cfg(test)]
+#[path = "native_object_component_preview_tests.rs"]
+mod component_tests;
+
+#[cfg(test)]
 #[path = "native_raster_image_preview_tests.rs"]
 mod raster_tests;
 

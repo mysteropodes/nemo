@@ -210,7 +210,8 @@
       if(error&&typeof error==='object')previewFailures.set(error,detail);return error;
     }
     function frameRequest(frame,pin){
-      pin=pin||requireActive();if(!integer(frame,0)||frame>=pin.totalFrames)throw previewFailure('frame-range',new Error('Frame is outside the native project'));
+      pin=pin||requireActive();var ctx=ports.context?ports.context():null; // #2256: an entered component presents its own context and frame count
+      if(!integer(frame,0)||frame>=(ctx?ctx.totalFrames:pin.totalFrames))throw previewFailure('frame-range',new Error('Frame is outside the native project'));
       var viewport;
       try{viewport=ports.mapping(pin);}catch(error){throw previewFailure('mapping',error);}
       try{
@@ -220,7 +221,7 @@
       }catch(error){throw previewFailure('viewport',error);}
       return {apiVersion:2,requestId:requestId('frame'),instanceId:pin.instanceId,documentId:pin.documentId,
         contentRevision:pin.contentRevision,documentSnapshotId:pin.documentSnapshotId,lifecycleGeneration:pin.lifecycleGeneration,
-        contextId:'scene-root',scopeKind:'authored',frame:frame,
+        contextId:ctx?ctx.contextId:'scene-root',scopeKind:'authored',frame:frame,
         outputSpec:{kind:'frame',format:'rgba8',width:pin.canvasW,height:pin.canvasH,colorInterpretation:'srgb',alphaMode:'straight'},
         viewport:viewport};
     }
@@ -284,7 +285,7 @@
       }
       await present(ports.frame?ports.frame():0);return receipt;
     });}
-    function currentPresentation(origin,ticket){return !openingRequested&&!synchronizing&&active()&&origin&&origin.presentation===presentation&&view.matches(presentation,info)&&same(info,origin)&&ticket===subscriptionTicket&&
+    function currentPresentation(origin,ticket){return !openingRequested&&!synchronizing&&active()&&origin&&!(ports.context&&ports.context())&&origin.presentation===presentation&&view.matches(presentation,info)&&same(info,origin)&&ticket===subscriptionTicket&&
       (!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&
       typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true;}
     function runFontResource(action){if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native font owner busy or unavailable'));
@@ -462,6 +463,7 @@
       if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.restoreInspector)root.NemoNativeObjectUI.restoreInspector(root);
       return false;
     }
+    var entered=root.NemoNativeComponentContext;if(entered&&!session.isIndeterminate()&&entered.paint(root))return true; // #2256: an entered component paints read-only
     var ports=nativeObjectUiPorts(root);
     try{if(session.isIndeterminate()||!root.NemoNativeObjectUI||root.NemoNativeObjectUI.render(root,session.info(),frameOnly,ports)!==true)
       throw new Error('Native document UI presentation is unavailable');
@@ -474,6 +476,7 @@
   function selectLayerUI(root,index,preserveLayerSel,uid,expected){
     var session=uiSession(root);if(!session)return false;
     if(expected&&!same(session.info(),expected))return true;
+    if(root.NemoNativeComponentContext&&root.NemoNativeComponentContext.presented(root))return true; // #2256: no scene selection inside a component
     try{if(!root.NemoNativeObjectUI)throw new Error('Native document UI selection is unavailable');
       root.NemoNativeObjectUI.select(root,session.info(),index,preserveLayerSel,uid,session.readPresentedObjectSession(),nativeObjectUiPorts(root));}
     catch(error){return uiFailure(root,error);}

@@ -96,9 +96,13 @@ pub(crate) fn admitted(operation: &str) -> bool {
 #[path = "native_component_read_contract.rs"]
 pub(crate) mod read;
 
-/// A command or the component read: the operations whose request and result this module validates.
+/// #2256: the pure enter/exit context transition of the workspace (view state: no revision, no history entry).
+#[path = "native_workspace_context_contract.rs"]
+pub(crate) mod workspace;
+
+/// A command, the component read or the workspace transition: the operations whose request and result this module validates.
 pub(crate) fn owns(operation: &str) -> bool {
-    admitted(operation) || operation == read::OP
+    admitted(operation) || operation == read::OP || operation == workspace::OP
 }
 
 fn id_text(text: &str) -> bool {
@@ -161,6 +165,9 @@ pub(super) fn request(operation: &str, payload: &Value) -> bool {
     if operation == read::OP {
         return read::request(payload);
     }
+    if operation == workspace::OP {
+        return workspace::request(payload);
+    }
     let Some((command, _, row)) = spec(operation) else {
         return false;
     };
@@ -190,6 +197,8 @@ pub(super) fn request(operation: &str, payload: &Value) -> bool {
 pub(super) fn result_for(operation: &str, payload: &Value, value: &Value) -> bool {
     if operation == read::OP {
         read::result(payload, value)
+    } else if operation == workspace::OP {
+        workspace::result(payload, value)
     } else {
         result(operation, value)
     }
@@ -219,6 +228,9 @@ pub(crate) fn response_matches(
 ) -> bool {
     if request.operation == read::OP {
         return read::response_matches(request, response);
+    }
+    if request.operation == workspace::OP {
+        return workspace::response_matches(request, response);
     }
     if !admitted(&request.operation) {
         return true;

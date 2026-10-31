@@ -3778,6 +3778,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-object-workspace-context-contract.js",
+      "moduleId": "app.native.object.workspace.context.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2619,
+          "scriptOrdinal": 269
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-object-component-intent.js",
       "moduleId": "app.native.object.component.intent",
       "executionClass": "document-classic",
@@ -4500,6 +4512,30 @@
     {
       "path": "src/js/adapters/native-component-convert-ui.js",
       "moduleId": "app.native.component.convert.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2371,
+          "scriptOrdinal": 63
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-component-context.js",
+      "moduleId": "app.native.component.context.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2371,
+          "scriptOrdinal": 63
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-component-enter-ui.js",
+      "moduleId": "app.native.component.enter.ui.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
