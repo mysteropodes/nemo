@@ -16,7 +16,9 @@
     (!own(v,'width')||finite(v.width)&&v.width>0)&&(!own(v,'opacity')||finite(v.opacity)&&v.opacity>=0&&v.opacity<=1)&&(!own(v,'cap')||['butt','round','square'].includes(v.cap))&&
     (!own(v,'join')||['miter','round','bevel'].includes(v.join))&&(!own(v,'miter')||finite(v.miter)&&v.miter>=0)&&(!own(v,'dashOffset')||finite(v.dashOffset))&&(!own(v,'paintOrder')||['fillFirst','strokeFirst'].includes(v.paintOrder))&&
     (!own(v,'maskMode')||['add','subtract','intersect'].includes(v.maskMode))&&(!own(v,'maskFeather')||finite(v.maskFeather)&&v.maskFeather>=0);
-  function target(v){return exact(v,['contextId','layerUid','frameScope','strokeId'])&&v.contextId==='scene-root'&&
+  // #2256: a presented-stroke VIEW may name the entered component the workspace controller holds (never free text); the edit intent stays on the scene root.
+  const viewContext=id=>{if(id==='scene-root')return true;try{const c=globalThis.NemoNativeComponentContext;return typeof id==='string'&&!!id&&!!c&&typeof c.contextId==='function'&&c.contextId(globalThis)===id;}catch(_){return false;}};
+  function target(v,context){return exact(v,['contextId','layerUid','frameScope','strokeId'])&&v.contextId===(context||'scene-root')&&
     ['layerUid','strokeId'].every(k=>typeof v[k]==='string'&&v[k].length>0)&&exact(v.frameScope,['kind','frame'])&&
     ['authored','reference'].includes(v.frameScope.kind)&&integer(v.frameScope.frame,4294967295);}
   function intent(v){
@@ -60,7 +62,7 @@
   function viewPayload(p){
     const v=p&&p.view;
     if(!exact(p,['atRevision','documentSnapshotId','view'])||!integer(p.atRevision)||typeof p.documentSnapshotId!=='string'||!p.documentSnapshotId||
-      !exact(v,['kind','contextId','layerUid','frame','workId','viewGeneration','cursor','limit'],['preview','hitTest'])||v.kind!=='subselect'||v.contextId!=='scene-root'||own(v,'hitTest')&&(v.hitTest!==true||own(v,'preview'))||
+      !exact(v,['kind','contextId','layerUid','frame','workId','viewGeneration','cursor','limit'],['preview','hitTest'])||v.kind!=='subselect'||!viewContext(v.contextId)||own(v,'hitTest')&&(v.hitTest!==true||own(v,'preview'))||
       typeof v.layerUid!=='string'||!v.layerUid||typeof v.workId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(v.workId)||
       !integer(v.frame,4294967295)||!integer(v.viewGeneration)||!v.viewGeneration||!integer(v.cursor,1024)||!integer(v.limit,8)||!v.limit||own(v,'preview')&&(!exact(v.preview,['stableTarget','intent'])||!target(v.preview.stableTarget)||!intent(v.preview.intent)))fail('Invalid subselect presentation selector');
   }
@@ -73,7 +75,7 @@
       // or text block (#2372) is listed too, its bounds the painted rect/glyph box and its count 0 (no editable geometry).
       if(own(r,'hitTest')?!exact(item,['stableTarget','closed','count','matrix','bounds','role','filled'],['strokeWidth','owner','brush','group','boxAngle','style'])||typeof item.filled!=='boolean'||own(item,'strokeWidth')&&!(typeof item.strokeWidth==='number'&&Number.isFinite(item.strokeWidth)&&item.strokeWidth>=0)||own(item,'boxAngle')&&!(typeof item.boxAngle==='number'&&Number.isFinite(item.boxAngle))||own(item,'style')&&!listedStyle(item.style)||!Array.isArray(item.bounds)||item.bounds.length!==4||!item.bounds.every(Number.isFinite)||
         !['plain','ribbon','fill','shape','brush','raster','text','mask'].includes(item.role)||own(item,'owner')&&(item.role!=='fill'||typeof item.owner!=='string'||!item.owner)||own(item,'brush')&&!['anchor','copy','bitmap'].includes(item.brush)||own(item,'group')&&(!own(item,'brush')||typeof item.group!=='string'||!item.group):!exact(item,['stableTarget','closed','count','matrix'],['paintCount']))fail('Invalid native subselect item');
-      if(!target(item.stableTarget)||item.stableTarget.contextId!==r.contextId||item.stableTarget.layerUid!==r.layerUid||typeof item.closed!=='boolean'||
+      if(!target(item.stableTarget,r.contextId)||item.stableTarget.contextId!==r.contextId||item.stableTarget.layerUid!==r.layerUid||typeof item.closed!=='boolean'||
         !integer(item.count,256)||own(item,'paintCount')&&(!integer(item.paintCount,256)||item.paintCount<2||item.closed!==false)||!Array.isArray(item.matrix)||item.matrix.length!==6||!item.matrix.every(Number.isFinite))fail('Invalid native subselect transform');
       const m=item.matrix,det=m[0]*m[3]-m[1]*m[2];if(!Number.isFinite(det)||Math.abs(det)<1e-12)fail('Singular native subselect transform');
     }

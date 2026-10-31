@@ -112,7 +112,8 @@
       const context = here(), ops = [];
       for (const step of steps) {
         const at = step.frame === undefined ? frame : step.frame;
-        if (step.delete !== undefined) { ops.push({ op: 'delete', stableTarget: stableTarget(layerUid, at, step.delete, context) }); continue; }
+        // {delete: strokeId} on the batch's layer, or {delete: stableTarget} for a record a presented listing named (Select's Delete over several layers).
+        if (step.delete !== undefined) { ops.push({ op: 'delete', stableTarget: step.delete && typeof step.delete === 'object' ? step.delete : stableTarget(layerUid, at, step.delete, context) }); continue; }
         // {reshape|clone: {stableTarget, geometry}}: a presented stroke's new geometry, or a new stroke from it, at `frame`
         // ({reshape: {stableTarget, center}} rebuilds a ribbon on a new centreline; {reshape: {stableTarget, matrix}} maps any record by a
         // record-space affine [a b c d e f] with its fill, copies and gradient: Select's move/scale/rotate);
