@@ -2094,6 +2094,7 @@
         "src/native_object_component_contract.rs",
         "src/native_object_component_contract_tests.rs",
         "src/native_object_component_receipt_tests.rs",
+        "src/native_object_duplicator_config_tests.rs",
         "src/native_frame_edit_contract.rs",
         "src/native_frame_edit_contract_tests.rs",
         "src/native_brush_resource_contract.rs",

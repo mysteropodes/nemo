@@ -269,7 +269,7 @@ test('the declaration, schema, composition and load order agree', () => {
   assert.equal(branch.allOf[1].properties.payload.$ref, '#/$defs/ObjectComponentReadPayload');
   assert.ok(schema.$defs.ResponseBase.properties.result.oneOf.some((b) => b.$ref === '#/$defs/ObjectComponentReadResult'));
   const kinds = schema.$defs.ObjectComponentReadResult.oneOf.map((b) => b.properties.kind.const);
-  assert.deepEqual(kinds, ['contexts', 'context', 'layers', 'instances']);
+  assert.deepEqual(kinds, ['contexts', 'context', 'layers', 'instances', 'duplicator']);
   assert.deepEqual(schema.$defs.ObjectComponentReadPayload.properties.selector.oneOf.map((b) => b.properties.kind.const), kinds);
   assert.deepEqual(descriptor.examples[0].request.payload.selector, { kind: 'contexts', cursor: 0, limit: 16 });
   contract.payload(OP, descriptor.examples[0].request.payload);
