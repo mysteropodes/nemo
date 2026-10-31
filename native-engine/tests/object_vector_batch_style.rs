@@ -418,42 +418,22 @@ fn brush_families_the_engine_cannot_restyle_are_refused_by_type_and_a_plain_anch
 
 #[test]
 fn a_mixed_selection_restyles_what_it_can_and_skips_the_texture_anchor_the_edit_would_unhide() {
-    let anchor_ext = json!({"brushTexture":{"brushGroupId":"g","brushTexturePreset":"charcoal-pencil","preTextureOpacity":1,"strokeSeed":1}});
-    let mut anchor = record_at("A", "L1", 0, "anchor");
-    anchor["vectorExt"] = anchor_ext;
-    let doc = document(1, vec![record_at("B", "L1", 0, "s-b"), anchor], None);
-    let mut owner = owner_of(&doc);
+    let ext = json!({"brushTexture":{"brushGroupId":"g","brushTexturePreset":"charcoal-pencil","preTextureOpacity":1,"strokeSeed":1}});
+    let anchor = |id: &str| {
+        let mut r = record_at("A", "L1", 0, id);
+        r["vectorExt"] = ext.clone();
+        r
+    };
+    let green = |id: &str| restyle(id, json!({"stroke":"#00ff00"}));
+    let mut owner = owner_of(&document(1, vec![record_at("B", "L1", 0, "s-b"), anchor("anchor")], None));
     let before = state(&owner);
-    let r = send(
-        &mut owner,
-        "mix",
-        batch(vec![
-            restyle("s-b", json!({"stroke":"#00ff00"})),
-            restyle("anchor", json!({"stroke":"#00ff00"})),
-        ]),
-    );
+    let r = send(&mut owner, "mix", batch(vec![green("s-b"), green("anchor")]));
     assert_eq!(r["ok"], true, "the plain item restyles, the anchor is skipped: {r}");
     assert_eq!(owner.history_depths(), (1, 0));
-    assert_eq!(
-        at(&owner, "anchor"),
-        before["objects"].as_array().unwrap().iter().find(|o| o["target"]["strokeId"] == "anchor").unwrap().clone(),
-        "the skipped anchor is untouched"
-    );
+    assert_eq!(at(&owner, "anchor"), before["objects"][1], "the skipped anchor is untouched");
     assert_ne!(at(&owner, "s-b")["vector"]["stroke"], before["objects"][0]["vector"]["stroke"]);
-    let both_anchors = {
-        let ext = at(&owner, "anchor")["vectorExt"].clone();
-        let mut second = record_at("A", "L1", 0, "anchor-2");
-        second["vectorExt"] = ext;
-        document(1, vec![at(&owner, "anchor"), second], None)
-    };
-    refused(
-        &both_anchors,
-        vec![
-            restyle("anchor", json!({"stroke":"#ff0000"})),
-            restyle("anchor-2", json!({"stroke":"#ff0000"})),
-        ],
-        "unavailable",
-    );
+    let two = document(1, vec![anchor("anchor"), anchor("anchor-2")], None);
+    refused(&two, vec![green("anchor"), green("anchor-2")], "unavailable");
 }
 
 #[test]
