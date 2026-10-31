@@ -32,10 +32,11 @@ async function fixture(tool='rect',native=true){
  area.appendChild(canvas);area.appendChild(pills);pills.appendChild(fit);pills.appendChild(pill);pill.appendChild(zoom);area.appendChild(ruler);
  doc.readyState='complete';doc.body=body;doc.getElementById=id=>({'drawing-canvas':canvas,'canvas-area':area,'zoom-scrub':zoom,'canvas-fit-btn':fit,'ruler-h':ruler}[id]||null);
  doc.createElementNS=()=>new Element();doc.documentElement={clientWidth:1200,clientHeight:900};
+ const flags={locked:false,visible:true},undos=[];
  const info=()=>({apiVersion:2,instanceId:'instance-A',documentId:'document-'+generation,lifecycleGeneration:generation,contentRevision:revision,
   documentSnapshotId:'native-object:document-'+generation+':'+revision,documentDigest:String(revision%10).repeat(64),byteCount:1000,
   canvasW:320,canvasH:180,totalFrames:16,fps:24,undoDepth:revision,redoDepth:0,reference:null,
-  layers:[{layerUid:'L1',name:'Drawing',visible:true,locked:false,shy:false,color:'#5FA875',parentLayerUid:null}]});
+  layers:[{layerUid:'L1',name:'Drawing',visible:flags.visible,locked:flags.locked,shy:false,color:'#5FA875',parentLayerUid:null}]});
  const root={document:doc,state:{tool,appMode:'anim2d',currentFrame:0,strokeEnabled:true,fillEnabled:true,strokeColor:'#112233',fillColor:'#44556680',
   brushSize:4,opacity:50,strokeCap:'round',strokeStyle:'solid',miterLimit:10,dashOffset:0,paintOrder:'fillFirst'},userLayers:[],selectedPaths:[],devicePixelRatio:2,
   NemoNativeObjectProject:Project,NemoNativeObjectProjectFile:Files,NemoApplicationMcpTransport:Transport,NemoNativeApplicationAdapter:SDK,NemoNativeObjectVector:Vector,
@@ -51,6 +52,8 @@ async function fixture(tool='rect',native=true){
    if(q.action==='subscribe'){binding=q.binding;return q.binding;}
    if(q.action==='acknowledge'){if(ack)await ack.promise;return null;}if(q.action==='disconnect')return null;
   }
+  if(command==='nemo_native_object_dispatch'){assert.equal(q.operation,'command.document.object.undo');undos.push(revision);revision++;
+   return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true}};}
   assert.equal(command,'nemo_native_dispatch');calls.push(structuredClone(q));assert.equal(q.operation,'command.document.object.vector.edit');
   const prior=receipts.get(q.requestId);if(prior){assert.deepEqual(prior.request,q);const r=structuredClone(prior.response);if(replyChange)replyChange(r);return r;}
   assert.equal(q.expectedRevision,revision);const many=q.payload.command==='object.vector.createMany';
@@ -94,7 +97,7 @@ async function fixture(tool='rect',native=true){
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-shape-tool.js'),'utf8'),context,{filename:'native-object-shape-tool.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/shape-bridge.js'),'utf8'),context,{filename:'shape-bridge.js'});
  if(tool==='pen'){root.SM={setTool(t){root.state.tool=t;}};vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/pen-bridge.js'),'utf8'),context,{filename:'pen-bridge.js'});}
- return {perspectiveMode:value=>perspectiveMode=value,root,context,session,area,canvas,zoom,fit,ruler,doc,body,calls,records,log,events,info,setRect:r=>rect=r,refuse:code=>refusal=code,hold:g=>hold=g,mutate:fn=>replyChange=fn,
+ return {perspectiveMode:value=>perspectiveMode=value,root,context,session,area,canvas,zoom,fit,ruler,doc,body,calls,records,log,events,info,flags,undos,setRect:r=>rect=r,refuse:code=>refusal=code,hold:g=>hold=g,mutate:fn=>replyChange=fn,
   async external(g){ack=g;const from=revision;revision++;return events.get('nemo-native-revision')({payload:{instanceId:'instance-A',documentId:info().documentId,lifecycleGeneration:generation,requestId:'external-'+revision,fromRevision:from,toRevision:revision}});},
   async gesture(end={clientX:240,clientY:210}){area.fire('pointerdown');area.fire('pointermove',end);area.fire('pointerup',end);return root.NemoNativeShapeToolController.whenSettled();}};
 }
@@ -124,8 +127,8 @@ test('pointercancel, lost capture, Escape, tiny click and unrelated pointer cann
  }
  const f=await fixture();f.area.fire('pointerdown');assert.equal(f.area.fire('pointerup',{pointerId:2}).stopped,true);assert.equal(f.calls.length,0);f.area.fire('pointercancel');
 });
-test('stale frame, selection, tool, style, owner or viewport cancels without transport and no legacy fallback',async()=>{
- for(const change of [f=>f.root.state.currentFrame=1,f=>f.root._layerSel=[],f=>f.root.state.tool='ellipse',f=>f.root.state.opacity=70,
+test('stale frame, selection, style, owner or viewport cancels without transport and no legacy fallback (a tool switch is its own cell below)',async()=>{
+ for(const change of [f=>f.root.state.currentFrame=1,f=>f.root._layerSel=[],f=>f.root.state.opacity=70,
   f=>f.setRect({left:45,top:50,width:640,height:360}),async f=>f.session.newProject({canvasW:320,canvasH:180,fps:24},{commit:meta=>Files.projectView(f.root,meta)})]){
   const f=await fixture();f.area.fire('pointerdown');await change(f);const up=f.area.fire('pointerup',{clientX:240,clientY:210});assert.equal(up.stopped,true);assert.equal(f.calls.length,0);assert.equal(f.body.children.length,0);
  }
@@ -417,4 +420,62 @@ test('symmetry preview draws the stroke and its mirror without writing anything,
  assert.equal(f.calls.length,0,'preview writes nothing');
  f.area.fire('pointerup',{clientX:240,clientY:210});await f.root.NemoNativeShapeToolController.whenSettled();
  assert.equal(f.body.children.length,0);assert.equal(f.calls.length,1);assert.equal(f.calls[0].payload.records.length,2);
+});
+
+// #2361 draw-cancel-matrix (shapes and Pen). Baseline shape-bridge.js @1065e9d8 captures `shapeTool` at the press and commitShape runs
+// whatever the tool, frame, lock or history did meanwhile; tools.js setTool runs finalizePen, so a Pen tool switch commits the path.
+// Matched: tool switch (Shape and Pen commit once), Undo with an open Pen (pops the path's own pushUndo entry: the path goes, no earlier
+// edit is undone). Cancelled on purpose: the baseline's frame/lock/undo outcomes are writes into whatever frame or layer is current at
+// release (or, for the Pen, a path saveAllLayerFrames leaves half-built on the old frame), which the pinned native owner cannot repeat.
+const keyDown=(f,e)=>{const seen={stopped:false,prevented:false},event={target:{tagName:'DIV'},...e,stopImmediatePropagation(){seen.stopped=true;},preventDefault(){seen.prevented=true;}};
+ (f.doc.listeners.get('keydown')||[]).forEach(l=>{if(!seen.stopped)l.fn(event);});return seen;};
+const penOpen=[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90]];
+async function unlockedAgain(f,key,value){f.flags[key]=value;const wait=gate();wait.resolve();await f.external(wait);}
+test('cancel matrix: a tool switch mid-drag still commits the shape it began, once (#2361)',async()=>{
+ for(const [from,next] of [['rect','ellipse'],['rect','select'],['ellipse','rect'],['line','hand']]){
+  const f=await fixture(from);f.area.fire('pointerdown');f.root.state.tool=next;const up=f.area.fire('pointerup',{clientX:240,clientY:210});
+  assert.equal(up.stopped,true);assert.equal((await f.root.NemoNativeShapeToolController.whenSettled()).status,'applied',from+'>'+next);
+  assert.equal(f.calls.length,1);assert.equal(f.session.info().contentRevision,1,'exactly one revision');assert.equal(f.body.children.length,0);assert.equal(f.area.captured.size,0);
+  const rec=f.calls[0].payload.record;assert.equal(rec.vectorExt&&rec.vectorExt.paramShape?rec.vectorExt.paramShape.kind:from,from==='rect'?'rect':from,'the shape the drag began with');
+  assert.equal(f.root.state.tool,next);
+ }
+});
+test('cancel matrix: Pen tool switch commits exactly one revision; frame change, lock and hide cancel with zero (#2361)',async()=>{
+ let f=await fixture('pen');await pen(f,penOpen);f.root.SM.setTool('rect');assert.equal((await f.root.NemoNativePenToolController.whenSettled()).status,'applied');
+ assert.equal(f.calls.length,1);assert.equal(f.session.info().contentRevision,1);assert.equal(f.undos.length,0);
+ f=await fixture('pen');await pen(f,penOpen);f.root.state.currentFrame=1;assert.equal(f.area.fire('pointerdown',{clientX:240,clientY:210}).stopped,true);
+ assert.equal(f.root.NemoNativePenToolController.isDragging(),false,'the next event ends the gesture');assert.equal(f.calls.length,0);assert.equal(f.body.children.length,0);assert.equal(f.session.info().contentRevision,0);
+ for(const [key,value] of [['locked',true],['visible',false]]){
+  f=await fixture('pen');await pen(f,penOpen);await unlockedAgain(f,key,value);
+  f.doc.listeners.get('keydown').forEach(l=>l.fn({key:'Enter',stopImmediatePropagation(){},preventDefault(){}}));
+  assert.equal(f.calls.length,0,key);assert.equal(f.root.NemoNativePenToolController.isDragging(),false,key);assert.equal(f.body.children.length,0,key);assert.equal(f.undos.length,0);
+ }
+});
+test('cancel matrix: Undo with an open Pen path ends the path alone and is consumed; fields keep their text undo; Redo is left to history (#2361)',async()=>{
+ let f=await fixture('pen');await pen(f,penOpen);
+ const typing=keyDown(f,{key:'z',metaKey:true,target:{tagName:'INPUT'}});assert.equal(typing.stopped,false,'a focused field keeps Cmd+Z');
+ const redo=keyDown(f,{key:'Z',metaKey:true,shiftKey:true});assert.equal(redo.stopped,false);assert.equal(f.root.NemoNativePenToolController.isDragging(),true);
+ const undo=keyDown(f,{key:'z',ctrlKey:true});assert.deepEqual([undo.stopped,undo.prevented],[true,true],'history never sees it');
+ assert.equal(f.root.NemoNativePenToolController.isDragging(),false);assert.equal(f.body.children.length,0);assert.equal(f.area.captured.size,0);
+ assert.equal(f.calls.length,0);assert.equal(f.undos.length,0);assert.equal(f.session.info().contentRevision,0,'zero revisions, no history step');
+ assert.equal(keyDown(f,{key:'z',metaKey:true}).stopped,false,'with no open path Undo is the document undo again');
+ const r=await pen(f,[['wait',500],['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
+ assert.equal(r.status,'applied');assert.equal(f.calls.length,1,'a fresh path draws normally afterwards');
+ // A commit already in flight is not cancelled by Undo: the key reaches history, which queues behind that one revision.
+ f=await fixture('pen');const wait=gate();f.hold(wait);const committing=pen(f,[...penOpen,['pointerdown',240,90]]);await turn();assert.equal(f.calls.length,1);
+ assert.equal(keyDown(f,{key:'z',metaKey:true}).stopped,false);const undone=f.session.historyFromUi('undo');await turn();assert.equal(f.undos.length,0);
+ wait.resolve();assert.equal((await committing).status,'applied');await undone;
+ assert.equal(f.calls.length,1);assert.deepEqual(f.undos,[1]);assert.equal(f.session.info().contentRevision,2);
+});
+test('cancel matrix: lock, hide, frame change and undo mid-shape cancel with zero revisions; a second pointer is ignored (#2361)',async()=>{
+ for(const [name,act] of [['locked',f=>unlockedAgain(f,'locked',true)],['hidden',f=>unlockedAgain(f,'visible',false)],['frame',f=>{f.root.state.currentFrame=1;}],['undo',f=>f.session.historyFromUi('undo')]]){
+  const f=await fixture();f.area.fire('pointerdown');await act(f);const up=f.area.fire('pointerup',{clientX:240,clientY:210});
+  assert.equal(up.stopped,true,name);assert.equal((await f.root.NemoNativeShapeToolController.whenSettled()).status!=='applied',true,name);
+  assert.equal(f.calls.length,0,name);assert.equal(f.body.children.length,0,name);assert.equal(f.area.captured.size,0,name);
+ }
+ const f=await fixture();f.area.fire('pointerdown');const other={pointerId:2,isPrimary:false,clientX:200,clientY:200};
+ for(const kind of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture'])assert.equal(f.area.fire(kind,other).stopped,true,kind);
+ assert.equal(f.calls.length,0);assert.equal(f.body.children.length,1,'the first pointer still drags');
+ f.area.fire('pointerup',{clientX:240,clientY:210});assert.equal((await f.root.NemoNativeShapeToolController.whenSettled()).status,'applied');
+ assert.equal(f.calls.length,1);assert.deepEqual(pts(f.calls[0].payload.record).length,4);
 });

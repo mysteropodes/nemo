@@ -96,10 +96,13 @@
       var t={perspective:perspective,session:s,pin:pin,presentation:shown.presentation,frame:frame,tool:state.tool,layerUid:selection(pin),sel:JSON.stringify(root._layerSel),style:style(state.tool,perspective),bounds:bounds(pin),pointer:e.pointerId,cancelled:false};
       t.behind=root.state.drawMode==='behind';t.start=point(e,t);t.scale=presentedScale(t);if(ports.freehand)t.samples=ports.begin(t.start,e,t);return t;
     }
+    // draw-bridge/shape-bridge @1065e9d8 keep the tool the gesture began with: a tool switch mid-drag still commits on release.
+    // The brush style reads state.tool, so it is checked as that tool; a Pen gesture keeps its own switch rule (finalizePen).
+    function styleAs(t,proof){var s=root.state,was=s.tool;if(ports.pen||was===t.tool)return style(t.tool,proof);s.tool=t.tool;try{return style(t.tool,proof);}finally{s.tool=was;}}
     function current(t,requirePresentation,lease){
       try{var s=session(),pin=s&&s.info();
-        if(retired||t.cancelled||requirePresentation&&!Mapping.matchesView(root,t.presentation)||s!==t.session||!s.isActive()||!s.blocksLegacy()||!same(pin,t.pin)||root.state.currentFrame!==t.frame||!t.finished&&root.state.tool!==t.tool||selection(pin)!==t.layerUid||JSON.stringify(root._layerSel)!==t.sel||
-            root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||JSON.stringify(style(t.tool,requirePresentation?undefined:t.perspective))!==JSON.stringify(t.style)||JSON.stringify(bounds(pin))!==JSON.stringify(t.bounds))return false;
+        if(retired||t.cancelled||requirePresentation&&!Mapping.matchesView(root,t.presentation)||s!==t.session||!s.isActive()||!s.blocksLegacy()||!same(pin,t.pin)||root.state.currentFrame!==t.frame||ports.pen&&!t.finished&&root.state.tool!==t.tool||selection(pin)!==t.layerUid||JSON.stringify(root._layerSel)!==t.sel||
+            root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||JSON.stringify(styleAs(t,requirePresentation?undefined:t.perspective))!==JSON.stringify(t.style)||JSON.stringify(bounds(pin))!==JSON.stringify(t.bounds))return false;
         // Public presentation is hidden by this action's own pending entry.
         // Its existing lease still verifies the exact origin, view and subscription.
         var shown=requirePresentation?s.readPresentedObjectSession():lease&&typeof lease.readPresentedObjectSession==='function'&&lease.readPresentedObjectSession();
@@ -289,6 +292,9 @@
     }
     function key(e){
       if(e.key==='Escape'&&drag){consume(e);cancel();}
+      // timeline.js onKeyDown @1065e9d8: Undo with an open Pen path pops the path's own pushUndo entry, so the path goes and no
+      // earlier edit is undone. A focused field keeps its text undo.
+      else if(ports.pen&&drag&&!pending&&(e.metaKey||e.ctrlKey)&&!e.shiftKey&&String(e.key).toLowerCase()==='z'&&!/^(INPUT|SELECT|TEXTAREA)$/.test(e.target&&e.target.tagName||'')&&!(e.target&&e.target.isContentEditable)){consume(e);cancel();}
       else if(ports.pen&&e.key==='Enter'&&drag&&!pending){consume(e);finish();}
       // timeline.js @1065e9d8: Backspace/Delete drops the last anchor; the last one ends the gesture.
       else if(ports.pen&&(e.key==='Backspace'||e.key==='Delete')&&drag&&!pending){consume(e);
