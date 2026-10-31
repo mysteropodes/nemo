@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "bdc26bc15779beea4a6a53db1faef4a9d2da818c",
-  "describe": "v0.7.0-alpha.4-4300-gbdc26bc1-dirty"
+  "head": "94a0ffa65b3686e50082be2de0ff1bf41e01688d",
+  "describe": "v0.7.0-alpha.4-4302-g94a0ffa6-dirty"
  },
- "inputsDigest": "3c653551b1edfc2f13df896551d42b9a9d5b52edcac27d574676f88425be9866",
+ "inputsDigest": "0bbada2d2745b679299b4ce321023766ef5e975b5c5fa772980c481957d51b93",
  "states": [
   "inventoried",
   "characterized",
@@ -171,7 +171,7 @@
   },
   "SMGroup": {
    "file": "src/js/group-bridge.js",
-   "line": 840,
+   "line": 836,
    "members": 0
   },
   "SMImageMeshUI": {
