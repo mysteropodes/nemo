@@ -131,17 +131,18 @@
       if (!C || at < 0 || !same(C, at)) { toast(tr(host, 'toastMatteChanged', 'The matte changed; open the menu again.')); refresh(); return; }
       write(C, at).then(settled, failed);
     }
+    const entry = (text, action) => ({ label: text, action });
     const sourceItems = (self, chosen, pick) => {
       const items = [{ label: tr(host, 'matteMenuSourceHdr', 'Matte layer:'), disabled: true, action() {} }];
       for (let oi = 0; oi < adapter.count(); oi += 1) {
         const other = adapter.layerUid(oi);
         if (oi === self || !other) continue;
-        items.push({ label: '  ' + adapter.nameOf(oi) + (chosen(other, oi) ? '  ✓' : ''), action: () => pick(other) });
+        items.push(entry('  ' + adapter.nameOf(oi) + (chosen(other, oi) ? '  ✓' : ''), () => pick(other)));
       }
       return items;
     };
     const modeItems = (current, pick) => [{ sep: true }, { label: tr(host, 'matteMenuModeHdr', 'Mode:'), disabled: true, action() {} }]
-      .concat(MODES.map((m) => ({ label: '  ' + modeName(m[0]) + (current === m[0] ? '  ✓' : ''), action: () => pick(m[0]) })));
+      .concat(MODES.map((m) => entry('  ' + modeName(m[0]) + (current === m[0] ? '  ✓' : ''), () => pick(m[0]))));
     const removeItem = (remove) => [{ sep: true }, { label: tr(host, 'matteMenuRemove', 'Remove the matte'), action: remove }];
 
     // openMatteConfigMenu: the first matte. Picking a source with no mode lets the owner default to Alpha, as the baseline does.
