@@ -528,6 +528,23 @@ test('a textured pressure ribbon commits one seeded, hidden ribbon anchor; its l
  }
 });
 
+// #2361 ribbon + texture A/B: the committed ribbon record carries the camouflage the baseline applyBrushTexture writes (the oracle's
+// serP of a hidden pressure ribbon in the same ink and Opacity), with the seed and group the fixed Math.random derives.
+test('a textured pressure ribbon commits the oracle camouflage: ink fill kept, no stroke, opacity 0, remembered opacity, seeded preset',async()=>{
+ const oracle=JSON.parse(fs.readFileSync(path.join(__dirname,'native-object-vector-fixtures','brush-dab-oracle.json'),'utf8'));
+ for(const c of oracle.ribbonCases){
+  const f=await fixture();f.root.BRUSH_PRESETS={[c.preset]:{}};Object.assign(f.root.state,{brushPreset:c.preset,vectorBrush:true,fillEnabled:false});
+  vm.runInContext('Math.random=function(){return .25;}',f.context);
+  send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:0});
+  await settled(f);assert.equal(f.calls.length,1);const r=plain(f.calls[0].payload.record);
+  assert.deepEqual(r.fill,c.record.fill,c.id+' the ribbon stays the ink fill');
+  assert.deepEqual(r.vector,c.record.vector,c.id+' no stroke, butt/miter defaults, opacity 0');
+  const {brushGroupId,...tags}=r.vectorExt.brushTexture;assert.match(brushGroupId,/^bg[0-9a-z]+_250000$/,c.id);
+  assert.deepEqual(tags,{brushTexturePreset:c.preset,preTextureOpacity:c.opacity,strokeSeed:1073741823},c.id);
+  assert.equal(r.geometry.closed,true);assert.deepEqual(Object.keys(r.vectorExt).sort(),['brushTexture','pressure']);
+ }
+});
+
 // #2361 Shadow Brush: applyShadowBrushTag @1065e9d8 over draw-bridge's commitStroke. The active swatch inks a plain
 // stroke (max(1, width), round ends) or, for the Stroke-off pressure fill, fills it; a ribbon goes back to its open
 // centreline; Shadow mode draws neither texture nor linked fill. Every record keeps its channel and swatch.

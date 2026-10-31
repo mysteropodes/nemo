@@ -176,6 +176,53 @@ fn a_textured_pressure_ribbon_stamps_along_its_centreline_through_its_profile() 
     }
 }
 
+/// An oracle ribbon record (the baseline anchor as the native mapping writes it) placed as the fixture's anchor.
+fn oracle_ribbon(case: &Value) -> Value {
+    let mut record = case["record"].clone();
+    record["target"] = json!({"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},"layerUid":"L0","strokeId":"anchor"});
+    record
+}
+
+#[test]
+fn a_baseline_pressure_ribbon_stamps_the_baseline_dabs_for_three_pressure_profiles() {
+    let oracle: Value = serde_json::from_str(ORACLE).unwrap();
+    let cases = oracle["ribbonCases"].as_array().unwrap();
+    assert_eq!(cases.len(), 3);
+    for case in cases {
+        let id = case["id"].as_str().unwrap();
+        let plan = plan_of(oracle_ribbon(case)).unwrap();
+        let entries: Vec<PaintEntry<'_>> = ordered_entries(&plan).collect();
+        assert!(matches!(entries[0], PaintEntry::Contour(_)), "{id}: the hidden ribbon anchor first");
+        let dabs: Vec<_> = entries[1..].iter().map(|e| match e { PaintEntry::Dab(d) => *d, _ => panic!("a dab") }).collect();
+        assert_eq!(dabs.len() as u64, case["count"].as_u64().unwrap(), "{id}: the baseline count along the centreline");
+        // The last dab painted is the first one made. Every dab: anchor centroid, extent and opacity; the first eight: every anchor.
+        for (made, dab) in dabs.iter().rev().enumerate() {
+            let got: Vec<[f64; 2]> = dab.svg_contour.as_ref().unwrap().segments().iter().map(|s| s.point).collect();
+            let mean = |axis: usize| got.iter().map(|p| p[axis]).sum::<f64>() / got.len() as f64;
+            let lo = |axis: usize| got.iter().map(|p| p[axis]).fold(f64::INFINITY, f64::min);
+            let hi = |axis: usize| got.iter().map(|p| p[axis]).fold(f64::NEG_INFINITY, f64::max);
+            let want = &case["summary"][made];
+            let have = [mean(0), mean(1), lo(0), lo(1), hi(0), hi(1), dab.svg_rgba.unwrap()[3]];
+            for (k, h) in have.iter().enumerate() {
+                assert!((h - want[k].as_f64().unwrap()).abs() <= 1.5e-3, "{id} dab {made} summary[{k}]: {h} != {want}");
+            }
+            if made < oracle["full"].as_u64().unwrap() as usize {
+                let exact: Vec<[f64; 2]> = case["dabs"][made]["parts"][0]["segments"].as_array().unwrap().iter()
+                    .map(|s| [s[0].as_f64().unwrap(), s[1].as_f64().unwrap()]).collect();
+                assert_eq!(got.len(), exact.len(), "{id} dab {made}");
+                for (g, w) in got.iter().zip(&exact) {
+                    assert!((g[0] - w[0]).abs() <= 1.5e-6 && (g[1] - w[1]).abs() <= 1.5e-6, "{id} dab {made}: {g:?} != {w:?}");
+                }
+                // The dab colour is the ribbon ink jittered by the dab's value delta, rounded to 8 bits by the oracle.
+                let rgba = dab.svg_rgba.unwrap();
+                for k in 0..3 {
+                    assert!((rgba[k] * 255.0 - case["dabs"][made]["fill"][k].as_f64().unwrap()).abs() <= 0.51, "{id} dab {made} channel {k}");
+                }
+            }
+        }
+    }
+}
+
 fn dab_points(plan: &ObjectPaintPlan) -> Vec<Vec<[f64; 2]>> {
     ordered_entries(plan).skip(1).map(|e| match e {
         PaintEntry::Dab(d) => d.svg_contour.as_ref().unwrap().segments().iter().map(|s| s.point).collect(),
