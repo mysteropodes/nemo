@@ -592,7 +592,7 @@ const pickText=(f,t,log=[])=>{f.root.NemoSelectCanvasIntent.pick=async(root,x,y,
 test('#2267 click on an existing text block opens the popover pre-filled and Apply commits ONE edit with only the changed member',async()=>{
  const f=await fixture(),t=target('existing-1');f.seed(t,block('Hands-on text'));const log=pickText(f,t);
  await f.click(100,110);await f.turn();
- assert.deepEqual(log,[[100,110,0]]);assert.equal(f.get('text-popover').style.display,'block');
+ assert.deepEqual(log,[[100,110,undefined]]);assert.equal(f.get('text-popover').style.display,'block');
  assert.equal(f.get('text-input').value,'Hands-on text');assert.equal(f.get('text-size').value,'48');assert.equal(f.get('text-color').value,'#112233');assert.equal(f.get('text-align').value,'left');
  const sel=f.get('text-font').children.find(n=>n.value===f.get('text-font').value);assert.equal(sel.textContent,'Roboto Regular');
  assert.equal(f.owner.items.size,1);assert.equal(f.owner.log.executed.length,0);
@@ -642,4 +642,31 @@ test('#2267 the popover font select is constrained to the popover width (stylesh
  const general=css.match(/#text-popover select[^{]*\{([^}]*)\}/);assert.ok(general);assert.match(general[1],/text-overflow:ellipsis/);assert.match(css,/#text-popover \.pr\{min-width:0;\}/);
  const tag=html.match(/<select id="text-font"[^>]*>/)[0];assert.doesNotMatch(tag,/width/);
  assert.match(html,/<div id="text-popover"[^>]*width:230px/);
+});
+
+// #2267 row D step 3: an UNSELECTED block on another layer is picked like Select picks (active layer first, then the rest), and its layer is activated first.
+const twoLayers=(f,project)=>{const base=f.session.info;f.session.info=()=>({...base(),layers:[{layerUid:'L0',locked:false},{layerUid:'L1',locked:false}]});f.root.NemoNativeObjectProject={...f.root.NemoNativeObjectProject,...project};};
+test('#2267 Text click on an unselected text block on another layer activates that layer and opens it pre-filled (one read, no create)',async()=>{
+ const f=await fixture(),t={...target('other-1'),layerUid:'L1'};f.seed(t,block('Hands-on text'));const acts=[];
+ twoLayers(f,{selectLayerUI:(root,idx,preserve,uid)=>{acts.push([idx,preserve,uid]);root.state.activeLayerIdx=idx;root._layerSel=[idx];return true;}});
+ f.root.NemoSelectCanvasIntent.pick=async(root,x,y,only)=>({data:{nativeRole:'text',nativeStableTarget:{...t},nativeLayerIndex:1,nativeLayerUid:'L1'},only});
+ await f.click(100,110);await f.turn();
+ assert.deepEqual(acts,[[1,false,'L1']]);assert.equal(f.root.state.activeLayerIdx,1);assert.equal(f.get('text-popover').style.display,'block');assert.equal(f.get('text-input').value,'Hands-on text');
+ assert.equal(f.owner.items.size,1);assert.equal(f.owner.log.executed.length,0);
+ f.input('text-size','60');f.apply();await f.turn();assert.equal(f.owner.log.received[0].payload.command,'object.text.edit');assert.deepEqual(f.owner.log.received[0].payload.stableTarget,t);assert.equal(f.logs.legacy,0);
+});
+test('#2267 a hit on the already-active layer does not re-select it; a refused layer activation is a notice with no editor and no new block',async()=>{
+ const f=await fixture(),t=target('same-layer');f.seed(t,block('Here'));let calls=0;
+ f.root.NemoNativeObjectProject.selectLayerUI=()=>{calls++;return true;};
+ f.root.NemoSelectCanvasIntent.pick=async()=>({data:{nativeRole:'text',nativeStableTarget:{...t},nativeLayerIndex:0,nativeLayerUid:'L0'}});
+ await f.click();await f.turn();assert.equal(calls,0);assert.equal(f.get('text-popover').style.display,'block');
+ const g=await fixture(),u={...target('refused'),layerUid:'L1'};g.seed(u,block('Elsewhere'));twoLayers(g,{selectLayerUI:()=>false});
+ g.root.NemoSelectCanvasIntent.pick=async()=>({data:{nativeRole:'text',nativeStableTarget:{...u},nativeLayerIndex:1,nativeLayerUid:'L1'}});
+ await g.click();await g.turn();assert.equal(g.root.state.activeLayerIdx,0);assert.equal(g.get('text-popover').style.display,'none');assert.equal(g.binding.core.snapshot().draft,null);assert.equal(g.owner.log.executed.length,0);
+});
+test('#2267 a hit that is not text (or a locked/hidden layer the pick skips) places new text on the active layer, never edits the other',async()=>{
+ const f=await fixture();let acts=0;f.root.NemoNativeObjectProject.selectLayerUI=()=>{acts++;return true;};
+ f.root.NemoSelectCanvasIntent.pick=async()=>({data:{nativeRole:'stroke',nativeLayerIndex:1,nativeLayerUid:'L1'}});
+ await f.click();await f.turn();assert.equal(acts,0);assert.equal(f.get('text-input').value,'');f.input('text-input','New');f.apply();await f.turn();
+ assert.equal(f.owner.log.received[0].payload.command,'object.text.create');assert.equal(f.owner.log.received[0].payload.layerUid||'L0','L0');
 });

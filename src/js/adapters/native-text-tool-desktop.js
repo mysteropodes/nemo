@@ -174,14 +174,22 @@
         result.page.items.forEach(function(row,i){var option=node('option',row.target.strokeId);option.value=String(i);select.appendChild(option);});select.value='';
         notify(result.page.items.length?'Select a text block to edit.':'No authored text at this frame. Use the Text tool to place text.');
       }catch(error){readyPin=null;page=null;notify(error.message||'Native text is unavailable.');}finally{refreshing=false;controls();flushPerspectiveRefresh();}};
-    // The text block under the click on the active layer, as the exact native read target; null when there is none (or no pick port: place new text).
+    // The text block under the click, as the exact native read target; null when there is none (or no pick port: place new text).
+    // Select's own rule (baseline hit-test): the active layer first, then every other visible unlocked layer from the topmost down (#2267 D3).
+    // A hit on another layer activates it through the native layer-selection route first (the edit reads the active layer's authored frame);
+    // a refused activation is a notice, never a stray new block.
     function pickExisting(x,y){
-      var I=root.NemoSelectCanvasIntent,idx=root.state&&root.state.activeLayerIdx;
-      if(!I||typeof I.pick!=='function'||!Number.isInteger(idx))return Promise.resolve(null);
-      return Promise.resolve(I.pick(root,x,y,idx)).then(function(hit){
+      var I=root.NemoSelectCanvasIntent;
+      if(!I||typeof I.pick!=='function')return Promise.resolve(null);
+      return Promise.resolve(I.pick(root,x,y)).then(function(hit){
         if(hit===undefined)throw new Error('The canvas is still busy - try again.');
         var d=hit&&hit.data,t=d&&d.nativeRole==='text'&&d.nativeStableTarget;
-        return t?{contextId:t.contextId,layerUid:t.layerUid,frameScope:t.frameScope,strokeId:t.strokeId}:null;});
+        if(!t)return null;
+        if(Number.isInteger(d.nativeLayerIndex)&&d.nativeLayerIndex!==root.state.activeLayerIdx){
+          var project=root.NemoNativeObjectProject;
+          if(!project||typeof project.selectLayerUI!=='function'||project.selectLayerUI(root,d.nativeLayerIndex,false,d.nativeLayerUid)!==true||root.state.activeLayerIdx!==d.nativeLayerIndex)throw new Error('That text layer could not be selected.');
+        }
+        return {contextId:t.contextId,layerUid:t.layerUid,frameScope:t.frameScope,strokeId:t.strokeId};});
     }
     b.handle=function(method,e){
       syncTool();if(b.retired||!root.state||root.state.tool!=='text')return false;
