@@ -173,3 +173,9 @@ test('custom-brush uses full project readiness and retains narrow immutable auth
   assert.ok(f.controller.read());
   assert.equal(f.edits().length, 0, 'restoring readiness does not replay a gesture');
 });
+test('the picker opens on the preset the button shows (a selected item readback), not the draw default',async()=>{
+  const f=await fixture([['10',{label:'Ten'}],['2',{}]]);assert.equal(f.root.state.brushPreset,'none');
+  f.root.BrushPresetPicker.paintButton('10');const el=picker(f);
+  assert.equal(customButton(el,'10').className.split(' ').includes('active'),true);
+  assert.equal(customButton(el,'2').className.split(' ').includes('active'),false);assert.equal(f.root.state.brushPreset,'none');
+});
