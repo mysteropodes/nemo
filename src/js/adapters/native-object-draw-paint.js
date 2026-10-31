@@ -46,8 +46,44 @@
     if(!(sw&&typeof sw.id==='string'&&sw.id&&/^#(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/.test(sw.color)))throw new Error('The Shadow Brush swatch is unavailable.');
     out.shadowSwatch={id:sw.id,color:sw.color};return out;
   }
+  // A native vector record holds 2..256 anchors (native-object-vector-stroke.js); the baseline Path has no cap, and a
+  // pressure ribbon across 40% of an HD frame already samples past it (#2343 B1). A longer outline is refitted:
+  // Paper's simplify within a quarter document unit, widened only until it fits. A path that fits keeps every anchor.
+  function fitRecord(path){
+    if(path.segments.length<=256)return;
+    var source=path.segments.map(function(s){return s.clone();});
+    for(var tolerance=.25;tolerance<=64;tolerance*=2){
+      path.removeSegments();path.addSegments(source.map(function(s){return s.clone();}));path.simplify(tolerance);
+      if(path.segments.length<=256)return;
+    }
+    throw new Error('This stroke is too long for a native vector record.');
+  }
+  // tools.js finalizePen with Taper ends @1065e9d8: the placed Pen path becomes a filled ribbon, its width tapering to the
+  // floor over 18% of the path length at each end (buildCenterSegmentsFromPath + taperWidthAtFrac), outlined by
+  // rebuildVectorBrushOutline from the sparse anchor widths (no pressure profile) and filled in the stroke colour at the
+  // brush opacity, with a new Path's stroke defaults and no dashes. A closed Pen path keeps only its anchors, as there.
+  function penTaper(root,dict){
+    var Segment=root.Segment,Point=root.Point,path=new root.Path({insert:false}),outline=null;
+    try{
+      dict.segments.forEach(function(s){path.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
+      path.closed=!!dict.closed;
+      var cs=root.buildCenterSegmentsFromPath(path,function(frac){return root.taperWidthAtFrac(frac,dict.strokeWidth,0.18);});
+      var sampled=root.sampleVectorBrushCenterline(cs);
+      outline=root.buildVariableWidthPath(sampled.pts,sampled.widths);
+      if(!outline)throw new Error('Native brush outline is unavailable.');
+      fitRecord(outline);
+      return {segments:outline.segments.map(function(s){return {point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};}),
+        closed:true,strokeColor:null,hasRealStroke:false,strokeWidth:1,strokeCap:'butt',strokeJoin:'miter',miterLimit:10,dashOffset:0,
+        fillColor:dict.strokeColor,opacity:dict.opacity,isVectorBrush:true,centerSegments:cs};
+    }finally{path.remove();if(outline)outline.remove();}
+  }
   // Pen and Shape tag the committed path only (tools.js tags at pointer-up); the live preview keeps the drawing colours.
-  function shade(out,final){var sw=out.shadowSwatch;delete out.shadowSwatch;return sw&&final?shadow(out,sw,false):out;}
+  // Taper ends (Pen only) also takes effect at commit; Shadow mode then turns the ribbon back into its centreline.
+  function shade(out,final,root){
+    var sw=out.shadowSwatch,taper=out.taperEnds;delete out.shadowSwatch;delete out.taperEnds;
+    if(final&&taper)out=penTaper(root,out);
+    return sw&&final?shadow(out,sw,false):out;
+  }
   // draw-bridge.js Fill Brush branch: the samples' centreline and width profile (buildCenterSegmentsFromRawStroke),
   // outlined as one closed ribbon (rebuildVectorBrushOutline; a Fill Brush shape has no keyline), filled in the Fill
   // colour at the brush opacity and tagged isFillShape. In Shadow mode applyShadowBrushTag turns it back into its
@@ -64,5 +100,5 @@
     out.isVectorBrush=true;out.centerSegments=cs;delete out.isFillShape;
     return shadow(out,style.shadowSwatch,false,style.brushSize);
   }
-  return Object.freeze({textureRibbon:textureRibbon,texturePlain:texturePlain,shadow:shadow,shadowStyle:shadowStyle,shade:shade,fillBrush:fillBrush});
+  return Object.freeze({textureRibbon:textureRibbon,texturePlain:texturePlain,shadow:shadow,shadowStyle:shadowStyle,shade:shade,fitRecord:fitRecord,fillBrush:fillBrush});
 }));
