@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "bc2046246c5ee9b09079fd2c46e4cde185c18890",
-  "describe": "v0.7.0-alpha.4-4372-gbc204624-dirty"
+  "head": "bc100ad9472ecc5e8605dc49dc77468589c7733c",
+  "describe": "v0.7.0-alpha.4-4374-gbc100ad9-dirty"
  },
- "inputsDigest": "323233ebfe588634641333adaea14bb19e744a613f7f8c215baa47e263929a2a",
+ "inputsDigest": "52723c26b385383155e17b734521019de982b3a335d799dbd005c54bb6f2cd21",
  "states": [
   "inventoried",
   "characterized",
@@ -132,11 +132,6 @@
   "SMCamera": {
    "file": "src/js/camera.js",
    "line": 651,
-   "members": 0
-  },
-  "SMColorManager": {
-   "file": "src/js/color-manager.js",
-   "line": 356,
    "members": 0
   },
   "SMCompPreview": {
