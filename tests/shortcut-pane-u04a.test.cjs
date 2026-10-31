@@ -58,6 +58,15 @@ test('a key already held by another action is refused with the baseline notice; 
   assert.equal(r.registry.clashFor('cmdInsertFrame','B').action,'draw','case-insensitive clash');
 });
 
+test('keys hard-wired outside the tables (Space, arrows, Enter, Delete, Tab, F9) are refused and never stored (#2370 review)',()=>{
+  for(const k of [' ','ArrowLeft','ArrowRight','Enter','Delete','Backspace','Tab','F9']){
+    const r=rig(),b=r.button('Insert frame');b.click();r.press(k);
+    assert.equal(r.registry.keyFor('cmdInsertFrame'),'F5',JSON.stringify(k)+' keeps the default');
+    assert.equal(r.store['nemo-shortcuts'],undefined);assert.match(r.toasts[0]||'',/reserved/);
+  }
+  const r=rig();assert.equal(r.registry.setKey('cmdInsertFrame',' '),false,'setKey itself refuses a reserved key');assert.equal(r.registry.keyFor('cmdInsertFrame'),'F5');
+});
+
 test('Escape cancels; a modifier press alone is ignored and the capture keeps waiting',()=>{
   const r=rig(),b=r.button('Insert frame');b.click();
   for(const m of ['Shift','Control','Alt','Meta']){const e=r.press(m);assert.equal(e.prevented,undefined,m+' is not consumed');}
