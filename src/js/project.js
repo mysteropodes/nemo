@@ -29,7 +29,7 @@
   function readNativeTabsUI(){return {tabs:tabs,activeTabId:activeTabId,path:currentPath,name:currentName};}
   var nativeInactiveTabs=nativeTabsUI.bind(window,{read:readNativeTabsUI,makeId:makeTabId,
     file:function(){return nativeSavedUI&&nativeSavedUI.nativeObject;},dirty:isDirty,notice:tabAddNotice,render:renderTabBar,
-    activateTab:function(id,path,name){activeTabId=id;currentPath=path;currentName=name;updateCurrentLabel();},switchTab:switchToTab,hideStart:hideStartScreen
+    activateTab:function(id,path,name){activeTabId=id;currentPath=path;currentName=name;updateCurrentLabel();},switchTab:switchToTab,hideStart:hideStartScreen,showStart:showStartScreen,saved:function(){nativeNewReturn=null;tabAddNotice('');try{markSaved(projectJSON());}catch(e){}},closeLegacy:function(){return afterMaybe(releaseNative('tab-close'),function(admitted){if(admitted===false){tabAddNotice('Closing the project is unavailable in this build.');return false;}newProjectNow({w:1920,h:1080,fps:24,name:'Untitled'});return true;});}
   });
   function p39bUseInactiveEntry(){try{var native=window.NemoNativeOpacityCutover;return !!activeTabId&&(native?native.blocksLegacy()!==false:'NemoNativeOpacityProject' in window);}catch(_){return !!activeTabId;}}
 
@@ -616,33 +616,9 @@
       activeTabId=id;newProjectNow({w:1920,h:1080,fps:24,name:'Untitled '+n});currentPath=null;currentName='Untitled '+n;updateCurrentLabel();renderTabBar();}
     try{var result=releaseNative('tab-add');return result&&typeof result.then==='function'?result.then(admitted,denied):admitted(result);}catch(e){return denied();}
   }
-  // #2381: the last tab closes like any other (unsaved-changes prompt first), releases its project and shows the home screen.
-  var lastTabClose=null;
-  function closeLastTab(){
-    var Close=window.NemoNativeObjectProjectClose;if(!Close)return showToast(SM.t('hsCannotCloseLastTab'));
-    if(!lastTabClose)lastTabClose=Close.create({
-      native:function(){var file=nativeSavedUI&&nativeSavedUI.nativeObject;return !!file&&file.isActive();},
-      current:function(){return tabs.length+':'+activeTabId;},isDirty:isDirty,notice:showToast,
-      confirmDiscard:function(){var msg='Unsaved changes will be lost. Close the project?',t=window.__TAURI__;
-        try{
-          if(t&&t.dialog&&typeof t.dialog.ask==='function')return t.dialog.ask(msg,{title:'Unsaved changes',kind:'warning',okLabel:'Discard and close',cancelLabel:'Cancel'});
-          if(typeof window.confirm==='function')return Promise.resolve(window.confirm(msg));
-        }catch(e){}
-        return Promise.resolve(false);},
-      closeNative:function(){return nativeSavedUI.nativeObject.closeProject();},
-      closeLegacy:function(){return afterMaybe(releaseNative('tab-close'),function(admitted){
-        if(admitted===false){tabAddNotice('Closing the project is unavailable in this build.');return false;}
-        newProjectNow({w:1920,h:1080,fps:24,name:'Untitled'});return true;});},
-      finish:function(){
-        tabs.splice(0,tabs.length);activeTabId=null;currentPath=null;currentName='Untitled';nativeNewReturn=null;tabAddNotice('');
-        try{markSaved(projectJSON());}catch(e){} // the launch baseline: nothing is open, so nothing is unsaved
-        updateCurrentLabel();renderTabBar();showStartScreen();}
-    });
-    return lastTabClose();
-  }
   function closeTab(id){
     var idx=tabs.findIndex(function(t){return t.id===id;});if(idx<0)return;if(tabs[idx].nativeInactiveProject)return nativeInactiveTabs.close(tabs[idx].nativeInactiveProject);
-    if(tabs.length===1)return closeLastTab(); // #2381: closing the only project returns to the home screen
+    if(tabs.length===1)return nativeInactiveTabs.closeLast(); // #2381: closing the only project returns to the home screen
     if(tabs[idx].nativePreparation)return inactiveEntry.close(tabs[idx].nativePreparation);
     var wasActive=id===activeTabId;
     function closed(){tabs.splice(idx,1);renderTabBar();}

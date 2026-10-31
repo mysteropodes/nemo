@@ -136,4 +136,5 @@ test('the shipped page loads the close module before the project tab code that c
   assert.ok(at('js/adapters/native-object-project-close.js') > 0);
   assert.ok(at('js/adapters/native-object-project-close.js') < at('js/project.js'));
   assert.ok(at('js/adapters/native-object-project-close.js') > at('js/adapters/native-object-project.js'), 'the session resolves it lazily, at call time');
+  assert.ok(at('js/adapters/native-object-project-close.js') < at('js/adapters/native-object-project-tabs-ui.js'));
 });
