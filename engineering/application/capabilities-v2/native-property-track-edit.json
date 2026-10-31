@@ -25,7 +25,7 @@
     "maxReadResponseBytes": 4096,
     "policy": "Complete 4096-byte correlated property-track request/receipt or typed refusal; no writable document or binary resource payload."
   },
-  "semantics": "Edit only existing stable target/property/frame selections through the native revision/history owner. Supports linear/ease/easeIn/easeOut/hold presets, in/out influence (finite inputs retain the native baseline clamp), and subdivision. The authority resolves every selection on the original snapshot; missing or duplicate keys, unsupported properties and stale/cancelled requests cannot partially publish. Changed edits add one revision/history entry; no-op preserves authored presence and redo. This does not admit other property mutations or create a JS evaluator/writer. Public route availability is separate from installed curve UI acceptance.",
+  "semantics": "Edit only existing stable target/property/frame selections through the native revision/history owner. Supports linear/ease/easeIn/easeOut/hold presets, in/out influence (finite inputs retain the native baseline clamp), subdivision, and lockTo (the per-key standing lock mode in/out/layer, or null to clear, written on every selected key). The authority resolves every selection on the original snapshot; missing or duplicate keys, unsupported properties and stale/cancelled requests cannot partially publish. Changed edits add one revision/history entry; no-op preserves authored presence and redo. This does not admit other property mutations or create a JS evaluator/writer. Public route availability is separate from installed curve UI acceptance.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",
@@ -157,6 +157,46 @@
       "response": {
         "apiVersion": 2,
         "requestId": "track-subdivide",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Native per-key lock; installed Motion menu acceptance pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "track-lockto",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.property.track.edit",
+        "payload": {
+          "command": "object.property.track.edit",
+          "selections": [
+            {
+              "target": {
+                "contextId": "scene-root",
+                "layerUid": "legacy layer:alpha"
+              },
+              "property": "position",
+              "frame": 0
+            }
+          ],
+          "action": {
+            "kind": "lockTo",
+            "mode": "out"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "track-lockto",
         "instanceId": "instance-A",
         "documentId": "document-A",
         "contentRevision": 8,

@@ -8,11 +8,14 @@ pub(super) fn request(value: &Value) -> bool {
             && p.get("layerUid")
                 .and_then(Value::as_str)
                 .is_some_and(|uid| !uid.is_empty())
-            && matches!(
-                p.get("flag").and_then(Value::as_str),
-                Some("locked" | "shy")
-            )
-            && p.get("value").and_then(Value::as_bool).is_some()
+            && match (p.get("flag").and_then(Value::as_str), p.get("value")) {
+                (Some("locked" | "shy"), Some(value)) => value.is_boolean(),
+                // D37: one layer key-lock mode, null clears it.
+                (Some("keyLock"), Some(value)) => {
+                    value.is_null() || matches!(value.as_str(), Some("in" | "out" | "layer"))
+                }
+                _ => false,
+            }
     })
 }
 pub(super) fn result(value: &Value) -> bool {
@@ -41,6 +44,29 @@ mod tests {
                 assert!(envelope(p).validate().is_ok());
             }
         }
+        for value in [json!(null), json!("in"), json!("out"), json!("layer")] {
+            let p = json!({"command":"object.layer.policy.edit","layerUid":"layer","flag":"keyLock","value":value});
+            assert!(request(&p));
+            assert!(envelope(p).validate().is_ok());
+        }
+        for (flag, value) in [
+            ("keyLock", json!(true)),
+            ("keyLock", json!(false)),
+            ("keyLock", json!("both")),
+            ("keyLock", json!("")),
+            ("keyLock", json!(0)),
+            ("keyLock", json!(["in"])),
+            ("keyLock", json!({"in":1})),
+            ("locked", json!(null)),
+            ("locked", json!("in")),
+            ("shy", json!("layer")),
+        ] {
+            let p = json!({"command":"object.layer.policy.edit","layerUid":"layer","flag":flag,"value":value});
+            assert!(!request(&p), "{p}");
+            assert!(envelope(p).validate_input().is_err());
+        }
+        let missing = json!({"command":"object.layer.policy.edit","layerUid":"layer","flag":"keyLock"});
+        assert!(!request(&missing));
         let valid = json!({"command":"object.layer.policy.edit","layerUid":"layer","flag":"locked","value":true});
         for key in ["command", "layerUid", "flag", "value"] {
             let mut p = valid.clone();

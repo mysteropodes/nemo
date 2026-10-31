@@ -53,7 +53,7 @@
       holder.className='lrow motion-expr-editor motion-keys-drawer';holder.hidden=true;section.appendChild(holder);
       entry.editor=Keys.create(holder,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,
         keyTimelineChanged:keyNotice,acceptKeySelection:function(frames){return acceptKeySelection(entry,frames);},
-        get editPropertyTrack(){return entry.property==='order'?null:ports.editPropertyTrack;},refresh:function(){return refresh(true);}});
+        get editPropertyTrack(){return entry.property==='order'?null:ports.editPropertyTrack;},get showContextMenu(){return ports.showContextMenu;},translate:function(k){return ports.translate?ports.translate(k):k;},refresh:function(){return refresh(true);}});
       keyEditors.push(entry);return entry;
     }
     var initial=makeKeyEditor(),keysAvailable=!!initial,rowIndex=new Map();if(initial)keyEditor=initial.editor;
