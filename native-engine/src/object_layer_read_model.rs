@@ -319,3 +319,6 @@ pub(crate) fn extend_layers(document: &ObjectDocument, info: &mut Value) {
 #[cfg(test)]
 #[path = "../tests/object_layer_read_model.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "../tests/object_layer_read_model_duplicator.rs"]
+mod duplicator_tests;

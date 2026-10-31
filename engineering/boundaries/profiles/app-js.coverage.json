@@ -3983,7 +3983,7 @@
     },
     {
       "path": "src/js/adapters/native-object-duplicator-ui.js",
-      "moduleId": "app.native.object.duplicator.adapter",
+      "moduleId": "app.native.object.duplicator.ui.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
