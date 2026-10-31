@@ -230,6 +230,7 @@
     {"src":"js/adapters/updater-platform.js"},
     {"src":"js/updater-bridge.js"},
     {"src":"js/adapters/kitsu-service.js"},
+    {"src":"js/application/kitsu-native-structure.js"},
     {"src":"js/kitsu.js"},
     {"src":"js/images.js"},
     {"comment":["<!-- Delaunator (Mapbox, ISC) 5.0.1, vendored — Delaunay triangulation for the","     image mesh (image-mesh.js). Loaded BEFORE that file so window.Delaunator","     already exists when a mesh is built. -->"]},

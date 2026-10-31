@@ -5702,6 +5702,18 @@
       ]
     },
     {
+      "path": "src/js/application/kitsu-native-structure.js",
+      "moduleId": "app.kitsu.native.structure",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2559,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/application/script-native-api.js",
       "moduleId": "app.script.native.api",
       "executionClass": "document-classic",

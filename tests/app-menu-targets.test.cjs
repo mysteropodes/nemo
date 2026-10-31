@@ -42,16 +42,16 @@ test('every app-menu action has a stable id and a declared desktop target',()=>{
 test('on desktop an unavailable action shows its reason and reaches nothing; native and presentation actions run',()=>{
   const m=menu({kitsu:true});
   const byId=Object.fromEntries(actions(m.items).map((i)=>[i.id,i]));
-  for(const id of ['ctx-nemo-plugin','ctx-new-view','ctx-kitsu-open','ctx-kitsu-publish','ctx-nemo-script']){
+  for(const id of ['ctx-nemo-plugin','ctx-new-view','ctx-kitsu-publish','ctx-nemo-script']){
     byId[id].action();
   }
   assert.deepEqual(m.calls,[],'no legacy script, plugin or viewer entry runs');
   assert.deepEqual(m.clicked,[],'no Kitsu button is pressed');
   assert.deepEqual(m.notices,['Plugins are unavailable in native Nemo.','A second viewer is unavailable in native Nemo.',
-    'Kitsu shots are unavailable in native Nemo.','Kitsu publishing is unavailable in native Nemo.','Scripts are unavailable in native Nemo.']);
-  byId['ctx-open'].action();byId['ctx-save'].action();byId['ctx-new-project'].action();byId['ctx-export'].action();byId['ctx-import-img'].action();
+    'Kitsu publishing is unavailable in native Nemo.','Scripts are unavailable in native Nemo.']);
+  byId['ctx-open'].action();byId['ctx-save'].action();byId['ctx-new-project'].action();byId['ctx-export'].action();byId['ctx-import-img'].action();byId['ctx-kitsu-open'].action();
   assert.deepEqual(m.calls,['SMProject.open','SMProject.save']);
-  assert.deepEqual(m.clicked,['project-tab-add','btn-export','btn-import-img']);
+  assert.deepEqual(m.clicked,['project-tab-add','btn-export','btn-import-img','btn-kitsu-open'],'Kitsu open is a native route now');
 });
 
 test('conditional targets: scripts follow the native script API, media imports need an open native document',()=>{
