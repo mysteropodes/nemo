@@ -41,11 +41,15 @@ function toggleNativeFlipPreview(controller){
   return nativeFlipPreview.toggle(controller);
 }
 function startNativePlay(controller){
+  // Test-package-only virtual time (P24): defined solely by the opt-in observer bootstrap, null in every normal build.
+  var testPlayClock=function(){try{var o=window.NemoTestPlayObserver;return o&&o.fixedClock||null;}catch(_){return null;}};
   if(!nativePlayScheduler)nativePlayScheduler=NemoNativeOpacityMotionSurface.createPlaybackScheduler({
     frame:function(){return state.currentFrame;},fps:function(){return state.fps;},
     playing:function(){return state.playing;},controller:function(){return window.NemoNativeOpacityCutover;},
     advance:advancePlayFrame,navigate:goToFrame,stop:stopPlay,
-    now:function(){return performance.now();},request:function(step){return window.requestAnimationFrame(step);},cancel:function(id){window.cancelAnimationFrame(id);}
+    now:function(){var c=testPlayClock();return c?c.now():performance.now();},
+    request:function(step){var c=testPlayClock();return c?c.request(step,1000/state.fps):window.requestAnimationFrame(step);},
+    cancel:function(id){var c=testPlayClock();if(c)c.cancel(id);else window.cancelAnimationFrame(id);}
   });
   // The flip ends only once Play has really started; a refused start leaves the flip running (RV4-FLIPCANCEL).
   if(!nativePlayScheduler.start(controller)){showToast('Native playback is unavailable');return;}
