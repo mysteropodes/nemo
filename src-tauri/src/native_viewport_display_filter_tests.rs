@@ -1,5 +1,7 @@
 //! Executes the actual production shader/final-pass dispatcher on the retained GPU context.
-use super::{DisplayFilterBlitter, ViewportDisplayFilter};
+use crate::native_viewport::platform::display_filter::{
+    DisplayFilterBlitter, ViewportDisplayFilter,
+};
 use native_engine::compositor::Compositor;
 
 const PIXELS: [u8; 32] = [

@@ -72,7 +72,7 @@ test('storage decoder remains confined to command and actual host-release tests'
 test('actual desktop graph admits new command port, denies old command and cross-adapter decoders', () => {
   const result = R.checkRustCrate(profile, policy, { root });
   assert.equal(result.ok, true, JSON.stringify(result.violations));
-  assert.equal(result.moduleCount, 17); assert.equal(result.edges.length, 46);
+  assert.equal(result.moduleCount, 17); assert.equal(result.edges.length, 45);
   assert.deepEqual(result.unsupported, []); assert.deepEqual(result.exceptionsApplied, []);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-v2-host-port-'));
   try {
