@@ -70,11 +70,12 @@ function harness(options) {
     SM: { t: (k) => ({ hdrElements: 'Elements', autoNameShape: 'Shape', autoNameStroke: 'Stroke', autoNameGroup: 'Group', autoNameText: 'Text', elementsRename: 'Rename',
       elementsSelect: 'Select', elementsSelectMembers: 'Select members', elementsUngroup: 'Ungroup', elementsPanelEmpty: 'No elements',
       combineUnion: 'Union', combineSubtract: 'Subtract', combineIntersect: 'Intersect', combineExclude: 'Exclude', combineNone: 'Remove combine' }[k] || k) },
-    NemoNativeObjectProject: { desktop: () => session, selectLayerUI: () => true }, NemoSelectCanvasIntent: Intent, NemoNativeShapeTreeModel: Model,
+    NemoNativeObjectProject: { desktop: () => session, selectLayerUI: () => true }, NemoSelectCanvasIntent: Intent,
+    ...(o.entered ? { NemoNativeComponentContext: { contextId: () => o.entered, layers: () => [{ layerUid: 'CL', name: 'Inner' }] } } : {}), NemoNativeShapeTreeModel: Model,
     NemoNativeViewportUnderlay: { canvasMapping: { point: (e) => ({ x: e.clientX, y: e.clientY }) } } };
   const panel = Shape.create(win, { canvas: () => spy, intent: () => intent });
   const container = element('div');
-  return { win, panel, container, toasts, calls, picks, reads, updates, state, set: (v) => { items = v; }, bump: () => { revision++; },
+  return { win, panel, container, toasts, calls, picks, reads, held: o.entered, updates, state, set: (v) => { items = v; }, bump: () => { revision++; },
     rows: () => container.querySelectorAll('.motion-elem-row'), names: () => container.querySelectorAll('.lnm').map((n) => n.textContent),
     selected: () => win.selectedPaths.map((p) => p.data.strokeId) };
 }
@@ -293,4 +294,43 @@ test('the real group intent builds the exact group.mode.set request the native c
   badge(h, 'outer').fire('click'); await settle();
   assert.deepEqual(sent.map((r) => [r.operation, r.expectedRevision, r.payload]), [
     ['command.document.object.group.mode.set', 7, { command: 'object.group.mode.set', layerUid: 'L', contextId: 'scene-root', groupId: 'outer', mode: 'unite' }]]);
+});
+
+// #2256: inside an entered component the three group edits address that component's context and its own layer (no refusal, one request each);
+// the scene-root requests above are unchanged.
+test('entered component: rename, ungroup and mode.set carry the held contextId and the component layer; the read targets the same context', async () => {
+  const h = await shown(harness({ entered: 'comp_9' }));
+  assert.equal(h.reads.length, 1); assert.equal(h.reads[0].layerUid, 'CL', 'the component layer is read, not the scene layer at that index');
+  assert.deepEqual(h.names(), ['Image 5', 'Shape 4', 'Body']);
+  h.panel.renameGroup({ gid: 'outer', name: 'Body', named: true }, 'Torso'); await settle();
+  row(h, gid('outer')).fire('contextmenu');
+  h.win.menu.find((m) => m.label === 'Ungroup').action(); await settle();
+  row(h, gid('outer')).querySelector('.motion-combine-badge').fire('click'); await settle();
+  assert.deepEqual(h.calls, [
+    ['rename', { layerUid: 'CL', contextId: 'comp_9', groupId: 'outer', name: 'Torso' }],
+    ['ungroup', { layerUid: 'CL', contextId: 'comp_9', strokeIds: ['v1'] }],
+    ['setMode', { layerUid: 'CL', contextId: 'comp_9', groupId: 'outer', mode: 'unite' }]]);
+  assert.equal(h.toasts.filter((t) => /inside a component/.test(t)).length, 0, 'the three refusals are gone');
+});
+
+test('entered component: an engine refusal keeps the typed toast and nothing else changes', async () => {
+  const h = await shown(harness({ entered: 'comp_9', verdicts: { rename: { ok: false, code: 'unavailable' }, ungroup: { ok: false, code: 'unavailable' }, setMode: { ok: false, code: 'unavailable' } } }));
+  h.panel.renameGroup({ gid: 'outer', name: 'Body', named: true }, 'Torso'); await settle();
+  assert.match(h.toasts.at(-1), /could not be renamed/);
+  row(h, gid('outer')).fire('contextmenu'); h.win.menu.find((m) => m.label === 'Ungroup').action(); await settle();
+  assert.match(h.toasts.at(-1), /could not be ungrouped/);
+  row(h, gid('outer')).querySelector('.motion-combine-badge').fire('click'); await settle();
+  assert.match(h.toasts.at(-1), /combine mode could not be changed/);
+  assert.equal(h.updates.length, 0);
+});
+
+test('the panel re-reads when the held context changes under the same revision, and refuses an edit whose context moved', async () => {
+  const h = await shown(harness());
+  assert.equal(h.reads.length, 1);
+  h.win.NemoNativeComponentContext = { contextId: () => 'comp_2', layers: () => [{ layerUid: 'CL', name: 'Inner' }] };
+  h.panel.renameGroup({ gid: 'outer', name: 'Body', named: true }, 'Torso'); await settle();
+  assert.deepEqual(h.calls, [], 'the view was read at the scene root: nothing is sent');
+  assert.match(h.toasts.at(-1), /document changed/);
+  h.panel.refresh(false); await settle();
+  assert.equal(h.reads.length, 2); assert.equal(h.reads[1].layerUid, 'CL');
 });

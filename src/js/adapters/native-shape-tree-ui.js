@@ -7,7 +7,8 @@
  *     menu sets a chosen one, each one command.document.object.group.mode.set (one history entry, a refusal toasts, nothing is written locally);
  *   - Ungroup is command.document.object.group.ungroup (one history entry) and dissolves the group's own level - the engine dissolves the
  *     OUTERMOST group of the member it is given, so only a top-level group is offered; a nested one reports unavailable.
- * It owns no document state and never reaches the legacy writer (shapes-panel.js stays refused). Refresh follows the project pin (revision),
+ * Inside an entered component the same three edits address that component's context (the held id) and its own layer; a refusal from the
+ * engine keeps the typed toast. It owns no document state and never reaches the legacy writer (shapes-panel.js stays refused). Refresh follows the project pin (revision),
  * the active layer and the frame; the same key repaints only the selection highlight, and a scrub reads once per settled frame (a read in
  * flight is followed by ONE more for the latest frame), keeping the old rows on screen until the new listing lands. */
 (function (root, factory) {
@@ -94,9 +95,10 @@
     async function edit(kind, input, done) {
       const s = session(), intent = s && D_intent(s);
       if (!intent || !view || busy) { notice('This is not available right now.'); return null; }
+      if (view.contextId !== heldNow()) { notice('The document changed — nothing was changed.'); return null; }
       busy = true;
       let out;
-      try { out = await intent[kind](Object.assign({ layerUid: view.layerUid, contextId: 'scene-root' }, input)); } catch (_) { out = { ok: false, code: 'unavailable' }; }
+      try { out = await intent[kind](Object.assign({ layerUid: view.layerUid, contextId: view.contextId }, input)); } catch (_) { out = { ok: false, code: 'unavailable' }; }
       busy = false;
       if (!out || !out.ok) {
         notice(out && (out.code === 'stale_revision' || out.code === 'stale_selection') ? 'The document changed — nothing was changed.' : done.failed);
@@ -105,19 +107,17 @@
       if (out.applied) { if (typeof win.updateUI === 'function') win.updateUI(); } else notice('Nothing changed.');
       return out;
     }
-    const entered = () => { const I = canvas(); return !!I && typeof I.heldId === 'function' && I.heldId(win) !== 'scene-root'; };
+    // The context the panel reads and edits: the entered component's id (the one the workspace controller holds) or the scene root.
+    const heldNow = () => { const I = canvas(); try { return I && typeof I.heldId === 'function' ? I.heldId(win) || 'scene-root' : 'scene-root'; } catch (_) { return 'scene-root'; } };
     function renameGroup(node, value) {
-      if (entered()) { notice('Groups cannot be renamed inside a component here.'); return; }
       if (value === node.name && node.named) return;
       edit('rename', { groupId: node.gid, name: value }, { failed: 'The group could not be renamed.' });
     }
     function ungroup(node) {
-      if (entered()) { notice('Groups cannot be ungrouped inside a component here.'); return; }
       if (node.parent) { notice('Only a top-level group can be ungrouped here — ungroup the outer group first.'); return; }
       edit('ungroup', { strokeIds: [node.memberIds[0]] }, { failed: 'The group could not be ungrouped.' });
     }
     function setMode(node, mode) {
-      if (entered()) { notice('Combine modes cannot be changed inside a component here.'); return; }
       if (mode === node.mode) return;
       edit('setMode', { groupId: node.gid, mode }, { failed: 'The combine mode could not be changed.' });
     }
@@ -234,8 +234,10 @@
     function keyOf() {
       const s = session();
       if (!s) return null;
-      const info = s.info(), idx = win.state && win.state.activeLayerIdx, layer = info && info.layers && info.layers[idx];
-      return layer ? { s, idx, layerUid: layer.layerUid, frame: win.state.currentFrame, pin: pinKey(info), key: [pinKey(info), idx, layer.layerUid, win.state.currentFrame].join('|') } : { s, none: true, key: 'none|' + pinKey(info) };
+      const info = s.info(), idx = win.state && win.state.activeLayerIdx, I = canvas(), ctx = heldNow();
+      // Inside an entered component the active layer index addresses the component's own layers, as the Select path reads them.
+      const rows = info && (ctx !== 'scene-root' && I && typeof I.layerList === 'function' ? I.layerList(win, info) : info.layers), layer = rows && rows[idx];
+      return layer ? { s, idx, layerUid: layer.layerUid, contextId: ctx, frame: win.state.currentFrame, pin: pinKey(info), key: [pinKey(info), ctx, idx, layer.layerUid, win.state.currentFrame].join('|') } : { s, none: true, key: 'none|' + ctx + '|' + pinKey(info) };
     }
     async function readOnce() {
       const k = keyOf(), I = canvas();
@@ -250,7 +252,7 @@
       const after = keyOf();
       if (!after || after.key !== k.key) { dirty = true; return; }
       if (!layers) { if (!view) message('The elements could not be read just now.'); return; }
-      view = { key: k.key, pin: k.pin, layerIdx: k.idx, layerUid: k.layerUid, frame: k.frame, tree: model().build(layers.items, labels()) };
+      view = { key: k.key, pin: k.pin, layerIdx: k.idx, layerUid: k.layerUid, contextId: k.contextId, frame: k.frame, tree: model().build(layers.items, labels()) };
       repaint(false);
     }
     function request() {
