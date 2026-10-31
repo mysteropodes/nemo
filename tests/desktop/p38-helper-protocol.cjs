@@ -189,6 +189,7 @@ async function closeOwnedHelpers(closeInput, children, cleanup) {
     throw Object.assign(Error('helper-cleanup-failed'),{code:'helper-cleanup-failed',cleanupDiagnostics:diagnostics});
   return {cleanupDiagnostics:diagnostics};
 }
+const CLEANUP_PROBES=200;
 async function cleanupHelper(child, services = {}) {
   if(!Number.isSafeInteger(child.pid))return; // Spawn failed before any process was created.
   const observation = { helperPid:child.pid, descendantPossible:child.p38GroupMayContainDescendants !== false };
@@ -205,7 +206,10 @@ async function cleanupHelper(child, services = {}) {
   const alive = services.alive || (()=>{try{process.kill(-child.pid,0);return true;}catch(e){if(e.code==='ESRCH')return false;throw e;}});
   const delay = services.delay || (()=>new Promise(resolve=>setTimeout(resolve,50)));
   let firstKnown, lastKnown, transientProbeDenied=false;
-  for(let i=0;i<40;i++){
+  // Bounded wait for the cooperative exit and group absence (~10 s of 50 ms probes).
+  // A loaded host can take several seconds to reap a helper after its stdin closes;
+  // the probe never signals, so a longer bound only delays the refusal of a live group.
+  for(let i=0;i<CLEANUP_PROBES;i++){
     try {
       const result=alive();
       if(typeof result!=='boolean')throw {code:'ERR_INVALID_PROBE_RESULT'};
@@ -220,7 +224,7 @@ async function cleanupHelper(child, services = {}) {
       transientProbeDenied=true;
       lastKnown=undefined;
     }
-    if(i<39)try { await delay(); }
+    if(i<CLEANUP_PROBES-1)try { await delay(); }
       catch { throw failed('group-wait-error',{probePoint:'initial',...(transientProbeDenied?{transientProbeDenied:true}:{})}); }
   }
   const facts={probePoint:'initial',...(transientProbeDenied?{transientProbeDenied:true}:{}),
