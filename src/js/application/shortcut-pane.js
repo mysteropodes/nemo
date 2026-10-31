@@ -64,6 +64,7 @@
     /* The outcome of assigning a pressed key to an action. Pure over the registry except for the store on success. */
     function assign(action,ev){
       if(ev.key==='Escape')return {kind:'cancel'};
+      if(typeof registry.isReserved==='function'&&registry.isReserved(ev.key))return {kind:'reserved'};
       var clash=registry.clashFor(action,ev.key);
       if(clash)return {kind:'clash',clash:clash};
       registry.setKey(action,ev.key);
@@ -87,6 +88,7 @@
           if(typeof ports.onChange==='function')ports.onChange(def.action);
         }else{
           if(res.kind==='clash')ports.notify(t('shortcutKeyClashToast').replace('{label}',labelOf(res.clash)));
+          else if(res.kind==='reserved')ports.notify('This key is reserved (Space, arrows, Enter, Delete, Tab, Esc, F9).');
           button.textContent=registry.keyFor(def.action)||'—';
         }
       };
@@ -151,6 +153,7 @@
       search.addEventListener('input',draw);
       // Typing in the search box must not trigger the shortcuts themselves.
       search.addEventListener('keydown',function(e){e.stopPropagation();});
+      search.addEventListener('focus',cancelCapture); // typing a search never rebinds an armed row
       draw();
     }
 

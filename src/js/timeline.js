@@ -47,7 +47,9 @@ function startNativePlay(controller){
     advance:advancePlayFrame,navigate:goToFrame,stop:stopPlay,
     now:function(){return performance.now();},request:function(step){return window.requestAnimationFrame(step);},cancel:function(id){window.cancelAnimationFrame(id);}
   });
-  if(typeof nativeFlipPreview!=='undefined'&&nativeFlipPreview)nativeFlipPreview.cancel();if(!nativePlayScheduler.start(controller)){showToast('Native playback is unavailable');return;}
+  // The flip ends only once Play has really started; a refused start leaves the flip running (RV4-FLIPCANCEL).
+  if(!nativePlayScheduler.start(controller)){showToast('Native playback is unavailable');return;}
+  if(typeof nativeFlipPreview!=='undefined'&&nativeFlipPreview)nativeFlipPreview.cancel();
   state.playing=true;state.playDir=1;
   try{var observer=window.NemoTestPlayObserver;if(observer)observer.playState(state.playing,state.currentFrame);}catch(_){}
   document.getElementById('btn-play').innerHTML='<span class="material-symbols-rounded">\u{e034}</span>';
@@ -3156,13 +3158,13 @@ function statusbarHelpRender(desc,sc){
   var el=document.getElementById('statusbar-help');
   if(!el)return;
   var html=desc?desc+' ':'';
-  html+=sc.map(function(pair){return '<span class="sc">'+pair[0]+'</span>'+pair[1];}).join(' ');
+  html+=sc.filter(function(pair){return pair[0];}).map(function(pair){return '<span class="sc">'+pair[0]+'</span>'+pair[1];}).join(' ');
   el.innerHTML=html;
 }
 function getStatusbarDefaultSc(){
   var tt=(window.SM&&SM.t)?SM.t:function(k){return k;};
   var rb=shortcutHint;
-  return [[rb('cmdInsertFrame','F5'),tt('scFrame')],[rb('cmdInsertKey','F6'),tt('scKey')],[rb('cmdInsertBlankKey','F7'),tt('scBlank')],['T',tt('scTween')],['D',tt('scDupli')],[rb('cmdFlipPreview','F'),tt('scFlip')],['X',tt('scMirror')],['Enter',tt('scPlay')]].filter(function(p){return p[0];});
+  return [[rb('cmdInsertFrame','F5'),tt('scFrame')],[rb('cmdInsertKey','F6'),tt('scKey')],[rb('cmdInsertBlankKey','F7'),tt('scBlank')],[rb('cmdTween',''),tt('scTween')],[rb('cmdDuplicateKey',''),tt('scDupli')],[rb('cmdFlipPreview','F'),tt('scFlip')],['X',tt('scMirror')],['Enter',tt('scPlay')]].filter(function(p){return p[0];});
 }
 function updateStatusBarHelp(){
   var tt=(window.SM&&SM.t)?SM.t:function(k){return k;};
@@ -3182,7 +3184,7 @@ function updateStatusBarHelp(){
   // 3. A timeline keyframe cell (or span) is selected.
   if(typeof _sel!=='undefined'&&_sel.frames&&_sel.frames.length>0){
     var kn=_sel.frames.length;
-    statusbarHelpRender(kn+' '+tt(kn>1?'thKeyframesSelected':'thKeyframeSelected')+' —',[['F6',tt('scKey')],['F7',tt('scBlank')],['T',tt('scTween')],['D',tt('scDupli')],['F',tt('scFlip')],['X',tt('scMirror')],[tt('scDelete'),tt('thErase')]]);
+    statusbarHelpRender(kn+' '+tt(kn>1?'thKeyframesSelected':'thKeyframeSelected')+' —',[[shortcutHint('cmdInsertKey','F6'),tt('scKey')],[shortcutHint('cmdInsertBlankKey','F7'),tt('scBlank')],[shortcutHint('cmdTween',''),tt('scTween')],[shortcutHint('cmdDuplicateKey',''),tt('scDupli')],[shortcutHint('cmdFlipPreview','F'),tt('scFlip')],['X',tt('scMirror')],[tt('scDelete'),tt('thErase')]]);
     return;
   }
   // 4. The active tool's own help.

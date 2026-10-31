@@ -2,7 +2,8 @@
  * ordinary native property read (stored facts, authored keys, raw sample), in the baseline preset shape
  * ({motion:{prop:{keys}}, motionStatic:{prop:[v]}} of motion-preset-picker.js @1065e9d8); apply writes every property through ONE
  * native command, hence one history entry that undo restores exactly. Holds no document state, reads nothing from the legacy
- * layer model and has no fallback writer: an absent project or route is a typed unavailability. */
+ * layer model and has no fallback writer. Every layer kind (null, folder, effect, 3D, image, text, component) owns all five
+ * transform properties, so none is skipped per kind; only names outside PROPS are skipped, and the toast lists them: an absent project or route is a typed unavailability. */
 (function (root, factory) {
   const commonjs = typeof module === 'object' && module.exports;
   const command = commonjs ? require('./native-object-rig-command.js') : root.NemoNativeObjectRigCommand;
