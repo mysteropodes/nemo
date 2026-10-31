@@ -173,7 +173,9 @@ fn a_restyle_names_its_target_and_valid_style_members_and_its_receipt_id_is_the_
     for ok in [json!({"fillEnabled":true,"fill":"#ff0000"}), json!({"fillEnabled":false}), json!({"strokeEnabled":true,"stroke":"#00ff0080"}),
         json!({"cap":"square","join":"bevel","miter":4,"dashOffset":-3,"paintOrder":"strokeFirst","strokeStyle":"dashed"}),
         json!({"brushPreset":"charcoal-pencil"}), json!({"brushPreset":"none"}), json!({"maskFeather":12.5}),
-        json!({"maskMode":"add"}), json!({"maskMode":"subtract"}), json!({"maskMode":"intersect"}), json!({"unmask":true})] {
+        json!({"maskMode":"add"}), json!({"maskMode":"subtract"}), json!({"maskMode":"intersect"}), json!({"unmask":true}),
+        json!({"fillGradient":null}), json!({"fillGradient":{"kind":"linear","from":[0,5],"to":[10.5,5],"stops":[{"offset":0,"color":"#ff000080"},{"offset":1,"color":"#0000ff"}]}}),
+        json!({"fillGradient":{"kind":"radial","from":[1,2],"to":[3,4],"stops":[{"offset":1,"color":"#00ff00"},{"offset":0.25,"color":"#0000ff"}]}})] {
         assert!(vector_request(VECTOR, &batch(vec![step(ok.clone())])), "{ok}");
     }
     for bad in [json!({"fillEnabled":true}), json!({"strokeEnabled":true}), json!({"fillEnabled":"yes","fill":"#ff0000"}), json!({"cap":"flat"}),
@@ -181,7 +183,15 @@ fn a_restyle_names_its_target_and_valid_style_members_and_its_receipt_id_is_the_
         json!({"brushPreset":""}), json!({"brushPreset":7}), json!({"maskFeather":501}), json!({"maskFeather":-1}),
         json!({"brushPreset":"chalk-round","cap":"round"}), json!({"brushPreset":"chalk-round","maskFeather":1}), json!({"maskFeather":3,"fill":"#ff0000"}),
         json!({"maskMode":"xor"}), json!({"maskMode":null}), json!({"maskMode":"add","unmask":true}), json!({"maskMode":"add","maskFeather":2}),
-        json!({"unmask":false}), json!({"unmask":"true"}), json!({"unmask":true,"fill":"#ff0000"})] {
+        json!({"unmask":false}), json!({"unmask":"true"}), json!({"unmask":true,"fill":"#ff0000"}),
+        // #2372 native-fill-gradient: two stops, #rrggbb[aa] colours, a known kind, two finite ends, and the edit stands alone.
+        json!({"fillGradient":{}}), json!({"fillGradient":"red"}),
+        json!({"fillGradient":{"kind":"conic","from":[0,0],"to":[1,0],"stops":[{"offset":0,"color":"#ff0000"},{"offset":1,"color":"#0000ff"}]}}),
+        json!({"fillGradient":{"kind":"linear","from":[0,0],"to":[1,0],"stops":[{"offset":0,"color":"#ff0000"}]}}),
+        json!({"fillGradient":{"kind":"linear","from":[0,0],"to":[1,0],"stops":[{"offset":0,"color":"#f00"},{"offset":1,"color":"#0000ff"}]}}),
+        json!({"fillGradient":{"kind":"linear","from":[0],"to":[1,0],"stops":[{"offset":0,"color":"#ff0000"},{"offset":1,"color":"#0000ff"}]}}),
+        json!({"fillGradient":{"kind":"linear","from":[0,0],"to":[1,0],"stops":[{"offset":0,"color":"#ff0000"},{"offset":1,"color":"#0000ff"}]},"fill":"#ff0000"}),
+        json!({"fillGradient":null,"unmask":true})] {
         assert!(!vector_request(VECTOR, &batch(vec![step(bad.clone())])), "{bad}");
     }
     let mut no_style = good.clone();

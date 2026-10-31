@@ -31,6 +31,8 @@ mod transform;
 mod style;
 #[path = "object_vector_batch_style_detail.rs"]
 mod detail;
+#[path = "object_vector_batch_style_gradient.rs"]
+mod gradient;
 
 /// One batch is a bounded gesture, never a document rewrite; the encoded request stays under the vector budget.
 pub(crate) const MAX_BATCH_OPS: usize = 64;

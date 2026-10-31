@@ -329,7 +329,7 @@ fn listed_style(v: &Value) -> bool {
     let hex = |s: &Value| s.as_str().and_then(|s| s.strip_prefix('#')).is_some_and(|d| [6, 8].contains(&d.len()) && d.bytes().all(|b| b.is_ascii_hexdigit()));
     let one_of = |s: &Value, set: &[&str]| s.as_str().is_some_and(|s| set.contains(&s));
     let number = |n: &Value| n.as_f64().is_some_and(f64::is_finite);
-    exact(v, &[], &["fill", "stroke", "width", "opacity", "cap", "join", "miter", "dashOffset", "paintOrder", "strokeStyle", "brushPreset", "maskMode", "maskFeather"]).is_some_and(|o| !o.is_empty())
+    exact(v, &[], &["fill", "stroke", "width", "opacity", "cap", "join", "miter", "dashOffset", "paintOrder", "strokeStyle", "brushPreset", "maskMode", "maskFeather", "fillGradient"]).is_some_and(|o| !o.is_empty())
         && v.get("fill").is_none_or(hex)
         && v.get("stroke").is_none_or(hex)
         && v.get("width").is_none_or(|w| w.as_f64().is_some_and(|w| w.is_finite() && w > 0.0))
@@ -343,6 +343,24 @@ fn listed_style(v: &Value) -> bool {
         && v.get("brushPreset").is_none_or(|p| p.as_str().is_some_and(|p| !p.is_empty() && p.len() <= 96))
         && v.get("maskMode").is_none_or(|m| one_of(m, &["add", "subtract", "intersect"]))
         && v.get("maskFeather").is_none_or(|f| f.as_f64().is_some_and(|f| f.is_finite() && f >= 0.0))
+        && v.get("fillGradient").is_none_or(listed_gradient)
+}
+
+/// #2372 native-fill-gradient: a record's stored two-stop gradient as listed (linear or radial, two finite record-space ends, two stops each
+/// with a finite offset and a `#rrggbb[aa]` colour), the body a `restyle` step's `fillGradient` takes back.
+fn listed_gradient(v: &Value) -> bool {
+    let number = |n: &Value| n.as_f64().is_some_and(|n| n.is_finite() && (n as f32).is_finite());
+    exact(v, &["kind", "from", "to", "stops"], &[]).is_some()
+        && v["kind"].as_str().is_some_and(|k| k == "linear" || k == "radial")
+        && ["from", "to"].iter().all(|k| v[*k].as_array().is_some_and(|p| p.len() == 2 && p.iter().all(number)))
+        && v["stops"].as_array().is_some_and(|stops| {
+            stops.len() == 2
+                && stops.iter().all(|s| {
+                    exact(s, &["offset", "color"], &[]).is_some()
+                        && number(&s["offset"])
+                        && s["color"].as_str().and_then(|c| c.strip_prefix('#')).is_some_and(|d| [3, 6, 8].contains(&d.len()) && d.bytes().all(|b| b.is_ascii_hexdigit()))
+                })
+        })
 }
 
 /// #2372: the `paramShape` a listed dynamic rectangle, ellipse or star carries: a `kind` and only the finite numeric members its kind owns

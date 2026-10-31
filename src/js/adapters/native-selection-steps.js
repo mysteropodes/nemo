@@ -19,7 +19,14 @@
   var CHOICES = { cap: ['butt', 'round', 'square'], join: ['miter', 'round', 'bevel'], paintOrder: ['fillFirst', 'strokeFirst'], strokeStyle: ['solid', 'dashed', 'dotted'], maskMode: ['add', 'subtract', 'intersect'] };
   // Every member a panel edit may name, and whether the edit stands alone (a preset and a smooth are not combined with other members).
   var MEMBERS = COLOUR.concat(['fillEnabled', 'strokeEnabled', 'fillWith', 'strokeWith', 'paintOrder', 'brushPreset', 'smooth', 'maskFeather', 'maskMode', 'unmask'], DETAIL);
-  var ALONE = ['brushPreset', 'smooth', 'maskFeather', 'maskMode', 'unmask'];
+  var ALONE = ['brushPreset', 'smooth', 'maskFeather', 'maskMode', 'unmask', 'fillGradient'];
+  // #2372 native-fill-gradient: a stored two-stop gradient (the only one the engine admits), its stop colours #rrggbb[aa]; null is the flat fill.
+  var finite = function (n) { return typeof n === 'number' && Number.isFinite(n); };
+  var pair = function (a) { return Array.isArray(a) && a.length === 2 && a.every(finite); };
+  function gradient(g) {
+    return !!g && typeof g === 'object' && ['linear', 'radial'].indexOf(g.kind) >= 0 && pair(g.from) && pair(g.to) && Array.isArray(g.stops) && g.stops.length === 2 &&
+      g.stops.every(function (t) { return t && finite(t.offset) && HEX.test(t.color); });
+  }
 
   // The members of `style` that are well formed (a bad one is dropped by the caller as an invalid edit).
   function valid(style) {
@@ -34,6 +41,7 @@
       if (CHOICES[k]) good = CHOICES[k].indexOf(v) >= 0;
       if (good) out[k] = v; else ok = false;
     });
+    if (style && style.fillGradient !== undefined) { if (style.fillGradient === null || gradient(style.fillGradient)) out.fillGradient = style.fillGradient; else ok = false; }
     return ok && Object.keys(out).length ? out : null;
   }
   // The member that makes the edit stand alone, or null.
@@ -49,6 +57,9 @@
     if (s.maskMode !== undefined) return role === 'mask' ? { maskMode: s.maskMode } : null;
     if (s.unmask !== undefined) return role === 'mask' ? { unmask: true } : null;
     if (role === 'mask') return null;
+    // A fill gradient is an edit of its own: a plain stroke or a dynamic shape takes it (a ribbon is inked by its fill, a brush texture, an image, a text block
+    // and a mask have no gradient consumer), as the baseline's single-shape toggle did.
+    if (s.fillGradient !== undefined) return (role === 'plain' || role === 'shape') && !path.data.nativeBrush && !path.data.nativeRibbon ? { fillGradient: s.fillGradient } : null;
     if (alone(s)) {
       // A preset restamps a plain stroke; a ribbon and an image are not eligible (the baseline filtered them out).
       return s.brushPreset !== undefined && role !== 'ribbon' && !ITEMS[role] ? { brushPreset: s.brushPreset } : null;
