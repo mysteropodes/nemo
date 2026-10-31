@@ -40,6 +40,12 @@
     toast(root, TABLE[id].notice);
     return true;
   }
+  // A menu entry (the custom shader library's "+ New custom shader" row): on a native project it is listed unavailable (`unavailable` = the sentence, shown as the
+  // row's title with aria-disabled) and its action says why instead of running; otherwise the entry is returned as it is.
+  function menuItem(root, id, item) {
+    if (!TABLE[id] || !active(root)) return item;
+    return Object.assign({}, item, { unavailable: TABLE[id].notice, action: function () { refuse(root, id); } });
+  }
   function mark(el, text) {
     if (!el) return;
     var d = el.dataset || (el.dataset = {});
@@ -86,5 +92,5 @@
     });
     return native;
   }
-  return Object.freeze({ TABLE: TABLE, active: active, noticeFor: noticeFor, refuse: refuse, sync: sync });
+  return Object.freeze({ TABLE: TABLE, active: active, noticeFor: noticeFor, refuse: refuse, menuItem: menuItem, sync: sync });
 }));

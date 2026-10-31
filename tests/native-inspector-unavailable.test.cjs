@@ -117,6 +117,13 @@ test('refuse is the guard: a stable sentence on native, false for an unknown id 
   assert.equal(Unavailable.refuse({}, 'btn-ghost-select'), false);
   assert.equal(Unavailable.refuse({ NemoNativeSelectionStyle: { native() { throw new Error('x'); } } }, 'btn-ghost-select'), false);
   assert.deepEqual(legacy.toasts, []);
+  const entry = { label: 'x', action() { throw new Error('legacy writer'); } };
+  assert.equal(Unavailable.menuItem(legacy, 'new-custom-shader', entry), entry, 'a legacy project keeps the baseline entry');
+  assert.equal(Unavailable.menuItem(native, 'btn-grad-add-stop', entry), entry);
+  const listed = Unavailable.menuItem(native, 'new-custom-shader', entry);
+  assert.equal(listed.unavailable, Unavailable.noticeFor('new-custom-shader'));
+  listed.action();
+  assert.equal(native.toasts[native.toasts.length - 1], Unavailable.noticeFor('new-custom-shader'));
 });
 
 function trap(name, calls) { return () => { calls.push(name); }; }
