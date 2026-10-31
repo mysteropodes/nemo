@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "d2f4439fc45556d9040cb69c90d17a1f6cdeb30d",
-  "describe": "v0.7.0-alpha.4-4464-gd2f4439f-dirty"
+  "head": "9459c5d06526ce83d87453dd5268e70a6f08bfb3",
+  "describe": "v0.7.0-alpha.4-4472-g9459c5d0-dirty"
  },
- "inputsDigest": "9861d44687f1ffde16d1ffacd8a5a1ab48c82527a4cd2d467e62c68189fce0c7",
+ "inputsDigest": "19d47351c2f01eadda0cb752ee7c418f8f0c1f50fa19240842ec0d67a01f79cf",
  "states": [
   "inventoried",
   "characterized",
@@ -55,10 +55,10 @@
    "native": 256,
    "export": 5,
    "animation": 428,
-   "history": 343,
+   "history": 341,
    "selection": 363,
-   "render": 456,
-   "persist": 386
+   "render": 454,
+   "persist": 384
   }
  },
  "fixturesByArea": {
@@ -28314,10 +28314,7 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "persist": 3,
-    "history": 3,
-    "animation": 3,
-    "render": 3
+    "animation": 3
    },
    "platforms": "browser and desktop",
    "status": "inventoried",
@@ -28325,7 +28322,7 @@
    "source": "src/js/shapes-panel.js:738",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 92
+    "functionsVisited": 66
    },
    "fixtures": [
     "static-props",
@@ -28401,7 +28398,7 @@
    "source": "src/js/shapes-panel.js:855",
    "meta": {
     "i18n": "elementsExplodeText",
-    "functionsVisited": 159
+    "functionsVisited": 160
    },
    "fixtures": [
     "static-props",
@@ -28428,10 +28425,7 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "persist": 3,
-    "history": 3,
-    "animation": 3,
-    "render": 3
+    "animation": 3
    },
    "platforms": "browser and desktop",
    "status": "inventoried",
@@ -28439,7 +28433,7 @@
    "source": "src/js/shapes-panel.js:860",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 92
+    "functionsVisited": 66
    },
    "fixtures": [
     "static-props",
@@ -28555,7 +28549,7 @@
    "source": "src/js/shapes-panel.js:869",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 312
+    "functionsVisited": 316
    },
    "fixtures": [
     "static-props",
@@ -30194,7 +30188,7 @@
    "source": "src/js/timeline.js:7014",
    "meta": {
     "i18n": "ctxLayerBlend",
-    "functionsVisited": 172
+    "functionsVisited": 173
    },
    "fixtures": [
     "keyed-props",
@@ -30271,7 +30265,7 @@
    "source": "src/js/timeline.js:7000",
    "meta": {
     "i18n": "ctxMenuAppearance",
-    "functionsVisited": 174
+    "functionsVisited": 175
    },
    "fixtures": [
     "keyed-props",

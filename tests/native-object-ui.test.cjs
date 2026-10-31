@@ -104,6 +104,12 @@ test('the Swatches section stays shown beside the native inspector only when the
     assert.equal(swatches.hidden===true,!palette,'swatches');assert.equal(other.hidden,true,'other sections stay hidden');
     assert.equal(root._lastPropsShow['swatches-sec'],palette,'and it gets a collapsed-rail entry');}
 });
+test('the native inspector hosts the Elements panel on every paint, frame-only included, and retires it with the inspector (#2376)',()=>{
+  const root=view(),panel=element(),calls=[];root.document.nodes.set('props-panel',panel);
+  root.NemoNativeShapeTree={mount(win,container,frameOnly){calls.push(['mount',win===root,container.id,frameOnly]);},retire(win){calls.push(['retire',win===root]);}};
+  UI.render(root,metadata(),false,fixturePorts(root));UI.render(root,metadata(),true,fixturePorts(root));UI.restoreInspector(root);
+  assert.deepEqual(calls,[['mount',true,'native-object-inspector',false],['mount',true,'native-object-inspector',true],['retire',true]],'mounted into the native inspector section, told when only the frame moved, retired on restore');
+});
 test('native inspector reuses actual bound Reference nodes, preserves collapsed layout and restores original parents/styles',async()=>{
   const root=view(),doc=root.document;
   function add(id,parent){const n=element();n.id=id;n.hidden=false;doc.nodes.set(id,n);if(parent)parent.appendChild(n);return n;}

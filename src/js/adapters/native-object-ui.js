@@ -98,7 +98,7 @@
     if(prior.fonts)prior.fonts.retire();
     if(prior.text)prior.text.retire();
     if(prior.footage)prior.footage.retire();
-    if(prior.subselect)prior.subselect.retire();
+    if(prior.subselect)prior.subselect.retire();if(root.NemoNativeShapeTree)root.NemoNativeShapeTree.retire(root);
     prior.children.forEach(function(saved){saved.node.hidden=saved.hidden;saved.node.style.display=saved.display;});
     if(prior.trigger&&prior.trigger.node.parentNode===prior.reference){
       var next=prior.trigger.next;
@@ -164,7 +164,7 @@
     if(changed){if(root.ColorPicker&&root.ColorPicker.close)root.ColorPicker.close();prior.settings.moves.forEach(function(saved){if(root.document.activeElement===saved.node&&saved.node.blur)saved.node.blur();});}
     prior.settings.ownerChanged=!!changed;
   }
-  function unavailableInspector(root,ports,info){
+  function unavailableInspector(root,ports,info,frameOnly){
     var panel=root.document.getElementById('props-panel');if(!panel)return;
     var prior=inspectors.get(root);
     if(prior&&prior.panel!==panel){restoreInspector(root);prior=null;}
@@ -195,7 +195,7 @@
     if(prior.fonts)prior.fonts.refresh();
     if(root.NemoNativeTextToolDesktop)prior.text=root.NemoNativeTextToolDesktop.mount(root,prior.section,{currentSession:ports.currentSession,fontResources:ports.fontResources});
     if(root.NemoNativeTimeRemapUI&&root.NemoNativeTimeRemapUI.mountInspector)prior.footage=root.NemoNativeTimeRemapUI.mountInspector(root,prior.section,{currentSession:ports.currentSession});
-    if(root.NemoNativeSubselectUI)prior.subselect=root.NemoNativeSubselectUI.mount(root,prior.section);
+    if(root.NemoNativeSubselectUI)prior.subselect=root.NemoNativeSubselectUI.mount(root,prior.section);if(root.NemoNativeShapeTree)root.NemoNativeShapeTree.mount(root,prior.section,frameOnly); // #2376: the Elements panel over the native listing
     prior.children.forEach(function(saved){saved.node.hidden=true;saved.node.style.display='none';});
     paintMotion(root,ports,prior);
   }
@@ -300,7 +300,7 @@
     caption.textContent='Frame '+(root.state.currentFrame+1)+' / '+info.totalFrames;
     if(root.NemoNativeFrameCellSelection)root.NemoNativeFrameCellSelection.mount(root,caption,info,Object.assign({},ports,{
       frameEditPending:function(){var controller=root.NemoNativeFrameEditController;return !!(controller&&controller.isPending());}}));
-    unavailableInspector(root,ports,info);
+    unavailableInspector(root,ports,info,frameOnly);
     if(!reuse){var pin={};['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].forEach(function(k){pin[k]=info[k];});
       views.set(root,{layerCount:info.layers.length,list:list,header:header,grid:grid,inspector:root.document.getElementById('props-panel'),rows:rows,
         controls:rows.map(function(row){return Array.from(row.children);}),shyMode:shyMode,caption:caption,unavailable:unavailable,

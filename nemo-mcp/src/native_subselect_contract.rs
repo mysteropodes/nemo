@@ -109,7 +109,7 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
             exact(
                 i,
                 &["stableTarget", "closed", "count", "matrix"],
-                if hit { &["bounds", "role", "filled", "strokeWidth", "owner", "brush", "group", "boxAngle", "style", "paramShape"] } else { &["paintCount"] },
+                if hit { &["bounds", "role", "filled", "strokeWidth", "owner", "brush", "group", "boxAngle", "style", "paramShape", "groupPath"] } else { &["paintCount"] },
             )
             .is_some()
                 && (!hit
@@ -122,6 +122,7 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
                         && i.get("boxAngle").is_none_or(|a| a.as_f64().is_some_and(f64::is_finite))
                         && i.get("style").is_none_or(listed_style)
                         && i.get("paramShape").is_none_or(listed_param_shape)
+                        && i.get("groupPath").is_none_or(listed_group_path)
                         && i.get("bounds").is_some()
                         && i.get("owner").is_none_or(|o| i["role"] == "fill" && o.as_str().is_some_and(|s| !s.is_empty()))
                         && i.get("brush").is_none_or(|b| ["anchor", "copy", "bitmap"].contains(&b.as_str().unwrap_or("")))
@@ -354,4 +355,17 @@ fn listed_param_shape(v: &Value) -> bool {
         _ => return false,
     };
     exact(v, &["kind"], members).is_some_and(|o| o.iter().all(|(k, n)| k == "kind" || n.as_f64().is_some_and(f64::is_finite)))
+}
+
+/// #2376: the `groupPath` of a listed record: one to four enclosing groups, outermost first, each a bounded `id` with an optional bounded
+/// `name` and nothing else (the Elements panel builds its tree from it).
+fn listed_group_path(v: &Value) -> bool {
+    v.as_array().is_some_and(|path| {
+        (1..=4).contains(&path.len())
+            && path.iter().all(|g| {
+                exact(g, &["id"], &["name"]).is_some()
+                    && g["id"].as_str().is_some_and(|id| !id.is_empty() && id.len() <= 128)
+                    && g.get("name").is_none_or(|n| n.as_str().is_some_and(|n| n.len() <= 256))
+            })
+    })
 }
