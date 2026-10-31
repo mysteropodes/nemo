@@ -447,20 +447,12 @@
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
 
-  // #2371: a native object project has no legacy state.layers/SMMotion holders behind this graph, and its edits would reach legacy writers. Refuse (one
-  // toast, nothing changed) instead of hiding the native timeline grid; the unavailable table in adapters/native-inspector-unavailable.js owns the sentence.
-  function nativeRefused() {
-    var U = window.NemoNativeInspectorUnavailable;
-    return !!(U && typeof U.refuse === 'function' && U.refuse(window, 'btn-mgraph'));
-  }
   function toggle(on) {
-    var next = (on === undefined) ? !_on : !!on;
-    if (next && !_on && nativeRefused()) return false;
-    _on = next;
+    if (!_on && on !== false && window.NemoNativeInspectorUnavailable && NemoNativeInspectorUnavailable.refuse(window, 'btn-mgraph')) return false;
+    _on = (on === undefined) ? !_on : !!on;
     var grid = document.getElementById('frame-grid');
-    // The track rows stay in the DOM (their geometry is what every other
-    // module measures) — they are only hidden, so toggling back is free and
-    // nothing downstream has to re-render.
+    // The track rows stay in the DOM (their geometry is what every other module measures), only hidden: toggling back is free.
+    // #2371: a native project has no legacy holders behind this graph; the guard above refuses (one toast, grid untouched).
     if (grid) grid.style.visibility = _on ? 'hidden' : '';
     var btn = document.getElementById('btn-mgraph');
     if (btn) btn.classList.toggle('on', _on);
@@ -488,8 +480,7 @@
     });
     b.addEventListener('contextmenu', function (e) {
       e.preventDefault();
-      if (!_on && nativeRefused()) return;
-      if (!_on) toggle(true);
+      if (!_on && !toggle(true)) return;
       setMode(_mode === 'value' ? 'speed' : 'value');
     });
   });
