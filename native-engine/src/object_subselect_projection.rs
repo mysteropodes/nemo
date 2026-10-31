@@ -158,6 +158,7 @@ impl ObjectCompositionWitness {
                 brush: brush.0,
                 group: brush.1,
                 style: if hit_test { record::style::listed(r) } else { None },
+                param_shape: if hit_test { record::param_shape(r) } else { None },
             });
         }
         flush(&mut items, usize::MAX);
@@ -192,6 +193,7 @@ fn mask_item(r: &crate::object_frame_packet::ObjectRecord, matrix: [f64; 6], fea
         brush: None,
         group: None,
         style: record::style::mask(r.mask_mode(), feather),
+        param_shape: None,
     }
 }
 
@@ -329,6 +331,7 @@ fn hit_item(
         brush: None,
         group: None,
         style: None,
+        param_shape: None,
     }
 }
 

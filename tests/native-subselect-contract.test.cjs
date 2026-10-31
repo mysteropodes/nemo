@@ -129,3 +129,13 @@ test('a hit-test page may be shorter than the limit when the engine shortened it
   const last={...page(3,null),total:5};
   assert.equal(C.viewCorrelate(p,last,'document'),true,'the final short page');
 });
+test('a hit-test listing item may carry the paramShape of a dynamic shape: its kind and finite members of that kind, never the box (#2372)',()=>{
+  const view={kind:'subselect',contextId:'scene-root',layerUid:'layer-a',frame:0,workId:'native-work-1',viewGeneration:1,cursor:0,hitTest:true};
+  const item={stableTarget:target,closed:true,count:4,matrix:[1,0,0,1,0,0],bounds:[0,0,10,10],role:'plain',filled:true};
+  const r={...view,atRevision:7,documentSnapshotId:'native-object:document:7',total:1,nextCursor:null,preview:false,items:[item]};
+  for(const paramShape of [{kind:'rect',tl:4,tr:4,br:0,bl:2.5},{kind:'rect'},{kind:'ellipse',startAngle:0,sweep:359.9,innerRadius:0.25},{kind:'star',pointCount:5,innerRatio:0.5,cornerRadius:0}])C.viewResult({...r,items:[{...item,paramShape}]});
+  for(const bad of [{},{kind:'hexagon'},{kind:'rect',sweep:1},{kind:'rect',tl:'4'},{kind:'rect',tl:NaN},{kind:'rect',box:{x1:0,y1:0,x2:1,y2:1}},{kind:'star',pointCount:null},'rect',null,[]])
+    assert.throws(()=>C.viewResult({...r,items:[{...item,paramShape:bad}]}),undefined,JSON.stringify(bad));
+  const {hitTest,...plain}=r;
+  assert.throws(()=>C.viewResult({...plain,items:[{stableTarget:target,closed:true,count:4,matrix:[1,0,0,1,0,0],paramShape:{kind:'rect'}}]}),undefined,'an editable page has no paramShape');
+});
