@@ -16,6 +16,7 @@ use crate::object_document::object_raster_asset_kernels::object_raster_asset_ite
 use crate::object_document::object_text_layout_kernels::object_text_layout_record::TextBlockRecord;
 use crate::object_document::{ObjectDocument, ObjectTarget};
 use crate::request_receipts::DispatchErrorCode;
+use crate::commands::object_fill_owner::vector_edit::batch_ops::style::{num as style_num, Checked};
 use serde_json::{Map, Number, Value};
 
 /// The edited item and the stored entry it replaces (named by its own target: the DESTINATION cell, which is the held
@@ -205,6 +206,51 @@ pub(super) fn transform(
     }
     let edited =
         TextBlockRecord::decode(&Value::Object(members).to_string()).map_err(|_| InvalidRequest)?;
+    Ok(Some(ItemSwap::Text(landing, edited)))
+}
+
+/// `Ok(None)` when `target` is not a stored item. A restyle (#2372) reaches an image's opacity, and a text block's colour: a fill is its
+/// colour, an opacity is its alpha (baseline: the alpha of the fill paint). A stroke and a width have nothing to change on an item.
+pub(super) fn restyle(
+    document: &ObjectDocument,
+    target: &ObjectTarget,
+    frame: Option<u32>,
+    style: &Checked,
+) -> Result<Option<ItemSwap>, DispatchErrorCode> {
+    let Some(items) = document.item_records() else {
+        return Ok(None);
+    };
+    let raster = items.raster_entries().iter().find(|e| &e.target == target);
+    let text = items.text_entries().iter().find(|e| &e.target == target);
+    if raster.is_none() && text.is_none() {
+        return Ok(None);
+    }
+    check_target(document, target)?;
+    check_layer(document, target)?;
+    let mut landing = target.clone();
+    landing.frame_scope.frame = frame.unwrap_or(target.frame_scope.frame);
+    if let Some(entry) = raster {
+        let edited = match style.opacity {
+            Some(opacity) => redecode(&entry.item, &[("opacity", style_num(opacity)?)])?,
+            None => entry.item.clone(),
+        };
+        return Ok(Some(ItemSwap::Raster(landing, edited)));
+    }
+    let block = &text.ok_or(DispatchErrorCode::InvalidRequest)?.block;
+    let Value::Object(mut members) = serde_json::to_value(block).map_err(|_| DispatchErrorCode::Internal)? else {
+        return Err(DispatchErrorCode::Internal);
+    };
+    let base = style.fill.as_ref().map(|(_, hex)| hex.clone()).or_else(|| members.get("color").and_then(Value::as_str).map(str::to_string));
+    if let Some(base) = base.filter(|_| style.fill.is_some() || style.opacity.is_some()) {
+        let rgb = base.get(..7).ok_or(DispatchErrorCode::InvalidRequest)?;
+        let color = match style.opacity {
+            Some(o) if o < 1.0 => format!("{rgb}{:02x}", (o * 255.0).round() as u8),
+            Some(_) => rgb.to_string(),
+            None => base.clone(),
+        };
+        members.insert("color".into(), Value::String(color));
+    }
+    let edited = TextBlockRecord::decode(&Value::Object(members).to_string()).map_err(|_| DispatchErrorCode::InvalidRequest)?;
     Ok(Some(ItemSwap::Text(landing, edited)))
 }
 

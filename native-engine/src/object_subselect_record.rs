@@ -6,6 +6,8 @@ use crate::object_document::{
 use serde_json::Number;
 #[path = "object_subselect_pressure.rs"]
 mod pressure;
+#[path = "object_subselect_style.rs"]
+pub(crate) mod style;
 
 /// The displayed frame may hold an earlier key. Admit promotion only when its
 /// source and complete copied cell are representable by the native frame owner.
