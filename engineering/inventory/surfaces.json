@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "c0b33cb6d26560c4774072de3e96d8dd0045c397",
-  "describe": "v0.7.0-alpha.4-4459-gc0b33cb6-dirty"
+  "head": "90f63315c34d023863db92756f8198845d6b52a1",
+  "describe": "90f63315-dirty"
  },
- "inputsDigest": "18f0c896371adfc409c66bedb7f7c23b463dfd0f2aa19771368b3f8c41e4d58f",
+ "inputsDigest": "99861438e11a2e8129c4db74468bf7ea244f3f30d55898259dae6d65275c6a7c",
  "states": [
   "inventoried",
   "characterized",
@@ -4270,7 +4270,7 @@
     "container": "rig-assign-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 266,
+    "functionsVisited": 267,
     "via": "chain",
     "references": []
    },
@@ -4318,7 +4318,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 137,
+    "functionsVisited": 139,
     "via": "chain",
     "references": []
    },
@@ -4513,7 +4513,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 269,
+    "functionsVisited": 270,
     "via": "chain",
     "references": []
    },
@@ -8012,7 +8012,7 @@
     "container": "footage-blend-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 37,
+    "functionsVisited": 36,
     "via": "variable sel",
     "references": []
    },
@@ -25723,7 +25723,7 @@
    "source": "src/js/motion.js:9819",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 166
+    "functionsVisited": 174
    },
    "fixtures": [
     "static-props",
@@ -25765,7 +25765,7 @@
    "source": "src/js/motion.js:9864",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 454
+    "functionsVisited": 460
    },
    "fixtures": [
     "static-props",
@@ -28325,7 +28325,7 @@
    "source": "src/js/shapes-panel.js:738",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 92
+    "functionsVisited": 100
    },
    "fixtures": [
     "static-props",
@@ -28439,7 +28439,7 @@
    "source": "src/js/shapes-panel.js:860",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 92
+    "functionsVisited": 100
    },
    "fixtures": [
     "static-props",
@@ -30909,7 +30909,7 @@
    "source": "src/js/timeline.js:5683",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 166
+    "functionsVisited": 174
    },
    "fixtures": [
     "keyed-props",
@@ -30948,7 +30948,7 @@
    "source": "src/js/timeline.js:5714",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 454
+    "functionsVisited": 460
    },
    "fixtures": [
     "keyed-props",
