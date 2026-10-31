@@ -3249,17 +3249,8 @@
         items.push({ label: 'Animer le texte…', action: function () { window.SMTextAnimator.openPanel(state.activeLayerIdx, animGid); } });
       }
     }
-    // Component exposed properties (2026-08-18, "réutilisation dynamique de
-    // component... modifier des properties au dessus" — Figma Component
-    // Properties + AE Master Properties synthesis, confirmed with Cyril).
-    // Only makes sense while EDITING INSIDE a symbol (state.activeSymbolId —
-    // enterSymbol/enterComponentLayer set it, exitToScene clears it) on a
-    // single shape with a real strokeId (multi-select or a not-yet-tagged
-    // item has nothing stable to bind to). v1 scope: opacity (number) and
-    // visibility (boolean, stored 0/100 like every other Motion scalar) —
-    // color is a natural v2 (needs its own swatch row; these two reuse the
-    // fully generic Transform row renderer with zero new UI code, see
-    // propsFor's own comment, motion.js).
+    // Component exposed properties (2026-08-18; Figma Component Properties + AE Master Properties): only while EDITING INSIDE a symbol
+    // (state.activeSymbolId) on a single shape with a real strokeId. v1: opacity (number) and visibility (boolean, 0/100); color is v2.
     // #2256: on a native object project the same entries are the native expose command (native-component-expose-ui.js), never the legacy writer.
     var nativeExpose = window.NemoNativeComponentExposeUI ? window.NemoNativeComponentExposeUI.menuItems(window, selectedPaths) : null;
     if (nativeExpose) {
