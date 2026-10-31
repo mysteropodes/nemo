@@ -67,6 +67,8 @@
   }
   // The shared body: `kind` 'align' | 'distribute', `mode` the button's value. Resolves to 'applied', 'noop', or a refusal ('refused' / 'stale' / 'failed' / 'cancelled' /
   // 'unavailable'); a refusal has already toasted. Never throws.
+  // A stroke id is unique within its layer only: a selection spanning layers keys each item by layer and id (as select-canvas-intent does).
+  function key(p) { return p.data.nativeLayerIndex + '|' + p.data.strokeId; }
   async function run(root, kind, mode) {
     try {
       var need = kind === 'align' ? 2 : 3, modes = kind === 'align' ? ALIGN : DISTRIBUTE;
@@ -78,9 +80,9 @@
       var boxes = paths.map(box);
       if (!at || boxes.some(function (b) { return !b; })) { notice(root, 'Aligning is not available right now.'); return 'unavailable'; }
       var deltas = kind === 'align' ? alignDeltas(boxes, mode) : distributeDeltas(boxes, mode), byId = {}, moved = 0;
-      paths.forEach(function (p, i) { if (deltas[i]) { byId[p.data.strokeId] = [1, 0, 0, 1, deltas[i][0], deltas[i][1]]; moved++; } });
+      paths.forEach(function (p, i) { if (deltas[i]) { byId[key(p)] = [1, 0, 0, 1, deltas[i][0], deltas[i][1]]; moved++; } });
       if (!moved) return 'noop';
-      var status = await root.NemoNativeSelectGesture.commitMatrix(root, paths, function (p) { return byId[p.data.strokeId] || null; }, {
+      var status = await root.NemoNativeSelectGesture.commitMatrix(root, paths, function (p) { return byId[key(p)] || null; }, {
         pin: at.pin, gone: 'The selection changed — nothing was moved.', stale: function () { return I.pickContext(root) !== ctx; } });
       if (status !== 'applied') return status;
       if (O && typeof O.show === 'function') O.show(root);
