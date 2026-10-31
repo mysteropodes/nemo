@@ -18,9 +18,11 @@ use std::sync::Arc;
 pub(crate) mod wire;
 /// What `commands` re-exports, each name at its own visibility, through one glob.
 pub(crate) mod exports {
-    pub use super::LinkedVideoFacts;
+    pub use crate::commands::object_fill_owner::video_link::LinkedVideoFacts;
     #[cfg(feature = "history")]
-    pub(crate) use super::{wire::VideoLink, VideoLinkResult};
+    pub(crate) use crate::commands::object_fill_owner::video_link::{
+        wire::VideoLink, VideoLinkResult,
+    };
 }
 use wire::{VideoIntent, VideoLink, MAX_LOCATOR_BYTES};
 
