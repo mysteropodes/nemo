@@ -114,6 +114,10 @@ pub(crate) enum SetupError {
     SeedRange,
     /// A duplicator setting outside its closed set (a mode or direction label).
     ConfigInvalid,
+    /// The layer is not a scene-root component instance (it carries no instance record).
+    NotAnInstance(String),
+    /// A component playback setting outside its closed set (a mode label, a non-positive speed, a frame outside the document).
+    PlaybackInvalid,
     IdUnavailable,
     RevisionOutOfRange,
     TooMany,

@@ -4343,6 +4343,49 @@
         }
       }
     },
+    "ObjectComponentInstanceSetPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.component.instance.set"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectComponentId"
+        },
+        "mode": {
+          "enum": [
+            "loop",
+            "once",
+            "pingpong",
+            "single"
+          ]
+        },
+        "singleFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "placedAt": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "speed": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "atFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      }
+    },
     "ObjectDuplicatorSetPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -7482,6 +7525,23 @@
                 },
                 "payload": {
                   "$ref": "#/$defs/ObjectComponentPlacePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.component.instance.set"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectComponentInstanceSetPayload"
                 }
               }
             }
@@ -18702,11 +18762,33 @@
                   "maxLength": 128
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "layerUid",
+                "frame"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "instance"
+                },
+                "layerUid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "frame": {
+                  "$ref": "#/$defs/Revision"
+                }
+              }
             }
           ]
         }
       },
-      "description": "Read-only component model pinned to (atRevision, documentSnapshotId): the contexts of the document, one context's summary, its layers, the scene layers that instance one component, or the stored duplicator descriptor of one scene layer. Paged and byte-bounded; no expectedRevision."
+      "description": "Read-only component model pinned to (atRevision, documentSnapshotId): the contexts of the document, one context's summary, its layers, the scene layers that instance one component, the stored duplicator descriptor of one scene layer, or the playback facts of one component-instance layer at an outer frame. Paged and byte-bounded; no expectedRevision."
     },
     "ObjectComponentReadResult": {
       "oneOf": [
@@ -19183,6 +19265,80 @@
                   ]
                 }
               }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "layerUid",
+            "componentId",
+            "mode",
+            "singleFrame",
+            "speed",
+            "placedAt",
+            "totalFrames",
+            "resolvedFrame",
+            "explicit"
+          ],
+          "properties": {
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "kind": {
+              "const": "instance"
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "componentId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "mode": {
+              "enum": [
+                "loop",
+                "once",
+                "pingpong",
+                "single"
+              ]
+            },
+            "singleFrame": {
+              "type": "number",
+              "minimum": 0
+            },
+            "speed": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "placedAt": {
+              "type": "number"
+            },
+            "totalFrames": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "resolvedFrame": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "explicit": {
+              "type": "boolean"
             }
           }
         }

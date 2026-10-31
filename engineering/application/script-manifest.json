@@ -358,6 +358,7 @@
     {"src":"js/adapters/native-object-duplicator.js"},
     {"src":"js/adapters/native-object-duplicator-ui.js"},
     {"src":"js/adapters/native-object-duplicator-panel.js"},
+    {"src":"js/adapters/native-component-instance-panel.js"},
     {"src":"js/adapters/native-import-core.js"},
     {"src":"js/adapters/native-import-png-stage.js"},
     {"src":"js/adapters/native-import-svg.js"},

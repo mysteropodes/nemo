@@ -7354,6 +7354,7 @@ function updateFootagePanel(){
   repBtn.disabled=(kind.key==='video'&&ld.nativeVideo&&ld.nativeVideo.isWeb);
 }
 function updateCompInstancePanel(){
+  if(window.NemoNativeComponentInstancePanel&&NemoNativeComponentInstancePanel.sync(window))return; // #2256 Q5: a native object project owns the panel
   var sec=document.getElementById('comp-instance-sec');
   if(state.activeSymbolId){sec.style.display='none';return;}
   var ld=state.layers[state.activeLayerIdx];

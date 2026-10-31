@@ -23,6 +23,9 @@ mod tests;
 #[path = "../tests/object_component_read_duplicator.rs"]
 mod duplicator_tests;
 #[cfg(test)]
+#[path = "../tests/object_component_read_instance.rs"]
+mod instance_tests;
+#[cfg(test)]
 #[path = "../tests/object_component_convert_fixture.rs"]
 mod fixture;
 
@@ -53,6 +56,11 @@ enum Selector<'a> {
     /// #2256 Q4: the stored duplicator descriptor of one scene layer, as the inspector panel shows it.
     Duplicator {
         layer_uid: &'a str,
+    },
+    /// #2256 Q5: the playback facts of one scene component-instance layer at an outer frame, as the instance panel shows them.
+    Instance {
+        layer_uid: &'a str,
+        frame: u64,
     },
 }
 
@@ -109,7 +117,24 @@ fn selector(payload: &Value) -> Option<Selector<'_>> {
                 layer_uid: context_id(&object["layerUid"])?,
             })
         }
+        "instance" => {
+            let object = fields(selector, &["kind", "layerUid", "frame"])?;
+            Some(Selector::Instance {
+                layer_uid: context_id(&object["layerUid"])?,
+                frame: object["frame"].as_u64().filter(|f| *f <= MAX_SAFE)?,
+            })
+        }
         _ => None,
+    }
+}
+
+/// A stored number as the panel shows it: whole values as integers (`x||fallback`: a stored zero shows the fallback).
+#[cfg(feature = "evaluation")]
+fn shown(stored: Option<f64>, fallback: u32) -> Value {
+    match stored.filter(|v| *v != 0.0 && v.is_finite()) {
+        Some(v) if v.fract() == 0.0 && v.abs() < 9.0e15 => json!(v as i64),
+        Some(v) => json!(v),
+        None => json!(fallback),
     }
 }
 
@@ -246,6 +271,32 @@ impl ObjectSnapshot {
                     for (key, value) in view.as_object().into_iter().flatten() {
                         result[key] = value.clone();
                     }
+                    return self.component_bounded(self.component_envelope(request, result));
+                }
+                Selector::Instance { layer_uid, frame } => {
+                    let instance = source
+                        .instance(layer_uid)
+                        .ok_or(DispatchErrorCode::NotFound)?;
+                    let component = instance.symbol_id();
+                    let total = source
+                        .context(component)
+                        .map_err(|_| DispatchErrorCode::NotFound)?
+                        .total_frames();
+                    let outer = i64::try_from(frame).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+                    let mode = instance.play_mode().filter(|m| !m.is_empty()).unwrap_or("loop");
+                    let mut result = self.component_head("instance");
+                    result["layerUid"] = json!(layer_uid);
+                    result["componentId"] = json!(component);
+                    result["mode"] = json!(mode);
+                    result["singleFrame"] = shown(instance.single_frame(), 0);
+                    result["speed"] = shown(instance.speed(), 1);
+                    result["placedAt"] = shown(instance.placed_at(), 0);
+                    result["totalFrames"] = json!(total);
+                    result["resolvedFrame"] = json!(self.instance_entry_frame(component, layer_uid, outer));
+                    result["explicit"] = json!(instance
+                        .frame_keys()
+                        .iter()
+                        .any(|k| u64::from(k.frame()) == frame && k.component_frame().is_some()));
                     return self.component_bounded(self.component_envelope(request, result));
                 }
                 Selector::Contexts { cursor, limit } => (

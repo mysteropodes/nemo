@@ -93,6 +93,22 @@
       return runner.run(OP('component.expose'), input, 'component-expose');
     }
 
+    // #2256 Q5: the Component Instance panel's writers (setSymbolPlayMode / setSymbolSingleFrame / setSymbolSpeed / setSymbolPlacedAt of the
+    // baseline). `patch` names only the members that changed (mode, singleFrame, placedAt, speed, atFrame); ONE request, no legacy row touched.
+    function setInstance(layerUid, patch) {
+      return runner.exclusive(async (exec) => {
+        const operation = OP('component.instance.set');
+        const allowed = contract.members(operation).filter((key) => key !== 'layerUid');
+        if (typeof layerUid !== 'string' || !layerUid.length || !patch || typeof patch !== 'object' || Array.isArray(patch) ||
+          !Object.keys(patch).length || Object.keys(patch).some((key) => !allowed.includes(key))) {
+          return fail(operation, 'invalid_request', { reason: 'layerUid and a patch of instance playback members are required' });
+        }
+        const ids = currentIds();
+        if (ids && core.stale([layerUid], ids).length) return fail(operation, 'stale_selection', { ids: [layerUid] });
+        return exec(operation, Object.assign({ layerUid }, patch), 'component-instance');
+      });
+    }
+
     // #2256: the read-only native component model (contexts, one context's summary, its layers, the scene layers that instance it),
     // pinned to the presented revision and snapshot. Reads nothing from the legacy symbols table and opens no context. A response
     // is judged by the read contract at this edge, and an answer is discarded when the project moved on while it was read.
@@ -265,7 +281,7 @@
       return Object.freeze({ ok: true, operation, exited: true, contextId: SCENE });
     }
     return Object.freeze({
-      convert, convertLayer: (layerUid) => convert([layerUid]), place, expose,
+      convert, convertLayer: (layerUid) => convert([layerUid]), place, expose, setInstance,
       readModel, storyboard, enter, exit, read, listContexts, listLayers, listInstances, workspaceTransition, workspaceNow,
     });
   }
@@ -281,6 +297,6 @@
   }
   return Object.freeze({
     createComponentIntent, desktop, exposedKey,
-    OPERATIONS: Object.freeze(['component.convert', 'component.place', 'component.expose'].map(OP)),
+    OPERATIONS: Object.freeze(['component.convert', 'component.place', 'component.expose', 'component.instance.set'].map(OP)),
   });
 }));
