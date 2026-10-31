@@ -25,6 +25,9 @@ mod layer_policy;
 #[path = "object_raster_image_import_history.rs"]
 mod image_import;
 #[cfg(feature = "project_media_codec")]
+#[path = "object_media_video_link_history.rs"]
+mod video_link;
+#[cfg(feature = "project_media_codec")]
 #[path = "object_brush_bitmap_stroke_history.rs"]
 mod bitmap_stroke;
 #[path = "object_raster_asset_history.rs"]

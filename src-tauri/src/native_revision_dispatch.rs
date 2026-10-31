@@ -99,6 +99,7 @@ impl RevisionSync {
         let application = authority.active_mut(generation)?;
         if (request.operation == crate::application_mcp::font_source::IMPORT
             || is_image_import(&request)
+            || is_video_link(&request)
             || is_import_batch_sources(&request))
             && request
                 .payload
@@ -115,6 +116,8 @@ impl RevisionSync {
                         "native import batch lifecycle generation is stale"
                     } else if is_image_import(&request) {
                         "native image lifecycle generation is stale"
+                    } else if is_video_link(&request) {
+                        "native video lifecycle generation is stale"
                     } else {
                         "native font lifecycle generation is stale"
                     },
@@ -217,6 +220,10 @@ impl RevisionSync {
                 None => return Ok(None),
             },
             ResourcePhase::Image(phase) => match invoke_image(application, &request, phase)? {
+                Some(response) => response,
+                None => return Ok(None),
+            },
+            ResourcePhase::Video(phase) => match invoke_video(application, &request, phase)? {
                 Some(response) => response,
                 None => return Ok(None),
             },

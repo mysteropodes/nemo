@@ -56,6 +56,11 @@ impl RevisionSync {
         external: bool,
         allowed: Option<ImageReadPermission>,
     ) -> Result<Delivery, String> {
+        if crate::application_mcp::revision_sync::video_dispatch::is_video_link(&request) {
+            return self
+                .dispatch_video_scoped(instance, native, request, external, allowed)
+                .await;
+        }
         if crate::application_mcp::revision_sync::import_batch_dispatch::is_import_batch_sources(
             &request,
         ) {

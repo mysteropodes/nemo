@@ -17,7 +17,7 @@
          typeof value.range.hasCustomRange!=='boolean'||typeof value.range.hasTimeLink!=='boolean')throw new TypeError('invalid resolved range');
       return;
     }
-    // T12: the layer's video placement facts, or null; remap keys are counted, never listed.
+    // T12: the layer's video placement facts, or null; remap keys are listed while they fit the read.
     function placementResult(value) {
       exact(value,['kind','instanceId','documentId','atRevision','documentSnapshotId','contextId','layerUid','frame','placement'],[],'placement result');
       id(value.instanceId,'instanceId');id(value.documentId,'documentId');revision(value.atRevision,'atRevision');
@@ -26,9 +26,12 @@
       const p=value.placement;if(p===null)return;
       exact(p,['placementId','assetId','assetKind','offsetFrames','timeRemap','interpMode','frameBlend','sourceFrameCount'],[],'video placement');
       objectUid(p.placementId);objectUid(p.assetId);
-      const r=p.timeRemap;if(r!==null)exact(r,['keyCount','keyAtFrame'],[],'time remap facts');
+      const r=p.timeRemap;if(r!==null)exact(r,['keyCount','keyAtFrame','value','keys'],[],'time remap facts');
+      // The key list is null when it does not fit the read; a listed key is one finite frame and value.
+      if(r!==null&&Array.isArray(r.keys))r.keys.forEach(k=>exact(k,['frame','value'],[],'time remap key'));
       if(p.assetKind!=='video'||!Number.isFinite(p.offsetFrames)||
-         r!==null&&(!Number.isSafeInteger(r.keyCount)||r.keyCount<0||typeof r.keyAtFrame!=='boolean')||
+         r!==null&&(!Number.isSafeInteger(r.keyCount)||r.keyCount<0||typeof r.keyAtFrame!=='boolean'||r.value!==null&&!Number.isFinite(r.value)||
+           r.keys!==null&&(!Array.isArray(r.keys)||r.keys.length!==r.keyCount||!r.keys.every(k=>Number.isFinite(k.frame)&&Number.isFinite(k.value))))||
          p.interpMode!==null&&(typeof p.interpMode!=='string'||!p.interpMode||p.interpMode.length>32)||
          p.frameBlend!==null&&typeof p.frameBlend!=='boolean'||p.sourceFrameCount!==null&&(!Number.isSafeInteger(p.sourceFrameCount)||p.sourceFrameCount<1||p.sourceFrameCount>4294967295))throw new TypeError('invalid video placement facts');
     }

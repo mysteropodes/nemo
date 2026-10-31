@@ -180,7 +180,7 @@ pub(super) fn intent(v: &Value) -> bool {
             indices(&v["indices"])
                 && matches!(
                     v["pointType"].as_str(),
-                    Some("corner" | "smooth" | "symmetric")
+                    Some("corner" | "smooth" | "symmetric" | "collapse")
                 ),
         ),
         Some("handle") => (
@@ -273,7 +273,7 @@ pub(super) fn result(document_id: &str, p: &Value, r: &Value) -> bool {
             "segments",
             "preview",
         ],
-        &["paint", "hitTest", "center", "widths"],
+        &["paint", "hitTest", "center", "widths", "pointTypes"],
     )
     .is_none()
         || s.get("hitTest").is_some() != p["subselect"].get("hitTest").is_some()
@@ -283,6 +283,15 @@ pub(super) fn result(document_id: &str, p: &Value, r: &Value) -> bool {
         || s.get("widths").is_some_and(|w| {
             !w.as_array().is_some_and(|w| w.len() == s["segments"].as_array().map_or(usize::MAX, Vec::len)
                 && w.iter().all(|v| v.as_f64().is_some_and(f64::is_finite)))
+        })
+        // #2356: the plain editable read lists the type each vertex shows, one per segment, never on a paint/hit-test/centreline page.
+        || s.get("pointTypes").is_some_and(|t| {
+            s.get("paint").is_some()
+                || s.get("hitTest").is_some()
+                || !t.as_array().is_some_and(|t| {
+                    t.len() == s["segments"].as_array().map_or(usize::MAX, Vec::len)
+                        && t.iter().all(|v| matches!(v.as_str(), Some("corner" | "smooth" | "symmetric")))
+                })
         })
         || s.get("hitTest").is_some_and(|h| h != true)
         || s["stableTarget"] != p["stableTarget"]

@@ -849,6 +849,16 @@
       "reason": "no executable regions in the coverage report",
       "note": "#2510: measured working tree on d76a4cb3 (nemo-mcp crate with the project.* contract); pinned cargo-llvm-cov via coverage-rust.cjs, report reports/cov2510b/coverage.json SHA256 ce01c0dacbd43dbe445d6b9ddf94490df8beb0c0fef6131a4e8c6722cca48d2a. Entry derived by the existing buildBaseline from the actual export. Only these two new source entries are added; all prior file and aggregate floors, exclusions, tool pin and historical metadata are preserved. All existing floors held."
     },
+    "nemo-mcp/src/native_video_link_contract.rs": {
+      "lines": 94.36,
+      "regions": 94.47,
+      "functions": 95.45,
+      "note": "Measured with cargo-llvm-cov 0.9.1 (unfiltered nemo-mcp suite) on the T12 land branch; new file entry only, every prior entry, floor, exclusion and aggregate is preserved. Source measurement is not installed acceptance."
+    },
+    "nemo-mcp/src/native_video_link_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report"
+    },
     "nemo-mcp/src/native_widget_read_contract.rs": {
       "lines": 98.05,
       "regions": 98.54,

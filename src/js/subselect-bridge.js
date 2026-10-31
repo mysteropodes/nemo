@@ -20,7 +20,9 @@
     const mapping=()=>root.NemoNativeViewportUnderlay&&root.NemoNativeViewportUnderlay.canvasMapping;
     function native(){const s=session();return !!s&&s.blocksLegacy();}
     function refreshUI(){if(root.NemoNativeSubselectUI)root.NemoNativeSubselectUI.refresh(root);}
-    function selectionState(){return !pending&&!uncertain&&!drag&&!marquee&&selection&&current(selection)&&selection.indices.length?Object.freeze({count:selection.indices.length}):null;}
+    function selectionState(){return !pending&&!uncertain&&!drag&&!marquee&&selection&&current(selection)&&selection.indices.length?Object.freeze(typeOf(selection)):null;}
+    // #2356: with ONE vertex selected the state also names its type (the engine's effective type: the stored hint, else the one its handles show), so the point-type row can mark it.
+    function typeOf(t){const n=t.indices.length,type=n===1&&t.item&&t.item.pointTypes&&t.item.pointTypes[t.indices[0]];return type?{count:n,pointType:type}:{count:n};}
     function notice(error){if(root.showToast)root.showToast(error&&error.message||String(error));}
     function layer(pin){const st=root.state,row=st.layers&&st.layers[st.activeLayerIdx],sel=root._layerSel;
       if(!row||!Array.isArray(sel)||sel.length!==1||sel[0]!==st.activeLayerIdx)throw new Error('Select one native Drawing layer.');
@@ -115,7 +117,10 @@
     function localSegments(t,intent){const src=t.item.segments,seg=i=>({point:src[i].point.slice(),handleIn:src[i].handleIn.slice(),handleOut:src[i].handleOut.slice()}),out=src.map((_,i)=>seg(i));
       if(intent.kind==='move')intent.indices.forEach(i=>{if(out[i])out[i].point=[out[i].point[0]+intent.delta[0],out[i].point[1]+intent.delta[1]];});
       else if(intent.kind==='handle'&&out[intent.index]){const a=out[intent.index],other=intent.handle==='handleOut'?'handleIn':'handleOut',h=[intent.point[0]-a.point[0],intent.point[1]-a.point[1]];a[intent.handle]=h;
-        if(!intent.breakPair)a[other]=[-h[0],-h[1]];else if(intent.pairedPoint)a[other]=[-(intent.pairedPoint[0]-a.point[0]),-(intent.pairedPoint[1]-a.point[1])];}
+        // #2356: a plain drag follows the vertex type like the engine: symmetric mirrors, smooth keeps the opposite handle's length on the opposite direction, corner leaves it.
+        if(!intent.breakPair){const type=(t.item.pointTypes&&t.item.pointTypes[intent.index])||'symmetric',old=src[intent.index][other],d=Math.hypot(h[0],h[1]);
+          if(type==='symmetric')a[other]=[-h[0],-h[1]];else if(type==='smooth'&&d>1e-9){const k=-Math.hypot(old[0],old[1])/d;a[other]=[h[0]*k,h[1]*k];}}
+        else if(intent.pairedPoint)a[other]=[-(intent.pairedPoint[0]-a.point[0]),-(intent.pairedPoint[1]-a.point[1])];}
       return out;}
     function flushDraw(){drawFrame=0;const j=drawLatest;drawLatest=null;if(j&&drag===j.t&&current(j.t))draw(j.t,j.segments);}
     function drawSoon(t,intent){drawLatest={t,segments:localSegments(t,intent)};if(drawFrame)return;if(!root.requestAnimationFrame){flushDraw();return;}drawFrame=root.requestAnimationFrame(flushDraw);}
@@ -195,7 +200,9 @@
         const a=t.item.segments[t.hit.index];if(e.shiftKey)p=snap(a.point,inverse(t.item.matrix,point(e,t)));t.intent={kind:'handle',index:t.hit.index,handle:'handleOut',point:p,breakPair:false};}
       else if(t.hit.key==='point'&&t.alt)t.intent=null;
       else if(t.hit.key==='point')t.intent={kind:'move',indices:t.dragIndices.slice(),delta:[p[0]-t.start[0],p[1]-t.start[1]]};
-      else {if(!e.altKey)t.pairedPoint=p;t.intent={kind:'handle',index:t.hit.index,handle:t.hit.key,point:p,breakPair:!!e.altKey};
+      else {t.intent={kind:'handle',index:t.hit.index,handle:t.hit.key,point:p,breakPair:!!e.altKey};
+        // The endpoint Alt keeps is where the opposite handle is NOW (the mirror of the drag for a symmetric vertex), so pressing Alt never moves it.
+        if(!e.altKey){const a=t.item.segments[t.hit.index],o=localSegments(t,t.intent)[t.hit.index][t.hit.key==='handleOut'?'handleIn':'handleOut'];t.pairedPoint=[a.point[0]-o[0],a.point[1]-o[1]];}
         if(e.altKey&&t.pairedPoint)t.intent.pairedPoint=t.pairedPoint;}
       if(t.intent){drawSoon(t,t.intent);preview(t,t.intent);}}
     function up(e){if(marquee&&marquee.pointer===e.pointerId){const t=marquee;t.ended=true;if(t.items)settled=Promise.resolve(finishMarquee(t));return;}

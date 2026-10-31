@@ -1,5 +1,5 @@
 /* Pure original placement DTO/receipt contract; no document mirror, writer or host. */
-(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeProjectPlacementContract=api;}(typeof globalThis==='object'?globalThis:this,function(){
+(function(root,factory){const video=typeof module==='object'&&module.exports?require('./native-video-asset-contract.js'):root.NemoNativeVideoAssetContract;const api=factory(video);if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeProjectPlacementContract=api;}(typeof globalThis==='object'?globalThis:this,function(Video){
   'use strict';
   const OP='command.document.object.project.placement.edit';
   const BLANK=/^[\u0009-\u000D\u0020\u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]*$/;
@@ -58,6 +58,7 @@
   const admitted=op=>op===OP;
   const own=Object.freeze({admitted,requiresRevision:admitted,payload,result,correlate,paths:op=>admitted(op)?OPAQUE:null});
   function compose(base){
+    if(Video)base=Video.compose(base);// the linked-video link (native-video-asset-contract.js) creates or relinks a placement
     if(!base)return own;
     return Object.freeze(Object.assign({},base,{
       admitted:op=>admitted(op)||base.admitted(op),

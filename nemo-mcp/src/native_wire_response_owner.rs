@@ -10,6 +10,7 @@ pub(super) fn correlated(
     let property_read = request.operation == crate::native_contract::property_read::OP;
     let frame_edit_command = crate::native_contract::frame_edit::declares(&request.operation);
     let image_owner = crate::native_contract::item::placed_png_owner_matches(request, response);
+    let video_owner = crate::native_contract::import::video_link::owner_matches(request, response);
     let correlated_operation = request.operation == crate::native_contract::history_read::OP
         || request.operation == crate::native_contract::text_read::OP
         || matches!(
@@ -24,6 +25,8 @@ pub(super) fn correlated(
                 | crate::native_contract::shadow::EDIT
                 | crate::native_contract::perspective::READ
                 | crate::native_contract::perspective::EDIT
+                | crate::native_contract::settings::symmetry::READ
+                | crate::native_contract::settings::symmetry::EDIT
                 | crate::native_contract::workspace::READ
                 | crate::native_contract::workspace::EDIT
                 | crate::native_contract::custom_brush::READ
@@ -46,11 +49,13 @@ pub(super) fn correlated(
         || crate::native_contract::object_rig::admitted(&request.operation)
         || crate::native_contract::object_component::admitted(&request.operation)
         || crate::native_contract::import::admitted(&request.operation)
-        || image_owner.is_some();
+        || image_owner.is_some()
+        || video_owner.is_some();
     let correlated_identity = !correlated_operation
         || (response.request_id == request.request_id
             && crate::native_contract::text_read::owner_matches(request, response)
                 .or(image_owner)
+                .or(video_owner)
                 .unwrap_or(
                     response.instance_id == request.instance_id
                         && (response.document_id == request.document_id
@@ -82,6 +87,15 @@ pub(super) fn correlated(
                     result,
                 )
             }))
+        && (request.operation != crate::native_contract::import::video_link::OP
+            || !response.ok
+            || response.result.as_ref().is_some_and(|result| {
+                crate::native_contract::import::video_link::revision_matches(
+                    request,
+                    response.content_revision,
+                    result,
+                )
+            }))
         && (request.operation != crate::native_contract::placement::OP
             || !response.ok
             || response.result.as_ref().is_some_and(|result| {
@@ -101,6 +115,9 @@ pub(super) fn reports_document(
             error.code == "wrong_document"
                 || crate::native_contract::text_read::wrong_instance_refusal(request, response)
                 || crate::native_contract::item::placed_png_wrong_instance_refusal(
+                    request, response,
+                )
+                || crate::native_contract::import::video_link::wrong_instance_refusal(
                     request, response,
                 )
         })
@@ -125,6 +142,7 @@ pub(super) fn pinned_read_correlated(
             | crate::native_contract::guide::READ
             | crate::native_contract::shadow::READ
             | crate::native_contract::perspective::READ
+            | crate::native_contract::settings::symmetry::READ
             | crate::native_contract::workspace::READ
             | crate::native_contract::custom_brush::READ
             | crate::native_contract::comments::READ
@@ -141,6 +159,7 @@ pub(super) fn pinned_read_correlated(
                 | crate::native_contract::guide::READ
                 | crate::native_contract::shadow::READ
                 | crate::native_contract::perspective::READ
+                | crate::native_contract::settings::symmetry::READ
                 | crate::native_contract::workspace::READ
                 | crate::native_contract::custom_brush::READ
                 | crate::native_contract::comments::READ

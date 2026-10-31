@@ -68,7 +68,7 @@ test('a drag redraws locally on every move while the engine preview stays one in
 });
 
 function node(){
-  const listeners=new Map(),n={children:[],hidden:false,disabled:false,style:{display:''},dataset:{},classList:{remove(){},contains(){return false;}},setAttribute(){},
+  const listeners=new Map(),n={children:[],hidden:false,disabled:false,style:{display:''},dataset:{},classList:{remove(){},toggle(){},contains(){return false;}},setAttribute(){},
     appendChild(child){return this.insertBefore(child,null);},
     insertBefore(child,next){if(child.parentNode)child.parentNode.removeChild(child);const i=next?this.children.indexOf(next):this.children.length;this.children.splice(i,0,child);child.parentNode=this;return child;},
     removeChild(child){const i=this.children.indexOf(child);this.children.splice(i,1);child.parentNode=null;},contains(child){return child===this||this.children.some(c=>c.contains(child));},
@@ -77,17 +77,17 @@ function node(){
   return n;
 }
 test('the point-type buttons reach the native owner through the row even though the legacy SM entry refuses silently',async()=>{
-  const f=fixture(),{root}=f,container=node(),row=node(),buttons=['corner','smooth','symmetric'].map(()=>node()),ids=['btn-pt-corner','btn-pt-smooth','btn-pt-symmetric'];
+  const f=fixture(),{root}=f,container=node(),row=node(),buttons=['corner','smooth','symmetric','collapse'].map(()=>node()),ids=['btn-pt-corner','btn-pt-smooth','btn-pt-symmetric','btn-pt-collapse'];
   buttons.forEach((b,i)=>{b.id=ids[i];row.appendChild(b);});node().appendChild(row);
   const nodes={'sp-pointtype-row':row};ids.forEach((id,i)=>nodes[id]=buttons[i]);const get=root.document.getElementById;root.document.getElementById=id=>nodes[id]||get(id);root.document.createComment=node;
   let legacy=0;root.SM={setPointType(){legacy++;return false;}};
-  buttons.forEach((b,i)=>b.addEventListener('click',()=>root.SM.setPointType(['corner','smooth','symmetric'][i])));// what timeline.js binds
+  buttons.forEach((b,i)=>b.addEventListener('click',()=>root.SM.setPointType(['corner','smooth','symmetric','collapse'][i])));// what timeline.js binds
   root.NemoNativeSubselectController=f.controller;root.NemoNativeSubselectUI=UI;const binding=UI.mount(root,container);
   const click=b=>{let stopped=false;const e={target:b,stopImmediatePropagation(){stopped=true;},preventDefault(){}};
     for(const l of row.listeners.get('click')||[])if(l.capture&&!stopped)l.fn(e);if(!stopped)(b.listeners.get('click')||[]).forEach(l=>l.fn(e));};
   click(buttons[0]);await settle();assert.equal(f.sent.length,0,'no vertex selected: nothing is sent');assert.ok(f.notices.length>0,'and the refusal is a toast');assert.equal(legacy,0);
   await points(f);assert.equal(row.hidden,false);
-  for(const [i,type] of ['corner','smooth','symmetric'].entries()){click(buttons[i]);await f.controller.settled();assert.deepEqual(f.sent.at(-1).payload.intent,{kind:'pointType',pointType:type,indices:[0]});}
-  assert.equal(f.sent.length,3);assert.equal(legacy,0);assert.deepEqual(f.controller.selectionState(),{count:1});
+  for(const [i,type] of ['corner','smooth','symmetric','collapse'].entries()){click(buttons[i]);await f.controller.settled();assert.deepEqual(f.sent.at(-1).payload.intent,{kind:'pointType',pointType:type,indices:[0]});}
+  assert.equal(f.sent.length,4);assert.equal(legacy,0);assert.deepEqual(f.controller.selectionState(),{count:1});
   binding.retire();assert.equal((row.listeners.get('click')||[]).length,0);
 });

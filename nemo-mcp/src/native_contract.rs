@@ -245,7 +245,7 @@ fn request_check(operation: &str, payload: &Value) -> Option<bool> {
                         .is_some_and(bounded_identifier)
                     && frame(object.get("frame")).is_some()
             }),
-        _ => return None,
+        _ => return import::video_link::request_check(operation, payload),
     })
 }
 
@@ -454,7 +454,7 @@ fn result_validator(operation: &str) -> Option<ResultValidator> {
             |o, _, _, r| reproduction::validate_result(o, r)
         }
         "query.document.serialize" | "query.document.evaluate" => document_read_result,
-        _ => return None,
+        _ => return import::video_link::result_validator(operation),
     })
 }
 

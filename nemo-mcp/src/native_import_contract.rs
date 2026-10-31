@@ -436,3 +436,7 @@ mod tests;
 #[cfg(test)]
 #[path = "native_import_asset_contract_tests.rs"]
 mod asset_tests;
+
+// T12 linked video is an import variant; it lives here so the shared router stays capped.
+#[path = "native_video_link_contract.rs"]
+pub(crate) mod video_link;

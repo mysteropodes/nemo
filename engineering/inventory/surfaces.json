@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "feeadeb9376392065ce680fed250c6073f9a4c58",
-  "describe": "v0.7.0-alpha.4-4634-gfeeadeb93-dirty"
+  "head": "efd6b27ed19edb63caa36a786fff0a085a057120",
+  "describe": "v0.7.0-alpha.4-4944-gefd6b27ed-dirty"
  },
- "inputsDigest": "4cd225e5e48479f6f0a2096e6096315e9da31fa86774c17d364f7197f5342e92",
+ "inputsDigest": "78a248a958e52665d36c1b8c07d0380c40b8e48f7f5964abfa0809012a51edcb",
  "states": [
   "inventoried",
   "characterized",
@@ -26,22 +26,22 @@
   "native"
  ],
  "counts": {
-  "total": 921,
+  "total": 922,
   "byKind": {
-   "dom": 484,
+   "dom": 485,
    "labs": 36,
    "menu": 275,
    "sdk": 76,
    "shortcut": 50
   },
   "byStatus": {
-   "inventoried": 885,
+   "inventoried": 886,
    "unmapped": 35,
    "unavailable-with-reason": 1
   },
   "byArea": {
    "project-lifecycle-integrations": 127,
-   "drawing-selection": 269,
+   "drawing-selection": 270,
    "media-import-export": 52,
    "timeline-layers-frames": 175,
    "animation-rigs-expressions": 157,
@@ -52,13 +52,13 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 263,
+   "native": 264,
    "export": 5,
-   "animation": 419,
-   "history": 381,
-   "selection": 404,
-   "render": 488,
-   "persist": 425
+   "animation": 420,
+   "history": 382,
+   "selection": 405,
+   "render": 489,
+   "persist": 426
   }
  },
  "fixturesByArea": {
@@ -361,7 +361,7 @@
   },
   "SMShapeGroup": {
    "file": "src/js/timeline.js",
-   "line": 10156,
+   "line": 10155,
    "members": 0
   },
   "SMTrackerPanel": {
@@ -404,7 +404,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1803",
+   "source": "src/index.html:1804",
    "meta": {
     "data": {},
     "i18n": "settingsCheckUpdates",
@@ -429,7 +429,7 @@
    "capability": "Menu",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:9190 initAppMenu()"
+    "src/js/timeline.js:9189 initAppMenu()"
    ],
    "events": [
     "click"
@@ -489,7 +489,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1248",
+   "source": "src/index.html:1249",
    "meta": {
     "data": {},
     "i18n": "assetsTabMedia",
@@ -534,7 +534,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1249",
+   "source": "src/index.html:1250",
    "meta": {
     "data": {},
     "i18n": "assetsTabPresets",
@@ -577,7 +577,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2221",
+   "source": "src/index.html:2222",
    "meta": {
     "data": {},
     "i18n": null,
@@ -622,7 +622,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2215",
+   "source": "src/index.html:2216",
    "meta": {
     "data": {},
     "i18n": null,
@@ -667,7 +667,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:826",
+   "source": "src/index.html:827",
    "meta": {
     "data": {},
     "i18n": null,
@@ -705,7 +705,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2220",
+   "source": "src/index.html:2221",
    "meta": {
     "data": {},
     "i18n": null,
@@ -747,7 +747,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2153",
+   "source": "src/index.html:2154",
    "meta": {
     "data": {},
     "i18n": null,
@@ -792,7 +792,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:483",
+   "source": "src/index.html:484",
    "meta": {
     "data": {},
     "i18n": null,
@@ -840,7 +840,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:482",
+   "source": "src/index.html:483",
    "meta": {
     "data": {},
     "i18n": null,
@@ -888,7 +888,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:481",
+   "source": "src/index.html:482",
    "meta": {
     "data": {},
     "i18n": null,
@@ -936,7 +936,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:480",
+   "source": "src/index.html:481",
    "meta": {
     "data": {},
     "i18n": null,
@@ -984,7 +984,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2185",
+   "source": "src/index.html:2186",
    "meta": {
     "data": {},
     "i18n": null,
@@ -1032,7 +1032,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:661",
+   "source": "src/index.html:662",
    "meta": {
     "data": {},
     "i18n": "camAddKey",
@@ -1074,7 +1074,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:665",
+   "source": "src/index.html:666",
    "meta": {
     "data": {},
     "i18n": "camEaseEdit",
@@ -1119,7 +1119,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2219",
+   "source": "src/index.html:2220",
    "meta": {
     "data": {},
     "i18n": null,
@@ -1164,7 +1164,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:823",
+   "source": "src/index.html:824",
    "meta": {
     "data": {},
     "i18n": null,
@@ -1210,7 +1210,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:858",
+   "source": "src/index.html:859",
    "meta": {
     "data": {
      "mode": "exclude"
@@ -1262,7 +1262,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:862",
+   "source": "src/index.html:863",
    "meta": {
     "data": {},
     "i18n": "combineFlattenBtn",
@@ -1309,7 +1309,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:857",
+   "source": "src/index.html:858",
    "meta": {
     "data": {
      "mode": "intersect"
@@ -1361,7 +1361,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:861",
+   "source": "src/index.html:862",
    "meta": {
     "data": {},
     "i18n": "combineRemoveBtn",
@@ -1408,7 +1408,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:856",
+   "source": "src/index.html:857",
    "meta": {
     "data": {
      "mode": "subtract"
@@ -1460,7 +1460,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:855",
+   "source": "src/index.html:856",
    "meta": {
     "data": {
      "mode": "unite"
@@ -1510,7 +1510,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2228",
+   "source": "src/index.html:2229",
    "meta": {
     "data": {},
     "i18n": null,
@@ -1555,7 +1555,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1450",
+   "source": "src/index.html:1451",
    "meta": {
     "data": {},
     "i18n": "compDetachBtn",
@@ -1600,7 +1600,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1431",
+   "source": "src/index.html:1432",
    "meta": {
     "data": {},
     "i18n": "btnEditComponent",
@@ -1644,7 +1644,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1430",
+   "source": "src/index.html:1431",
    "meta": {
     "data": {},
     "i18n": "compPreviewOpen",
@@ -1688,7 +1688,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1289",
+   "source": "src/index.html:1290",
    "meta": {
     "data": {},
     "i18n": null,
@@ -1715,7 +1715,7 @@
    "capability": "Cycle — repeats the selected frame range N times (walk cycles)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:9086 initCycleAndPropagate()"
+    "src/js/timeline.js:9085 initCycleAndPropagate()"
    ],
    "events": [
     "click"
@@ -1736,7 +1736,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2176",
+   "source": "src/index.html:2177",
    "meta": {
     "data": {},
     "i18n": null,
@@ -1762,7 +1762,7 @@
    "capability": "Link width/height (keep proportions)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10288"
+    "src/js/timeline.js:10287"
    ],
    "events": [
     "click"
@@ -1781,7 +1781,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:769",
+   "source": "src/index.html:770",
    "meta": {
     "data": {},
     "i18n": null,
@@ -1827,7 +1827,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2226",
+   "source": "src/index.html:2227",
    "meta": {
     "data": {},
     "i18n": null,
@@ -1872,14 +1872,14 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1535",
+   "source": "src/index.html:1536",
    "meta": {
     "data": {},
     "i18n": "dupAddEffector",
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 194,
+    "functionsVisited": 193,
     "via": "chain",
     "references": []
    },
@@ -1916,17 +1916,17 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1538",
+   "source": "src/index.html:1539",
    "meta": {
     "data": {},
     "i18n": "dupEditSource",
     "container": "dup-edit-source-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 139,
+    "functionsVisited": 138,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7526 updateDuplicatorPanel()"
+     "src/js/timeline.js:7525 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -1964,14 +1964,14 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1497",
+   "source": "src/index.html:1498",
    "meta": {
     "data": {},
     "i18n": null,
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 56,
+    "functionsVisited": 55,
     "via": "chain",
     "references": []
    },
@@ -2010,7 +2010,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2227",
+   "source": "src/index.html:2228",
    "meta": {
     "data": {},
     "i18n": null,
@@ -2048,7 +2048,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1187",
+   "source": "src/index.html:1188",
    "meta": {
     "data": {},
     "i18n": "editCurveBtn",
@@ -2096,7 +2096,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:524",
+   "source": "src/index.html:525",
    "meta": {
     "data": {},
     "i18n": "ellipseArcConvertBtn",
@@ -2136,7 +2136,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1622",
+   "source": "src/index.html:1623",
    "meta": {
     "data": {},
     "i18n": null,
@@ -2146,7 +2146,7 @@
     "functionsVisited": 15,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:9246 action()"
+     "src/js/timeline.js:9245 action()"
     ]
    },
    "fixtures": [
@@ -2178,7 +2178,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2139",
+   "source": "src/index.html:2140",
    "meta": {
     "data": {},
     "i18n": null,
@@ -2222,7 +2222,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1178",
+   "source": "src/index.html:1179",
    "meta": {
     "data": {},
     "i18n": "fillPropagateBtn",
@@ -2261,7 +2261,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:821",
+   "source": "src/index.html:822",
    "meta": {
     "data": {},
     "i18n": null,
@@ -2306,7 +2306,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1414",
+   "source": "src/index.html:1415",
    "meta": {
     "data": {},
     "i18n": "footageReplace",
@@ -2352,7 +2352,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2165",
+   "source": "src/index.html:2166",
    "meta": {
     "data": {},
     "i18n": null,
@@ -2398,7 +2398,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2166",
+   "source": "src/index.html:2167",
    "meta": {
     "data": {},
     "i18n": null,
@@ -2443,7 +2443,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:907",
+   "source": "src/index.html:908",
    "meta": {
     "data": {},
     "i18n": "btnAddStop",
@@ -2485,7 +2485,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1618",
+   "source": "src/index.html:1619",
    "meta": {
     "data": {},
     "i18n": null,
@@ -2495,7 +2495,7 @@
     "functionsVisited": 123,
     "via": "variable histBtn",
     "references": [
-     "src/js/timeline.js:9217 action()"
+     "src/js/timeline.js:9216 action()"
     ]
    },
    "fixtures": [
@@ -2526,7 +2526,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1065",
+   "source": "src/index.html:1066",
    "meta": {
     "data": {},
     "i18n": "imageMeshReset",
@@ -2574,7 +2574,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1623",
+   "source": "src/index.html:1624",
    "meta": {
     "data": {},
     "i18n": null,
@@ -2584,7 +2584,7 @@
     "functionsVisited": 229,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:9219 action()"
+     "src/js/timeline.js:9218 action()"
     ]
    },
    "fixtures": [
@@ -2610,8 +2610,8 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "reason": "helper parameter has no proved registration or unchanged returned lookup (reassignment, shadowing or unsupported return flow)",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:9221 action())",
-   "source": "src/index.html:1627",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:9220 action())",
+   "source": "src/index.html:1628",
    "meta": {
     "data": {},
     "i18n": null,
@@ -2620,7 +2620,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:9221 action()"
+     "src/js/timeline.js:9220 action()"
     ]
    },
    "fixtures": [
@@ -2657,7 +2657,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1625",
+   "source": "src/index.html:1626",
    "meta": {
     "data": {},
     "i18n": null,
@@ -2668,7 +2668,7 @@
     "via": "chain",
     "references": [
      "src/js/images.js:705",
-     "src/js/timeline.js:9220 action()"
+     "src/js/timeline.js:9219 action()"
     ]
    },
    "fixtures": [
@@ -2698,7 +2698,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1617",
+   "source": "src/index.html:1618",
    "meta": {
     "data": {},
     "i18n": null,
@@ -2708,7 +2708,7 @@
     "functionsVisited": 20,
     "via": "helper el()",
     "references": [
-     "src/js/timeline.js:9206 action()"
+     "src/js/timeline.js:9205 action()"
     ]
    },
    "fixtures": [
@@ -2739,7 +2739,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1620",
+   "source": "src/index.html:1621",
    "meta": {
     "data": {},
     "i18n": null,
@@ -2749,7 +2749,7 @@
     "functionsVisited": 17,
     "via": "helper el()",
     "references": [
-     "src/js/timeline.js:9268 action()"
+     "src/js/timeline.js:9267 action()"
     ]
    },
    "fixtures": [
@@ -2780,7 +2780,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2143",
+   "source": "src/index.html:2144",
    "meta": {
     "data": {},
     "i18n": null,
@@ -2825,7 +2825,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1448",
+   "source": "src/index.html:1449",
    "meta": {
     "data": {},
     "i18n": "lipApply",
@@ -2866,7 +2866,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2144",
+   "source": "src/index.html:2145",
    "meta": {
     "data": {},
     "i18n": null,
@@ -2914,7 +2914,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:502",
+   "source": "src/index.html:503",
    "meta": {
     "data": {},
     "i18n": "btnUnmask",
@@ -2937,8 +2937,8 @@
    "capability": "Flou de mouvement de la composition — clic droit : échantillons et obturateur",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:9144 bindMotionBlur()",
-    "src/js/timeline.js:9145 bindMotionBlur()"
+    "src/js/timeline.js:9143 bindMotionBlur()",
+    "src/js/timeline.js:9144 bindMotionBlur()"
    ],
    "events": [
     "click",
@@ -2957,7 +2957,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2187",
+   "source": "src/index.html:2188",
    "meta": {
     "data": {},
     "i18n": null,
@@ -2999,7 +2999,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1315",
+   "source": "src/index.html:1316",
    "meta": {
     "data": {},
     "i18n": null,
@@ -3044,7 +3044,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1317",
+   "source": "src/index.html:1318",
    "meta": {
     "data": {},
     "i18n": null,
@@ -3087,7 +3087,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1320",
+   "source": "src/index.html:1321",
    "meta": {
     "data": {},
     "i18n": null,
@@ -3125,7 +3125,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1285",
+   "source": "src/index.html:1286",
    "meta": {
     "data": {
      "mode": "embedded"
@@ -3170,7 +3170,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1286",
+   "source": "src/index.html:1287",
    "meta": {
     "data": {
      "mode": "linked"
@@ -3220,7 +3220,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2189",
+   "source": "src/index.html:2190",
    "meta": {
     "data": {},
     "i18n": null,
@@ -3264,7 +3264,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1331",
+   "source": "src/index.html:1332",
    "meta": {
     "data": {},
     "i18n": null,
@@ -3307,7 +3307,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1330",
+   "source": "src/index.html:1331",
    "meta": {
     "data": {},
     "i18n": "mpSaveBtn",
@@ -3348,7 +3348,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1616",
+   "source": "src/index.html:1617",
    "meta": {
     "data": {},
     "i18n": null,
@@ -3387,7 +3387,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2142",
+   "source": "src/index.html:2143",
    "meta": {
     "data": {},
     "i18n": null,
@@ -3428,14 +3428,14 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1615",
+   "source": "src/index.html:1616",
    "meta": {
     "data": {},
     "i18n": null,
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 170,
+    "functionsVisited": 169,
     "via": "chain",
     "references": []
    },
@@ -3507,7 +3507,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2160",
+   "source": "src/index.html:2161",
    "meta": {
     "data": {},
     "i18n": null,
@@ -3552,7 +3552,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2161",
+   "source": "src/index.html:2162",
    "meta": {
     "data": {},
     "i18n": null,
@@ -3590,7 +3590,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1213",
+   "source": "src/index.html:1214",
    "meta": {
     "data": {},
     "i18n": null,
@@ -3632,7 +3632,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1214",
+   "source": "src/index.html:1215",
    "meta": {
     "data": {},
     "i18n": null,
@@ -3677,7 +3677,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1202",
+   "source": "src/index.html:1203",
    "meta": {
     "data": {},
     "i18n": null,
@@ -3721,7 +3721,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1218",
+   "source": "src/index.html:1219",
    "meta": {
     "data": {},
     "i18n": null,
@@ -3771,7 +3771,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1215",
+   "source": "src/index.html:1216",
    "meta": {
     "data": {},
     "i18n": null,
@@ -3815,7 +3815,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2140",
+   "source": "src/index.html:2141",
    "meta": {
     "data": {},
     "i18n": null,
@@ -3856,7 +3856,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2141",
+   "source": "src/index.html:2142",
    "meta": {
     "data": {},
     "i18n": null,
@@ -3882,13 +3882,59 @@
    ]
   },
   {
+   "id": "dom:#btn-pt-collapse",
+   "kind": "dom",
+   "surface": "sp-pointtype-row > button#btn-pt-collapse",
+   "capability": "Collapse",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/timeline.js:10593"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (contextual)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "render": 2,
+    "selection": 3,
+    "animation": 3,
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:473",
+   "meta": {
+    "data": {},
+    "i18n": "ptCollapse",
+    "container": "sp-pointtype-row",
+    "modal": false,
+    "hiddenAtLoad": true,
+    "functionsVisited": 91,
+    "via": "chain",
+    "references": []
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
    "id": "dom:#btn-pt-corner",
    "kind": "dom",
    "surface": "sp-pointtype-row > button#btn-pt-corner",
    "capability": "Corner",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10591"
+    "src/js/timeline.js:10590"
    ],
    "events": [
     "click"
@@ -3934,7 +3980,7 @@
    "capability": "Smooth",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10592"
+    "src/js/timeline.js:10591"
    ],
    "events": [
     "click"
@@ -3980,7 +4026,7 @@
    "capability": "Symmetric",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10593"
+    "src/js/timeline.js:10592"
    ],
    "events": [
     "click"
@@ -4042,7 +4088,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:717",
+   "source": "src/index.html:718",
    "meta": {
     "data": {},
     "i18n": "refImportBtn",
@@ -4083,7 +4129,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:718",
+   "source": "src/index.html:719",
    "meta": {
     "data": {},
     "i18n": "btnRemove",
@@ -4123,7 +4169,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:822",
+   "source": "src/index.html:823",
    "meta": {
     "data": {},
     "i18n": null,
@@ -4167,7 +4213,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:492",
+   "source": "src/index.html:493",
    "meta": {
     "data": {},
     "i18n": "revAccept",
@@ -4211,7 +4257,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:493",
+   "source": "src/index.html:494",
    "meta": {
     "data": {},
     "i18n": "revReject",
@@ -4256,7 +4302,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2175",
+   "source": "src/index.html:2176",
    "meta": {
     "data": {},
     "i18n": "revisionViewAll",
@@ -4301,14 +4347,14 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1576",
+   "source": "src/index.html:1577",
    "meta": {
     "data": {},
     "i18n": "rigAutoAssignBtn",
     "container": "rig-assign-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 263,
+    "functionsVisited": 264,
     "via": "chain",
     "references": []
    },
@@ -4349,14 +4395,14 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1591",
+   "source": "src/index.html:1592",
    "meta": {
     "data": {},
     "i18n": "rigCommitBtn",
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 138,
+    "functionsVisited": 140,
     "via": "chain",
     "references": []
    },
@@ -4395,7 +4441,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1565",
+   "source": "src/index.html:1566",
    "meta": {
     "data": {},
     "i18n": null,
@@ -4444,7 +4490,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1564",
+   "source": "src/index.html:1565",
    "meta": {
     "data": {},
     "i18n": null,
@@ -4493,7 +4539,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1566",
+   "source": "src/index.html:1567",
    "meta": {
     "data": {},
     "i18n": null,
@@ -4544,14 +4590,14 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1592",
+   "source": "src/index.html:1593",
    "meta": {
     "data": {},
     "i18n": "rigResetBtn",
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 269,
+    "functionsVisited": 270,
     "via": "chain",
     "references": []
    },
@@ -4590,7 +4636,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:825",
+   "source": "src/index.html:826",
    "meta": {
     "data": {},
     "i18n": null,
@@ -4635,7 +4681,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:824",
+   "source": "src/index.html:825",
    "meta": {
     "data": {},
     "i18n": null,
@@ -4678,7 +4724,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1613",
+   "source": "src/index.html:1614",
    "meta": {
     "data": {},
     "i18n": null,
@@ -4718,7 +4764,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1614",
+   "source": "src/index.html:1615",
    "meta": {
     "data": {},
     "i18n": null,
@@ -4755,7 +4801,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1619",
+   "source": "src/index.html:1620",
    "meta": {
     "data": {},
     "i18n": null,
@@ -4765,10 +4811,10 @@
     "functionsVisited": 23,
     "via": "variable btn",
     "references": [
-     "src/js/timeline.js:9233 action()",
-     "src/js/timeline.js:9249 action()",
-     "src/js/timeline.js:9251 action()",
-     "src/js/timeline.js:9256 action()"
+     "src/js/timeline.js:9232 action()",
+     "src/js/timeline.js:9248 action()",
+     "src/js/timeline.js:9250 action()",
+     "src/js/timeline.js:9255 action()"
     ]
    },
    "fixtures": []
@@ -4799,7 +4845,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2174",
+   "source": "src/index.html:2175",
    "meta": {
     "data": {},
     "i18n": null,
@@ -4825,7 +4871,7 @@
    "capability": "Hide “shy” layers (right-click a layer to mark it)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:9158 bindShy()"
+    "src/js/timeline.js:9157 bindShy()"
    ],
    "events": [
     "click"
@@ -4845,7 +4891,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2188",
+   "source": "src/index.html:2189",
    "meta": {
     "data": {},
     "i18n": null,
@@ -4873,7 +4919,7 @@
    "capability": "Link width/height (keep proportions)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10521"
+    "src/js/timeline.js:10520"
    ],
    "events": [
     "click"
@@ -4917,7 +4963,7 @@
    "capability": "Animate text…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8767 updateTextActionsPanel()"
+    "src/js/timeline.js:8766 updateTextActionsPanel()"
    ],
    "events": [
     "click"
@@ -4936,7 +4982,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1131",
+   "source": "src/index.html:1132",
    "meta": {
     "data": {},
     "i18n": null,
@@ -4961,7 +5007,7 @@
    "capability": "Split by character",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8762 updateTextActionsPanel()"
+    "src/js/timeline.js:8761 updateTextActionsPanel()"
    ],
    "events": [
     "click"
@@ -4981,7 +5027,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1123",
+   "source": "src/index.html:1124",
    "meta": {
     "data": {},
     "i18n": null,
@@ -5026,7 +5072,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2194",
+   "source": "src/index.html:2195",
    "meta": {
     "data": {},
     "i18n": null,
@@ -5064,7 +5110,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1155",
+   "source": "src/index.html:1156",
    "meta": {
     "data": {},
     "i18n": null,
@@ -5110,7 +5156,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1402",
+   "source": "src/index.html:1403",
    "meta": {
     "data": {},
     "i18n": "trackApply",
@@ -5153,7 +5199,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1394",
+   "source": "src/index.html:1395",
    "meta": {
     "data": {},
     "i18n": "trackPick",
@@ -5196,7 +5242,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1399",
+   "source": "src/index.html:1400",
    "meta": {
     "data": {},
     "i18n": "trackRun",
@@ -5237,7 +5283,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1323",
+   "source": "src/index.html:1324",
    "meta": {
     "data": {},
     "i18n": null,
@@ -5282,7 +5328,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1347",
+   "source": "src/index.html:1348",
    "meta": {
     "data": {},
     "i18n": "btnTween",
@@ -5323,7 +5369,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1348",
+   "source": "src/index.html:1349",
    "meta": {
     "data": {},
     "i18n": "twReassignBtn",
@@ -5365,7 +5411,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2177",
+   "source": "src/index.html:2178",
    "meta": {
     "data": {},
     "i18n": null,
@@ -5394,7 +5440,7 @@
    "capability": "Fill color",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10168"
+    "src/js/timeline.js:10167"
    ],
    "events": [
     "input"
@@ -5424,7 +5470,7 @@
     "functionsVisited": 82,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:10169",
+     "src/js/timeline.js:10168",
      "src/js/tools.js:7597 onMouseDown()",
      "src/js/timeline.js:3965 updateFsSelPanel()",
      "src/js/timeline.js:6506 paintFillSwatches()",
@@ -5445,7 +5491,7 @@
    "capability": "Stroke color",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10176"
+    "src/js/timeline.js:10175"
    ],
    "events": [
     "input"
@@ -5475,7 +5521,7 @@
     "functionsVisited": 93,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:10177",
+     "src/js/timeline.js:10176",
      "src/js/tools.js:7594 onMouseDown()",
      "src/js/tools.js:7596 onMouseDown()",
      "src/js/timeline.js:3977 updateFsSelPanel()",
@@ -5497,7 +5543,7 @@
    "capability": "Delete this comment",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8038 initCommentPopover()"
+    "src/js/timeline.js:8037 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -5518,7 +5564,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2110",
+   "source": "src/index.html:2111",
    "meta": {
     "data": {},
     "i18n": null,
@@ -5528,7 +5574,7 @@
     "functionsVisited": 432,
     "via": "variable delBtn",
     "references": [
-     "src/js/timeline.js:7931 openCommentPopover()"
+     "src/js/timeline.js:7930 openCommentPopover()"
     ]
    },
    "fixtures": [
@@ -5554,8 +5600,8 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7934 openCommentPopover())",
-   "source": "src/index.html:2078",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7933 openCommentPopover())",
+   "source": "src/index.html:2079",
    "meta": {
     "data": {},
     "i18n": null,
@@ -5564,8 +5610,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7934 openCommentPopover()",
-     "src/js/timeline.js:8004 initCommentPopover()"
+     "src/js/timeline.js:7933 openCommentPopover()",
+     "src/js/timeline.js:8003 initCommentPopover()"
     ]
    },
    "fixtures": [
@@ -5589,8 +5635,8 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7927 openCommentPopover())",
-   "source": "src/index.html:2090",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7926 openCommentPopover())",
+   "source": "src/index.html:2091",
    "meta": {
     "data": {},
     "i18n": null,
@@ -5599,8 +5645,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7927 openCommentPopover()",
-     "src/js/timeline.js:8009 initCommentPopover()"
+     "src/js/timeline.js:7926 openCommentPopover()",
+     "src/js/timeline.js:8008 initCommentPopover()"
     ]
    },
    "fixtures": [
@@ -5624,8 +5670,8 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7927 openCommentPopover())",
-   "source": "src/index.html:2087",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7926 openCommentPopover())",
+   "source": "src/index.html:2088",
    "meta": {
     "data": {},
     "i18n": null,
@@ -5634,8 +5680,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7927 openCommentPopover()",
-     "src/js/timeline.js:8009 initCommentPopover()"
+     "src/js/timeline.js:7926 openCommentPopover()",
+     "src/js/timeline.js:8008 initCommentPopover()"
     ]
    },
    "fixtures": [
@@ -5650,7 +5696,7 @@
    "capability": "⏺ Record actions",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:7964 initCommentPopover()"
+    "src/js/timeline.js:7963 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -5664,7 +5710,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2069",
+   "source": "src/index.html:2070",
    "meta": {
     "data": {},
     "i18n": "commentRecordBtn",
@@ -5674,7 +5720,7 @@
     "functionsVisited": 15,
     "via": "variable recordBtn",
     "references": [
-     "src/js/timeline.js:7857 updateRecordUI()"
+     "src/js/timeline.js:7856 updateRecordUI()"
     ]
    },
    "fixtures": [
@@ -5700,8 +5746,8 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7930 openCommentPopover())",
-   "source": "src/index.html:2109",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7929 openCommentPopover())",
+   "source": "src/index.html:2110",
    "meta": {
     "data": {},
     "i18n": null,
@@ -5710,9 +5756,9 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7930 openCommentPopover()",
-     "src/js/timeline.js:8025 initCommentPopover()",
-     "src/js/timeline.js:8028 initCommentPopover()"
+     "src/js/timeline.js:7929 openCommentPopover()",
+     "src/js/timeline.js:8024 initCommentPopover()",
+     "src/js/timeline.js:8027 initCommentPopover()"
     ]
    },
    "fixtures": [
@@ -5729,7 +5775,7 @@
    "capability": "Save",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8022 initCommentPopover()"
+    "src/js/timeline.js:8021 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -5750,7 +5796,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2113",
+   "source": "src/index.html:2114",
    "meta": {
     "data": {},
     "i18n": "btnSave",
@@ -5775,7 +5821,7 @@
    "capability": "Save as feedback",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:7997 initCommentPopover()"
+    "src/js/timeline.js:7996 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -5792,7 +5838,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2114",
+   "source": "src/index.html:2115",
    "meta": {
     "data": {},
     "i18n": "commentSaveFbBtn",
@@ -5815,7 +5861,7 @@
    "capability": "comment shot input",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:7981 initCommentPopover()"
+    "src/js/timeline.js:7980 initCommentPopover()"
    ],
    "events": [
     "change"
@@ -5829,7 +5875,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2107",
+   "source": "src/index.html:2108",
    "meta": {
     "data": {},
     "i18n": null,
@@ -5863,8 +5909,8 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7926 openCommentPopover())",
-   "source": "src/index.html:2063",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7925 openCommentPopover())",
+   "source": "src/index.html:2064",
    "meta": {
     "data": {},
     "i18n": null,
@@ -5873,11 +5919,11 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7926 openCommentPopover()",
-     "src/js/timeline.js:7942 openCommentPopover()",
-     "src/js/timeline.js:8002 initCommentPopover()",
-     "src/js/timeline.js:8025 initCommentPopover()",
-     "src/js/timeline.js:8027 initCommentPopover()",
+     "src/js/timeline.js:7925 openCommentPopover()",
+     "src/js/timeline.js:7941 openCommentPopover()",
+     "src/js/timeline.js:8001 initCommentPopover()",
+     "src/js/timeline.js:8024 initCommentPopover()",
+     "src/js/timeline.js:8026 initCommentPopover()",
      "src/js/tutorial.js:1121 measure()"
     ]
    },
@@ -5916,7 +5962,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1424",
+   "source": "src/index.html:1425",
    "meta": {
     "data": {
      "step": "1"
@@ -5966,7 +6012,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1420",
+   "source": "src/index.html:1421",
    "meta": {
     "data": {},
     "i18n": null,
@@ -6014,7 +6060,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1421",
+   "source": "src/index.html:1422",
    "meta": {
     "data": {
      "step": "1"
@@ -6063,7 +6109,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1423",
+   "source": "src/index.html:1424",
    "meta": {
     "data": {
      "step": "0.1"
@@ -6108,7 +6154,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1361",
+   "source": "src/index.html:1362",
    "meta": {
     "data": {},
     "i18n": "curveSavePresetBtn",
@@ -6156,17 +6202,17 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1519",
+   "source": "src/index.html:1520",
    "meta": {
     "data": {},
     "i18n": null,
     "container": "dup-anim-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 55,
+    "functionsVisited": 54,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7517 updateDuplicatorPanel()"
+     "src/js/timeline.js:7516 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6204,17 +6250,17 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1515",
+   "source": "src/index.html:1516",
    "meta": {
     "data": {},
     "i18n": null,
     "container": "dup-anim-hdr-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 55,
+    "functionsVisited": 54,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7514 updateDuplicatorPanel()"
+     "src/js/timeline.js:7513 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6252,7 +6298,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1518",
+   "source": "src/index.html:1519",
    "meta": {
     "data": {
      "step": "1"
@@ -6261,10 +6307,10 @@
     "container": "dup-anim-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 57,
+    "functionsVisited": 56,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7516 updateDuplicatorPanel()"
+     "src/js/timeline.js:7515 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6302,7 +6348,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1483",
+   "source": "src/index.html:1484",
    "meta": {
     "data": {
      "step": "1"
@@ -6311,10 +6357,10 @@
     "container": "dup-grid-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 58,
+    "functionsVisited": 57,
     "via": "helper wireNum()",
     "references": [
-     "src/js/timeline.js:7495 updateDuplicatorPanel()"
+     "src/js/timeline.js:7494 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6352,7 +6398,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1489",
+   "source": "src/index.html:1490",
    "meta": {
     "data": {
      "step": "1"
@@ -6361,10 +6407,10 @@
     "container": "dup-count-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 58,
+    "functionsVisited": 57,
     "via": "helper wireNum()",
     "references": [
-     "src/js/timeline.js:7498 updateDuplicatorPanel()"
+     "src/js/timeline.js:7497 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6402,17 +6448,17 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1462",
+   "source": "src/index.html:1463",
    "meta": {
     "data": {},
     "i18n": null,
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 54,
+    "functionsVisited": 53,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7486 updateDuplicatorPanel()"
+     "src/js/timeline.js:7485 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6450,17 +6496,17 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1496",
+   "source": "src/index.html:1497",
    "meta": {
     "data": {},
     "i18n": null,
     "container": "dup-path-align-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 54,
+    "functionsVisited": 53,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7502 updateDuplicatorPanel()"
+     "src/js/timeline.js:7501 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6498,17 +6544,17 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1495",
+   "source": "src/index.html:1496",
    "meta": {
     "data": {},
     "i18n": null,
     "container": "dup-path-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 54,
+    "functionsVisited": 53,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7518 updateDuplicatorPanel()"
+     "src/js/timeline.js:7517 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6545,17 +6591,17 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1494",
+   "source": "src/index.html:1495",
    "meta": {
     "data": {},
     "i18n": null,
     "container": "dup-radial-orient-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 54,
+    "functionsVisited": 53,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7501 updateDuplicatorPanel()"
+     "src/js/timeline.js:7500 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6593,7 +6639,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1491",
+   "source": "src/index.html:1492",
    "meta": {
     "data": {
      "step": "1"
@@ -6602,10 +6648,10 @@
     "container": "dup-radial-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 58,
+    "functionsVisited": 57,
     "via": "helper wireNum()",
     "references": [
-     "src/js/timeline.js:7499 updateDuplicatorPanel()"
+     "src/js/timeline.js:7498 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6643,17 +6689,17 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1504",
+   "source": "src/index.html:1505",
    "meta": {
     "data": {},
     "i18n": null,
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 54,
+    "functionsVisited": 53,
     "via": "helper wireRand()",
     "references": [
-     "src/js/timeline.js:7509 updateDuplicatorPanel()"
+     "src/js/timeline.js:7508 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6691,17 +6737,17 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1503",
+   "source": "src/index.html:1504",
    "meta": {
     "data": {},
     "i18n": null,
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 54,
+    "functionsVisited": 53,
     "via": "helper wireRand()",
     "references": [
-     "src/js/timeline.js:7508 updateDuplicatorPanel()"
+     "src/js/timeline.js:7507 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6739,17 +6785,17 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1500",
+   "source": "src/index.html:1501",
    "meta": {
     "data": {},
     "i18n": null,
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 54,
+    "functionsVisited": 53,
     "via": "helper wireRand()",
     "references": [
-     "src/js/timeline.js:7505 updateDuplicatorPanel()"
+     "src/js/timeline.js:7504 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6787,17 +6833,17 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1501",
+   "source": "src/index.html:1502",
    "meta": {
     "data": {},
     "i18n": null,
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 54,
+    "functionsVisited": 53,
     "via": "helper wireRand()",
     "references": [
-     "src/js/timeline.js:7506 updateDuplicatorPanel()"
+     "src/js/timeline.js:7505 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6835,17 +6881,17 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1502",
+   "source": "src/index.html:1503",
    "meta": {
     "data": {},
     "i18n": null,
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 54,
+    "functionsVisited": 53,
     "via": "helper wireRand()",
     "references": [
-     "src/js/timeline.js:7507 updateDuplicatorPanel()"
+     "src/js/timeline.js:7506 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6883,7 +6929,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1482",
+   "source": "src/index.html:1483",
    "meta": {
     "data": {
      "step": "1"
@@ -6892,10 +6938,10 @@
     "container": "dup-grid-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 58,
+    "functionsVisited": 57,
     "via": "helper wireNum()",
     "references": [
-     "src/js/timeline.js:7494 updateDuplicatorPanel()"
+     "src/js/timeline.js:7493 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6933,7 +6979,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1497",
+   "source": "src/index.html:1498",
    "meta": {
     "data": {
      "step": "1"
@@ -6942,10 +6988,10 @@
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 58,
+    "functionsVisited": 57,
     "via": "helper wireNum()",
     "references": [
-     "src/js/timeline.js:7503 updateDuplicatorPanel()"
+     "src/js/timeline.js:7502 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -6962,7 +7008,7 @@
    "capability": "dup source add",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:7569 renderDuplicatorSourcePool()"
+    "src/js/timeline.js:7568 renderDuplicatorSourcePool()"
    ],
    "events": [
     "change"
@@ -6982,7 +7028,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1477",
+   "source": "src/index.html:1478",
    "meta": {
     "data": {},
     "i18n": null,
@@ -7028,7 +7074,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1486",
+   "source": "src/index.html:1487",
    "meta": {
     "data": {
      "step": "1"
@@ -7037,10 +7083,10 @@
     "container": "dup-grid-spacing-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 58,
+    "functionsVisited": 57,
     "via": "helper wireNum()",
     "references": [
-     "src/js/timeline.js:7496 updateDuplicatorPanel()"
+     "src/js/timeline.js:7495 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -7078,7 +7124,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1487",
+   "source": "src/index.html:1488",
    "meta": {
     "data": {
      "step": "1"
@@ -7087,10 +7133,10 @@
     "container": "dup-grid-spacing-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 58,
+    "functionsVisited": 57,
     "via": "helper wireNum()",
     "references": [
-     "src/js/timeline.js:7497 updateDuplicatorPanel()"
+     "src/js/timeline.js:7496 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -7128,7 +7174,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1492",
+   "source": "src/index.html:1493",
    "meta": {
     "data": {
      "step": "1"
@@ -7137,10 +7183,10 @@
     "container": "dup-radial-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 58,
+    "functionsVisited": 57,
     "via": "helper wireNum()",
     "references": [
-     "src/js/timeline.js:7500 updateDuplicatorPanel()"
+     "src/js/timeline.js:7499 updateDuplicatorPanel()"
     ]
    },
    "fixtures": [
@@ -7169,7 +7215,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1675",
+   "source": "src/index.html:1676",
    "meta": {
     "data": {},
     "i18n": null,
@@ -7212,7 +7258,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1683",
+   "source": "src/index.html:1684",
    "meta": {
     "data": {},
     "i18n": "btnCancel",
@@ -7250,7 +7296,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1638",
+   "source": "src/index.html:1639",
    "meta": {
     "data": {},
     "i18n": null,
@@ -7290,7 +7336,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1672",
+   "source": "src/index.html:1673",
    "meta": {
     "data": {
      "step": "1"
@@ -7331,7 +7377,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1676",
+   "source": "src/index.html:1677",
    "meta": {
     "data": {},
     "i18n": null,
@@ -7372,7 +7418,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1653",
+   "source": "src/index.html:1654",
    "meta": {
     "data": {},
     "i18n": null,
@@ -7417,7 +7463,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1679",
+   "source": "src/index.html:1680",
    "meta": {
     "data": {},
     "i18n": "btnExportRun",
@@ -7455,7 +7501,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1659",
+   "source": "src/index.html:1660",
    "meta": {
     "data": {},
     "i18n": null,
@@ -7494,7 +7540,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1670",
+   "source": "src/index.html:1671",
    "meta": {
     "data": {
      "step": "1"
@@ -7535,7 +7581,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1635",
+   "source": "src/index.html:1636",
    "meta": {
     "data": {},
     "i18n": null,
@@ -7559,7 +7605,7 @@
    "capability": "↻ Refresh",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:9529 initGithubFeedbackUI()"
+    "src/js/timeline.js:9528 initGithubFeedbackUI()"
    ],
    "events": [
     "click"
@@ -7575,7 +7621,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1955",
+   "source": "src/index.html:1956",
    "meta": {
     "data": {},
     "i18n": "btnRefresh",
@@ -7598,7 +7644,7 @@
    "capability": "&times;",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:9528 initGithubFeedbackUI()"
+    "src/js/timeline.js:9527 initGithubFeedbackUI()"
    ],
    "events": [
     "click"
@@ -7612,7 +7658,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1948",
+   "source": "src/index.html:1949",
    "meta": {
     "data": {},
     "i18n": null,
@@ -7635,7 +7681,7 @@
    "capability": "📋 Open feedback board",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:9527 initGithubFeedbackUI()"
+    "src/js/timeline.js:9526 initGithubFeedbackUI()"
    ],
    "events": [
     "click"
@@ -7649,7 +7695,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1864",
+   "source": "src/index.html:1865",
    "meta": {
     "data": {},
     "i18n": "btnOpenFeedbackBoard",
@@ -7669,7 +7715,7 @@
    "capability": "Pull the team's feedback",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:9333 initFeedbackUI()"
+    "src/js/timeline.js:9332 initFeedbackUI()"
    ],
    "events": [
     "click"
@@ -7683,7 +7729,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1854",
+   "source": "src/index.html:1855",
    "meta": {
     "data": {},
     "i18n": "btnPullFeedback",
@@ -7721,7 +7767,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1878",
+   "source": "src/index.html:1879",
    "meta": {
     "data": {},
     "i18n": "btnImportFigma",
@@ -7759,7 +7805,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1871",
+   "source": "src/index.html:1872",
    "meta": {
     "data": {},
     "i18n": null,
@@ -7795,7 +7841,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1872",
+   "source": "src/index.html:1873",
    "meta": {
     "data": {},
     "i18n": "btnSave",
@@ -7833,7 +7879,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1875",
+   "source": "src/index.html:1876",
    "meta": {
     "data": {},
     "i18n": null,
@@ -7869,7 +7915,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1621",
+   "source": "src/index.html:1622",
    "meta": {
     "data": {},
     "i18n": null,
@@ -7894,7 +7940,7 @@
    "capability": "Enable/disable fill",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10226"
+    "src/js/timeline.js:10225"
    ],
    "events": [
     "click"
@@ -7914,7 +7960,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:897",
+   "source": "src/index.html:898",
    "meta": {
     "data": {},
     "i18n": null,
@@ -7942,7 +7988,7 @@
    "capability": "Enable/disable fill",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10174"
+    "src/js/timeline.js:10173"
    ],
    "events": [
     "click"
@@ -7999,7 +8045,7 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7340 updateFootagePanel())",
-   "source": "src/index.html:1383",
+   "source": "src/index.html:1384",
    "meta": {
     "data": {},
     "i18n": null,
@@ -8030,7 +8076,7 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7317 updateFootagePanel())",
-   "source": "src/index.html:1381",
+   "source": "src/index.html:1382",
    "meta": {
     "data": {},
     "i18n": null,
@@ -8065,14 +8111,14 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1408",
+   "source": "src/index.html:1409",
    "meta": {
     "data": {},
     "i18n": null,
     "container": "footage-blend-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 37,
+    "functionsVisited": 36,
     "via": "variable sel",
     "references": []
    },
@@ -8100,7 +8146,7 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7304 updateFootagePanel())",
-   "source": "src/index.html:1377",
+   "source": "src/index.html:1378",
    "meta": {
     "data": {},
     "i18n": null,
@@ -8131,7 +8177,7 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7308 updateFootagePanel())",
-   "source": "src/index.html:1378",
+   "source": "src/index.html:1379",
    "meta": {
     "data": {},
     "i18n": null,
@@ -8163,7 +8209,7 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7316 updateFootagePanel())",
-   "source": "src/index.html:1380",
+   "source": "src/index.html:1381",
    "meta": {
     "data": {},
     "i18n": null,
@@ -8198,7 +8244,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1860",
+   "source": "src/index.html:1861",
    "meta": {
     "data": {},
     "i18n": null,
@@ -8208,7 +8254,7 @@
     "functionsVisited": 3,
     "via": "container delegation #settings-modal",
     "references": [
-     "src/js/timeline.js:9519 initGithubFeedbackUI()"
+     "src/js/timeline.js:9518 initGithubFeedbackUI()"
     ]
    },
    "fixtures": []
@@ -8220,7 +8266,7 @@
    "capability": "Save",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:9523 initGithubFeedbackUI()"
+    "src/js/timeline.js:9522 initGithubFeedbackUI()"
    ],
    "events": [
     "click"
@@ -8234,7 +8280,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1861",
+   "source": "src/index.html:1862",
    "meta": {
     "data": {},
     "i18n": "btnSave",
@@ -8310,7 +8356,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1740",
+   "source": "src/index.html:1741",
    "meta": {
     "data": {},
     "i18n": null,
@@ -8347,7 +8393,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1624",
+   "source": "src/index.html:1625",
    "meta": {
     "data": {},
     "i18n": null,
@@ -8387,7 +8433,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1981",
+   "source": "src/index.html:1982",
    "meta": {
     "data": {},
     "i18n": "btnBack",
@@ -8424,7 +8470,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1967",
+   "source": "src/index.html:1968",
    "meta": {
     "data": {},
     "i18n": null,
@@ -8461,7 +8507,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1972",
+   "source": "src/index.html:1973",
    "meta": {
     "data": {},
     "i18n": null,
@@ -8502,7 +8548,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1975",
+   "source": "src/index.html:1976",
    "meta": {
     "data": {},
     "i18n": "btnLogin",
@@ -8539,7 +8585,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1982",
+   "source": "src/index.html:1983",
    "meta": {
     "data": {},
     "i18n": "btnLogout",
@@ -8576,7 +8622,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1973",
+   "source": "src/index.html:1974",
    "meta": {
     "data": {},
     "i18n": null,
@@ -8615,7 +8661,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1971",
+   "source": "src/index.html:1972",
    "meta": {
     "data": {},
     "i18n": null,
@@ -8734,7 +8780,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1441",
+   "source": "src/index.html:1442",
    "meta": {
     "data": {
      "step": "1"
@@ -8778,7 +8824,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1445",
+   "source": "src/index.html:1446",
    "meta": {
     "data": {
      "step": "1"
@@ -8822,7 +8868,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1444",
+   "source": "src/index.html:1445",
    "meta": {
     "data": {
      "step": "0.1"
@@ -8866,7 +8912,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1440",
+   "source": "src/index.html:1441",
    "meta": {
     "data": {
      "step": "1"
@@ -8908,7 +8954,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1438",
+   "source": "src/index.html:1439",
    "meta": {
     "data": {},
     "i18n": null,
@@ -8951,7 +8997,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1723",
+   "source": "src/index.html:1724",
    "meta": {
     "data": {},
     "i18n": null,
@@ -8991,7 +9037,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1729",
+   "source": "src/index.html:1730",
    "meta": {
     "data": {},
     "i18n": null,
@@ -9033,7 +9079,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1730",
+   "source": "src/index.html:1731",
    "meta": {
     "data": {},
     "i18n": null,
@@ -9121,7 +9167,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1274",
+   "source": "src/index.html:1275",
    "meta": {
     "data": {},
     "i18n": null,
@@ -9164,7 +9210,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1279",
+   "source": "src/index.html:1280",
    "meta": {
     "data": {},
     "i18n": null,
@@ -9459,7 +9505,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2034",
+   "source": "src/index.html:2035",
    "meta": {
     "data": {},
     "i18n": null,
@@ -9497,7 +9543,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2035",
+   "source": "src/index.html:2036",
    "meta": {
     "data": {},
     "i18n": null,
@@ -9535,7 +9581,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2036",
+   "source": "src/index.html:2037",
    "meta": {
     "data": {},
     "i18n": null,
@@ -9573,7 +9619,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2037",
+   "source": "src/index.html:2038",
    "meta": {
     "data": {},
     "i18n": "onionSpanAll",
@@ -9615,7 +9661,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:654",
+   "source": "src/index.html:655",
    "meta": {
     "data": {},
     "i18n": "btnAddEffect",
@@ -9659,7 +9705,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:527",
+   "source": "src/index.html:528",
    "meta": {
     "data": {
      "step": "1"
@@ -9707,7 +9753,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:525",
+   "source": "src/index.html:526",
    "meta": {
     "data": {
      "step": "1"
@@ -9753,7 +9799,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:526",
+   "source": "src/index.html:527",
    "meta": {
     "data": {
      "step": "1"
@@ -9796,7 +9842,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:681",
+   "source": "src/index.html:682",
    "meta": {
     "data": {
      "value": "normal"
@@ -9845,7 +9891,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:977",
+   "source": "src/index.html:978",
    "meta": {
     "data": {},
     "i18n": null,
@@ -9884,7 +9930,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:976",
+   "source": "src/index.html:977",
    "meta": {
     "data": {},
     "i18n": null,
@@ -9911,7 +9957,7 @@
    "capability": "cap grp",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10351 wireIconGroup()"
+    "src/js/timeline.js:10350 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -9930,7 +9976,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:958",
+   "source": "src/index.html:959",
    "meta": {
     "data": {
      "value": "round"
@@ -9944,8 +9990,8 @@
     "references": [
      "src/js/timeline.js:3718 _restoreDrawingDefaults()",
      "src/js/timeline.js:3864 updateSelPropsPanel()",
-     "src/js/timeline.js:10367",
-     "src/js/timeline.js:10435 syncStrokePropsForVectorBrush()"
+     "src/js/timeline.js:10366",
+     "src/js/timeline.js:10434 syncStrokePropsForVectorBrush()"
     ]
    },
    "fixtures": [
@@ -9976,7 +10022,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:819",
+   "source": "src/index.html:820",
    "meta": {
     "data": {},
     "i18n": null,
@@ -10003,7 +10049,7 @@
    "capability": "ch",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10308",
+    "src/js/timeline.js:10307",
     "src/js/timeline.js:10661"
    ],
    "events": [
@@ -10019,7 +10065,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:768",
+   "source": "src/index.html:769",
    "meta": {
     "data": {
      "step": "1"
@@ -10031,7 +10077,7 @@
     "functionsVisited": 30,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:10304"
+     "src/js/timeline.js:10303"
     ]
    },
    "fixtures": [
@@ -10069,7 +10115,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:518",
+   "source": "src/index.html:519",
    "meta": {
     "data": {
      "step": "1"
@@ -10119,7 +10165,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:517",
+   "source": "src/index.html:518",
    "meta": {
     "data": {
      "step": "1"
@@ -10169,7 +10215,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:515",
+   "source": "src/index.html:516",
    "meta": {
     "data": {
      "step": "1"
@@ -10219,7 +10265,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:516",
+   "source": "src/index.html:517",
    "meta": {
     "data": {
      "step": "1"
@@ -10265,7 +10311,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:514",
+   "source": "src/index.html:515",
    "meta": {
     "data": {},
     "i18n": null,
@@ -10315,7 +10361,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2024",
+   "source": "src/index.html:2025",
    "meta": {
     "data": {},
     "i18n": null,
@@ -10339,7 +10385,7 @@
    "capability": "cw",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10300",
+    "src/js/timeline.js:10299",
     "src/js/timeline.js:10660"
    ],
    "events": [
@@ -10355,7 +10401,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:767",
+   "source": "src/index.html:768",
    "meta": {
     "data": {
      "step": "1"
@@ -10367,7 +10413,7 @@
     "functionsVisited": 30,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:10312"
+     "src/js/timeline.js:10311"
     ]
    },
    "fixtures": [
@@ -10384,7 +10430,7 @@
    "capability": "Shifts the dash pattern along the stroke — only visible when Style is Dashed or Dotted",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10336"
+    "src/js/timeline.js:10335"
    ],
    "events": [
     "change"
@@ -10402,7 +10448,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:973",
+   "source": "src/index.html:974",
    "meta": {
     "data": {
      "step": "1"
@@ -10446,7 +10492,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1170",
+   "source": "src/index.html:1171",
    "meta": {
     "data": {},
     "i18n": null,
@@ -10485,7 +10531,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1194",
+   "source": "src/index.html:1195",
    "meta": {
     "data": {
      "step": "1"
@@ -10514,7 +10560,7 @@
    "capability": "Dégradé de fill — sélectionne une seule forme avec l'outil Sélection",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:9052 initFillGradientButton()"
+    "src/js/timeline.js:9051 initFillGradientButton()"
    ],
    "events": [
     "click"
@@ -10528,7 +10574,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:896",
+   "source": "src/index.html:897",
    "meta": {
     "data": {},
     "i18n": null,
@@ -10538,7 +10584,7 @@
     "functionsVisited": 25,
     "via": "variable btn",
     "references": [
-     "src/js/timeline.js:9070 syncFillGradientButton()"
+     "src/js/timeline.js:9069 syncFillGradientButton()"
     ]
    },
    "fixtures": [
@@ -10555,8 +10601,8 @@
    "capability": "Hex code — type to change",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10253",
-    "src/js/timeline.js:10280"
+    "src/js/timeline.js:10252",
+    "src/js/timeline.js:10279"
    ],
    "events": [
     "change",
@@ -10577,7 +10623,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:886",
+   "source": "src/index.html:887",
    "meta": {
     "data": {},
     "i18n": null,
@@ -10604,7 +10650,7 @@
    "capability": "fill on",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10170"
+    "src/js/timeline.js:10169"
    ],
    "events": [
     "change"
@@ -10624,7 +10670,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:885",
+   "source": "src/index.html:886",
    "meta": {
     "data": {},
     "i18n": null,
@@ -10653,7 +10699,7 @@
    "capability": "fillbrushmode grp",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10351 wireIconGroup()"
+    "src/js/timeline.js:10350 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -10672,7 +10718,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1171",
+   "source": "src/index.html:1172",
    "meta": {
     "data": {
      "value": "above"
@@ -10684,7 +10730,7 @@
     "functionsVisited": 50,
     "via": "helper wireIconGroup()",
     "references": [
-     "src/js/timeline.js:10370"
+     "src/js/timeline.js:10369"
     ]
    },
    "fixtures": [
@@ -10715,7 +10761,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1179",
+   "source": "src/index.html:1180",
    "meta": {
     "data": {
      "step": "1"
@@ -10763,7 +10809,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1176",
+   "source": "src/index.html:1177",
    "meta": {
     "data": {},
     "i18n": null,
@@ -10809,7 +10855,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1177",
+   "source": "src/index.html:1178",
    "meta": {
     "data": {
      "step": "1"
@@ -10859,7 +10905,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:905",
+   "source": "src/index.html:906",
    "meta": {
     "data": {},
     "i18n": null,
@@ -10906,7 +10952,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:904",
+   "source": "src/index.html:905",
    "meta": {
     "data": {},
     "i18n": null,
@@ -10917,8 +10963,8 @@
     "via": "variable onCb",
     "references": [
      "src/js/gradient-bridge.js:67 renderGradientPanel()",
-     "src/js/timeline.js:9049 initFillGradientButton()",
-     "src/js/timeline.js:9071 syncFillGradientButton()",
+     "src/js/timeline.js:9048 initFillGradientButton()",
+     "src/js/timeline.js:9070 syncFillGradientButton()",
      "src/js/tutorial.js:1269 check()"
     ]
    },
@@ -10950,7 +10996,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1345",
+   "source": "src/index.html:1346",
    "meta": {
     "data": {},
     "i18n": null,
@@ -10991,7 +11037,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1061",
+   "source": "src/index.html:1062",
    "meta": {
     "data": {
      "step": "1"
@@ -11037,7 +11083,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1058",
+   "source": "src/index.html:1059",
    "meta": {
     "data": {},
     "i18n": null,
@@ -11082,7 +11128,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1056",
+   "source": "src/index.html:1057",
    "meta": {
     "data": {},
     "i18n": null,
@@ -11127,7 +11173,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1062",
+   "source": "src/index.html:1063",
    "meta": {
     "data": {
      "step": "1"
@@ -11159,8 +11205,8 @@
    "capability": "join grp",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10351 wireIconGroup()",
-    "src/js/timeline.js:10375"
+    "src/js/timeline.js:10350 wireIconGroup()",
+    "src/js/timeline.js:10374"
    ],
    "events": [
     "click"
@@ -11179,7 +11225,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:963",
+   "source": "src/index.html:964",
    "meta": {
     "data": {
      "value": "round"
@@ -11193,10 +11239,10 @@
     "references": [
      "src/js/timeline.js:3718 _restoreDrawingDefaults()",
      "src/js/timeline.js:3864 updateSelPropsPanel()",
-     "src/js/timeline.js:10368",
-     "src/js/timeline.js:10374 syncMiterLimitEnabled()",
-     "src/js/timeline.js:10395 syncJoinEnabledForGradient()",
-     "src/js/timeline.js:10435 syncStrokePropsForVectorBrush()"
+     "src/js/timeline.js:10367",
+     "src/js/timeline.js:10373 syncMiterLimitEnabled()",
+     "src/js/timeline.js:10394 syncJoinEnabledForGradient()",
+     "src/js/timeline.js:10434 syncStrokePropsForVectorBrush()"
     ]
    },
    "fixtures": [
@@ -11235,7 +11281,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:501",
+   "source": "src/index.html:502",
    "meta": {
     "data": {
      "step": "1"
@@ -11283,7 +11329,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:500",
+   "source": "src/index.html:501",
    "meta": {
     "data": {},
     "i18n": null,
@@ -11322,7 +11368,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1193",
+   "source": "src/index.html:1194",
    "meta": {
     "data": {},
     "i18n": null,
@@ -11359,7 +11405,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1193",
+   "source": "src/index.html:1194",
    "meta": {
     "data": {},
     "i18n": null,
@@ -11396,7 +11442,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:687",
+   "source": "src/index.html:688",
    "meta": {
     "data": {
      "value": "none"
@@ -11424,7 +11470,7 @@
    "capability": "Miter limit — how far a sharp Join:Miter corner can extend before falling back to a bevel",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10335"
+    "src/js/timeline.js:10334"
    ],
    "events": [
     "change"
@@ -11442,7 +11488,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:968",
+   "source": "src/index.html:969",
    "meta": {
     "data": {
      "step": "1"
@@ -11456,8 +11502,8 @@
     "references": [
      "src/js/timeline.js:3720 _restoreDrawingDefaults()",
      "src/js/timeline.js:3866 updateSelPropsPanel()",
-     "src/js/timeline.js:10374 syncMiterLimitEnabled()",
-     "src/js/timeline.js:10401 syncJoinEnabledForGradient()"
+     "src/js/timeline.js:10373 syncMiterLimitEnabled()",
+     "src/js/timeline.js:10400 syncJoinEnabledForGradient()"
     ]
    },
    "fixtures": [
@@ -11493,7 +11539,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1186",
+   "source": "src/index.html:1187",
    "meta": {
     "data": {
      "step": "1"
@@ -11541,7 +11587,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1186",
+   "source": "src/index.html:1187",
    "meta": {
     "data": {
      "step": "1"
@@ -11584,7 +11630,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2059",
+   "source": "src/index.html:2060",
    "meta": {
     "data": {},
     "i18n": null,
@@ -11622,7 +11668,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2023",
+   "source": "src/index.html:2024",
    "meta": {
     "data": {},
     "i18n": null,
@@ -11664,7 +11710,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2057",
+   "source": "src/index.html:2058",
    "meta": {
     "data": {},
     "i18n": null,
@@ -11704,7 +11750,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2054",
+   "source": "src/index.html:2055",
    "meta": {
     "data": {},
     "i18n": "onionShiftReset",
@@ -11744,7 +11790,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2052",
+   "source": "src/index.html:2053",
    "meta": {
     "data": {
      "step": "1"
@@ -11786,7 +11832,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2053",
+   "source": "src/index.html:2054",
    "meta": {
     "data": {
      "step": "1"
@@ -11828,7 +11874,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2045",
+   "source": "src/index.html:2046",
    "meta": {
     "data": {},
     "i18n": null,
@@ -11868,7 +11914,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2044",
+   "source": "src/index.html:2045",
    "meta": {
     "data": {},
     "i18n": null,
@@ -11911,7 +11957,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2046",
+   "source": "src/index.html:2047",
    "meta": {
     "data": {},
     "i18n": "onionTintReset",
@@ -11949,7 +11995,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2026",
+   "source": "src/index.html:2027",
    "meta": {
     "data": {
      "step": "1"
@@ -11975,8 +12021,8 @@
    "capability": "opacity",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10330",
-    "src/js/timeline.js:10331"
+    "src/js/timeline.js:10329",
+    "src/js/timeline.js:10330"
    ],
    "events": [
     "input",
@@ -11994,7 +12040,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:887",
+   "source": "src/index.html:888",
    "meta": {
     "data": {
      "step": "1"
@@ -12038,7 +12084,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2025",
+   "source": "src/index.html:2026",
    "meta": {
     "data": {
      "step": "1"
@@ -12064,7 +12110,7 @@
    "capability": "paintorder grp",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10351 wireIconGroup()"
+    "src/js/timeline.js:10350 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -12083,7 +12129,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:969",
+   "source": "src/index.html:970",
    "meta": {
     "data": {
      "value": "fillFirst"
@@ -12097,7 +12143,7 @@
     "references": [
      "src/js/timeline.js:3719 _restoreDrawingDefaults()",
      "src/js/timeline.js:3865 updateSelPropsPanel()",
-     "src/js/timeline.js:10369"
+     "src/js/timeline.js:10368"
     ]
    },
    "fixtures": [
@@ -12128,7 +12174,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1185",
+   "source": "src/index.html:1186",
    "meta": {
     "data": {},
     "i18n": null,
@@ -12169,7 +12215,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1188",
+   "source": "src/index.html:1189",
    "meta": {
     "data": {},
     "i18n": null,
@@ -12208,7 +12254,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1183",
+   "source": "src/index.html:1184",
    "meta": {
     "data": {
      "step": "1"
@@ -12249,7 +12295,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1182",
+   "source": "src/index.html:1183",
    "meta": {
     "data": {
      "step": "1"
@@ -12276,7 +12322,7 @@
    "capability": "poststroke smooth",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10343"
+    "src/js/timeline.js:10342"
    ],
    "events": [
     "change"
@@ -12296,7 +12342,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:957",
+   "source": "src/index.html:958",
    "meta": {
     "data": {
      "step": "1"
@@ -12339,7 +12385,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:713",
+   "source": "src/index.html:714",
    "meta": {
     "data": {},
     "i18n": "refNoneShort",
@@ -12384,7 +12430,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:732",
+   "source": "src/index.html:733",
    "meta": {
     "data": {
      "step": "1"
@@ -12429,7 +12475,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:721",
+   "source": "src/index.html:722",
    "meta": {
     "data": {},
     "i18n": null,
@@ -12471,7 +12517,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:731",
+   "source": "src/index.html:732",
    "meta": {
     "data": {
      "step": "1"
@@ -12513,7 +12559,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1343",
+   "source": "src/index.html:1344",
    "meta": {
     "data": {
      "step": "1"
@@ -12554,7 +12600,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1192",
+   "source": "src/index.html:1193",
    "meta": {
     "data": {},
     "i18n": null,
@@ -12599,7 +12645,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1344",
+   "source": "src/index.html:1345",
    "meta": {
     "data": {},
     "i18n": null,
@@ -12624,7 +12670,7 @@
    "capability": "Simplifies the curve AFTER the fact (fewer points, more efficient stroke) — has no effect on shakiness while drawing, that's what Stabilizer above handles. At 0: the point count isn't reduced, but the stroke can still look visibly smoothed if Stabilizer is enabled.",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10332"
+    "src/js/timeline.js:10331"
    ],
    "events": [
     "input"
@@ -12638,7 +12684,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1169",
+   "source": "src/index.html:1170",
    "meta": {
     "data": {
      "step": "1"
@@ -12667,7 +12713,7 @@
    "capability": "Smooths POSITION live while you draw (corrects hand shake) — acts BEFORE the stroke is laid down, independent of Smooth below. Off/Low/Medium/High: classic sliding average. Quill: physical spring-damper model (Google ink-stroke-modeler, like rnote), catches up to the tip on release. Set this to Off if you want a stroke that follows your hand pixel-perfectly.",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10333"
+    "src/js/timeline.js:10332"
    ],
    "events": [
     "change"
@@ -12681,7 +12727,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1168",
+   "source": "src/index.html:1169",
    "meta": {
     "data": {},
     "i18n": null,
@@ -12728,7 +12774,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:535",
+   "source": "src/index.html:536",
    "meta": {
     "data": {
      "step": "1"
@@ -12776,7 +12822,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:534",
+   "source": "src/index.html:535",
    "meta": {
     "data": {
      "step": "1"
@@ -12824,7 +12870,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:533",
+   "source": "src/index.html:534",
    "meta": {
     "data": {
      "step": "1"
@@ -12867,7 +12913,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1342",
+   "source": "src/index.html:1343",
    "meta": {
     "data": {},
     "i18n": null,
@@ -12892,8 +12938,8 @@
    "capability": "Stroke opacity (color alpha)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10276",
-    "src/js/timeline.js:10277"
+    "src/js/timeline.js:10275",
+    "src/js/timeline.js:10276"
    ],
    "events": [
     "input",
@@ -12914,7 +12960,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:929",
+   "source": "src/index.html:930",
    "meta": {
     "data": {
      "step": "1"
@@ -12943,8 +12989,8 @@
    "capability": "Hex code — type to change",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10259",
-    "src/js/timeline.js:10280"
+    "src/js/timeline.js:10258",
+    "src/js/timeline.js:10279"
    ],
    "events": [
     "change",
@@ -12965,7 +13011,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:928",
+   "source": "src/index.html:929",
    "meta": {
     "data": {},
     "i18n": null,
@@ -12992,8 +13038,8 @@
    "capability": "strokegrad along",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10192",
-    "src/js/timeline.js:10403"
+    "src/js/timeline.js:10191",
+    "src/js/timeline.js:10402"
    ],
    "events": [
     "change"
@@ -13013,7 +13059,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:940",
+   "source": "src/index.html:941",
    "meta": {
     "data": {},
     "i18n": null,
@@ -13024,7 +13070,7 @@
     "via": "chain",
     "references": [
      "src/js/timeline.js:3843 updateSelPropsPanel()",
-     "src/js/timeline.js:10396 syncJoinEnabledForGradient()"
+     "src/js/timeline.js:10395 syncJoinEnabledForGradient()"
     ]
    },
    "fixtures": [
@@ -13051,7 +13097,7 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:3849 updateSelPropsPanel())",
-   "source": "src/index.html:941",
+   "source": "src/index.html:942",
    "meta": {
     "data": {},
     "i18n": null,
@@ -13061,7 +13107,7 @@
     "functionsVisited": 0,
     "references": [
      "src/js/timeline.js:3849 updateSelPropsPanel()",
-     "src/js/timeline.js:10208"
+     "src/js/timeline.js:10207"
     ]
    },
    "fixtures": [
@@ -13078,7 +13124,7 @@
    "capability": "strokegrad from c",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10205"
+    "src/js/timeline.js:10204"
    ],
    "events": [
     "input"
@@ -13098,7 +13144,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:941",
+   "source": "src/index.html:942",
    "meta": {
     "data": {},
     "i18n": null,
@@ -13109,7 +13155,7 @@
     "via": "chain",
     "references": [
      "src/js/timeline.js:3848 updateSelPropsPanel()",
-     "src/js/timeline.js:10197"
+     "src/js/timeline.js:10196"
     ]
    },
    "fixtures": [
@@ -13136,7 +13182,7 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:3851 updateSelPropsPanel())",
-   "source": "src/index.html:942",
+   "source": "src/index.html:943",
    "meta": {
     "data": {},
     "i18n": null,
@@ -13146,7 +13192,7 @@
     "functionsVisited": 0,
     "references": [
      "src/js/timeline.js:3851 updateSelPropsPanel()",
-     "src/js/timeline.js:10217"
+     "src/js/timeline.js:10216"
     ]
    },
    "fixtures": [
@@ -13163,7 +13209,7 @@
    "capability": "strokegrad to c",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10214"
+    "src/js/timeline.js:10213"
    ],
    "events": [
     "input"
@@ -13183,7 +13229,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:942",
+   "source": "src/index.html:943",
    "meta": {
     "data": {},
     "i18n": null,
@@ -13194,7 +13240,7 @@
     "via": "chain",
     "references": [
      "src/js/timeline.js:3850 updateSelPropsPanel()",
-     "src/js/timeline.js:10198"
+     "src/js/timeline.js:10197"
     ]
    },
    "fixtures": [
@@ -13211,7 +13257,57 @@
    "capability": "strokestyle",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10334"
+    "src/js/timeline.js:10333"
+   ],
+   "events": [
+    "change"
+   ],
+   "exposure": [
+    "UI"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "selection": 2,
+    "render": 2,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:952",
+   "meta": {
+    "data": {},
+    "i18n": null,
+    "container": "stroke-sec",
+    "modal": false,
+    "hiddenAtLoad": false,
+    "functionsVisited": 45,
+    "via": "chain",
+    "references": [
+     "src/js/timeline.js:3724 _restoreDrawingDefaults()",
+     "src/js/timeline.js:6479 nativeStyleReadback()",
+     "src/js/timeline.js:6490 nativeStyleReadbackEnd()",
+     "src/js/timeline.js:10444 syncStrokePropsForVectorBrush()"
+    ]
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "dom:#p-sw",
+   "kind": "dom",
+   "surface": "stroke-sec > input[number]#p-sw",
+   "capability": "Stroke width (px) — also drives Bitmap Brush dab size",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/timeline.js:10157"
    ],
    "events": [
     "change"
@@ -13232,56 +13328,6 @@
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:951",
-   "meta": {
-    "data": {},
-    "i18n": null,
-    "container": "stroke-sec",
-    "modal": false,
-    "hiddenAtLoad": false,
-    "functionsVisited": 45,
-    "via": "chain",
-    "references": [
-     "src/js/timeline.js:3724 _restoreDrawingDefaults()",
-     "src/js/timeline.js:6479 nativeStyleReadback()",
-     "src/js/timeline.js:6490 nativeStyleReadbackEnd()",
-     "src/js/timeline.js:10445 syncStrokePropsForVectorBrush()"
-    ]
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "dom:#p-sw",
-   "kind": "dom",
-   "surface": "stroke-sec > input[number]#p-sw",
-   "capability": "Stroke width (px) — also drives Bitmap Brush dab size",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/timeline.js:10158"
-   ],
-   "events": [
-    "change"
-   ],
-   "exposure": [
-    "UI"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "selection": 2,
-    "render": 2,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:950",
    "meta": {
     "data": {
      "step": "1"
@@ -13335,7 +13381,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1190",
+   "source": "src/index.html:1191",
    "meta": {
     "data": {},
     "i18n": null,
@@ -13381,7 +13427,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1127",
+   "source": "src/index.html:1128",
    "meta": {
     "data": {},
     "i18n": null,
@@ -13425,7 +13471,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1191",
+   "source": "src/index.html:1192",
    "meta": {
     "data": {},
     "i18n": null,
@@ -13466,7 +13512,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1191",
+   "source": "src/index.html:1192",
    "meta": {
     "data": {
      "step": "1"
@@ -13495,7 +13541,7 @@
    "capability": "vecbrush",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10449"
+    "src/js/timeline.js:10448"
    ],
    "events": [
     "change"
@@ -13509,7 +13555,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1180",
+   "source": "src/index.html:1181",
    "meta": {
     "data": {},
     "i18n": null,
@@ -13561,7 +13607,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1076",
+   "source": "src/index.html:1077",
    "meta": {
     "data": {
      "step": "1"
@@ -13613,7 +13659,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1075",
+   "source": "src/index.html:1076",
    "meta": {
     "data": {
      "step": "1"
@@ -13662,7 +13708,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1086",
+   "source": "src/index.html:1087",
    "meta": {
     "data": {},
     "i18n": null,
@@ -13712,7 +13758,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1081",
+   "source": "src/index.html:1082",
    "meta": {
     "data": {
      "step": "1"
@@ -13764,7 +13810,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1080",
+   "source": "src/index.html:1081",
    "meta": {
     "data": {
      "step": "1"
@@ -13816,7 +13862,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1085",
+   "source": "src/index.html:1086",
    "meta": {
     "data": {
      "step": "1"
@@ -13865,7 +13911,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1096",
+   "source": "src/index.html:1097",
    "meta": {
     "data": {},
     "i18n": null,
@@ -13915,7 +13961,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1091",
+   "source": "src/index.html:1092",
    "meta": {
     "data": {
      "step": "1"
@@ -13967,7 +14013,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1090",
+   "source": "src/index.html:1091",
    "meta": {
     "data": {
      "step": "1"
@@ -14019,7 +14065,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1095",
+   "source": "src/index.html:1096",
    "meta": {
     "data": {
      "step": "1"
@@ -14064,7 +14110,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1846",
+   "source": "src/index.html:1847",
    "meta": {
     "data": {},
     "i18n": "btnAdd",
@@ -14105,7 +14151,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1842",
+   "source": "src/index.html:1843",
    "meta": {
     "data": {},
     "i18n": "btnCopy",
@@ -14142,7 +14188,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1845",
+   "source": "src/index.html:1846",
    "meta": {
     "data": {},
     "i18n": null,
@@ -14179,7 +14225,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1841",
+   "source": "src/index.html:1842",
    "meta": {
     "data": {},
     "i18n": null,
@@ -14215,7 +14261,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1219",
+   "source": "src/index.html:1220",
    "meta": {
     "data": {},
     "i18n": null,
@@ -14261,7 +14307,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:644",
+   "source": "src/index.html:645",
    "meta": {
     "data": {},
     "i18n": null,
@@ -14306,7 +14352,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:884",
+   "source": "src/index.html:885",
    "meta": {
     "data": {},
     "i18n": null,
@@ -14337,7 +14383,7 @@
    "capability": "pm fill c",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10169"
+    "src/js/timeline.js:10168"
    ],
    "events": [
     "input"
@@ -14357,7 +14403,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:884",
+   "source": "src/index.html:885",
    "meta": {
     "data": {},
     "i18n": null,
@@ -14401,7 +14447,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:927",
+   "source": "src/index.html:928",
    "meta": {
     "data": {},
     "i18n": null,
@@ -14432,7 +14478,7 @@
    "capability": "pm stroke c",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10177"
+    "src/js/timeline.js:10176"
    ],
    "events": [
     "input"
@@ -14452,7 +14498,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:927",
+   "source": "src/index.html:928",
    "meta": {
     "data": {},
     "i18n": null,
@@ -14497,7 +14543,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1783",
+   "source": "src/index.html:1784",
    "meta": {
     "data": {},
     "i18n": null,
@@ -14538,7 +14584,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1783",
+   "source": "src/index.html:1784",
    "meta": {
     "data": {},
     "i18n": null,
@@ -14575,7 +14621,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1787",
+   "source": "src/index.html:1788",
    "meta": {
     "data": {},
     "i18n": null,
@@ -14611,7 +14657,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1782",
+   "source": "src/index.html:1783",
    "meta": {
     "data": {},
     "i18n": null,
@@ -14653,7 +14699,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1791",
+   "source": "src/index.html:1792",
    "meta": {
     "data": {},
     "i18n": null,
@@ -14689,7 +14735,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:777",
+   "source": "src/index.html:778",
    "meta": {
     "data": {
      "step": "1"
@@ -14734,7 +14780,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:778",
+   "source": "src/index.html:779",
    "meta": {
     "data": {
      "step": "1"
@@ -14792,7 +14838,7 @@
     "references": [
      "src/js/adapters/native-object-project-tabs-ui.js:99 render()",
      "src/js/project.js:661",
-     "src/js/timeline.js:9202 action()"
+     "src/js/timeline.js:9201 action()"
     ]
    },
    "fixtures": [
@@ -14891,7 +14937,7 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason",
-   "source": "src/index.html:1628",
+   "source": "src/index.html:1629",
    "meta": {
     "data": {},
     "i18n": null,
@@ -14927,7 +14973,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:714",
+   "source": "src/index.html:715",
    "meta": {
     "data": {},
     "i18n": null,
@@ -14961,7 +15007,7 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:11426)",
-   "source": "src/index.html:1588",
+   "source": "src/index.html:1589",
    "meta": {
     "data": {},
     "i18n": null,
@@ -14996,7 +15042,7 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:11425)",
-   "source": "src/index.html:1587",
+   "source": "src/index.html:1588",
    "meta": {
     "data": {},
     "i18n": null,
@@ -15032,7 +15078,7 @@
    "status": "unmapped",
    "reason": "helper parameter has no proved registration or unchanged returned lookup (reassignment, shadowing or unsupported return flow)",
    "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/adapters/native-object-rig-canvas.js:32)",
-   "source": "src/index.html:1579",
+   "source": "src/index.html:1580",
    "meta": {
     "data": {
      "step": "5"
@@ -15074,7 +15120,7 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/rig-bridge.js:193 panelRotate())",
-   "source": "src/index.html:1580",
+   "source": "src/index.html:1581",
    "meta": {
     "data": {},
     "i18n": null,
@@ -15114,7 +15160,7 @@
    "status": "unmapped",
    "reason": "helper parameter has no proved registration or unchanged returned lookup (reassignment, shadowing or unsupported return flow)",
    "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/adapters/native-object-rig-canvas.js:31)",
-   "source": "src/index.html:1578",
+   "source": "src/index.html:1579",
    "meta": {
     "data": {
      "step": "1"
@@ -15161,7 +15207,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1704",
+   "source": "src/index.html:1705",
    "meta": {
     "data": {},
     "i18n": "rmAddCurrentBtn",
@@ -15201,7 +15247,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1701",
+   "source": "src/index.html:1702",
    "meta": {
     "data": {},
     "i18n": null,
@@ -15239,7 +15285,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1705",
+   "source": "src/index.html:1706",
    "meta": {
     "data": {},
     "i18n": "rmDeleteAllBtn",
@@ -15279,7 +15325,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1710",
+   "source": "src/index.html:1711",
    "meta": {
     "data": {
      "step": "1"
@@ -15319,7 +15365,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1713",
+   "source": "src/index.html:1714",
    "meta": {
     "data": {
      "step": "1"
@@ -15362,7 +15408,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1707",
+   "source": "src/index.html:1708",
    "meta": {
     "data": {},
     "i18n": "rmRenderAllBtn",
@@ -15402,7 +15448,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1750",
+   "source": "src/index.html:1751",
    "meta": {
     "data": {},
     "i18n": null,
@@ -15436,7 +15482,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1771",
+   "source": "src/index.html:1772",
    "meta": {
     "data": {},
     "i18n": null,
@@ -15473,7 +15519,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1886",
+   "source": "src/index.html:1887",
    "meta": {
     "data": {},
     "i18n": "settingsResetAll",
@@ -15493,8 +15539,8 @@
    "capability": "Height",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10464 wireLiveXformField()",
-    "src/js/timeline.js:10468 wireLiveXformField()"
+    "src/js/timeline.js:10463 wireLiveXformField()",
+    "src/js/timeline.js:10467 wireLiveXformField()"
    ],
    "events": [
     "input",
@@ -15528,7 +15574,7 @@
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3942 updateSelPropsPanel()",
-     "src/js/timeline.js:10530"
+     "src/js/timeline.js:10529"
     ]
    },
    "fixtures": [
@@ -15545,8 +15591,8 @@
    "capability": "Rotation relative to selection state (degrees)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10464 wireLiveXformField()",
-    "src/js/timeline.js:10468 wireLiveXformField()"
+    "src/js/timeline.js:10463 wireLiveXformField()",
+    "src/js/timeline.js:10467 wireLiveXformField()"
    ],
    "events": [
     "input",
@@ -15596,8 +15642,8 @@
    "capability": "Width",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10464 wireLiveXformField()",
-    "src/js/timeline.js:10468 wireLiveXformField()"
+    "src/js/timeline.js:10463 wireLiveXformField()",
+    "src/js/timeline.js:10467 wireLiveXformField()"
    ],
    "events": [
     "input",
@@ -15631,7 +15677,7 @@
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3941 updateSelPropsPanel()",
-     "src/js/timeline.js:10541"
+     "src/js/timeline.js:10540"
     ]
    },
    "fixtures": [
@@ -15648,8 +15694,8 @@
    "capability": "X — drag to scrub, click to type",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10464 wireLiveXformField()",
-    "src/js/timeline.js:10468 wireLiveXformField()"
+    "src/js/timeline.js:10463 wireLiveXformField()",
+    "src/js/timeline.js:10467 wireLiveXformField()"
    ],
    "events": [
     "input",
@@ -15699,8 +15745,8 @@
    "capability": "Y — drag to scrub, click to type",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10464 wireLiveXformField()",
-    "src/js/timeline.js:10468 wireLiveXformField()"
+    "src/js/timeline.js:10463 wireLiveXformField()",
+    "src/js/timeline.js:10467 wireLiveXformField()"
    ],
    "events": [
     "input",
@@ -15941,7 +15987,7 @@
    "capability": "Enable/disable stroke",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10227"
+    "src/js/timeline.js:10226"
    ],
    "events": [
     "click"
@@ -15961,7 +16007,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:931",
+   "source": "src/index.html:932",
    "meta": {
     "data": {},
     "i18n": null,
@@ -15989,7 +16035,7 @@
    "capability": "Enable/disable stroke",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10175"
+    "src/js/timeline.js:10174"
    ],
    "events": [
     "click"
@@ -16052,7 +16098,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1834",
+   "source": "src/index.html:1835",
    "meta": {
     "data": {},
     "i18n": "settingsCheckUpdates",
@@ -16088,7 +16134,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1830",
+   "source": "src/index.html:1831",
    "meta": {
     "data": {},
     "i18n": "settingsChoose",
@@ -16122,7 +16168,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1829",
+   "source": "src/index.html:1830",
    "meta": {
     "data": {},
     "i18n": null,
@@ -16162,7 +16208,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1833",
+   "source": "src/index.html:1834",
    "meta": {
     "data": {},
     "i18n": "settingsPublish",
@@ -16191,8 +16237,8 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8091 resetTextPopoverFields())",
-   "source": "src/index.html:2005",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8090 resetTextPopoverFields())",
+   "source": "src/index.html:2006",
    "meta": {
     "data": {},
     "i18n": null,
@@ -16201,8 +16247,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:8091 resetTextPopoverFields()",
-     "src/js/timeline.js:8574 commitText()"
+     "src/js/timeline.js:8090 resetTextPopoverFields()",
+     "src/js/timeline.js:8573 commitText()"
     ]
    },
    "fixtures": [
@@ -16219,7 +16265,7 @@
    "capability": "Place text",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8626 initTextPopover()"
+    "src/js/timeline.js:8625 initTextPopover()"
    ],
    "events": [
     "click"
@@ -16240,7 +16286,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2011",
+   "source": "src/index.html:2012",
    "meta": {
     "data": {},
     "i18n": "btnApplyText",
@@ -16265,7 +16311,7 @@
    "capability": "Cancel",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8627 initTextPopover()"
+    "src/js/timeline.js:8626 initTextPopover()"
    ],
    "events": [
     "click"
@@ -16279,7 +16325,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2010",
+   "source": "src/index.html:2011",
    "meta": {
     "data": {},
     "i18n": "btnCancel2",
@@ -16313,8 +16359,8 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8092 resetTextPopoverFields())",
-   "source": "src/index.html:2002",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8091 resetTextPopoverFields())",
+   "source": "src/index.html:2003",
    "meta": {
     "data": {},
     "i18n": null,
@@ -16323,8 +16369,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:8092 resetTextPopoverFields()",
-     "src/js/timeline.js:8575 commitText()"
+     "src/js/timeline.js:8091 resetTextPopoverFields()",
+     "src/js/timeline.js:8574 commitText()"
     ]
    },
    "fixtures": [
@@ -16350,8 +16396,8 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8090 resetTextPopoverFields())",
-   "source": "src/index.html:1997",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8089 resetTextPopoverFields())",
+   "source": "src/index.html:1998",
    "meta": {
     "data": {},
     "i18n": null,
@@ -16360,8 +16406,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:8090 resetTextPopoverFields()",
-     "src/js/timeline.js:8573 commitText()"
+     "src/js/timeline.js:8089 resetTextPopoverFields()",
+     "src/js/timeline.js:8572 commitText()"
     ]
    },
    "fixtures": [
@@ -16378,7 +16424,7 @@
    "capability": "text input",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8636 initTextPopover()"
+    "src/js/timeline.js:8635 initTextPopover()"
    ],
    "events": [
     "keydown"
@@ -16398,7 +16444,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1994",
+   "source": "src/index.html:1995",
    "meta": {
     "data": {},
     "i18n": null,
@@ -16408,11 +16454,11 @@
     "functionsVisited": 97,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:8088 resetTextPopoverFields()",
-     "src/js/timeline.js:8098 openTextPopover()",
-     "src/js/timeline.js:8108 openTextPopoverForBox()",
-     "src/js/timeline.js:8125 openTextPopoverForEdit()",
-     "src/js/timeline.js:8570 commitText()",
+     "src/js/timeline.js:8087 resetTextPopoverFields()",
+     "src/js/timeline.js:8097 openTextPopover()",
+     "src/js/timeline.js:8107 openTextPopoverForBox()",
+     "src/js/timeline.js:8124 openTextPopoverForEdit()",
+     "src/js/timeline.js:8569 commitText()",
      "src/js/tutorial.js:83 measureTextInputLength()"
     ]
    },
@@ -16439,8 +16485,8 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8089 resetTextPopoverFields())",
-   "source": "src/index.html:1996",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8088 resetTextPopoverFields())",
+   "source": "src/index.html:1997",
    "meta": {
     "data": {
      "step": "1"
@@ -16451,8 +16497,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:8089 resetTextPopoverFields()",
-     "src/js/timeline.js:8572 commitText()"
+     "src/js/timeline.js:8088 resetTextPopoverFields()",
+     "src/js/timeline.js:8571 commitText()"
     ]
    },
    "fixtures": [
@@ -16485,7 +16531,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2138",
+   "source": "src/index.html:2139",
    "meta": {
     "data": {
      "step": "1",
@@ -16531,7 +16577,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2156",
+   "source": "src/index.html:2157",
    "meta": {
     "data": {
      "step": "1"
@@ -16576,7 +16622,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2157",
+   "source": "src/index.html:2158",
    "meta": {
     "data": {
      "step": "1"
@@ -16646,7 +16692,7 @@
    "capability": "Comment",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -16703,8 +16749,8 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "reason": "helper parameter has no proved registration or unchanged returned lookup (reassignment, shadowing or unsupported return flow)",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8819 fillNativeTextProps())",
-   "source": "src/index.html:565",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8818 fillNativeTextProps())",
+   "source": "src/index.html:566",
    "meta": {
     "data": {},
     "i18n": null,
@@ -16713,9 +16759,9 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:8819 fillNativeTextProps()",
-     "src/js/timeline.js:8862 updateTextPropsPanel()",
-     "src/js/timeline.js:8899 applyTextPropsEdit()"
+     "src/js/timeline.js:8818 fillNativeTextProps()",
+     "src/js/timeline.js:8861 updateTextPropsPanel()",
+     "src/js/timeline.js:8898 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -16732,7 +16778,7 @@
    "capability": "Text content",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8951"
+    "src/js/timeline.js:8950"
    ],
    "events": [
     "blur"
@@ -16753,7 +16799,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:548",
+   "source": "src/index.html:549",
    "meta": {
     "data": {},
     "i18n": null,
@@ -16763,9 +16809,9 @@
     "functionsVisited": 131,
     "via": "variable contentEl",
     "references": [
-     "src/js/timeline.js:8816 fillNativeTextProps()",
-     "src/js/timeline.js:8851 updateTextPropsPanel()",
-     "src/js/timeline.js:8892 applyTextPropsEdit()"
+     "src/js/timeline.js:8815 fillNativeTextProps()",
+     "src/js/timeline.js:8850 updateTextPropsPanel()",
+     "src/js/timeline.js:8891 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -16791,8 +16837,8 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8829 fillNativeTextProps())",
-   "source": "src/index.html:607",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8828 fillNativeTextProps())",
+   "source": "src/index.html:608",
    "meta": {
     "data": {
      "step": "1"
@@ -16803,11 +16849,11 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:8829 fillNativeTextProps()",
-     "src/js/timeline.js:8875 updateTextPropsPanel()",
-     "src/js/timeline.js:8913 applyTextPropsEdit()",
-     "src/js/timeline.js:8974",
-     "src/js/timeline.js:8975"
+     "src/js/timeline.js:8828 fillNativeTextProps()",
+     "src/js/timeline.js:8874 updateTextPropsPanel()",
+     "src/js/timeline.js:8912 applyTextPropsEdit()",
+     "src/js/timeline.js:8973",
+     "src/js/timeline.js:8974"
     ]
    },
    "fixtures": [
@@ -16834,8 +16880,8 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "reason": "helper parameter has no proved registration or unchanged returned lookup (reassignment, shadowing or unsupported return flow)",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8817 fillNativeTextProps())",
-   "source": "src/index.html:550",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8816 fillNativeTextProps())",
+   "source": "src/index.html:551",
    "meta": {
     "data": {},
     "i18n": null,
@@ -16844,10 +16890,10 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:8817 fillNativeTextProps()",
-     "src/js/timeline.js:8858 updateTextPropsPanel()",
-     "src/js/timeline.js:8897 applyTextPropsEdit()",
-     "src/js/timeline.js:9000 confirmAddGoogleFont()"
+     "src/js/timeline.js:8816 fillNativeTextProps()",
+     "src/js/timeline.js:8857 updateTextPropsPanel()",
+     "src/js/timeline.js:8896 applyTextPropsEdit()",
+     "src/js/timeline.js:8999 confirmAddGoogleFont()"
     ]
    },
    "fixtures": [
@@ -16864,7 +16910,7 @@
    "capability": "Add a Google Font by name",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8987"
+    "src/js/timeline.js:8986"
    ],
    "events": [
     "click"
@@ -16878,7 +16924,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:563",
+   "source": "src/index.html:564",
    "meta": {
     "data": {},
     "i18n": null,
@@ -16903,7 +16949,7 @@
    "capability": "Add",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:9025"
+    "src/js/timeline.js:9024"
    ],
    "events": [
     "click"
@@ -16924,7 +16970,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:569",
+   "source": "src/index.html:570",
    "meta": {
     "data": {},
     "i18n": "tpFontAddConfirm",
@@ -16949,7 +16995,7 @@
    "capability": "tp font add input",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:9026"
+    "src/js/timeline.js:9025"
    ],
    "events": [
     "keydown"
@@ -16968,7 +17014,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:568",
+   "source": "src/index.html:569",
    "meta": {
     "data": {},
     "i18n": null,
@@ -17003,8 +17049,8 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "reason": "helper parameter has no proved registration or unchanged returned lookup (reassignment, shadowing or unsupported return flow)",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8824 fillNativeTextProps())",
-   "source": "src/index.html:591",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8823 fillNativeTextProps())",
+   "source": "src/index.html:592",
    "meta": {
     "data": {
      "step": "0.5"
@@ -17015,9 +17061,9 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:8824 fillNativeTextProps()",
-     "src/js/timeline.js:8867 updateTextPropsPanel()",
-     "src/js/timeline.js:8907 applyTextPropsEdit()"
+     "src/js/timeline.js:8823 fillNativeTextProps()",
+     "src/js/timeline.js:8866 updateTextPropsPanel()",
+     "src/js/timeline.js:8906 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -17044,8 +17090,8 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "reason": "helper parameter has no proved registration or unchanged returned lookup (reassignment, shadowing or unsupported return flow)",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8825 fillNativeTextProps())",
-   "source": "src/index.html:595",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8824 fillNativeTextProps())",
+   "source": "src/index.html:596",
    "meta": {
     "data": {
      "step": "0.05"
@@ -17056,9 +17102,9 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:8825 fillNativeTextProps()",
-     "src/js/timeline.js:8869 updateTextPropsPanel()",
-     "src/js/timeline.js:8908 applyTextPropsEdit()"
+     "src/js/timeline.js:8824 fillNativeTextProps()",
+     "src/js/timeline.js:8868 updateTextPropsPanel()",
+     "src/js/timeline.js:8907 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -17085,8 +17131,8 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "reason": "helper parameter has no proved registration or unchanged returned lookup (reassignment, shadowing or unsupported return flow)",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8818 fillNativeTextProps())",
-   "source": "src/index.html:564",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8817 fillNativeTextProps())",
+   "source": "src/index.html:565",
    "meta": {
     "data": {
      "step": "1"
@@ -17097,9 +17143,9 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:8818 fillNativeTextProps()",
-     "src/js/timeline.js:8860 updateTextPropsPanel()",
-     "src/js/timeline.js:8898 applyTextPropsEdit()"
+     "src/js/timeline.js:8817 fillNativeTextProps()",
+     "src/js/timeline.js:8859 updateTextPropsPanel()",
+     "src/js/timeline.js:8897 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -17126,8 +17172,8 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "reason": "helper parameter has no proved registration or unchanged returned lookup (reassignment, shadowing or unsupported return flow)",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8826 fillNativeTextProps())",
-   "source": "src/index.html:601",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:8825 fillNativeTextProps())",
+   "source": "src/index.html:602",
    "meta": {
     "data": {
      "step": "0.5"
@@ -17138,9 +17184,9 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:8826 fillNativeTextProps()",
-     "src/js/timeline.js:8871 updateTextPropsPanel()",
-     "src/js/timeline.js:8909 applyTextPropsEdit()"
+     "src/js/timeline.js:8825 fillNativeTextProps()",
+     "src/js/timeline.js:8870 updateTextPropsPanel()",
+     "src/js/timeline.js:8908 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -17171,7 +17217,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1397",
+   "source": "src/index.html:1398",
    "meta": {
     "data": {
      "step": "1"
@@ -17217,7 +17263,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1396",
+   "source": "src/index.html:1397",
    "meta": {
     "data": {
      "step": "1"
@@ -17259,7 +17305,7 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/tracker-panel.js:110 fillTargets())",
-   "source": "src/index.html:1401",
+   "source": "src/index.html:1402",
    "meta": {
     "data": {},
     "i18n": null,
@@ -17302,7 +17348,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1391",
+   "source": "src/index.html:1392",
    "meta": {
     "data": {
      "step": "1"
@@ -17349,7 +17395,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1392",
+   "source": "src/index.html:1393",
    "meta": {
     "data": {
      "step": "1"
@@ -17396,7 +17442,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1338",
+   "source": "src/index.html:1339",
    "meta": {
     "data": {},
     "i18n": null,
@@ -17436,7 +17482,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1626",
+   "source": "src/index.html:1627",
    "meta": {
     "data": {},
     "i18n": null,
@@ -17479,7 +17525,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1820",
+   "source": "src/index.html:1821",
    "meta": {
     "data": {},
     "i18n": "settingsWebChangelogBtn",
@@ -17531,7 +17577,7 @@
     "container": "canvas-zoom-pills",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 252,
+    "functionsVisited": 251,
     "via": "chain",
     "references": [
      "src/js/adapters/native-object-project-desktop.js:359 presented()",
@@ -17552,7 +17598,7 @@
    "capability": "Align bottom",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10586"
+    "src/js/timeline.js:10585"
    ],
    "events": [
     "click"
@@ -17599,7 +17645,7 @@
    "capability": "Align center horizontally",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10586"
+    "src/js/timeline.js:10585"
    ],
    "events": [
     "click"
@@ -17646,7 +17692,7 @@
    "capability": "Align center vertically",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10586"
+    "src/js/timeline.js:10585"
    ],
    "events": [
     "click"
@@ -17693,7 +17739,7 @@
    "capability": "Align left",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10586"
+    "src/js/timeline.js:10585"
    ],
    "events": [
     "click"
@@ -17740,7 +17786,7 @@
    "capability": "Align right",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10586"
+    "src/js/timeline.js:10585"
    ],
    "events": [
     "click"
@@ -17787,7 +17833,7 @@
    "capability": "Align top",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10586"
+    "src/js/timeline.js:10585"
    ],
    "events": [
     "click"
@@ -17834,7 +17880,7 @@
    "capability": "Distribute horizontally",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10589"
+    "src/js/timeline.js:10588"
    ],
    "events": [
     "click"
@@ -17881,7 +17927,7 @@
    "capability": "Distribute vertically",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10589"
+    "src/js/timeline.js:10588"
    ],
    "events": [
     "click"
@@ -18075,7 +18121,7 @@
    "capability": "🐞",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:7956 initCommentPopover()"
+    "src/js/timeline.js:7955 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -18089,7 +18135,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2073",
+   "source": "src/index.html:2074",
    "meta": {
     "data": {
      "tag": "bug"
@@ -18114,7 +18160,7 @@
    "capability": "💡",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:7956 initCommentPopover()"
+    "src/js/timeline.js:7955 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -18128,7 +18174,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2075",
+   "source": "src/index.html:2076",
    "meta": {
     "data": {
      "tag": "idea"
@@ -18153,7 +18199,7 @@
    "capability": "⚡",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:7956 initCommentPopover()"
+    "src/js/timeline.js:7955 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -18167,7 +18213,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2074",
+   "source": "src/index.html:2075",
    "meta": {
     "data": {
      "tag": "perf"
@@ -18192,7 +18238,7 @@
    "capability": "✨",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:7956 initCommentPopover()"
+    "src/js/timeline.js:7955 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -18206,7 +18252,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2076",
+   "source": "src/index.html:2077",
    "meta": {
     "data": {
      "tag": "polish"
@@ -18231,7 +18277,7 @@
    "capability": "Butt",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10351 wireIconGroup()"
+    "src/js/timeline.js:10350 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18250,7 +18296,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:960",
+   "source": "src/index.html:961",
    "meta": {
     "data": {
      "value": "butt"
@@ -18277,7 +18323,7 @@
    "capability": "Round",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10351 wireIconGroup()"
+    "src/js/timeline.js:10350 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18296,7 +18342,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:959",
+   "source": "src/index.html:960",
    "meta": {
     "data": {
      "value": "round"
@@ -18323,7 +18369,7 @@
    "capability": "Square",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10351 wireIconGroup()"
+    "src/js/timeline.js:10350 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18342,7 +18388,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:961",
+   "source": "src/index.html:962",
    "meta": {
     "data": {
      "value": "square"
@@ -18369,7 +18415,7 @@
    "capability": "Above — on top of existing fills",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10351 wireIconGroup()"
+    "src/js/timeline.js:10350 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18388,7 +18434,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1172",
+   "source": "src/index.html:1173",
    "meta": {
     "data": {
      "value": "above"
@@ -18415,7 +18461,7 @@
    "capability": "Below — behind existing fills (background patch)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10351 wireIconGroup()"
+    "src/js/timeline.js:10350 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18434,7 +18480,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1173",
+   "source": "src/index.html:1174",
    "meta": {
     "data": {
      "value": "below"
@@ -18461,7 +18507,7 @@
    "capability": "Merge — unite with any existing fill it overlaps",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10351 wireIconGroup()"
+    "src/js/timeline.js:10350 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18480,7 +18526,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1174",
+   "source": "src/index.html:1175",
    "meta": {
     "data": {
      "value": "merge"
@@ -18507,7 +18553,7 @@
    "capability": "Bevel",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10351 wireIconGroup()"
+    "src/js/timeline.js:10350 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18526,7 +18572,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:966",
+   "source": "src/index.html:967",
    "meta": {
     "data": {
      "value": "bevel"
@@ -18553,7 +18599,7 @@
    "capability": "Miter",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10351 wireIconGroup()"
+    "src/js/timeline.js:10350 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18572,7 +18618,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:965",
+   "source": "src/index.html:966",
    "meta": {
     "data": {
      "value": "miter"
@@ -18599,7 +18645,7 @@
    "capability": "Round",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10351 wireIconGroup()"
+    "src/js/timeline.js:10350 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18618,7 +18664,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:964",
+   "source": "src/index.html:965",
    "meta": {
     "data": {
      "value": "round"
@@ -18645,7 +18691,7 @@
    "capability": "Fill in front of Stroke",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10351 wireIconGroup()"
+    "src/js/timeline.js:10350 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18664,7 +18710,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:970",
+   "source": "src/index.html:971",
    "meta": {
     "data": {
      "value": "fillFirst"
@@ -18691,7 +18737,7 @@
    "capability": "Stroke in front of Fill",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10351 wireIconGroup()"
+    "src/js/timeline.js:10350 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18710,7 +18756,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:971",
+   "source": "src/index.html:972",
    "meta": {
     "data": {
      "value": "strokeFirst"
@@ -18751,7 +18797,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1913",
+   "source": "src/index.html:1914",
    "meta": {
     "data": {},
     "i18n": null,
@@ -18785,7 +18831,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1904",
+   "source": "src/index.html:1905",
    "meta": {
     "data": {},
     "i18n": null,
@@ -18819,7 +18865,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1908",
+   "source": "src/index.html:1909",
    "meta": {
     "data": {},
     "i18n": null,
@@ -18853,7 +18899,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1858",
+   "source": "src/index.html:1859",
    "meta": {
     "data": {},
     "i18n": null,
@@ -18887,7 +18933,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1897",
+   "source": "src/index.html:1898",
    "meta": {
     "data": {
      "pane": "about"
@@ -18923,7 +18969,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1824",
+   "source": "src/index.html:1825",
    "meta": {
     "data": {
      "pane": "collab"
@@ -18959,7 +19005,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1850",
+   "source": "src/index.html:1851",
    "meta": {
     "data": {
      "pane": "feedback"
@@ -18995,7 +19041,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1867",
+   "source": "src/index.html:1868",
    "meta": {
     "data": {
      "pane": "figma"
@@ -19031,7 +19077,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1768",
+   "source": "src/index.html:1769",
    "meta": {
     "data": {
      "pane": "general"
@@ -19067,7 +19113,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1889",
+   "source": "src/index.html:1890",
    "meta": {
     "data": {
      "pane": "labs"
@@ -19103,7 +19149,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1881",
+   "source": "src/index.html:1882",
    "meta": {
     "data": {
      "pane": "shortcuts"
@@ -19139,7 +19185,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1799",
+   "source": "src/index.html:1800",
    "meta": {
     "data": {
      "pane": "updates"
@@ -19175,7 +19221,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1765",
+   "source": "src/index.html:1766",
    "meta": {
     "data": {
      "tab": "about"
@@ -19211,7 +19257,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1760",
+   "source": "src/index.html:1761",
    "meta": {
     "data": {
      "tab": "collab"
@@ -19247,7 +19293,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1761",
+   "source": "src/index.html:1762",
    "meta": {
     "data": {
      "tab": "feedback"
@@ -19283,7 +19329,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1762",
+   "source": "src/index.html:1763",
    "meta": {
     "data": {
      "tab": "figma"
@@ -19319,7 +19365,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1758",
+   "source": "src/index.html:1759",
    "meta": {
     "data": {
      "tab": "general"
@@ -19355,7 +19401,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1764",
+   "source": "src/index.html:1765",
    "meta": {
     "data": {
      "tab": "labs"
@@ -19391,7 +19437,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1763",
+   "source": "src/index.html:1764",
    "meta": {
     "data": {
      "tab": "shortcuts"
@@ -19427,7 +19473,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1759",
+   "source": "src/index.html:1760",
    "meta": {
     "data": {
      "tab": "updates"
@@ -19449,7 +19495,7 @@
    "capability": "Ellipse",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -19496,7 +19542,7 @@
    "capability": "Line (U in Animation 2D — Motion mode reserves U to reveal animated properties)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -19543,7 +19589,7 @@
    "capability": "Rectangle",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -19590,7 +19636,7 @@
    "capability": "Speech bubble — rounded rect with an auto tail, drag to size (D)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -19637,7 +19683,7 @@
    "capability": "Star / Polygon — drag to size, adjust point count / inner radius / corner rounding in the panel (K)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -19697,7 +19743,7 @@
    "status": "unavailable-with-reason",
    "reason": "static placeholder: #symbol-tabs is emptied and rebuilt at runtime by src/js/timeline.js:7258 renderSymbolTabs(); the live controls are created and bound there",
    "nextGate": "none for the static markup; characterize the runtime-built controls through src/js/timeline.js:7258 renderSymbolTabs()",
-   "source": "src/index.html:2129",
+   "source": "src/index.html:2130",
    "meta": {
     "data": {
      "sym": ""
@@ -19719,7 +19765,7 @@
    "capability": "B",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8963"
+    "src/js/timeline.js:8962"
    ],
    "events": [
     "click"
@@ -19740,7 +19786,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:577",
+   "source": "src/index.html:578",
    "meta": {
     "data": {
      "flag": "bold"
@@ -19767,7 +19813,7 @@
    "capability": "I",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8963"
+    "src/js/timeline.js:8962"
    ],
    "events": [
     "click"
@@ -19788,7 +19834,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:578",
+   "source": "src/index.html:579",
    "meta": {
     "data": {
      "flag": "italic"
@@ -19815,7 +19861,7 @@
    "capability": "S",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8963"
+    "src/js/timeline.js:8962"
    ],
    "events": [
     "click"
@@ -19836,7 +19882,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:580",
+   "source": "src/index.html:581",
    "meta": {
     "data": {
      "flag": "strike"
@@ -19863,7 +19909,7 @@
    "capability": "U",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8963"
+    "src/js/timeline.js:8962"
    ],
    "events": [
     "click"
@@ -19884,7 +19930,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:579",
+   "source": "src/index.html:580",
    "meta": {
     "data": {
      "flag": "underline"
@@ -19911,7 +19957,7 @@
    "capability": "Auto width",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8972"
+    "src/js/timeline.js:8971"
    ],
    "events": [
     "click"
@@ -19932,7 +19978,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:605",
+   "source": "src/index.html:606",
    "meta": {
     "data": {
      "val": "auto"
@@ -19959,7 +20005,7 @@
    "capability": "Ab",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8966"
+    "src/js/timeline.js:8965"
    ],
    "events": [
     "click"
@@ -19980,7 +20026,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:586",
+   "source": "src/index.html:587",
    "meta": {
     "data": {
      "val": "capitalize"
@@ -20007,7 +20053,7 @@
    "capability": "Center",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8957"
+    "src/js/timeline.js:8956"
    ],
    "events": [
     "click"
@@ -20028,7 +20074,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:573",
+   "source": "src/index.html:574",
    "meta": {
     "data": {
      "val": "center"
@@ -20055,7 +20101,7 @@
    "capability": "Fixed width",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8972"
+    "src/js/timeline.js:8971"
    ],
    "events": [
     "click"
@@ -20076,7 +20122,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:606",
+   "source": "src/index.html:607",
    "meta": {
     "data": {
      "val": "fixed"
@@ -20103,7 +20149,7 @@
    "capability": "Left",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8957"
+    "src/js/timeline.js:8956"
    ],
    "events": [
     "click"
@@ -20124,7 +20170,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:572",
+   "source": "src/index.html:573",
    "meta": {
     "data": {
      "val": "left"
@@ -20151,7 +20197,7 @@
    "capability": "aa",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8966"
+    "src/js/timeline.js:8965"
    ],
    "events": [
     "click"
@@ -20172,7 +20218,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:585",
+   "source": "src/index.html:586",
    "meta": {
     "data": {
      "val": "lower"
@@ -20199,7 +20245,7 @@
    "capability": "Aa",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8966"
+    "src/js/timeline.js:8965"
    ],
    "events": [
     "click"
@@ -20220,7 +20266,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:583",
+   "source": "src/index.html:584",
    "meta": {
     "data": {
      "val": "none"
@@ -20247,7 +20293,7 @@
    "capability": "Right",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8957"
+    "src/js/timeline.js:8956"
    ],
    "events": [
     "click"
@@ -20268,7 +20314,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:574",
+   "source": "src/index.html:575",
    "meta": {
     "data": {
      "val": "right"
@@ -20295,7 +20341,7 @@
    "capability": "AA",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8966"
+    "src/js/timeline.js:8965"
    ],
    "events": [
     "click"
@@ -20316,7 +20362,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:584",
+   "source": "src/index.html:585",
    "meta": {
     "data": {
      "val": "upper"
@@ -20343,7 +20389,7 @@
    "capability": "Brush",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -20390,7 +20436,7 @@
    "capability": "Eraser (E in Animation 2D — Motion mode reserves E to reveal Effects)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -20437,7 +20483,7 @@
    "capability": "Eyedropper",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -20484,7 +20530,7 @@
    "capability": "Fill",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -20531,7 +20577,7 @@
    "capability": "Fill Brush",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -20578,7 +20624,7 @@
    "capability": "Fill/Stroke Select — click a fill or a stroke segment to select it independently (M in Animation 2D — Motion mode reserves M to reveal Mattes)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -20625,7 +20671,7 @@
    "capability": "Hand",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -20672,7 +20718,7 @@
    "capability": "Pen",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -20719,7 +20765,7 @@
    "capability": "Rig — 3 steps in the panel: 1. Draw (click=anchor, drag=curve) 2. Assign (link shapes to bones) 3. Move (drag an anchor to pose) (S in Animation 2D — Motion mode reserves S for Scale)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -20766,7 +20812,7 @@
    "capability": "Rotate canvas",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -20813,7 +20859,7 @@
    "capability": "Select",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -20860,7 +20906,7 @@
    "capability": "Subselect (nodes)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -20907,7 +20953,7 @@
    "capability": "Text",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -20954,7 +21000,7 @@
    "capability": "Zoom",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10139"
+    "src/js/timeline.js:10138"
    ],
    "events": [
     "click"
@@ -21001,7 +21047,7 @@
    "capability": "Bottom-center",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10579"
+    "src/js/timeline.js:10578"
    ],
    "events": [
     "click"
@@ -21045,7 +21091,7 @@
    "capability": "Bottom-left",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10579"
+    "src/js/timeline.js:10578"
    ],
    "events": [
     "click"
@@ -21089,7 +21135,7 @@
    "capability": "Bottom-right",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10579"
+    "src/js/timeline.js:10578"
    ],
    "events": [
     "click"
@@ -21133,7 +21179,7 @@
    "capability": "Center",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10579"
+    "src/js/timeline.js:10578"
    ],
    "events": [
     "click"
@@ -21177,7 +21223,7 @@
    "capability": "Middle-left",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10579"
+    "src/js/timeline.js:10578"
    ],
    "events": [
     "click"
@@ -21221,7 +21267,7 @@
    "capability": "Middle-right",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10579"
+    "src/js/timeline.js:10578"
    ],
    "events": [
     "click"
@@ -21265,7 +21311,7 @@
    "capability": "Top-center",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10579"
+    "src/js/timeline.js:10578"
    ],
    "events": [
     "click"
@@ -21309,7 +21355,7 @@
    "capability": "Top-left",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10579"
+    "src/js/timeline.js:10578"
    ],
    "events": [
     "click"
@@ -21353,7 +21399,7 @@
    "capability": "Top-right",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10579"
+    "src/js/timeline.js:10578"
    ],
    "events": [
     "click"
@@ -26204,7 +26250,7 @@
    "source": "src/js/motion.js:9827",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 166
+    "functionsVisited": 174
    },
    "fixtures": [
     "static-props",
@@ -26246,7 +26292,7 @@
    "source": "src/js/motion.js:9872",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 456
+    "functionsVisited": 462
    },
    "fixtures": [
     "static-props",
@@ -26765,7 +26811,7 @@
    "source": "src/js/motion.js:7351",
    "meta": {
     "i18n": "ctxObjectDuplicatorEllipsis",
-    "functionsVisited": 171
+    "functionsVisited": 170
    },
    "fixtures": [
     "static-props",
@@ -28803,7 +28849,7 @@
    "source": "src/js/shapes-panel.js:738",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 66
+    "functionsVisited": 74
    },
    "fixtures": [
     "static-props",
@@ -28914,7 +28960,7 @@
    "source": "src/js/shapes-panel.js:860",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 66
+    "functionsVisited": 74
    },
    "fixtures": [
     "static-props",
@@ -30935,7 +30981,7 @@
    "source": "src/js/timeline.js:6986",
    "meta": {
     "i18n": "ctxObjectDuplicatorEllipsis",
-    "functionsVisited": 171
+    "functionsVisited": 170
    },
    "fixtures": [
     "keyed-props",
@@ -31384,7 +31430,7 @@
    "source": "src/js/timeline.js:5686",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 166
+    "functionsVisited": 174
    },
    "fixtures": [
     "keyed-props",
@@ -31423,7 +31469,7 @@
    "source": "src/js/timeline.js:5717",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 456
+    "functionsVisited": 462
    },
    "fixtures": [
     "keyed-props",
@@ -33045,7 +33091,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 397
+    "functionsVisited": 398
    },
    "fixtures": [
     "media",

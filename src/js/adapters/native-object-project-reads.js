@@ -284,15 +284,17 @@
       return freeze({ info: copyPins(o.info), presentation: o.presentation, layerUid: selector.layerUid, frames: frames });
     }
     async function subselectGeometry(o, stableTarget, intent, paint, hitTest, center) {
-      let cursor=0,segments=[],total=null,closed=null,widths=[];
+      let cursor=0,segments=[],total=null,closed=null,widths=[],pointTypes=[],typed=false;
       for(;;){
         const page={cursor:cursor,limit:16};if(intent!==undefined)page.preview=intent;if(paint)page.paint=true;if(hitTest)page.hitTest=true;if(center)page.center=true;
         const r=(await queryBody(o,{atRevision:o.info.contentRevision,documentSnapshotId:o.info.documentSnapshotId,stableTarget:stableTarget,subselect:page})).subselect;
         if(total!==null&&(r.total!==total||r.closed!==closed))throw fault('uncorrelated','Subselect geometry changed between pages');
-        total=r.total;closed=r.closed;segments=segments.concat(r.segments);if(center)widths=widths.concat(r.widths);
+        total=r.total;closed=r.closed;segments=segments.concat(r.segments);if(center)widths=widths.concat(r.widths);if(own(r,'pointTypes')){typed=true;pointTypes=pointTypes.concat(r.pointTypes);}
         if(r.nextCursor===null)break;cursor=r.nextCursor;
       }
-      requireCurrent(o);return center?{closed:closed,segments:segments,widths:widths}:{closed:closed,segments:segments};
+      requireCurrent(o);if(center)return {closed:closed,segments:segments,widths:widths};
+      // #2356: the type each vertex shows, when the plain editable read lists it (a ribbon centreline has none).
+      return typed&&pointTypes.length===segments.length?{closed:closed,segments:segments,pointTypes:pointTypes}:{closed:closed,segments:segments};
     }
     async function readSubselect(selector,pin) {
       if(!exact(selector,['contextId','layerUid','frame'],[])||selector.contextId!=='scene-root'||!text(selector.layerUid)||!integer(selector.frame,0,4294967295)||!pins(pin))throw fault('invalid_request','Invalid subselect selection');
@@ -309,7 +311,7 @@
         const key=stable(item.stableTarget);if(ids.has(key)||item.stableTarget.frameScope.kind!=='authored'||item.stableTarget.frameScope.frame>selector.frame)throw fault('uncorrelated','Subselect selection has invalid source identities');ids.add(key);
         const geometry=await subselectGeometry(o,item.stableTarget);
         if(geometry.closed!==item.closed||geometry.segments.length!==item.count)throw fault('uncorrelated','Subselect geometry differs from its native presentation');
-        item.segments=geometry.segments;
+        item.segments=geometry.segments;if(geometry.pointTypes)item.pointTypes=geometry.pointTypes;
         if(own(item,'paintCount')){
           const paint=await subselectGeometry(o,item.stableTarget,undefined,true);
           if(!paint.closed||paint.segments.length!==item.paintCount)throw fault('uncorrelated','Subselect paint differs from its native presentation');

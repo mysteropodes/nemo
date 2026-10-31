@@ -836,6 +836,19 @@
         },
         "isFillShape": {
           "const": true
+        },
+        "pointTypes": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 256,
+          "items": {
+            "enum": [
+              "corner",
+              "smooth",
+              "symmetric"
+            ]
+          },
+          "description": "Optional per-vertex point-type hint aligned with geometry.segments; absent means inferred from the handles. Never on a pressure ribbon."
         }
       },
       "minProperties": 1,
@@ -8841,6 +8854,23 @@
             {
               "properties": {
                 "operation": {
+                  "const": "command.document.object.asset.video.link"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectVideoLinkPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
                   "const": "command.document.object.vector.edit"
                 },
                 "payload": {
@@ -10349,6 +10379,9 @@
             },
             {
               "$ref": "#/$defs/ObjectProjectSymmetryReadResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectVideoLinkResult"
             },
             {
               "$ref": "#/$defs/ObjectComponentReadResult"
@@ -13388,7 +13421,9 @@
                       "additionalProperties": false,
                       "required": [
                         "keyCount",
-                        "keyAtFrame"
+                        "keyAtFrame",
+                        "value",
+                        "keys"
                       ],
                       "properties": {
                         "keyCount": {
@@ -13397,6 +13432,44 @@
                         },
                         "keyAtFrame": {
                           "type": "boolean"
+                        },
+                        "value": {
+                          "description": "The eased source frame at the read's frame; null without keys.",
+                          "oneOf": [
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "number"
+                            }
+                          ]
+                        },
+                        "keys": {
+                          "description": "The keys in frame order while the read fits its bound; null past it (keyCount still counts them).",
+                          "oneOf": [
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "frame",
+                                  "value"
+                                ],
+                                "properties": {
+                                  "frame": {
+                                    "type": "number"
+                                  },
+                                  "value": {
+                                    "type": "number"
+                                  }
+                                }
+                              }
+                            }
+                          ]
                         }
                       }
                     }
@@ -13436,7 +13509,7 @@
               }
             }
           ],
-          "description": "T12: the layer's video drawing placement, or null. Remap keys are counted, never listed, so the read stays within 4096 bytes."
+          "description": "T12: the layer's video drawing placement, or null. Remap keys are listed while the read stays within 4096 bytes and counted always."
         }
       }
     },
@@ -17818,6 +17891,151 @@
         }
       }
     },
+    "ObjectVideoLinkPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentSnapshotId",
+        "lifecycleGeneration",
+        "source",
+        "intent"
+      ],
+      "description": "T12: link one desktop video file. The host canonicalizes the path inside the request filesystem scope and probes width, height and frame count; the owner publishes one revision. Whitespace-only or NUL-bearing ids and paths are refused by the contract. The path bound (2048 bytes) fits the 4096-byte request with every other field at its maximum.",
+      "properties": {
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "lifecycleGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "path"
+          ],
+          "properties": {
+            "kind": {
+              "const": "file"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          }
+        },
+        "intent": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "newLayer"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "placementId"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "replace"
+                },
+                "placementId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ObjectVideoLinkResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded",
+        "assetId",
+        "placementId",
+        "target",
+        "newLayer",
+        "sourceWidth",
+        "sourceHeight",
+        "sourceFrameCount"
+      ],
+      "description": "T12: one applied linked-video revision. A new layer names the placement minted from its request id in the scene root; a replace names the unchanged placement id and its own target, whose context may be a component.",
+      "properties": {
+        "applied": {
+          "const": true
+        },
+        "historyEntriesAdded": {
+          "const": 1
+        },
+        "assetId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "placementId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contextId",
+            "layerUid"
+          ],
+          "properties": {
+            "contextId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            }
+          }
+        },
+        "newLayer": {
+          "type": "boolean"
+        },
+        "sourceWidth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "sourceHeight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "sourceFrameCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        }
+      }
+    },
     "ObjectImportAsset": {
       "type": "object",
       "additionalProperties": false,
@@ -19879,6 +20097,19 @@
         },
         "isFillShape": {
           "const": true
+        },
+        "pointTypes": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 256,
+          "items": {
+            "enum": [
+              "corner",
+              "smooth",
+              "symmetric"
+            ]
+          },
+          "description": "Optional per-vertex point-type hint aligned with geometry.segments; absent means inferred from the handles. Never on a pressure ribbon."
         }
       },
       "minProperties": 1,
@@ -20091,6 +20322,19 @@
         },
         "isFillShape": {
           "const": true
+        },
+        "pointTypes": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 256,
+          "items": {
+            "enum": [
+              "corner",
+              "smooth",
+              "symmetric"
+            ]
+          },
+          "description": "Optional per-vertex point-type hint aligned with geometry.segments; absent means inferred from the handles. Never on a pressure ribbon."
         }
       },
       "minProperties": 1,
@@ -20279,7 +20523,8 @@
               "enum": [
                 "corner",
                 "smooth",
-                "symmetric"
+                "symmetric",
+                "collapse"
               ]
             }
           }
@@ -20585,6 +20830,18 @@
             },
             "paint": {
               "const": true
+            },
+            "pointTypes": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "enum": [
+                  "corner",
+                  "smooth",
+                  "symmetric"
+                ]
+              },
+              "description": "The point type each listed vertex shows: its stored hint, else the one its handles show. Only on the plain editable read."
             }
           },
           "allOf": [
