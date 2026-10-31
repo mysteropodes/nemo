@@ -19,10 +19,12 @@ const path = require('node:path');
 
 test('every scripts/nemo/*.test.cjs suite is reachable from a tests/ entry', () => {
   const root = path.resolve(__dirname, '..');
-  const entries = fs.readdirSync(__dirname).filter((f) => f.endsWith('.test.cjs'))
-    .map((f) => fs.readFileSync(path.join(__dirname, f), 'utf8')).join('\n');
+  // Reached means a real require() of the suite from a tests/ entry; a mention in a comment or string does not count.
+  const reached = new Set(fs.readdirSync(__dirname).filter((f) => f.endsWith('.test.cjs'))
+    .flatMap((f) => [...fs.readFileSync(path.join(__dirname, f), 'utf8')
+      .matchAll(/^\s*require\(\s*['"]\.\.\/scripts\/nemo\/([^'"/]+\.test\.cjs)['"]\s*\)/gm)].map((m) => m[1])));
   const missing = fs.readdirSync(path.join(root, 'scripts/nemo'))
     .filter((f) => /\.test\.cjs$/.test(f) && !/^boundaries-.+\.test\.cjs$/.test(f))
-    .filter((f) => !entries.includes(f));
+    .filter((f) => !reached.has(f));
   assert.deepEqual(missing, [], `scripts/nemo suites outside every tests/ entry: ${missing.join(', ')}`);
 });

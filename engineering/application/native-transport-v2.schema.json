@@ -1180,7 +1180,7 @@
           "description": "Optional, create steps only. Baseline trimStrokeEndsMax: the first create is cut against its own cell and every other create (symmetry copies, Labs multi-frame stamps) takes the same cut."
         }
       },
-      "description": "#2361/#2362: 1..64 ordered create/replace/delete steps on one scene-root layer as one revision and one undo entry; the native owner refuses the whole batch when any step is refused."
+      "description": "#2361/#2362: 1..64 ordered create/replace/delete steps on scene-root layers (one or, for a Select spanning layers, several; a trimEnds batch is one layer) as one revision and one undo entry; the native owner refuses the whole batch when any step is refused."
     },
     "ObjectVectorEditPayload": {
       "oneOf": [

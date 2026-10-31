@@ -1,4 +1,5 @@
-//! `object.vector.batch` (#2361, #2362): an ordered list of creates, replaces and deletes on ONE scene-root layer, applied
+//! `object.vector.batch` (#2361, #2362): an ordered list of creates, replaces and deletes on the scene-root layers (one or, since #2372, several: a
+//! Select spanning layers is one step; every step is guarded by ITS layer's lock and path effects, a refusal refuses all), applied
 //! through the single-command kernels to the document as it grows, as one candidate, one revision and one undo entry. It
 //! carries the Labs edits that the baseline makes inside one undo step: the knife's cut pieces, sculpt's rewritten
 //! strokes, pose stamps and multiframe copies. Ids are allocated from the origin revision, as single creates are, and
@@ -333,7 +334,8 @@ pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool, 
     // `trimEnds` (all-create batches only): the first create is cut against its own cell before any step lands, and every
     // other create takes the same cut, as the baseline stamps and mirrors the already trimmed path.
     if let Some(max) = trim {
-        if ops.iter().any(|op| op.op != "create") {
+        // The cut is against ONE cell, so a trimmed batch stays on one layer.
+        if ops.iter().any(|op| op.op != "create" || target_of(op).is_none_or(|t| t.layer_uid != first.layer_uid)) {
             return Err(InvalidRequest);
         }
         let mut records: Vec<ObjectRecord> = ops.iter().map(|op| op.record.value().cloned().ok_or(InvalidRequest)).collect::<Result<_, _>>()?;
@@ -356,27 +358,38 @@ pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool, 
     // batch (the baseline freezes all its targets before stamping any): a later step never copies an earlier one, and a
     // replace or delete on a held cell edits that cell's copy (same stroke ids), never the key it held.
     if keyed.contains(&true) {
-        let timing = document.layers.iter().find(|l| l.layer_uid == first.layer_uid).and_then(|l| l.timing.value());
-        let mut plain: Vec<u32> = Vec::new();
-        for op in ops.iter().zip(&keyed).filter(|(_, keyed)| **keyed).map(|(op, _)| op) {
-            let frame = target_of(op).ok_or(InvalidRequest)?.frame_scope.frame;
-            let shown = timing.is_some_and(|t| matches!(t.exposure(frame).0, "held" | "unexposed"));
-            if shown && frame < document.total_frames && !plain.contains(&frame) {
-                plain.push(frame);
+        // One promotion per layer a keyed step touches (#2372: a selection may span layers, each with its own timing).
+        let mut layers: Vec<String> = Vec::new();
+        for (op, _) in ops.iter().zip(&keyed).filter(|(_, keyed)| **keyed) {
+            let layer = target_of(op).ok_or(InvalidRequest)?.layer_uid;
+            if !layers.contains(&layer) {
+                layers.push(layer);
             }
         }
-        if !plain.is_empty() {
-            if let DocumentEdit::Changed(next) =
-                promote_cells(&document, &first.layer_uid, &plain).map_err(|_| InvalidRequest)?
-            {
-                document = next;
+        for layer in layers {
+            let timing = document.layers.iter().find(|l| l.layer_uid == *layer).and_then(|l| l.timing.value());
+            let mut plain: Vec<u32> = Vec::new();
+            for op in ops.iter().zip(&keyed).filter(|(_, keyed)| **keyed).map(|(op, _)| op) {
+                let at = target_of(op).ok_or(InvalidRequest)?;
+                if at.layer_uid != *layer {
+                    continue;
+                }
+                let shown = timing.is_some_and(|t| matches!(t.exposure(at.frame_scope.frame).0, "held" | "unexposed"));
+                if shown && at.frame_scope.frame < document.total_frames && !plain.contains(&at.frame_scope.frame) {
+                    plain.push(at.frame_scope.frame);
+                }
+            }
+            if !plain.is_empty() {
+                if let DocumentEdit::Changed(next) = promote_cells(&document, &layer, &plain).map_err(|_| InvalidRequest)? {
+                    document = next;
+                }
             }
         }
     }
     let (mut stroke_ids, mut changed) = (Vec::new(), false);
     for ((((op, copy), fill), companion), swap) in ops.into_iter().zip(keyed).zip(fills).zip(companions).zip(swaps) {
         let target = target_of(&op).ok_or(InvalidRequest)?;
-        if target.context_id != first.context_id || target.layer_uid != first.layer_uid {
+        if target.context_id != first.context_id {
             return Err(InvalidRequest);
         }
         if let Some(swap) = swap {
