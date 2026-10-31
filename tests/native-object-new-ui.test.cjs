@@ -540,6 +540,7 @@ function queueHidden(app){
   proxy.readPresentedObjectSession=f=>{if(state.hidden){if(typeof f==='function')f('queue-pending');return null;}return real.readPresentedObjectSession(f);};
   app.window.NemoNativeObjectProject={...Project,desktop:()=>proxy};
   app.window.NemoNativePresentationWait=require('../src/js/adapters/native-presentation-wait.js');
+  app.window.NemoNativeNewReturnPin=require('../src/js/adapters/native-new-return-pin.js');
   app.window.setTimeout=(fn,ms)=>ms?setImmediate(fn):setTimeout(fn,0);
   return state;
 }
