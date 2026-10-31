@@ -111,6 +111,69 @@ fn follow_path_sets_clears_and_carries_align_as_one_exact_undoable_entry() {
     assert_eq!(bytes(&reopened), bytes(&aligned), "save and reopen");
 }
 
+fn follow_align(layer: &str, target: Value, align: Value) -> Value {
+    let mut payload = follow(layer, target);
+    payload["align"] = align;
+    payload
+}
+
+#[test]
+fn follow_path_align_is_authored_kept_dropped_and_undoable() {
+    let mut owner = owner_of(&fixture());
+    let path = |owner: &NativeObjectHistory| value(owner)["layers"][0]["followPath"].clone();
+    // omitted keeps the stored align (false for a fresh follow)
+    send(&mut owner, "a0", "followPath.set", &follow("L0", json!("L2")));
+    assert_eq!(path(&owner), json!({"targetLayerUid":"L2","align":false}));
+    // align:true on the same target is a real edit: one entry, one revision
+    let (revision, depths) = (owner.content_revision(), owner.history_depths());
+    let reply = send(&mut owner, "a1", "followPath.set", &follow_align("L0", json!("L2"), json!(true)));
+    assert_eq!(reply["result"], json!({"applied":true,"historyEntriesAdded":1}), "{reply}");
+    assert_eq!(path(&owner), json!({"targetLayerUid":"L2","align":true}));
+    assert_eq!(owner.content_revision(), revision + 1);
+    assert_eq!(owner.history_depths(), (depths.0 + 1, 0));
+    // the same align again publishes nothing
+    let kept = bytes(&owner);
+    let reply = send(&mut owner, "a2", "followPath.set", &follow_align("L0", json!("L2"), json!(true)));
+    assert_eq!(reply["result"]["applied"], false);
+    assert_eq!(bytes(&owner), kept);
+    // omitted align on the same target is a no-op and a retarget keeps the authored align
+    let reply = send(&mut owner, "a3", "followPath.set", &follow("L0", json!("L2")));
+    assert_eq!(reply["result"]["applied"], false);
+    send(&mut owner, "a4", "followPath.set", &follow("L0", json!("L1")));
+    assert_eq!(path(&owner), json!({"targetLayerUid":"L1","align":true}));
+    // align:false is authored too
+    send(&mut owner, "a5", "followPath.set", &follow_align("L0", json!("L1"), json!(false)));
+    assert_eq!(path(&owner), json!({"targetLayerUid":"L1","align":false}));
+    // one call may retarget and author at once
+    send(&mut owner, "a6", "followPath.set", &follow_align("L0", json!("L2"), json!(true)));
+    assert_eq!(path(&owner), json!({"targetLayerUid":"L2","align":true}));
+    // undo restores the previous align, redo reapplies it
+    let aligned = bytes(&owner);
+    let at = owner.content_revision();
+    assert_eq!(owner.undo(at).unwrap(), at + 1);
+    assert_eq!(path(&owner), json!({"targetLayerUid":"L1","align":false}));
+    owner.redo(at + 1).unwrap();
+    assert_eq!(bytes(&owner), aligned, "redo");
+    // a clear drops the align; an align beside a null target is ignored (nothing to clear: no edit)
+    send(&mut owner, "a7", "followPath.set", &follow_align("L0", Value::Null, json!(true)));
+    assert!(path(&owner).is_null());
+    let reply = send(&mut owner, "a8", "followPath.set", &follow_align("L0", Value::Null, json!(false)));
+    assert_eq!(reply["result"]["applied"], false);
+    // a fresh follow after the clear starts unaligned unless authored
+    send(&mut owner, "a9", "followPath.set", &follow("L0", json!("L2")));
+    assert_eq!(path(&owner), json!({"targetLayerUid":"L2","align":false}));
+    // a non-boolean align is invalid
+    refused(&mut owner, "bad-align", &follow_align("L0", json!("L2"), json!("yes")), "invalid_request");
+    // authoring on a fresh follow, then undo back to the untouched bytes
+    let mut fresh = owner_of(&fixture());
+    let untouched = bytes(&fresh);
+    send(&mut fresh, "u0", "followPath.set", &follow_align("L0", json!("L2"), json!(true)));
+    assert_eq!(path(&fresh), json!({"targetLayerUid":"L2","align":true}));
+    let at = fresh.content_revision();
+    fresh.undo(at).unwrap();
+    assert_eq!(bytes(&fresh), untouched);
+}
+
 #[test]
 fn follow_path_refusals_are_typed_and_a_target_must_carry_a_path() {
     let mut owner = owner_of(&fixture());

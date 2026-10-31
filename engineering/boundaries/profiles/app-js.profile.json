@@ -3486,11 +3486,13 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-layer-parent.js"
+        "native-layer-parent.js",
+        "native-motion-layer-link-rows.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
-        "native-layer-parent.js"
+        "native-layer-parent.js",
+        "native-motion-layer-link-rows.js"
       ]
     },
     {

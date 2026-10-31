@@ -150,6 +150,7 @@
       get showContextMenu(){return typeof root.showContextMenu==='function'?function(x,y,items){return root.showContextMenu(x,y,items);}:undefined;},
       get editPropertyTrack(){return typeof ui.editPropertyTrack==='function'?function(payload,pin,current){return editProperty(payload,pin,current,true);}:undefined;},
       get editProperty(){return typeof ui.editProperty==='function'?editProperty:undefined;},
+      layerLinkRows:function(target){var rows=root.NemoNativeMotionLayerLinkRows;return rows&&typeof rows.build==='function'?rows.build(root,target):null;},
       selectTarget:selectTarget,labelTarget:labelTarget,labelProperty:options.labelProperty,dimLabels:options.dimLabels,readPreference:options.readPreference,writePreference:options.writePreference});
     async function update(force){var ticket=++updateSerial,base=baseScope();if(base&&!base.explicit&&!cacheMatches(base)&&uniqueContextAllowed())showWait('Loading properties…',true);
       if(base)await resolveContext(base,!!force);if(retired||ticket!==updateSerial||options.isCurrent&&options.isCurrent()!==true)return false;clearWait();return caller.update(force);}
