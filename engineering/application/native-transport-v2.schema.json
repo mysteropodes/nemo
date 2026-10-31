@@ -11922,6 +11922,83 @@
                   "const": "bake"
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "controlType",
+                "name"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "addControl"
+                },
+                "controlType": {
+                  "enum": [
+                    "number",
+                    "checkbox",
+                    "angle",
+                    "point",
+                    "color"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "name"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "renameControl"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "removeControl"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "direction"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "moveControl"
+                },
+                "direction": {
+                  "enum": [
+                    -1,
+                    1
+                  ]
+                }
+              }
             }
           ]
         }

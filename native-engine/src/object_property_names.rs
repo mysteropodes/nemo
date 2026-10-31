@@ -82,6 +82,10 @@ fn js_lower(s: &str) -> String {
     out
 }
 
+pub(super) fn trim(name: &str) -> &str {
+    name.trim_matches(|c| in_ranges(c, &JS_SPACE))
+}
+
 pub(super) fn normalize(name: &str) -> String {
-    js_lower(name.trim_matches(|c| in_ranges(c, &JS_SPACE)))
+    js_lower(trim(name))
 }
