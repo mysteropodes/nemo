@@ -2,6 +2,7 @@
 use crate::compositor::object_compositor::prepare_command;
 use crate::compositor::{Compositor, CompositorError};
 use crate::object_render_scene::object_scene_style_emit::PreparedItem;
+use crate::object_render_scene::viewport_checker::shadow::is_shadow_guide;
 use crate::object_render_scene::{ordered_entries, ObjectCompositionWitness, PaintEntry};
 use vello::kurbo::Affine;
 /// T12: the layered path draws solid layers only, so a video is refused, never omitted.
@@ -99,7 +100,12 @@ impl Compositor {
         }
         // #2372: the viewport-only Current frame outline (an export witness has none): vector items, not text, video or images.
         let outline = prepared.viewport_outline();
+        // #2373: the viewport-only hidden Shadow guides (an export witness hides none).
+        let hide_shadow = prepared.viewport_hides_shadow_guides();
         for entry in ordered_entries(prepared.plan()) {
+            if hide_shadow && is_shadow_guide(&entry) {
+                continue;
+            }
             match entry {
                 PaintEntry::Contour(command) => {
                     paint_item(&prepare_command(command)?, scene, command.path(), outline)
@@ -198,6 +204,11 @@ pub(super) fn check_layered_camera(
     if prepared.viewport_outline().is_some() {
         return Err(CompositorError::new(
             "current frame outline with layered effects is unavailable",
+        ));
+    }
+    if prepared.viewport_hides_shadow_guides() {
+        return Err(CompositorError::new(
+            "hidden shadow guides with layered effects is unavailable",
         ));
     }
     Ok(())

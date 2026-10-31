@@ -167,8 +167,10 @@ test('the shadow-guides button flips a view flag only: no persisted or native re
     if (e.isDirectory()) walk(p); else if (/\.js$/.test(e.name) && fs.readFileSync(p, 'utf8').includes('showShadowGuides')) readers.push(path.relative(path.join(__dirname, '..'), p));
   } };
   walk(path.join(__dirname, '..', 'src/js'));
-  assert.deepEqual(readers.sort(), ['src/js/app.js', 'src/js/engine-bridge.js', 'src/js/timeline.js'],
-    'the default, the two render readers and the toggle; no serializer or native bridge reads the flag');
+  // #2373: on a native object project the flag also rides the preview request (view-only): the toggle in native-view-aids-ui.js and
+  // the request port in native-object-project-desktop.js. Still no serializer: the export request builders never read it.
+  assert.deepEqual(readers.sort(), ['src/js/adapters/native-object-project-desktop.js', 'src/js/adapters/native-view-aids-ui.js', 'src/js/app.js', 'src/js/engine-bridge.js', 'src/js/timeline.js'],
+    'the default, the two render readers, the toggle and the two native view-only readers; no serializer reads the flag');
 });
 
 test('Roll only moves the playhead around the origin while R is held and returns to it on release or disable', () => {

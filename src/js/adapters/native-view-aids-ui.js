@@ -13,7 +13,10 @@
  * only flips the flag, mirrors the button and asks the session for one more preview.
  * "Current frame outline" (#p-current-outline, #2372) is the same kind of flag (`currentOutline` of the preview request, read from
  * state.currentFrameOutline): the engine draws the presented frame's items as outlines in the viewport only, never in an export.
- * If the renderer refuses the request, the box is unchecked again and one toast says so. */
+ * If the renderer refuses the request, the box is unchecked again and one toast says so.
+ * "Shadow guides" (#btn-shadow-guides, #2373) is the inverse flag: state.showShadowGuides is true by default, and only when it is
+ * false the preview request carries `hideShadowGuides` and the engine leaves the shadow-tagged items out of the viewport (an export
+ * keeps its own exportIncludeShadowGuides rule). A refused hide switches the guides back on and says so once. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -21,7 +24,7 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
   var NS = 'http://www.w3.org/2000/svg';
-  var FLAGS = { clip: 'canvasClip', safety: 'safetyZones', alpha: 'previewAlphaBg', outline: 'currentFrameOutline' };
+  var FLAGS = { clip: 'canvasClip', safety: 'safetyZones', alpha: 'previewAlphaBg', outline: 'currentFrameOutline', shadow: 'showShadowGuides' };
   var CLIP_RGB = 'rgb(35,35,48)', CLIP_SPAN = 100000;
   var ACTION_RGB = 'rgb(255,210,0)', TITLE_RGB = 'rgb(255,90,90)', ZONE_OPACITY = String(200 / 255);
   var states = new WeakMap();
@@ -128,6 +131,12 @@
     if (control && 'checked' in control) control.checked = false;
     if (typeof root.showToast === 'function') root.showToast('Current frame outline could not be shown.');
   }
+  // The renderer refused to leave the guides out: the view flag goes back to shown, the button is lit again and the user hears it once.
+  function shadowRefused(root, button) {
+    root.state.showShadowGuides = true;
+    if (button && button.classList) button.classList.add('active');
+    if (typeof root.showToast === 'function') root.showToast('Shadow guides could not be hidden.');
+  }
   // A button click on a native object project: flip the view flag, mirror the button and redraw (Safety, Clip) or present again
   // (alpha). Returns false when the legacy path owns the click (no native object project), so the caller keeps its own behaviour.
   function toggle(root, kind, button) {
@@ -137,6 +146,7 @@
     root.state[key] = button && typeof button.checked === 'boolean' ? button.checked : !root.state[key];
     if (button && button.classList) button.classList.toggle('active', !!root.state[key]);
     if (kind === 'alpha') presentAgain(root);
+    else if (kind === 'shadow') presentAgain(root, root.state[key] ? null : function () { shadowRefused(root, button); });
     else if (kind === 'outline') presentAgain(root, root.state[key] ? function () { outlineRefused(root, button); } : null);
     else refresh(root, true);
     return true;

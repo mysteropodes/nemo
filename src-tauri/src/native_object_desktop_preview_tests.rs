@@ -511,3 +511,6 @@ mod checker;
 
 #[path = "native_object_desktop_preview_outline_tests.rs"]
 mod outline;
+
+#[path = "native_object_desktop_preview_shadow_tests.rs"]
+mod shadow;
