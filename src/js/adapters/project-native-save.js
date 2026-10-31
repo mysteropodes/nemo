@@ -178,8 +178,10 @@ var NemoProjectNativeSave = (function () {
       nativeObject:object,write:saved.write,
       isDirty:function(){return objectActive()?object.isDirty():ports.isDirty();},
       saveAs:function(writer){return objectActive()?object.saveAs():saved.saveAs(writer);},
+      // A native project that already has a file saves in place (replacing that file); an untitled one asks where, exactly
+      // like Save As. Neither path shows a notice before the dialog.
       save:function(writer){
-        if(objectActive()){ports.notice('Save this native project to a new file.');return object.saveAs();}
+        if(objectActive()){var path=ports.read().path;return path?object.saveAs(path,{replace:true}):object.saveAs();}
         return saved.save(writer);
       },
       openNative:function(path){return object?object.openPath(path):Promise.resolve(null);},

@@ -70,6 +70,11 @@
     return to<0?null:{from:from,to:to};
   }
   function paint(root,w){
+    var fc=root.FC;
+    if(!Number.isFinite(fc)||fc<=0)return;
+    paintSelection(root,w);paintLabels(root,w);
+  }
+  function paintSelection(root,w){
     var range=w.capture?interval(w.capture):selected(root,w),fc=root.FC;
     if(!Number.isFinite(fc)||fc<=0)return;
     w.highlight.hidden=!range;
@@ -78,7 +83,9 @@
       'Normal ruler mode: click or drag scrubs. Use Select frames for frame selection';
     if(range)label='Selected frames '+(range.from+1)+' through '+(range.to+1)+' for selected layer bounds. '+label;
     w.node.setAttribute('aria-label',label);w.node.title=label;
-    w.labels.replaceChildren();
+  }
+  function paintLabels(root,w){
+    var fc=root.FC;w.labels.replaceChildren();
     var wrap=root.document.getElementById('fg-wrap'),first=Math.max(0,Math.floor((wrap&&wrap.scrollLeft||0)/fc));
     var width=wrap&&wrap.clientWidth||w.node.getBoundingClientRect().width;
     var last=Math.min(w.info.totalFrames-1,first+Math.ceil(width/fc));
@@ -154,8 +161,13 @@
       read:function(f){var s=w.ports.currentSession();return s?s.readPresentedObjectSession(f):null;},snapshot:snap,
       holds:function(t){var n=works.get(root)===w&&snap();return !!n&&Object.keys(t).every(function(k){return n[k]===t[k];});},notice:'The canvas is still busy - try again.'});
   }
+  function stripWidth(root,info){var wrap=root.document.getElementById('fg-wrap'),fc=root.FC;return Math.max(Number.isFinite(fc)&&fc>0?info.totalFrames*fc:0,wrap&&wrap.clientWidth||0);}
   function mount(root,caption,info,ports){
     var w=works.get(root);
+    // #2371: a playback or scrub tick (same revision, same geometry, no gesture) keeps the strip and its ruler cells; only the frame label and highlight move.
+    if(w&&ports&&ports.frameOnly===true&&w.node&&w.frameLabel&&w.caption===caption&&same(w.info,info)&&!w.capture&&!w.dialog&&w.fc===root.FC&&w.width===stripWidth(root,info)){
+      w.ports=ports;w.frameLabel.textContent=caption.textContent;caption.style.minWidth='100%';caption.replaceChildren(w.node);paintSelection(root,w);return true;
+    }
     if(w){cancel(root);if(!same(w.info,info))mode(w,false);}
     else{
       w={capture:null,timer:null,listeners:[],enabled:false};works.set(root,w);
@@ -172,7 +184,7 @@
     var captionText=caption.textContent,fc=root.FC,node=root.document.createElement('div'),labels=root.document.createElement('div');
     var highlight=root.document.createElement('div'),pending=root.document.createElement('span');
     node.className='native-frame-selection-strip';node.setAttribute('role','group');node.tabIndex=0;
-    var wrap=root.document.getElementById('fg-wrap'),width=Math.max(Number.isFinite(fc)&&fc>0?info.totalFrames*fc:0,wrap&&wrap.clientWidth||0);
+    var width=stripWidth(root,info);w.fc=fc;w.width=width;
     caption.style.minWidth='100%';
     Object.assign(node.style,{position:'relative',height:'20px',width:width+'px',
       minWidth:'100%',cursor:'crosshair',userSelect:'none',backgroundImage:'repeating-linear-gradient(to right,transparent 0,transparent '+Math.max(0,fc-1)+'px,var(--border) '+Math.max(0,fc-1)+'px,var(--border) '+fc+'px)'});
@@ -181,7 +193,7 @@
     w.node=node;w.labels=labels;w.highlight=highlight;w.status=pending;
     node.appendChild(highlight);node.appendChild(labels);node.appendChild(pending);caption.replaceChildren(node);
     var frameLabel=root.document.createElement('span');frameLabel.className='native-frame-selection-caption';frameLabel.textContent=captionText;
-    Object.assign(frameLabel.style,{position:'sticky',right:'0',float:'right',lineHeight:'20px',background:'var(--panel2)',pointerEvents:'none'});node.appendChild(frameLabel);
+    Object.assign(frameLabel.style,{position:'sticky',right:'0',float:'right',lineHeight:'20px',background:'var(--panel2)',pointerEvents:'none'});node.appendChild(frameLabel);w.frameLabel=frameLabel;
     var button=root.document.createElement('button');button.type='button';button.className='native-frame-selection-mode';
     button.title='Select frame cells for the selected layer bounds; normal ruler clicks move the playhead';
     Object.assign(button.style,{position:'sticky',right:'0',float:'right',height:'20px',fontSize:'10px',padding:'0 5px'});node.appendChild(button);w.button=button;mode(w,w.enabled);
