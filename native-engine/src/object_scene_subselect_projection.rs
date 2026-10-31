@@ -179,9 +179,10 @@ fn shared_matrices(
         return Err("Subselect mask or path effect is unavailable");
     }
     if !hit {
-        // The editable read admits the vector records exactly as a vector-only layer does.
+        // The editable read admits the vector records exactly as their paint does: with the shared item chain, so layer Motion
+        // on a layer that also paints Text or images is admitted like the paint admits it.
         let poses = BTreeMap::new();
-        if let Some(prepared) = prepare_layer(packet, index, &sources, &poses, None)? {
+        if let Some(prepared) = prepare_layer(packet, index, &sources, &poses, Some(chains))? {
             if prepared.iter().any(|v| v.refusal.is_some()) {
                 return Err("Subselect layer paint consumer is unavailable");
             }
@@ -194,7 +195,12 @@ fn shared_matrices(
             }
         }
     }
-    let chain = chains.chain(index).map_err(|failure| failure.reason())?;
+    // A vertex preview re-derives the layer's own pivot from its edited geometry, as the committed edit will (#2372).
+    let chain = match preview {
+        Some(edited) => chains.chain_with_preview(index, edited),
+        None => chains.chain(index),
+    }
+    .map_err(|failure| failure.reason())?;
     let outer = chain.iter().fold(Affine::IDENTITY, |outer, entry| affine(entry) * outer);
     element_matrices(packet, sources, preview, outer)
 }
