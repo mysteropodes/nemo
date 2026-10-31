@@ -287,3 +287,14 @@ test('asset-bearing clipboard packets require bounded closed provenance in both 
     assert.throws(() => contract.result(P + 'clipboard.copy', result(bad)), TypeError);
   }
 });
+
+// Installed hands-on bug (2026-10-31): Direct Select sends atFrame with every vertex edit (e35712f3, held-frame promotion), the
+// schema, the capability, nemo-mcp and the host all admit it, but this table did not: every UI vertex edit was refused before
+// dispatch as "has missing or unknown fields" and surfaced as "Native subselect command was not delivered".
+test('subselect.edit admits the optional atFrame cell and still refuses a bad frame or an unknown member', () => {
+  const base = {command:'object.subselect.edit',stableTarget:{contextId:'scene-root',layerUid:'layer-a',frameScope:{kind:'authored',frame:0},strokeId:'stroke-a'},intent:{kind:'move',indices:[0],delta:[5,2]}};
+  contract.payload(P + 'subselect.edit', { ...base, atFrame: 3 });
+  contract.payload(P + 'subselect.edit', base);
+  for (const bad of [-1, 1.5, '3', 4294967296]) assert.throws(() => contract.payload(P + 'subselect.edit', { ...base, atFrame: bad }), /native u32 frame/);
+  assert.throws(() => contract.payload(P + 'subselect.edit', { ...base, other: 1 }), /missing or unknown fields/);
+});

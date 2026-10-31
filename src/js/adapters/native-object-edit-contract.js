@@ -114,7 +114,8 @@
   };
   // operation suffix -> [command, result kind, [wire member, validator]...]. Member order is the wire order.
   const SPEC = {
-    'subselect.edit': ['object.subselect.edit', 'command', [['stableTarget','subselectTarget'],['intent','subselectIntent']]],
+    // atFrame: the cell Direct Select edits, when it differs from the stored key (held frames, #2356); optional on the wire.
+    'subselect.edit': ['object.subselect.edit', 'command', [['stableTarget','subselectTarget'],['intent','subselectIntent']], [['atFrame', 'frame']]],
     'layer.delete': ['object.layer.delete', 'command', [['selection', 'selection']]],
     'layer.duplicate': ['object.layer.duplicate', 'created', [['layerUid', 'layerUid']]],
     'layer.rename': ['object.layer.rename', 'command', [['layerUid', 'layerUid'], ['name', 'name']]],
@@ -144,9 +145,11 @@
   function payload(operation, value) {
     const entry = spec(operation);
     if (!entry) fail('native object edit operation is not declared');
-    exact(value, ['command', ...entry[2].map((member) => member[0])], [], operation);
+    const optional = entry[3] || [];
+    exact(value, ['command', ...entry[2].map((member) => member[0])], optional.map((member) => member[0]), operation);
     if (value.command !== entry[0]) fail(`${operation} command is invalid`);
     for (const [member, kind] of entry[2]) FIELDS[kind](value[member], `${operation}.${member}`);
+    for (const [member, kind] of optional) if (has(value, member)) FIELDS[kind](value[member], `${operation}.${member}`);
   }
   function result(operation, value) {
     const entry = spec(operation);
