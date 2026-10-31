@@ -55,9 +55,13 @@
     value.forEach((part, at) => num(part, `${label}[${at}]`));
   }
 
+  // #2256: a component context is admitted only when it is the one the workspace controller holds (the id the owner declared on enter), never free text.
+  function heldContext(id) {
+    try { const c = typeof globalThis === 'object' ? globalThis.NemoNativeComponentContext : undefined; return typeof id === 'string' && !!id && !!c && typeof c.contextId === 'function' && c.contextId(globalThis) === id; } catch (_) { return false; }
+  }
   function target(value, label, create) {
     exact(value, ['contextId', 'frameScope', 'layerUid', 'strokeId'], [], label);
-    if (typeof value.contextId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(value.contextId)) fail(`${label}.contextId is not admitted`); // #2256: the scene root or a component id, never free text
+    if (value.contextId !== 'scene-root' && !heldContext(value.contextId)) fail(`${label}.contextId is not admitted`); // #2256: the scene root or the component the workspace holds
     exact(value.frameScope, ['kind', 'frame'], [], `${label}.frameScope`); oneOf(value.frameScope.kind, ['authored', 'reference'], `${label}.frameScope.kind`);
     frame(value.frameScope.frame, `${label}.frameScope.frame`); opaque(value.layerUid, `${label}.layerUid`);
     // A created record names no stroke id: the owner allocates it and the caller cannot choose it.

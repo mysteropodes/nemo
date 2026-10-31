@@ -115,11 +115,13 @@
   function objectUid(value) {
     if (typeof value !== 'string' || !value.length) throw new TypeError('object UID must be a nonempty opaque string');
   }
+  function heldContext(id) {
+    try { const c = typeof globalThis === 'object' ? globalThis.NemoNativeComponentContext : undefined; return typeof id === 'string' && !!id && !!c && typeof c.contextId === 'function' && c.contextId(globalThis) === id; } catch (_) { return false; }
+  }
   function objectTarget(value) {
     exact(value, ['contextId', 'frameScope', 'layerUid', 'strokeId'], [], 'object target');
-    // #2256: the scene root or a component context id. The builders take the id from the workspace controller's held context only
-    // (native-component-write.js) and the native owner refuses any context the document does not declare.
-    if (typeof value.contextId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(value.contextId)) throw new TypeError('unsupported object context');
+    // #2256: the scene root or the component context the workspace controller holds (the id the owner declared on enter); never free text.
+    if (value.contextId !== 'scene-root' && !heldContext(value.contextId)) throw new TypeError('unsupported object context');
     objectUid(value.layerUid); objectUid(value.strokeId);
     exact(value.frameScope, ['kind', 'frame'], [], 'object frame scope');
     if (!['authored', 'reference'].includes(value.frameScope.kind)) throw new TypeError('unsupported object frame scope');
