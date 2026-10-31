@@ -115,16 +115,20 @@ impl TweenGhostFrame {
         }
         out
     }
+    /// The Ghost All outline paint (baseline `renderGhostAll`: `Color(.68, .6, 1, op * 1.6)`), `None` for an onion frame.
+    pub fn key_outline(&self) -> Option<[f64; 4]> {
+        (self.kind == TweenGhostKind::AllKeys).then(|| [0.68, 0.6, 1., self.opacity * 1.6])
+    }
     pub fn vector_visual(&self, r: &ObjectRecord) -> TweenGhostVisual {
         let mut out = self.raster_visual();
         out.translation = self.translation;
         out.omit = false;
         let body = r.vector.value();
         let painted = r.solid_fill().is_some() || body.is_some_and(|v| v.solid_stroke().is_some());
-        if self.kind == TweenGhostKind::AllKeys {
+        if let Some(outline) = self.key_outline() {
             out.omit = !painted;
             out.clear_fill = true;
-            out.stroke = Some([0.68, 0.6, 1., self.opacity * 1.6]);
+            out.stroke = Some(outline);
             return out;
         }
         let texture = r
@@ -233,9 +237,23 @@ impl TweenGhostRead {
     /// Bitmap frames use prepare_brush_admission with the shared ObjectBrushRuntime.
     pub fn prepare_frame(&self, index: usize) -> Result<ObjectCompositionWitness, Error> {
         let packet = self.prepare_packet(index)?;
+        self.compose(&packet)
+    }
+    /// The evaluated key frame of a Ghost All frame, for the produced items stored geometry cannot show (brush dabs,
+    /// bitmap brush paint). Vector geometry still comes from `all_keys_paths`, never from this evaluation.
+    pub fn prepare_key_frame(&self, index: usize) -> Result<ObjectCompositionWitness, Error> {
+        let frame = self.frames.get(index).ok_or(Error::InvalidRequest)?;
+        if frame.kind != TweenGhostKind::AllKeys {
+            return Err(Error::InvalidRequest);
+        }
+        let packet = prepare_object_exposure_frame(&self.snapshot, &self.selector(frame.frame))
+            .map_err(|_| Error::Unavailable)?;
+        self.compose(&packet)
+    }
+    fn compose(&self, packet: &ObjectFramePacket) -> Result<ObjectCompositionWitness, Error> {
         let selector = self.selector(packet.frame());
         let scene =
-            prepare_object_render_scene(&packet, &selector).map_err(|_| Error::Unavailable)?;
+            prepare_object_render_scene(packet, &selector).map_err(|_| Error::Unavailable)?;
         let plan = prepare_object_paint_plan(&scene, &selector).map_err(|_| Error::Unavailable)?;
         prepare_object_composition(&plan, &selector).map_err(|_| Error::Unavailable)
     }

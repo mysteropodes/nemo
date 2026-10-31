@@ -242,3 +242,5 @@ fn ghost_request_validation_and_refusals_are_typed_and_leave_a_stable_identity()
 
 #[path = "object_ghost_fidelity.rs"]
 mod fidelity;
+#[path = "object_ghost_all_keys.rs"]
+mod all_keys;

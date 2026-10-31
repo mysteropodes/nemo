@@ -42,8 +42,19 @@ impl GhostUnderlay {
                     clear_fill: visual.clear_fill,
                 });
             };
+        // Baseline `renderGhostAll` draws a key frame's stored strokes in one purple outline: the produced brush items
+        // join them that way, and text, rasters, components and duplicator copies stay out of it.
+        let key = at.all_keys;
+        let outline = at
+            .key_outline
+            .map(|[r, g, b, a]| Color::new([r as f32, g as f32, b as f32, a.clamp(0., 1.) as f32]));
         for entry in ordered_entries(plan) {
             match entry {
+                PaintEntry::Text(_)
+                | PaintEntry::Raster(_)
+                | PaintEntry::Component(_)
+                | PaintEntry::Duplicator(_)
+                    if key => {}
                 PaintEntry::Text(source) if ours(source.layer_index) => {
                     for (contour, [r, g, b, a]) in source.item.painted() {
                         let base = Color::from_rgba8(r, g, b, a);
@@ -90,8 +101,8 @@ impl GhostUnderlay {
                         path: dab.path.clone(),
                         at: shift,
                         alpha: at.raster_opacity as f32,
-                        tint: None,
-                        clear_fill: false,
+                        tint: outline.map(|c| (c, None)),
+                        clear_fill: key,
                     })
                 }
                 PaintEntry::Brush(i)
