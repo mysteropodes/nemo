@@ -90,6 +90,18 @@ pub(crate) fn validate_vector_ext(record: &ObjectRecord) -> Result<(), ObjectCod
     if ext.is_fill_shape.value() == Some(&false) {
         return Err(invalid("isFillShape is only ever true"));
     }
+    if let Some(types) = ext.point_types.value() {
+        if !ext.pressure.missing()
+            || types.len() != record.geometry.segments.len()
+            || types
+                .iter()
+                .any(|t| !["corner", "smooth", "symmetric"].contains(&t.as_str()))
+        {
+            return Err(invalid(
+                "pointTypes is one corner|smooth|symmetric per vertex of a non-pressure path",
+            ));
+        }
+    }
     if let Some(shadow) = ext.shadow.value() {
         if shadow.channel_tag != "shadow" {
             return Err(invalid("channelTag is only ever 'shadow'"));

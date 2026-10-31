@@ -230,7 +230,8 @@ fn append_copies(
                 handle_out: at(value(&s.handle_out.x)?, value(&s.handle_out.y)?, 0.0, 0.0)?,
             });
         }
-        if m[0] * m[3] - m[1] * m[2] < 0.0 && source.geometry.closed {
+        let mirrored = m[0] * m[3] - m[1] * m[2] < 0.0 && source.geometry.closed;
+        if mirrored {
             segments.reverse();
             for s in &mut segments {
                 std::mem::swap(&mut s.handle_in, &mut s.handle_out);
@@ -239,6 +240,12 @@ fn append_copies(
         let mut copy = source.clone();
         copy.target = scope.target(id);
         copy.geometry.segments = segments;
+        if let (true, Presence::Present(ext)) = (mirrored, &mut copy.vector_ext) {
+            // The vertices were reversed, so their point-type hints are too.
+            if let Presence::Present(types) = &mut ext.point_types {
+                types.reverse();
+            }
+        }
         created.push(copy);
     }
     let mut stack = stack_of(document, scope);

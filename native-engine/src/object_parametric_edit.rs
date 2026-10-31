@@ -293,6 +293,8 @@ pub(crate) fn transformed(record: &ObjectRecord, m: [f64; 6]) -> Result<ObjectRe
     next.geometry.segments = segments_of(&anchors)?;
     next.geometry.closed = record.geometry.closed || rebuilt;
     if let Presence::Present(next_ext) = &mut next.vector_ext {
+        // The generator rewrote the vertices: an authored point-type hint no longer describes them.
+        next_ext.point_types = Presence::Missing;
         next_ext.param_shape = Presence::Present(match frame {
             Some(frame) => with_frame(stored.clone(), frame)?,
             None => stored.clone(),
@@ -350,6 +352,7 @@ impl ObjectFillOwner {
         next.geometry.segments = segments_of(&outcome.anchors)?;
         next.geometry.closed = outcome.closed;
         if let Presence::Present(next_ext) = &mut next.vector_ext {
+            next_ext.point_types = Presence::Missing;
             next_ext.param_shape = Presence::Present(outcome.shape);
             // Baseline transformFillGradient applies the same gesture to its document-world endpoints.
             if let Some(gradient) = next_ext.fill_gradient.value().cloned() {

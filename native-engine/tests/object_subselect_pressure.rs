@@ -4,6 +4,7 @@
 mod support;
 use crate::history::NativeObjectHistory;
 use crate::object_codec::{decode_storage_project, subselect::record};
+use crate::object_document::subselect::point_type::tests::baseline_intent;
 use serde_json::{json, Value};
 use support::{bytes, dispatch, document, owner_of, record_at, state, target};
 fn oracle() -> Value {
@@ -72,8 +73,11 @@ fn subselect_pressure_all_180_edits_preserve_metadata_preview_history_and_reopen
             let before = bytes(&owner);
             let snapshot = owner.acquire_snapshot(0).unwrap();
             let intent = serde_json::from_value(case["intent"].clone()).unwrap();
+            // #2356: Corner is `collapse` against the frozen outlines; a case whose rule the owner decision replaced is skipped here.
+            let Some(intent) = baseline_intent(&record::anchors(&snapshot.document().objects()[0]).unwrap(), &intent) else { continue };
+            let case_intent = serde_json::to_value(&intent).unwrap();
             let planned = record::plan(&snapshot.document().objects()[0], &intent).unwrap();
-            let read = json!({"apiVersion":2,"requestId":"pressure-preview","instanceId":owner.instance_id(),"documentId":owner.document_id(),"operation":"query.document.object","payload":{"atRevision":0,"documentSnapshotId":snapshot.snapshot_id(),"stableTarget":target("L1",0,"s-a"),"subselect":{"cursor":0,"limit":16,"preview":case["intent"]}}});
+            let read = json!({"apiVersion":2,"requestId":"pressure-preview","instanceId":owner.instance_id(),"documentId":owner.document_id(),"operation":"query.document.object","payload":{"atRevision":0,"documentSnapshotId":snapshot.snapshot_id(),"stableTarget":target("L1",0,"s-a"),"subselect":{"cursor":0,"limit":16,"preview":case_intent}}});
             let preview = serde_json::to_value(
                 snapshot
                     .dispatch(serde_json::from_value(read).unwrap())
@@ -87,7 +91,7 @@ fn subselect_pressure_all_180_edits_preserve_metadata_preview_history_and_reopen
                 case["expected"]["center"].as_array().unwrap().len()
             );
             assert_eq!(bytes(&owner), before);
-            let q = request(&owner, &case["intent"]);
+            let q = request(&owner, &case_intent);
             let response = dispatch(&mut owner, &q);
             assert_eq!(response["ok"], true, "case {index}: {response}");
             let actual = state(&owner);

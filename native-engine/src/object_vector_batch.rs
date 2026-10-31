@@ -123,6 +123,7 @@ fn with_geometry(source: &ObjectDocument, target: &ObjectTarget, geometry: Objec
     }
     let mut record = existing.clone();
     record.geometry = geometry;
+    record.drop_stale_point_types();
     Ok(record)
 }
 

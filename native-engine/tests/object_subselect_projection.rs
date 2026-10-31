@@ -127,7 +127,12 @@ fn check_parent_edits(parametric: bool) {
             frame: 0,
         };
         let packet = prepare_object_frame(&snapshot, &selector).unwrap();
-        let intent = serde_json::from_value(edit["intent"].clone()).unwrap();
+        // #2356: the frozen Corner zeroes the handles, which is `collapse` now (Corner keeps them and moves the transform pivot).
+        let mut edit_intent = edit["intent"].clone();
+        if edit_intent["pointType"] == "corner" {
+            edit_intent["pointType"] = json!("collapse");
+        }
+        let intent = serde_json::from_value(edit_intent.clone()).unwrap();
         let candidate = crate::object_codec::subselect::record::plan(
             &snapshot.document().objects()[0],
             &intent,
@@ -135,16 +140,20 @@ fn check_parent_edits(parametric: bool) {
         .unwrap();
         let preview = super::matrices_with_preview(&packet, 0, Some(&candidate)).unwrap()[&0];
         assert_eq!(support::bytes(&owner), before);
-        let q = json!({"apiVersion":2,"requestId":format!("type-{}",edit["intent"]["pointType"].as_str().unwrap()),"instanceId":owner.instance_id(),"documentId":owner.document_id(),"operation":"command.document.object.subselect.edit","expectedRevision":owner.content_revision(),"payload":{"command":"object.subselect.edit","stableTarget":support::target("L1",0,"s-0"),"intent":edit["intent"]}});
+        let q = json!({"apiVersion":2,"requestId":format!("type-{}",edit["intent"]["pointType"].as_str().unwrap()),"instanceId":owner.instance_id(),"documentId":owner.document_id(),"operation":"command.document.object.subselect.edit","expectedRevision":owner.content_revision(),"payload":{"command":"object.subselect.edit","stableTarget":support::target("L1",0,"s-0"),"intent":edit_intent}});
         let r = owner
             .try_dispatch_object_command(&serde_json::from_value(q).unwrap())
             .unwrap()
             .unwrap();
         assert!(r.ok, "{r:?}");
-        check(
-            &owner.acquire_snapshot(owner.content_revision()).unwrap(),
-            &edit["expected"],
-        );
+        // Smooth and Symmetric no longer re-aim along the neighbour chord (they keep the placed tangent), so the frozen world
+        // positions only describe the zeroing edit; the geometry kernel tests own the new rules. Preview == commit is checked for all.
+        if edit["intent"]["pointType"] == "corner" {
+            check(
+                &owner.acquire_snapshot(owner.content_revision()).unwrap(),
+                &edit["expected"],
+            );
+        }
         let after = owner.acquire_snapshot(owner.content_revision()).unwrap();
         let selector = ObjectFrameSelector {
             instance_id: after.instance_id(),

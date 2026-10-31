@@ -390,3 +390,27 @@ fn a_hit_test_listing_and_geometry_may_name_the_entered_component_but_never_free
     let edit = json!({"command":"object.subselect.edit","stableTarget":comp("comp-a"),"intent":{"kind":"move","indices":[0],"delta":[1,2]}});
     assert!(!edit_request(&edit));
 }
+
+#[test]
+fn point_types_are_the_four_owner_kinds_and_the_read_lists_one_valid_type_per_vertex() {
+    let command = |kind: &str| -> NativeApplicationRequest {
+        serde_json::from_value(json!({"apiVersion":2,"requestId":"type-1","instanceId":"instance","documentId":"document","expectedRevision":7,"operation":EDIT,"payload":{"command":"object.subselect.edit","stableTarget":target(),"intent":{"kind":"pointType","indices":[0],"pointType":kind}}})).unwrap()
+    };
+    for kind in ["corner", "smooth", "symmetric", "collapse"] {
+        assert!(command(kind).validate_input().is_ok(), "{kind}");
+    }
+    assert!(command("round").validate_input().is_err());
+    let (q, mut r) = (query(), page());
+    r["subselect"]["pointTypes"] = json!(["corner", "symmetric"]);
+    assert!(public_read(&q, &r));
+    for bad in [json!(["corner"]), json!(["corner", "collapse"]), json!(["corner", 1]), json!("corner")] {
+        r["subselect"]["pointTypes"] = bad.clone();
+        assert!(!public_read(&q, &r), "{bad}");
+    }
+    let mut marked = page();
+    marked["subselect"]["pointTypes"] = json!(["corner", "symmetric"]);
+    marked["subselect"]["hitTest"] = json!(true);
+    let mut hit = query();
+    hit["subselect"]["hitTest"] = json!(true);
+    assert!(!public_read(&hit, &marked), "a hit-test page carries no point types");
+}

@@ -31,7 +31,7 @@
       case 'move':keys=['kind','indices','delta'];valid=indices(v.indices)&&point(v.delta);break;
       case 'scale':keys=['kind','indices','scale','anchor'];valid=indices(v.indices)&&point(v.scale)&&point(v.anchor);break;
       case 'rotate':keys=['kind','indices','degrees','center'];valid=indices(v.indices)&&Number.isFinite(v.degrees)&&point(v.center);break;
-      case 'pointType':keys=['kind','indices','pointType'];valid=indices(v.indices)&&['corner','smooth','symmetric'].includes(v.pointType);break;
+      case 'pointType':keys=['kind','indices','pointType'];valid=indices(v.indices)&&['corner','smooth','symmetric','collapse'].includes(v.pointType);break;
       case 'handle':keys=['kind','index','handle','point','breakPair'];optional=['pairedPoint'];valid=(!own(v,'pairedPoint')||v.breakPair===true&&point(v.pairedPoint))&&integer(v.index,255)&&['handleIn','handleOut'].includes(v.handle)&&point(v.point)&&typeof v.breakPair==='boolean';break;
       case 'toggle':keys=['kind','index'];valid=integer(v.index,255);break;
       case 'insert':keys=['kind','curve','time'];valid=integer(v.curve,255)&&Number.isFinite(v.time)&&v.time>=1e-8&&v.time<=1-1e-8;break;
@@ -50,9 +50,11 @@
   function readResult(v){
     if(!exact(v,['atRevision','documentSnapshotId','subselect'])||!integer(v.atRevision)||typeof v.documentSnapshotId!=='string'||!v.documentSnapshotId)fail('Invalid subselect read result');
     const s=v.subselect;
-    if(!exact(s,['stableTarget','closed','total','cursor','nextCursor','segments','preview'],['paint','hitTest','center','widths'])||own(s,'hitTest')&&s.hitTest!==true||own(s,'center')!==own(s,'widths')||own(s,'center')&&(s.center!==true||!Array.isArray(s.widths)||!s.widths.every(Number.isFinite)||s.widths.length!==(Array.isArray(s.segments)?s.segments.length:-1))||!target(s.stableTarget)||typeof s.closed!=='boolean'||typeof s.preview!=='boolean'||own(s,'paint')&&(s.paint!==true||s.closed!==true)||
+    if(!exact(s,['stableTarget','closed','total','cursor','nextCursor','segments','preview'],['paint','hitTest','center','widths','pointTypes'])||own(s,'hitTest')&&s.hitTest!==true||own(s,'center')!==own(s,'widths')||own(s,'center')&&(s.center!==true||!Array.isArray(s.widths)||!s.widths.every(Number.isFinite)||s.widths.length!==(Array.isArray(s.segments)?s.segments.length:-1))||!target(s.stableTarget)||typeof s.closed!=='boolean'||typeof s.preview!=='boolean'||own(s,'paint')&&(s.paint!==true||s.closed!==true)||
       !integer(s.total,256)||!integer(s.cursor,s.total)||!Array.isArray(s.segments)||s.segments.length>16||s.cursor+s.segments.length>s.total||
       !s.segments.every(a=>exact(a,['point','handleIn','handleOut'])&&point(a.point)&&point(a.handleIn)&&point(a.handleOut)))fail('Invalid subselect geometry page');
+    // #2356: the plain editable read lists the type each vertex shows (corner, smooth or symmetric), one per segment of the page.
+    if(own(s,'pointTypes')&&(!Array.isArray(s.pointTypes)||s.pointTypes.length!==s.segments.length||!s.pointTypes.every(t=>['corner','smooth','symmetric'].includes(t))||own(s,'paint')||own(s,'hitTest')||own(s,'center')))fail('Invalid subselect point types');
     const end=s.cursor+s.segments.length;
     if(end===s.total?s.nextCursor!==null:s.nextCursor!==end||!s.segments.length)fail('Invalid subselect page progress');
   }

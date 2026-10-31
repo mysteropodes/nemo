@@ -12,12 +12,13 @@ function fixture(mode){
     sent.push(q);const p=q.payload;let result;
     if(p.view){const {limit,...view}=p.view;
       const item={stableTarget:target,closed:false,count:2,matrix:[1,0,0,1,0,0]};
-      if(mode!=='plain')item.paintCount=mode==='count'?21:20;
+      if(mode!=='plain'&&mode!=='types')item.paintCount=mode==='count'?21:20;
       result={...view,atRevision:0,documentSnapshotId:pin.documentSnapshotId,total:1,nextCursor:null,preview:false,items:[item]};
     }else{
       const page=p.subselect,total=page.paint?(mode==='total'&&page.cursor?19:20):2,source=page.paint?paint:center;
       const end=Math.min(page.cursor+page.limit,total);
       result={atRevision:0,documentSnapshotId:pin.documentSnapshotId,subselect:{stableTarget:target,closed:!!page.paint,total,cursor:page.cursor,nextCursor:end===total?null:end,preview:false,segments:source.slice(page.cursor,end)}};
+      if(mode==='types'&&!page.paint)result.subselect.pointTypes=['corner','smooth'].slice(page.cursor,end);
       if(page.paint){result.subselect.paint=true;
         if(mode==='missing-marker')delete result.subselect.paint;
         if(mode==='open')result.subselect.closed=false;
@@ -44,4 +45,8 @@ test('paint paging refuses mismatched marker, closedness, total, presentation co
     const f=fixture(mode);await assert.rejects(f.read(),undefined,mode);
     assert.ok(f.sent.every(q=>q.operation==='query.document.object'),mode);
   }
+});
+test('#2356: the plain read carries the type each vertex shows onto the listed item, and a page without types adds none',async()=>{
+  const typed=await fixture('types').read();assert.deepEqual(typed.items[0].pointTypes,['corner','smooth']);assert.equal(Object.hasOwn(typed.items[0],'paint'),false);
+  const plain=await fixture('plain').read();assert.equal(Object.hasOwn(plain.items[0],'pointTypes'),false);
 });

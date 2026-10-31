@@ -52,6 +52,10 @@ pub struct VectorExt {
     /// A Fill Brush shape (serP's `isFillShape`, written only when true), which the same-colour merge treats apart.
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) is_fill_shape: Presence<bool>,
+    /// #2356: the optional per-vertex point-type hint, aligned with `geometry.segments`: `corner` | `smooth` | `symmetric`.
+    /// Absent = inferred from the handles; present only after a type was set. Never on a pressure ribbon.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) point_types: Presence<Vec<String>>,
 }
 object_deserialize!(VectorExt {
     #[serde(default)] pressure: Presence<PressureFields>,
@@ -67,7 +71,8 @@ object_deserialize!(VectorExt {
     #[serde(default)] bitmap_brush: Presence<crate::object_document::BitmapBrushFields>,
     #[serde(default)] brush_texture: Presence<BrushTexture>,
     #[serde(default)] shadow: Presence<ShadowChannel>,
-    #[serde(default)] is_fill_shape: Presence<bool>
+    #[serde(default)] is_fill_shape: Presence<bool>,
+    #[serde(default)] point_types: Presence<Vec<String>>
 });
 
 /// serP's shadow channel members: `channelTag` (only ever `'shadow'`, written when truthy) and the swatch that drew
@@ -84,6 +89,20 @@ object_deserialize!(ShadowChannel {
     #[serde(default)] shadow_swatch_id: Presence<String>
 });
 
+impl crate::object_document::ObjectRecord {
+    /// #2356: a point-type hint array that no longer matches the vertices (a reshape changed their number) is dropped, and a
+    /// vectorExt left empty by that is omitted, as the codec requires.
+    pub(crate) fn drop_stale_point_types(&mut self) {
+        let count = self.geometry.segments.len();
+        let Presence::Present(ext) = &mut self.vector_ext else { return };
+        if ext.point_types.value().is_some_and(|t| t.len() != count) {
+            ext.point_types = Presence::Missing;
+            if ext.is_empty() {
+                self.vector_ext = Presence::Missing;
+            }
+        }
+    }
+}
 impl VectorExt {
     pub(crate) fn is_empty(&self) -> bool {
         self.linked_fill_id.missing()
@@ -100,6 +119,7 @@ impl VectorExt {
             && self.brush_texture.missing()
             && self.shadow.missing()
             && self.is_fill_shape.missing()
+            && self.point_types.missing()
     }
 }
 

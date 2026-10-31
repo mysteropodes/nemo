@@ -5688,7 +5688,7 @@ function setPointType(type){
   var n=arr.length,closed=isVB?false:path.closed;
   _nodeSel.forEach(function(idx){
     var seg=arr[idx];
-    if(type==='corner'){_ptSetHandleIn(isVB,seg,new Point(0,0));_ptSetHandleOut(isVB,seg,new Point(0,0));return;}
+    if(type==='corner'||type==='collapse'){_ptSetHandleIn(isVB,seg,new Point(0,0));_ptSetHandleOut(isVB,seg,new Point(0,0));return;}
     var prevSeg=idx>0?arr[idx-1]:(closed?arr[n-1]:null);
     var nextSeg=idx<n-1?arr[idx+1]:(closed?arr[0]:null);
     var pt=_ptGet(isVB,seg);
