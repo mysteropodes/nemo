@@ -130,6 +130,23 @@ pub(super) fn read_file(
     Ok(bytes)
 }
 
+/// #2269: a project file the UI names directly (a recent entry or a crash-recovery generation) was never picked in a
+/// dialog, so it is not in the dynamic fs scope. Admit that one file, exactly as an MCP `project.open` does, before the
+/// ordinary scope check; a refused path simply stays refused by `read_file`.
+pub(super) fn admit_source<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    state: &ApplicationMcp,
+    raw: &str,
+) {
+    if let Some(request) = file_request(raw).filter(|request| {
+        request.project_only
+            && !request.cancelled_before_dispatch
+            && request.instance_id == state.instance_id()
+    }) {
+        crate::application_mcp::project_scope::admit_open_file(app, &request.source_path);
+    }
+}
+
 pub(super) fn not_dispatched(mut error: NativeApplicationError) -> NativeApplicationError {
     error.details = Some(json!({"disposition":"notDispatched","retryExecution":false}));
     error

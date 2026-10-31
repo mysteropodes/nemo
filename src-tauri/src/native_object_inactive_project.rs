@@ -343,6 +343,25 @@ fn request_with(
     decode(reply)
 }
 
+/// #2269: a tab opened from a recent entry names a project file no dialog granted this session; admit that one file as
+/// an MCP `project.open` does. A refused path stays refused by the route's own scope check.
+fn admit_source<R: tauri::Runtime>(app: &tauri::AppHandle<R>, state: &ApplicationMcp, raw: &str) {
+    if raw.len() > 4096 {
+        return;
+    }
+    if let Ok(Request {
+        instance_id,
+        cancelled_before_dispatch: false,
+        action: Action::Prepare { source_path },
+        ..
+    }) = serde_json::from_str::<Request>(raw)
+    {
+        if instance_id == state.instance_id() {
+            crate::application_mcp::project_scope::admit_open_file(app, &source_path);
+        }
+    }
+}
+
 #[tauri::command]
 pub(crate) async fn nemo_native_object_inactive_project(
     app: tauri::AppHandle,
@@ -351,6 +370,7 @@ pub(crate) async fn nemo_native_object_inactive_project(
     request_json: String,
 ) -> HostResult<Value> {
     require_main(&window)?;
+    admit_source(&app, &state, &request_json);
     if activation::is_request(&request_json) {
         return activation::execute(&app, &state, &request_json, window.label()).await;
     }
