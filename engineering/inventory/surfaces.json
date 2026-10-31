@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "577db8eaf5cafbbf0abdc85b30107645b72123f6",
-  "describe": "v0.7.0-alpha.4-4458-g577db8ea-dirty"
+  "head": "d7c13c2c73c6976520a1608e0fdd41329391752f",
+  "describe": "v0.7.0-alpha.4-4459-gd7c13c2c-dirty"
  },
- "inputsDigest": "5997210097fd496deaaf889ffacbce4bfa255181feeb04de963d6b8d5ff33145",
+ "inputsDigest": "d5c34db5baf10bf77023e420353285463a22e0d5f031b44130318f2e493e2f6f",
  "states": [
   "inventoried",
   "characterized",
@@ -28445,7 +28445,7 @@
    "capability": "Break text into shapes",
    "area": "drawing-selection",
    "handler": [
-    "src/js/shapes-panel.js:856 renderNode()"
+    "src/js/shapes-panel.js:855 renderNode()"
    ],
    "events": [
     "click"
@@ -28464,7 +28464,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/shapes-panel.js:856",
+   "source": "src/js/shapes-panel.js:855",
    "meta": {
     "i18n": "elementsExplodeText",
     "functionsVisited": 160
@@ -28483,7 +28483,7 @@
    "capability": "Rename",
    "area": "drawing-selection",
    "handler": [
-    "src/js/shapes-panel.js:861 renderNode()"
+    "src/js/shapes-panel.js:860 renderNode()"
    ],
    "events": [
     "click"
@@ -28499,7 +28499,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/shapes-panel.js:861",
+   "source": "src/js/shapes-panel.js:860",
    "meta": {
     "i18n": "elementsRename",
     "functionsVisited": 66
@@ -28518,7 +28518,7 @@
    "capability": "Select members",
    "area": "drawing-selection",
    "handler": [
-    "src/js/shapes-panel.js:854 renderNode()"
+    "src/js/shapes-panel.js:853 renderNode()"
    ],
    "events": [
     "click"
@@ -28537,7 +28537,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/shapes-panel.js:854",
+   "source": "src/js/shapes-panel.js:853",
    "meta": {
     "i18n": "elementsSelectMembers",
     "functionsVisited": 87
@@ -28556,7 +28556,7 @@
    "capability": "Select members",
    "area": "drawing-selection",
    "handler": [
-    "src/js/shapes-panel.js:862 renderNode()"
+    "src/js/shapes-panel.js:861 renderNode()"
    ],
    "events": [
     "click"
@@ -28575,7 +28575,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/shapes-panel.js:862",
+   "source": "src/js/shapes-panel.js:861",
    "meta": {
     "i18n": "elementsSelectMembers",
     "functionsVisited": 87
@@ -28594,7 +28594,7 @@
    "capability": "Ungroup",
    "area": "drawing-selection",
    "handler": [
-    "src/js/shapes-panel.js:870 renderNode()"
+    "src/js/shapes-panel.js:869 renderNode()"
    ],
    "events": [
     "click"
@@ -28615,7 +28615,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/shapes-panel.js:870",
+   "source": "src/js/shapes-panel.js:869",
    "meta": {
     "i18n": "elementsUngroup",
     "functionsVisited": 316
