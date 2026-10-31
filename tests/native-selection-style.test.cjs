@@ -19,7 +19,7 @@ const tick = () => new Promise((done) => setTimeout(done, 0));
 const settle = async () => { for (let i = 0; i < 6; i++) await tick(); };
 
 function harness(items, options = {}) {
-  const paper = Paper.load(), toasts = [], batches = [], timers = [];
+  const paper = Paper.load(), toasts = [], batches = [], options_ = [], timers = [];
   let pin = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 1, documentSnapshotId: 's1', canvasW: 200, canvasH: 200, layers: [{ layerUid: 'L' }] };
   const store = items.map((i) => JSON.parse(JSON.stringify(i)));
   const session = { info: () => pin, isActive: () => true, blocksLegacy: () => true, readPresentedObjectSession: () => ({ presentation: { ...pin, frame: 0 } }),
@@ -28,7 +28,8 @@ function harness(items, options = {}) {
     selectedPaths: [], updateUI() {}, SMEngineBridge: { renderNow() {} }, showToast: (t) => toasts.push(t),
     setTimeout: (fn) => { timers.push(fn); return timers.length; }, clearTimeout: (id) => { timers[id - 1] = null; },
     NemoNativeObjectProject: { desktop: () => session, selectLayerUI: () => true },
-    NemoNativeObjectLabs: { desktop: () => ({ batchStrokes: async (layerUid, frame, steps) => {
+    NemoNativeObjectLabs: { desktop: () => ({ batchStrokes: async (layerUid, frame, steps, sent) => {
+      options_.push(sent);
       batches.push({ layerUid, frame, steps: JSON.parse(JSON.stringify(steps)) });
       if (options.reply) return options.reply;
       steps.forEach((s) => { const it = store.find((i) => i.stableTarget.strokeId === s.restyle.stableTarget.strokeId); it.style = { ...it.style, ...s.restyle.style }; });
@@ -36,7 +37,7 @@ function harness(items, options = {}) {
       return { status: 'applied' };
     } }) },
     NemoSelectCanvasIntent: Intent, NemoNativeSelectionSteps: Steps, NemoNativeSelectOverlay: overlayStub(Intent) };
-  const h = { root, toasts, batches, store, timers,
+  const h = { root, toasts, batches, sentOptions: options_, store, timers,
     async select(ids) { const layers = await Intent.layerPaths(root, (item) => ids.includes(item.stableTarget.strokeId), false, 0); root.selectedPaths = layers.paths; root.NemoNativeSelectOverlay.show(root); },
     // The quiet timer of the pending edit fires.
     fire: async () => { const fns = timers.splice(0).filter(Boolean); fns.forEach((fn) => fn()); await settle(); },
@@ -157,6 +158,10 @@ test('batchStrokes maps a restyle step to the closed engine step, and the contra
   const result = await client.batchStrokes('L', 3, [{ restyle: { stableTarget: target, style } }, { restyle: { stableTarget: target, style: { opacity: 0 } }, frame: 5 }]);
   assert.equal(result.status, 'applied', JSON.stringify(result));
   assert.deepEqual(sent[0].ops, [{ op: 'restyle', stableTarget: target, style, frame: 3 }, { op: 'restyle', stableTarget: target, style: { opacity: 0 }, frame: 5 }]);
+  assert.equal('skipUnavailable' in sent[0], false, 'the batch is atomic unless asked');
+  await client.batchStrokes('L', 3, [{ restyle: { stableTarget: target, style } }], { skipUnavailable: true });
+  await client.batchStrokes('L', 3, [{ restyle: { stableTarget: target, style } }], { skipUnavailable: 'yes' });
+  assert.deepEqual([sent[1].skipUnavailable, 'skipUnavailable' in sent[2]], [true, false], 'only a literal true opts in');
   const step = (style) => ({ op: 'restyle', stableTarget: target, style, frame: 2 });
   Contract.payload(Contract.VECTOR, { command: 'object.vector.batch', ops: [step({ fill: '#ff000080', stroke: '#00ff00', width: 6, opacity: 0.4 }), step({ opacity: 0 })] });
   for (const bad of [{}, { fill: 'red' }, { fill: '#12' }, { fill: null }, { width: 0 }, { width: 20000 }, { opacity: 1.5 }, { colour: '#000000' }]) {
@@ -211,4 +216,25 @@ test('the panel setters route a native selection to the adapter first and the pa
     assert.ok(head.includes(first), setter + ' hands a native selection over before the legacy gate');
   }
   assert.ok(TIMELINE.includes('var ref=nativeStyleView(selectedPaths[0]);'), 'the panel reads the selection through the listed style');
+});
+
+test('the panel opts its multi-select restyle in to skipping the steps the engine cannot do; the adapter batch is atomic otherwise (#2372)', async () => {
+  const h = harness([quad('A', 10, 10, 30, 30), quad('B', 40, 40, 60, 60)]);
+  await h.select(['A', 'B']);
+  const done = Style.apply(h.root, { stroke: '#00ff00' });
+  await h.fire();
+  assert.deepEqual(await done, { status: 'applied' });
+  assert.equal(h.batches.length, 1);
+  assert.deepEqual(h.sentOptions, [{ skipUnavailable: true }], 'the Select panel sends the explicit opt-in');
+});
+
+test('the Labs route forwards only a literal skipUnavailable opt-in to the vector batch and always keys held cells (#2372)', async () => {
+  const Labs = require('../src/js/adapters/native-object-labs.js'), calls = [];
+  const session = { blocksLegacy: () => true, info: () => ({ layers: [] }) };
+  const host = { NemoNativeObjectProject: { desktop: () => session }, NemoNativeObjectVector: { create: () => ({ batchStrokes: async (...args) => { calls.push(args[3]); return { status: 'applied' }; } }) } };
+  const route = Labs.desktop(host);
+  await route.batchStrokes('L', 0, [{}]);
+  await route.batchStrokes('L', 0, [{}], { skipUnavailable: true });
+  await route.batchStrokes('L', 0, [{}], { skipUnavailable: 1 });
+  assert.deepEqual(calls, [{ keyframe: 'copy' }, { keyframe: 'copy', skipUnavailable: true }, { keyframe: 'copy' }]);
 });

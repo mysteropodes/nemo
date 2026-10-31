@@ -326,13 +326,13 @@
     // G15: the two creates take an optional placement (absent = front; behind = under the layer's artwork)
     // and an optional trimEnds limit (the baseline trimStrokeEndsMax; finite, above zero).
     const creates = value.command === 'object.vector.create' || value.command === 'object.vector.createMany';
-    exact(value, ['command', ...entry[1]], creates ? ['placement', 'trimEnds', 'keyframe'] : value.command === 'object.vector.batch' ? ['keyframe', 'trimEnds'] : [], operation);
+    exact(value, ['command', ...entry[1]], creates ? ['placement', 'trimEnds', 'keyframe'] : value.command === 'object.vector.batch' ? ['keyframe', 'trimEnds', 'skipUnavailable'] : [], operation);
     if (has(value, 'placement')) oneOf(value.placement, ['front', 'behind'], `${value.command}.placement`);
     if (has(value, 'trimEnds') && !(typeof value.trimEnds === 'number' && Number.isFinite(value.trimEnds) && value.trimEnds > 0)) fail(`${value.command}.trimEnds is invalid`);
     // A batch trims only when every step creates (the drawn stroke, its copies and its multi-frame stamps share one cut).
     if (has(value, 'trimEnds') && value.command === 'object.vector.batch' && Array.isArray(value.ops) && value.ops.some((op) => !plain(op) || (op.op !== 'create' && op.op !== 'copy'))) fail('object.vector.batch.trimEnds needs create steps only'); if (has(value, 'trimEnds') && value.command === 'object.vector.batch' && Array.isArray(value.ops) && new Set(value.ops.filter((op) => op.record && op.record.target).map((op) => op.record.target.layerUid)).size > 1) fail('object.vector.batch.trimEnds stays on one layer');
     // keyframe: 'copy' keys a held cell with what it showed (the Labs creators' ensureKeyframe()); absent is Draw's empty key.
-    if (has(value, 'keyframe') && value.keyframe !== 'copy') fail(`${value.command} keyframe must be 'copy'`);
+    if (has(value, 'keyframe') && value.keyframe !== 'copy') fail(`${value.command} keyframe must be 'copy'`); if (has(value, 'skipUnavailable') && typeof value.skipUnavailable !== 'boolean') fail(`${value.command} skipUnavailable must be a boolean`); // #2372: a batch is atomic unless this opts in
     entry[1].forEach((key) => member(value.command, key, value[key]));
     // A replace names an existing record; a record of a reference scope is readable storage, never a drawing edit target.
     if (value.command === 'object.vector.replace' && value.record.target.frameScope.kind !== 'authored') fail('a replace targets an authored frame');
@@ -341,12 +341,12 @@
     if (!OPS.has(operation)) fail('native vector operation is not declared');
     const edit = operation === VECTOR;
     const many = edit && plain(value) && (value.operation === 'createMany' || value.operation === 'batch');
-    exact(value, edit ? ['applied', 'historyEntriesAdded', 'operation', 'strokeId'].concat(many ? ['strokeIds'] : []) : ['applied', 'historyEntriesAdded'], [], 'vector edit result');
+    exact(value, edit ? ['applied', 'historyEntriesAdded', 'operation', 'strokeId'].concat(many ? ['strokeIds'] : []) : ['applied', 'historyEntriesAdded'], value.operation === 'batch' ? ['skippedSteps'] : [], 'vector edit result');
     if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) fail('invalid vector edit disposition');
     if (edit) { oneOf(value.operation, ['create', 'createMany', 'replace', 'delete', 'mask.edit', 'batch'], 'result.operation'); opaque(value.strokeId, 'result.strokeId'); }
     if (many) {
       if (!Array.isArray(value.strokeIds) || value.strokeIds.length < (value.operation === 'batch' ? 1 : 2)) fail('result.strokeIds must list every created stroke');
-      value.strokeIds.forEach((id, at) => opaque(id, `result.strokeIds[${at}]`));
+      value.strokeIds.forEach((id, at) => opaque(id, `result.strokeIds[${at}]`)); if (has(value, 'skippedSteps') && !(Number.isSafeInteger(value.skippedSteps) && value.skippedSteps >= 1 && value.skippedSteps < value.strokeIds.length)) fail('result.skippedSteps must count some, not all, steps');
     }
   }
   function correlate(request, response) {
@@ -366,7 +366,7 @@
     const allocated = (id) => typeof id === 'string' && id.startsWith(allocation) && /^(0|[1-9][0-9]*)$/.test(id.slice(allocation.length));
     if (command === 'object.vector.batch') {
       // One id per step, in order: allocated for a create, the named target for a replace or delete.
-      const ids = response.result.strokeIds, ops = request.payload.ops;
+      const ids = response.result.strokeIds, ops = request.payload.ops; if (has(response.result, 'skippedSteps') && request.payload.skipUnavailable !== true) fail('vector receipt skipped steps of an atomic batch');
       if (!(ids.length === ops.length && ids[0] === stroke && ops.every((op, at) => (['create', 'copy', 'clone'].includes(op.op) ? allocated(ids[at])
         : ids[at] === (op.op === 'replace' ? op.record.target.strokeId : op.stableTarget.strokeId))))) fail('vector receipt stroke mismatch');
       return;
