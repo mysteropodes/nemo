@@ -73,6 +73,8 @@
       var ob=decor(doc,'div','lico comp-badge native-layer-opacity','Opacity: '+shown+(layer.opacityAnimated===true?' (animated — static value shown)':''));
       ob.innerHTML=BADGE+shown+'</span>';ob.style.width='auto';after.push(ob);
     }
+    // #2256: the baseline Duplicator column cell (.motion-col-duplicator) comes from the caller's hook too; its on/off state is the row's hasDuplicator fact.
+    if(typeof context.duplicatorCell==='function'){var dc=context.duplicatorCell(layer,i,node);if(dc){dc.style.order='1';after.push(dc);}}
     // The baseline Parent cell (.lparent) comes from the caller's hook: it owns the Parent A edit, this file commits nothing.
     if(typeof context.parentCell==='function'){var pc=context.parentCell(layer,i,node);if(pc){pc.style.order='1';after.push(pc);}}
     if(layer.kind==='component')node.className+=' is-comp';
