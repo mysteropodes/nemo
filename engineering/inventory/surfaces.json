@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "2623cf4ace47674206a84a95bf32b71090d829e0",
-  "describe": "v0.7.0-alpha.4-4586-g2623cf4a-dirty"
+  "head": "6e9b201bfb248dd6b3cd6990563be7ffccd8bfe7",
+  "describe": "v0.7.0-alpha.4-4582-g6e9b201b-dirty"
  },
- "inputsDigest": "0605bf2975784e1403e83ef88c01252d3783a534dc73bbcda232da2e90751124",
+ "inputsDigest": "a93b41e3dc24f9372d4b537631a0242817941ab841420ec2f5fa275a0a367340",
  "states": [
   "inventoried",
   "characterized",
@@ -22197,7 +22197,7 @@
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
    "source": "src/js/labs/timeline-markers.js:82",
    "meta": {
-    "functionsVisited": 23
+    "functionsVisited": 22
    },
    "fixtures": []
   },
@@ -25288,7 +25288,7 @@
    "source": "src/js/motion.js:9085",
    "meta": {
     "i18n": "exprExRemapOther",
-    "functionsVisited": 20
+    "functionsVisited": 24
    },
    "fixtures": [
     "static-props",
