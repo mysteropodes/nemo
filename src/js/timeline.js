@@ -2936,8 +2936,10 @@ document.getElementById('p-mask-mode').addEventListener('change',function(){
 document.getElementById('p-mask-feather').addEventListener('input',function(){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask)return;
   var v=Math.max(0,parseFloat(this.value)||0);
-  // #2372 SEL-MASK: on a native object project the feather restyles the layer's masks as ONE native batch entry (one history entry).
-  if(p.data.nativeStableTarget&&nativeSelStyle({maskFeather:Math.min(500,v)}))return;
+  // #2372 SEL-MASK: on a native object project the feather restyles the layer's masks as ONE native batch entry (one history entry): it is committed by
+  // the 'change' listener below (Enter/blur for a typed value, release for a scrub), never per keystroke, so '12' is one entry and not '1' then '12'.
+  var NS=window.NemoNativeSelectionStyle;
+  if(p.data.nativeStableTarget&&NS&&NS.handles(window))return;
   if(!p.layer)return;
   if(!n20AllowLegacyWrite('timeline-mask-feather'))return false;
   // Shared per-layer value (see updateMaskPanel's comment) — every mask on
@@ -2945,6 +2947,10 @@ document.getElementById('p-mask-feather').addEventListener('input',function(){
   // reads (LayerIn.mask_feather, the max across a layer's own masks).
   p.layer.children.forEach(function(c){if(c.data&&c.data.isMask)c.data.maskFeather=v;});
   saveActiveLayerFrame();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+});
+document.getElementById('p-mask-feather').addEventListener('change',function(){
+  var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask||!p.data.nativeStableTarget)return;
+  nativeSelStyle({maskFeather:Math.min(500,Math.max(0,parseFloat(this.value)||0))});
 });
 document.getElementById('btn-mask-unset').addEventListener('click',function(){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask)return;
@@ -6389,7 +6395,7 @@ function nativeSelStyle(style){
 }
 // The numeric fields a native Select selection owns scrub on ui.js's static path (one change at release, no legacy checkpoint, no live writes): the
 // legacy path pushes an undo before it raises _scrubLiveActive, which a native project refuses, so a paused drag would commit mid-gesture and again at release.
-var NATIVE_SCRUB_FIELDS=['p-sw','p-opacity','p-stroke-alpha','p-poststroke-smooth','p-miterlimit','p-dashoffset'];
+var NATIVE_SCRUB_FIELDS=['p-sw','p-opacity','p-stroke-alpha','p-poststroke-smooth','p-miterlimit','p-dashoffset','p-mask-feather'];
 function markNativeScrubFields(){
   var A=window.NemoNativeSelectionStyle,own=!!A&&A.handles(window);
   NATIVE_SCRUB_FIELDS.forEach(function(id){
