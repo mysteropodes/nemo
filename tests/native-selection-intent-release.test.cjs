@@ -146,6 +146,7 @@ test('an unavailable or failing pick retries a bounded number of times then show
   const f = fixture({ mode: 'anim2d' }), applied = [], toasts = [], results = [];
   f.scope.showToast = (m) => toasts.push(m);
   f.scope.setTimeout = (fn) => setTimeout(fn, 1); // the retry delay, shortened
+  f.scope.NemoNativePresentationWait = require('../src/js/adapters/native-presentation-wait.js'); // the shared bounded wait the pick retries through
   f.scope.NemoSelectCanvasIntent = { ...SelectCanvasIntent, objectProject: () => ({}), pickContext: () => JSON.stringify([f.state.tool, f.state.currentFrame]),
     pick: () => { const r = results.shift(); return r instanceof Error ? Promise.reject(r) : Promise.resolve(r); },
     applyPick: (_root, item, shift) => applied.push([item, shift]) };

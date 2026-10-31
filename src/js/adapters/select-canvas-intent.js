@@ -222,6 +222,8 @@
       // The record's stored boxAngle (baseline serP/desP data.boxAngle) turned by the presented matrix when that is a pure similarity, so the
       // oriented box is drawn in world space after a frame change, an undo or a reload.
       // #2372 SEL-MASK: a listed mask is the selection the Mask panel edits (the baseline mask Path carried data.isMask / maskMode / maskFeather).
+      // #2372 insp-parametric: a dynamic rectangle / ellipse / star carries its listed parameters as the baseline Paper item's data.paramShape, which the Rounded corners, Ellipse arc and Star panels show.
+      if (item.paramShape) path.data.paramShape = JSON.parse(JSON.stringify(item.paramShape));
       if (item.role === 'mask') { path.data.isMask = true; path.data.maskMode = item.style && item.style.maskMode || 'add'; path.data.maskFeather = item.style && item.style.maskFeather || 0; }
       var mx = item.matrix, sim = mx[0] * mx[3] - mx[1] * mx[2] > 0 && Math.abs(mx[0] - mx[3]) < 1e-6 * (Math.abs(mx[0]) + 1) && Math.abs(mx[1] + mx[2]) < 1e-6 * (Math.abs(mx[1]) + 1);
       if (item.boxAngle) path.data.boxAngle = (item.boxAngle + (sim ? Math.atan2(mx[1], mx[0]) * 180 / Math.PI : 0)) % 360;
@@ -447,25 +449,27 @@
     return JSON.stringify([st.tool, st.appMode, st.currentFrame, st.activeLayerIdx, st.activeSymbolId || null,
       pin ? PINS.map(function (k) { return pin[k]; }) : null]);
   }
-  // #2372: a pick that resolves undefined (the presentation could not be proven current) or throws is not "nothing under the
-  // cursor" (null, which clears). The native queue reports no presentation while ANY command is pending - the press's own read, a hover
-  // read, the repaint of the previous pick - and that window outlasts one short retry, so the pick is retried while the context still
-  // holds (about a second at most) before saying so instead of dropping the click: neither the first click's box nor an empty click's
-  // clear may be lost to it. `I` is the intent API in use (its pick/applyPick); `ctx` is the pickContext captured at the click;
-  // `retried` is the attempt count (true: already exhausted).
-  var PICK_RETRIES = 16, PICK_RETRY_MS = 60;
-  function resolvePick(root, I, intent, shift, ctx, retried) {
-    var attempt = retried === true ? PICK_RETRIES : retried || 0;
-    var unavailable = function () { if (typeof root.showToast === 'function') root.showToast('Could not read the canvas just now \u2014 click again.'); };
-    return I.pick(root, intent.x, intent.y).then(function (item) {
-      if (I.pickContext(root) !== ctx) return;
-      if (item === undefined) {
-        if (attempt >= PICK_RETRIES) return unavailable();
-        return new Promise(function (done) { (root.setTimeout || setTimeout)(done, PICK_RETRY_MS); }).then(function () {
-          return I.pickContext(root) === ctx ? resolvePick(root, I, intent, shift, ctx, attempt + 1) : undefined; });
-      }
-      try { I.applyPick(root, item, shift); } catch (_) {}
-    }, unavailable);
+  // #2372: a pick that resolves undefined (the presentation could not be proven current) or throws is not "nothing under the cursor" (null, which clears).
+  // The native queue reports no presentation while ANY command is pending - the press's own read, a hover read, the repaint of the previous pick - so the
+  // pick is waited out with the shared bounded wait (native-presentation-wait.js: the first read and 16 retries, about a second, abandoned the moment `ctx`, the pickContext captured at
+  // the click, no longer holds) before saying so instead of dropping the click: neither the first click's box nor an empty click's clear may be lost to it.
+  // `I` is the intent API in use (its pick/applyPick); `retried` is kept for callers and ignored.
+  function resolvePick(root, I, intent, shift, ctx) {
+    var W = root.NemoNativePresentationWait, text = 'Could not read the canvas just now \u2014 click again.';
+    var unavailable = function () { if (typeof root.showToast === 'function') root.showToast(text); };
+    var apply = function (item) { try { I.applyPick(root, item, shift); } catch (_) {} };
+    var read = function () { return I.pick(root, intent.x, intent.y); };
+    if (!W) return read().then(function (item) { if (item !== undefined && I.pickContext(root) === ctx) apply(item); }, unavailable);
+    return W.await(root, { read: read, ready: function (v) { return v !== undefined; }, holds: function () { return I.pickContext(root) === ctx; }, notice: text }, { tries: 17 })
+      .then(function (r) { if (r.ready) apply(r.value); else if (r.status === 'refused') unavailable(); });
+  }
+  // #2372: presentedState once the queue stops hiding the presentation - the shared bounded wait; null when it never does, or when the pick context (tool, frame, layer,
+  // revision) changed meanwhile, so a real change still refuses. A Select-family action (Delete, align, restyle, Transform fields) starts from this.
+  function presentedSettled(root) {
+    var W = root.NemoNativePresentationWait, now = presentedSession(root);
+    if (now || !W) return Promise.resolve(now);
+    var ctx = pickContext(root);
+    return W.await(root, { read: function () { return presentedSession(root); }, holds: function () { return pickContext(root) === ctx; } }).then(function (r) { return r.ready ? r.value : null; });
   }
   // Select's own rule on a picked stroke: a click selects it, Shift toggles it, an empty click clears unless Shift is held.
   // Picks are fresh objects, so identity is the native stroke id.
@@ -495,5 +499,5 @@
   }
 
   return Object.freeze({ create: create, hitHandles: hitHandles, objectProject: objectProject, presented: presented,
-    presentedState: presentedSession, heldId: heldId, layerList: layerList, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, transformSteps: transformSteps, inRecordSpace: inRecordSpace, layerPaths: layerPaths, reread: reread, marquee: marquee, pick: pick, pickContext: pickContext, applyPick: applyPick, resolvePick: resolvePick });
+    presentedState: presentedSession, presentedSettled: presentedSettled, heldId: heldId, layerList: layerList, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, transformSteps: transformSteps, inRecordSpace: inRecordSpace, layerPaths: layerPaths, reread: reread, marquee: marquee, pick: pick, pickContext: pickContext, applyPick: applyPick, resolvePick: resolvePick });
 }));

@@ -2988,6 +2988,7 @@ document.getElementById('p-corners-link').addEventListener('change',function(){
 });
 function commitCornerEdit(which,val){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='rect')return;
+  if(nativeParamOwned(p))return; // #2372 insp-parametric: a native shape commits on 'change' (nativeParamChange), never per keystroke through a history checkpoint
   pushUndo();
   var ps=p.data.paramShape;
   var v=Math.max(0,parseFloat(val)||0);
@@ -2998,6 +2999,7 @@ function commitCornerEdit(which,val){
 }
 ['tl','tr','br','bl'].forEach(function(which){
   document.getElementById('p-corner-'+which).addEventListener('input',function(){commitCornerEdit(which,this.value);});
+  document.getElementById('p-corner-'+which).addEventListener('change',function(){nativeParamChange(which,this.value,document.getElementById('p-corners-link').checked);});
 });
 // Dynamic shapes, Ellipse (2026-08-18) — same panel pattern as Coins:
 // shown for exactly one selected path that's EITHER already a dynamic
@@ -3028,12 +3030,14 @@ function updateEllipseArcPanel(){
 }
 document.getElementById('btn-ellipse-arc-convert').addEventListener('click',function(){
   var p=selectedPaths[0];if(!p)return;
+  if(nativeParamConvert(p))return;
   pushUndo();
   window.convertToDynamicEllipse(p);
   saveActiveLayerFrame();updateEllipseArcPanel();if(window.SMEngineBridge)SMEngineBridge.renderNow();
 });
 function commitArcEdit(field,val,isPercent){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='ellipse')return;
+  if(nativeParamOwned(p))return;
   pushUndo();
   var ps=p.data.paramShape;
   var v=parseFloat(val)||0;
@@ -3044,6 +3048,7 @@ function commitArcEdit(field,val,isPercent){
 document.getElementById('p-arc-start').addEventListener('input',function(){commitArcEdit('startAngle',this.value,false);});
 document.getElementById('p-arc-sweep').addEventListener('input',function(){commitArcEdit('sweep',this.value,false);});
 document.getElementById('p-arc-inner').addEventListener('input',function(){commitArcEdit('innerRadius',this.value,true);});
+[['p-arc-start','startAngle'],['p-arc-sweep','sweep'],['p-arc-inner','innerRadius']].forEach(function(f){document.getElementById(f[0]).addEventListener('change',function(){nativeParamChange(f[1],this.value);});});
 // Dynamic shapes, Star/Polygon (2026-08-18) — same panel pattern as
 // Coins/Camembert. pointCount stays a plain field (no stopwatch/Motion
 // row) — a fractional point count between two integer keyframes has no
@@ -3065,6 +3070,7 @@ function updateStarPanel(){
 }
 function commitStarEdit(field,val,isPercent){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='star')return;
+  if(nativeParamOwned(p))return;
   pushUndo();
   var ps=p.data.paramShape;
   var v=parseFloat(val)||0;
@@ -3077,6 +3083,13 @@ function commitStarEdit(field,val,isPercent){
 document.getElementById('p-star-points').addEventListener('input',function(){commitStarEdit('pointCount',this.value);});
 document.getElementById('p-star-inner').addEventListener('input',function(){commitStarEdit('innerRatio',this.value);});
 document.getElementById('p-star-corner').addEventListener('input',function(){commitStarEdit('cornerRadius',this.value);});
+[['p-star-points','pointCount'],['p-star-inner','innerRatio'],['p-star-corner','cornerRadius']].forEach(function(f){document.getElementById(f[0]).addEventListener('change',function(){nativeParamChange(f[1],this.value);});});
+// #2372 insp-parametric: on a native object project the Rounded corners / Ellipse arc / Star fields commit the selected dynamic shape through ONE
+// native parametric edit (adapters/native-parametric-panel.js): a typed value on change (Enter / blur), a scrub once at release (the fields are marked
+// static below), never a Paper rebuild or a history checkpoint a native project refuses.
+function nativeParamOwned(p){var N=window.NemoNativeParametricPanel;return !!N&&N.owns(window,p);}
+function nativeParamChange(field,raw,linked){var p=selectedPaths[0];if(nativeParamOwned(p))window.NemoNativeParametricPanel.edit(window,field,raw,{linked:linked});}
+function nativeParamConvert(p){var N=window.NemoNativeParametricPanel;if(!N||!p.data||!p.data.nativeStableTarget)return false;N.convertUnavailable(window);return true;}
 // Team review Accept/Reject panel — shown when exactly one selected item is
 // either an active (non-ghost) revision (data.revisionParentId) or a
 // delete-revision ghost (data.isRevisionGhost && revisionAction==='delete').
@@ -6407,7 +6420,8 @@ function nativeSelStyle(style){
 }
 // The numeric fields a native Select selection owns scrub on ui.js's static path (one change at release, no legacy checkpoint, no live writes): the
 // legacy path pushes an undo before it raises _scrubLiveActive, which a native project refuses, so a paused drag would commit mid-gesture and again at release.
-var NATIVE_SCRUB_FIELDS=['p-sw','p-opacity','p-stroke-alpha','p-poststroke-smooth','p-miterlimit','p-dashoffset','p-mask-feather'];
+var NATIVE_SCRUB_FIELDS=['p-sw','p-opacity','p-stroke-alpha','p-poststroke-smooth','p-miterlimit','p-dashoffset','p-mask-feather',
+  'p-corner-tl','p-corner-tr','p-corner-br','p-corner-bl','p-arc-start','p-arc-sweep','p-arc-inner','p-star-points','p-star-inner','p-star-corner'];
 function markNativeScrubFields(){
   var A=window.NemoNativeSelectionStyle,own=!!A&&A.handles(window);
   NATIVE_SCRUB_FIELDS.forEach(function(id){
@@ -8768,9 +8782,48 @@ function textPropsRoot(){
   var allMatch=selectedPaths.every(function(p){return p.data&&p.data.groupId===first.data.groupId;});
   return allMatch?root:null;
 }
+// #2372 insp-text-props: with ONE native text block selected on a native object project the same tp-* section shows that block's stored settings
+// (the native text inspect read) and each change commits as ONE object.text.edit (adapters/native-text-props-panel.js), never a vector-text rebuild.
+var NATIVE_TEXT_SCRUB_FIELDS=['tp-size','tp-letter-spacing','tp-line-height','tp-word-spacing','tp-fixed-width'];
+function nativeTextOwned(){var N=window.NemoNativeTextPropsPanel;return !!N&&N.owns(window);}
+function nativeTextEdit(field,value){if(!nativeTextOwned())return false;window.NemoNativeTextPropsPanel.edit(window,field,value);return true;}
+function markNativeTextScrubFields(own){
+  NATIVE_TEXT_SCRUB_FIELDS.forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el)return;
+    if(own)el.dataset.nativeOpacityScrub='static';
+    else if(el.dataset.nativeOpacityScrub==='static')delete el.dataset.nativeOpacityScrub;
+  });
+}
+function fillNativeTextProps(b){
+  var active=document.activeElement,fam=b.font&&b.font.kind==='bundled'?String(b.font.fontKey).replace(/-(Bold|Regular)$/,''):'';
+  function put(id,v,prop){var el=document.getElementById(id);if(el&&active!==el)el[prop||'value']=v;return el;}
+  put('tp-content',b.text||'');
+  put('tp-font',fam);
+  put('tp-size',b.size||48);
+  var colorEl=put('tp-color',(b.color||'#000000').slice(0,7));
+  if(colorEl)colorEl.dataset.hex8=b.color||'#000000';
+  document.querySelectorAll('.tp-align-btn').forEach(function(x){x.classList.toggle('ac',x.dataset.val===(b.align||'left'));});
+  document.querySelectorAll('.tp-style-btn').forEach(function(x){x.classList.toggle('ac',!!b[x.dataset.flag]);});
+  document.querySelectorAll('.tp-case-btn').forEach(function(x){x.classList.toggle('ac',x.dataset.val===(b.textCase||'none'));});
+  put('tp-letter-spacing',b.letterSpacing||0);
+  put('tp-line-height',b.lineHeightMult||1.25);
+  put('tp-word-spacing',b.wordSpacing||0);
+  var fixed=typeof b.fixedWidth==='number'&&b.fixedWidth>0;
+  document.querySelectorAll('.tp-width-btn').forEach(function(x){x.classList.toggle('ac',(x.dataset.val==='fixed')===fixed);});
+  var fw=document.getElementById('tp-fixed-width');
+  if(fw){fw.style.display=fixed?'':'none';if(active!==fw)fw.value=fixed?b.fixedWidth:300;}
+}
 function updateTextPropsPanel(){
   var sec=document.getElementById('text-props-sec');
   if(!sec)return;
+  var nativeText=nativeTextOwned();
+  markNativeTextScrubFields(nativeText);
+  if(nativeText){
+    sec.style.display='';
+    window.NemoNativeTextPropsPanel.sync(window,fillNativeTextProps);
+    return;
+  }
   var root=textPropsRoot();
   sec.style.display=root?'':'none';
   if(!root)return;
@@ -8817,6 +8870,7 @@ function updateTextPropsPanel(){
 // than flooding the undo stack per intermediate value (the exact bug
 // already found and fixed once this session for the easing-curve drag).
 function applyTextPropsEdit(){
+  if(nativeTextOwned())return; // a native text block commits through nativeTextEdit, never the vector rebuild below
   var root=textPropsRoot();
   if(!root||!window.SMVectorText)return;
   var d=root.data;
@@ -8879,30 +8933,31 @@ function applyTextPropsEdit(){
 (function(){
   var contentEl=document.getElementById('tp-content');
   if(!contentEl)return; // this file is also loaded in contexts without the full panel markup
-  contentEl.addEventListener('blur',applyTextPropsEdit);
-  ['tp-font','tp-size','tp-color','tp-letter-spacing','tp-line-height','tp-word-spacing','tp-fixed-width'].forEach(function(id){
-    document.getElementById(id).addEventListener('change',applyTextPropsEdit);
+  contentEl.addEventListener('blur',function(){if(!nativeTextEdit('text',contentEl.value))applyTextPropsEdit();});
+  [['tp-font','font'],['tp-size','size'],['tp-color','color'],['tp-letter-spacing','letterSpacing'],['tp-line-height','lineHeightMult'],['tp-word-spacing','wordSpacing'],['tp-fixed-width','fixedWidth']].forEach(function(f){
+    var el=document.getElementById(f[0]);
+    el.addEventListener('change',function(){if(!nativeTextEdit(f[1],el.value))applyTextPropsEdit();});
   });
   document.querySelectorAll('.tp-align-btn').forEach(function(b){
     b.addEventListener('click',function(){
       document.querySelectorAll('.tp-align-btn').forEach(function(o){o.classList.toggle('ac',o===b);});
-      applyTextPropsEdit();
+      if(!nativeTextEdit('align',b.dataset.val))applyTextPropsEdit();
     });
   });
   document.querySelectorAll('.tp-style-btn').forEach(function(b){
-    b.addEventListener('click',function(){b.classList.toggle('ac');applyTextPropsEdit();});
+    b.addEventListener('click',function(){b.classList.toggle('ac');if(!nativeTextEdit(b.dataset.flag,b.classList.contains('ac')))applyTextPropsEdit();});
   });
   document.querySelectorAll('.tp-case-btn').forEach(function(b){
     b.addEventListener('click',function(){
       document.querySelectorAll('.tp-case-btn').forEach(function(o){o.classList.toggle('ac',o===b);});
-      applyTextPropsEdit();
+      if(!nativeTextEdit('textCase',b.dataset.val))applyTextPropsEdit();
     });
   });
   document.querySelectorAll('.tp-width-btn').forEach(function(b){
     b.addEventListener('click',function(){
       document.querySelectorAll('.tp-width-btn').forEach(function(o){o.classList.toggle('ac',o===b);});
       document.getElementById('tp-fixed-width').style.display=(b.dataset.val==='fixed')?'':'none';
-      applyTextPropsEdit();
+      if(!nativeTextEdit('fixedWidth',b.dataset.val==='fixed'?(parseFloat(document.getElementById('tp-fixed-width').value)||300):null))applyTextPropsEdit();
     });
   });
   // Live Google Fonts (2026-08-28) — "+" reveals a name field instead of
@@ -8944,7 +8999,7 @@ function applyTextPropsEdit(){
           fontSel.appendChild(opt);
         }
         fontSel.value=value;
-        applyTextPropsEdit();
+        if(!nativeTextEdit('font',value))applyTextPropsEdit();
         if(window.showToast)showToast(SM.t('toastGoogleFontAdded').replace('{family}',family),'success');
       }).catch(function(e){
         fontAddConfirm.disabled=false;fontAddInput.disabled=false;

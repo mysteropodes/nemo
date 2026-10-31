@@ -7,21 +7,17 @@
   if(node)module.exports=api;else root.NemoNativeObjectShapeTool=api;
 }(typeof globalThis==='object'?globalThis:this,function(Paint,Symmetry,Bitmap,Resize){
   'use strict';
-  var tools=['line','rect','ellipse'],shapeTools=tools.concat(['star','speechbubble']);
-  var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
-  function same(a,b){return !!a&&!!b&&pinKeys.every(function(k){return a[k]===b[k];});}
-  function fail(message){throw new Error(message);}
+  var tools=['line','rect','ellipse'],shapeTools=tools.concat(['star','speechbubble']); var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
+  function same(a,b){return !!a&&!!b&&pinKeys.every(function(k){return a[k]===b[k];});} function fail(message){throw new Error(message);}
   function contextId(root){/* #2256: the context Draw/Pen/shape target and its frame bound are the workspace controller's held ones */var c=root.NemoNativeComponentContext;return c?c.contextId(root):'scene-root';}function frameBound(root,pin){var c=root.NemoNativeComponentContext;return c?c.frameBound(root,pin):pin.totalFrames;}
-  // A pressure ribbon drawn with Fill on carries its linked fill companion (draw-bridge.js @1065e9d8): the dictionary
-  // builder records it here, against the ribbon's dictionary, and the commit creates both in one createMany.
+  // A pressure ribbon drawn with Fill on carries its linked fill companion (draw-bridge.js @1065e9d8): the dictionary builder records it here, against the ribbon's dictionary, and the commit creates both in one createMany.
   var linkedCompanions=new WeakMap();
   function consume(e){if(e&&e.stopImmediatePropagation)e.stopImmediatePropagation();if(e&&e.preventDefault)e.preventDefault();}
   function create(root,ports){
     var Mapping=ports.mapping,sizer=ports.freehand&&Resize?Resize.create(root,{Mapping:Mapping,session:session,bounds:bounds,scale:presentedScale,notice:notice,consume:consume}):null; // Alt+drag brush resize: UI state only
     var admitted=ports.freehand?['draw','fillbrush']:ports.pen?['pen']:tools,handled=ports.freehand?['draw','fillbrush']:ports.pen?['pen']:shapeTools;
-    var drag=null,pending=null,uncertain=null,overlay=null,retired=false,settled=Promise.resolve({status:'idle'});
-    function session(){return root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);}
-    function nativeMode(){try{var s=session();return !!s&&s.blocksLegacy();}catch(_){return true;}}
+    var drag=null,pending=null,uncertain=null,overlay=null,retired=false,gate=null,settled=Promise.resolve({status:'idle'});
+    function session(){return root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);} function nativeMode(){try{var s=session();return !!s&&s.blocksLegacy();}catch(_){return true;}}
     function notice(message){if(typeof root.showToast==='function')root.showToast(message);}
     function stageOrigin(e){var d=root.document;return e.target===d.getElementById('drawing-canvas')||e.target===d.getElementById('canvas-area');}
     function bounds(info){
@@ -33,10 +29,8 @@
       return {left:r.left,top:r.top,width:r.width,height:r.height};
     }
     // Confirmed CSS -> native composition pixels -> the painted receipt's inverse.
-    // Canvas uses identity; Paper pan/zoom never supplies a native coordinate proof.
-    // CSS pixels per document unit as presented: the painted document-to-composition transform composed with the
-    // element box, the same affine point() inverts. A fitted view letterboxes the document, so the element's own
-    // width/canvasW and height/canvasH differ while the presentation stays uniform (#2343 B1). The brush modeler takes
+    // Canvas uses identity; Paper pan/zoom never supplies a native coordinate proof. CSS pixels per document unit as presented: the painted document-to-composition transform composed with the
+    // element box, the same affine point() inverts. A fitted view letterboxes the document, so the element's own width/canvasW and height/canvasH differ while the presentation stays uniform (#2343 B1). The brush modeler takes
     // this one scale (the baseline's view.zoom); null when the presentation is not uniform beyond CSS layout rounding.
     function presentedScale(t){
       var m=Mapping.transform({presentation:t.presentation},false),kx=t.bounds.width/t.pin.canvasW,ky=t.bounds.height/t.pin.canvasH,
@@ -102,18 +96,17 @@
     // The brush style reads state.tool, so it is checked as that tool; a Pen gesture keeps its own switch rule (finalizePen).
     function styleAs(t,proof){var s=root.state,was=s.tool;if(ports.pen||was===t.tool)return style(t.tool,proof);s.tool=t.tool;try{return style(t.tool,proof);}finally{s.tool=was;}}
     function current(t,requirePresentation,lease){
-      try{var s=session(),pin=s&&s.info();
-        if(retired||t.cancelled||requirePresentation&&!Mapping.matchesView(root,t.presentation)||s!==t.session||!s.isActive()||!s.blocksLegacy()||!same(pin,t.pin)||root.state.currentFrame!==t.frame||ports.pen&&!t.finished&&root.state.tool!==t.tool||selection(pin)!==t.layerUid||JSON.stringify(root._layerSel)!==t.sel||
-            root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||JSON.stringify(styleAs(t,requirePresentation?undefined:t.perspective))!==JSON.stringify(t.style)||JSON.stringify(bounds(pin))!==JSON.stringify(t.bounds))return false;
-        // Public presentation is hidden by this action's own pending entry.
-        // Its existing lease still verifies the exact origin, view and subscription.
-        var shown=requirePresentation?s.readPresentedObjectSession():lease&&typeof lease.readPresentedObjectSession==='function'&&lease.readPresentedObjectSession();
+      try{var s=session(),pin=s&&s.info(),why,shown=requirePresentation&&s?s.readPresentedObjectSession(function(c){why=c;}):null,unproven=requirePresentation&&!shown&&why==='queue-pending';
+        if(retired||t.cancelled||requirePresentation&&!unproven&&!Mapping.matchesView(root,t.presentation)||s!==t.session||!s.isActive()||!s.blocksLegacy()||!same(pin,t.pin)||root.state.currentFrame!==t.frame||ports.pen&&!t.finished&&root.state.tool!==t.tool||selection(pin)!==t.layerUid||JSON.stringify(root._layerSel)!==t.sel||
+            root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||JSON.stringify(styleAs(t,requirePresentation&&!unproven?undefined:t.perspective))!==JSON.stringify(t.style)||JSON.stringify(bounds(pin))!==JSON.stringify(t.bounds))return false;
+        // Public presentation is hidden by this action's own pending entry. // Its existing lease still verifies the exact origin, view and subscription.
+        if(!requirePresentation)shown=lease&&typeof lease.readPresentedObjectSession==='function'&&lease.readPresentedObjectSession();
+        if(unproven)return true; // #2372: unprovable while the queue is busy is not changed; every write re-proves it through the dispatch lease above
         return !!shown&&same(shown,t.pin)&&shown.presentation===t.presentation;
       }catch(_){return false;}
     }
-    function clear(){if(overlay){overlay.remove();overlay=null;}}
-    function release(t){try{var el=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(el.releasePointerCapture)el.releasePointerCapture(t.pointer);}catch(_){} }
-    function cancel(){if(sizer)sizer.cancel();if(drag){var t=drag;drag=null;t.cancelled=true;clear();release(t);}return {status:'cancelled'};}
+    function clear(){if(overlay){overlay.remove();overlay=null;}} function release(t){try{var el=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(el.releasePointerCapture)el.releasePointerCapture(t.pointer);}catch(_){} }
+    function cancel(){if(gate)gate.cancel();if(sizer)sizer.cancel();if(drag){var t=drag;drag=null;t.cancelled=true;clear();release(t);}return {status:'cancelled'};}
     function endpoint(t,e){var end=point(e,t);return !ports.freehand&&e.shiftKey?ports.constrain(t.tool,t.start,end):end;}
     function dictionary(t,end,final){
       if(ports.pen){
@@ -127,8 +120,7 @@
       if(t.tool==='rect')out.paramShape={kind:'rect',tl:0,tr:0,br:0,bl:0,box:{x1:Math.min(t.start[0],end[0]),y1:Math.min(t.start[1],end[1]),x2:Math.max(t.start[0],end[0]),y2:Math.max(t.start[1],end[1])}};
       return Paint.shade(out,final);
     }
-    // The live preview shows the stroke and, with symmetry on, every copy the commit will create
-    // (symmetry-bridge.js onPreview @1065e9d8); a refused symmetry previews only the stroke itself.
+    // The live preview shows the stroke and, with symmetry on, every copy the commit will create (symmetry-bridge.js onPreview @1065e9d8); a refused symmetry previews only the stroke itself.
     function preview(t,end){
       var d=root.document,dict=dictionary(t,end);if(!dict)return;
       var dicts;try{dicts=Symmetry.copies(root,dict,t.pin,linkedCompanions.get(dict)||null);}catch(_){dicts=[dict];}
@@ -155,11 +147,9 @@
       // Labs predictive stroke (draw-bridge.js onStrokeCommitted @1065e9d8) reshapes a freehand stroke before it is committed.
       if(ports.freehand&&root.SMLabs&&typeof root.SMLabs.predictStrokeDict==='function')dict=root.SMLabs.predictStrokeDict(dict)||dict;
       // Mask mode (tools.js tagOwner @1065e9d8, on every Draw/Pen/shape commit): the shape becomes a mask of the layer
-      // with the chosen combine mode; its symmetry copies and multi-frame stamps carry the same tags. tagOwner tags the
-      // committed path only, so a pressure ribbon's linked fill stays an ordinary fill.
+      // with the chosen combine mode; its symmetry copies and multi-frame stamps carry the same tags. tagOwner tags the committed path only, so a pressure ribbon's linked fill stays an ordinary fill.
       if(root.state.maskMode)dict=Object.assign({},dict,{isMask:true,maskMode:root.state.maskModeType||'add'});
-      // No second queue: only add a current-intent check to the real Project
-      // resource action. While that action runs, its own pending count hides presentation.
+      // No second queue: only add a current-intent check to the real Project resource action. While that action runs, its own pending count hides presentation.
       var wrap=function(route){return function(action){return s[route](function(ctx){
         if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});
         return action({reconcile:ctx.reconcile,dispatch:function(q){if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});return ctx.dispatch(q);}});
@@ -200,8 +190,12 @@
     // queue starts. Always return a promise so release finalization clears
     // pending, without classifying a pre-dispatch refusal as owner uncertainty.
     function commitAttempt(t,end){
-      try{return Promise.resolve(commit(t,end));}
-      catch(error){t.refusal=error&&error.message;return Promise.resolve({status:'unavailable',reason:'pre_dispatch_failed'});}
+      var go=function(){try{return Promise.resolve(commit(t,end));}catch(error){t.refusal=error&&error.message;return Promise.resolve({status:'unavailable',reason:'pre_dispatch_failed'});}};
+      // #2372: the Project records the presentation a command was SUBMITTED under, and the queue hides it while any command is pending: a stroke released in that
+      // window would be refused at dispatch. Wait (bounded) for it to be readable, submit then; a real change meanwhile cancels it (native-presentation-wait.js).
+      var W=root.NemoNativePresentationWait,s=session(),read=function(f){return s?s.readPresentedObjectSession(f):null;};
+      if(!W||!s||!W.busy(read))return go();
+      return W.until(root,{readPresentedObjectSession:read},function(){return !!read();},function(){return current(t,true);},{notice:'The canvas is still busy - the stroke was not drawn.'}).then(function(ok){return ok?go():{status:'cancelled'};});
     }
     function submit(t,end){
       pending=t;settled=commitAttempt(t,end).catch(function(){return {status:'unconfirmed'};}).then(function(result){
@@ -209,7 +203,7 @@
         if(!retired&&result.status!=='applied'&&result.status!=='noop'&&result.status!=='cancelled')notice(t.refusal||'Native shape drawing was not confirmed.');return result;
       }).finally(function(){if(pending===t)pending=null;});
     }
-    function grab(e){var el=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(el.setPointerCapture)el.setPointerCapture(e.pointerId);}
+    function grab(e){try{var el=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(el.setPointerCapture)el.setPointerCapture(e.pointerId);}catch(_){/* a held press replayed after its release has no pointer left to capture */}}
     // Pen: one gesture spans several presses. A press adds an anchor (Shift: 45 degrees from the
     // previous one), a drag sets its symmetric handles (Alt keeps handleIn), a press near the
     // first anchor closes and commits, a double press commits the open path, Escape cancels.
@@ -291,7 +285,7 @@
       }
       if(!admitted.includes(root.state.tool)){notice('This shape tool is not available in native Drawing.');return true;}
       if(e.button!==0||e.isPrimary===false||!Number.isSafeInteger(e.pointerId))return true;
-      try{drag=capture(e);var el=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(el.setPointerCapture)el.setPointerCapture(e.pointerId);preview(drag,drag.start);}
+      try{drag=capture(e);grab(e);preview(drag,drag.start);}
       catch(error){cancel();notice(error.message||'Native Drawing is unavailable.');}return true;
     }
     function key(e){
@@ -309,7 +303,12 @@
     // Switching away from Pen commits the open path (timeline.js setTool @1065e9d8: finalizePen()).
     var setTool=ports.pen&&root.SM&&typeof root.SM.setTool==='function'?root.SM.setTool:null,boundSetTool=null;
     if(setTool){boundSetTool=function(next){if(next!=='pen')finish();return setTool.apply(this,arguments);};root.SM.setTool=boundSetTool;}
-    return Object.freeze({handle:handle,cancel:cancel,finish:finish,whenSettled:function(){return settled;},isDragging:function(){return !!drag;},
+    // #2372: a press while the native queue is busy (queue-pending) waits for the presentation and is replayed with the events that followed it (native-presentation-wait.js).
+    gate=root.NemoNativePresentationWait&&root.NemoNativePresentationWait.gate(root,{handle:handle,notice:'The canvas is still busy - try again.',
+      begins:function(k,e){return nativeMode()&&handled.includes(root.state.tool)&&!drag&&!pending&&!(sizer&&sizer.active())&&stageOrigin(e)&&e.button===0&&e.isPrimary!==false;},
+      read:function(f){var s=session();return s?s.readPresentedObjectSession(f):null;},snapshot:function(){var s=session(),i=s&&s.info(),st=root.state;return JSON.stringify([st.tool,st.currentFrame,root._layerSel,i&&[i.instanceId,i.documentId,i.lifecycleGeneration,i.contentRevision]]);},
+      holds:function(token){return !retired&&nativeMode()&&handled.includes(root.state.tool)&&this.snapshot()===token;}});
+    return Object.freeze({handle:gate?gate.handle:handle,cancel:cancel,finish:finish,whenSettled:function(){return settled;},isDragging:function(){return !!drag;},
       dispose:function(){retired=true;cancel();if(pending)pending.cancelled=true;root.document.removeEventListener('keydown',key,{capture:true});
         if(boundSetTool&&root.SM&&root.SM.setTool===boundSetTool)root.SM.setTool=setTool;}});
   }

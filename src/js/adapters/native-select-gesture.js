@@ -119,10 +119,11 @@
     if (o.stale && o.stale()) { notice(root, gone); return 'stale'; }
     if (!route) { notice(root, 'Transforming is not available right now.'); return 'refused'; }
     // The queue may still be draining the repaint of the pick that started this gesture: give the presentation a moment to become readable
-    // again (before the re-read, which needs it, and after it) rather than calling an unreadable document a changed one.
-    var settle = async function (read) { var v = read(); for (var wait = 0; !v && wait < 10; wait++) { await new Promise(function (done) { (root.setTimeout || setTimeout)(done, 40); }); v = read(); } return v; };
-    await settle(function () { return I.presentedState(root); });
-    var layers = await I.reread(root, sel, false), again = await settle(function () { return I.presentedState(root); });
+    // again (the shared bounded wait, before the re-read which needs it and after it) rather than calling an unreadable document a changed one.
+    var W = root.NemoNativePresentationWait;
+    var settle = function () { return W ? W.await(root, { read: function () { return I.presentedState(root); }, tries: 10, ms: 40 }).then(function (r) { return r.value || null; }) : Promise.resolve(I.presentedState(root)); };
+    await settle();
+    var layers = await I.reread(root, sel, false), again = await settle();
     if (!layers || !layers.complete || !again || !samePin(again.pin, o.pin)) { notice(root, gone); return 'stale'; }
     var result, steps;
     try { steps = I.transformSteps(root, layers.paths, m); } catch (_) { steps = null; }

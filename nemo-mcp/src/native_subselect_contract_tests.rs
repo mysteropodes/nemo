@@ -225,6 +225,19 @@ fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
         item["items"][0]["boxAngle"] = bad.clone();
         assert!(!public_read(&q, &item), "boxAngle {bad} is refused");
     }
+    // #2372 insp-parametric: a dynamic shape lists its kind and the members that kind owns (finite), never the generator box.
+    for good in [json!({"kind":"rect","tl":4,"tr":4.5,"br":0,"bl":0}), json!({"kind":"ellipse","startAngle":10,"sweep":359.9,"innerRadius":0.25}),
+        json!({"kind":"star","pointCount":5,"innerRatio":0.5,"cornerRadius":0}), json!({"kind":"rect"})] {
+        let mut item = r.clone();
+        item["items"][0]["paramShape"] = good.clone();
+        assert!(public_read(&q, &item), "paramShape {good} is legal in a hit-test listing");
+    }
+    for bad in [json!({}), json!({"kind":"hexagon"}), json!({"kind":"rect","sweep":1}), json!({"kind":"rect","tl":"4"}), json!({"kind":"rect","box":{"x1":0,"y1":0,"x2":1,"y2":1}}),
+        json!({"kind":"star","pointCount":null}), json!("rect"), json!(null)] {
+        let mut item = r.clone();
+        item["items"][0]["paramShape"] = bad.clone();
+        assert!(!public_read(&q, &item), "paramShape {bad} is refused");
+    }
     // #2372 SEL-STYLE: the style a panel shows is optional, with hex colours, a positive width and an opacity in 0..1.
     for good in [json!({"fill":"#ff000080","stroke":"#00ff00","width":6.0,"opacity":0.5}), json!({"opacity":0}), json!({"fill":"#112233"}),
         json!({"cap":"square","join":"bevel","miter":4.0,"dashOffset":-2.5,"paintOrder":"strokeFirst"}),

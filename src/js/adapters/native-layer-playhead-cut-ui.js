@@ -48,7 +48,15 @@
         ports.currentSession()===task.session&&task.session.isActive()===true&&task.session.blocksLegacy()===true&&
         task.session.readSubscriptionGeneration()===task.transport&&root.state.currentFrame===task.frame;
     }
+    // #2372: a cut right after another native command finds the presentation hidden by the queue (queue-pending): wait for it (bounded) and cut then, instead of
+    // answering false; the playhead, session or a second cut in the meantime still refuses (the checks in cutNow stay strict).
     function split(index){
+      var W=root.NemoNativePresentationWait,s=!retired&&!pending&&ports.currentSession(),frame=root.state.currentFrame;
+      if(!W||!s||typeof s.readPresentedObjectSession!=='function'||!W.busy(function(f){return s.readPresentedObjectSession(f);}))return cutNow(index);
+      return W.until(root,s,function(){return !!s.readPresentedObjectSession();},function(){return !retired&&!pending&&ports.currentSession()===s&&root.state.currentFrame===frame;},{notice:'The canvas is still busy - the cut was not applied.'})
+        .then(function(ok){return ok?cutNow(index):false;});
+    }
+    function cutNow(index){
       if(retired||pending)return Promise.resolve(false);
       var session,info,signature,transport,frame,source;
       try{

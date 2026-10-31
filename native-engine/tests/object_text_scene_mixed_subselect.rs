@@ -13,18 +13,24 @@ fn mixed() -> Value {
 
 /// One page of the subselect view (the hit-test listing, or the editable one) of the layer `L0` of `doc`.
 fn view(doc: &Value, hit_test: bool) -> Result<Value, &'static str> {
-    let owner = owner(doc);
-    let snapshot = support::head(&owner);
+    view_of(&owner(doc), hit_test, None)
+}
+/// The same page read from `owner`'s head, optionally while a vertex `preview` of one of its records is in flight.
+fn view_of(owner: &NativeObjectHistory, hit_test: bool, preview: Option<&Value>) -> Result<Value, &'static str> {
+    let snapshot = support::head(owner);
     let p = plan(&snapshot, 0);
     let witness = prepare_object_viewport_composition(&p, &selector(&snapshot, 0), None).unwrap();
     let projection = witness
-        .subselect_read_projection("L0", None, hit_test)?
+        .subselect_read_projection("L0", preview, hit_test)?
         .with_presentation("native-work-1".into(), 1)
         .unwrap();
     let mut v = json!({"kind":"subselect","contextId":"scene-root","layerUid":"L0","frame":0,
         "workId":"native-work-1","viewGeneration":1,"cursor":0,"limit":8});
     if hit_test {
         v["hitTest"] = json!(true);
+    }
+    if let Some(preview) = preview {
+        v["preview"] = preview.clone();
     }
     let request = json!({"apiVersion":2,"requestId":"mixed","instanceId":snapshot.instance_id(),"documentId":snapshot.document_id(),
         "operation":"query.document.object","payload":{"atRevision":snapshot.content_revision(),
@@ -130,3 +136,27 @@ fn a_subselect_move_of_the_vector_in_a_mixed_layer_is_one_history_entry() {
     assert_eq!(owner.history_depths(), (1, 0));
     assert!((first(&owner) - x0 - 3.0).abs() < 1e-9, "the vertex moved by the delta");
 }
+#[test]
+fn a_vertex_preview_on_a_rotated_mixed_layer_poses_like_the_committed_edit() {
+    // The layer rotates about the centre of everything it paints, so moving a vertex outward moves that pivot: the preview's
+    // listing must re-derive it from the edited geometry, or the shape jumps when the drag is released.
+    let mut doc = mixed();
+    doc["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"L0"},"properties":[{"property":"rotation","static":[30]}]}]);
+    let intent = json!({"kind":"move","indices":[0],"delta":[400,300]});
+    let preview = json!({"stableTarget":support::target("L0", "vector"),"intent":intent});
+    let mut owner = owner(&doc);
+    let before = view_of(&owner, false, None).unwrap()["items"][0]["matrix"].clone();
+    let during = view_of(&owner, false, Some(&preview)).unwrap()["items"][0]["matrix"].clone();
+    let request = json!({"apiVersion":2,"requestId":"edit","instanceId":owner.instance_id(),"documentId":owner.document_id(),
+        "expectedRevision":owner.content_revision(),"operation":"command.document.object.subselect.edit",
+        "payload":{"command":"object.subselect.edit","stableTarget":support::target("L0", "vector"),"intent":intent}});
+    let response = owner.try_dispatch_object_command(&serde_json::from_value(request).unwrap()).unwrap().unwrap();
+    let response = serde_json::to_value(response).unwrap();
+    assert_eq!(response["ok"], true, "{response}");
+    let after = view_of(&owner, false, None).unwrap()["items"][0]["matrix"].clone();
+    let m = |v: &Value| v.as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect::<Vec<_>>();
+    let far = |a: &[f64], b: &[f64]| a.iter().zip(b).map(|(x, y)| (x - y).abs()).fold(0.0, f64::max);
+    assert!(far(&m(&before), &m(&after)) > 1.0, "the edit moves the layer pivot: {before} -> {after}");
+    assert!(far(&m(&during), &m(&after)) < 1e-6, "the preview poses like the committed edit: {during} vs {after}");
+}
+

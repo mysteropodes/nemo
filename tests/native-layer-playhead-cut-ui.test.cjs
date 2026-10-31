@@ -14,11 +14,11 @@ function fixture(){
   const effects=[],calls=[],root={state:{},_layerSel:[],_layerSelAnchor:0,selectedPaths:[],NemoNativeObjectLayerSplice:Splice,
     SM:{splitLayerAtPlayhead(){effects.push('legacy');return 'legacy';}},showToast(message){effects.push(['notice',message]);}};
   ProjectFile.projectView(root,info);root.state.appMode='drawing';root.state.activeSymbolId=null;root.state.currentFrame=10;root._curFrame=10;
-  let session,active=true,blocks=true,pending=false,current,subscription=2,serial=0;
+  let session,active=true,blocks=true,pending=false,hiddenByQueue=false,current,subscription=2,serial=0;
   const control={dispatchGate:null,reconcileGate:null,receipt:null,failDispatch:null,failReconcile:null};
   function presented(){return {...info,available:true,kind:'native-object',presentation:{owner:'native',status:'presented',contextId:'scene-root',frame:root.state.currentFrame,
     instanceId:info.instanceId,documentId:info.documentId,lifecycleGeneration:info.lifecycleGeneration,contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId}};}
-  session={isActive:()=>active,blocksLegacy:()=>blocks,info:()=>info,readPresentedObjectSession:()=>pending?null:presented(),
+  session={isActive:()=>active,blocksLegacy:()=>blocks,info:()=>info,readPresentedObjectSession:why=>{if(pending||hiddenByQueue){if(why)why('queue-pending');return null;}return presented();},
     readSubscriptionGeneration:()=>subscription,requestId:()=> 'cut-ui-'+(++serial),
     async runResourceCommand(action){
       assert.equal(pending,false,'child uses existing single resource queue');pending=true;effects.push('queue');
@@ -40,7 +40,7 @@ function fixture(){
       effects.push(['select',index,uid]);root.state.activeLayerIdx=index;root._layerSel=[index];root._layerSelAnchor=index;return true;},
     repaint(){effects.push('repaint');return true;}};
   const previous=root.SM.splitLayerAtPlayhead,api=Cut.createPorts(root,ports);
-  return {root,session,api,ports,previous,control,effects,calls,info:()=>info,
+  return {hide:v=>{hiddenByQueue=v;},root,session,api,ports,previous,control,effects,calls,info:()=>info,
     setInfo:value=>{info=value;},replaceSession:()=>{current={...session};},setActive:value=>{active=value;},setBlocks:value=>{blocks=value;},
     changeSubscription:()=>{subscription++;},pending:()=>pending};
 }
@@ -341,4 +341,21 @@ test('actual bootstrap composition is per-root idempotent and refuses replaced d
   assert.throws(()=>Desktop.composeUI(a.root,{},{}),/unavailable/);
   a.root.document=document;assert.equal(Bootstrap.bindObjectUI(a.root),true);
   assert.equal(Project.paintUI(a.root),true);assert.equal(Project.paintUI(b.root),true);
+});
+
+// #2372 presentation-busy-audit: the native queue hides the presentation while ANY command is pending (queue-pending).
+test('a split issued while another native command hides the presentation waits for it and cuts exactly once',async()=>{
+  try{
+    const f=fixture();f.root.NemoNativePresentationWait=require('../src/js/adapters/native-presentation-wait.js');f.root.setTimeout=fn=>setTimeout(fn,5);assert.ok(f.api.bindCutEntries());f.hide(true);
+    const work=f.root.SM.splitLayerAtPlayhead();await new Promise(r=>setTimeout(r,30));
+    assert.equal(f.calls.length,0,'nothing is sent while the presentation is hidden');
+    f.hide(false);const done=await work;assert.equal(done,true,JSON.stringify(f.effects));assert.equal(f.calls.length,1);
+  }finally{/* the wait module is per-root */}
+});
+test('a split whose playhead moved during the wait still refuses and sends nothing',async()=>{
+  try{
+    const f=fixture();f.root.NemoNativePresentationWait=require('../src/js/adapters/native-presentation-wait.js');f.root.setTimeout=fn=>setTimeout(fn,5);assert.ok(f.api.bindCutEntries());f.hide(true);
+    const work=f.root.SM.splitLayerAtPlayhead();await new Promise(r=>setTimeout(r,20));
+    f.root.state.currentFrame=11;f.hide(false);assert.equal(await work,false);assert.equal(f.calls.length,0);
+  }finally{/* the wait module is per-root */}
 });

@@ -109,7 +109,7 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
             exact(
                 i,
                 &["stableTarget", "closed", "count", "matrix"],
-                if hit { &["bounds", "role", "filled", "strokeWidth", "owner", "brush", "group", "boxAngle", "style"] } else { &["paintCount"] },
+                if hit { &["bounds", "role", "filled", "strokeWidth", "owner", "brush", "group", "boxAngle", "style", "paramShape"] } else { &["paintCount"] },
             )
             .is_some()
                 && (!hit
@@ -121,6 +121,7 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
                         && i.get("strokeWidth").is_none_or(|w| w.as_f64().is_some_and(|w| w.is_finite() && w >= 0.0))
                         && i.get("boxAngle").is_none_or(|a| a.as_f64().is_some_and(f64::is_finite))
                         && i.get("style").is_none_or(listed_style)
+                        && i.get("paramShape").is_none_or(listed_param_shape)
                         && i.get("bounds").is_some()
                         && i.get("owner").is_none_or(|o| i["role"] == "fill" && o.as_str().is_some_and(|s| !s.is_empty()))
                         && i.get("brush").is_none_or(|b| ["anchor", "copy", "bitmap"].contains(&b.as_str().unwrap_or("")))
@@ -341,4 +342,16 @@ fn listed_style(v: &Value) -> bool {
         && v.get("brushPreset").is_none_or(|p| p.as_str().is_some_and(|p| !p.is_empty() && p.len() <= 96))
         && v.get("maskMode").is_none_or(|m| one_of(m, &["add", "subtract", "intersect"]))
         && v.get("maskFeather").is_none_or(|f| f.as_f64().is_some_and(|f| f.is_finite() && f >= 0.0))
+}
+
+/// #2372: the `paramShape` a listed dynamic rectangle, ellipse or star carries: a `kind` and only the finite numeric members its kind owns
+/// (the generator `box` is never listed), the body `object.parametric.set` takes back.
+fn listed_param_shape(v: &Value) -> bool {
+    let members: &[&str] = match v.get("kind").and_then(Value::as_str) {
+        Some("rect") => &["tl", "tr", "br", "bl"],
+        Some("ellipse") => &["startAngle", "sweep", "innerRadius"],
+        Some("star") => &["pointCount", "innerRatio", "cornerRadius"],
+        _ => return false,
+    };
+    exact(v, &["kind"], members).is_some_and(|o| o.iter().all(|(k, n)| k == "kind" || n.as_f64().is_some_and(f64::is_finite)))
 }
