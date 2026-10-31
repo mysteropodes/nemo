@@ -10069,30 +10069,7 @@ function onKeyDown(event){
     // Figma convention) — previously had NO handler at all here, so Delete
     // silently did nothing while a node was selected with the subselect
     // tool (reported as "impossible d'enlever le point de la ligne").
-    else if(state.tool==='subselect'&&_nodeSel.length>0){
-      event.preventDefault();
-      var ntp=nodeEditTargetPath();
-      if(ntp){
-        var isCenter=!!(ntp.data&&ntp.data.isVectorBrush&&ntp.data.centerSegments);
-        var curLen=isCenter?ntp.data.centerSegments.length:ntp.segments.length;
-        var minPts=isCenter?2:(ntp.closed?3:2);
-        if(curLen-_nodeSel.length<minPts){showToast(SM.t('toastNotEnoughPointsLeft'));}
-        else{
-          pushUndo();
-          var idxsDesc=_nodeSel.slice().sort(function(a,b){return b-a;});
-          idxsDesc.forEach(function(i){
-            if(isCenter)ntp.data.centerSegments.splice(i,1);
-            else ntp.removeSegment(i);
-          });
-          if(isCenter)rebuildVectorBrushOutline(ntp);
-          _nodeSel=[];
-          renderNodeHandles();
-          fillRegenerateLinked(userLayers[state.activeLayerIdx],ntp);
-          saveActiveLayerFrame();renderArcs();updateUI();
-          if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
-        }
-      }
-    }
+    else if(state.tool==='subselect'&&_nodeSel.length>0){event.preventDefault();}// #2356: vertex delete is native-only (subselect-bridge); the Paper writer is retired
     // Same rule as Cmd+D (feedback #803, see that branch): a timeline row
     // click auto-selects the layer's whole content, so this branch fired
     // for a LAYER selection too and Delete emptied the drawing instead of

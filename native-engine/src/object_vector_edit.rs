@@ -51,6 +51,7 @@ struct VectorPayload {
     records: Presence<Vec<ObjectRecord>>,
     placement: Presence<String>,
     trim_ends: Presence<serde_json::Number>,
+    trim_clip: Presence<create_ops::TrimClipWire>,
     keyframe: Presence<String>,
     skip_unavailable: Presence<bool>,
     ops: Presence<Vec<batch_ops::BatchOp>>,
@@ -63,6 +64,7 @@ object_deserialize!(VectorPayload {
     #[serde(default)] records: Presence<Vec<ObjectRecord>>,
     #[serde(default)] placement: Presence<String>,
     #[serde(default)] trim_ends: Presence<serde_json::Number>,
+    #[serde(default)] trim_clip: Presence<create_ops::TrimClipWire>,
     #[serde(default)] keyframe: Presence<String>,
     #[serde(default)] skip_unavailable: Presence<bool>,
     #[serde(default)] ops: Presence<Vec<batch_ops::BatchOp>>,
@@ -374,7 +376,7 @@ impl ObjectFillOwner {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         let placement = Placement::parse(&payload.command, &payload.placement)?;
-        let trim = create_ops::trim_ends(&payload.command, &payload.trim_ends)?;
+        let trim = create_ops::trim_ends(&payload.command, &payload.trim_ends, &payload.trim_clip)?;
         let copy_key = create_ops::copy_key(&payload.command, &payload.keyframe)?;
         // `skipUnavailable` (#2372) is a batch member only; a batch is atomic unless it asks to skip the restyle steps the engine cannot do.
         if payload.command != "object.vector.batch" && !payload.skip_unavailable.missing() {

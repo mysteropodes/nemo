@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const Parent = require('../src/js/adapters/native-layer-parent.js');
 const Contract = require('../src/js/adapters/native-object-rig-contract.js');
 const Rows = require('../src/js/adapters/native-motion-layer-link-rows.js');
+const LockMenu = require('../src/js/adapters/native-motion-key-lock-menu.js');
 
 const PATH = 'command.document.object.layer.followPath.set';
 const TIME = 'command.document.object.layer.timeLink.set';
@@ -62,11 +63,22 @@ function harness(options = {}) {
       },
       async reconcile() {},
     }) };
+  // D37: the real session's editLayerPolicy refuses a stale pin before anything commits; this fake mirrors that contract.
+  const policy = [];
+  const editLayerPolicy = options.noPolicy ? undefined : async (payload, expected) => {
+    policy.push({ payload: plain(payload), expected: plain(expected) });
+    if (expected.contentRevision !== pin.contentRevision) throw new Error('Native layer policy intent is stale or invalid');
+    const row = pin.layers.find((r) => r.layerUid === payload.layerUid);
+    if (payload.value === null) delete row.keyLock; else row.keyLock = payload.value;
+    pin.contentRevision += 1;
+    return { ok: true, contentRevision: pin.contentRevision };
+  };
+  Object.defineProperty(session, 'editLayerPolicy', { get: () => editLayerPolicy, enumerable: true });
   const throws = (name) => () => { throw new Error('LEGACY ' + name); };
-  const host = { document: { createElement: element }, state: { currentFrame: 9 }, NemoNativeObjectProject: { desktop: () => session },
+  const host = { NemoNativeMotionKeyLockMenu: LockMenu, document: { createElement: element }, state: { currentFrame: 9 }, NemoNativeObjectProject: { desktop: () => session },
     showToast: (m) => toasts.push(m), showContextMenu: (x, y, items) => menus.push({ x, y, items }), nativeCompositingRefresh: () => refreshed.push('refresh'),
-    setLayerFollowPath: throws('setLayerFollowPath'), setLayerTimeLink: throws('setLayerTimeLink'), pushUndo: throws('pushUndo'), unlinkTimeLinkPreserveRange: throws('unlink') };
-  return { host, sent, toasts, menus, refreshed, pin, adapter: Parent.create(session) };
+    setLayerFollowPath: throws('setLayerFollowPath'), setLayerTimeLink: throws('setLayerTimeLink'), pushUndo: throws('pushUndo'), unlinkTimeLinkPreserveRange: throws('unlink'), setLayerKeyLock: throws('setLayerKeyLock') };
+  return { host, sent, toasts, menus, refreshed, pin, policy, adapter: Parent.create(session) };
 }
 
 test('the contract admits an optional boolean align on followPath.set and nothing else new', () => {
@@ -239,8 +251,77 @@ test('a disposed rows object paints nothing and a layer that became a folder emp
   assert.equal(rows.node.children.length, 0);
   h.pin.layers[2].kind = 'draw';
   assert.equal(rows.refresh(), true);
-  assert.equal(rows.node.children.length, 2);
+  assert.equal(rows.node.children.length, 3);
   rows.dispose();
   assert.equal(rows.refresh(), false);
   assert.equal(rows.node.children.length, 0);
+});
+
+// ---- D37 / #2522: the layer key-lock row and its "Lock keyframes on:" menu ----
+const lockPill = (rows) => rows.node.children[2].children[1];
+const lockRows = () => [{ layerUid: 'L-a', name: 'A', kind: 'draw' }, { layerUid: 'L-b', name: 'B', kind: 'draw', keyLock: 'out' }, { layerUid: 'L-f', name: 'Folder', kind: 'folder' }];
+
+test('the lock row shows the stored mode, the baseline menu order and the check on the active mode', () => {
+  const h = harness({ rows: lockRows() });
+  const none = Rows.build(h.host, { contextId: 'scene-root', layerUid: 'L-a' });
+  assert.deepEqual(none.node.children.map((row) => row.children[0].textContent), ['Path', 'Time', 'Lock keyframes on']);
+  assert.equal(lockPill(none).textContent, '—');
+  assert.ok(lockPill(none).className.split(' ').includes('none'));
+  lockPill(none).fire('click');
+  assert.deepEqual(h.menus[0].items.map((item) => item.label), ['Lock keyframes on:', '   • the in point', '   • the out point', '   • the whole layer']);
+  assert.equal(h.menus[0].items[0].disabled, true, 'the header row only titles the group');
+  const locked = Rows.build(h.host, { contextId: 'scene-root', layerUid: 'L-b' });
+  assert.equal(lockPill(locked).textContent, 'out point');
+  lockPill(locked).fire('click');
+  assert.deepEqual(h.menus[1].items.map((item) => item.label), ['Lock keyframes on:', '   • the in point', '   • the out point  ✓', '   • the whole layer']);
+  assert.equal(h.sent.length, 0, 'opening a menu writes nothing');
+  assert.equal(h.policy.length, 0);
+});
+
+test('picking a mode writes it through the native layer policy; picking the active mode clears it', async () => {
+  const h = harness({ rows: lockRows() });
+  const rows = Rows.build(h.host, { contextId: 'scene-root', layerUid: 'L-a' });
+  lockPill(rows).fire('click');
+  assert.equal(await h.menus[0].items[1].action(), true);
+  assert.deepEqual(h.policy[0].payload, { command: 'object.layer.policy.edit', layerUid: 'L-a', flag: 'keyLock', value: 'in' });
+  assert.equal(h.policy[0].expected.contentRevision, 4, 'the pin the menu was built from');
+  assert.equal(h.adapter.keyLockOf(0), 'in');
+  assert.equal(lockPill(rows).textContent, 'in point', 'the row repaints from the confirmed project rows');
+  lockPill(rows).fire('click');
+  assert.match(h.menus[1].items[1].label, /✓$/);
+  assert.equal(await h.menus[1].items[1].action(), true);
+  assert.equal(h.policy[1].payload.value, null, 'the active row clears');
+  assert.equal(h.adapter.keyLockOf(0), null);
+  assert.equal(lockPill(rows).textContent, '—');
+  lockPill(rows).fire('click');
+  assert.equal(await h.menus[2].items[3].action(), true);
+  assert.equal(h.policy[2].payload.value, 'layer');
+  assert.equal(h.sent.length, 0, 'no rig command is involved');
+  assert.deepEqual(h.toasts, []);
+});
+
+test('a menu built before the project changed cannot commit, and an unavailable policy route is a toast', async () => {
+  const h = harness({ rows: lockRows() });
+  const rows = Rows.build(h.host, { contextId: 'scene-root', layerUid: 'L-a' });
+  lockPill(rows).fire('click');
+  h.pin.contentRevision += 1; // another edit lands while the menu is open
+  assert.equal(await h.menus[0].items[2].action(), false);
+  assert.equal(h.adapter.keyLockOf(0), null, 'the stale pick published nothing');
+  assert.match(h.toasts[0], /Key lock was refused or the project changed/);
+  const off = harness({ rows: lockRows(), noPolicy: true });
+  const offRows = Rows.build(off.host, { contextId: 'scene-root', layerUid: 'L-a' });
+  lockPill(offRows).fire('click');
+  assert.equal(await off.menus[0].items[1].action(), false);
+  assert.equal(off.policy.length, 0);
+  assert.equal(off.toasts.length, 1, 'no legacy setLayerKeyLock fallback');
+});
+
+test('the lock menu builder is the single source of labels and clears the active mode', () => {
+  const picks = [];
+  const items = LockMenu.items({}, (m) => m === 'layer', (next) => picks.push(next));
+  assert.deepEqual(items.map((i) => i.label), ['Lock keyframes on:', '   • the in point', '   • the out point', '   • the whole layer  ✓']);
+  items[1].action(); items[3].action();
+  assert.deepEqual(picks, ['in', null]);
+  const translated = LockMenu.items({ SM: { t: (key) => ({ ctxLockKeyframesOnColon: 'Verrouiller :', ctxKeyLockInPoint: '   • entrée' })[key] || key } }, () => false, () => {});
+  assert.deepEqual(translated.map((i) => i.label), ['Verrouiller :', '   • entrée', '   • the out point', '   • the whole layer']);
 });

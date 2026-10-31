@@ -98,11 +98,13 @@
       Object.values(value.target).forEach(objectUid); objectUid(value.property);
       const action = value.action;
       if (!plain(action)) throw new TypeError('property action must be an object');
+      // Expression authoring and D18-B control declaration edits carry no frame; for control
+      // edits `property` is the control key.
       const fields = {setValue:['values'], setKey:['values'], removeKey:[], setAnimated:['animated'], bake:[],
-        setExpression:['code'], setExpressionEnabled:['enabled'], removeExpression:[]};
+        setExpression:['code'], setExpressionEnabled:['enabled'], removeExpression:[],
+        addControl:['controlType', 'name'], renameControl:['name'], removeControl:[], moveControl:['direction']};
       if (typeof action.kind !== 'string' || !has(fields, action.kind)) throw new TypeError('unsupported property edit action');
-      // Expression authoring is frameless: it edits the stored source, never a sample.
-      const frameless = action.kind === 'bake' || /Expression/.test(action.kind);
+      const frameless = action.kind === 'bake' || /Expression/.test(action.kind) || /^(?:add|rename|remove|move)Control$/.test(action.kind);
       exact(action, ['kind', ...(frameless ? [] : ['frame']), ...fields[action.kind]], [], 'property action');
       // Native frames are finite numbers, including negative and fractional values.
       if (!frameless && !Number.isFinite(action.frame)) throw new TypeError('invalid property frame');
@@ -112,6 +114,12 @@
       } else if (action.kind === 'setExpressionEnabled' && typeof action.enabled !== 'boolean') {
         throw new TypeError('expression enabled intent must be boolean');
       }
+      if (has(action, 'name') && (typeof action.name !== 'string' || !action.name || Array.from(action.name).length > 128)) {
+        throw new TypeError('invalid control name');
+      }
+      if (action.kind === 'addControl' && (!['number', 'checkbox', 'angle', 'point', 'color'].includes(action.controlType) ||
+          !/^xc_[A-Za-z0-9_]{1,124}$/.test(value.property))) throw new TypeError('invalid control declaration');
+      if (action.kind === 'moveControl' && action.direction !== -1 && action.direction !== 1) throw new TypeError('invalid control direction');
       if (has(action, 'values')) {
         const values = action.values;
         if (!Array.isArray(values) || values.length < 1 || values.length > 4 ||
@@ -152,6 +160,10 @@
         // Native baseline clamps finite percentages; transport must preserve the input.
       } else if (action.kind === 'subdivide') {
         exact(action, ['kind'], [], 'property key subdivision');
+      } else if (action.kind === 'lockTo') {
+        // D37: per-key standing lock; null clears. Required, never defaulted.
+        exact(action, ['kind', 'mode'], [], 'property key lock');
+        if (action.mode !== null && !['in', 'out', 'layer'].includes(action.mode)) throw new TypeError('invalid property key lock mode');
       } else {
         throw new TypeError('unsupported property track action');
       }

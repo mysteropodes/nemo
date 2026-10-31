@@ -13,6 +13,16 @@ use std::collections::HashSet;
 
 #[path = "object_vector_trim.rs"]
 mod trim;
+#[path = "object_vector_axis_clip.rs"]
+mod clip;
+pub(crate) use clip::TrimClipWire;
+
+/// Trim Stroke Ends as asked: the overshoot limit, and for a stop-at-axis mirror the clip that runs after the trim.
+#[derive(Debug, Clone)]
+pub(super) struct Trim {
+    max: f64,
+    clip: Option<clip::Clip>,
+}
 
 /// Where created records enter the layer's stack in their frame.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,11 +45,25 @@ impl Placement {
 
 /// `trimEnds` (the baseline `trimStrokeEndsMax`) is optional on the two create commands only: a finite
 /// overshoot limit above zero. Absent means no trim, as with `trimStrokeEnds` off.
-pub(super) fn trim_ends(command: &str, value: &Presence<serde_json::Number>) -> Result<Option<f64>, DispatchErrorCode> {
+/// `trimClip` (a mirror's stop-at-axis clip, which the baseline runs after the trim) is valid only beside `trimEnds`.
+pub(super) fn trim_ends(
+    command: &str,
+    value: &Presence<serde_json::Number>,
+    clip: &Presence<TrimClipWire>,
+) -> Result<Option<Trim>, DispatchErrorCode> {
     let creates = matches!(command, "object.vector.create" | "object.vector.createMany" | "object.vector.batch");
+    let clip = match clip.value() {
+        None => None,
+        Some(wire) if creates && value.value().is_some() => Some(clip::Clip::parse(wire).ok_or(DispatchErrorCode::InvalidRequest)?),
+        Some(_) => return Err(DispatchErrorCode::InvalidRequest),
+    };
     match value.value() {
         None => Ok(None),
-        Some(n) if creates => n.as_f64().filter(|v| v.is_finite() && *v > 0.).map(Some).ok_or(DispatchErrorCode::InvalidRequest),
+        Some(n) if creates => n
+            .as_f64()
+            .filter(|v| v.is_finite() && *v > 0.)
+            .map(|max| Some(Trim { max, clip }))
+            .ok_or(DispatchErrorCode::InvalidRequest),
         Some(_) => Err(DispatchErrorCode::InvalidRequest),
     }
 }
@@ -82,7 +106,7 @@ pub(super) fn create(
     revision: u64,
     record: ObjectRecord,
     placement: Placement,
-    trim: Option<f64>,
+    trim: Option<Trim>,
     copy_key: bool,
 ) -> Result<Edit, DispatchErrorCode> {
     create_many_or_one(base, revision, vec![record], placement, trim, copy_key, VectorEditKind::Create)
@@ -96,7 +120,7 @@ fn create_many_or_one(
     revision: u64,
     records: Vec<ObjectRecord>,
     placement: Placement,
-    trim: Option<f64>,
+    trim: Option<Trim>,
     copy_key: bool,
     kind: VectorEditKind,
 ) -> Result<Edit, DispatchErrorCode> {
@@ -106,7 +130,8 @@ fn create_many_or_one(
 /// Trim Stroke Ends (draw-bridge.js @1065e9d8 trims the drawn path before the symmetry copies and the Labs multi-frame
 /// stamps exist): the first record's cut against the paths of its own cell, shared by every record, so copies keep the
 /// same anchors. Nothing is trimmed when any record could not take the cut.
-pub(super) fn trim_records(source: &ObjectDocument, records: &mut [ObjectRecord], max: f64) -> Result<(), DispatchErrorCode> {
+pub(super) fn trim_records(source: &ObjectDocument, records: &mut [ObjectRecord], plan: &Trim) -> Result<(), DispatchErrorCode> {
+    let max = plan.max;
     let first = records.first().ok_or(DispatchErrorCode::InvalidRequest)?.target.clone();
     let walls = source.objects.iter().filter(|r| {
         r.target.context_id == first.context_id
@@ -115,15 +140,16 @@ pub(super) fn trim_records(source: &ObjectDocument, records: &mut [ObjectRecord]
     });
     // A pressure ribbon trims its centreline and rebuilds its outline and its linked fill's.
     if records.iter().any(trim::is_vector_brush) {
-        return trim::ribbon(records, walls, max);
+        trim::ribbon(records, walls, max)?;
+    } else {
+        // The baseline trims nothing when a cut would leave fewer than two anchors; neither do the copies.
+        let cut = trim::cuts(&records[0], walls, max);
+        let trimmed: Option<Vec<_>> = cut.and_then(|cut| records.iter().map(|r| trim::apply(r, cut)).collect());
+        for (record, segments) in records.iter_mut().zip(trimmed.into_iter().flatten()) {
+            record.geometry.segments = segments;
+        }
     }
-    // The baseline trims nothing when a cut would leave fewer than two anchors; neither do the copies.
-    let cut = trim::cuts(&records[0], walls, max);
-    let trimmed: Option<Vec<_>> = cut.and_then(|cut| records.iter().map(|r| trim::apply(r, cut)).collect());
-    for (record, segments) in records.iter_mut().zip(trimmed.into_iter().flatten()) {
-        record.geometry.segments = segments;
-    }
-    Ok(())
+    plan.clip.as_ref().map_or(Ok(()), |clip| clip::axis_clip(records, clip))
 }
 
 /// The create kernel against a document being edited; `revision` is the origin's, so ids stay monotonic.
@@ -132,7 +158,7 @@ pub(super) fn create_in(
     revision: u64,
     mut records: Vec<ObjectRecord>,
     placement: Placement,
-    trim: Option<f64>,
+    trim: Option<Trim>,
     copy_key: bool,
     kind: VectorEditKind,
 ) -> Result<Edit, DispatchErrorCode> {
@@ -144,8 +170,8 @@ pub(super) fn create_in(
     }) {
         return Err(DispatchErrorCode::InvalidRequest);
     }
-    if let Some(max) = trim {
-        trim_records(source, &mut records, max)?;
+    if let Some(plan) = &trim {
+        trim_records(source, &mut records, plan)?;
     }
     let mut document = source.clone();
     // Baseline Draw, Pen and shape commits run ensureKeyframe(true) first (draw-bridge.js commitStroke, tools.js
@@ -220,7 +246,7 @@ pub(super) fn create_many(
     revision: u64,
     records: Vec<ObjectRecord>,
     placement: Placement,
-    trim: Option<f64>,
+    trim: Option<Trim>,
     copy_key: bool,
 ) -> Result<Edit, DispatchErrorCode> {
     if !(2..=MAX_CREATE_MANY).contains(&records.len()) {

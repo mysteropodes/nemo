@@ -15,7 +15,7 @@
 //! sets the boolean `skipUnavailable` restyles what it can; the receipt then adds `skippedSteps` (1 to one less than the steps) and
 //! still lists one id per step.
 use super::shapes::{anchor, geometry, gradient, record_shape};
-use super::target;
+use super::{target, trim_clip};
 use crate::native_contract::exact;
 use serde_json::Value;
 
@@ -123,7 +123,8 @@ fn targets(ops: &[Value]) -> Option<Vec<&Value>> {
 }
 
 pub(super) fn request(payload: &Value) -> bool {
-    exact(payload, &["command", "ops"], &["keyframe", "trimEnds", "skipUnavailable"]).is_some()
+    exact(payload, &["command", "ops"], &["keyframe", "trimEnds", "trimClip", "skipUnavailable"]).is_some()
+        && trim_clip(payload)
         && payload.get("keyframe").is_none_or(|k| k == "copy")
         && payload.get("skipUnavailable").is_none_or(Value::is_boolean)
         // A batch trims only when every step creates: the drawn stroke, its copies and its multi-frame stamps.

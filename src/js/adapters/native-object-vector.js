@@ -76,11 +76,13 @@
         revision: receipt.contentRevision, origin: pinned, receipt,
       }, describe ? describe(receipt) : null))).catch(failed);
     }
+    // #2361 trimClip: rebuilt here, in the SDK's own realm, from the caller's {axis, mirrors} (a payload object of another realm is not plain).
+    const clipOf = (options) => (options && options.trimClip ? { trimClip: { axis: Array.from(options.trimClip.axis, Number), mirrors: Array.from(options.trimClip.mirrors, (pair) => Array.from(pair, Number)) } } : {});
     const strokeFields = (receipt) => ({ strokeId: receipt.strokeId });
     // G15: `options.placement === 'behind'` enters under the layer's existing artwork; front is the absent default.
     // `options.trimEnds` asks native to trim the new open stroke's dangling ends (baseline Trim Stroke Ends).
     const placed = (body, options) => Object.assign(body, options && options.placement === 'behind' ? { placement: 'behind' } : {},
-      options && options.trimEnds !== undefined ? { trimEnds: options.trimEnds } : {},
+      options && options.trimEnds !== undefined ? { trimEnds: options.trimEnds } : {}, clipOf(options),
       // `options.keyframe: 'copy'` keys a held cell with what it showed instead of Draw's empty key.
       options && options.keyframe === 'copy' ? { keyframe: 'copy' } : {});
 
@@ -135,7 +137,7 @@
           step.keyframe === 'copy' ? { keyframe: 'copy' } : {}));
       }
       const body = Object.assign({ command: 'object.vector.batch', ops }, options && options.keyframe === 'copy' ? { keyframe: 'copy' } : {},
-        options && options.trimEnds !== undefined ? { trimEnds: options.trimEnds } : {}, options && options.skipUnavailable === true ? { skipUnavailable: true } : {});
+        options && options.trimEnds !== undefined ? { trimEnds: options.trimEnds } : {}, clipOf(options), options && options.skipUnavailable === true ? { skipUnavailable: true } : {});
       return send(Contract.VECTOR, body, options, (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds }), context);
     }
     function replaceStroke(target, dict, options) {

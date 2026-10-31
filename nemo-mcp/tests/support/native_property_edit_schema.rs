@@ -14,6 +14,10 @@ pub(super) fn check(valid: impl Fn(&Value) -> bool) {
         json!({"kind":"setExpression","code":"// 雪 🧭\r\nreturn value;"}),
         json!({"kind":"setExpressionEnabled","enabled":true}),
         json!({"kind":"removeExpression"}),
+        json!({"kind":"addControl","controlType":"point","name":"Where"}),
+        json!({"kind":"renameControl","name":"Velocity"}),
+        json!({"kind":"removeControl"}),
+        json!({"kind":"moveControl","direction":-1}),
     ] {
         let mut q = base.clone();
         q["payload"]["action"] = action;
@@ -31,6 +35,7 @@ pub(super) fn check(valid: impl Fn(&Value) -> bool) {
         }
         let mut bad = q.clone();
         bad["payload"]["action"]["frame"] = json!("0");
+        // Control declaration edits carry no frame: the member is simply added, which the closed shape refuses.
         assert!(!valid(&bad));
         let mut bad = q.clone();
         bad["payload"]["target"]["strokeId"] = Value::Null;
@@ -45,6 +50,12 @@ pub(super) fn check(valid: impl Fn(&Value) -> bool) {
         json!({"kind":"setValue","frame":0,"values":[1,2,3,4,5]}),
         json!({"kind":"setValue","frame":0,"values":[null]}),
         json!({"kind":"setAnimated","frame":0,"animated":0}),
+        json!({"kind":"addControl","controlType":"slider","name":"A"}),
+        json!({"kind":"addControl","controlType":"number","name":""}),
+        json!({"kind":"renameControl","name":""}),
+        json!({"kind":"removeControl","frame":0}),
+        json!({"kind":"moveControl","direction":0}),
+        json!({"kind":"moveControl","direction":"up"}),
         json!(["removeKey", 0]),
         json!({"kind":"setExpression"}),
         json!({"kind":"setExpression","code":null}),

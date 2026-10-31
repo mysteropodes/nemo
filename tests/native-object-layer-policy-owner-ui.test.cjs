@@ -77,9 +77,9 @@ function scenario(openFault){
     if(command==='nemo_native_dispatch'&&r.operation==='query.document.object.layer.timing')return {apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,contentRevision:revision,ok:false,error:{code:'unavailable',message:'Timing is outside this policy fixture'}};
     assert.equal(command,'nemo_native_dispatch');routes.push(command);assert.equal(r.expectedRevision,revision);
     assert.equal(r.documentId,info().documentId);commands.push(r);
-    assert.equal(r.operation,'command.document.object.layer.policy.edit');assert.equal(r.payload.command,'object.layer.policy.edit');assert.ok(['locked','shy'].includes(r.payload.flag));
-    const applied=(policy[r.payload.flag]===true)!==r.payload.value;
-    if(applied){policy[r.payload.flag]=r.payload.value;revision++;}
+    assert.equal(r.operation,'command.document.object.layer.policy.edit');assert.equal(r.payload.command,'object.layer.policy.edit');assert.ok(['locked','shy','keyLock'].includes(r.payload.flag));
+    const keyLock=r.payload.flag==='keyLock',applied=keyLock?(policy.keyLock===undefined?null:policy.keyLock)!==r.payload.value:(policy[r.payload.flag]===true)!==r.payload.value;
+    if(applied){if(keyLock&&r.payload.value===null)delete policy.keyLock;else policy[r.payload.flag]=r.payload.value;revision++;}
     const response={apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,
       contentRevision:revision,ok:true,result:{applied,historyEntriesAdded:applied?1:0}};
     if(replyGate){const gate=replyGate;replyGate=null;await gate.promise;}
@@ -282,3 +282,16 @@ test('actual native paint installs ordinary policy wrappers once and disposes th
 test('composition has no Paper selection lookup and leaves native layer fields exclusively owner-controlled',async()=>{const h=await openDesktop(),info=h.session.info();Object.defineProperty(h.root,'userLayers',{get(){throw Error('No Paper selection authority');},configurable:true});h.root.selectedPaths=[{id:'ui-only'}];h.root.state.selectedStrokeIndices=[2];assert.equal(h.uiPorts.clearDrawingSelection('legacy layer:alpha',info),false);assert.equal(h.root.selectedPaths.length,1);assert.equal(Object.hasOwn(info.layers[0],'locked'),false);});
 
 test('actual frame-only Project paint preserves policy control identity and focus without provider-driven rebuilds',async()=>{const h=await openDesktop(),button=h.row().children[2],Project=require('../src/js/adapters/native-object-project.js');button.focus();Project.paintUI(h.root,true);assert.equal(h.row().children[2]===button,true);assert.equal(h.root.document.activeElement===button,true);});
+
+test('D37 the actual SDK and session write, read back and clear a layer key lock, and refuse a stale pin or malformed mode',async()=>{
+ const h=await open(),pin=h.session.info();
+ const set=await h.session.editLayerPolicy(payload('keyLock','in'),pin);assert.equal(set.ok,true);assert.equal(set.result.applied,true);
+ assert.equal(h.session.info().layers[0].keyLock,'in','the project row is the native read the lock menu ticks');assert.equal(h.session.info().layers[1].keyLock,undefined);
+ assert.equal(h.commands[0].payload.flag,'keyLock');assert.deepEqual(h.routes,['nemo_native_dispatch']);
+ await assert.rejects(h.session.editLayerPolicy(payload('keyLock','out'),pin),/stale/);assert.equal(h.commands.length,1);
+ for(const bad of ['both',true,0,undefined])await assert.rejects(h.session.editLayerPolicy(payload('keyLock',bad),h.session.info()),/invalid/);
+ assert.equal(h.commands.length,1,'invalid intents never reach the transport');
+ const same=await h.session.editLayerPolicy(payload('keyLock','in'),h.session.info());assert.equal(same.result.applied,false);assert.equal(h.session.info().layers[0].keyLock,'in');
+ const clear=await h.session.editLayerPolicy(payload('keyLock',null),h.session.info());assert.equal(clear.result.applied,true);
+ assert.equal(Object.hasOwn(h.session.info().layers[0],'keyLock'),false);
+});

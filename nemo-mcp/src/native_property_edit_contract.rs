@@ -21,6 +21,12 @@ fn code(value: Option<&Value>) -> bool {
         .and_then(Value::as_str)
         .is_some_and(|code| code.len() <= 4096)
 }
+/// D18-B control declaration text: non-empty and bounded; the engine owns trimming, clashes and shape.
+fn control_name(value: Option<&Value>) -> bool {
+    value
+        .and_then(Value::as_str)
+        .is_some_and(|s| !s.is_empty() && s.chars().count() <= 128)
+}
 fn action(value: &Value) -> bool {
     match value.get("kind").and_then(Value::as_str) {
         Some("setExpression") => {
@@ -37,6 +43,17 @@ fn action(value: &Value) -> bool {
         }
         Some("setAnimated") => exact(value, &["kind", "frame", "animated"], &[])
             .is_some_and(|a| finite(a.get("frame")) && a["animated"].is_boolean()),
+        Some("addControl") => exact(value, &["kind", "controlType", "name"], &[]).is_some_and(|a| {
+            a["controlType"]
+                .as_str()
+                .is_some_and(|t| ["number", "checkbox", "angle", "point", "color"].contains(&t))
+                && control_name(a.get("name"))
+        }),
+        Some("renameControl") => exact(value, &["kind", "name"], &[])
+            .is_some_and(|a| control_name(a.get("name"))),
+        Some("removeControl") => exact(value, &["kind"], &[]).is_some(),
+        Some("moveControl") => exact(value, &["kind", "direction"], &[])
+            .is_some_and(|a| matches!(a["direction"].as_i64(), Some(-1 | 1))),
         _ => false,
     }
 }

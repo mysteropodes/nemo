@@ -378,6 +378,8 @@ mod property_bake_tests;
 #[cfg(test)]
 #[path = "native_property_expression_dispatch_tests.rs"]
 mod property_expression_tests;
+#[path = "native_property_control_dispatch_tests.rs"]
+mod property_control_tests;
 
 #[cfg(test)]
 #[path = "native_image_mesh_binding_public_tests.rs"]
@@ -410,3 +412,7 @@ mod comments_tests;
 #[cfg(test)]
 #[path = "native_import_batch_dispatch_tests.rs"]
 mod import_batch_tests;
+
+#[cfg(test)]
+#[path = "native_key_lock_dispatch_tests.rs"]
+mod key_lock_tests;

@@ -182,7 +182,9 @@
     } else if (['command.document.object.layer.visibility.set', 'command.document.object.layer.policy.edit'].includes(operation)) {
       const policy = operation === 'command.document.object.layer.policy.edit';
       exact(payload, policy ? ['command', 'layerUid', 'flag', 'value'] : ['command', 'layerUid', 'visible'], [], 'object layer command');
-      if (payload.command !== (policy ? 'object.layer.policy.edit' : 'object.layer.visibility.set') || typeof payload[policy ? 'value' : 'visible'] !== 'boolean' || policy && !['locked', 'shy'].includes(payload.flag)) throw new TypeError('invalid object layer command');
+      // D37: the keyLock flag carries the layer key-lock mode (null clears); locked and shy stay booleans.
+      const keyLock = policy && payload.flag === 'keyLock' && (payload.value === null || ['in', 'out', 'layer'].includes(payload.value));
+      if (payload.command !== (policy ? 'object.layer.policy.edit' : 'object.layer.visibility.set') || !keyLock && typeof payload[policy ? 'value' : 'visible'] !== 'boolean' || policy && !keyLock && !['locked', 'shy'].includes(payload.flag)) throw new TypeError('invalid object layer command');
       objectUid(payload.layerUid);
     } else if (objectHistoryOperations.includes(operation)) { exact(payload, ['command'], ['steps'], 'object history command'); if (payload.command !== operation.slice('command.document.'.length) || has(payload, 'steps') && !(Number.isSafeInteger(payload.steps) && payload.steps >= 1)) throw new TypeError('invalid object history command'); } else if (operation === 'query.document.serialize' || operation === 'query.document.evaluate') {
       const evaluate = operation === 'query.document.evaluate';

@@ -40,10 +40,13 @@ test('D36 declaration keeps mutation admission separate from read-only metadata 
   assert.deepEqual(payload.properties.target.required, ['contextId', 'layerUid']);
   assert.equal(payload.properties.target.additionalProperties, false);
   assert.deepEqual(payload.properties.action.oneOf.map(v => v.properties.kind.const),
-    ['setValue', 'setKey', 'removeKey', 'setAnimated', 'bake', 'setExpression', 'setExpressionEnabled', 'removeExpression']);
+    ['setValue', 'setKey', 'removeKey', 'setAnimated', 'bake', 'setExpression', 'setExpressionEnabled', 'removeExpression', 'addControl', 'renameControl', 'removeControl', 'moveControl']);
   for (const action of payload.properties.action.oneOf) {
     assert.equal(action.additionalProperties, false);
-    if (['bake', 'removeExpression'].includes(action.properties.kind.const)) {
+    if (/^(?:add|rename|remove|move)Control$/.test(action.properties.kind.const)) {
+      assert.equal(action.properties.frame, undefined, 'a control declaration edit carries no frame');
+      assert.deepEqual(action.required, ['kind', ...Object.keys(action.properties).filter(k => k !== 'kind')]);
+    } else if (['bake', 'removeExpression'].includes(action.properties.kind.const)) {
       assert.deepEqual(action.required, ['kind']);
       assert.deepEqual(Object.keys(action.properties), ['kind']);
     } else if (action.properties.kind.const === 'setExpression') {
@@ -254,4 +257,38 @@ test('expression authoring sends exact code, enablement and removal through the 
   assert.doesNotThrow(() => SDK.validateRequest(q));
   const bad = request({kind:'setExpressionEnabled', enabled:true}); bad.payload.action.enabled = 'data:x';
   assert.throws(() => SDK.validateRequest(bad));
+});
+
+test('D18-B control declaration edits are strict frameless intents through the one property edit operation', async () => {
+  const control = (action, property = 'xc_native_a') => {const q = request(action); q.payload.property = property; return q;};
+  const accepted = [
+    control({kind:'addControl', controlType:'number', name:'Speed'}),
+    control({kind:'addControl', controlType:'color', name:'Tint 雪'}, 'xc_k_9'),
+    control({kind:'renameControl', name:'  Velocity '}),
+    control({kind:'removeControl'}),
+    control({kind:'moveControl', direction:-1}),
+    control({kind:'moveControl', direction:1}),
+  ];
+  for (const q of accepted) {
+    const before = structuredClone(q); let calls = 0, sent;
+    const response = await adapter(value => {calls++; sent = value; return reply(value);}).editProperty(q);
+    assert.equal(calls, 1); assert.deepEqual(sent, before); assert.deepEqual(response, reply(q));
+  }
+  const refused = [
+    control({kind:'addControl', controlType:'slider', name:'A'}), control({kind:'addControl', controlType:'number', name:''}),
+    control({kind:'addControl', controlType:'number', name:4}), control({kind:'addControl', controlType:'number', name:'x'.repeat(129)}),
+    control({kind:'addControl', controlType:'number'}), control({kind:'addControl', name:'A'}),
+    control({kind:'addControl', controlType:'number', name:'A', frame:0}),
+    control({kind:'addControl', controlType:'number', name:'A'}, 'speed'), control({kind:'addControl', controlType:'number', name:'A'}, 'xc_'),
+    control({kind:'addControl', controlType:'number', name:'A'}, 'xc_a-b'), control({kind:'addControl', controlType:'number', name:'A'}, 'position'),
+    control({kind:'renameControl'}), control({kind:'renameControl', name:''}), control({kind:'renameControl', name:null}),
+    control({kind:'renameControl', name:'A', controlType:'number'}),
+    control({kind:'removeControl', frame:0}), control({kind:'removeControl', name:'A'}),
+    control({kind:'moveControl'}), control({kind:'moveControl', direction:0}), control({kind:'moveControl', direction:2}),
+    control({kind:'moveControl', direction:1.5}), control({kind:'moveControl', direction:'up'}), control({kind:'moveControl', direction:true}),
+    control({kind:['removeControl']}),
+  ];
+  let calls = 0; const port = adapter(() => {calls++;});
+  for (const q of refused) assert.throws(() => port.editProperty(q), TypeError, JSON.stringify(q.payload.action));
+  assert.equal(calls, 0);
 });

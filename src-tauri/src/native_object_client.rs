@@ -8,7 +8,10 @@ use serde_json::{json, Value};
 
 const MAX_BYTES: usize = 4096;
 const MAX_REVISION: u64 = 9_007_199_254_740_991;
-const OPERATIONS: [&str; 11] = [
+/// Must equal the operations flagged `rawClient` (with their `revisionDelta`) in
+/// engineering/application/capabilities-v2/*.json; the drift checker
+/// (`native-raw-client-allowlist`) and an admission test both hold that.
+pub(super) const OPERATIONS: [&str; 11] = [
     "query.document.object",
     "command.document.object.fill.set",
     "command.document.object.undo",

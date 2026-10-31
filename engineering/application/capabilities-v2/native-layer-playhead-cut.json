@@ -12,6 +12,11 @@
   "operations": [
     "command.document.object.layer.cut"
   ],
+  "rawClient": {
+    "command.document.object.layer.cut": {
+      "revisionDelta": 1
+    }
+  },
   "input": {
     "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerPlayheadCutPayload"
   },

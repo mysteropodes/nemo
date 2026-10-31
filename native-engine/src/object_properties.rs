@@ -193,6 +193,10 @@ impl PropertyHolder {
     pub(crate) fn normalized_control_name(name: &str) -> String {
         names::normalize(name)
     }
+    /// The authored control name: the JS `trim` of what the caller typed.
+    pub(crate) fn trimmed_control_name(name: &str) -> &str {
+        names::trim(name)
+    }
 }
 fn controls(holder: &PropertyHolder) -> Result<(), PropertyAdmissionError> {
     let mut keys = HashSet::new();

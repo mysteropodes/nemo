@@ -90,6 +90,21 @@ test('the Path and Time rows mount under the layer name for the single active la
  assert.equal(tree(h.nodes['motion-props-body']).filter(n=>n.className==='motion-props-layername').length,2,'two layers selected');assert.equal(built.length,1,'a multi-layer selection builds no rows');assert.equal(tree(h.nodes['motion-props-body']).filter(n=>n.className==='native-motion-layer-link-rows').length,0);
  h.retire();assert.ok(disposed.includes('L0'),'retiring the panel disposes the rows');
 });
+test('D18-B: the Expression controls entry joins the layer row slot with the binding pinned read and edit ports',async()=>{
+ const h=host(),seen=[],disposed=[];
+ h.root.NemoNativeMotionLayerLinkRows={build(){const node=h.doc.createElement('div');node.className='native-motion-layer-link-rows';return {node,refresh(){return true;},dispose(){disposed.push('link');}};}};
+ h.root.NemoNativeMotionControlRows={build(root,ports,target){seen.push({root,ports,target});const node=h.doc.createElement('div');node.className='native-motion-control-rows';return {node,refresh(){return true;},dispose(){disposed.push('controls');}};},
+  compose(root,a,b){const node=h.doc.createElement('div');node.className='native-motion-layer-rows';[a,b].forEach(x=>node.appendChild(x.node));return {node,refresh(){return true;},dispose(){a.dispose();b.dispose();}};}};
+ h.paint();await h.settle();
+ assert.equal(seen.length,1);assert.equal(seen[0].root,h.root);assert.equal(seen[0].target.layerUid,'L0');assert.equal(seen[0].target.strokeId,undefined);
+ assert.deepEqual(Object.keys(seen[0].ports).sort(),['editProperty','query','readContext']);
+ assert.ok(Object.values(seen[0].ports).every(f=>typeof f==='function'));
+ const context=seen[0].ports.readContext();assert.equal(context.pin.documentId,h.ports.currentSession().info().documentId,'the context pin is the binding scope pin');
+ const kids=tree(h.nodes['motion-props-body']),name=kids.findIndex(n=>n.className==='motion-props-layername'),slot=kids.findIndex(n=>n.className==='native-motion-layer-rows');
+ assert.ok(name>=0&&slot===name+1,'one composed slot directly under the layer name');
+ assert.equal(kids.filter(n=>n.className==='native-motion-control-rows').length,1);
+ h.retire();assert.deepEqual(disposed.sort(),['controls','link']);
+});
 test('a throwing rows module cannot break the panel, which paints without them',async()=>{
  const h=host();h.root.NemoNativeMotionLayerLinkRows={build(){throw new Error('boom');}};
  h.paint();await h.settle();assert.ok(h.rows().length>5);assert.equal(h.status(),'');

@@ -96,14 +96,15 @@
     var meta = shotMetadata(shot, project);
     var title = (project.name || 'Kitsu') + ' — ' + shot.name;
     if (nativeProjectMode()) {
-      // Native authority: width/height/fps/duration are one New Project intent. No state.layers, createUserLayer or
-      // totalFrames write exists on this path and nothing falls back to one. A refusal throws before any Kitsu state is
-      // recorded, so an unrelated active project is never reset by a failed open. The Rough/Clean/Color layer structure
-      // is NOT built: native layer create exists but there is no native layer rename for "Layer 1" (#2381 I44).
+      // Native authority: width/height/fps/duration are one New Project intent, then Rough/Clean/Color are built through
+      // the native layer.rename and layer.create routes (kitsu-native-structure.js) and read back from the native model.
+      // No state.layers, createUserLayer or totalFrames write exists on this path and nothing falls back to one. A refusal
+      // throws before any Kitsu state is recorded, and an unrelated active project is never reset by a failed open.
       if (!Number.isSafeInteger(meta.frameCount) || meta.frameCount < 1) throw new Error('Durée du shot illisible : projet natif non créé');
       var created = await window.SMProject.newProject({ w: meta.w, h: meta.h, fps: meta.fps, name: title, totalFrames: meta.frameCount });
       if (created !== true) throw new Error('Création du projet natif refusée ou indisponible');
-      meta.layerStructure = 'unavailable';
+      if (!window.NemoKitsuNativeStructure) throw new Error('Structure des calques Kitsu indisponible (projet natif)');
+      meta.layerStructure = (await window.NemoKitsuNativeStructure.build(window)).layers.map(function (l) { return l.name; });
       return finishOpenShot(session, project, sequence, shot, meta);
     }
     await window.SMProject.newProject({ w: meta.w, h: meta.h, fps: meta.fps, name: title });
@@ -378,6 +379,7 @@
       showToast('Shot ouvert : ' + shot.name + ' (' + res.meta.w + '×' + res.meta.h + ', ' + res.meta.fps + 'fps, ' + res.meta.frameCount + ' frames)' + previewNote);
     } catch (e) {
       list.innerHTML = '<div style="font-size:10px;color:#ff6b6b">' + e.message + '</div>';
+      try { showToast(e.message); } catch (_) { }
     }
   }
 

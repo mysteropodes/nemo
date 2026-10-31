@@ -171,11 +171,32 @@ fn the_request_is_closed_and_bounded_per_part() {
     let mut missing = p.clone();
     missing["view"].as_object_mut().unwrap().remove("layerUid");
     assert!(!request(&missing));
+    // The payload itself must be the closed three-member object.
+    let mut unpinned = p.clone();
+    unpinned.as_object_mut().unwrap().remove("documentSnapshotId");
+    for bad in [Value::Null, json!([]), json!({}), unpinned] {
+        assert!(!request(&bad), "{bad}");
+    }
 }
 
 #[test]
 fn pagination_and_item_shape_are_checked_against_the_request() {
     let p = payload("bones", 0, 0, 2);
+    // A malformed answer envelope, or one whose page numbers are not integers, is refused before any pin is compared.
+    assert!(!result("document", &p, &Value::Null));
+    assert!(!result("document", &p, &json!({"kind":"rig"})));
+    let mut untotaled = response("bones", 0, 0, vec![], 0, Value::Null, Value::Null);
+    untotaled["total"] = json!("none");
+    assert!(!result("document", &p, &untotaled));
+    let mut unpaged = p.clone();
+    unpaged["view"]["cursor"] = json!("first");
+    assert!(!result("document", &unpaged, &response("bones", 0, 0, vec![], 0, Value::Null, Value::Null)));
+    // An item of a part the contract does not list is never well-formed.
+    let mut other = p.clone();
+    other["view"]["part"] = json!("nothing");
+    let mut listed = response("nothing", 0, 0, vec![json!({})], 1, Value::Null, Value::Null);
+    listed["part"] = json!("nothing");
+    assert!(!result("document", &other, &listed));
     let (a, b) = (good()[0].2.clone(), good()[1].2.clone());
     let page = response(
         "bones",

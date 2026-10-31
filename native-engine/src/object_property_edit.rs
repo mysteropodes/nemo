@@ -6,11 +6,16 @@ use crate::object_document::{
 };
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
+use action::{deserialize_action, PropertyAction};
 use serde::Deserialize;
 use serde_json::Number;
 
+#[path = "object_property_action.rs"]
+mod action;
 #[path = "object_property_bake_edit.rs"]
 mod bake_edit;
+#[path = "object_property_control_edit.rs"]
+mod control_edit;
 #[path = "object_property_curve_edits.rs"]
 mod curves;
 #[path = "object_property_expression_edit.rs"]
@@ -20,36 +25,6 @@ mod preset_apply;
 #[path = "object_property_track_edit.rs"]
 mod track_edit;
 
-#[derive(Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
-enum PropertyAction {
-    // Sealed target of every expression intent: the private producer and the public actions.
-    #[serde(skip_deserializing)]
-    SetExpression {
-        expression: Option<OrderExpression>,
-    },
-    #[serde(rename = "setExpression")]
-    SetExpressionCode { code: String },
-    SetExpressionEnabled { enabled: bool },
-    RemoveExpression {},
-    SetValue {
-        frame: Number,
-        values: Vec<Number>,
-    },
-    SetKey {
-        frame: Number,
-        values: Vec<Number>,
-        #[serde(default, rename = "curvePoints")]
-        curve_points: Presence<Option<Vec<OrderCurvePoint>>>,
-    },
-    RemoveKey {
-        frame: Number,
-    },
-    SetAnimated {
-        frame: Number,
-        animated: bool,
-    },
-}
 #[derive(Debug)]
 struct PropertyPayload {
     command: String,
@@ -77,25 +52,6 @@ object_deserialize!(ExpressionPayload {
     #[serde(default)] expression: Presence<Option<OrderExpression>>
 });
 
-// Internally tagged enum derives also admit positional sequences. Require a
-// map before the derive sees original fields, preserving duplicate rejection.
-fn deserialize_action<'de, D, T>(deserializer: D) -> Result<T, D::Error>
-where
-    D: serde::Deserializer<'de>,
-    T: Deserialize<'de>,
-{
-    struct MapOnly<T>(std::marker::PhantomData<T>);
-    impl<'de, T: Deserialize<'de>> serde::de::Visitor<'de> for MapOnly<T> {
-        type Value = T;
-        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.write_str("a property action object")
-        }
-        fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<T, A::Error> {
-            T::deserialize(serde::de::value::MapAccessDeserializer::new(map))
-        }
-    }
-    deserializer.deserialize_map(MapOnly(std::marker::PhantomData))
-}
 
 /// The origin and proposed document cannot be forged by callers.
 #[derive(Debug, Clone)]
@@ -280,6 +236,15 @@ impl ObjectFillOwner {
         if matches!(payload.property.as_str(), "order" | "timeRemap") {
             return Err(DispatchErrorCode::Unavailable);
         }
+        if let Some(op) = payload.action.control() {
+            return Self::apply_control_edit(
+                origin,
+                document,
+                &payload.target,
+                &payload.property,
+                op,
+            );
+        }
         let mut holders = document
             .property_holders
             .value()
@@ -336,6 +301,11 @@ impl ObjectFillOwner {
             other => other,
         };
         match action {
+            // Taken above, before any metadata lookup: a control edit has no value record.
+            PropertyAction::AddControl { .. }
+            | PropertyAction::RenameControl { .. }
+            | PropertyAction::RemoveControl {}
+            | PropertyAction::MoveControl { .. } => return Err(DispatchErrorCode::Internal),
             PropertyAction::SetExpression { expression } => {
                 record.expression = expression.map_or(Presence::Missing, Presence::Present);
             }

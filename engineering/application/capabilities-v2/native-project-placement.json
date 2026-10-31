@@ -12,6 +12,11 @@
   "operations": [
     "command.document.object.project.placement.edit"
   ],
+  "rawClient": {
+    "command.document.object.project.placement.edit": {
+      "revisionDelta": 1
+    }
+  },
   "input": {
     "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectPlacementPayload"
   },

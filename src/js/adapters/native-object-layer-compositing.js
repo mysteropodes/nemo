@@ -65,6 +65,8 @@
       blendOf(index) { const row = rowAt(index); return row && text(row.blendMode) ? row.blendMode : 'normal'; },
       matteOf(index) { const row = rowAt(index); return row && text(row.matteMode) ? row.matteMode : 'none'; },
       sourceOf(index) { const row = rowAt(index); return row && text(row.matteSourceLayerUid) ? row.matteSourceLayerUid : null; },
+      // The additional mattes in stored order, as fresh {uid, mode} copies, index-aligned with the stored list (empty when none).
+      mattesMoreOf(index) { const row = rowAt(index); return row && Array.isArray(row.mattesMore) ? row.mattesMore.map((m) => ({ uid: m && text(m.uid) ? m.uid : null, mode: m && text(m.mode) ? m.mode : 'alpha' })) : []; },
       layerCount() { return rows(session.info()).length; },
       stackOf(index) { return stackOfRow(rowAt(index)); },
       stackAvailable(index) { return stackOfRow(rowAt(index)) !== null; },

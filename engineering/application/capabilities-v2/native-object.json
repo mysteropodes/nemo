@@ -15,6 +15,16 @@
     "command.document.object.undo",
     "command.document.object.redo"
   ],
+  "hostOperations": [
+    "query.document.object.serialize"
+  ],
+  "rawClient": {
+    "query.document.object": { "revisionDelta": 0 },
+    "command.document.object.layer.visibility.set": { "revisionDelta": 1 },
+    "command.document.object.undo": { "revisionDelta": 1 },
+    "command.document.object.redo": { "revisionDelta": 1 },
+    "query.document.object.serialize": { "revisionDelta": 0 }
+  },
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",

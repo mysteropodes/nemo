@@ -2023,11 +2023,31 @@
       "layer": "application",
       "dir": "src/js/application",
       "files": [
-        "script-native-api.js"
+        "script-native-api.js",
+        "script-native-drain.js",
+        "script-native-reads.js",
+        "script-native-run.js",
+        "script-native-writes.js"
       ],
       "sizeProfile": "Domain/application",
       "publicApi": [
-        "script-native-api.js"
+        "script-native-api.js",
+        "script-native-drain.js",
+        "script-native-reads.js",
+        "script-native-run.js",
+        "script-native-writes.js"
+      ]
+    },
+    {
+      "id": "app.kitsu.native.structure",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "kitsu-native-structure.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "kitsu-native-structure.js"
       ]
     },
     {
@@ -3341,7 +3361,9 @@
         "native-motion-property-panel.js",
         "native-motion-property-binding.js",
         "native-motion-property-keys.js",
-        "native-motion-property-value.js"
+        "native-motion-key-lock-menu.js",
+        "native-motion-property-value.js",
+        "native-motion-control-rows.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [

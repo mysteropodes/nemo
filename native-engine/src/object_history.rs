@@ -229,6 +229,10 @@ mod object_selection_edit_tests;
 #[cfg(test)]
 #[path = "../tests/object_property_edit.rs"]
 mod property_edit_tests;
+// D18-B (#2376): expression-control declaration edits (uses the widget harness for the axis guard).
+#[cfg(test)]
+#[path = "../tests/object_property_control_edit.rs"]
+mod object_property_control_edit_tests;
 // L03-M (#2109): widget transaction tests (the write tests need the evaluation kernel).
 #[cfg(test)]
 #[path = "../tests/object_widget_edit_controls.rs"]

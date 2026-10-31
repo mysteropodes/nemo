@@ -959,6 +959,41 @@
       },
       "description": "The record of a vector create."
     },
+    "ObjectVectorTrimClip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "axis",
+        "mirrors"
+      ],
+      "properties": {
+        "axis": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "number"
+          },
+          "description": "The mirror axis [x1, y1, x2, y2] in document pixels."
+        },
+        "mirrors": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "description": "[drawn, mirror] pairs of indices into the create's records (or a batch's create steps), each index used once."
+        }
+      },
+      "description": "#2361: the stop-at-axis clip a mirror takes AFTER Trim Stroke Ends (baseline clipPathAtAxis after trimStrokeEnds): the cut is measured on the whole stroke, then the drawn path is clipped at its first anchor on the far side of the axis, and the mirror copy to the same anchors; a pressure-ribbon copy with a linked fill is rebuilt from its whole centreline and kept whole. Valid only beside trimEnds. A stroke left with fewer than two anchors refuses the create."
+    },
     "ObjectVectorCreatePayload": {
       "type": "object",
       "additionalProperties": false,
@@ -984,6 +1019,9 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Optional (absent = no trim). Baseline trimStrokeEndsMax: cut the new open stroke's head/tail back to its first/last crossing with the layer's paths in the frame when the overshoot is at most this; symmetry copies share the cuts."
+        },
+        "trimClip": {
+          "$ref": "#/$defs/ObjectVectorTrimClip"
         },
         "keyframe": {
           "const": "copy",
@@ -1021,6 +1059,9 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Optional (absent = no trim). Baseline trimStrokeEndsMax: cut the new open stroke's head/tail back to its first/last crossing with the layer's paths in the frame when the overshoot is at most this; symmetry copies share the cuts."
+        },
+        "trimClip": {
+          "$ref": "#/$defs/ObjectVectorTrimClip"
         },
         "keyframe": {
           "const": "copy",
@@ -1219,6 +1260,9 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Optional, create steps only. Baseline trimStrokeEndsMax: the first create is cut against its own cell and every other create (symmetry copies, Labs multi-frame stamps) takes the same cut."
+        },
+        "trimClip": {
+          "$ref": "#/$defs/ObjectVectorTrimClip"
         },
         "skipUnavailable": {
           "type": "boolean",
@@ -4246,13 +4290,57 @@
         "flag": {
           "enum": [
             "locked",
-            "shy"
+            "shy",
+            "keyLock"
           ]
         },
         "value": {
-          "type": "boolean"
+          "description": "Boolean for locked and shy; null or in/out/layer for keyLock (null clears the layer key-lock mode).",
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "in",
+                "out",
+                "layer"
+              ]
+            }
+          ]
         }
-      }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "flag": {
+              "enum": [
+                "locked",
+                "shy"
+              ]
+            },
+            "value": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "properties": {
+            "flag": {
+              "const": "keyLock"
+            },
+            "value": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      ]
     },
     "ObjectComponentId": {
       "type": "string",
@@ -10637,6 +10725,28 @@
                   "const": "subdivide"
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "mode"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "lockTo"
+                },
+                "mode": {
+                  "description": "Per-key standing lock applied to every selected key; null clears it. Same-effective-value keys keep their authored presence.",
+                  "enum": [
+                    "in",
+                    "out",
+                    "layer",
+                    null
+                  ]
+                }
+              }
             }
           ]
         }
@@ -10831,27 +10941,6 @@
                   "maximum": 1.7976931348623157e+308
                 }
               }
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "kind",
-                "target",
-                "property"
-              ],
-              "properties": {
-                "kind": {
-                  "const": "expressionSource"
-                },
-                "target": {
-                  "$ref": "#/$defs/ObjectPropertyReadTarget"
-                },
-                "property": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
             }
           ]
         }
@@ -10954,7 +11043,7 @@
       }
     },
     "ObjectPropertyReadResult": {
-      "description": "Exact authored storage DTO or raw native sample. Native/shared runtime validators additionally correlate owner, revision, snapshot, target, property, frame and cursor; enforce increasing key/curve coordinates and actual native curve endpoints. Missing/null/empty curve distinctions are preserved. Provider result limit3072 and full envelope limit4096 are encoded UTF8 byte bounds, not JSON string lengths. Oversized pages refuse unavailable; no dynamic truncation. The expressionSource view returns the exact authored code (null when no expression is authored); an oversized source refuses unavailable.",
+      "description": "Exact authored storage DTO or raw native sample. Native/shared runtime validators additionally correlate owner, revision, snapshot, target, property, frame and cursor; enforce increasing key/curve coordinates and actual native curve endpoints. Missing/null/empty curve distinctions are preserved. Provider result limit3072 and full envelope limit4096 are encoded UTF8 byte bounds, not JSON string lengths. Oversized pages refuse unavailable; no dynamic truncation.",
       "oneOf": [
         {
           "type": "object",
@@ -11759,74 +11848,6 @@
               }
             }
           ]
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "instanceId",
-            "documentId",
-            "atRevision",
-            "documentSnapshotId",
-            "kind",
-            "target",
-            "property",
-            "dimension",
-            "expression"
-          ],
-          "properties": {
-            "instanceId": {
-              "$ref": "#/$defs/Identifier"
-            },
-            "documentId": {
-              "$ref": "#/$defs/Identifier"
-            },
-            "atRevision": {
-              "$ref": "#/$defs/Revision"
-            },
-            "documentSnapshotId": {
-              "type": "string",
-              "minLength": 1
-            },
-            "kind": {
-              "const": "expressionSource"
-            },
-            "target": {
-              "$ref": "#/$defs/ObjectPropertyReadTarget"
-            },
-            "property": {
-              "type": "string",
-              "minLength": 1
-            },
-            "dimension": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 4
-            },
-            "expression": {
-              "oneOf": [
-                {
-                  "type": "null"
-                },
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "enabled",
-                    "code"
-                  ],
-                  "properties": {
-                    "enabled": {
-                      "type": "boolean"
-                    },
-                    "code": {
-                      "type": "string"
-                    }
-                  }
-                }
-              ]
-            }
-          }
         }
       ]
     },
@@ -12011,6 +12032,83 @@
               "properties": {
                 "kind": {
                   "const": "removeExpression"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "controlType",
+                "name"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "addControl"
+                },
+                "controlType": {
+                  "enum": [
+                    "number",
+                    "checkbox",
+                    "angle",
+                    "point",
+                    "color"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "name"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "renameControl"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "removeControl"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "direction"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "moveControl"
+                },
+                "direction": {
+                  "enum": [
+                    -1,
+                    1
+                  ]
                 }
               }
             }
@@ -20912,7 +21010,7 @@
             },
             "time": {
               "type": "number",
-              "minimum": 1e-8,
+              "minimum": 1e-08,
               "maximum": 0.99999999
             }
           }

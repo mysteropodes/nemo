@@ -10,7 +10,7 @@
 //! `reshape` with a `center` instead rebuilds a pressure ribbon on a new centreline (sculpt) and re-syncs its linked fill. A `restyle`
 //! (#2372) names a record or stored item and only the style members to change (fill, stroke, width, opacity), so one panel edit over a
 //! mixed selection is one entry.
-use crate::commands::object_fill_owner::vector_edit::create_ops::{copy_key as keyframe_copy, create_in, trim_records, Placement};
+use crate::commands::object_fill_owner::vector_edit::create_ops::{copy_key as keyframe_copy, create_in, trim_records, Placement, Trim};
 use crate::commands::object_fill_owner::vector_edit::{delete_in, is_vector_record, replace_in, Edit, VectorEditKind};
 use crate::commands::object_fill_owner::object_frame_edit_document::DocumentEdit;
 use crate::commands::object_fill_owner::vector_edit::cells;
@@ -260,7 +260,7 @@ fn expand_transforms(origin: &ObjectSnapshot, base: &ObjectDocument, ops: Vec<Ba
 }
 
 /// `base` is the document the steps edit: the origin's own, or a component's view of it (`object_vector_edit_context`); `context` is its context id.
-pub(super) fn batch(origin: &ObjectSnapshot, base: &ObjectDocument, context: &str, ops: Vec<BatchOp>, copy_key: bool, trim: Option<f64>, skip_unavailable: bool) -> Result<Edit, DispatchErrorCode> {
+pub(super) fn batch(origin: &ObjectSnapshot, base: &ObjectDocument, context: &str, ops: Vec<BatchOp>, copy_key: bool, trim: Option<Trim>, skip_unavailable: bool) -> Result<Edit, DispatchErrorCode> {
     use DispatchErrorCode::InvalidRequest;
     if !(1..=MAX_BATCH_OPS).contains(&ops.len()) {
         return Err(InvalidRequest);
@@ -351,13 +351,13 @@ pub(super) fn batch(origin: &ObjectSnapshot, base: &ObjectDocument, context: &st
     let mut document = base.clone();
     // `trimEnds` (all-create batches only): the first create is cut against its own cell before any step lands, and every
     // other create takes the same cut, as the baseline stamps and mirrors the already trimmed path.
-    if let Some(max) = trim {
+    if let Some(plan) = &trim {
         // The cut is against ONE cell, so a trimmed batch stays on one layer.
         if ops.iter().any(|op| op.op != "create" || target_of(op).is_none_or(|t| t.layer_uid != first.layer_uid)) {
             return Err(InvalidRequest);
         }
         let mut records: Vec<ObjectRecord> = ops.iter().map(|op| op.record.value().cloned().ok_or(InvalidRequest)).collect::<Result<_, _>>()?;
-        trim_records(&document, &mut records, max)?;
+        trim_records(&document, &mut records, plan)?;
         for (op, record) in ops.iter_mut().zip(records) {
             op.record = Presence::Present(record);
         }

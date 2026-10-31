@@ -5,7 +5,7 @@
     "regions",
     "functions"
   ],
-  "branchesExcluded": "branch coverage is not instrumented by the stable Rust toolchain (needs nightly -Z coverage-options=branch); every branch count is 0, so a branch floor would be a gate that cannot fail. Excluded on purpose — see T04/#1053.",
+  "branchesExcluded": "branch coverage is not instrumented by the stable Rust toolchain (needs nightly -Z coverage-options=branch); every branch count is 0, so a branch floor would be a gate that cannot fail. Excluded on purpose \u2014 see T04/#1053.",
   "crate": "nemo-mcp",
   "manifestPath": "nemo-mcp/Cargo.toml",
   "recorded": {
@@ -241,10 +241,10 @@
       "note": "T08 Guide: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean f405eb49ebcf483c8f69e8c92e61ce26ec070401. Report SHA256 3dcfa955293ee92c79e96435fdd6ceb51f1614f4d127efdecad1a3371da699ed. All existing entries, aggregate floors, exclusions and recorded provenance are preserved."
     },
     "nemo-mcp/src/native_component_read_contract.rs": {
-      "lines": 99.15,
-      "regions": 99.48,
+      "lines": 100,
+      "regions": 100,
       "functions": 100,
-      "note": "#2256: observed floors from a local cargo-llvm-cov 0.9.1 run of nemo-mcp (cargo llvm-cov --json, lib and integration tests, 0 failed) on the candidate tree. Hand-added for the two new files only; all prior entries, aggregate floors and exclusions are preserved."
+      "note": "#2256: observed floors from a local cargo-llvm-cov 0.9.1 run of nemo-mcp (cargo llvm-cov --json, lib and integration tests, 0 failed) on the candidate tree. Hand-added for the two new files only; all prior entries, aggregate floors and exclusions are preserved. #2368: the floors had drifted from the files (unreached refusal arms, two uncovered functions) with no source change since they were hand-added; contract tests were added for the unreached arms and the floors raised to the measured values."
     },
     "nemo-mcp/src/native_component_read_contract_tests.rs": {
       "noRegions": true,
@@ -721,10 +721,10 @@
       "note": "Measured clean 8c8a6f5a88a7a33d5fb63504f2504357177f8dbc, MCP tree f7acc3f36f23e1b23fa886d9be37ade009b91116; standard cargo-llvm-cov 0.9.1 JSON 2590dff1c3824a737398717075987df614f65f4618c2040a13243253b223f8ef, actual full unfiltered suites 313 tests/0 failed across 20 binaries, booking 1062/6245971235. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
     },
     "nemo-mcp/src/native_vector_batch_contract.rs": {
-      "lines": 96.72,
-      "regions": 97.81,
+      "lines": 100,
+      "regions": 99.5,
       "functions": 100,
-      "note": "Vector batch contract (#2361, #2362): floors derived by the original floorPct from the cargo-llvm-cov measurement of a coverage-rust --check run on branch claude/cs8-vector-batch (candidate lines 96.08%, regions 97.37%, functions 100%). Only these two entries are added; all existing entries, aggregate floors, exclusions and recorded provenance are preserved."
+      "note": "Vector batch contract (#2361, #2362): floors derived by the original floorPct from the cargo-llvm-cov measurement of a coverage-rust --check run on branch claude/cs8-vector-batch (candidate lines 96.08%, regions 97.37%, functions 100%). Only these two entries are added; all existing entries, aggregate floors, exclusions and recorded provenance are preserved. #2368: the floors had drifted from the files (unreached refusal arms, two uncovered functions) with no source change since they were hand-added; contract tests were added for the unreached arms and the floors raised to the measured values."
     },
     "nemo-mcp/src/native_vector_batch_contract_tests.rs": {
       "noRegions": true,
@@ -887,10 +887,10 @@
       "note": "Measured on the #2358 D23 candidate with cargo-llvm-cov 0.9.1; new file entry only, every prior entry, floor, exclusion and aggregate is preserved. Source measurement is not installed acceptance."
     },
     "nemo-mcp/src/native_rig_read_contract.rs": {
-      "lines": 98.33,
-      "regions": 98.8,
+      "lines": 100,
+      "regions": 100,
       "functions": 100,
-      "note": "Measured on the #2255 candidate with normal cargo-llvm-cov 0.9.1 (unfiltered nemo-mcp suite); new file entry only, every prior entry, floor, exclusion and aggregate is preserved. Source measurement is not installed acceptance."
+      "note": "Measured on the #2255 candidate with normal cargo-llvm-cov 0.9.1 (unfiltered nemo-mcp suite); new file entry only, every prior entry, floor, exclusion and aggregate is preserved. Source measurement is not installed acceptance. #2368: the floors had drifted from the files (unreached refusal arms, two uncovered functions) with no source change since they were hand-added; contract tests were added for the unreached arms and the floors raised to the measured values."
     },
     "nemo-mcp/src/native_rig_read_contract_tests.rs": {
       "noRegions": true,

@@ -21,6 +21,14 @@ test('the selection survives a commit whose new revision reaches the canvas seve
   f.lagPresentation(6);assert.equal((await f.controller.setPointType('symmetric')).status,'applied',f.notices.join(';'));
   assert.deepEqual(f.sent.at(-1).payload.intent,{kind:'pointType',pointType:'symmetric',indices:[0]});assert.deepEqual(f.controller.selectionState(),{count:1});
 });
+test('an applied edit keeps its handles on screen until the re-read selection replaces them (no blink)',async()=>{
+  const f=fixture();await points(f);assert.equal(f.live(),1);f.liveLog();
+  f.lagPresentation(6);assert.equal((await f.controller.setPointType('symmetric')).status,'applied',f.notices.join(';'));
+  assert.ok(!f.liveLog().includes(0),'the overlay never left the screen');assert.equal(f.live(),1);
+  f.lagPresentation(6);f.drag();f.controller.handle('up',f.event(52,34));assert.equal((await f.controller.settled()).status,'applied');
+  assert.ok(!f.liveLog().includes(0),'a vertex drag does not blink either');assert.equal(f.live(),1);
+  const g=fixture();await points(g);g.failTransport(2);await g.controller.setPointType('smooth');assert.equal(g.live(),0,'a failed edit still clears');
+});
 test('a tangent drag, delete-less scale and rotate keep the selected indices',async()=>{
   const f=fixture();f.item.segments[0].handleOut=[10,0];await points(f);
   const p=[20+10,20];const q=(x,y)=>[1.5*x+.5*y,.2*x+y];

@@ -81,9 +81,22 @@
         return payload;
       });
     }
+    // D37: the layer's standing key-lock mode (in/out/layer) as the project rows read it, or null.
+    const keyLockOf = (index) => { const row = rowAt(index); return row && ['in', 'out', 'layer'].includes(row.keyLock) ? row.keyLock : null; };
+    // The pin a menu was built from: a write against any other revision is refused by the session before it can commit.
+    const pinOf = () => { const info = session.info(); return info ? Object.freeze({ instanceId: info.instanceId, documentId: info.documentId, lifecycleGeneration: info.lifecycleGeneration, contentRevision: info.contentRevision, documentSnapshotId: info.documentSnapshotId }) : null; };
+    // One native layer-policy edit (flag keyLock); `mode` is in/out/layer, or null to clear. `expected` is the pin the menu was built from.
+    function setKeyLock(layerUid, mode, expected) {
+      const edit = session.editLayerPolicy;
+      if (!text(layerUid) || !(mode === null || ['in', 'out', 'layer'].includes(mode))) return Promise.reject(fault('invalid_request', 'The key lock intent is invalid', { reason: 'local_validation' }));
+      if (typeof edit !== 'function') return Promise.reject(fault('unavailable', 'Native layer policy editing is unavailable', { reason: 'no_native_policy' }));
+      if (!expected) return Promise.reject(fault('unavailable', 'Native project is unavailable', { reason: 'no_native_project' }));
+      return Promise.resolve().then(() => edit({ command: 'object.layer.policy.edit', layerUid, flag: 'keyLock', value: mode }, expected))
+        .then((receipt) => { if (!receipt || receipt.ok !== true) throw fault('unavailable', 'Native key lock was not confirmed'); return receipt; });
+    }
     const indexOf = (uid) => rows(session.info()).findIndex((row) => row.layerUid === uid);
     const nameOf = (index) => { const row = rowAt(index); return row ? (typeof row.name === 'string' && row.name ? row.name : 'Layer ' + (index + 1)) : null; };
-    return Object.freeze({ layerUid: uidOf, parentUidOf, descendants, setParent, setTimeLink, setFollowPath, timeLinkWouldCycle,
+    return Object.freeze({ layerUid: uidOf, parentUidOf, descendants, setParent, setTimeLink, setFollowPath, timeLinkWouldCycle, keyLockOf, pinOf, setKeyLock,
       timeLinkUidOf: (index) => stored(index, 'timeLinkUid'), followPathUidOf: (index) => stored(index, 'followPathUid'),
       followPathAlignOf: (index) => { const row = rowAt(index); return !!row && row.followPathAlign === true; }, indexOf, nameOf, count: () => rows(session.info()).length,
       rowKind: (index) => { const row = rowAt(index); return row && row.kind || null; } });

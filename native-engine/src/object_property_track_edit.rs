@@ -2,7 +2,8 @@
 use crate::commands::object_fill_owner::property_edit::curves::{self, CurvePreset, InfluenceSide};
 use crate::commands::{ObjectFillOwner, PreparedPropertyEdit};
 use crate::object_document::{
-    object_deserialize, OrderKey, OrderTrack, Presence, PropertyHolder, PropertyHolderTarget,
+    object_deserialize, KeyLockMode, OrderKey, OrderTrack, Presence, PropertyHolder,
+    PropertyHolderTarget,
 };
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
@@ -28,6 +29,11 @@ enum Action {
     Preset { preset: String },
     Influence { side: String, percent: Number },
     Subdivide {},
+    // `mode` is required: null clears, in/out/layer sets. Never defaulted.
+    LockTo {
+        #[serde(deserialize_with = "Option::deserialize")]
+        mode: Option<String>,
+    },
 }
 #[derive(Debug)]
 struct Payload {
@@ -44,6 +50,7 @@ enum ValidAction {
     Preset(CurvePreset),
     Influence(InfluenceSide, f64),
     Subdivide,
+    LockTo(Option<KeyLockMode>),
 }
 fn invalid() -> DispatchErrorCode {
     DispatchErrorCode::InvalidRequest
@@ -71,6 +78,13 @@ impl Action {
                 finite(percent)?,
             ),
             Self::Subdivide {} => ValidAction::Subdivide,
+            Self::LockTo { mode } => ValidAction::LockTo(match mode.as_deref() {
+                None => None,
+                Some("in") => Some(KeyLockMode::In),
+                Some("out") => Some(KeyLockMode::Out),
+                Some("layer") => Some(KeyLockMode::Layer),
+                Some(_) => return Err(invalid()),
+            }),
         })
     }
 }
@@ -177,6 +191,19 @@ impl ObjectFillOwner {
                         percent,
                     )?
                     .0
+                }
+                ValidAction::LockTo(mode) => {
+                    // Per-key standing lock: only keys whose effective lock differs
+                    // are written, so a no-op keeps field presence and publishes
+                    // nothing. Clearing authors the baseline explicit null.
+                    let mut proposed = group.original.clone();
+                    for &ki in &group.selected {
+                        let key = &mut proposed.keys[ki];
+                        if key.lock_to.value().copied().flatten() != mode {
+                            key.lock_to = Presence::Present(mode);
+                        }
+                    }
+                    proposed
                 }
                 ValidAction::Subdivide => {
                     let plan = curves::subdivision_plan(&group.original, &group.selected)?;

@@ -22,8 +22,9 @@
     'ctx-open':NATIVE,
     // project-native-save.js: the native object session saves; otherwise desktopJSON refuses without native persistence.
     'ctx-save':NATIVE,'ctx-save-as':NATIVE,
-    // kitsu.js openShot rewrites state.layers after newProject; publish renders through the JavaScript exporter (#2381).
-    'ctx-kitsu-open':off('Kitsu shots are unavailable in native Nemo.'),
+    // kitsu.js openShot: native New Project (with duration), then Rough/Clean/Color via native layer.rename/create (#2381);
+    // publish renders through the JavaScript exporter.
+    'ctx-kitsu-open':NATIVE,
     'ctx-kitsu-publish':off('Kitsu publishing is unavailable in native Nemo.'),
     // The legacy script API writes state.layers directly; the native script API (#2354) replaces it when loaded.
     'ctx-nemo-script':function(root){return root.NemoScriptNativeApi?NATIVE:off('Scripts are unavailable in native Nemo.');},
