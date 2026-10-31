@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "2dcf8039033c51731fc63d510012c5be95d2ca4b",
-  "describe": "v0.7.0-alpha.4-4487-g2dcf8039-dirty"
+  "head": "c6f9879af015da36318ab9cd11070d53855423d6",
+  "describe": "v0.7.0-alpha.4-4490-gc6f9879a-dirty"
  },
- "inputsDigest": "edcfd17caa485858fb5259b54f9155356bff7a49d410e7608e1fefb5f2e1a07c",
+ "inputsDigest": "ab3734ca067b8a83d27a39f6613ab648b4d8c14e59a9d5a4c5701ece37ceea86",
  "states": [
   "inventoried",
   "characterized",
@@ -3228,7 +3228,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 56,
+    "functionsVisited": 72,
     "via": "variable b",
     "references": [
      "src/js/motion-graph.js:457 toggle()",
