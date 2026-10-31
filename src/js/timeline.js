@@ -11098,7 +11098,11 @@ document.getElementById('btn-bake-cache').addEventListener('click',function(){ma
 })();
 document.getElementById('btn-tween-curves').addEventListener('click',function(){window.SM.toggleTweenCurves();});
 document.getElementById('btn-ghost-select').addEventListener('click',function(){selectGhostAll();});
-document.getElementById('btn-shadow-guides').addEventListener('click',function(){window.SM.toggleShadowGuides();});
+document.getElementById('btn-shadow-guides').addEventListener('click',function(){
+  // #2373: on a native object project the switch rides the next preview request (view-only; a refused hide lights the button again).
+  if(window.NemoNativeViewAids&&window.NemoNativeViewAids.toggle(window,'shadow',this))return;
+  window.SM.toggleShadowGuides();
+});
 // Team review view filter — cycles All -> Mine -> Corrections, purely a
 // render-time filter in engine-bridge.js's buildSceneJson (never touches
 // the document), so switching is instant and always reversible.

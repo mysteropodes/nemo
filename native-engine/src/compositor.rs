@@ -493,3 +493,7 @@ mod viewport_checker_tests;
 #[cfg(all(test, feature = "history", feature = "application", feature = "project_media_codec"))]
 #[path = "../tests/object_viewport_outline.rs"]
 mod viewport_outline_tests;
+
+#[cfg(all(test, feature = "history", feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_viewport_shadow.rs"]
+mod viewport_shadow_tests;

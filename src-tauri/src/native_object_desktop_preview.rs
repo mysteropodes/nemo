@@ -33,6 +33,9 @@ pub(crate) struct ObjectPreviewReceipt {
     /// The items were drawn as outlines (#2372); absent when not asked for.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub(crate) current_outline: bool,
+    /// The Shadow Brush guide lines were left out (#2373); absent when not asked for.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) hide_shadow_guides: bool,
     /// What the renderer did with the request's onion / Ghost All settings; absent when none were asked for.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) ghosts: Option<GhostReceipt>,
@@ -95,6 +98,10 @@ pub(crate) struct ObjectPreviewRequest {
     /// export, never persisted).
     #[serde(default)]
     pub(crate) current_outline: bool,
+    /// "Shadow guides" switched off (#2373): the renderer leaves the shadow-tagged items out of the presented frame (viewport only,
+    /// never an export, never persisted).
+    #[serde(default)]
+    pub(crate) hide_shadow_guides: bool,
     /// Onion skin / Ghost All composed under the live frame by the native renderer (viewport only, never an export).
     #[serde(default)]
     pub(crate) ghosts: Option<GhostUnderlayRequest>,
@@ -199,6 +206,8 @@ pub(crate) struct ObjectPreviewConsumer<'a> {
     alpha_checker: Option<f64>,
     /// Screen px per composition px of the shown canvas when the Current frame outline is asked for.
     current_outline: Option<f64>,
+    /// The Shadow guides switch is off (#2373).
+    hide_shadow_guides: bool,
 }
 impl ObjectPreviewConsumer<'_> {
     pub(crate) fn present<P: SurfacePort>(
@@ -214,6 +223,7 @@ impl ObjectPreviewConsumer<'_> {
             self.display_filter,
             self.alpha_checker,
             self.current_outline,
+            self.hide_shadow_guides,
             &mut diagnostic,
         )?;
         diagnostic.finish(presented.receipt.status());
@@ -279,6 +289,7 @@ pub(crate) fn preview_with_target(
                         display_filter: request.display_filter,
                         alpha_checker: request.alpha_checker.then(|| request.viewport.display_scale()),
                         current_outline: request.current_outline.then(|| request.viewport.display_scale()),
+                        hide_shadow_guides: request.hide_shadow_guides,
                     }))
                 };
                 owner.with_prepared_object_preview_for_navigation(
@@ -303,6 +314,7 @@ pub(crate) fn preview_with_target(
         display_filter: request.display_filter,
         alpha_checker: request.alpha_checker,
         current_outline: request.current_outline,
+        hide_shadow_guides: request.hide_shadow_guides,
         ghosts: receipt.ghosts,
     })
 }
