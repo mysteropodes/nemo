@@ -39,6 +39,8 @@ impl InactiveProject {
 
 #[path = "object_reference_dispatch.rs"]
 mod reference_dispatch;
+#[path = "object_layer_read_model.rs"]
+mod layer_read_model; // #2371: kind, folder, component, matte, blend and opacity facts
 // L06-H (lane #2112): asset attach / remove commands.
 #[path = "object_raster_asset_dispatch.rs"]
 #[allow(dead_code)]
@@ -493,6 +495,7 @@ fn project_snapshot_info(
         "byteCount":bytes.len(), "canvasW":width, "canvasH":height,
         "fps":project.project().fps(), "totalFrames":project.drawing().total_frames,
         "layers":layers, "reference":reference});
+    layer_read_model::extend_layers(project.drawing(), &mut info);
     if let Some(background) = project.project().canvas_background() {
         info["canvasBg"] = background.into();
     }

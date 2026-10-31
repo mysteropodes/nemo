@@ -33,6 +33,10 @@ impl LayerFolders {
     pub fn get(&self, id: &str) -> Option<&LayerFolder> {
         self.0.get(id)
     }
+    /// Folder rows in deterministic (sorted id) order.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &LayerFolder)> {
+        self.0.iter().map(|(id, folder)| (id.as_str(), folder))
+    }
 }
 impl<'de> Deserialize<'de> for LayerFolders {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
