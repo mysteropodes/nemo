@@ -142,7 +142,31 @@ pub(crate) fn hit_matrices(
     index: usize,
     chains: &crate::object_render_scene::text_scene::parent_chain::SceneParentChains,
 ) -> Result<BTreeMap<usize, [f64; 6]>, &'static str> {
+    shared_matrices(packet, index, None, chains, true)
+}
+/// #2372 editable (Direct Select) listing of the VECTOR records of a layer that also paints Text or raster items. They take the
+/// same shared chain as the hit-test listing, so the listing and the geometry agree; the image and text items are no vector
+/// records, so they are never listed (nor editable), and every editable-scope refusal (component, 3D, rig, duplicator, mask,
+/// path effects, paint-consumer limits) is kept.
+pub(crate) fn mixed_matrices(
+    packet: &ObjectFramePacket,
+    index: usize,
+    preview: Option<&ObjectRecord>,
+    chains: &crate::object_render_scene::text_scene::parent_chain::SceneParentChains,
+) -> Result<BTreeMap<usize, [f64; 6]>, &'static str> {
+    shared_matrices(packet, index, preview, chains, false)
+}
+fn shared_matrices(
+    packet: &ObjectFramePacket,
+    index: usize,
+    preview: Option<&ObjectRecord>,
+    chains: &crate::object_render_scene::text_scene::parent_chain::SceneParentChains,
+    hit: bool,
+) -> Result<BTreeMap<usize, [f64; 6]>, &'static str> {
     let layer = &packet.source_layers()[index];
+    if !hit && packet.context_id() != "scene-root" {
+        return Err("Subselect editing is unavailable inside a component");
+    }
     if layer.three_d.value() == Some(&true)
         || layer.rig().is_some()
         || packet.duplicator_outputs().iter().any(|d| d.layer_index == index)
@@ -154,9 +178,25 @@ pub(crate) fn hit_matrices(
     if sources.iter().any(|s| !is_vector_record(s.record()) && s.record().family != "closed-solid-fill-cubic-path") {
         return Err("Subselect mask or path effect is unavailable");
     }
+    if !hit {
+        // The editable read admits the vector records exactly as a vector-only layer does.
+        let poses = BTreeMap::new();
+        if let Some(prepared) = prepare_layer(packet, index, &sources, &poses, None)? {
+            if prepared.iter().any(|v| v.refusal.is_some()) {
+                return Err("Subselect layer paint consumer is unavailable");
+            }
+        }
+        for source in &sources {
+            record::admit_layer(packet.snapshot().document(), source.record(), layer)
+                .map_err(|_| "Subselect geometry consumer is unavailable")?;
+            if source.record().is_mask() || record_layer_has_active_path_fx(packet, source.record()) {
+                return Err("Subselect mask or path effect is unavailable");
+            }
+        }
+    }
     let chain = chains.chain(index).map_err(|failure| failure.reason())?;
     let outer = chain.iter().fold(Affine::IDENTITY, |outer, entry| affine(entry) * outer);
-    element_matrices(packet, sources, None, outer)
+    element_matrices(packet, sources, preview, outer)
 }
 
 /// Each record's own element Motion (pivot at its canonical cubic bounds) on top of the layer's `outer` pose.
