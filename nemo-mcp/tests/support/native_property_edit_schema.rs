@@ -10,6 +10,10 @@ pub(super) fn check(valid: impl Fn(&Value) -> bool) {
         json!({"kind":"setKey","frame":1.25,"values":[25]}),
         json!({"kind":"removeKey","frame":-1}),
         json!({"kind":"setAnimated","frame":0,"animated":false}),
+        json!({"kind":"setExpression","code":""}),
+        json!({"kind":"setExpression","code":"// 雪 🧭\r\nreturn value;"}),
+        json!({"kind":"setExpressionEnabled","enabled":true}),
+        json!({"kind":"removeExpression"}),
     ] {
         let mut q = base.clone();
         q["payload"]["action"] = action;
@@ -42,6 +46,13 @@ pub(super) fn check(valid: impl Fn(&Value) -> bool) {
         json!({"kind":"setValue","frame":0,"values":[null]}),
         json!({"kind":"setAnimated","frame":0,"animated":0}),
         json!(["removeKey", 0]),
+        json!({"kind":"setExpression"}),
+        json!({"kind":"setExpression","code":null}),
+        json!({"kind":"setExpression","code":"x".repeat(4097)}),
+        json!({"kind":"setExpression","code":"x","enabled":true}),
+        json!({"kind":"setExpressionEnabled","enabled":0}),
+        json!({"kind":"setExpressionEnabled"}),
+        json!({"kind":"removeExpression","code":null}),
     ] {
         let mut bad = base.clone();
         bad["payload"]["action"] = action;

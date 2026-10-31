@@ -13,6 +13,8 @@ use serde_json::Number;
 mod bake_edit;
 #[path = "object_property_curve_edits.rs"]
 mod curves;
+#[path = "object_property_expression_edit.rs"]
+mod expression_edit;
 #[path = "object_property_preset_apply.rs"]
 mod preset_apply;
 #[path = "object_property_track_edit.rs"]
@@ -21,11 +23,15 @@ mod track_edit;
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 enum PropertyAction {
-    // Private producer only. Public property intents keep refusing expression edits.
+    // Sealed target of every expression intent: the private producer and the public actions.
     #[serde(skip_deserializing)]
     SetExpression {
         expression: Option<OrderExpression>,
     },
+    #[serde(rename = "setExpression")]
+    SetExpressionCode { code: String },
+    SetExpressionEnabled { enabled: bool },
+    RemoveExpression {},
     SetValue {
         frame: Number,
         values: Vec<Number>,
@@ -212,7 +218,7 @@ impl OrderTrack {
 }
 impl ObjectFillOwner {
     /// Private authoring producer over a retained origin; the existing history
-    /// owner commits the sealed candidate. No public expression writer is admitted.
+    /// owner commits the sealed candidate. The public actions reach the same edit.
     /// Null removes the expression; an empty string preserves its authored presence.
     #[allow(dead_code)]
     pub(crate) fn prepare_property_expression_edit_json(
@@ -318,7 +324,18 @@ impl ObjectFillOwner {
                 expression: Presence::Missing,
             });
         let before = record.clone();
-        match payload.action {
+        let current = record.expression.value();
+        let action = match payload.action {
+            PropertyAction::SetExpressionCode { code } => PropertyAction::SetExpression {
+                expression: expression_edit::set_code(current, code)?,
+            },
+            PropertyAction::SetExpressionEnabled { enabled } => PropertyAction::SetExpression {
+                expression: expression_edit::set_enabled(current, enabled),
+            },
+            PropertyAction::RemoveExpression {} => PropertyAction::SetExpression { expression: None },
+            other => other,
+        };
+        match action {
             PropertyAction::SetExpression { expression } => {
                 record.expression = expression.map_or(Presence::Missing, Presence::Present);
             }
@@ -395,6 +412,7 @@ impl ObjectFillOwner {
                     }
                 }
             }
+            _ => unreachable!("expression intents resolve to SetExpression above"),
         }
         if before != record {
             if let Some(i) = record_index {

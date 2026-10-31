@@ -285,3 +285,31 @@ test('authored-key read accepts only actual nullable standing lock modes while p
  for(const lockTo of [null,'in','out','layer']){const q=request('authoredKeys'),r=response(q);r.result.items[0].lockTo=lockTo;assert.deepEqual((await read(q,r)).result.items[0],r.result.items[0]);}
  for(const lockTo of [false,0,'',{},'unknown']){const q=request('authoredKeys'),r=response(q);r.result.items[0].lockTo=lockTo;await assert.rejects(read(q,r),TypeError);}
 });
+
+test('expressionSource returns the exact authored code, frameless and correlated, and never truncates (#2376)', async () => {
+  const q = request();
+  q.payload.view = {kind:'expressionSource', target:{contextId:'scene-root', layerUid:'data:layer 雪'}, property:'opacity'};
+  const make = expression => {
+    const r = response(q, {expression});
+    for (const key of ['trackPresent', 'items', 'nextOffset']) delete r.result[key];
+    return r;
+  };
+  for (const expression of [null, {enabled:false, code:''}, {enabled:true, code:'data:x\r\n値 🧭 return ('}]) {
+    const r = make(expression); assert.deepEqual(await read(q, r), r);
+  }
+  const bad = [r => delete r.result.expression, r => r.result.expression = {enabled:true},
+    r => r.result.expression = {code:'x'}, r => r.result.expression = {enabled:1, code:'x'},
+    r => r.result.expression = {enabled:true, code:null}, r => r.result.expression = 'x',
+    r => r.result.expression = {enabled:true, code:'x', present:true}, r => r.result.frame = 0,
+    r => r.result.evaluation = {state:'unavailable', reason:'not-evaluated'}, r => r.result.kind = 'expressionState',
+    r => r.result.property = 'foreign', r => r.result.target.layerUid = 'foreign',
+    // Past the 3072-byte provider bound a page is refused, never trimmed.
+    r => r.result.expression = {enabled:true, code:'y'.repeat(3100)}];
+  for (const mutate of bad) { const r = make({enabled:true, code:'return 1;'}); mutate(r); await assert.rejects(read(q, r)); }
+  for (const key of ['frame', 'offset', 'limit']) {
+    const extra = {...q, payload:{...q.payload, view:{...q.payload.view, [key]:0}}};
+    assert.throws(() => SDK.validateRequest(extra), undefined, key);
+  }
+  const noProperty = {...q, payload:{...q.payload, view:{kind:'expressionSource', target:q.payload.view.target}}};
+  assert.throws(() => SDK.validateRequest(noProperty));
+});

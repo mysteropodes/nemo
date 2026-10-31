@@ -14,8 +14,21 @@ fn values(value: &Value) -> bool {
         (1..=4).contains(&values.len()) && values.iter().all(|v| finite(Some(v)))
     })
 }
+// The native owner caps authored code at the evaluator's 4096 UTF-8 bytes; JSON string
+// escapes may only shrink the request, so the same bound holds on the wire.
+fn code(value: Option<&Value>) -> bool {
+    value
+        .and_then(Value::as_str)
+        .is_some_and(|code| code.len() <= 4096)
+}
 fn action(value: &Value) -> bool {
     match value.get("kind").and_then(Value::as_str) {
+        Some("setExpression") => {
+            exact(value, &["kind", "code"], &[]).is_some_and(|a| code(a.get("code")))
+        }
+        Some("setExpressionEnabled") => exact(value, &["kind", "enabled"], &[])
+            .is_some_and(|a| a["enabled"].is_boolean()),
+        Some("removeExpression") => exact(value, &["kind"], &[]).is_some(),
         Some("bake") => exact(value, &["kind"], &[]).is_some(),
         Some("setValue" | "setKey") => exact(value, &["kind", "frame", "values"], &[])
             .is_some_and(|a| finite(a.get("frame")) && values(&a["values"])),

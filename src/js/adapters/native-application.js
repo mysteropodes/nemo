@@ -67,7 +67,7 @@
     return value;
   }
   function objectIdPaths(operation) {
-    if (operation === editOperation) return { has: p => /^payload\.(?:property|target\.(?:contextId|layerUid|strokeId))$/.test(p) };
+    if (operation === editOperation) return { has: p => /^payload\.(?:property|action\.code|target\.(?:contextId|layerUid|strokeId))$/.test(p) };
     if (operation === readOperation) return property.readPaths;
     if (operation === trackOperation) return { has: p => /^payload\.selections\.\d+\.(?:property|target\.(?:contextId|layerUid|strokeId))$/.test(p) };
     if (fontContract && fontContract.admitted(operation)) return fontContract.paths(operation);
