@@ -170,3 +170,48 @@ fn property_bake_admits_only_the_intent_not_samples_or_replacement_keys() {
         assert!(envelope(payload(action)).validate().is_err());
     }
 }
+
+#[test]
+fn property_control_edits_admit_only_the_closed_declaration_shapes() {
+    for kind in ["number", "checkbox", "angle", "point", "color"] {
+        let p = payload(json!({"kind":"addControl","controlType":kind,"name":"Speed 雪"}));
+        assert!(request(&p), "{kind}");
+        assert!(envelope(p).validate().is_ok());
+    }
+    for action in [
+        json!({"kind":"renameControl","name":" Velocity "}),
+        json!({"kind":"removeControl"}),
+        json!({"kind":"moveControl","direction":-1}),
+        json!({"kind":"moveControl","direction":1}),
+    ] {
+        let p = payload(action);
+        assert!(request(&p));
+        assert!(envelope(p).validate().is_ok());
+    }
+    let long = "x".repeat(129);
+    for action in [
+        json!({"kind":"addControl","controlType":"slider","name":"A"}),
+        json!({"kind":"addControl","controlType":"number"}),
+        json!({"kind":"addControl","name":"A"}),
+        json!({"kind":"addControl","controlType":"number","name":""}),
+        json!({"kind":"addControl","controlType":"number","name":4}),
+        json!({"kind":"addControl","controlType":"number","name":long}),
+        json!({"kind":"addControl","controlType":"number","name":"A","frame":0}),
+        json!({"kind":"renameControl"}),
+        json!({"kind":"renameControl","name":""}),
+        json!({"kind":"renameControl","name":null}),
+        json!({"kind":"renameControl","name":"A","controlType":"number"}),
+        json!({"kind":"removeControl","frame":0}),
+        json!({"kind":"removeControl","name":"A"}),
+        json!({"kind":"moveControl"}),
+        json!({"kind":"moveControl","direction":0}),
+        json!({"kind":"moveControl","direction":2}),
+        json!({"kind":"moveControl","direction":1.5}),
+        json!({"kind":"moveControl","direction":"up"}),
+        json!({"kind":"moveControl","direction":true}),
+        json!(["removeControl"]),
+    ] {
+        assert!(!request(&payload(action.clone())), "{action}");
+        assert!(envelope(payload(action)).validate().is_err());
+    }
+}

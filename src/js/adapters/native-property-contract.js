@@ -95,11 +95,20 @@
       Object.values(value.target).forEach(objectUid); objectUid(value.property);
       const action = value.action;
       if (!plain(action)) throw new TypeError('property action must be an object');
-      const fields = {setValue:['values'], setKey:['values'], removeKey:[], setAnimated:['animated'], bake:[]};
+      // D18-B: control declaration edits carry no frame; `property` is the control key.
+      const fields = {setValue:['values'], setKey:['values'], removeKey:[], setAnimated:['animated'], bake:[],
+        addControl:['controlType', 'name'], renameControl:['name'], removeControl:[], moveControl:['direction']};
       if (typeof action.kind !== 'string' || !has(fields, action.kind)) throw new TypeError('unsupported property edit action');
-      exact(action, ['kind', ...(action.kind === 'bake' ? [] : ['frame']), ...fields[action.kind]], [], 'property action');
+      const frameless = action.kind === 'bake' || /^(?:add|rename|remove|move)Control$/.test(action.kind);
+      exact(action, ['kind', ...(frameless ? [] : ['frame']), ...fields[action.kind]], [], 'property action');
       // Native frames are finite numbers, including negative and fractional values.
-      if (action.kind !== 'bake' && !Number.isFinite(action.frame)) throw new TypeError('invalid property frame');
+      if (!frameless && !Number.isFinite(action.frame)) throw new TypeError('invalid property frame');
+      if (has(action, 'name') && (typeof action.name !== 'string' || !action.name || Array.from(action.name).length > 128)) {
+        throw new TypeError('invalid control name');
+      }
+      if (action.kind === 'addControl' && (!['number', 'checkbox', 'angle', 'point', 'color'].includes(action.controlType) ||
+          !/^xc_[A-Za-z0-9_]{1,124}$/.test(value.property))) throw new TypeError('invalid control declaration');
+      if (action.kind === 'moveControl' && action.direction !== -1 && action.direction !== 1) throw new TypeError('invalid control direction');
       if (has(action, 'values')) {
         const values = action.values;
         if (!Array.isArray(values) || values.length < 1 || values.length > 4 ||

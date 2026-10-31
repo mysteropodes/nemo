@@ -350,6 +350,7 @@
     {"src":"js/adapters/native-object-layer-compositing.js"},
     {"src":"js/adapters/native-layer-parent.js"},
     {"src":"js/adapters/native-motion-layer-link-rows.js"},
+    {"src":"js/adapters/native-motion-control-rows.js"},
     {"src":"js/adapters/native-path-effects-ui.js"},
     {"src":"js/adapters/native-object-rig.js"},
     {"src":"js/adapters/native-object-tween.js"},
