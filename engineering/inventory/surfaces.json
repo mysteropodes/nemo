@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "8049fe31b422e8e443ad4c3fca82daeaabe445fb",
-  "describe": "v0.7.0-alpha.4-4184-g8049fe31-dirty"
+  "head": "79f42f460881bc89f0008fbed6756259d26c3ca9",
+  "describe": "v0.7.0-alpha.4-4191-g79f42f46-dirty"
  },
- "inputsDigest": "ea69c4fd0a47b6701571cd4a33930604ad4ebf7cfbbf94afc70e304993c644af",
+ "inputsDigest": "c1c1cd00158c7ec7ace605b1c84bc0e45324bee7b77e72a3b709ec7ec02a9a39",
  "states": [
   "inventoried",
   "characterized",
@@ -52,7 +52,7 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 258,
+   "native": 255,
    "export": 5,
    "animation": 435,
    "history": 350,
@@ -453,7 +453,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 140,
+    "functionsVisited": 139,
     "via": "variable btn",
     "references": []
    },
@@ -584,7 +584,7 @@
     "container": "layer-ctrls",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 148,
+    "functionsVisited": 147,
     "via": "variable input",
     "references": []
    },
@@ -2464,7 +2464,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 122,
+    "functionsVisited": 124,
     "via": "variable histBtn",
     "references": [
      "src/js/timeline.js:9109 action()"
@@ -2553,7 +2553,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 231,
+    "functionsVisited": 230,
     "via": "chain",
     "references": [
      "src/js/timeline.js:9111 action()"
@@ -2636,7 +2636,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 278,
+    "functionsVisited": 277,
     "via": "chain",
     "references": [
      "src/js/images.js:705",
@@ -3402,7 +3402,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 161,
+    "functionsVisited": 160,
     "via": "chain",
     "references": []
    },
@@ -4968,7 +4968,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 127,
+    "functionsVisited": 126,
     "via": "variable trigger",
     "references": []
    },
@@ -5179,7 +5179,7 @@
     "container": "media-statusbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 81,
+    "functionsVisited": 79,
     "via": "chain",
     "references": []
    },
@@ -7359,7 +7359,7 @@
     "container": "export-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 104,
+    "functionsVisited": 102,
     "via": "variable runBtn",
     "references": []
    },
@@ -9730,7 +9730,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 70,
+    "functionsVisited": 68,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3421 updatePropsContext()"
@@ -9816,7 +9816,7 @@
     "container": "p-brushpreset-row",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 64,
+    "functionsVisited": 62,
     "via": "variable btn",
     "references": [
      "src/js/timeline.js:503 setTool()"
@@ -10170,10 +10170,8 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "consumers": {},
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:514",
@@ -10183,7 +10181,7 @@
     "container": "corners-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 70,
+    "functionsVisited": 66,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2982 updateCornersPanel()",
@@ -11142,7 +11140,7 @@
     "container": "mask-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 210,
+    "functionsVisited": 209,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2926 updateMaskPanel()"
@@ -11303,7 +11301,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 70,
+    "functionsVisited": 68,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3427 updatePropsContext()",
@@ -11885,10 +11883,8 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "consumers": {},
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:887",
@@ -11900,7 +11896,7 @@
     "container": "fill-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 81,
+    "functionsVisited": 84,
     "via": "chain",
     "references": [
      "src/js/timeline.js:3837 updateSelPropsPanel()",
@@ -12800,10 +12796,9 @@
     "persist": 3,
     "history": 3,
     "selection": 3,
-    "render": 3,
-    "native": 3
+    "render": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:929",
@@ -12815,7 +12810,7 @@
     "container": "stroke-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 98,
+    "functionsVisited": 105,
     "via": "chain",
     "references": [
      "src/js/timeline.js:6434 paintStrokeSwatches()"
@@ -13455,7 +13450,7 @@
     "container": "p-widget-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 191,
+    "functionsVisited": 190,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:566 renderWidgetPanel()"
@@ -13505,7 +13500,7 @@
     "container": "p-widget-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 191,
+    "functionsVisited": 190,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:566 renderWidgetPanel()"
@@ -13602,7 +13597,7 @@
     "container": "p-widget-xrange-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 191,
+    "functionsVisited": 190,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:570 renderWidgetPanel()"
@@ -13652,7 +13647,7 @@
     "container": "p-widget-xrange-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 191,
+    "functionsVisited": 190,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:570 renderWidgetPanel()"
@@ -13702,7 +13697,7 @@
     "container": "p-widget-xrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 191,
+    "functionsVisited": 190,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:570 renderWidgetPanel()"
@@ -13799,7 +13794,7 @@
     "container": "p-widget-yrange-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 191,
+    "functionsVisited": 190,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:580 renderWidgetPanel()"
@@ -13849,7 +13844,7 @@
     "container": "p-widget-yrange-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 191,
+    "functionsVisited": 190,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:580 renderWidgetPanel()"
@@ -13899,7 +13894,7 @@
     "container": "p-widget-yrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 191,
+    "functionsVisited": 190,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:580 renderWidgetPanel()"
@@ -14278,7 +14273,7 @@
     "container": "stroke-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 68,
+    "functionsVisited": 66,
     "via": "exported ColorPicker.wireColorSwatches()",
     "references": [
      "src/js/timeline.js:3956 updateFsSelPanel()",
@@ -15388,7 +15383,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 52,
+    "functionsVisited": 51,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3922 updateSelPropsPanel()",
@@ -15434,7 +15429,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 52,
+    "functionsVisited": 51,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3923 updateSelPropsPanel()"
@@ -15479,7 +15474,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 52,
+    "functionsVisited": 51,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3921 updateSelPropsPanel()",
@@ -15525,7 +15520,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 52,
+    "functionsVisited": 51,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3919 updateSelPropsPanel()"
@@ -15570,7 +15565,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 52,
+    "functionsVisited": 51,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3920 updateSelPropsPanel()"
@@ -16087,7 +16082,7 @@
     "container": "text-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 512,
+    "functionsVisited": 511,
     "via": "variable save",
     "references": []
    },
@@ -18007,7 +18002,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 25,
+    "functionsVisited": 24,
     "via": "callback btn",
     "references": []
    },
@@ -18046,7 +18041,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 25,
+    "functionsVisited": 24,
     "via": "callback btn",
     "references": []
    },
@@ -18085,7 +18080,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 25,
+    "functionsVisited": 24,
     "via": "callback btn",
     "references": []
    },
@@ -18124,7 +18119,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 25,
+    "functionsVisited": 24,
     "via": "callback btn",
     "references": []
    },
@@ -19038,7 +19033,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 27,
+    "functionsVisited": 26,
     "via": "callback tab",
     "references": []
    },
@@ -19074,7 +19069,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 27,
+    "functionsVisited": 26,
     "via": "callback tab",
     "references": []
    },
@@ -19110,7 +19105,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 27,
+    "functionsVisited": 26,
     "via": "callback tab",
     "references": []
    },
@@ -19146,7 +19141,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 27,
+    "functionsVisited": 26,
     "via": "callback tab",
     "references": []
    },
@@ -19182,7 +19177,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 27,
+    "functionsVisited": 26,
     "via": "callback tab",
     "references": []
    },
@@ -19218,7 +19213,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 27,
+    "functionsVisited": 26,
     "via": "callback tab",
     "references": []
    },
@@ -19254,7 +19249,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 27,
+    "functionsVisited": 26,
     "via": "callback tab",
     "references": []
    },
@@ -19290,7 +19285,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 27,
+    "functionsVisited": 26,
     "via": "callback tab",
     "references": []
    },
@@ -25680,7 +25675,7 @@
    "source": "src/js/motion.js:10522",
    "meta": {
     "i18n": "ctxDeleteThisKey",
-    "functionsVisited": 524
+    "functionsVisited": 523
    },
    "fixtures": [
     "static-props",
@@ -33325,7 +33320,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:393",
    "meta": {
-    "functionsVisited": 175
+    "functionsVisited": 173
    },
    "fixtures": [
     "media",

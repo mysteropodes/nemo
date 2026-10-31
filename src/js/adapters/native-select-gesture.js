@@ -5,7 +5,7 @@
  * began. A plain stroke is reshaped by its transformed geometry; a ribbon, a fill, a parametric shape and a texture anchor go as one
  * record-space matrix the engine applies (it rebuilds a ribbon from its centreline and re-syncs its linked fill, carries a texture
  * anchor's dabs and a gradient's end points, keeps a shape's box). It holds no document state and writes nothing while the pointer
- * moves: Escape, a lost capture or a stale document ends the gesture with no write. Baseline (1065e9d8 select-bridge onDown/onMove/onUp):
+ * moves: Escape (also between the release and the send), a lost capture, or a pin / frame / tool / layer / selection that no longer matches the press ends the gesture with no write (P25 / #1027). Baseline (1065e9d8 select-bridge onDown/onMove/onUp):
  * A selection may span layers (a marquee reads every visible unlocked layer, a Shift pick adds from another): its move / scale / rotate is still ONE
  * batch, each step naming its own layer. Shift on a corner scales proportionally, Alt scales from the box centre, Shift snaps a rotation to 15 degrees, Shift on the press extends
  * the selection. An image and a text block go in the same batch as a record-space matrix in their own frame (the listing's bounds and
@@ -159,6 +159,18 @@
       }) });
       g.previewed = true;
     }
+    // P25 (#1027): a move / scale / rotate whose document pin, frame, tool, layer or selection no longer matches the snapshot taken at the press
+    // ends there, with a notice and no write (it was only ever a preview); the release then has nothing to commit.
+    function ids(list) { return (list || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget; }).map(function (p) { return p.data.strokeId; }).join('|'); }
+    function stale() {
+      var now = I.presentedState(root);
+      return !now || !samePin(now.pin, g.pin) || now.presentation.frame !== g.frame || (!!g.ctx && I.pickContext(root) !== g.ctx) || ids(root.selectedPaths) !== ids(g.sel);
+    }
+    function abandon() {
+      g.kind = 'none';
+      if (g.previewed && O) { O.preview(root, null); g.previewed = false; }
+      notice(root, 'The document changed during the drag — nothing was changed.');
+    }
     function move(ev) {
       if (g.cancelled) return;
       g.last = ev;
@@ -167,6 +179,7 @@
         g.active = true; listen(true);
       }
       if (!g.kind) classify();
+      if ((g.kind === 'move' || g.kind === 'scale' || g.kind === 'rotate') && stale()) return abandon();
       if (g.kind) update();
     }
     async function marqueeEnd() {
@@ -187,9 +200,9 @@
       if (bad) return notice(root, 'Transforming ' + bad + ' is not available on native projects yet.');
       if (!ids.length || unread) return notice(root, 'Select items to transform them.');
       if (ids.length > MAX_STEPS) return notice(root, 'Too many items to transform at once (' + MAX_STEPS + ' at most).');
-      var m = g.matrix, cannot = unstorable(root, g.sel, m), now = I.presentedState(root), route = root.NemoNativeObjectLabs && root.NemoNativeObjectLabs.desktop(root);
+      var m = g.matrix, cannot = unstorable(root, g.sel, m), route = root.NemoNativeObjectLabs && root.NemoNativeObjectLabs.desktop(root);
       if (cannot) return notice(root, cannot + ' is not available on native projects yet.');
-      if (!now || !samePin(now.pin, g.pin) || now.presentation.frame !== g.frame || I.pickContext(root) !== g.ctx) return notice(root, 'The document changed during the drag — nothing was changed.');
+      if (stale()) return notice(root, 'The document changed during the drag — nothing was changed.');
       if (!route) return notice(root, 'Transforming is not available right now.');
       var layers = await I.reread(root, g.sel, false);
       var again = I.presentedState(root);
@@ -198,6 +211,8 @@
       var steps;
       try { steps = I.transformSteps(root, layers.paths, m); } catch (_) { steps = null; }
       if (steps && JSON.stringify(steps).length > MAX_BYTES) return notice(root, 'Too much to transform at once \u2014 select fewer items.');
+      if (g.cancelled) return; // Escape between the release and the send still cancels; once sent, the write is not cancellable (undo reverts it)
+      listen(false);
       try { result = steps ? await route.batchStrokes(layers.layerUid, layers.frame, steps) : null; } catch (_) { result = null; }
       if (!result || result.status !== 'applied') return notice(root, 'The transform could not be applied.');
       await reselect(ids);
@@ -227,7 +242,7 @@
       } catch (_) { notice(root, 'The transform could not be applied.'); }
       finally {
         listen(false);
-        if (O && !g.cancelled) { O.show(root); O.preview(root, null); }
+        if (O) { O.show(root); O.preview(root, null); }
         g.cancelled = true;
         if (typeof root.updateUI === 'function') root.updateUI();
         if (root.SMEngineBridge && typeof root.SMEngineBridge.renderNow === 'function') root.SMEngineBridge.renderNow();
