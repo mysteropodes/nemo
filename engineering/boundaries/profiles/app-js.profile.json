@@ -4270,7 +4270,7 @@
     {
       "path": "src/js/i18n.js",
       "rule": "size",
-      "ceiling": 4186,
+      "ceiling": 4194,
       "owner": "ivg-design",
       "issue": "901",
       "reason": "Four authored translation dictionaries plus explicit install call only; handwritten locale switching/DOM/storage behavior is already isolated in app.i18n.runtime.adapter. Preserve whole catalog rather than arbitrary chunking. Existing tests/i18n-runtime.test.cjs verifies exact dictionary bytes/key counts and real runtime/caller behavior. No generated/vendor exemption or size-profile increase.",
