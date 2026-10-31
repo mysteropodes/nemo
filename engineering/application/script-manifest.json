@@ -229,6 +229,7 @@
     {"src":"js/history-panel.js"},
     {"src":"js/adapters/updater-platform.js"},
     {"src":"js/updater-bridge.js"},
+    {"src":"js/application/kitsu-native-structure.js"},
     {"src":"js/adapters/kitsu-service.js"},
     {"src":"js/kitsu.js"},
     {"src":"js/images.js"},

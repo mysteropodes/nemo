@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "777aa3cb3ff3607fd1a70c9e73bf709b4a9672a8",
-  "describe": "v0.7.0-alpha.4-5046-g777aa3cb3-dirty"
+  "head": "ac2152ea666716817e009b37f73f07bbeeed613c",
+  "describe": "v0.7.0-alpha.4-5055-gac2152ea6-dirty"
  },
- "inputsDigest": "dbc302f9a3f5cac4f9b96b7dadd6c6f070b95f4dc4e27d4ca7e330b2921b7374",
+ "inputsDigest": "a6a28ed96fabfb0872423b7cdfced41bfc44413e63d0fbe62d87908fc0266888",
  "states": [
   "inventoried",
   "characterized",
@@ -186,7 +186,7 @@
   },
   "SMKitsu": {
    "file": "src/js/kitsu.js",
-   "line": 275,
+   "line": 276,
    "members": 3
   },
   "SMLabs": {
@@ -2682,7 +2682,7 @@
    "capability": "kitsu open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:413 initKitsuUI()"
+    "src/js/kitsu.js:415 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -2721,7 +2721,7 @@
    "capability": "kitsu publish",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:439 initKitsuUI()"
+    "src/js/kitsu.js:441 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8389,7 +8389,7 @@
    "capability": "&larr; Back",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:434 initKitsuUI()"
+    "src/js/kitsu.js:436 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8426,7 +8426,7 @@
    "capability": "&times;",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:415 initKitsuUI()"
+    "src/js/kitsu.js:417 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8463,7 +8463,7 @@
    "capability": "kitsu email",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:417 initKitsuUI()"
+    "src/js/kitsu.js:419 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8487,7 +8487,7 @@
     "functionsVisited": 3,
     "via": "container delegation #kitsu-modal",
     "references": [
-     "src/js/kitsu.js:422 initKitsuUI()"
+     "src/js/kitsu.js:424 initKitsuUI()"
     ]
    },
    "fixtures": [
@@ -8502,7 +8502,7 @@
    "capability": "Log in",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:420 initKitsuUI()"
+    "src/js/kitsu.js:422 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8541,7 +8541,7 @@
    "capability": "Log out",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:436 initKitsuUI()"
+    "src/js/kitsu.js:438 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8578,7 +8578,7 @@
    "capability": "kitsu password",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:417 initKitsuUI()"
+    "src/js/kitsu.js:419 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8602,7 +8602,7 @@
     "functionsVisited": 3,
     "via": "container delegation #kitsu-modal",
     "references": [
-     "src/js/kitsu.js:422 initKitsuUI()"
+     "src/js/kitsu.js:424 initKitsuUI()"
     ]
    },
    "fixtures": [
@@ -8617,7 +8617,7 @@
    "capability": "kitsu url",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:417 initKitsuUI()"
+    "src/js/kitsu.js:419 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8641,7 +8641,7 @@
     "functionsVisited": 3,
     "via": "container delegation #kitsu-modal",
     "references": [
-     "src/js/kitsu.js:422 initKitsuUI()"
+     "src/js/kitsu.js:424 initKitsuUI()"
     ]
    },
    "fixtures": [

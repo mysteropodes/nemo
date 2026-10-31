@@ -2039,6 +2039,18 @@
       ]
     },
     {
+      "id": "app.kitsu.native.structure",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "kitsu-native-structure.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "kitsu-native-structure.js"
+      ]
+    },
+    {
       "id": "app.presenter.seam",
       "layer": "application",
       "dir": "src/js/application",
