@@ -29,7 +29,7 @@
     return { fill, stroke: real ? style.stroke : null };
   }
   // Every row is a fresh object: { type: 'shape', strokeId, role, label, index, fill, stroke } or
-  // { type: 'group', gid, name, named, children, memberIds }.
+  // { type: 'group', gid, name, named, mode, children, memberIds } (mode: the stored combine mode, 'none' when the listing carries none).
   function build(items, labels) {
     const list = Array.isArray(items) ? items : [];
     const linked = new Map();
@@ -46,7 +46,7 @@
       one.path.forEach((g) => {
         let node = groups.get(g.id);
         if (!node) {
-          node = { type: 'group', gid: g.id, name: g.name || labels.group, named: !!g.name, children: [], memberIds: [] };
+          node = { type: 'group', gid: g.id, name: g.name || labels.group, named: !!g.name, mode: typeof g.mode === 'string' ? g.mode : 'none', children: [], memberIds: [] };
           groups.set(g.id, node);
           siblings.push(node);
         }
@@ -63,7 +63,7 @@
   // A compact signature of a tree, so an identical listing at another frame repaints nothing.
   function signature(rows) {
     const part = (row) => row.type === 'group'
-      ? 'g(' + row.gid + '|' + row.name + '|' + row.children.map(part).join(',') + ')'
+      ? 'g(' + row.gid + '|' + row.name + '|' + row.mode + '|' + row.children.map(part).join(',') + ')'
       : 's(' + row.strokeId + '|' + row.label + '|' + (row.fill || '') + '|' + (row.stroke || '') + '|' + row.role + ')';
     return rows.map(part).join(';');
   }
