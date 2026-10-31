@@ -6136,8 +6136,8 @@ function startParentPickwhip(li,fromEl,ev){
 // Parent B picker menu contain," so the two surfaces can never drift apart
 // (CLAUDE.md §3). `onChanged()` fires after every write, before the caller's
 // own re-render — each surface refreshes only what it actually shows.
-// #2372 U12: on a native object project Parent A is one native edit (command.document.object.layer.parent.set); Parent B,
-// Parent in Time and Follow Path report unavailable. The adapter keeps all the logic (src/js/adapters/native-layer-parent.js).
+// #2372 U12: on a native object project Parent A, Link time and Follow path are each one native edit (command.document.object.layer.
+// parent.set / timeLink.set / followPath.set); Parent B reports unavailable. The adapter keeps all the logic (src/js/adapters/native-layer-parent.js).
 function nativeLayerParent(){try{var a=window.NemoNativeLayerParent,d=a&&typeof a.desktop==='function'?a.desktop(window):null;return d?{api:a,adapter:d}:null;}catch(_){return null;}}
 window.nativeLayerParent=nativeLayerParent;
 function buildParentMenuItems(li,ld,onChanged){
@@ -6193,7 +6193,7 @@ window.buildParentMenuItems=buildParentMenuItems;
 // comment explains why a cycle here just means each side ignores the
 // other's contribution, not infinite recursion).
 function buildFollowPathMenuItems(li,ld,onChanged){
-  var natP=nativeLayerParent();if(natP)return natP.api.unavailableItems(window,'Chemin indisponible (projet natif)','Follow Path has no native owner yet.');
+  var natP=nativeLayerParent();if(natP)return natP.api.followPathMenuItems(window,natP.adapter,li,onChanged);
   var M=window.SMMotion;
   if(!M||!M.setLayerFollowPath)return [{label:'Chemin indisponible',disabled:true}];
   var items=[{label:'Chemin : Aucun',disabled:!(ld.followPath&&ld.followPath.targetLayerUid),action:function(){
@@ -6225,7 +6225,7 @@ window.buildFollowPathMenuItems=buildFollowPathMenuItems;
 // here — 'in'/'out'-only refinement stays on the existing Temps-row select
 // and the on-bar anchor dots.
 function buildTimeLinkMenuItems(li,ld,onChanged){
-  var natP=nativeLayerParent();if(natP)return natP.api.unavailableItems(window,SM.t('ctxParentInTimeUnavailable'),'Parent in Time has no native owner yet.');
+  var natP=nativeLayerParent();if(natP)return natP.api.timeLinkMenuItems(window,natP.adapter,li,onChanged);
   var M=window.SMMotion;
   if(!M||!M.setLayerTimeLink)return [{label:SM.t('ctxParentInTimeUnavailable'),disabled:true}];
   var items=[{label:SM.t('ctxTimeNoneUnlink'),disabled:!ld.timeLink,action:function(){

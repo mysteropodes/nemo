@@ -154,6 +154,24 @@ fn blend_and_matte_facts_are_copied_and_a_source_is_marked() {
 }
 
 #[test]
+fn the_stored_time_link_source_and_follow_path_target_are_reported_when_set() {
+    let document = flat(
+        json!([{"layerUid":"lead"},
+            {"layerUid":"linked","range":{"timeLink":{"uid":"lead","mode":"in"}},
+                "followPath":{"targetLayerUid":"lead","align":true}},
+            {"layerUid":"empty","range":{"inPoint":2},"followPath":null},
+            {"layerUid":"plain"}]),
+        json!({}),
+    );
+    let rows = rows(&document);
+    assert_eq!(rows[1]["timeLinkUid"], json!("lead"));
+    assert_eq!(rows[1]["followPathUid"], json!("lead"));
+    for row in [&rows[0], &rows[2], &rows[3]] {
+        assert!(row.get("timeLinkUid").is_none() && row.get("followPathUid").is_none());
+    }
+}
+
+#[test]
 fn static_opacity_is_reported_and_an_animated_track_is_flagged() {
     let target = |uid: &str| json!({"contextId":"scene-root","layerUid":uid});
     let layers = [

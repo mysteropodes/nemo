@@ -29,6 +29,10 @@ use std::collections::HashSet;
 #[path = "object_layer_lifecycle_parent.rs"]
 mod parent;
 use parent::plan_parent;
+// #2372: Link time and Follow path write the layer's own range / follow fields; the range seed reads the range evaluator.
+#[path = "object_layer_lifecycle_link.rs"]
+mod link;
+use link::{plan_follow_path, plan_time_link, TimeLinkRequest};
 
 const MAX_PAYLOAD_BYTES: usize = 4096;
 
@@ -106,6 +110,40 @@ object_deserialize!(ParentPayload {
     frame: u32
 });
 
+#[derive(Debug)]
+struct TimeLinkPayload {
+    command: String,
+    context_id: String,
+    layer_uid: String,
+    source_layer_uid: Option<String>,
+    mode: Option<String>,
+    src_anchor: Option<String>,
+    frame: u32,
+}
+object_deserialize!(TimeLinkPayload {
+    command: String,
+    context_id: String,
+    layer_uid: String,
+    source_layer_uid: Option<String>,
+    mode: Option<String>,
+    src_anchor: Option<String>,
+    frame: u32
+});
+
+#[derive(Debug)]
+struct FollowPathPayload {
+    command: String,
+    context_id: String,
+    layer_uid: String,
+    target_layer_uid: Option<String>,
+}
+object_deserialize!(FollowPathPayload {
+    command: String,
+    context_id: String,
+    layer_uid: String,
+    target_layer_uid: Option<String>
+});
+
 impl SelectionPayload {
     /// Identities only; an empty string is never a layer identity.
     fn into_selection(self) -> Result<LayerSelection, DispatchErrorCode> {
@@ -138,12 +176,16 @@ fn refusal_code(error: &LifecycleError) -> DispatchErrorCode {
         | LifecycleError::ParentSelf(_)
         | LifecycleError::ParentCycle { .. }
         | LifecycleError::ParentRefused(_)
+        | LifecycleError::LinkSelf(_)
+        | LifecycleError::LinkCycle { .. }
+        | LifecycleError::LinkRefused(_)
         | LifecycleError::NonFiniteGap
         | LifecycleError::InvalidColor(_)
         | LifecycleError::SourceUnnamed(_) => DispatchErrorCode::InvalidRequest,
         // Admission guarantees every context lists every layer.
         LifecycleError::OrderPlanIncomplete { .. } => DispatchErrorCode::Internal,
         LifecycleError::PoseUnavailable(_)
+        | LifecycleError::LinkUnavailable(_)
         | LifecycleError::RevisionOutOfRange
         | LifecycleError::IdUnavailable
         | LifecycleError::TooManyLayers
@@ -158,6 +200,8 @@ pub(crate) enum LayerLifecycleKind {
     Rename,
     Reorder,
     Parent,
+    TimeLink,
+    FollowPath,
 }
 
 /// A detached candidate sealed to the snapshot it was planned from. Only this
@@ -331,6 +375,60 @@ impl ObjectFillOwner {
             payload.frame,
         );
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::Parent, plan)
+    }
+    /// #2372: Link time to a layer (with the seeded offsets) or unlink it (baking the range), `sourceLayerUid: null`.
+    pub(crate) fn prepare_layer_time_link_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedLayerLifecycle, DispatchErrorCode> {
+        let payload: TimeLinkPayload = parse(bytes)?;
+        let empty = |v: &Option<String>| v.as_deref() == Some("");
+        if payload.command != "object.layer.timeLink.set"
+            || payload.context_id.is_empty()
+            || payload.layer_uid.is_empty()
+            || [&payload.source_layer_uid, &payload.mode, &payload.src_anchor]
+                .into_iter()
+                .any(empty)
+            || (payload.source_layer_uid.is_none()
+                && (payload.mode.is_some() || payload.src_anchor.is_some()))
+        {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        let origin = self.current_snapshot();
+        let plan = plan_time_link(
+            origin.document(),
+            &TimeLinkRequest {
+                context_id: &payload.context_id,
+                layer_uid: &payload.layer_uid,
+                source: payload.source_layer_uid.as_deref(),
+                mode: payload.mode.as_deref(),
+                src_anchor: payload.src_anchor.as_deref(),
+                frame: payload.frame,
+            },
+        );
+        PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::TimeLink, plan)
+    }
+    /// #2372: Follow path target set or clear (`targetLayerUid: null`).
+    pub(crate) fn prepare_layer_follow_path_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedLayerLifecycle, DispatchErrorCode> {
+        let payload: FollowPathPayload = parse(bytes)?;
+        if payload.command != "object.layer.followPath.set"
+            || payload.context_id.is_empty()
+            || payload.layer_uid.is_empty()
+            || payload.target_layer_uid.as_deref() == Some("")
+        {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        let origin = self.current_snapshot();
+        let plan = plan_follow_path(
+            origin.document(),
+            &payload.context_id,
+            &payload.layer_uid,
+            payload.target_layer_uid.as_deref(),
+        );
+        PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::FollowPath, plan)
     }
     pub(crate) fn commit_layer_lifecycle(
         &mut self,
