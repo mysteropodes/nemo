@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "0aba3beedae631e02efc73849b6a3e095e0d8c04",
-  "describe": "v0.7.0-alpha.4-4355-g0aba3bee-dirty"
+  "head": "edcc4506b91b72693287147805cfb11b55988c22",
+  "describe": "v0.7.0-alpha.4-4358-gedcc4506-dirty"
  },
- "inputsDigest": "bd3310522db1454ba484f98a91e56b8c4dddf9469724bb4c550667325bb3d76b",
+ "inputsDigest": "1a574d5bc293fea27984f581093063299db153efa17b07e7df6357dfbf901615",
  "states": [
   "inventoried",
   "characterized",
@@ -5366,7 +5366,7 @@
     "via": "chain",
     "references": [
      "src/js/timeline.js:10083",
-     "src/js/tools.js:7593 onMouseDown()",
+     "src/js/tools.js:7597 onMouseDown()",
      "src/js/timeline.js:3950 updateFsSelPanel()",
      "src/js/timeline.js:6468 paintFillSwatches()",
      "src/js/viewtools-bridge.js:140 setColorUI()"
@@ -5417,8 +5417,8 @@
     "via": "chain",
     "references": [
      "src/js/timeline.js:10091",
-     "src/js/tools.js:7590 onMouseDown()",
-     "src/js/tools.js:7592 onMouseDown()",
+     "src/js/tools.js:7594 onMouseDown()",
+     "src/js/tools.js:7596 onMouseDown()",
      "src/js/timeline.js:3962 updateFsSelPanel()",
      "src/js/timeline.js:6458 paintStrokeSwatches()",
      "src/js/viewtools-bridge.js:136 setColorUI()"
@@ -10552,7 +10552,7 @@
     "via": "chain",
     "references": [
      "src/js/timeline.js:697 _syncFillEnabledUI()",
-     "src/js/tools.js:7593 onMouseDown()",
+     "src/js/tools.js:7597 onMouseDown()",
      "src/js/viewtools-bridge.js:143 setColorUI()"
     ]
    },
@@ -13202,7 +13202,7 @@
      "src/js/timeline.js:770 setBrushPreset()",
      "src/js/timeline.js:3707 _restoreDrawingDefaults()",
      "src/js/timeline.js:3868 updateSelPropsPanel()",
-     "src/js/tools.js:7595 onMouseDown()",
+     "src/js/tools.js:7599 onMouseDown()",
      "src/js/viewtools-bridge.js:186 pick()",
      "src/js/viewtools-bridge.js:189 pick()"
     ]
@@ -14202,7 +14202,7 @@
      "src/js/timeline.js:694 _syncFillEnabledUI()",
      "src/js/timeline.js:3949 updateFsSelPanel()",
      "src/js/timeline.js:6467 paintFillSwatches()",
-     "src/js/tools.js:7593 onMouseDown()",
+     "src/js/tools.js:7597 onMouseDown()",
      "src/js/viewtools-bridge.js:141 setColorUI()"
     ]
    },
@@ -14250,7 +14250,7 @@
     "functionsVisited": 85,
     "via": "chain",
     "references": [
-     "src/js/tools.js:7593 onMouseDown()",
+     "src/js/tools.js:7597 onMouseDown()",
      "src/js/timeline.js:3950 updateFsSelPanel()",
      "src/js/timeline.js:6468 paintFillSwatches()",
      "src/js/viewtools-bridge.js:140 setColorUI()"
@@ -14296,8 +14296,8 @@
     "references": [
      "src/js/timeline.js:3961 updateFsSelPanel()",
      "src/js/timeline.js:6457 paintStrokeSwatches()",
-     "src/js/tools.js:7590 onMouseDown()",
-     "src/js/tools.js:7592 onMouseDown()",
+     "src/js/tools.js:7594 onMouseDown()",
+     "src/js/tools.js:7596 onMouseDown()",
      "src/js/viewtools-bridge.js:137 setColorUI()"
     ]
    },
@@ -14345,8 +14345,8 @@
     "functionsVisited": 96,
     "via": "chain",
     "references": [
-     "src/js/tools.js:7590 onMouseDown()",
-     "src/js/tools.js:7592 onMouseDown()",
+     "src/js/tools.js:7594 onMouseDown()",
+     "src/js/tools.js:7596 onMouseDown()",
      "src/js/timeline.js:3962 updateFsSelPanel()",
      "src/js/timeline.js:6458 paintStrokeSwatches()",
      "src/js/viewtools-bridge.js:136 setColorUI()"
@@ -17469,7 +17469,7 @@
     "references": [
      "src/js/adapters/native-object-project-desktop.js:355 presented()",
      "src/js/app.js:536 updZoom()",
-     "src/js/tools.js:7120 show()"
+     "src/js/tools.js:7124 show()"
     ]
    },
    "fixtures": [
@@ -17514,7 +17514,7 @@
     "container": "align-toolbar",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 93,
+    "functionsVisited": 97,
     "via": "callback btn",
     "references": []
    },
@@ -17561,7 +17561,7 @@
     "container": "align-toolbar",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 93,
+    "functionsVisited": 97,
     "via": "callback btn",
     "references": []
    },
@@ -17608,7 +17608,7 @@
     "container": "align-toolbar",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 93,
+    "functionsVisited": 97,
     "via": "callback btn",
     "references": []
    },
@@ -17655,7 +17655,7 @@
     "container": "align-toolbar",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 93,
+    "functionsVisited": 97,
     "via": "callback btn",
     "references": []
    },
@@ -17702,7 +17702,7 @@
     "container": "align-toolbar",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 93,
+    "functionsVisited": 97,
     "via": "callback btn",
     "references": []
    },
@@ -17749,7 +17749,7 @@
     "container": "align-toolbar",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 93,
+    "functionsVisited": 97,
     "via": "callback btn",
     "references": []
    },
@@ -17796,7 +17796,7 @@
     "container": "align-toolbar",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 93,
+    "functionsVisited": 97,
     "via": "callback btn",
     "references": []
    },
@@ -17843,7 +17843,7 @@
     "container": "align-toolbar",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 93,
+    "functionsVisited": 97,
     "via": "callback btn",
     "references": []
    },
