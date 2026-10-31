@@ -710,6 +710,7 @@
         "object_scheduled_scene.rs",
         "object_reference_scene.rs",
         "object_ghost_underlay.rs",
+        "object_ghost_items_collect.rs",
         "scene_effect_kernels.rs",
         "scene_effect_order.rs",
         "scene_effect_blend_ref.rs",

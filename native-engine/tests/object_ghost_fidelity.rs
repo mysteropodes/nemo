@@ -17,15 +17,17 @@ fn rect(context: &str, layer: &str, id: &str, frame: u32, r: [i32; 4], fill: [f6
     record["target"] = json!({"contextId":context,"layerUid":layer,"strokeId":id,
         "frameScope":{"kind":"authored","frame":frame}});
     let [x0, y0, x1, y1] = r;
-    record["geometry"]["segments"] = json!([[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(|[x, y]| {
-        json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}})
-    }));
+    record["geometry"]["segments"] =
+        json!([[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(|[x, y]| {
+            json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}})
+        }));
     record["fill"] = json!({"kind":"solid","r":fill[0],"g":fill[1],"b":fill[2],"a":1});
     record
 }
 /// A seeded charcoal-pencil anchor: invisible itself (stroke opacity 0), its dabs are produced from it.
 fn anchor(frame: u32) -> Value {
-    let p = |x: f64| json!({"point":{"x":x,"y":32},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}});
+    let p =
+        |x: f64| json!({"point":{"x":x,"y":32},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}});
     json!({"schemaVersion":1,"family":"editable-vector-path",
         "target":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":frame},"layerUid":"L0","strokeId":"anchor"},
         "geometry":{"kind":"cubic-path","closed":false,"coordinateSpace":"document-world","handleSpace":"relative",
@@ -47,27 +49,32 @@ fn scopes(keys: &[(u32, &str, &str)]) -> Vec<Value> {
 fn project(drawing: Value) -> NativeObjectHistory {
     NativeObjectHistory::from_project_file(
         "ghost-fidelity",
-        &serde_json::to_vec(&json!({"format":"nemo.native-project-document","formatVersion":1,
+        &serde_json::to_vec(
+            &json!({"format":"nemo.native-project-document","formatVersion":1,
             "project":{"canvasW":64,"canvasH":64,"fps":24},"viewportReference":null,"assets":[],
-            "drawing":drawing}))
+            "drawing":drawing}),
+        )
         .unwrap(),
     )
     .unwrap()
 }
 /// Frame 2 holds the dab anchor (a horizontal line at y 32); frame 3 only a small square far from it.
 fn dab_owner() -> NativeObjectHistory {
-    project(json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":4,
+    project(
+        json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":4,
         "layers":[{"layerUid":"L0","timing":timing(&[2,3])}],
         "objects":[anchor(2), rect("scene-root","L0","square",3,[4,4,12,12],[0.,0.,1.])],
         "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
             "contexts":[{"contextId":"scene-root","layers":[{"layerUid":"L0","naturalPosition":0,"order":{}}],
                 "scopes":scopes(&[(2,"L0","anchor"),(3,"L0","square")])}],
-            "migration":"explicit-plan-required","referencePolicy":"unresolved"}}))
+            "migration":"explicit-plan-required","referencePolicy":"unresolved"}}),
+    )
 }
 /// One host layer instancing a two-key symbol (a red square that jumps right at symbol frame 4), nothing else.
 fn component_owner() -> NativeObjectHistory {
     let inner = |frame, r| rect("comp-a", "inner", "ink", frame, r, [1., 0., 0.]);
-    project(json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":16,
+    project(
+        json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":16,
         "layers":[{"layerUid":"host","timing":timing(&[0,4,6])}],"objects":[],
         "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
             "migration":"explicit-plan-required","referencePolicy":"unresolved","contexts":[{
@@ -77,7 +84,8 @@ fn component_owner() -> NativeObjectHistory {
             "components":[{"symbolId":"comp-a","totalFrames":8,"layers":[{"layerUid":"inner","timing":timing(&[0,4])}],
                 "objects":[inner(0,[8,8,24,24]), inner(4,[24,8,40,24])]}],
             "instances":[{"contextId":"scene-root","layerUid":"host","symbolId":"comp-a","symPlayMode":"loop",
-                "symMatrix":[1,0,0,1,0,0]}]}}}))
+                "symMatrix":[1,0,0,1,0,0]}]}}}),
+    )
 }
 fn request_for(layer: &str, mode: GhostMode, previous: f64, to: u32) -> GhostUnderlayRequest {
     GhostUnderlayRequest {
