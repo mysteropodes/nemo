@@ -6118,6 +6118,8 @@ function startParentPickwhip(li,fromEl,ev){
     var t=rowUnder(e.clientX,e.clientY);
     cleanup();
     if(!t)return; // dropped on nothing / itself / a descendant — no-op, no undo entry
+    var natP=nativeLayerParent();
+    if(natP){natP.api.parentChosen(window,natP.adapter,li,t.idx,function(){renderLayerList();renderTimeline();});return;}
     pushUndo();
     M.setLayerParent(li,M.ensureLayerUid(state.layers[t.idx]));
     renderLayerList(); renderTimeline();
@@ -6134,7 +6136,12 @@ function startParentPickwhip(li,fromEl,ev){
 // Parent B picker menu contain," so the two surfaces can never drift apart
 // (CLAUDE.md §3). `onChanged()` fires after every write, before the caller's
 // own re-render — each surface refreshes only what it actually shows.
+// #2372 U12: on a native object project Parent A is one native edit (command.document.object.layer.parent.set); Parent B,
+// Parent in Time and Follow Path report unavailable. The adapter keeps all the logic (src/js/adapters/native-layer-parent.js).
+function nativeLayerParent(){try{var a=window.NemoNativeLayerParent,d=a&&typeof a.desktop==='function'?a.desktop(window):null;return d?{api:a,adapter:d}:null;}catch(_){return null;}}
+window.nativeLayerParent=nativeLayerParent;
 function buildParentMenuItems(li,ld,onChanged){
+  var natP=nativeLayerParent();if(natP)return natP.api.parentMenuItems(window,natP.adapter,li,onChanged);
   var M=window.SMMotion;
   if(!M||!M.setLayerParent)return [{label:'Parentage indisponible',disabled:true}];
   var bad=parentDescendants(li);
@@ -6186,6 +6193,7 @@ window.buildParentMenuItems=buildParentMenuItems;
 // comment explains why a cycle here just means each side ignores the
 // other's contribution, not infinite recursion).
 function buildFollowPathMenuItems(li,ld,onChanged){
+  var natP=nativeLayerParent();if(natP)return natP.api.unavailableItems(window,'Chemin indisponible (projet natif)','Follow Path has no native owner yet.');
   var M=window.SMMotion;
   if(!M||!M.setLayerFollowPath)return [{label:'Chemin indisponible',disabled:true}];
   var items=[{label:'Chemin : Aucun',disabled:!(ld.followPath&&ld.followPath.targetLayerUid),action:function(){
@@ -6217,6 +6225,7 @@ window.buildFollowPathMenuItems=buildFollowPathMenuItems;
 // here — 'in'/'out'-only refinement stays on the existing Temps-row select
 // and the on-bar anchor dots.
 function buildTimeLinkMenuItems(li,ld,onChanged){
+  var natP=nativeLayerParent();if(natP)return natP.api.unavailableItems(window,SM.t('ctxParentInTimeUnavailable'),'Parent in Time has no native owner yet.');
   var M=window.SMMotion;
   if(!M||!M.setLayerTimeLink)return [{label:SM.t('ctxParentInTimeUnavailable'),disabled:true}];
   var items=[{label:SM.t('ctxTimeNoneUnlink'),disabled:!ld.timeLink,action:function(){
@@ -6338,6 +6347,8 @@ function buildParentCell(row,ld,li){
   // (once per slot) with no faster path at all.
   cell.addEventListener('contextmenu',function(e){
     e.preventDefault();e.stopPropagation();
+    var natP=nativeLayerParent();
+    if(natP){if(natP.adapter.parentUidOf(li))natP.api.parentCleared(window,natP.adapter,li,function(){renderLayerList();renderTimeline();});return;}
     if(!pName&&!pbName)return; // nothing to clear
     var M=window.SMMotion;if(!M||!M.setLayerParent)return;
     pushUndo();

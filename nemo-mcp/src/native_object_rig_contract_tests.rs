@@ -32,7 +32,11 @@ pub(super) const TWEEN: [&str; 4] = [
 ];
 
 /// G39 (#2376): the Motion preset apply shares the table; its own shapes are pinned in the preset tests.
-pub(super) const PRESET: [&str; 2] = ["property.preset.apply", "layer.compositing.edit"];
+pub(super) const PRESET: [&str; 3] = [
+    "property.preset.apply",
+    "layer.compositing.edit",
+    "layer.parent.set",
+];
 
 pub(super) fn corpus() -> Value {
     serde_json::from_str(CORPUS).expect("the agreement corpus parses")
@@ -46,8 +50,8 @@ pub(super) fn envelope(operation: &str, payload: Value) -> NativeApplicationRequ
 }
 
 #[test]
-fn the_table_declares_exactly_the_twenty_operations_and_nothing_else() {
-    assert_eq!(table().len(), 20, "an unparsable table admits nothing");
+fn the_table_declares_exactly_the_twenty_one_operations_and_nothing_else() {
+    assert_eq!(table().len(), 21, "an unparsable table admits nothing");
     for &suffix in OPERATIONS.iter().chain(&LABS).chain(&TWEEN).chain(&PRESET) {
         assert!(admitted(&format!("{P}{suffix}")), "{suffix}");
     }
@@ -472,4 +476,28 @@ fn the_layer_compositing_edit_is_a_closed_union_by_edit() {
     assert!(!ok(json!({"layerUid":"L"})), "edit is required");
     let wide = json!({"type":"blur","enabled":true,"keys":{"p1":{"keys":"x".repeat(2100)}}});
     assert!(!ok(json!({"edit":"effects","effects":[wide]})), "key tracks are bounded");
+}
+
+/// #2372 U12: the Parent A write is one closed shape; the engine repeats every rule on original bytes.
+#[test]
+fn the_layer_parent_set_names_one_layer_one_parent_or_null_and_one_frame() {
+    let op = format!("{P}layer.parent.set");
+    let base = || json!({"command":"object.layer.parent.set","contextId":"scene-root","layerUid":"L","parentLayerUid":"P","frame":3});
+    let ok = |edit: &dyn Fn(&mut Value)| {
+        let mut payload = base();
+        edit(&mut payload);
+        crate::native_contract::validate_request(&op, &payload)
+    };
+    assert!(ok(&|_| {}));
+    assert!(ok(&|p| p["parentLayerUid"] = Value::Null), "Parent A : None");
+    assert!(ok(&|p| p["frame"] = json!(4294967295u64)));
+    assert!(!ok(&|p| p["parentLayerUid"] = json!("")), "an empty uid is not a parent");
+    assert!(!ok(&|p| p["parentLayerUid"] = json!(7)));
+    assert!(!ok(&|p| { p.as_object_mut().unwrap().remove("parentLayerUid"); }), "null is explicit");
+    assert!(!ok(&|p| { p.as_object_mut().unwrap().remove("contextId"); }));
+    assert!(!ok(&|p| p["frame"] = json!(-1)));
+    assert!(!ok(&|p| p["frame"] = json!(1.5)));
+    assert!(!ok(&|p| p["extra"] = json!(1)), "closed members");
+    assert!(!ok(&|p| p["layerUid"] = json!("x".repeat(129))));
+    assert!(!ok(&|p| p["command"] = json!("object.layer.rename")));
 }

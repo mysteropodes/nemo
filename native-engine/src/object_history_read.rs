@@ -78,6 +78,7 @@ pub(crate) fn label_for(operation: &str, payload: &Value) -> String {
         "layer.duplicate" => "Duplicate Layer",
         "layer.rename" => "Rename Layer",
         "layer.reorder" => "Reorder Layers",
+        "layer.parent.set" => "Set Layer Parent",
         "layer.split" => "Split Layer",
         "layer.cut" => "Cut Layer",
         "layer.policy.edit" => "Layer Settings",

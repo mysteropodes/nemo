@@ -8100,6 +8100,23 @@
             {
               "properties": {
                 "operation": {
+                  "const": "command.document.object.layer.parent.set"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerParentSetPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
                   "const": "command.document.object.tween.split"
                 },
                 "payload": {
@@ -22380,6 +22397,49 @@
               "maxProperties": 4096
             }
           ]
+        }
+      }
+    },
+    "ObjectLayerParentSetPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUid",
+        "parentLayerUid",
+        "frame"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.parent.set"
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "parentLayerUid": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            {
+              "const": null
+            }
+          ]
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
         }
       }
     },
