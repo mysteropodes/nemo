@@ -14,6 +14,7 @@ use native_engine::{
     },
     object_document::FrameScopeKind,
     object_frame_packet::ObjectFrameSelector,
+    object_render_scene::{GhostReceipt, GhostUnderlayRequest},
     scheduler::OutputSpec,
 };
 use serde::{Deserialize, Serialize};
@@ -26,6 +27,9 @@ pub(crate) struct ObjectPreviewReceipt {
     pub(crate) preview: NativePreviewReceipt,
     pub(crate) view: ObjectViewProjection,
     pub(crate) display_filter: ViewportDisplayFilter,
+    /// What the renderer did with the request's onion / Ghost All settings; absent when none were asked for.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) ghosts: Option<GhostReceipt>,
 }
 impl std::ops::Deref for ObjectPreviewReceipt {
     type Target = NativePreviewReceipt;
@@ -77,6 +81,9 @@ pub(crate) struct ObjectPreviewRequest {
     pub(crate) navigation: ObjectPreviewNavigation,
     #[serde(default)]
     pub(crate) display_filter: ViewportDisplayFilter,
+    /// Onion skin / Ghost All composed under the live frame by the native renderer (viewport only, never an export).
+    #[serde(default)]
+    pub(crate) ghosts: Option<GhostUnderlayRequest>,
     pub(crate) revision_sync: Option<PreviewRevisionProof>,
     #[serde(default)]
     pub(crate) cancelled_before_dispatch: bool,
@@ -157,6 +164,11 @@ pub(crate) fn admit_request(raw: &str, instance: &str) -> HostResult<ObjectPrevi
         .navigation
         .validate()
         .map_err(|message| host_error("invalid_request", message))?;
+    if let Some(ghosts) = &request.ghosts {
+        ghosts
+            .validate()
+            .map_err(|message| host_error("invalid_request", message))?;
+    }
     let output = request.output_spec.admit_object()?;
     request.viewport.admit_object(&output)?;
     Ok(request)
@@ -249,6 +261,7 @@ pub(crate) fn preview_with_target(
                     output,
                     request.view_mode,
                     request.navigation,
+                    request.ghosts.clone(),
                     revision_sync.is_some(),
                     consume,
                 )
@@ -263,6 +276,7 @@ pub(crate) fn preview_with_target(
         },
         view: receipt.view,
         display_filter: request.display_filter,
+        ghosts: receipt.ghosts,
     })
 }
 

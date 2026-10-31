@@ -44,6 +44,10 @@ pub(crate) struct SubselectReadItem {
     /// Hit-test listing only: the brush group an anchor, its copies and a bitmap brush's companion share.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) group: Option<String>,
+    /// Hit-test listing only (#2372): the style a panel shows for the record (fill, stroke, width, opacity), each member absent when the
+    /// record has none; an image lists its opacity and a text block its colour and the colour's alpha.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) style: Option<serde_json::Value>,
 }
 #[derive(Debug, Clone)]
 pub struct SubselectReadProjection {

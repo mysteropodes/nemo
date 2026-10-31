@@ -140,6 +140,11 @@ var NemoShortcutRegistry = (function () {
     return null;
   }
 
+  // Keys hard-wired outside the rebind tables (Space hold/pan and play tap, arrows frame-step, F9 Easy Ease, Enter, Delete,
+  // Tab, Escape). A rebind to one of them would be shadowed or would shadow the hard-wired action, so it is refused (#2370).
+  var RESERVED_KEYS = [' ', 'arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'enter', 'backspace', 'delete', 'tab', 'escape', 'f9'];
+  function isReserved(key) { return RESERVED_KEYS.indexOf((key || '').toLowerCase()) >= 0; }
+
   // Pure: returns a NEW overrides object rather than mutating the one passed in.
   function withOverride(overrides, action, key) {
     var next = Object.assign({}, overrides);
@@ -179,6 +184,7 @@ var NemoShortcutRegistry = (function () {
     var overrides = loadOverrides(storage);
 
     function setKey(action, key) {
+      if (key && isReserved(key)) return false;
       overrides = withOverride(overrides, action, key);
       try { storage.setItem(STORAGE_KEY, JSON.stringify(overrides)); } catch (e) { /* in-memory override still applies */ }
       if (typeof onOverrideChanged === 'function') onOverrideChanged(action);
@@ -199,6 +205,7 @@ var NemoShortcutRegistry = (function () {
       hintFor: function (action) { return displayKey(keyFor(overrides, action)); },
       clashFor: function (action, key) { return clashFor(overrides, action, key); },
       setKey: setKey,
+      isReserved: isReserved,
       reset: reset,
       toolShortcuts: function () { return TOOL_SHORTCUTS; },
       commandShortcuts: function () { return COMMAND_SHORTCUTS; },
@@ -217,6 +224,7 @@ var NemoShortcutRegistry = (function () {
     TOOL_SHORTCUTS: TOOL_SHORTCUTS,
     COMMAND_SHORTCUTS: COMMAND_SHORTCUTS,
     READONLY_SHORTCUTS: READONLY_SHORTCUTS,
+    isReserved: isReserved,
     SHORTCUT_CATS: SHORTCUT_CATS,
   };
 })();

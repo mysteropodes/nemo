@@ -129,7 +129,7 @@ test('flyout: closing before the arming tick leaves no listener behind (the stra
 });
 
 test('flyout: Escape and window blur close it; a pick selects the tool, fronts it and closes',()=>{
-  let r=railRig();r.g.open(r.doc.buttons.rect);r.tm.advance(0);r.doc.emit('keydown',{key:'a'});assert.equal(r.g.isOpen(),true);r.doc.emit('keydown',{key:'Escape'});assert.equal(r.g.isOpen(),false);assert.equal(r.listeners(),0);
+  let r=railRig();r.g.open(r.doc.buttons.rect);r.tm.advance(0);r.doc.emit('keydown',{key:'a'});assert.equal(r.g.isOpen(),true);const esc={key:'Escape',stopPropagation(){esc.stopped=true;}};r.doc.emit('keydown',esc);assert.equal(r.g.isOpen(),false);assert.equal(esc.stopped,true,'an Escape that closes the flyout does not also reach the global Escape (deselect/cancel)');assert.equal(r.listeners(),0);
   r=railRig();r.g.open(r.doc.buttons.rect);r.tm.advance(0);r.win.emit('blur');assert.equal(r.g.isOpen(),false);assert.equal(r.listeners(),0);
   r=railRig();r.g.open(r.doc.buttons.rect);r.tm.advance(0);const item=r.doc.body.children[0].children[2];
   assert.equal(item.innerHTML.includes('class="sk"'),false,'the flyout item drops the key badge');

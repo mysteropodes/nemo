@@ -6,7 +6,9 @@
 //! step creates an earlier create's record again on another frame, so a multiframe stamp does not resend the stroke. A
 //! `reshape` gives an existing plain stroke new geometry and a `clone` creates a new stroke from one with new geometry:
 //! style stays with the native record, so a client that only reads presented geometry (the Labs knife) can cut. A
-//! `reshape` with a `center` instead rebuilds a pressure ribbon on a new centreline (sculpt) and re-syncs its linked fill.
+//! `reshape` with a `center` instead rebuilds a pressure ribbon on a new centreline (sculpt) and re-syncs its linked fill. A `restyle`
+//! (#2372) names a record or stored item and only the style members to change (fill, stroke, width, opacity), so one panel edit over a
+//! mixed selection is one entry.
 use crate::commands::object_fill_owner::vector_edit::create_ops::{copy_key as keyframe_copy, create_in, trim_records, Placement};
 use crate::commands::object_fill_owner::vector_edit::{delete_in, is_vector_record, replace_in, Edit, VectorEditKind};
 use crate::commands::object_fill_owner::object_frame_edit_document::{promote_cells, DocumentEdit};
@@ -23,6 +25,8 @@ mod ribbon;
 mod items;
 #[path = "object_vector_batch_transform.rs"]
 mod transform;
+#[path = "object_vector_batch_style.rs"]
+mod style;
 
 /// One batch is a bounded gesture, never a document rewrite; the encoded request stays under the vector budget.
 pub(crate) const MAX_BATCH_OPS: usize = 64;
@@ -42,6 +46,7 @@ pub(super) struct BatchOp {
     offset: Presence<[f64; 2]>,
     center: Presence<Vec<CenterSegment>>,
     matrix: Presence<[f64; 6]>,
+    style: Presence<style::Style>,
 }
 object_deserialize!(BatchOp {
     op: String,
@@ -54,7 +59,8 @@ object_deserialize!(BatchOp {
     #[serde(default)] geometry: Presence<ObjectGeometry>,
     #[serde(default)] offset: Presence<[f64; 2]>,
     #[serde(default)] center: Presence<Vec<CenterSegment>>,
-    #[serde(default)] matrix: Presence<[f64; 6]>
+    #[serde(default)] matrix: Presence<[f64; 6]>,
+    #[serde(default)] style: Presence<style::Style>
 });
 
 /// A geometry-less `clone` (#2362 pose stamp): any vector record copied as stored, its points shifted by `offset` (the
@@ -128,6 +134,8 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<
     // Where each REQUESTED step starts in the expanded list: a transform becomes several replaces, so a `copy`'s
     // `fromStep` (an index into the requested steps) is resolved here, before the indices shift.
     let mut starts: Vec<usize> = Vec::with_capacity(ops.len());
+    // The targets restyled so far: two steps on one record would each start from the origin and the second would drop the first.
+    let mut restyled: Vec<ObjectTarget> = Vec::new();
     for (requested, mut op) in ops.into_iter().enumerate() {
         starts.push(out.len());
         if op.op == "copy" {
@@ -135,6 +143,41 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<
                 let from = from.and_then(|n| usize::try_from(n).ok()).filter(|&n| n < requested).ok_or(InvalidRequest)?;
                 op.from_step = Presence::Present(serde_json::Number::from(starts[from]));
             }
+        }
+        // A `restyle` (#2372) becomes the replaces of the records it restyles, or the swap of a stored item, in the cell `frame` names.
+        if op.op == "restyle" || !op.style.missing() {
+            let frame = op.frame.value().and_then(serde_json::Number::as_u64).and_then(|n| u32::try_from(n).ok());
+            let (Presence::Present(target), Presence::Present(spec)) = (op.stable_target.clone(), std::mem::take(&mut op.style)) else {
+                return Err(InvalidRequest);
+            };
+            if op.op != "restyle" || !op.record.missing() || !op.from_step.missing() || !op.placement.missing() || !op.keyframe.missing()
+                || !op.geometry.missing() || !op.center.missing() || !op.offset.missing() || !op.matrix.missing() || (!op.frame.missing() && frame.is_none())
+                || restyled.contains(&target)
+            {
+                return Err(InvalidRequest);
+            }
+            restyled.push(target.clone());
+            let style = spec.checked()?;
+            if let Some(swap) = items::restyle(origin.document(), &target, frame, &style)? {
+                out.push(BatchOp { op: "item".into(), record: Presence::Missing, stable_target: Presence::Present(swap.target().clone()), placement: Presence::Missing,
+                    keyframe: Presence::Missing, from_step: Presence::Missing, frame: Presence::Missing, geometry: Presence::Missing,
+                    offset: Presence::Missing, center: Presence::Missing, matrix: Presence::Missing, style: Presence::Missing });
+                companion.push(false);
+                swaps.push(Some(swap));
+                continue;
+            }
+            for (at, mut record) in style::restyle(origin.document(), &target, &style)?.into_iter().enumerate() {
+                record.target.frame_scope.frame = frame.unwrap_or(target.frame_scope.frame);
+                companion.push(at > 0);
+                swaps.push(None);
+                out.push(BatchOp { op: "replace".into(), record: Presence::Present(record), stable_target: Presence::Missing, placement: Presence::Missing,
+                    keyframe: Presence::Missing, from_step: Presence::Missing, frame: Presence::Missing, geometry: Presence::Missing,
+                    offset: Presence::Missing, center: Presence::Missing, matrix: Presence::Missing, style: Presence::Missing });
+            }
+            if out.len() > MAX_EXPANDED_OPS {
+                return Err(InvalidRequest);
+            }
+            continue;
         }
         let Some(matrix) = op.matrix.value().copied() else {
             out.push(op);
@@ -162,7 +205,7 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<
             // The step names the cell it lands in, so a copy key promotes a held frame for an item as it does for a vector.
             out.push(BatchOp { op: "item".into(), record: Presence::Missing, stable_target: Presence::Present(swap.target().clone()), placement: Presence::Missing,
                 keyframe: Presence::Missing, from_step: Presence::Missing, frame: Presence::Missing, geometry: Presence::Missing,
-                offset: Presence::Missing, center: Presence::Missing, matrix: Presence::Missing });
+                offset: Presence::Missing, center: Presence::Missing, matrix: Presence::Missing, style: Presence::Missing });
             companion.push(false);
             swaps.push(Some(swap));
             continue;
@@ -173,7 +216,7 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<
             swaps.push(None);
             out.push(BatchOp { op: "replace".into(), record: Presence::Present(record), stable_target: Presence::Missing, placement: Presence::Missing,
                 keyframe: Presence::Missing, from_step: Presence::Missing, frame: Presence::Missing, geometry: Presence::Missing,
-                offset: Presence::Missing, center: Presence::Missing, matrix: Presence::Missing });
+                offset: Presence::Missing, center: Presence::Missing, matrix: Presence::Missing, style: Presence::Missing });
         }
         if out.len() > MAX_EXPANDED_OPS {
             return Err(InvalidRequest);

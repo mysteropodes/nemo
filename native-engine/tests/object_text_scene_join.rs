@@ -463,3 +463,8 @@ fn text_alpha_never_admits_other_layer_properties_or_enabled_expressions() {
 #[cfg(feature = "font_asset_wire")]
 #[path = "object_text_scene_gpu.rs"]
 mod gpu;
+
+// #2358 GHOST-UNDER: text and raster ghosts of the ghosted layer, composed under the live frame.
+#[cfg(feature = "font_asset_wire")]
+#[path = "object_ghost_items.rs"]
+mod ghost_items;

@@ -784,7 +784,7 @@ test('session view change invalidates the original pending action lease before a
 });
 
 function navigationFixture(initialFilter='none'){
- const h=host(),invoke=h.invoke,hold=deferred();let filter=initialFilter,mode='canvas',frame=0,pause=false,tamper=null,rect={x:0,y:0,width:320,height:180};
+ const h=host(),invoke=h.invoke,hold=deferred();let filter=initialFilter,ghosts=null,mode='canvas',frame=0,pause=false,tamper=null,rect={x:0,y:0,width:320,height:180};
  const literals=new Map([
   ['1:0,0',[[2,0,0,2,-160,-90],[.5,0,0,.5,80,45]]],
   ['1:10,-5',[[2,0,0,2,-180,-80],[.5,0,0,.5,90,40]]],
@@ -794,12 +794,13 @@ function navigationFixture(initialFilter='none'){
  ]);
  h.invoke=async(command,args)=>{const result=await invoke(command,args),q=args&&JSON.parse(args.requestJson);
   if(command==='nemo_native_object_preview')result.displayFilter=q.displayFilter||'none';
+  if(command==='nemo_native_object_preview'&&q.ghosts)result.ghosts={selected:q.ghosts,status:'composited',frames:2};
   if(command!=='nemo_native_object_preview'||q.viewMode!=='stored-camera')return result;
   const n=q.navigation||{zoom:1,pan:[0,0]},pair=literals.get(n.zoom+':'+n.pan.join(','));assert.ok(pair,'independent authored navigation literal');
   if(pause)await hold.promise;
   const reply={...result,view:{mode:'stored-camera',navigation:n,cameraAvailable:true,documentToComposition:pair[0],compositionToDocument:pair[1]}};return tamper?tamper(reply):reply;};
- const s=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{...rect},physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>frame,viewMode:()=>mode,displayFilter:()=>filter});
- return {h,s,async open(){await s.openPath('/project.json');mode='stored-camera';await s.presentPreview(frame);},set filter(value){filter=value;},set frame(value){frame=value;},set mode(value){mode=value;},set rect(value){rect=value;},pause(){pause=true;},release(){pause=false;hold.resolve();},tamper(fn){tamper=fn;}};
+ const s=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{...rect},physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>frame,viewMode:()=>mode,displayFilter:()=>filter,ghosts:()=>ghosts});
+ return {h,s,async open(){await s.openPath('/project.json');mode='stored-camera';await s.presentPreview(frame);},set filter(value){filter=value;},set ghosts(value){ghosts=value;},set frame(value){frame=value;},set mode(value){mode=value;},set rect(value){rect=value;},pause(){pause=true;},release(){pause=false;hold.resolve();},tamper(fn){tamper=fn;}};
 }
 test('native session hand and zoom retain exact view intent through scrub while excluding export and source/history',async()=>{
  const f=navigationFixture();await f.open();const before=JSON.stringify(f.s.info());
@@ -919,4 +920,34 @@ test('an exposure between the deferral and the listener registration is not lost
   h.preview('presented');listeners.forEach(l=>l({visible:true}));
   for(let i=0;i<8;i++)await turn();
   assert.equal(previews(),before+4);assert.ok(s.readPresentedObjectSession());assert.deepEqual(notices,[]);
+});
+
+const ONION={layerUid:'native-layer:1:0',onion:true,ghostAll:false,from:1,to:8,previousOpacity:30,nextOpacity:40,mode:'tinted'};
+test('native onion skin rides every preview request, is part of the presented view and is excluded from export and history (#2358 GHOST-UNDER)',async()=>{
+ const f=navigationFixture();await f.open();const before=JSON.stringify(f.s.info());
+ assert.ok(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').every(c=>!Object.hasOwn(c.r,'ghosts')),'no onion asked, none sent');
+ assert.equal(Object.hasOwn(f.s.readPresentedObjectSession().presentation,'ghosts'),false);
+ f.ghosts=ONION;assert.equal(f.s.readPresentedObjectSession(),null,'a changed onion selection is a different view, so the old presentation is no longer current');
+ await f.s.renderPreview(0);
+ assert.deepEqual(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').at(-1).r.ghosts,ONION);
+ const shown=f.s.readPresentedObjectSession().presentation;
+ assert.deepEqual(shown.ghosts,{selected:ONION,status:'composited',frames:2});
+ f.ghosts={...ONION,mode:'outline',shift:{x:4,y:-3,next:true}};assert.equal(f.s.readPresentedObjectSession(),null);
+ await f.s.renderPreview(0);assert.equal(f.s.readPresentedObjectSession().presentation.ghosts.selected.mode,'outline');
+ await f.s.exportPng('/no-onion',[0]);
+ assert.equal(Object.hasOwn(f.h.calls.filter(c=>c.command==='nemo_native_object_export').at(-1).r,'ghosts'),false);
+ assert.equal(JSON.stringify(f.s.info()),before);
+ f.ghosts=null;await f.s.renderPreview(0);assert.equal(Object.hasOwn(f.s.readPresentedObjectSession().presentation,'ghosts'),false);
+});
+test('native onion receipts must echo exactly the selection asked for and nothing when none was asked',async()=>{
+ const bad=[r=>({...r,ghosts:{...r.ghosts,selected:{...r.ghosts.selected,mode:'default'}}}),r=>({...r,ghosts:{...r.ghosts,status:'maybe'}}),r=>({...r,ghosts:{...r.ghosts,frames:-1}}),
+  r=>({...r,ghosts:{...r.ghosts,status:'unavailable'}}),r=>({...r,ghosts:{...r.ghosts,extra:1}}),r=>{const{ghosts,...rest}=r;return rest;}];
+ for(const tamper of bad){
+  const f=navigationFixture();await f.open();f.ghosts=ONION;f.tamper(tamper);
+  await assert.rejects(f.s.presentPreview(0),/ghosts/);assert.equal(f.s.readPresentedObjectSession(),null);
+ }
+ const f=navigationFixture();await f.open();f.tamper(r=>({...r,ghosts:{selected:ONION,status:'empty',frames:0}}));
+ await assert.rejects(f.s.presentPreview(0),/ghosts/);
+ const g=navigationFixture();await g.open();g.ghosts=ONION;g.tamper(r=>({...r,ghosts:{selected:ONION,status:'unavailable',frames:0,reason:'layer_not_found'}}));
+ await g.s.presentPreview(0);assert.equal(g.s.readPresentedObjectSession().presentation.ghosts.reason,'layer_not_found');
 });
