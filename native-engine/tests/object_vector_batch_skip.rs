@@ -3,7 +3,7 @@
 //! how many steps were skipped (still one id per requested step); a batch where every step is skipped is refused all the same.
 use super::support::*;
 use super::batch_style::{at, batch, refused, restyle, target};
-use serde_json::json;
+use serde_json::{json, Value};
 
 fn anchor_record(id: &str) -> Value {
     let mut r = record_at("A", "L1", 0, id);
