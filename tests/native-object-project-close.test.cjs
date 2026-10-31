@@ -130,8 +130,10 @@ test('a failed close keeps the tab, and a repeated Cmd+W while one runs is ignor
   assert.equal(await thrown.close(), false, 'busy flag clears after a failure');
 });
 
-test('the shipped page loads the close module before the native project session', () => {
+test('the shipped page loads the close module before the project tab code that closes through it', () => {
   const html = fs.readFileSync('src/index.html', 'utf8');
-  const at = (name) => html.indexOf('js/adapters/' + name);
-  assert.ok(at('native-object-project-close.js') > 0 && at('native-object-project-close.js') < at('native-object-project.js'));
+  const at = (name) => html.indexOf(name);
+  assert.ok(at('js/adapters/native-object-project-close.js') > 0);
+  assert.ok(at('js/adapters/native-object-project-close.js') < at('js/project.js'));
+  assert.ok(at('js/adapters/native-object-project-close.js') > at('js/adapters/native-object-project.js'), 'the session resolves it lazily, at call time');
 });
