@@ -43,11 +43,12 @@ test('unbound and unavailable rows refuse with a typed error and never fall back
   const typed=(fn,row,reason)=>assert.throws(fn,e=>e.code==='unavailable'&&e.row===row&&e.reason===reason);
   typed(()=>layer.blendMode,'sdk:nemo-script.Layer.blendMode','no-native-blend-matte');
   typed(()=>{layer.blendMode='add';},'sdk:nemo-script.Layer.blendMode','no-native-blend-matte');
-  typed(()=>layer.get('position'),'sdk:nemo-script.Layer.get','not-yet-bound');
-  typed(()=>layer.keys,'sdk:nemo-script.Layer.keys','not-yet-bound');
-  typed(()=>n.isKeyframe(0,1),'sdk:nemo-script.isKeyframe','not-yet-bound');
+  typed(()=>layer.get('position'),'sdk:nemo-script.Layer.get','native-entry-absent');
+  typed(()=>layer.keys('position'),'sdk:nemo-script.Layer.keys','native-entry-absent');
+  typed(()=>layer.strokes,'sdk:nemo-script.Layer.strokes','no-native-stroke-read');
+  typed(()=>n.isKeyframe(0,1),'sdk:nemo-script.isKeyframe','native-entry-absent');
   typed(()=>n.undoGroup(()=>{}),'sdk:nemo-script.undoGroup','script-run-grouping');
-  typed(()=>n.markers.list(),'sdk:nemo-script.markers.list','not-yet-bound');
+  typed(()=>n.markers.list(),'sdk:nemo-script.markers.list','native-entry-absent');typed(()=>n.comp.beats(),'sdk:nemo-script.comp.beats','native-entry-absent');
   typed(()=>n.camera.keys(),'sdk:nemo-script.camera.keys','no-native-camera');
   typed(()=>n.comp.setWorkArea(0,1),'sdk:nemo-script.comp.setWorkArea','no-native-work-area');
 });
