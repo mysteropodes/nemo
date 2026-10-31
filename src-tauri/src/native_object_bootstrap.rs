@@ -70,6 +70,10 @@ mod v2_tests;
 mod project_tests;
 
 #[cfg(test)]
+#[path = "native_object_project_info_tests.rs"]
+mod project_info_tests;
+
+#[cfg(test)]
 #[path = "native_object_new_project_tests.rs"]
 mod new_project_tests;
 
