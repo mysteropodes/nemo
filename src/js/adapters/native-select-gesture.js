@@ -269,6 +269,33 @@
     }
     return { move: move, end: end, cancel: cancel, owns: function () { return !!handle; } };
   }
-  function bind(root) { return Object.freeze({ begin: function (e, abort) { return begin(root, e, abort); } }); }
-  return Object.freeze({ bind: bind, begin: begin, hitHandle: hitHandle, matrixOf: matrixOf, commitMatrix: commitMatrix, unsupported: unsupported, unstorable: unstorable });
+  // Cmd/Ctrl+A (baseline 1065e9d8 timeline.js onKeyDown): every selectable item of the ACTIVE layer, Select and Direct Select only. A native object
+  // project builds no Paper children, so the items come from the same presented listing the marquee reads (a texture dab and a linked fill companion
+  // follow their anchor and are never their own selection) and commit through the marquee's path: the pick context is checked before and after the
+  // read, the queue-pending window is waited out, and a locked / hidden layer or an unreadable canvas shows ONE notice and changes nothing. Returns
+  // false when this is not a native object project (or another tool is active) so the legacy handler runs; otherwise a promise (true = handled).
+  function selectAll(root) {
+    var I = root && root.NemoSelectCanvasIntent, O = root && root.NemoNativeSelectOverlay, st = root && root.state;
+    if (!I || !st || (st.tool !== 'select' && st.tool !== 'subselect') || !I.objectProject(root)) return false;
+    var idx = st.activeLayerIdx, keep = function (item) { return !(item.role === 'fill' && item.owner) && item.brush !== 'copy'; };
+    return (async function () {
+      var ctx = I.pickContext(root), s = await I.presentedSettled(root);
+      if (!s) { if (I.pickContext(root) === ctx) notice(root, 'Could not read the canvas just now \u2014 try again.'); return true; }
+      var info = I.layerList(root, s.pin)[idx];
+      if (!info || info.locked === true || info.visible === false) { notice(root, 'The active layer is locked or hidden \u2014 nothing was selected.'); return true; }
+      var layers;
+      try { layers = await I.layerPaths(root, keep, false, idx); } catch (_) { layers = null; }
+      if (I.pickContext(root) !== ctx) return true; // the tool, frame, layer or revision moved on while reading: the key no longer means this
+      if (!layers) { notice(root, 'Could not read the canvas just now \u2014 try again.'); return true; }
+      if (root.NemoNativeSelectionStyle && typeof root.NemoNativeSelectionStyle.flush === 'function') root.NemoNativeSelectionStyle.flush(root);
+      root.selectedPaths = layers.paths; root.state.selectedStrokeIndices = [];
+      root._layerActiveExplicit = false; // a canvas selection, not a layer-row one (baseline clearSel)
+      if (O) O.show(root);
+      if (typeof root.updateUI === 'function') root.updateUI();
+      if (root.SMEngineBridge && typeof root.SMEngineBridge.renderNow === 'function') root.SMEngineBridge.renderNow();
+      return true;
+    }());
+  }
+  function bind(root) { return Object.freeze({ begin: function (e, abort) { return begin(root, e, abort); }, selectAll: function () { return selectAll(root); } }); }
+  return Object.freeze({ bind: bind, begin: begin, selectAll: selectAll, hitHandle: hitHandle, matrixOf: matrixOf, commitMatrix: commitMatrix, unsupported: unsupported, unstorable: unstorable });
 }));
