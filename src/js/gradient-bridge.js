@@ -17,7 +17,11 @@
 // obvious canvas gesture of their own.
 (function () {
   function engineOn() { return window.SMEngineBridge && window.SMEngineBridge.isEnabled() && !state.playing; }
+  // #2372 native-fill-gradient: on a native object project the engine owns the document, so every control of this file hands over to
+  // adapters/native-fill-gradient.js (the Fill row reads and restyles the listed item natively); the Paper writers below are never reached there.
+  function native() { var N = window.NemoNativeFillGradient; return N && N.handles(window) ? N : null; }
   function singleTarget() {
+    if (native()) return null;
     if ((state.tool !== 'select' && state.tool !== 'subselect') || !window.selectedPaths || selectedPaths.length !== 1) return null;
     var p = selectedPaths[0];
     return (p instanceof Path || p instanceof CompoundPath) ? p : null;
@@ -66,7 +70,7 @@
     var stopsList = document.getElementById('p-grad-stops-list');
     var addRow = document.getElementById('p-grad-addstop-row');
     var hintRow = document.getElementById('p-grad-hint-row');
-    var target = singleTarget();
+    var N = native(), target = N ? N.target(window) : singleTarget();
     if (!target) {
       onCb.checked = false; onCb.disabled = true;
       kindRow.style.display = stopsList.style.display = addRow.style.display = hintRow.style.display = 'none';
@@ -95,6 +99,7 @@
       colorInp.dataset.hex8 = stop.color;
       colorInp.style.cssText = 'width:24px;height:22px;border:none;cursor:pointer;padding:0;';
       colorInp.addEventListener('change', function () {
+        if (N) { N.stopColor(window, grad.stops.indexOf(stop), this.value); return; }
         pushUndo();
         // A native <input type=color> can only ever produce a 6-hex value
         // (CLAUDE.md §2) — this.value alone would silently drop the stop's
@@ -112,6 +117,7 @@
       offInp.style.width = '48px';
       offInp.value = Math.round(stop.offset * 100);
       offInp.addEventListener('change', function () {
+        if (N) { N.stopOffset(window, grad.stops.indexOf(stop), parseFloat(this.value)); return; }
         pushUndo(); stop.offset = Math.max(0, Math.min(100, parseFloat(this.value) || 0)) / 100;
         normalizeStops(grad);
         saveActiveLayerFrameOrPromote(); renderGradientPanel(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
@@ -121,7 +127,7 @@
       rmBtn.className = 'pbtn'; rmBtn.textContent = '×'; rmBtn.style.cssText = 'padding:0 6px;';
       rmBtn.disabled = grad.stops.length <= 2;
       rmBtn.addEventListener('click', function () {
-        if (grad.stops.length <= 2) return;
+        if (N || grad.stops.length <= 2) return;
         pushUndo();
         var idx = grad.stops.indexOf(stop);
         if (idx >= 0) grad.stops.splice(idx, 1);
@@ -141,6 +147,8 @@
 // scrub. The helper promotes the held frame in Animation 2D and writes
 // into the hold's own keyframe in Motion.
 function toggleGradient(on) {
+    var N = native();
+    if (N) { N.toggle(window, on); return; }
     var target = singleTarget();
     if (!target) return;
     pushUndo();
@@ -154,6 +162,8 @@ function toggleGradient(on) {
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   function addStop() {
+    var N = native();
+    if (N) { N.addStop(window); return; }
     var target = singleTarget();
     if (!target || !target.data.fillGradient) return;
     pushUndo();
@@ -244,6 +254,8 @@ function toggleGradient(on) {
     return Math.hypot(worldPt.x - wx, worldPt.y - wy) < tol;
   }
   function onDown(e) {
+    var N = native();
+    if (N) { N.pointer(window, 'down', e); return; }
     if (!shouldEdit()) return;
     var target = singleTarget();
     var grad = target.data.fillGradient;
@@ -266,6 +278,8 @@ function toggleGradient(on) {
     window.SMEngineBridge.suspend();
   }
   function onMove(e) {
+    var N = native();
+    if (N) { N.pointer(window, 'move', e); return; }
     if (!dragging || !shouldEdit()) return;
     e.stopImmediatePropagation(); e.preventDefault();
     var target = singleTarget();
@@ -286,6 +300,8 @@ function toggleGradient(on) {
     window.SMEngineBridge.renderNow();
   }
   function onUp(e) {
+    var N = native();
+    if (N) { N.pointer(window, e.type === 'pointercancel' ? 'cancel' : 'up', e); return; }
     if (!dragging) return;
     e.stopImmediatePropagation(); e.preventDefault();
     dragging = null;
@@ -300,6 +316,8 @@ function toggleGradient(on) {
       onCb.addEventListener('change', function () { toggleGradient(this.checked); });
       document.getElementById('btn-grad-add-stop').addEventListener('click', addStop);
       document.getElementById('p-grad-kind').addEventListener('change', function () {
+        var N = native();
+        if (N) { N.kind(window, this.value); return; }
         var target = singleTarget();
         if (!target || !target.data.fillGradient) return;
         pushUndo(); target.data.fillGradient.kind = this.value;

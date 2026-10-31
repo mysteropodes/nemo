@@ -471,3 +471,17 @@ fn a_page_that_fits_is_not_shortened_and_one_item_alone_over_the_limit_stays_ref
     assert_eq!(response["ok"], false, "{response}");
     assert_eq!(response["error"]["message"], "Subselect view exceeds the response byte limit");
 }
+
+#[test]
+fn a_record_with_a_stored_gradient_lists_it_for_the_fill_row() {
+    // #2372 native-fill-gradient: the gradient button and the stop editor show the selection's own stored gradient.
+    let mut doc = drawing();
+    doc["objects"][0]["family"] = json!("editable-vector-path");
+    doc["objects"][0]["fill"] = json!({"kind":"solid","r":1.0,"g":0.0,"b":0.0,"a":1.0});
+    doc["objects"][0]["vector"] = json!({"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"butt","strokeJoin":"miter",
+        "miterLimit":10,"dashOffset":0,"opacity":1});
+    assert!(listing(&doc)["items"][0]["style"].get("fillGradient").is_none(), "a flat fill lists none");
+    let gradient = json!({"kind":"radial","from":[1,2],"to":[30,2],"stops":[{"offset":0,"color":"#ff0000"},{"offset":0.75,"color":"#0000ff80"}]});
+    doc["objects"][0]["vectorExt"] = json!({"fillGradient": gradient});
+    assert_eq!(listing(&doc)["items"][0]["style"]["fillGradient"], gradient, "as stored: kind, record-space ends, stop order and alpha");
+}

@@ -14,11 +14,13 @@
 //!   its mask tags are dropped, its geometry and paint stay (baseline `btn-mask-unset` deletes `isMask`, `maskMode`, `maskFeather` of
 //!   the one selected path).
 //! A bitmap brush, a stamped dab, stored dabs and a stroke switch on a texture anchor are refused (`Unavailable`) by the caller.
+use crate::commands::object_fill_owner::vector_edit::batch_ops::gradient;
 use crate::commands::object_fill_owner::vector_edit::batch_ops::style::{
     num, parse, Checked, Style,
 };
 use crate::object_document::{
     BrushTexture, ObjectDocument, ObjectRecord, Presence, ProjectPresetCatalog, SolidFill,
+    StoredGradient,
 };
 use crate::request_receipts::DispatchErrorCode;
 use serde_json::Number;
@@ -44,6 +46,7 @@ pub(super) struct Detail {
     mask_feather: Option<f64>,
     mask_mode: Option<String>,
     unmask: bool,
+    gradient: Option<Option<StoredGradient>>,
 }
 
 /// A member that names one of `allowed`.
@@ -79,7 +82,9 @@ impl Detail {
                     .ok_or(DispatchErrorCode::InvalidRequest)
             })
             .transpose()?;
+        let gradient = gradient::checked(&style.fill_gradient)?;
         Ok(Self {
+            gradient,
             fill_enabled: style.fill_enabled.value().copied(),
             stroke_enabled: style.stroke_enabled.value().copied(),
             cap: choice(&style.cap, &CAPS)?,
@@ -109,6 +114,7 @@ impl Detail {
             + usize::from(self.mask_feather.is_some())
             + usize::from(self.mask_mode.is_some())
             + usize::from(self.unmask)
+            + usize::from(self.gradient.is_some())
     }
     /// Any member that is not a preset or a feather.
     pub(super) fn has_plain(&self) -> bool {
@@ -139,6 +145,10 @@ impl Detail {
     }
     pub(super) fn unmask(&self) -> bool {
         self.unmask
+    }
+    /// The fill gradient edit: `Some(Some(g))` stores `g`, `Some(None)` returns to the flat fill.
+    pub(super) fn gradient(&self) -> Option<Option<&StoredGradient>> {
+        self.gradient.as_ref().map(Option::as_ref)
     }
 }
 
@@ -403,7 +413,7 @@ fn stamp(
     Ok(vec![record])
 }
 
-fn is_mask(r: &ObjectRecord) -> bool {
+pub(super) fn is_mask(r: &ObjectRecord) -> bool {
     r.vector_ext
         .value()
         .is_some_and(|e| e.is_mask.value() == Some(&Some(true)))

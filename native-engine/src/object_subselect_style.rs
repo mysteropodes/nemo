@@ -66,6 +66,10 @@ pub(crate) fn listed(record: &ObjectRecord) -> Option<Value> {
         out.insert("opacity".into(), json!(opacity));
     }
     details(record, &mut out);
+    // #2372 native-fill-gradient: the stored two-stop gradient the Fill row's gradient button and stop editor show (record space, stop order as stored).
+    if let Some(gradient) = record.fill_gradient() {
+        out.insert("fillGradient".into(), json!(gradient));
+    }
     (!out.is_empty()).then_some(Value::Object(out))
 }
 

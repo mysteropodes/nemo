@@ -254,7 +254,8 @@ fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
     for good in [json!({"fill":"#ff000080","stroke":"#00ff00","width":6.0,"opacity":0.5}), json!({"opacity":0}), json!({"fill":"#112233"}),
         json!({"cap":"square","join":"bevel","miter":4.0,"dashOffset":-2.5,"paintOrder":"strokeFirst"}),
         json!({"maskMode":"subtract","maskFeather":12.5}), json!({"maskMode":"add","maskFeather":0}),
-        json!({"strokeStyle":"dotted","brushPreset":"chalk-round"}), json!({"strokeStyle":"solid"})] {
+        json!({"strokeStyle":"dotted","brushPreset":"chalk-round"}), json!({"strokeStyle":"solid"}),
+        json!({"fill":"#ff0000","fillGradient":{"kind":"linear","from":[0,5],"to":[10,5],"stops":[{"offset":0,"color":"#ff0000"},{"offset":1,"color":"#0000ff80"}]}})] {
         let mut item = r.clone();
         item["items"][0]["style"] = good.clone();
         assert!(public_read(&q, &item), "style {good} is legal in a hit-test listing");
@@ -262,7 +263,11 @@ fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
     for bad in [json!({}), json!({"fill":"red"}), json!({"fill":null}), json!({"width":0}), json!({"opacity":2}), json!({"colour":"#000000"}), json!("#000000"),
         json!({"cap":"flat"}), json!({"join":"sharp"}), json!({"miter":-1}), json!({"paintOrder":"x"}),
         json!({"maskMode":"xor"}), json!({"maskMode":null}), json!({"maskFeather":-1}), json!({"maskFeather":"3"}),
-        json!({"strokeStyle":"wavy"}), json!({"strokeStyle":null}), json!({"brushPreset":""}), json!({"brushPreset":7})] {
+        json!({"strokeStyle":"wavy"}), json!({"strokeStyle":null}), json!({"brushPreset":""}), json!({"brushPreset":7}),
+        json!({"fillGradient":null}), json!({"fillGradient":{}}),
+        json!({"fillGradient":{"kind":"linear","from":[0,5],"to":[10,5],"stops":[{"offset":0,"color":"#ff0000"}]}}),
+        json!({"fillGradient":{"kind":"linear","from":[0,5],"to":[10],"stops":[{"offset":0,"color":"#ff0000"},{"offset":1,"color":"#0000ff"}]}}),
+        json!({"fillGradient":{"kind":"linear","from":[0,5],"to":[10,5],"stops":[{"offset":0,"color":"red"},{"offset":1,"color":"#0000ff"}]}})] {
         let mut item = r.clone();
         item["items"][0]["style"] = bad.clone();
         assert!(!public_read(&q, &item), "style {bad} is refused");
