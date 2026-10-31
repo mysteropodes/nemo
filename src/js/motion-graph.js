@@ -447,8 +447,16 @@
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
 
+  // #2371: a native object project has no legacy state.layers/SMMotion holders behind this graph, and its edits would reach legacy writers. Refuse (one
+  // toast, nothing changed) instead of hiding the native timeline grid; the unavailable table in adapters/native-inspector-unavailable.js owns the sentence.
+  function nativeRefused() {
+    var U = window.NemoNativeInspectorUnavailable;
+    return !!(U && typeof U.refuse === 'function' && U.refuse(window, 'btn-mgraph'));
+  }
   function toggle(on) {
-    _on = (on === undefined) ? !_on : !!on;
+    var next = (on === undefined) ? !_on : !!on;
+    if (next && !_on && nativeRefused()) return false;
+    _on = next;
     var grid = document.getElementById('frame-grid');
     // The track rows stay in the DOM (their geometry is what every other
     // module measures) — they are only hidden, so toggling back is free and
@@ -480,6 +488,7 @@
     });
     b.addEventListener('contextmenu', function (e) {
       e.preventDefault();
+      if (!_on && nativeRefused()) return;
       if (!_on) toggle(true);
       setMode(_mode === 'value' ? 'speed' : 'value');
     });

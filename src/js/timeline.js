@@ -11109,6 +11109,8 @@ document.getElementById('btn-shadow-guides').addEventListener('click',function()
 var REVISION_VIEW_LABELS={all:'Tout',mine:'Mes traits',revisions:'Corrections'};
 var REVISION_VIEW_ORDER=['all','mine','revisions'];
 document.getElementById('btn-revision-view').addEventListener('click',function(){
+  // #2371: a native object project has no legacy scene filter behind this cycle; the unavailable table says so and nothing changes.
+  if(window.NemoNativeInspectorUnavailable&&NemoNativeInspectorUnavailable.refuse(window,'btn-revision-view'))return;
   var idx=REVISION_VIEW_ORDER.indexOf(state.revisionView);
   state.revisionView=REVISION_VIEW_ORDER[(idx+1)%REVISION_VIEW_ORDER.length];
   this.textContent=REVISION_VIEW_LABELS[state.revisionView];
