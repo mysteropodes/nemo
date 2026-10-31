@@ -125,7 +125,10 @@
       return recover(pending,p);
     }
     async function openPath(path){
-      if(busy)return {status:'busy'};busy=true;
+      if(busy)return {status:'busy'};
+      // A file that is already open is focused, not prepared a second time.
+      var focused=typeof ports.focusOpen==='function'?ports.focusOpen(path):null;if(focused)return focused;
+      busy=true;
       try{
         if(typeof path!=='string'||!(/^(\/|[A-Za-z]:[\\/])/.test(path)))throw new Error('Native project path must be absolute');
         var p=pins();

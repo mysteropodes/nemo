@@ -29,7 +29,9 @@
   function readNativeTabsUI(){return {tabs:tabs,activeTabId:activeTabId,path:currentPath,name:currentName};}
   var nativeInactiveTabs=nativeTabsUI.bind(window,{read:readNativeTabsUI,makeId:makeTabId,
     file:function(){return nativeSavedUI&&nativeSavedUI.nativeObject;},dirty:isDirty,notice:tabAddNotice,render:renderTabBar,
-    activateTab:function(id,path,name){activeTabId=id;currentPath=path;currentName=name;updateCurrentLabel();}
+    activateTab:function(id,path,name){activeTabId=id;currentPath=path;currentName=name;updateCurrentLabel();},
+    // Opening a file that already has a tab focuses that tab (see findOpen in the tabs UI adapter).
+    switchTab:function(id){return switchToTab(id);},hideStart:function(){hideStartScreen();}
   });
   function p39bUseInactiveEntry(){try{var native=window.NemoNativeOpacityCutover;return !!activeTabId&&(native?native.blocksLegacy()!==false:'NemoNativeOpacityProject' in window);}catch(_){return !!activeTabId;}}
 
@@ -196,12 +198,6 @@
   }
   async function openPath(path){
     if(!nativeSavedUI.allowOpen()){try{window.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__&&window.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__('allow-open-refused');}catch(_){}return false;}
-    var already=nativeTabsUI.findOpen(readNativeTabsUI(),path);
-    if(already&&already.tab){
-      hideStartScreen();
-      if(already.active){showToast('Already open: '+window.SMProjectDocument.baseName(path));return true;}
-      return switchToTab(already.tab.id);
-    }
     if(nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.isActive())return nativeInactiveTabs.openPath(path);
     if(p39bUseInactiveEntry())return inactiveEntry.openPath(path);
     if(!tauriOk())return;

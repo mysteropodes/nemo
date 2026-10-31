@@ -21,6 +21,12 @@
     a.layerUids.every(function(uid,index){return uid===b.layerUids[index];});}
   function bind(root,ports){
     return root.NemoNativeObjectInactiveProjectTabs.create(root,{
+      focusOpen:function(path){
+        var open=findOpen(ports.read(),path);if(!open||!open.tab)return null;
+        ports.hideStart();
+        if(open.active){ports.notice('Already open: '+root.SMProjectDocument.baseName(path));return {status:'already-open'};}
+        return Promise.resolve(ports.switchTab(open.tab.id));
+      },
       owner:function(){var s=root.NemoNativeObjectProject.desktop(root);return s&&s.identity();},
       invoke:function(command,args){var response=root.__TAURI__.core.invoke(command,args),gate=root.NemoNativeSettingsValidationGate;
         return gate&&command==='nemo_native_object_inactive_project'?

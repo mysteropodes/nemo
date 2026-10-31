@@ -4,6 +4,7 @@
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
 const Shortcut = require('../src/js/adapters/project-save-shortcut.js');
 const TabsUI = require('../src/js/adapters/native-object-project-tabs-ui.js');
+const InactiveTabs = require('../src/js/adapters/native-object-inactive-project-tabs.js');
 
 function shortcutRig({ tauri = true } = {}) {
   const calls = [], listeners = {}, menu = {};
@@ -82,7 +83,8 @@ function project() {
     getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); },
     createElement: element, querySelector: () => null };
   const stubTabs = { create(root, ports) { tabPorts = ports; return Object.freeze({
-    openPath: async (p) => { opened.push(p); return { status: 'prepared' }; },
+    // Mirrors the real adapter's contract: a focus port that answers first wins, otherwise the file is prepared.
+    openPath: async (p) => { const focused = ports.focusOpen(p); if (focused) return focused; opened.push(p); return { status: 'prepared' }; },
     activateClick: async (meta) => { activated.push(meta); return { status: 'activated' }; },
     close: async () => ({ status: 'closed' }), canReplaceActiveProject: () => true, held: () => null, isBusy: () => false }); } };
   const fileAdapter = { bind(root, ports) { filePorts = ports; return Object.freeze({
@@ -134,9 +136,10 @@ test('Opening a file that is already open focuses its tab: active tab -> notice,
   const p = project();
   assert.equal(await p.root.SMProject.openPath('/work/A.json'), true);
   p.start();
-  assert.equal(await p.root.SMProject.openPath('/work/A.json'), true, 'the active project is already open');
+  assert.deepEqual(await p.root.SMProject.openPath('/work/A.json'), { status: 'already-open' }, 'the active project is already open');
   assert.deepEqual(p.opened, []); assert.deepEqual(p.activated, []);
-  assert.ok(p.notices.includes('Already open: A')); assert.equal(p.startHidden(), true, 'the start screen is dismissed');
+  const alert = p.document.getElementById('project-tabs-bar').children.find(c => c.getAttribute && c.getAttribute('role') === 'alert');
+  assert.equal(alert && alert.textContent, 'Already open: A'); assert.equal(p.startHidden(), true, 'the start screen is dismissed');
   const meta = Object.freeze({ kind: 'native-object-inactive', path: '/work/B.json', name: 'B', preparationToken: 'tok-B' });
   assert.equal(p.tabPorts.commit(meta), true);
   const rows = p.document.getElementById('project-tabs-list').children;
@@ -146,4 +149,15 @@ test('Opening a file that is already open focuses its tab: active tab -> notice,
   assert.deepEqual(p.opened, []); assert.equal(p.document.getElementById('project-tabs-list').children.length, 2);
   await p.root.SMProject.openPath('/work/C.json');
   assert.deepEqual(p.opened, ['/work/C.json'], 'a file that is not open still prepares a new tab');
+});
+
+test('the real inactive-tab adapter answers a focus request before it reads the owner or calls the host', async () => {
+  const touched = [], focus = [];
+  const tabs = InactiveTabs.create({}, { owner() { touched.push('owner'); }, invoke() { touched.push('invoke'); }, commit() { return true; },
+    remove() { return true; }, notice() {}, baseName: x => x, focusOpen(path) { focus.push(path); return path === '/open.json' ? Promise.resolve({ status: 'focused' }) : null; } });
+  assert.deepEqual(await tabs.openPath('/open.json'), { status: 'focused' });
+  assert.deepEqual(touched, []); assert.deepEqual(focus, ['/open.json']);
+  await tabs.openPath('/new.json');
+  assert.deepEqual(focus, ['/open.json', '/new.json']);
+  assert.ok(touched.includes('owner'), 'a file that is not open continues into the normal prepare path');
 });
