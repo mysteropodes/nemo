@@ -2825,6 +2825,7 @@
         "native-selection-steps.js",
         "native-selection-style.js",
         "native-parametric-panel.js",
+        "native-text-props-panel.js",
         "native-selection-boolean.js",
         "native-selection-transform.js",
         "native-selection-align.js",

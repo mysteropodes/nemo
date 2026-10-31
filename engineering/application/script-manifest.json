@@ -262,6 +262,7 @@
     {"src":"js/adapters/native-selection-steps.js"},
     {"src":"js/adapters/native-selection-style.js"},
     {"src":"js/adapters/native-parametric-panel.js"},
+    {"src":"js/adapters/native-text-props-panel.js"},
     {"src":"js/adapters/native-selection-boolean.js"},
     {"src":"js/adapters/native-selection-transform.js"},
     {"src":"js/adapters/native-selection-align.js"},
