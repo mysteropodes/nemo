@@ -14,6 +14,13 @@ test('the edited item and its vertices stay selected after a move, so the next e
   assert.equal(f.sent.length,2);assert.deepEqual(f.sent[1].payload.intent,{kind:'pointType',pointType:'smooth',indices:[0]});
   assert.deepEqual(f.controller.selectionState(),{count:1},'and again after the point type edit');
 });
+test('the selection survives a commit whose new revision reaches the canvas several reads after the info pin (installed timing)',async()=>{
+  const f=fixture();await points(f);f.lagPresentation(6);f.drag();f.controller.handle('up',f.event(52,34));
+  assert.equal((await f.controller.settled()).status,'applied',f.notices.join(';'));
+  assert.deepEqual(f.controller.selectionState(),{count:1},'restored once the canvas caught up');
+  f.lagPresentation(6);assert.equal((await f.controller.setPointType('symmetric')).status,'applied',f.notices.join(';'));
+  assert.deepEqual(f.sent.at(-1).payload.intent,{kind:'pointType',pointType:'symmetric',indices:[0]});assert.deepEqual(f.controller.selectionState(),{count:1});
+});
 test('a tangent drag, delete-less scale and rotate keep the selected indices',async()=>{
   const f=fixture();f.item.segments[0].handleOut=[10,0];await points(f);
   const p=[20+10,20];const q=(x,y)=>[1.5*x+.5*y,.2*x+y];
