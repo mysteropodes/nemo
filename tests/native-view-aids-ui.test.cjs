@@ -1,6 +1,7 @@
 'use strict';
-// #2373: Safety zones, Clip to canvas and the alpha checker on a native object project are pure view overlays: drawn from the
-// native presentation view, no engine command, no revision change, never in an export, baseline geometry at every zoom.
+// #2373: Safety zones and Clip to canvas on a native object project are pure view overlays: drawn from the native presentation
+// view, no engine command, no revision change, never in an export, baseline geometry at every zoom. "Show transparency" is a pure
+// view FLAG of the preview request: the engine paints the checker behind the artwork, so the module draws nothing for it.
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
 const Intent = require('../src/js/adapters/select-canvas-intent.js');
 const Aids = require('../src/js/adapters/native-view-aids-ui.js');
@@ -12,22 +13,24 @@ function el(tag) {
     remove() { this.removed = true; if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((c) => c !== this); } };
 }
 function harness(transform = [1, 0, 0, 1, 0, 0], native = true) {
-  const body = el('body'), frames = [], calls = [];
+  const body = el('body'), frames = [], calls = [], previews = [];
   const pin = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 7, documentSnapshotId: 'native-object:d:7', canvasW: 1920, canvasH: 1080, layers: [] };
   let presentation = { ...pin, owner: 'native', status: 'presented', contextId: 'scene-root', frame: 0 };
   const rect = { left: 10, top: 20, width: 960, height: 540 };
   // Any engine route (a command, a write, a read of the document) is recorded: a view aid must use none of them.
-  const session = new Proxy({ info: () => pin, isActive: () => true, blocksLegacy: () => true, readPresentedObjectSession: () => ({ ...pin, presentation }) },
+  // renderPreview is the one sanctioned route (a presentation request, no command): it is recorded apart from the forbidden ones.
+  const session = new Proxy({ info: () => pin, isActive: () => true, blocksLegacy: () => true, readPresentedObjectSession: () => ({ ...pin, presentation }),
+    renderPreview: (frame) => { previews.push(frame); return Promise.resolve(); } },
     { get(t, k) { if (k in t) return t[k]; return (...a) => { calls.push(String(k)); }; } });
   const classes = new Set();
   const button = { classList: { toggle: (c, on) => { if (on) classes.add(c); else classes.delete(c); } } };
-  const root = { state: { canvasClip: false, safetyZones: false, previewAlphaBg: false },
+  const root = { state: { canvasClip: false, safetyZones: false, previewAlphaBg: false, currentFrame: 5 },
     document: { body, getElementById: () => ({ getBoundingClientRect: () => rect }), createElementNS: (_n, tag) => el(tag) },
     requestAnimationFrame: (fn) => frames.push(fn),
     NemoNativeObjectProject: { desktop: () => (native ? session : null) },
     NemoNativeViewportUnderlay: { canvasMapping: { transform: () => transform } },
     NemoSelectCanvasIntent: Intent, NemoNativeViewAids: Aids };
-  return { root, body, rect, button, classes, calls, pin,
+  return { root, body, rect, button, classes, calls, previews, pin,
     setView: (t) => { transform = t; presentation = { ...presentation }; },
     tick: () => frames.splice(0).forEach((fn) => fn()),
     svgs: () => body.children.filter((c) => c.tag === 'svg') };
@@ -40,6 +43,7 @@ test('toggles send no engine command and leave the content revision untouched', 
   assert.deepEqual(h.calls, []);
   assert.equal(h.pin.contentRevision, 7);
   assert.equal(h.svgs().length, 0); // all three turned off again
+  assert.deepEqual(h.previews, [5, 5]); // only the two alpha toggles asked for a preview, at the current playhead
   assert.deepEqual([h.root.state.canvasClip, h.root.state.safetyZones, h.root.state.previewAlphaBg], [false, false, false]);
 });
 
@@ -88,25 +92,31 @@ for (const [name, V] of [['fit', [1, 0, 0, 1, 0, 0]], ['zoom 2 panned', [2, 0, 0
     assert.deepEqual(inner, [].concat(map(0, 0), map(1920, 0), map(1920, 1080), map(0, 1080)));
     assert.equal(Number(svg.style.zIndex) < 20, true); // under the Select overlay, like the baseline layer order
   });
-  test(`alpha checker at ${name} follows the baseline grid and darkens alternate tiles by 255 -> 222`, () => {
-    const h = harness(V);
-    Aids.toggle(h.root, 'alpha', h.button);
-    const [svg] = h.svgs(), group = svg.children[0], tiles = group.children[0];
-    assert.equal(group.attrs.transform, `matrix(${V.join(' ')})`);
-    // baseline engine-bridge: world tile = 8 / view.zoom, view.zoom = screen px per world unit, 4000-tile cap
-    const zoom = Math.hypot(V[0], V[1]) * 960 / 1920;
-    let tile = 8 / zoom;
-    if ((1920 / tile) * (1080 / tile) > 4000) tile *= Math.sqrt(((1920 / tile) * (1080 / tile)) / 4000);
-    const cols = Math.max(1, Math.round(1920 / tile)), rows = Math.max(1, Math.round(1080 / tile));
-    const cells = tiles.attrs.d.split('Z').filter((s) => s.trim());
-    let even = 0;
-    for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) if ((x + y) % 2 === 0) even++;
-    assert.equal(cells.length, even);
-    assert.match(cells[0], new RegExp(`^M 0 0 h ${1920 / cols} v ${1080 / rows} h ${-1920 / cols}`));
-    assert.equal(Number(tiles.attrs['fill-opacity']), (255 - 222) / 255);
-    assert.ok(cols * rows <= 4000 * 1.2);
-  });
 }
+
+test('"Show transparency" only flips the view flag and asks for a preview: no overlay, no command, nothing for an export to contain', () => {
+  const h = harness([2, 0, 0, 2, -300, 120]);
+  assert.equal(Aids.toggle(h.root, 'alpha', h.button), true);
+  assert.equal(h.root.state.previewAlphaBg, true);
+  assert.ok(h.classes.has('active'));
+  assert.equal(h.svgs().length, 0, 'the checker is engine pixels behind the artwork, not an SVG over the canvas');
+  assert.deepEqual(h.previews, [5]);
+  assert.deepEqual(h.calls, []);
+  assert.equal(h.pin.contentRevision, 7);
+  Aids.notify(h.root); h.tick();
+  assert.equal(h.svgs().length, 0, 'a view change redraws no checker either');
+  assert.equal(Aids.toggle(h.root, 'alpha', h.button), true);
+  assert.equal(h.root.state.previewAlphaBg, false);
+  assert.ok(!h.classes.has('active'));
+  assert.deepEqual(h.previews, [5, 5]);
+  // a native project that is not active asks for nothing; the flag still flips for the next preview
+  const idle = harness();
+  idle.root.NemoNativeObjectProject.desktop = () => ({ isActive: () => false, info: () => idle.pin, readPresentedObjectSession: () => ({ ...idle.pin, presentation: {} }) });
+  Aids.toggle(idle.root, 'alpha', idle.button);
+  assert.deepEqual(idle.previews, []);
+  const src = fs.readFileSync(path.join(__dirname, '../src/js/adapters/native-view-aids-ui.js'), 'utf8');
+  assert.ok(!/checkerGrid|fill-opacity.*CHECK|CHECK_PX/.test(src));
+});
 
 test('an aid follows the view: a pan/zoom presentation redraws in place on the next frame, and is dropped without a presentation', () => {
   const h = harness();
@@ -129,7 +139,7 @@ test('aids on from a loaded project draw when the presentation arrives and stack
   Object.assign(h.root.state, { canvasClip: true, safetyZones: true, previewAlphaBg: true });
   Aids.notify(h.root); h.tick();
   const [under, over] = h.svgs();
-  assert.deepEqual(under.children.map((c) => c.tag), ['g', 'path']); // checker below the clip mask
+  assert.deepEqual(under.children.map((c) => c.tag), ['path']); // the clip mask only: the checker is drawn by the engine
   assert.equal(over.children.length, 2);
   assert.ok(Number(over.style.zIndex) > 20); // safety above the selection handles, as in the baseline
 });
