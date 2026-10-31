@@ -353,7 +353,10 @@
           "desktop_viewport::ObjectPreviewNavigation",
           "desktop_viewport::ObjectViewProjection",
           "desktop_viewport::ObjectPresentedFrame",
-          "desktop_viewport::ViewportDisplayFilter"
+          "desktop_viewport::ViewportDisplayFilter",
+          "object_render_scene::GhostUnderlayRequest",
+          "object_render_scene::GhostReceipt",
+          "application::prepare_ghost_underlay"
         ],
         "rust.desktop.native.application.tests": [
           "application::ExportResourceResolver",
@@ -481,7 +484,10 @@
           "object_render_scene::ObjectBrushAdmission",
           "export_job::export_object_frames_with_materializer",
           "history::ImportAssetSource",
-          "desktop_viewport::ViewportDisplayFilter"
+          "desktop_viewport::ViewportDisplayFilter",
+          "object_render_scene::GhostUnderlayRequest",
+          "object_render_scene::GhostReceipt",
+          "application::prepare_ghost_underlay"
         ],
         "rust.desktop.media": [
           "native_media_frame_export::NativeVideoDecoder",

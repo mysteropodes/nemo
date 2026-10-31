@@ -28,6 +28,18 @@ impl Compositor {
         }
         Ok(())
     }
+    /// Ghost images the live frame does not draw would stay resident (and charged) in the renderer's atlas for as long
+    /// as it lives: start a fresh one rather than accumulating a decoded image per ghost frame.
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    pub(super) fn release_ghost_images(
+        &mut self,
+        prepared: &ObjectCompositionWitness,
+    ) -> Result<(), CompositorError> {
+        match prepared.ghost_underlay() {
+            Some(g) if g.draws_foreign_images(prepared) => self.reset_object_image_cache(),
+            _ => Ok(()),
+        }
+    }
     pub(super) fn emit_object_paint_sequence(
         &mut self,
         prepared: &ObjectCompositionWitness,
@@ -40,6 +52,10 @@ impl Compositor {
             // Vello can replace an image atlas on a solid-only pass. Every live native asset is
             // explicitly restored before use; instances of the same asset share one ImageData ID.
             for image in prepared.raster_images().chain(prepared.brush_images()) {
+                self.renderer.mark_override_image_dirty(image);
+            }
+            // #2358 GHOST-UNDER: the ghost frames' images are restored like any live native asset.
+            for image in prepared.ghost_underlay().into_iter().flat_map(|g| g.images()) {
                 self.renderer.mark_override_image_dirty(image);
             }
         }
@@ -61,6 +77,12 @@ impl Compositor {
         } else {
             &mut self.scene
         };
+        // Onion / Ghost All sit UNDER the live frame (baseline stack order): drawn first, in the same artwork scene,
+        // so the camera / viewport navigation applies to them exactly once and live pixels win where they overlap.
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        if let Some(ghosts) = prepared.ghost_underlay() {
+            ghosts.draw(scene);
+        }
         for entry in ordered_entries(prepared.plan()) {
             match entry {
                 PaintEntry::Contour(command) => {

@@ -103,6 +103,18 @@ impl TweenGhostFrame {
             omit: self.kind == TweenGhostKind::AllKeys,
         }
     }
+    /// A glyph contour of the ghosted layer: the baseline tints text like any painted path, so Outline mode is a
+    /// one-unit tinted stroke without its fill, and Tinted/Default keep the fill at the ghost opacity.
+    pub fn text_visual(&self) -> TweenGhostVisual {
+        let mut out = self.raster_visual();
+        out.translation = self.translation;
+        if self.mode == Mode::Outline {
+            out.stroke = Some([self.tint[0], self.tint[1], self.tint[2], 0.8]);
+            out.stroke_width = Some(1.);
+            out.clear_fill = true;
+        }
+        out
+    }
     pub fn vector_visual(&self, r: &ObjectRecord) -> TweenGhostVisual {
         let mut out = self.raster_visual();
         out.translation = self.translation;

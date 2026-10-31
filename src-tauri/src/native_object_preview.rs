@@ -1,7 +1,7 @@
 //! Owner-held work only: GPU and surface remain borrowed from the caller.
 use crate::native_dispatch::{NativeObjectHost, NativeReleaseProgress};
 use native_engine::desktop_viewport::{
-    ObjectPresentedFrame, ObjectPreviewNavigation, ObjectPreviewView, ObjectViewProjection,
+    ObjectPresentedFrame, ObjectPreviewView, ObjectViewProjection,
     ViewportDisplayFilter,
 };
 use native_engine::{
@@ -214,51 +214,6 @@ impl NativeObjectHost {
         )
     }
 
-    pub(crate) fn with_prepared_object_preview_for_view<T>(
-        &mut self,
-        expected: &ObjectFrameSelector<'_>,
-        output: OutputSpec,
-        view: ObjectPreviewView,
-        pending_proof_fallback: bool,
-        operation: impl FnOnce(&mut Self) -> Result<T, String>,
-    ) -> Result<T, String> {
-        self.with_prepared_object_preview_for_navigation(
-            expected,
-            output,
-            view,
-            ObjectPreviewNavigation::default(),
-            pending_proof_fallback,
-            operation,
-        )
-    }
-    pub(crate) fn with_prepared_object_preview_for_navigation<T>(
-        &mut self,
-        expected: &ObjectFrameSelector<'_>,
-        output: OutputSpec,
-        view: ObjectPreviewView,
-        navigation: ObjectPreviewNavigation,
-        pending_proof_fallback: bool,
-        operation: impl FnOnce(&mut Self) -> Result<T, String>,
-    ) -> Result<T, String> {
-        if self.preview.prepared.is_some() {
-            return Err("native object preview preparation is already borrowed".into());
-        }
-        let prepared = self.prepare_object_preview_navigation(
-            expected,
-            output,
-            view,
-            navigation,
-            pending_proof_fallback,
-        )?;
-        self.preview.prepared = Some(prepared);
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(self)));
-        self.preview.prepared = None;
-        match result {
-            Ok(result) => result,
-            Err(payload) => std::panic::resume_unwind(payload),
-        }
-    }
-
     pub(crate) fn present_prepared_object_preview<P: SurfacePort>(
         &mut self,
         expected: &ObjectFrameSelector<'_>,
@@ -320,7 +275,7 @@ impl NativeObjectHost {
         }
         // Cancel a different source or viewport identity before brush retirement.
         // The same immutable admission and navigation may retain deferred work.
-        let quality = prepared.navigation.quality(prepared.view);
+        let quality = prepared.quality();
         if self.preview.pending.as_ref().is_some_and(|work| {
             let key = work.key();
             key.document_snapshot_id() != prepared.snapshot.snapshot_id()
@@ -346,6 +301,7 @@ impl NativeObjectHost {
             snapshot,
             view,
             navigation,
+            ghosts,
             ..
         } = prepared;
         // T12: the frame's videos (MissingLink refused before any decode). Media is
@@ -389,6 +345,8 @@ impl NativeObjectHost {
         let vector_source = (!composition.has_scene_images() && !media.draws_video(expected.frame))
             .then(|| composition.clone());
         let composition = media.witness(expected.frame, composition)?;
+        // #2358 GHOST-UNDER: onion / Ghost All composed UNDER the live frame (preview witness only, never an export).
+        let (composition, ghost_receipt) = prepare::attach_ghosts(composition, ghosts.as_ref(), &snapshot, expected.frame)?;
         let key = if media.draws_video(expected.frame) {
             EvaluationKey::new(
                 key.document_snapshot_id(),
@@ -494,7 +452,7 @@ impl NativeObjectHost {
             self.preview.presented_mesh_view = Some(receipt.clone());
             self.preview.presented_vectors = vector_source;
         }
-        Ok(ObjectPresentedFrame { receipt, view })
+        Ok(ObjectPresentedFrame { receipt, view, ghosts: ghost_receipt })
     }
 
 

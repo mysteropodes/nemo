@@ -5,6 +5,10 @@ mod ghost;
 pub use ghost::{
     TweenGhostFrame, TweenGhostKind, TweenGhostPath, TweenGhostRead, TweenGhostVisual,
 };
+// #2358 GHOST-UNDER: the retained ghost query as the viewport's onion underlay source.
+#[path = "tween_ghost_underlay.rs"]
+mod ghost_underlay;
+pub use ghost_underlay::prepare_ghost_underlay;
 
 pub(super) fn resolution_code(kind: ResourceResolutionErrorKind) -> DispatchErrorCode {
     match kind {

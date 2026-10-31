@@ -385,6 +385,11 @@ impl crate::object_render_scene::ObjectCompositionWitness {
     /// the media gate from finishing, blocking every later preview and export.
     pub(crate) fn without_media(&self) -> Self {
         let mut retained = self.clone();
+        // Ghost pieces hold decoded ghost-frame pixels: the renderer keeps no witness longer than its own images need.
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        {
+            retained.ghosts = None;
+        }
         if retained.media.take().is_some() {
             retained.resources = retained.resources.take().and_then(|set| {
                 let kept: Vec<_> = set

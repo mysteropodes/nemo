@@ -2,12 +2,15 @@
 use crate::native_dispatch::NativeObjectHost;
 use native_engine::{
     application::{
-        prepare_object_motion_exposure_frame_for_control,
+        prepare_ghost_underlay, prepare_object_motion_exposure_frame_for_control,
         prepare_object_motion_fallback_frame_for_control,
     },
     desktop_viewport::{ObjectPreviewNavigation, ObjectPreviewView},
     object_frame_packet::ObjectFrameSelector,
-    object_render_scene::{ObjectBrushAdmission, ObjectPaintPlan},
+    object_render_scene::{
+        GhostReceipt, GhostUnderlayRequest, ObjectBrushAdmission, ObjectCompositionWitness,
+        ObjectPaintPlan,
+    },
     object_snapshot::ObjectSnapshot,
     scheduler::{EvaluationKey, OutputSpec},
 };
@@ -19,9 +22,20 @@ pub(super) struct PreparedObjectPreview {
     pub(super) output: OutputSpec,
     pub(super) view: ObjectPreviewView,
     pub(super) navigation: ObjectPreviewNavigation,
+    /// Viewport-only onion / Ghost All settings: part of the canonical quality identity of the frame.
+    pub(super) ghosts: Option<GhostUnderlayRequest>,
 }
 
 impl PreparedObjectPreview {
+    /// The one canonical cache identity of this preview: view, navigation and the onion settings.
+    pub(super) fn quality(&self) -> String {
+        let base = self.navigation.quality(self.view);
+        match &self.ghosts {
+            Some(ghosts) => format!("{base}{}", ghosts.quality_suffix()),
+            None => base,
+        }
+    }
+
     /// Only a materialized native plan supplies resource versions. CPU admission
     /// alone is not a paint plan, scheduler key or presentation proof.
     pub(super) fn materialized_key(&self, plan: &ObjectPaintPlan) -> Result<EvaluationKey, String> {
@@ -30,7 +44,7 @@ impl PreparedObjectPreview {
             self.snapshot.snapshot_id(),
             packet.context_id(),
             packet.frame(),
-            self.navigation.quality(self.view),
+            self.quality(),
             self.output.clone(),
             plan.scene_resource_versions()
                 .map_err(|error| format!("preview scene resources: {error:?}"))?,
@@ -66,6 +80,7 @@ impl NativeObjectHost {
             output,
             view,
             ObjectPreviewNavigation::default(),
+            None,
             pending_proof_fallback,
         )
     }
@@ -75,9 +90,13 @@ impl NativeObjectHost {
         output: OutputSpec,
         view: ObjectPreviewView,
         navigation: ObjectPreviewNavigation,
+        ghosts: Option<GhostUnderlayRequest>,
         pending_proof_fallback: bool,
     ) -> Result<PreparedObjectPreview, String> {
         navigation.validate()?;
+        if let Some(ghosts) = &ghosts {
+            ghosts.validate().map_err(str::to_owned)?;
+        }
         if self.released.is_some() || self.preview.released {
             return Err("native object host was released".into());
         }
@@ -126,6 +145,76 @@ impl NativeObjectHost {
             output,
             view,
             navigation,
+            ghosts,
         })
+    }
+}
+
+/// The viewport witness with its onion / Ghost All underlay attached and what the renderer will report about it. The
+/// retained vector source of the presented frame is hit-test geometry and never contains ghosts.
+pub(super) fn attach_ghosts(
+    composition: ObjectCompositionWitness,
+    ghosts: Option<&GhostUnderlayRequest>,
+    snapshot: &ObjectSnapshot,
+    frame: u32,
+) -> Result<(ObjectCompositionWitness, Option<GhostReceipt>), String> {
+    let Some(request) = ghosts else {
+        return Ok((composition, None));
+    };
+    let underlay = prepare_ghost_underlay(snapshot, request, frame);
+    let receipt = underlay.receipt();
+    let composition = composition
+        .with_ghost_underlay(underlay)
+        .map_err(|e| format!("preview onion composition: {e:?}"))?;
+    Ok((composition, Some(receipt)))
+}
+
+impl NativeObjectHost {
+    pub(crate) fn with_prepared_object_preview_for_view<T>(
+        &mut self,
+        expected: &ObjectFrameSelector<'_>,
+        output: OutputSpec,
+        view: ObjectPreviewView,
+        pending_proof_fallback: bool,
+        operation: impl FnOnce(&mut Self) -> Result<T, String>,
+    ) -> Result<T, String> {
+        self.with_prepared_object_preview_for_navigation(
+            expected,
+            output,
+            view,
+            ObjectPreviewNavigation::default(),
+            None,
+            pending_proof_fallback,
+            operation,
+        )
+    }
+    pub(crate) fn with_prepared_object_preview_for_navigation<T>(
+        &mut self,
+        expected: &ObjectFrameSelector<'_>,
+        output: OutputSpec,
+        view: ObjectPreviewView,
+        navigation: ObjectPreviewNavigation,
+        ghosts: Option<native_engine::object_render_scene::GhostUnderlayRequest>,
+        pending_proof_fallback: bool,
+        operation: impl FnOnce(&mut Self) -> Result<T, String>,
+    ) -> Result<T, String> {
+        if self.preview.prepared.is_some() {
+            return Err("native object preview preparation is already borrowed".into());
+        }
+        let prepared = self.prepare_object_preview_navigation(
+            expected,
+            output,
+            view,
+            navigation,
+            ghosts,
+            pending_proof_fallback,
+        )?;
+        self.preview.prepared = Some(prepared);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(self)));
+        self.preview.prepared = None;
+        match result {
+            Ok(result) => result,
+            Err(payload) => std::panic::resume_unwind(payload),
+        }
     }
 }

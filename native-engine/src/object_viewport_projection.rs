@@ -188,4 +188,7 @@ impl ObjectViewProjection {
 pub struct ObjectPresentedFrame {
     pub receipt: PresentationReceipt,
     pub view: ObjectViewProjection,
+    /// What the renderer did with the onion / Ghost All settings of the request (`None`: none were asked for).
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    pub ghosts: Option<crate::object_render_scene::GhostReceipt>,
 }
