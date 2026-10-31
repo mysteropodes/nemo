@@ -177,3 +177,62 @@ fn a_vertex_preview_on_a_rotated_mixed_layer_poses_like_the_committed_edit() {
     assert!(far(&m(&during), &m(&after)) < 1e-6, "the preview poses like the committed edit: {during} vs {after}");
 }
 
+
+/// A pressure stroke that is also a Fill Brush shape: a record whose centreline Direct Select refuses to edit (#2356).
+fn uneditable_record(stroke: &str) -> Value {
+    let mut r = edit_support::record_at("A", "L0", 0, stroke);
+    let centre = |x: f64, w: f64| json!({"point":{"x":x,"y":0.0},"handleIn":{"x":0.0,"y":0.0},"handleOut":{"x":0.0,"y":0.0},"width":w});
+    r["vector"]["stroke"] = Value::Null;
+    r["vector"]["hasRealStroke"] = json!(false);
+    r["fill"] = json!({"kind":"solid","r":1,"g":0,"b":0,"a":1});
+    r["vectorExt"] = json!({"pressure":{"centerSegments":[centre(0.0, 3.0), centre(40.0, 8.0), centre(80.0, 4.0)],
+        "widthProfile":[{"t":0,"width":2},{"t":1,"width":1}],"strokeProfile":"bulge","profileBase":8},"isFillShape":true});
+    r
+}
+/// `doc` with the non-editable record `brush` appended to layer `L0` (or standing alone there, when `only`); `plain` also
+/// drops the layer's text and image so the layer holds vector records only.
+fn with_uneditable(doc: &Value, only: bool, plain: bool) -> Value {
+    let mut d = if plain {
+        let mut d = without(&without(doc, "text"), "raster");
+        d.as_object_mut().unwrap().remove("items");
+        d
+    } else {
+        doc.clone()
+    };
+    let brush = uneditable_record("brush");
+    if only {
+        d["objects"] = json!([brush]);
+    } else {
+        d["objects"].as_array_mut().unwrap().push(brush);
+    }
+    let elements = d["compositionOrder"]["contexts"][0]["scopes"][0]["elements"].as_array_mut().unwrap();
+    if only {
+        elements.retain(|e| e["strokeId"] != "vector");
+        for (i, e) in elements.iter_mut().enumerate() {
+            e["naturalPosition"] = json!(i);
+        }
+    }
+    elements.push(json!({"layerUid":"L0","strokeId":"brush","naturalPosition":elements.len(),"order":{}}));
+    d
+}
+#[test]
+fn a_non_editable_record_is_omitted_from_the_editable_listing_instead_of_failing_the_layer() {
+    for plain in [true, false] {
+        let doc = with_uneditable(&mixed(), false, plain);
+        let hit = view(&doc, true).unwrap();
+        assert!(strokes(&hit).contains(&"brush"), "Select still lists the stroke: {hit}");
+        let editable = view(&doc, false).expect("one non-editable record no longer refuses the layer");
+        assert_eq!(strokes(&editable), ["vector"], "the editable quad is listed and the stroke is omitted: {editable}");
+        assert_eq!(geometry(&doc, "vector", false)["ok"], true);
+        let page = geometry(&doc, "brush", false);
+        assert_eq!(page["ok"], false, "the stroke's own geometry read stays refused: {page}");
+    }
+}
+#[test]
+fn a_layer_of_only_non_editable_records_keeps_its_whole_layer_refusal() {
+    for plain in [true, false] {
+        let doc = with_uneditable(&mixed(), true, plain);
+        assert_eq!(view(&doc, false), Err("Subselect target geometry is unavailable"));
+        assert!(view(&doc, true).is_ok(), "the hit-test listing still lists it");
+    }
+}

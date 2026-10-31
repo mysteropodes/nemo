@@ -3,20 +3,21 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const UI=require('../src/js/adapters/native-subselect-ui.js');
 const {fixture,deferred}=require('./helpers/native-subselect.cjs');
 function node(){
-  const listeners=new Map(),n={children:[],hidden:false,disabled:false,style:{display:''},dataset:{},classList:{remove(){},contains(){return false;}},
+  const listeners=new Map(),n={children:[],hidden:false,disabled:false,style:{display:''},dataset:{},classes:new Set(),classList:{remove(c){n.classes.delete(c);},contains(c){return n.classes.has(c);},toggle(c,on){if(on)n.classes.add(c);else n.classes.delete(c);return !!on;}},
     setAttribute(){},replaceChildren(...children){this.children.slice().forEach(child=>this.removeChild(child));children.forEach(child=>this.appendChild(child));},
     appendChild(child){return this.insertBefore(child,null);},
     insertBefore(child,next){if(child.parentNode)child.parentNode.removeChild(child);const i=next?this.children.indexOf(next):this.children.length;assert.ok(i>=0);this.children.splice(i,0,child);child.parentNode=this;return child;},
     removeChild(child){const i=this.children.indexOf(child);assert.ok(i>=0);this.children.splice(i,1);child.parentNode=null;},
     contains(child){return child===this||this.children.some(n=>n.contains(child));},
     addEventListener(type,fn){if(!listeners.has(type))listeners.set(type,[]);listeners.get(type).push(fn);},
+    removeEventListener(type,fn){const l=listeners.get(type)||[],i=l.indexOf(fn);if(i>=0)l.splice(i,1);},
     click(){if(!this.disabled)(listeners.get('click')||[]).forEach(fn=>fn());},listeners};
   return n;
 }
 function ui(){
-  const f=fixture(),{root,controller}=f,home=node(),container=node(),row=node(),next=node(),buttons=['corner','smooth','symmetric'].map(()=>node());
+  const f=fixture(),{root,controller}=f,home=node(),container=node(),row=node(),next=node(),buttons=['corner','smooth','symmetric','collapse'].map(()=>node());
   row.style.display='none';row.style.gap='4px';home.appendChild(row);home.appendChild(next);buttons.forEach(b=>row.appendChild(b));
-  const nodes={'sp-pointtype-row':row};['corner','smooth','symmetric'].forEach((type,i)=>nodes['btn-pt-'+type]=buttons[i]);
+  const nodes={'sp-pointtype-row':row};['corner','smooth','symmetric','collapse'].forEach((type,i)=>nodes['btn-pt-'+type]=buttons[i]);
   const get=root.document.getElementById;root.document.getElementById=id=>nodes[id]||get(id);root.document.createComment=node;
   root.NemoNativeSubselectController=controller;root.NemoNativeSubselectUI=UI;
   // Execute the existing production handlers and native routing branch, with a
@@ -31,7 +32,7 @@ function ui(){
 }
 async function points(f){await f.select();f.controller.handle('down',f.event(40,24));f.controller.handle('up',f.event(40,24));}
 test('existing point-type buttons become available for native points and each sends exactly one guarded command',async()=>{
-  for(const [i,type] of ['corner','smooth','symmetric'].entries()){
+  for(const [i,type] of ['corner','smooth','symmetric','collapse'].entries()){
     const f=ui(),binding=f.mount();assert.equal(f.row.parentNode,f.container);assert.equal(f.row.style.display,'none');
     await f.select();assert.equal(f.row.hidden,true,'a selected path without points is insufficient');
     await points(f);assert.equal(f.row.hidden,false);assert.equal(f.row.style.display,'flex');assert.ok(f.buttons.every(b=>!b.disabled));
@@ -40,7 +41,7 @@ test('existing point-type buttons become available for native points and each se
     const gate=deferred();f.setGate(gate);f.buttons[i].click();assert.equal(f.row.hidden,true);assert.equal(f.controller.selectionState(),null);
     f.buttons[i].click();gate.resolve();const result=await f.controller.settled();
     assert.equal(result.status,'applied',f.notices.join(';'));assert.equal(result.receipt.historyEntriesAdded,1);assert.equal(f.sent.length,1);
-    assert.deepEqual(f.sent[0].payload.intent,{indices:[0],kind:'pointType',pointType:type});assert.equal(f.row.hidden,true);
+    assert.deepEqual(f.sent[0].payload.intent,{indices:[0],kind:'pointType',pointType:type});assert.equal(f.row.hidden,false,'#2356: the vertex stays selected after the edit');assert.deepEqual(f.controller.selectionState(),{count:1});
     binding.retire();assert.deepEqual(f.home.children,[f.row,f.next]);assert.equal(f.row.hidden,false);assert.equal(f.row.style.display,'none');assert.equal(f.row.style.gap,'4px');
     assert.ok(f.buttons.every(b=>!b.disabled));binding.retire();assert.deepEqual(f.home.children,[f.row,f.next]);
   }

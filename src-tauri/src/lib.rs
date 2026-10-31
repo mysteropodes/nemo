@@ -24,6 +24,179 @@ mod task_runtime;
 
 #[cfg(feature = "test-play-publication-observer")]
 mod test_play_observer;
+const CLOSE_PROJECT_MENU_ID: &str = "close_project";
+const SAVE_PROJECT_MENU_ID: &str = "save_project";
+const SAVE_PROJECT_AS_MENU_ID: &str = "save_project_as";
+
+/// The page event each project menu item turns into (None for every other item).
+fn project_menu_event(id: &str) -> Option<&'static str> {
+    match id {
+        CLOSE_PROJECT_MENU_ID => Some("menu-close-project"),
+        SAVE_PROJECT_MENU_ID => Some("menu-save-project"),
+        SAVE_PROJECT_AS_MENU_ID => Some("menu-save-project-as"),
+        _ => None,
+    }
+}
+
+/// Cmd+S / Shift+Cmd+S belong to the File menu like Cmd+W: the menu item owns the accelerator and
+/// the page runs the project's own Save / Save As (the keydown path alone never reached an
+/// installed build). Idempotent per menu build; the File submenu is the one named "File".
+#[cfg(target_os = "macos")]
+fn add_project_save_items<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    menu: &tauri::menu::Menu<R>,
+) -> tauri::Result<()> {
+    use tauri::menu::{MenuItem, MenuItemKind, PredefinedMenuItem};
+    for top in menu.items()? {
+        let MenuItemKind::Submenu(submenu) = top else {
+            continue;
+        };
+        if submenu.text()?.replace('&', "") != "File" {
+            continue;
+        }
+        let save = MenuItem::with_id(app, SAVE_PROJECT_MENU_ID, "Save", true, Some("CmdOrCtrl+S"))?;
+        let save_as = MenuItem::with_id(
+            app,
+            SAVE_PROJECT_AS_MENU_ID,
+            "Save As\u{2026}",
+            true,
+            Some("CmdOrCtrl+Shift+S"),
+        )?;
+        submenu.insert(&save, 0)?;
+        submenu.insert(&save_as, 1)?;
+        submenu.insert(&PredefinedMenuItem::separator(app)?, 2)?;
+    }
+    Ok(())
+}
+
+#[derive(Debug, PartialEq)]
+enum CloseWindowEdit {
+    Remove(usize),
+    ReplaceWithCloseProject(usize),
+}
+
+/// Which predefined "Close Window" items of one submenu to drop (highest index first, so each
+/// index stays valid while applied) and which of them becomes the Cmd+W "Close Project" item.
+/// `predefined_text[i]` is the text of item `i` when it is a predefined item, else `None`.
+fn close_window_edits(submenu_text: &str, predefined_text: &[Option<String>]) -> Vec<CloseWindowEdit> {
+    let mut edits = Vec::new();
+    for (index, text) in predefined_text.iter().enumerate().rev() {
+        // muda spells the default text "C&lose Window" (mnemonic) and strips the `&` on macOS.
+        if text.as_deref().map(|t| t.replace('&', "")).as_deref() != Some("Close Window") {
+            continue;
+        }
+        edits.push(if submenu_text == "File" {
+            CloseWindowEdit::ReplaceWithCloseProject(index)
+        } else {
+            CloseWindowEdit::Remove(index)
+        });
+    }
+    edits
+}
+
+/// Tauri's default menu binds Cmd+W to the predefined "Close Window" item, which closes the
+/// only window and quits the app. Replace it (File menu: a "Close Project" item carrying the
+/// accelerator that the page turns into the tab bar's own close; elsewhere: removed).
+#[cfg(target_os = "macos")]
+fn route_close_window_to_project<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    menu: &tauri::menu::Menu<R>,
+) -> tauri::Result<()> {
+    use tauri::menu::{MenuItem, MenuItemKind};
+    for top in menu.items()? {
+        let MenuItemKind::Submenu(submenu) = top else {
+            continue;
+        };
+        let texts = submenu
+            .items()?
+            .iter()
+            .map(|item| match item {
+                MenuItemKind::Predefined(p) => p.text().map(Some),
+                _ => Ok(None),
+            })
+            .collect::<tauri::Result<Vec<_>>>()?;
+        for edit in close_window_edits(&submenu.text()?, &texts) {
+            match edit {
+                CloseWindowEdit::Remove(index) => {
+                    submenu.remove_at(index)?;
+                }
+                CloseWindowEdit::ReplaceWithCloseProject(index) => {
+                    submenu.remove_at(index)?;
+                    let close = MenuItem::with_id(
+                        app,
+                        CLOSE_PROJECT_MENU_ID,
+                        "Close Project",
+                        true,
+                        Some("CmdOrCtrl+W"),
+                    )?;
+                    submenu.insert(&close, index)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod close_window_menu_tests {
+    use super::{close_window_edits, project_menu_event, CloseWindowEdit};
+
+    #[test]
+    fn project_menu_items_map_to_their_page_events() {
+        assert_eq!(project_menu_event("close_project"), Some("menu-close-project"));
+        assert_eq!(project_menu_event("save_project"), Some("menu-save-project"));
+        assert_eq!(project_menu_event("save_project_as"), Some("menu-save-project-as"));
+        assert_eq!(project_menu_event("check_update"), None);
+        assert_eq!(project_menu_event("save"), None);
+    }
+
+    fn predefined(texts: &[&str]) -> Vec<Option<String>> {
+        texts
+            .iter()
+            .map(|t| (!t.is_empty()).then(|| t.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn file_menu_close_window_becomes_the_cmd_w_close_project_item() {
+        let edits = close_window_edits("File", &predefined(&["Close Window"]));
+        assert_eq!(edits, vec![CloseWindowEdit::ReplaceWithCloseProject(0)]);
+    }
+
+    #[test]
+    fn the_mnemonic_spelling_is_recognised() {
+        let edits = close_window_edits("File", &predefined(&["C&lose Window"]));
+        assert_eq!(edits, vec![CloseWindowEdit::ReplaceWithCloseProject(0)]);
+    }
+
+    #[test]
+    fn window_menu_close_window_is_removed_so_it_cannot_quit_the_app() {
+        let items = predefined(&["Minimize", "Zoom", "", "Close Window"]);
+        let edits = close_window_edits("Window", &items);
+        assert_eq!(edits, vec![CloseWindowEdit::Remove(3)]);
+    }
+
+    #[test]
+    fn other_predefined_items_and_non_predefined_items_are_untouched() {
+        assert!(close_window_edits("Edit", &predefined(&["Undo", "", "Copy"])).is_empty());
+        assert!(close_window_edits("File", &[None]).is_empty());
+        // Quit lives in the app menu and is deliberately not edited (Cmd+Q is unchanged).
+        assert!(close_window_edits("Nemo", &predefined(&["Quit Nemo"])).is_empty());
+    }
+
+    #[test]
+    fn edits_apply_from_the_highest_index_down() {
+        let edits = close_window_edits("File", &predefined(&["Close Window", "", "Close Window"]));
+        assert_eq!(
+            edits,
+            vec![
+                CloseWindowEdit::ReplaceWithCloseProject(2),
+                CloseWindowEdit::ReplaceWithCloseProject(0)
+            ]
+        );
+    }
+}
+
 #[tauri::command]
 async fn run_ffmpeg(
     app: tauri::AppHandle,
@@ -264,6 +437,8 @@ pub fn run() {
         .on_menu_event(|app, event| {
             if event.id() == "check_update" {
                 let _ = app.emit("menu-check-update", ());
+            } else if let Some(name) = project_menu_event(event.id().as_ref()) {
+                let _ = app.emit(name, ());
             }
         })
         .setup(move |app| {
@@ -280,6 +455,8 @@ pub fn run() {
             {
                 use tauri::menu::{Menu, MenuItem, MenuItemKind};
                 let menu = Menu::default(app.handle())?;
+                route_close_window_to_project(app.handle(), &menu)?;
+                add_project_save_items(app.handle(), &menu)?;
                 if let Some(MenuItemKind::Submenu(app_submenu)) = menu.items()?.first() {
                     let check_update_item = MenuItem::with_id(
                         app.handle(),

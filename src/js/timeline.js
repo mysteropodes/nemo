@@ -10590,6 +10590,7 @@ document.querySelectorAll('#align-toolbar .align-btn[data-distribute]').forEach(
 document.getElementById('btn-pt-corner').addEventListener('click',function(){window.SM.setPointType('corner');});
 document.getElementById('btn-pt-smooth').addEventListener('click',function(){window.SM.setPointType('smooth');});
 document.getElementById('btn-pt-symmetric').addEventListener('click',function(){window.SM.setPointType('symmetric');});
+document.getElementById('btn-pt-collapse').addEventListener('click',function(){window.SM.setPointType('collapse');});
 // Alt/Option+click = non-destructive combine-group (2026-07-29, mirrors
 // Illustrator's own Alt+Pathfinder "Compound Shape" convention) — plain
 // click keeps the existing destructive booleanOp byte-for-byte unchanged.

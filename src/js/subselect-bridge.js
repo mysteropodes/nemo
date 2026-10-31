@@ -12,6 +12,7 @@
   function snap(start,p){const x=p[0]-start[0],y=p[1]-start[1],distance=Math.sqrt(x*x+y*y),angle=Math.round(Math.atan2(y,x)/(Math.PI/4))*(Math.PI/4);return [start[0]+Math.cos(angle)*distance,start[1]+Math.sin(angle)*distance];}
   const consume=e=>{if(e.stopImmediatePropagation)e.stopImmediatePropagation();if(e.preventDefault)e.preventDefault();};
   function create(root){
+    const RESTORE_TRIES=20,RESTORE_MS=60;
     let selection=null,drag=null,marquee=null,overlay=null,pending=null,uncertain=null,recovering=false,readToken=0,previewToken=0,previewBusy=false,previewNext=null,retired=false;
     let watching=false;
     let settled=Promise.resolve({status:'idle'});
@@ -19,7 +20,9 @@
     const mapping=()=>root.NemoNativeViewportUnderlay&&root.NemoNativeViewportUnderlay.canvasMapping;
     function native(){const s=session();return !!s&&s.blocksLegacy();}
     function refreshUI(){if(root.NemoNativeSubselectUI)root.NemoNativeSubselectUI.refresh(root);}
-    function selectionState(){return !pending&&!uncertain&&!drag&&!marquee&&selection&&current(selection)&&selection.indices.length?Object.freeze({count:selection.indices.length}):null;}
+    function selectionState(){return !pending&&!uncertain&&!drag&&!marquee&&selection&&current(selection)&&selection.indices.length?Object.freeze(typeOf(selection)):null;}
+    // #2356: with ONE vertex selected the state also names its type (the engine's effective type: the stored hint, else the one its handles show), so the point-type row can mark it.
+    function typeOf(t){const n=t.indices.length,type=n===1&&t.item&&t.item.pointTypes&&t.item.pointTypes[t.indices[0]];return type?{count:n,pointType:type}:{count:n};}
     function notice(error){if(root.showToast)root.showToast(error&&error.message||String(error));}
     function layer(pin){const st=root.state,row=st.layers&&st.layers[st.activeLayerIdx],sel=root._layerSel;
       if(!row||!Array.isArray(sel)||sel.length!==1||sel[0]!==st.activeLayerIdx)throw new Error('Select one native Drawing layer.');
@@ -47,7 +50,7 @@
     function clear(){if(overlay){overlay.remove();overlay=null;}}
     function grab(el,id){try{if(el.setPointerCapture)el.setPointerCapture(id);}catch(_){/* a press replayed after its release has no pointer left to capture */}}
     function release(t){try{if(t&&t.capture&&t.capture.releasePointerCapture)t.capture.releasePointerCapture(t.pointer);}catch(_){}}
-    function cancel(clearSelection){if(gate)gate.cancel();if(drag)drag.cancelled=true;if(marquee)marquee.cancelled=true;if(selection)selection.cancelled=true;release(drag);release(marquee);++readToken;++previewToken;previewNext=null;drag=null;marquee=null;clear();if(clearSelection)selection=null;refreshUI();return {status:'cancelled'};}
+    function cancel(clearSelection){if(gate)gate.cancel();if(drag)drag.cancelled=true;if(marquee)marquee.cancelled=true;if(selection)selection.cancelled=true;release(drag);release(marquee);++readToken;++previewToken;previewNext=null;drawLatest=null;drag=null;marquee=null;clear();if(clearSelection)selection=null;refreshUI();return {status:'cancelled'};}
     function node(tag,attrs){const n=root.document.createElementNS('http://www.w3.org/2000/svg',tag);Object.keys(attrs).forEach(k=>n.setAttribute(k,attrs[k]));return n;}
     function watch(){if(watching||!root.requestAnimationFrame)return;watching=true;root.requestAnimationFrame(()=>{watching=false;if(pending)return;if((selection&&!current(selection))||(marquee&&!current(marquee))){cancel(true);return;}if(selection||marquee)watch();});}
     function draw(t,segments,previewMatrix){clear();if(!current(t))return;watch();
@@ -82,8 +85,18 @@
       overlay.setAttribute('viewBox','0 0 '+t.pin.canvasW+' '+t.pin.canvasH);overlay.setAttribute('preserveAspectRatio','none');
       overlay.appendChild(node('polygon',{points:corners.map(p=>p.join(',')).join(' '),fill:'rgba(255,184,108,.08)',stroke:'#ffb86c','stroke-width':1,'stroke-dasharray':'4 3','vector-effect':'non-scaling-stroke'}));
     }
+    // #2356: the editable listing omits a record that has no editable points (a brush, textured or pressure stroke). A plain click that
+    // selected nothing therefore says so when it landed on such a record, instead of clearing without a word. The hit-test listing is read
+    // (no geometry paged) only for that click; any failure of this courtesy read stays silent.
+    function uneditableNotice(t){const s=t.session;if(!s||typeof s.readPresentedStrokes!=='function'||!t.items)return Promise.resolve(false);const token=readToken,key=i=>JSON.stringify(i.stableTarget),own=new Set(t.items.map(key));
+      return Promise.resolve().then(()=>s.readPresentedStrokes({contextId:t.selector.contextId,layerUid:t.selector.layerUid,frame:t.selector.frame},t.pin,()=>false)).then(data=>{
+        if(token!==readToken||retired||!data||!data.presentation||data.presentation!==t.presentation)return false;
+        const hit=(data.items||[]).find(i=>!own.has(key(i))&&['plain','ribbon','fill','shape','brush'].includes(i.role)&&Array.isArray(i.bounds)&&i.bounds.length===4&&Array.isArray(i.matrix)&&(()=>{
+          const m=i.matrix,b=i.bounds,pad=4+(i.strokeWidth||0)/2,xs=[],ys=[];[[b[0],b[1]],[b[2],b[1]],[b[0],b[3]],[b[2],b[3]]].forEach(c=>{const q=map(m,c);xs.push(q[0]);ys.push(q[1]);});
+          return t.start[0]>=Math.min(...xs)-pad&&t.start[0]<=Math.max(...xs)+pad&&t.start[1]>=Math.min(...ys)-pad&&t.start[1]<=Math.max(...ys)+pad;})());
+        if(hit)notice(new Error('This stroke has no editable points.'));return !!hit;}).catch(()=>false);}
     function finishMarquee(t){if(marquee!==t||!current(t)){cancel(true);return {status:'cancelled'};}
-      marquee=null;release(t);if(!t.moved){cancel(true);return {status:'cleared'};}
+      marquee=null;release(t);if(!t.moved){cancel(true);return uneditableNotice(t).then(()=>({status:'cleared'}));}
       const r=rectangle(t);let item=t.target&&t.target.item;
       if(!item)for(const candidate of t.items){const curve=path(candidate);try{
         const Matrix=root.Matrix||(root.paper&&root.paper.Matrix);curve.transform(new Matrix(...candidate.matrix));if(curve.bounds.intersects(r))item=candidate;
@@ -99,9 +112,21 @@
       return curve.closed&&curve.contains(local)?{}:null;
     }finally{curve.remove();}}
     async function load(t,token){const data=await t.session.readSubselect(t.selector,t.pin);if(token!==readToken||!current(t)||data.presentation!==t.presentation||!same(data.info,t.pin))return null;return data.items;}
+    // #2356: the pointer redraws the outline and handles locally on every move (at most once per frame); the engine preview is latest-only and only refines it.
+    let drawFrame=0,drawLatest=null;
+    function localSegments(t,intent){const src=t.item.segments,seg=i=>({point:src[i].point.slice(),handleIn:src[i].handleIn.slice(),handleOut:src[i].handleOut.slice()}),out=src.map((_,i)=>seg(i));
+      if(intent.kind==='move')intent.indices.forEach(i=>{if(out[i])out[i].point=[out[i].point[0]+intent.delta[0],out[i].point[1]+intent.delta[1]];});
+      else if(intent.kind==='handle'&&out[intent.index]){const a=out[intent.index],other=intent.handle==='handleOut'?'handleIn':'handleOut',h=[intent.point[0]-a.point[0],intent.point[1]-a.point[1]];a[intent.handle]=h;
+        // #2356: a plain drag follows the vertex type like the engine: symmetric mirrors, smooth keeps the opposite handle's length on the opposite direction, corner leaves it.
+        if(!intent.breakPair){const type=(t.item.pointTypes&&t.item.pointTypes[intent.index])||'symmetric',old=src[intent.index][other],d=Math.hypot(h[0],h[1]);
+          if(type==='symmetric')a[other]=[-h[0],-h[1]];else if(type==='smooth'&&d>1e-9){const k=-Math.hypot(old[0],old[1])/d;a[other]=[h[0]*k,h[1]*k];}}
+        else if(intent.pairedPoint)a[other]=[-(intent.pairedPoint[0]-a.point[0]),-(intent.pairedPoint[1]-a.point[1])];}
+      return out;}
+    function flushDraw(){drawFrame=0;const j=drawLatest;drawLatest=null;if(j&&drag===j.t&&current(j.t))draw(j.t,j.segments);}
+    function drawSoon(t,intent){drawLatest={t,segments:localSegments(t,intent)};if(drawFrame)return;if(!root.requestAnimationFrame){flushDraw();return;}drawFrame=root.requestAnimationFrame(flushDraw);}
     function preview(t,intent){previewNext={t,intent,token:++previewToken};if(previewBusy)return;previewBusy=true;
       (async()=>{while(previewNext){const job=previewNext;previewNext=null;try{const r=await job.t.session.previewSubselect(job.t.selector,job.t.item.stableTarget,job.intent,job.t.pin);
-        if(job.token===previewToken&&drag===job.t&&current(job.t)&&r.presentation===job.t.presentation&&same(r.info,job.t.pin))draw(job.t,r.segments,r.matrix);
+        if(job.token===previewToken&&!previewNext&&drag===job.t&&current(job.t)&&r.presentation===job.t.presentation&&same(r.info,job.t.pin)){drawLatest=null;draw(job.t,r.segments,r.matrix);}
       }catch(e){if(job.token===previewToken){cancel(false);notice(e);}}}previewBusy=false;})();}
     function admitted(t,lease){if(!recovering)return current(t,lease);const s=session(),p=s&&s.info();return !retired&&s===t.session&&s.isActive()&&p&&['instanceId','documentId','lifecycleGeneration'].every(k=>p[k]===t.pin[k]);}
     function commit(t,intent){if(uncertain)throw new Error('Resolve the previous subselect command before another edit.');if(pending)throw new Error('A native subselect command is still pending.');
@@ -116,7 +141,35 @@
       // refused at dispatch. Wait (bounded) until it is readable, then submit; a real change meanwhile ends the edit with no write (native-presentation-wait.js).
       const Wait=root.NemoNativePresentationWait,read=f=>{const x=session();return x?x.readPresentedObjectSession(f):null;};
       pending=Wait&&Wait.busy(read)?Wait.until(root,{readPresentedObjectSession:read},()=>!!read(),()=>current(t),{notice:'The canvas is still busy - the edit was not applied.'}).then(ok=>ok?send():{applied:false}):send();
-      refreshUI();settled=pending.then(receipt=>{cancel(true);return {status:receipt.applied?'applied':'noop',receipt};},error=>{cancel(true);notice(error);if(error&&error.code==='subselect_command_indeterminate'){uncertain=error;return {status:'indeterminate',error};}return {status:'refused',error};}).finally(()=>{pending=null;refreshUI();});return settled;
+      // #2356: a completed edit keeps the edited item and its vertices selected (baseline kept _nodeSel across every commit): the selection is re-read at the new
+      // revision once the presentation is readable. A refusal, a stale gesture or an indeterminate outcome clears it as before.
+      const keep={session:s,selector:t.selector,stableTarget:t.item.stableTarget,indices:t.indices.slice(),intent};
+      refreshUI();const outcome=pending.then(receipt=>{cancel(true);return {result:{status:receipt.applied?'applied':'noop',receipt},keep};},error=>{cancel(true);notice(error);if(error&&error.code==='subselect_command_indeterminate'){uncertain=error;return {result:{status:'indeterminate',error}};}return {result:{status:'refused',error}};});
+      settled=outcome.then(o=>{pending=null;refreshUI();return o.keep?restore(o.keep).then(()=>o.result,()=>o.result):o.result;},error=>{pending=null;refreshUI();throw error;});return settled;
+    }
+    // Index of the same vertices after the edit: an insert selects the new vertex (curve + 1, appended for the closing curve), a delete removes what was selected.
+    function remap(keep,count){const k=keep.intent;let idx=keep.indices;if(k.kind==='insert')idx=[k.curve+1];else if(k.kind==='delete')idx=[];return idx.filter(i=>i<count);}
+    // After a commit the info pin moves to the new revision before the canvas presents it, and hover reads re-present it again: capture() and load() then
+    // refuse as stale for a few frames. That is "not yet", never "gone", so the re-read is retried (bounded) until the new revision is presented (#2356).
+    async function restore(keep){const token=++readToken,Wait=root.NemoNativePresentationWait,read=f=>{const x=session();return x?x.readPresentedObjectSession(f):null;},
+      holds=()=>token===readToken&&!retired&&!selection&&native()&&root.state.tool==='subselect'&&root.state.currentFrame===keep.selector.frame,
+      sleep=ms=>new Promise(done=>(root.setTimeout||setTimeout)(done,ms));
+      for(let attempt=0;attempt<RESTORE_TRIES;attempt++){
+        if(attempt)await sleep(RESTORE_MS);
+        if(!holds())return null;
+        if(!read()&&!(Wait&&await Wait.until(root,{readPresentedObjectSession:read},()=>!!read(),holds)))continue;
+        if(!holds())return null;
+        let t;try{t=capture();}catch(_){continue;}
+        if(t.session!==keep.session||t.selector.layerUid!==keep.selector.layerUid||t.selector.frame!==keep.selector.frame)return null;
+        let items;try{items=await load(t,token);}catch(_){items=null;}
+        if(token!==readToken||selection)return null;
+        if(!items)continue;
+        // A held frame is promoted by its first edit, which re-scopes the record to the current frame: match the record, not its frame scope.
+        const item=items.find(i=>i.stableTarget.strokeId===keep.stableTarget.strokeId&&i.stableTarget.layerUid===keep.stableTarget.layerUid&&i.stableTarget.contextId===keep.stableTarget.contextId);
+        if(!item)return null;
+        selection={...t,item,indices:remap(keep,item.segments.length)};draw(selection,item.segments);return selection;
+      }
+      return null;
     }
     function start(e,t,hit){
       const group=hit.key==='point'&&t.indices.includes(hit.index)&&t.indices.length>1;
@@ -142,10 +195,16 @@
     function move(e){if(marquee&&marquee.pointer===e.pointerId){const t=marquee;if(!current(t)){cancel(true);return;}t.end=point(e,t);t.moved=true;if(t.items)drawMarquee(t);return;}
       const t=drag;if(!t||t.pointer!==e.pointerId)return;if(!current(t)){cancel(true);return;}
       let p=inverse(t.item.matrix,point(e,t));if(e.shiftKey)p=snap(t.hit.key==='point'?t.start:t.item.segments[t.hit.index].point,p);
-      if(t.hit.key==='point')t.intent={kind:'move',indices:t.dragIndices.slice(),delta:[p[0]-t.start[0],p[1]-t.start[1]]};
-      else {if(!e.altKey)t.pairedPoint=p;t.intent={kind:'handle',index:t.hit.index,handle:t.hit.key,point:p,breakPair:!!e.altKey};
+      // Alt-drag from a vertex pulls out its tangent handles in one gesture (a symmetric pair, Illustrator style); a press that has not left the click radius stays an Alt+click.
+      if(t.hit.key==='point'&&t.alt&&Math.hypot(e.clientX-t.clientStart[0],e.clientY-t.clientStart[1])>=3){
+        const a=t.item.segments[t.hit.index];if(e.shiftKey)p=snap(a.point,inverse(t.item.matrix,point(e,t)));t.intent={kind:'handle',index:t.hit.index,handle:'handleOut',point:p,breakPair:false};}
+      else if(t.hit.key==='point'&&t.alt)t.intent=null;
+      else if(t.hit.key==='point')t.intent={kind:'move',indices:t.dragIndices.slice(),delta:[p[0]-t.start[0],p[1]-t.start[1]]};
+      else {t.intent={kind:'handle',index:t.hit.index,handle:t.hit.key,point:p,breakPair:!!e.altKey};
+        // The endpoint Alt keeps is where the opposite handle is NOW (the mirror of the drag for a symmetric vertex), so pressing Alt never moves it.
+        if(!e.altKey){const a=t.item.segments[t.hit.index],o=localSegments(t,t.intent)[t.hit.index][t.hit.key==='handleOut'?'handleIn':'handleOut'];t.pairedPoint=[a.point[0]-o[0],a.point[1]-o[1]];}
         if(e.altKey&&t.pairedPoint)t.intent.pairedPoint=t.pairedPoint;}
-      preview(t,t.intent);}
+      if(t.intent){drawSoon(t,t.intent);preview(t,t.intent);}}
     function up(e){if(marquee&&marquee.pointer===e.pointerId){const t=marquee;t.ended=true;if(t.items)settled=Promise.resolve(finishMarquee(t));return;}
       const t=drag;if(!t||t.pointer!==e.pointerId)return;drag=null;release(t);++previewToken;previewNext=null;
       if(!current(t)){cancel(true);return;}const click=Math.hypot(e.clientX-t.clientStart[0],e.clientY-t.clientStart[1])<3;

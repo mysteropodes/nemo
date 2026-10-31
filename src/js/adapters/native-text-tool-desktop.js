@@ -6,8 +6,9 @@
   var Reader=typeof module==='object'&&module.exports?require('./native-text-read.js'):root.NemoNativeTextRead;
   var Writer=typeof module==='object'&&module.exports?require('./native-object-text-layout.js'):root.NemoNativeObjectTextLayout;
   var Mapping=(typeof module==='object'&&module.exports?require('./native-viewport-underlay.js'):root.NemoNativeViewportUnderlay);
-  var api=factory(Tool,Item,Reader,Writer,Mapping&&Mapping.canvasMapping);if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeTextToolDesktop=api;
-}(typeof globalThis==='object'?globalThis:this,function(Tool,Item,Reader,Writer,Mapping){
+  var Label=typeof module==='object'&&module.exports?require('./native-font-panel.js'):root.NemoNativeFontPanel;
+  var api=factory(Tool,Item,Reader,Writer,Mapping&&Mapping.canvasMapping,Label);if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeTextToolDesktop=api;
+}(typeof globalThis==='object'?globalThis:this,function(Tool,Item,Reader,Writer,Mapping,Label){
   'use strict';var bindings=new WeakMap(),traceBudget=64;
   // Temporary local-candidate diagnostic: eager scalars, no Event retention or content.
   function trace(root,decision,method,sampled){
@@ -93,11 +94,13 @@
     function fillFonts(rows,d,ticket){
       if(!ownsUI()||shown!==d||ticket!==fontTicket)return;
       var wanted=dirty.has('font')?chosenFont(font.value):d.block.font;wanted=wanted||d.block.font;
-      var choices=Item.FONTS.map(function(key){return {name:key,font:{kind:'bundled',fontKey:key}};});
-      rows.filter(function(r){return r&&r.available===true&&typeof r.assetId==='string';}).forEach(function(r){choices.push({name:r.name+' — '+r.assetId,font:{kind:'asset',assetId:r.assetId}});});
+      // #2267: the human family/style name is the label; the opaque asset id stays the tooltip and the committed value, never the text.
+      var label=Label&&Label.label||function(n){return String(n);};
+      var choices=Item.FONTS.map(function(key){return {name:label(key),title:key,font:{kind:'bundled',fontKey:key}};});
+      rows.filter(function(r){return r&&r.available===true&&typeof r.assetId==='string';}).forEach(function(r){choices.push({name:label(r.name),title:r.assetId,font:{kind:'asset',assetId:r.assetId}});});
       var selected=choices.findIndex(function(c){return c.font.kind===wanted.kind&&(c.font.kind==='asset'?c.font.assetId===wanted.assetId:c.font.fontKey===wanted.fontKey);});
-      if(selected<0){choices.push({name:'Unavailable font: '+(wanted.assetId||wanted.fontKey),font:wanted,unavailable:true});selected=choices.length-1;}
-      fontChoices=choices;font.replaceChildren();choices.forEach(function(c,i){var o=node('option',c.name);o.value=String(i);o.disabled=!!c.unavailable;font.appendChild(o);});font.value=String(selected);controls();
+      if(selected<0){choices.push({name:'Unavailable font'+(wanted.fontKey?': '+label(wanted.fontKey):''),title:wanted.assetId||wanted.fontKey,font:wanted,unavailable:true});selected=choices.length-1;}
+      fontChoices=choices;font.replaceChildren();choices.forEach(function(c,i){var o=node('option',c.name);o.value=String(i);o.title=c.title||'';o.disabled=!!c.unavailable;font.appendChild(o);});font.value=String(selected);controls();
     }
     function turnedBox(b){ // Doc-unit frame of a turned block: stored width, else a monospace-ish estimate of the longest line.
       var lines=String(b.text).split('\n'),longest=Math.max.apply(null,lines.map(function(l){return l.length;}));
@@ -171,6 +174,15 @@
         result.page.items.forEach(function(row,i){var option=node('option',row.target.strokeId);option.value=String(i);select.appendChild(option);});select.value='';
         notify(result.page.items.length?'Select a text block to edit.':'No authored text at this frame. Use the Text tool to place text.');
       }catch(error){readyPin=null;page=null;notify(error.message||'Native text is unavailable.');}finally{refreshing=false;controls();flushPerspectiveRefresh();}};
+    // The text block under the click on the active layer, as the exact native read target; null when there is none (or no pick port: place new text).
+    function pickExisting(x,y){
+      var I=root.NemoSelectCanvasIntent,idx=root.state&&root.state.activeLayerIdx;
+      if(!I||typeof I.pick!=='function'||!Number.isInteger(idx))return Promise.resolve(null);
+      return Promise.resolve(I.pick(root,x,y,idx)).then(function(hit){
+        if(hit===undefined)throw new Error('The canvas is still busy - try again.');
+        var d=hit&&hit.data,t=d&&d.nativeRole==='text'&&d.nativeStableTarget;
+        return t?{contextId:t.contextId,layerUid:t.layerUid,frameScope:t.frameScope,strokeId:t.strokeId}:null;});
+    }
     b.handle=function(method,e){
       syncTool();if(b.retired||!root.state||root.state.tool!=='text')return false;
       var sampled={};function read(k){return sampled[k]=e[k];}
@@ -195,7 +207,10 @@
         var end=point(e,c),wide=Math.abs(read('clientX')-held.x)>20,token={id:held.id};
         if(held.clickOnly&&(!stage||wide||Math.hypot(sampled.clientX-held.x,read('clientY')-held.y)>20||held.context.frame!==c.frame||held.context.layerUid!==c.layerUid)){trace(root,'reject.clickOnly.release',method,sampled);return true;}
         discovery=token;dragBox=wide?{w:Math.abs(sampled.clientX-held.x),h:Math.max(24,Math.abs(read('clientY')-held.y))}:null;trace(root,'openNew.start',method,sampled);
-        core.openNew({anchorTopLeft:wide?{x:Math.min(held.point.x,end.x),y:Math.min(held.point.y,end.y)}:held.point,fixedWidth:wide?Math.abs(end.x-held.point.x):null})
+        // #2267: a plain click on an existing native text block edits it (baseline: Text tool click on text = its popover); a drag always places a new area.
+        (wide?Promise.resolve(null):pickExisting(sampled.clientX,sampled.clientY)).then(function(hit){
+          if(discovery!==token)return null;
+          return hit?core.openExisting(hit):core.openNew({anchorTopLeft:wide?{x:Math.min(held.point.x,end.x),y:Math.min(held.point.y,end.y)}:held.point,fixedWidth:wide?Math.abs(end.x-held.point.x):null});})
           .catch(function(error){trace(root,'openNew.error',null);if(discovery===token)notify(error.message);}).finally(function(){dragBox=null;trace(root,'openNew.finished',null,{current:discovery===token,shown:!!shown});if(discovery===token)discovery=null;});
       }return true;};
     b.retire=function(){if(b.retired)return;removeGuide();perspectiveRefreshNeeded=false;if(removePerspectiveRead){removePerspectiveRead();removePerspectiveRead=null;}if(b.animators)b.animators.retire();var owned=ownsUI();hide();b.retired=true;core.retire();events.forEach(function(a){a[0].removeEventListener(a[1],a[2],a[3]);});

@@ -53,4 +53,14 @@ fn the_layer_time_link_and_follow_path_writes_are_closed_shapes() {
     let mut missing = follow();
     missing.as_object_mut().unwrap().remove("targetLayerUid");
     assert!(!ok("layer.followPath.set", missing));
+    for align in [json!(true), json!(false)] {
+        let mut aligned = follow();
+        aligned["align"] = align;
+        assert!(ok("layer.followPath.set", aligned), "the optional orient toggle");
+    }
+    for bad in [json!("true"), json!(1), Value::Null] {
+        let mut aligned = follow();
+        aligned["align"] = bad;
+        assert!(!ok("layer.followPath.set", aligned), "align is a boolean");
+    }
 }

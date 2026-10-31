@@ -93,6 +93,8 @@ impl ObjectSnapshot {
             }
         });
         let mut widths = Vec::new();
+        // #2356: the plain editable read also lists the type each vertex shows (its stored hint, else the one its handles show).
+        let mut types: Option<Vec<&'static str>> = None;
         let geometry = planned.and_then(|r| {
             if center {
                 let (anchors, w) = record::center_anchors(&r)?;
@@ -109,6 +111,9 @@ impl ObjectSnapshot {
                 }
                 Ok((r.geometry.closed, record::paint_anchors(&r)?))
             } else {
+                if !record::has_pressure(&r) {
+                    types = Some(record::effective_types(&r, &anchors)?);
+                }
                 Ok((record::closed(&r), anchors))
             }
         });
@@ -152,6 +157,9 @@ impl ObjectSnapshot {
         };
         if paint {
             response.result.as_mut().unwrap()["subselect"]["paint"] = json!(true);
+        }
+        if let Some(types) = &types {
+            response.result.as_mut().unwrap()["subselect"]["pointTypes"] = json!(types[cursor..end]);
         }
         if hit_test {
             response.result.as_mut().unwrap()["subselect"]["hitTest"] = json!(true);

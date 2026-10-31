@@ -467,9 +467,10 @@
           </div>
         </div>
         <div class="pr" id="sp-pointtype-row" style="display:none;gap:4px">
-          <button class="pbtn" id="btn-pt-corner" data-i18n-title="ptCornerTitle" data-i18n="ptCorner" title="Corner point — no curvature, handles zeroed">Corner</button>
+          <button class="pbtn" id="btn-pt-corner" data-i18n-title="ptCornerTitle" data-i18n="ptCorner" title="Corner point — breaks the tangent angle, the handles move independently">Corner</button>
           <button class="pbtn" id="btn-pt-smooth" data-i18n-title="ptSmoothTitle" data-i18n="ptSmooth" title="Smooth point — handles stay tangent but can differ in length">Smooth</button>
           <button class="pbtn" id="btn-pt-symmetric" data-i18n-title="ptSymmetricTitle" data-i18n="ptSymmetric" title="Symmetric point — handles tangent and equal length">Symmetric</button>
+          <button class="pbtn" id="btn-pt-collapse" data-i18n-title="ptCollapseTitle" data-i18n="ptCollapse" title="Collapse point: remove both handles">Collapse</button>
         </div>
         <!-- Flat monochrome icons (matching the .lico/.pbtn icon language elsewhere)
              built from two overlapping circles as a single combined path, using
@@ -2544,6 +2545,8 @@
 <script src="js/adapters/native-object-inactive-project-tabs.js"></script>
 <script src="js/adapters/native-object-project-tabs-ui.js"></script>
 <script src="js/project.js"></script>
+<script src="js/adapters/project-close-shortcut.js"></script>
+<script src="js/adapters/project-save-shortcut.js"></script>
 <script src="js/adapters/feedback-local.js"></script>
 <script src="js/adapters/feedback-remote.js"></script>
 <script src="js/feedback-bridge.js"></script>
@@ -2674,6 +2677,7 @@
 <script src="js/adapters/native-object-motion-preset.js"></script>
 <script src="js/adapters/native-object-layer-compositing.js"></script>
 <script src="js/adapters/native-layer-parent.js"></script>
+<script src="js/adapters/native-motion-layer-link-rows.js"></script>
 <script src="js/adapters/native-path-effects-ui.js"></script>
 <script src="js/adapters/native-object-rig.js"></script>
 <script src="js/adapters/native-object-tween.js"></script>
@@ -2681,6 +2685,7 @@
 <script src="js/adapters/native-object-component-intent.js"></script>
 <script src="js/adapters/native-object-component.js"></script>
 <script src="js/adapters/native-object-duplicator.js"></script>
+<script src="js/adapters/native-object-duplicator-ui.js"></script>
 <script src="js/adapters/native-import-core.js"></script>
 <script src="js/adapters/native-import-png-stage.js"></script>
 <script src="js/adapters/native-import-svg.js"></script>

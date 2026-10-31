@@ -71,15 +71,21 @@
         return payload;
       });
     }
-    function setFollowPath(index, target) {
+    // `options.align` (boolean) authors the orient toggle with the target; omitted keeps the stored one. A clear carries none.
+    function setFollowPath(index, target, options) {
       const uid = uidOf(index);
       if (!uid) return Promise.reject(fault('not_found', 'The layer is not in the native project', { reason: 'layer_missing' }));
-      return commands.execute(Contract.FOLLOW_PATH_SET, () => ({ command: 'object.layer.followPath.set', contextId: ROOT_CONTEXT, layerUid: uid, targetLayerUid: target }));
+      return commands.execute(Contract.FOLLOW_PATH_SET, () => {
+        const payload = { command: 'object.layer.followPath.set', contextId: ROOT_CONTEXT, layerUid: uid, targetLayerUid: target };
+        if (target !== null && options && typeof options.align === 'boolean') payload.align = options.align;
+        return payload;
+      });
     }
     const indexOf = (uid) => rows(session.info()).findIndex((row) => row.layerUid === uid);
     const nameOf = (index) => { const row = rowAt(index); return row ? (typeof row.name === 'string' && row.name ? row.name : 'Layer ' + (index + 1)) : null; };
     return Object.freeze({ layerUid: uidOf, parentUidOf, descendants, setParent, setTimeLink, setFollowPath, timeLinkWouldCycle,
-      timeLinkUidOf: (index) => stored(index, 'timeLinkUid'), followPathUidOf: (index) => stored(index, 'followPathUid'), indexOf, nameOf, count: () => rows(session.info()).length,
+      timeLinkUidOf: (index) => stored(index, 'timeLinkUid'), followPathUidOf: (index) => stored(index, 'followPathUid'),
+      followPathAlignOf: (index) => { const row = rowAt(index); return !!row && row.followPathAlign === true; }, indexOf, nameOf, count: () => rows(session.info()).length,
       rowKind: (index) => { const row = rowAt(index); return row && row.kind || null; } });
   }
 
@@ -181,6 +187,16 @@
       return true;
     }, (error) => { toast(host, linkRefusalText('path', error)); return false; });
   }
+  // The Align button of the Path row (baseline mp-align-btn): author the orient toggle of the stored path. Only a layer that follows a path has one.
+  function followPathAlignSet(host, adapter, li, align, onChanged) {
+    const target = adapter.followPathUidOf(li);
+    if (!target || typeof align !== 'boolean') { toast(host, 'Follow Path : choisissez d\'abord un calque de tracé.'); return Promise.resolve(false); }
+    return adapter.setFollowPath(li, target, { align }).then(() => {
+      if (typeof onChanged === 'function') onChanged();
+      refreshAll(host);
+      return true;
+    }, (error) => { toast(host, linkRefusalText('path', error)); return false; });
+  }
   // The Follow Path picker: only a layer that can carry a path is a target (a folder, Null or effect layer never does).
   function followPathMenuItems(host, adapter, li, onChanged) {
     const current = adapter.followPathUidOf(li);
@@ -206,7 +222,7 @@
       host.showContextMenu(x, y, [
         { label: tr(host, 'ctxParentInTimeLinkTimeEllipsis', 'Parent in Time — lier le temps à…'), action: () => { host.showContextMenu(x, y, timeLinkMenuItems(host, adapter, li, onChanged)); } },
         { label: 'Chemin (Follow Path)…', action: () => { host.showContextMenu(x, y, followPathMenuItems(host, adapter, li, onChanged)); } },
-      ]);
+      ].concat(host.NemoNativeObjectDuplicatorUi ? host.NemoNativeObjectDuplicatorUi.contextItems(host, li) : [])); // #2256: Object-mode Duplicator…
     });
   }
   // The baseline layer-row Parent cell (.lparent: pickwhip .lpick + label; 1065e9d8 buildParentCell) for a NATIVE row: the label is the
@@ -280,5 +296,5 @@
   function parentCleared(host, adapter, li, onChanged) { return pick(host, adapter, li, null, onChanged); }
   function parentChosen(host, adapter, li, parentIndex, onChanged) { return pick(host, adapter, li, parentIndex, onChanged); }
 
-  return Object.freeze({ create, desktop, refusalText, parentMenuItems, timeLinkMenuItems, followPathMenuItems, timeLinkSet, followPathSet, linkRefusalText, parentCleared, parentChosen, cell, startPickwhip });
+  return Object.freeze({ create, desktop, refusalText, parentMenuItems, timeLinkMenuItems, followPathMenuItems, timeLinkSet, followPathSet, followPathAlignSet, linkRefusalText, parentCleared, parentChosen, cell, startPickwhip });
 }));

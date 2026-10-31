@@ -64,6 +64,9 @@ pub(crate) enum Refusal {
 }
 #[path = "object_subselect_record.rs"]
 pub(crate) mod record;
+#[path = "object_subselect_point_type.rs"]
+pub(crate) mod point_type;
+use point_type::Kind;
 type Result<T> = std::result::Result<T, Refusal>;
 fn add(a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
     [a[0] + b[0], a[1] + b[1]]
@@ -130,23 +133,31 @@ fn direction(point: [f64; 2], previous: Option<[f64; 2]>, next: Option<[f64; 2]>
         _ => [1.0, 0.0],
     }
 }
-fn convert(a: &mut [Anchor], closed: bool, index: usize, kind: &str) -> Result<()> {
-    if !matches!(kind, "corner" | "smooth" | "symmetric") {
-        return Err(Refusal::Invalid);
-    }
-    if kind == "corner" {
-        a[index].handle_in = [0.0; 2];
-        a[index].handle_out = [0.0; 2];
-        return Ok(());
+/// #2356: Corner keeps both handles (it only breaks the tangent angle), `collapse` removes them, Smooth and Symmetric keep
+/// the vertex's current tangent direction (the neighbour chord only when it has no handle) so switching never rotates a
+/// handle the user already placed. Symmetric equalises the lengths (their mean), Smooth keeps them. The anchor never moves.
+/// Returns the type to record for the vertex.
+fn convert(a: &mut [Anchor], closed: bool, index: usize, kind: &str) -> Result<Kind> {
+    match kind {
+        "corner" => return Ok(Kind::Corner),
+        "collapse" => {
+            a[index].handle_in = [0.0; 2];
+            a[index].handle_out = [0.0; 2];
+            return Ok(Kind::Corner);
+        }
+        "smooth" | "symmetric" => {}
+        _ => return Err(Refusal::Invalid),
     }
     let (previous, next) = neighbors(a, closed, index);
     let p = a[index].point;
-    let d = direction(p, previous, next);
-    let dir = if length(d) > 0.01 {
-        mul(d, 1.0 / length(d))
-    } else {
-        [1.0, 0.0]
-    };
+    let dir = point_type::current_tangent(&a[index]).unwrap_or_else(|| {
+        let d = direction(p, previous, next);
+        if length(d) > 0.01 {
+            mul(d, 1.0 / length(d))
+        } else {
+            [1.0, 0.0]
+        }
+    });
     let mut out = length(a[index].handle_out);
     let mut input = length(a[index].handle_in);
     if out == 0.0 {
@@ -164,7 +175,7 @@ fn convert(a: &mut [Anchor], closed: bool, index: usize, kind: &str) -> Result<(
     }
     a[index].handle_out = mul(dir, out);
     a[index].handle_in = mul(dir, -input);
-    Ok(())
+    Ok(if kind == "smooth" { Kind::Smooth } else { Kind::Symmetric })
 }
 fn toggle(a: &mut [Anchor], closed: bool, pressure: bool, index: usize) {
     let s = &a[index];
@@ -234,6 +245,38 @@ fn insert(a: &mut Vec<Anchor>, closed: bool, curve: usize, t: f64) -> Result<()>
 /// Inputs are never changed, including every refusal and no-op.
 pub(crate) fn edit(
     source: &[Anchor],
+    closed: bool,
+    pressure: bool,
+    intent: &Intent,
+) -> Result<Vec<Anchor>> {
+    edit_typed(source, None, closed, pressure, intent).map(|(anchors, _)| anchors)
+}
+/// `edit` with the optional per-vertex point-type hints (aligned with `source`, absent = inferred). The returned hints are
+/// the array to store: still `None` unless a hint array existed or this edit recorded a type (a pressure centerline has none).
+pub(crate) fn edit_typed(
+    source: &[Anchor],
+    hints: Option<&[Kind]>,
+    closed: bool,
+    pressure: bool,
+    intent: &Intent,
+) -> Result<(Vec<Anchor>, Option<Vec<Kind>>)> {
+    if hints.is_some_and(|h| h.len() != source.len()) {
+        return Err(Refusal::Invalid);
+    }
+    let mut next = hints.map(<[Kind]>::to_vec);
+    let anchors = edit_anchors(source, &mut next, closed, pressure, intent)?;
+    Ok((anchors, if pressure { None } else { next }))
+}
+/// Record `kind` for the vertices, starting the hint array from the inferred types when there is none yet.
+fn record(hints: &mut Option<Vec<Kind>>, anchors: &[Anchor], set: &[(usize, Kind)]) {
+    let all = hints.get_or_insert_with(|| point_type::inferred_all(anchors));
+    for (i, kind) in set {
+        all[*i] = *kind;
+    }
+}
+fn edit_anchors(
+    source: &[Anchor],
+    hints: &mut Option<Vec<Kind>>,
     closed: bool,
     pressure: bool,
     intent: &Intent,
@@ -328,25 +371,31 @@ pub(crate) fn edit(
                 _ => return Err(Refusal::Invalid),
             };
             let v = sub(*point, a[*index].point);
-            let opposite = if !break_pair {
-                Some(mul(v, -1.0))
-            } else {
-                paired.map(|p| mul(sub(p, a[*index].point), -1.0))
-            };
-            match handle.as_str() {
-                "handleIn" => {
-                    a[*index].handle_in = v;
-                    if let Some(opposite) = opposite {
-                        a[*index].handle_out = opposite;
-                    }
-                }
-                "handleOut" => {
-                    a[*index].handle_out = v;
-                    if let Some(opposite) = opposite {
-                        a[*index].handle_in = opposite;
-                    }
-                }
+            let into = match handle.as_str() {
+                "handleIn" => true,
+                "handleOut" => false,
                 _ => return Err(Refusal::Invalid),
+            };
+            let kind = point_type::effective(hints.as_deref(), &a, *index);
+            let opposite = if *break_pair {
+                paired.map(|p| mul(sub(p, a[*index].point), -1.0))
+            } else {
+                let old = if into { a[*index].handle_out } else { a[*index].handle_in };
+                point_type::opposite_of_drag(kind, v, old)
+            };
+            if into {
+                a[*index].handle_in = v;
+                if let Some(opposite) = opposite {
+                    a[*index].handle_out = opposite;
+                }
+            } else {
+                a[*index].handle_out = v;
+                if let Some(opposite) = opposite {
+                    a[*index].handle_in = opposite;
+                }
+            }
+            if *break_pair && !pressure {
+                record(hints, &a, &[(*index, Kind::Corner)]);
             }
         }
         Intent::PointType {
@@ -354,16 +403,27 @@ pub(crate) fn edit(
             point_type,
         } => {
             indices(selected, a.len())?;
+            let mut set = Vec::with_capacity(selected.len());
             for i in selected {
-                convert(&mut a, closed && !pressure, *i, point_type)?;
+                set.push((*i, convert(&mut a, closed && !pressure, *i, point_type)?));
+            }
+            if !pressure {
+                record(hints, &a, &set);
             }
         }
         Intent::Toggle { index } => {
             indices(&[*index], a.len())?;
             toggle(&mut a, closed, pressure, *index);
+            if let Some(all) = hints.as_mut() {
+                let bare = a[*index].handle_in == [0.0; 2] && a[*index].handle_out == [0.0; 2];
+                all[*index] = if bare { Kind::Corner } else { point_type::infer(&a[*index]) };
+            }
         }
         Intent::Insert { curve, time } => {
             insert(&mut a, closed && !pressure, *curve, *time)?;
+            if let Some(all) = hints.as_mut() {
+                all.insert(curve + 1, point_type::infer(&a[curve + 1]));
+            }
         }
         Intent::Delete { indices: selected } => {
             indices(selected, a.len())?;
@@ -375,6 +435,13 @@ pub(crate) fn edit(
                 .enumerate()
                 .filter_map(|(i, v)| (!selected.contains(&i)).then_some(v))
                 .collect();
+            if let Some(all) = hints.as_mut() {
+                let mut i = 0;
+                all.retain(|_| {
+                    i += 1;
+                    !selected.contains(&(i - 1))
+                });
+            }
         }
     }
     if !valid(&a) {

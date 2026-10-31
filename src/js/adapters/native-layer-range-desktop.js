@@ -91,7 +91,7 @@
     value.tracks.map(function(track){return [trackIdentity(track),track.items.map(function(k){return k.frame;})];})]);}
   function keyAddress(track,frame){return {target:{kind:'property',target:track.target,property:track.property},frame:frame};}
   function selectedAddresses(value){var keys=[];value.tracks.forEach(function(track){track.items.forEach(function(key){if(key.selected)keys.push(keyAddress(track,key.frame));});});return keys;}
-  function clearKeys(w){(w.keyNodes||[]).forEach(function(n){if(n.parentNode)n.parentNode.removeChild(n);});w.keyNodes=[];}
+  function clearKeys(w){(w.keyNodes||[]).forEach(function(n){if(n.parentNode)n.parentNode.removeChild(n);});w.keyNodes=[];w.keySig=null;}
   function keyRows(root,w,layout){
     if(layout.length&&(!w.ports||typeof w.ports.setKeyTimelineRows!=='function'||w.ports.setKeyTimelineRows(layout,w.info)!==true))throw Error('Native property label rows unavailable');
     if(!layout.length&&w.ports&&typeof w.ports.setKeyTimelineRows==='function')w.ports.setKeyTimelineRows([],w.info);
@@ -103,12 +103,17 @@
   function remapTracks(root,w){var f=root.SM&&root.SM.timeRemapKeyFacts;if(typeof f!=='function')return [];
     return w.info.layers.map(function(l,i){var r=f(i),keys=r&&Array.isArray(r.keys)?r.keys:[];
       return keys.length?{target:{contextId:'scene-root',layerUid:l.layerUid},property:'timeRemap',inert:true,items:keys.map(function(k){return {frame:k.frame,selected:false};})}:null;}).filter(Boolean);}
+  function resetKeys(root,w){clearKeys(w);keyRows(root,w,[]);}
+  // The key buttons depend on the key frames, selection, lanes and zoom, not on which frame is shown: a playback tick whose projection prints the same
+  // signature keeps its buttons (#2371) and only swaps the live value their handlers read.
+  function keySignature(root,w,fc,layout,positions){
+    return JSON.stringify([fc,layout,positions.map(function(p){return [p.index,w.rows[p.index].hidden,trackIdentity(p.track),p.key.frame,p.key.selected,p.left,p.top];})]);
+  }
   function refreshKeys(root){
-    var w=works.get(root);if(!w)return;clearKeys(w);
+    var w=works.get(root);if(!w)return;
     try{
-      keyRows(root,w,[]);
-      if(!w.node||root.state.appMode!=='motion'||!ready(root,session(root),w.info))return;
-      var value=keyViews(root,w),remap=remapTracks(root,w),fc=root.FC;if((!value&&!remap.length)||!Number.isFinite(fc)||fc<=0)return;
+      var live=w.node&&root.state.appMode==='motion'&&ready(root,session(root),w.info),value=live?keyViews(root,w):null,remap=live?remapTracks(root,w):[],fc=root.FC;
+      if((!value&&!remap.length)||!Number.isFinite(fc)||fc<=0){resetKeys(root,w);return;}
       var groups=new Map(),layout=[],positions=[];
       (value?value.tracks:[]).concat(remap).forEach(function(track){
         var index=w.info.layers.findIndex(function(l){return l.layerUid===track.target.layerUid;});if(index<0)throw Error('Foreign native key layer');
@@ -123,7 +128,9 @@
           positions.push({track:track,key:key,index:index,left:left,top:top});
         });});
       });
-      keyRows(root,w,layout);
+      var signature=keySignature(root,w,fc,layout,positions);
+      if(w.keySig===signature&&w.keyNodes.every(function(n){return !!n.parentNode;})){w.keyValue=value;return;}
+      resetKeys(root,w);keyRows(root,w,layout);w.keyValue=value;
       positions.forEach(function(position){
         var track=position.track,key=position.key,row=w.rows[position.index];if(row.hidden)return;
         var node=root.document.createElement('button');node.type='button';node.className='motion-key layer-inout-key native-motion-property-key';
@@ -134,15 +141,17 @@
         function choose(event){
           event.preventDefault();event.stopPropagation();if(event.button!==undefined&&event.button!==0)return;
           try{
-            if(root.state.appMode!=='motion'||node.parentNode!==row||w.rows[position.index]!==row||root.FC!==fc||w.down||w.marquee||!ready(root,session(root),w.info)||!value.isCurrent())throw Error('Stale native key selection');
-            var keys=event.ctrlKey||event.metaKey||event.shiftKey?selectedAddresses(value):[],address=keyAddress(track,key.frame),id=JSON.stringify(address);
+            var live=w.keyValue;
+            if(root.state.appMode!=='motion'||node.parentNode!==row||w.rows[position.index]!==row||root.FC!==fc||w.down||w.marquee||!ready(root,session(root),w.info)||!live||live.frame!==root.state.currentFrame||!live.isCurrent())throw Error('Stale native key selection');
+            var keys=event.ctrlKey||event.metaKey||event.shiftKey?selectedAddresses(live):[],address=keyAddress(track,key.frame),id=JSON.stringify(address);
             var at=keys.findIndex(function(k){return JSON.stringify(k)===id;});if(at>=0&&(event.ctrlKey||event.metaKey))keys.splice(at,1);else if(at<0)keys.push(address);
-            if(value.selectKeys(keys)!==true)throw Error('Native key selection refused');refreshKeys(root);
+            if(live.selectKeys(keys)!==true)throw Error('Native key selection refused');refreshKeys(root);
           }catch(_){notice(root,'Native key selection is unavailable or stale.');}
         }
         node.addEventListener('mousedown',choose);node.addEventListener('click',function(event){if(event.detail===0)choose(event);});
         row.appendChild(node);w.keyNodes.push(node);
       });
+      w.keySig=signature;
     }catch(_){clearKeys(w);try{keyRows(root,w,[]);}catch(_){}notice(root,'Native key timeline coordinates are unavailable.');}
   }
   function marqueeKeys(root,w,m,x0,y0,x1,y1){
@@ -260,7 +269,12 @@
     if(!w){w={serial:0,rows:[],capture:null,down:false};works.set(root,w);
       root.document.addEventListener('mousemove',function(e){move(root,e);});root.document.addEventListener('mouseup',function(e){up(root,e);});
       if(root.addEventListener){root.addEventListener('blur',function(){cancel(root);});root.addEventListener('pagehide',function(){cancel(root);});}}
-    if(w.node&&w.node.parentNode===grid&&same(w.info,info)&&w.frame===frame&&w.rows.length===info.layers.length){w.ports=ports;w.barUiReady=barUiReady;refreshKeys(root);return;}
+    // #2371: a frame-only change (same revision pin, same rows) keeps the painted rows and bars; rebuilding them per playback tick
+    // reset every bar and re-read every range, which is the timeline flicker. Only a row whose range never arrived asks again.
+    if(w.node&&w.node.parentNode===grid&&same(w.info,info)&&w.rows.length===info.layers.length){
+      w.ports=ports;w.barUiReady=barUiReady;
+      if(w.frame!==frame){w.frame=frame;if(s&&typeof s.readLayerRange==='function')w.rows.forEach(function(row,li){if(!row.nativeRange&&row.rangeAsked!==frame)askRange(root,s,w,row,li,info,frame,w.node);});}
+      refreshKeys(root);return;}
     var ownPending=w.capture&&owner(w.capture.info,info)&&info.contentRevision===w.capture.info.contentRevision+1&&!w.down;
     if(!ownPending)cancel(root);
     w.serial++;var ticket=w.serial;w.info=info;w.frame=frame;w.grid=grid;w.ports=ports;w.barUiReady=barUiReady;
@@ -271,7 +285,11 @@
       return row;});
     w.rows.forEach(function(row,li){node.appendChild(row);if(w.barUiReady)w.ports.barUi.buildBar(row,li);});grid.appendChild(node);refreshKeys(root);
     if(!s||typeof s.readLayerRange!=='function')return;
-    w.rows.forEach(function(row,li){Promise.resolve(s.readLayerRange(info.layers[li].layerUid,frame,info)).then(function(result){
+    w.rows.forEach(function(row,li){askRange(root,s,w,row,li,info,frame,node);});
+  }
+  function askRange(root,s,w,row,li,info,frame,node){
+    var ticket=w.serial;row.rangeAsked=frame;
+    Promise.resolve(s.readLayerRange(info.layers[li].layerUid,frame,info)).then(function(result){
       if(ticket!==w.serial||w.rows[li]!==row||row.parentNode!==node||!ready(root,s,info)||!result||result.kind!=='layerRange'||
         result.instanceId!==info.instanceId||result.documentId!==info.documentId||result.atRevision!==info.contentRevision||result.documentSnapshotId!==info.documentSnapshotId||
         result.contextId!=='scene-root'||result.layerUid!==info.layers[li].layerUid||result.frame!==frame)return;
@@ -279,7 +297,7 @@
       if(!range||Object.keys(range).length!==6||!fields.every(function(k){return Object.prototype.hasOwnProperty.call(range,k);})||
         !fields.slice(0,4).every(function(k){return Number.isFinite(range[k]);})||typeof range.hasCustomRange!=='boolean'||typeof range.hasTimeLink!=='boolean')return;
       row.nativeRange=freeze({pin:Object.assign({},info),range:JSON.parse(JSON.stringify(range))});paint(root,row,li);
-    }).catch(function(){});});
+    }).catch(function(){});
   }
   return Object.freeze({active:active,mount:mount,refreshKeys:refreshKeys,retire:retire,owns:owns,buildBar:buildBar,paint:paint,down:down,startMarquee:startMarquee,isGestureCurrent:isGestureCurrent});
 }));

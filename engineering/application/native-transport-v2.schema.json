@@ -836,6 +836,19 @@
         },
         "isFillShape": {
           "const": true
+        },
+        "pointTypes": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 256,
+          "items": {
+            "enum": [
+              "corner",
+              "smooth",
+              "symmetric"
+            ]
+          },
+          "description": "Optional per-vertex point-type hint aligned with geometry.segments; absent means inferred from the handles. Never on a pressure ribbon."
         }
       },
       "minProperties": 1,
@@ -19806,6 +19819,19 @@
         },
         "isFillShape": {
           "const": true
+        },
+        "pointTypes": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 256,
+          "items": {
+            "enum": [
+              "corner",
+              "smooth",
+              "symmetric"
+            ]
+          },
+          "description": "Optional per-vertex point-type hint aligned with geometry.segments; absent means inferred from the handles. Never on a pressure ribbon."
         }
       },
       "minProperties": 1,
@@ -20018,6 +20044,19 @@
         },
         "isFillShape": {
           "const": true
+        },
+        "pointTypes": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 256,
+          "items": {
+            "enum": [
+              "corner",
+              "smooth",
+              "symmetric"
+            ]
+          },
+          "description": "Optional per-vertex point-type hint aligned with geometry.segments; absent means inferred from the handles. Never on a pressure ribbon."
         }
       },
       "minProperties": 1,
@@ -20206,7 +20245,8 @@
               "enum": [
                 "corner",
                 "smooth",
-                "symmetric"
+                "symmetric",
+                "collapse"
               ]
             }
           }
@@ -20512,6 +20552,18 @@
             },
             "paint": {
               "const": true
+            },
+            "pointTypes": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "enum": [
+                  "corner",
+                  "smooth",
+                  "symmetric"
+                ]
+              },
+              "description": "The point type each listed vertex shows: its stored hint, else the one its handles show. Only on the plain editable read."
             }
           },
           "allOf": [
@@ -22772,6 +22824,9 @@
               "const": null
             }
           ]
+        },
+        "align": {
+          "type": "boolean"
         }
       }
     },

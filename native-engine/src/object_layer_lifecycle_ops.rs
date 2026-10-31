@@ -136,12 +136,14 @@ struct FollowPathPayload {
     context_id: String,
     layer_uid: String,
     target_layer_uid: Option<String>,
+    align: Option<bool>,
 }
 object_deserialize!(FollowPathPayload {
     command: String,
     context_id: String,
     layer_uid: String,
-    target_layer_uid: Option<String>
+    target_layer_uid: Option<String>,
+    align: Option<bool>
 });
 
 impl SelectionPayload {
@@ -408,7 +410,7 @@ impl ObjectFillOwner {
         );
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::TimeLink, plan)
     }
-    /// #2372: Follow path target set or clear (`targetLayerUid: null`).
+    /// #2372: Follow path target set or clear (`targetLayerUid: null`); an optional `align` authors the orient toggle.
     pub(crate) fn prepare_layer_follow_path_json(
         &self,
         bytes: &[u8],
@@ -427,6 +429,7 @@ impl ObjectFillOwner {
             &payload.context_id,
             &payload.layer_uid,
             payload.target_layer_uid.as_deref(),
+            payload.align,
         );
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::FollowPath, plan)
     }

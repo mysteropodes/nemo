@@ -115,3 +115,7 @@ mod held_tests;
 #[cfg(test)]
 #[path = "../tests/object_subselect_pressure.rs"]
 mod pressure_tests;
+
+#[cfg(test)]
+#[path = "../tests/object_subselect_point_type_history.rs"]
+mod point_type_tests;

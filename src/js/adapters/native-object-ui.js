@@ -288,7 +288,7 @@
           if(row.parentNode!==list||!views.get(root)||!views.get(root).rows.includes(row))return false;
           return setLayerPolicy(root,layer.layerUid,flag,value,info,ports);
         },
-        onOpen:function(layer){return typeof ports.openLayer==='function'&&ports.openLayer(layer.layerUid);},parentCell:root.NemoNativeLayerParent?function(layer,i,row){return root.NemoNativeLayerParent.cell(root,info,layer,i,row);}:null,layerKind:root.SMLayerKind,blendLabels:root.BLEND_MODE_LABELS,matteLabel:typeof root.matteModeLabel==='function'?root.matteModeLabel:null});
+        onOpen:function(layer){return typeof ports.openLayer==='function'&&ports.openLayer(layer.layerUid);},parentCell:root.NemoNativeLayerParent?function(layer,i,row){return root.NemoNativeLayerParent.cell(root,info,layer,i,row);}:null,duplicatorCell:root.NemoNativeObjectDuplicatorUi?function(layer,i,row){return root.NemoNativeObjectDuplicatorUi.cell(root,info,layer,i,row);}:null,layerKind:root.SMLayerKind,blendLabels:root.BLEND_MODE_LABELS,matteLabel:typeof root.matteModeLabel==='function'?root.matteModeLabel:null});
       caption=createNativeObjectUiText(root,'div','');
       unavailable=createNativeObjectUiText(root,'div','Native keyframe, held-frame and tween timing is unavailable.');
       unavailable.setAttribute('role','status');unavailable.className='native-object-timing-unavailable';
@@ -298,7 +298,7 @@
     if(root.NemoNativeLayerRangeDesktop&&typeof root.NemoNativeLayerRangeDesktop.mount==='function')
       root.NemoNativeLayerRangeDesktop.mount(root,grid,info,Object.assign({},ports,{setKeyTimelineRows:function(layout,expected){return setKeyTimelineRows(root,layout,expected);},readMotionKeyTimelines:function(expected){return readMotionKeyTimelines(root,expected);},readMotionKeyTimeline:function(expected){return readMotionKeyTimeline(root,expected);},readSelectedMotionKeys:function(expected){return readSelectedMotionKeys(root,expected);},readLegacyMotionSelection:function(){var motion=root.SMMotion;return motion&&typeof motion.getKeySelection==='function'?motion.getKeySelection():null;},barUi:root.SMLayerInOut}));
     caption.textContent='Frame '+(root.state.currentFrame+1)+' / '+info.totalFrames;
-    if(root.NemoNativeFrameCellSelection)root.NemoNativeFrameCellSelection.mount(root,caption,info,Object.assign({},ports,{
+    if(root.NemoNativeFrameCellSelection)root.NemoNativeFrameCellSelection.mount(root,caption,info,Object.assign({},ports,{frameOnly:reuse===true,
       frameEditPending:function(){var controller=root.NemoNativeFrameEditController;return !!(controller&&controller.isPending());}}));
     unavailableInspector(root,ports,info,frameOnly);
     if(!reuse){var pin={};['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].forEach(function(k){pin[k]=info[k];});

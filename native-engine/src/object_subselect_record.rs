@@ -1,5 +1,7 @@
 //! Detached canonical-record projection of a subselect intent. Shared by preview and commit.
-use crate::object_document::subselect::{edit, Anchor, Intent, Refusal};
+use crate::object_document::subselect::point_type::Kind;
+use crate::object_document::subselect::{edit_typed, Anchor, Intent, Refusal};
+use crate::object_document::{Presence, VectorExt};
 use crate::object_document::{
     ObjectDocument, ObjectPoint, ObjectRecord, ObjectSegment, VECTOR_FAMILY,
 };
@@ -170,12 +172,41 @@ pub(crate) fn paint_anchors(record: &ObjectRecord) -> Result<Vec<Anchor>, Refusa
         })
         .collect()
 }
+/// #2356: the stored per-vertex point-type hints (`None` = inferred); a hint array that does not match the vertices is refused.
+pub(crate) fn hints(record: &ObjectRecord) -> Result<Option<Vec<Kind>>, Refusal> {
+    let Some(stored) = record.vector_ext.value().and_then(|e| e.point_types.value()) else {
+        return Ok(None);
+    };
+    if stored.len() != record.geometry.segments.len() {
+        return Err(Refusal::Invalid);
+    }
+    stored.iter().map(|t| Kind::parse(t).ok_or(Refusal::Invalid)).collect::<Result<Vec<_>, _>>().map(Some)
+}
+/// The type each vertex shows: its stored hint, else the one its handles show.
+pub(crate) fn effective_types(record: &ObjectRecord, anchors: &[Anchor]) -> Result<Vec<&'static str>, Refusal> {
+    let stored = hints(record)?;
+    Ok((0..anchors.len())
+        .map(|i| crate::object_document::subselect::point_type::effective(stored.as_deref(), anchors, i).name())
+        .collect())
+}
+/// Store the hint array on the record. `None` leaves the record as it is (an absent hint stays absent).
+fn store_hints(next: &mut ObjectRecord, hints: Option<Vec<Kind>>) {
+    let Some(hints) = hints else { return };
+    let names = hints.iter().map(|k| k.name().to_string()).collect();
+    match next.vector_ext {
+        Presence::Present(ref mut ext) => ext.point_types = Presence::Present(names),
+        _ => {
+            next.vector_ext = Presence::Present(VectorExt { point_types: Presence::Present(names), ..VectorExt::default() })
+        }
+    }
+}
 pub(crate) fn plan(record: &ObjectRecord, intent: &Intent) -> Result<ObjectRecord, Refusal> {
     if has_pressure(record) {
         return pressure::plan(record, intent);
     }
-    let edited = edit(&anchors(record)?, record.geometry.closed, false, intent)?;
+    let (edited, typed) = edit_typed(&anchors(record)?, hints(record)?.as_deref(), record.geometry.closed, false, intent)?;
     let mut next = record.clone();
+    store_hints(&mut next, typed);
     let mut origins: Vec<Option<usize>> = (0..record.geometry.segments.len()).map(Some).collect();
     match intent {
         Intent::Insert { curve, .. } => origins.insert(curve + 1, None),

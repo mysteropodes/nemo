@@ -80,6 +80,36 @@ pub(crate) fn roots<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Vec<PathBuf
     .collect()
 }
 
+/// #2269: the desktop UI's own Open of a path no dialog granted this session (a recent project, a crash-recovery
+/// generation). The bootstrap and inactive-project routes read through `try_fs_scope`, which holds only dynamic
+/// grants (the plugin's static config scope is empty), so such a path was refused as outside the scope. The path is
+/// admitted here exactly as an MCP `project.open` is: it must exist, be a regular file and lie inside the static
+/// roots. Only that one file is granted; the route's own strict format gate still decides whether it is a project.
+pub(crate) fn admit_open_file_with(
+    raw: &str,
+    roots: &[PathBuf],
+    allow: impl FnOnce(&Path) -> Result<(), String>,
+) -> Result<PathBuf, String> {
+    if raw.contains('\0') {
+        return Err(format!("{raw:?} is not a usable project path"));
+    }
+    let resolved = resolve(Path::new(raw), true)?;
+    if !resolved.is_file() || !inside(&Target::File(resolved.clone()), roots) {
+        return Err("project path is outside the app's file roots".into());
+    }
+    allow(&resolved)?;
+    Ok(resolved)
+}
+
+/// Best effort: a refused path stays outside the scope, so the route answers its own typed refusal.
+pub(crate) fn admit_open_file<R: tauri::Runtime>(app: &tauri::AppHandle<R>, raw: &str) -> bool {
+    let scope = app.fs_scope();
+    admit_open_file_with(raw, &roots(app), |path| {
+        scope.allow_file(path).map_err(|error| error.to_string())
+    })
+    .is_ok()
+}
+
 /// Validates the request as before (an invalid request still fails the connection), then admits a project request's
 /// own path into the fs scope. A path that cannot be admitted answers a typed refusal the caller writes back, so the
 /// client sees why instead of a dropped connection.

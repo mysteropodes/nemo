@@ -614,6 +614,10 @@ input[type="checkbox"]:disabled{opacity:.4;cursor:not-allowed;}
    is measured from the padding box, so "right 8px" reliably keeps the
    chevron clear of the border-radius regardless of box width. */
 .psel{background-color:var(--panel3);border:none;color:var(--text);border-radius:6px;padding:5px 24px 5px 8px;font-size:12px;outline:none;flex:1;appearance:none;-webkit-appearance:none;-moz-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(236,234,231,.45)' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;}
+/* #2267: the Text popover is 230px wide; a long font name (an imported document font) must be clipped with an ellipsis inside it, not widen the select past the popover (baseline popover select stayed in its flex row). */
+#text-popover .pr{min-width:0;}
+#text-popover select,#text-popover input[type=number]{min-width:0;max-width:100%;text-overflow:ellipsis;}
+#text-popover #text-font{width:0;min-width:0;max-width:100%;flex:1 1 0;overflow:hidden;white-space:nowrap;}
 /* Blend-mode custom dropdown list (hover = live canvas preview, see
    initBlendDropdown in timeline.js) */
 #blend-pop,#matte-pop{display:none;position:fixed;z-index:300;width:180px;max-height:340px;overflow-y:auto;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:4px;}
@@ -1879,7 +1883,7 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 #statusbar{height:20px;flex-shrink:0;background:transparent;border-top:none;display:flex;align-items:center;justify-content:space-between;padding:0 6px;font-size:10.5px;color:rgba(236,234,231,.4);font-weight:500;}
 #statusbar>span:first-child{display:flex;gap:16px;}
 .sc{background:transparent;color:rgba(236,234,231,.6);font-weight:700;padding:0;border-radius:0;font-family:inherit;font-size:10.5px;margin:0 3px 0 0;}
-#toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel3);color:var(--text);padding:6px 16px;border-radius:6px;font-size:11px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:100;border:1px solid var(--border);}
+#toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel3);color:var(--text);padding:6px 16px;border-radius:6px;font-size:11px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:10000;border:1px solid var(--border);}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 ::-webkit-scrollbar{width:6px;height:6px;}
 ::-webkit-scrollbar-track{background:var(--bg);}

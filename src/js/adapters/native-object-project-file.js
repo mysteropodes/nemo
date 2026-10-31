@@ -61,7 +61,7 @@
         });});
   }
   // #2371: read-model members the layer table admits (validated by native-object-project-metadata.js; the presenter reads info.layers).
-  var MODEL_ROW_KEYS=['kind','folderCollapsed','folderId','componentId','blendMode','matteMode','matteSourceLayerUid','timeLinkUid','followPathUid','mattesMore','isMatteSource','opacity','opacityAnimated','effects','effectsOversize','pathFx','pathFxOversize'];
+  var MODEL_ROW_KEYS=['kind','folderCollapsed','folderId','componentId','blendMode','matteMode','matteSourceLayerUid','timeLinkUid','followPathUid','followPathAlign','hasDuplicator','dupSourceMode','mattesMore','isMatteSource','opacity','opacityAnimated','effects','effectsOversize','pathFx','pathFxOversize'];
   function layerTable(layers){
     if(!Array.isArray(layers))throw new Error('Native layer table is invalid');
     var seen=new Set(),next=[];
@@ -212,8 +212,9 @@
       baselines.set(previous.documentId,baseline);
       try{
         var current=await session.activateProject(target,{
+          // A tab switch keeps the current project visible until the next one is presented: no start-screen cover (occlude/restore
+          // belong to Open/New, which really leave the previous project), so the canvas and the UI do not blink.
           isCurrent:transition.isCurrent,confirm:async function(){return true;},
-          occlude:ports.occlude,restore:ports.restore,
           reveal:function(info,view){if(transition.projecting)transition.projecting();return ports.reveal(info,view);},
           commit:async function(info,receipt){
             baseline=baselines.has(info.documentId)?baselines.get(info.documentId):target.digest;
@@ -229,12 +230,14 @@
       }finally{opening=false;}
     }
     // destination: an application request's path (#2510) in place of the picker; the same workflow otherwise.
-    async function saveAs(destination){
+    // replace: true is the in-place Save of a titled project (the host renames over the existing file); it never applies to a picker choice.
+    async function saveAs(destination,mode){
       if(saving||opening)return {status:saving?'save-in-progress':'open-in-progress',acknowledged:false};
       var pick=typeof destination==='string'&&destination?function(){return Promise.resolve(destination);}:ports.pick;
       saving=true;
       try{
         var options={requestId:session.requestId('save'),pinRequestId:session.requestId('save-pin'),project:true};
+        if(mode&&mode.replace===true&&typeof destination==='string'&&destination)options.replace=true;
         var ticket=saved.begin({saveRequestId:options.requestId,serializerRequestId:options.pinRequestId}),serialization;
         options.isCurrent=function(){return saved.isCurrent(ticket);};
         var written=await workflow.run({readPresentedObjectSession:session.captureSaveSession(),
