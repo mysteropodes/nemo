@@ -1,8 +1,8 @@
 //! Real native project files bypass the small command-response byte envelope.
 use crate::application_mcp::ApplicationMcp;
-use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
+use crate::native_dispatch::{NativeDispatch, NativeObjectHost, PROJECT_INFO_LIMIT_BYTES};
 use crate::native_object_bootstrap::{
-    bootstrap_raw, reopen::bootstrap_request, save::save_request, PROJECT_INFO_LIMIT_BYTES,
+    bootstrap_raw, reopen::bootstrap_request, save::save_request,
 };
 use native_engine::{
     object_document::FrameScopeKind, object_frame_packet::ObjectFrameSelector,

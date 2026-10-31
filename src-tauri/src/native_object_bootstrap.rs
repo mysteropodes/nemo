@@ -28,7 +28,6 @@ mod admission;
 mod reference;
 #[path = "native_object_save.rs"]
 mod save;
-pub(crate) use reference::PROJECT_INFO_LIMIT_BYTES;
 #[allow(unused_imports)]
 pub(crate) use reference::{
     __cmd__nemo_native_object_reference, __tauri_command_name_nemo_native_object_reference,

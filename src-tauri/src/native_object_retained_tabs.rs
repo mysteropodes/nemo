@@ -1,6 +1,5 @@
 //! One parked project in the original host; only self.history accepts commands.
 use crate::native_dispatch::object_host::{envelope_identity, export, preview};
-use crate::native_object_bootstrap::PROJECT_INFO_LIMIT_BYTES;
 use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
 use native_engine::{
     application::{ApplicationReleaseReceipt, ObjectMotionFrameControl},
@@ -12,6 +11,15 @@ use native_engine::{
     object_snapshot::ObjectSnapshot,
 };
 use serde_json::{json, Value};
+
+/// Hard cap on one project-info answer (active or inactive), checked on the serialized bytes. #2371 made every layer row
+/// richer (kind, folder, blend, opacity, matte and its additional mattes, long names): measured 484 bytes for a fully
+/// populated row (`rich_rows_stay_within_the_ui_bound`, native-engine), so the earlier 64 KiB cap failed at about 135
+/// such layers; baseline Release to Layers makes one layer per shape, so hundreds are realistic. 4 MiB holds about
+/// 8,600 such rows (4096 rich layers measure 1.9 MB) and is still one cheap IPC/JSON parse. The answer is one read, not
+/// paged: open, revision sync and the layer-list presenter all correlate on the whole answer's snapshot pins. Past the
+/// cap the read is refused outright, never truncated.
+pub(crate) const PROJECT_INFO_LIMIT_BYTES: usize = 4 * 1024 * 1024;
 
 pub(super) struct ParkedProject {
     history: NativeObjectHistory,

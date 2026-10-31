@@ -1,20 +1,11 @@
 //! Project files use the original object host and native lifecycle slot.
 use crate::application_mcp::ApplicationMcp;
-use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
+use crate::native_dispatch::{NativeDispatch, NativeObjectHost, PROJECT_INFO_LIMIT_BYTES};
 use native_engine::{
     commands::{OpacityRequest, ResponseEnvelope},
     object_frame_packet::ObjectFrameSelector,
 };
 use serde_json::{json, Value};
-
-/// Hard cap on one project-info answer (active or inactive), checked on the serialized bytes. #2371 made every layer row
-/// richer (kind, folder, blend, opacity, matte and its additional mattes, long names): measured 484 bytes for a fully
-/// populated row (`rich_rows_stay_within_the_ui_bound`, native-engine), so the earlier 64 KiB cap failed at about 135
-/// such layers; baseline Release to Layers makes one layer per shape, so hundreds are realistic. 4 MiB holds about
-/// 8,600 such rows (4096 rich layers measure 1.9 MB) and is still one cheap IPC/JSON parse. The answer is one read, not
-/// paged: open, revision sync and the layer-list presenter all correlate on the whole answer's snapshot pins. Past the
-/// cap the read is refused outright, never truncated.
-pub(crate) const PROJECT_INFO_LIMIT_BYTES: usize = 4 * 1024 * 1024;
 
 /// Outcome of a recovery snapshot request: a stale pin is a normal answer, not
 /// an error, and a bare drawing document is never a recoverable project.

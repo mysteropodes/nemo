@@ -15,7 +15,6 @@ use tauri_plugin_fs::FsExt;
 #[path = "native_object_project_route.rs"]
 mod project_route;
 pub(super) use project_route::RecoverySnapshot;
-pub(crate) use project_route::PROJECT_INFO_LIMIT_BYTES;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
