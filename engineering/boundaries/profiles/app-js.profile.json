@@ -673,6 +673,18 @@
       ]
     },
     {
+      "id": "app.project.close.shortcut.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "project-close-shortcut.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "project-close-shortcut.js"
+      ]
+    },
+    {
       "id": "app.updater.platform.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

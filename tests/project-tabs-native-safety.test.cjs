@@ -446,3 +446,21 @@ test('real B tab click refuses activation and close removes it only after exact 
   assert.equal(f.calls.at(-1).req.action.preparationToken,'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
   assert.equal(f.effects.some(effect=>/import|release|frame save|Paper/.test(effect)),false);
 });
+
+test('#2373 SMProject.closeActiveTab is the tab x button path for the active tab, and the last tab stays open', async () => {
+  const viaX = fixture(), viaKey = fixture();
+  assert.equal(typeof viaKey.root.SMProject.closeActiveTab, 'function');
+  viaX.close(viaX.a); await new Promise(setImmediate);
+  await viaKey.root.SMProject.closeActiveTab(); await new Promise(setImmediate);
+  const shape = f => { const v = f.state(); return { ...v, rows: v.rows.map(({ id, ...row }) => row) }; };
+  const same = (a, b) => assert.equal(JSON.stringify(shape(a)), JSON.stringify(shape(b)));
+  same(viaKey, viaX);
+  assert.equal(JSON.stringify(viaKey.effects), JSON.stringify(viaX.effects));
+  assert.equal(JSON.stringify(viaKey.notices), JSON.stringify(viaX.notices));
+  assert.equal(viaKey.state().rows.length, 1);
+  viaKey.effects.length = 0; viaKey.notices.length = 0;
+  await viaKey.root.SMProject.closeActiveTab();
+  assert.equal(viaKey.effects.length, 0);
+  assert.equal(viaKey.notices.at(-1), 'hsCannotCloseLastTab');
+  assert.equal(viaKey.state().rows.length, 1);
+});
