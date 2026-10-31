@@ -129,6 +129,7 @@ fn the_catalog_declares_each_operation_once_under_five_owner_descriptors() {
         s if s.starts_with("labs.") => "native.object.labs",
         s if s.starts_with("tween.") => "native.object.tween",
         "property.preset.apply" => "native.object.motion-preset",
+        "layer.compositing.edit" => "native.object.layer-compositing",
         _ => "native.object.rig",
     };
     for &suffix in OPERATIONS.iter().chain(&LABS).chain(&TWEEN).chain(&PRESET) {
@@ -152,7 +153,7 @@ fn every_descriptor_example_is_a_valid_request_with_a_correlated_valid_response(
     let mut seen = 0;
     for descriptor in crate::capabilities::native_catalog().descriptors() {
         let id = descriptor["id"].as_str().unwrap();
-        if !["image-mesh", "widget", "rig", "tween", "motion-preset"]
+        if !["image-mesh", "widget", "rig", "tween", "motion-preset", "layer-compositing"]
             .iter()
             .any(|family| id == format!("native.object.{family}"))
         {
@@ -178,7 +179,7 @@ fn every_descriptor_example_is_a_valid_request_with_a_correlated_valid_response(
             seen += 1;
         }
     }
-    assert_eq!(seen, 11, "one copyable example per declared operation");
+    assert_eq!(seen, 12, "one copyable example per declared operation");
 }
 
 #[test]

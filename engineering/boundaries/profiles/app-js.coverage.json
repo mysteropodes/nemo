@@ -4246,6 +4246,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-object-layer-compositing.js",
+      "moduleId": "app.native.object.layer-compositing.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2662,
+          "scriptOrdinal": 312
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-object-rig.js",
       "moduleId": "app.native.object.rig.adapter",
       "executionClass": "document-classic",

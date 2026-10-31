@@ -8,12 +8,18 @@
 //! Row additions (all optional except `kind`): `kind` (the `layer-kind.js` `keyOf` taxonomy, or `unknown` when the stored
 //! content contradicts itself), `folderCollapsed` (a folder layer's stored state), `folderId` (organisational membership),
 //! `componentId` (the symbol an instance layer places), `blendMode`, `matteMode`, `matteSourceLayerUid`, `mattesMore`,
-//! `isMatteSource`, `opacity` (the static value) and `opacityAnimated`. Top level: `layerFolders` (the organisational folder
+//! `isMatteSource`, `opacity` (the static value), `opacityAnimated`, and (#2372) `effects` (the layer's stored effect stack, so the
+//! effects panel can send a complete replacement) or `effectsOversize` when the stack is past the row or document bound. Top level: `layerFolders` (the organisational folder
 //! rows) and `layerModelUnavailable`. The colour label stays the existing `color` row member.
 use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
 use crate::object_document::ObjectDocument;
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
+
+/// #2372: a layer's effect stack travels in its row only up to this many encoded bytes, which keeps the full-stack
+/// edit request inside the 4096-byte dispatcher bound; the document-wide budget keeps the info answer bounded.
+const EFFECTS_ROW_BYTES: usize = 2048;
+const EFFECTS_TOTAL_BYTES: usize = 256 * 1024;
 
 /// Facts that exist in the baseline layer row but have no native storage; a presenter reports them unavailable.
 const UNAVAILABLE: [&str; 5] = [
@@ -132,6 +138,7 @@ pub(crate) fn layer_members(document: &ObjectDocument) -> Vec<Map<String, Value>
                 .map(move |p| (h.target.layer_uid.as_str(), p))
         })
         .collect();
+    let mut effects_budget = EFFECTS_TOTAL_BYTES;
     document
         .layers()
         .iter()
@@ -188,6 +195,19 @@ pub(crate) fn layer_members(document: &ObjectDocument) -> Vec<Map<String, Value>
             }
             if sources.contains(&index) {
                 row.insert("isMatteSource".into(), json!(true));
+            }
+            if let Some(stack) = layer.effects().filter(|stack| !stack.is_empty()) {
+                let encoded = serde_json::to_value(stack).ok();
+                let size = encoded.as_ref().map_or(usize::MAX, |value| value.to_string().len());
+                match encoded {
+                    Some(value) if size <= EFFECTS_ROW_BYTES && size <= effects_budget => {
+                        effects_budget -= size;
+                        row.insert("effects".into(), value);
+                    }
+                    _ => {
+                        row.insert("effectsOversize".into(), json!(true));
+                    }
+                }
             }
             if let Some(record) = opacity.get(uid) {
                 if let Some([value]) = record.static_value.value().map(Vec::as_slice) {

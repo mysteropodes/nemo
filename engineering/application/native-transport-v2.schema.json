@@ -8083,6 +8083,23 @@
             {
               "properties": {
                 "operation": {
+                  "const": "command.document.object.layer.compositing.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerCompositingEditPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
                   "const": "command.document.object.tween.split"
                 },
                 "payload": {
@@ -22219,6 +22236,690 @@
               }
             }
           }
+        }
+      ]
+    },
+    "ObjectLayerCompositingEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "enabled"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "p1": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": -1000000000.0,
+              "maximum": 1000000000.0
+            },
+            {
+              "const": null
+            }
+          ]
+        },
+        "p2": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": -1000000000.0,
+              "maximum": 1000000000.0
+            },
+            {
+              "const": null
+            }
+          ]
+        },
+        "p3": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": -1000000000.0,
+              "maximum": 1000000000.0
+            },
+            {
+              "const": null
+            }
+          ]
+        },
+        "p4": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": -1000000000.0,
+              "maximum": 1000000000.0
+            },
+            {
+              "const": null
+            }
+          ]
+        },
+        "p5": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": -1000000000.0,
+              "maximum": 1000000000.0
+            },
+            {
+              "const": null
+            }
+          ]
+        },
+        "p6": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": -1000000000.0,
+              "maximum": 1000000000.0
+            },
+            {
+              "const": null
+            }
+          ]
+        },
+        "p7": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": -1000000000.0,
+              "maximum": 1000000000.0
+            },
+            {
+              "const": null
+            }
+          ]
+        },
+        "p8": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": -1000000000.0,
+              "maximum": 1000000000.0
+            },
+            {
+              "const": null
+            }
+          ]
+        },
+        "keys": {
+          "oneOf": [
+            {
+              "const": null
+            },
+            {
+              "type": "object",
+              "maxProperties": 4096
+            }
+          ]
+        }
+      }
+    },
+    "ObjectLayerCompositingEditPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "edit"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.compositing.edit"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "edit": {
+          "enum": [
+            "blend",
+            "matteMode",
+            "matteSource",
+            "matteClear",
+            "matteMoreAdd",
+            "matteMoreSet",
+            "matteMoreRemove",
+            "effects",
+            "effectsFromSet",
+            "effectsFromClear",
+            "folderCollapsed"
+          ]
+        },
+        "mode": {
+          "enum": [
+            "normal",
+            "multiply",
+            "screen",
+            "overlay",
+            "darken",
+            "lighten",
+            "colorDodge",
+            "colorBurn",
+            "hardLight",
+            "softLight",
+            "difference",
+            "exclusion",
+            "hue",
+            "saturation",
+            "color",
+            "luminosity",
+            "alpha",
+            "alphaInverted",
+            "luma",
+            "lumaInverted"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "collapsed": {
+          "type": "boolean"
+        },
+        "effects": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/ObjectLayerCompositingEffect"
+          }
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "edit": {
+              "const": "blend"
+            },
+            "mode": {
+              "enum": [
+                "normal",
+                "multiply",
+                "screen",
+                "overlay",
+                "darken",
+                "lighten",
+                "colorDodge",
+                "colorBurn",
+                "hardLight",
+                "softLight",
+                "difference",
+                "exclusion",
+                "hue",
+                "saturation",
+                "color",
+                "luminosity"
+              ]
+            }
+          },
+          "required": [
+            "edit",
+            "mode"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "index"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "matteMode"
+            },
+            "mode": {
+              "enum": [
+                "alpha",
+                "alphaInverted",
+                "luma",
+                "lumaInverted"
+              ]
+            }
+          },
+          "required": [
+            "edit",
+            "mode"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "index"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "matteSource"
+            }
+          },
+          "required": [
+            "edit",
+            "source"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "mode"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "index"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "matteClear"
+            }
+          },
+          "required": [
+            "edit"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "mode"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "index"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "matteMoreAdd"
+            },
+            "mode": {
+              "enum": [
+                "alpha",
+                "alphaInverted",
+                "luma",
+                "lumaInverted"
+              ]
+            }
+          },
+          "required": [
+            "edit",
+            "source"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "index"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "matteMoreSet"
+            },
+            "mode": {
+              "enum": [
+                "alpha",
+                "alphaInverted",
+                "luma",
+                "lumaInverted"
+              ]
+            }
+          },
+          "required": [
+            "edit",
+            "index"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "matteMoreRemove"
+            }
+          },
+          "required": [
+            "edit",
+            "index"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "mode"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "effects"
+            }
+          },
+          "required": [
+            "edit",
+            "effects"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "mode"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "index"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "effectsFromSet"
+            }
+          },
+          "required": [
+            "edit",
+            "source"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "mode"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "index"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "effectsFromClear"
+            }
+          },
+          "required": [
+            "edit"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "mode"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "index"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "folderCollapsed"
+            }
+          },
+          "required": [
+            "edit",
+            "collapsed"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "mode"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "index"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            }
+          ]
         }
       ]
     }

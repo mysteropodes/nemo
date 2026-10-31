@@ -56,6 +56,9 @@ fn check_references(
         Edit::MatteSource(uid)
         | Edit::EffectsFromSet(uid)
         | Edit::MatteMoreAdd { source: uid, .. } => Some(uid),
+        Edit::MatteMode {
+            source: Some(uid), ..
+        } => Some(uid),
         Edit::MatteMoreSet {
             source: Some(uid), ..
         } => Some(uid),
@@ -93,8 +96,12 @@ fn apply(layer: &mut ObjectLayer, edit: &Edit) -> Result<(), DispatchErrorCode> 
                 layer.matte_mode = Presence::Present(Some("alpha".to_string()));
             }
         }
-        Edit::MatteMode(mode) => {
+        Edit::MatteMode { mode, source } => {
             layer.matte_mode = Presence::Present(Some(mode.clone()));
+            // The baseline matte menu freezes the adjacent source into the same write (timeline.js initMatteDropdown).
+            if let Some(uid) = source {
+                layer.matte_source_layer_uid = Presence::Present(uid.clone());
+            }
         }
         Edit::MatteClear => {
             layer.matte_mode = Presence::Missing;

@@ -426,3 +426,29 @@ fn explicit_dangling_and_self_sources_follow_baseline() {
         [false, true, false]
     );
 }
+
+/// #2372: the effects panel resends the whole stack, so a row carries it (keyed parameters included) within the bound.
+#[test]
+fn a_stored_effect_stack_is_carried_in_its_row_until_the_row_or_document_bound() {
+    let stack = json!([{"type":"blur","enabled":true,"p1":4,"p2":null},
+        {"type":"vignette","enabled":false,"p1":0.5,"p5":2}]);
+    let document = flat(
+        json!([{"layerUid":"plain"},
+            {"layerUid":"empty","isEffectLayer":true,"effects":[]},
+            {"layerUid":"fx","effects":stack}]),
+        json!({}),
+    );
+    let got = rows(&document);
+    assert!(got[0].get("effects").is_none());
+    assert!(got[1].get("effects").is_none(), "an empty stack is absent");
+    assert_eq!(got[2]["effects"], stack);
+    assert!(got[2].get("effectsOversize").is_none());
+    // Past the per-row bound the stack is named oversize, never truncated.
+    let many: Vec<Value> = (0..30)
+        .map(|i| json!({"type":format!("effect-{i:04}-{}", "x".repeat(60)),"enabled":true,"p1":i}))
+        .collect();
+    let big = flat(json!([{"layerUid":"big","effects":many}]), json!({}));
+    let got = rows(&big);
+    assert!(got[0].get("effects").is_none());
+    assert_eq!(got[0]["effectsOversize"], json!(true));
+}

@@ -28,10 +28,11 @@ const SPEC: &str = r####"{
 "tween.regenerate": {"command":"object.tween.regenerate","result":"command","node":{"t":"oneOf","cases":[{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":255}},"opt":{"options":{"t":"obj","req":{"resamplePoints":{"t":"int","min":2,"max":256},"step":{"t":"int","min":1,"max":999},"skipManual":{"t":"bool"},"easing":{"t":"arr","of":{"t":"obj","req":{"x":{"t":"num","min":0,"max":1},"y":{"t":"num"}},"opt":{"tx":{"t":"num"},"ty":{"t":"num"}}},"min":0,"max":256}}}}},{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":255},"starts":{"t":"arr","of":{"t":"int","min":0,"max":4294967295},"min":0,"max":4096}},"opt":{"options":{"t":"obj","req":{"resamplePoints":{"t":"int","min":2,"max":256},"step":{"t":"int","min":1,"max":999},"skipManual":{"t":"bool"},"easing":{"t":"arr","of":{"t":"obj","req":{"x":{"t":"num","min":0,"max":1},"y":{"t":"num"}},"opt":{"tx":{"t":"num"},"ty":{"t":"num"}}},"min":0,"max":256}}}}},{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":255},"selection":{"t":"arr","of":{"t":"int","min":0,"max":4294967295},"min":0,"max":4096}},"opt":{"options":{"t":"obj","req":{"resamplePoints":{"t":"int","min":2,"max":256},"step":{"t":"int","min":1,"max":999},"skipManual":{"t":"bool"},"easing":{"t":"arr","of":{"t":"obj","req":{"x":{"t":"num","min":0,"max":1},"y":{"t":"num"}},"opt":{"tx":{"t":"num"},"ty":{"t":"num"}}},"min":0,"max":256}}}}}]}},
 "tween.split": {"command":"object.tween.split","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":255},"frame":{"t":"int","min":0,"max":4294967295}},"opt":{"options":{"t":"obj","req":{"resamplePoints":{"t":"int","min":2,"max":256},"step":{"t":"int","min":1,"max":999},"skipManual":{"t":"bool"},"easing":{"t":"arr","of":{"t":"obj","req":{"x":{"t":"num","min":0,"max":1},"y":{"t":"num"}},"opt":{"tx":{"t":"num"},"ty":{"t":"num"}}},"min":0,"max":256}}}}}},
 "tween.reassign": {"command":"object.tween.reassign","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":255},"span":{"t":"obj","req":{"from":{"t":"int","min":0,"max":4294967295},"to":{"t":"int","min":0,"max":4294967295},"overrides":{"t":"arr","min":0,"max":128,"of":{"t":"obj","req":{"bId":{"t":"str","min":1,"max":255}},"opt":{"aId":{"t":"str","min":1,"max":255},"aIds":{"t":"arr","of":{"t":"str","min":1,"max":255},"min":1,"max":128}},"xor":["aId","aIds"]}}},"opt":{"easing":{"t":"arr","of":{"t":"obj","req":{"x":{"t":"num","min":0,"max":1},"y":{"t":"num"}},"opt":{"tx":{"t":"num"},"ty":{"t":"num"}}},"min":0,"max":256},"manualStrokes":{"t":"arr","of":{"t":"str","min":1,"max":255},"min":0,"max":128}}}},"opt":{"options":{"t":"obj","req":{"resamplePoints":{"t":"int","min":2,"max":256},"step":{"t":"int","min":1,"max":999},"skipManual":{"t":"bool"},"easing":{"t":"arr","of":{"t":"obj","req":{"x":{"t":"num","min":0,"max":1},"y":{"t":"num"}},"opt":{"tx":{"t":"num"},"ty":{"t":"num"}}},"min":0,"max":256}}}}}},
-"property.preset.apply": {"command":"object.property.preset.apply","result":"command","node":{"t":"obj","req":{"target":{"t":"obj","req":{"contextId":{"t":"str","min":1,"max":256},"layerUid":{"t":"str","min":1,"max":256}}},"properties":{"t":"arr","min":1,"max":5,"of":{"t":"obj","req":{"property":{"t":"enum","v":["position","anchor","rotation","scale","opacity"]},"keys":{"t":"arr","min":0,"max":512,"of":{"t":"obj","req":{"frame":{"t":"num","abs":1000000000},"v":{"t":"arr","min":1,"max":4,"of":{"t":"num","abs":1000000000}}},"opt":{"hold":{"t":"bool"},"lockTo":{"t":"enum","v":["in","out","layer"]},"curvePoints":{"t":"arr","min":0,"max":64,"of":{"t":"obj","req":{"x":{"t":"num","abs":1000000000},"y":{"t":"num","abs":1000000000}},"opt":{"tx":{"t":"num","abs":1000000000},"ty":{"t":"num","abs":1000000000}}}},"hIn":{"t":"arr","min":2,"max":2,"of":{"t":"num","abs":1000000000}},"hOut":{"t":"arr","min":2,"max":2,"of":{"t":"num","abs":1000000000}}}}}},"opt":{"static":{"t":"arr","min":1,"max":4,"of":{"t":"num","abs":1000000000}}}}}}}}
+"property.preset.apply": {"command":"object.property.preset.apply","result":"command","node":{"t":"obj","req":{"target":{"t":"obj","req":{"contextId":{"t":"str","min":1,"max":256},"layerUid":{"t":"str","min":1,"max":256}}},"properties":{"t":"arr","min":1,"max":5,"of":{"t":"obj","req":{"property":{"t":"enum","v":["position","anchor","rotation","scale","opacity"]},"keys":{"t":"arr","min":0,"max":512,"of":{"t":"obj","req":{"frame":{"t":"num","abs":1000000000},"v":{"t":"arr","min":1,"max":4,"of":{"t":"num","abs":1000000000}}},"opt":{"hold":{"t":"bool"},"lockTo":{"t":"enum","v":["in","out","layer"]},"curvePoints":{"t":"arr","min":0,"max":64,"of":{"t":"obj","req":{"x":{"t":"num","abs":1000000000},"y":{"t":"num","abs":1000000000}},"opt":{"tx":{"t":"num","abs":1000000000},"ty":{"t":"num","abs":1000000000}}}},"hIn":{"t":"arr","min":2,"max":2,"of":{"t":"num","abs":1000000000}},"hOut":{"t":"arr","min":2,"max":2,"of":{"t":"num","abs":1000000000}}}}}},"opt":{"static":{"t":"arr","min":1,"max":4,"of":{"t":"num","abs":1000000000}}}}}}}},
+"layer.compositing.edit": {"command":"object.layer.compositing.edit","result":"command","node":{"t":"union","by":"edit","cases":{"blend":{"req":{"layerUid":{"t":"str","min":1,"max":128},"mode":{"t":"enum","v":["normal","multiply","screen","overlay","darken","lighten","colorDodge","colorBurn","hardLight","softLight","difference","exclusion","hue","saturation","color","luminosity"]}}},"matteMode":{"req":{"layerUid":{"t":"str","min":1,"max":128},"mode":{"t":"enum","v":["alpha","alphaInverted","luma","lumaInverted"]}},"opt":{"source":{"t":"str","min":1,"max":128}}},"matteSource":{"req":{"layerUid":{"t":"str","min":1,"max":128},"source":{"t":"str","min":1,"max":128}}},"matteClear":{"req":{"layerUid":{"t":"str","min":1,"max":128}}},"matteMoreAdd":{"req":{"layerUid":{"t":"str","min":1,"max":128},"source":{"t":"str","min":1,"max":128}},"opt":{"mode":{"t":"enum","v":["alpha","alphaInverted","luma","lumaInverted"]}}},"matteMoreSet":{"req":{"layerUid":{"t":"str","min":1,"max":128},"index":{"t":"int","min":0,"max":4294967295}},"opt":{"source":{"t":"str","min":1,"max":128},"mode":{"t":"enum","v":["alpha","alphaInverted","luma","lumaInverted"]}}},"matteMoreRemove":{"req":{"layerUid":{"t":"str","min":1,"max":128},"index":{"t":"int","min":0,"max":4294967295}}},"effects":{"req":{"layerUid":{"t":"str","min":1,"max":128},"effects":{"t":"arr","min":0,"max":32,"of":{"t":"obj","req":{"type":{"t":"str","min":1,"max":256},"enabled":{"t":"bool"}},"opt":{"p1":{"t":"oneOf","cases":[{"t":"num","abs":1000000000},{"t":"null"}]},"p2":{"t":"oneOf","cases":[{"t":"num","abs":1000000000},{"t":"null"}]},"p3":{"t":"oneOf","cases":[{"t":"num","abs":1000000000},{"t":"null"}]},"p4":{"t":"oneOf","cases":[{"t":"num","abs":1000000000},{"t":"null"}]},"p5":{"t":"oneOf","cases":[{"t":"num","abs":1000000000},{"t":"null"}]},"p6":{"t":"oneOf","cases":[{"t":"num","abs":1000000000},{"t":"null"}]},"p7":{"t":"oneOf","cases":[{"t":"num","abs":1000000000},{"t":"null"}]},"p8":{"t":"oneOf","cases":[{"t":"num","abs":1000000000},{"t":"null"}]},"keys":{"t":"oneOf","cases":[{"t":"null"},{"t":"json","maxBytes":2048}]}}}}}},"effectsFromSet":{"req":{"layerUid":{"t":"str","min":1,"max":128},"source":{"t":"str","min":1,"max":128}}},"effectsFromClear":{"req":{"layerUid":{"t":"str","min":1,"max":128}}},"folderCollapsed":{"req":{"layerUid":{"t":"str","min":1,"max":128},"collapsed":{"t":"bool"}}}}}}
 }"####;
 
-const DECLARED: [&str; 19] = [
+const DECLARED: [&str; 20] = [
     "image.mesh.edit",
     "widget.create",
     "widget.write",
@@ -51,6 +52,7 @@ const DECLARED: [&str; 19] = [
     "tween.split",
     "tween.reassign",
     "property.preset.apply",
+    "layer.compositing.edit",
 ];
 fn parse_table(source: &str) -> Map<String, Value> {
     match serde_json::from_str::<Value>(source) {
@@ -147,6 +149,15 @@ fn array_ok(node: &Value, value: &Value) -> bool {
             .is_none_or(|limit| perimeter(items) <= limit)
 }
 
+/// An opaque bounded object (effect parameter key tracks): the native owner repeats the full structural rules.
+fn json_ok(node: &Value, value: &Value) -> bool {
+    value.is_object()
+        && node
+            .get("maxBytes")
+            .and_then(Value::as_u64)
+            .is_some_and(|limit| value.to_string().len() as u64 <= limit)
+}
+
 fn pair_ok(node: &Value, value: &Value) -> bool {
     value
         .as_array()
@@ -229,6 +240,7 @@ fn check(node: &Value, value: &Value) -> bool {
         }),
         Some("arr") => array_ok(node, value),
         Some("pair") => pair_ok(node, value),
+        Some("json") => json_ok(node, value),
         _ => false,
     }
 }

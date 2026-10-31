@@ -6248,6 +6248,20 @@ window.matteSourceIndicesInUse=matteSourceIndicesInUse;
 // confirmed with Cyril). Picking a source with no mode set defaults the
 // mode to 'alpha' so the pick has a visible effect immediately.
 function buildMatteMenuItems(li,ld,onChanged){
+  var nat=nativeCompositing(); // #2372: native projects write one compositing edit per pick; the stored values come from the project info
+  if(nat){
+    var natItems=[{label:'Matte : Aucune (retirer)',disabled:nat.matteOf(li)==='none',action:function(){
+      nat.setMatteMode(li,'none').then(function(){onChanged();nativeCompositingRefresh();},nativeCompositingRefused);
+    }}];
+    state.layers.forEach(function(other,oi){
+      var uid=oi===li?null:nat.layerUid(oi);if(!uid)return; // a layer can't matte itself
+      var cur=nat.sourceOf(li)===uid;
+      natItems.push({label:'Source : '+(other.name||('Layer '+(oi+1)))+(cur?'  \u2713':''),disabled:cur,action:function(){
+        nat.setMatteSource(li,uid).then(function(){onChanged();nativeCompositingRefresh();},nativeCompositingRefused);
+      }});
+    });
+    return natItems;
+  }
   var items=[{label:'Matte : Aucune (retirer)',disabled:!ld.matteMode,action:function(){
     pushUndo();
     delete ld.matteMode;delete ld.matteSourceLayerUid;delete ld.mattesMore;
@@ -10579,6 +10593,12 @@ window.syncSymmetryPanelVisibility=function(){};
 // way (outside click, Escape, re-click on the field) reverts to the mode
 // the layer had when the list opened. A native <select> can't do this: its
 // open popup is OS-rendered and exposes no per-option hover events.
+// #2372: on a native object project the blend and matte pickers write ONE native compositing edit on commit and never touch
+// the legacy layer model; a hover is a UI-local label preview only (no document, ld or engine write).
+function nativeCompositing(){try{var a=window.NemoNativeObjectLayerCompositing;return a&&typeof a.desktop==='function'?a.desktop(window):null;}catch(_){return null;}}
+function nativeCompositingRefused(){if(window.showToast)showToast('Native layer compositing command was refused.');}
+function nativeCompositingRefresh(){try{if(window.SMMotion&&SMMotion.renderMotionPropsPanel)SMMotion.renderMotionPropsPanel();if(window.renderLayerList)renderLayerList();if(window.renderTimeline)renderTimeline();}catch(_){}}
+window.nativeCompositing=nativeCompositing;window.nativeCompositingRefused=nativeCompositingRefused;window.nativeCompositingRefresh=nativeCompositingRefresh;
 var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overlay:'Overlay',darken:'Darken',lighten:'Lighten',colorDodge:'Color Dodge',colorBurn:'Color Burn',hardLight:'Hard Light',softLight:'Soft Light',difference:'Difference',exclusion:'Exclusion',hue:'Hue',saturation:'Saturation',color:'Color',luminosity:'Luminosity'};
 (function initBlendDropdown(){
   var dd=document.getElementById('p-blendmode');if(!dd)return;
@@ -10586,6 +10606,7 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
   var origMode=null; // layer's mode when the list opened — the revert target while previewing
   function currentLd(){return state.layers[state.activeLayerIdx];}
   function applyPreview(v){
+    if(nativeCompositing()){dd.textContent=BLEND_MODE_LABELS[v]||v;return;} // #2372: native hover = label only
     var ld=currentLd();if(!ld)return;
     // Keyed layers (feedback #207, Duik-inspired hold-only Blend keys) skip
     // the live hover preview here — layerBlendModeAt (motion.js) ignores
@@ -10614,6 +10635,7 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
     // #207), not the (irrelevant once keyed) static field.
     var keyedAtOpen=!!(ld.blendKeys&&ld.blendKeys.length);
     origMode=keyedAtOpen?((window.SMMotion&&SMMotion.layerBlendModeAt)?SMMotion.layerBlendModeAt(state.activeLayerIdx,state.currentFrame):(ld.blendMode||'normal')):(ld.blendMode||'normal');
+    var natOpen=nativeCompositing();if(natOpen)origMode=natOpen.blendOf(state.activeLayerIdx);
     pop.innerHTML='';
     Object.keys(BLEND_MODE_LABELS).forEach(function(v){
       var it=document.createElement('div');
@@ -10622,6 +10644,12 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
       it.addEventListener('mouseenter',function(){applyPreview(v);});
       it.addEventListener('click',function(e){
         e.stopPropagation();
+        var nat=nativeCompositing();
+        if(nat){ // #2372: one native edit, no ld write, no pushUndo
+          var from=origMode;origMode=null;close(false);
+          nat.setBlend(state.activeLayerIdx,v).then(function(){setLabel(v);nativeCompositingRefresh();},function(){setLabel(from||'normal');nativeCompositingRefused();});
+          return;
+        }
         var ld2=currentLd();if(!ld2){close(false);return;}
         if(ld2.blendKeys&&ld2.blendKeys.length){
           // Duik-style hold key: SNAP the mode at the current frame instead
@@ -10703,6 +10731,7 @@ function matteModeLabel(mode){
   var origMode=null;
   function currentLd(){return state.layers[state.activeLayerIdx];}
   function applyPreview(v){
+    if(nativeCompositing()){dd.textContent=matteModeLabel(v)||v;return;} // #2372: native hover = label only
     var ld=currentLd();if(!ld)return;
     ld.matteMode=v==='none'?undefined:v;
     window._sceneVersion=(window._sceneVersion||0)+1;
@@ -10735,6 +10764,7 @@ function matteModeLabel(mode){
       return;
     }
     origMode=ld.matteMode||'none';
+    var natOpen=nativeCompositing();if(natOpen)origMode=natOpen.matteOf(state.activeLayerIdx);
     pop.innerHTML='';
     MATTE_MODES.forEach(function(v){
       var it=document.createElement('div');
@@ -10743,6 +10773,12 @@ function matteModeLabel(mode){
       it.addEventListener('mouseenter',function(){applyPreview(v);});
       it.addEventListener('click',function(e){
         e.stopPropagation();
+        var nat=nativeCompositing();
+        if(nat){ // #2372: one native edit (None clears the matte; a pick freezes the adjacent source in the same write)
+          var from=origMode;origMode=null;close(false);
+          nat.setMatteMode(state.activeLayerIdx,v).then(function(){setLabel(v);nativeCompositingRefresh();},function(){setLabel(from||'none');nativeCompositingRefused();});
+          return;
+        }
         var ld2=currentLd();if(ld2)ld2.matteMode=origMode==='none'?undefined:origMode;
         pushUndo();
         applyPreview(v);

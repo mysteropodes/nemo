@@ -157,6 +157,21 @@
 
   function activeLayer() { return state.layers[state.activeLayerIdx]; }
 
+  // #2372: on a native object project the layer's stack lives in the native document. Add / remove / toggle / parameter
+  // edits each send the layer's complete resulting stack as ONE native compositing edit (history entry); the panel only
+  // renders the stack read from the pinned project info and never writes the legacy layer model. Per-element effects and
+  // keyed parameters have no native owner yet and report unavailable.
+  function nativeComp() { try { return typeof window.nativeCompositing === 'function' ? window.nativeCompositing() : null; } catch (_) { return null; } }
+  function nativeStack(nat) { return (nat && nat.stackOf(state.activeLayerIdx)) || []; }
+  function nativeRefused(error) {
+    var code = error && error.code, why = error && error.reason;
+    if (window.showToast) showToast(why === 'effects_oversize' ? 'This effect stack is too large to edit natively.' : code === 'not_found' ? SM.t('hsSelectLayerFirst') : 'Native effect stack command was refused.');
+  }
+  function nativeEffectOp(promise, after) {
+    promise.then(function () { if (after) after(); renderEffectsSection(); }, function (error) { nativeRefused(error); renderEffectsSection(); });
+  }
+  function nativeUnavailable() { if (window.showToast) showToast('Keyed effect parameters are not available on native projects yet.'); }
+
   // Per-ELEMENT effects (2026-07, "possible de différencié les effet par
   // éléments sélectionné si j'applique un effet sur un élément select alors
   // il ne s'applique sur celui-ci") — same singleTarget() convention
@@ -168,6 +183,7 @@
   // tool is active — no separate manual toggle, matches gradient-bridge's
   // own automatic-by-selection precedent.
   function singleSelectedElement() {
+    if (nativeComp()) return null; // #2372: per-element effects have no native owner; the panel targets the layer stack
     if ((state.tool !== 'select' && state.tool !== 'subselect') || !window.selectedPaths || selectedPaths.length !== 1) return null;
     var p = selectedPaths[0];
     return (p instanceof Path || p instanceof CompoundPath) ? p : null;
@@ -431,6 +447,12 @@
   window.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAddMenu(); });
 
   function addEffect(type) {
+    var nat = nativeComp();
+    if (nat) {
+      var nd = defaultsArrFor(type), fresh = { type: type, enabled: true, p1: nd[0], p2: nd[1], p3: nd[2], p4: nd[3], p5: nd[4], p6: nd[5], p7: nd[6], p8: nd[7] };
+      nativeEffectOp(nat.addEffect(state.activeLayerIdx, fresh), function () { expandedIdx = nativeStack(nat).length - 1; });
+      return;
+    }
     var t = effectsTarget(); if (!t) return;
     pushUndo();
     if (!t.obj.effects) t.obj.effects = [];
@@ -442,6 +464,8 @@
   }
   window.addEffectToActiveLayer = addEffect; // custom-effects.js calls this right after authoring a brand-new shader
   function toggleEnabled(idx) {
+    var nat = nativeComp();
+    if (nat) { nativeEffectOp(nat.toggleEffect(state.activeLayerIdx, idx)); return; }
     var t = effectsTarget(); if (!t || !t.obj.effects || !t.obj.effects[idx]) return;
     pushUndo();
     t.obj.effects[idx].enabled = !t.obj.effects[idx].enabled;
@@ -449,6 +473,11 @@
     saveActiveLayerFrame(); renderEffectsSection(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   function deleteEffect(idx) {
+    var nat = nativeComp();
+    if (nat) {
+      nativeEffectOp(nat.removeEffect(state.activeLayerIdx, idx), function () { if (expandedIdx === idx) expandedIdx = -1; else if (expandedIdx > idx) expandedIdx--; });
+      return;
+    }
     var t = effectsTarget(); if (!t || !t.obj.effects) return;
     pushUndo();
     t.obj.effects.splice(idx, 1);
@@ -534,6 +563,7 @@
   // freezes the value the animation had reached rather than snapping back to
   // whatever the static field last held.
   function toggleParamKeying(idx, key) {
+    if (nativeComp()) { nativeUnavailable(); return; }
     var t = effectsTarget(); if (!t || !t.obj.effects || !t.obj.effects[idx]) return;
     var eff = t.obj.effects[idx];
     pushUndo();
@@ -572,6 +602,7 @@
     return best !== null;
   }
   function toggleKeyHere(idx, key) {
+    if (nativeComp()) { nativeUnavailable(); return; }
     var t = effectsTarget(); if (!t || !t.obj.effects || !t.obj.effects[idx]) return;
     var eff = t.obj.effects[idx];
     if (!paramKeyed(eff, key)) return;
@@ -596,6 +627,13 @@
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   function setParam(idx, key, raw) {
+    var nat = nativeComp();
+    if (nat) {
+      var eff = nativeStack(nat)[idx];
+      if (eff && paramKeyed(eff, key)) { nativeUnavailable(); return; }
+      nat.setEffectParam(state.activeLayerIdx, idx, key, raw).catch(nativeRefused);
+      return;
+    }
     var t = effectsTarget(); if (!t || !t.obj.effects || !t.obj.effects[idx]) return;
     var eff = t.obj.effects[idx];
     pushUndo();
@@ -689,7 +727,8 @@
     if (!list) return;
     list.innerHTML = '';
     var t = effectsTarget();
-    var effects = (t && t.obj.effects) || [];
+    var nat = nativeComp();
+    var effects = nat ? nativeStack(nat) : ((t && t.obj.effects) || []);
     effects.forEach(function (eff, idx) {
       var row = document.createElement('div');
       row.className = 'fx-row' + (eff.enabled ? '' : ' disabled') + (expandedIdx === idx ? ' expanded' : '');
@@ -769,7 +808,8 @@
     // invisible until you happen to click the header. The header is the only
     // thing on screen when collapsed, so that is where the count belongs.
     var t = effectsTarget();
-    var n = (t && t.obj && t.obj.effects) ? t.obj.effects.length : 0;
+    var natSec = nativeComp();
+    var n = natSec ? nativeStack(natSec).length : ((t && t.obj && t.obj.effects) ? t.obj.effects.length : 0);
     var hdr = sec.querySelector('.phdr');
     if (hdr) {
       var badge = hdr.querySelector('.fx-count');

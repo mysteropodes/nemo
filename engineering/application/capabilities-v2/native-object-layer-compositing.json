@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.layer-compositing",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.layer.compositing.edit"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerCompositingEditPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal. The request is one flat edit of one layer and is at most 4096 encoded bytes, so a full effect stack that does not fit is refused, never split."
+  },
+  "semantics": "#2372: the baseline layer compositing writes of src/js/timeline.js and src/js/effects-panel.js @1065e9d8 as one native transaction per edit (the owner is scene_effect_layer_edit.rs). edit blend: picking Normal clears the member. matteMode: sets the first matte's mode, optionally freezing the source in the same write (the matte menu freezes the adjacent layer); the menu's None is matteClear, which removes the first matte and its additional mattes. matteSource: picking a source on a layer with no real mode sets alpha. matteMoreAdd/Set/Remove: the additional mattes (adding needs a matte that is on; removing the last removes the member). effects: replaces the layer's complete effect stack, so add, remove, reorder and toggle each send the full resulting stack; effectsFromSet/Clear borrow another layer's stack. folderCollapsed: folder layers only. A layer cannot matte itself or borrow its own stack; named layers must exist. One successful edit is one history entry and one revision; an edit that leaves the layer equal publishes nothing. Hover previews of the blend and matte pickers are UI-local and never reach this operation. No JS/Paper writer or fallback.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "#2372 pick the Multiply blend of a layer; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "compositing-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.compositing.edit",
+        "payload": {
+          "command": "object.layer.compositing.edit",
+          "layerUid": "layer-1",
+          "edit": "blend",
+          "mode": "multiply"
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "compositing-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}
