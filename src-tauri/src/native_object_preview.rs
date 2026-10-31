@@ -235,6 +235,7 @@ impl NativeObjectHost {
             compositor,
             viewport,
             ViewportDisplayFilter::None,
+            None,
             &mut (),
         )
     }
@@ -245,13 +246,16 @@ impl NativeObjectHost {
         compositor: &mut Compositor,
         viewport: &mut DesktopViewportHost<P>,
         display_filter: ViewportDisplayFilter,
+        alpha_checker: Option<f64>,
         observer: &mut dyn crate::native_dispatch::ObjectPreviewObserver,
     ) -> Result<ObjectPresentedFrame, String> {
-        let prepared = self
+        let mut prepared = self
             .preview
             .prepared
             .take()
             .ok_or("native object preview has no current CPU preparation")?;
+        // #2373: the checker is part of the canonical quality identity of this frame, like the onion settings.
+        prepared.checker_scale = alpha_checker;
         self.preview.presented_mesh_view = None;
         self.preview.presented_vectors = None;
         if self.released.is_some() || self.preview.released || self.preview.blocked.is_some() {
@@ -347,6 +351,13 @@ impl NativeObjectHost {
         let composition = media.witness(expected.frame, composition)?;
         // #2358 GHOST-UNDER: onion / Ghost All composed UNDER the live frame (preview witness only, never an export).
         let (composition, ghost_receipt) = prepare::attach_ghosts(composition, ghosts.as_ref(), &snapshot, expected.frame)?;
+        // #2373: the transparency checker behind the artwork of this viewport witness only (never the retained hit-test source).
+        let composition = match alpha_checker {
+            Some(scale) => composition
+                .with_viewport_checker(key.output_spec().dimensions(), scale)
+                .map_err(|e| format!("preview transparency checker: {e:?}"))?,
+            None => composition,
+        };
         let key = if media.draws_video(expected.frame) {
             EvaluationKey::new(
                 key.document_snapshot_id(),

@@ -313,6 +313,7 @@ impl Compositor {
             self.last_reference_image = None;
         }
         self.scene.reset();
+        prepared.paint_viewport_checker(&mut self.scene); // #2373: only a viewport witness has one; BEHIND reference and artwork
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         if let Some((image, transform, opacity)) = prepared.reference_image() {
             // Retain identity before fallible rendering, including error/unwind.

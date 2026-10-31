@@ -26,6 +26,10 @@ use scene_effect_kernels::scene_effect_scene_join::SceneEffectPlan;
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 #[path = "object_reference_scene.rs"]
 mod reference;
+// #2373: the viewport-only "Show transparency" checker painted under the artwork.
+#[path = "object_viewport_checker.rs"]
+pub(crate) mod viewport_checker;
+pub use viewport_checker::viewport_checker_quality_suffix;
 // #2358 GHOST-UNDER: onion / Ghost All frames composed under the live frame of a viewport witness.
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 #[path = "object_ghost_underlay.rs"]
@@ -127,6 +131,8 @@ pub struct ObjectCompositionWitness {
     viewport_quality: Option<String>,
     camera: Option<[f64; 6]>,
     resources: Option<Arc<ObjectSceneResourceSet>>,
+    /// Viewport-only transparency checker painted under the artwork (#2373); never present on an export witness.
+    viewport_checker: Option<viewport_checker::ViewportChecker>,
     /// Joined layer/effect plan of this witness' packet (L08-K); `None` keeps the flat fast path.
     scene_effects: Option<Arc<SceneEffectPlan>>,
     /// Decoded video frames of the plan's video slots (T12); `None` while undecoded.
@@ -155,6 +161,7 @@ pub fn prepare_object_composition(
         plan: plan.clone(),
         viewport: false,
         viewport_quality: None,
+        viewport_checker: None,
         camera,
         resources: None,
         scene_effects: None,
