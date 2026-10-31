@@ -5630,7 +5630,7 @@
       ]
     },
     {
-      "path": "src/js/application/script-native-api.js",
+      "path": "src/js/application/script-native-writes.js",
       "moduleId": "app.script.native.api",
       "executionClass": "document-classic",
       "loadSites": [
@@ -5638,6 +5638,18 @@
           "path": "src/index.html",
           "line": 2729,
           "scriptOrdinal": 375
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/script-native-api.js",
+      "moduleId": "app.script.native.api",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2730,
+          "scriptOrdinal": 376
         }
       ]
     }
