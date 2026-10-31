@@ -5907,6 +5907,12 @@ function foldBooleanOp(op,paths,layer){
   return{result:result,companions:extraRemovals};
 }
 function booleanOp(op){
+  // #2372 insp-boolean-ops: on a native object project the owner applies the boolean as ONE sealed transaction (one revision, one history
+  // entry) through the group intent; the Paper / WASM writer below and its pushUndo (refused there) are never reached.
+  var nativeBool=window.NemoNativeSelectionBoolean;
+  if(nativeBool&&nativeBool.native(window)){nativeBool.apply(window,op);return;}
+  var nativeOwner=window.NemoNativeObjectProject&&window.NemoNativeObjectProject.desktop(window);
+  if(nativeOwner&&nativeOwner.blocksLegacy()){showToast('Boolean operations are not available on native projects right now.');return;}
   if(selectedPaths.length<2){showToast(SM.t('toastSelectAtLeast2Shapes'));return;}
   pushUndo();
   var paths=selectedPaths.slice();

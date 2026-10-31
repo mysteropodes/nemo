@@ -90,14 +90,15 @@ fn content_kind(content: Option<&Content<'_>>) -> &'static str {
 /// consulted `mattesMore` here, so a layer used only as an additional matte source carries no badge.
 fn matte_sources_in_use(document: &ObjectDocument) -> HashSet<usize> {
     let layers = document.layers();
+    // One uid index per info build: a per-matte linear scan made this O(layers x matted layers) on every revision sync.
+    let mut by_uid: HashMap<&str, usize> = HashMap::with_capacity(layers.len());
+    for (index, layer) in layers.iter().enumerate() {
+        by_uid.entry(layer.layer_uid()).or_insert(index);
+    }
     let mut used = HashSet::new();
     for (index, layer) in layers.iter().enumerate().filter(|(_, l)| l.matte_on()) {
         let source = match layer.matte_source_uid().filter(|uid| !uid.is_empty()) {
-            Some(uid) => layers
-                .iter()
-                .enumerate()
-                .find(|(other, l)| *other != index && l.layer_uid() == uid)
-                .map(|(other, _)| other),
+            Some(uid) => by_uid.get(uid).copied().filter(|other| *other != index),
             None => Some(index + 1).filter(|below| *below < layers.len()),
         };
         used.extend(source);
