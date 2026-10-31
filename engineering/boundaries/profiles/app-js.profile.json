@@ -2360,11 +2360,13 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-duplicator.js"
+        "native-object-duplicator.js",
+        "native-object-duplicator-ui.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
-        "native-object-duplicator.js"
+        "native-object-duplicator.js",
+        "native-object-duplicator-ui.js"
       ]
     },
     {

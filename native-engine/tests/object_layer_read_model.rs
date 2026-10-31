@@ -164,6 +164,16 @@ fn the_stored_link_source_and_follow_target_are_reported() {
 }
 
 #[test]
+fn a_duplicator_host_is_reported_with_its_source_mode() { // #2256: the Motion duplicator column reads this; nothing else changes
+    let layers = [fixture::layer("host", "Host", &[(0, "s1")]), fixture::layer("pool", "Pool", &[(0, "s2")]), fixture::layer("plain", "Plain", &[(0, "s3")])];
+    let table = fixture::duplicator_table(&[("host", json!({"mode":"grid"})), ("pool", json!({"sourceMode":"objects","sourceLayerUids":["plain"]}))]);
+    let rows = rows(&fixture::decode(&fixture::document(&layers, json!({"componentTables":{"duplicators":table}}))));
+    assert_eq!((&rows[0]["hasDuplicator"], &rows[0]["dupSourceMode"]), (&json!(true), &json!("shape")));
+    assert_eq!((&rows[1]["hasDuplicator"], &rows[1]["dupSourceMode"]), (&json!(true), &json!("objects")));
+    assert!(rows[2].get("hasDuplicator").is_none() && rows[2].get("dupSourceMode").is_none());
+}
+
+#[test]
 fn static_opacity_is_reported_and_an_animated_track_is_flagged() {
     let target = |uid: &str| json!({"contextId":"scene-root","layerUid":uid});
     let layers = [

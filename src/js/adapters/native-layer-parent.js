@@ -222,7 +222,7 @@
       host.showContextMenu(x, y, [
         { label: tr(host, 'ctxParentInTimeLinkTimeEllipsis', 'Parent in Time — lier le temps à…'), action: () => { host.showContextMenu(x, y, timeLinkMenuItems(host, adapter, li, onChanged)); } },
         { label: 'Chemin (Follow Path)…', action: () => { host.showContextMenu(x, y, followPathMenuItems(host, adapter, li, onChanged)); } },
-      ]);
+      ].concat(host.NemoNativeObjectDuplicatorUi ? host.NemoNativeObjectDuplicatorUi.contextItems(host, li) : [])); // #2256: Object-mode Duplicator…
     });
   }
   // The baseline layer-row Parent cell (.lparent: pickwhip .lpick + label; 1065e9d8 buildParentCell) for a NATIVE row: the label is the
