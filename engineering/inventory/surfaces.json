@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "77cb098485a91cd0311a8dc6fa8081629dd49689",
-  "describe": "v0.7.0-alpha.4-4259-g77cb0984-dirty"
+  "head": "20057d2014b99bca6f18baa6b5faeaba7e5eb3bc",
+  "describe": "v0.7.0-alpha.4-4261-g20057d20-dirty"
  },
- "inputsDigest": "4c1238afd4e25e5fc744434ddf27a7a37e70ea77a19d52905085e8c7ec4d8c6e",
+ "inputsDigest": "3353cf21b392a2e267361111ed1c2ecd9904ecf34a6b0d27b6f95750c9654140",
  "states": [
   "inventoried",
   "characterized",
@@ -4799,7 +4799,7 @@
     "functionsVisited": 140,
     "via": "variable b",
     "references": [
-     "src/js/adapters/native-object-ui.js:372 setShyMode()",
+     "src/js/adapters/native-object-ui.js:371 setShyMode()",
      "src/js/motion.js:13204 setAppMode()",
      "src/js/timeline.js:1270 toggleLayerShy()"
     ]
@@ -25143,7 +25143,7 @@
    "source": "src/js/motion.js:11530",
    "meta": {
     "i18n": "ctxExprControlsEllipsis",
-    "functionsVisited": 40
+    "functionsVisited": 39
    },
    "fixtures": [
     "static-props",
@@ -26170,7 +26170,7 @@
    "source": "src/js/motion.js:7315",
    "meta": {
     "i18n": "ctxExprControlsEllipsis",
-    "functionsVisited": 40
+    "functionsVisited": 39
    },
    "fixtures": [
     "static-props",
