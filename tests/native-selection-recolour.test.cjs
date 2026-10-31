@@ -43,7 +43,7 @@ function harness(items, { native = true } = {}) {
   root.window = root;
   vm.createContext(root);
   vm.runInContext(COLOR_MANAGER, root);
-  return { root, toasts, batches, sent, store, legacy, canvasBg, panel: root.SMColorManager,
+  return { root, toasts, batches, sent, store, legacy, canvasBg, panel: root.NemoSelectedColors,
     async select(ids) { const layers = await Intent.layerPaths(root, (item) => ids.includes(item.stableTarget.strokeId), false, 0); root.selectedPaths = layers.paths; root.NemoNativeSelectOverlay.show(root); },
     fire: async () => { timers.splice(0).filter(Boolean).forEach((fn) => fn()); await settle(); },
     setPin: (n) => { pin = { ...pin, ...n }; } };

@@ -353,7 +353,7 @@
     _hadSel = hasSelNow;
   }
 
-  window.SMColorManager = { computeUsedColors: computeUsedColors, recolorColor: recolorColor };
+  window.NemoSelectedColors = { computeUsedColors: computeUsedColors, recolorColor: recolorColor };
 
   function init() {
     var sec = document.getElementById('selected-colors-sec');
