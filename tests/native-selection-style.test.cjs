@@ -9,6 +9,7 @@ const Steps = require('../src/js/adapters/native-selection-steps.js');
 const Contract = require('../src/js/adapters/native-object-vector-contract.js');
 const Subselect = require('../src/js/adapters/native-subselect-contract.js');
 const Paper = require('./helpers/native-import-paper.cjs');
+const overlayStub = require('./helpers/native-selection-overlay-stub.cjs');
 
 const seg = (x, y) => ({ point: [x, y], handleIn: [0, 0], handleOut: [0, 0] });
 const quad = (id, x0, y0, x1, y1, extra) => ({ stableTarget: { contextId: 'scene-root', layerUid: 'L', frameScope: { kind: 'authored', frame: 0 }, strokeId: id },
@@ -34,9 +35,9 @@ function harness(items, options = {}) {
       pin = { ...pin, contentRevision: pin.contentRevision + 1, documentSnapshotId: 's' + (pin.contentRevision + 1) };
       return { status: 'applied' };
     } }) },
-    NemoSelectCanvasIntent: Intent, NemoNativeSelectionSteps: Steps };
+    NemoSelectCanvasIntent: Intent, NemoNativeSelectionSteps: Steps, NemoNativeSelectOverlay: overlayStub(Intent) };
   const h = { root, toasts, batches, store, timers,
-    async select(ids) { const layers = await Intent.layerPaths(root, (item) => ids.includes(item.stableTarget.strokeId), false, 0); root.selectedPaths = layers.paths; },
+    async select(ids) { const layers = await Intent.layerPaths(root, (item) => ids.includes(item.stableTarget.strokeId), false, 0); root.selectedPaths = layers.paths; root.NemoNativeSelectOverlay.show(root); },
     // The quiet timer of the pending edit fires.
     fire: async () => { const fns = timers.splice(0).filter(Boolean); fns.forEach((fn) => fn()); await settle(); },
     setPin: (n) => { pin = { ...pin, ...n }; } };

@@ -138,6 +138,10 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<
     let mut starts: Vec<usize> = Vec::with_capacity(ops.len());
     // The targets restyled so far: two steps on one record would each start from the origin and the second would drop the first.
     let mut restyled: Vec<ObjectTarget> = Vec::new();
+    // A panel edit over a mixed selection restyles what it can (the baseline skipped a texture anchor the edit would unhide); a
+    // single refused restyle, or a selection where every restyle is refused, still refuses the batch.
+    let restyle_steps = ops.iter().filter(|op| op.op == "restyle" || !op.style.missing()).count();
+    let mut skipped = 0usize;
     for (requested, mut op) in ops.into_iter().enumerate() {
         starts.push(out.len());
         if op.op == "copy" {
@@ -168,7 +172,14 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<
                 swaps.push(Some(swap));
                 continue;
             }
-            for (at, mut record) in style::restyle(origin.document(), &target, &style, origin.project().and_then(|p| p.project().custom_brush_presets()))?.into_iter().enumerate() {
+            let restyled_records = match style::restyle(origin.document(), &target, &style, origin.project().and_then(|p| p.project().custom_brush_presets())) {
+                Err(DispatchErrorCode::Unavailable) if restyle_steps > 1 => {
+                    skipped += 1;
+                    continue;
+                }
+                other => other?,
+            };
+            for (at, mut record) in restyled_records.into_iter().enumerate() {
                 record.target.frame_scope.frame = frame.unwrap_or(target.frame_scope.frame);
                 companion.push(at > 0);
                 swaps.push(None);
@@ -223,6 +234,9 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<
         if out.len() > MAX_EXPANDED_OPS {
             return Err(InvalidRequest);
         }
+    }
+    if skipped > 0 && out.is_empty() {
+        return Err(DispatchErrorCode::Unavailable);
     }
     Ok((out, companion, swaps))
 }
