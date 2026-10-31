@@ -12,9 +12,10 @@
   // and (SEL-STYLE2) the stroke details cap, join, miter, dashOffset, paintOrder.
   const hexColour=v=>typeof v==='string'&&/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v);
   const finite=v=>typeof v==='number'&&Number.isFinite(v);
-  const listedStyle=v=>exact(v,[],['fill','stroke','width','opacity','cap','join','miter','dashOffset','paintOrder'])&&Object.keys(v).length>0&&(!own(v,'fill')||hexColour(v.fill))&&(!own(v,'stroke')||hexColour(v.stroke))&&
+  const listedStyle=v=>exact(v,[],['fill','stroke','width','opacity','cap','join','miter','dashOffset','paintOrder','maskMode','maskFeather'])&&Object.keys(v).length>0&&(!own(v,'fill')||hexColour(v.fill))&&(!own(v,'stroke')||hexColour(v.stroke))&&
     (!own(v,'width')||finite(v.width)&&v.width>0)&&(!own(v,'opacity')||finite(v.opacity)&&v.opacity>=0&&v.opacity<=1)&&(!own(v,'cap')||['butt','round','square'].includes(v.cap))&&
-    (!own(v,'join')||['miter','round','bevel'].includes(v.join))&&(!own(v,'miter')||finite(v.miter)&&v.miter>=0)&&(!own(v,'dashOffset')||finite(v.dashOffset))&&(!own(v,'paintOrder')||['fillFirst','strokeFirst'].includes(v.paintOrder));
+    (!own(v,'join')||['miter','round','bevel'].includes(v.join))&&(!own(v,'miter')||finite(v.miter)&&v.miter>=0)&&(!own(v,'dashOffset')||finite(v.dashOffset))&&(!own(v,'paintOrder')||['fillFirst','strokeFirst'].includes(v.paintOrder))&&
+    (!own(v,'maskMode')||['add','subtract','intersect'].includes(v.maskMode))&&(!own(v,'maskFeather')||finite(v.maskFeather)&&v.maskFeather>=0);
   function target(v){return exact(v,['contextId','layerUid','frameScope','strokeId'])&&v.contextId==='scene-root'&&
     ['layerUid','strokeId'].every(k=>typeof v[k]==='string'&&v[k].length>0)&&exact(v.frameScope,['kind','frame'])&&
     ['authored','reference'].includes(v.frameScope.kind)&&integer(v.frameScope.frame,4294967295);}
@@ -71,7 +72,7 @@
       // A hit-test listing (#2362) gives every painted record its bounds, role and fill flag instead of a paint count; a raster image
       // or text block (#2372) is listed too, its bounds the painted rect/glyph box and its count 0 (no editable geometry).
       if(own(r,'hitTest')?!exact(item,['stableTarget','closed','count','matrix','bounds','role','filled'],['strokeWidth','owner','brush','group','boxAngle','style'])||typeof item.filled!=='boolean'||own(item,'strokeWidth')&&!(typeof item.strokeWidth==='number'&&Number.isFinite(item.strokeWidth)&&item.strokeWidth>=0)||own(item,'boxAngle')&&!(typeof item.boxAngle==='number'&&Number.isFinite(item.boxAngle))||own(item,'style')&&!listedStyle(item.style)||!Array.isArray(item.bounds)||item.bounds.length!==4||!item.bounds.every(Number.isFinite)||
-        !['plain','ribbon','fill','shape','brush','raster','text'].includes(item.role)||own(item,'owner')&&(item.role!=='fill'||typeof item.owner!=='string'||!item.owner)||own(item,'brush')&&!['anchor','copy','bitmap'].includes(item.brush)||own(item,'group')&&(!own(item,'brush')||typeof item.group!=='string'||!item.group):!exact(item,['stableTarget','closed','count','matrix'],['paintCount']))fail('Invalid native subselect item');
+        !['plain','ribbon','fill','shape','brush','raster','text','mask'].includes(item.role)||own(item,'owner')&&(item.role!=='fill'||typeof item.owner!=='string'||!item.owner)||own(item,'brush')&&!['anchor','copy','bitmap'].includes(item.brush)||own(item,'group')&&(!own(item,'brush')||typeof item.group!=='string'||!item.group):!exact(item,['stableTarget','closed','count','matrix'],['paintCount']))fail('Invalid native subselect item');
       if(!target(item.stableTarget)||item.stableTarget.contextId!==r.contextId||item.stableTarget.layerUid!==r.layerUid||typeof item.closed!=='boolean'||
         !integer(item.count,256)||own(item,'paintCount')&&(!integer(item.paintCount,256)||item.paintCount<2||item.closed!==false)||!Array.isArray(item.matrix)||item.matrix.length!==6||!item.matrix.every(Number.isFinite))fail('Invalid native subselect transform');
       const m=item.matrix,det=m[0]*m[3]-m[1]*m[2];if(!Number.isFinite(det)||Math.abs(det)<1e-12)fail('Singular native subselect transform');

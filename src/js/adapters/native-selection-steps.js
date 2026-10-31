@@ -18,8 +18,8 @@
   var HEX = /^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
   var CHOICES = { cap: ['butt', 'round', 'square'], join: ['miter', 'round', 'bevel'], paintOrder: ['fillFirst', 'strokeFirst'], strokeStyle: ['solid', 'dashed', 'dotted'] };
   // Every member a panel edit may name, and whether the edit stands alone (a preset and a smooth are not combined with other members).
-  var MEMBERS = COLOUR.concat(['fillEnabled', 'strokeEnabled', 'fillWith', 'strokeWith', 'paintOrder', 'brushPreset', 'smooth'], DETAIL);
-  var ALONE = ['brushPreset', 'smooth'];
+  var MEMBERS = COLOUR.concat(['fillEnabled', 'strokeEnabled', 'fillWith', 'strokeWith', 'paintOrder', 'brushPreset', 'smooth', 'maskFeather'], DETAIL);
+  var ALONE = ['brushPreset', 'smooth', 'maskFeather'];
 
   // The members of `style` that are well formed (a bad one is dropped by the caller as an invalid edit).
   function valid(style) {
@@ -29,7 +29,7 @@
       if (v === undefined || v === null) return;
       var good = ({ fill: HEX.test(v), stroke: HEX.test(v), fillWith: HEX.test(v), strokeWith: HEX.test(v), fillEnabled: typeof v === 'boolean', strokeEnabled: typeof v === 'boolean',
         width: typeof v === 'number' && v > 0 && v <= 10000, opacity: typeof v === 'number' && v >= 0 && v <= 1, miter: typeof v === 'number' && v >= 1 && v <= 1000,
-        dashOffset: typeof v === 'number' && Math.abs(v) <= 1e6, smooth: typeof v === 'number' && v >= 0 && v <= 1000,
+        dashOffset: typeof v === 'number' && Math.abs(v) <= 1e6, smooth: typeof v === 'number' && v >= 0 && v <= 1000, maskFeather: typeof v === 'number' && v >= 0 && v <= 500,
         brushPreset: typeof v === 'string' && v.length > 0 && v.length <= 96 })[k];
       if (CHOICES[k]) good = CHOICES[k].indexOf(v) >= 0;
       if (good) out[k] = v; else ok = false;
@@ -43,6 +43,9 @@
   // `last` names the colour member written last in the edit ('fill' | 'stroke'): a ribbon is inked by one colour, so the later write wins.
   function styleFor(path, s, last) {
     var role = path.data.nativeRole, out = {}, copy = function (k) { if (s[k] !== undefined) out[k] = s[k]; };
+    // A mask has the Mask panel's feather and nothing else: the layer's shared feather (SEL-MASK), no paint.
+    if (s.maskFeather !== undefined) return role === 'mask' ? { maskFeather: s.maskFeather } : null;
+    if (role === 'mask') return null;
     if (alone(s)) {
       // A preset restamps a plain stroke; a ribbon and an image are not eligible (the baseline filtered them out).
       return s.brushPreset !== undefined && role !== 'ribbon' && !ITEMS[role] ? { brushPreset: s.brushPreset } : null;
@@ -82,7 +85,7 @@
     if (!fresh) return null;
     fresh.paths.forEach(function (p) {
       var role = p.data.nativeRole, cs = p.data.centerSegments;
-      if (ITEMS[role]) return;
+      if (ITEMS[role] || role === 'mask') return;
       if (p.data.isVectorBrush && cs && cs.length > 1) {
         var rebuilt = root.buildCenterSegmentsFromRawStroke(cs.map(function (s) { return new Point(s.point[0], s.point[1]); }), cs.map(function (s) { return s.width; }), amount);
         p.data.centerSegments = Array.prototype.slice.call(rebuilt).map(function (c) { return { point: c.point, handleIn: c.handleIn, handleOut: c.handleOut, width: c.width }; });

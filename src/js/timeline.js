@@ -2917,6 +2917,8 @@ function updateMaskPanel(){
   var layer=p.layer;
   var maxFeather=0;
   if(layer)layer.children.forEach(function(c){if(c.data&&c.data.isMask&&c.data.maskFeather>maxFeather)maxFeather=c.data.maskFeather;});
+  // A native mask (#2372 SEL-MASK) is a transient presented path: the engine's listing already gives the layer's shared feather.
+  if(p.data.nativeStableTarget&&typeof p.data.maskFeather==='number')maxFeather=p.data.maskFeather;
   document.getElementById('p-mask-feather').value=maxFeather;
 }
 document.getElementById('p-mask-mode').addEventListener('change',function(){
@@ -2925,9 +2927,12 @@ document.getElementById('p-mask-mode').addEventListener('change',function(){
   saveActiveLayerFrame();if(window.SMEngineBridge)SMEngineBridge.renderNow();
 });
 document.getElementById('p-mask-feather').addEventListener('input',function(){
-  var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask||!p.layer)return;
-  if(!n20AllowLegacyWrite('timeline-mask-feather'))return false;
+  var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask)return;
   var v=Math.max(0,parseFloat(this.value)||0);
+  // #2372 SEL-MASK: on a native object project the feather restyles the layer's masks as ONE native batch entry (one history entry).
+  if(p.data.nativeStableTarget&&nativeSelStyle({maskFeather:Math.min(500,v)}))return;
+  if(!p.layer)return;
+  if(!n20AllowLegacyWrite('timeline-mask-feather'))return false;
   // Shared per-layer value (see updateMaskPanel's comment) — every mask on
   // this layer gets the same feather, matching what the engine actually
   // reads (LayerIn.mask_feather, the max across a layer's own masks).
