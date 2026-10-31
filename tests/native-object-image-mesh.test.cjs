@@ -273,7 +273,7 @@ function meshDocument(){const nodes=new Map();for(const id of ['layer-list','fra
     getElementById(id){if(nodes.has(id))return nodes.get(id);function find(node){if(node.id===id)return node;for(const child of node.children){const found=find(child);if(found)return found;}return null;}for(const node of nodes.values()){const found=find(node);if(found)return found;}return null;},
     createElement(){doc.created++;return meshElement();},createComment:()=>meshElement(),addEventListener(){},removeEventListener(){}};return doc;}
 function composedMesh(geometry = false, meshValue, beforeDispatch = async () => {}, desktopCompletion = false) {
-  const root = { state: { tool: 'select', playing: false }, userLayers: [], document: meshDocument(), addEventListener() {}, requestAnimationFrame: f => setImmediate(f) };
+  const root = { state: { tool: 'select', playing: false }, userLayers: [], document: meshDocument(), addEventListener() {}, requestAnimationFrame: f => setImmediate(f), setTimeout: f => setTimeout(f, 1) };
   const doc = root.document, calls = [], minted = [], messages = [];
   for (const id of ['p-imagemesh-sec', 'p-imagemesh-on', 'p-imagemesh-edit', 'p-imagemesh-body',
     'p-imagemesh-cols', 'p-imagemesh-rows', 'p-imagemesh-info', 'btn-imagemesh-reset']) doc.nodes.set(id, meshElement());
@@ -286,7 +286,7 @@ function composedMesh(geometry = false, meshValue, beforeDispatch = async () => 
   area.releasePointerCapture = () => { pointer = null; };
   root.showToast = message => messages.push(message);
   root.NemoNativeObjectUI = ComposedUI;
-  let active = false, revision = 0, documentId = 'document', generation = 1, liveSession;
+  let active = false, revision = 0, documentId = 'document', generation = 1, liveSession, previewGate = null;
   let mesh = meshValue === undefined ? { outline: OUTLINE, verts: OUTLINE, tris: [0, 1, 2, 0, 2, 3], offsets: OUTLINE.map(() => [0, 0]), cols: 1, rows: 1 } : meshValue;
   const metadata = () => ({ apiVersion: 2, instanceId: 'instance', documentId, lifecycleGeneration: generation,
     contentRevision: revision, documentSnapshotId: `native-object:${documentId}:${revision}`, documentDigest: 'a'.repeat(64), byteCount: 1000,
@@ -339,6 +339,7 @@ function composedMesh(geometry = false, meshValue, beforeDispatch = async () => 
     }
     if (command === 'nemo_native_object_reference') return { ...metadata(), requestId: r.requestId };
     assert.equal(command, 'nemo_native_object_preview');
+    if (previewGate) await previewGate.promise; /* the canvas presents a new revision after its info pin (installed timing) */
     return { status: 'presented', workId: `work-${generation}-${revision}`, viewGeneration: generation };
   }
   let projected = false;
@@ -382,7 +383,7 @@ function composedMesh(geometry = false, meshValue, beforeDispatch = async () => 
     assert.equal(ComposedUI.select(root, session.info(), 0, false, 'L0', session.readPresentedObjectSession(), uiPorts), true);
     if (settle) { await root.SMImageMeshUI.refresh(); await meshTurn(); }
   }
-  return { root, session, calls, minted, messages, open, uiPorts,
+  return { root, session, calls, minted, messages, open, uiPorts, holdPreview() { previewGate = meshGate(); return previewGate; },
     async settle() { await meshTurn(); await root.SMImageMeshUI.refresh(); await meshTurn(); },
     replaceSession() { liveSession = ComposedProject.create(ports); },
     pointer(type, x, y) { let stopped = false; captures.get(type)({ target: doc.nodes.get('drawing-canvas'), pointerId: 7,
@@ -522,6 +523,27 @@ test('real capture handlers cancel without a command and commit one leased point
   const proof = ComposedUI.readImageMeshSelection(h.root);
   const read = await proof.session.readImageMesh(proof.selector, proof.info);
   assert.deepEqual(read.mesh.offsets[0], [0.09999999999999998, 0.09999999999999998]);
+  assert.deepEqual(h.messages, []);
+});
+
+test('a vertex commit keeps Edit points, the Mesh panel and the handles while the canvas catches up (#2242)', async () => {
+  const h = composedMesh(true); await h.open();
+  const doc = h.root.document, section = doc.getElementById('p-imagemesh-sec'), edit = doc.getElementById('p-imagemesh-edit');
+  const handles = () => (doc.body.children[0] ? doc.body.children[0].children.filter(n => n.attributes.cx !== undefined || n.attributes.width !== undefined).length : 0);
+  h.root.SMImageMeshUI.toggleEditing(); await meshTurn(); await meshTurn();
+  assert.equal(h.root.SMImageMeshUI.isEditing(), true); assert.ok(handles() > 0);
+  const gate = h.holdPreview();
+  h.pointer('pointerdown', 160, 90); h.pointer('pointermove', 180, 100); h.pointer('pointerup', 180, 100);
+  for (let i = 0; i < 8; i++) { await meshTurn(); await h.root.SMImageMeshUI.refresh(); }
+  assert.equal(h.calls.filter(r => r.operation === OP).length, 1);
+  assert.notEqual(section.style.display, 'none', 'the panel holds while the new revision is not yet presented');
+  assert.equal(h.root.SMImageMeshUI.isEditing(), true); assert.equal(edit.checked, true); assert.ok(handles() > 0, 'the handles hold');
+  gate.resolve();
+  for (let i = 0; i < 40 && !h.root.SMImageMeshUI.hasMesh(); i++) await new Promise(done => setTimeout(done, 5));
+  await meshTurn(); await meshTurn();
+  assert.equal(h.root.SMImageMeshUI.hasMesh(), true, 're-read at the new revision');
+  assert.equal(h.session.info().contentRevision, 1);
+  assert.equal(h.root.SMImageMeshUI.isEditing(), true); assert.equal(edit.checked, true); assert.ok(handles() > 0, 'the next vertex is one drag away');
   assert.deepEqual(h.messages, []);
 });
 
