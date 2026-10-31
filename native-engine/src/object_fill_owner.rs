@@ -110,6 +110,9 @@ pub(crate) use widget_edit::{
 #[cfg(feature = "project_media_codec")]
 #[path = "object_raster_image_import_owner.rs"]
 pub(crate) mod image_import;
+#[cfg(feature = "project_media_codec")]
+#[path = "object_media_video_link_owner.rs"]
+pub(crate) mod video_link;
 // #2361: a bitmap-brush Draw stroke (anchor, companion and its baked PNG) in one candidate project.
 #[cfg(feature = "project_media_codec")]
 #[path = "object_brush_bitmap_stroke_owner.rs"]

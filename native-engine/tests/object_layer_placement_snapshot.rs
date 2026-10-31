@@ -32,8 +32,9 @@ fn snapshot(o: &NativeObjectHistory) -> ObjectSnapshot {
 }
 
 #[test]
-fn a_video_layer_reports_its_placement_and_remap_facts_without_the_keys() {
-    let remap = json!({"timeRemap":{"keys":[{"frame":0,"v":[0]},{"frame":24,"v":[47]}]},
+fn a_video_layer_reports_its_placement_its_remap_keys_and_the_eased_source_frame() {
+    let remap = json!({"timeRemap":{"keys":[{"frame":0,"v":[0],
+        "curvePoints":[{"x":0,"y":0},{"x":1,"y":1}]},{"frame":24,"v":[47]}]},
         "interpMode":"blend","frameBlend":true});
     let s = snapshot(&owner(remap));
     let value = read(&s, &query(&s, "L", 24)).unwrap();
@@ -42,11 +43,30 @@ fn a_video_layer_reports_its_placement_and_remap_facts_without_the_keys() {
         json!({"kind":"layerPlacement","instanceId":s.instance_id(),"documentId":s.document_id(),
             "atRevision":0,"documentSnapshotId":s.snapshot_id(),"contextId":"scene-root",
             "layerUid":"L","frame":24,"placement":{"placementId":"p1","assetId":"v1",
-            "assetKind":"video","offsetFrames":5,"timeRemap":{"keyCount":2,"keyAtFrame":true},
+            "assetKind":"video","offsetFrames":5,"timeRemap":{"keyCount":2,"keyAtFrame":true,
+            "value":47.0,"keys":[{"frame":0,"value":0},{"frame":24,"value":47}]},
             "interpMode":"blend","frameBlend":true,"sourceFrameCount":null}})
     );
     let between = read(&s, &query(&s, "L", 3)).unwrap();
     assert_eq!(between["placement"]["timeRemap"]["keyAtFrame"], false);
+    // The linear first key: frame 6 of 24 maps to a quarter of 47 source frames.
+    let eased = read(&s, &query(&s, "L", 6)).unwrap();
+    assert_eq!(eased["placement"]["timeRemap"]["value"], json!(11.75));
+}
+
+#[test]
+fn a_key_list_past_the_read_budget_is_dropped_and_the_counted_facts_stay() {
+    let keys: Vec<Value> = (0..300)
+        .map(|i| json!({"frame":i,"v":[f64::from(i) + 0.123_456_789_012]}))
+        .collect();
+    let s = snapshot(&owner(json!({"timeRemap":{"keys":keys}})));
+    let value = read(&s, &query(&s, "L", 7)).unwrap();
+    let remap = &value["placement"]["timeRemap"];
+    assert_eq!(remap["keys"], Value::Null);
+    assert_eq!(remap["keyCount"], 300);
+    assert_eq!(remap["keyAtFrame"], true);
+    assert_eq!(remap["value"], json!(7.123_456_789_012));
+    assert!(value.to_string().len() <= MAX_MESSAGE_BYTES - HOST_FILL_BYTES);
 }
 
 #[test]

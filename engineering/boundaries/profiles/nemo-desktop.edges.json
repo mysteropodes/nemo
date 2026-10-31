@@ -232,6 +232,9 @@
           "scheduler::OutputSpec",
           "object_document::FrameScopeKind",
           "export_job::MAX_OBJECT_EXPORT_FRAMES",
+          "commands::LinkedVideoFacts",
+          "native_media_frame_export::NativeVideoDecoder",
+          "native_media_frame_export::NativeVideoInfo",
           "history::ImportAssetSource"
         ],
         "rust.desktop.mcp.adapter.tests": [
@@ -411,6 +414,8 @@
           "object_codec::encode_storage_project",
           "desktop_viewport::ObjectPreviewView",
           "object_render_scene::prepare_object_camera_viewport_composition",
+          "commands::LinkedVideoFacts",
+          "native_media_frame_export::NativeVideoDecoder",
           "desktop_viewport::ViewportDisplayFilter"
         ],
         "rust.desktop.native.dispatch": [
@@ -482,6 +487,7 @@
           "application::ObjectBrushRuntime",
           "object_render_scene::ObjectBrushAdmission",
           "export_job::export_object_frames_with_materializer",
+          "commands::LinkedVideoFacts",
           "history::ImportAssetSource",
           "desktop_viewport::ViewportDisplayFilter",
           "object_render_scene::GhostUnderlayRequest",

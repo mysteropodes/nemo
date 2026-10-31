@@ -7,7 +7,7 @@ use crate::request_receipts::{
 use crate::transaction::{CompactFailure, CompactResult, ReceiptLookup, RetainedDisposition};
 
 const ATTACH: &str = "command.document.object.asset.attach";
-fn identifier(value: &str) -> bool {
+pub(crate) fn identifier(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 128
         && value.as_bytes()[0].is_ascii_alphanumeric()

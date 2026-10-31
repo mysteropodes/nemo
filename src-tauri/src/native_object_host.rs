@@ -25,6 +25,8 @@ pub(crate) use retained_tabs::{PreparedRetainedActivation, PROJECT_INFO_LIMIT_BY
 mod font_assets;
 #[path = "native_object_image.rs"]
 mod image_import;
+#[path = "native_object_video_link.rs"]
+mod video_link;
 #[path = "native_object_import_batch.rs"]
 mod import_batch;
 

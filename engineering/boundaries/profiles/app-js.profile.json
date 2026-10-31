@@ -2718,6 +2718,42 @@
       ]
     },
     {
+      "id": "app.native.video.asset.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-video-asset-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-video-asset-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.video.asset.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-video-asset.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-video-asset.js"
+      ]
+    },
+    {
+      "id": "app.native.import.video.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-video.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-import-video.js"
+      ]
+    },
+    {
       "id": "app.native.project-settings.intent.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

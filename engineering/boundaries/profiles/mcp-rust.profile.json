@@ -84,6 +84,8 @@
         "src/native_object_edit_receipt_tests.rs",
         "src/native_item_contract.rs",
         "src/native_item_contract_tests.rs",
+        "src/native_video_link_contract.rs",
+        "src/native_video_link_contract_tests.rs",
         "src/native_vector_contract.rs",
         "src/native_vector_contract_shapes.rs",
         "src/native_vector_contract_texture.rs",
@@ -183,7 +185,9 @@
         "native_revision_sync.rs",
         "native_font_source.rs",
         "native_raster_image_source.rs",
-        "native_raster_image_dispatch.rs"
+        "native_raster_image_dispatch.rs",
+        "native_video_link_source.rs",
+        "native_video_link_dispatch.rs"
       ],
       "publicApi": [
         "application_mcp.rs"
@@ -200,7 +204,8 @@
         "application_mcp_reproduction_tests.rs",
         "native_revision_sync_tests.rs",
         "native_font_source_tests.rs",
-        "native_raster_image_dispatch_tests.rs"
+        "native_raster_image_dispatch_tests.rs",
+        "native_video_link_dispatch_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

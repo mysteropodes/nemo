@@ -99,6 +99,10 @@
       row.style.height=((1+extra)*22)+'px';var bar=row.querySelector('.layer-inout-bar');if(bar){bar.style.bottom=extra?'auto':'2px';bar.style.height=extra?'18px':'';}
     });
   }
+  // T12: a native video placement's Time Remap keys (its placement read) as one inert lane: no atomic move-key op exists.
+  function remapTracks(root,w){var f=root.SM&&root.SM.timeRemapKeyFacts;if(typeof f!=='function')return [];
+    return w.info.layers.map(function(l,i){var r=f(i),keys=r&&Array.isArray(r.keys)?r.keys:[];
+      return keys.length?{target:{contextId:'scene-root',layerUid:l.layerUid},property:'timeRemap',inert:true,items:keys.map(function(k){return {frame:k.frame,selected:false};})}:null;}).filter(Boolean);}
   function resetKeys(root,w){clearKeys(w);keyRows(root,w,[]);}
   // The key buttons depend on the key frames, selection, lanes and zoom, not on which frame is shown: a playback tick whose projection prints the same
   // signature keeps its buttons (#2371) and only swaps the live value their handlers read.
@@ -108,10 +112,10 @@
   function refreshKeys(root){
     var w=works.get(root);if(!w)return;
     try{
-      var value=w.node&&root.state.appMode==='motion'&&ready(root,session(root),w.info)?keyViews(root,w):null,fc=root.FC;
-      if(!value||!Number.isFinite(fc)||fc<=0){resetKeys(root,w);return;}
+      var live=w.node&&root.state.appMode==='motion'&&ready(root,session(root),w.info),value=live?keyViews(root,w):null,remap=live?remapTracks(root,w):[],fc=root.FC;
+      if((!value&&!remap.length)||!Number.isFinite(fc)||fc<=0){resetKeys(root,w);return;}
       var groups=new Map(),layout=[],positions=[];
-      value.tracks.forEach(function(track){
+      (value?value.tracks:[]).concat(remap).forEach(function(track){
         var index=w.info.layers.findIndex(function(l){return l.layerUid===track.target.layerUid;});if(index<0)throw Error('Foreign native key layer');
         var group=groups.get(index)||[];group.push(track);groups.set(index,group);
       });
@@ -133,6 +137,7 @@
         Object.assign(node.style,{position:'absolute',left:position.left+'px',top:position.top+'px',padding:'0',cursor:'pointer',zIndex:'7'});
         node.dataset.frame=String(key.frame);node.dataset.keyTrack=trackIdentity(track);node.classList.toggle('sel',key.selected);
         node.setAttribute('aria-label',track.property+' key at frame '+String(key.frame));node.setAttribute('aria-pressed',String(key.selected));
+        if(track.inert){node.disabled=true;node.style.pointerEvents='none';row.appendChild(node);w.keyNodes.push(node);return;}
         function choose(event){
           event.preventDefault();event.stopPropagation();if(event.button!==undefined&&event.button!==0)return;
           try{

@@ -73,7 +73,7 @@ impl<'de> Deserialize<'de> for ImageImport {
 
 // Tagged enums accept sequence representations by default. These wire fields are objects only.
 // Deserialize from the original map so duplicate and unknown members remain visible to the DTO.
-fn closed_map<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+pub(crate) fn closed_map<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     D: Deserializer<'de>,
     T: Deserialize<'de>,

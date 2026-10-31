@@ -370,7 +370,7 @@ test('timing declaration and closed transport definitions retain the accepted se
   assert.equal(validateRequest(placement.request),placement.request);
   assert.doesNotThrow(()=>validateResponse(placement.response,placement.request.requestId,placement.request.operation));
   assert.deepEqual(validate(transport.$defs.ObjectLayerPlacementResult,placement.response.result,transport.$defs),[]);
-  for(const bad of [{assetKind:'image'},{offsetFrames:'0'},{interpMode:''},{frameBlend:1},{sourceFrameCount:0},{sourceFrameCount:1.5},{timeRemap:{keyCount:-1,keyAtFrame:true}},{timeRemap:{keyCount:1}},{extra:1}]){
+  for(const bad of [{assetKind:'image'},{offsetFrames:'0'},{interpMode:''},{frameBlend:1},{sourceFrameCount:0},{sourceFrameCount:1.5},{timeRemap:{keyCount:-1,keyAtFrame:true}},{timeRemap:{keyCount:1}},{timeRemap:{keyCount:2,keyAtFrame:true}},{timeRemap:{keyCount:1,keyAtFrame:false,value:1,keys:[]}},{timeRemap:{keyCount:1,keyAtFrame:false,value:'1',keys:null}},{extra:1}]){
     const result={...placement.response.result,placement:{...placement.response.result.placement,...bad}};
     assert.throws(()=>validateResponse({...placement.response,result},placement.request.requestId,placement.request.operation),TypeError,JSON.stringify(bad));
   }
