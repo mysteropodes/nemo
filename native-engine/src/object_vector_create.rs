@@ -13,13 +13,15 @@ use std::collections::HashSet;
 
 #[path = "object_vector_trim.rs"]
 mod trim;
-pub(crate) use trim::TrimClipWire;
+#[path = "object_vector_axis_clip.rs"]
+mod clip;
+pub(crate) use clip::TrimClipWire;
 
 /// Trim Stroke Ends as asked: the overshoot limit, and for a stop-at-axis mirror the clip that runs after the trim.
 #[derive(Debug, Clone)]
 pub(super) struct Trim {
     max: f64,
-    clip: Option<trim::Clip>,
+    clip: Option<clip::Clip>,
 }
 
 /// Where created records enter the layer's stack in their frame.
@@ -52,7 +54,7 @@ pub(super) fn trim_ends(
     let creates = matches!(command, "object.vector.create" | "object.vector.createMany" | "object.vector.batch");
     let clip = match clip.value() {
         None => None,
-        Some(wire) if creates && value.value().is_some() => Some(trim::Clip::parse(wire).ok_or(DispatchErrorCode::InvalidRequest)?),
+        Some(wire) if creates && value.value().is_some() => Some(clip::Clip::parse(wire).ok_or(DispatchErrorCode::InvalidRequest)?),
         Some(_) => return Err(DispatchErrorCode::InvalidRequest),
     };
     match value.value() {
@@ -147,7 +149,7 @@ pub(super) fn trim_records(source: &ObjectDocument, records: &mut [ObjectRecord]
             record.geometry.segments = segments;
         }
     }
-    plan.clip.as_ref().map_or(Ok(()), |clip| trim::axis_clip(records, clip))
+    plan.clip.as_ref().map_or(Ok(()), |clip| clip::axis_clip(records, clip))
 }
 
 /// The create kernel against a document being edited; `revision` is the origin's, so ids stay monotonic.
