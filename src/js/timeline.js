@@ -10543,19 +10543,27 @@ function renderXformAnchorGrid(){
     btn.classList.toggle('xa-active',!state.xformAnchorCustom&&btn.dataset.key===state.xformAnchorKey);
   });
 }
-document.querySelectorAll('#xform-anchor-grid .xa-dot').forEach(function(btn){
-  btn.addEventListener('click',function(e){
-    e.stopPropagation();
-    state.xformAnchorKey=btn.dataset.key;
-    state.xformAnchorCustom=null; // explicit preset pick always wins back over a custom point
+// #2372 xform-anchor-grid: on a native selection the pivot is a session preference only (selection-transform read() derives the anchor from state),
+// so a pick never stamps the strokes nor reaches saveActiveLayerFrame (a legacy writer a native project refuses).
+function xformAnchorPick(key){
+  var NS=window.NemoNativeSelectionStyle,own=!!NS&&NS.handles(window);
+  state.xformAnchorKey=key;
+  state.xformAnchorCustom=null; // explicit preset pick always wins back over a custom point
+  if(!own){
     // Persist per-stroke (2026-07, same fix as select-bridge.js's canvas
     // Alt-drag path) so picking a preset here ALSO survives a deselect+
     // reselect, not just the canvas gesture.
-    selectedPaths.forEach(function(p){if(p&&p.data){p.data.xformAnchorKey=btn.dataset.key;delete p.data.xformAnchorCustom;}});
+    selectedPaths.forEach(function(p){if(p&&p.data){p.data.xformAnchorKey=key;delete p.data.xformAnchorCustom;}});
     if(selectedPaths.length)saveActiveLayerFrame();
-    renderXformAnchorGrid();
-    if(window.renderTransformHandles)renderTransformHandles();
-    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  }
+  renderXformAnchorGrid();
+  if(window.renderTransformHandles)renderTransformHandles();
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
+document.querySelectorAll('#xform-anchor-grid .xa-dot').forEach(function(btn){
+  btn.addEventListener('click',function(e){
+    e.stopPropagation();
+    xformAnchorPick(btn.dataset.key);
   });
 });
 renderXformAnchorGrid();
