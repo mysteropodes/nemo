@@ -198,6 +198,8 @@ impl NativeObjectHost {
         self.history
             .commit_project_replacement(prepared)
             .map_err(|_| "native project replacement origin changed".to_string())?;
+        // The ghost caches hold the replaced document's snapshots alive; nothing of it can be asked for again.
+        native_engine::application::release_ghost_caches();
         self.preview = preview::ObjectPreview::default();
         self.inactive_project = None;
         self.parked_project = None;
@@ -460,6 +462,7 @@ impl NativeDispatch for NativeObjectHost {
             }
         };
         self.released = Some(application.clone());
+        native_engine::application::release_ghost_caches();
         self.inactive_project = None;
         self.parked_project = None;
         self.inactive_requests.clear();

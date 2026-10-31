@@ -66,13 +66,14 @@
     }
     // tools.js Pen @1065e9d8: strokeColor/brushSize/cap/join/opacity, no fill, applyStrokeStyle dashes.
     function penStyle(s){
-      if(s.taperEnds)fail('Tapered Pen strokes are unavailable in native Drawing.');
       var hex=/^#(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/;
       if(!hex.test(s.strokeColor))fail('Native shapes require solid colours.');
       if(!Number.isFinite(s.brushSize)||s.brushSize<=0||!Number.isFinite(s.opacity)||s.opacity<0||s.opacity>100)fail('Native shape style is unavailable.');
       if(!['solid','dashed','dotted'].includes(s.strokeStyle))fail('This shape stroke style is unavailable.');
       var out={strokeColor:s.strokeColor,hasRealStroke:true,strokeWidth:s.brushSize,fillColor:null,opacity:s.opacity/100,
         strokeCap:s.strokeCap===undefined?'butt':s.strokeCap,strokeJoin:s.strokeJoin===undefined?'miter':s.strokeJoin,miterLimit:10,dashOffset:0}; // unset = Paper defaults
+      // finalizePen @1065e9d8 replaces the path with a tapered ribbon at commit only; the live preview stays the plain line.
+      if(s.taperEnds)out.taperEnds=true;
       Object.assign(out,ports.lineStyle());
       if(!['butt','round','square'].includes(out.strokeCap)||!['miter','round','bevel'].includes(out.strokeJoin))fail('Native stroke cap is unavailable.');
       return out;
@@ -113,7 +114,7 @@
       if(ports.pen){
         var anchors=t.anchors.concat(end&&!t.handleDrag?[{point:end}]:[]);
         return Paint.shade(Object.assign({},t.style,{closed:!!t.closed,segments:anchors.map(function(a){
-          return {point:a.point.slice(),handleIn:(a.handleIn||[0,0]).slice(),handleOut:(a.handleOut||[0,0]).slice()};})}),final);
+          return {point:a.point.slice(),handleIn:(a.handleIn||[0,0]).slice(),handleOut:(a.handleOut||[0,0]).slice()};})}),final,root);
       }
       if(ports.freehand)return ports.dictionary(t.samples,t.style);
       var g=ports.geometry(t.tool,t.start[0],t.start[1],end[0],end[1]);
@@ -382,18 +383,7 @@
         samples.push([w[0],w[1],filters.width(pressure)]);
       }
     }
-    // A native vector record holds 2..256 anchors (native-object-vector-stroke.js); the baseline Path has no cap, and a
-    // pressure ribbon across 40% of an HD frame already samples past it (#2343 B1). A longer freehand outline is refitted:
-    // Paper's simplify within a quarter document unit, widened only until it fits. A stroke that fits keeps every anchor.
-    function fitRecord(path){
-      if(path.segments.length<=256)return;
-      var source=path.segments.map(function(s){return s.clone();});
-      for(var tolerance=.25;tolerance<=64;tolerance*=2){
-        path.removeSegments();path.addSegments(source.map(function(s){return s.clone();}));path.simplify(tolerance);
-        if(path.segments.length<=256)return;
-      }
-      throw new Error('This stroke is too long for a native vector record.');
-    }
+    function fitRecord(path){return Paint.fitRecord(path);} // native-object-draw-paint.js: a record holds 2..256 anchors (#2343 B1)
     function nativeDictionary(raw,style) {
       if(raw.length<2)return null;
       if(raw.some(function(s){return !s.every(Number.isFinite);}))throw new Error('Brush samples must stay finite.');

@@ -41,11 +41,15 @@ function toggleNativeFlipPreview(controller){
   return nativeFlipPreview.toggle(controller);
 }
 function startNativePlay(controller){
+  // Test-package-only virtual time (P24): defined solely by the opt-in observer bootstrap, null in every normal build.
+  var testPlayClock=function(){try{var o=window.NemoTestPlayObserver;return o&&o.fixedClock||null;}catch(_){return null;}};
   if(!nativePlayScheduler)nativePlayScheduler=NemoNativeOpacityMotionSurface.createPlaybackScheduler({
     frame:function(){return state.currentFrame;},fps:function(){return state.fps;},
     playing:function(){return state.playing;},controller:function(){return window.NemoNativeOpacityCutover;},
     advance:advancePlayFrame,navigate:goToFrame,stop:stopPlay,
-    now:function(){return performance.now();},request:function(step){return window.requestAnimationFrame(step);},cancel:function(id){window.cancelAnimationFrame(id);}
+    now:function(){var c=testPlayClock();return c?c.now():performance.now();},
+    request:function(step){var c=testPlayClock();return c?c.request(step,1000/state.fps):window.requestAnimationFrame(step);},
+    cancel:function(id){var c=testPlayClock();if(c)c.cancel(id);else window.cancelAnimationFrame(id);}
   });
   // The flip ends only once Play has really started; a refused start leaves the flip running (RV4-FLIPCANCEL).
   if(!nativePlayScheduler.start(controller)){showToast('Native playback is unavailable');return;}
@@ -2923,14 +2927,19 @@ function updateMaskPanel(){
 }
 document.getElementById('p-mask-mode').addEventListener('change',function(){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask)return;
+  // #2372 MASK-NATIVE-REST: on a native object project the mode restyles THIS mask as ONE native batch entry (one history entry).
+  if(p.data.nativeStableTarget&&nativeSelStyle({maskMode:this.value}))return;
+  if(!n20AllowLegacyWrite('timeline-mask-mode'))return false;
   pushUndo();p.data.maskMode=this.value;
   saveActiveLayerFrame();if(window.SMEngineBridge)SMEngineBridge.renderNow();
 });
 document.getElementById('p-mask-feather').addEventListener('input',function(){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask)return;
   var v=Math.max(0,parseFloat(this.value)||0);
-  // #2372 SEL-MASK: on a native object project the feather restyles the layer's masks as ONE native batch entry (one history entry).
-  if(p.data.nativeStableTarget&&nativeSelStyle({maskFeather:Math.min(500,v)}))return;
+  // #2372 SEL-MASK: on a native object project the feather restyles the layer's masks as ONE native batch entry (one history entry): it is committed by
+  // the 'change' listener below (Enter/blur for a typed value, release for a scrub), never per keystroke, so '12' is one entry and not '1' then '12'.
+  var NS=window.NemoNativeSelectionStyle;
+  if(p.data.nativeStableTarget&&NS&&NS.handles(window))return;
   if(!p.layer)return;
   if(!n20AllowLegacyWrite('timeline-mask-feather'))return false;
   // Shared per-layer value (see updateMaskPanel's comment) — every mask on
@@ -2939,8 +2948,15 @@ document.getElementById('p-mask-feather').addEventListener('input',function(){
   p.layer.children.forEach(function(c){if(c.data&&c.data.isMask)c.data.maskFeather=v;});
   saveActiveLayerFrame();if(window.SMEngineBridge)SMEngineBridge.renderNow();
 });
+document.getElementById('p-mask-feather').addEventListener('change',function(){
+  var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask||!p.data.nativeStableTarget)return;
+  nativeSelStyle({maskFeather:Math.min(500,Math.max(0,parseFloat(this.value)||0))});
+});
 document.getElementById('btn-mask-unset').addEventListener('click',function(){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask)return;
+  // #2372 MASK-NATIVE-REST: "Remove as mask" turns the native mask back into a normal shape (geometry and paint kept) in ONE batch entry.
+  if(p.data.nativeStableTarget&&nativeSelStyle({unmask:true}))return;
+  if(!n20AllowLegacyWrite('timeline-mask-unset'))return false;
   pushUndo();
   delete p.data.isMask;delete p.data.maskMode;delete p.data.maskFeather;
   saveActiveLayerFrame();updateUI();if(window.SMEngineBridge)SMEngineBridge.renderNow();
@@ -6379,7 +6395,7 @@ function nativeSelStyle(style){
 }
 // The numeric fields a native Select selection owns scrub on ui.js's static path (one change at release, no legacy checkpoint, no live writes): the
 // legacy path pushes an undo before it raises _scrubLiveActive, which a native project refuses, so a paused drag would commit mid-gesture and again at release.
-var NATIVE_SCRUB_FIELDS=['p-sw','p-opacity','p-stroke-alpha','p-poststroke-smooth','p-miterlimit','p-dashoffset'];
+var NATIVE_SCRUB_FIELDS=['p-sw','p-opacity','p-stroke-alpha','p-poststroke-smooth','p-miterlimit','p-dashoffset','p-mask-feather'];
 function markNativeScrubFields(){
   var A=window.NemoNativeSelectionStyle,own=!!A&&A.handles(window);
   NATIVE_SCRUB_FIELDS.forEach(function(id){

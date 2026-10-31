@@ -315,7 +315,8 @@ test('a drag that ends where it began commits nothing', async () => {
 
 const centre = [{ point: [20, 60], handleIn: [0, 0], handleOut: [10, 0], width: 8 }, { point: [120, 60], handleIn: [-10, 0], handleOut: [0, 0], width: 8 }];
 const FAMILIES = [['a ribbon', { role: 'ribbon', center: centre }], ['a texture anchor', { role: 'brush', brush: 'anchor', group: 'g' }],
-  ['a parametric or fill shape', { role: 'shape' }], ['a standalone fill', { role: 'fill' }], ['a ribbon with a gradient', { role: 'ribbon', filled: true }]];
+  ['a parametric or fill shape', { role: 'shape' }], ['a standalone fill', { role: 'fill' }], ['a ribbon with a gradient', { role: 'ribbon', filled: true }],
+  ['a mask (MASK-NATIVE-REST)', { role: 'mask', filled: true, style: { maskMode: 'subtract', maskFeather: 6 } }]];
 const M = (step) => step.reshape.matrix.map((v) => Math.round(v * 1e6) / 1e6 + 0);
 
 test('every painted family moves by the exact delta as ONE batch of record-space matrices (the engine carries its fill, dabs and gradient)', async () => {
@@ -479,4 +480,24 @@ test('a dynamic shape keeps the world-axis resize of its engine kernel even unde
   h.press(e[0], e[1]); h.drag(e[0] + 30, e[1]); await settle(); await h.release(e[0] + 30, e[1]); await settle();
   const m = h.batches[0].steps[0].reshape.matrix;
   assert.ok(Math.abs(m[1]) < 1e-9 && Math.abs(m[2]) < 1e-9, 'axis-aligned, so the shape kernel accepts it');
+});
+
+test('MASK-NATIVE-REST: a mask scales like a shape, and moves with the content it masks in the one batch', async () => {
+  const mask = quad('M', 20, 20, 120, 120, { role: 'mask', filled: true, style: { maskMode: 'add', maskFeather: 0 } });
+  const h = harness([mask, FAR]);
+  await h.select(70, 70);
+  assert.deepEqual(h.ids(), ['M']);
+  const handle = h.root.NemoNativeSelectOverlay.boxOf(h.root, h.root.selectedPaths).handles[4]; // the south-east corner
+  h.press(handle[0], handle[1]); h.drag(handle[0] + 20, handle[1] + 20); await settle(); await h.release(handle[0] + 20, handle[1] + 20); await settle();
+  assert.equal(h.toasts.length, 0, 'no refusal notice');
+  assert.equal(h.batches.length, 1, 'one commit');
+  const m = M(h.batches[0].steps[0]);
+  assert.deepEqual([m[0] > 1, m[3] > 1, m[1], m[2]], [true, true, 0, 0], 'a scale about the opposite corner');
+  assert.deepEqual(h.batches[0].steps[0].reshape.stableTarget, mask.stableTarget);
+  const both = harness([mask, FAR]);
+  await both.select(70, 70); await both.select(170, 170, true);
+  assert.deepEqual(both.ids(), ['M', 'B']);
+  both.press(70, 70); both.drag(80, 80); await settle(); await both.release(80, 80); await settle();
+  assert.equal(both.batches.length, 1);
+  assert.deepEqual(both.batches[0].steps.map((s) => s.reshape.stableTarget.strokeId), ['M', 'B']);
 });

@@ -7,7 +7,7 @@
 //! - `opacity` (0..1) is the alpha of the solid fill, else the item opacity (an image, an unfilled stroke).
 //! - `width` is the stroke width of a plain record. A ribbon rescales every centre width and the width profile by `width / peak`
 //!   (the profile's own peak is the current size) and rebuilds its outline and linked fill as the sculpt does.
-//! The panel's other style kinds (switches, cap, join, miter, dash, paint order, stroke style, brush preset, mask feather) are the
+//! The panel's other style kinds (switches, cap, join, miter, dash, paint order, stroke style, brush preset, mask feather, mask mode, unmask) are the
 //! members of `object_vector_batch_style_detail.rs`.
 //! A bitmap brush, a stamped brush dab, a texture anchor's stroke colour, a texture anchor's opacity without a fill, and a width on
 //! an anchor whose copies are stored are refused (`Unavailable`): their image derives from more than the record.
@@ -39,6 +39,8 @@ pub(super) struct Style {
     pub(super) stroke_style: Presence<String>,
     pub(super) brush_preset: Presence<String>,
     pub(super) mask_feather: Presence<Number>,
+    pub(super) mask_mode: Presence<String>,
+    pub(super) unmask: Presence<bool>,
 }
 object_deserialize!(Style {
     #[serde(default)] fill: Presence<String>,
@@ -54,7 +56,9 @@ object_deserialize!(Style {
     #[serde(default)] paint_order: Presence<String>,
     #[serde(default)] stroke_style: Presence<String>,
     #[serde(default)] brush_preset: Presence<String>,
-    #[serde(default)] mask_feather: Presence<Number>
+    #[serde(default)] mask_feather: Presence<Number>,
+    #[serde(default)] mask_mode: Presence<String>,
+    #[serde(default)] unmask: Presence<bool>
 });
 
 /// A validated style: parsed colours and finite numbers in range.
@@ -218,6 +222,12 @@ pub(super) fn restyle(
     }
     if let Some(feather) = style.detail.mask_feather() {
         return detail::feather(source, existing, feather);
+    }
+    if let Some(mode) = style.detail.mask_mode() {
+        return detail::mode(existing, mode);
+    }
+    if style.detail.unmask() {
+        return detail::unmask(existing);
     }
     let ext = existing.vector_ext.value();
     let texture = ext.and_then(|e| e.brush_texture.value());

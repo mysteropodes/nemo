@@ -278,6 +278,17 @@
     var again = anchor && await presented(root, layerIndex, function (item) { return item.stableTarget.strokeId === anchor.stableTarget.strokeId; });
     return again && again.paths[0] ? withFill(again.paths[0], again.items) : hit;
   }
+  // #2372 mask review: a mask is never painted on the canvas (the engine clips with it), so its interior must not cover the content it masks,
+  // whatever the listing order (the mask is listed after its content as often as before it). Within one layer: a mask's own OUTLINE is
+  // grabbed first (the precise click that selects the mask), then the top-most non-mask item (fill or stroke), and only then a mask's
+  // interior, so a click inside a mask with nothing under it still selects the mask.
+  function maskAwareHit(paths, at, t) {
+    var i, isMask = function (p) { return p.data && p.data.isMask === true; };
+    for (i = paths.length - 1; i >= 0; i--) if (isMask(paths[i]) && paths[i].hitTest(at, { fill: false, stroke: true, tolerance: t })) return paths[i];
+    for (i = paths.length - 1; i >= 0; i--) if (!isMask(paths[i]) && paths[i].hitTest(at, { fill: true, stroke: true, tolerance: t })) return paths[i];
+    for (i = paths.length - 1; i >= 0; i--) if (isMask(paths[i]) && paths[i].hitTest(at, { fill: true, stroke: false, tolerance: t })) return paths[i];
+    return null;
+  }
   // The top-most presented stroke within 8 screen pixels of the click, or null, as the baseline did: the active layer is
   // tested first, then every other visible unlocked layer from the topmost down (#2372). The hit carries its layer
   // (data.nativeLayerIndex/Uid) so applyPick can activate it. Only records whose bounds reach the click have their geometry
@@ -297,8 +308,9 @@
       if (!info || info.locked === true || info.visible === false) continue;
       var layers = await presented(root, order[n], reach);
       if (!layers) return undefined;
-      for (var i = layers.paths.length - 1; i >= 0; i--) if (layers.paths[i].hitTest(at, { fill: true, stroke: true, tolerance: t })) {
-        var hit = await anchored(root, order[n], withFill(owned(layers.paths[i], layers.items), layers.items), layers);
+      var found = maskAwareHit(layers.paths, at, t);
+      if (found) {
+        var hit = await anchored(root, order[n], withFill(owned(found, layers.items), layers.items), layers);
         hit.data.nativeLayerIndex = order[n]; hit.data.nativeLayerUid = layers.layerUid;
         return hit;
       }

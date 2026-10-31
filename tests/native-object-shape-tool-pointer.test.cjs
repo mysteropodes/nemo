@@ -313,7 +313,7 @@ test('Pen: pressing near the first anchor closes; Shift snaps to 45 degrees; Alt
  assert.deepEqual(pts(rec),[[20,20],[100.156,20],[100,80]],'Shift snaps the angle and keeps the distance (constrainAngle45)');
  const second=rec.geometry.segments[1];assert.deepEqual([second.handleOut.x,second.handleOut.y],[4.844,5]);assert.deepEqual([second.handleIn.x,second.handleIn.y],[0,0]);
 });
-test('Pen: Escape and a single anchor commit nothing; Backspace drops the last anchor; a tool switch commits; taper refuses',async()=>{
+test('Pen: Escape and a single anchor commit nothing; Backspace drops the last anchor; a tool switch commits',async()=>{
  let f=await fixture('pen');await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90]]);
  f.doc.listeners.get('keydown').forEach(l=>l.fn({key:'Escape',stopImmediatePropagation(){},preventDefault(){}}));
  await pen(f,[['wait',500],['pointerdown',240,210],['pointerup',240,210]]);assert.equal(f.calls.length,0,'Escape dropped the gesture; the next press starts a new one');
@@ -324,8 +324,52 @@ test('Pen: Escape and a single anchor commit nothing; Backspace drops the last a
  f.root.SM.setTool('rect');const switched=await f.root.NemoNativePenToolController.whenSettled();
  assert.equal(switched.status,'applied','switching tools commits the open path, as finalizePen does');
  assert.deepEqual(pts(f.calls[0].payload.record),[[20,20],[100,20]],'Backspace removed the last anchor first');
- f=await fixture('pen');f.root.state.taperEnds=true;await pen(f,[['pointerdown',80,90]]);
- assert.ok(f.log.includes('Tapered Pen strokes are unavailable in native Drawing.'));assert.equal(f.calls.length,0);
+});
+// #2361 draw-pen-taper: tools.js finalizePen with Taper ends @1065e9d8 replaces the placed path with a filled ribbon whose
+// width tapers (buildCenterSegmentsFromPath + taperWidthAtFrac(frac, brushSize, 0.18)) and rebuildVectorBrushOutline outlines.
+// The oracle below runs those baseline functions itself on a Paper path built from the same anchors.
+function paperTaper(f){
+ const paper=require('./helpers/native-import-paper.cjs').load(),tools=fs.readFileSync(path.join(ROOT,'src/js/tools.js'),'utf8'),r=f.root;
+ r.Point=paper.Point;r.Segment=paper.Segment;r.Path=function(options){assert.equal(options&&options.insert,false,'all geometry must be detached');return new paper.Path(options);};
+ for(const name of ['widthAtFrac','taperFloorWidth','taperWidthAtFrac','buildCenterSegmentsFromPath','sampleVectorBrushCenterline','_polylineCrossCandidates',
+  '_ribbonHasRealSelfIntersections','_flattenResolvedRibbon','_cleanupSelfIntersectingOutline','buildVariableWidthPath','buildClosedRingOutline','_polyClosestPair'])
+  vm.runInContext(baselineFunction(tools,name),f.context,{filename:'tools.js:'+name});
+ return paper;
+}
+function oracle(f,paper,anchors,closed){
+ const r=f.root,path=new paper.Path({insert:false});anchors.forEach(a=>path.add(new paper.Segment(new paper.Point(a[0],a[1]),new paper.Point(a[2]||0,a[3]||0),new paper.Point(a[4]||0,a[5]||0))));path.closed=!!closed;
+ const cs=r.buildCenterSegmentsFromPath(path,frac=>r.taperWidthAtFrac(frac,r.state.brushSize,0.18)),sampled=r.sampleVectorBrushCenterline(cs,undefined);
+ const outline=r.buildVariableWidthPath(sampled.pts,sampled.widths);return {cs:JSON.parse(JSON.stringify(cs)),segments:JSON.parse(JSON.stringify(outline.segments.map(s=>[s.point.x,s.point.y])))};
+}
+const penSteps=[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210],['pointerdown',240,210]];
+test('Pen with Taper ends commits the baseline tapered ribbon as ONE native create, the preview stays the plain line',async()=>{
+ const f=await fixture('pen'),paper=paperTaper(f);Object.assign(f.root.state,{taperEnds:true,brushSize:10,strokeStyle:'dashed'});
+ const want=oracle(f,paper,[[20,20],[100,20],[100,80]],false);
+ f.area.fire('pointerdown',{clientX:80,clientY:90});f.area.fire('pointerup',{clientX:80,clientY:90});f.area.fire('pointermove',{clientX:240,clientY:210});
+ const live=f.body.firstChild.firstChild.attributes;assert.deepEqual([live.fill,live.stroke,live['stroke-width']],['none','#112233','10'],'baseline: plain line until the path is finalised');
+ f.area.fire('pointerdown',{clientX:240,clientY:90});f.area.fire('pointerup',{clientX:240,clientY:90});
+ const r=await pen(f,[['wait',500],['pointerdown',240,210],['pointerup',240,210],['pointerdown',240,210]]);
+ assert.equal(r.status,'applied');assert.equal(f.calls.length,1,'one revision, one undo step');assert.equal(f.calls[0].payload.command,'object.vector.create');
+ const rec=f.calls[0].payload.record,ribbon=rec.vectorExt.pressure;
+ assert.equal(rec.geometry.closed,true);assert.equal(rec.vector.hasRealStroke,false);assert.deepEqual(rec.vector.dashArray||[],[],'a ribbon has no dashes');
+ assert.equal(rec.vector.strokeWidth,1);assert.equal(rec.vector.opacity,0.5);assert.equal(rec.vector.fill===undefined,true);
+ assert.deepEqual([rec.fill.r,rec.fill.g,rec.fill.b].map(v=>Math.round(v*255)),[0x11,0x22,0x33],'filled in the stroke colour');
+ assert.deepEqual(pts(rec),want.segments.map(p=>p.map(v=>Math.round(v*1000)/1000)),'the outline is the baseline taper outline');
+ assert.deepEqual(ribbon.centerSegments.map(c=>[c.point[0]??c.point.x,c.width]).map(([x,w])=>[x,Math.round(w*1000)/1000]),want.cs.map(c=>[c.point[0],Math.round(c.width*1000)/1000]));
+ const widths=ribbon.centerSegments.map(c=>c.width);assert.equal(widths[0],.8,'tapers to the floor at the start');assert.equal(widths.at(-1),.8,'and at the end');
+ assert.ok(widths.some(w=>w>=9.9),'full brush width mid-path');assert.equal(ribbon.widthProfile,undefined,'a Pen path has no pressure profile');
+ assert.deepEqual(f.root.state.layers[0].frames,[],'no legacy frame was written');
+});
+test('Pen with Taper ends: a closed path, Shadow mode and the plain path stay the baseline',async()=>{
+ const closed=await fixture('pen'),paper=paperTaper(closed);Object.assign(closed.root.state,{taperEnds:true,brushSize:10});
+ const rc=await pen(closed,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210],['wait',500],['pointerdown',84,94]]);
+ assert.equal(rc.status,'applied');const want=oracle(closed,paper,[[20,20],[100,20],[100,80]],true);
+ assert.deepEqual(pts(closed.calls[0].payload.record),want.segments.map(p=>p.map(v=>Math.round(v*1000)/1000)),'closed: ribbon of the anchors, as finalizePen');
+ const swatch={id:'sh5',ordinal:5,color:'#2288ff'},sh=await fixture('pen');paperTaper(sh);Object.assign(sh.root.state,{taperEnds:true,shadowMode:true});sh.root.SMShadowBrush={activeSwatch:()=>swatch};
+ await pen(sh,penSteps);const q=sh.calls[0].payload.record;assert.equal(q.geometry.closed,false,'applyShadowBrushTag returns the ribbon to its centreline');
+ assert.deepEqual(pts(q),[[20,20],[100,20],[100,80]]);assert.equal(q.vectorExt.shadow.shadowSwatchId,'sh5');assert.equal(q.vector.hasRealStroke,true);assert.equal(q.fill,null);
+ const off=await fixture('pen');await pen(off,penSteps);const plain=off.calls[0].payload.record;
+ assert.equal(plain.geometry.closed,false);assert.equal(plain.vectorExt&&plain.vectorExt.pressure,undefined,'without Taper ends the Pen path is plain');
 });
 
 test('Pen: Enter commits; Alt reshapes a placed anchor; a direct tool change still commits; another pointer type cannot join',async()=>{

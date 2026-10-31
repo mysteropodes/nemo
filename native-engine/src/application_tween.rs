@@ -8,7 +8,7 @@ pub use ghost::{
 // #2358 GHOST-UNDER: the retained ghost query as the viewport's onion underlay source.
 #[path = "tween_ghost_underlay.rs"]
 mod ghost_underlay;
-pub use ghost_underlay::prepare_ghost_underlay;
+pub use ghost_underlay::{prepare_ghost_underlay, release_ghost_caches};
 #[cfg(test)]
 pub(crate) use ghost_underlay::prepared_frames;
 

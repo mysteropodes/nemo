@@ -514,6 +514,6 @@ use tween::{export_error_code, resolution_code};
 #[cfg(test)]
 pub(crate) use tween::prepared_frames as prepared_ghost_frames;
 pub use tween::{
-    prepare_ghost_underlay, TweenGhostFrame, TweenGhostKind, TweenGhostPath, TweenGhostRead,
+    prepare_ghost_underlay, release_ghost_caches, TweenGhostFrame, TweenGhostKind, TweenGhostPath, TweenGhostRead,
     TweenGhostVisual,
 };

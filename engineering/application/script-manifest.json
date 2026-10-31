@@ -69,6 +69,7 @@
     {"src":"js/adapters/native-audio-track-contract.js"},
     {"src":"js/adapters/native-layer-playhead-cut-contract.js"},
     {"src":"js/adapters/native-layer-playhead-cut-ui.js"},
+    {"src":"js/adapters/native-component-convert-ui.js"},
     {"src":"js/adapters/native-import-contract.js"},
     {"src":"js/adapters/native-import-seam.js"},
     {"src":"js/adapters/native-object-edit-contract.js"},

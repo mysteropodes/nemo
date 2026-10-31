@@ -4,11 +4,11 @@
 use super::*;
 use serde_json::{json, Value};
 
-fn timing(keys: &[u32]) -> Value {
+pub(super) fn timing(keys: &[u32]) -> Value {
     json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
         "contextId":"scene-root","keys":keys.iter().map(|f|json!({"frame":f})).collect::<Vec<_>>(),"samples":[]})
 }
-fn rect(context: &str, layer: &str, id: &str, frame: u32, r: [i32; 4], fill: [f64; 3]) -> Value {
+pub(super) fn rect(context: &str, layer: &str, id: &str, frame: u32, r: [i32; 4], fill: [f64; 3]) -> Value {
     let cases: Value = serde_json::from_str(include_str!(
         "../../engineering/application/examples/native-object-v1/cases.json"
     ))
@@ -25,7 +25,7 @@ fn rect(context: &str, layer: &str, id: &str, frame: u32, r: [i32; 4], fill: [f6
     record
 }
 /// A seeded charcoal-pencil anchor: invisible itself (stroke opacity 0), its dabs are produced from it.
-fn anchor(frame: u32) -> Value {
+pub(super) fn anchor(frame: u32) -> Value {
     let p =
         |x: f64| json!({"point":{"x":x,"y":32},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}});
     json!({"schemaVersion":1,"family":"editable-vector-path",
@@ -38,7 +38,7 @@ fn anchor(frame: u32) -> Value {
         "vectorExt":{"brushTexture":{"brushGroupId":"g","brushTexturePreset":"charcoal-pencil",
             "preTextureOpacity":1,"strokeSeed":1}}})
 }
-fn scopes(keys: &[(u32, &str, &str)]) -> Vec<Value> {
+pub(super) fn scopes(keys: &[(u32, &str, &str)]) -> Vec<Value> {
     keys.iter()
         .map(|(frame, layer, id)| {
             json!({"frameScope":{"kind":"authored","frame":frame},
@@ -46,7 +46,7 @@ fn scopes(keys: &[(u32, &str, &str)]) -> Vec<Value> {
         })
         .collect()
 }
-fn project(drawing: Value) -> NativeObjectHistory {
+pub(super) fn project(drawing: Value) -> NativeObjectHistory {
     NativeObjectHistory::from_project_file(
         "ghost-fidelity",
         &serde_json::to_vec(
@@ -59,7 +59,7 @@ fn project(drawing: Value) -> NativeObjectHistory {
     .unwrap()
 }
 /// Frame 2 holds the dab anchor (a horizontal line at y 32); frame 3 only a small square far from it.
-fn dab_owner() -> NativeObjectHistory {
+pub(super) fn dab_owner() -> NativeObjectHistory {
     project(
         json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":4,
         "layers":[{"layerUid":"L0","timing":timing(&[2,3])}],
@@ -71,7 +71,7 @@ fn dab_owner() -> NativeObjectHistory {
     )
 }
 /// One host layer instancing a two-key symbol (a red square that jumps right at symbol frame 4), nothing else.
-fn component_owner() -> NativeObjectHistory {
+pub(super) fn component_owner() -> NativeObjectHistory {
     let inner = |frame, r| rect("comp-a", "inner", "ink", frame, r, [1., 0., 0.]);
     project(
         json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":16,
@@ -103,7 +103,7 @@ fn request_for(layer: &str, mode: GhostMode, previous: f64, to: u32) -> GhostUnd
     }
 }
 /// Summed darkness (255 - min channel) of the pixels in rows 24..40: the dab line's footprint.
-fn ink(bytes: &[u8]) -> u64 {
+pub(super) fn ink(bytes: &[u8]) -> u64 {
     (24..40)
         .flat_map(|y| (0..64).map(move |x| (x, y)))
         .map(|(x, y)| {

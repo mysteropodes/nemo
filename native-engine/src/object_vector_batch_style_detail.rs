@@ -10,6 +10,9 @@
 //!   the preset (a fresh group and seed; native stamps the dabs). A ribbon, a Fill Brush shape and a record with no stroke are left as they
 //!   are, as the baseline's eligibility filter leaves them.
 //! - `maskFeather` is the layer's shared feather: every mask of the named mask's cell takes it.
+//! - `maskMode` (add, subtract, intersect) is the named mask's own mode; `unmask` (true) turns the named mask back into a normal shape:
+//!   its mask tags are dropped, its geometry and paint stay (baseline `btn-mask-unset` deletes `isMask`, `maskMode`, `maskFeather` of
+//!   the one selected path).
 //! A bitmap brush, a stamped dab, stored dabs and a stroke switch on a texture anchor are refused (`Unavailable`) by the caller.
 use crate::commands::object_fill_owner::vector_edit::batch_ops::style::{
     num, parse, Checked, Style,
@@ -24,6 +27,7 @@ const CAPS: [&str; 3] = ["butt", "round", "square"];
 const JOINS: [&str; 3] = ["miter", "round", "bevel"];
 const ORDERS: [&str; 2] = ["fillFirst", "strokeFirst"];
 const STYLES: [&str; 3] = ["solid", "dashed", "dotted"];
+const MODES: [&str; 3] = ["add", "subtract", "intersect"];
 
 /// The validated detail members of a restyle step.
 #[derive(Debug, Default)]
@@ -38,6 +42,8 @@ pub(super) struct Detail {
     stroke_style: Option<String>,
     brush_preset: Option<String>,
     mask_feather: Option<f64>,
+    mask_mode: Option<String>,
+    unmask: bool,
 }
 
 /// A member that names one of `allowed`.
@@ -84,11 +90,25 @@ impl Detail {
             stroke_style: choice(&style.stroke_style, &STYLES)?,
             brush_preset: preset,
             mask_feather: finite(&style.mask_feather, 0.0, 500.0)?,
+            mask_mode: choice(&style.mask_mode, &MODES)?,
+            // `unmask` only ever says "yes": `false` is no edit at all.
+            unmask: match style.unmask.value() {
+                Some(true) => true,
+                Some(false) => return Err(DispatchErrorCode::InvalidRequest),
+                None => false,
+            },
         })
     }
-    /// A preset or a mask feather is its own edit: it combines with nothing else (not with the other, not with a plain member).
+    /// A preset, a mask feather, a mask mode or an unmask is its own edit: it combines with nothing else (not with another, not with a
+    /// plain member).
     pub(super) fn exclusive(&self) -> bool {
-        self.brush_preset.is_some() || self.mask_feather.is_some()
+        self.exclusives() > 0
+    }
+    fn exclusives(&self) -> usize {
+        usize::from(self.brush_preset.is_some())
+            + usize::from(self.mask_feather.is_some())
+            + usize::from(self.mask_mode.is_some())
+            + usize::from(self.unmask)
     }
     /// Any member that is not a preset or a feather.
     pub(super) fn has_plain(&self) -> bool {
@@ -102,7 +122,7 @@ impl Detail {
             || self.stroke_style.is_some()
     }
     pub(super) fn both_exclusive(&self) -> bool {
-        self.brush_preset.is_some() && self.mask_feather.is_some()
+        self.exclusives() > 1
     }
     /// The switches that bring the stroke back: a texture anchor hides its stroke, so these would show its outline again.
     pub(super) fn touches_stroke(&self) -> bool {
@@ -113,6 +133,12 @@ impl Detail {
     }
     pub(super) fn mask_feather(&self) -> Option<f64> {
         self.mask_feather
+    }
+    pub(super) fn mask_mode(&self) -> Option<&str> {
+        self.mask_mode.as_deref()
+    }
+    pub(super) fn unmask(&self) -> bool {
+        self.unmask
     }
 }
 
@@ -377,17 +403,50 @@ fn stamp(
     Ok(vec![record])
 }
 
+fn is_mask(r: &ObjectRecord) -> bool {
+    r.vector_ext
+        .value()
+        .is_some_and(|e| e.is_mask.value() == Some(&Some(true)))
+}
+
+/// The named mask alone takes `mode` (a mode is per mask; only the feather is shared by the layer).
+pub(super) fn mode(
+    named: &ObjectRecord,
+    mode: &str,
+) -> Result<Vec<ObjectRecord>, DispatchErrorCode> {
+    if !is_mask(named) {
+        return Err(DispatchErrorCode::Unavailable);
+    }
+    let mut record = named.clone();
+    if let Some(e) = record.vector_ext.value_mut() {
+        e.mask_mode = Presence::Present(Some(mode.to_string()));
+    }
+    Ok(vec![record])
+}
+
+/// The named mask becomes a normal shape again: its mask tags go, its geometry and paint stay as they are.
+pub(super) fn unmask(named: &ObjectRecord) -> Result<Vec<ObjectRecord>, DispatchErrorCode> {
+    if !is_mask(named) {
+        return Err(DispatchErrorCode::Unavailable);
+    }
+    let mut record = named.clone();
+    if let Some(e) = record.vector_ext.value_mut() {
+        e.is_mask = Presence::Missing;
+        e.mask_mode = Presence::Missing;
+        e.mask_feather = Presence::Missing;
+    }
+    if record.vector_ext.value().is_some_and(|e| e.is_empty()) {
+        record.vector_ext = Presence::Missing;
+    }
+    Ok(vec![record])
+}
+
 /// Every mask of `named`'s cell takes the feather (the layer's shared value); the named mask leads.
 pub(super) fn feather(
     source: &ObjectDocument,
     named: &ObjectRecord,
     value: f64,
 ) -> Result<Vec<ObjectRecord>, DispatchErrorCode> {
-    let is_mask = |r: &ObjectRecord| {
-        r.vector_ext
-            .value()
-            .is_some_and(|e| e.is_mask.value() == Some(&Some(true)))
-    };
     if !is_mask(named) {
         return Err(DispatchErrorCode::Unavailable);
     }

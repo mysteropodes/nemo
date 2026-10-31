@@ -19,6 +19,9 @@
       if (!child || typeof child.compose !== 'function') throw new Error('Native cut UI composition is unavailable');
       // Without the Time Remap child its legacy entries stay disconnected writers.
       var composed = child.compose(root, base, policy);
+      // #2256: the ordinary Convert to Component entry sends the native convert transaction (legacy documents keep theirs).
+      var convert = root.NemoNativeComponentConvertUI;
+      if (convert && typeof convert.compose === 'function') composed = convert.compose(root, base, composed);
       return remap && typeof remap.compose === 'function' ? remap.compose(root, base, composed) : composed;
     };
     project.bindUIComposition(root, compose);

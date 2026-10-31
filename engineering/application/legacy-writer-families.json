@@ -217,6 +217,8 @@
       "entries": {},
       "kinds": [
         "timeline-mask-feather",
+        "timeline-mask-mode",
+        "timeline-mask-unset",
         "timeline-selection-brush-preset",
         "timeline-selection-brush-size",
         "timeline-selection-dash-offset",
