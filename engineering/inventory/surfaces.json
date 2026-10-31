@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "6422691c33827b926bdb646e33095e38cafb8eda",
-  "describe": "v0.7.0-alpha.4-4505-g6422691c-dirty"
+  "head": "2514250ee763550cf7a7f3895cd8625bed46b3b5",
+  "describe": "v0.7.0-alpha.4-4512-g2514250e-dirty"
  },
- "inputsDigest": "753320b5a886ed3075bb131498178a9c78b9e3b87e101c42375de5139f90f5c2",
+ "inputsDigest": "beffce18b0369cd2668a584c4e1d5d9506ec6c8c499411dc9abb6a387e3cf6c9",
  "states": [
   "inventoried",
   "characterized",
@@ -12340,7 +12340,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 37,
+    "functionsVisited": 23,
     "via": "variable trig",
     "references": [
      "src/js/adapters/native-object-ui.js:175 unavailableInspector()",
@@ -22190,7 +22190,7 @@
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
    "source": "src/js/labs/timeline-markers.js:82",
    "meta": {
-    "functionsVisited": 21
+    "functionsVisited": 22
    },
    "fixtures": []
   },
@@ -22333,7 +22333,7 @@
    "capability": "Parent A : ",
    "area": "unclassified",
    "handler": [
-    "src/js/adapters/native-layer-parent.js:88 parentMenuItems()"
+    "src/js/adapters/native-layer-parent.js:91 parentMenuItems()"
    ],
    "events": [
     "click"
@@ -22347,7 +22347,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-layer-parent.js:88",
+   "source": "src/js/adapters/native-layer-parent.js:91",
    "meta": {
     "i18n": null,
     "functionsVisited": 3
@@ -22361,7 +22361,7 @@
    "capability": "Parent A : Aucun (parentage libre)",
    "area": "unclassified",
    "handler": [
-    "src/js/adapters/native-layer-parent.js:84 parentMenuItems()"
+    "src/js/adapters/native-layer-parent.js:87 parentMenuItems()"
    ],
    "events": [
     "click"
@@ -22375,7 +22375,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-layer-parent.js:84",
+   "source": "src/js/adapters/native-layer-parent.js:87",
    "meta": {
     "i18n": null,
     "functionsVisited": 3
