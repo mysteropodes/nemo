@@ -396,6 +396,9 @@ fn a_ninth_open_tab_evicts_the_oldest_tab_that_is_not_the_active_one() {
     let active_oldest = json!({"activeContextId":"sym_x7","openTabs":held,"view":view(0, 0, 11),"sceneView":view(0, 0, 23)});
     let kept = answer(&snap, active_oldest, enter("sym_x7"));
     assert_eq!(kept["outcome"], "already_active");
+    // Nothing was evicted and nothing reordered: the strip is exactly the one held, the active tab still in it.
+    assert_eq!(kept["workspace"]["openTabs"], json!(held));
+    assert_eq!(kept["workspace"]["activeContextId"], "sym_x7");
 }
 
 fn enter_from(id: &str, layer: &str) -> Value {
@@ -437,4 +440,58 @@ fn an_unknown_or_foreign_instance_enters_at_the_first_frame_and_an_explicit_entr
     assert_eq!(refused(&snap, scene(0, json!([])), both), DispatchErrorCode::InvalidRequest);
     let malformed = json!({"kind":"enter","contextId":"sym_comp","entryFrame":null,"fromLayerUid":""});
     assert_eq!(refused(&snap, scene(0, json!([])), malformed), DispatchErrorCode::InvalidRequest);
+}
+
+/// Baseline `resolveSymbolFrameIdx`: Time Remap, when its track has keys, names the internal frame directly (`Math.round`, clamped
+/// into the component) and overrides the play mode; a track without keys is null and the play mode applies.
+fn with_time_remap(layer: &str, remap: Value) -> ObjectSnapshot {
+    let mut doc: Value = serde_json::from_str(world_json("D")).unwrap();
+    let instance = doc["componentTables"]["components"]["instances"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|i| i["layerUid"] == layer)
+        .expect("instance");
+    instance["timeRemap"] = remap;
+    snapshot_from(&doc)
+}
+fn entry_frame(snap: &ObjectSnapshot, layer: &str, playhead: u64) -> u64 {
+    let out = answer(snap, scene(playhead, json!([])), enter_from("sym_comp", layer));
+    assert_eq!(out["outcome"], "entered");
+    out["workspace"]["view"]["frame"].as_u64().unwrap()
+}
+fn remap_key(frame: u64, value: f64) -> Value {
+    json!({"frame":frame,"v":[value]})
+}
+
+#[test]
+fn entering_an_instance_with_a_keyed_time_remap_starts_at_the_frame_the_remap_names() {
+    // sym_comp has 12 frames. One key: every playhead reads its value, rounded like Math.round and clamped into 0..11.
+    for (value, expected) in [(3.0, 3), (6.6, 7), (6.5, 7), (40.0, 11), (-4.0, 0)] {
+        let snap = with_time_remap("ly_comp_loop", json!({"keys":[remap_key(0, value)]}));
+        assert_eq!(entry_frame(&snap, "ly_comp_loop", 10), expected, "remap {value}");
+    }
+    // Two keys: before the first and after the last the end values hold; a held first key keeps its value up to the second.
+    let ramp = with_time_remap("ly_comp_loop", json!({"keys":[{"frame":4,"v":[2],"hold":true},remap_key(20, 9.0)]}));
+    assert_eq!(entry_frame(&ramp, "ly_comp_loop", 0), 2, "before the first key");
+    assert_eq!(entry_frame(&ramp, "ly_comp_loop", 12), 2, "held between the keys");
+    assert_eq!(entry_frame(&ramp, "ly_comp_loop", 30), 9, "after the last key");
+    // The remap overrides the play mode of the instance (single would show frame 5) and is read at the held playhead.
+    let single = with_time_remap("ly_comp_single", json!({"keys":[remap_key(0, 1.0)]}));
+    assert_eq!(entry_frame(&single, "ly_comp_single", 17), 1);
+}
+
+#[test]
+fn a_time_remap_without_keys_falls_back_to_the_play_mode_like_the_baseline_null() {
+    let snap = with_time_remap("ly_comp_loop", json!({"keys":[]}));
+    assert_eq!(entry_frame(&snap, "ly_comp_loop", 10), 6, "loop: (10 - 4) % 12");
+}
+
+#[test]
+fn a_time_remap_cannot_be_driven_by_an_expression_so_the_keyed_track_is_always_the_answer() {
+    // The document admits no `timeRemap` property record (the track belongs to the instance), so an expression has nowhere to live.
+    let mut doc: Value = serde_json::from_str(world_json("D")).unwrap();
+    doc["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"ly_comp_loop"},
+        "properties":[{"property":"timeRemap","expression":{"enabled":true,"code":"5"}}]}]);
+    assert!(decode_storage_project(doc.to_string().as_bytes()).is_err());
 }

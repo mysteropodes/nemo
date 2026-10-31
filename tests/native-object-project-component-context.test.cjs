@@ -72,7 +72,7 @@ test('an action that needs the presented scene lease is refused inside a compone
   assert.ok(scene && scene.presentation.contextId === 'scene-root', 'the scene lease is granted');
   entered = { contextId: 'sym_a', totalFrames: 12, fps: 12 };
   await s.presentPreview(0);
-  assert.equal(await lease(), null, 'no scene lease inside a component: the editors report unavailable');
+  await assert.rejects(lease, /not available inside a component/, 'no scene lease inside a component: the resource route is refused');
   entered = null;
   await s.presentPreview(0);
   assert.ok(await lease(), 'the lease is granted again once the scene is presented');
@@ -91,11 +91,42 @@ test('the component command route is granted the ENTERED presentation only; the 
   await s.presentPreview(0);
   const lease = await via('runComponentCommand');
   assert.ok(lease && lease.presentation.contextId === 'sym_a', 'inside the component the route is granted the component presentation');
-  assert.equal(await via('runResourceCommand'), null, 'every other family still refuses');
-  assert.equal(await via('runFontResource'), null, 'including the font route');
+  await assert.rejects(() => via('runResourceCommand'), /not available inside a component/, 'every other family still refuses');
+  await assert.rejects(() => via('runFontResource'), /not available inside a component/, 'including the font route: no family is document-global while a component is entered');
   entered = { contextId: 'sym_b', totalFrames: 12, fps: 12 };
   assert.equal(await via('runComponentCommand'), null, 'a presentation of another context is not the held one');
   entered = null;
   await s.presentPreview(0);
   assert.equal(await via('runComponentCommand'), null);
+});
+
+// #2256 review of #2660: the guard is checked again when the queued command is DISPATCHED, not only when it is submitted.
+test('a resource command queued before a component is entered does not run after the entry', async () => {
+  const h = host();
+  let entered = null;
+  const s = await session(h, () => entered);
+  await s.presentPreview(0);
+  let release;
+  const blocker = s.runResourceCommand(() => new Promise((resolve) => { release = resolve; }));
+  let ran = false;
+  const queued = s.runResourceCommand(async () => { ran = true; }).then(() => null, (error) => error);
+  for (let i = 0; i < 10 && !release; i++) await new Promise((done) => setImmediate(done));
+  entered = { contextId: 'sym_a', totalFrames: 12, fps: 12 };
+  release();
+  await blocker;
+  const refusal = await queued;
+  assert.match(String(refusal && refusal.message), /not available inside a component/);
+  assert.equal(ran, false, 'the action never started');
+  const font = s.runFontResource(async () => { ran = true; });
+  await assert.rejects(font, /not available inside a component/, 'refused at submit while entered');
+  assert.equal(ran, false);
+});
+
+test('the component route queued in a component is refused at dispatch only through its own presentation check, not the scene guard', async () => {
+  const h = host();
+  let entered = { contextId: 'sym_a', totalFrames: 12, fps: 12 };
+  const s = await session(h, () => entered);
+  await s.presentPreview(0);
+  const lease = await s.runComponentCommand(async (ctx) => ctx.readPresentedObjectSession());
+  assert.ok(lease && lease.presentation.contextId === 'sym_a', 'the component route still runs inside the component');
 });
