@@ -98,10 +98,14 @@
     // is judged by the read contract at this edge, and an answer is discarded when the project moved on while it was read.
     // `want` ({contentRevision, documentSnapshotId}, optional) is the pin a LATER page of one listing must still be at: when the
     // project has moved off it the read is refused as stale_revision without being sent, so pages never mix two revisions.
-    function read(selector, want) { return pinned(reads, 'component.read', 'component-read', () => ({ selector: JSON.parse(JSON.stringify(selector)) }), want); }
+    function read(selector, want, via) { return pinned(reads, 'component.read', 'component-read', () => ({ selector: JSON.parse(JSON.stringify(selector)) }), want, via); }
     // One pinned, single-route read of a pure native query (no expectedRevision, no reconcile) judged by its contract.
-    function pinned(mod, operation, label, extra, want) {
-      return runner.exclusive(async () => {
+    // `via` ({dispatch(request)}, optional) is the lease of a revision synchronization or a native mutation that is already running
+    // inside the project's queue: the read rides it directly instead of waiting for that queue (it would wait for itself) and
+    // takes no intent turn. Everything else about the read (pin, correlation, staleness) is unchanged.
+    function pinned(mod, operation, label, extra, want, via) {
+      const turn = via ? (body) => body() : (body) => runner.exclusive(body);
+      return turn(async () => {
         const unavailable = (reason, more) => fail(operation, 'unavailable', Object.assign({ reason }, more));
         if (!mod || typeof ports.read !== 'function' || typeof ports.readDeclared !== 'function') return unavailable('component_read_unavailable');
         let declared = false;
@@ -120,7 +124,7 @@
           request = { apiVersion: 2, requestId, instanceId: pin.instanceId, documentId: pin.documentId, operation: mod.OP, payload: body };
         } catch (error) { return fail(operation, 'invalid_request', { reason: String(error && error.message || error) }); }
         let response;
-        try { response = await ports.read(request); } catch (error) {
+        try { response = await (via ? via.dispatch(request) : ports.read(request)); } catch (error) {
           if (error && error.notSent === true) return unavailable(error.reason || 'native_project_busy', { requestId: request.requestId });
           return fail(operation, 'transport_failed', { requestId: request.requestId, message: String(error && error.message || error) });
         }
@@ -152,13 +156,13 @@
       return workspace ? detach(workspace) : null;
     }
     // `view` is the live {frame, workIn, workOut} of the presented context (the caller owns the playhead).
-    async function workspaceTransition(action, view) {
+    async function workspaceTransition(action, view, via) {
       const operation = 'workspace.' + (action && action.kind);
       let pin = null;
       try { pin = ports.pin(); } catch (_) { pin = null; }
       if (!pin) return fail(operation, 'unavailable', { reason: 'no_presented_native_session' });
       const base = Object.assign({}, workspaceHeld(pin) || sceneWorkspace(view), { view: Object.assign({}, view) });
-      const answer = await pinned(workspaceContract, operation, 'workspace-context', () => ({ workspace: JSON.parse(JSON.stringify(base)), action }));
+      const answer = await pinned(workspaceContract, operation, 'workspace-context', () => ({ workspace: JSON.parse(JSON.stringify(base)), action }), undefined, via);
       if (!answer.ok) return answer;
       const next = answer.result;
       held = { instanceId: answer.instanceId, documentId: answer.documentId, workspace: next.workspace };
@@ -168,11 +172,11 @@
     // One listing is ONE revision: the first page fixes the pin and every later page must still be at it. When the project moves
     // between pages (a convert or delete would skip or duplicate an item) the listing restarts from cursor 0, a bounded number
     // of times, then answers a typed stale refusal; a mixed list is never returned.
-    async function listPagesAt(operation, base) {
+    async function listPagesAt(operation, base, via) {
       const items = [];
       let cursor = 0, want = null;
       for (let guard = 0; guard < 64; guard += 1) {
-        const page = await read(Object.assign({}, base, { cursor, limit: reads ? reads.MAX_PAGE : 16 }), want);
+        const page = await read(Object.assign({}, base, { cursor, limit: reads ? reads.MAX_PAGE : 16 }), want, via);
         if (!page.ok) return fail(operation, page.code, { reason: page.reason, message: page.message, stale: page.stale });
         if (!want) want = { contentRevision: page.result.atRevision, documentSnapshotId: page.result.documentSnapshotId };
         items.push(...page.result.items);
@@ -181,21 +185,21 @@
       }
       return fail(operation, 'unavailable', { reason: 'component_pages_unbounded' });
     }
-    async function listPages(operation, base) {
+    async function listPages(operation, base, via) {
       let last = null;
       for (let attempt = 0; attempt < LIST_ATTEMPTS; attempt += 1) {
-        last = await listPagesAt(operation, base);
+        last = await listPagesAt(operation, base, via);
         if (last.ok || last.stale !== true) return last;
       }
       return fail(operation, 'stale_revision', { stale: true, reason: 'component_list_unstable', message: last && last.message });
     }
     // Every context of the document in order (scene-root first); a name the owner had to cut carries nameTruncated: true.
-    async function listContexts() {
-      const out = await listPages('component.contexts', { kind: 'contexts' });
+    async function listContexts(via) {
+      const out = await listPages('component.contexts', { kind: 'contexts' }, via);
       return out.ok ? Object.freeze({ ok: true, operation: out.operation, revision: out.revision, contexts: out.items }) : out;
     }
     // All layers of one context / all scene layers instancing one component, from one revision.
-    function listLayers(contextId) { return listPages('component.layers', { kind: 'layers', contextId }); }
+    function listLayers(contextId, via) { return listPages('component.layers', { kind: 'layers', contextId }, via); }
     function listInstances(contextId) { return listPages('component.instances', { kind: 'instances', contextId }); }
 
     // The same typed refusal, reported under the operation the caller asked for.

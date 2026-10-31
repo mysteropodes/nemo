@@ -78,6 +78,7 @@ fn published_schema_declares_the_forbidden_revision_request_and_closed_shapes() 
     for action in [
         enter(),
         json!({"kind":"enter","contextId":"sym_a","entryFrame":3}),
+        json!({"kind":"enter","contextId":"sym_a","entryFrame":null,"fromLayerUid":"L2"}),
         json!({"kind":"exit"}),
         json!({"kind":"close","contextId":"sym_a"}),
         json!({"kind":"refresh"}),
@@ -96,6 +97,7 @@ fn published_schema_declares_the_forbidden_revision_request_and_closed_shapes() 
     for action in [
         json!({"kind":"enter","contextId":"","entryFrame":null}),
         json!({"kind":"enter","contextId":"a"}),
+        json!({"kind":"enter","contextId":"a","entryFrame":null,"fromLayerUid":""}),
         json!({"kind":"exit","contextId":"a"}),
         json!({"kind":"teleport"}),
     ] {
@@ -145,6 +147,10 @@ fn request_is_exact_pinned_and_bounded() {
             scene(json!(["sym_a"])),
             json!({"kind":"enter","contextId":"sym_a","entryFrame":4294967295u64}),
         ),
+        (
+            scene(json!([])),
+            json!({"kind":"enter","contextId":"sym_a","entryFrame":null,"fromLayerUid":"L2"}),
+        ),
         (inside(json!(["sym_a"])), json!({"kind":"exit"})),
         (
             inside(json!(["sym_b", "sym_a"])),
@@ -188,6 +194,9 @@ fn request_is_exact_pinned_and_bounded() {
     for action in [
         json!({"kind":"enter","contextId":"sym_a","entryFrame":-1}),
         json!({"kind":"enter","contextId":"sym_a"}),
+        json!({"kind":"enter","contextId":"sym_a","entryFrame":null,"fromLayerUid":""}),
+        json!({"kind":"enter","contextId":"sym_a","entryFrame":3,"fromLayerUid":"L2"}),
+        json!({"kind":"enter","contextId":"sym_a","entryFrame":null,"fromLayerUid":7}),
         json!({"kind":"close"}),
         json!({"kind":"exit","contextId":"sym_a"}),
         json!({"kind":"refresh","x":1}),
