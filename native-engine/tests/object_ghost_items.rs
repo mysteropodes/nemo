@@ -3,8 +3,8 @@ use super::gpu::metal;
 use super::{drawing, owner, plan, selector};
 use crate::application::prepare_ghost_underlay;
 use crate::object_render_scene::{
-    prepare_object_composition, prepare_object_viewport_composition,
-    GhostMode, GhostUnderlayRequest,
+    prepare_object_composition, prepare_object_viewport_composition, GhostMode,
+    GhostUnderlayRequest,
 };
 
 fn request(layer: &str, mode: GhostMode) -> GhostUnderlayRequest {
@@ -24,15 +24,23 @@ fn request(layer: &str, mode: GhostMode) -> GhostUnderlayRequest {
 }
 
 #[test]
-fn gpu_text_and_raster_ghosts_join_the_vector_ghosts_under_the_live_frame_and_stay_out_of_exports() {
+fn gpu_text_and_raster_ghosts_join_the_vector_ghosts_under_the_live_frame_and_stay_out_of_exports()
+{
     let owner = owner(&drawing());
     let snapshot = owner.acquire_snapshot(0).unwrap();
     let request = request("L0", GhostMode::Tinted);
     let underlay = prepare_ghost_underlay(&snapshot, &request, 7);
     let receipt = underlay.receipt();
-    assert_eq!((receipt.status, receipt.frames), ("composited", 7), "{receipt:?}");
+    assert_eq!(
+        (receipt.status, receipt.frames),
+        ("composited", 7),
+        "{receipt:?}"
+    );
     let (shapes, images) = underlay.counts();
-    assert!(images >= 7, "one raster ghost per ghost frame, got {images}");
+    assert!(
+        images >= 7,
+        "one raster ghost per ghost frame, got {images}"
+    );
     // 7 frames x (the vector square + the glyph contours of 'A'): text adds contours beyond the vector paths alone.
     assert!(shapes > 7, "vector and text ghosts, got {shapes}");
     let outline = prepare_ghost_underlay(&snapshot, &self::request("L0", GhostMode::Outline), 7);
@@ -46,20 +54,37 @@ fn gpu_text_and_raster_ghosts_join_the_vector_ghosts_under_the_live_frame_and_st
     let with = live.clone().with_ghost_underlay(underlay.clone()).unwrap();
     let ghosted = render_with_quality(&mut gpu, &with);
     assert_eq!(plain.len(), ghosted.len());
-    let wide = |bytes: &[u8], x: usize, y: usize| -> [u8; 4] { bytes[(y * 320 + x) * 4..(y * 320 + x) * 4 + 4].try_into().unwrap() };
+    let wide = |bytes: &[u8], x: usize, y: usize| -> [u8; 4] {
+        bytes[(y * 320 + x) * 4..(y * 320 + x) * 4 + 4]
+            .try_into()
+            .unwrap()
+    };
     for (x, y) in [(300, 20), (41, 41), (60, 60)] {
         let (a, b) = (wide(&plain, x, y), wide(&ghosted, x, y));
-        assert!(a.iter().zip(b).all(|(l, r)| l.abs_diff(r) <= 3), "{x},{y}: {a:?} vs {b:?}");
+        assert!(
+            a.iter().zip(b).all(|(l, r)| l.abs_diff(r) <= 3),
+            "{x},{y}: {a:?} vs {b:?}"
+        );
     }
     // Never in an export: the artwork witness refuses the underlay.
     let artwork = prepare_object_composition(&p, &pins).unwrap();
     assert!(artwork.with_ghost_underlay(underlay).is_err());
     // A layer with nothing to ghost is typed, not blank-by-accident.
-    assert_eq!(prepare_ghost_underlay(&snapshot, &self::request("nope", GhostMode::Tinted), 7).receipt().status, "unavailable");
+    assert_eq!(
+        prepare_ghost_underlay(&snapshot, &self::request("nope", GhostMode::Tinted), 7)
+            .receipt()
+            .status,
+        "unavailable"
+    );
 }
-fn render_with_quality(gpu: &mut crate::compositor::Compositor, witness: &crate::object_render_scene::ObjectCompositionWitness) -> Vec<u8> {
+fn render_with_quality(
+    gpu: &mut crate::compositor::Compositor,
+    witness: &crate::object_render_scene::ObjectCompositionWitness,
+) -> Vec<u8> {
     use crate::object_render_scene::prepare_scheduled_object_composition_from_witness as prepare_live;
-    use crate::scheduler::{EvaluationKey, FrameScheduler, ObjectSchedulePins, ObjectScheduleScope, OutputSpec};
+    use crate::scheduler::{
+        EvaluationKey, FrameScheduler, ObjectSchedulePins, ObjectScheduleScope, OutputSpec,
+    };
     let snapshot = witness.plan().packet().snapshot();
     let pins = ObjectSchedulePins {
         instance_id: snapshot.instance_id().into(),
@@ -80,10 +105,17 @@ fn render_with_quality(gpu: &mut crate::compositor::Compositor, witness: &crate:
     )
     .unwrap();
     let mut scheduler = FrameScheduler::new();
-    let work = scheduler.schedule_object(snapshot.clone(), pins, key).unwrap();
+    let work = scheduler
+        .schedule_object(snapshot.clone(), pins, key)
+        .unwrap();
     let live = prepare_live(&scheduler, &work, witness).unwrap();
     let result = gpu.compose_scheduled_object(&live).unwrap();
-    let bytes = gpu.readback_scheduled_object_rgba8(&result, &live).unwrap().bytes(&live).unwrap().to_vec();
+    let bytes = gpu
+        .readback_scheduled_object_rgba8(&result, &live)
+        .unwrap()
+        .bytes(&live)
+        .unwrap()
+        .to_vec();
     drop(live);
     scheduler.succeed(work.work_id()).unwrap();
     bytes

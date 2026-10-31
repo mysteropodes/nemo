@@ -2,11 +2,11 @@
 //! The ghost frames (opacity falloff, tint, shift, mode) are decided by `tween_ghost_query.rs` once; this file only hands
 //! them to the render-scene underlay (`object_ghost_underlay.rs`) and remembers the vector pieces of the last renders.
 use crate::application::{TweenGhostKind, TweenGhostRead};
+use crate::object_document::bitmap_brush::rgba;
 use crate::object_render_scene::{
     GhostFrameSpec, GhostPath, GhostSource, GhostUnderlay, GhostUnderlayRequest,
     ObjectCompositionWitness,
 };
-use crate::object_document::bitmap_brush::rgba;
 use crate::request_receipts::{DispatchErrorCode as Code, GhostFrames};
 use crate::revision::ObjectSnapshot;
 use std::sync::{Arc, Mutex, Weak};
@@ -57,8 +57,14 @@ impl GhostSource for Source<'_> {
 }
 fn layer_has_items(snapshot: &ObjectSnapshot, layer_uid: &str) -> bool {
     snapshot.document().item_records().is_some_and(|items| {
-        items.raster_entries().iter().any(|e| e.target.layer_uid() == layer_uid)
-            || items.text_entries().iter().any(|e| e.target.layer_uid() == layer_uid)
+        items
+            .raster_entries()
+            .iter()
+            .any(|e| e.target.layer_uid() == layer_uid)
+            || items
+                .text_entries()
+                .iter()
+                .any(|e| e.target.layer_uid() == layer_uid)
     })
 }
 
@@ -102,7 +108,12 @@ pub fn prepare_ghost_underlay(
     let underlay = Arc::new(match snapshot.query_tween_ghosts_json(&key) {
         Ok(read) => {
             let items = layer_has_items(snapshot, &request.layer_uid);
-            GhostUnderlay::build(&Source { read: &read, items }, request, snapshot.snapshot_id(), frame)
+            GhostUnderlay::build(
+                &Source { read: &read, items },
+                request,
+                snapshot.snapshot_id(),
+                frame,
+            )
         }
         Err(error) => {
             let reason = match error {
@@ -116,7 +127,14 @@ pub fn prepare_ghost_underlay(
     });
     if !underlay.has_images() {
         if let Ok(mut memo) = MEMO.lock() {
-            memo.insert(0, Memo { revision, key, underlay: Arc::clone(&underlay) });
+            memo.insert(
+                0,
+                Memo {
+                    revision,
+                    key,
+                    underlay: Arc::clone(&underlay),
+                },
+            );
             memo.truncate(MEMO_ENTRIES);
         }
     }

@@ -61,7 +61,10 @@ impl GhostUnderlayRequest {
         if !opacity(self.previous_opacity) || !opacity(self.next_opacity) {
             return Err("onion opacity is out of range");
         }
-        if self.shift.is_some_and(|s| !s.x.is_finite() || !s.y.is_finite()) {
+        if self
+            .shift
+            .is_some_and(|s| !s.x.is_finite() || !s.y.is_finite())
+        {
             return Err("onion shift is not finite");
         }
         if !self.onion && !self.ghost_all {
@@ -75,8 +78,17 @@ impl GhostUnderlayRequest {
     }
     /// The retained ghost query's selector for `frame` of a snapshot. `from` / `to` are the user's onion range,
     /// independent of the frame; the query's range always holds the frame and the last frame.
-    pub fn query_bytes(&self, at_revision: u64, snapshot_id: &str, total_frames: u32, frame: u32) -> Vec<u8> {
-        let (from, to) = (self.from.min(frame), self.to.max(frame).min(total_frames.saturating_sub(1)));
+    pub fn query_bytes(
+        &self,
+        at_revision: u64,
+        snapshot_id: &str,
+        total_frames: u32,
+        frame: u32,
+    ) -> Vec<u8> {
+        let (from, to) = (
+            self.from.min(frame),
+            self.to.max(frame).min(total_frames.saturating_sub(1)),
+        );
         let mut q = serde_json::json!({"atRevision":at_revision,"documentSnapshotId":snapshot_id,
             "contextId":"scene-root","layerUid":self.layer_uid,"frame":frame,"onion":self.onion,"ghostAll":self.ghost_all,
             "from":from,"to":to,"previousOpacity":self.previous_opacity,"nextOpacity":self.next_opacity,"mode":self.mode});
@@ -106,8 +118,17 @@ pub struct GhostReceipt {
 }
 
 enum Piece {
-    Shape { path: BezPath, fill: Option<Color>, stroke: Option<(Color, f64)>, at: Affine },
-    Image { image: ImageData, transform: Affine, alpha: f32 },
+    Shape {
+        path: BezPath,
+        fill: Option<Color>,
+        stroke: Option<(Color, f64)>,
+        at: Affine,
+    },
+    Image {
+        image: ImageData,
+        transform: Affine,
+        alpha: f32,
+    },
 }
 /// The prepared ghost pieces of one preview, in baseline order, plus whatever keeps their decoded resources alive.
 pub struct GhostUnderlay {
@@ -129,15 +150,23 @@ impl std::fmt::Debug for GhostUnderlay {
     }
 }
 fn color([r, g, b, a]: [u8; 4], opacity: f64) -> Color {
-    let alpha = (f64::from(a) * opacity.clamp(0., 1.)).round().clamp(0., 255.) as u8;
+    let alpha = (f64::from(a) * opacity.clamp(0., 1.))
+        .round()
+        .clamp(0., 255.) as u8;
     Color::from_rgba8(r, g, b, alpha)
 }
 fn bez(segments: &[[f64; 6]], closed: bool) -> BezPath {
     let mut path = BezPath::new();
-    let Some(first) = segments.first() else { return path };
+    let Some(first) = segments.first() else {
+        return path;
+    };
     path.move_to((first[0], first[1]));
     let edge = |path: &mut BezPath, a: &[f64; 6], b: &[f64; 6]| {
-        path.curve_to((a[0] + a[4], a[1] + a[5]), (b[0] + b[2], b[1] + b[3]), (b[0], b[1]));
+        path.curve_to(
+            (a[0] + a[4], a[1] + a[5]),
+            (b[0] + b[2], b[1] + b[3]),
+            (b[0], b[1]),
+        );
     };
     for pair in segments.windows(2) {
         edge(&mut path, &pair[0], &pair[1]);
@@ -161,12 +190,19 @@ impl GhostUnderlay {
             (None, true) => "empty",
             (None, false) => "composited",
         };
-        GhostReceipt { selected: self.request.clone(), status, frames: self.frames, reason: self.refusal }
+        GhostReceipt {
+            selected: self.request.clone(),
+            status,
+            frames: self.frames,
+            reason: self.refusal,
+        }
     }
     /// Images this underlay draws that the live artwork does not: they stay resident in the renderer's atlas.
     pub(crate) fn draws_foreign_images(&self, live: &ObjectCompositionWitness) -> bool {
         let known: Vec<_> = live.raster_images().map(|i| i.data.id()).collect();
-        self.pieces.iter().any(|p| matches!(p, Piece::Image { image, .. } if !known.contains(&image.data.id())))
+        self.pieces
+            .iter()
+            .any(|p| matches!(p, Piece::Image { image, .. } if !known.contains(&image.data.id())))
     }
     /// Drawn `(shapes, images)`; shapes are stored vector paths and glyph contours.
     pub(crate) fn counts(&self) -> (usize, usize) {
@@ -186,17 +222,31 @@ impl GhostUnderlay {
     pub(crate) fn draw(&self, scene: &mut vello::Scene) {
         for piece in &self.pieces {
             match piece {
-                Piece::Shape { path, fill, stroke, at } => {
+                Piece::Shape {
+                    path,
+                    fill,
+                    stroke,
+                    at,
+                } => {
                     if let Some(fill) = fill {
                         scene.fill(Fill::NonZero, *at, *fill, None, path);
                     }
                     if let Some((paint, width)) = stroke {
-                        let style = Stroke::new(*width).with_caps(Cap::Round).with_join(Join::Round);
+                        let style = Stroke::new(*width)
+                            .with_caps(Cap::Round)
+                            .with_join(Join::Round);
                         scene.stroke(&style, *at, *paint, None, path);
                     }
                 }
-                Piece::Image { image, transform, alpha } => {
-                    scene.draw_image(&ImageBrush::new(image.clone()).multiply_alpha(*alpha), *transform);
+                Piece::Image {
+                    image,
+                    transform,
+                    alpha,
+                } => {
+                    scene.draw_image(
+                        &ImageBrush::new(image.clone()).multiply_alpha(*alpha),
+                        *transform,
+                    );
                 }
             }
         }
@@ -240,7 +290,12 @@ pub trait GhostSource {
 }
 impl GhostUnderlay {
     /// A request the engine could not honour: no pieces, the reason kept, the identity stable.
-    pub fn refused(request: &GhostUnderlayRequest, snapshot_id: &str, frame: u32, reason: &'static str) -> Self {
+    pub fn refused(
+        request: &GhostUnderlayRequest,
+        snapshot_id: &str,
+        frame: u32,
+        reason: &'static str,
+    ) -> Self {
         Self {
             request: request.clone(),
             snapshot_id: snapshot_id.into(),
@@ -251,7 +306,12 @@ impl GhostUnderlay {
             _keep: Vec::new(),
         }
     }
-    pub fn build(source: &dyn GhostSource, request: &GhostUnderlayRequest, snapshot_id: &str, frame: u32) -> Self {
+    pub fn build(
+        source: &dyn GhostSource,
+        request: &GhostUnderlayRequest,
+        snapshot_id: &str,
+        frame: u32,
+    ) -> Self {
         if let Err(reason) = request.validate() {
             return Self::refused(request, snapshot_id, frame, reason);
         }
@@ -285,7 +345,12 @@ impl GhostUnderlay {
                     if fill.is_none() && stroke.is_none() {
                         continue;
                     }
-                    out.pieces.push(Piece::Shape { path: bez(&p.segments, p.closed), fill, stroke, at: shift });
+                    out.pieces.push(Piece::Shape {
+                        path: bez(&p.segments, p.closed),
+                        fill,
+                        stroke,
+                        at: shift,
+                    });
                 }
             }
             if out.pieces.len() > MAX_PIECES || segments > MAX_SEGMENTS {
@@ -295,24 +360,52 @@ impl GhostUnderlay {
         out
     }
     /// The text glyphs and images of one evaluated ghost frame that belong to the ghosted layer.
-    fn collect_items(&mut self, layer_uid: &str, at: &GhostFrameSpec, witness: &ObjectCompositionWitness) {
+    fn collect_items(
+        &mut self,
+        layer_uid: &str,
+        at: &GhostFrameSpec,
+        witness: &ObjectCompositionWitness,
+    ) {
         let plan = witness.plan();
         let layers = plan.packet().source_layers();
-        let ours = |layer_index: usize| layers.get(layer_index).is_some_and(|l| l.layer_uid() == layer_uid);
+        let ours = |layer_index: usize| {
+            layers
+                .get(layer_index)
+                .is_some_and(|l| l.layer_uid() == layer_uid)
+        };
         let shift = Affine::translate((at.translation[0], at.translation[1]));
         for entry in ordered_entries(plan) {
             match entry {
                 PaintEntry::Text(source) if ours(source.layer_index) => {
                     for (contour, [r, g, b, a]) in source.item.painted() {
                         let base = Color::from_rgba8(r, g, b, a);
-                        let fill = (!at.text_clear_fill).then(|| base.with_alpha(base.components[3] * at.text_opacity as f32));
+                        let fill = (!at.text_clear_fill)
+                            .then(|| base.with_alpha(base.components[3] * at.text_opacity as f32));
                         let stroke = at.text_stroke.map(|([tr, tg, tb, ta], width)| {
-                            (Color::new([tr as f32, tg as f32, tb as f32, (ta * at.text_opacity).clamp(0., 1.) as f32]), width)
+                            (
+                                Color::new([
+                                    tr as f32,
+                                    tg as f32,
+                                    tb as f32,
+                                    (ta * at.text_opacity).clamp(0., 1.) as f32,
+                                ]),
+                                width,
+                            )
                         });
-                        self.pieces.push(Piece::Shape { path: contour.contour.path().clone(), fill, stroke, at: shift });
+                        self.pieces.push(Piece::Shape {
+                            path: contour.contour.path().clone(),
+                            fill,
+                            stroke,
+                            at: shift,
+                        });
                     }
                 }
-                PaintEntry::Raster(i) if plan.raster_sources().get(i).is_some_and(|s| ours(s.layer_index)) => {
+                PaintEntry::Raster(i)
+                    if plan
+                        .raster_sources()
+                        .get(i)
+                        .is_some_and(|s| ours(s.layer_index)) =>
+                {
                     if let Some((image, transform, opacity)) = witness.raster_image(i) {
                         self.pieces.push(Piece::Image {
                             image: image.clone(),

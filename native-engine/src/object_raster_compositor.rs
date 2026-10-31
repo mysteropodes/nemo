@@ -28,6 +28,18 @@ impl Compositor {
         }
         Ok(())
     }
+    /// Ghost images the live frame does not draw would stay resident (and charged) in the renderer's atlas for as long
+    /// as it lives: start a fresh one rather than accumulating a decoded image per ghost frame.
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    pub(super) fn release_ghost_images(
+        &mut self,
+        prepared: &ObjectCompositionWitness,
+    ) -> Result<(), CompositorError> {
+        match prepared.ghost_underlay() {
+            Some(g) if g.draws_foreign_images(prepared) => self.reset_object_image_cache(),
+            _ => Ok(()),
+        }
+    }
     pub(super) fn emit_object_paint_sequence(
         &mut self,
         prepared: &ObjectCompositionWitness,
