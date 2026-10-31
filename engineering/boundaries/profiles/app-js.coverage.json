@@ -4486,6 +4486,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-component-convert-ui.js",
+      "moduleId": "app.native.component.convert.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-layer-playhead-cut-ui.js",
       "moduleId": "app.native.object.ui.adapter",
       "executionClass": "document-classic",
