@@ -73,11 +73,16 @@ impl ObjectSnapshot {
         {
             return refused(DispatchErrorCode::InvalidRequest, "Invalid subselect hit-test selector.");
         }
-        let Some(stored) = self
-            .document()
-            .objects
-            .iter()
-            .find(|r| r.target == payload.stable_target)
+        // #2256: a component's records live in its own context (Select's hit-test geometry read of an entered component); the editable and
+        // preview reads stay on the scene root.
+        if payload.stable_target.context_id != "scene-root" && !hit_test {
+            return refused(DispatchErrorCode::Unavailable, "Subselect editing is unavailable inside a component.");
+        }
+        use crate::evaluation::object_component_kernels::object_context_resolver::ContextSource;
+        let Some(stored) = ContextSource::of_document(self.document())
+            .context(&payload.stable_target.context_id)
+            .ok()
+            .and_then(|context| context.objects().iter().find(|r| r.target == payload.stable_target))
         else {
             return refused(DispatchErrorCode::NotFound, "Subselect target is absent.");
         };

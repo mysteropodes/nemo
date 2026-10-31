@@ -139,6 +139,13 @@ object_deserialize!(View {
     #[serde(default)] preview: Presence<Preview>,
     #[serde(default)] hit_test: Presence<bool>
 });
+/// #2256: the scene root or the id of a component context. Only the host knows which context is presented (it compares the id with the
+/// presented witness's), so this bounds the shape: a context is an id and never text.
+fn bounded_context(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 128
+        && id.chars().all(|c| c.is_ascii_alphanumeric() || "._:/-".contains(c))
+}
 impl ObjectSnapshot {
     pub fn dispatch_with_subselect_view(
         &self,
@@ -162,7 +169,7 @@ impl ObjectSnapshot {
         let hit_test = v.hit_test.value() == Some(&true);
         if v.kind != "subselect"
             || (!v.hit_test.missing() && (!hit_test || !v.preview.missing()))
-            || v.context_id != "scene-root"
+            || !bounded_context(&v.context_id)
             || v.limit == 0
             || v.limit > 8
             || v.cursor > 1024
