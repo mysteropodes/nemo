@@ -9,6 +9,7 @@ const Steps = require('../src/js/adapters/native-selection-steps.js');
 const Contract = require('../src/js/adapters/native-object-vector-contract.js');
 const Subselect = require('../src/js/adapters/native-subselect-contract.js');
 const Paper = require('./helpers/native-import-paper.cjs');
+const overlayStub = require('./helpers/native-selection-overlay-stub.cjs');
 
 const seg = (x, y) => ({ point: [x, y], handleIn: [0, 0], handleOut: [0, 0] });
 const target = (id) => ({ contextId: 'scene-root', layerUid: 'L', frameScope: { kind: 'authored', frame: 0 }, strokeId: id });
@@ -31,7 +32,7 @@ function harness(items) {
     NemoNativeViewportUnderlay: { canvasMapping: { point: (e) => ({ x: e.clientX, y: e.clientY }) } },
     NemoNativeObjectProject: { desktop: () => session, selectLayerUI: () => true },
     NemoNativeObjectLabs: { desktop: () => ({ batchStrokes: async (layerUid, frame, steps) => { batches.push({ layerUid, frame, steps: JSON.parse(JSON.stringify(steps)) }); return { status: 'applied' }; } }) },
-    NemoSelectCanvasIntent: Intent, NemoNativeSelectionSteps: Steps };
+    NemoSelectCanvasIntent: Intent, NemoNativeSelectionSteps: Steps, NemoNativeSelectOverlay: overlayStub(Intent) };
   return { root, toasts, batches, timers, fire: async () => { timers.splice(0).filter(Boolean).forEach((fn) => fn()); await settle(); } };
 }
 
@@ -50,6 +51,7 @@ test('a click on masked content selects the content, a click on the mask alone s
 test('the Mask panel feather on a selected mask is ONE native restyle batch with the maskFeather member alone', async () => {
   const h = harness([MASK, CONTENT]);
   h.root.selectedPaths = [await Intent.pick(h.root, 350, 350)];
+  h.root.NemoNativeSelectOverlay.show(h.root);
   assert.equal(Style.handles(h.root), true, 'a selected mask hands the edit to the native route');
   const done = Style.apply(h.root, { maskFeather: 5 }), again = Style.apply(h.root, { maskFeather: 12.5 });
   await h.fire();
