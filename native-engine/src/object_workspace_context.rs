@@ -11,6 +11,7 @@
 //! It mutates nothing, publishes no revision, adds no history entry and keeps no state: the pin is `(atRevision,
 //! documentSnapshotId)` of this snapshot, any other pin is `stale_revision`. Editing inside an entered component is a
 //! separate, later owner; this answer only says WHICH context the viewport presents and at which frame.
+#![cfg_attr(not(feature = "evaluation"), allow(dead_code, unused_imports))]
 use crate::object_snapshot::{ObjectSnapshot, ReadAdmission, MAX_MESSAGE_BYTES};
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
 use serde_json::{json, Map, Value};
