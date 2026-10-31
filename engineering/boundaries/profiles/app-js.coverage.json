@@ -4258,6 +4258,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-path-effects-ui.js",
+      "moduleId": "app.native.path-effects.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-object-rig.js",
       "moduleId": "app.native.object.rig.adapter",
       "executionClass": "document-classic",

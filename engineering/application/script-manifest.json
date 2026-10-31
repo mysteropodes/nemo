@@ -332,6 +332,7 @@
     {"src":"js/adapters/native-object-labs.js"},
     {"src":"js/adapters/native-object-motion-preset.js"},
     {"src":"js/adapters/native-object-layer-compositing.js"},
+    {"src":"js/adapters/native-path-effects-ui.js"},
     {"src":"js/adapters/native-object-rig.js"},
     {"src":"js/adapters/native-object-tween.js"},
     {"src":"js/adapters/native-object-tween-ui.js"},
