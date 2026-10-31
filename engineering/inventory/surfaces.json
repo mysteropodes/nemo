@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "56a0b818ecbc971e1e6e32d65b896bd9778d4abb",
-  "describe": "56a0b818-dirty"
+  "head": "0e65953ee1b915225f9d2a270fc01f03f27b13cc",
+  "describe": "v0.7.0-alpha.4-4427-g0e65953e-dirty"
  },
- "inputsDigest": "c0e874187cf600b3515df50fccd836aa5d2f22c1c4706a95db1b11103d0fa760",
+ "inputsDigest": "301498e1507d9a5f1b473b99cb823406abe0b7a93a5afb6e06d043b3c6c7e42f",
  "states": [
   "inventoried",
   "characterized",
@@ -4270,7 +4270,7 @@
     "container": "rig-assign-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 267,
+    "functionsVisited": 266,
     "via": "chain",
     "references": []
    },
@@ -4318,7 +4318,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 139,
+    "functionsVisited": 137,
     "via": "chain",
     "references": []
    },
@@ -4513,7 +4513,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 270,
+    "functionsVisited": 269,
     "via": "chain",
     "references": []
    },
@@ -8013,7 +8013,7 @@
     "container": "footage-blend-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 34,
+    "functionsVisited": 35,
     "via": "variable sel",
     "references": []
    },
@@ -9803,7 +9803,7 @@
    "capability": "brushpreset btn",
    "area": "drawing-selection",
    "handler": [
-    "src/js/brush-preset-picker.js:348 init()"
+    "src/js/brush-preset-picker.js:352 init()"
    ],
    "events": [
     "click"
@@ -25787,7 +25787,7 @@
    "source": "src/js/motion.js:9819",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 174
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -25829,7 +25829,7 @@
    "source": "src/js/motion.js:9864",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 471
+    "functionsVisited": 466
    },
    "fixtures": [
     "static-props",
@@ -28391,7 +28391,7 @@
    "source": "src/js/shapes-panel.js:738",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 100
+    "functionsVisited": 92
    },
    "fixtures": [
     "static-props",
@@ -28505,7 +28505,7 @@
    "source": "src/js/shapes-panel.js:860",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 100
+    "functionsVisited": 92
    },
    "fixtures": [
     "static-props",
@@ -30975,7 +30975,7 @@
    "source": "src/js/timeline.js:5670",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 174
+    "functionsVisited": 166
    },
    "fixtures": [
     "keyed-props",
@@ -31014,7 +31014,7 @@
    "source": "src/js/timeline.js:5701",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 471
+    "functionsVisited": 466
    },
    "fixtures": [
     "keyed-props",

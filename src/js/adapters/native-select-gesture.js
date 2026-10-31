@@ -118,7 +118,11 @@
     if (cannot) { notice(root, cannot + ' is not available on native projects yet.'); return 'refused'; }
     if (o.stale && o.stale()) { notice(root, gone); return 'stale'; }
     if (!route) { notice(root, 'Transforming is not available right now.'); return 'refused'; }
-    var layers = await I.reread(root, sel, false), again = I.presentedState(root);
+    // The queue may still be draining the repaint of the pick that started this gesture: give the presentation a moment to become readable
+    // again (before the re-read, which needs it, and after it) rather than calling an unreadable document a changed one.
+    var settle = async function (read) { var v = read(); for (var wait = 0; !v && wait < 10; wait++) { await new Promise(function (done) { (root.setTimeout || setTimeout)(done, 40); }); v = read(); } return v; };
+    await settle(function () { return I.presentedState(root); });
+    var layers = await I.reread(root, sel, false), again = await settle(function () { return I.presentedState(root); });
     if (!layers || !layers.complete || !again || !samePin(again.pin, o.pin)) { notice(root, gone); return 'stale'; }
     var result, steps;
     try { steps = I.transformSteps(root, layers.paths, m); } catch (_) { steps = null; }
@@ -205,9 +209,12 @@
     // P25 (#1027): a move / scale / rotate whose document pin, frame, tool, layer or selection no longer matches the snapshot taken at the press
     // ends there, with a notice and no write (it was only ever a preview); the release then has nothing to commit.
     function ids(list) { return (list || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget; }).map(function (p) { return p.data.strokeId; }).join('|'); }
+    // The native queue reports no presentation while any command is pending (the pick's own repaint, a hover read): that is "cannot prove it
+    // right now", not "it changed", so only a positive mismatch abandons. The pin, frame, tool, layer and revision are all in pickContext,
+    // which reads no presentation; the release re-proves the pin before it writes (commitMatrix).
     function stale() {
       var now = I.presentedState(root);
-      return !now || !samePin(now.pin, g.pin) || now.presentation.frame !== g.frame || (!!g.ctx && I.pickContext(root) !== g.ctx) || ids(root.selectedPaths) !== ids(g.sel);
+      return (!!now && (!samePin(now.pin, g.pin) || now.presentation.frame !== g.frame)) || (!!g.ctx && I.pickContext(root) !== g.ctx) || ids(root.selectedPaths) !== ids(g.sel);
     }
     function abandon() {
       g.kind = 'none';

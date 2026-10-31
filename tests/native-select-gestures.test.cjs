@@ -21,14 +21,15 @@ const settle = async () => { for (let i = 0; i < 6; i++) await tick(); };
 
 function harness(items, options = {}) {
   const paper = Paper.load(), body = el('body'), listeners = [], toasts = [], batches = [], frames = [];
+  let busy = false; // the native queue has a command pending: the public presentation getter reports none (queue-pending)
   let pin = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 1, documentSnapshotId: 's1', canvasW: 200, canvasH: 200, layers: [{ layerUid: 'L' }] };
   const store = items.map((i) => JSON.parse(JSON.stringify(i)));
-  const session = { info: () => pin, isActive: () => true, blocksLegacy: () => true, readPresentedObjectSession: () => ({ presentation: { ...pin, frame: 0 } }),
+  const session = { info: () => pin, isActive: () => true, blocksLegacy: () => true, readPresentedObjectSession: () => (busy ? null : { presentation: { ...pin, frame: 0 } }),
     async readPresentedStrokes(_selector, _pin, wanted, centres) {
       return { items: store.map((item) => { const { segments, center, ...rest } = item; return wanted(rest) ? { ...rest, segments, ...(centres && center ? { center } : {}) } : rest; }) };
     } };
   const root = { paper, Path: paper.Path, Point: paper.Point, Matrix: paper.Matrix, state: { tool: 'select', appMode: 'anim2d', currentFrame: 0, activeLayerIdx: 0, layers: [{ layerUid: 'L' }], selectedStrokeIndices: [] },
-    selectedPaths: [], updateUI() {}, SMEngineBridge: { renderNow() {} }, showToast: (t) => toasts.push(t),
+    selectedPaths: [], updateUI() { if (options.busyOnRepaint) busy = true; }, SMEngineBridge: { renderNow() {} }, showToast: (t) => toasts.push(t),
     document: { body, getElementById: () => ({ getBoundingClientRect: () => ({ left: 0, top: 0, width: 200, height: 200 }) }), createElementNS: (_n, tag) => el(tag),
       addEventListener: (type, fn) => listeners.push([type, fn]), removeEventListener: (type, fn) => { const at = listeners.findIndex((l) => l[0] === type && l[1] === fn); if (at >= 0) listeners.splice(at, 1); } },
     requestAnimationFrame: (fn) => frames.push(fn),
@@ -48,7 +49,9 @@ function harness(items, options = {}) {
       pin = { ...pin, contentRevision: pin.contentRevision + 1, documentSnapshotId: 's' + (pin.contentRevision + 1) };
       return { status: 'applied' };
     } }) },
-    NemoSelectCanvasIntent: Intent, NemoNativeSelectOverlay: Overlay };
+    NemoSelectCanvasIntent: Intent,
+    // busyAtShow: the pick's read has resolved but its queue entry is released a tick later, so applyPick draws inside that lag
+    NemoNativeSelectOverlay: options.busyAtShow ? { ...Overlay, show: (r) => { busy = true; return Overlay.show(r); } } : Overlay };
   root.NemoNativeSelectGesture = Gesture.bind(root);
   const intent = Intent.create({
     context: () => JSON.stringify([root.state.tool, root.state.activeLayerIdx, (root.selectedPaths || []).map((p) => p.data.strokeId)]),
@@ -58,7 +61,8 @@ function harness(items, options = {}) {
   const target = { setPointerCapture() {}, releasePointerCapture() {}, hasPointerCapture: () => true };
   const ev = (x, y, extra) => ({ button: 0, pointerId: 1, buttons: 1, clientX: x, clientY: y, shiftKey: false, altKey: false, currentTarget: target,
     stopImmediatePropagation() {}, preventDefault() {}, ...extra });
-  const h = { root, intent, toasts, batches, store, body, listeners,
+  const h = { root, intent, toasts, batches, store, body, listeners, frames,
+    busy: (on) => { busy = on; }, runFrames: () => { frames.splice(0).forEach((f) => f()); }, // one animation frame: callbacks queued meanwhile wait for the next
     setPin: (n) => { pin = { ...pin, ...n }; },
     press: (x, y, extra) => intent.down(ev(x, y, extra)), drag: (x, y, extra) => intent.move(ev(x, y, extra)), release: (x, y, extra) => intent.up(ev(x, y, { buttons: 0, ...extra })),
     key: (key) => listeners.filter((l) => l[0] === 'keydown').forEach((l) => l[1]({ key, stopImmediatePropagation() {}, preventDefault() {} })),
@@ -500,4 +504,156 @@ test('MASK-NATIVE-REST: a mask scales like a shape, and moves with the content i
   both.press(70, 70); both.drag(80, 80); await settle(); await both.release(80, 80); await settle();
   assert.equal(both.batches.length, 1);
   assert.deepEqual(both.batches[0].steps.map((s) => s.reshape.stableTarget.strokeId), ['M', 'B']);
+});
+
+// The native queue reports no presentation while a command is pending - and the pick's own repaint (updateUI) is one. That window is
+// "unreadable", not "changed": the installed build abandoned every drag and dropped the selection box inside it.
+test('a drag on an unselected shape survives the queue being busy with the pick\'s own repaint, and sends one batch', async () => {
+  const h = harness([BIG, FAR], { busyOnRepaint: true });
+  h.press(35, 35); await settle(); // the pick resolves, applyPick repaints, the queue is busy
+  h.drag(45, 35); h.drag(55, 35); await settle();
+  assert.deepEqual(h.ids(), ['A'], 'the press selected the shape');
+  assert.ok(!h.toasts.some((t) => /document changed/.test(t)), h.toasts.join('|'));
+  h.busy(false);
+  h.drag(65, 35); await h.release(65, 35); await settle();
+  assert.equal(h.batches.length, 1, 'one batch');
+  assert.deepEqual(pts(h.batches[0].steps[0])[0], [50, 20]);
+  assert.deepEqual(h.toasts, []);
+});
+
+test('a click then a drag on the SELECTED shape sends one batch although the queue is busy during the drag', async () => {
+  const h = harness([BIG, FAR]);
+  await h.select(35, 35);
+  assert.deepEqual(h.ids(), ['A']);
+  h.press(35, 35); await settle(); h.busy(true); // the press's own pick is read before the queue gets busy
+  h.drag(45, 40); h.drag(65, 50); await settle();
+  assert.ok(!h.toasts.length, h.toasts.join('|'));
+  h.busy(false);
+  await h.release(65, 50); await settle();
+  assert.equal(h.batches.length, 1);
+  assert.deepEqual(pts(h.batches[0].steps[0])[0], [50, 35]);
+  assert.deepEqual(h.toasts, []);
+});
+
+test('a release while the presentation is still unreadable waits for it instead of reporting a changed document', async () => {
+  const h = harness([BIG, FAR]);
+  await h.select(35, 35);
+  h.press(35, 35); h.drag(65, 50); await settle();
+  h.busy(true);
+  const done = h.release(65, 50);
+  setTimeout(() => h.busy(false), 60);
+  await done; await new Promise((r) => setTimeout(r, 150)); await settle();
+  assert.equal(h.batches.length, 1);
+  assert.deepEqual(h.toasts, []);
+});
+
+test('a genuinely foreign change mid-drag still abandons, busy or not', async () => {
+  for (const busy of [false, true]) {
+    const frame = harness([BIG, FAR]); await frame.select(35, 35);
+    frame.press(35, 35); frame.drag(45, 35); await settle(); frame.busy(busy); frame.root.state.currentFrame = 3; frame.drag(55, 35); await frame.release(55, 35); await settle();
+    assert.equal(frame.batches.length, 0, `frame change (busy ${busy})`);
+    assert.ok(frame.toasts.some((t) => /document changed/.test(t)));
+    const layer = harness([BIG, FAR]); await layer.select(35, 35);
+    layer.press(35, 35); layer.drag(45, 35); await settle(); layer.busy(busy); layer.root.state.activeLayerIdx = 1; layer.drag(55, 35); await layer.release(55, 35); await settle();
+    assert.equal(layer.batches.length, 0, `layer change (busy ${busy})`);
+    const sel = harness([BIG, FAR]); await sel.select(35, 35);
+    sel.press(35, 35); sel.drag(45, 35); await settle(); sel.busy(busy); sel.root.selectedPaths = []; sel.drag(55, 35); await sel.release(55, 35); await settle();
+    assert.equal(sel.batches.length, 0, `selection change (busy ${busy})`);
+    const doc = harness([BIG, FAR]); await doc.select(35, 35);
+    doc.press(35, 35); doc.drag(45, 35); await settle(); doc.busy(busy); doc.setPin({ contentRevision: 9, documentSnapshotId: 's9' }); doc.drag(55, 35); await doc.release(55, 35); await settle();
+    assert.equal(doc.batches.length, 0, `revision change (busy ${busy})`);
+    assert.ok(doc.toasts.some((t) => /document changed/.test(t)));
+  }
+});
+
+test('a click shows the selection box even when the queue is busy with the click\'s repaint, and draws it once readable', async () => {
+  const h = harness([BIG, FAR], { busyAtShow: true });
+  h.press(35, 35); await h.release(35, 35); await settle();
+  assert.deepEqual(h.ids(), ['A']);
+  assert.ok(Overlay.selectionContext(h.root), 'the pick was recorded although the presentation was unreadable at that instant');
+  h.runFrames(); // the repaint's one-shot redraw runs while the presentation is unreadable
+  assert.deepEqual(h.ids(), ['A'], 'an unreadable presentation does not end the selection');
+  assert.ok(Overlay.selectionContext(h.root), 'the overlay still owns the selection');
+  h.busy(false); h.runFrames();
+  const svg = h.svg();
+  assert.ok(svg && svg.children.some((c) => c.tag === 'polygon'), 'the box is drawn');
+  assert.equal(svg.children.filter((c) => c.tag === 'rect').length, 8, 'with its 8 handles');
+});
+
+test('the overlay selection still ends when its context really changes while the presentation is unreadable', async () => {
+  const h = harness([BIG, FAR]);
+  await h.select(35, 35);
+  h.busy(true); h.root.state.currentFrame = 4; Overlay.notify(h.root); h.runFrames();
+  assert.equal(Overlay.selectionContext(h.root), null);
+});
+
+// #2372 click feedback. The native queue reports no presentation while any command is pending (the press's own read, a hover read, the
+// previous pick's repaint) and that window outlasts one short retry: the click's pick was dropped (first click showed no box, an empty
+// click did not clear the selection). A click now waits the window out.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const hasBox = (h) => { const s = h.svg(); return !!s && s.parentNode === h.body && s.children.some((c) => c.tag === 'polygon'); };
+
+test('the FIRST click on an unselected shape shows its box although the presentation is unreadable for a while after the press', async () => {
+  const h = harness([BIG, FAR]);
+  h.busy(true); // the queue is busy right after the press (presentedState null)
+  h.press(35, 35); await settle();
+  const done = h.release(35, 35);
+  setTimeout(() => h.busy(false), 300); // longer than the single 120 ms retry the click used to get
+  await done; await sleep(500); await settle();
+  assert.deepEqual(h.ids(), ['A'], 'the click selected the shape');
+  assert.deepEqual(h.toasts, []);
+  h.runFrames();
+  assert.ok(hasBox(h), 'the selection box is drawn');
+  assert.equal(h.svg().children.filter((c) => c.tag === 'rect').length, 8, 'with its 8 handles');
+});
+
+test('a click on empty canvas clears the selection and hides the box although the presentation is unreadable for a while', async () => {
+  const h = harness([BIG, FAR]);
+  await h.select(35, 35); h.runFrames();
+  assert.deepEqual(h.ids(), ['A']); assert.ok(hasBox(h));
+  h.busy(true);
+  h.press(5, 195); await settle();
+  const done = h.release(5, 195);
+  setTimeout(() => h.busy(false), 300);
+  await done; await sleep(500); await settle(); h.runFrames();
+  assert.deepEqual(h.ids(), [], 'the selection is cleared');
+  assert.ok(!h.svg() || h.svg().parentNode !== h.body, 'the box is hidden');
+  assert.equal(h.root.state.selectedStrokeIndices.length, 0);
+});
+
+test('a Shift click on empty canvas keeps the selection and its box, busy or not', async () => {
+  for (const busy of [false, true]) {
+    const h = harness([BIG, FAR]);
+    await h.select(35, 35); h.runFrames();
+    h.busy(busy);
+    h.press(5, 195, { shiftKey: true }); await settle();
+    const done = h.release(5, 195, { shiftKey: true });
+    setTimeout(() => h.busy(false), 300);
+    await done; await sleep(500); await settle(); h.runFrames();
+    assert.deepEqual(h.ids(), ['A'], `kept (busy ${busy})`);
+    assert.ok(hasBox(h), `box kept (busy ${busy})`);
+  }
+});
+
+test('a presentation that never becomes readable ends the click with ONE notice and leaves the selection alone', async () => {
+  const h = harness([BIG, FAR]);
+  await h.select(35, 35);
+  h.root.setTimeout = (fn) => setTimeout(fn, 1);
+  h.busy(true);
+  h.press(5, 195); await settle();
+  await h.release(5, 195); await sleep(200); await settle();
+  assert.deepEqual(h.ids(), ['A'], 'an unprovable pick is not an empty click');
+  assert.equal(h.toasts.length, 1);
+  assert.match(h.toasts[0], /Could not read the canvas/);
+});
+
+test('a click whose context changes while it waits for the presentation selects nothing', async () => {
+  const h = harness([BIG, FAR]);
+  h.busy(true);
+  h.press(35, 35); await settle();
+  const done = h.release(35, 35);
+  setTimeout(() => { h.root.state.currentFrame = 2; h.busy(false); }, 150);
+  await done; await sleep(400); await settle();
+  assert.deepEqual(h.ids(), []);
+  assert.deepEqual(h.toasts, []);
 });
