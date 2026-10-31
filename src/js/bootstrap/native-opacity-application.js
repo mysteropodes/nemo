@@ -22,6 +22,9 @@
       // #2256: the ordinary Convert to Component entry sends the native convert transaction (legacy documents keep theirs).
       var convert = root.NemoNativeComponentConvertUI;
       if (convert && typeof convert.compose === 'function') composed = convert.compose(root, base, composed);
+      // #2256: entering / leaving a Component (tabs, row double-click) sends the native workspace transition.
+      var enter = root.NemoNativeComponentEnterUI;
+      if (enter && typeof enter.compose === 'function') composed = enter.compose(root, base, composed);
       return remap && typeof remap.compose === 'function' ? remap.compose(root, base, composed) : composed;
     };
     project.bindUIComposition(root, compose);

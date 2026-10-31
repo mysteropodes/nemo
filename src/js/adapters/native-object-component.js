@@ -9,10 +9,11 @@
   const contract = commonjs ? require('./native-object-component-contract.js') : root.NemoNativeObjectComponentContract;
   const core = commonjs ? require('./native-object-component-intent.js') : root.NemoNativeObjectComponentIntent;
   const reads = commonjs ? require('./native-object-component-read-contract.js') : root.NemoNativeObjectComponentReadContract;
-  const api = factory(contract, core, reads);
+  const workspaceContract = commonjs ? require('./native-object-workspace-context-contract.js') : root.NemoNativeObjectWorkspaceContextContract;
+  const api = factory(contract, core, reads, workspaceContract);
   if (commonjs) module.exports = api;
   else root.NemoNativeObjectComponent = api;
-}(typeof globalThis === 'object' ? globalThis : this, function (contract, core, reads) {
+}(typeof globalThis === 'object' ? globalThis : this, function (contract, core, reads, workspaceContract) {
   'use strict';
 
   const SCENE = 'scene-root';
@@ -94,24 +95,25 @@
     // #2256: the read-only native component model (contexts, one context's summary, its layers, the scene layers that instance it),
     // pinned to the presented revision and snapshot. Reads nothing from the legacy symbols table and opens no context. A response
     // is judged by the read contract at this edge, and an answer is discarded when the project moved on while it was read.
-    function read(selector) {
+    function read(selector) { return pinned(reads, 'component.read', 'component-read', () => ({ selector: JSON.parse(JSON.stringify(selector)) })); }
+    // One pinned, single-route read of a pure native query (no expectedRevision, no reconcile) judged by its contract.
+    function pinned(mod, operation, label, extra) {
       return runner.exclusive(async () => {
-        const operation = 'component.read';
-        const unavailable = (reason, extra) => fail(operation, 'unavailable', Object.assign({ reason }, extra));
-        if (!reads || typeof ports.read !== 'function' || typeof ports.readDeclared !== 'function') return unavailable('component_read_unavailable');
+        const unavailable = (reason, more) => fail(operation, 'unavailable', Object.assign({ reason }, more));
+        if (!mod || typeof ports.read !== 'function' || typeof ports.readDeclared !== 'function') return unavailable('component_read_unavailable');
         let declared = false;
-        try { declared = ports.readDeclared(reads.OP) === true; } catch (_) { declared = false; }
+        try { declared = ports.readDeclared(mod.OP) === true; } catch (_) { declared = false; }
         if (!declared) return unavailable('native_declaration_absent');
         let pin = null;
         try { pin = ports.pin(); } catch (_) { pin = null; }
         if (!pin || typeof pin.instanceId !== 'string' || typeof pin.documentId !== 'string' || !Number.isSafeInteger(pin.contentRevision) || typeof pin.documentSnapshotId !== 'string') return unavailable('no_presented_native_session');
         let request;
         try {
-          const body = { atRevision: pin.contentRevision, documentSnapshotId: pin.documentSnapshotId, selector: JSON.parse(JSON.stringify(selector)) };
-          reads.payload(reads.OP, body);
-          const requestId = ports.requestId('component-read');
+          const body = Object.assign({ atRevision: pin.contentRevision, documentSnapshotId: pin.documentSnapshotId }, extra());
+          mod.payload(mod.OP, body);
+          const requestId = ports.requestId(label);
           if (typeof requestId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(requestId)) throw new TypeError('request id is not a bounded identifier');
-          request = { apiVersion: 2, requestId, instanceId: pin.instanceId, documentId: pin.documentId, operation: reads.OP, payload: body };
+          request = { apiVersion: 2, requestId, instanceId: pin.instanceId, documentId: pin.documentId, operation: mod.OP, payload: body };
         } catch (error) { return fail(operation, 'invalid_request', { reason: String(error && error.message || error) }); }
         let response;
         try { response = await ports.read(request); } catch (error) {
@@ -123,12 +125,40 @@
           const code = response.error && response.error.code || 'unavailable';
           return fail(operation, code, { requestId: request.requestId, stale: code === 'stale_revision', message: response.error && response.error.message });
         }
-        try { reads.correlate(request, response); } catch (bad) { return fail(operation, 'transport_failed', { requestId: request.requestId, message: 'uncorrelated native read: ' + bad.message }); }
+        try { mod.correlate(request, response); } catch (bad) { return fail(operation, 'transport_failed', { requestId: request.requestId, message: 'uncorrelated native read: ' + bad.message }); }
         let after = null;
         try { after = ports.pin(); } catch (_) { after = null; }
         if (!after || after.contentRevision !== pin.contentRevision || after.documentSnapshotId !== pin.documentSnapshotId) return fail(operation, 'stale_revision', { requestId: request.requestId, stale: true });
-        return Object.freeze({ ok: true, operation, requestId: request.requestId, revision: response.contentRevision, result: detach(response.result) });
+        return Object.freeze({ ok: true, operation, requestId: request.requestId, revision: response.contentRevision, instanceId: pin.instanceId, documentId: pin.documentId, result: detach(response.result) });
       });
+    }
+    // #2256: the enter/exit workspace. The session workspace is view state held HERE (like the viewport navigation), never in the
+    // document: each transition sends the held workspace and one action, the native owner applies the baseline rules and answers
+    // the new workspace, which is kept only when the answer is correlated and current. A different project resets it to the scene.
+    let held = null;
+    const sceneWorkspace = (view) => ({ activeContextId: null, openTabs: [], view: Object.assign({}, view), sceneView: null });
+    function workspaceHeld(pin) {
+      return held && pin && held.instanceId === pin.instanceId && held.documentId === pin.documentId ? held.workspace : null;
+    }
+    // The workspace the current project holds (a frozen copy), or null when none was ever opened for it.
+    function workspaceNow() {
+      let pin = null;
+      try { pin = ports.pin(); } catch (_) { pin = null; }
+      const workspace = workspaceHeld(pin);
+      return workspace ? detach(workspace) : null;
+    }
+    // `view` is the live {frame, workIn, workOut} of the presented context (the caller owns the playhead).
+    async function workspaceTransition(action, view) {
+      const operation = 'workspace.' + (action && action.kind);
+      let pin = null;
+      try { pin = ports.pin(); } catch (_) { pin = null; }
+      if (!pin) return fail(operation, 'unavailable', { reason: 'no_presented_native_session' });
+      const base = Object.assign({}, workspaceHeld(pin) || sceneWorkspace(view), { view: Object.assign({}, view) });
+      const answer = await pinned(workspaceContract, operation, 'workspace-context', () => ({ workspace: JSON.parse(JSON.stringify(base)), action }));
+      if (!answer.ok) return answer;
+      const next = answer.result;
+      held = { instanceId: answer.instanceId, documentId: answer.documentId, workspace: next.workspace };
+      return Object.freeze({ ok: true, operation, outcome: next.outcome, contextId: next.contextId, totalFrames: next.totalFrames, fps: next.fps, workspace: next.workspace, revision: answer.revision });
     }
     // Every context of the document in order (scene-root first), following nextCursor; bounded so a malformed owner cannot loop.
     async function listContexts() {
@@ -208,7 +238,7 @@
     }
     return Object.freeze({
       convert, convertLayer: (layerUid) => convert([layerUid]), place, expose,
-      readModel, storyboard, enter, exit, read, listContexts,
+      readModel, storyboard, enter, exit, read, listContexts, workspaceTransition, workspaceNow,
     });
   }
 
