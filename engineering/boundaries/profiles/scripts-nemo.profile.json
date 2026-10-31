@@ -114,6 +114,7 @@
       "dir": "scripts/nemo/lib",
       "files": [
         "capability-drift.cjs",
+        "capability-raw-client.cjs",
         "capability-schema.cjs"
       ],
       "publicApi": [

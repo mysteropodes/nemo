@@ -13,6 +13,14 @@
     "command.document.object.fill.trace",
     "command.document.object.fill.brush"
   ],
+  "hostOperations": [
+    "command.document.object.fill.set"
+  ],
+  "rawClient": {
+    "command.document.object.fill.set": {
+      "revisionDelta": 1
+    }
+  },
   "input": {
     "oneOf": [
       {

@@ -12,6 +12,11 @@
   "operations": [
     "command.document.object.layer.policy.edit"
   ],
+  "rawClient": {
+    "command.document.object.layer.policy.edit": {
+      "revisionDelta": 1
+    }
+  },
   "input": {
     "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerPolicyPayload"
   },
