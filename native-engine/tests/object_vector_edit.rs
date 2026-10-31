@@ -16,6 +16,8 @@ mod create_many;
 mod create_held;
 #[path = "object_vector_batch.rs"]
 mod batch;
+#[path = "object_vector_batch_layers.rs"]
+mod batch_layers;
 #[path = "object_vector_batch_items.rs"]
 mod batch_items;
 #[path = "object_vector_batch_box_angle.rs"]
@@ -26,6 +28,8 @@ mod batch_style;
 mod batch_style_detail;
 #[path = "object_vector_batch_style_preset.rs"]
 mod batch_style_preset;
+#[path = "object_vector_batch_skip.rs"]
+mod batch_skip;
 #[path = "object_vector_trim_ends.rs"]
 mod trim_ends;
 #[path = "object_vector_edit_support.rs"]

@@ -294,3 +294,23 @@ test('a batch reshape by matrix (#2372 Select) is six finite numbers and exclude
   }
   assert.throws(() => C.payload(EDIT, { command: 'object.vector.batch', ops: [{ op: 'clone', stableTarget: target('s-r'), frame: 3, matrix: [1, 0, 0, 1, 0, 0] }] }), TypeError);
 });
+
+test('a batch is atomic: skipUnavailable is an optional boolean, and only an opted-in receipt may report skipped steps (#2372)', () => {
+  const EDIT = 'command.document.object.vector.edit';
+  const step = (id) => ({ op: 'restyle', stableTarget: target(id), style: { stroke: '#00ff00' } });
+  const batch = (extra = {}) => ({ command: 'object.vector.batch', ops: [step('s-a'), step('s-b')], ...extra });
+  assert.equal(accepts(EDIT, batch()), true);
+  for (const good of [true, false]) assert.equal(accepts(EDIT, batch({ skipUnavailable: good })), true, String(good));
+  for (const bad of [1, 0, 'true', null, [true], {}]) assert.equal(accepts(EDIT, batch({ skipUnavailable: bad })), false, JSON.stringify(bad));
+  assert.equal(accepts(EDIT, { command: 'object.vector.delete', stableTarget: target('s-a'), skipUnavailable: true }), false, 'a batch member only');
+  const withReceipt = (payload, extra) => {
+    const request = envelope(EDIT, payload), result = { applied: true, historyEntriesAdded: 1, operation: 'batch', strokeId: 's-a', strokeIds: ['s-a', 's-b'], ...extra };
+    return () => { C.result(C.VECTOR, result); C.correlate(request, ok(request, 8, result)); };
+  };
+  assert.doesNotThrow(withReceipt(batch({ skipUnavailable: true }), { skippedSteps: 1 }));
+  assert.doesNotThrow(withReceipt(batch(), {}));
+  for (const bad of [0, 2, -1, 1.5, '1']) assert.throws(withReceipt(batch({ skipUnavailable: true }), { skippedSteps: bad }), TypeError, String(bad));
+  assert.throws(withReceipt(batch(), { skippedSteps: 1 }), TypeError, 'an atomic request never skips');
+  assert.throws(withReceipt(batch({ skipUnavailable: false }), { skippedSteps: 1 }), TypeError, 'an explicit false never skips');
+  assert.throws(() => C.result(C.VECTOR, { applied: true, historyEntriesAdded: 1, operation: 'replace', strokeId: 's-a', skippedSteps: 1 }), TypeError, 'only a batch receipt reports skipped steps');
+});

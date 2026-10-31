@@ -1,4 +1,5 @@
-//! `object.vector.batch` (#2361, #2362): an ordered list of creates, replaces and deletes on ONE scene-root layer, applied
+//! `object.vector.batch` (#2361, #2362): an ordered list of creates, replaces and deletes on the scene-root layers (one or, since #2372, several: a
+//! Select spanning layers is one step; every step is guarded by ITS layer's lock and path effects, a refusal refuses all), applied
 //! through the single-command kernels to the document as it grows, as one candidate, one revision and one undo entry. It
 //! carries the Labs edits that the baseline makes inside one undo step: the knife's cut pieces, sculpt's rewritten
 //! strokes, pose stamps and multiframe copies. Ids are allocated from the origin revision, as single creates are, and
@@ -126,9 +127,12 @@ fn target_of(op: &BatchOp) -> Option<ObjectTarget> {
     op.record.value().map(|r| r.target.clone()).or_else(|| op.stable_target.value().cloned())
 }
 
+/// The expanded steps with, per step, whether it is a companion of the one before and its item swap, and the skipped restyle count.
+type Expanded = (Vec<BatchOp>, Vec<bool>, Vec<Option<items::ItemSwap>>, u32);
+
 /// A `reshape` with a `matrix` (#2372 Select) becomes the replaces of the records it moves: the named record, its linked
 /// fill and the copies of its texture group, each retargeted to the held cell's `frame` as a geometry reshape is.
-fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<BatchOp>, Vec<bool>, Vec<Option<items::ItemSwap>>), DispatchErrorCode> {
+fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>, skip_unavailable: bool) -> Result<Expanded, DispatchErrorCode> {
     use DispatchErrorCode::InvalidRequest;
     // The receipt lists one stroke id per REQUESTED step; the companions a transform brings are not steps of their own.
     let (mut out, mut companion) = (Vec::with_capacity(ops.len()), Vec::with_capacity(ops.len()));
@@ -138,10 +142,10 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<
     let mut starts: Vec<usize> = Vec::with_capacity(ops.len());
     // The targets restyled so far: two steps on one record would each start from the origin and the second would drop the first.
     let mut restyled: Vec<ObjectTarget> = Vec::new();
-    // A panel edit over a mixed selection restyles what it can (the baseline skipped a texture anchor the edit would unhide); a
-    // single refused restyle, or a selection where every restyle is refused, still refuses the batch.
-    let restyle_steps = ops.iter().filter(|op| op.op == "restyle" || !op.style.missing()).count();
-    let mut skipped = 0usize;
+    // A batch is atomic: a restyle the engine cannot do refuses it whole. Only a request that sets `skipUnavailable` (the Select
+    // panel: the baseline skipped a texture anchor the edit would unhide) restyles what it can; each skipped step stays in the receipt
+    // as a no-op naming its target, and a batch where every step is skipped is still refused.
+    let mut skipped = 0u32;
     for (requested, mut op) in ops.into_iter().enumerate() {
         starts.push(out.len());
         if op.op == "copy" {
@@ -173,8 +177,13 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<
                 continue;
             }
             let restyled_records = match style::restyle(origin.document(), &target, &style, origin.project().and_then(|p| p.project().custom_brush_presets())) {
-                Err(DispatchErrorCode::Unavailable) if restyle_steps > 1 => {
+                Err(DispatchErrorCode::Unavailable) if skip_unavailable => {
                     skipped += 1;
+                    out.push(BatchOp { op: "noop".into(), record: Presence::Missing, stable_target: Presence::Present(target), placement: Presence::Missing,
+                        keyframe: Presence::Missing, from_step: Presence::Missing, frame: Presence::Missing, geometry: Presence::Missing,
+                        offset: Presence::Missing, center: Presence::Missing, matrix: Presence::Missing, style: Presence::Missing });
+                    companion.push(false);
+                    swaps.push(None);
                     continue;
                 }
                 other => other?,
@@ -235,18 +244,18 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<
             return Err(InvalidRequest);
         }
     }
-    if skipped > 0 && out.is_empty() {
+    if skipped > 0 && out.iter().all(|op| op.op == "noop") {
         return Err(DispatchErrorCode::Unavailable);
     }
-    Ok((out, companion, swaps))
+    Ok((out, companion, swaps, skipped))
 }
 
-pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool, trim: Option<f64>) -> Result<Edit, DispatchErrorCode> {
+pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool, trim: Option<f64>, skip_unavailable: bool) -> Result<Edit, DispatchErrorCode> {
     use DispatchErrorCode::InvalidRequest;
     if !(1..=MAX_BATCH_OPS).contains(&ops.len()) {
         return Err(InvalidRequest);
     }
-    let (mut ops, companions, swaps) = expand_transforms(origin, ops)?;
+    let (mut ops, companions, swaps, skipped) = expand_transforms(origin, ops, skip_unavailable)?;
     // `copy` {fromStep, frame}: the record of an EARLIER create (or copy) step, retargeted to `frame` and then a create in
     // every respect; a stroke and its companion stamped on n frames cost one record each, not n.
     let mut links: Vec<(String, String)> = Vec::new();
@@ -333,7 +342,8 @@ pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool, 
     // `trimEnds` (all-create batches only): the first create is cut against its own cell before any step lands, and every
     // other create takes the same cut, as the baseline stamps and mirrors the already trimmed path.
     if let Some(max) = trim {
-        if ops.iter().any(|op| op.op != "create") {
+        // The cut is against ONE cell, so a trimmed batch stays on one layer.
+        if ops.iter().any(|op| op.op != "create" || target_of(op).is_none_or(|t| t.layer_uid != first.layer_uid)) {
             return Err(InvalidRequest);
         }
         let mut records: Vec<ObjectRecord> = ops.iter().map(|op| op.record.value().cloned().ok_or(InvalidRequest)).collect::<Result<_, _>>()?;
@@ -350,34 +360,50 @@ pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool, 
         if own && op.op != "create" {
             return Err(InvalidRequest);
         }
-        keyed.push(copy_key || own);
+        // A skipped restyle touches nothing, not even to key the cell it named.
+        keyed.push((copy_key || own) && op.op != "noop");
     }
     // With the copy key, every held or unexposed cell a step targets is keyed first with what it showed before the
     // batch (the baseline freezes all its targets before stamping any): a later step never copies an earlier one, and a
     // replace or delete on a held cell edits that cell's copy (same stroke ids), never the key it held.
     if keyed.contains(&true) {
-        let timing = document.layers.iter().find(|l| l.layer_uid == first.layer_uid).and_then(|l| l.timing.value());
-        let mut plain: Vec<u32> = Vec::new();
-        for op in ops.iter().zip(&keyed).filter(|(_, keyed)| **keyed).map(|(op, _)| op) {
-            let frame = target_of(op).ok_or(InvalidRequest)?.frame_scope.frame;
-            let shown = timing.is_some_and(|t| matches!(t.exposure(frame).0, "held" | "unexposed"));
-            if shown && frame < document.total_frames && !plain.contains(&frame) {
-                plain.push(frame);
+        // One promotion per layer a keyed step touches (#2372: a selection may span layers, each with its own timing).
+        let mut layers: Vec<String> = Vec::new();
+        for (op, _) in ops.iter().zip(&keyed).filter(|(_, keyed)| **keyed) {
+            let layer = target_of(op).ok_or(InvalidRequest)?.layer_uid;
+            if !layers.contains(&layer) {
+                layers.push(layer);
             }
         }
-        if !plain.is_empty() {
-            if let DocumentEdit::Changed(next) =
-                promote_cells(&document, &first.layer_uid, &plain).map_err(|_| InvalidRequest)?
-            {
-                document = next;
+        for layer in layers {
+            let timing = document.layers.iter().find(|l| l.layer_uid == *layer).and_then(|l| l.timing.value());
+            let mut plain: Vec<u32> = Vec::new();
+            for op in ops.iter().zip(&keyed).filter(|(_, keyed)| **keyed).map(|(op, _)| op) {
+                let at = target_of(op).ok_or(InvalidRequest)?;
+                if at.layer_uid != *layer {
+                    continue;
+                }
+                let shown = timing.is_some_and(|t| matches!(t.exposure(at.frame_scope.frame).0, "held" | "unexposed"));
+                if shown && at.frame_scope.frame < document.total_frames && !plain.contains(&at.frame_scope.frame) {
+                    plain.push(at.frame_scope.frame);
+                }
+            }
+            if !plain.is_empty() {
+                if let DocumentEdit::Changed(next) = promote_cells(&document, &layer, &plain).map_err(|_| InvalidRequest)? {
+                    document = next;
+                }
             }
         }
     }
     let (mut stroke_ids, mut changed) = (Vec::new(), false);
     for ((((op, copy), fill), companion), swap) in ops.into_iter().zip(keyed).zip(fills).zip(companions).zip(swaps) {
         let target = target_of(&op).ok_or(InvalidRequest)?;
-        if target.context_id != first.context_id || target.layer_uid != first.layer_uid {
+        if target.context_id != first.context_id {
             return Err(InvalidRequest);
+        }
+        if op.op == "noop" {
+            stroke_ids.push(target.stroke_id.clone());
+            continue;
         }
         if let Some(swap) = swap {
             stroke_ids.push(target.stroke_id.clone());
@@ -428,5 +454,6 @@ pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool, 
         stroke_id: stroke_ids.first().cloned().unwrap_or_default(),
         stroke_ids,
         changed,
+        skipped,
     })
 }

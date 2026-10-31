@@ -76,7 +76,6 @@ fn any_refused_step_refuses_the_whole_batch() {
     for payload in [
         batch(vec![]),
         batch(many),
-        batch(vec![op_create(record_at("B", "L1", 0, "")), op_create(record_at("C", "L2", 0, ""))]),
         batch(vec![json!({"op":"move","record":record_at("B", "L1", 0, "")})]),
         batch(vec![op_create(record_at("B", "L1", 0, "")), json!({"op":"delete","stableTarget":target("L1", 0, "missing")})]),
         batch(vec![json!({"op":"delete","stableTarget":target("L1", 0, "s-a"),"placement":"behind"})]),

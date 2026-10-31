@@ -1,4 +1,5 @@
-//! `object.vector.batch` (#2361, #2362): ordered create, replace and delete steps on ONE scene-root layer, applied by the
+//! `object.vector.batch` (#2361, #2362): ordered create, replace and delete steps on scene-root layers (one or, since #2372, several: a
+//! Select spanning layers is one batch; only a `trimEnds` batch is one layer), applied by the
 //! native owner as one revision and one undo entry. Shapes are the single commands' own; the receipt lists one stroke id
 //! per step, in order: an owner-allocated id for a create, the step's named target for a replace or delete. A `copy` step
 //! (multiframe stamps) is an earlier create's record again on another frame: a create in every respect but its size. A
@@ -10,7 +11,9 @@
 //! one named record. The named target may also be a stored raster image or text block (its own frame: an image's centre, size and
 //! rotation, a text block's anchor and size), so one gesture over a mixed selection is one batch. A `restyle` (#2372, `style` of
 //! optional `fill` and `stroke` hex colours, a positive `width` and an `opacity` in 0..1, at least one) restyles a named record
-//! or item; its receipt id is the named target.
+//! or item; its receipt id is the named target. A batch is atomic: any step the engine refuses refuses it whole. Only a request that
+//! sets the boolean `skipUnavailable` restyles what it can; the receipt then adds `skippedSteps` (1 to one less than the steps) and
+//! still lists one id per step.
 use super::shapes::{anchor, geometry, record_shape};
 use super::target;
 use crate::native_contract::exact;
@@ -116,8 +119,9 @@ fn targets(ops: &[Value]) -> Option<Vec<&Value>> {
 }
 
 pub(super) fn request(payload: &Value) -> bool {
-    exact(payload, &["command", "ops"], &["keyframe", "trimEnds"]).is_some()
+    exact(payload, &["command", "ops"], &["keyframe", "trimEnds", "skipUnavailable"]).is_some()
         && payload.get("keyframe").is_none_or(|k| k == "copy")
+        && payload.get("skipUnavailable").is_none_or(Value::is_boolean)
         // A batch trims only when every step creates: the drawn stroke, its copies and its multi-frame stamps.
         && payload.get("trimEnds").is_none_or(|t| {
             t.as_f64().is_some_and(|v| v.is_finite() && v > 0.)
@@ -127,7 +131,8 @@ pub(super) fn request(payload: &Value) -> bool {
             let targets = targets(ops);
             (1..=MAX_OPS).contains(&ops.len())
                 && targets.is_some_and(|targets| {
-                    targets.iter().all(|t| t["contextId"] == "scene-root" && t["layerUid"] == targets[0]["layerUid"])
+                    targets.iter().all(|t| t["contextId"] == "scene-root")
+                        && (payload.get("trimEnds").is_none() || targets.iter().all(|t| t["layerUid"] == targets[0]["layerUid"]))
                 })
         })
 }
@@ -136,7 +141,11 @@ pub(super) fn result(payload: &Value, value: &Value) -> bool {
     let (Some(ops), Some(ids)) = (payload["ops"].as_array(), value["strokeIds"].as_array()) else {
         return false;
     };
-    exact(value, &["applied", "historyEntriesAdded", "operation", "strokeId", "strokeIds"], &[]).is_some()
+    exact(value, &["applied", "historyEntriesAdded", "operation", "strokeId", "strokeIds"], &["skippedSteps"]).is_some()
+        // Skipped steps are reported only to a request that opted in, and never all of them (an all-skipped batch is refused).
+        && value.get("skippedSteps").is_none_or(|n| {
+            payload["skipUnavailable"] == true && n.as_u64().is_some_and(|n| n >= 1 && usize::try_from(n).is_ok_and(|n| n < ops.len()))
+        })
         && value["applied"].is_boolean()
         && value["historyEntriesAdded"].as_u64() == Some(u64::from(value["applied"] == true))
         && value["operation"] == "batch"

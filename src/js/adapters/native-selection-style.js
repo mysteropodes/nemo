@@ -13,7 +13,8 @@
  * tool, revision) - nothing else clears root.selectedPaths on a native project, so a stale selection is dropped, not restyled into another cell.
  * The pending edit commits to the cell it was made on (its layer, frame and document pin), so flush() on a context change (the overlay drops the
  * selection) or a new pick keeps an edit made inside the quiet window. An edit made while a commit runs waits for it and its re-read selection.
- * The batch is one layer, so a selection across layers is refused with the reason. */
+ * MULTI-LAYER: a selection may span layers (a marquee or a Shift pick across them); every restyle step names its own layer, so the edit is still ONE
+ * batch, one revision and one history entry. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -61,16 +62,16 @@
     if (typeof root.updateUI === 'function') root.updateUI();
   }
 
-  async function reselect(root, ids, layerIdx, before) {
+  async function reselect(root, ids, before) {
     var I = root.NemoSelectCanvasIntent, fresh = null, angles = {};
     before.forEach(function (p) { if (p.data.boxAngle) angles[p.data.strokeId] = p.data.boxAngle; });
     for (var tries = 0; tries < 2 && !fresh; tries++) {
       if (tries) await new Promise(function (done) { timer(root)(done, 120); });
-      try { fresh = await I.layerPaths(root, function (item) { return ids.indexOf(item.stableTarget.strokeId) >= 0; }, false, layerIdx); } catch (_) { fresh = null; }
+      try { fresh = await I.reread(root, before, false); } catch (_) { fresh = null; }
     }
     // The user may have picked something else while the commit ran: their selection stands.
     if (!sameSelection((root.selectedPaths || []).map(function (p) { return p.data && p.data.strokeId; }), ids)) return;
-    root.selectedPaths = fresh ? fresh.paths.sort(function (a, b) { return ids.indexOf(a.data.strokeId) - ids.indexOf(b.data.strokeId); })
+    root.selectedPaths = fresh ? fresh.paths
       .map(function (p) { if (angles[p.data.strokeId] && (p.data.nativeRole === 'raster' || p.data.nativeRole === 'text')) p.data.boxAngle = angles[p.data.strokeId]; return p; }) : [];
     if (root.state) root.state.selectedStrokeIndices = [];
   }
@@ -95,8 +96,16 @@
     if (job.style.smooth !== undefined) {
       // Smooth reads the geometry of the presented cell, so it needs the app still on the context it was made in.
       if (!now || I.pickContext(root) !== job.ctx) { notice(root, 'The selection changed \u2014 nothing was restyled.'); return { status: 'stale' }; }
-      var smoothed = null;
-      try { smoothed = await S.smoothSteps(root, apply.map(function (p) { return p.data.strokeId; }), job.layerIdx, job.style.smooth); } catch (_) { smoothed = null; }
+      var smoothed = null, layerIdxs = [];
+      apply.forEach(function (p) { if (layerIdxs.indexOf(p.data.nativeLayerIndex) < 0) layerIdxs.push(p.data.nativeLayerIndex); });
+      try {
+        // One read per layer the selection sits on; their steps go in the one batch.
+        for (var n = 0; n < layerIdxs.length; n++) {
+          var part = await S.smoothSteps(root, apply.filter(function (p) { return p.data.nativeLayerIndex === layerIdxs[n]; }).map(function (p) { return p.data.strokeId; }), layerIdxs[n], job.style.smooth);
+          if (!part) { smoothed = null; break; }
+          smoothed = smoothed ? { layerUid: smoothed.layerUid, frame: smoothed.frame, steps: smoothed.steps.concat(part.steps) } : part;
+        }
+      } catch (_) { smoothed = null; }
       if (!smoothed) { notice(root, 'Could not read the strokes to smooth just now.'); return { status: 'unavailable' }; }
       if (I.pickContext(root) !== job.ctx) { notice(root, 'The selection changed \u2014 nothing was restyled.'); return { status: 'stale' }; }
       layerUid = smoothed.layerUid; frame = smoothed.frame; steps = smoothed.steps;
@@ -104,13 +113,13 @@
     if (!steps.length) return { status: 'noop' };
     if (JSON.stringify(steps).length > MAX_BYTES) { notice(root, 'Too much to restyle at once — select fewer items.'); return { status: 'too_large' }; }
     var result;
-    try { result = await labs.batchStrokes(layerUid, frame, steps); } catch (_) { result = null; }
+    try { result = await labs.batchStrokes(layerUid, frame, steps, { skipUnavailable: true }); } catch (_) { result = null; }
     if (!result || (result.status !== 'applied' && result.status !== 'noop')) {
       notice(root, 'The style could not be applied' + (result && result.status === 'unavailable' ? ' to this kind of item.' : '.'));
       return { status: result ? result.status : 'unavailable' };
     }
     var applied = apply.map(function (p) { return p.data.strokeId; });
-    if (here) await reselect(root, applied, job.layerIdx, apply);
+    if (here) await reselect(root, applied, apply);
     else if (sameSelection((root.selectedPaths || []).map(function (p) { return p.data && p.data.strokeId; }), job.ids)) dropSelection(root);
     state(root).commits += 1; // after the re-read: an edit that follows sees the fresh selection, never the one before this commit
     if (O && typeof O.show === 'function') O.show(root);
@@ -158,11 +167,6 @@
     if (!(owns(root) || (pending && pending.ctx === ctx && sameSelection(pending.ids, ids)))) {
       dropSelection(root);
       notice(root, 'The selection no longer applies here \u2014 select the items again.');
-      return Promise.resolve({ status: 'unavailable' });
-    }
-    if (paths.some(function (p) { return p.data.nativeLayerIndex !== paths[0].data.nativeLayerIndex; })) {
-      // One native batch is one layer (the engine addresses a single layer's cells and keys them together), so one undo entry cannot span layers.
-      notice(root, 'Restyling works on one layer at a time \u2014 select items of one layer.');
       return Promise.resolve({ status: 'unavailable' });
     }
     if (ids.length > MAX_STEPS) { notice(root, 'Too many items to restyle at once (' + MAX_STEPS + ' at most).'); return Promise.resolve({ status: 'too_large' }); }

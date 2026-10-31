@@ -1178,9 +1178,13 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Optional, create steps only. Baseline trimStrokeEndsMax: the first create is cut against its own cell and every other create (symmetry copies, Labs multi-frame stamps) takes the same cut."
+        },
+        "skipUnavailable": {
+          "type": "boolean",
+          "description": "Optional (absent or false = atomic: any step the engine refuses refuses the whole batch with nothing written). true lets restyle steps the engine cannot do (a texture anchor the edit would unhide) be skipped while the rest apply; the receipt then reports skippedSteps. A batch whose every step is skipped is still refused."
         }
       },
-      "description": "#2361/#2362: 1..64 ordered create/replace/delete steps on one scene-root layer as one revision and one undo entry; the native owner refuses the whole batch when any step is refused."
+      "description": "#2361/#2362: 1..64 ordered create/replace/delete steps on scene-root layers (one or, for a Select spanning layers, several; a trimEnds batch is one layer) as one revision and one undo entry; the native owner refuses the whole batch when any step is refused."
     },
     "ObjectVectorEditPayload": {
       "oneOf": [
@@ -1392,6 +1396,11 @@
           "items": {
             "$ref": "#/$defs/ObjectOpaqueId"
           }
+        },
+        "skippedSteps": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Batch only, and only when the request set skipUnavailable: how many restyle steps were skipped (their ids are still listed, naming their targets)."
         }
       },
       "description": "Compact vector edit receipt: the stroke an owner allocated (create) or the stable target named (replace, delete, mask.edit). Parameter and path-effect edits answer with the compact CommandResult."

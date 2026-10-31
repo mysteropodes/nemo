@@ -315,12 +315,42 @@
     if (layers) layers.paths.forEach(function (p) { withFill(p, layers.items); p.data.nativeLayerIndex = idx; p.data.nativeLayerUid = layers.layerUid; });
     return layers;
   }
-  // The items of the active layer whose painted bounds meet the world rectangle [x0, y0, x1, y1] (the baseline marquee's intersection
-  // rule); a linked fill and a texture dab are never their own selection, they follow their ribbon / anchor.
+  // The items of EVERY visible unlocked layer whose painted bounds meet the world rectangle [x0, y0, x1, y1] (the baseline marquee's
+  // intersection rule, which spanned the layers), bottom layer first; a linked fill and a texture dab are never their own selection,
+  // they follow their ribbon / anchor. null when a layer that should be read could not be (nothing is half-selected).
   async function marquee(root, rect) {
-    var layers = await layerPaths(root, function (item, b) {
-      return !(item.role === 'fill' && item.owner) && item.brush !== 'copy' && b[0] <= rect[2] && b[2] >= rect[0] && b[1] <= rect[3] && b[3] >= rect[1]; });
-    return layers && layers.paths;
+    var s = presentedSession(root), found = [];
+    if (!s) return null;
+    var keep = function (item, b) {
+      return !(item.role === 'fill' && item.owner) && item.brush !== 'copy' && b[0] <= rect[2] && b[2] >= rect[0] && b[1] <= rect[3] && b[3] >= rect[1]; };
+    for (var k = 0; k < s.pin.layers.length; k++) {
+      var info = s.pin.layers[k];
+      if (!info || info.locked === true || info.visible === false) continue;
+      var layers = await layerPaths(root, keep, false, k);
+      if (!layers) return null;
+      found = found.concat(layers.paths);
+    }
+    return found;
+  }
+  // The selected `paths` (they may sit on several layers) as fresh presented paths, one read per layer, in the order given. `complete` is
+  // false when a layer lost one of them (the document moved on); null when a layer could not be read at all. `layerUid` and `frame` are
+  // those of the first path's layer: the batch route needs one, every step names its own layer. `centres` adds a ribbon's centreline.
+  async function reread(root, paths, centres) {
+    var groups = [], fresh = [], first = null, complete = true;
+    paths.forEach(function (p) {
+      var idx = p.data.nativeLayerIndex, g = groups.find(function (x) { return x.idx === idx; });
+      if (!g) groups.push(g = { idx: idx, ids: [] });
+      g.ids.push(p.data.strokeId);
+    });
+    for (var n = 0; n < groups.length; n++) {
+      var g = groups[n], layers = await layerPaths(root, function (item) { return g.ids.indexOf(item.stableTarget.strokeId) >= 0; }, !!centres, g.idx);
+      if (!layers) return null;
+      first = first || layers; complete = complete && layers.paths.length === g.ids.length;
+      fresh = fresh.concat(layers.paths);
+    }
+    var key = function (p) { return p.data.nativeLayerIndex + '|' + p.data.strokeId; }, order = paths.map(key);
+    fresh.sort(function (a, b) { return order.indexOf(key(a)) - order.indexOf(key(b)); });
+    return first && { paths: fresh, layerUid: first.layerUid, frame: first.frame, pin: first.pin, complete: complete };
   }
 
   // #2362 Labs sculpt: a drag over the active layer's presented strokes (a ribbon with its world centreline). Moves wait
@@ -436,5 +466,5 @@
   }
 
   return Object.freeze({ create: create, hitHandles: hitHandles, objectProject: objectProject, presented: presented,
-    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, transformSteps: transformSteps, inRecordSpace: inRecordSpace, layerPaths: layerPaths, marquee: marquee, pick: pick, pickContext: pickContext, applyPick: applyPick, resolvePick: resolvePick });
+    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, transformSteps: transformSteps, inRecordSpace: inRecordSpace, layerPaths: layerPaths, reread: reread, marquee: marquee, pick: pick, pickContext: pickContext, applyPick: applyPick, resolvePick: resolvePick });
 }));

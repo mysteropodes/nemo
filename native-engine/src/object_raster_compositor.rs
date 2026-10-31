@@ -29,16 +29,29 @@ impl Compositor {
         Ok(())
     }
     /// Ghost images the live frame does not draw would stay resident (and charged) in the renderer's atlas for as long
-    /// as it lives: start a fresh one rather than accumulating a decoded image per ghost frame.
+    /// as it lives: start a fresh one rather than accumulating a decoded image per ghost frame. A ghost set already
+    /// resident (pan, zoom and repeat presents draw the same memoised images) costs no reset and no re-upload.
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     pub(super) fn release_ghost_images(
         &mut self,
         prepared: &ObjectCompositionWitness,
     ) -> Result<(), CompositorError> {
-        match prepared.ghost_underlay() {
-            Some(g) if g.draws_foreign_images(prepared) => self.reset_object_image_cache(),
-            _ => Ok(()),
+        let Some(ghosts) = prepared.ghost_underlay() else {
+            return Ok(());
+        };
+        let drawn = ghosts.foreign_image_ids(prepared);
+        if drawn.iter().all(|id| self.resident_ghost_images.contains(id)) {
+            return Ok(());
         }
+        self.reset_object_image_cache()?;
+        self.ghost_cache_resets += 1;
+        self.resident_ghost_images = drawn;
+        Ok(())
+    }
+    /// Times a ghost image set forced the object image cache to be rebuilt (a probe for "unchanged set, no reset").
+    #[cfg(all(test, feature = "application", feature = "project_media_codec"))]
+    pub(crate) fn ghost_cache_resets(&self) -> u64 {
+        self.ghost_cache_resets
     }
     pub(super) fn emit_object_paint_sequence(
         &mut self,
@@ -187,6 +200,7 @@ impl Compositor {
         self.scene.reset();
         self.retained_object_reference = None;
         self.last_reference_image = None;
+        self.resident_ghost_images.clear();
         Ok(())
     }
     /// Called only on an admitted brush cache miss, before charged replacement

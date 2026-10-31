@@ -209,6 +209,7 @@ pub(super) fn create_in(
         stroke_id: stroke_ids[0].clone(),
         stroke_ids,
         changed: true,
+        skipped: 0,
     })
 }
 
