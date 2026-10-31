@@ -181,3 +181,40 @@ fn a_refused_preset_publishes_nothing() {
     assert_eq!(o.history_depths(), (0, 0));
     assert_eq!(wire(&o), fixture());
 }
+/// Every layer kind owns all five transform properties: the catalog and the holder admission do not look at the layer
+/// kind (baseline `propsFor` lists the same `PROPS` for every layer holder), so a preset applies to Null, Folder,
+/// Effect, 3D and folder-member layers alike, never turning the whole apply Unavailable.
+#[test]
+fn a_preset_applies_to_every_layer_kind_with_all_five_transform_properties() {
+    let all = json!([
+      {"property":"position","keys":[{"frame":0,"v":[1,2]}]},
+      {"property":"anchor","keys":[],"static":[3,4]},
+      {"property":"rotation","keys":[{"frame":0,"v":[5]},{"frame":10,"v":[9]}]},
+      {"property":"scale","keys":[],"static":[50,60]},
+      {"property":"opacity","keys":[{"frame":0,"v":[40]}]}
+    ]);
+    let layers = json!([
+      {"layerUid":"null","name":"null","isNullLayer":true,"nullPos":[0,0]},
+      {"layerUid":"folder","name":"folder","isFolderLayer":true},
+      {"layerUid":"member","name":"member","folderId":"folder"},
+      {"layerUid":"effect","name":"effect","isEffectLayer":true},
+      {"layerUid":"d3","name":"d3","threeD":true}
+    ]);
+    let doc = json!({"format":"nemo.native-object-document","formatVersion":1,"totalFrames":40,
+      "layers":layers,"layerFolders":{"folder":{"name":"folder"}},"objects":[]});
+    let mut o = from(doc);
+    for (n, layer) in ["null", "folder", "member", "effect", "d3"]
+        .iter()
+        .enumerate()
+    {
+        assert_eq!(
+            apply(&mut o, payload(layer, all.clone())).unwrap(),
+            n as u64 + 1,
+            "{layer}"
+        );
+        let w = wire(&o);
+        let props = holder(&w, layer).unwrap()["properties"].as_array().unwrap();
+        assert_eq!(props.len(), 5, "{layer}: all five properties written");
+    }
+    assert_eq!(o.history_depths(), (5, 0));
+}
