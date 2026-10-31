@@ -1050,6 +1050,7 @@
         "property_follow_path_sample.rs",
         "brush_dab_oracle.rs",
         "object_brush_dab_paint.rs",
+        "object_brush_dab_pixels.rs",
         "object_paint_plan_tests.rs",
         "property_follow_path_sample_controls.rs",
         "property_expression_views.rs",

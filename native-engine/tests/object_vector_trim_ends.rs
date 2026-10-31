@@ -448,3 +448,22 @@ fn symmetry_copies_of_a_trimmed_ribbon_take_the_drawn_ribbons_cut_and_rebuild_as
         eprintln!("{name}: worst {worst_seen:e}");
     }
 }
+
+/// #2361 draw-texture-symmetry-trim: Trim cuts a seeded texture anchor, and its mirrored copy in the same createMany, before
+/// native stamps any dab (the dabs are produced at render from the stored, trimmed anchor); the texture members are untouched.
+#[test]
+fn a_textured_anchor_and_its_mirror_are_trimmed_and_keep_their_group_and_seed() {
+    let tag = |group: &str, seed: u64| json!({"brushTexture":{"brushGroupId":group,"brushTexturePreset":"charcoal-smooth","preTextureOpacity":1,"strokeSeed":seed}});
+    let mut original = path("L1", 0, "", &[(0.0, 50.0), (100.0, 50.0)]);
+    original["vectorExt"] = tag("bg1_1", 5);
+    let mut mirror = path("L1", 0, "", &[(100.0, 50.0), (0.0, 50.0)]);
+    mirror["vectorExt"] = tag("bg1_1_c1", 6);
+    let payload = json!({"command":"object.vector.createMany","records":[original, mirror],"trimEnds":24});
+    let (response, created) = trimmed(payload, walls());
+    assert_eq!(response["ok"], true, "{response}");
+    assert_eq!(response["result"]["historyEntriesAdded"], 1);
+    near(&points(&created[0]), &[(10.0, 50.0), (95.0, 50.0)]);
+    near(&points(&created[1]), &[(90.0, 50.0), (5.0, 50.0)]);
+    assert_eq!(created[0]["vectorExt"], tag("bg1_1", 5));
+    assert_eq!(created[1]["vectorExt"], tag("bg1_1_c1", 6));
+}

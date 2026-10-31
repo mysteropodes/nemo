@@ -10,7 +10,17 @@
   // adoptFreshIdentity: a pressure ribbon's centreline follows the copy (points and handles mapped, widths kept), and a ribbon
   // with a linked fill gets a fresh fill of its own below it, its outline rebuilt from the mapped centreline
   // (rebuildVectorBrushOutline); without one the copy keeps the reflected or rotated outline.
-  function adopt(root,copy,companion,fp,fv){
+  // A texture anchor's copy is an anchor of its own (adoptFreshIdentity drops the membership tag): a fresh brush group, and the
+  // stamping seed of copy k derived from the drawn stroke's, so native stamps its own dabs (seededRng, never Math.random) and the
+  // result is the same on every build of the same stroke.
+  function retexture(copy,k){
+    if(!copy.brushTexturePreset)return copy;
+    if(copy.brushGroupId)copy.brushGroupId+='_c'+k;
+    copy.strokeSeed=(Math.imul(copy.strokeSeed^(k*0x9E3779B1),0x85EBCA6B)^(copy.strokeSeed>>>13)^k)>>>0;
+    return copy;
+  }
+  function adopt(root,copy,companion,fp,fv,k){
+    retexture(copy,k);
     if(copy.centerSegments)copy.centerSegments=copy.centerSegments.map(function(c){
       var out={point:fp(c.point[0],c.point[1]),width:c.width};
       if(c.handleIn)out.handleIn=fv(c.handleIn[0],c.handleIn[1]);
@@ -39,7 +49,7 @@
       var c=s.symmetryRadialCenter||{x:w/2,y:h/2},n=Math.max(2,Math.min(24,s.symmetryRadialSectors|0||6));
       for(var k=n-1;k>=1;k--)(function(a){var cs=Math.cos(a),sn=Math.sin(a);
         var fp=function(x,y){var dx=x-c.x,dy=y-c.y;return [c.x+dx*cs-dy*sn,c.y+dx*sn+dy*cs];},fv=function(x,y){return [x*cs-y*sn,x*sn+y*cs];};
-        out.push.apply(out,adopt(root,map(dict,fp,fv),companion,fp,fv));})(k*2*Math.PI/n);
+        out.push.apply(out,adopt(root,map(dict,fp,fv),companion,fp,fv,k));})(k*2*Math.PI/n);
       return out;
     }
     var cx=w/2,cy=h/2,r=Math.min(w,h)*0.4;
@@ -60,7 +70,7 @@
     }
     var mirrored=map(stroke,point,vector);
     if(mirrored.closed)mirrored=Object.assign({},mirrored,{segments:mirrored.segments.slice().reverse().map(function(x){return {point:x.point,handleIn:x.handleOut,handleOut:x.handleIn};})});
-    out.push.apply(out,adopt(root,mirrored,companion,point,vector));
+    out.push.apply(out,adopt(root,mirrored,companion,point,vector,1));
     return out;
   }
   // The same copies as affine maps [a, b, c, d, e, f] (x' = a x + c y + e, y' = b x + d y + f), in stack order above the

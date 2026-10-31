@@ -3593,7 +3593,8 @@
         "native-object-shape-tool.js",
         "native-object-draw-paint.js",
         "native-object-draw-symmetry.js",
-        "native-object-draw-bitmap.js"
+        "native-object-draw-bitmap.js",
+        "native-object-draw-resize.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
