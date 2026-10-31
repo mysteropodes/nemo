@@ -3159,7 +3159,8 @@ function statusbarHelpRender(desc,sc){
 }
 function getStatusbarDefaultSc(){
   var tt=(window.SM&&SM.t)?SM.t:function(k){return k;};
-  return [['F5',tt('scFrame')],['F6',tt('scKey')],['F7',tt('scBlank')],['T',tt('scTween')],['D',tt('scDupli')],['F',tt('scFlip')],['X',tt('scMirror')],['Enter',tt('scPlay')]];
+  var rb=shortcutHint;
+  return [[rb('cmdInsertFrame','F5'),tt('scFrame')],[rb('cmdInsertKey','F6'),tt('scKey')],[rb('cmdInsertBlankKey','F7'),tt('scBlank')],['T',tt('scTween')],['D',tt('scDupli')],[rb('cmdFlipPreview','F'),tt('scFlip')],['X',tt('scMirror')],['Enter',tt('scPlay')]].filter(function(p){return p[0];});
 }
 function updateStatusBarHelp(){
   var tt=(window.SM&&SM.t)?SM.t:function(k){return k;};
@@ -5369,9 +5370,9 @@ document.getElementById('frame-grid').addEventListener('contextmenu',function(e)
     {label:SM.t('ctxPaste'),shortcut:'⌘V',disabled:!hasClip,action:function(){window.SM.pasteFrames();}},
     {label:SM.t('ctxDuplicateSelection'),action:function(){window.SM.duplicateSelectedFrames();}},
     {sep:true},
-    {label:SM.t('ctxInsertFrame'),shortcut:'F5',action:function(){insertFrame();}},
-    {label:SM.t('ctxInsertKeyframe'),shortcut:'F6',action:function(){insertKeyframe();}},
-    {label:SM.t('ctxInsertBlankKeyframe'),shortcut:'F7',action:function(){insertBlankKeyframe();}},
+    {label:SM.t('ctxInsertFrame'),shortcut:shortcutHint('cmdInsertFrame'),action:function(){insertFrame();}},
+    {label:SM.t('ctxInsertKeyframe'),shortcut:shortcutHint('cmdInsertKey'),action:function(){insertKeyframe();}},
+    {label:SM.t('ctxInsertBlankKeyframe'),shortcut:shortcutHint('cmdInsertBlankKey'),action:function(){insertBlankKeyframe();}},
     {label:SM.t('ctxConvertToKeyframes'),action:function(){window.SM.convertToKeyframes();}},
     {label:SM.t('ctxClearKeyframe'),action:function(){window.SM.clearKeyframe();}},
     {sep:true},
@@ -7578,7 +7579,7 @@ function showToast(m){var el=document.getElementById('toast');el.textContent=m;e
 // Tables, override persistence and the pure lookups all live in
 // shortcut-registry.js (P30/#1032) now; onOverrideChanged wires a rebind back
 // to the left-rail badge, exactly what setShortcutKey called directly before.
-var shortcutRegistry=NemoShortcutRegistry.create({storage:window.localStorage,onOverrideChanged:function(action){syncToolButtonShortcutBadge(action);},onReset:function(){syncAllToolButtonShortcutBadges();}});
+var shortcutRegistry=NemoShortcutRegistry.create({storage:window.localStorage,onOverrideChanged:function(action){syncToolButtonShortcutBadge(action);refreshShortcutHints();},onReset:function(){syncAllToolButtonShortcutBadges();refreshShortcutHints();}});
 var toolRailBadges=NemoToolRail.createBadges({doc:document,registry:shortcutRegistry});
 // COMMAND_SHORTCUTS is pure {action,key,cat,label} data (P30/#1032, review on
 // #1114); dispatch by action lives here, same pattern as runToolShortcut below.
@@ -7610,6 +7611,10 @@ function runCommandShortcut(k,event){
 // would be more likely to mangle one than to fix it.
 function syncToolButtonShortcutBadge(action){return toolRailBadges.sync(action);}
 function syncAllToolButtonShortcutBadges(){toolRailBadges.syncAll();}
+// U04a (#2370): the context menu and the status bar show the CURRENT binding, so a remap (Insert Frame off F5 on a Mac without
+// F-keys) shows there too. An unbound command shows no hint rather than a stale default.
+function shortcutHint(action,fallback){return shortcutRegistry?shortcutRegistry.hintFor(action):(fallback||'');}
+function refreshShortcutHints(){try{if(typeof updateStatusBarHelp==='function')updateStatusBarHelp();}catch(e){/* the status bar redraws on its next event */}}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',syncAllToolButtonShortcutBadges);else syncAllToolButtonShortcutBadges();
 function runToolShortcut(k){
   var lk=(k||'').toLowerCase();
@@ -7625,112 +7630,10 @@ function runToolShortcut(k){
   return false;
 }
 // ---- Settings modal: shortcut rebinding UI ----
-function renderShortcutsList(){
-  var list=document.getElementById('shortcuts-list');if(!list)return;
-  list.innerHTML='';
-  // Filtre de recherche + regroupement par catégorie (2026-09) : la liste
-  // était une seule colonne de 21 lignes sans en-têtes ni recherche, et ne
-  // montrait QUE les outils — impossible d'y retrouver une commande, encore
-  // moins de vérifier ce qu'une touche fait déjà. Elle liste maintenant les
-  // outils, les commandes réassignables et, en lecture seule, les touches
-  // câblées ailleurs : le panneau est la carte complète du clavier.
-  var q='';
-  var search=document.createElement('input');
-  search.type='search';search.className='pi';
-  search.placeholder=SM.t('shortcutSearchPlaceholder');
-  search.style.cssText='width:100%;margin-bottom:8px;';
-  list.appendChild(search);
-  var body=document.createElement('div');
-  body.style.cssText='display:flex;flex-direction:column;gap:2px;';
-  list.appendChild(body);
-  function matches(label,key){
-    if(!q)return true;
-    return (label||'').toLowerCase().indexOf(q)>=0||(key||'').toLowerCase().indexOf(q)>=0;
-  }
-  function keyRow(label,keyText,onAssign){
-    var row=document.createElement('div');
-    row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;border-radius:4px;font-size:11px;';
-    var lbl=document.createElement('span');lbl.textContent=label;lbl.style.cssText='flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-    row.appendChild(lbl);
-    if(!onAssign){
-      var ro=document.createElement('span');
-      ro.textContent=keyText;
-      ro.title=SM.t('shortcutNotRebindableTitle');
-      ro.style.cssText='min-width:60px;text-align:center;font-family:monospace;font-size:10px;color:var(--text-dim);border:1px dashed var(--border);border-radius:4px;padding:2px 6px;';
-      row.appendChild(ro);
-    }else{
-      var keyBtn=document.createElement('button');
-      keyBtn.className='pbtn';keyBtn.style.cssText='min-width:60px;font-family:monospace;text-transform:uppercase;';
-      keyBtn.textContent=keyText;
-      keyBtn.title=SM.t('shortcutClickThenPressTitle');
-      keyBtn.addEventListener('click',function(){
-        keyBtn.textContent='…';keyBtn.classList.add('ac');
-        function capture(ev){
-          ev.preventDefault();ev.stopPropagation();
-          onAssign(ev,keyBtn);
-          keyBtn.classList.remove('ac');
-          document.removeEventListener('keydown',capture,true);
-        }
-        document.addEventListener('keydown',capture,true);
-      });
-      row.appendChild(keyBtn);
-    }
-    return row;
-  }
-  function assignFor(def){
-    return function(ev,keyBtn){
-      if(ev.key==='Escape'){keyBtn.textContent=shortcutRegistry.keyFor(def.action)||'—';return;}
-      var clash=shortcutRegistry.clashFor(def.action,ev.key);
-      if(clash){
-        showToast(SM.t('shortcutKeyClashToast').replace('{label}',clash.label&&clash.label.indexOf('shortcut')===0?SM.t(clash.label):clash.label));
-        keyBtn.textContent=shortcutRegistry.keyFor(def.action)||'—';
-      }else{
-        shortcutRegistry.setKey(def.action,ev.key);
-        keyBtn.textContent=ev.key.toLowerCase();
-      }
-    };
-  }
-  function draw(){
-    body.innerHTML='';
-    var shown=0;
-    shortcutRegistry.categories().forEach(function(cat){
-      var rows=[];
-      if(cat.id==='tools'){
-        shortcutRegistry.toolShortcuts().forEach(function(d){
-          var key=shortcutRegistry.keyFor(d.action)||'';
-          if(matches(d.label,key))rows.push(keyRow(d.label,key||'—',assignFor(d)));
-        });
-      }
-      shortcutRegistry.commandShortcuts().forEach(function(d){
-        if(d.cat!==cat.id)return;
-        var label=SM.t(d.label),key=shortcutRegistry.keyFor(d.action)||'';
-        if(matches(label,key))rows.push(keyRow(label,key||'—',assignFor(d)));
-      });
-      shortcutRegistry.readonlyShortcuts().forEach(function(d){
-        if(d.cat!==cat.id)return;
-        var label=SM.t(d.label);
-        if(matches(label,d.keys))rows.push(keyRow(label,d.keys,null));
-      });
-      if(!rows.length)return;
-      var hdr=document.createElement('div');
-      hdr.className='phdr';
-      hdr.style.cssText='padding:8px 0 3px 0;font-size:9px;color:var(--text-dim);';
-      hdr.textContent=SM.t(cat.label);
-      body.appendChild(hdr);
-      rows.forEach(function(r){body.appendChild(r);shown++;});
-    });
-    if(!shown){
-      var none=document.createElement('div');
-      none.style.cssText='font-size:10px;color:var(--text-dim);padding:8px 4px;';
-      none.textContent=SM.t('shortcutNoMatch');
-      body.appendChild(none);
-    }
-  }
-  search.addEventListener('input',function(){q=search.value.trim().toLowerCase();draw();});
-  // La saisie de la recherche ne doit pas déclencher les raccourcis eux-mêmes.
-  search.addEventListener('keydown',function(e){e.stopPropagation();});
-  draw();
-}
+// The pane is a presenter over the registry (application/shortcut-pane.js, U04a #2370): a rebind is stored by the registry,
+// the rail badge and the menu/status hints follow through refreshShortcutHints, and a conflict shows the existing notice.
+var shortcutPane=NemoShortcutPane.create({doc:document,win:window,registry:shortcutRegistry,translate:function(key){return SM.t(key);},notify:function(text){showToast(text);}});
+function renderShortcutsList(){shortcutPane.render(document.getElementById('shortcuts-list'));}
 // Team review: anchored comment pins. `_activeComment` is either an
 // existing entry from state.comments (edit-in-place) or a fresh draft
 // object not yet pushed to the array — Save decides which by checking
@@ -9020,7 +8923,7 @@ function settingsPreferencesUiInstance(){
     document:document,readProfile:function(){return state.userProfile;},
     setProfileField:function(key,value){state.userProfile[key]=value;},saveProfile:function(){return saveUserProfile();},
     setHex8Input:function(input,value){return setHex8Input(input,value);},
-    renderShortcuts:function(){return renderShortcutsList();},resetShortcuts:function(){return shortcutRegistry.reset();},
+    renderShortcuts:function(){return renderShortcutsList();},resetShortcuts:function(){return shortcutRegistry.reset();},cancelShortcutCapture:function(){return typeof shortcutPane!=='undefined'&&!!shortcutPane&&shortcutPane.cancelCapture();},
     refreshFeedback:function(){return refreshFeedbackList();},
     renderLabs:function(){var render=window.renderLabsPanel;if(render)return render();},
     showToast:function(text){return showToast(text);},translate:function(key){return SM.t(key);},

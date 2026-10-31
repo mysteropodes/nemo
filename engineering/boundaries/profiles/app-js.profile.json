@@ -2067,6 +2067,18 @@
       ]
     },
     {
+      "id": "app.shortcut.pane",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "shortcut-pane.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "shortcut-pane.js"
+      ]
+    },
+    {
       "id": "app.tool.rail",
       "layer": "application",
       "dir": "src/js/application",
