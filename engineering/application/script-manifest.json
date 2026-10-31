@@ -263,6 +263,7 @@
     {"src":"js/adapters/native-selection-style.js"},
     {"src":"js/adapters/native-selection-boolean.js"},
     {"src":"js/adapters/native-selection-transform.js"},
+    {"src":"js/adapters/native-selection-align.js"},
     {"src":"js/adapters/native-selection-delete.js"},
     {"src":"js/select-bridge.js"},
     {"src":"js/adapters/native-subselect-ui.js"},
