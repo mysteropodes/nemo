@@ -153,6 +153,23 @@ test('the rotation field turns about the anchor point by the difference to the a
   assert.equal(h.root.state.selRotAccum, 100);
 });
 
+test('a move, resize or nudge after a turn keeps the accumulated angle, so the same angle typed again turns nothing', async () => {
+  const h = harness();
+  await h.select();
+  // the real panel (updateSelPropsPanel) resets the angle when the selected items' ids change, as every native commit re-reads them
+  let sig = h.root.selectedPaths.map((p) => p.id).join();
+  h.root.updateUI = () => { const now = h.root.selectedPaths.map((p) => p.id).join(); if (now !== sig) { sig = now; h.root.state.selRotAccum = 0; } };
+  h.type('sp-rot', '30'); await h.fire();
+  assert.equal(h.root.state.selRotAccum, 30);
+  h.key('ArrowRight'); await settle();
+  assert.equal(h.batches.length, 2);
+  assert.equal(h.root.state.selRotAccum, 30, 'the nudge keeps the angle');
+  h.type('sp-x', '25'); await h.fire();
+  assert.equal(h.root.state.selRotAccum, 30, 'so does a typed move');
+  h.type('sp-rot', '30'); await h.fire();
+  assert.equal(h.batches.length, 3, 'the same angle again is no turn');
+});
+
 test('an edit of another field commits the pending one first; the batches are written in order', async () => {
   const h = harness();
   await h.select();
