@@ -3684,6 +3684,7 @@ function _snapshotDrawingDefaults(){
     strokeCap:state.strokeCap,strokeJoin:state.strokeJoin,
     miterLimit:state.miterLimit,dashOffset:state.dashOffset,
     paintOrder:state.paintOrder,brushSize:state.brushSize,
+    strokeStyle:state.strokeStyle,brushPreset:state.brushPreset,
   };
 }
 function _restoreDrawingDefaults(){
@@ -3704,6 +3705,9 @@ function _restoreDrawingDefaults(){
   var _mlEl=document.getElementById('p-miterlimit');if(_mlEl)_mlEl.value=state.miterLimit;
   var _doEl=document.getElementById('p-dashoffset');if(_doEl)_doEl.value=state.dashOffset;
   var _swEl=document.getElementById('p-sw');if(_swEl)_swEl.value=Math.round(state.brushSize);
+  // The Stroke Style and brush preset are drawing defaults too: a selection's readback (nativeStyleReadback) must not leak into the next stroke.
+  if(d.strokeStyle!==undefined){state.strokeStyle=d.strokeStyle;var _ssEl=document.getElementById('p-strokestyle');if(_ssEl)_ssEl.value=state.strokeStyle;}
+  if(d.brushPreset!==undefined){state.brushPreset=d.brushPreset;if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(state.brushPreset);}
 }
 // Populates the Transform section's fields (position/size/rotation/point-
 // type/boolean-op rows) — visibility itself is now owned by
@@ -3846,6 +3850,7 @@ function updateSelPropsPanel(){
         paintIconGroup('p-paintorder-grp',state.paintOrder);syncMiterLimitEnabled();
         document.getElementById('p-miterlimit').value=state.miterLimit;
         document.getElementById('p-dashoffset').value=state.dashOffset;
+        nativeStyleReadback(ref);
       }
       // Stroke Width staleness fix (2026-08-21, feedback #34: "tous les
       // paramètres stroke ne fonctionnent pas pour modifié la stroke") —
@@ -6430,7 +6435,22 @@ function nativeStyleView(p){
   if(ribbon){data.isVectorBrush=true;data.widthProfile=[{width:st.width||0}];}
   if(st.paintOrder)data.paintOrder=st.paintOrder;
   return {id:p.id,data:data,fillColor:st.fill?new Color(st.fill):null,strokeColor:!ribbon&&st.stroke?new Color(st.stroke):null,strokeWidth:st.width||0,nativeOpacity:st.opacity,
-    strokeCap:st.cap,strokeJoin:st.join,miterLimit:st.miter,dashOffset:st.dashOffset};
+    strokeCap:st.cap,strokeJoin:st.join,miterLimit:st.miter,dashOffset:st.dashOffset,nativeListed:true,strokeStyle:st.strokeStyle,
+    brushPreset:st.role==='plain'||st.role==='brush'?st.brushPreset||'none':undefined};
+}
+// #2372 INSP-READBACK: the Stroke Style and brush preset controls show the listed selection's own values (the engine reads the style back from the dash
+// pattern and names a texture anchor's preset), not the tool defaults left by the last pick. Passive display: neither goes through the setters
+// (they would re-apply onto the selection). A legacy path (no listed style) is left as it was.
+function nativeStyleReadback(ref){
+  if(!ref||!ref.nativeListed)return;
+  if(typeof ref.strokeStyle==='string'){
+    state.strokeStyle=ref.strokeStyle;
+    var ss=document.getElementById('p-strokestyle');if(ss)ss.value=ref.strokeStyle;
+  }
+  if(typeof ref.brushPreset==='string'){
+    state.brushPreset=ref.brushPreset;
+    if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(ref.brushPreset);
+  }
 }
 function paintStrokeSwatches(v){
   var sw=document.getElementById('stroke-well'); if(sw)sw.style.background=v;
