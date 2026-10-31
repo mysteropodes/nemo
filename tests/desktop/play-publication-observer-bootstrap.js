@@ -17,6 +17,7 @@
     'sessionOrdinal', 'hostCallOrdinal', 'intent', 'runGeneration', 'hostGeneration', 'currentFrame', 'priorFrame'];
   var statuses = ['presented', 'deferred-occluded', 'deferred-timeout', 'stale-discarded',
     'failed-validation', 'failed-device-lost', 'failed-retry-lost', 'failed-retry-outdated', 'failed-recreate', 'failed-reconfigure'];
+  var objectDocument = 'native-object-document-';
   var identifier = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
   var uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
   function snapshot(event) {
@@ -32,7 +33,8 @@
       else if (key === 'documentSnapshotId' || key === 'contextId') valid = typeof value === 'string' && identifier.test(value) && !value.endsWith('\n');
       else if (key === 'instanceId') valid = typeof value === 'string' && uuid.test(value);
       else if (key === 'documentId' || key === 'workId') {
-        var prefix = key === 'documentId' ? 'native-document-' : 'native-work-';
+        // Opacity projects publish 'native-document-N'; native object projects publish 'native-object-document-N'.
+        var prefix = key === 'workId' ? 'native-work-' : typeof value === 'string' && value.startsWith(objectDocument) ? objectDocument : 'native-document-';
         valid = typeof value === 'string' && value.startsWith(prefix) &&
           /^[1-9][0-9]{0,19}$/.test(value.slice(prefix.length)) && !value.endsWith('\n') &&
           BigInt(value.slice(prefix.length)) <= 18446744073709551615n;

@@ -189,12 +189,14 @@ impl TestPlayLog {
                 .as_str()
                 .is_some_and(|s| uuid::Uuid::parse_str(s).is_ok_and(|v| v.to_string() == s)),
             "documentId" | "workId" => value.as_str().is_some_and(|s| {
-                let prefix = if key == "documentId" {
-                    "native-document-"
+                // Opacity projects publish `native-document-N`, native object projects `native-object-document-N`.
+                let tail = if key == "documentId" {
+                    s.strip_prefix("native-object-document-")
+                        .or_else(|| s.strip_prefix("native-document-"))
                 } else {
-                    "native-work-"
+                    s.strip_prefix("native-work-")
                 };
-                s.strip_prefix(prefix).is_some_and(|tail| {
+                tail.is_some_and(|tail| {
                     tail.parse::<u64>()
                         .is_ok_and(|n| n > 0 && n.to_string() == tail)
                 })
