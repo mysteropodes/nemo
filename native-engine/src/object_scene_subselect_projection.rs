@@ -179,6 +179,10 @@ fn shared_matrices(
         return Err("Subselect mask or path effect is unavailable");
     }
     if !hit {
+        // A layer that paints only images or Text has no vertices to edit: it keeps the vector-layer refusal (#2372).
+        if sources.is_empty() {
+            return Err("Subselect requires a complete native vector layer");
+        }
         // The editable read admits the vector records exactly as their paint does: with the shared item chain, so layer Motion
         // on a layer that also paints Text or images is admitted like the paint admits it.
         let poses = BTreeMap::new();
