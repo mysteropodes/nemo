@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "d55b121d362bda3d37b04972550a816fdf8db5df",
-  "describe": "v0.7.0-alpha.4-4349-gd55b121d-dirty"
+  "head": "3aecb8209eccf38db5cceb3b1ae3218e57a71e64",
+  "describe": "v0.7.0-alpha.4-4352-g3aecb820-dirty"
  },
- "inputsDigest": "765e45e34e2679bc162684b2a503f5fb23246d81a1a0ec9d106a61c4e06b3efa",
+ "inputsDigest": "489d58cc80c476b3368d57dfc3531afb4254a90fd6c5ae2f332d1edddb26176c",
  "states": [
   "inventoried",
   "characterized",
@@ -161,7 +161,7 @@
   },
   "SMFeedback": {
    "file": "src/js/feedback-bridge.js",
-   "line": 261,
+   "line": 286,
    "members": 0
   },
   "SMFigmaImport": {
@@ -2809,7 +2809,7 @@
     "container": "comp-instance-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 495,
+    "functionsVisited": 496,
     "via": "variable btn",
     "references": []
    },
@@ -25281,7 +25281,7 @@
    "source": "src/js/motion.js:7901",
    "meta": {
     "i18n": null,
-    "functionsVisited": 158
+    "functionsVisited": 159
    },
    "fixtures": [
     "static-props",
@@ -25356,7 +25356,7 @@
    "source": "src/js/motion.js:7916",
    "meta": {
     "i18n": "matteMenuRemove",
-    "functionsVisited": 154
+    "functionsVisited": 155
    },
    "fixtures": [
     "static-props",
@@ -25431,7 +25431,7 @@
    "source": "src/js/motion.js:7910",
    "meta": {
     "i18n": null,
-    "functionsVisited": 154
+    "functionsVisited": 155
    },
    "fixtures": [
     "static-props",
@@ -25473,7 +25473,7 @@
    "source": "src/js/motion.js:8257",
    "meta": {
     "i18n": "menuRemoveThisParent",
-    "functionsVisited": 521
+    "functionsVisited": 522
    },
    "fixtures": [
     "static-props",
@@ -25513,7 +25513,7 @@
    "source": "src/js/motion.js:7826",
    "meta": {
     "i18n": null,
-    "functionsVisited": 158
+    "functionsVisited": 159
    },
    "fixtures": [
     "static-props",
@@ -25588,7 +25588,7 @@
    "source": "src/js/motion.js:7850",
    "meta": {
     "i18n": "matteMenuRemove",
-    "functionsVisited": 154
+    "functionsVisited": 155
    },
    "fixtures": [
     "static-props",
@@ -25663,7 +25663,7 @@
    "source": "src/js/motion.js:7843",
    "meta": {
     "i18n": null,
-    "functionsVisited": 154
+    "functionsVisited": 155
    },
    "fixtures": [
     "static-props",
@@ -28653,7 +28653,7 @@
    "source": "src/js/storyboard.js:1213",
    "meta": {
     "i18n": null,
-    "functionsVisited": 31
+    "functionsVisited": 29
    },
    "fixtures": [
     "components"
@@ -28743,7 +28743,7 @@
    "source": "src/js/storyboard.js:1214",
    "meta": {
     "i18n": null,
-    "functionsVisited": 33
+    "functionsVisited": 32
    },
    "fixtures": [
     "components"
@@ -28776,7 +28776,7 @@
    "source": "src/js/storyboard.js:975",
    "meta": {
     "i18n": null,
-    "functionsVisited": 74
+    "functionsVisited": 72
    },
    "fixtures": [
     "components"
@@ -28806,7 +28806,7 @@
    "source": "src/js/storyboard.js:988",
    "meta": {
     "i18n": null,
-    "functionsVisited": 31
+    "functionsVisited": 29
    },
    "fixtures": [
     "components"
@@ -28910,7 +28910,7 @@
    "source": "src/js/storyboard.js:974",
    "meta": {
     "i18n": null,
-    "functionsVisited": 70
+    "functionsVisited": 68
    },
    "fixtures": [
     "components"
@@ -28940,7 +28940,7 @@
    "source": "src/js/storyboard.js:979",
    "meta": {
     "i18n": null,
-    "functionsVisited": 23
+    "functionsVisited": 21
    },
    "fixtures": [
     "components"
@@ -29032,7 +29032,7 @@
    "source": "src/js/storyboard.js:990",
    "meta": {
     "i18n": null,
-    "functionsVisited": 33
+    "functionsVisited": 32
    },
    "fixtures": [
     "components"
