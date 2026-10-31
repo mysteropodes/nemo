@@ -4018,6 +4018,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-object-duplicator-panel.js",
+      "moduleId": "app.native.object.duplicator.panel.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2686,
+          "scriptOrdinal": 336
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-bitmap-brush-resources-contract.js",
       "moduleId": "app.native.bitmap.brush.resources.contract",
       "executionClass": "document-classic",

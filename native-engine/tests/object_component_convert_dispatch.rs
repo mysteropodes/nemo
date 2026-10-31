@@ -166,6 +166,7 @@ fn every_staged_operation_name_is_routed_and_unrelated_names_are_not() {
         "command.document.object.duplicator.set",
         "command.document.object.duplicator.objects",
         "command.document.object.duplicator.path",
+        "command.document.object.duplicator.config",
     ] {
         assert!(
             NativeObjectHistory::component_setup_operation(operation),

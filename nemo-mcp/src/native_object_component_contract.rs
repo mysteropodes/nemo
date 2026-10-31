@@ -26,7 +26,16 @@ enum K {
     Seed,
     /// `null` clears the path layer, a string names one (at most 128 bytes).
     PathUid,
+    /// The duplicator mode label: `grid`, `radial` or `path`.
+    DupMode,
+    /// `{position?, rotation?, scale?, opacity?, hue?}`, each a boolean.
+    DupStagger,
+    /// `{enabled?, offsetFrames?, direction?}`: a boolean, a finite number and a direction label.
+    DupTime,
 }
+const DUP_MODES: [&str; 3] = ["grid", "radial", "path"];
+const DUP_DIRECTIONS: [&str; 4] = ["forward", "backward", "centerOut", "random"];
+const DUP_CHANNELS: [&str; 5] = ["position", "rotation", "scale", "opacity", "hue"];
 
 /// What a successful receipt of an operation looks like.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -40,7 +49,7 @@ enum Receipt {
 }
 
 /// (operation suffix, command, receipt, "member:kind" in wire order; a trailing `?` marks an optional member).
-static SPECS: [(&str, &str, Receipt, &str); 6] = [
+static SPECS: [(&str, &str, Receipt, &str); 7] = [
     (
         "component.convert",
         "object.component.convert",
@@ -76,6 +85,13 @@ static SPECS: [(&str, &str, Receipt, &str); 6] = [
         "object.duplicator.path",
         Receipt::Command,
         "layerUid:id pathLayerUid:pathUid",
+    ),
+    // #2256 Q4: the inspector's closed partial edit of the stored descriptor (the path layer keeps duplicator.path).
+    (
+        "duplicator.config",
+        "object.duplicator.config",
+        Receipt::Command,
+        "layerUid:id mode:dupMode? rows:number? cols:number? spacingX:number? spacingY:number? count:number? radius:number? startAngle:number? radialOrient:boolean? pathAlignTangent:boolean? seed:seed? staggerRandom:dupStagger? timeOffset:dupTime?",
     ),
 ];
 const PREFIX: &str = "command.document.object.";
@@ -123,6 +139,9 @@ fn kind(token: &str) -> Option<K> {
         "boolean" => K::Boolean,
         "seed" => K::Seed,
         "pathUid" => K::PathUid,
+        "dupMode" => K::DupMode,
+        "dupStagger" => K::DupStagger,
+        "dupTime" => K::DupTime,
         _ => return None,
     })
 }
@@ -145,6 +164,21 @@ fn check(kind: K, value: &Value) -> bool {
             .as_u64()
             .is_some_and(|seed| seed <= u64::from(u32::MAX)),
         K::PathUid => value.is_null() || value.as_str().is_some_and(|path| path.len() <= MAX_ID),
+        K::DupMode => value.as_str().is_some_and(|mode| DUP_MODES.contains(&mode)),
+        K::DupStagger => value.as_object().is_some_and(|map| {
+            map.iter()
+                .all(|(key, flag)| DUP_CHANNELS.contains(&key.as_str()) && flag.is_boolean())
+        }),
+        K::DupTime => value.as_object().is_some_and(|map| {
+            map.iter().all(|(key, member)| match key.as_str() {
+                "enabled" => member.is_boolean(),
+                "offsetFrames" => check(K::Number, member),
+                "direction" => member
+                    .as_str()
+                    .is_some_and(|direction| DUP_DIRECTIONS.contains(&direction)),
+                _ => false,
+            })
+        }),
     }
 }
 
@@ -268,3 +302,7 @@ mod tests;
 #[cfg(test)]
 #[path = "native_object_component_receipt_tests.rs"]
 mod receipt_tests;
+
+#[cfg(test)]
+#[path = "native_object_duplicator_config_tests.rs"]
+mod config_tests;

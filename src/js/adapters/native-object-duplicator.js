@@ -1,6 +1,7 @@
 /* L04-N duplicator setup intents over the single native application client: enable or disable a duplicator on a
  * layer, turn a layer selection into an object duplicator, and pick the path layer. Each is ONE closed typed request
- * (command.document.object.duplicator.*) pinned to the presented revision. toggleLayerDuplicator,
+ * (command.document.object.duplicator.*) pinned to the presented revision. configure/reseed (#2256 Q4) are the inspector panel's writers: ONE
+ * object.duplicator.config request carrying only the members the panel field changed. toggleLayerDuplicator,
  * convertSelectionToObjectDuplicator, the duplicator panel writers and applyLayerDuplicator are never called here:
  * placement, count, modes and effectors are evaluated by the native engine, not by this adapter. */
 (function (root, factory) {
@@ -99,7 +100,27 @@
         return exec(operation, { layerUid, pathLayerUid: pathLayerUid === '' ? null : pathLayerUid }, 'duplicator-path');
       });
     }
-    return Object.freeze({ setEnabled, toggle, fromObjects, setPath });
+    // The inspector panel's field writers: `patch` names only the members that changed (mode, rows, cols, spacingX, spacingY, count, radius,
+    // startAngle, radialOrient, pathAlignTangent, seed, staggerRandom, timeOffset); the owner clamps them with the baseline wireNum bounds.
+    function configure(layerUid, patch) {
+      return runner.exclusive(async (exec) => {
+        const operation = OP('duplicator.config');
+        const allowed = contract.members(operation).filter((key) => key !== 'layerUid');
+        if (typeof layerUid !== 'string' || !layerUid.length || !patch || typeof patch !== 'object' || Array.isArray(patch) ||
+          Object.keys(patch).some((key) => !allowed.includes(key))) {
+          return fail(operation, 'invalid_request', { reason: 'layerUid and a patch of duplicator members are required' });
+        }
+        const ids = currentIds();
+        if (ids && core.stale([layerUid], ids).length) return fail(operation, 'stale_selection', { ids: [layerUid] });
+        return exec(operation, Object.assign({ layerUid }, patch), 'duplicator-config');
+      });
+    }
+    // The reseed button: a fresh Math.floor(Math.random() * 1e6) as ONE config request.
+    function reseed(layerUid) {
+      const drawn = seedNow(OP('duplicator.config'));
+      return drawn.error ? Promise.resolve(drawn.error) : configure(layerUid, { seed: drawn.seed });
+    }
+    return Object.freeze({ setEnabled, toggle, fromObjects, setPath, configure, reseed });
   }
 
   const bindings = new WeakMap();
@@ -113,6 +134,6 @@
   }
   return Object.freeze({
     createDuplicatorIntent, desktop, drawSeed,
-    OPERATIONS: Object.freeze(['duplicator.set', 'duplicator.objects', 'duplicator.path'].map(OP)),
+    OPERATIONS: Object.freeze(['duplicator.set', 'duplicator.objects', 'duplicator.path', 'duplicator.config'].map(OP)),
   });
 }));

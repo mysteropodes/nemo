@@ -20,21 +20,25 @@ use crate::commands::object_fill_owner::component_owner::object_component_conver
 use crate::commands::object_fill_owner::component_owner::object_component_place::{
     plan_expose, plan_place, ExposeEntry,
 };
+use crate::commands::object_fill_owner::component_owner::object_duplicator_config::{
+    plan_duplicator_config, ConfigEdit, StaggerEdit, TimeEdit,
+};
 use crate::commands::object_fill_owner::component_owner::object_duplicator_convert::{
     plan_duplicator_path, plan_duplicator_set, plan_object_duplicator,
 };
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
 use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::LifecycleError;
-use crate::object_document::ObjectDocument;
+use crate::object_document::{ObjectDocument, Presence};
+use serde_json::Number;
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 
 #[path = "object_component_convert_wire.rs"]
 mod wire;
 use wire::{
-    id_ok, ids_ok, seed_of, ConvertPayload, DuplicatorObjectsPayload, DuplicatorPathPayload,
-    DuplicatorSetPayload, ExposePayload, PlacePayload, MAX_PAYLOAD_BYTES,
+    id_ok, ids_ok, seed_of, ConvertPayload, DuplicatorConfigPayload, DuplicatorObjectsPayload,
+    DuplicatorPathPayload, DuplicatorSetPayload, ExposePayload, PlacePayload, MAX_PAYLOAD_BYTES,
 };
 
 /// Which setup a payload asks for.
@@ -46,6 +50,7 @@ pub(crate) enum SetupKind {
     DuplicatorSet,
     DuplicatorObjects,
     DuplicatorPath,
+    DuplicatorConfig,
 }
 
 /// A typed refusal: the receipt vocabulary code, a fixed message and, when a
@@ -81,6 +86,7 @@ fn refusal_of(error: SetupError) -> SetupRefusal {
         SetupError::PathChained(_) => (InvalidRequest, "The path layer is a duplicator."),
         SetupError::PathUnknown(_) => (InvalidRequest, "The path layer is absent."),
         SetupError::SeedRange => (InvalidRequest, "Seed must be an integer in 0..999999."),
+        SetupError::ConfigInvalid => (InvalidRequest, "A duplicator setting is not valid."),
         SetupError::V1Document => (Unavailable, "A v1 document cannot hold components."),
         SetupError::NestedContext(_) => (Unavailable, "Close the component first."),
         SetupError::HoldersUnavailable { .. } => (
@@ -159,6 +165,53 @@ fn parse<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, SetupRefusal
             DispatchErrorCode::InvalidRequest,
             "Component setup payload is invalid.",
         )
+    })
+}
+
+fn number_of(value: &Presence<Number>) -> Result<Option<f64>, ()> {
+    match value {
+        Presence::Missing => Ok(None),
+        Presence::Present(n) => n.as_f64().filter(|v| v.is_finite()).map(Some).ok_or(()),
+    }
+}
+fn flag_of(value: &Presence<bool>) -> Option<bool> {
+    value.value().copied()
+}
+/// The request's named members as an edit; `None` when a number is not a finite JSON number.
+fn config_edit(payload: &DuplicatorConfigPayload) -> Option<ConfigEdit> {
+    let seed = match payload.seed.value() {
+        None => None,
+        Some(n) => Some(n.as_u64()?),
+    };
+    let stagger = payload.stagger_random.value().map(|s| StaggerEdit {
+        position: flag_of(&s.position),
+        rotation: flag_of(&s.rotation),
+        scale: flag_of(&s.scale),
+        opacity: flag_of(&s.opacity),
+        hue: flag_of(&s.hue),
+    });
+    let time = match payload.time_offset.value() {
+        None => None,
+        Some(t) => Some(TimeEdit {
+            enabled: flag_of(&t.enabled),
+            offset_frames: number_of(&t.offset_frames).ok()?,
+            direction: t.direction.value().cloned(),
+        }),
+    };
+    Some(ConfigEdit {
+        mode: payload.mode.value().cloned(),
+        rows: number_of(&payload.rows).ok()?,
+        cols: number_of(&payload.cols).ok()?,
+        spacing_x: number_of(&payload.spacing_x).ok()?,
+        spacing_y: number_of(&payload.spacing_y).ok()?,
+        count: number_of(&payload.count).ok()?,
+        radius: number_of(&payload.radius).ok()?,
+        start_angle: number_of(&payload.start_angle).ok()?,
+        radial_orient: flag_of(&payload.radial_orient),
+        path_align_tangent: flag_of(&payload.path_align_tangent),
+        seed,
+        stagger_random: stagger,
+        time_offset: time,
     })
 }
 
@@ -249,6 +302,14 @@ impl ObjectFillOwner {
                     &payload.layer_uid,
                     payload.path_layer_uid.as_deref(),
                 )
+            }
+            SetupKind::DuplicatorConfig => {
+                let payload: DuplicatorConfigPayload = parse(bytes)?;
+                if payload.command != "object.duplicator.config" || !id_ok(&payload.layer_uid) {
+                    return Err(malformed());
+                }
+                let edit = config_edit(&payload).ok_or_else(malformed)?;
+                plan_duplicator_config(document, &payload.layer_uid, &edit)
             }
         }
         .map_err(refusal_of)?;

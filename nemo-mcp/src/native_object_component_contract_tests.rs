@@ -32,6 +32,13 @@ pub(super) fn valid() -> Vec<(&'static str, Value)> {
             "duplicator.path",
             json!({"command":"object.duplicator.path","layerUid":"layer-a","pathLayerUid":"layer-b"}),
         ),
+        (
+            "duplicator.config",
+            json!({"command":"object.duplicator.config","layerUid":"layer-a","mode":"radial","rows":3,"cols":4,
+            "spacingX":150.5,"spacingY":-20,"count":12,"radius":240,"startAngle":45,"radialOrient":true,
+            "pathAlignTangent":false,"seed":482913,"staggerRandom":{"position":true,"hue":false},
+            "timeOffset":{"enabled":true,"offsetFrames":2.5,"direction":"centerOut"}}),
+        ),
     ]
 }
 
@@ -58,7 +65,7 @@ fn without(suffix: &str, key: &str) -> Value {
 }
 
 #[test]
-fn the_six_declared_commands_are_exactly_the_admitted_operations() {
+fn the_seven_declared_commands_are_exactly_the_admitted_operations() {
     let expected = [
         "component.convert",
         "component.expose",
@@ -66,8 +73,9 @@ fn the_six_declared_commands_are_exactly_the_admitted_operations() {
         "duplicator.set",
         "duplicator.objects",
         "duplicator.path",
+        "duplicator.config",
     ];
-    assert_eq!(SPECS.len(), 6);
+    assert_eq!(SPECS.len(), 7);
     assert_eq!(
         valid().iter().map(|(s, _)| *s).collect::<Vec<_>>(),
         expected
@@ -124,7 +132,8 @@ fn one_member_mutations_are_refused_by_shape_and_by_input_admission() {
         let operation = format!("{P}{suffix}");
         let mut mutants = vec![json!([]), Value::Null, json!("x")];
         for key in payload.as_object().unwrap().keys() {
-            if !optional.contains(&(suffix, key.as_str())) {
+            let config_member = suffix == "duplicator.config" && !["command", "layerUid"].contains(&key.as_str());
+            if !optional.contains(&(suffix, key.as_str())) && !config_member {
                 mutants.push(without(suffix, key));
             }
             let mut null = payload.clone();
