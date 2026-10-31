@@ -52,6 +52,10 @@ pub(crate) struct SubselectReadItem {
     /// generator `box`), the very body `object.parametric.set` takes back. Absent for a record without a `paramShape`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) param_shape: Option<serde_json::Value>,
+    /// Hit-test listing only (#2376): the vector groups the record sits in, outermost first (innermost four at most): each `{id, name?}`,
+    /// the name absent for a group never renamed. Absent for a loose record. The Elements panel builds its group tree from it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) group_path: Option<Vec<serde_json::Value>>,
 }
 #[derive(Debug, Clone)]
 pub struct SubselectReadProjection {

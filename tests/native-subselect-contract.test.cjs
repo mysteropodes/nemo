@@ -139,3 +139,13 @@ test('a hit-test listing item may carry the paramShape of a dynamic shape: its k
   const {hitTest,...plain}=r;
   assert.throws(()=>C.viewResult({...plain,items:[{stableTarget:target,closed:true,count:4,matrix:[1,0,0,1,0,0],paramShape:{kind:'rect'}}]}),undefined,'an editable page has no paramShape');
 });
+test('a hit-test listing item may carry the groupPath of its enclosing groups: one to four bounded ids with an optional name, outermost first (#2376)',()=>{
+  const view={kind:'subselect',contextId:'scene-root',layerUid:'layer-a',frame:0,workId:'native-work-1',viewGeneration:1,cursor:0,hitTest:true};
+  const item={stableTarget:target,closed:true,count:4,matrix:[1,0,0,1,0,0],bounds:[0,0,10,10],role:'plain',filled:true};
+  const r={...view,atRevision:7,documentSnapshotId:'native-object:document:7',total:1,nextCursor:null,preview:false,items:[item]};
+  for(const groupPath of [[{id:'g1'}],[{id:'outer',name:'Body'},{id:'inner'}],[{id:'a'},{id:'b'},{id:'c'},{id:'d',name:''}]])C.viewResult({...r,items:[{...item,groupPath}]});
+  for(const bad of [[],{id:'g'},'g',[{id:''}],[{id:7}],[{id:'g',name:3}],[{id:'g',mode:'unite'}],[{name:'x'}],[{id:'a'},{id:'b'},{id:'c'},{id:'d'},{id:'e'}],[{id:'x'.repeat(129)}],[{id:'g',name:'n'.repeat(257)}],null])
+    assert.throws(()=>C.viewResult({...r,items:[{...item,groupPath:bad}]}),undefined,JSON.stringify(bad));
+  const {hitTest,...plain}=r;
+  assert.throws(()=>C.viewResult({...plain,items:[{stableTarget:target,closed:true,count:4,matrix:[1,0,0,1,0,0],groupPath:[{id:'g'}]}]}),undefined,'an editable page has no groupPath');
+});

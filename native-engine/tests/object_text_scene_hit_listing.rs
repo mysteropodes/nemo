@@ -257,6 +257,34 @@ fn a_dynamic_shape_lists_its_parameters_without_the_generator_box_and_every_othe
 }
 
 #[test]
+fn a_grouped_record_lists_the_groups_it_sits_in_outermost_first_and_a_loose_record_lists_none() {
+    // #2376: the Elements panel builds its group tree from the listing; the path is the member tag's group then each parent up.
+    // (A layer with a group table paints vectors only: its images and text have no parent chain to sit in.)
+    let mut doc = drawing();
+    doc.as_object_mut().unwrap().remove("items");
+    let order = |ids: &[&str]| -> Vec<Value> {
+        ids.iter().enumerate().map(|(n, id)| json!({"layerUid":"L0","strokeId":id,"naturalPosition":n,"order":{}})).collect()
+    };
+    for id in ["v2", "v3", "v4"] {
+        let mut more = doc["objects"][0].clone();
+        more["target"] = support::target("L0", id);
+        doc["objects"].as_array_mut().unwrap().push(more);
+    }
+    doc["compositionOrder"]["contexts"][0]["scopes"][0]["elements"] = json!(order(&["vector", "v2", "v3", "v4"]));
+    let loose = listing(&doc)["items"].as_array().unwrap().clone();
+    assert!(loose.iter().all(|i| i.get("groupPath").is_none()), "a layer without a group table lists none");
+    doc["layers"][0]["groups"] = json!({"contextId":"scene-root",
+        "entries":[{"gid":"outer","name":"Body","order":["inner","v3"]},{"gid":"inner","parent":"outer","order":["vector","v2"]}],
+        "members":[{"strokeId":"vector","groupId":"inner"},{"strokeId":"v2","groupId":"inner"},{"strokeId":"v3","groupId":"outer"}]});
+    let items = listing(&doc)["items"].as_array().unwrap().clone();
+    let path = |id: &str| items.iter().find(|i| i["stableTarget"]["strokeId"] == id).unwrap().get("groupPath").cloned();
+    assert_eq!(path("vector"), Some(json!([{"id":"outer","name":"Body"},{"id":"inner"}])), "a nested member: the parent first, an unnamed group has no name");
+    assert_eq!(path("v2"), path("vector"), "a sibling shares the inner group");
+    assert_eq!(path("v3"), Some(json!([{"id":"outer","name":"Body"}])), "a direct member of the outer group alone");
+    assert_eq!(path("v4"), None, "a loose stroke of a grouped layer lists none");
+}
+
+#[test]
 fn a_posed_layer_lists_its_image_and_text_in_their_stored_frame_with_the_pose_as_the_map() {
     // #2372: record space is the stored item's own frame, so a Select matrix conjugated with the listing's map is what the
     // item's batch transform applies to the stored centre / anchor.
@@ -370,6 +398,7 @@ fn worst_case_items(count: usize, id_len: usize) -> Vec<crate::object_snapshot::
                 group: None,
                 style: None,
                 param_shape: None,
+                group_path: None,
             }
         })
         .collect()

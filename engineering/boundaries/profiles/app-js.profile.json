@@ -2831,6 +2831,8 @@
         "native-selection-transform.js",
         "native-selection-align.js",
         "native-presentation-wait.js",
+        "native-shape-tree-model.js",
+        "native-shape-tree-ui.js",
         "native-new-return-pin.js",
         "native-selection-delete.js",
         "native-layer-list-presenter.js",
