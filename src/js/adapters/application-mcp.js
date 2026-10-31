@@ -20,6 +20,11 @@
     return value;
   }
 
+  // #2373: one Record action-trail entry per APPLIED native command (the trail never sees the payload, only operation/frame/layer uid).
+  function noteApplied(request) {
+    try { if (window.SMFeedback && typeof window.SMFeedback.logNativeCommand === 'function') window.SMFeedback.logNativeCommand(request); } catch (_) { /* diagnostics must never fail a command */ }
+  }
+
   function createNativeTauriTransport(invoke) {
     if (typeof invoke !== 'function') throw new TypeError('native transport requires invoke(command, args)');
     var binding = null;
@@ -158,6 +163,7 @@
           binding = Object.freeze({ instanceId: binding.instanceId, documentId: binding.documentId,
             contentRevision: Math.max(binding.contentRevision, boundedRevision(response.contentRevision, 'contentRevision')) });
           if (subscription && advances && response.ok) subscription.revision = Math.max(subscription.revision, response.contentRevision);
+          if (advances && response.ok) noteApplied(request);
         }
         return response;
       } catch (error) {
