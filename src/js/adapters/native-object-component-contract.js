@@ -15,6 +15,8 @@
   // UTF-8 bytes and carry no NUL; layer lists hold 1..256 identities; a seed is a native u32.
   const MAX_ID = 128, MAX_LAYERS = 256, MAX_SEED = 4294967295;
   const EXPOSED_KEY_PREFIX = 'ep_';
+  const DUP_MODES = ['grid', 'radial', 'path'], DUP_DIRECTIONS = ['forward', 'backward', 'centerOut', 'random'];
+  const DUP_CHANNELS = ['position', 'rotation', 'scale', 'opacity', 'hue'];
   const has = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
   const fail = (message) => { throw new TypeError(message); };
   const bytes = (text) => (typeof TextEncoder === 'function' ? new TextEncoder().encode(text).length : unescape(encodeURIComponent(text)).length);
@@ -56,6 +58,18 @@
       if (value === null) return;
       if (typeof value !== 'string' || bytes(value) > MAX_ID) fail(`${at} must be null or a bounded identity`);
     },
+    // #2256 Q4: the duplicator inspector's closed members (mode label, per-channel random flags, temporal stagger).
+    dupMode: (value, at) => { if (!DUP_MODES.includes(value)) fail(`${at} is not a duplicator mode`); },
+    dupStagger: (value, at) => {
+      exact(value, [], DUP_CHANNELS, at);
+      DUP_CHANNELS.forEach((key) => { if (has(value, key) && typeof value[key] !== 'boolean') fail(`${at}.${key} must be a boolean`); });
+    },
+    dupTime: (value, at) => {
+      exact(value, [], ['enabled', 'offsetFrames', 'direction'], at);
+      if (has(value, 'enabled') && typeof value.enabled !== 'boolean') fail(`${at}.enabled must be a boolean`);
+      if (has(value, 'offsetFrames')) KINDS.number(value.offsetFrames, `${at}.offsetFrames`);
+      if (has(value, 'direction') && !DUP_DIRECTIONS.includes(value.direction)) fail(`${at}.direction is not a stagger direction`);
+    },
   };
   // operation suffix -> [command, receipt kind, [[wire member, kind, optional]...]]. Member order is the wire order.
   // Receipt kinds: 'command' = {applied, historyEntriesAdded}; 'created' = a new layer was minted (applied, one history entry,
@@ -68,6 +82,10 @@
     'duplicator.set': ['object.duplicator.set', 'command', [['layerUid', 'id'], ['enabled', 'boolean'], ['seed', 'seed', true]]],
     'duplicator.objects': ['object.duplicator.objects', 'created', [['layerUids', 'ids'], ['seed', 'seed']]],
     'duplicator.path': ['object.duplicator.path', 'command', [['layerUid', 'id'], ['pathLayerUid', 'pathUid']]],
+    // #2256 Q4: the inspector's closed partial edit of the stored descriptor (the path layer keeps duplicator.path).
+    'duplicator.config': ['object.duplicator.config', 'command', [['layerUid', 'id'], ['mode', 'dupMode', true], ['rows', 'number', true], ['cols', 'number', true],
+      ['spacingX', 'number', true], ['spacingY', 'number', true], ['count', 'number', true], ['radius', 'number', true], ['startAngle', 'number', true],
+      ['radialOrient', 'boolean', true], ['pathAlignTangent', 'boolean', true], ['seed', 'seed', true], ['staggerRandom', 'dupStagger', true], ['timeOffset', 'dupTime', true]]],
   };
   const OPERATIONS = Object.freeze(Object.keys(SPEC).map((suffix) => PREFIX + suffix));
   const spec = (operation) => (typeof operation === 'string' && operation.startsWith(PREFIX) && has(SPEC, operation.slice(PREFIX.length)) ? SPEC[operation.slice(PREFIX.length)] : null);

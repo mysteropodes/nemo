@@ -271,6 +271,17 @@ impl DuplicatorSet {
     }
 }
 
+/// `x || fallback` over a stored number (zero and absent both show the fallback), as the baseline panel fills its fields.
+fn shown(slot: &Presence<Number>, fallback: u32) -> Number {
+    match slot.value() {
+        Some(n) if n.as_f64().is_some_and(|v| v != 0.0) => n.clone(),
+        _ => Number::from(fallback),
+    }
+}
+fn shown_flag(slot: &Presence<bool>) -> bool {
+    slot.value() == Some(&true)
+}
+
 impl DuplicatorDescriptor {
     fn validate<'a>(
         &'a self,
@@ -327,6 +338,31 @@ impl DuplicatorDescriptor {
             effector.validate()?;
         }
         Ok(())
+    }
+    /// What the panel displays for a stored descriptor (`updateDuplicatorPanel`): every member resolved with the baseline
+    /// display default (`mode||'grid'`, `rows||1`, `cols||1`, `count||1`, the others `||0`, the checkboxes `!!`,
+    /// `timeOffset.offsetFrames` 1 and `direction||'forward'` when unset, `sourceMode` `shape` unless `objects`).
+    pub(crate) fn panel_view(&self, layer_uid: &str) -> serde_json::Value {
+        let d = self;
+        let random = d.stagger_random.value();
+        let flag = |pick: fn(&StaggerRandom) -> &Presence<bool>| random.is_some_and(|r| shown_flag(pick(r)));
+        let time = d.time_offset.value();
+        serde_json::json!({
+            "layerUid": layer_uid,
+            "mode": d.mode.value().filter(|m| !m.is_empty()).map_or("grid", String::as_str),
+            "rows": shown(&d.rows, 1), "cols": shown(&d.cols, 1),
+            "spacingX": shown(&d.spacing_x, 0), "spacingY": shown(&d.spacing_y, 0),
+            "count": shown(&d.count, 1), "radius": shown(&d.radius, 0), "startAngle": shown(&d.start_angle, 0),
+            "radialOrient": shown_flag(&d.radial_orient), "pathAlignTangent": shown_flag(&d.path_align_tangent),
+            "pathLayerUid": d.path_layer_uid().filter(|p| !p.is_empty()),
+            "seed": shown(&d.seed, 0),
+            "sourceMode": if d.source_mode.value().map(String::as_str) == Some("objects") { "objects" } else { "shape" },
+            "staggerRandom": {"position": flag(|r| &r.position), "rotation": flag(|r| &r.rotation),
+                "scale": flag(|r| &r.scale), "opacity": flag(|r| &r.opacity), "hue": flag(|r| &r.hue)},
+            "timeOffset": {"enabled": time.is_some_and(|t| shown_flag(&t.enabled)),
+                "offsetFrames": time.and_then(|t| t.offset_frames.value().cloned()).unwrap_or_else(|| Number::from(1_u32)),
+                "direction": time.and_then(|t| t.direction.value()).filter(|d| !d.is_empty()).map_or("forward", String::as_str)},
+        })
     }
     pub(crate) fn mode_label(&self) -> Option<&str> {
         self.mode.value().map(String::as_str)

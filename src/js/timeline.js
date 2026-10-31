@@ -7464,6 +7464,7 @@ function renderCompFrameStrip(ld){
 // file, next to #comp-playmode's own) and write into ld.duplicator.* then
 // reload the frame.
 function updateDuplicatorPanel(){
+  if(window.NemoNativeObjectDuplicatorPanel&&NemoNativeObjectDuplicatorPanel.sync(window))return; // #2256 Q4: a native object project owns the panel
   var sec=document.getElementById('duplicator-sec');
   if(!sec)return;
   var ld=state.layers[state.activeLayerIdx];

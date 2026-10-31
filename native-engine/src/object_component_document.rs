@@ -21,7 +21,9 @@
 //! (codec layer); this file owns the storage shape and the document-layer
 //! reads only. Component inner layers and strokes stay inside their component
 //! record, so `ObjectDocument.layers` is still the scene-root layer list.
-use crate::object_document::object_component_record_kernels::object_component_records::ComponentSet;
+use crate::object_document::object_component_record_kernels::object_component_records::{
+    ComponentSet, SCENE_CONTEXT,
+};
 use crate::object_document::object_component_record_kernels::object_duplicator_records::DuplicatorSet;
 use crate::object_document::object_component_record_kernels::object_storyboard_records::StoryboardRecord;
 use crate::object_document::{
@@ -65,6 +67,12 @@ impl ObjectDocument {
         self.component_tables
             .value()
             .and_then(|tables| tables.duplicators.value())
+    }
+    /// #2256 Q4: what the inspector panel shows for the duplicator a scene layer hosts (`None`: it hosts none).
+    pub(crate) fn scene_duplicator_view(&self, layer_uid: &str) -> Option<serde_json::Value> {
+        self.duplicator_set()?
+            .duplicator(SCENE_CONTEXT, layer_uid)
+            .map(|record| record.duplicator.panel_view(layer_uid))
     }
 }
 

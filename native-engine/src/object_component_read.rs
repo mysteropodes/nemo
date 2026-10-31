@@ -19,6 +19,12 @@ use serde_json::{json, Value};
 #[cfg(test)]
 #[path = "../tests/object_component_read.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "../tests/object_component_read_duplicator.rs"]
+mod duplicator_tests;
+#[cfg(test)]
+#[path = "../tests/object_component_convert_fixture.rs"]
+mod fixture;
 
 const MAX_SAFE: u64 = 9_007_199_254_740_991;
 /// Items per page; the byte bound cuts a page earlier when names are long.
@@ -43,6 +49,10 @@ enum Selector<'a> {
         id: &'a str,
         cursor: u64,
         limit: u64,
+    },
+    /// #2256 Q4: the stored duplicator descriptor of one scene layer, as the inspector panel shows it.
+    Duplicator {
+        layer_uid: &'a str,
     },
 }
 
@@ -91,6 +101,12 @@ fn selector(payload: &Value) -> Option<Selector<'_>> {
                 Selector::Layers { id, cursor, limit }
             } else {
                 Selector::Instances { id, cursor, limit }
+            })
+        }
+        "duplicator" => {
+            let object = fields(selector, &["kind", "layerUid"])?;
+            Some(Selector::Duplicator {
+                layer_uid: context_id(&object["layerUid"])?,
             })
         }
         _ => None,
@@ -220,6 +236,17 @@ impl ObjectSnapshot {
                     }
                     let response = self.component_envelope(request, result);
                     return self.component_bounded(response);
+                }
+                Selector::Duplicator { layer_uid } => {
+                    let view = self
+                        .document()
+                        .scene_duplicator_view(layer_uid)
+                        .ok_or(DispatchErrorCode::NotFound)?;
+                    let mut result = self.component_head("duplicator");
+                    for (key, value) in view.as_object().into_iter().flatten() {
+                        result[key] = value.clone();
+                    }
+                    return self.component_bounded(self.component_envelope(request, result));
                 }
                 Selector::Contexts { cursor, limit } => (
                     self.component_head("contexts"),
