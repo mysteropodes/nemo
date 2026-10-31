@@ -1,5 +1,7 @@
 /* C3 point-type presentation. Reuse the bound controls; the controller alone owns
- * disposable point selection and guards every native edit. No legacy state reads. */
+ * disposable point selection and guards every native edit. No legacy state reads.
+ * #2356: on a native project the legacy SM.setPointType entry is a fail-closed wrapper (it returns false without a word), so a click on
+ * Corner / Smooth / Symmetric is taken here, in the capture phase of the row, and goes to the controller's one native pointType edit. */
 (function(root,factory){
   var api=factory();if(typeof module==='object'&&module.exports)module.exports=api;
   else root.NemoNativeSubselectUI=api;
@@ -14,6 +16,18 @@
     var buttons=ids.map(function(id){return root.document.getElementById(id);});
     if(!row||!row.parentNode||buttons.some(function(button){return !button||!row.contains(button);}))return null;
     var parent=row.parentNode,marker=root.document.createComment('native point-type position');
+    var types={'btn-pt-corner':'corner','btn-pt-smooth':'smooth','btn-pt-symmetric':'symmetric'};
+    function onClick(e){
+      var node=e.target,button=node&&node.closest?node.closest('button'):node,type=button&&types[button.id];
+      if(!type)return;
+      if(e.stopImmediatePropagation)e.stopImmediatePropagation();
+      if(e.preventDefault)e.preventDefault();
+      var controller=root.NemoNativeSubselectController;
+      if(!controller||typeof controller.setPointType!=='function'){if(root.showToast)root.showToast('Native subselect is unavailable.');return;}
+      // A refusal (no selection, a stale frame, an unavailable owner) is reported by the controller's own toast; nothing falls back to the legacy writer.
+      Promise.resolve(controller.setPointType(type)).catch(function(error){if(root.showToast)root.showToast(error&&error.message||String(error));});
+    }
+    row.addEventListener('click',onClick,true);
     var saved={hidden:row.hidden,display:row.style.display,disabled:buttons.map(function(button){return button.disabled;})},retired=false;
     parent.insertBefore(marker,row);container.appendChild(row);
     var binding={row:row,container:container,refresh:function(){
@@ -23,7 +37,7 @@
       row.hidden=!available;row.style.display=available?'flex':'none';
       buttons.forEach(function(button){button.disabled=!available;});
     },retire:function(){
-      if(retired)return;retired=true;
+      if(retired)return;retired=true;row.removeEventListener('click',onClick,true);
       if(bindings.get(root)===binding)bindings.delete(root);
       if(row.parentNode===container){
         if(marker.parentNode===parent)parent.insertBefore(row,marker);

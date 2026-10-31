@@ -10,6 +10,7 @@ function node(){
     removeChild(child){const i=this.children.indexOf(child);assert.ok(i>=0);this.children.splice(i,1);child.parentNode=null;},
     contains(child){return child===this||this.children.some(n=>n.contains(child));},
     addEventListener(type,fn){if(!listeners.has(type))listeners.set(type,[]);listeners.get(type).push(fn);},
+    removeEventListener(type,fn){const l=listeners.get(type)||[],i=l.indexOf(fn);if(i>=0)l.splice(i,1);},
     click(){if(!this.disabled)(listeners.get('click')||[]).forEach(fn=>fn());},listeners};
   return n;
 }
@@ -40,7 +41,7 @@ test('existing point-type buttons become available for native points and each se
     const gate=deferred();f.setGate(gate);f.buttons[i].click();assert.equal(f.row.hidden,true);assert.equal(f.controller.selectionState(),null);
     f.buttons[i].click();gate.resolve();const result=await f.controller.settled();
     assert.equal(result.status,'applied',f.notices.join(';'));assert.equal(result.receipt.historyEntriesAdded,1);assert.equal(f.sent.length,1);
-    assert.deepEqual(f.sent[0].payload.intent,{indices:[0],kind:'pointType',pointType:type});assert.equal(f.row.hidden,true);
+    assert.deepEqual(f.sent[0].payload.intent,{indices:[0],kind:'pointType',pointType:type});assert.equal(f.row.hidden,false,'#2356: the vertex stays selected after the edit');assert.deepEqual(f.controller.selectionState(),{count:1});
     binding.retire();assert.deepEqual(f.home.children,[f.row,f.next]);assert.equal(f.row.hidden,false);assert.equal(f.row.style.display,'none');assert.equal(f.row.style.gap,'4px');
     assert.ok(f.buttons.every(b=>!b.disabled));binding.retire();assert.deepEqual(f.home.children,[f.row,f.next]);
   }
