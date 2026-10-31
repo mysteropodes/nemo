@@ -192,3 +192,32 @@ test('a legacy project keeps the legacy writer (the adapter steps aside)', async
   assert.equal(Align.native(h.root), false);
   assert.equal(h.batches.length, 0);
 });
+
+// #2372 presentation-busy-audit: the native queue hides the presentation while ANY command is pending (queue-pending).
+function hideQueue(h) {
+  const session = h.root.NemoNativeObjectProject.desktop(), real = session.readPresentedObjectSession, q = { hidden: false };
+  session.readPresentedObjectSession = function (why) { if (q.hidden) { if (why) why('queue-pending'); return null; } return real.call(this); };
+  h.root.NemoNativePresentationWait = require('../src/js/adapters/native-presentation-wait.js');
+  h.root.setTimeout = (fn) => setTimeout(fn, 10);
+  return q;
+}
+const spinTicks = async (n) => { for (let i = 0; i < n; i++) await new Promise((done) => setImmediate(done)); };
+test('Align made while the queue hides the presentation waits for it and moves the selection as ONE batch, with no unavailable notice', async () => {
+  const h = harness(); await h.select();
+  const q = hideQueue(h); q.hidden = true;
+  await h.align('left');
+  assert.equal(h.batches.length, 0, 'nothing is written while the presentation is hidden');
+  assert.deepEqual(h.toasts, []);
+  q.hidden = false;
+  for (let i = 0; i < 60 && !h.batches.length; i++) await new Promise((done) => setTimeout(done, 5));
+  assert.equal(h.batches.length, 1);
+  assert.deepEqual(translations(h), BASELINE.left);
+});
+test('Align whose selection changed while the presentation was hidden still refuses and writes nothing', async () => {
+  const h = harness(); await h.select();
+  const q = hideQueue(h); q.hidden = true;
+  await h.align('left');
+  h.root.state.currentFrame = 1; q.hidden = false;
+  await new Promise((done) => setTimeout(done, 250));
+  assert.equal(h.batches.length, 0);
+});

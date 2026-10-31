@@ -6,7 +6,7 @@ const test = require('node:test'), assert = require('node:assert/strict'), fs = 
 const { createFixture } = require('./native-object-rig-support.cjs');
 
 const ROOT = path.join(__dirname, '..', 'src', 'js');
-const SOURCES = ['adapters/native-object-rig-contract.js', 'adapters/native-object-rig-command.js', 'adapters/native-object-widget.js',
+const SOURCES = ['adapters/native-presentation-wait.js', 'adapters/native-object-rig-contract.js', 'adapters/native-object-rig-command.js', 'adapters/native-object-widget.js',
   'adapters/native-object-query-contract.js', 'adapters/native-object-widget-ui.js', 'rig-widget.js'];
 const OP = 'command.document.object.widget.';
 const UID = 'native-layer:1:0', LOCKED = 'native-layer:2:0';
@@ -350,4 +350,52 @@ test('the widget overlay follows a pan of the view by itself, with no revision o
   const first = (text) => text.split(' ')[0].split(',').map(Number);
   assert.deepEqual([first(after)[0] - first(before)[0], first(after)[1] - first(before)[1]], [40, -25]);
   assert.equal(h.reads.length, base);
+});
+
+// #2372 presentation-busy-audit: the native queue hides the presentation while ANY command is pending (queue-pending).
+function hideable(h) {
+  const real = h.fx.session.readPresentedObjectSession, state = { hidden: false };
+  h.fx.session.readPresentedObjectSession = function (why) { if (state.hidden) { if (why) why('queue-pending'); return null; } return real.call(this); };
+  h.sandbox.setTimeout = (fn) => setImmediate(fn);
+  return state;
+}
+const spin = async (n) => { for (let i = 0; i < n; i++) await new Promise((resolve) => setImmediate(resolve)); };
+
+test('a puck release in the queue-pending window waits for the presentation and then writes once; the drag survives the hidden frames', async () => {
+  const h = await started(), q = hideable(h);
+  h.fire('pointerdown', { clientX: 960, clientY: 540 });
+  q.hidden = true;
+  h.fire('pointermove', { clientX: 990, clientY: 500 });
+  h.flushFrames(); // the overlay watcher runs while the presentation is hidden: the pad and the drag stay
+  h.fire('pointermove', { clientX: 1010, clientY: 440 });
+  h.fire('pointerup', { clientX: 1010, clientY: 440 });
+  await spin(4);
+  assert.deepEqual(h.sent(), [], 'nothing is written while the presentation is hidden');
+  q.hidden = false;
+  await spin(12);
+  assert.deepEqual(h.toasts, []);
+  assert.deepEqual(h.sent(), [[OP + 'write', { command: 'object.widget.write', layerUid: UID, frame: 0, to: { kind: 'world', point: [1010, 440], anchor: [960, 540], angleDegrees: 0 } }]]);
+});
+
+test('a puck release whose playhead moved during the wait still refuses: nothing is written', async () => {
+  const h = await started(), q = hideable(h);
+  h.fire('pointerdown', { clientX: 960, clientY: 540 });
+  h.fire('pointermove', { clientX: 1010, clientY: 440 });
+  q.hidden = true;
+  h.fire('pointerup', { clientX: 1010, clientY: 440 });
+  h.sandbox.state.currentFrame = 1;
+  q.hidden = false;
+  await spin(12);
+  assert.deepEqual(h.sent(), []);
+});
+
+test('a queue that never frees gives a puck release one clear notice and writes nothing', async () => {
+  const h = await started(), q = hideable(h);
+  h.fire('pointerdown', { clientX: 960, clientY: 540 });
+  h.fire('pointermove', { clientX: 1010, clientY: 440 });
+  q.hidden = true;
+  h.fire('pointerup', { clientX: 1010, clientY: 440 });
+  await spin(40);
+  assert.deepEqual(h.toasts, ['The canvas is still busy - try the pad again.']);
+  assert.deepEqual(h.fx.owner.log.received, []);
 });

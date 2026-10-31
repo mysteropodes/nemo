@@ -53,8 +53,10 @@
       if (!native() && root.SMEngineBridge) root.SMEngineBridge.renderNow();
     }
     function cancelGesture() { if (typeof root.cancelPerspectiveGesture === 'function') root.cancelPerspectiveGesture(); }
+    // #2372: an origin that is not shown only because a pending native command hides the presentation is waited out (model.readSettled), not refused.
+    async function shownSoon(origin) { return shown(origin) || (!busy() && !!origin && await model.readSettled() === origin); }
     async function edit(action, origin) {
-      if (!shown(origin)) { notice(); return { status: 'unavailable' }; }
+      if (!(await shownSoon(origin))) { notice(); return { status: 'unavailable' }; }
       cancelGesture(); busyStamp = identity(); pending = true; repaint();
       try {
         var result = await model.edit(action, origin);

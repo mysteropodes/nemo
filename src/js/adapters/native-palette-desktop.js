@@ -92,15 +92,29 @@
       if (typeof ports.publish === 'function' && ports.publish(projection) !== true) throw fault();
       guard(stamp); cache = { stamp: stamp, value: projection }; return projection;
     }
-    function read() {
+    // #2372: a presentation hidden by a PENDING native command (queue-pending) is "cannot prove it right now", not "changed": read() stays null - it authorizes input,
+    // so it never answers while work is pending - but the sealed projection is kept (only a real change drops it); an edit waits for the presentation (readSettled).
+    function read(onRefusal) {
       try {
-        if (cache && current(cache.stamp) && presented(cache.stamp.session.readPresentedObjectSession(), cache.stamp.info) &&
-            available(cache.stamp)) return cache.value;
+        if (cache && current(cache.stamp)) {
+          var why = null, shown = cache.stamp.session.readPresentedObjectSession(function (c) { why = c; });
+          if (presented(shown, cache.stamp.info) && available(cache.stamp)) return cache.value;
+          if (!shown && why === 'queue-pending' && available(cache.stamp)) {
+            if (typeof onRefusal === 'function') try { onRefusal(why); } catch (_) {} return null;
+          }
+        }
       } catch (_) {}
       cache = null; return null;
     }
+    // #2372: the native queue hides the presentation while ANY command is pending (the previous edit's repaint, a hover read). An edit that finds it hidden
+    // waits for it (bounded, native-presentation-wait.js) before judging the cache; a presentation that really changed still refuses as stale.
+    function readSettled() {
+      var first = read(), W = typeof globalThis === 'object' ? globalThis.NemoNativePresentationWait : null;
+      if (first || !W || !cache) return Promise.resolve(first);
+      return W.await(null, { read: read, holds: function () { return !!cache; } }).then(function (r) { return r.ready ? r.value : null; });
+    }
     async function edit(value, expected) {
-      var intent = Contract.action(value), shown = read();
+      var intent = Contract.action(value), shown = await readSettled();
       if (!expected || shown !== expected) throw fault('stale_revision');
       invalidate(); var stamp = capture(), receipt = null, after = null;
       if (!same(expected.info, stamp.info)) throw fault('stale_revision');
@@ -127,7 +141,7 @@
         return Object.freeze({ status: receipt ? 'applied-unconfirmed' : 'unconfirmed', applied: receipt ? receipt.result.applied : null, code: error && error.code || 'unavailable' });
       }
     }
-    return Object.freeze({ refresh: refresh, read: read, edit: edit, invalidate: invalidate,
+    return Object.freeze({ refresh: refresh, read: read, readSettled: readSettled, edit: edit, invalidate: invalidate,
       dispose: function () { retired = true; invalidate(); } });
   }
   return Object.freeze({ create: create });

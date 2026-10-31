@@ -123,6 +123,11 @@
         var action = queue.shift();
         for (var attempt = 0; ; attempt++) {
           var origin = model.read();
+          if (!origin) { // #2372: hidden only by a pending native command: wait for the presentation, do not refuse - but never carry a gesture onto another document
+            var was = identity(), now;
+            origin = await model.readSettled(); now = identity();
+            if (!origin && (!was || !now || ['instanceId', 'documentId', 'lifecycleGeneration'].some(function (k) { return was.pin[k] !== now.pin[k]; }))) { refuse(); return; }
+          }
           if (!origin) { await load(); origin = model.read(); }
           if (!origin || retired) { refuse(); return; }
           busyStamp = identity();

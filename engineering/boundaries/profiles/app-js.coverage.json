@@ -1021,6 +1021,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-presentation-wait.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2593,
+          "scriptOrdinal": 245
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-selection-transform.js",
       "moduleId": "app.native.object.ui.adapter",
       "executionClass": "document-classic",
