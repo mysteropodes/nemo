@@ -85,7 +85,7 @@
       // The baseline draws on the ACTIVE layer; a canvas click on empty stage leaves _layerSel=[]. Only other/several layers are ambiguous.
       if(!Number.isSafeInteger(index)||!row||!Array.isArray(selected)||selected.length>1||selected.length===1&&selected[0]!==index)fail('Select one native Drawing layer.');
       var layer=(root.NemoNativeComponentContext&&root.NemoNativeComponentContext.layerRows(root)||info.layers).filter(function(l){return l.layerUid===row.layerUid;});
-      if(layer.length!==1||layer[0].locked===true||layer[0].visible===false||layer[0].parentLayerUid||row.threeD||row.motion&&Object.keys(row.motion).length)fail('The selected native layer is unavailable for this gesture.');
+      if(layer.length!==1||layer[0].locked===true||layer[0].visible===false||layer[0].parentLayerUid||layer[0].threeD===true||layer[0].hasMotion===true||row.threeD||row.motion&&Object.keys(row.motion).length)fail('The selected native layer is unavailable for this gesture.');
       return row.layerUid;
     }
     function capture(e){

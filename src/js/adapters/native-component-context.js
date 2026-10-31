@@ -51,7 +51,7 @@
   function contextId(host) { var st = live(host); return st ? st.contextId : SCENE; }
   function layerRows(host) {
     var st = live(host);
-    return st ? st.rows.map(function (row) { return { layerUid: row.layerUid, locked: false, visible: true }; }) : null;
+    return st ? st.rows.map(function (row) { return { layerUid: row.layerUid, locked: row.locked === true, visible: row.visible !== false, parentLayerUid: row.parentLayerUid || null, threeD: row.threeD === true, hasMotion: row.hasMotion === true }; }) : null;
   }
   function frameBound(host, pin) { var st = live(host); return st ? st.totalFrames : pin.totalFrames; }
   // #2256: what a pinned timing read of the held context is judged by: the component's own id, frame count and layer uids (null at the scene root).
@@ -59,8 +59,9 @@
     var st = live(host);
     return st ? Object.freeze({ contextId: st.contextId, totalFrames: st.totalFrames, layerUids: Object.freeze(st.rows.map(function (row) { return row.layerUid; })) }) : null;
   }
-  // The entered rows with their names (what the Select adapters walk as the layer list of the context).
-  function layers(host) { var st = live(host); return st ? st.rows.map(function (row) { return Object.freeze({ layerUid: row.layerUid, name: row.name, locked: false, visible: true }); }) : null; }
+  // The entered rows with their names and the owner's lock / visibility facts (what the Select adapters walk as the layer list of the context:
+  // a hidden or locked layer is never picked, marqueed or edited, exactly as in the scene).
+  function layers(host) { var st = live(host); return st ? layerRows(host).map(function (row, i) { return Object.freeze(Object.assign({ name: st.rows[i].name }, row)); }) : null; }
   // Row click: the component's layer becomes the active (and only selected) one. The layer table of a component is read-only here; this is a view choice.
   function selectLayer(host, index) {
     var st = live(host);
@@ -90,8 +91,10 @@
     if (!all.ok) return null;
     var rows = [];
     all.items.forEach(function (layer) {
+      // The facts the scene's drawing gates read come from the owner's layer read (absent only from an older owner: then the permissive default).
       rows.push({ layerUid: layer.layerUid, name: layer.name === null ? 'Layer ' + (rows.length + 1) : layer.name, layerKind: layer.layerKind,
-        visible: true, locked: false, color: '#5FA875', parentLayerUid: null, frames: [], motion: {} });
+        visible: layer.visible !== false, locked: layer.locked === true, color: '#5FA875', parentLayerUid: layer.parentLayerUid || null,
+        threeD: layer.threeD === true, hasMotion: layer.hasMotion === true, frames: [], motion: {} });
     });
     return rows;
   }
@@ -320,20 +323,26 @@
       read: function (kind, layerUid) {
         var s = session(host), info = s && s.info();
         if (!info || typeof s.readLayerCells !== 'function' || typeof s.readLayerRange !== 'function') return null;
-        if (kind !== 'cells') return s.readLayerRange(layerUid, host.state.currentFrame, info);
-        // A row's cells are a function of the revision alone (the playhead is not an input), so a scrub reads each row once per revision.
-        if (!st.cells || st.cells.revision !== info.contentRevision) st.cells = { revision: info.contentRevision, rows: new Map() };
-        var held = st.cells;
-        if (held.rows.has(layerUid)) return Promise.resolve(held.rows.get(layerUid));
-        return Promise.resolve(s.readLayerCells(layerUid, info)).then(function (runs) { if (runs && st.cells === held) held.rows.set(layerUid, runs); return runs; });
+        // A row's cells AND its in/out range are functions of the revision alone (the playhead is not an input of either: the owner's range reader
+        // only validates the frame), so each is read once per revision and a repaint, a scrub or a playback tick starts no read for an answered row.
+        // The pending read is held too, so two paints before the answer share it; a refused read (null) is forgotten and asked again.
+        var key = kind === 'cells' ? 'cells' : 'ranges';
+        if (!st[key] || st[key].revision !== info.contentRevision) st[key] = { revision: info.contentRevision, rows: new Map() };
+        var held = st[key], hit = held.rows.get(layerUid);
+        if (hit) return hit;
+        var forget = function () { if (held.rows.get(layerUid) === pending) held.rows.delete(layerUid); };
+        var ask = kind === 'cells' ? s.readLayerCells(layerUid, info) : s.readLayerRange(layerUid, host.state.currentFrame, info);
+        var pending = Promise.resolve(ask).then(function (value) { if (!value) forget(); return value; }, function (error) { forget(); throw error; });
+        held.rows.set(layerUid, pending);
+        return pending;
       },
     };
   }
   // The paint of an entered component (the scene paint is skipped: its pins and rows are the scene's). The grid is the component's own timeline.
-  function paint(host) {
+  function paint(host, frameOnly) {
     var st = live(host);
     if (!st) return false;
-    if (Grid) Grid.paint(host, st, timingPort(host, st));
+    if (Grid) Grid.paint(host, st, timingPort(host, st), frameOnly === true);
     var doc = host.document, frame = host.state.currentFrame;
     var field = doc.getElementById('tl-cf');
     if (field) { if (doc.activeElement !== field) field.value = frame + 1; field.max = st.totalFrames; }

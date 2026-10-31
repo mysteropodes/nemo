@@ -250,7 +250,17 @@ impl ObjectSnapshot {
                             } else {
                                 "drawing"
                             };
-                            json!({"layerUid":layer.layer_uid(),"name":layer.name(),"layerKind":kind})
+                            // #2256: the facts the scene's drawing gates read (hidden, locked, parented, 3D, Motion-transformed), so an entered
+                            // component's rows are judged by the same rules. `locked` is the effective Drawing policy, `hasMotion` a layer-level holder.
+                            let motion = self.document().property_holders().unwrap_or(&[]).iter().any(|holder| {
+                                holder.target.context_id == context.id()
+                                    && holder.target.layer_uid == layer.layer_uid()
+                                    && holder.target.stroke_id.value().is_none()
+                            });
+                            json!({"layerUid":layer.layer_uid(),"name":layer.name(),"layerKind":kind,
+                                "visible":layer.visible.value() != Some(&false),"locked":if scene { self.document().layer_is_locked(layer.layer_uid()) } else { layer.locked() },
+                                "parentLayerUid":layer.parent_layer_uid.value().cloned().flatten(),
+                                "threeD":layer.three_d.value() == Some(&true),"hasMotion":motion})
                         })
                         .collect();
                     let mut head = self.component_head("layers");

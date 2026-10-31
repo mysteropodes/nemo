@@ -88,12 +88,22 @@ fn context_item(value: &Value, first: bool) -> bool {
     })
 }
 fn layer_item(value: &Value) -> bool {
-    exact(value, &["layerUid", "name", "layerKind"], &[]).is_some_and(|o| {
+    // The drawing-gate facts (visible, locked, parented, 3D, Motion-transformed) are optional on the wire; the owner always sends them (#2256).
+    exact(
+        value,
+        &["layerUid", "name", "layerKind"],
+        &["visible", "locked", "parentLayerUid", "threeD", "hasMotion"],
+    )
+    .is_some_and(|o| {
         uid(o.get("layerUid"))
             && name(o.get("name"))
             && o["layerKind"]
                 .as_str()
                 .is_some_and(|k| LAYER_KINDS.contains(&k))
+            && ["visible", "locked", "threeD", "hasMotion"]
+                .iter()
+                .all(|k| o.get(*k).map_or(true, Value::is_boolean))
+            && o.get("parentLayerUid").map_or(true, |p| p.is_null() || uid(Some(p)))
     })
 }
 fn instance_item(value: &Value) -> bool {
