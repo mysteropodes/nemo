@@ -2870,6 +2870,7 @@ function syncDocFields(){
 // that CHANGED CONTENT must not pass frameOnly — the panel refreshes below
 // still run either way, only the wholesale timeline rebuild is skipped.
 function updateUI(frameOnly){
+  if(window.NemoNativeInspectorUnavailable)window.NemoNativeInspectorUnavailable.sync(window); // #2372 UNAVAIL-NOTICES: mark/unmark the controls with no native owner
   if(window.NemoNativeObjectProject&&window.NemoNativeObjectProject.paintUI(window,frameOnly))return;
   syncDocFields();
   // countOnly: this is only ever read for .length just below.
@@ -3983,6 +3984,8 @@ function updateFsSelPanel(){
 // edits get routed back to each proxy's own frame instead of the current one).
 var _ghostProxyActive=false;
 function selectGhostAll(){
+  // #2372 UNAVAIL-NOTICES: multi-frame ghost selection has no native owner - one stable notice, before pushUndo / desP / any Paper write.
+  if(window.NemoNativeInspectorUnavailable&&window.NemoNativeInspectorUnavailable.refuse(window,'btn-ghost-select'))return;
   // Used to silently no-op unless Ghost All (btn-ghost-all) had already
   // been turned on first — an invisible prerequisite (the button looked
   // identically clickable either way, `disabled` had no CSS styling of its
@@ -10170,7 +10173,9 @@ document.getElementById('pm-stroke-c').addEventListener('input',function(){var v
 // tool's own default when nothing is selected) — this is a per-shape
 // property with no meaningful "future stroke" default the way a flat
 // color has.
-function applyStrokeGradAlongToSelection(mutate){
+function applyStrokeGradAlongToSelection(mutate,id){
+  // #2372 UNAVAIL-NOTICES: no native record slot for a stroke gradient along the path - notice, no pushUndo / saveActiveLayerFrame.
+  if(window.NemoNativeInspectorUnavailable&&window.NemoNativeInspectorUnavailable.refuse(window,id||'p-strokegrad-along'))return;
   if(!selectedPaths.length)return;
   pushUndo();
   selectedPaths.forEach(function(p){mutate(p);});
@@ -10179,6 +10184,7 @@ function applyStrokeGradAlongToSelection(mutate){
 }
 document.getElementById('p-strokegrad-along').addEventListener('change',function(){
   var on=this.checked;
+  if(window.NemoNativeInspectorUnavailable&&window.NemoNativeInspectorUnavailable.refuse(window,'p-strokegrad-along')){this.checked=!on;return;}
   applyStrokeGradAlongToSelection(function(p){
     if(on){
       var fromC=document.getElementById('p-strokegrad-from-c').value;
@@ -10187,23 +10193,25 @@ document.getElementById('p-strokegrad-along').addEventListener('change',function
     }else{
       delete p.data.strokeGradientAlongPath;
     }
-  });
+  },'p-strokegrad-along');
 });
 document.getElementById('p-strokegrad-from-c').addEventListener('input',function(){
   var v=this.value;
+  if(window.NemoNativeInspectorUnavailable&&window.NemoNativeInspectorUnavailable.refuse(window,'p-strokegrad-from-c'))return;
   document.getElementById('p-strokegrad-from').style.background=v;
   applyStrokeGradAlongToSelection(function(p){
     if(!p.data.strokeGradientAlongPath)return;
     p.data.strokeGradientAlongPath.from=v;
-  });
+  },'p-strokegrad-from-c');
 });
 document.getElementById('p-strokegrad-to-c').addEventListener('input',function(){
   var v=this.value;
+  if(window.NemoNativeInspectorUnavailable&&window.NemoNativeInspectorUnavailable.refuse(window,'p-strokegrad-to-c'))return;
   document.getElementById('p-strokegrad-to').style.background=v;
   applyStrokeGradAlongToSelection(function(p){
     if(!p.data.strokeGradientAlongPath)return;
     p.data.strokeGradientAlongPath.to=v;
-  });
+  },'p-strokegrad-to-c');
 });
 // Figma-style color row (2026-07, "les couleurs ça peut être un système
 // comme [Figma]") — inline eye toggles + editable hex/alpha text fields

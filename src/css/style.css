@@ -2920,3 +2920,6 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 #statusbar>span:first-child{min-width:0;overflow:hidden;}
 #statusbar>span:last-child{flex:none;margin-left:12px;}
 #statusbar-help{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+
+/* #2372 UNAVAIL-NOTICES: a control with no native owner on a native object project (adapters/native-inspector-unavailable.js) stays listed but reads as unavailable. */
+[data-native-unavailable="1"] { opacity: .45; cursor: not-allowed; }
