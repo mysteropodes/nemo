@@ -1,6 +1,6 @@
 //! Project files use the original object host and native lifecycle slot.
 use crate::application_mcp::ApplicationMcp;
-use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
+use crate::native_dispatch::{NativeDispatch, NativeObjectHost, PROJECT_INFO_LIMIT_BYTES};
 use native_engine::{
     commands::{OpacityRequest, ResponseEnvelope},
     object_frame_packet::ObjectFrameSelector,
@@ -88,7 +88,7 @@ impl ApplicationMcp {
         info["instanceId"] = json!(self.instance_id());
         info["documentId"] = json!(document);
         info["lifecycleGeneration"] = json!(generation);
-        if serde_json::to_vec(&info).map_or(true, |v| v.len() > 65536) {
+        if serde_json::to_vec(&info).map_or(true, |v| v.len() > PROJECT_INFO_LIMIT_BYTES) {
             return Err("native project metadata exceeds UI limit".into());
         }
         Ok(info)

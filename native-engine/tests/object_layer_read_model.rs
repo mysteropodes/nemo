@@ -146,7 +146,8 @@ fn blend_and_matte_facts_are_copied_and_a_source_is_marked() {
         rows[4]["mattesMore"],
         json!([{"uid":"extra","mode":"alpha"}])
     );
-    assert_eq!(rows[2]["isMatteSource"], json!(true));
+    // Baseline `matteSourceIndicesInUse` never consulted `mattesMore`: an additional-matte source carries no badge.
+    assert!(rows[2].get("isMatteSource").is_none());
     // A stored null blend is not a named blend.
     assert!(rows[5].get("blendMode").is_none());
     assert!(rows[1].get("isMatteSource").is_none());
@@ -245,7 +246,183 @@ fn project_info_carries_the_rows_beside_the_existing_members_within_the_ui_bound
     assert_eq!(info["layers"][1]["blendMode"], json!("screen"));
     assert_eq!(info["layerFolders"][0]["folderId"], json!("f1"));
     assert!(info["layerModelUnavailable"].is_array());
-    // Row bytes stay small enough that the 64 KiB UI bound still holds hundreds of layers.
-    let per_layer = serde_json::to_vec(a).unwrap().len();
-    assert!(per_layer < 220, "row grew to {per_layer} bytes");
+}
+
+/// A fully populated row: every member the read model can add, long names, a folder and two extra mattes (native storage admits no non-null parent).
+fn rich_layers(count: usize) -> Value {
+    let uid = |i: usize| format!("ly_{i:05}_mh3k2j9a4f");
+    Value::Array(
+        (0..count)
+            .map(|i| {
+                json!({"layerUid":uid(i),
+                    "name":format!("Layer {i} \u{2014} Forme {} (d\u{e9}tail tr\u{e8}s long du nom, pour la mesure)", i % 17),
+                    "visible":true,"locked":i % 3 == 0,"shy":i % 5 == 0,"color":"#5FA875",
+                    "parentLayerUid":Value::Null,
+                    "folderId":format!("folder-{:03}", i % 40),
+                    "blendMode":"multiply","matteMode":"alphaInverted","matteSourceLayerUid":uid((i + 1) % count),
+                    "mattesMore":[{"uid":uid((i + 2) % count),"mode":"luma"},{"uid":uid((i + 3) % count),"mode":"alpha"}]})
+            })
+            .collect(),
+    )
+}
+fn rich_file(count: usize) -> Vec<u8> {
+    let folders: Map<String, Value> = (0..40)
+        .map(|f| {
+            (
+                format!("folder-{f:03}"),
+                json!({"name":format!("Folder {f}"),"collapsed":f % 2 == 0}),
+            )
+        })
+        .collect();
+    let holders: Vec<Value> = (0..count)
+        .map(|i| {
+            let value = if i % 2 == 0 { json!({"static":[50.5]}) } else {
+                json!({"static":[100],"track":{"keys":[{"frame":0,"v":[100]},{"frame":3,"v":[0]}]}})
+            };
+            let mut record = json!({"property":"opacity"});
+            record.as_object_mut().unwrap().extend(value.as_object().unwrap().clone());
+            json!({"target":{"contextId":"scene-root","layerUid":format!("ly_{i:05}_mh3k2j9a4f")},"properties":[record]})
+        })
+        .collect();
+    let drawing = json!({"format":"nemo.native-object-document","formatVersion":1,"totalFrames":4,
+        "layers":rich_layers(count),"layerFolders":folders,"propertyHolders":holders,"objects":[]});
+    serde_json::to_vec(&json!({"format":"nemo.native-project-document","formatVersion":1,
+        "project":{"canvasW":320,"canvasH":180,"fps":24},"drawing":drawing,"viewportReference":null,"assets":[]}))
+    .unwrap()
+}
+
+/// #2371 review: the whole project-info answer used to hard-fail above 64 KiB, and the richer rows put that line
+/// at about 135 layers (measured 484 bytes per row). A few hundred fully populated rows (baseline Release to Layers makes one layer per shape) must read.
+#[test]
+fn rich_rows_stay_within_the_ui_bound() {
+    const OLD_LIMIT: usize = 65536;
+    const NEW_LIMIT: usize = 4 * 1024 * 1024;
+    for count in [150usize, 400, 1000, 4096] {
+        let owner = NativeObjectHistory::from_project_file("rich", &rich_file(count)).unwrap();
+        let info = owner.project_file_info().unwrap();
+        let bytes = serde_json::to_vec(&info).unwrap().len();
+        let per_row = serde_json::to_vec(&info["layers"][1]).unwrap().len();
+        let layers = info["layers"].as_array().unwrap();
+        assert_eq!(layers.len(), count);
+        for key in [
+            "name",
+            "kind",
+            "folderId",
+            "blendMode",
+            "matteMode",
+            "matteSourceLayerUid",
+            "mattesMore",
+            "opacity",
+            "parentLayerUid",
+            "color",
+        ] {
+            assert!(
+                layers[1].get(key).is_some(),
+                "{key} missing from the rich row"
+            );
+        }
+        assert_eq!(info["layerFolders"].as_array().unwrap().len(), 40);
+        assert!(
+            per_row > 400 && per_row < 600,
+            "rich row is {per_row} bytes"
+        );
+        assert!(bytes < NEW_LIMIT, "{count} rich layers need {bytes} bytes");
+        if count >= 150 {
+            // The earlier bound would have refused this answer outright.
+            assert!(
+                bytes > OLD_LIMIT,
+                "{count} rich layers fit the old bound ({bytes})"
+            );
+        }
+    }
+}
+
+/// Every matte fact the engine can emit must be an answer the metadata decoder admits: unbounded lists and folders,
+/// empty and long strings (a stored file may carry any mode name).
+#[test]
+fn unbounded_stored_values_are_emitted_as_stored_not_truncated() {
+    let many = 300usize;
+    let mut layers: Vec<Value> = (0..many)
+        .map(|i| json!({"layerUid":format!("s{i}")}))
+        .collect();
+    layers[0] = json!({"layerUid":"s0","blendMode":"","matteMode":"alpha","matteSourceLayerUid":"s1",
+        "mattesMore":(2..many).map(|i| json!({"uid":format!("s{i}"),"mode":""})).collect::<Vec<_>>()});
+    let folders: Map<String, Value> = (0..1500)
+        .map(|f| (format!("fold-{f:04}"), json!({"collapsed":false})))
+        .collect();
+    let document = flat(Value::Array(layers), json!({"layerFolders":folders}));
+    let rows = rows(&document);
+    assert_eq!(rows[0]["mattesMore"].as_array().unwrap().len(), many - 2);
+    assert_eq!(rows[0]["mattesMore"][0]["mode"], json!(""));
+    assert_eq!(rows[0]["blendMode"], json!(""));
+    assert_eq!(
+        model_members(&document)["layerFolders"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1500
+    );
+}
+
+fn matte_sources(layers: Value) -> Vec<bool> {
+    let document = flat(layers, json!({}));
+    rows(&document)
+        .iter()
+        .map(|row| row.get("isMatteSource") == Some(&json!(true)))
+        .collect()
+}
+
+/// Baseline `matteSourceIndicesInUse` (`timeline.js`, 1065e9d8): an active matte without a stored source uid consumes
+/// the layer below (the legacy implicit adjacency; the native loader stores what the file says and does not migrate it).
+#[test]
+fn a_matte_without_a_source_uid_marks_the_layer_below() {
+    assert_eq!(
+        matte_sources(
+            json!([{"layerUid":"a","matteMode":"alpha"},{"layerUid":"b"},{"layerUid":"c"}])
+        ),
+        [false, true, false]
+    );
+    // The last layer has nothing below it.
+    assert_eq!(
+        matte_sources(json!([{"layerUid":"a"},{"layerUid":"b","matteMode":"luma"}])),
+        [false, false]
+    );
+    // An inactive matte (`none`) consumes nothing, with or without a uid.
+    assert_eq!(
+        matte_sources(json!([{"layerUid":"a","matteMode":"none"},{"layerUid":"b"}])),
+        [false, false]
+    );
+}
+
+#[test]
+fn explicit_dangling_and_self_sources_follow_baseline() {
+    // An explicit uid wins over adjacency.
+    assert_eq!(
+        matte_sources(
+            json!([{"layerUid":"a","matteMode":"alpha","matteSourceLayerUid":"c"},{"layerUid":"b"},{"layerUid":"c"}])
+        ),
+        [false, false, true]
+    );
+    // A dangling uid resolves to nothing and does not fall back to the layer below.
+    assert_eq!(
+        matte_sources(
+            json!([{"layerUid":"a","matteMode":"alpha","matteSourceLayerUid":"ghost"},{"layerUid":"b"}])
+        ),
+        [false, false]
+    );
+    // A self reference is skipped (the first OTHER layer with that uid), so it marks nothing.
+    assert_eq!(
+        matte_sources(
+            json!([{"layerUid":"a","matteMode":"alpha","matteSourceLayerUid":"a"},{"layerUid":"b"}])
+        ),
+        [false, false]
+    );
+    // An additional matte source alone does not mark a layer (baseline ignored `mattesMore` here); the first does.
+    assert_eq!(
+        matte_sources(
+            json!([{"layerUid":"a","matteMode":"alpha","matteSourceLayerUid":"b",
+            "mattesMore":[{"uid":"c","mode":"luma"}]},{"layerUid":"b"},{"layerUid":"c"}])
+        ),
+        [false, true, false]
+    );
 }
