@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.layer-parent",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.layer.parent.set"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerParentSetPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal. The request names one layer, one parent or null and one frame; nothing is split."
+  },
+  "semantics": "#2372 U12: the baseline Parent A menu write (setLayerParent, src/js/motion.js and the Parent A items of buildParentMenuItems, src/js/timeline.js @1065e9d8) as one native transaction. parentLayerUid names an existing layer of the same context, or is null for Parent A : None (free parenting). A layer cannot parent itself, a folder is not a parent, and a parent that would close a cycle is refused invalid_request; an unknown layer or parent is not_found. The child's world pose at `frame` is kept like the baseline: the displacement between the old and the new ancestor chain is folded into the child's static Position in the same write. That is computed exactly when every ancestor of both chains is a pure translation at `frame`; a rotated or scaled ancestor, an expression-driven ancestor or a keyed child Position is refused unavailable and nothing changes, never a visible jump. One successful edit is one history entry and one revision; naming the stored parent publishes nothing. Only a v2 object document stores parent links (a v1 document answers invalid_request). Parent B, Link time to and Follow path are not part of this operation. No JS/Paper writer or fallback.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "#2372 U12 parent a layer to another; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "parent-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.parent.set",
+        "payload": {
+          "command": "object.layer.parent.set",
+          "contextId": "scene-root",
+          "layerUid": "layer-1",
+          "parentLayerUid": "layer-2",
+          "frame": 0
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "parent-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

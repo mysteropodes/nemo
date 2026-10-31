@@ -3478,6 +3478,18 @@
       ]
     },
     {
+      "id": "app.native.layer-parent.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-layer-parent.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-layer-parent.js"
+      ]
+    },
+    {
       "id": "app.native.path-effects.ui.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

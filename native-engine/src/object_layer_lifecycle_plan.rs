@@ -25,6 +25,8 @@ mod duplicate;
 mod fields;
 #[path = "object_layer_lifecycle_order.rs"]
 mod order;
+#[path = "object_layer_lifecycle_parent.rs"]
+mod parent;
 
 #[allow(unused_imports)]
 pub(crate) use delete::plan_delete;
@@ -32,6 +34,7 @@ pub(crate) use delete::plan_delete;
 pub(crate) use duplicate::{plan_duplicate, unique_layer_name};
 #[allow(unused_imports)]
 pub(crate) use fields::{plan_recolor, plan_rename};
+pub(crate) use parent::plan_parent;
 
 /// Largest content revision an identity may embed (2^53 - 1, as the sealed
 /// layer-create path bounds it).
@@ -87,6 +90,17 @@ pub(crate) enum LifecycleError {
     RevisionOutOfRange,
     IdUnavailable,
     TooManyLayers,
+    /// #2372 U12: a layer cannot be its own parent.
+    ParentSelf(String),
+    /// #2372 U12: the parent would sit below the layer in its own chain.
+    ParentCycle {
+        layer_uid: String,
+        parent_uid: String,
+    },
+    /// #2372 U12: folders and the layers outside the edited context are not parents.
+    ParentRefused(String),
+    /// #2372 U12: keeping the world pose is not exactly computable; the reason is a fixed phrase.
+    PoseUnavailable(&'static str),
     Policy {
         op: LayerOp,
         layer_uid: String,

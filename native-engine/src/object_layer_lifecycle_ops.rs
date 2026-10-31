@@ -15,7 +15,7 @@
 //! the kernel the stand-in policy that answers "unavailable".
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::{
-    plan_delete, plan_duplicate, plan_rename, plan_reorder, LayerSelection, LifecycleError,
+    plan_delete, plan_duplicate, plan_parent, plan_rename, plan_reorder, LayerSelection, LifecycleError,
     LifecyclePlan, SelectionOutcome, UnavailableLayerEditPolicy,
 };
 use crate::object_document::{object_deserialize, ObjectDocument};
@@ -85,6 +85,22 @@ object_deserialize!(ReorderPayload {
     selection: SelectionPayload
 });
 
+#[derive(Debug)]
+struct ParentPayload {
+    command: String,
+    context_id: String,
+    layer_uid: String,
+    parent_layer_uid: Option<String>,
+    frame: u32,
+}
+object_deserialize!(ParentPayload {
+    command: String,
+    context_id: String,
+    layer_uid: String,
+    parent_layer_uid: Option<String>,
+    frame: u32
+});
+
 impl SelectionPayload {
     /// Identities only; an empty string is never a layer identity.
     fn into_selection(self) -> Result<LayerSelection, DispatchErrorCode> {
@@ -114,12 +130,16 @@ fn refusal_code(error: &LifecycleError) -> DispatchErrorCode {
     match error {
         LifecycleError::UnknownLayer(_) => DispatchErrorCode::NotFound,
         LifecycleError::LastLayer
+        | LifecycleError::ParentSelf(_)
+        | LifecycleError::ParentCycle { .. }
+        | LifecycleError::ParentRefused(_)
         | LifecycleError::NonFiniteGap
         | LifecycleError::InvalidColor(_)
         | LifecycleError::SourceUnnamed(_) => DispatchErrorCode::InvalidRequest,
         // Admission guarantees every context lists every layer.
         LifecycleError::OrderPlanIncomplete { .. } => DispatchErrorCode::Internal,
-        LifecycleError::RevisionOutOfRange
+        LifecycleError::PoseUnavailable(_)
+        | LifecycleError::RevisionOutOfRange
         | LifecycleError::IdUnavailable
         | LifecycleError::TooManyLayers
         | LifecycleError::Policy { .. } => DispatchErrorCode::Unavailable,
@@ -132,6 +152,7 @@ pub(crate) enum LayerLifecycleKind {
     Duplicate,
     Rename,
     Reorder,
+    Parent,
 }
 
 /// A detached candidate sealed to the snapshot it was planned from. Only this
@@ -282,6 +303,29 @@ impl ObjectFillOwner {
             &UnavailableLayerEditPolicy,
         );
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::Reorder, plan)
+    }
+    /// #2372 U12: Parent A set or clear (`parentLayerUid: null`) that keeps the child's world pose at `frame`.
+    pub(crate) fn prepare_layer_parent_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedLayerLifecycle, DispatchErrorCode> {
+        let payload: ParentPayload = parse(bytes)?;
+        if payload.command != "object.layer.parent.set"
+            || payload.context_id.is_empty()
+            || payload.layer_uid.is_empty()
+            || payload.parent_layer_uid.as_deref() == Some("")
+        {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        let origin = self.current_snapshot();
+        let plan = plan_parent(
+            &origin,
+            &payload.context_id,
+            &payload.layer_uid,
+            payload.parent_layer_uid.as_deref(),
+            payload.frame,
+        );
+        PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::Parent, plan)
     }
     pub(crate) fn commit_layer_lifecycle(
         &mut self,

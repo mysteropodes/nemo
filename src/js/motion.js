@@ -3665,9 +3665,18 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     for (var k = 0; k < chain.length; k++) pt = transformSegments(pt, chain[k].pivot, chain[k].mat);
     return pt[0].point;
   }
+  // #2372 U12: Parent A on a native project is the adapter's native edit (timeline.js menus, pickwhip, cell right-click); Parent B,
+  // Follow Path and Parent in Time have no native owner, and none of these legacy setters may write a layer row there.
+  function nativeParentBlocks(what) {
+    try {
+      if (!window.nativeLayerParent || !window.nativeLayerParent()) return false;
+      if (window.showToast) showToast(what + ' is not available on a native project yet.');
+      return true;
+    } catch (_) { return false; }
+  }
   function setLayerParent(li, parentUid) {
     var ld = state.layers[li];
-    if (!ld) return;
+    if (!ld || nativeParentBlocks('Parent A')) return;
     // Mirrors setLayerParentB's own guard below — the context menu already
     // disables "Parent A : X (déjà Parent B)", but the pickwhip drag (still
     // Parent-A-only) calls straight through to this function and bypassed
@@ -3722,7 +3731,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   // layer with itself), everything else mirrors setLayerParent exactly.
   function setLayerParentB(li, parentUid) {
     var ld = state.layers[li];
-    if (!ld) return;
+    if (!ld || nativeParentBlocks('Parent B')) return;
     if (parentUid && parentUid === ld.parentLayerUid) {
       if (window.showToast) showToast(SM.t('toastParentBMustDifferFromA'));
       return;
@@ -3741,7 +3750,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   // contribution rather than recursing infinitely.
   function setLayerFollowPath(li, targetUid) {
     var ld = state.layers[li];
-    if (!ld) return;
+    if (!ld || nativeParentBlocks('Follow Path')) return;
     if (!targetUid) { ld.followPath = null; if (window.SMEngineBridge) SMEngineBridge.renderNow(); return; }
     if (targetUid === ensureLayerUid(ld)) return; // can't follow itself
     ld.followPath = { targetLayerUid: targetUid, align: (ld.followPath && ld.followPath.align) || false };
@@ -8487,7 +8496,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   }
   function setLayerTimeLink(li, targetIdx, mode, srcAnchor) {
     var ld = state.layers[li], src = state.layers[targetIdx];
-    if (!ld || !src || targetIdx === li) return false;
+    if (!ld || !src || targetIdx === li || nativeParentBlocks('Parent in Time')) return false;
     if (timeLinkWouldCycle(li, targetIdx)) { if (window.showToast) showToast(SM.t('toastLinkImpossibleCycle')); return false; }
     pushUndo();
     mode = mode || 'both';

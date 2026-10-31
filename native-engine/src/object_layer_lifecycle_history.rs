@@ -11,6 +11,7 @@ const OP_LAYER_DELETE: &str = "command.document.object.layer.delete";
 const OP_LAYER_DUPLICATE: &str = "command.document.object.layer.duplicate";
 const OP_LAYER_RENAME: &str = "command.document.object.layer.rename";
 const OP_LAYER_REORDER: &str = "command.document.object.layer.reorder";
+const OP_LAYER_PARENT: &str = "command.document.object.layer.parent.set";
 
 impl NativeObjectHistory {
     pub(crate) fn prepare_layer_delete_json(
@@ -37,6 +38,12 @@ impl NativeObjectHistory {
     ) -> Result<PreparedLayerLifecycle, DispatchErrorCode> {
         self.owner.prepare_layer_reorder_json(bytes)
     }
+    pub(crate) fn prepare_layer_parent_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedLayerLifecycle, DispatchErrorCode> {
+        self.owner.prepare_layer_parent_json(bytes)
+    }
     pub(crate) fn commit_layer_lifecycle(
         &mut self,
         candidate: PreparedLayerLifecycle,
@@ -56,7 +63,11 @@ impl NativeObjectHistory {
     pub(crate) fn layer_lifecycle_operation(operation: &str) -> bool {
         matches!(
             operation,
-            OP_LAYER_DELETE | OP_LAYER_DUPLICATE | OP_LAYER_RENAME | OP_LAYER_REORDER
+            OP_LAYER_DELETE
+                | OP_LAYER_DUPLICATE
+                | OP_LAYER_RENAME
+                | OP_LAYER_REORDER
+                | OP_LAYER_PARENT
         )
     }
     /// Prepare and commit one lifecycle operation for the dispatcher, which has
@@ -78,6 +89,7 @@ impl NativeObjectHistory {
             OP_LAYER_DUPLICATE => self.prepare_layer_duplicate_json(&bytes),
             OP_LAYER_RENAME => self.prepare_layer_rename_json(&bytes),
             OP_LAYER_REORDER => self.prepare_layer_reorder_json(&bytes),
+            OP_LAYER_PARENT => self.prepare_layer_parent_json(&bytes),
             _ => Err(DispatchErrorCode::InvalidRequest),
         };
         let candidate = prepared.map_err(|code| {

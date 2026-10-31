@@ -4342,6 +4342,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-layer-parent.js",
+      "moduleId": "app.native.layer-parent.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2669,
+          "scriptOrdinal": 319
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-path-effects-ui.js",
       "moduleId": "app.native.path-effects.ui.adapter",
       "executionClass": "document-classic",
