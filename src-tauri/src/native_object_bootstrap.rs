@@ -211,6 +211,7 @@ pub(crate) async fn nemo_native_object_bootstrap(
     request_json: String,
 ) -> HostResult<ObjectBootstrapReceipt> {
     require_main(&window)?;
+    reopen::admit_source(&app, &state, &request_json);
     let admitted = if let Some(request) =
         admission::new_request(&request_json).filter(|request| request.replace.is_some())
     {

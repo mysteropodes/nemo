@@ -60,7 +60,7 @@ pub(crate) use font_source::fetch_google_font;
 
 #[path = "native_revision_sync.rs"]
 mod revision_sync;
-#[path = "native_mcp_project_scope.rs"] mod project_scope; #[path = "native_mcp_source_scope.rs"] mod source_scope;
+#[path = "native_mcp_project_scope.rs"] pub(crate) mod project_scope; #[path = "native_mcp_source_scope.rs"] mod source_scope;
 #[cfg(test)]
 use revision_sync::dispatch_native;
 use revision_sync::{RevisionControl, RevisionSync};
