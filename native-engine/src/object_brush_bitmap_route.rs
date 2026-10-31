@@ -1,19 +1,18 @@
 //! #2361 (DRAW-C): the host route of the bitmap-brush resource operations. One session owner: the charged
-//! `BrushBitmapStore` already held by the preview's `ObjectBrushRuntime` (so it is retired when the session closes or is
+//! `BrushBitmapStore` already held by the preview's brush producer (so it is retired when the session closes or is
 //! replaced). Publish decodes an embedded PNG asset of the pinned snapshot into that store; inspect and scene are
 //! pinned reads of it. No document revision moves and no history entry is added; no pixels cross this seam.
-use crate::object_render_scene::brush_scene::BrushRuntime;
 use crate::evaluation::object_scene_style_kernels::{
     bitmap_brush_resources_store::BrushBitmapStore,
     bitmap_brush_resources_bitmap::BrushStoreError,
     object_scene_producer_brush_slot::{anchor_key, slot_brush_id},
 };
 use crate::object_codec::{ImageAssetError, ImageAssetLimits};
-use crate::object_document::FrameScopeKind;
 use crate::object_frame_packet::{
-    prepare_object_exposure_frame, ObjectFrameError, ObjectFrameSelector,
+    prepare_object_exposure_frame, FrameScopeKind, ObjectFrameError, ObjectFrameSelector,
 };
-use crate::read_queries::{brush_read, BrushAssetError, BrushAssetRequest};
+use crate::read_queries::brush_read::{bindings, Binding, NativeBrushProducer};
+use crate::read_queries::{BrushAssetError, BrushAssetRequest};
 use crate::request_receipts::{
     DispatchError, DispatchErrorCode, OpacityRequest, ResponseEnvelope, APPLICATION_API_VERSION,
 };
@@ -108,7 +107,7 @@ fn bitmap_row(brush_id: &str, store: &BrushBitmapStore) -> Value {
 fn scene_entry(
     packet: &crate::object_frame_packet::ObjectFramePacket,
     store: &BrushBitmapStore,
-    binding: &brush_read::Binding<'_>,
+    binding: &Binding<'_>,
 ) -> Result<Value, Refusal> {
     let (record, _, _, window) = binding;
     let target = record.record().target();
@@ -161,11 +160,11 @@ pub(crate) fn owns(operation: &str) -> bool {
 /// One publish, inspect or scene request against the current pinned snapshot. Always an envelope: a refusal is a
 /// typed `ok: false`, and the store is untouched by it. `None` is a released session.
 pub(crate) fn dispatch(
-    runtime: Option<&mut BrushRuntime>,
+    producer: Option<&mut NativeBrushProducer>,
     snapshot: &ObjectSnapshot,
     request: &OpacityRequest,
 ) -> ResponseEnvelope {
-    let (ok, result, error) = match outcome(runtime, snapshot, request) {
+    let (ok, result, error) = match outcome(producer, snapshot, request) {
         Ok(result) => (true, Some(result), None),
         Err((code, reason)) => (
             false,
@@ -190,7 +189,7 @@ pub(crate) fn dispatch(
 }
 
 fn outcome(
-    runtime: Option<&mut BrushRuntime>,
+    producer: Option<&mut NativeBrushProducer>,
     snapshot: &ObjectSnapshot,
     request: &OpacityRequest,
 ) -> Result<Value, Refusal> {
@@ -238,7 +237,7 @@ fn outcome(
         {
             return Err((StaleRevision, "stale-snapshot"));
         }
-        return publish_bitmap(runtime, snapshot, asset_id, brush_id, (width, height));
+        return publish_bitmap(producer, snapshot, asset_id, brush_id, (width, height));
     }
     if request.expected_revision.is_some() {
         return Err((InvalidRequest, "malformed-request"));
@@ -271,8 +270,8 @@ fn outcome(
     if at != snapshot.content_revision() || snapshot_id != snapshot.snapshot_id() {
         return Err((StaleRevision, "stale-snapshot"));
     }
-    let runtime = runtime.ok_or((Unavailable, "session-released"))?;
-    let store = runtime.producer.publisher_mut().store();
+    let producer = producer.ok_or((Unavailable, "session-released"))?;
+    let store = producer.publisher.store();
     if let Some(brush_id) = brush_id {
         let row = match bitmap_row(brush_id, store) {
             Value::Null => json!({"brushId": brush_id, "resident": false}),
@@ -299,12 +298,12 @@ fn outcome(
         },
     )
     .map_err(frame_refusal)?;
-    let bindings = brush_read::bindings(&packet).map_err(|error| (Unavailable, error.reason))?;
-    let total = bindings.len() as u64;
+    let records = bindings(&packet).map_err(|error| (Unavailable, error.reason))?;
+    let total = records.len() as u64;
     if offset > total {
         return Err((InvalidRequest, "offset-beyond-total"));
     }
-    let entries = match bindings.get(offset as usize) {
+    let entries = match records.get(offset as usize) {
         Some(binding) => vec![scene_entry(&packet, store, binding)?],
         None => Vec::new(),
     };
@@ -315,19 +314,18 @@ fn outcome(
 }
 
 fn publish_bitmap(
-    runtime: Option<&mut BrushRuntime>,
+    producer: Option<&mut NativeBrushProducer>,
     snapshot: &ObjectSnapshot,
     asset_id: &str,
     brush_id: &str,
     (width, height): (u32, u32),
 ) -> Result<Value, Refusal> {
-    let runtime = runtime.ok_or((DispatchErrorCode::Unavailable, "session-released"))?;
+    let producer = producer.ok_or((DispatchErrorCode::Unavailable, "session-released"))?;
     // The same operating envelope as the native project and attachment admission, narrowed to a brush bake.
     let limits = ImageAssetLimits::new(16 << 20, 256 << 20, 64 << 20, 4096, 4096)
         .map_err(|_| (DispatchErrorCode::Unavailable, "limits-unavailable"))?;
-    let publication = runtime
-        .producer
-        .publisher_mut()
+    let publication = producer
+        .publisher
         .publish(
             snapshot,
             BrushAssetRequest {

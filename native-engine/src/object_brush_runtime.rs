@@ -34,7 +34,8 @@ impl ObjectBrushRuntime {
         snapshot: &crate::revision::ObjectSnapshot,
         request: &crate::request_receipts::OpacityRequest,
     ) -> crate::request_receipts::ResponseEnvelope {
-        brush_scene::bitmap_route::dispatch(self.services.as_mut(), snapshot, request)
+        let producer = self.services.as_mut().map(BrushRuntime::producer_mut);
+        brush_scene::bitmap_route::dispatch(producer, snapshot, request)
     }
     /// The host lends its actual compositor retirement result. A failed reset
     /// refuses pixel replacement; no concrete GPU authority crosses this port.

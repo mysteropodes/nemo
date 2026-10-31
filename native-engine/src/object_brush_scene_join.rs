@@ -28,6 +28,9 @@ impl BrushRuntime {
             previous: None,
         }
     }
+    pub(crate) fn producer_mut(&mut self) -> &mut NativeBrushProducer {
+        &mut self.producer
+    }
     #[cfg(test)]
     pub(crate) fn resident_count(&self) -> usize {
         self.producer.resident_count()
@@ -40,6 +43,8 @@ impl BrushRuntime {
         }
     }
 }
+// #2361: the bitmap-brush resource route lives with the charged producer it serves.
+pub(crate) use crate::read_queries::brush_read::bitmap_route;
 #[derive(Debug, Clone)]
 pub(crate) struct BrushPaint {
     pub(crate) source_index: usize,
@@ -230,9 +235,6 @@ pub(crate) fn prepare_object_render_scene_with_brush(
         brushes: Some(Arc::new(brushes)),
     })
 }
-// #2361: the host route of the bitmap-brush resource operations over this runtime's charged store.
-#[path = "object_brush_bitmap_route.rs"]
-pub(crate) mod bitmap_route;
 #[cfg(all(test, feature = "application", feature = "project_media_codec"))]
 #[path = "../tests/object_brush_scene_join.rs"]
 mod tests;

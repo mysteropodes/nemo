@@ -60,9 +60,6 @@ impl NativeBrushProducer {
             guarded: true,
         }
     }
-    pub(crate) fn publisher_mut(&mut self) -> &mut BrushAssetPublisher {
-        &mut self.publisher
-    }
     #[cfg(test)]
     pub(crate) fn resident_count(&self) -> usize {
         self.publisher.store().stats().count
@@ -190,13 +187,13 @@ fn source(
         }),
     }
 }
-pub(crate) type Binding<'a> = (
+type Binding<'a> = (
     crate::object_frame_packet::ObjectFrameRecord<'a>,
     &'a BitmapBrushFields,
     crate::object_frame_packet::ObjectFrameRasterRecord<'a>,
     Option<TrimWindow>,
 );
-pub(crate) fn bindings(packet: &ObjectFramePacket) -> Result<Vec<Binding<'_>>, BrushReadError> {
+fn bindings(packet: &ObjectFramePacket) -> Result<Vec<Binding<'_>>, BrushReadError> {
     let rasters: Vec<_> = packet.raster_records().collect();
     let mut bindings = Vec::new();
     let mut claimed = BTreeSet::new();
@@ -469,3 +466,6 @@ pub(crate) fn produce(
     publisher.store_mut().end_build(retire);
     result
 }
+// #2361: the host route of the bitmap-brush resource operations over this producer's charged store.
+#[path = "object_brush_bitmap_route.rs"]
+pub(crate) mod bitmap_route;
