@@ -65,6 +65,7 @@
   function selectLayer(host, index) {
     var st = live(host);
     if (!st || !Number.isSafeInteger(index) || index < 0 || index >= st.rows.length) return false;
+    st.fault = null;
     host.state.activeLayerIdx = index; host._layerSel = [index]; host._layerSelAnchor = index; host.selectedPaths = []; host.state.selectedStrokeIndices = [];
     repaint(host);
     return true;
@@ -187,6 +188,7 @@
   }
   // exitToScene()
   function exit(host) {
+    unfence(host);
     return guarded(host, async function () {
       var c = intent(host);
       if (!c || !live(host)) return false;
@@ -200,6 +202,7 @@
   }
   // closeSymbolTab(symId): the active tab exits first.
   function close(host, contextId) {
+    unfence(host);
     return guarded(host, async function () {
       var c = intent(host), was = live(host);
       if (!c) return false;
@@ -253,10 +256,18 @@
     toast(host, 'Native component context: the component could not be refreshed.');
     return false;
   }
+  // Retries AND the exit both failed: the context is fenced with a typed unavailable state (the toast above is its one message) and is not
+  // asked again by later revisions: every one of them would repeat the whole ladder of pauses on the publication queue. The next user action
+  // (exit, close, a row click, entering a context) lifts the fence, so a recovered owner is asked once more then.
+  function fence(st, target) { st.fault = Object.freeze({ code: 'unavailable', revision: target }); }
+  function unfence(host) { var st = entered.get(host); if (st && st.fault) st.fault = null; }
+  // The fence of the entered context, or null: { code: 'unavailable', revision }.
+  function fault(host) { var st = live(host); return st && st.fault ? st.fault : null; }
   // Re-read the entered context until it is settled. The revision is acknowledged (`st.revision`) ONLY once a refresh succeeded: until then
   // projectionReady() is false, so the viewport never presents a revision over rows, tabs and a frame count that are stale.
   async function settle(host, lease, target) {
     var st = live(host);
+    if (st && st.fault) return true; // fenced: the next user action lifts it
     for (var attempt = 0; attempt <= RETRY_MS.length; attempt += 1) {
       if (!st || live(host) !== st) return true; // left, closed or replaced meanwhile: nothing left to settle
       var ok = false;
@@ -264,14 +275,17 @@
       if (ok) { if (live(host) === st) st.revision = target; return true; }
       if (attempt < RETRY_MS.length) await pause(host, RETRY_MS[attempt]);
     }
-    return st && live(host) === st ? giveUp(host, lease) : true;
+    if (!st || live(host) !== st) return true;
+    var left = await giveUp(host, lease);
+    if (!left && live(host) === st) fence(st, target);
+    return left;
   }
   // A revision moved on (Undo, an MCP edit). `lease` is the publication the project queue is running: the refresh rides it, so the
   // context, frame count and layers are settled BEFORE the frame of this revision is presented (a shrunk or deleted component is
   // never asked for a frame it no longer has). Without a lease the refresh is queued behind any transition in flight, never dropped.
   function revision(host, info, lease) {
     var st = live(host), target = info.contentRevision;
-    if (!st || st.revision === target) return Promise.resolve(true);
+    if (!st || st.revision === target || st.fault) return Promise.resolve(true); // a fenced context is not asked again until a user action
     if (lease) return settle(host, lease, target).then(function () { return true; });
     if (busy.has(host)) { queued.add(host); return Promise.resolve(true); }
     return guarded(host, function () { return settle(host, null, target); }).then(function () { return true; });
@@ -348,5 +362,5 @@
     });
     return true;
   }
-  return Object.freeze({ SCENE: SCENE, presented: presented, contextId: contextId, layerRows: layerRows, layers: layers, readScope: readScope, selectLayer: selectLayer, frameBound: frameBound, enter: enter, exit: exit, close: close, revision: revision, projectionReady: projectionReady, openLayer: openLayer, paint: paint, renderTabs: renderTabs });
+  return Object.freeze({ SCENE: SCENE, presented: presented, contextId: contextId, layerRows: layerRows, layers: layers, readScope: readScope, selectLayer: selectLayer, frameBound: frameBound, enter: enter, exit: exit, close: close, revision: revision, projectionReady: projectionReady, fault: fault, openLayer: openLayer, paint: paint, renderTabs: renderTabs });
 }));
