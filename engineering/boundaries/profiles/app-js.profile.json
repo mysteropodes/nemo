@@ -2833,6 +2833,7 @@
         "native-subselect-ui.js",
         "native-select-overlay.js",
         "native-select-gesture.js",
+        "native-selection-steps.js",
         "native-selection-style.js",
         "native-layer-list-presenter.js",
         "native-object-ui.js",
