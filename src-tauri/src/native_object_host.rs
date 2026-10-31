@@ -25,6 +25,8 @@ pub(crate) use retained_tabs::{PreparedRetainedActivation, PROJECT_INFO_LIMIT_BY
 mod font_assets;
 #[path = "native_object_image.rs"]
 mod image_import;
+#[path = "native_object_brush_bitmap.rs"]
+mod brush_bitmap;
 #[path = "native_object_video_link.rs"]
 mod video_link;
 #[path = "native_object_import_batch.rs"]
@@ -372,6 +374,9 @@ impl NativeDispatch for NativeObjectHost {
                 .history
                 .dispatch_history_read(&request)
                 .map_err(|_| "native history read correlation is invalid".into());
+        }
+        if Self::owns_brush_bitmap(&request) {
+            return self.dispatch_brush_bitmap(&request);
         }
         if request.operation() == "command.document.object.asset.remove" {
             return self

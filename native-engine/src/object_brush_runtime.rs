@@ -1,7 +1,7 @@
 //! Opaque application orchestration over the one derived render resource owner.
 use crate::evaluation::object_scene_style_kernels::bitmap_brush_resources_store::BrushBitmapStore;
 use crate::object_render_scene::{
-    brush_scene::BrushRuntime, ObjectBrushAdmission, ObjectPaintPlan, ObjectSceneError,
+    brush_scene::{self, BrushRuntime}, ObjectBrushAdmission, ObjectPaintPlan, ObjectSceneError,
 };
 
 /// Preview and export borrow this same store/slots/publisher and image cache.
@@ -22,6 +22,20 @@ impl ObjectBrushRuntime {
     }
     pub fn release(&mut self) {
         self.services = None;
+    }
+    /// #2361: whether the host routes this operation to the session-owned brush store rather than the command chain.
+    pub fn owns_bitmap_resource(operation: &str) -> bool {
+        brush_scene::bitmap_route::owns(operation)
+    }
+    /// #2361: one bitmap-brush publish, inspect or scene request over this session's store (typed unavailability once
+    /// the session was released). No document revision moves and no history entry is added.
+    pub fn dispatch_bitmap_resource(
+        &mut self,
+        snapshot: &crate::revision::ObjectSnapshot,
+        request: &crate::request_receipts::OpacityRequest,
+    ) -> crate::request_receipts::ResponseEnvelope {
+        let producer = self.services.as_mut().map(BrushRuntime::producer_mut);
+        brush_scene::bitmap_route::dispatch(producer, snapshot, request)
     }
     /// The host lends its actual compositor retirement result. A failed reset
     /// refuses pixel replacement; no concrete GPU authority crosses this port.

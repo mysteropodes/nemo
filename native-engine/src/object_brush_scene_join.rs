@@ -28,6 +28,9 @@ impl BrushRuntime {
             previous: None,
         }
     }
+    pub(crate) fn producer_mut(&mut self) -> &mut NativeBrushProducer {
+        &mut self.producer
+    }
     #[cfg(test)]
     pub(crate) fn resident_count(&self) -> usize {
         self.producer.resident_count()
@@ -40,6 +43,8 @@ impl BrushRuntime {
         }
     }
 }
+// #2361: the bitmap-brush resource route lives with the charged producer it serves.
+pub(crate) use crate::read_queries::brush_read::bitmap_route;
 #[derive(Debug, Clone)]
 pub(crate) struct BrushPaint {
     pub(crate) source_index: usize,

@@ -466,3 +466,6 @@ pub(crate) fn produce(
     publisher.store_mut().end_build(retire);
     result
 }
+// #2361: the host route of the bitmap-brush resource operations over this producer's charged store.
+#[path = "object_brush_bitmap_route.rs"]
+pub(crate) mod bitmap_route;
