@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "b8a442a460f6ec2f099c63b6a84a7001efaeb809",
-  "describe": "v0.7.0-alpha.4-4312-gb8a442a4-dirty"
+  "head": "48129eed6752ba479d8f3cf33a03497327021cff",
+  "describe": "v0.7.0-alpha.4-4316-g48129eed-dirty"
  },
- "inputsDigest": "72e91e3eb7a587ed1d0a4ef2c12b14e8e4c6b7e74607e73d90a4dd6cf1f788d8",
+ "inputsDigest": "b5d89f2f3397a09e26ca69a954a8382df23cf5787098736e6ce6827542776227",
  "states": [
   "inventoried",
   "characterized",
@@ -56,7 +56,7 @@
    "export": 5,
    "animation": 435,
    "history": 350,
-   "selection": 367,
+   "selection": 375,
    "render": 463,
    "persist": 393
   }
@@ -2456,7 +2456,8 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 1
+    "native": 1,
+    "selection": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -4960,6 +4961,7 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
+    "selection": 3,
     "native": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
@@ -4972,7 +4974,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 126,
+    "functionsVisited": 127,
     "via": "variable trigger",
     "references": []
    },
@@ -9164,7 +9166,9 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {},
+   "consumers": {
+    "selection": 3
+   },
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
@@ -9175,7 +9179,7 @@
     "container": "start-newpanel",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 94,
+    "functionsVisited": 95,
     "via": "chain",
     "references": []
    },
@@ -10175,7 +10179,8 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 3
+    "native": 3,
+    "selection": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -11890,7 +11895,8 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 3
+    "native": 3,
+    "selection": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -17398,7 +17404,8 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 2
+    "native": 2,
+    "selection": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -17410,7 +17417,7 @@
     "container": "web-changelog-row",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 76,
+    "functionsVisited": 77,
     "via": "variable toggle",
     "references": []
    },
@@ -27531,7 +27538,8 @@
     "history": 1,
     "persist": 2,
     "render": 2,
-    "animation": 3
+    "animation": 3,
+    "selection": 3
    },
    "platforms": "browser and desktop",
    "status": "inventoried",
@@ -27539,7 +27547,7 @@
    "source": "src/js/rig-widget.js:514",
    "meta": {
     "i18n": "widgetMenuAxisRangePrefix",
-    "functionsVisited": 200
+    "functionsVisited": 201
    },
    "fixtures": [
     "static-props",
@@ -27571,7 +27579,8 @@
     "history": 1,
     "persist": 2,
     "render": 2,
-    "animation": 3
+    "animation": 3,
+    "selection": 3
    },
    "platforms": "browser and desktop",
    "status": "inventoried",
@@ -27579,7 +27588,7 @@
    "source": "src/js/rig-widget.js:528",
    "meta": {
     "i18n": "widgetMenuSizeEllipsis",
-    "functionsVisited": 200
+    "functionsVisited": 201
    },
    "fixtures": [
     "static-props",
@@ -32624,7 +32633,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 383
+    "functionsVisited": 385
    },
    "fixtures": [
     "media",

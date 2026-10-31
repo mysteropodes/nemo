@@ -225,7 +225,7 @@ test('the panel opts its multi-select restyle in to skipping the steps the engin
   await h.fire();
   assert.deepEqual(await done, { status: 'applied' });
   assert.equal(h.batches.length, 1);
-  assert.deepEqual(h.sentOptions, [{ skipUnavailable: true }], 'the Select panel sends the explicit opt-in');
+  assert.deepEqual(h.sentOptions, [{ skipUnavailable: true, select: true }], 'the Select panel sends the explicit opt-in, and marks the batch as Select\'s (the only one a component accepts)');
 });
 
 test('the Labs route forwards only a literal skipUnavailable opt-in to the vector batch and always keys held cells (#2372)', async () => {

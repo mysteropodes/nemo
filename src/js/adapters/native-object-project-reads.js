@@ -13,6 +13,10 @@
   const OP = 'query.document.object';
   const PIN = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
   const PAGE_KINDS = ['outline', 'verts', 'tris', 'offsets'];
+  // #2256: the entered component the workspace controller holds (its id, frame count and layer uids), or null at the scene root. The timing and
+  // presented-stroke reads ask THIS context, never a caller's text.
+  const held = () => { try { const c = globalThis.NemoNativeComponentContext; return c && typeof c.readScope === 'function' ? c.readScope(globalThis) : null; } catch (_) { return null; } };
+  const readContext = (id) => { const h = held(); return h ? id === h.contextId : id === 'scene-root'; };
   const own = (v, k) => Object.prototype.hasOwnProperty.call(v, k);
   const object = (v) => !!v && typeof v === 'object' && !Array.isArray(v) &&
     (Object.getPrototypeOf(v) === Object.prototype || Object.getPrototypeOf(v) === null);
@@ -331,7 +335,7 @@
       return presented.get(key);
     }
     async function readPresentedStrokes(selector,pin,wanted,centres){
-      if(!exact(selector,['contextId','layerUid','frame'],[])||selector.contextId!=='scene-root'||!text(selector.layerUid)||!integer(selector.frame,0,4294967295)||!pins(pin))throw fault('invalid_request','Invalid presented-stroke selection');
+      if(!exact(selector,['contextId','layerUid','frame'],[])||!readContext(selector.contextId)||!text(selector.layerUid)||!integer(selector.frame,0,4294967295)||!pins(pin))throw fault('invalid_request','Invalid presented-stroke selection');
       const o=origin(selector,pin);if(!o)throw fault('unavailable','Presented strokes need a current native presentation');
       await settle(o);const entry=presentedEntry(o,selector);let items;
       if(entry.items)items=entry.items.map(i=>Object.assign({},i));
@@ -374,18 +378,21 @@
       requireCurrent(o);return freeze({info:copyPins(o.info),presentation:o.presentation,closed:geometry.closed,segments:geometry.segments,matrix:matrix});
     }
     async function readLegacy(layerUid, frame, pin, view) {
+      const scope = held(); // #2256: inside an entered component the row, frame count and context are the component's (its placement facts stay scene-only)
       function ready() {
         const s = ports.state(), p = s && s.presented;
         return s && !s.opening && samePins(s.info, pin) && p && p.available === true &&
-          p.presentation && samePins(p.presentation, pin) && (view === 'cells' || p.presentation.frame === frame) && integer(frame, 0) && frame < pin.totalFrames &&
-          Array.isArray(pin.layers) && pin.layers.filter((l) => l && l.layerUid === layerUid).length === 1;
+          p.presentation && samePins(p.presentation, pin) && (view === 'cells' || p.presentation.frame === frame) && integer(frame, 0) && frame < (scope ? scope.totalFrames : pin.totalFrames) &&
+          (scope ? held() && held().contextId === scope.contextId && scope.layerUids.filter((u) => u === layerUid).length === 1 && p.presentation.contextId === scope.contextId
+            : Array.isArray(pin.layers) && pin.layers.filter((l) => l && l.layerUid === layerUid).length === 1);
       }
+      if (scope && view === 'placement') return null;
       try {
         if (!pins(pin)) return null;
         if (!await waitLegacy()) return null;
         const ticket = ports.state().ticket, request = { apiVersion: 2, requestId: ports.requestId(view || 'timing'), instanceId: pin.instanceId,
           documentId: pin.documentId, operation: 'query.document.object.layer.timing', payload: { atRevision: pin.contentRevision,
-            documentSnapshotId: pin.documentSnapshotId, contextId: 'scene-root', layerUid: layerUid, frame: frame } };
+            documentSnapshotId: pin.documentSnapshotId, contextId: scope ? scope.contextId : 'scene-root', layerUid: layerUid, frame: frame } };
         if (view) request.payload.view = view;
         let response, failed = false;
         try { response = await ports.dispatch(request); } catch (_) { failed = true; }

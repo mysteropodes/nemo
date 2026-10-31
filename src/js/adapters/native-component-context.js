@@ -4,15 +4,16 @@
  * (NemoNativeObjectComponent.workspaceTransition, the pure query.document.object.workspace.context) which context is entered, reads
  * its layers through the pinned component read, projects the read-only view fields the ordinary UI reads (playhead, frame count,
  * work area, fps, tab strip) and asks the viewport to present the entered context. It writes no document and no history entry.
- * Editing INSIDE an entered component is offered to the vector family only (#2256 component writes: Draw, Pen and shape create through
- * the component command route, which targets the context held here); every other action that needs the presented scene lease declines (the
+ * Editing INSIDE an entered component is offered to the vector family only (#2256 component writes: Draw, Pen and shape create, and Select's
+ * pick, move / scale / rotate, restyle and Delete, through the component command route, which targets the context held here; the timeline
+ * paints the component's own frames and range from the pinned timing reads of that context, native-component-grid.js); every other action that needs the presented scene lease declines (the
  * presented context is not scene-root) and the scene editors keep `state.activeSymbolId` set. Exit restores the scene projection from the
  * native truth (projectView), never from a saved copy of the rows. Legacy documents never reach this module. */
 (function (root, factory) {
-  var api = factory();
+  var api = factory(typeof module === 'object' && module.exports ? require('./native-component-grid.js') : root.NemoNativeComponentGrid);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.NemoNativeComponentContext = api;
-}(typeof globalThis === 'object' ? globalThis : this, function () {
+}(typeof globalThis === 'object' ? globalThis : this, function (Grid) {
   'use strict';
   var SCENE = 'scene-root';
   var entered = new WeakMap(); // host -> the entered context's read-side view; absent while the scene is presented
@@ -53,6 +54,21 @@
     return st ? st.rows.map(function (row) { return { layerUid: row.layerUid, locked: false, visible: true }; }) : null;
   }
   function frameBound(host, pin) { var st = live(host); return st ? st.totalFrames : pin.totalFrames; }
+  // #2256: what a pinned timing read of the held context is judged by: the component's own id, frame count and layer uids (null at the scene root).
+  function readScope(host) {
+    var st = live(host);
+    return st ? Object.freeze({ contextId: st.contextId, totalFrames: st.totalFrames, layerUids: Object.freeze(st.rows.map(function (row) { return row.layerUid; })) }) : null;
+  }
+  // The entered rows with their names (what the Select adapters walk as the layer list of the context).
+  function layers(host) { var st = live(host); return st ? st.rows.map(function (row) { return Object.freeze({ layerUid: row.layerUid, name: row.name, locked: false, visible: true }); }) : null; }
+  // Row click: the component's layer becomes the active (and only selected) one. The layer table of a component is read-only here; this is a view choice.
+  function selectLayer(host, index) {
+    var st = live(host);
+    if (!st || !Number.isSafeInteger(index) || index < 0 || index >= st.rows.length) return false;
+    host.state.activeLayerIdx = index; host._layerSel = [index]; host._layerSelAnchor = index; host.selectedPaths = []; host.state.selectedStrokeIndices = [];
+    repaint(host);
+    return true;
+  }
   function integer(value, fallback) { return Number.isSafeInteger(value) && value >= 0 ? value : fallback; }
   // The live playhead and work area of the presented context, clamped into it (the owner refuses an out-of-range view).
   function viewNow(host) {
@@ -281,24 +297,30 @@
   }
 
   function node(host, tag, text, cls) { var el = host.document.createElement(tag); el.textContent = text; if (cls) el.className = cls; return el; }
-  // The read-side paint of an entered component (the scene paint is skipped: its pins and rows are the scene's).
+  // The pinned timing read of the entered component (cells: the whole row; range: the layer's in/out at the playhead frame). The reads consult the
+  // held context themselves; a read the owner refuses answers null and the row stays blank.
+  function timingPort(host, st) {
+    return {
+      current: function () { return live(host) === st; },
+      select: function (index) { selectLayer(host, index); },
+      read: function (kind, layerUid) {
+        var s = session(host), info = s && s.info();
+        if (!info || typeof s.readLayerCells !== 'function' || typeof s.readLayerRange !== 'function') return null;
+        if (kind !== 'cells') return s.readLayerRange(layerUid, host.state.currentFrame, info);
+        // A row's cells are a function of the revision alone (the playhead is not an input), so a scrub reads each row once per revision.
+        if (!st.cells || st.cells.revision !== info.contentRevision) st.cells = { revision: info.contentRevision, rows: new Map() };
+        var held = st.cells;
+        if (held.rows.has(layerUid)) return Promise.resolve(held.rows.get(layerUid));
+        return Promise.resolve(s.readLayerCells(layerUid, info)).then(function (runs) { if (runs && st.cells === held) held.rows.set(layerUid, runs); return runs; });
+      },
+    };
+  }
+  // The paint of an entered component (the scene paint is skipped: its pins and rows are the scene's). The grid is the component's own timeline.
   function paint(host) {
     var st = live(host);
     if (!st) return false;
-    var doc = host.document, list = doc.getElementById('layer-list'), header = doc.getElementById('frame-hdr'), grid = doc.getElementById('frame-grid');
-    if (!list || !header || !grid) return true;
-    var rows = st.rows.map(function (layer) {
-      var row = node(host, 'div', '', 'native-object-layer native-component-layer');
-      row.dataset.layerUid = layer.layerUid; row.style.display = 'flex';
-      var pick = node(host, 'button', layer.name + ' — ' + layer.layerKind); pick.type = 'button'; pick.disabled = true; pick.style.flex = '1'; pick.style.textAlign = 'left';
-      pick.setAttribute('aria-label', layer.name + ' (' + layer.layerUid + ')');
-      row.appendChild(pick); return row;
-    });
-    list.replaceChildren.apply(list, rows);
-    var frame = host.state.currentFrame;
-    header.replaceChildren(node(host, 'div', st.name + ' — Frame ' + (frame + 1) + ' / ' + st.totalFrames));
-    var note = node(host, 'div', 'Component layers are read-only here: editing inside a component is not available yet.', 'native-object-timing-unavailable');
-    note.setAttribute('role', 'status'); grid.replaceChildren(note);
+    if (Grid) Grid.paint(host, st, timingPort(host, st));
+    var doc = host.document, frame = host.state.currentFrame;
     var field = doc.getElementById('tl-cf');
     if (field) { if (doc.activeElement !== field) field.value = frame + 1; field.max = st.totalFrames; }
     ['tl-tf', 'info-frame'].forEach(function (id) { var el = doc.getElementById(id); if (el) el.textContent = id === 'tl-tf' ? st.totalFrames : frame + 1; });
@@ -326,5 +348,5 @@
     });
     return true;
   }
-  return Object.freeze({ SCENE: SCENE, presented: presented, contextId: contextId, layerRows: layerRows, frameBound: frameBound, enter: enter, exit: exit, close: close, revision: revision, projectionReady: projectionReady, openLayer: openLayer, paint: paint, renderTabs: renderTabs });
+  return Object.freeze({ SCENE: SCENE, presented: presented, contextId: contextId, layerRows: layerRows, layers: layers, readScope: readScope, selectLayer: selectLayer, frameBound: frameBound, enter: enter, exit: exit, close: close, revision: revision, projectionReady: projectionReady, openLayer: openLayer, paint: paint, renderTabs: renderTabs });
 }));
