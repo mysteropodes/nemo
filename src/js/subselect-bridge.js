@@ -13,7 +13,7 @@
   const consume=e=>{if(e.stopImmediatePropagation)e.stopImmediatePropagation();if(e.preventDefault)e.preventDefault();};
   function create(root){
     const RESTORE_TRIES=20,RESTORE_MS=60;
-    let selection=null,drag=null,marquee=null,overlay=null,pending=null,uncertain=null,recovering=false,readToken=0,previewToken=0,previewBusy=false,previewNext=null,retired=false;
+    let selection=null,drag=null,marquee=null,overlay=null,held=null,pending=null,uncertain=null,recovering=false,readToken=0,previewToken=0,previewBusy=false,previewNext=null,retired=false;
     let watching=false;
     let settled=Promise.resolve({status:'idle'});
     const session=()=>root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);
@@ -48,14 +48,16 @@
     function point(e,t){const p=mapping().point(e,{bounds:t.bounds,canvasW:t.pin.canvasW,canvasH:t.pin.canvasH,presentation:t.presentation});return [p.x,p.y];}
     function client(p,t){const q=map(mapping().transform({presentation:t.presentation},false),p);return [t.bounds.left+q[0]*t.bounds.width/t.pin.canvasW,t.bounds.top+q[1]*t.bounds.height/t.pin.canvasH];}
     function clear(){if(overlay){overlay.remove();overlay=null;}}
+    // #2356: the drawing of an applied edit stays up until its re-read selection replaces it, so the handles never blink off between commit and restore.
+    function drop(){if(held){held.remove();held=null;}}
     function grab(el,id){try{if(el.setPointerCapture)el.setPointerCapture(id);}catch(_){/* a press replayed after its release has no pointer left to capture */}}
     function release(t){try{if(t&&t.capture&&t.capture.releasePointerCapture)t.capture.releasePointerCapture(t.pointer);}catch(_){}}
-    function cancel(clearSelection){if(gate)gate.cancel();if(drag)drag.cancelled=true;if(marquee)marquee.cancelled=true;if(selection)selection.cancelled=true;release(drag);release(marquee);++readToken;++previewToken;previewNext=null;drawLatest=null;drag=null;marquee=null;clear();if(clearSelection)selection=null;refreshUI();return {status:'cancelled'};}
+    function cancel(clearSelection){if(gate)gate.cancel();if(drag)drag.cancelled=true;if(marquee)marquee.cancelled=true;if(selection)selection.cancelled=true;release(drag);release(marquee);++readToken;++previewToken;previewNext=null;drawLatest=null;drag=null;marquee=null;clear();drop();if(clearSelection)selection=null;refreshUI();return {status:'cancelled'};}
     function node(tag,attrs){const n=root.document.createElementNS('http://www.w3.org/2000/svg',tag);Object.keys(attrs).forEach(k=>n.setAttribute(k,attrs[k]));return n;}
     function watch(){if(watching||!root.requestAnimationFrame)return;watching=true;root.requestAnimationFrame(()=>{watching=false;if(pending)return;if((selection&&!current(selection))||(marquee&&!current(marquee))){cancel(true);return;}if(selection||marquee)watch();});}
-    function draw(t,segments,previewMatrix){clear();if(!current(t))return;watch();
-      const d=root.document;overlay=node('svg',{viewBox:'0 0 '+t.pin.canvasW+' '+t.pin.canvasH,preserveAspectRatio:'none','aria-hidden':'true'});
-      Object.assign(overlay.style,{position:'fixed',pointerEvents:'none',zIndex:'20',left:t.bounds.left+'px',top:t.bounds.top+'px',width:t.bounds.width+'px',height:t.bounds.height+'px'});d.body.appendChild(overlay);
+    function draw(t,segments,previewMatrix){if(!current(t)){clear();drop();return;}watch();
+      const d=root.document,old=overlay;overlay=node('svg',{viewBox:'0 0 '+t.pin.canvasW+' '+t.pin.canvasH,preserveAspectRatio:'none','aria-hidden':'true'});
+      Object.assign(overlay.style,{position:'fixed',pointerEvents:'none',zIndex:'20',left:t.bounds.left+'px',top:t.bounds.top+'px',width:t.bounds.width+'px',height:t.bounds.height+'px'});d.body.appendChild(overlay);if(old)old.remove();drop();/* swap, never remove-then-add: no frame without handles */
       const m=previewMatrix||t.item.matrix,V=mapping().transform({presentation:t.presentation},false),world=p=>map(V,map(m,p));
       let text='';segments.forEach((a,i)=>{if(!i){const p=world(a.point);text='M '+p.join(' ');return;}curve(segments[i-1],a);});
       function curve(a,b){text+=' C '+world([a.point[0]+a.handleOut[0],a.point[1]+a.handleOut[1]]).join(' ')+' '+world([b.point[0]+b.handleIn[0],b.point[1]+b.handleIn[1]]).join(' ')+' '+world(b.point).join(' ');}
@@ -76,7 +78,7 @@
       const geometry=!editable&&item.paint?item.paint:item;
       return new Path({insert:false,closed:geometry.closed,segments:geometry.segments.map(a=>[a.point,a.handleIn,a.handleOut])});}
     function rectangle(t){const Rectangle=root.Rectangle||(root.paper&&root.paper.Rectangle),Point=root.Point||(root.paper&&root.paper.Point);return new Rectangle(new Point(t.start),new Point(t.end));}
-    function drawMarquee(t){clear();if(!current(t))return;watch();
+    function drawMarquee(t){clear();drop();if(!current(t))return;watch();
       if(t.target)draw(t.target,t.target.item.segments);
       if(!overlay){overlay=node('svg',{'aria-hidden':'true'});Object.assign(overlay.style,{position:'fixed',pointerEvents:'none',zIndex:'20',left:t.bounds.left+'px',top:t.bounds.top+'px',width:t.bounds.width+'px',height:t.bounds.height+'px'});root.document.body.appendChild(overlay);}
       // Keep the selection rectangle in the same project coordinate system as the
@@ -135,7 +137,7 @@
         if(!admitted(t,ctx))throw new Error('Subselect intent changed before dispatch.');return action({reconcile:ctx.reconcile,dispatch:q=>{if(!admitted(t,ctx))throw new Error('Subselect intent changed before dispatch.');return ctx.dispatch(q);}});
       })};
       const command=root.NemoNativeObjectVectorCommand.create(guarded,'subselect',root.NemoNativeSubselectContract);
-      clear();++previewToken;previewNext=null;
+      ++previewToken;previewNext=null;
       const send=()=>command.execute(root.NemoNativeSubselectContract.EDIT,pin=>{if(!same(pin,t.pin))throw new Error('Subselect revision changed.');return {command:'object.subselect.edit',stableTarget:t.item.stableTarget,atFrame:t.selector.frame,intent:intent};});
       // The Project records the presentation a command is SUBMITTED under and the queue hides it while any command is pending: an edit submitted in that window is
       // refused at dispatch. Wait (bounded) until it is readable, then submit; a real change meanwhile ends the edit with no write (native-presentation-wait.js).
@@ -144,8 +146,8 @@
       // #2356: a completed edit keeps the edited item and its vertices selected (baseline kept _nodeSel across every commit): the selection is re-read at the new
       // revision once the presentation is readable. A refusal, a stale gesture or an indeterminate outcome clears it as before.
       const keep={session:s,selector:t.selector,stableTarget:t.item.stableTarget,indices:t.indices.slice(),intent};
-      refreshUI();const outcome=pending.then(receipt=>{cancel(true);return {result:{status:receipt.applied?'applied':'noop',receipt},keep};},error=>{cancel(true);notice(error);if(error&&error.code==='subselect_command_indeterminate'){uncertain=error;return {result:{status:'indeterminate',error}};}return {result:{status:'refused',error}};});
-      settled=outcome.then(o=>{pending=null;refreshUI();return o.keep?restore(o.keep).then(()=>o.result,()=>o.result):o.result;},error=>{pending=null;refreshUI();throw error;});return settled;
+      refreshUI();const outcome=pending.then(receipt=>{const shown=overlay;overlay=null;cancel(true);held=shown;return {result:{status:receipt.applied?'applied':'noop',receipt},keep};},error=>{cancel(true);notice(error);if(error&&error.code==='subselect_command_indeterminate'){uncertain=error;return {result:{status:'indeterminate',error}};}return {result:{status:'refused',error}};});
+      settled=outcome.then(o=>{pending=null;refreshUI();return o.keep?restore(o.keep).then(kept=>{if(!kept)drop();return o.result;},()=>{drop();return o.result;}):o.result;},error=>{pending=null;refreshUI();throw error;});return settled;
     }
     // Index of the same vertices after the edit: an insert selects the new vertex (curve + 1, appended for the closing curve), a delete removes what was selected.
     function remap(keep,count){const k=keep.intent;let idx=keep.indices;if(k.kind==='insert')idx=[k.curve+1];else if(k.kind==='delete')idx=[];return idx.filter(i=>i<count);}
