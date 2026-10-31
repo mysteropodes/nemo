@@ -218,6 +218,7 @@
     {"src":"js/adapters/native-object-project-tabs-ui.js"},
     {"src":"js/project.js"},
     {"src":"js/adapters/project-close-shortcut.js"},
+    {"src":"js/adapters/project-save-shortcut.js"},
     {"src":"js/adapters/feedback-local.js"},
     {"src":"js/adapters/feedback-remote.js"},
     {"src":"js/feedback-bridge.js"},

@@ -46,7 +46,7 @@ test('browser preview without Tauri still handles the keydown', () => {
 test('Rust: the default Close Window item is replaced by a Cmd+W Close Project menu item that emits the same event', () => {
   const lib = fs.readFileSync('src-tauri/src/lib.rs', 'utf8');
   assert.match(lib, /CmdOrCtrl\+W/);
-  assert.match(lib, /emit\("menu-close-project"/);
+  assert.match(lib, /Some\("menu-close-project"\)/);
   assert.match(lib, /route_close_window_to_project\(app\.handle\(\), &menu\)/);
   assert.equal(Shortcut.MENU_EVENT, 'menu-close-project');
 });

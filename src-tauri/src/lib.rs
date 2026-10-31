@@ -25,6 +25,49 @@ mod task_runtime;
 #[cfg(feature = "test-play-publication-observer")]
 mod test_play_observer;
 const CLOSE_PROJECT_MENU_ID: &str = "close_project";
+const SAVE_PROJECT_MENU_ID: &str = "save_project";
+const SAVE_PROJECT_AS_MENU_ID: &str = "save_project_as";
+
+/// The page event each project menu item turns into (None for every other item).
+fn project_menu_event(id: &str) -> Option<&'static str> {
+    match id {
+        CLOSE_PROJECT_MENU_ID => Some("menu-close-project"),
+        SAVE_PROJECT_MENU_ID => Some("menu-save-project"),
+        SAVE_PROJECT_AS_MENU_ID => Some("menu-save-project-as"),
+        _ => None,
+    }
+}
+
+/// Cmd+S / Shift+Cmd+S belong to the File menu like Cmd+W: the menu item owns the accelerator and
+/// the page runs the project's own Save / Save As (the keydown path alone never reached an
+/// installed build). Idempotent per menu build; the File submenu is the one named "File".
+#[cfg(target_os = "macos")]
+fn add_project_save_items<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    menu: &tauri::menu::Menu<R>,
+) -> tauri::Result<()> {
+    use tauri::menu::{MenuItem, MenuItemKind, PredefinedMenuItem};
+    for top in menu.items()? {
+        let MenuItemKind::Submenu(submenu) = top else {
+            continue;
+        };
+        if submenu.text()?.replace('&', "") != "File" {
+            continue;
+        }
+        let save = MenuItem::with_id(app, SAVE_PROJECT_MENU_ID, "Save", true, Some("CmdOrCtrl+S"))?;
+        let save_as = MenuItem::with_id(
+            app,
+            SAVE_PROJECT_AS_MENU_ID,
+            "Save As\u{2026}",
+            true,
+            Some("CmdOrCtrl+Shift+S"),
+        )?;
+        submenu.insert(&save, 0)?;
+        submenu.insert(&save_as, 1)?;
+        submenu.insert(&PredefinedMenuItem::separator(app)?, 2)?;
+    }
+    Ok(())
+}
 
 #[derive(Debug, PartialEq)]
 enum CloseWindowEdit {
@@ -96,7 +139,16 @@ fn route_close_window_to_project<R: tauri::Runtime>(
 
 #[cfg(test)]
 mod close_window_menu_tests {
-    use super::{close_window_edits, CloseWindowEdit};
+    use super::{close_window_edits, project_menu_event, CloseWindowEdit};
+
+    #[test]
+    fn project_menu_items_map_to_their_page_events() {
+        assert_eq!(project_menu_event("close_project"), Some("menu-close-project"));
+        assert_eq!(project_menu_event("save_project"), Some("menu-save-project"));
+        assert_eq!(project_menu_event("save_project_as"), Some("menu-save-project-as"));
+        assert_eq!(project_menu_event("check_update"), None);
+        assert_eq!(project_menu_event("save"), None);
+    }
 
     fn predefined(texts: &[&str]) -> Vec<Option<String>> {
         texts
@@ -385,8 +437,8 @@ pub fn run() {
         .on_menu_event(|app, event| {
             if event.id() == "check_update" {
                 let _ = app.emit("menu-check-update", ());
-            } else if event.id() == CLOSE_PROJECT_MENU_ID {
-                let _ = app.emit("menu-close-project", ());
+            } else if let Some(name) = project_menu_event(event.id().as_ref()) {
+                let _ = app.emit(name, ());
             }
         })
         .setup(move |app| {
@@ -404,6 +456,7 @@ pub fn run() {
                 use tauri::menu::{Menu, MenuItem, MenuItemKind};
                 let menu = Menu::default(app.handle())?;
                 route_close_window_to_project(app.handle(), &menu)?;
+                add_project_save_items(app.handle(), &menu)?;
                 if let Some(MenuItemKind::Submenu(app_submenu)) = menu.items()?.first() {
                     let check_update_item = MenuItem::with_id(
                         app.handle(),
