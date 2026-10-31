@@ -173,6 +173,25 @@ impl PreparedItem {
     }
 }
 
+impl PreparedItem {
+    /// #2372 CURRENT-OUTLINE: the item as the baseline "Current frame outline" draws it. The fill (flat or gradient) is dropped; an
+    /// authored stroke is kept as it is, an item without one gets the 235,235,240 stroke of `width` at the item's own opacity
+    /// (the alpha of its solid fill, which carries the item opacity). Same path and transform as `draw`.
+    pub(crate) fn draw_outline(&self, scene: &mut Scene, transform: Affine, path: &BezPath, width: f64) {
+        if let Some((stroke, color)) = &self.stroke {
+            scene.stroke(stroke, transform, *color, None, path);
+            return;
+        }
+        let opacity = match &self.fill {
+            Some(PreparedFill::Solid(color)) => f64::from(color.components[3]),
+            _ => 1.,
+        };
+        let alpha = (255. * opacity).round().clamp(0., 255.) as u8;
+        let paint = Color::from_rgba8(235, 235, 240, alpha);
+        scene.stroke(&Stroke::new(width), transform, paint, None, path);
+    }
+}
+
 fn color_of(solid: &SceneSolid) -> Result<Color, EmitError> {
     // AlphaColor<Srgb> holds straight float channels; do not quantize to RGB8.
     // The channel rule lives once, in the L07-A SceneSolid kernel.

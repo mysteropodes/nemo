@@ -508,3 +508,6 @@ mod onion;
 
 #[path = "native_object_desktop_preview_checker_tests.rs"]
 mod checker;
+
+#[path = "native_object_desktop_preview_outline_tests.rs"]
+mod outline;

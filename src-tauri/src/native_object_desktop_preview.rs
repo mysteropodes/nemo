@@ -30,6 +30,9 @@ pub(crate) struct ObjectPreviewReceipt {
     /// The checker was painted behind the artwork; absent when not asked for.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub(crate) alpha_checker: bool,
+    /// The items were drawn as outlines (#2372); absent when not asked for.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) current_outline: bool,
     /// What the renderer did with the request's onion / Ghost All settings; absent when none were asked for.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) ghosts: Option<GhostReceipt>,
@@ -88,6 +91,10 @@ pub(crate) struct ObjectPreviewRequest {
     /// background (viewport only, never an export).
     #[serde(default)]
     pub(crate) alpha_checker: bool,
+    /// "Current frame outline" (#2372): the renderer draws the items of the presented frame as outlines (viewport only, never an
+    /// export, never persisted).
+    #[serde(default)]
+    pub(crate) current_outline: bool,
     /// Onion skin / Ghost All composed under the live frame by the native renderer (viewport only, never an export).
     #[serde(default)]
     pub(crate) ghosts: Option<GhostUnderlayRequest>,
@@ -178,7 +185,7 @@ pub(crate) fn admit_request(raw: &str, instance: &str) -> HostResult<ObjectPrevi
     }
     let output = request.output_spec.admit_object()?;
     request.viewport.admit_object(&output)?;
-    if request.alpha_checker && !(request.viewport.display_scale().is_finite() && request.viewport.display_scale() > 0.) {
+    if (request.alpha_checker || request.current_outline) && !(request.viewport.display_scale().is_finite() && request.viewport.display_scale() > 0.) {
         return Err(host_error("invalid_request", "invalid object preview checker scale"));
     }
     Ok(request)
@@ -190,6 +197,8 @@ pub(crate) struct ObjectPreviewConsumer<'a> {
     display_filter: ViewportDisplayFilter,
     /// Screen px per composition px of the shown canvas when the transparency checker is asked for.
     alpha_checker: Option<f64>,
+    /// Screen px per composition px of the shown canvas when the Current frame outline is asked for.
+    current_outline: Option<f64>,
 }
 impl ObjectPreviewConsumer<'_> {
     pub(crate) fn present<P: SurfacePort>(
@@ -204,6 +213,7 @@ impl ObjectPreviewConsumer<'_> {
             viewport,
             self.display_filter,
             self.alpha_checker,
+            self.current_outline,
             &mut diagnostic,
         )?;
         diagnostic.finish(presented.receipt.status());
@@ -268,6 +278,7 @@ pub(crate) fn preview_with_target(
                         selector: selector.clone(),
                         display_filter: request.display_filter,
                         alpha_checker: request.alpha_checker.then(|| request.viewport.display_scale()),
+                        current_outline: request.current_outline.then(|| request.viewport.display_scale()),
                     }))
                 };
                 owner.with_prepared_object_preview_for_navigation(
@@ -291,6 +302,7 @@ pub(crate) fn preview_with_target(
         view: receipt.view,
         display_filter: request.display_filter,
         alpha_checker: request.alpha_checker,
+        current_outline: request.current_outline,
         ghosts: receipt.ghosts,
     })
 }
