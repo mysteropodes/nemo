@@ -9629,6 +9629,12 @@ function onKeyDown(event){
   // drawings). Scoped to the Select/Subselect tools only: select-all while
   // Brush/Pen/etc are active would be a silent, confusing side effect with
   // no visible feedback for what tool is active.
+  // #2371: on a native object project the layer has no Paper children; the native Select module lists the presented layer itself and owns the answer
+  // (a refusal is its own notice) - the legacy branch below never runs there, and still runs everywhere else (selectAll returns false).
+  if((event.metaKey||event.ctrlKey)&&(event.key==='a'||event.key==='A')&&window.NemoNativeSelectGesture&&window.NemoNativeSelectGesture.selectAll&&window.NemoNativeSelectGesture.selectAll(window)){
+    event.preventDefault();
+    return;
+  }
   if((event.metaKey||event.ctrlKey)&&(event.key==='a'||event.key==='A')&&(state.tool==='select'||state.tool==='subselect')&&userLayers[state.activeLayerIdx]){
     event.preventDefault();
     clearSel();
@@ -11092,13 +11098,19 @@ document.getElementById('btn-bake-cache').addEventListener('click',function(){ma
 })();
 document.getElementById('btn-tween-curves').addEventListener('click',function(){window.SM.toggleTweenCurves();});
 document.getElementById('btn-ghost-select').addEventListener('click',function(){selectGhostAll();});
-document.getElementById('btn-shadow-guides').addEventListener('click',function(){window.SM.toggleShadowGuides();});
+document.getElementById('btn-shadow-guides').addEventListener('click',function(){
+  // #2373: on a native object project the switch rides the next preview request (view-only; a refused hide lights the button again).
+  if(window.NemoNativeViewAids&&window.NemoNativeViewAids.toggle(window,'shadow',this))return;
+  window.SM.toggleShadowGuides();
+});
 // Team review view filter — cycles All -> Mine -> Corrections, purely a
 // render-time filter in engine-bridge.js's buildSceneJson (never touches
 // the document), so switching is instant and always reversible.
 var REVISION_VIEW_LABELS={all:'Tout',mine:'Mes traits',revisions:'Corrections'};
 var REVISION_VIEW_ORDER=['all','mine','revisions'];
 document.getElementById('btn-revision-view').addEventListener('click',function(){
+  // #2371: a native object project has no legacy scene filter behind this cycle; the unavailable table says so and nothing changes.
+  if(window.NemoNativeInspectorUnavailable&&NemoNativeInspectorUnavailable.refuse(window,'btn-revision-view'))return;
   var idx=REVISION_VIEW_ORDER.indexOf(state.revisionView);
   state.revisionView=REVISION_VIEW_ORDER[(idx+1)%REVISION_VIEW_ORDER.length];
   this.textContent=REVISION_VIEW_LABELS[state.revisionView];
@@ -11113,6 +11125,8 @@ var currentOutlineChk=document.getElementById('p-current-outline');
 if(currentOutlineChk){
   currentOutlineChk.checked=!!state.currentFrameOutline;
   currentOutlineChk.addEventListener('change',function(){
+    // #2372: on a native object project the flag rides the next preview request (view-only; a refusal unchecks the box).
+    if(window.NemoNativeViewAids&&window.NemoNativeViewAids.toggle(window,'outline',this))return;
     state.currentFrameOutline=this.checked;
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
   });

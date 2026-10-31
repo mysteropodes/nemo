@@ -290,6 +290,10 @@
       ghosts:function(info){var ui=root.NemoNativeObjectGhostUI;return ui&&typeof ui.selection==='function'?ui.selection(root,info):null;},
       // "Show transparency" (#2373): a view flag the renderer reads, so the checker is engine pixels behind the artwork.
       alphaChecker:function(){return !!(root.state&&root.state.previewAlphaBg===true);},
+      // "Current frame outline" (#2372): likewise a view flag the renderer reads; the checkbox only flips state.currentFrameOutline.
+      currentOutline:function(){return !!(root.state&&root.state.currentFrameOutline===true);},
+      // "Shadow guides" off (#2373): the flag is the inverse of state.showShadowGuides (shown by default, as in the baseline).
+      hideShadowGuides:function(){return !!(root.state&&root.state.showShadowGuides===false);},
       displayFilter:function(){var labs=root.SMLabs,color=labs&&typeof labs.getViewFilter==='function'?labs.getViewFilter():'none';
         return labs&&typeof labs.isMirrored==='function'&&labs.isMirrored()?(color==='none'?'mirrored':color+'-mirrored'):color;},
       subscribeWindowOcclusion:root.__TAURI__.event&&typeof root.__TAURI__.event.listen==='function'?async function(hint,cancel){

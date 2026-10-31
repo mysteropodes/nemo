@@ -4,6 +4,12 @@
 //! (column + row) even. Only a viewport witness can carry one, so an export (a different witness) can never contain it, and the
 //! document background colour stays the export background.
 use crate::object_render_scene::{ObjectCompositionWitness, ObjectSceneError};
+// #2372: the sibling viewport-only display mode, a child here so it reaches the witness' private fields without growing its file.
+#[path = "object_viewport_outline.rs"]
+pub(crate) mod outline;
+// #2373: and the Shadow guides switch, the third.
+#[path = "object_viewport_shadow.rs"]
+pub(crate) mod shadow;
 use vello::kurbo::{Affine, Rect};
 use vello::peniko::{Color, Fill};
 

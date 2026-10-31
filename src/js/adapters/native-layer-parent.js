@@ -86,7 +86,7 @@
   // What a refusal says to the person: the owner's code, in the words of the menu's own cases.
   function refusalText(error) {
     const code = error && error.code;
-    if (code === 'unavailable') return 'Parenting would move the layer: a rotated or scaled parent, an expression or an animated Position cannot be kept in place natively.';
+    if (code === 'unavailable') return 'Parenting would move the layer: an expression, an animated Position, Rotation or Scale, a skewing or collapsed parent chain, or a layer without a pivot (text, image, mask, 3D, rig) cannot be kept in place natively.';
     if (code === 'not_found') return 'The layer or its parent is no longer in the project.';
     if (code === 'invalid_request') return 'Parenting refused: a layer cannot be its own parent, a folder cannot be a parent and a cycle is not allowed.';
     return 'Native layer parent command was refused.';

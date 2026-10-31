@@ -73,6 +73,7 @@
     {"src":"js/adapters/native-component-grid.js"},
     {"src":"js/adapters/native-component-context.js"},
     {"src":"js/adapters/native-component-enter-ui.js"},
+    {"src":"js/adapters/native-component-expose-ui.js"},
     {"src":"js/adapters/native-import-contract.js"},
     {"src":"js/adapters/native-import-seam.js"},
     {"src":"js/adapters/native-object-edit-contract.js"},

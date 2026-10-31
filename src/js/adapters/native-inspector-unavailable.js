@@ -12,7 +12,7 @@
   else root.NemoNativeInspectorUnavailable = api;
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
-  function row(reason, what, kind) { return Object.freeze({ reason: reason, kind: kind || 'control', notice: what + ' not available on this project yet.' }); }
+  function row(reason, what, kind, notice) { return Object.freeze({ reason: reason, kind: kind || 'control', notice: notice || (what + ' not available on this project yet.') }); }
   var PROPAGATE = row('propagate-across-frames', 'Propagating a fill across frames is');
   var GHOST = row('multi-frame-ghost-selection', 'Selecting the content of several keyframes at once is');
   var STROKE_GRADIENT = row('stroke-gradient-along-path', 'A gradient along a stroke is');
@@ -24,6 +24,10 @@
     'p-strokegrad-from-c': STROKE_GRADIENT,
     'p-strokegrad-to': STROKE_GRADIENT,
     'p-strokegrad-to-c': STROKE_GRADIENT,
+    // #2371: the Curve editor (motion-graph.js) and the Revision view cycle (timeline.js) read legacy state.layers / a legacy scene filter; their notices are
+    // their own sentences (key ease stays editable through the native property-key presets).
+    'btn-mgraph': row('curve-editor', '', 'control', 'Curve editor is not available on native projects yet; use the key ease presets in the property panel'),
+    'btn-revision-view': row('revision-view', '', 'control', 'Revision view is not available on native projects'),
     'new-custom-shader': row('custom-shader-library', 'The custom shader library is', 'menu')
   });
   var installed = new WeakMap();
@@ -75,6 +79,13 @@
     if (typeof event.preventDefault === 'function') event.preventDefault();
     if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
   }
+  // The Curve editor's secondary gesture (right-click swaps value/speed) is a contextmenu, not a click: same refusal, and no browser menu.
+  function interceptMenu(root, event) {
+    var id = ownerOf(root, event && event.target);
+    if (!id || !refuse(root, id)) return;
+    if (typeof event.preventDefault === 'function') event.preventDefault();
+    if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+  }
   // Brings the marks in line with the project kind (cheap and idempotent: called from every UI repaint) and installs the listener once.
   function sync(root) {
     var doc = root && root.document;
@@ -82,6 +93,7 @@
     if (!installed.has(root) && typeof doc.addEventListener === 'function') {
       var handler = function (event) { intercept(root, event); };
       doc.addEventListener('click', handler, true);
+      doc.addEventListener('contextmenu', function (event) { interceptMenu(root, event); }, true);
       installed.set(root, handler);
     }
     var native = active(root);

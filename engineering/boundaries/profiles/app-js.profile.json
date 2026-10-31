@@ -2875,13 +2875,15 @@
         "native-layer-list-presenter.js",
         "native-object-ui.js",
         "native-layer-range-desktop.js",
-        "native-layer-playhead-cut-ui.js"
+        "native-layer-playhead-cut-ui.js",
+        "native-component-expose-ui.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-object-ui.js",
         "native-layer-range-desktop.js",
-        "native-layer-playhead-cut-ui.js"
+        "native-layer-playhead-cut-ui.js",
+        "native-component-expose-ui.js"
       ]
     },
     {

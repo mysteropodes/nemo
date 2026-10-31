@@ -8,7 +8,7 @@ use native_engine::{
     desktop_viewport::{ObjectPreviewNavigation, ObjectPreviewView},
     object_frame_packet::ObjectFrameSelector,
     object_render_scene::{
-        viewport_checker_quality_suffix, GhostReceipt, GhostUnderlayRequest, ObjectBrushAdmission,
+        viewport_checker_quality_suffix, viewport_outline_quality_suffix, viewport_shadow_guides_quality_suffix, GhostReceipt, GhostUnderlayRequest, ObjectBrushAdmission,
         ObjectCompositionWitness, ObjectPaintPlan,
     },
     object_snapshot::ObjectSnapshot,
@@ -26,6 +26,10 @@ pub(super) struct PreparedObjectPreview {
     pub(super) ghosts: Option<GhostUnderlayRequest>,
     /// #2373: screen px per composition px when the viewport paints the transparency checker; part of the quality identity.
     pub(super) checker_scale: Option<f64>,
+    /// #2372: screen px per composition px when the viewport draws the Current frame outline; part of the quality identity.
+    pub(super) outline_scale: Option<f64>,
+    /// #2373: the Shadow guides switch is off in this viewport frame; part of the quality identity.
+    pub(super) hide_shadow_guides: bool,
 }
 
 impl PreparedObjectPreview {
@@ -36,9 +40,18 @@ impl PreparedObjectPreview {
             Some(ghosts) => format!("{base}{}", ghosts.quality_suffix()),
             None => base,
         };
-        match self.checker_scale {
+        let base = match self.checker_scale {
             Some(scale) => format!("{base}{}", viewport_checker_quality_suffix(scale)),
             None => base,
+        };
+        let base = match self.outline_scale {
+            Some(scale) => format!("{base}{}", viewport_outline_quality_suffix(scale)),
+            None => base,
+        };
+        if self.hide_shadow_guides {
+            format!("{base}{}", viewport_shadow_guides_quality_suffix())
+        } else {
+            base
         }
     }
 
@@ -153,6 +166,8 @@ impl NativeObjectHost {
             navigation,
             ghosts,
             checker_scale: None,
+            outline_scale: None,
+            hide_shadow_guides: false,
         })
     }
 }
@@ -174,6 +189,36 @@ pub(super) fn attach_ghosts(
         .with_ghost_underlay(underlay)
         .map_err(|e| format!("preview onion composition: {e:?}"))?;
     Ok((composition, Some(receipt)))
+}
+
+/// The view-only aids of a viewport witness, in the order the canonical quality identity lists them: the transparency checker
+/// (#2373) behind the artwork, then the Current frame outline (#2372). An export witness never goes through here.
+pub(super) fn attach_view_aids(
+    composition: ObjectCompositionWitness,
+    canvas: (u32, u32),
+    checker: Option<f64>,
+    outline: Option<f64>,
+    hide_shadow_guides: bool,
+) -> Result<ObjectCompositionWitness, String> {
+    let composition = match checker {
+        Some(scale) => composition
+            .with_viewport_checker(canvas, scale)
+            .map_err(|e| format!("preview transparency checker: {e:?}"))?,
+        None => composition,
+    };
+    let composition = match outline {
+        Some(scale) => composition
+            .with_viewport_outline(scale)
+            .map_err(|e| format!("preview current frame outline: {e:?}"))?,
+        None => composition,
+    };
+    if hide_shadow_guides {
+        composition
+            .with_viewport_hidden_shadow_guides()
+            .map_err(|e| format!("preview hidden shadow guides: {e:?}"))
+    } else {
+        Ok(composition)
+    }
 }
 
 impl NativeObjectHost {

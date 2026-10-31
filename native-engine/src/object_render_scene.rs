@@ -29,7 +29,10 @@ mod reference;
 // #2373: the viewport-only "Show transparency" checker painted under the artwork.
 #[path = "object_viewport_checker.rs"]
 pub(crate) mod viewport_checker;
-pub use viewport_checker::viewport_checker_quality_suffix;
+pub use viewport_checker::{
+    outline::viewport_outline_quality_suffix, shadow::viewport_shadow_guides_quality_suffix,
+    viewport_checker_quality_suffix,
+};
 // #2358 GHOST-UNDER: onion / Ghost All frames composed under the live frame of a viewport witness.
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 #[path = "object_ghost_underlay.rs"]
@@ -133,6 +136,8 @@ pub struct ObjectCompositionWitness {
     resources: Option<Arc<ObjectSceneResourceSet>>,
     /// Viewport-only transparency checker painted under the artwork (#2373); never present on an export witness.
     viewport_checker: Option<viewport_checker::ViewportChecker>,
+    viewport_outline: Option<f64>, // #2372 outline stroke width, viewport only
+    viewport_hides_shadow: bool,   // #2373 Shadow guides hidden, viewport only
     /// Joined layer/effect plan of this witness' packet (L08-K); `None` keeps the flat fast path.
     scene_effects: Option<Arc<SceneEffectPlan>>,
     /// Decoded video frames of the plan's video slots (T12); `None` while undecoded.
@@ -162,6 +167,8 @@ pub fn prepare_object_composition(
         viewport: false,
         viewport_quality: None,
         viewport_checker: None,
+        viewport_outline: None,
+        viewport_hides_shadow: false,
         camera,
         resources: None,
         scene_effects: None,

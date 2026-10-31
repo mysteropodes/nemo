@@ -784,7 +784,7 @@ test('session view change invalidates the original pending action lease before a
 });
 
 function navigationFixture(initialFilter='none'){
- const h=host(),invoke=h.invoke,hold=deferred();let filter=initialFilter,ghosts=null,checker=false,mode='canvas',frame=0,pause=false,tamper=null,rect={x:0,y:0,width:320,height:180};
+ const h=host(),invoke=h.invoke,hold=deferred();let filter=initialFilter,ghosts=null,checker=false,outline=false,hideShadow=false,mode='canvas',frame=0,pause=false,tamper=null,rect={x:0,y:0,width:320,height:180};
  const literals=new Map([
   ['1:0,0',[[2,0,0,2,-160,-90],[.5,0,0,.5,80,45]]],
   ['1:10,-5',[[2,0,0,2,-180,-80],[.5,0,0,.5,90,40]]],
@@ -795,13 +795,15 @@ function navigationFixture(initialFilter='none'){
  h.invoke=async(command,args)=>{const result=await invoke(command,args),q=args&&JSON.parse(args.requestJson);
   if(command==='nemo_native_object_preview')result.displayFilter=q.displayFilter||'none';
   if(command==='nemo_native_object_preview'&&q.alphaChecker)result.alphaChecker=true;
+  if(command==='nemo_native_object_preview'&&q.currentOutline)result.currentOutline=true;
+  if(command==='nemo_native_object_preview'&&q.hideShadowGuides)result.hideShadowGuides=true;
   if(command==='nemo_native_object_preview'&&q.ghosts)result.ghosts={selected:q.ghosts,status:'composited',frames:2};
   if(command!=='nemo_native_object_preview'||q.viewMode!=='stored-camera')return result;
   const n=q.navigation||{zoom:1,pan:[0,0]},pair=literals.get(n.zoom+':'+n.pan.join(','));assert.ok(pair,'independent authored navigation literal');
   if(pause)await hold.promise;
   const reply={...result,view:{mode:'stored-camera',navigation:n,cameraAvailable:true,documentToComposition:pair[0],compositionToDocument:pair[1]}};return tamper?tamper(reply):reply;};
- const s=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{...rect},physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>frame,viewMode:()=>mode,displayFilter:()=>filter,ghosts:()=>ghosts,alphaChecker:()=>checker});
- return {h,s,async open(){await s.openPath('/project.json');mode='stored-camera';await s.presentPreview(frame);},set filter(value){filter=value;},set ghosts(value){ghosts=value;},set checker(value){checker=value;},set frame(value){frame=value;},set mode(value){mode=value;},set rect(value){rect=value;},pause(){pause=true;},release(){pause=false;hold.resolve();},tamper(fn){tamper=fn;}};
+ const s=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{...rect},physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>frame,viewMode:()=>mode,displayFilter:()=>filter,ghosts:()=>ghosts,alphaChecker:()=>checker,currentOutline:()=>outline,hideShadowGuides:()=>hideShadow});
+ return {h,s,async open(){await s.openPath('/project.json');mode='stored-camera';await s.presentPreview(frame);},set filter(value){filter=value;},set ghosts(value){ghosts=value;},set checker(value){checker=value;},set outline(value){outline=value;},set hideShadow(value){hideShadow=value;},set frame(value){frame=value;},set mode(value){mode=value;},set rect(value){rect=value;},pause(){pause=true;},release(){pause=false;hold.resolve();},tamper(fn){tamper=fn;}};
 }
 test('native session hand and zoom retain exact view intent through scrub while excluding export and source/history',async()=>{
  const f=navigationFixture();await f.open();const before=JSON.stringify(f.s.info());
@@ -949,6 +951,58 @@ test('"Show transparency" receipts must echo exactly what was asked: a checker n
  }
  const ok=navigationFixture();await ok.open();ok.checker=true;await ok.s.presentPreview(0);
  assert.equal(ok.s.readPresentedObjectSession().presentation.alphaChecker,true);
+});
+test('"Current frame outline" rides every preview request as a view flag, is part of the presented view and never reaches export or history (#2372)',async()=>{
+ const f=navigationFixture();await f.open();const before=JSON.stringify(f.s.info());
+ assert.ok(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').every(c=>!Object.hasOwn(c.r,'currentOutline')),'outline off: nothing sent');
+ f.outline=true;assert.equal(f.s.readPresentedObjectSession(),null,'a changed outline flag is a different view, so the old presentation is no longer current');
+ const calls=f.h.calls.length;await f.s.renderPreview(0);
+ const asked=f.h.calls.slice(calls);
+ assert.deepEqual(asked.map(c=>c.command),['nemo_native_object_preview'],'only a preview request: no document command');
+ assert.equal(asked[0].r.currentOutline,true);
+ assert.equal(f.s.readPresentedObjectSession().presentation.currentOutline,true);
+ await f.s.exportPng('/no-outline',[0]);
+ assert.equal(Object.hasOwn(f.h.calls.filter(c=>c.command==='nemo_native_object_export').at(-1).r,'currentOutline'),false);
+ assert.equal(JSON.stringify(f.s.info()),before);
+ f.outline=false;assert.equal(f.s.readPresentedObjectSession(),null);await f.s.renderPreview(0);
+ assert.equal(Object.hasOwn(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').at(-1).r,'currentOutline'),false);
+ assert.equal(Object.hasOwn(f.s.readPresentedObjectSession().presentation,'currentOutline'),false);
+});
+test('"Current frame outline" receipts must echo exactly what was asked: an outline nobody asked for, or none when asked, is refused (#2372)',async()=>{
+ const unasked=navigationFixture();await unasked.open();unasked.tamper(r=>({...r,currentOutline:true}));
+ await assert.rejects(unasked.s.presentPreview(0),/current-outline/);assert.equal(unasked.s.readPresentedObjectSession(),null);
+ for(const tamper of [r=>{const{currentOutline,...rest}=r;return rest;},r=>({...r,currentOutline:false}),r=>({...r,currentOutline:1})]){
+  const f=navigationFixture();await f.open();f.outline=true;f.tamper(tamper);
+  await assert.rejects(f.s.presentPreview(0),/current-outline/);assert.equal(f.s.readPresentedObjectSession(),null);
+ }
+ const ok=navigationFixture();await ok.open();ok.outline=true;await ok.s.presentPreview(0);
+ assert.equal(ok.s.readPresentedObjectSession().presentation.currentOutline,true);
+});
+test('"Shadow guides" off rides every preview request as the hideShadowGuides view flag, is part of the presented view and never reaches export or history (#2373)',async()=>{
+ const f=navigationFixture();await f.open();const before=JSON.stringify(f.s.info());
+ assert.ok(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').every(c=>!Object.hasOwn(c.r,'hideShadowGuides')),'guides shown (the default): nothing sent');
+ f.hideShadow=true;assert.equal(f.s.readPresentedObjectSession(),null,'a changed guides flag is a different view, so the old presentation is no longer current');
+ const calls=f.h.calls.length;await f.s.renderPreview(0);
+ const asked=f.h.calls.slice(calls);
+ assert.deepEqual(asked.map(c=>c.command),['nemo_native_object_preview'],'only a preview request: no document command');
+ assert.equal(asked[0].r.hideShadowGuides,true);
+ assert.equal(f.s.readPresentedObjectSession().presentation.hideShadowGuides,true);
+ await f.s.exportPng('/no-shadow',[0]);
+ assert.equal(Object.hasOwn(f.h.calls.filter(c=>c.command==='nemo_native_object_export').at(-1).r,'hideShadowGuides'),false);
+ assert.equal(JSON.stringify(f.s.info()),before);
+ f.hideShadow=false;assert.equal(f.s.readPresentedObjectSession(),null);await f.s.renderPreview(0);
+ assert.equal(Object.hasOwn(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').at(-1).r,'hideShadowGuides'),false);
+ assert.equal(Object.hasOwn(f.s.readPresentedObjectSession().presentation,'hideShadowGuides'),false);
+});
+test('"Shadow guides" receipts must echo exactly what was asked: a hide nobody asked for, or none when asked, is refused (#2373)',async()=>{
+ const unasked=navigationFixture();await unasked.open();unasked.tamper(r=>({...r,hideShadowGuides:true}));
+ await assert.rejects(unasked.s.presentPreview(0),/shadow-guides/);assert.equal(unasked.s.readPresentedObjectSession(),null);
+ for(const tamper of [r=>{const{hideShadowGuides,...rest}=r;return rest;},r=>({...r,hideShadowGuides:false}),r=>({...r,hideShadowGuides:1})]){
+  const f=navigationFixture();await f.open();f.hideShadow=true;f.tamper(tamper);
+  await assert.rejects(f.s.presentPreview(0),/shadow-guides/);assert.equal(f.s.readPresentedObjectSession(),null);
+ }
+ const ok=navigationFixture();await ok.open();ok.hideShadow=true;await ok.s.presentPreview(0);
+ assert.equal(ok.s.readPresentedObjectSession().presentation.hideShadowGuides,true);
 });
 const ONION={layerUid:'native-layer:1:0',onion:true,ghostAll:false,from:1,to:8,previousOpacity:30,nextOpacity:40,mode:'tinted'};
 test('native onion skin rides every preview request, is part of the presented view and is excluded from export and history (#2358 GHOST-UNDER)',async()=>{
