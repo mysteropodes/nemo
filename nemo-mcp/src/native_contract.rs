@@ -46,8 +46,6 @@ pub(crate) mod workspace;
 
 #[path = "native_comments_contract.rs"]
 pub(crate) mod comments;
-#[path = "native_component_read_contract.rs"]
-pub(crate) mod component_read;
 
 #[path = "native_diagnostics_contract.rs"]
 mod diagnostics;
@@ -123,8 +121,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
     matches!(
         operation,
         "query.document.object"
-            | history_read::OP
-            | component_read::OP
+            | history_read::OP | object_component::read::OP
             | text_read::OP
             | metadata::OP
             | property_read::OP
@@ -192,7 +189,6 @@ pub(crate) fn has_request_validator(operation: &str) -> bool {
 fn request_check(operation: &str, payload: &Value) -> Option<bool> {
     Some(match operation {
         history_read::OP => history_read::request(payload),
-        component_read::OP => component_read::request(payload),
         font::IMPORT | font::QUERY => font::request(operation, payload),
         brush::PUBLISH | brush::QUERY => brush::request(operation, payload),
         "query.document.object" => object::request(payload),
@@ -221,7 +217,7 @@ fn request_check(operation: &str, payload: &Value) -> Option<bool> {
         property_track::OP => property_track::request(payload),
         property_edit::OP => property_edit::request(payload),
         op if frame_edit::declares(op) => frame_edit::request(op, payload),
-        op if object_component::admitted(op) => object_component::request(op, payload),
+        op if object_component::owns(op) => object_component::request(op, payload),
         op if object_rig::admitted(op) => object_rig::request(op, payload),
         op if object_edit::admitted(op) => object_edit::request(op, payload),
         op if item::owns(op) => item::request(op, payload),
@@ -417,7 +413,6 @@ fn result_validator(operation: &str) -> Option<ResultValidator> {
     Some(match operation {
         // Routed before request validation in validate_result; listed for routing.
         history_read::OP => |_, _, p, r| history_read::result(p, r),
-        component_read::OP => |_, _, p, r| component_read::result(p, r),
         font::IMPORT | font::QUERY => |o, _, p, r| font::result(o, p, r),
         property_read::OP => |_, d, p, r| property_read::result(d, p, r),
         composition::READ | composition::EDIT => |o, d, p, r| composition::result(o, d, p, r),
@@ -439,7 +434,7 @@ fn result_validator(operation: &str) -> Option<ResultValidator> {
         layer_policy::OP => |_, _, _, r| layer_policy::result(r),
         layer_cut::OP => |_, _, _, r| layer_cut::result(r),
         op if frame_edit::declares(op) => |o, _, _, r| frame_edit::result_for_operation(o, r),
-        op if object_component::admitted(op) => |o, _, _, r| object_component::result(o, r),
+        op if object_component::owns(op) => |o, _, p, r| object_component::result_for(o, p, r),
         op if object_rig::admitted(op) => |o, _, _, r| object_rig::result(o, r),
         op if object_edit::admitted(op) => |o, _, _, r| object_edit::result(o, r),
         op if item::owns(op) => |o, _, p, r| item::result(o, p, r),
