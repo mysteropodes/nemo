@@ -1344,6 +1344,7 @@
         "object_vector_batch_skip.rs",
         "object_vector_batch_layers.rs",
         "object_vector_trim_ends.rs",
+        "object_vector_trim_clip.rs",
         "object_vector_edit_limits.rs",
         "object_vector_edit_lock.rs",
         "object_vector_edit_support.rs",

@@ -40,7 +40,10 @@
   // The stroke and its copies, bottom to top. Mirrors clip the stroke at the axis unless Extend is on, reflect points and
   // handles and re-orient closed copies; radial adds n-1 rotations about the centre (2..24 sectors), stacked as insertAbove
   // leaves them (the stroke, then copy n-1 down to copy 1). `companion` is the stroke's linked fill, which lies below it.
-  function copies(root,dict,pin,companion){
+  // `defer` (Trim Stroke Ends on a mirror that stops at the axis): the baseline trims the whole stroke first and clips it after
+  // (draw-bridge.js, then symmetry-bridge.js), so the stroke and its copy leave whole and `out.clip` names the pair and the axis
+  // for native to clip after its trim (`trimClip`).
+  function copies(root,dict,pin,companion,defer){
     var s=root.state,base=companion?[companion,dict]:[dict];if(!s.symmetryEnabled)return base;
     function map(d,fp,fv){return Object.assign({},d,{segments:d.segments.map(function(x){
       return {point:fp(x.point[0],x.point[1]),handleIn:fv(x.handleIn[0],x.handleIn[1]),handleOut:fv(x.handleOut[0],x.handleOut[1])};})});}
@@ -61,7 +64,7 @@
     var stroke=dict;
     // clipPathAtAxis clips the drawn path's segments: a ribbon's outline, never its centreline, which the stroke keeps whole
     // (the codec stores it as authored); the mirror then maps that whole centreline (adopt).
-    if(!s.symmetryExtend&&dict.segments.length){
+    if(!s.symmetryExtend&&dict.segments.length&&!defer){
       var first=side(dict.segments[0].point),cut=dict.segments.length;
       for(var i=1;i<dict.segments.length;i++)if(side(dict.segments[i].point)!==first){cut=i;break;}
       // The baseline keeps a one-anchor remnant; a native path needs two, so refuse rather than drop it silently.
@@ -71,7 +74,13 @@
     var mirrored=map(stroke,point,vector);
     if(mirrored.closed)mirrored=Object.assign({},mirrored,{segments:mirrored.segments.slice().reverse().map(function(x){return {point:x.point,handleIn:x.handleOut,handleOut:x.handleIn};})});
     out.push.apply(out,adopt(root,mirrored,companion,point,vector,1));
+    if(defer&&!s.symmetryExtend)out.clip={axis:[axis.x1,axis.y1,axis.x2,axis.y2],drawn:dict,mirror:out[out.length-1]};
     return out;
+  }
+  // The `trimClip` of a create: the axis and the [drawn, mirror] indices in the list sent (dicts, or batch steps {create: dict}).
+  function clip(info,list){
+    var at=function(d){return list.findIndex(function(x){return (x&&x.create||x)===d;});};
+    return {axis:info.axis,mirrors:[[at(info.drawn),at(info.mirror)]]};
   }
   // The same copies as affine maps [a, b, c, d, e, f] (x' = a x + c y + e, y' = b x + d y + f), in stack order above the
   // path, for a commit whose final path only the native owner knows (the Fill Brush). A mirror needs Extend: stop-at-axis
@@ -90,5 +99,5 @@
     var r00=2*ux*ux-1,r01=2*ux*uy,r11=2*uy*uy-1;
     return [[r00,r01,r01,r11,axis.x1-(r00*axis.x1+r01*axis.y1),axis.y1-(r01*axis.x1+r11*axis.y1)]];
   }
-  return Object.freeze({copies:copies,matrices:matrices});
+  return Object.freeze({copies:copies,clip:clip,matrices:matrices});
 }));
