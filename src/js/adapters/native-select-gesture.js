@@ -22,7 +22,8 @@
   'use strict';
   var DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], DRAG = 3, MAX_STEPS = 64, MAX_BYTES = 60000; // under the 65536-byte vector request cap
   var PINS = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
-  var MAPPED = ['plain', 'ribbon', 'fill', 'shape', 'brush', 'raster', 'text'];
+  // A mask (MASK-NATIVE-REST) is a record like any other: it takes the record-space matrix, keeps its mask tags and its listed mode.
+  var MAPPED = ['plain', 'ribbon', 'fill', 'shape', 'brush', 'raster', 'text', 'mask'];
   function samePin(a, b) { return !!a && !!b && PINS.every(function (k) { return a[k] === b[k]; }); }
   function notice(root, text) { if (typeof root.showToast === 'function') try { root.showToast(text); } catch (_) {} }
   // The selection's items that have no native transform here, as labels (null when every one can be moved, scaled and rotated).
