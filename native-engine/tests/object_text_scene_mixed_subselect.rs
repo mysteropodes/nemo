@@ -99,6 +99,23 @@ fn the_editable_listing_of_a_mixed_layer_carries_only_its_vectors_with_the_hit_l
     }
 }
 #[test]
+fn a_layer_with_only_images_or_text_keeps_the_editable_listing_refusal() {
+    let only_items = {
+        let mut d = mixed();
+        d["objects"] = json!([]);
+        let elements = d["compositionOrder"]["contexts"][0]["scopes"][0]["elements"].as_array_mut().unwrap();
+        elements.retain(|e| e["strokeId"] != "vector");
+        for (i, e) in elements.iter_mut().enumerate() {
+            e["naturalPosition"] = json!(i);
+        }
+        d
+    };
+    for doc in [only_items.clone(), without(&only_items, "text"), without(&only_items, "raster")] {
+        assert_eq!(view(&doc, false), Err("Subselect requires a complete native vector layer"));
+        assert!(view(&doc, true).is_ok(), "the hit-test listing still lists the images and text");
+    }
+}
+#[test]
 fn the_editable_read_and_edit_of_the_raster_and_text_items_stay_refused() {
     let doc = mixed();
     for stroke in ["image", "text"] {
