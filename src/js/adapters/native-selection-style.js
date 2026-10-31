@@ -8,7 +8,12 @@
  * selection is read again so the panel shows the stored style. Baseline stays: no Paper writer is reached from here.
  * SEL-STYLE2 widens the edit to the paint switches, cap / join / miter / dash / paint order / stroke style (and the swap of the two paints, which is
  * a fill and a stroke colour of one edit), a brush preset and Smooth. A preset and a smooth are edits of their own: the pending edit is committed
- * first and they are never merged with another. The steps each item takes are named by native-selection-steps.js. */
+ * first and they are never merged with another. The steps each item takes are named by native-selection-steps.js.
+ * RV6-STYLE (review of #2630 / #2632): an edit is taken only while the selection is the one the overlay draws for the CURRENT context (frame, layer,
+ * tool, revision) - nothing else clears root.selectedPaths on a native project, so a stale selection is dropped, not restyled into another cell.
+ * The pending edit commits to the cell it was made on (its layer, frame and document pin), so flush() on a context change (the overlay drops the
+ * selection) or a new pick keeps an edit made inside the quiet window. An edit made while a commit runs waits for it and its re-read selection.
+ * The batch is one layer, so a selection across layers is refused with the reason. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -22,7 +27,7 @@
   function timer(root) { return typeof root.setTimeout === 'function' ? root.setTimeout.bind(root) : setTimeout; }
   function clear(root, id) { return (typeof root.clearTimeout === 'function' ? root.clearTimeout.bind(root) : clearTimeout)(id); }
   function state(root) {
-    if (!jobs.has(root)) jobs.set(root, { pending: null, chain: Promise.resolve(), commits: 0 });
+    if (!jobs.has(root)) jobs.set(root, { pending: null, chain: Promise.resolve(), commits: 0, inflight: 0 });
     return jobs.get(root);
   }
   function route(root) { var L = root.NemoNativeObjectLabs; return L && typeof L.desktop === 'function' ? L.desktop(root) : null; }
@@ -41,6 +46,20 @@
     return s ? Object.assign({ role: path.data.nativeRole }, s) : null;
   }
   function sameSelection(a, b) { return a.length === b.length && a.every(function (id, at) { return id === b[at]; }); }
+  var PINS = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
+  function samePin(a, b) { return !!a && !!b && PINS.every(function (k) { return a[k] === b[k]; }); }
+  function livePin(root) { var I = root.NemoSelectCanvasIntent, session = I && I.objectProject(root); try { return session ? session.info() : null; } catch (_) { return null; } }
+  // True while the overlay draws the selection for the context the app is in now (the same rule as the Select gesture's).
+  function owns(root) {
+    var I = root.NemoSelectCanvasIntent, O = root.NemoNativeSelectOverlay;
+    return !!(I && O && typeof O.selectionContext === 'function' && O.selectionContext(root) === I.pickContext(root));
+  }
+  function dropSelection(root) {
+    var O = root.NemoNativeSelectOverlay;
+    root.selectedPaths = []; if (root.state) root.state.selectedStrokeIndices = [];
+    if (O && typeof O.show === 'function') O.show(root);
+    if (typeof root.updateUI === 'function') root.updateUI();
+  }
 
   async function reselect(root, ids, layerIdx, before) {
     var I = root.NemoSelectCanvasIntent, fresh = null, angles = {};
@@ -62,22 +81,26 @@
     // fresh selection of the same items.
     if (job.commits !== state(root).commits) {
       var again = selected(root);
-      if (!sameSelection(again.map(function (p) { return p.data.strokeId; }), job.ids)) { notice(root, 'The selection changed — nothing was restyled.'); return { status: 'stale' }; }
-      job.paths = again; job.ctx = I && I.pickContext(root);
+      if (!sameSelection(again.map(function (p) { return p.data.strokeId; }), job.ids)) { notice(root, 'The selection changed \u2014 nothing was restyled.'); return { status: 'stale' }; }
+      job.paths = again; job.ctx = I && I.pickContext(root); job.pin = now && now.pin; job.frame = now && now.presentation.frame; job.commits = state(root).commits;
     }
+    // The edit lands in the cell it was made on: the document must be the one it was read from, whatever frame, layer or tool the app moved to since.
+    if (!labs || !I || !job.pin || job.frame === undefined) { notice(root, 'Restyling is not available right now.'); return { status: 'unavailable' }; }
+    if (!samePin(livePin(root), job.pin) || (root.state && (root.state.activeSymbolId || null) !== job.symbol)) { notice(root, 'The selection changed \u2014 nothing was restyled.'); return { status: 'stale' }; }
+    var here = owns(root); // false when the app has left the context the edit was made in (a flushed edit): the stale selection is dropped after the commit
     var apply = job.paths.filter(function (p) { return !SKIPPED[p.data.nativeBrush]; }), skipped = job.paths.filter(function (p) { return SKIPPED[p.data.nativeBrush]; });
-    if (!labs || !now) { notice(root, 'Restyling is not available right now.'); return { status: 'unavailable' }; }
-    if (I.pickContext(root) !== job.ctx) { notice(root, 'The selection changed — nothing was restyled.'); return { status: 'stale' }; }
     if (skipped.length) notice(root, 'Restyling ' + skipped.map(function (p) { return SKIPPED[p.data.nativeBrush]; }).filter(function (l, i, all) { return all.indexOf(l) === i; }).join(', ') + ' is not available on native projects yet.');
     if (!apply.length) return { status: 'unavailable' };
-    var S = root.NemoNativeSelectionSteps, layerUid = job.layerUid, frame = now.presentation.frame, steps;
+    var S = root.NemoNativeSelectionSteps, layerUid = job.layerUid, frame = job.frame, steps;
     if (job.style.smooth !== undefined) {
+      // Smooth reads the geometry of the presented cell, so it needs the app still on the context it was made in.
+      if (!now || I.pickContext(root) !== job.ctx) { notice(root, 'The selection changed \u2014 nothing was restyled.'); return { status: 'stale' }; }
       var smoothed = null;
       try { smoothed = await S.smoothSteps(root, apply.map(function (p) { return p.data.strokeId; }), job.layerIdx, job.style.smooth); } catch (_) { smoothed = null; }
       if (!smoothed) { notice(root, 'Could not read the strokes to smooth just now.'); return { status: 'unavailable' }; }
-      if (I.pickContext(root) !== job.ctx) { notice(root, 'The selection changed — nothing was restyled.'); return { status: 'stale' }; }
+      if (I.pickContext(root) !== job.ctx) { notice(root, 'The selection changed \u2014 nothing was restyled.'); return { status: 'stale' }; }
       layerUid = smoothed.layerUid; frame = smoothed.frame; steps = smoothed.steps;
-    } else steps = S.restyleSteps(apply, job.style);
+    } else steps = S.restyleSteps(apply, job.style, job.last);
     if (!steps.length) return { status: 'noop' };
     if (JSON.stringify(steps).length > MAX_BYTES) { notice(root, 'Too much to restyle at once — select fewer items.'); return { status: 'too_large' }; }
     var result;
@@ -86,17 +109,21 @@
       notice(root, 'The style could not be applied' + (result && result.status === 'unavailable' ? ' to this kind of item.' : '.'));
       return { status: result ? result.status : 'unavailable' };
     }
-    state(root).commits += 1;
-    await reselect(root, apply.map(function (p) { return p.data.strokeId; }), job.layerIdx, apply);
+    var applied = apply.map(function (p) { return p.data.strokeId; });
+    if (here) await reselect(root, applied, job.layerIdx, apply);
+    else if (sameSelection((root.selectedPaths || []).map(function (p) { return p.data && p.data.strokeId; }), job.ids)) dropSelection(root);
+    state(root).commits += 1; // after the re-read: an edit that follows sees the fresh selection, never the one before this commit
     if (O && typeof O.show === 'function') O.show(root);
     if (typeof root.updateUI === 'function') root.updateUI();
     if (root.SMEngineBridge && typeof root.SMEngineBridge.renderNow === 'function') root.SMEngineBridge.renderNow();
     return { status: result.status };
   }
   function run(root, job) {
-    var s = state(root);
+    var s = state(root), settle = function () { s.inflight -= 1; };
     var next = s.chain.then(function () { return commit(root, job); }, function () { return commit(root, job); });
-    s.chain = next.catch(function () {});
+    s.inflight += 1;
+    next.then(settle, settle);
+    s.chain = next.then(function () {}, function () {});
     return next.then(function (r) { job.done(r); return r; }, function () { var r = { status: 'unavailable' }; job.done(r); return r; });
   }
   // Commits the pending edit now, whatever the quiet timer says (a selection change, a tool change, a test).
@@ -124,21 +151,35 @@
     var s = state(root), S = root.NemoNativeSelectionSteps, members = S && S.valid(style), paths = selected(root);
     if (!members) return Promise.resolve({ status: 'invalid' });
     if (!paths.length || !route(root)) return Promise.resolve({ status: 'unavailable' });
-    var I = root.NemoSelectCanvasIntent, ids = paths.map(function (p) { return p.data.strokeId; });
+    // A commit in flight re-reads the selection when it ends: this edit follows it instead of reading the one before.
+    if (s.inflight) return s.chain.then(function () { return apply(root, style); });
+    var I = root.NemoSelectCanvasIntent, ids = paths.map(function (p) { return p.data.strokeId; }), ctx = I && I.pickContext(root), pending = s.pending;
+    // The selection must be the one drawn for this frame, layer and tool: a selection that outlived a context change is dropped, never restyled.
+    if (!(owns(root) || (pending && pending.ctx === ctx && sameSelection(pending.ids, ids)))) {
+      dropSelection(root);
+      notice(root, 'The selection no longer applies here \u2014 select the items again.');
+      return Promise.resolve({ status: 'unavailable' });
+    }
     if (paths.some(function (p) { return p.data.nativeLayerIndex !== paths[0].data.nativeLayerIndex; })) {
-      notice(root, 'Select items of one layer to restyle them.');
+      // One native batch is one layer (the engine addresses a single layer's cells and keys them together), so one undo entry cannot span layers.
+      notice(root, 'Restyling works on one layer at a time \u2014 select items of one layer.');
       return Promise.resolve({ status: 'unavailable' });
     }
     if (ids.length > MAX_STEPS) { notice(root, 'Too many items to restyle at once (' + MAX_STEPS + ' at most).'); return Promise.resolve({ status: 'too_large' }); }
-    var pending = s.pending, own = S.alone(members);
+    var own = S.alone(members);
     // A preset and a smooth are edits of their own: whatever is pending is committed first, and the next edit starts afresh.
     if (pending && (!sameSelection(pending.ids, ids) || pending.own !== own)) { flush(root); pending = null; }
     if (!pending) {
-      var job = { ids: ids, paths: paths, style: {}, layerIdx: paths[0].data.nativeLayerIndex, layerUid: paths[0].data.nativeLayerUid, ctx: I && I.pickContext(root), commits: s.commits, timer: 0, waiting: [], own: own };
+      var shown = I.presentedState(root);
+      if (!shown) { notice(root, 'Restyling is not available right now.'); return Promise.resolve({ status: 'unavailable' }); }
+      var job = { ids: ids, paths: paths, style: {}, layerIdx: paths[0].data.nativeLayerIndex, layerUid: paths[0].data.nativeLayerUid, ctx: ctx, pin: shown.pin, frame: shown.presentation.frame,
+        symbol: (root.state && root.state.activeSymbolId) || null, commits: s.commits, timer: 0, waiting: [], own: own, last: null };
       job.done = function (r) { job.waiting.forEach(function (w) { w(r); }); };
       s.pending = pending = job;
     }
     Object.assign(pending.style, members);
+    // A ribbon is inked by one colour: when the fill and the stroke colour differ in one window the later write wins, as the baseline's two setters did.
+    if (members.stroke !== undefined) pending.last = 'stroke'; else if (members.fill !== undefined) pending.last = 'fill';
     var waiting = new Promise(function (resolve) { pending.waiting.push(resolve); });
     arm(root, pending);
     return waiting;

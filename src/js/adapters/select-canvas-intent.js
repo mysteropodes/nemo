@@ -252,11 +252,12 @@
     return { x: p.x, y: p.y, perPixel: pin.canvasW / r.width };
   }
   // A linked fill is selected as its ribbon, as the baseline's resolveBrushAnchor did (the native listing names it).
-  function owned(path) {
+  // The ribbon carries the style the listing gives the ribbon itself (the fill record only paints its ink), so the panel shows what the ribbon is.
+  function owned(path, items) {
     var id = path.data.nativeOwner;
     if (path.data.nativeRole !== 'fill' || !id) return path;
-    var ribbon = path.clone({ insert: false });
-    ribbon.data = Object.assign({}, path.data, { strokeId: id, nativeRole: 'ribbon', nativeRibbon: true, nativeOwner: undefined, nativeStyle: undefined,
+    var ribbon = path.clone({ insert: false }), listed = (items || []).find(function (i) { return i.stableTarget && i.stableTarget.strokeId === id; });
+    ribbon.data = Object.assign({}, path.data, { strokeId: id, nativeRole: 'ribbon', nativeRibbon: true, nativeOwner: undefined, nativeStyle: listed ? listed.style : path.data.nativeStyle,
       nativeStableTarget: Object.assign({}, path.data.nativeStableTarget, { strokeId: id }) });
     return ribbon;
   }
@@ -295,7 +296,7 @@
       var layers = await presented(root, order[n], reach);
       if (!layers) return undefined;
       for (var i = layers.paths.length - 1; i >= 0; i--) if (layers.paths[i].hitTest(at, { fill: true, stroke: true, tolerance: t })) {
-        var hit = await anchored(root, order[n], withFill(owned(layers.paths[i]), layers.items), layers);
+        var hit = await anchored(root, order[n], withFill(owned(layers.paths[i], layers.items), layers.items), layers);
         hit.data.nativeLayerIndex = order[n]; hit.data.nativeLayerUid = layers.layerUid;
         return hit;
       }
@@ -410,6 +411,8 @@
   // Picks are fresh objects, so identity is the native stroke id.
   function applyPick(root, item, shift) {
     var data = item && item.data;
+    // An edit still waiting in the style panel's quiet window commits to the cell it was made on before this pick moves the selection or the layer.
+    if (root.NemoNativeSelectionStyle && typeof root.NemoNativeSelectionStyle.flush === 'function') root.NemoNativeSelectionStyle.flush(root);
     // #2372: a picked image also makes its layer the one selected layer row, which is what the Mesh panel reads
     // (readImageMeshSelection); a Shift pick keeps the layer selection it extends.
     var image = !!data && data.nativeRole === 'raster' && !shift;
