@@ -197,7 +197,10 @@ pub(super) fn stroke_members(
     let Some(body) = record.vector.value_mut() else {
         return Ok(());
     };
-    if let Some(order) = &detail.paint_order {
+    // A Stroke Style pick is the baseline's `applyStrokeStyle`, which ran only on a stroked, non-ribbon path: on any other record it
+    // changes nothing (no dash, offset, miter or paint order).
+    let skipped = detail.stroke_style.is_some() && (ribbon || !body.has_real_stroke);
+    if let Some(order) = detail.paint_order.as_ref().filter(|_| !skipped) {
         body.paint_order = Presence::Present(order.clone());
     }
     if ribbon {
@@ -209,8 +212,11 @@ pub(super) fn stroke_members(
     if let Some(join) = &detail.join {
         body.stroke_join = join.clone();
     }
-    if let Some(limit) = detail.miter {
+    if let Some(limit) = detail.miter.filter(|_| !skipped) {
         body.miter_limit = Presence::Present(num(limit)?);
+    }
+    if skipped {
+        return Ok(());
     }
     if let Some(kind) = detail
         .stroke_style
