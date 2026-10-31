@@ -166,7 +166,7 @@ test('badges show the bound key, follow a remap, and return to the defaults afte
 test('timeline.js routes the holds, the flyout and the badge refresh through the modules',()=>{
   assert.match(timeline,/spaceKeyDown\(event\)/);assert.match(timeline,/toolHolds\.altKeyDown\(\)/);assert.match(timeline,/function onKeyUp\(event\)\{toolHolds\.keyUp\(event\);\}/);
   assert.match(timeline,/NemoKeyboardArbiter\.mount\(document,\{keydown:onKeyDown,keyup:onKeyUp\}\);\s*toolHolds\.mount\(\);/);
-  assert.match(timeline,/onReset:function\(\)\{syncAllToolButtonShortcutBadges\(\);\}/,'a reset refreshes the rail badges');
+  assert.match(timeline,/onReset:function\(\)\{syncAllToolButtonShortcutBadges\(\);refreshShortcutHints\(\);\}/,'a reset refreshes the rail badges and the hints');
   assert.doesNotMatch(timeline,/_cmdHold|SPACE_TAP_MS|state\.spaceDown=true/,'no hold logic left inline');
   assert.match(timeline,/window\.SMShapeGroup=\{ensureFront:shapeGroup\.ensureFront\}/);
   const html=fs.readFileSync(path.join(__dirname,'../src/index.html'),'utf8');
