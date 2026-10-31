@@ -213,6 +213,42 @@
     arm(root, pending);
     return waiting;
   }
+  // #2372 PAL-REPLACE: the Palette's "Replace in layer" (baseline palette-panel.js replaceInActiveLayer, scope "frame"): every fill or stroke of every item of the
+  // ACTIVE layer at the CURRENT frame that equals `from` becomes `to`, as ONE restyle batch (one revision, one history entry) built by the same recolourSteps as the
+  // Selected Colors panel. A linked fill follows its ribbon and a texture dab / bitmap brush has no restyle (as for a selection); a mask and an image carry no paint.
+  // Resolves { status, count }: 'applied' (count = colours replaced), 'nomatch', or a refusal ('unavailable' | 'stale' | 'too_large' | 'invalid'; the user was told).
+  // The layer is read at the frame and document it is committed to; a pending Select-panel edit is committed first so the two cannot reorder.
+  var HEX = /^#[0-9a-f]{6}([0-9a-f]{2})?$/;
+  function widen(c) { var m = typeof c === 'string' && /^#([0-9a-fA-F]{3,4})$/.exec(c); return m ? '#' + m[1].replace(/./g, '$&$&') : c; }
+  async function recolourLayer(root, from, to) {
+    var I = root.NemoSelectCanvasIntent, S = root.NemoNativeSelectionSteps, O = root.NemoNativeSelectOverlay, labs = route(root);
+    var a = S && S.key(widen(from)), b = S && S.key(widen(to));
+    if (!I || !S || !labs) { notice(root, 'Replacing a colour is not available right now.'); return { status: 'unavailable', count: 0 }; }
+    if (!HEX.test(a) || !HEX.test(b)) return { status: 'invalid', count: 0 };
+    if (a === b) return { status: 'nomatch', count: 0 };
+    await flush(root);
+    var now = I.presentedState(root) || await I.presentedSettled(root), ctx = I.pickContext(root), layers = null;
+    if (!now) { notice(root, 'Replacing a colour is not available right now.'); return { status: 'unavailable', count: 0 }; }
+    try { layers = await I.layerPaths(root, null, false, root.state.activeLayerIdx); } catch (_) { layers = null; }
+    if (!layers) { notice(root, 'This layer cannot be read right now (locked or hidden).'); return { status: 'unavailable', count: 0 }; }
+    if (I.pickContext(root) !== ctx || !samePin(livePin(root), layers.pin)) { notice(root, 'The document changed \u2014 nothing was replaced.'); return { status: 'stale', count: 0 }; }
+    var items = layers.paths.filter(function (p) { return !(p.data.nativeRole === 'fill' && p.data.nativeOwner) && !SKIPPED[p.data.nativeBrush]; });
+    var steps = S.recolourSteps(items, a, b);
+    if (!steps.length) return { status: 'nomatch', count: 0 };
+    if (JSON.stringify(steps).length > MAX_BYTES) { notice(root, 'Too much to replace at once.'); return { status: 'too_large', count: 0 }; }
+    var result;
+    try { result = await labs.batchStrokes(layers.layerUid, layers.frame, steps, { skipUnavailable: true }); } catch (_) { result = null; }
+    if (!result || (result.status !== 'applied' && result.status !== 'noop')) { notice(root, 'The colours could not be replaced.'); return { status: result ? result.status : 'unavailable', count: 0 }; }
+    var count = steps.reduce(function (n, st) { return n + ['fill', 'stroke'].filter(function (k) { return st.restyle.style[k] !== undefined; }).length; }, 0);
+    // The selection (if any) shows the stored style: read it again, as after a panel edit.
+    var kept = selected(root);
+    if (kept.length && owns(root)) await reselect(root, kept.map(function (p) { return p.data.strokeId; }), kept);
+    state(root).commits += 1;
+    if (O && typeof O.show === 'function') O.show(root);
+    if (typeof root.updateUI === 'function') root.updateUI();
+    if (root.SMEngineBridge && typeof root.SMEngineBridge.renderNow === 'function') root.SMEngineBridge.renderNow();
+    return { status: result.status === 'applied' && count ? 'applied' : 'nomatch', count: result.status === 'applied' ? count : 0 };
+  }
   // True on a native object project (the panel's writes then go through the engine, never a Paper item).
   function native(root) { return !!route(root); }
   // The colours of the selected native items, most used first, as the Selected Colors panel lists them; null when no native item is selected.
@@ -222,5 +258,5 @@
     paths.forEach(function (p) { S.coloursOf(p).forEach(function (c) { (map[c] = map[c] || { hex: c, count: 0 }).count++; }); });
     return Object.keys(map).map(function (c) { return map[c]; }).sort(function (a, b) { return b.count - a.count; });
   }
-  return Object.freeze({ apply: apply, applyRecolor: applyRecolor, colours: colours, native: native, flush: flush, handles: handles, shown: shown });
+  return Object.freeze({ apply: apply, applyRecolor: applyRecolor, recolourLayer: recolourLayer, colours: colours, native: native, flush: flush, handles: handles, shown: shown });
 }));
