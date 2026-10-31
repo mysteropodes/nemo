@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const UI=require('../src/js/adapters/native-subselect-ui.js');
 const {fixture,deferred}=require('./helpers/native-subselect.cjs');
 function node(){
-  const listeners=new Map(),n={children:[],hidden:false,disabled:false,style:{display:''},dataset:{},classList:{remove(){},contains(){return false;}},
+  const listeners=new Map(),n={children:[],hidden:false,disabled:false,style:{display:''},dataset:{},classes:new Set(),classList:{remove(c){n.classes.delete(c);},contains(c){return n.classes.has(c);},toggle(c,on){if(on)n.classes.add(c);else n.classes.delete(c);return !!on;}},
     setAttribute(){},replaceChildren(...children){this.children.slice().forEach(child=>this.removeChild(child));children.forEach(child=>this.appendChild(child));},
     appendChild(child){return this.insertBefore(child,null);},
     insertBefore(child,next){if(child.parentNode)child.parentNode.removeChild(child);const i=next?this.children.indexOf(next):this.children.length;assert.ok(i>=0);this.children.splice(i,0,child);child.parentNode=this;return child;},
@@ -15,9 +15,9 @@ function node(){
   return n;
 }
 function ui(){
-  const f=fixture(),{root,controller}=f,home=node(),container=node(),row=node(),next=node(),buttons=['corner','smooth','symmetric'].map(()=>node());
+  const f=fixture(),{root,controller}=f,home=node(),container=node(),row=node(),next=node(),buttons=['corner','smooth','symmetric','collapse'].map(()=>node());
   row.style.display='none';row.style.gap='4px';home.appendChild(row);home.appendChild(next);buttons.forEach(b=>row.appendChild(b));
-  const nodes={'sp-pointtype-row':row};['corner','smooth','symmetric'].forEach((type,i)=>nodes['btn-pt-'+type]=buttons[i]);
+  const nodes={'sp-pointtype-row':row};['corner','smooth','symmetric','collapse'].forEach((type,i)=>nodes['btn-pt-'+type]=buttons[i]);
   const get=root.document.getElementById;root.document.getElementById=id=>nodes[id]||get(id);root.document.createComment=node;
   root.NemoNativeSubselectController=controller;root.NemoNativeSubselectUI=UI;
   // Execute the existing production handlers and native routing branch, with a
@@ -32,7 +32,7 @@ function ui(){
 }
 async function points(f){await f.select();f.controller.handle('down',f.event(40,24));f.controller.handle('up',f.event(40,24));}
 test('existing point-type buttons become available for native points and each sends exactly one guarded command',async()=>{
-  for(const [i,type] of ['corner','smooth','symmetric'].entries()){
+  for(const [i,type] of ['corner','smooth','symmetric','collapse'].entries()){
     const f=ui(),binding=f.mount();assert.equal(f.row.parentNode,f.container);assert.equal(f.row.style.display,'none');
     await f.select();assert.equal(f.row.hidden,true,'a selected path without points is insufficient');
     await points(f);assert.equal(f.row.hidden,false);assert.equal(f.row.style.display,'flex');assert.ok(f.buttons.every(b=>!b.disabled));

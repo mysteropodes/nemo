@@ -1,5 +1,6 @@
 //! G21: fixtures are emitted by the pinned original production editor, never this kernel.
 use crate::object_document::subselect::{edit, Anchor, Intent, Refusal};
+use crate::object_document::subselect::point_type::tests::baseline_intent;
 use serde_json::Value;
 fn oracle() -> Value {
     serde_json::from_str(include_str!("fixtures/subselect-baseline/oracle.json")).unwrap()
@@ -12,6 +13,8 @@ fn subselect_matches_all_original_point_type_toggle_transform_and_insert_cases()
         let source: Vec<Anchor> = serde_json::from_value(case["segments"].clone()).unwrap();
         let expected: Vec<Anchor> = serde_json::from_value(case["expected"].clone()).unwrap();
         let intent: Intent = serde_json::from_value(case["intent"].clone()).unwrap();
+        // #2356: Corner is `collapse` here; a case whose rule the owner decision replaced is checked in object_subselect_point_type.rs.
+        let Some(intent) = baseline_intent(&source, &intent) else { continue };
         let actual = edit(
             &source,
             case["closed"].as_bool().unwrap(),
@@ -111,6 +114,7 @@ fn subselect_modifier_intents_match_frozen_pointer_history_at_every_step() {
         for step in row["steps"].as_array().unwrap() {
             let expected: Vec<Anchor> = serde_json::from_value(step["expected"].clone()).unwrap();
             let intent: Intent = serde_json::from_value(step["intent"].clone()).unwrap();
+            let Some(intent) = baseline_intent(&source, &intent) else { continue };
             let actual = edit(&source, true, false, &intent).unwrap();
             for (a, b) in actual.iter().zip(&expected) {
                 for (x, y) in a
@@ -168,6 +172,7 @@ fn subselect_pressure_centerlines_match_frozen_production_edits() {
         let before = source.clone();
         let expected = anchors(&case["expected"]["center"]);
         let intent: Intent = serde_json::from_value(case["intent"].clone()).unwrap();
+        let Some(intent) = baseline_intent(&source, &intent) else { continue };
         // Pass the painted closure flag: original toggleTangentAt wraps endpoint
         // neighbours on a closed ribbon. Other pressure operations use an open
         // centerline. Width/metadata retention and outline reconstruction remain
