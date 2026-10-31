@@ -14,6 +14,10 @@ and exits 2 on malformed policy or baseline input.
 
 The checker, ratchet, CLI, discovery, coverage and application-policy suites run in normal
 `npm test` / `verify` through the existing `tests/nemo-boundaries*.test.cjs` entries.
+`tests/nemo-boundaries-suites.test.cjs` also runs every `scripts/nemo/boundaries-*.test.cjs` suite
+(the adopted-graph edge counts, native-engine port grants and source-shape guards) as one child
+`node --test`, so `npm test` and the JS unit job catch pin drift on the PR that causes it (#2348).
+When a reviewed PR legitimately adds an edge or port, update the policy JSON and these pins together.
 Pull-request validation runs the standard `scripts/nemo/ci.cjs boundaries` lane. That lane
 requires every current `scripts/nemo/**/*.cjs` source in the tooling profile, enforces its
 dependency rules and protected-base size ratchet, then enforces the adopted application

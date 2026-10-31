@@ -115,7 +115,8 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'desktop_viewport::SettledSurfaceFrame', 'desktop_viewport::SurfaceAttempt',
       'desktop_viewport::SurfacePort', 'desktop_viewport::SurfacePresentation',
       'desktop_viewport::SurfaceRecoveryError', 'desktop_viewport::ViewportError',
-      'desktop_viewport::ViewportMapping', 'render_scene::ScheduledFrameIdentity', 'scheduler::WorkId'],
+      'desktop_viewport::ViewportMapping', 'render_scene::ScheduledFrameIdentity', 'scheduler::WorkId',
+      'desktop_viewport::ViewportDisplayFilter'],
     'rust.desktop.native.application.ports': [
       'application::ExportResourceResolver', 'application::ResourceResolutionError',
       'application::ResourceResolutionErrorKind', 'compositor::CompositionResult', 'compositor::Compositor',
@@ -154,7 +155,9 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'object_document::FrameScopeKind', 'object_frame_packet::ObjectFrameSelector', 'resource_leases::WorkId',
       'scheduler::OutputSpec', 'desktop_viewport::ObjectPreviewView',
       'desktop_viewport::ObjectPreviewNavigation', 'desktop_viewport::ObjectViewProjection',
-      'desktop_viewport::ObjectPresentedFrame'],
+      'desktop_viewport::ObjectPresentedFrame',
+      'desktop_viewport::ViewportDisplayFilter', 'object_render_scene::GhostUnderlayRequest',
+      'object_render_scene::GhostReceipt'],
     'rust.desktop.native.application.tests': [
       'application::ExportResourceResolver', 'compositor::Compositor',
       'desktop_viewport::AcquiredSurfaceFrame', 'desktop_viewport::DesktopViewportHost',
@@ -179,7 +182,8 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'object_frame_packet::ObjectFrameSelector', 'object_snapshot::ObjectSnapshot',
       'render_scene::ScheduledFrameIdentity', 'resource_leases::WorkId', 'scheduler::OutputSpec',
       'object_codec::encode_storage_project', 'desktop_viewport::ObjectPreviewView',
-      'object_render_scene::prepare_object_camera_viewport_composition'],
+      'object_render_scene::prepare_object_camera_viewport_composition',
+      'desktop_viewport::ViewportDisplayFilter'],
     'rust.desktop.native.dispatch': [
       'application::ApplicationReleaseReceipt', 'application::ExportResourceResolver',
       'application::NativeApplication', 'commands::DispatchErrorCode', 'commands::OpacityRequest',
@@ -201,6 +205,7 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'object_render_scene::prepare_object_render_scene',
       'object_render_scene::prepare_scheduled_object_composition_from_witness',
       'object_render_scene::ObjectCompositionWitness', 'object_snapshot::ObjectSnapshot',
+      'object_snapshot::ImageMeshReadFailure', 'object_snapshot::ImageMeshReadProjection',
       'resource_leases::WorkId', 'scheduler::EvaluationKey', 'scheduler::FrameScheduler',
       'scheduler::ObjectSchedulePins', 'scheduler::ObjectScheduleScope', 'scheduler::OutputSpec',
       'scheduler::ScheduledFrame', 'application::prepare_object_motion_exposure_frame_for_control',
@@ -211,7 +216,9 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'desktop_viewport::ObjectViewProjection', 'desktop_viewport::ObjectPresentedFrame',
       'object_render_scene::prepare_object_navigated_viewport_composition', 'application::ObjectBrushRuntime',
       'object_render_scene::ObjectBrushAdmission', 'export_job::export_object_frames_with_materializer',
-      'history::ImportAssetSource'],
+      'history::ImportAssetSource',
+      'desktop_viewport::ViewportDisplayFilter', 'object_render_scene::GhostUnderlayRequest',
+      'object_render_scene::GhostReceipt', 'application::prepare_ghost_underlay'],
     'rust.desktop.media': [
       'native_media_frame_export::NativeVideoDecoder', 'native_media_frame_export::NativeVideoInfo'],
   });
