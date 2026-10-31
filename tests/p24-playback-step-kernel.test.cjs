@@ -203,26 +203,26 @@ test('fixed clock: single-frame work area never presents a frame and stops', asy
 
 // -- the opt-in test clock inside the real startNativePlay ----------------------------------------
 function observerHarness({ fixedClock }) {
-  const events = [];
+  const events = [], sequences = [];
   const observer = createObserver({ runId: '00000000-0000-4000-8000-000000000001', fixedClock }, {
-    invoke: async (action, payload) => { if (action === 'record') { events.push(payload.event); return { sequence: payload.sequence }; } return {}; },
+    invoke: async (action, payload) => { if (action === 'record') { events.push(payload.event); sequences.push(payload.sequence); return { sequence: payload.sequence }; } return {}; },
     listen: async () => () => {} });
-  return { observer, events };
+  return { observer, events, sequences };
 }
-async function playUnderClock({ fixedClock, waOut, loop = false, ping = false }) {
-  const { observer, events } = observerHarness({ fixedClock });
+async function playUnderClock({ fixedClock, waOut, loop = false, ping = false, documentId = 'native-document-1', stopAfter = 0, extra = {} }) {
+  const { observer, events, sequences } = observerHarness({ fixedClock });
   await observer.ready;
   const state = { playing: false, playDir: 1, currentFrame: 0, fps: 24, waIn: 0, waOut, loopPlayback: loop, pingPongPlayback: ping };
   const written = [], rafs = [];
   const owner = { isActive: () => true, blocksLegacy: () => true,
-    identity: () => ({ instanceId: '00000000-0000-4000-8000-000000000002', documentId: 'native-document-1', contentRevision: 0 }) };
+    identity: () => ({ instanceId: '00000000-0000-4000-8000-000000000002', documentId, contentRevision: 0, ...extra }) };
   const window = { NemoTestPlayObserver: observer, NemoNativeOpacityCutover: owner,
     SMAudio: { onPlayStart() {}, onLoop() {} },
     requestAnimationFrame: fn => { rafs.push(fn); return rafs.length; }, cancelAnimationFrame() {} };
   globalThis.window = window; // the adapter reads the observer from its own global
   let finish; const stopped = new Promise(resolve => { finish = resolve; });
   const sandbox = { window, state, SMAudio: window.SMAudio, NemoNativeOpacityMotionSurface: surface, performance: { now: () => 0 },
-    goToFrame: async n => { written.push(n); state.currentFrame = n; return true; },
+    goToFrame: async n => { written.push(n); state.currentFrame = n; if (stopAfter && written.length === stopAfter) sandbox.stopPlay(); return true; },
     stopPlay: () => { state.playing = false; sandbox.nativePlayScheduler.stop(); finish(); },
     showToast() {}, nativeFlipPreview: null,
     document: { getElementById: () => ({ innerHTML: '', classList: { add() {}, remove() {} } }) } };
@@ -232,7 +232,8 @@ async function playUnderClock({ fixedClock, waOut, loop = false, ping = false })
   try {
     sandbox.startNativePlay(owner);
     if (fixedClock) await Promise.race([stopped, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))]);
-    return { state, written, events, rafs, observer };
+    await observer.ready; await new Promise(resolve => setImmediate(resolve));
+    return { state, written, events, sequences, rafs, observer };
   } finally { delete globalThis.window; }
 }
 
@@ -276,4 +277,99 @@ test('the test hook is absent from normal product wiring: only the observer boot
   const adapters = fs.readdirSync(path.join(__dirname, '../src/js/adapters'));
   for (const file of adapters) assert.ok(!/fixedClock/.test(fs.readFileSync(path.join(__dirname, '../src/js/adapters', file), 'utf8')), file);
   assert.equal((timeline.match(/fixedClock/g) || []).length, 1, 'timeline reads the flag only inside startNativePlay');
+});
+
+// -- native object projects (#1026): ids 'native-object-document-N' reach the collector --------------
+const OBJECT_DOC = 'native-object-document-7';
+
+test('object project Play under the fixed clock: 0..W loop run publishes gap-free play-step pairs the verifier accepts', async () => {
+  const r = await playUnderClock({ fixedClock: true, waOut: 3, loop: true, documentId: OBJECT_DOC, stopAfter: 9 });
+  assert.deepEqual(r.written, [1, 2, 3, 0, 1, 2, 3, 0, 1]);
+  assert.equal(r.rafs.length, 0);
+  assert.equal(r.observer.inspect().dropped, 0, 'no object-project event is dropped by the bootstrap');
+  assert.deepEqual(r.sequences, r.sequences.map((_, i) => i + 1), 'the sink sees a gap-free sequence');
+  assert.ok(r.events.some(e => e.event === 'play-start' && e.documentId === OBJECT_DOC));
+  assert.ok(r.events.some(e => e.event === 'play-state' && e.playing === true));
+  const verdict = verifyFixedClockSteps(r.events, { start: 0, waIn: 0, waOut: 3, loop: true });
+  assert.deepEqual(verdict.failures, []);
+  assert.deepEqual(verdict.observed, r.written);
+});
+
+test('object project Play under the fixed clock: a no-loop run publishes 1..W and ends with a plain stop', async () => {
+  const r = await playUnderClock({ fixedClock: true, waOut: 4, documentId: OBJECT_DOC });
+  assert.equal(r.observer.inspect().dropped, 0);
+  const verdict = verifyFixedClockSteps(r.events, { start: 0, waIn: 0, waOut: 4 });
+  assert.deepEqual(verdict.failures, []);
+  assert.deepEqual(verdict.observed, [1, 2, 3, 4]);
+});
+
+test('object project Play: the identity is the whole project info, and only its pins reach the collector', async () => {
+  // A native object project's identity() is its project info: layers, canvas, timing... (installed run at 854b3d88
+  // logged only 'ready' because play-start carried these members, snapshot() dropped it and the sink refused the rest).
+  const info = { lifecycleGeneration: 1, documentSnapshotId: 'native-object:native-object-document-7:0', canvasW: 320, canvasH: 180,
+    fps: 24, totalFrames: 4, layers: [{ layerUid: 'L1', name: 'Layer 1', visible: true }], layerFolders: [], layerModelUnavailable: ['linkGroup'] };
+  const r = await playUnderClock({ fixedClock: true, waOut: 3, loop: true, documentId: OBJECT_DOC, stopAfter: 5, extra: info });
+  assert.equal(r.observer.inspect().dropped, 0, 'no event dropped');
+  assert.deepEqual(r.sequences, r.sequences.map((_, i) => i + 1));
+  const start = r.events.find(e => e.event === 'play-start');
+  assert.deepEqual(Object.keys(start).sort(), ['contentRevision', 'documentId', 'documentSnapshotId', 'event', 'instanceId', 'lifecycleGeneration', 'runGeneration']);
+  assert.deepEqual(verifyFixedClockSteps(r.events, { start: 0, waIn: 0, waOut: 3, loop: true, steps: 5 }).failures, []);
+});
+
+test('a looping run stopped by the operator: only the in-flight step superseded by Stop may return false', () => {
+  const step = (frame, result) => ({ event: 'play-step', frame, ...(result === undefined ? {} : { result }) });
+  const run = [1, 2, 3, 0].flatMap(f => [step(f), step(f, true)]);
+  const stopped = [...run, step(1), { event: 'play-stop' }, step(1, false)];
+  const v = verifyFixedClockSteps(stopped, { start: 0, waIn: 0, waOut: 3, loop: true });
+  assert.deepEqual(v.failures, []); assert.equal(v.stoppedInFlight, true); assert.deepEqual(v.observed, [1, 2, 3, 0]);
+  // a false return before Stop, or a false return that is not the last step, still fails
+  assert.equal(verifyFixedClockSteps([...run, step(1), step(1, false), { event: 'play-stop' }], { start: 0, waIn: 0, waOut: 3, loop: true }).ok, false);
+  assert.equal(verifyFixedClockSteps([step(1), step(1, false), ...run.slice(2), { event: 'play-stop' }], { start: 0, waIn: 0, waOut: 3, loop: true }).ok, false);
+});
+
+test('the bootstrap accepts opacity and object document ids and still refuses malformed ones', async () => {
+  const ok = id => { const { observer } = observerHarness({}); return observer.ready.then(() => {
+    observer.record({ event: 'host-receipt', documentId: id }); return observer.inspect().dropped === 0; }); };
+  for (const id of ['native-document-1', OBJECT_DOC, 'native-object-document-18446744073709551615']) assert.equal(await ok(id), true, id);
+  for (const id of ['native-object-document-0', 'native-object-document-01', 'native-object-document-', 'native-object-document-18446744073709551616',
+    'native-object-document-1\n', 'native-object-documents-1', 'native-objects-document-1', 'object-document-1', 'native-work-1']) assert.equal(await ok(id), false, id);
+  const { observer } = observerHarness({}); await observer.ready;
+  observer.record({ event: 'host-receipt', workId: OBJECT_DOC }); observer.record({ event: 'host-receipt', workId: 'native-work-9' });
+  assert.equal(observer.inspect().dropped, 1, 'workId keeps its own prefix');
+});
+
+// -- which Play path a native object project takes ------------------------------------------------
+function startPlayHarness({ blocks, observer }) {
+  const calls = { native: [], raf: 0, clock: 0, perf: 0 };
+  const window = { NemoNativeOpacityCutover: blocks === null ? undefined : { blocksLegacy: () => blocks }, NemoTestPlayObserver: observer,
+    requestAnimationFrame: () => { calls.raf++; return 1; } };
+  const state = { playing: false, playDir: 1, currentFrame: 0, fps: 24 };
+  const sandbox = { window, state, performance: { now: () => { calls.perf++; return 0; } }, requestAnimationFrame: window.requestAnimationFrame,
+    startNativePlay: c => { calls.native.push(c); }, SMPlaybackCache: undefined, SMAudio: undefined,
+    document: { getElementById: () => ({ innerHTML: '', classList: { add() {}, remove() {} } }) } };
+  vm.createContext(sandbox);
+  vm.runInContext(extractFunction(timeline, 'startPlay'), sandbox);
+  return { sandbox, calls, window };
+}
+
+test('a native object project (cutover routes blocksLegacy to its session) plays through the native scheduler, never the legacy rAF loop', () => {
+  const clock = { now() { throw new Error('legacy path read the clock'); }, request() { throw new Error('legacy path requested a tick'); }, cancel() {} };
+  const { sandbox, calls, window } = startPlayHarness({ blocks: true, observer: { fixedClock: clock } });
+  sandbox.startPlay();
+  assert.deepEqual(calls.native, [window.NemoNativeOpacityCutover]);
+  assert.equal(calls.raf, 0); assert.equal(calls.perf, 0); assert.equal(sandbox.state.playing, false);
+  // The published cutover answers blocksLegacy from the active object project session before anything else.
+  const operations = fs.readFileSync(path.join(__dirname, '../src/js/application/native-opacity-operations.js'), 'utf8');
+  assert.match(operations, /function objectProject\(\)\{var p=ports\.objectProject&&ports\.objectProject\(\);return p&&p\.blocksLegacy\(\)\?p:null;\}/);
+  assert.match(operations, /blocksLegacy: routed\('blocksLegacy',lifecycle\.blocksLegacy\)/);
+});
+
+test('without the native block (browser or legacy project) startPlay keeps the legacy loop and never reads the observer clock', () => {
+  const clock = { get now() { throw new Error('observer clock read'); } };
+  for (const blocks of [false, null]) {
+    const { sandbox, calls } = startPlayHarness({ blocks, observer: { fixedClock: clock } });
+    sandbox.startPlay();
+    assert.deepEqual(calls.native, []);
+    assert.equal(calls.raf, 1); assert.equal(sandbox.state.playing, true);
+  }
 });

@@ -79,16 +79,20 @@
   }
   // A colour as the panel and the engine compare it: lower case, the opaque alpha byte dropped (#rrggbbff is #rrggbb).
   function key(c) { var h = typeof c === 'string' ? c.toLowerCase() : ''; return /^#[0-9a-f]{8}$/.test(h) && h.slice(7) === 'ff' ? h.slice(0, 7) : h; }
-  // The colours one listed item shows the Selected Colors panel: its fill and (outside a ribbon, which is inked by its fill) its stroke; a mask shows none.
+  // A mask is a matte (its paint is never shown and the engine takes no paint edit on it) and an image has no paint colour at all (baseline: a Raster has no
+  // fillColor / strokeColor): the Selected Colors panel neither lists their colours (coloursOf) nor recolours them (recolourSteps), by ONE rule.
+  function paintless(path) { var role = path.data.nativeRole; return role === 'mask' || role === 'raster'; }
+  // The colours one listed item shows the Selected Colors panel: its fill and (outside a ribbon, which is inked by its fill) its stroke; a mask or an image shows none.
   function coloursOf(path) {
     var st = path.data.nativeStyle || {}, role = path.data.nativeRole;
-    if (role === 'mask' || role === 'raster') return [];
+    if (paintless(path)) return [];
     return [key(st.fill)].concat(role === 'ribbon' || path.data.nativeRibbon === true ? [] : [key(st.stroke)]).filter(function (c) { return HEX.test(c); });
   }
   // Selected Colors panel recolour (baseline color-manager recolorColor): every fill or stroke of a selected item that equals `from` becomes `to`, alpha
-  // byte included (the colour is the whole #rrggbb[aa]); an item with no match gets no step.
+  // byte included (the colour is the whole #rrggbb[aa]); an item with no match, a mask and an image get no step.
   function recolourSteps(paths, from, to) {
     return paths.map(function (p) {
+      if (paintless(p)) return null;
       var st = p.data.nativeStyle || {}, m = {}, ribbon = p.data.nativeRole === 'ribbon' || p.data.nativeRibbon === true;
       if (key(st.fill) === from) m.fill = to;
       if (!ribbon && key(st.stroke) === from) m.stroke = to;

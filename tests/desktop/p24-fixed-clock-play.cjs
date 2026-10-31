@@ -3,6 +3,8 @@
 // scheduler advances exactly one frame period per tick, so the frames it asks the native owner to present
 // are fully determined by the kernel. This offline verifier derives that sequence from the shipped kernel
 // and compares it with the retained play-step requests. It drives nothing and never launches the app.
+// Works for opacity projects (documentId native-document-N) and native object projects (native-object-document-N):
+// both play through the native scheduler, and the collector accepts both id forms.
 //
 //   node tests/desktop/p24-fixed-clock-play.cjs <native-app.stderr.log> --start 0 --wa-in 0 --wa-out 20 [--loop] [--ping] [--steps N]
 const fs = require('node:fs');
@@ -26,7 +28,13 @@ function expectedFrames({ start, waIn, waOut, loop = false, ping = false, steps 
 function verifyFixedClockSteps(events, spec) {
   const requests = events.filter(e => e.event === 'play-step' && e.result === undefined);
   const returns = events.filter(e => e.event === 'play-step' && e.result !== undefined);
-  const observed = requests.map(e => e.frame);
+  // The operator's Stop supersedes the one step still in flight: it returns false after play-stop and was never
+  // shown. Only that last step is excused, and it is left out of the presented sequence.
+  const stopAt = events.findIndex(e => e.event === 'play-stop'), last = returns[returns.length - 1];
+  const stoppedInFlight = !!last && last.result === false && stopAt >= 0 && events.indexOf(last) > stopAt &&
+    requests.length === returns.length && requests[requests.length - 1].frame === last.frame;
+  const presented = stoppedInFlight ? returns.slice(0, -1) : returns;
+  const observed = (stoppedInFlight ? requests.slice(0, -1) : requests).map(e => e.frame);
   // A non-looping run is finite: the kernel's whole sequence must be requested, so a run that stalls or is
   // stopped early fails. A looping or ping-pong run ends only when the operator stops it, so it must cover
   // --steps requests when given, else at least one full pass of the work area (one wrap or reversal).
@@ -39,8 +47,8 @@ function verifyFixedClockSteps(events, spec) {
   if (observed.length < expected.length) failures.push(`run ended after ${observed.length} of ${expected.length} expected requests`);
   const n = Math.min(observed.length, expected.length);
   for (let i = 0; i < n; i++) if (observed[i] !== expected[i]) { failures.push(`request ${i}: ${observed[i]} != ${expected[i]}`); break; }
-  if (returns.length !== requests.length || returns.some(e => e.result !== true)) failures.push('a step did not return a presented frame');
-  return { ok: failures.length === 0, failures, observed, expected: expected.slice(0, Math.max(n, 0)) };
+  if (returns.length !== requests.length || presented.some(e => e.result !== true)) failures.push('a step did not return a presented frame');
+  return { ok: failures.length === 0, failures, observed, stoppedInFlight, expected: expected.slice(0, Math.max(n, 0)) };
 }
 
 function eventsFromLog(text) {
