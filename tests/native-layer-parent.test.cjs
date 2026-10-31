@@ -161,20 +161,22 @@ test('the pickwhip drop on native is one native Parent A edit and never the lega
 
 test('the legacy setters of motion.js refuse on a native project instead of writing a layer row', () => {
   const text = source('motion.js');
-  const from = text.indexOf('function nativeParentBlocks(what) {');
-  const to = text.indexOf('function setLayerParent(li, parentUid) {');
-  assert.ok(from > 0 && to > from);
-  const toasts = [];
-  const context = { showToast: (m) => toasts.push(m), nativeLayerParent: () => ({}) };
-  context.window = context;
-  vm.runInNewContext(text.slice(from, to) + '; this.blocks = nativeParentBlocks;', context);
-  assert.equal(context.blocks('Parent A'), true);
-  assert.deepEqual(toasts, ['Parent A is not available on a native project yet.']);
-  context.nativeLayerParent = () => null;
-  assert.equal(context.blocks('Parent A'), false, 'a legacy project keeps its setters');
-  for (const name of ['setLayerParent(li, parentUid)', 'setLayerParentB(li, parentUid)', 'setLayerFollowPath(li, targetUid)', 'setLayerTimeLink(li, targetIdx, mode, srcAnchor)']) {
-    const at = text.indexOf('function ' + name);
-    assert.ok(at > 0, name);
-    assert.match(text.slice(at, at + 400), /nativeParentBlocks\(/, name + ' is guarded');
+  const body = (name) => { const at = text.indexOf('  function ' + name + '('); assert.ok(at > 0, name); return text.slice(at, text.indexOf('\n  }\n', at) + 4); };
+  for (const [name, args, notice] of [['setLayerParent', '0, "x"', 'Parent A'], ['setLayerParentB', '0, "x"', 'Parent B'], ['setLayerFollowPath', '0, "x"', 'Follow Path'], ['setLayerTimeLink', '0, 1', 'Parent in Time']]) {
+    for (const native of [true, false]) {
+      const toasts = [], rows = [new Proxy({}, { set() { throw Error('legacy layer row written'); } }), {}];
+      const context = { showToast: (m) => toasts.push(m), state: { layers: rows }, nativeLayerParent: native ? () => ({}) : null, SM: { t: (k) => k } };
+      context.window = context;
+      let outcome = 'returned';
+      vm.runInNewContext(body(name) + '\ntry { this.result = ' + name + '(' + args + '); } catch (error) { this.threw = error.message; }', context);
+      if (native) {
+        assert.deepEqual(toasts, [notice + ' is not available on a native project yet.'], name);
+        assert.equal(context.threw, undefined, name + ' wrote nothing');
+      } else {
+        assert.notDeepEqual(toasts, [notice + ' is not available on a native project yet.'], name + ' keeps the legacy path off a native project');
+        outcome = context.threw || outcome;
+        assert.notEqual(outcome, undefined);
+      }
+    }
   }
 });

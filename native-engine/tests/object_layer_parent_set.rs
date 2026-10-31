@@ -244,3 +244,24 @@ fn a_pose_that_cannot_be_kept_exactly_is_refused_not_jumped() {
     );
     assert_eq!(reply["result"]["applied"], true);
 }
+
+#[test]
+fn a_keyed_parent_is_sampled_at_the_playhead_frame() {
+    let mut document = base(2);
+    document["propertyHolders"][2]["properties"] = json!([{"property":"position","track":{"keys":[
+        {"frame":0,"v":[0,0]},{"frame":4,"v":[8,0]}]}}]);
+    let mut owner = owner_of(&document);
+    let target: crate::object_document::PropertyHolderTarget =
+        serde_json::from_value(json!({"contextId":"scene-root","layerUid":"L2"})).unwrap();
+    let snapshot = owner.acquire_snapshot(owner.content_revision()).unwrap();
+    let at_two = snapshot
+        .sample_property_raw(&target, "position", 2.0)
+        .unwrap()[0];
+    assert!(at_two > 0.0 && at_two < 8.0, "{at_two}");
+    let mut payload = parent("L0", json!("L2"));
+    payload["frame"] = json!(2);
+    send(&mut owner, "keyed", "parent.set", &payload);
+    // the child sits where the parent's pose at frame 2 cancels: world = own + parent = 0 at that frame
+    let own = position(&value(&owner), "L0")[0];
+    assert!((own + at_two).abs() < 1e-9, "{own} vs {at_two}");
+}

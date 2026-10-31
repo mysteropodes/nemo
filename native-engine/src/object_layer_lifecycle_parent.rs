@@ -51,15 +51,42 @@ fn in_context(document: &ObjectDocument, context_id: &str, uids: [&str; 2]) -> b
 
 mod pose {
     use super::{LifecycleError, ObjectSnapshot};
-    use crate::evaluation::motion_parent_chain::motion_mat_from_values;
-    use crate::object_document::{Presence, PropertyHolderTarget};
+    use crate::object_document::{ObjectDocument, Presence, PropertyHolderTarget};
 
-    pub(super) fn target(context_id: &str, layer_uid: &str) -> PropertyHolderTarget {
+    const MOTION: [&str; 4] = ["position", "anchor", "rotation", "scale"];
+
+    fn target(context_id: &str, layer_uid: &str) -> PropertyHolderTarget {
         PropertyHolderTarget {
             context_id: context_id.to_owned(),
             layer_uid: layer_uid.to_owned(),
             stroke_id: Presence::Missing,
         }
+    }
+
+    /// Raw values of one Motion property at `frame` (the read-query facade; expressions are not evaluated).
+    fn sample(
+        snapshot: &ObjectSnapshot,
+        target: &PropertyHolderTarget,
+        key: &str,
+        frame: u32,
+        what: &'static str,
+    ) -> Result<Vec<f64>, LifecycleError> {
+        snapshot
+            .sample_property_raw(target, key, f64::from(frame))
+            .map_err(|_| LifecycleError::PoseUnavailable(what))
+    }
+
+    /// True when an enabled expression drives a Motion property of the target: raw tracks are then not its value.
+    fn expression_driven(document: &ObjectDocument, target: &PropertyHolderTarget) -> bool {
+        document.property_holders().is_some_and(|holders| {
+            holders.iter().any(|h| {
+                h.target() == target
+                    && h.properties().iter().any(|p| {
+                        MOTION.contains(&p.property())
+                            && p.expression.value().is_some_and(|code| code.enabled)
+                    })
+            })
+        })
     }
 
     /// Sum of the translations of `chain` at `frame`; a rotation, a scale or an unsampleable pose refuses.
@@ -69,22 +96,33 @@ mod pose {
         chain: &[&str],
         frame: u32,
     ) -> Result<[f64; 2], LifecycleError> {
+        const NOT_SAMPLEABLE: &str = "a parent pose is not sampleable";
         let mut sum = [0.0, 0.0];
         for uid in chain {
-            let v = snapshot
-                .sampled_motion_values(&target(context_id, uid), f64::from(frame))
-                .map_err(|_| LifecycleError::PoseUnavailable("parent pose is not sampleable"))?;
-            if let Some(m) =
-                motion_mat_from_values(v.position, v.anchor, v.rotation, v.scale, v.opacity)
-            {
-                if m.rot != 0.0 || m.sx != 1.0 || m.sy != 1.0 {
-                    return Err(LifecycleError::PoseUnavailable(
-                        "a rotated or scaled parent needs its evaluated pivot",
-                    ));
-                }
-                sum[0] += m.dx;
-                sum[1] += m.dy;
+            let t = target(context_id, uid);
+            if expression_driven(snapshot.document(), &t) {
+                return Err(LifecycleError::PoseUnavailable(
+                    "an expression-driven parent cannot be kept in place",
+                ));
             }
+            let position = sample(snapshot, &t, "position", frame, NOT_SAMPLEABLE)?;
+            let rotation = sample(snapshot, &t, "rotation", frame, NOT_SAMPLEABLE)?;
+            let scale = sample(snapshot, &t, "scale", frame, NOT_SAMPLEABLE)?;
+            let (px, py, rot, sx, sy) =
+                match (position.as_slice(), rotation.as_slice(), scale.as_slice()) {
+                    (&[px, py], &[rot], &[sx, sy]) => (px, py, rot, sx, sy),
+                    _ => return Err(LifecycleError::PoseUnavailable(NOT_SAMPLEABLE)),
+                };
+            if [px, py, rot, sx, sy].iter().any(|v| !v.is_finite()) {
+                return Err(LifecycleError::PoseUnavailable(NOT_SAMPLEABLE));
+            }
+            if rot != 0.0 || sx != 100.0 || sy != 100.0 {
+                return Err(LifecycleError::PoseUnavailable(
+                    "a rotated or scaled parent needs its evaluated pivot",
+                ));
+            }
+            sum[0] += px;
+            sum[1] += py;
         }
         Ok(sum)
     }
@@ -95,10 +133,18 @@ mod pose {
         layer_uid: &str,
         frame: u32,
     ) -> Result<[f64; 2], LifecycleError> {
-        snapshot
-            .sampled_motion_values(&target(context_id, layer_uid), f64::from(frame))
-            .map(|v| v.position)
-            .map_err(|_| LifecycleError::PoseUnavailable("child position is not sampleable"))
+        let what = "the child position is not sampleable";
+        match sample(
+            snapshot,
+            &target(context_id, layer_uid),
+            "position",
+            frame,
+            what,
+        )?[..]
+        {
+            [x, y] => Ok([x, y]),
+            _ => Err(LifecycleError::PoseUnavailable(what)),
+        }
     }
 }
 

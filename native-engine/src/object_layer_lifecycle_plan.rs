@@ -25,8 +25,6 @@ mod duplicate;
 mod fields;
 #[path = "object_layer_lifecycle_order.rs"]
 mod order;
-#[path = "object_layer_lifecycle_parent.rs"]
-mod parent;
 
 #[allow(unused_imports)]
 pub(crate) use delete::plan_delete;
@@ -34,7 +32,6 @@ pub(crate) use delete::plan_delete;
 pub(crate) use duplicate::{plan_duplicate, unique_layer_name};
 #[allow(unused_imports)]
 pub(crate) use fields::{plan_recolor, plan_rename};
-pub(crate) use parent::plan_parent;
 
 /// Largest content revision an identity may embed (2^53 - 1, as the sealed
 /// layer-create path bounds it).

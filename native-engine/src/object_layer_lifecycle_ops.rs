@@ -15,7 +15,7 @@
 //! the kernel the stand-in policy that answers "unavailable".
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::{
-    plan_delete, plan_duplicate, plan_parent, plan_rename, plan_reorder, LayerSelection, LifecycleError,
+    plan_delete, plan_duplicate, plan_rename, plan_reorder, LayerSelection, LifecycleError,
     LifecyclePlan, SelectionOutcome, UnavailableLayerEditPolicy,
 };
 use crate::object_document::{object_deserialize, ObjectDocument};
@@ -24,6 +24,11 @@ use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use serde_json::Number;
 use std::collections::HashSet;
+
+// #2372 U12: Parent A planning reads the pinned snapshot's Motion through the read-query facade, so it lives with the commands.
+#[path = "object_layer_lifecycle_parent.rs"]
+mod parent;
+use parent::plan_parent;
 
 const MAX_PAYLOAD_BYTES: usize = 4096;
 
