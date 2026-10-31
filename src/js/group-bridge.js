@@ -319,6 +319,10 @@
   // full membership) just updates that group's combine mode. mode is one of
   // 'unite'/'subtract'/'intersect'/'exclude'.
   function combineSelection(mode) {
+    // #2372 insp-boolean-ops: on a native object project the owner creates (or re-modes) the combine group in ONE sealed transaction; the
+    // legacy ld.groups writer below and its pushUndo (refused on a native project) are never reached.
+    var nativeBool = window.NemoNativeSelectionBoolean;
+    if (nativeBool && nativeBool.native(window)) { nativeBool.combine(window, mode); return; }
     if ((state.tool !== 'select' && state.tool !== 'subselect') || !window.selectedPaths || selectedPaths.length < 2) {
       if (window.showToast) showToast(SM.t('toastSelectAtLeast2ShapesToCombine'));
       return;
