@@ -20,6 +20,9 @@ fn track_actions_preserve_native_numeric_and_opaque_string_domains() {
     for preset in ["linear", "ease", "easeIn", "easeOut", "hold"] {
         actions.push(json!({"kind":"preset","preset":preset}));
     }
+    for mode in [json!(null), json!("in"), json!("out"), json!("layer")] {
+        actions.push(json!({"kind":"lockTo","mode":mode}));
+    }
     for side in ["in", "out"] {
         for percent in [-1000.5, 0.0, 100.0, 1000.5] {
             actions.push(json!({"kind":"influence","side":side,"percent":percent}));
@@ -77,6 +80,12 @@ fn track_payload_selection_target_and_action_are_closed_at_every_level() {
         ("/selections", json!({})),
         ("/action", json!({"kind":"preset","preset":"elastic"})),
         ("/action", json!({"kind":"subdivide","preset":"linear"})),
+        ("/action", json!({"kind":"lockTo"})),
+        ("/action", json!({"kind":"lockTo","mode":"both"})),
+        ("/action", json!({"kind":"lockTo","mode":""})),
+        ("/action", json!({"kind":"lockTo","mode":true})),
+        ("/action", json!({"kind":"lockTo","mode":["in"]})),
+        ("/action", json!({"kind":"lockTo","mode":"in","extra":0})),
         (
             "/action",
             json!({"kind":"influence","side":"both","percent":50}),

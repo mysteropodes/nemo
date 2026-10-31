@@ -34,3 +34,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../tests/object_duplicator_lock_policy.rs"]
 mod duplicator_tests;
+
+#[cfg(test)]
+#[path = "../tests/object_key_lock_edit.rs"]
+mod key_lock_tests;

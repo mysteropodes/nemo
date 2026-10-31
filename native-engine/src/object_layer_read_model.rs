@@ -8,7 +8,7 @@
 //! Row additions (all optional except `kind`): `kind` (the `layer-kind.js` `keyOf` taxonomy, or `unknown` when the stored
 //! content contradicts itself), `folderCollapsed` (a folder layer's stored state), `folderId` (organisational membership),
 //! `componentId` (the symbol an instance layer places), `blendMode`, `matteMode`, `matteSourceLayerUid`, `mattesMore`,
-//! `isMatteSource`, `timeLinkUid` and `followPathUid` (#2372: the stored Link time source and Follow path target), `followPathAlign` (true only: the orient toggle of that path), `hasDuplicator` (true only: the layer hosts a stored duplicator) with `dupSourceMode` (`shape` or `objects`, as that duplicator stores it), `opacity` (the static value), `opacityAnimated`, and (#2372) `effects` (the layer's stored effect stack, so the
+//! `isMatteSource`, `timeLinkUid` and `followPathUid` (#2372: the stored Link time source and Follow path target), `followPathAlign` (true only: the orient toggle of that path), `keyLock` (D37: the layer's standing key-lock mode `in`, `out` or `layer`; omitted when none), `hasDuplicator` (true only: the layer hosts a stored duplicator) with `dupSourceMode` (`shape` or `objects`, as that duplicator stores it), `opacity` (the static value), `opacityAnimated`, and (#2372) `effects` (the layer's stored effect stack, so the
 //! effects panel can send a complete replacement) or `effectsOversize` when the stack is past the row or document bound, and the same for the path-effect stack (`pathFx`, `pathFxOversize`). Top level: `layerFolders` (the organisational folder
 //! rows) and `layerModelUnavailable`. The colour label stays the existing `color` row member.
 use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
@@ -253,6 +253,10 @@ pub(crate) fn layer_members(document: &ObjectDocument) -> Vec<Map<String, Value>
                     row.insert("followPathAlign".into(), json!(true));
                 }
             }
+            // D37: the layer's standing key-lock mode (in/out/layer) so the Motion lock menu can tick it; absent or null reads as none.
+            if let Some(mode) = layer.key_lock.value().copied().flatten() {
+                row.insert("keyLock".into(), json!(mode));
+            }
             if let Some(mode) = hosts.get(uid) {
                 row.insert("hasDuplicator".into(), json!(true));
                 row.insert("dupSourceMode".into(), json!(mode));
@@ -322,3 +326,6 @@ mod tests;
 #[cfg(test)]
 #[path = "../tests/object_layer_read_model_duplicator.rs"]
 mod duplicator_tests;
+#[cfg(test)]
+#[path = "../tests/object_layer_read_model_key_lock.rs"]
+mod key_lock_tests;
