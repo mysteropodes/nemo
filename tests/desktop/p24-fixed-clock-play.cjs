@@ -3,6 +3,8 @@
 // scheduler advances exactly one frame period per tick, so the frames it asks the native owner to present
 // are fully determined by the kernel. This offline verifier derives that sequence from the shipped kernel
 // and compares it with the retained play-step requests. It drives nothing and never launches the app.
+// Works for opacity projects (documentId native-document-N) and native object projects (native-object-document-N):
+// both play through the native scheduler, and the collector accepts both id forms.
 //
 //   node tests/desktop/p24-fixed-clock-play.cjs <native-app.stderr.log> --start 0 --wa-in 0 --wa-out 20 [--loop] [--ping] [--steps N]
 const fs = require('node:fs');
