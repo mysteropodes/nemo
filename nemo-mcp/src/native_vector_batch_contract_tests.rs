@@ -150,3 +150,33 @@ fn reshape_and_clone_name_a_stroke_and_new_geometry() {
         assert!(!vector_request(VECTOR, &p), "{bad}");
     }
 }
+
+/// #2372 SEL-STYLE: a restyle names a record or item and only the style members to change.
+#[test]
+fn a_restyle_names_its_target_and_valid_style_members_and_its_receipt_id_is_the_target() {
+    let step = |style: Value| json!({"op":"restyle","stableTarget":target("L1","s-a"),"style":style});
+    let batch = |ops: Vec<Value>| json!({"command":"object.vector.batch","ops":ops});
+    let good = batch(vec![step(json!({"fill":"#ff000080","stroke":"#00ff00","width":6,"opacity":0.4})), step(json!({"opacity":0}))]);
+    assert!(vector_request(VECTOR, &good));
+    let mut framed = good.clone();
+    framed["ops"][0]["frame"] = json!(2);
+    assert!(vector_request(VECTOR, &framed));
+    let receipt = json!({"applied":true,"historyEntriesAdded":1,"operation":"batch","strokeId":"s-a","strokeIds":["s-a","s-a"]});
+    assert!(vector_result(VECTOR, &good, &receipt));
+    let mut wrong = receipt.clone();
+    wrong["strokeIds"] = json!(["s-a","native-stroke:8:0"]);
+    assert!(!vector_result(VECTOR, &good, &wrong), "a restyle reports its named target, never an allocated id");
+    for bad in [json!({}), json!({"fill":"red"}), json!({"fill":"#12"}), json!({"stroke":"#12345g"}), json!({"fill":null}), json!({"width":0}),
+        json!({"width":-1}), json!({"width":20000}), json!({"opacity":1.5}), json!({"opacity":"1"}), json!({"colour":"#000000"})] {
+        assert!(!vector_request(VECTOR, &batch(vec![step(bad.clone())])), "{bad}");
+    }
+    let mut no_style = good.clone();
+    no_style["ops"][0].as_object_mut().unwrap().remove("style");
+    assert!(!vector_request(VECTOR, &no_style));
+    let mut extra = good.clone();
+    extra["ops"][0]["matrix"] = json!([1, 0, 0, 1, 0, 0]);
+    assert!(!vector_request(VECTOR, &extra), "a restyle takes no geometry or matrix");
+    let mut other_layer = good;
+    other_layer["ops"][1]["stableTarget"] = target("L2", "s-b");
+    assert!(!vector_request(VECTOR, &other_layer), "a batch stays on one layer");
+}

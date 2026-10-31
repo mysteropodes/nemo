@@ -109,7 +109,7 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
             exact(
                 i,
                 &["stableTarget", "closed", "count", "matrix"],
-                if hit { &["bounds", "role", "filled", "strokeWidth", "owner", "brush", "group", "boxAngle"] } else { &["paintCount"] },
+                if hit { &["bounds", "role", "filled", "strokeWidth", "owner", "brush", "group", "boxAngle", "style"] } else { &["paintCount"] },
             )
             .is_some()
                 && (!hit
@@ -120,6 +120,7 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
                         && i["filled"].is_boolean()
                         && i.get("strokeWidth").is_none_or(|w| w.as_f64().is_some_and(|w| w.is_finite() && w >= 0.0))
                         && i.get("boxAngle").is_none_or(|a| a.as_f64().is_some_and(f64::is_finite))
+                        && i.get("style").is_none_or(listed_style)
                         && i.get("bounds").is_some()
                         && i.get("owner").is_none_or(|o| i["role"] == "fill" && o.as_str().is_some_and(|s| !s.is_empty()))
                         && i.get("brush").is_none_or(|b| ["anchor", "copy", "bitmap"].contains(&b.as_str().unwrap_or("")))
@@ -319,3 +320,13 @@ pub(super) fn result(document_id: &str, p: &Value, r: &Value) -> bool {
 #[cfg(test)]
 #[path = "native_subselect_contract_tests.rs"]
 mod tests;
+
+/// #2372: the style a panel shows for a listed item, each member optional: hex `fill` / `stroke`, a positive `width`, an `opacity` in 0..1.
+fn listed_style(v: &Value) -> bool {
+    let hex = |s: &Value| s.as_str().and_then(|s| s.strip_prefix('#')).is_some_and(|d| [6, 8].contains(&d.len()) && d.bytes().all(|b| b.is_ascii_hexdigit()));
+    exact(v, &[], &["fill", "stroke", "width", "opacity"]).is_some_and(|o| !o.is_empty())
+        && v.get("fill").is_none_or(hex)
+        && v.get("stroke").is_none_or(hex)
+        && v.get("width").is_none_or(|w| w.as_f64().is_some_and(|w| w.is_finite() && w > 0.0))
+        && v.get("opacity").is_none_or(|o| o.as_f64().is_some_and(|o| (0.0..=1.0).contains(&o)))
+}

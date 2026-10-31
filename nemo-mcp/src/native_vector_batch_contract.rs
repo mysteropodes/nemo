@@ -8,7 +8,9 @@
 //! own space, #2372 Select) maps the record by that affine and brings what belongs to it: a ribbon's rebuilt outline and
 //! linked fill, a texture anchor's copies, a gradient's end points and a dynamic shape's box; its receipt id is still the
 //! one named record. The named target may also be a stored raster image or text block (its own frame: an image's centre, size and
-//! rotation, a text block's anchor and size), so one gesture over a mixed selection is one batch.
+//! rotation, a text block's anchor and size), so one gesture over a mixed selection is one batch. A `restyle` (#2372, `style` of
+//! optional `fill` and `stroke` hex colours, a positive `width` and an `opacity` in 0..1, at least one) restyles a named record
+//! or item; its receipt id is the named target.
 use super::shapes::{anchor, geometry, record_shape};
 use super::target;
 use crate::native_contract::exact;
@@ -38,6 +40,11 @@ fn step(op: &Value) -> Option<&Value> {
             && op.get("center").is_none_or(|c| c.as_array().is_some_and(|a| (2..=256).contains(&a.len()) && a.iter().all(anchor)))
             && op.get("frame").is_none_or(|f| f.as_u64().is_some_and(|f| u32::try_from(f).is_ok())))
         .then(|| &op["stableTarget"]),
+        "restyle" => (exact(op, &["op", "stableTarget", "style"], &["frame"]).is_some()
+            && target(&op["stableTarget"], false)
+            && style(&op["style"])
+            && op.get("frame").is_none_or(|f| f.as_u64().is_some_and(|f| u32::try_from(f).is_ok())))
+        .then(|| &op["stableTarget"]),
         // A clone takes new geometry (the knife's plain pieces) or, without it, copies any stroke shifted by `offset`
         // (a pose stamp), never both.
         "clone" => (exact(op, &["op", "stableTarget", "frame"], &["geometry", "offset", "placement", "keyframe"]).is_some()
@@ -53,6 +60,19 @@ fn step(op: &Value) -> Option<&Value> {
         .then(|| &op["stableTarget"]),
         _ => None,
     }
+}
+
+/// `#rrggbb` or `#rrggbbaa`.
+fn hex(v: &Value) -> bool {
+    v.as_str().and_then(|s| s.strip_prefix('#')).is_some_and(|d| [6, 8].contains(&d.len()) && d.bytes().all(|b| b.is_ascii_hexdigit()))
+}
+/// A restyle's members: at least one of a hex `fill` / `stroke`, a `width` in (0, 10000] and an `opacity` in [0, 1].
+fn style(v: &Value) -> bool {
+    exact(v, &[], &["fill", "stroke", "width", "opacity"]).is_some_and(|o| !o.is_empty())
+        && v.get("fill").is_none_or(hex)
+        && v.get("stroke").is_none_or(hex)
+        && v.get("width").is_none_or(|w| w.as_f64().is_some_and(|w| w > 0.0 && w <= 10_000.0))
+        && v.get("opacity").is_none_or(|o| o.as_f64().is_some_and(|o| (0.0..=1.0).contains(&o)))
 }
 
 /// Every step's addressed target; a copy addresses its source's layer and must name an earlier create or copy.
@@ -106,7 +126,7 @@ pub(super) fn result(payload: &Value, value: &Value) -> bool {
         && ops.iter().zip(ids).all(|(op, id)| match op["op"].as_str() {
             Some("create" | "copy" | "clone") => id.as_str().is_some_and(|s| s.starts_with("native-stroke:")),
             Some("replace") => *id == op["record"]["target"]["strokeId"],
-            Some("reshape") => *id == op["stableTarget"]["strokeId"],
+            Some("reshape" | "restyle") => *id == op["stableTarget"]["strokeId"],
             Some("delete") => *id == op["stableTarget"]["strokeId"],
             _ => false,
         })

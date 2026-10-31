@@ -169,6 +169,27 @@ fn a_stroked_plain_record_lists_its_authored_width_and_an_unstroked_or_image_ite
 }
 
 #[test]
+fn a_record_image_and_text_list_the_style_a_panel_shows() {
+    // #2372 SEL-STYLE: the panel shows the selection's style from the listing, not from the transient presented path.
+    let mut doc = drawing();
+    doc["objects"][0]["family"] = json!("editable-vector-path");
+    doc["objects"][0]["fill"] = json!({"kind":"solid","r":1.0,"g":0.0,"b":0.0,"a":0.5019607843137255});
+    doc["objects"][0]["vector"] = json!({"stroke":{"kind":"solid","r":0.0,"g":1.0,"b":0.0,"a":1.0},"hasRealStroke":true,"strokeWidth":6,
+        "strokeCap":"butt","strokeJoin":"miter","miterLimit":10,"dashOffset":0,"opacity":1});
+    let items = listing(&doc)["items"].as_array().unwrap().clone();
+    assert_eq!(items[0]["style"], json!({"fill":"#ff000080","stroke":"#00ff00","width":6.0,"opacity":0.5019607843137255}));
+    assert_eq!(items[1]["role"], "text");
+    assert!(items[1]["style"]["fill"].as_str().is_some_and(|c| c.starts_with('#')), "a text block lists its colour: {}", items[1]);
+    assert_eq!(items[2]["style"], json!({"opacity":1.0}), "an image lists its opacity");
+    // Unfilled: the item opacity stands in; unstroked: no stroke member.
+    doc["objects"][0]["fill"] = Value::Null;
+    doc["objects"][0]["vector"]["hasRealStroke"] = json!(false);
+    doc["objects"][0]["vector"]["stroke"] = Value::Null;
+    doc["objects"][0]["vector"]["opacity"] = json!(0.25);
+    assert_eq!(listing(&doc)["items"][0]["style"], json!({"width":6.0,"opacity":0.25}));
+}
+
+#[test]
 fn a_record_lists_its_stored_box_angle_and_an_unturned_record_or_an_image_lists_none() {
     // #2372: Select draws its oriented box from this after a frame change, an undo or a reload (baseline serP boxAngle).
     let listed = |ext: Value| {
@@ -301,6 +322,7 @@ fn worst_case_items(count: usize, id_len: usize) -> Vec<crate::object_snapshot::
                 owner: None,
                 brush: None,
                 group: None,
+                style: None,
             }
         })
         .collect()
