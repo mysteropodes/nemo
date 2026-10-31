@@ -15,6 +15,9 @@
   var overlay = null;
   var paintQueued = false;
   var drag = null;
+  // After a commit the info pin moves before the canvas presents the new revision, so the selection proof is briefly unprovable:
+  // that is "not yet", never "deselected". The panel, Edit points and the handles hold until the re-read lands (bounded, #2242).
+  var settling = 0, SETTLE_TRIES = 20, SETTLE_MS = 60;
 
   function el(id) { return document.getElementById(id); }
   function toast(message) { if (window.showToast) window.showToast(message, 'warn'); }
@@ -45,6 +48,7 @@
   function refresh() {
     var proof = proofNow(), key = proof && keyOf(proof), prior = currentCache();
     if (!proof) {
+      if (settling) return Promise.resolve(null);
       if (cached) { serial++; cached = null; cancelDrag(); }
       paintPanel(); schedulePaint(); return Promise.resolve(null);
     }
@@ -94,9 +98,21 @@
     if (error && error.code) message += ' (' + error.code + (error.reason ? ': ' + error.reason : '') + ')';
     toast(message);
   }
-  function refreshAfter(receipt) {
-    if (receipt && receipt.applied === false) return refresh();
-    return refresh();
+  // Holds from the moment a command is sent: the queue hides the presentation while it is pending, and updateUI re-reads the panel then.
+  function hold(operation) {
+    settling++;
+    return Promise.resolve(operation).then(settle, function (error) { settling--; throw error; });
+  }
+  function settle() {
+    var tries = 0;
+    function done(read) { settling--; paintPanel(); schedulePaint(); return read; }
+    function later() { return new Promise(function (go) { window.setTimeout(go, SETTLE_MS); }).then(attempt); }
+    function attempt() {
+      var last = ++tries > SETTLE_TRIES;
+      if (!proofNow()) { if (!last) return later(); done(null); return refresh(); }
+      return refresh().then(function (read) { return read || last ? done(read) : later(); }, function () { return last ? done(null) : later(); });
+    }
+    return attempt();
   }
   function toggleMesh(on) {
     var entry = usable();
@@ -113,7 +129,7 @@
       if (!read.meshId) { editing = false; refresh(); return Promise.resolve(true); }
       operation = invoke('detach', [target], entry).then(function (receipt) { editing = false; return receipt; });
     }
-    return operation.then(refreshAfter).then(function () { return true; }).catch(function (error) { showFailure(error); refresh(); return false; });
+    return hold(operation).then(function () { return true; }).catch(function (error) { showFailure(error); refresh(); return false; });
   }
   function densityOf(raw) {
     var module = window.NemoNativeObjectImageMesh;
@@ -124,13 +140,13 @@
     if (!entry || !entry.read.meshId) { refresh(); return Promise.resolve(false); }
     var cols = el('p-imagemesh-cols'), rows = el('p-imagemesh-rows');
     var c = densityOf(cols && cols.value), r = densityOf(rows && rows.value);
-    return invoke('setDensity', [entry.read.meshId, c, r], entry).then(refreshAfter).then(function () { return true; })
+    return hold(invoke('setDensity', [entry.read.meshId, c, r], entry)).then(function () { return true; })
       .catch(function (error) { showFailure(error); refresh(); return false; });
   }
   function resetPose() {
     var entry = usable();
     if (!entry || !entry.read.meshId) { refresh(); return Promise.resolve(false); }
-    return invoke('resetOffsets', [entry.read.meshId], entry).then(refreshAfter).then(function () { return true; })
+    return hold(invoke('resetOffsets', [entry.read.meshId], entry)).then(function () { return true; })
       .catch(function (error) { showFailure(error); refresh(); return false; });
   }
   function setEditing(value) {
@@ -142,11 +158,13 @@
     var section = el('p-imagemesh-sec');
     if (!section) return;
     var entry = currentCache();
-    if (!entry) { section.style.display = 'none'; return; }
+    if (!entry) { if (!settling) section.style.display = 'none'; return; }
     section.hidden = false;
     section.style.display = '';
     var read = entry.read, has = !!(read && read.meshId);
-    if (!has) editing = false;
+    if (!read && settling) return;
+    // Edit points is a sticky preference: only a read that proves the image has no mesh turns it off, never a read still in flight.
+    if (read && !has) editing = false;
     var on = el('p-imagemesh-on'); if (on) { on.checked = has; on.disabled = !read; }
     var edit = el('p-imagemesh-edit'); if (edit) { edit.checked = editing; edit.disabled = !has; }
     var body = el('p-imagemesh-body'); if (body) body.style.display = has ? '' : 'none';
@@ -200,8 +218,9 @@
   }
   function drawOverlay() {
     var svg = ensureOverlay();
-    while (svg.firstChild) svg.removeChild(svg.firstChild);
     var entry = usable();
+    if (!entry && settling) return;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
     if (!editing || !entry || !entry.read.mesh || !window.SMImageMesh) return;
     var read = entry.read, map = mappingFor(read, entry.proof.info), pts = map && screenPoints(entry, read, map), mesh = effectiveMesh(read);
     if (!pts) return;
@@ -276,8 +295,8 @@
     try { if (done.area.hasPointerCapture && done.area.hasPointerCapture(done.pointerId)) done.area.releasePointerCapture(done.pointerId); } catch (_) {}
     schedulePaint();
     if (!done.moved || !done.offset || done.entry.proof.current() !== true || cached !== done.entry) return;
-    invoke('setOffset', [done.entry.read.meshId, done.index, done.offset[0], done.offset[1]], done.entry)
-      .then(refreshAfter).catch(function (error) { showFailure(error); refresh(); });
+    hold(invoke('setOffset', [done.entry.read.meshId, done.index, done.offset[0], done.offset[1]], done.entry))
+.catch(function (error) { showFailure(error); refresh(); });
   }
   function onCancel(e) { if (drag && e.pointerId === drag.pointerId) cancelDrag(); }
 

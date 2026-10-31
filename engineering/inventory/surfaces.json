@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "8a9fa6ea914b1b4e6163cfdee0f0a49fffbb0f77",
-  "describe": "v0.7.0-alpha.4-5006-g8a9fa6ea9-dirty"
+  "head": "57e1a242b023aba19b618db206fbca1341ec5440",
+  "describe": "v0.7.0-alpha.4-5007-g57e1a242b-dirty"
  },
- "inputsDigest": "be39644da8eb02bf579b8c239788599c8dd0ea94563958bdc134c62b9120d4da",
+ "inputsDigest": "c58fe66d666a474cd668f621ab76ea6be29fd296689f225092ffe005153012e4",
  "states": [
   "inventoried",
   "characterized",
@@ -52,13 +52,13 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 264,
+   "native": 261,
    "export": 5,
-   "animation": 420,
-   "history": 382,
+   "animation": 416,
+   "history": 378,
    "selection": 405,
-   "render": 489,
-   "persist": 426
+   "persist": 426,
+   "render": 485
   }
  },
  "fixturesByArea": {
@@ -176,7 +176,7 @@
   },
   "SMImageMeshUI": {
    "file": "src/js/image-mesh-bridge.js",
-   "line": 306,
+   "line": 325,
    "members": 7
   },
   "SM": {
@@ -612,10 +612,10 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "render": 2,
     "persist": 2,
     "history": 2,
     "animation": 2,
+    "render": 2,
     "selection": 3,
     "native": 3
    },
@@ -629,7 +629,7 @@
     "container": "layer-ctrls",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 186,
+    "functionsVisited": 120,
     "via": "chain",
     "references": []
    },
@@ -2510,7 +2510,7 @@
    "capability": "Reset shape",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/image-mesh-bridge.js:292 init()"
+    "src/js/image-mesh-bridge.js:311 init()"
    ],
    "events": [
     "click"
@@ -2520,10 +2520,8 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "native": 2
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "consumers": {},
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1066",
@@ -2533,7 +2531,7 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 36,
+    "functionsVisited": 22,
     "via": "helper el()",
     "references": []
    },
@@ -11021,7 +11019,7 @@
    "capability": "imagemesh cols",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/image-mesh-bridge.js:290 init()"
+    "src/js/image-mesh-bridge.js:309 init()"
    ],
    "events": [
     "change"
@@ -11031,10 +11029,8 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "native": 2
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "consumers": {},
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1062",
@@ -11046,11 +11042,11 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 41,
+    "functionsVisited": 28,
     "via": "helper el()",
     "references": [
-     "src/js/image-mesh-bridge.js:125 setDensity()",
-     "src/js/image-mesh-bridge.js:155 paintPanel()"
+     "src/js/image-mesh-bridge.js:141 setDensity()",
+     "src/js/image-mesh-bridge.js:173 paintPanel()"
     ]
    },
    "fixtures": [
@@ -11069,7 +11065,7 @@
    "capability": "imagemesh edit",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/image-mesh-bridge.js:288 init()"
+    "src/js/image-mesh-bridge.js:307 init()"
    ],
    "events": [
     "change"
@@ -11093,7 +11089,7 @@
     "functionsVisited": 10,
     "via": "helper el()",
     "references": [
-     "src/js/image-mesh-bridge.js:151 paintPanel()"
+     "src/js/image-mesh-bridge.js:169 paintPanel()"
     ]
    },
    "fixtures": [
@@ -11112,7 +11108,7 @@
    "capability": "imagemesh on",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/image-mesh-bridge.js:286 init()"
+    "src/js/image-mesh-bridge.js:305 init()"
    ],
    "events": [
     "change"
@@ -11138,7 +11134,7 @@
     "functionsVisited": 20,
     "via": "helper el()",
     "references": [
-     "src/js/image-mesh-bridge.js:150 paintPanel()"
+     "src/js/image-mesh-bridge.js:168 paintPanel()"
     ]
    },
    "fixtures": [
@@ -11157,7 +11153,7 @@
    "capability": "imagemesh rows",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/image-mesh-bridge.js:291 init()"
+    "src/js/image-mesh-bridge.js:310 init()"
    ],
    "events": [
     "change"
@@ -11167,10 +11163,8 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "native": 2
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "consumers": {},
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1063",
@@ -11182,11 +11176,11 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 41,
+    "functionsVisited": 28,
     "via": "helper el()",
     "references": [
-     "src/js/image-mesh-bridge.js:125 setDensity()",
-     "src/js/image-mesh-bridge.js:155 paintPanel()"
+     "src/js/image-mesh-bridge.js:141 setDensity()",
+     "src/js/image-mesh-bridge.js:173 paintPanel()"
     ]
    },
    "fixtures": [
@@ -23068,18 +23062,14 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "history": 3,
-    "animation": 3
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/labs/command-palette.js:33",
    "meta": {
     "i18n": "labsCmdNewLayer",
-    "functionsVisited": 103
+    "functionsVisited": 13
    },
    "fixtures": []
   },
@@ -23955,7 +23945,7 @@
    "source": "src/js/layer-inout.js:1555",
    "meta": {
     "i18n": null,
-    "functionsVisited": 400
+    "functionsVisited": 402
    },
    "fixtures": [
     "static-props",
@@ -25937,7 +25927,7 @@
    "source": "src/js/motion.js:8263",
    "meta": {
     "i18n": "menuRemoveThisParent",
-    "functionsVisited": 515
+    "functionsVisited": 517
    },
    "fixtures": [
     "static-props",
@@ -26169,7 +26159,7 @@
    "source": "src/js/motion.js:10530",
    "meta": {
     "i18n": "ctxDeleteThisKey",
-    "functionsVisited": 524
+    "functionsVisited": 526
    },
    "fixtures": [
     "static-props",
@@ -26211,7 +26201,7 @@
    "source": "src/js/motion.js:9874",
    "meta": {
     "i18n": "elementsDelete",
-    "functionsVisited": 571
+    "functionsVisited": 573
    },
    "fixtures": [
     "static-props",
@@ -26292,7 +26282,7 @@
    "source": "src/js/motion.js:9872",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 449
+    "functionsVisited": 451
    },
    "fixtures": [
     "static-props",
@@ -26414,7 +26404,7 @@
    "source": "src/js/motion.js:9829",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 533
+    "functionsVisited": 535
    },
    "fixtures": [
     "static-props",
@@ -26853,7 +26843,7 @@
    "source": "src/js/motion.js:7313",
    "meta": {
     "i18n": "ctxParentInTimeLinkTimeEllipsis",
-    "functionsVisited": 400
+    "functionsVisited": 402
    },
    "fixtures": [
     "static-props",
@@ -27094,7 +27084,7 @@
    "source": "src/js/motion.js:8340",
    "meta": {
     "i18n": "ctxUnlinkTime",
-    "functionsVisited": 531
+    "functionsVisited": 533
    },
    "fixtures": [
     "static-props",
@@ -27136,7 +27126,7 @@
    "source": "src/js/motion.js:10965",
    "meta": {
     "i18n": "ctxAddKeyHere",
-    "functionsVisited": 521
+    "functionsVisited": 523
    },
    "fixtures": [
     "static-props",
@@ -27611,7 +27601,7 @@
    "source": "src/js/motion.js:11028",
    "meta": {
     "i18n": "ctxParentInTimeLinkTimeEllipsis",
-    "functionsVisited": 400
+    "functionsVisited": 402
    },
    "fixtures": [
     "static-props",
@@ -27729,7 +27719,7 @@
    "source": "src/js/motion.js:11000",
    "meta": {
     "i18n": "ctxSubdivideMidpoint",
-    "functionsVisited": 532
+    "functionsVisited": 534
    },
    "fixtures": [
     "static-props",
@@ -30438,18 +30428,14 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "history": 3,
-    "animation": 3
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/timeline.js:6967",
    "meta": {
     "i18n": "ctxInsertLayer",
-    "functionsVisited": 103
+    "functionsVisited": 13
    },
    "fixtures": [
     "keyed-props",
@@ -30754,7 +30740,7 @@
    "source": "src/js/timeline.js:7041",
    "meta": {
     "i18n": "ctxMatteSource",
-    "functionsVisited": 385
+    "functionsVisited": 387
    },
    "fixtures": [
     "keyed-props",
@@ -30817,18 +30803,14 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "history": 3,
-    "animation": 3
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/timeline.js:6966",
    "meta": {
     "i18n": "ctxMenuInsert",
-    "functionsVisited": 105
+    "functionsVisited": 16
    },
    "fixtures": [
     "keyed-props",
@@ -31098,7 +31080,7 @@
    "source": "src/js/timeline.js:6996",
    "meta": {
     "i18n": "ctxRemoveFromFolder",
-    "functionsVisited": 384
+    "functionsVisited": 386
    },
    "fixtures": [
     "keyed-props",
@@ -31249,7 +31231,7 @@
    "source": "src/js/timeline.js:7004",
    "meta": {
     "i18n": "ctxUnlinkFromLFSGroup",
-    "functionsVisited": 385
+    "functionsVisited": 387
    },
    "fixtures": [
     "keyed-props",
@@ -31469,7 +31451,7 @@
    "source": "src/js/timeline.js:5717",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 449
+    "functionsVisited": 451
    },
    "fixtures": [
     "keyed-props",
@@ -31582,7 +31564,7 @@
    "source": "src/js/timeline.js:5688",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 533
+    "functionsVisited": 535
    },
    "fixtures": [
     "keyed-props",
@@ -31621,7 +31603,7 @@
    "source": "src/js/timeline.js:5719",
    "meta": {
     "i18n": "fxDelete",
-    "functionsVisited": 571
+    "functionsVisited": 573
    },
    "fixtures": [
     "keyed-props",
@@ -31980,18 +31962,14 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "history": 3,
-    "animation": 3
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/timeline.js:11291",
    "meta": {
     "i18n": "ctxInsertLayer",
-    "functionsVisited": 103
+    "functionsVisited": 13
    },
    "fixtures": [
     "keyed-props",
@@ -32625,7 +32603,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:433",
    "meta": {
-    "functionsVisited": 361
+    "functionsVisited": 368
    },
    "fixtures": [
     "media",
@@ -32660,7 +32638,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:442",
    "meta": {
-    "functionsVisited": 392
+    "functionsVisited": 394
    },
    "fixtures": [
     "media",
@@ -33091,7 +33069,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 400
+    "functionsVisited": 407
    },
    "fixtures": [
     "media",
@@ -33306,7 +33284,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:286",
    "meta": {
-    "functionsVisited": 359
+    "functionsVisited": 361
    },
    "fixtures": [
     "media",
@@ -33712,7 +33690,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:60",
    "meta": {
-    "functionsVisited": 359
+    "functionsVisited": 361
    },
    "fixtures": [
     "media",
@@ -33875,7 +33853,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:52",
    "meta": {
-    "functionsVisited": 359
+    "functionsVisited": 361
    },
    "fixtures": [
     "media",
@@ -33943,7 +33921,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:64",
    "meta": {
-    "functionsVisited": 380
+    "functionsVisited": 382
    },
    "fixtures": [
     "media",
@@ -34288,7 +34266,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:56",
    "meta": {
-    "functionsVisited": 359
+    "functionsVisited": 361
    },
    "fixtures": [
     "media",
@@ -34618,7 +34596,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:603",
    "meta": {
-    "functionsVisited": 358
+    "functionsVisited": 360
    },
    "fixtures": [
     "media",
@@ -34681,7 +34659,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:590",
    "meta": {
-    "functionsVisited": 433
+    "functionsVisited": 435
    },
    "fixtures": [
     "media",

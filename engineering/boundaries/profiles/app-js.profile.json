@@ -2023,11 +2023,19 @@
       "layer": "application",
       "dir": "src/js/application",
       "files": [
-        "script-native-api.js"
+        "script-native-api.js",
+        "script-native-drain.js",
+        "script-native-reads.js",
+        "script-native-run.js",
+        "script-native-writes.js"
       ],
       "sizeProfile": "Domain/application",
       "publicApi": [
-        "script-native-api.js"
+        "script-native-api.js",
+        "script-native-drain.js",
+        "script-native-reads.js",
+        "script-native-run.js",
+        "script-native-writes.js"
       ]
     },
     {
