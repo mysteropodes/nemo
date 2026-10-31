@@ -6,16 +6,23 @@
   var KINDS=['draw','image','sequence','video','camera','effect','text','null','folder','component','montage','widget','effector','guide','unknown'];
   var ROW_KEYS=['kind','folderCollapsed','folderId','componentId','blendMode','matteMode','matteSourceLayerUid','mattesMore','isMatteSource','opacity','opacityAnimated'];
   function has(o,k){return Object.prototype.hasOwnProperty.call(o,k);}
-  function text(v){return typeof v==='string'&&v.length>0&&v.length<=1024;}
+  // Bounds match what the engine can emit, not a tighter guess: the desktop route refuses a whole project-info answer above
+  // 4 MiB (PROJECT_INFO_LIMIT_BYTES, native_object_project_route.rs), so no string or list in an answer that reached
+  // here can be longer than that. Modes and blend names are stored as given (a file may carry any string, even empty);
+  // ids are non-empty because engine admission refuses an empty reference, folder id or symbol id.
+  var MAX_INFO=4*1024*1024;
+  function str(v){return typeof v==='string'&&v.length<=MAX_INFO;}
+  function text(v){return str(v)&&v.length>0;}
   function rowModel(l){
     return (!has(l,'kind')||KINDS.indexOf(l.kind)>=0)&&(!has(l,'folderCollapsed')||typeof l.folderCollapsed==='boolean')&&
-      ['folderId','componentId','blendMode','matteMode','matteSourceLayerUid'].every(function(k){return !has(l,k)||text(l[k]);})&&
-      (!has(l,'mattesMore')||Array.isArray(l.mattesMore)&&l.mattesMore.length<=64&&l.mattesMore.every(function(m){return m&&Object.keys(m).length===2&&text(m.uid)&&text(m.mode);}))&&
+      ['folderId','componentId','matteSourceLayerUid'].every(function(k){return !has(l,k)||text(l[k]);})&&
+      ['blendMode','matteMode'].every(function(k){return !has(l,k)||str(l[k]);})&&
+      (!has(l,'mattesMore')||Array.isArray(l.mattesMore)&&l.mattesMore.length<=MAX_INFO&&l.mattesMore.every(function(m){return m&&Object.keys(m).length===2&&text(m.uid)&&str(m.mode);}))&&
       ['isMatteSource','opacityAnimated'].every(function(k){return !has(l,k)||l[k]===true;})&&(!has(l,'opacity')||Number.isFinite(l.opacity));
   }
   function topModel(v){
-    return (!has(v,'layerFolders')||Array.isArray(v.layerFolders)&&v.layerFolders.length<=1024&&v.layerFolders.every(function(f){
-      return f&&text(f.folderId)&&typeof f.collapsed==='boolean'&&(!has(f,'name')||typeof f.name==='string')&&Object.keys(f).length===(has(f,'name')?3:2);}))&&
+    return (!has(v,'layerFolders')||Array.isArray(v.layerFolders)&&v.layerFolders.length<=MAX_INFO&&v.layerFolders.every(function(f){
+      return f&&text(f.folderId)&&typeof f.collapsed==='boolean'&&(!has(f,'name')||str(f.name))&&Object.keys(f).length===(has(f,'name')?3:2);}))&&
       (!has(v,'layerModelUnavailable')||Array.isArray(v.layerModelUnavailable)&&v.layerModelUnavailable.length<=32&&v.layerModelUnavailable.every(text));
   }
   function clone(v){return JSON.parse(JSON.stringify(v));}

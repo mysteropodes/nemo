@@ -1,5 +1,6 @@
 //! One parked project in the original host; only self.history accepts commands.
 use crate::native_dispatch::object_host::{envelope_identity, export, preview};
+use crate::native_object_bootstrap::PROJECT_INFO_LIMIT_BYTES;
 use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
 use native_engine::{
     application::{ApplicationReleaseReceipt, ObjectMotionFrameControl},
@@ -51,7 +52,7 @@ fn settled_export(session: &Option<export::ObjectExportSession>) -> bool {
     })
 }
 fn bounded_metadata(value: Value) -> Result<Value, String> {
-    if serde_json::to_vec(&value).map_or(true, |v| v.len() > 65536) {
+    if serde_json::to_vec(&value).map_or(true, |v| v.len() > PROJECT_INFO_LIMIT_BYTES) {
         Err("native inactive project metadata exceeds UI limit".into())
     } else {
         Ok(value)

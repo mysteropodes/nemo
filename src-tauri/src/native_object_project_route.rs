@@ -7,6 +7,15 @@ use native_engine::{
 };
 use serde_json::{json, Value};
 
+/// Hard cap on one project-info answer (active or inactive), checked on the serialized bytes. #2371 made every layer row
+/// richer (kind, folder, blend, opacity, matte and its additional mattes, long names): measured 484 bytes for a fully
+/// populated row (`rich_rows_stay_within_the_ui_bound`, native-engine), so the earlier 64 KiB cap failed at about 135
+/// such layers; baseline Release to Layers makes one layer per shape, so hundreds are realistic. 4 MiB holds about
+/// 8,600 such rows (4096 rich layers measure 1.9 MB) and is still one cheap IPC/JSON parse. The answer is one read, not
+/// paged: open, revision sync and the layer-list presenter all correlate on the whole answer's snapshot pins. Past the
+/// cap the read is refused outright, never truncated.
+pub(crate) const PROJECT_INFO_LIMIT_BYTES: usize = 4 * 1024 * 1024;
+
 /// Outcome of a recovery snapshot request: a stale pin is a normal answer, not
 /// an error, and a bare drawing document is never a recoverable project.
 pub(crate) enum RecoverySnapshot {
@@ -88,7 +97,7 @@ impl ApplicationMcp {
         info["instanceId"] = json!(self.instance_id());
         info["documentId"] = json!(document);
         info["lifecycleGeneration"] = json!(generation);
-        if serde_json::to_vec(&info).map_or(true, |v| v.len() > 65536) {
+        if serde_json::to_vec(&info).map_or(true, |v| v.len() > PROJECT_INFO_LIMIT_BYTES) {
             return Err("native project metadata exceeds UI limit".into());
         }
         Ok(info)

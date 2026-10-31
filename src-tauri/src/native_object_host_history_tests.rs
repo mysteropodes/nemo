@@ -263,6 +263,7 @@ fn actual_history_receipt_cannot_cross_terminal_release_and_new_incarnation() {
 mod inactive {
     use super::*;
     use crate::native_dispatch::NativeDispatch;
+    use crate::native_object_bootstrap::PROJECT_INFO_LIMIT_BYTES;
     use native_engine::{
         object_document::FrameScopeKind, object_frame_packet::ObjectFrameSelector,
         scheduler::OutputSpec,
@@ -431,9 +432,10 @@ mod inactive {
             .contains("Unavailable"));
         let mut large: Value = serde_json::from_slice(&file(1, 640)).unwrap();
         let layers = large["drawing"]["layers"].as_array_mut().unwrap();
-        layers.extend(
-            (0..2000).map(|i| json!({"layerUid":format!("extra-layer-{i:04}-{}","x".repeat(40))})),
-        );
+        // Three names that together pass the shared project-info hard cap (a plain 2000-layer table no longer does).
+        layers.extend((0..3).map(|i| {
+            json!({"layerUid":format!("extra-layer-{i}"),"name":"x".repeat(PROJECT_INFO_LIMIT_BYTES / 3)})
+        }));
         assert!(pins
             .prepare(&mut a, &serde_json::to_vec(&large).unwrap())
             .unwrap_err()
