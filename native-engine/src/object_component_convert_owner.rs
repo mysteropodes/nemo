@@ -17,6 +17,9 @@ use crate::commands::object_fill_owner::component_owner::object_component_conver
 use crate::commands::object_fill_owner::component_owner::object_component_convert_support::{
     SetupError, SetupPlan,
 };
+use crate::commands::object_fill_owner::component_owner::object_component_instance_set::{
+    plan_instance_set, InstanceEdit,
+};
 use crate::commands::object_fill_owner::component_owner::object_component_place::{
     plan_expose, plan_place, ExposeEntry,
 };
@@ -38,7 +41,8 @@ use crate::request_receipts::DispatchErrorCode;
 mod wire;
 use wire::{
     id_ok, ids_ok, seed_of, ConvertPayload, DuplicatorConfigPayload, DuplicatorObjectsPayload,
-    DuplicatorPathPayload, DuplicatorSetPayload, ExposePayload, PlacePayload, MAX_PAYLOAD_BYTES,
+    DuplicatorPathPayload, DuplicatorSetPayload, ExposePayload, InstanceSetPayload, PlacePayload,
+    MAX_PAYLOAD_BYTES,
 };
 
 /// Which setup a payload asks for.
@@ -51,6 +55,7 @@ pub(crate) enum SetupKind {
     DuplicatorObjects,
     DuplicatorPath,
     DuplicatorConfig,
+    InstanceSet,
 }
 
 /// A typed refusal: the receipt vocabulary code, a fixed message and, when a
@@ -87,6 +92,8 @@ fn refusal_of(error: SetupError) -> SetupRefusal {
         SetupError::PathUnknown(_) => (InvalidRequest, "The path layer is absent."),
         SetupError::SeedRange => (InvalidRequest, "Seed must be an integer in 0..999999."),
         SetupError::ConfigInvalid => (InvalidRequest, "A duplicator setting is not valid."),
+        SetupError::NotAnInstance(_) => (NotFound, "Layer is not a component instance."),
+        SetupError::PlaybackInvalid => (InvalidRequest, "A component playback setting is not valid."),
         SetupError::V1Document => (Unavailable, "A v1 document cannot hold components."),
         SetupError::NestedContext(_) => (Unavailable, "Close the component first."),
         SetupError::HoldersUnavailable { .. } => (
@@ -215,6 +222,28 @@ fn config_edit(payload: &DuplicatorConfigPayload) -> Option<ConfigEdit> {
     })
 }
 
+/// A native `u32` member of the request; `None` for a negative, fractional or oversized number.
+fn u32_of(value: &Presence<Number>) -> Result<Option<u32>, ()> {
+    match value {
+        Presence::Missing => Ok(None),
+        Presence::Present(n) => n.as_u64().and_then(|v| u32::try_from(v).ok()).map(Some).ok_or(()),
+    }
+}
+/// The request's named members as an edit; `None` when a number is not of its closed kind.
+fn instance_edit(payload: &InstanceSetPayload) -> Option<InstanceEdit> {
+    let placed_at = match payload.placed_at.value() {
+        None => None,
+        Some(n) => Some(i32::try_from(n.as_i64()?).ok()?),
+    };
+    Some(InstanceEdit {
+        mode: payload.mode.value().cloned(),
+        single_frame: u32_of(&payload.single_frame).ok()?,
+        placed_at,
+        speed: number_of(&payload.speed).ok()?,
+        at_frame: u32_of(&payload.at_frame).ok()?,
+    })
+}
+
 fn malformed() -> SetupRefusal {
     refuse(
         DispatchErrorCode::InvalidRequest,
@@ -302,6 +331,14 @@ impl ObjectFillOwner {
                     &payload.layer_uid,
                     payload.path_layer_uid.as_deref(),
                 )
+            }
+            SetupKind::InstanceSet => {
+                let payload: InstanceSetPayload = parse(bytes)?;
+                if payload.command != "object.component.instance.set" || !id_ok(&payload.layer_uid) {
+                    return Err(malformed());
+                }
+                let edit = instance_edit(&payload).ok_or_else(malformed)?;
+                plan_instance_set(document, &payload.layer_uid, &edit)
             }
             SetupKind::DuplicatorConfig => {
                 let payload: DuplicatorConfigPayload = parse(bytes)?;

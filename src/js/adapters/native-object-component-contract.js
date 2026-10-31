@@ -17,6 +17,7 @@
   const EXPOSED_KEY_PREFIX = 'ep_';
   const DUP_MODES = ['grid', 'radial', 'path'], DUP_DIRECTIONS = ['forward', 'backward', 'centerOut', 'random'];
   const DUP_CHANNELS = ['position', 'rotation', 'scale', 'opacity', 'hue'];
+  const INSTANCE_MODES = ['loop', 'once', 'pingpong', 'single'], MAX_FRAME = 4294967295, MAX_PLACED = 2147483647;
   const has = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
   const fail = (message) => { throw new TypeError(message); };
   const bytes = (text) => (typeof TextEncoder === 'function' ? new TextEncoder().encode(text).length : unescape(encodeURIComponent(text)).length);
@@ -64,6 +65,11 @@
       exact(value, [], DUP_CHANNELS, at);
       DUP_CHANNELS.forEach((key) => { if (has(value, key) && typeof value[key] !== 'boolean') fail(`${at}.${key} must be a boolean`); });
     },
+    // #2256 Q5: the Component Instance panel's closed members (playback label, native u32 frame, native i32 offset, positive speed).
+    instMode: (value, at) => { if (!INSTANCE_MODES.includes(value)) fail(`${at} is not a playback mode`); },
+    frame: (value, at) => { if (!Number.isSafeInteger(value) || value < 0 || value > MAX_FRAME) fail(`${at} must be a native u32 frame`); },
+    placedAt: (value, at) => { if (!Number.isSafeInteger(value) || value < -MAX_PLACED - 1 || value > MAX_PLACED) fail(`${at} must be a native i32 offset`); },
+    speed: (value, at) => { if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) fail(`${at} must be a finite number above zero`); },
     dupTime: (value, at) => {
       exact(value, [], ['enabled', 'offsetFrames', 'direction'], at);
       if (has(value, 'enabled') && typeof value.enabled !== 'boolean') fail(`${at}.enabled must be a boolean`);
@@ -86,6 +92,9 @@
     'duplicator.config': ['object.duplicator.config', 'command', [['layerUid', 'id'], ['mode', 'dupMode', true], ['rows', 'number', true], ['cols', 'number', true],
       ['spacingX', 'number', true], ['spacingY', 'number', true], ['count', 'number', true], ['radius', 'number', true], ['startAngle', 'number', true],
       ['radialOrient', 'boolean', true], ['pathAlignTangent', 'boolean', true], ['seed', 'seed', true], ['staggerRandom', 'dupStagger', true], ['timeOffset', 'dupTime', true]]],
+    // #2256 Q5: the Component Instance panel's closed partial edit of the stored playback record.
+    'component.instance.set': ['object.component.instance.set', 'command', [['layerUid', 'id'], ['mode', 'instMode', true], ['singleFrame', 'frame', true],
+      ['placedAt', 'placedAt', true], ['speed', 'speed', true], ['atFrame', 'frame', true]]],
   };
   const OPERATIONS = Object.freeze(Object.keys(SPEC).map((suffix) => PREFIX + suffix));
   const spec = (operation) => (typeof operation === 'string' && operation.startsWith(PREFIX) && has(SPEC, operation.slice(PREFIX.length)) ? SPEC[operation.slice(PREFIX.length)] : null);

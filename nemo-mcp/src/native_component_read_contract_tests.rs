@@ -64,6 +64,13 @@ fn duplicator_result() -> Value {
             "timeOffset":{"enabled":true,"offsetFrames":2.5,"direction":"centerOut"}}),
     )
 }
+fn instance_result() -> Value {
+    with(
+        head("instance"),
+        json!({"layerUid":"ly_inst","componentId":"sym_a","mode":"pingpong","singleFrame":9,"speed":2.5,"placedAt":-4,
+            "totalFrames":12,"resolvedFrame":null,"explicit":false}),
+    )
+}
 fn good_cases() -> Vec<(Value, Value)> {
     vec![
         (contexts(), contexts_result()),
@@ -82,6 +89,10 @@ fn good_cases() -> Vec<(Value, Value)> {
         (
             json!({"kind":"duplicator","layerUid":"ly_dup"}),
             duplicator_result(),
+        ),
+        (
+            json!({"kind":"instance","layerUid":"ly_inst","frame":10}),
+            instance_result(),
         ),
     ]
 }

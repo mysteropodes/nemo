@@ -10,6 +10,8 @@ pub(crate) mod object_component_convert;
 pub(crate) mod object_component_convert_owner;
 #[path = "object_component_convert_support.rs"]
 pub(crate) mod object_component_convert_support;
+#[path = "object_component_instance_set.rs"]
+pub(crate) mod object_component_instance_set;
 #[path = "object_component_place.rs"]
 pub(crate) mod object_component_place;
 #[path = "object_duplicator_config.rs"]

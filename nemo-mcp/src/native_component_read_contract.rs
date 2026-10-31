@@ -35,6 +35,10 @@ fn selector(value: &Value) -> bool {
         // #2256 Q4: the stored duplicator descriptor of one scene layer.
         Some("duplicator") => exact(value, &["kind", "layerUid"], &[])
             .is_some_and(|o| context_id(o.get("layerUid")).is_some()),
+        // #2256 Q5: the playback facts of one scene component-instance layer at an outer frame.
+        Some("instance") => exact(value, &["kind", "layerUid", "frame"], &[]).is_some_and(|o| {
+            context_id(o.get("layerUid")).is_some() && revision(o.get("frame")).is_some()
+        }),
         _ => false,
     }
 }
@@ -253,8 +257,43 @@ pub(crate) fn result(payload: &Value, value: &Value) -> bool {
         .is_some_and(|o| {
             pins(o) && o.get("layerUid") == wanted.get("layerUid") && duplicator_view(o)
         }),
+        "instance" => exact(
+            value,
+            &with(&[
+                "layerUid",
+                "componentId",
+                "mode",
+                "singleFrame",
+                "speed",
+                "placedAt",
+                "totalFrames",
+                "resolvedFrame",
+                "explicit",
+            ]),
+            &[],
+        )
+        .is_some_and(|o| {
+            pins(o) && o.get("layerUid") == wanted.get("layerUid") && instance_view(o)
+        }),
         _ => false,
     }
+}
+
+const INSTANCE_MODES: [&str; 4] = ["loop", "once", "pingpong", "single"];
+/// The instance view: the panel's fields with their baseline display defaults, closed members only.
+fn instance_view(o: &Map<String, Value>) -> bool {
+    let number = |key: &str| o.get(key).and_then(Value::as_f64).filter(|v| v.is_finite());
+    context_id(o.get("componentId")).is_some()
+        && o.get("mode")
+            .and_then(Value::as_str)
+            .is_some_and(|m| INSTANCE_MODES.contains(&m))
+        && number("singleFrame").is_some_and(|v| v >= 0.0)
+        && number("speed").is_some_and(|v| v > 0.0)
+        && number("placedAt").is_some()
+        && uint32(o.get("totalFrames"))
+        && o.get("resolvedFrame")
+            .is_some_and(|v| v.is_null() || uint32(Some(v)))
+        && o.get("explicit").is_some_and(Value::is_boolean)
 }
 
 const DUP_MODES: [&str; 3] = ["grid", "radial", "path"];

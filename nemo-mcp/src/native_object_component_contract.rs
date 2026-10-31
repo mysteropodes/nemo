@@ -32,7 +32,16 @@ enum K {
     DupStagger,
     /// `{enabled?, offsetFrames?, direction?}`: a boolean, a finite number and a direction label.
     DupTime,
+    /// The instance playback mode label: `loop`, `once`, `pingpong` or `single`.
+    InstMode,
+    /// A native u32 frame number.
+    Frame,
+    /// A native i32 frame offset.
+    PlacedAt,
+    /// A finite number above zero.
+    Speed,
 }
+const INSTANCE_MODES: [&str; 4] = ["loop", "once", "pingpong", "single"];
 const DUP_MODES: [&str; 3] = ["grid", "radial", "path"];
 const DUP_DIRECTIONS: [&str; 4] = ["forward", "backward", "centerOut", "random"];
 const DUP_CHANNELS: [&str; 5] = ["position", "rotation", "scale", "opacity", "hue"];
@@ -49,7 +58,7 @@ enum Receipt {
 }
 
 /// (operation suffix, command, receipt, "member:kind" in wire order; a trailing `?` marks an optional member).
-static SPECS: [(&str, &str, Receipt, &str); 7] = [
+static SPECS: [(&str, &str, Receipt, &str); 8] = [
     (
         "component.convert",
         "object.component.convert",
@@ -92,6 +101,13 @@ static SPECS: [(&str, &str, Receipt, &str); 7] = [
         "object.duplicator.config",
         Receipt::Command,
         "layerUid:id mode:dupMode? rows:number? cols:number? spacingX:number? spacingY:number? count:number? radius:number? startAngle:number? radialOrient:boolean? pathAlignTangent:boolean? seed:seed? staggerRandom:dupStagger? timeOffset:dupTime?",
+    ),
+    // #2256 Q5: the Component Instance panel's closed partial edit of the stored playback record.
+    (
+        "component.instance.set",
+        "object.component.instance.set",
+        Receipt::Command,
+        "layerUid:id mode:instMode? singleFrame:frame? placedAt:placedAt? speed:speed? atFrame:frame?",
     ),
 ];
 const PREFIX: &str = "command.document.object.";
@@ -142,6 +158,10 @@ fn kind(token: &str) -> Option<K> {
         "dupMode" => K::DupMode,
         "dupStagger" => K::DupStagger,
         "dupTime" => K::DupTime,
+        "instMode" => K::InstMode,
+        "frame" => K::Frame,
+        "placedAt" => K::PlacedAt,
+        "speed" => K::Speed,
         _ => return None,
     })
 }
@@ -164,6 +184,10 @@ fn check(kind: K, value: &Value) -> bool {
             .as_u64()
             .is_some_and(|seed| seed <= u64::from(u32::MAX)),
         K::PathUid => value.is_null() || value.as_str().is_some_and(|path| path.len() <= MAX_ID),
+        K::InstMode => value.as_str().is_some_and(|m| INSTANCE_MODES.contains(&m)),
+        K::Frame => value.as_u64().is_some_and(|f| f <= u64::from(u32::MAX)),
+        K::PlacedAt => value.as_i64().is_some_and(|v| i32::try_from(v).is_ok()),
+        K::Speed => value.as_f64().is_some_and(|v| v.is_finite() && v > 0.0),
         K::DupMode => value.as_str().is_some_and(|mode| DUP_MODES.contains(&mode)),
         K::DupStagger => value.as_object().is_some_and(|map| {
             map.iter()
@@ -306,3 +330,7 @@ mod receipt_tests;
 #[cfg(test)]
 #[path = "native_object_duplicator_config_tests.rs"]
 mod config_tests;
+
+#[cfg(test)]
+#[path = "native_object_component_instance_tests.rs"]
+mod instance_tests;
