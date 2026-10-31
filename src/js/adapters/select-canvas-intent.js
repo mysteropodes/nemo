@@ -450,15 +450,21 @@
       pin ? PINS.map(function (k) { return pin[k]; }) : null]);
   }
   // #2372: a pick that resolves undefined (the presentation could not be proven current) or throws is not "nothing under the
-  // cursor" (null, which clears): retry once after the presentation settles, then say so instead of dropping the click.
-  // `I` is the intent API in use (its pick/applyPick); `ctx` is the pickContext captured at the click.
+  // cursor" (null, which clears). The native queue reports no presentation while ANY command is pending - the press's own read, a hover
+  // read, the repaint of the previous pick - and that window outlasts one short retry, so the pick is retried while the context still
+  // holds (about a second at most) before saying so instead of dropping the click: neither the first click's box nor an empty click's
+  // clear may be lost to it. `I` is the intent API in use (its pick/applyPick); `ctx` is the pickContext captured at the click;
+  // `retried` is the attempt count (true: already exhausted).
+  var PICK_RETRIES = 16, PICK_RETRY_MS = 60;
   function resolvePick(root, I, intent, shift, ctx, retried) {
+    var attempt = retried === true ? PICK_RETRIES : retried || 0;
     var unavailable = function () { if (typeof root.showToast === 'function') root.showToast('Could not read the canvas just now \u2014 click again.'); };
     return I.pick(root, intent.x, intent.y).then(function (item) {
       if (I.pickContext(root) !== ctx) return;
       if (item === undefined) {
-        if (retried) return unavailable();
-        return new Promise(function (done) { (root.setTimeout || setTimeout)(done, 120); }).then(function () { return resolvePick(root, I, intent, shift, ctx, true); });
+        if (attempt >= PICK_RETRIES) return unavailable();
+        return new Promise(function (done) { (root.setTimeout || setTimeout)(done, PICK_RETRY_MS); }).then(function () {
+          return I.pickContext(root) === ctx ? resolvePick(root, I, intent, shift, ctx, attempt + 1) : undefined; });
       }
       try { I.applyPick(root, item, shift); } catch (_) {}
     }, unavailable);
