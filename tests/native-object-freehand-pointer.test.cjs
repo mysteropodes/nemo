@@ -199,8 +199,6 @@ test('chrome, cancellation, Escape and lost capture remain usable or abort witho
 });
 test('unsupported brush cells are explicit without native or legacy fallback',async()=>{
  const cases=[s=>Object.assign(s,{tool:'fillbrush',fillBrushMode:'front',fillBrushSize:40}),s=>s.bitmapBrushOn=true,s=>s.brushPreset='my-custom-brush',
-  // With stop-at-axis symmetry the original trims the whole stroke before clipping; native would trim the clipped one.
-  s=>Object.assign(s,{trimStrokeEnds:true,symmetryEnabled:true,symmetryExtend:false}),
   // Plain-stroke symmetry commits natively since G23 (#2361); with a pressure brush it stays refused.
   s=>s.shadowMode=true,s=>Object.assign(s,{vectorBrush:true,fillEnabled:false,pressureCurve:'unknown'}),s=>s.stabilizer=7];
  for(const change of cases){const f=await fixture();change(f.root.state);const e=send(f,'pointerdown',20,20);send(f,'pointerup',60,50);assert.equal(e.prevented,true);assert.equal(f.calls.length,0);assert.ok(f.log.some(s=>/unavailable|not available|requires/.test(s)),f.log.join(','));}
@@ -823,8 +821,40 @@ test('Trim Stroke Ends on a textured stroke asks native to trim the anchor, whic
  assert.ok(m.records.every(r=>r.vectorExt.brushTexture.brushTexturePreset==='charcoal-smooth'));
  const ribbon=await textured({vectorBrush:true,trimStrokeEnds:true,trimStrokeEndsMax:24},true);
  assert.equal(ribbon.calls[0].payload.trimEnds,24);
- const stop=await fixture();stop.root.BRUSH_PRESETS={'charcoal-smooth':{}};Object.assign(stop.root.state,{brushPreset:'charcoal-smooth',trimStrokeEnds:true,symmetryEnabled:true,symmetryExtend:false});
- send(stop,'pointerdown',20,20);send(stop,'pointerup',60,50);assert.equal(stop.calls.length,0,'stop-at-axis Trim keeps refusing: the original trims the whole stroke before the clip');
+ const stop=await fixture();stop.root.BRUSH_PRESETS={'charcoal-smooth':{}};Object.assign(stop.root.state,{brushPreset:'charcoal-smooth',trimStrokeEnds:true,trimStrokeEndsMax:24,symmetryEnabled:true,symmetryMode:'y',symmetryExtend:false});
+ send(stop,'pointerdown',20,20);send(stop,'pointerup',60,50);await settled(stop);assert.equal(stop.calls.length,1,'stop-at-axis Trim now commits: native trims the whole stroke, then clips');
+ assert.deepEqual(plain(stop.calls[0].payload.trimClip),{axis:[160,0,160,180],mirrors:[[0,1]]});
+});
+// #2361: the original trims the WHOLE stroke (draw-bridge.js) and only then clips it at the axis (symmetry-bridge.js clipPathAtAxis @1065e9d8).
+test('Trim Stroke Ends with a stop-at-axis mirror sends the whole stroke and its copy, and native clips them after its trim',async()=>{
+ const f=await fixture();Object.assign(f.root.state,{trimStrokeEnds:true,trimStrokeEndsMax:24,symmetryEnabled:true,symmetryMode:'y',symmetryExtend:false});
+ send(f,'pointerdown',20,20);send(f,'pointermove',100,40);send(f,'pointermove',150,60);send(f,'pointerup',230,80);
+ await settled(f);assert.equal(f.calls.length,1,f.log.join(','));const p=plain(f.calls[0].payload);
+ assert.deepEqual([p.command,p.trimEnds,p.records.length,p.trimClip],['object.vector.createMany',24,2,{axis:[160,0,160,180],mirrors:[[0,1]]}]);
+ const xs=r=>r.geometry.segments.map(s=>s.point.x);
+ // Unclipped: the drawn stroke still runs past the axis, and its copy is the reflection of that whole stroke.
+ assert.ok(Math.max(...xs(p.records[0]))>160,'the drawn stroke is not clipped in JS');assert.ok(Math.min(...xs(p.records[1]))<160);
+ assert.deepEqual(xs(p.records[1]).map(x=>Math.round(320-x)),xs(p.records[0]).map(Math.round));
+ for(const [mode,axis] of [['x',[0,90,320,90]],['free',[160-72,90-72,160+72,90+72]]]){
+  const g=await fixture();Object.assign(g.root.state,{trimStrokeEnds:true,trimStrokeEndsMax:24,symmetryEnabled:true,symmetryMode:mode,symmetryExtend:false});
+  send(g,'pointerdown',20,20);send(g,'pointermove',100,40);send(g,'pointerup',230,80);await settled(g);
+  assert.deepEqual(plain(g.calls[0].payload.trimClip),{axis,mirrors:[[0,1]]},mode);
+ }
+ // Without Trim, Extend or a mirror the clip stays in JS: no trimClip, and the stroke leaves clipped at the axis.
+ for(const state of [{trimStrokeEnds:false},{symmetryExtend:true},{symmetryMode:'radial',symmetryRadialSectors:3,symmetryRadialCenter:{x:160,y:90}}]){
+  const g=await fixture();Object.assign(g.root.state,{trimStrokeEnds:true,trimStrokeEndsMax:24,symmetryEnabled:true,symmetryMode:'y',symmetryExtend:false},state);
+  send(g,'pointerdown',20,20);send(g,'pointermove',100,40);send(g,'pointerup',230,80);await settled(g);
+  const q=plain(g.calls[0].payload);assert.equal(q.trimClip,undefined,JSON.stringify(state));
+  if(!state.symmetryExtend&&state.trimStrokeEnds===false)assert.ok(Math.max(...q.records[0].geometry.segments.map(x=>x.point.x))<=160,'clipped in JS');
+ }
+});
+test('a stop-at-axis mirror with Trim and a Labs multi-frame stamp clips only the drawn pair; the stamp copies the whole drawn stroke',async()=>{
+ const f=await fixture();Object.assign(f.root.state,{trimStrokeEnds:true,trimStrokeEndsMax:24,symmetryEnabled:true,symmetryMode:'y',symmetryExtend:false});
+ f.root.SMLabs={isOn:()=>false,register(){},unmigratedDrawHooks:()=>[],multiframeTargets:()=>[3],multiframeStamped(){}};
+ send(f,'pointerdown',20,20);send(f,'pointermove',100,40);send(f,'pointerup',230,80);await settled(f);
+ assert.equal(f.calls.length,1,f.log.join(','));const p=plain(f.calls[0].payload);
+ assert.deepEqual([p.command,p.trimEnds,p.trimClip],['object.vector.batch',24,{axis:[160,0,160,180],mirrors:[[0,1]]}]);
+ assert.deepEqual(p.ops.map(o=>[o.op,o.fromStep,o.frame]),[['create',undefined,undefined],['create',undefined,undefined],['copy',0,3]]);
 });
 test('a texture preset still refuses a key neither the built-ins nor the catalog hold, with symmetry too',async()=>{
  const f=await fixture();Object.assign(f.root.state,{brushPreset:'not-a-preset',symmetryEnabled:true,symmetryMode:'y',symmetryExtend:true});

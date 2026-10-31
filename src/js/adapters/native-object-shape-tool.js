@@ -167,11 +167,11 @@
       // tools.js @1065e9d8 Draw commit: drawMode 'behind' slips the stroke under the layer's artwork.
       // G23 (symmetry-bridge.js onStrokeCommitted @1065e9d8): the stroke and its copies, each linked fill below its ribbon,
       // in one createMany (behind keeps the order at the bottom).
-      var vector=root.NemoNativeObjectVector.create(guarded,function(){return t.context;}),dicts=Symmetry.copies(root,dict,t.pin,companion);
+      var trimOn=ports.freehand&&root.state.trimStrokeEnds&&root.state.trimStrokeEndsMax>0,vector=root.NemoNativeObjectVector.create(guarded,function(){return t.context;}),dicts=Symmetry.copies(root,dict,t.pin,companion,trimOn);
       var group=companion?[companion,dict]:[dict];
       var options={origin:t.pin,placement:ports.freehand&&t.behind?'behind':'front'};
       // draw-bridge.js @1065e9d8 Trim Stroke Ends: a Draw commit trims before its symmetry copies exist; native shares the cuts.
-      if(ports.freehand&&root.state.trimStrokeEnds&&root.state.trimStrokeEndsMax>0)options.trimEnds=root.state.trimStrokeEndsMax;
+      if(trimOn)options.trimEnds=root.state.trimStrokeEndsMax;
       // Labs multi-frame draw (draw-bridge.js onStrokeCommitted @1065e9d8, before the symmetry copies): the stroke is also
       // stamped on every other selected frame, held ones keyed with what they showed, in the same single undo step.
       var stamps=ports.freehand&&root.SMLabs&&typeof root.SMLabs.multiframeTargets==='function'?root.SMLabs.multiframeTargets(t.frame):[];
@@ -181,10 +181,10 @@
         var steps=here.concat([].concat.apply([],stamps.map(function(frame){
           var cell=group.map(function(d){var i=here.findIndex(function(s){return s.create===d;});return Object.assign(i<0?{create:d}:{copy:i},{frame:frame,keyframe:'copy',placement:options.placement});});// a stamp copies its drawn step: sent once (64 KiB)
           return options.placement==='behind'?cell.reverse():cell;})));
-        return vector.batchStrokes(t.layerUid,t.frame,steps,Object.assign({origin:t.pin},options.trimEnds?{trimEnds:options.trimEnds}:{})).then(function(result){
+        return vector.batchStrokes(t.layerUid,t.frame,steps,Object.assign({origin:t.pin},options.trimEnds?{trimEnds:options.trimEnds}:{},dicts.clip?{trimClip:Symmetry.clip(dicts.clip,steps)}:{})).then(function(result){
           if(result&&result.status==='applied'&&typeof root.SMLabs.multiframeStamped==='function')root.SMLabs.multiframeStamped(stamps.length);return result;});
       }
-      return dicts.length>1?vector.createStrokes(t.layerUid,t.frame,dicts,options):vector.createStroke(t.layerUid,t.frame,dict,options);
+      return dicts.length>1?vector.createStrokes(t.layerUid,t.frame,dicts,dicts.clip?Object.assign({},options,{trimClip:Symmetry.clip(dicts.clip,dicts)}):options):vector.createStroke(t.layerUid,t.frame,dict,options);
     }
     // Geometry/mapping can refuse synchronously before the existing Project
     // queue starts. Always return a promise so release finalization clears
@@ -329,10 +329,9 @@
       // returns the path untouched). An unknown or changing catalog cannot tell a deleted key from a new one: unavailable.
       var CB=root.NemoNativeCustomBrushUI,cbc=CB&&CB.controller(root),key=state.brushPreset,absent=!fb&&!state.shadowMode&&!!key&&key!=='none'&&
         !(root.BRUSH_PRESETS&&Object.prototype.hasOwnProperty.call(root.BRUSH_PRESETS,key))&&!!cbc&&!cbc.isPending()&&CB.exists(root,key)===false;
-      // Trim measures the whole stroke before the stop-at-axis clip (draw-bridge then symmetry-bridge); native would trim the clipped one.
-      // A pressure ribbon trims natively alone, with its linked fill, its symmetry copies and its multi-frame stamps. Only a
-      // mirror clips at its axis (symmetry-bridge.js clipPathAtAxis); a radial copy never does.
-      if (!fb && (state.tool !== 'draw' || state.trimStrokeEnds && state.symmetryEnabled && state.symmetryMode !== 'radial' && !state.symmetryExtend ||
+      // Trim measures the whole stroke BEFORE a mirror's stop-at-axis clip (draw-bridge, then symmetry-bridge clipPathAtAxis): the create
+      // sends the unclipped pair with `trimClip`, and native clips after its trim. A ribbon trims natively with its linked fill, copies and stamps.
+      if (!fb && (state.tool !== 'draw' ||
           state.drawMode !== 'front' && state.drawMode !== 'behind' ||
           // G16 option C (#2361): one seeded anchor whose dabs native stamps; the key resolves as resolveBrushPreset (a built-in,
           // else a confirmed native catalog record). A key neither holds stays unavailable. Trim cuts the anchor before native
