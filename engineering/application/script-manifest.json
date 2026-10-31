@@ -247,6 +247,7 @@
     {"src":"js/perspective-bridge.js"},
     {"src":"js/symmetry-bridge.js"},
     {"src":"js/gradient-bridge.js"},
+    {"src":"js/adapters/native-eyedropper.js"},
     {"src":"js/viewtools-bridge.js"},
     {"src":"js/abr-import.js"},
     {"src":"js/bitmap-brush.js"},
