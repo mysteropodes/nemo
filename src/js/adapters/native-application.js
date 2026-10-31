@@ -117,7 +117,9 @@
   }
   function objectTarget(value) {
     exact(value, ['contextId', 'frameScope', 'layerUid', 'strokeId'], [], 'object target');
-    if (value.contextId !== 'scene-root') throw new TypeError('unsupported object context');
+    // #2256: the scene root or a component context id. The builders take the id from the workspace controller's held context only
+    // (native-component-write.js) and the native owner refuses any context the document does not declare.
+    if (typeof value.contextId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(value.contextId)) throw new TypeError('unsupported object context');
     objectUid(value.layerUid); objectUid(value.strokeId);
     exact(value.frameScope, ['kind', 'frame'], [], 'object frame scope');
     if (!['authored', 'reference'].includes(value.frameScope.kind)) throw new TypeError('unsupported object frame scope');
@@ -316,7 +318,7 @@
       'cellKind', 'sourceFrame', 'hasContent', 'manualEdit'], [], 'timing result');
     id(value.instanceId, 'instanceId'); id(value.documentId, 'documentId'); revision(value.atRevision, 'atRevision');
     objectUid(value.documentSnapshotId); objectUid(value.layerUid); frame(value.frame);
-    if (value.contextId !== 'scene-root' || typeof value.hasContent !== 'boolean' || typeof value.manualEdit !== 'boolean') throw new TypeError('invalid timing result');
+    if (typeof value.contextId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(value.contextId) || typeof value.hasContent !== 'boolean' || typeof value.manualEdit !== 'boolean') throw new TypeError('invalid timing result');
     if (value.sourceFrame !== null) frame(value.sourceFrame);
     const valid = value.cellKind === 'unexposed' ? value.sourceFrame === null && !value.hasContent && !value.manualEdit
       : value.cellKind === 'held' ? value.sourceFrame !== null && value.sourceFrame < value.frame && !value.manualEdit

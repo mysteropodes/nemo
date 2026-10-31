@@ -3,8 +3,7 @@
 use crate::commands::object_fill_owner::vector_edit::{
     check_drawing_layer, check_target, is_vector_record, same_record, Edit, VectorEditKind,
 };
-use crate::object_document::{ObjectTarget, Presence};
-use crate::object_snapshot::ObjectSnapshot;
+use crate::object_document::{ObjectDocument, ObjectTarget, Presence};
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use serde_json::Number;
@@ -20,13 +19,12 @@ pub(super) enum MaskEdit {
 }
 
 pub(super) fn apply(
-    origin: &ObjectSnapshot,
+    base: &ObjectDocument,
     target: ObjectTarget,
     intent: MaskEdit,
 ) -> Result<Edit, DispatchErrorCode> {
-    check_target(origin.document(), &target)?;
-    let selected = origin
-        .document()
+    check_target(base, &target)?;
+    let selected = base
         .objects
         .iter()
         .find(|record| record.target == target)
@@ -34,7 +32,7 @@ pub(super) fn apply(
     if !is_vector_record(selected) || !selected.is_mask() {
         return Err(DispatchErrorCode::Unavailable);
     }
-    check_drawing_layer(origin.document(), &target)?;
+    check_drawing_layer(base, &target)?;
     match &intent {
         MaskEdit::Mode { mode } if !["add", "subtract", "intersect"].contains(&mode.as_str()) => {
             return Err(DispatchErrorCode::InvalidRequest);
@@ -45,7 +43,7 @@ pub(super) fn apply(
         _ => {}
     }
     let shared = matches!(&intent, MaskEdit::Feather { .. });
-    let mut document = origin.document().clone();
+    let mut document = base.clone();
     let mut changed = false;
     for record in &mut document.objects {
         let in_scope = record.target.context_id == target.context_id

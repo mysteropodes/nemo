@@ -57,7 +57,7 @@
 
   function target(value, label, create) {
     exact(value, ['contextId', 'frameScope', 'layerUid', 'strokeId'], [], label);
-    if (value.contextId !== 'scene-root') fail(`${label}.contextId is not admitted`);
+    if (typeof value.contextId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(value.contextId)) fail(`${label}.contextId is not admitted`); // #2256: the scene root or a component id, never free text
     exact(value.frameScope, ['kind', 'frame'], [], `${label}.frameScope`); oneOf(value.frameScope.kind, ['authored', 'reference'], `${label}.frameScope.kind`);
     frame(value.frameScope.frame, `${label}.frameScope.frame`); opaque(value.layerUid, `${label}.layerUid`);
     // A created record names no stroke id: the owner allocates it and the caller cannot choose it.
@@ -274,7 +274,7 @@
     }
     else if (key === 'stableTarget') target(payloadValue, label, false);
     else if (key === 'ops') {
-      // #2361/#2362: 1..64 ordered create/replace/delete steps on scene-root layers (#2372: a Select may span layers; a trimEnds batch is one layer), one revision and one undo entry.
+      // #2361/#2362: 1..64 ordered create/replace/delete steps on the layers of one context (#2372: a Select may span layers; a trimEnds batch is one layer), one revision and one undo entry.
       if (!Array.isArray(payloadValue) || payloadValue.length < 1 || payloadValue.length > 64) fail(`${label} must hold 1 to 64 steps`);
       const targets = payloadValue.map((op, at) => {
         const where = `${label}[${at}]`;
@@ -298,7 +298,7 @@
         return fail(`${where}.op must be create, copy, replace, reshape, clone, restyle or delete`);
       });
       targets.forEach((t, at) => { if (!t) targets[at] = targets[payloadValue[at].fromStep]; });
-      if (targets.some((t) => t.contextId !== 'scene-root')) fail(`${label} must stay on the scene root`);
+      if (targets.some((t) => t.contextId !== targets[0].contextId)) fail(`${label} must stay on one context`);
     }
     else if (key === 'maskEdit') {
       if (!plain(payloadValue)) fail(`${label} must be an object`);

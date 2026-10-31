@@ -127,12 +127,17 @@ fn target_of(op: &BatchOp) -> Option<ObjectTarget> {
     op.record.value().map(|r| r.target.clone()).or_else(|| op.stable_target.value().cloned())
 }
 
+/// The first target any step addresses: a `copy` addresses its source's, so it never names a context of its own.
+pub(super) fn first_target(ops: &[BatchOp]) -> Option<ObjectTarget> {
+    ops.iter().find_map(target_of)
+}
+
 /// The expanded steps with, per step, whether it is a companion of the one before and its item swap, and the skipped restyle count.
 type Expanded = (Vec<BatchOp>, Vec<bool>, Vec<Option<items::ItemSwap>>, u32);
 
 /// A `reshape` with a `matrix` (#2372 Select) becomes the replaces of the records it moves: the named record, its linked
 /// fill and the copies of its texture group, each retargeted to the held cell's `frame` as a geometry reshape is.
-fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>, skip_unavailable: bool) -> Result<Expanded, DispatchErrorCode> {
+fn expand_transforms(origin: &ObjectSnapshot, base: &ObjectDocument, ops: Vec<BatchOp>, skip_unavailable: bool) -> Result<Expanded, DispatchErrorCode> {
     use DispatchErrorCode::InvalidRequest;
     // The receipt lists one stroke id per REQUESTED step; the companions a transform brings are not steps of their own.
     let (mut out, mut companion) = (Vec::with_capacity(ops.len()), Vec::with_capacity(ops.len()));
@@ -168,7 +173,7 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>, skip_unavailabl
             }
             restyled.push(target.clone());
             let style = spec.checked()?;
-            if let Some(swap) = items::restyle(origin.document(), &target, frame, &style)? {
+            if let Some(swap) = items::restyle(base, &target, frame, &style)? {
                 out.push(BatchOp { op: "item".into(), record: Presence::Missing, stable_target: Presence::Present(swap.target().clone()), placement: Presence::Missing,
                     keyframe: Presence::Missing, from_step: Presence::Missing, frame: Presence::Missing, geometry: Presence::Missing,
                     offset: Presence::Missing, center: Presence::Missing, matrix: Presence::Missing, style: Presence::Missing });
@@ -176,7 +181,7 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>, skip_unavailabl
                 swaps.push(Some(swap));
                 continue;
             }
-            let restyled_records = match style::restyle(origin.document(), &target, &style, origin.project().and_then(|p| p.project().custom_brush_presets())) {
+            let restyled_records = match style::restyle(base, &target, &style, origin.project().and_then(|p| p.project().custom_brush_presets())) {
                 Err(DispatchErrorCode::Unavailable) if skip_unavailable => {
                     skipped += 1;
                     out.push(BatchOp { op: "noop".into(), record: Presence::Missing, stable_target: Presence::Present(target), placement: Presence::Missing,
@@ -218,7 +223,7 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>, skip_unavailabl
         }
         // A stored raster image or text block is mapped like a vector record: retargeted to the held cell's `frame`, where the
         // copy key has made the same item (promotion copies a cell's images and text with its records).
-        if let Some(swap) = items::transform(origin.document(), &target, frame, matrix)? {
+        if let Some(swap) = items::transform(base, &target, frame, matrix)? {
             // Refused by where the swap LANDS: two steps writing one cell would silently overwrite each other, and a step that
             // retargets `frame` never lands on its source target.
             if swaps.iter().flatten().any(|s| s.target() == swap.target()) {
@@ -232,7 +237,7 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>, skip_unavailabl
             swaps.push(Some(swap));
             continue;
         }
-        for (at, mut record) in transform::transform(origin.document(), &target, matrix)?.into_iter().enumerate() {
+        for (at, mut record) in transform::transform(base, &target, matrix)?.into_iter().enumerate() {
             record.target.frame_scope.frame = frame.unwrap_or(target.frame_scope.frame);
             companion.push(at > 0);
             swaps.push(None);
@@ -250,12 +255,13 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>, skip_unavailabl
     Ok((out, companion, swaps, skipped))
 }
 
-pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool, trim: Option<f64>, skip_unavailable: bool) -> Result<Edit, DispatchErrorCode> {
+/// `base` is the document the steps edit: the origin's own, or a component's view of it (`object_vector_edit_context`); `context` is its context id.
+pub(super) fn batch(origin: &ObjectSnapshot, base: &ObjectDocument, context: &str, ops: Vec<BatchOp>, copy_key: bool, trim: Option<f64>, skip_unavailable: bool) -> Result<Edit, DispatchErrorCode> {
     use DispatchErrorCode::InvalidRequest;
     if !(1..=MAX_BATCH_OPS).contains(&ops.len()) {
         return Err(InvalidRequest);
     }
-    let (mut ops, companions, swaps, skipped) = expand_transforms(origin, ops, skip_unavailable)?;
+    let (mut ops, companions, swaps, skipped) = expand_transforms(origin, base, ops, skip_unavailable)?;
     // `copy` {fromStep, frame}: the record of an EARLIER create (or copy) step, retargeted to `frame` and then a create in
     // every respect; a stroke and its companion stamped on n frames cost one record each, not n.
     let mut links: Vec<(String, String)> = Vec::new();
@@ -279,7 +285,7 @@ pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool, 
                 return Err(InvalidRequest);
             }
             let offset = op.offset.value().copied().unwrap_or([0.0, 0.0]);
-            let mut record = shifted_copy(origin.document(), &target, offset, &mut links, origin.content_revision())?;
+            let mut record = shifted_copy(base, &target, offset, &mut links, origin.content_revision())?;
             (record.target.frame_scope.frame, record.target.stroke_id) = (frame, String::new());
             (op.op, op.record, op.stable_target, op.frame, op.offset) =
                 ("create".into(), Presence::Present(record), Presence::Missing, Presence::Missing, Presence::Missing);
@@ -297,8 +303,8 @@ pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool, 
             }
             // A reshape's `frame` is the held cell it edits (its copy-keyed copy keeps the stroke id); a clone is new there.
             let (mut record, fill) = match (std::mem::take(&mut op.center), std::mem::take(&mut op.geometry)) {
-                (Presence::Present(center), _) => ribbon::reshape(origin.document(), &target, center)?,
-                (_, Presence::Present(geometry)) => (with_geometry(origin.document(), &target, geometry)?, None),
+                (Presence::Present(center), _) => ribbon::reshape(base, &target, center)?,
+                (_, Presence::Present(geometry)) => (with_geometry(base, &target, geometry)?, None),
                 _ => return Err(InvalidRequest),
             };
             record.target.frame_scope.frame = frame.unwrap_or(target.frame_scope.frame);
@@ -334,11 +340,11 @@ pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool, 
         (op.op, op.record, op.from_step, op.frame) = ("create".into(), Presence::Present(record), Presence::Missing, Presence::Missing);
     }
     let first = target_of(&ops[0]).ok_or(InvalidRequest)?;
-    if first.context_id != "scene-root" {
+    if first.context_id != context {
         return Err(InvalidRequest);
     }
     let revision = origin.content_revision();
-    let mut document = origin.document().clone();
+    let mut document = base.clone();
     // `trimEnds` (all-create batches only): the first create is cut against its own cell before any step lands, and every
     // other create takes the same cut, as the baseline stamps and mirrors the already trimmed path.
     if let Some(max) = trim {
@@ -367,6 +373,10 @@ pub(super) fn batch(origin: &ObjectSnapshot, ops: Vec<BatchOp>, copy_key: bool, 
     // batch (the baseline freezes all its targets before stamping any): a later step never copies an earlier one, and a
     // replace or delete on a held cell edits that cell's copy (same stroke ids), never the key it held.
     if keyed.contains(&true) {
+        // A component's cells are keyed by the plain Draw rule only; the copy keys of the Labs creators stay scene-only.
+        if context != "scene-root" {
+            return Err(DispatchErrorCode::Unavailable);
+        }
         // One promotion per layer a keyed step touches (#2372: a selection may span layers, each with its own timing).
         let mut layers: Vec<String> = Vec::new();
         for (op, _) in ops.iter().zip(&keyed).filter(|(_, keyed)| **keyed) {
