@@ -15,6 +15,9 @@
 }(typeof globalThis === 'object' ? globalThis : this, function (Command, Contract) {
   'use strict';
   const LIMIT = 4096, MAX_EFFECTS = 32;
+  // The read model lists a stack only up to the request bound (engine EFFECTS_ROW_BYTES = 4096); an edit may leave behind at most
+  // LIMIT - 256 encoded bytes (the request envelope is <= ~215), so an accepted edit can never make its own stack unreadable.
+  const MAX_STACK_BYTES = LIMIT - 256;
   const BLEND = Object.freeze(['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'colorDodge', 'colorBurn', 'hardLight', 'softLight', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity']);
   const MATTE = Object.freeze(['none', 'alpha', 'alphaInverted', 'luma', 'lumaInverted']);
   const fault = (code, message, extra) => Command.fault(code, message, extra);
@@ -52,6 +55,7 @@
         if (!stack) throw fault('unavailable', 'This effect stack is too large to edit natively', { reason: 'effects_oversize' });
         const next = mutate(stack);
         if (!Array.isArray(next) || next.length > MAX_EFFECTS) throw fault('invalid_request', 'The effect stack is outside the native bound', { reason: 'effects_bound' });
+        if (JSON.stringify(next).length > MAX_STACK_BYTES) throw fault('invalid_request', 'The effect stack would be too large to store and list', { reason: 'effects_bytes' });
         return { effects: next };
       });
     }
@@ -124,7 +128,7 @@
     const redraw = () => { try { if (typeof host.updateEffectsPanel === 'function') host.updateEffectsPanel(); } catch (_) { /* presentation only */ } };
     function refused(error) {
       const why = error && error.reason;
-      toast(why === 'effects_oversize' ? 'This effect stack is too large to edit natively.' : error && error.code === 'not_found' && host.SM ? host.SM.t('hsSelectLayerFirst') : 'Native effect stack command was refused.');
+      toast(why === 'effects_oversize' ? 'This effect stack is too large to edit natively.' : why === 'effects_bound' || why === 'effects_bytes' ? 'No room for more effects: this layer\'s effect stack is full.' : error && error.code === 'not_found' && host.SM ? host.SM.t('hsSelectLayerFirst') : 'Native effect stack command was refused.');
     }
     function run(make, after) {
       const comp = live();
@@ -135,6 +139,14 @@
     const api = Object.freeze({
       on: () => live() !== null,
       stack: () => { const comp = live(); return comp ? (comp.stackOf(at()) || []) : null; },
+      // A stack the row names oversize is flagged in the list instead of looking like an empty one.
+      flag(list) {
+        const comp = live();
+        if (!comp || comp.stackAvailable(at()) || !list || !host.document) return;
+        const note = host.document.createElement('div');
+        note.style.cssText = 'font-size:10px;opacity:.7;padding:4px 0;'; note.textContent = 'This effect stack is too large to list or edit natively.';
+        list.appendChild(note);
+      },
       add: (type, d, after) => run((comp, i) => comp.addEffect(i, { type, enabled: true, p1: d[0], p2: d[1], p3: d[2], p4: d[3], p5: d[4], p6: d[5], p7: d[6], p8: d[7] }), after),
       toggle: (at2) => run((comp, i) => comp.toggleEffect(i, at2)),
       remove: (at2, after) => run((comp, i) => comp.removeEffect(i, at2), after),

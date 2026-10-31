@@ -16,10 +16,14 @@ use crate::object_document::ObjectDocument;
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
 
-/// #2372: a layer's effect stack travels in its row only up to this many encoded bytes, which keeps the full-stack
-/// edit request inside the 4096-byte dispatcher bound; the document-wide budget keeps the info answer bounded.
-const EFFECTS_ROW_BYTES: usize = 2048;
-const EFFECTS_TOTAL_BYTES: usize = 256 * 1024;
+/// #2372: a layer's effect stack travels in its row up to this many encoded bytes. The bound is the dispatcher's own
+/// 4096-byte request bound, so it is never below what an edit can write: a full-stack edit request carries the stack
+/// plus at most ~215 bytes of envelope (measured with a 128-byte layer uid), hence any stack an accepted edit leaves
+/// behind is strictly smaller than this and stays listed. Measured baseline entries (`{type,enabled,p1..p8}`, as the
+/// panel adds them) are 105-127 bytes, path-effect entries 58-65, so the row holds ~32-39 effects or ~66 path effects.
+/// The document-wide budget keeps the info answer inside the 4 MiB project-info bound.
+const EFFECTS_ROW_BYTES: usize = 4096;
+const EFFECTS_TOTAL_BYTES: usize = 1024 * 1024;
 
 /// Facts that exist in the baseline layer row but have no native storage; a presenter reports them unavailable.
 const UNAVAILABLE: [&str; 5] = [

@@ -167,6 +167,39 @@ test('an owner refusal and an oversize stack each say so and never write the leg
   assert.deepEqual(big.toasts, ['This path-effect stack is too large to edit natively.']);
 });
 
+// #2372: a stack wider than the old 2048-byte / 32-entry guess is read and edited; an edit that would leave it unlistable is refused.
+test('a path-effect stack at the edit limit stays listed and editable; one more entry is refused with a notice', async () => {
+  const stack = Array.from({ length: 60 }, (_, i) => ({ type: 'zigzag', enabled: true, p1: i + 0.5, p2: 1.5, p3: 2.5 }));
+  assert.ok(JSON.stringify(stack).length > 2048 && JSON.stringify(stack).length < 3840);
+  const p = panelHarness({ layers: [{ uid: 'L1', kind: 'draw', stack }] });
+  p.context.updatePathFxPanel();
+  assert.equal(p.list().children.length, 60, 'every entry is listed');
+  p.add().value = 'zigzag'; p.add().fire('change');
+  await settle();
+  assert.equal(p.sent().length, 1);
+  assert.equal(p.sent()[0].payload.stack.length, 61);
+  const full = panelHarness({ layers: [{ uid: 'L1', kind: 'draw', stack: Array.from({ length: 66 }, (_, i) => ({ type: 'zigzag', enabled: true, p1: i + 0.5, p2: 1.5, p3: 2.5 })) }] });
+  full.context.updatePathFxPanel();
+  full.add().value = 'roughen'; full.add().fire('change');
+  await settle();
+  assert.equal(full.sent().length, 0);
+  assert.deepEqual(full.toasts, ["No room for more path effects: this layer's stack is full."]);
+});
+
+test('the metadata validator admits every stack the engine can emit and flags the rest, so one big layer never fails the table', () => {
+  const base = (layers) => ({ apiVersion: 2, requestId: 'model', instanceId: 'instance', documentId: 'document', lifecycleGeneration: 1, contentRevision: 0,
+    documentSnapshotId: 'snapshot-0', documentDigest: 'a'.repeat(64), byteCount: 1000, canvasW: 320, canvasH: 180, fps: 24, totalFrames: 24, reference: null, undoDepth: 0, redoDepth: 0, layers });
+  const request = { requestId: 'model', instanceId: 'instance', documentId: 'document' };
+  // The smallest entry is 27 bytes, so a 4096-byte row holds ~150 effects; engine rows past 32 must still decode.
+  const small = Array.from({ length: 150 }, () => ({ type: 'a', enabled: true }));
+  const paths = Array.from({ length: 66 }, () => ({ type: 'zigzag' }));
+  const read = Metadata.decode(base([{ layerUid: 'a', effects: small, pathFx: paths }, { layerUid: 'b', effectsOversize: true, pathFxOversize: true }, { layerUid: 'c', effects: [{ type: '', enabled: true }] }]), request);
+  assert.equal(read.layers[0].effects.length, 150);
+  assert.equal(read.layers[0].pathFx.length, 66);
+  assert.equal(read.layers[1].effectsOversize, true);
+  assert.equal(read.layers[2].effects.length, 1, 'an empty stored type is stored as given');
+});
+
 test('a null layer hides the section; a missing layer row is a toast', async () => {
   const p = panelHarness();
   p.state.activeLayerIdx = 2;

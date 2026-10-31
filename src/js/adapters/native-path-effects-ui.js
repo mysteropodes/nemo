@@ -13,11 +13,14 @@
   else root.NemoNativePathEffectsUi = api;
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
+  // The row lists a stack up to the request bound (engine EFFECTS_ROW_BYTES = 4096); an edit may leave at most 4096 - 256 encoded bytes,
+  // so an accepted edit can never make its own stack unreadable.
+  const MAX_STACK_BYTES = 4096 - 256;
   const PIN_KEYS = ['instanceId', 'documentId', 'contentRevision', 'documentSnapshotId'];
   const MESSAGES = Object.freeze({
     unavailable: 'Native path-effect command is unavailable.', oversize: 'This path-effect stack is too large to edit natively.',
     stale: 'The project changed under this edit; try again.', refused: 'Native path-effect command was refused.',
-    layer: 'Select a layer first.',
+    layer: 'Select a layer first.', full: 'No room for more path effects: this layer\'s stack is full.',
   });
   const copy = (value) => JSON.parse(JSON.stringify(value));
   const panels = new WeakMap();
@@ -57,6 +60,7 @@
         if (!stack) { toast(MESSAGES.oversize); return null; }
         const next = mutate(stack);
         if (!Array.isArray(next)) return null;
+        if (JSON.stringify(next).length > MAX_STACK_BYTES) { toast(MESSAGES.full); return null; }
         const origin = PIN_KEYS.reduce((acc, key) => { acc[key] = info[key]; return acc; }, {});
         return client.setPathEffects(uid, next, { origin }).then(report, () => toast(MESSAGES.refused));
       }).catch(() => toast(MESSAGES.refused)).then(redraw);
