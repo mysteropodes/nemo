@@ -148,8 +148,18 @@
       catch (_) { return false; } }
     function restoreWork(pins) { return typeof pins.workId === 'string' && /^native-work-[1-9][0-9]{0,19}$/.test(pins.workId) &&
       BigInt(pins.workId.slice(12)) <= 18446744073709551615n && Number.isSafeInteger(pins.viewGeneration) && pins.viewGeneration > 0; }
+    // A native object project's identity is its whole project info (layers, canvas, ...): only the identity
+    // pins are telemetry. Any other member would make snapshot() drop the event, and one drop refuses the rest.
+    var identityKeys = ['instanceId', 'documentId', 'contentRevision', 'documentSnapshotId', 'contextId', 'workId',
+      'lifecycleGeneration', 'jsLifecycleGeneration', 'hostLifecycleGeneration', 'viewGeneration', 'sessionOrdinal',
+      'hostGeneration', 'hostCallOrdinal'];
+    function identityPins(identity) {
+      var out = {};
+      if (identity && typeof identity === 'object') identityKeys.forEach(function (key) { if (Object.hasOwn(identity, key)) out[key] = identity[key]; });
+      return out;
+    }
     function navigationRequest(intent, frame, identity) {
-      var ticket = Object.freeze({}), pins = Object.freeze(Object.assign({ intent: intent, frame: frame }, identity));
+      var ticket = Object.freeze({}), pins = Object.freeze(Object.assign({ intent: intent, frame: frame }, identityPins(identity)));
       navigations.set(ticket, { pins: pins, finished: false, afterCallOrdinal: callSequence }); productPendingNavigation++;
       record(Object.assign({ event: 'navigate-request' }, pins)); return ticket;
     }
@@ -201,7 +211,7 @@
       record(observed);
     }
     function schedulerRequest(run, frame, identity) {
-      var ticket = Object.freeze({}), pins = Object.freeze(Object.assign({ runGeneration: run, frame: frame }, identity));
+      var ticket = Object.freeze({}), pins = Object.freeze(Object.assign({ runGeneration: run, frame: frame }, identityPins(identity)));
       steps.set(ticket, { pins: pins, finished: false }); productPendingPlayback++;
       record(Object.assign({ event: 'play-step' }, pins)); return ticket;
     }
@@ -210,7 +220,7 @@
       step.finished = true; productPendingPlayback--; if (typeof result !== 'boolean') dropped++;
       record(Object.assign({ event: 'play-step', result: result === true }, step.pins));
     }
-    function schedulerState(event, run, identity) { if (identity) record(Object.assign({ event: event, runGeneration: run }, identity)); }
+    function schedulerState(event, run, identity) { if (identity) record(Object.assign({ event: event, runGeneration: run }, identityPins(identity))); }
     function playState(playing, frame) {
       productPlaying = playing === true; record({ event: 'play-state', playing: playing, currentFrame: frame });
     }
