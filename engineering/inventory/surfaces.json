@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "bbd3431b3b323776e0879466282b766ffc4f2ee8",
-  "describe": "v0.7.0-alpha.4-4548-gbbd3431b-dirty"
+  "head": "8588164a64f53a0489b4f8c41a5cf33fef0b935d",
+  "describe": "v0.7.0-alpha.4-4551-g8588164a-dirty"
  },
- "inputsDigest": "73928aaf489cd618c07760415daa537972c78b63f1e386139ce65bee515c2d4b",
+ "inputsDigest": "0e7d91e200f1a616af14fa196112e2c0202a9d01ab3c39c9aa882acff1a6ae16",
  "states": [
   "inventoried",
   "characterized",
@@ -26,16 +26,16 @@
   "native"
  ],
  "counts": {
-  "total": 919,
+  "total": 921,
   "byKind": {
    "dom": 484,
    "labs": 36,
-   "menu": 273,
+   "menu": 275,
    "sdk": 76,
    "shortcut": 50
   },
   "byStatus": {
-   "inventoried": 883,
+   "inventoried": 885,
    "unmapped": 35,
    "unavailable-with-reason": 1
   },
@@ -46,13 +46,13 @@
    "timeline-layers-frames": 175,
    "animation-rigs-expressions": 157,
    "effects-masks": 10,
-   "preferences-workspace": 40,
+   "preferences-workspace": 42,
    "unclassified": 11,
    "labs": 61,
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 261,
+   "native": 263,
    "export": 5,
    "animation": 419,
    "history": 380,
@@ -321,7 +321,7 @@
   },
   "SMSelectBridge": {
    "file": "src/js/select-bridge.js",
-   "line": 3565,
+   "line": 3570,
    "members": 4
   },
   "SMShadowBrush": {
@@ -22331,6 +22331,66 @@
    "fixtures": []
   },
   {
+   "id": "menu:adapters/native-component-expose-ui.js:menuItems:exposer-l-opacite-comme-propriete-de-component",
+   "kind": "menu",
+   "surface": "dynamic menu (menuItems)",
+   "capability": "Exposer l'opacité comme propriété de Component…",
+   "area": "preferences-workspace",
+   "handler": [
+    "src/js/adapters/native-component-expose-ui.js:56 menuItems()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-component-expose-ui.js:56",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 19
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-component-expose-ui.js:menuItems:exposer-la-visibilite-comme-propriete-de-compone",
+   "kind": "menu",
+   "surface": "dynamic menu (menuItems)",
+   "capability": "Exposer la visibilité comme propriété de Component…",
+   "area": "preferences-workspace",
+   "handler": [
+    "src/js/adapters/native-component-expose-ui.js:57 menuItems()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-component-expose-ui.js:57",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 17
+   },
+   "fixtures": []
+  },
+  {
    "id": "menu:adapters/native-layer-parent.js:followPathMenuItems:chemin",
    "kind": "menu",
    "surface": "dynamic menu (followPathMenuItems)",
@@ -28459,7 +28519,7 @@
    "capability": "Exposer l\\'opacité comme propriété de Component…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3265 onContext()"
+    "src/js/select-bridge.js:3270 onContext()"
    ],
    "events": [
     "click"
@@ -28477,7 +28537,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3265",
+   "source": "src/js/select-bridge.js:3270",
    "meta": {
     "i18n": null,
     "functionsVisited": 34
@@ -28496,7 +28556,7 @@
    "capability": "Exposer la visibilité comme propriété de Component…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/select-bridge.js:3274 onContext()"
+    "src/js/select-bridge.js:3279 onContext()"
    ],
    "events": [
     "click"
@@ -28514,7 +28574,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/select-bridge.js:3274",
+   "source": "src/js/select-bridge.js:3279",
    "meta": {
     "i18n": null,
     "functionsVisited": 33
