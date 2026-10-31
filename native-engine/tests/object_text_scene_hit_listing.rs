@@ -30,16 +30,6 @@ fn page(drawing: &Value, cursor: u64) -> Value {
     assert_eq!(response["ok"], true, "{response}");
     response["result"].clone()
 }
-#[test]
-fn the_editable_listing_of_a_layer_with_an_image_or_text_stays_refused() {
-    let owner = owner(&drawing());
-    let snapshot = support::head(&owner);
-    let p = plan(&snapshot, 0);
-    let witness = prepare_object_viewport_composition(&p, &selector(&snapshot, 0), None).unwrap();
-    assert!(witness
-        .subselect_read_projection("L0", None, false)
-        .is_err());
-}
 fn pair(v: &Value) -> Vec<f64> {
     v.as_array()
         .unwrap()

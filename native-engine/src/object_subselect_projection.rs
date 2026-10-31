@@ -37,12 +37,14 @@ impl ObjectCompositionWitness {
                     .map_err(|_| "Subselect preview intent is unavailable")
             })
             .transpose()?;
-        // A hit-test listing of a layer that also paints images or text poses its vectors with the union chain they share.
-        let shared = hit_test
-            && (packet.raster_records().any(|r| r.layer_index() == index)
-                || packet.text_records().any(|r| r.layer_index() == index));
-        let matrices = if shared {
+        // A layer that also paints images or text poses its vectors with the union chain they share, for the hit-test listing and
+        // the editable (vertex) listing alike, so the listing and the per-item geometry agree (#2372).
+        let shared = packet.raster_records().any(|r| r.layer_index() == index)
+            || packet.text_records().any(|r| r.layer_index() == index);
+        let matrices = if shared && hit_test {
             subselect::hit_matrices(packet, index, &self.plan().native_parent_chains())?
+        } else if shared {
+            subselect::mixed_matrices(packet, index, edited.as_ref(), &self.plan().native_parent_chains())?
         } else if hit_test {
             subselect::matrices_hit(packet, index)?
         } else {
