@@ -58,18 +58,14 @@
     return held.map;
   }
   async function readRows(c, contextId) {
-    var rows = [], cursor = 0;
-    for (var guard = 0; guard < 64; guard += 1) {
-      var page = await c.read({ kind: 'layers', contextId: contextId, cursor: cursor, limit: 16 });
-      if (!page.ok) return null;
-      page.result.items.forEach(function (layer) {
-        rows.push({ layerUid: layer.layerUid, name: layer.name === null ? 'Layer ' + (rows.length + 1) : layer.name, layerKind: layer.layerKind,
-          visible: true, locked: true, color: '#5FA875', parentLayerUid: null, frames: [], motion: {} });
-      });
-      if (page.result.nextCursor === null) return rows;
-      cursor = page.result.nextCursor;
-    }
-    return null;
+    var all = await c.listLayers(contextId);
+    if (!all.ok) return null;
+    var rows = [];
+    all.items.forEach(function (layer) {
+      rows.push({ layerUid: layer.layerUid, name: layer.name === null ? 'Layer ' + (rows.length + 1) : layer.name, layerKind: layer.layerKind,
+        visible: true, locked: true, color: '#5FA875', parentLayerUid: null, frames: [], motion: {} });
+    });
+    return rows;
   }
   function selectedUids(host) {
     var s = host.state, rows = Array.isArray(s.layers) ? s.layers : [], sel = Array.isArray(host._layerSel) ? host._layerSel : [];
@@ -196,13 +192,8 @@
     for (var i = 0; i < all.contexts.length; i += 1) {
       var ctx = all.contexts[i];
       if (ctx.contextKind !== 'component') continue;
-      for (var cursor = 0, guard = 0; guard < 64; guard += 1) {
-        var page = await c.read({ kind: 'instances', contextId: ctx.contextId, cursor: cursor, limit: 16 });
-        if (!page.ok) break;
-        if (page.result.items.some(function (item) { return item.layerUid === layerUid; })) return enter(host, ctx.contextId, null);
-        if (page.result.nextCursor === null) break;
-        cursor = page.result.nextCursor;
-      }
+      var found = await c.listInstances(ctx.contextId);
+      if (found.ok && found.items.some(function (item) { return item.layerUid === layerUid; })) return enter(host, ctx.contextId, null);
     }
     return false;
   }

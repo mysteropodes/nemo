@@ -71,11 +71,14 @@ fn context_item(value: &Value, first: bool) -> bool {
             "totalFrames",
             "layerCount",
         ],
-        &[],
+        &["nameTruncated"],
     )
     .is_some_and(|o| {
         let scene = o["contextId"] == SCENE;
-        uid(o.get("contextId"))
+        // Present only as `true`: the owner cut an oversized component name to fit the page. The scene has no name to cut.
+        o.get("nameTruncated")
+            .map_or(true, |flag| *flag == true && !scene && o["name"].is_string())
+            && uid(o.get("contextId"))
             && scene == first
             && o["contextKind"] == if scene { "scene" } else { "component" }
             && name(o.get("name"))

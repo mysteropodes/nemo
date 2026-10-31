@@ -18318,6 +18318,10 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 4294967295
+                  },
+                  "nameTruncated": {
+                    "const": true,
+                    "description": "Present only when the owner cut an oversized component name to fit the page."
                   }
                 }
               }

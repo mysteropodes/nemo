@@ -2,7 +2,8 @@
  * document, copies no model and issues no request. One pinned read answers one of four selectors: the contexts of the
  * document (scene-root first, then every component in table order), one context's summary, a page of its layers, or the page
  * of scene layers that instance one component. Pages are at most 16 items and the native owner also cuts them by the 4096-byte
- * response bound, so `nextCursor` (the first unread index, null at the end) is the only trustworthy end of a page.
+ * response bound, so `nextCursor` (the first unread index, null at the end) is the only trustworthy end of a page. A context whose
+ * summary cannot fit a page alone keeps its identity and counts and has its name cut and flagged `nameTruncated: true`.
  * A pinned read carries no expectedRevision. Mirrors nemo-mcp/src/native_component_read_contract.rs. */
 (function (root, factory) {
   const api = factory();
@@ -20,9 +21,9 @@
   const uint32 = (value) => Number.isSafeInteger(value) && value >= 0 && value <= 4294967295;
   const idText = (value) => typeof value === 'string' && value.length > 0 && value.length <= MAX_ID && !value.includes('\0');
   const nameOk = (value) => value === null || typeof value === 'string';
-  function exact(value, required, label) {
+  function exact(value, required, label, optional) {
     if (!value || typeof value !== 'object' || Array.isArray(value) || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) fail(label + ' must be a plain object');
-    if (!required.every((key) => has(value, key)) || Object.keys(value).some((key) => !required.includes(key))) fail(label + ' has missing or unknown fields');
+    if (!required.every((key) => has(value, key)) || Object.keys(value).some((key) => !required.includes(key) && !(optional || []).includes(key))) fail(label + ' has missing or unknown fields');
     return value;
   }
   function pageArgs(selector) {
@@ -43,8 +44,10 @@
     selectorOk(value.selector);
   }
   function contextItem(item, first) {
-    exact(item, ['contextId', 'contextKind', 'name', 'totalFrames', 'layerCount'], 'component context');
+    exact(item, ['contextId', 'contextKind', 'name', 'totalFrames', 'layerCount'], 'component context', ['nameTruncated']);
     const scene = item.contextId === SCENE;
+    // Present only as true: the owner cut an oversized component name to fit its page (a scene has no name to cut).
+    if (has(item, 'nameTruncated') && (item.nameTruncated !== true || scene || typeof item.name !== 'string')) fail('invalid component name truncation flag');
     if (!idText(item.contextId) || scene !== first || item.contextKind !== (scene ? 'scene' : 'component') || !nameOk(item.name) ||
       (scene && item.name !== null) || !uint32(item.totalFrames) || !uint32(item.layerCount)) fail('invalid component context');
   }
