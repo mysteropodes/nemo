@@ -93,6 +93,7 @@
     // #2361/#2362: ordered create/replace/delete steps on one layer as one native revision and one undo entry. Each step
     // is {create: dict} | {copy: earlierStepIndex} | {replace: {strokeId, dict}} | {restyle: {stableTarget, style}} | {delete: strokeId} at `frame` (or the step's own `frame`); a create
     // step's own `keyframe: 'copy'` keys its held cell with a copy when the batch's options do not.
+    // The batch is atomic (any refused step refuses it whole); `options.skipUnavailable === true` lets the engine skip restyle steps it cannot do and report them (#2372).
     function batchStrokes(layerUid, frame, steps, options) {
       if (!Array.isArray(steps) || !steps.length) return Promise.resolve(Object.freeze({ status: 'invalid', reason: 'a batch needs at least one step' }));
       const ops = [];
@@ -120,7 +121,7 @@
           step.keyframe === 'copy' ? { keyframe: 'copy' } : {}));
       }
       const body = Object.assign({ command: 'object.vector.batch', ops }, options && options.keyframe === 'copy' ? { keyframe: 'copy' } : {},
-        options && options.trimEnds !== undefined ? { trimEnds: options.trimEnds } : {});
+        options && options.trimEnds !== undefined ? { trimEnds: options.trimEnds } : {}, options && options.skipUnavailable === true ? { skipUnavailable: true } : {});
       return send(Contract.VECTOR, body, options, (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds }));
     }
     function replaceStroke(target, dict, options) {

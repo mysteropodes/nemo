@@ -48,6 +48,7 @@ struct VectorPayload {
     placement: Presence<String>,
     trim_ends: Presence<serde_json::Number>,
     keyframe: Presence<String>,
+    skip_unavailable: Presence<bool>,
     ops: Presence<Vec<batch_ops::BatchOp>>,
     stable_target: Presence<ObjectTarget>,
     mask_edit: Presence<mask_edit::MaskEdit>,
@@ -59,6 +60,7 @@ object_deserialize!(VectorPayload {
     #[serde(default)] placement: Presence<String>,
     #[serde(default)] trim_ends: Presence<serde_json::Number>,
     #[serde(default)] keyframe: Presence<String>,
+    #[serde(default)] skip_unavailable: Presence<bool>,
     #[serde(default)] ops: Presence<Vec<batch_ops::BatchOp>>,
     #[serde(default)] stable_target: Presence<ObjectTarget>,
     #[serde(default)] mask_edit: Presence<mask_edit::MaskEdit>
@@ -93,6 +95,7 @@ pub(crate) struct VectorEditResult {
     stroke_id: String,
     stroke_ids: Vec<String>,
     applied: bool,
+    skipped: u32,
 }
 impl VectorEditResult {
     pub(crate) fn result(&self) -> Value {
@@ -104,6 +107,10 @@ impl VectorEditResult {
         });
         if matches!(self.kind, VectorEditKind::CreateMany | VectorEditKind::Batch) {
             value["strokeIds"] = json!(self.stroke_ids);
+        }
+        // Only an opted-in batch that actually skipped steps reports them; every other receipt keeps its exact shape.
+        if self.skipped > 0 {
+            value["skippedSteps"] = json!(self.skipped);
         }
         value
     }
@@ -130,6 +137,8 @@ pub(super) struct Edit {
     pub(super) stroke_id: String,
     pub(super) stroke_ids: Vec<String>,
     pub(super) changed: bool,
+    /// Restyle steps an opted-in batch (`skipUnavailable`) left untouched because the engine cannot restyle them (#2372).
+    pub(super) skipped: u32,
 }
 
 pub(super) fn order_code(error: OrderEditError) -> DispatchErrorCode {
@@ -268,6 +277,7 @@ pub(super) fn replace_in(source: &ObjectDocument, record: ObjectRecord) -> Resul
         stroke_ids: vec![stroke_id.clone()],
         stroke_id,
         changed,
+        skipped: 0,
     })
 }
 
@@ -321,6 +331,7 @@ pub(super) fn delete_in(source: &ObjectDocument, target: ObjectTarget) -> Result
         stroke_ids: vec![target.stroke_id.clone()],
         stroke_id: target.stroke_id,
         changed: true,
+        skipped: 0,
     })
 }
 
@@ -353,6 +364,11 @@ impl ObjectFillOwner {
         let placement = Placement::parse(&payload.command, &payload.placement)?;
         let trim = create_ops::trim_ends(&payload.command, &payload.trim_ends)?;
         let copy_key = create_ops::copy_key(&payload.command, &payload.keyframe)?;
+        // `skipUnavailable` (#2372) is a batch member only; a batch is atomic unless it asks to skip the restyle steps the engine cannot do.
+        if payload.command != "object.vector.batch" && !payload.skip_unavailable.missing() {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        let skip_unavailable = payload.skip_unavailable.value() == Some(&true);
         let mut edit = match (
             payload.command.as_str(),
             payload.record,
@@ -393,7 +409,7 @@ impl ObjectFillOwner {
                 let Presence::Present(ops) = payload.ops else {
                     return Err(DispatchErrorCode::InvalidRequest);
                 };
-                batch_ops::batch(&origin, ops, copy_key, trim)?
+                batch_ops::batch(&origin, ops, copy_key, trim, skip_unavailable)?
             }
             _ => return Err(DispatchErrorCode::InvalidRequest),
         };
@@ -421,6 +437,7 @@ impl ObjectFillOwner {
                 stroke_id: edit.stroke_id,
                 stroke_ids: edit.stroke_ids,
                 applied: edit.changed,
+                skipped: edit.skipped,
             },
         })
     }

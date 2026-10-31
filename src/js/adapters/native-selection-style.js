@@ -113,7 +113,7 @@
     if (!steps.length) return { status: 'noop' };
     if (JSON.stringify(steps).length > MAX_BYTES) { notice(root, 'Too much to restyle at once — select fewer items.'); return { status: 'too_large' }; }
     var result;
-    try { result = await labs.batchStrokes(layerUid, frame, steps); } catch (_) { result = null; }
+    try { result = await labs.batchStrokes(layerUid, frame, steps, { skipUnavailable: true }); } catch (_) { result = null; }
     if (!result || (result.status !== 'applied' && result.status !== 'noop')) {
       notice(root, 'The style could not be applied' + (result && result.status === 'unavailable' ? ' to this kind of item.' : '.'));
       return { status: result ? result.status : 'unavailable' };

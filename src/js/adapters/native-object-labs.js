@@ -37,10 +37,11 @@
       // A Labs-created stroke through the ordinary native vector create, keyed with what a held cell showed
       // (the Labs creators' ensureKeyframe(), not Draw's empty key).
       // Several Labs strokes as ONE native vector batch (one revision, one undo entry), keyed with what a held cell showed.
-      batchStrokes: (layerUid, frame, steps) => {
+      // `options.skipUnavailable: true` lets a restyle batch skip the steps the engine cannot do (Select's multi-select edit); absent, it is atomic.
+      batchStrokes: (layerUid, frame, steps, options) => {
         const Vector = vectorRoute();
         if (!Vector) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'no_vector_route' }));
-        return Vector.create(session).batchStrokes(layerUid, frame, steps, { keyframe: 'copy' });
+        return Vector.create(session).batchStrokes(layerUid, frame, steps, options && options.skipUnavailable === true ? { keyframe: 'copy', skipUnavailable: true } : { keyframe: 'copy' });
       },
       createStroke: (layerUid, frame, dict, opacity) => {
         const Vector = vectorRoute();
