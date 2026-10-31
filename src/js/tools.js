@@ -1284,6 +1284,8 @@ function transformFillGradient(path, pointTransform){
 // backdrop, brush-texture dabs) need the same translate to avoid the
 // "parallax drift" bug already fixed once this session.
 function alignSelection(mode){
+  // #2372 insp-align-distribute: on a native project the move is ONE native reshape batch (adapters/native-selection-align.js), never the Paper writer below.
+  var _na=window.NemoNativeSelectionAlign;if(_na&&_na.native(window)){_na.align(window,mode);return;}
   if(!allowLegacySelectionEdit(null,'select'))return;
   if(selectedPaths.length<2)return;
   var b=xformSelBounds();if(!b)return;
@@ -1323,6 +1325,8 @@ function alignSelection(mode){
 // alignSelection right above, for the identical "don't tear the drawing
 // apart" reason (CLAUDE.md §1).
 function distributeSelection(mode){
+  // #2372 insp-align-distribute: on a native project the move is ONE native reshape batch (adapters/native-selection-align.js), never the Paper writer below.
+  var _na=window.NemoNativeSelectionAlign;if(_na&&_na.native(window)){_na.distribute(window,mode);return;}
   if(!allowLegacySelectionEdit(null,'select'))return;
   if(selectedPaths.length<3)return;
   pushUndo();

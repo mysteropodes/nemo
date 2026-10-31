@@ -1009,6 +1009,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-selection-align.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-selection-transform.js",
       "moduleId": "app.native.object.ui.adapter",
       "executionClass": "document-classic",
