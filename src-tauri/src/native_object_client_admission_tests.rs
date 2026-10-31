@@ -309,6 +309,21 @@ fn raw_client_flags(descriptors: &[Value]) -> Result<std::collections::BTreeMap<
     }
     Ok(flags)
 }
+/// The same bytes nemo-mcp/build.rs embeds, read from the declaration directory.
+fn declarations() -> Vec<Value> {
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../engineering/application/capabilities-v2");
+    let mut files: Vec<_> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
+        .collect();
+    files.sort();
+    assert!(files.len() > 40, "declaration directory not found");
+    files
+        .iter()
+        .map(|path| serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap())
+        .collect()
+}
 fn raw_client_allowlist_drift(descriptors: &[Value]) -> Result<(), String> {
     let flags = raw_client_flags(descriptors)?;
     let listed: std::collections::BTreeSet<_> = OPERATIONS.iter().copied().collect();
@@ -320,9 +335,9 @@ fn raw_client_allowlist_drift(descriptors: &[Value]) -> Result<(), String> {
 }
 #[test]
 fn raw_client_allowlist_equals_the_capability_declared_rawclient_set() {
-    let descriptors = nemo_mcp::capabilities::native_catalog().descriptors();
-    raw_client_allowlist_drift(descriptors).unwrap();
-    let flags = raw_client_flags(descriptors).unwrap();
+    let descriptors = declarations();
+    raw_client_allowlist_drift(&descriptors).unwrap();
+    let flags = raw_client_flags(&descriptors).unwrap();
     for operation in OPERATIONS {
         let delta = flags[operation];
         // Reads never advance the revision; every command is one transaction.
@@ -331,21 +346,24 @@ fn raw_client_allowlist_equals_the_capability_declared_rawclient_set() {
 }
 #[test]
 fn raw_client_host_operations_stay_out_of_the_public_registration() {
-    let catalog = nemo_mcp::capabilities::native_catalog();
+    let descriptors = declarations();
+    let registered: Vec<&Value> = descriptors
+        .iter()
+        .flat_map(|d| d["operations"].as_array().unwrap())
+        .collect();
     let mut host = 0;
-    for descriptor in catalog.descriptors() {
+    for descriptor in &descriptors {
         for operation in descriptor["hostOperations"].as_array().into_iter().flatten() {
-            let operation = operation.as_str().unwrap();
             host += 1;
-            assert!(catalog.capability_for_operation(operation).is_none(), "{operation}");
-            assert!(OPERATIONS.contains(&operation), "{operation}");
+            assert!(!registered.contains(&operation), "{operation}");
+            assert!(OPERATIONS.contains(&operation.as_str().unwrap()), "{operation}");
         }
     }
     assert_eq!(host, 2);
 }
 #[test]
 fn raw_client_allowlist_drift_is_caught_in_both_directions() {
-    let real = nemo_mcp::capabilities::native_catalog().descriptors().to_vec();
+    let real = declarations();
     // Unflag one operation: OPERATIONS now lists an operation nothing declares.
     for operation in OPERATIONS {
         let mut unflagged = real.clone();
