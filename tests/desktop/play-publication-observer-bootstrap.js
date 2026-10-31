@@ -1,6 +1,9 @@
 /* TEST PACKAGE ONLY: embedded by the cfg-gated isolated Tauri main-window builder.
  * This transports metadata; O2 supplies the real publication observations.
- * No call here drives a frame, Play, retry, document command or product timer.
+ * No call here drives a frame, Play, retry or document command. The only timer hook is the
+ * opt-in P24 fixed clock (config.fixedClock === true, from NEMO_TEST_PLAY_FIXED_CLOCK=1): the
+ * product's own playback scheduler asks it for time, and it steps exactly one frame period per
+ * accepted tick, never while a presentation is outstanding. Absent, product time is untouched.
  */
 (function () {
   'use strict';
@@ -322,12 +325,28 @@
           generated: generated, dropped: dropped, failed: failed, pending: pendingCount });
       } catch (_) { failed++; }
     }
+    // Virtual time for the product scheduler (P24). The 1e-6 ms bias keeps floor((now-clock)/frameMs)
+    // at exactly 1 despite float rounding; ticks wait while a scheduler step is still presenting.
+    var fixedClock = config.fixedClock !== true ? null : (function () {
+      var t = 0, ids = 0, timers = new Map();
+      function request(step, frameMs) {
+        var id = ++ids;
+        function fire() {
+          timers.delete(id);
+          if (productPendingPlayback > 0) { timers.set(id, setTimeout(fire, 1)); return; }
+          t += (frameMs > 0 ? frameMs : 1000 / 24) + 1e-6; step(t);
+        }
+        timers.set(id, setTimeout(fire, 0)); return id;
+      }
+      function cancel(id) { clearTimeout(timers.get(id)); timers.delete(id); }
+      return Object.freeze({ now: function () { return t; }, request: request, cancel: cancel });
+    })();
     var ready = Promise.resolve().then(function () { return ports.listen(seal); }).then(async function () {
       listening = true;
       record({ event: 'ready' });
       await queue;
     }).catch(function () { failed++; });
-    return Object.freeze({ record: record, ready: ready, bindPreview: bindPreview, beginHost: beginHost,
+    return Object.freeze({ fixedClock: fixedClock, record: record, ready: ready, bindPreview: bindPreview, beginHost: beginHost,
       rawReceipt: rawReceipt, associateReceipt: associateReceipt, rejectReceipt: rejectReceipt,
       presentedReturn: presentedReturn, receiptContext: function (receipt) { return receipts.get(receipt); },
       navigationRequest: navigationRequest, navigationSuperseded: navigationSuperseded, navigationReturn: navigationReturn,
