@@ -371,6 +371,36 @@ test('F then Space: the flip ends and Play runs; Space then F: Play ends and the
   assert.equal(intervals.size, 1, 'the flip runs');
 });
 
+test('Play start failure leaves the running flip untouched; a successful start cancels it (RV4-FLIPCANCEL)', async () => {
+  const toggle = extractFunction(timeline, 'toggleNativeFlipPreview');
+  const startPlayFn = extractFunction(timeline, 'startNativePlay');
+  for (const startOk of [false, true]) {
+    const calls = [], intervals = new Map();
+    const controller = owner();
+    const state = { currentFrame: 3, fps: 10, waIn: 2, waOut: 5, playing: false, playDir: 1 };
+    const el = { innerHTML: '', classList: { add() {}, remove() {} } };
+    const sandbox = {
+      window: { NemoNativeOpacityCutover: controller, setInterval: (fn) => { intervals.set(1, fn); return 1; },
+        clearInterval: id => { intervals.delete(id); }, requestAnimationFrame: () => 1, cancelAnimationFrame() {} },
+      state, NemoNativeFlipPreview: flip, performance: { now: () => 0 },
+      document: { getElementById: () => el },
+      NemoNativeOpacityMotionSurface: { createPlaybackScheduler: () => ({
+        start: () => { calls.push(['playStart', intervals.size]); return startOk; }, stop: () => {} }) },
+      goToFrame: frame => { state.currentFrame = frame; return Promise.resolve(true); },
+      advancePlayFrame() {}, showToast: message => calls.push(['toast', message]), stopPlay() {}
+    };
+    vm.createContext(sandbox);
+    vm.runInContext('var nativePlayScheduler=null;var nativeFlipPreview=null;\n' + toggle + '\n' + startPlayFn, sandbox);
+    await sandbox.toggleNativeFlipPreview(controller);
+    assert.equal(intervals.size, 1);
+    sandbox.startNativePlay(controller);
+    assert.deepEqual(calls[0], ['playStart', 1], 'the flip is still running when Play starts');
+    assert.equal(intervals.size, startOk ? 0 : 1, startOk ? 'success cancels the flip' : 'a refused start leaves the flip running');
+    assert.equal(state.playing, startOk);
+    if (!startOk) assert.deepEqual(calls[1], ['toast', 'Native playback is unavailable']);
+  }
+});
+
 test('the shortcut table declares Flip preview as a native route', () => {
   assert.equal(Targets.target({}, 'cmdFlipPreview').kind, 'native');
 });
