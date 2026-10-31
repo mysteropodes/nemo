@@ -154,7 +154,9 @@ fn expand_transforms(origin: &ObjectSnapshot, ops: Vec<BatchOp>) -> Result<(Vec<
         // A stored raster image or text block is mapped like a vector record: retargeted to the held cell's `frame`, where the
         // copy key has made the same item (promotion copies a cell's images and text with its records).
         if let Some(swap) = items::transform(origin.document(), &target, frame, matrix)? {
-            if swaps.iter().flatten().any(|s| s.target() == &target) {
+            // Refused by where the swap LANDS: two steps writing one cell would silently overwrite each other, and a step that
+            // retargets `frame` never lands on its source target.
+            if swaps.iter().flatten().any(|s| s.target() == swap.target()) {
                 return Err(InvalidRequest);
             }
             // The step names the cell it lands in, so a copy key promotes a held frame for an item as it does for a vector.
