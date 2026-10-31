@@ -169,6 +169,10 @@
     try { var s = root.NemoNativeObjectProject && root.NemoNativeObjectProject.desktop(root);
       return s && s.blocksLegacy() === true ? s : null; } catch (_) { return null; }
   }
+  // #2256: inside an entered component the presented layers, their rows and the read context are the component's (the one the workspace
+  // controller holds); at the scene root they are the pinned document's.
+  function heldId(root) { var c = root.NemoNativeComponentContext; return c && typeof c.contextId === 'function' ? c.contextId(root) : 'scene-root'; }
+  function layerList(root, pin) { var c = root.NemoNativeComponentContext, rows = c && typeof c.layers === 'function' ? c.layers(root) : null; return rows || pin.layers; }
   function presentedSession(root) {
     var session = objectProject(root);
     var pin = session && session.isActive() && session.info(), shown = pin && session.readPresentedObjectSession();
@@ -192,10 +196,10 @@
   // brush), geometry paged only for the records `wanted(item, worldBounds)` keeps; with `centres` a kept ribbon also carries
   // its world-space centreline as the baseline item did (data.isVectorBrush, data.centerSegments with record widths).
   async function presented(root, layerIndex, wanted, attempt, centres) {
-    var s = presentedSession(root), layer = s && s.pin.layers[layerIndex], data;
+    var s = presentedSession(root), layer = s && layerList(root, s.pin)[layerIndex], data;
     if (!layer) return null;
     try {
-      data = await s.session.readPresentedStrokes({ contextId: 'scene-root', layerUid: layer.layerUid, frame: s.presentation.frame }, s.pin,
+      data = await s.session.readPresentedStrokes({ contextId: heldId(root), layerUid: layer.layerUid, frame: s.presentation.frame }, s.pin,
         function (item) { return !wanted || wanted(item, worldBounds(item)); }, centres);
     } catch (error) {
       if (!error || error.code !== 'stale_revision' || (attempt || 0) >= 3) throw error;
@@ -302,9 +306,9 @@
       var r = t + worldStrokeWidth(item) / 2;
       return w.x >= b[0] - r && w.x <= b[2] + r && w.y >= b[1] - r && w.y <= b[3] + r; };
     if (Number.isInteger(only)) order = [only];
-    else for (var k = s.pin.layers.length - 1; k >= 0; k--) if (k !== active) order.push(k);
+    else for (var k = layerList(root, s.pin).length - 1; k >= 0; k--) if (k !== active) order.push(k);
     for (var n = 0; n < order.length; n++) {
-      var info = s.pin.layers[order[n]];
+      var info = layerList(root, s.pin)[order[n]];
       if (!info || info.locked === true || info.visible === false) continue;
       var layers = await presented(root, order[n], reach);
       if (!layers) return undefined;
@@ -321,7 +325,7 @@
   // #2372: the selectable paths of one layer (default: the active one) the `wanted(item, worldBounds)` filter keeps, each carrying its
   // linked fill and layer; a locked or hidden layer is never read. `centres` adds a ribbon's world centreline (what a commit needs).
   async function layerPaths(root, wanted, centres, layerIndex) {
-    var s = presentedSession(root), idx = layerIndex === undefined ? root.state.activeLayerIdx : layerIndex, info = s && s.pin.layers[idx];
+    var s = presentedSession(root), idx = layerIndex === undefined ? root.state.activeLayerIdx : layerIndex, info = s && layerList(root, s.pin)[idx];
     if (!info || info.locked === true || info.visible === false) return null;
     var layers = await presented(root, idx, wanted, 0, centres);
     if (layers) layers.paths.forEach(function (p) { withFill(p, layers.items); p.data.nativeLayerIndex = idx; p.data.nativeLayerUid = layers.layerUid; });
@@ -335,8 +339,8 @@
     if (!s) return null;
     var keep = function (item, b) {
       return !(item.role === 'fill' && item.owner) && item.brush !== 'copy' && b[0] <= rect[2] && b[2] >= rect[0] && b[1] <= rect[3] && b[3] >= rect[1]; };
-    for (var k = 0; k < s.pin.layers.length; k++) {
-      var info = s.pin.layers[k];
+    for (var k = 0, rows = layerList(root, s.pin); k < rows.length; k++) {
+      var info = rows[k];
       if (!info || info.locked === true || info.visible === false) continue;
       var layers = await layerPaths(root, keep, false, k);
       if (!layers) return null;
@@ -463,8 +467,8 @@
     if (data && Number.isInteger(data.nativeLayerIndex) && (data.nativeLayerIndex !== root.state.activeLayerIdx || image)) {
       // #2372: a hit on another layer activates it through the native layer-selection route (_layerSel follows); a refused
       // activation selects nothing rather than a stroke of a layer that is not active.
-      var project = root.NemoNativeObjectProject;
-      if (!project || project.selectLayerUI(root, data.nativeLayerIndex, false, data.nativeLayerUid) !== true ||
+      var project = root.NemoNativeObjectProject, inside = heldId(root) !== 'scene-root'; // #2256: a component's layer is activated by its context controller
+      if (inside ? !root.NemoNativeComponentContext.selectLayer(root, data.nativeLayerIndex) : (!project || project.selectLayerUI(root, data.nativeLayerIndex, false, data.nativeLayerUid) !== true) ||
           root.state.activeLayerIdx !== data.nativeLayerIndex) return;
     }
     var selected = root.selectedPaths || [], id = item && item.data.strokeId;
@@ -472,11 +476,12 @@
     root.selectedPaths = item ? (shift ? (held.length ? selected.filter(function (p) { return held.indexOf(p) < 0; }) : selected.concat([item])) : [item])
       : (shift ? selected : []);
     root.state.selectedStrokeIndices = [];
+    if (item) root._layerActiveExplicit = false; // a canvas pick is a stroke selection, not a layer-row one (baseline clearSel): Delete then removes the stroke
     if (root.NemoNativeSelectOverlay) root.NemoNativeSelectOverlay.show(root); // #2372: the pick's outline, box and handles
     if (typeof root.updateUI === 'function') root.updateUI();
     if (root.SMEngineBridge && typeof root.SMEngineBridge.renderNow === 'function') root.SMEngineBridge.renderNow();
   }
 
   return Object.freeze({ create: create, hitHandles: hitHandles, objectProject: objectProject, presented: presented,
-    presentedState: presentedSession, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, transformSteps: transformSteps, inRecordSpace: inRecordSpace, layerPaths: layerPaths, reread: reread, marquee: marquee, pick: pick, pickContext: pickContext, applyPick: applyPick, resolvePick: resolvePick });
+    presentedState: presentedSession, heldId: heldId, layerList: layerList, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, transformSteps: transformSteps, inRecordSpace: inRecordSpace, layerPaths: layerPaths, reread: reread, marquee: marquee, pick: pick, pickContext: pickContext, applyPick: applyPick, resolvePick: resolvePick });
 }));

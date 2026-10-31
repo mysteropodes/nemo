@@ -92,6 +92,15 @@ pub(crate) fn admit(document: &ObjectDocument, record: &ObjectRecord) -> Result<
         .iter()
         .find(|l| l.layer_uid == record.target.layer_uid)
         .ok_or(Refusal::Unsupported)?;
+    admit_layer(document, record, layer)
+}
+/// The admission of a record whose layer the CALLER resolved in the record's own context (#2256: Select's hit-test listing of an entered
+/// component reads the component's layer, not a scene layer). The edit and preview routes keep `admit`, which is scene-root only.
+pub(crate) fn admit_layer(
+    document: &ObjectDocument,
+    record: &ObjectRecord,
+    layer: &crate::object_document::ObjectLayer,
+) -> Result<(), Refusal> {
     if layer.three_d.value() == Some(&true) || layer.rig().is_some() {
         return Err(Refusal::Unsupported);
     }

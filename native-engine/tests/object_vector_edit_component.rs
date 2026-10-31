@@ -235,3 +235,57 @@ fn component_reads_refuse_an_undeclared_context_a_foreign_layer_and_a_frame_past
     assert_eq!(read(&owner, CTX, "inner", 8, None).unwrap_err(), InvalidRequest);
     assert_eq!(read(&owner, CTX, "inner", 8, Some("cells")).unwrap_err(), InvalidRequest);
 }
+
+/// #2256: Select's hit-test listing of the ENTERED component, as the viewport presents it: the component's own layer and records, named by the
+/// component context, with the geometry read of the same record; the editable (Subselect) listing stays scene-root.
+fn component_view(owner: &NativeObjectHistory, context: &str, layer: &str, hit: bool) -> Result<Value, &'static str> {
+    use crate::object_render_scene::prepare_object_viewport_composition;
+    let s = owner.acquire_snapshot(owner.content_revision()).unwrap();
+    let expected = ObjectFrameSelector {
+        instance_id: s.instance_id(), document_id: s.document_id(), content_revision: s.content_revision(),
+        document_snapshot_id: s.snapshot_id(), context_id: context, scope_kind: FrameScopeKind::Authored, frame: 0,
+    };
+    let packet = prepare_object_exposure_frame(&s, &expected).unwrap_or_else(|e| panic!("{e:?}"));
+    let scene = prepare_object_render_scene(&packet, &expected).unwrap();
+    let plan = prepare_object_paint_plan(&scene, &expected).unwrap();
+    let witness = prepare_object_viewport_composition(&plan, &expected, None).unwrap();
+    assert_eq!(witness.context_id(), context);
+    let projection = witness.subselect_read_projection(layer, None, hit)?.with_presentation("native-work-1".into(), 1).unwrap();
+    let mut view = json!({"kind":"subselect","contextId":context,"layerUid":layer,"frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"limit":8});
+    if hit { view["hitTest"] = json!(true); }
+    let request = json!({"apiVersion":2,"requestId":"hit","instanceId":s.instance_id(),"documentId":s.document_id(),
+        "operation":"query.document.object","payload":{"atRevision":s.content_revision(),"documentSnapshotId":s.snapshot_id(),"view":view}});
+    let response = s.dispatch_with_subselect_view(serde_json::from_value(request).unwrap(), Ok(&projection)).unwrap();
+    let response = serde_json::to_value(response).unwrap();
+    assert_eq!(response["ok"], true, "{response}");
+    Ok(response["result"].clone())
+}
+
+#[test]
+fn select_lists_the_entered_components_records_and_reads_their_geometry() {
+    let owner = owner_of(&doc());
+    let listing = component_view(&owner, CTX, "inner", true).unwrap();
+    assert_eq!(listing["contextId"], CTX);
+    let items = listing["items"].as_array().unwrap();
+    assert_eq!(items.len(), 1, "{listing}");
+    assert_eq!(items[0]["stableTarget"]["contextId"], CTX);
+    assert_eq!(items[0]["stableTarget"]["layerUid"], "inner");
+    assert_eq!(items[0]["stableTarget"]["strokeId"], "c-a");
+    // The geometry read of the same record (what Select pages for the records its click reaches).
+    let s = owner.acquire_snapshot(owner.content_revision()).unwrap();
+    let request = json!({"apiVersion":2,"requestId":"geo","instanceId":s.instance_id(),"documentId":s.document_id(),
+        "operation":"query.document.object","payload":{"atRevision":s.content_revision(),"documentSnapshotId":s.snapshot_id(),
+        "stableTarget":items[0]["stableTarget"],"subselect":{"cursor":0,"limit":16,"hitTest":true}}});
+    let response = serde_json::to_value(s.dispatch(serde_json::from_value(request.clone()).unwrap()).unwrap()).unwrap();
+    assert_eq!(response["ok"], true, "{response}");
+    assert_eq!(response["result"]["subselect"]["stableTarget"]["contextId"], CTX);
+    assert_eq!(response["result"]["subselect"]["total"].as_u64().unwrap() as usize, items[0]["count"].as_u64().unwrap() as usize);
+    // The editable read of a component record stays refused; the scene root is listed as before.
+    let mut editable = request.clone();
+    editable["payload"]["subselect"] = json!({"cursor":0,"limit":16});
+    let refused = serde_json::to_value(s.dispatch(serde_json::from_value(editable).unwrap()).unwrap()).unwrap();
+    assert_eq!(refused["ok"], false, "{refused}");
+    assert!(component_view(&owner, CTX, "inner", false).is_err(), "the editable listing is scene-root only");
+    let scene = component_view(&owner, "scene-root", "L1", true).unwrap();
+    assert_eq!(scene["contextId"], "scene-root");
+}

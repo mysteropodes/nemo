@@ -62,6 +62,10 @@ fn layer_matrices(
     hit: bool,
 ) -> Result<BTreeMap<usize, [f64; 6]>, &'static str> {
     let layer = &packet.source_layers()[index];
+    // #2256: Select's hit-test listing reads an entered component like the scene; the editable (Subselect) listing stays scene-root.
+    if !hit && packet.context_id() != "scene-root" {
+        return Err("Subselect editing is unavailable inside a component");
+    }
     if layer.three_d.value() == Some(&true)
         || layer.rig().is_some()
         || packet
@@ -89,7 +93,7 @@ fn layer_matrices(
     }
     let mut rest = Vec::new();
     for source in &sources {
-        record::admit(packet.snapshot().document(), source.record())
+        record::admit_layer(packet.snapshot().document(), source.record(), layer)
             .map_err(|_| "Subselect geometry consumer is unavailable")?;
         if !hit && (source.record().is_mask() || record_layer_has_active_path_fx(packet, source.record())) {
             return Err("Subselect mask or path effect is unavailable");

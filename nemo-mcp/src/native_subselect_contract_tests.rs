@@ -325,3 +325,35 @@ fn a_hit_test_page_may_be_shorter_than_the_limit_when_the_engine_shortened_it_to
     last["total"] = json!(5);
     assert!(public_read(&q, &last), "the final short page");
 }
+
+#[test]
+fn a_hit_test_listing_and_geometry_may_name_the_entered_component_but_never_free_text() {
+    let comp = |id: &str| json!({"contextId":id,"layerUid":"inner","frameScope":{"kind":"authored","frame":0},"strokeId":"c-a"});
+    let listing = |id: &str| {
+        let view = json!({"kind":"subselect","contextId":id,"layerUid":"inner","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"limit":8,"hitTest":true});
+        let q = json!({"atRevision":7,"documentSnapshotId":"native-object:document:7","view":view});
+        let r = json!({"kind":"subselect","atRevision":7,"documentSnapshotId":"native-object:document:7","contextId":id,"layerUid":"inner","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"total":1,"nextCursor":null,"preview":false,"hitTest":true,
+            "items":[{"stableTarget":comp(id),"closed":true,"count":4,"matrix":[1,0,0,1,0,0],"bounds":[0.0,0.0,10.0,10.0],"role":"plain","filled":false}]});
+        (q, r)
+    };
+    let (q, r) = listing("comp-a");
+    assert!(view_request(&q) && public_read(&q, &r), "the presented component's listing");
+    for bad in ["", "two words", "a;b"] {
+        let (q, r) = listing(bad);
+        assert!(!view_request(&q) && !public_read(&q, &r), "{bad:?} is not a context id");
+    }
+    let (q, mut r) = listing("comp-a");
+    r["items"][0]["stableTarget"] = comp("comp-b");
+    assert!(!public_read(&q, &r), "an item names the listing's own context");
+    let mut geometry = json!({"atRevision":7,"documentSnapshotId":"native-object:document:7","stableTarget":comp("comp-a"),"subselect":{"cursor":0,"limit":16,"hitTest":true}});
+    assert!(request(&geometry));
+    let mut answer = page();
+    answer["subselect"]["stableTarget"] = comp("comp-a");
+    answer["subselect"]["hitTest"] = json!(true);
+    assert!(public_read(&geometry, &answer));
+    geometry["stableTarget"]["contextId"] = json!("a b");
+    assert!(!request(&geometry));
+    // The edit intent keeps the scene root.
+    let edit = json!({"command":"object.subselect.edit","stableTarget":comp("comp-a"),"intent":{"kind":"move","indices":[0],"delta":[1,2]}});
+    assert!(!edit_request(&edit));
+}

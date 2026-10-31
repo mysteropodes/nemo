@@ -4,14 +4,25 @@ use super::{exact, frame, revision};
 use serde_json::Value;
 
 fn target(value: &Value) -> bool {
+    target_in(value, false)
+}
+/// #2256: the target of a presented-stroke read (Select's hit-test view and geometry in an entered component): the scene root, or the id of
+/// a component context. Only the native owner knows which components the document declares; this bounds the shape.
+pub(super) fn view_target(value: &Value) -> bool {
+    target_in(value, true)
+}
+fn target_in(value: &Value, component: bool) -> bool {
     exact(
         value,
         &["contextId", "frameScope", "layerUid", "strokeId"],
         &[],
     )
     .is_some_and(|value| {
-        value.get("contextId").and_then(Value::as_str) == Some("scene-root")
-            && ["layerUid", "strokeId"].iter().all(|key| {
+        (if component {
+            value.get("contextId").is_some_and(crate::native_contract::vector::context)
+        } else {
+            value.get("contextId").and_then(Value::as_str) == Some("scene-root")
+        }) && ["layerUid", "strokeId"].iter().all(|key| {
                 value
                     .get(*key)
                     .and_then(Value::as_str)
