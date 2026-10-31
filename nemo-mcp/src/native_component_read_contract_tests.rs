@@ -55,6 +55,15 @@ fn instances_result() -> Value {
             "items":[{"layerUid":"ly_1"},{"layerUid":"ly_2"}]}),
     )
 }
+fn duplicator_result() -> Value {
+    with(
+        head("duplicator"),
+        json!({"layerUid":"ly_dup","mode":"radial","rows":2,"cols":3,"spacingX":150.5,"spacingY":-20,"count":8,"radius":200,
+            "startAngle":0,"radialOrient":true,"pathAlignTangent":false,"pathLayerUid":null,"seed":4242,"sourceMode":"shape",
+            "staggerRandom":{"position":true,"rotation":false,"scale":false,"opacity":false,"hue":true},
+            "timeOffset":{"enabled":true,"offsetFrames":2.5,"direction":"centerOut"}}),
+    )
+}
 fn good_cases() -> Vec<(Value, Value)> {
     vec![
         (contexts(), contexts_result()),
@@ -69,6 +78,10 @@ fn good_cases() -> Vec<(Value, Value)> {
         (
             json!({"kind":"instances","contextId":"sym_a","cursor":1,"limit":16}),
             instances_result(),
+        ),
+        (
+            json!({"kind":"duplicator","layerUid":"ly_dup"}),
+            duplicator_result(),
         ),
     ]
 }

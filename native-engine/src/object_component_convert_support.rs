@@ -112,6 +112,8 @@ pub(crate) enum SetupError {
     PathChained(String),
     PathUnknown(String),
     SeedRange,
+    /// A duplicator setting outside its closed set (a mode or direction label).
+    ConfigInvalid,
     IdUnavailable,
     RevisionOutOfRange,
     TooMany,

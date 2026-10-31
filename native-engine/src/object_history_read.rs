@@ -123,7 +123,7 @@ pub(crate) fn label_for(operation: &str, payload: &Value) -> String {
         "rig.pose" => "Rig Pose",
         "widget.create" | "widget.settings" | "widget.write" => "Edit Widget",
         "component.convert" | "component.expose" | "component.place" => "Component",
-        "duplicator.objects" | "duplicator.path" | "duplicator.set" => "Duplicator",
+        "duplicator.config" | "duplicator.objects" | "duplicator.path" | "duplicator.set" => "Duplicator",
         "brush.bitmap.stroke" | "brush.bitmap.publish" => "Brush Stroke",
         "asset.attach" => "Attach Asset",
         "asset.remove" => "Remove Asset",

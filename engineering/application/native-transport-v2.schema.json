@@ -4423,6 +4423,102 @@
         }
       }
     },
+    "ObjectDuplicatorConfigPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.duplicator.config"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectComponentId"
+        },
+        "mode": {
+          "enum": [
+            "grid",
+            "radial",
+            "path"
+          ]
+        },
+        "rows": {
+          "type": "number"
+        },
+        "cols": {
+          "type": "number"
+        },
+        "spacingX": {
+          "type": "number"
+        },
+        "spacingY": {
+          "type": "number"
+        },
+        "count": {
+          "type": "number"
+        },
+        "radius": {
+          "type": "number"
+        },
+        "startAngle": {
+          "type": "number"
+        },
+        "radialOrient": {
+          "type": "boolean"
+        },
+        "pathAlignTangent": {
+          "type": "boolean"
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "staggerRandom": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "position": {
+              "type": "boolean"
+            },
+            "rotation": {
+              "type": "boolean"
+            },
+            "scale": {
+              "type": "boolean"
+            },
+            "opacity": {
+              "type": "boolean"
+            },
+            "hue": {
+              "type": "boolean"
+            }
+          }
+        },
+        "timeOffset": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "offsetFrames": {
+              "type": "number"
+            },
+            "direction": {
+              "enum": [
+                "forward",
+                "backward",
+                "centerOut",
+                "random"
+              ]
+            }
+          }
+        }
+      }
+    },
     "ObjectEditId": {
       "type": "string",
       "minLength": 1,
@@ -7437,6 +7533,23 @@
                 },
                 "payload": {
                   "$ref": "#/$defs/ObjectDuplicatorPathPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.duplicator.config"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectDuplicatorConfigPayload"
                 }
               }
             }
@@ -18571,11 +18684,29 @@
                   "maximum": 16
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "layerUid"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "duplicator"
+                },
+                "layerUid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
             }
           ]
         }
       },
-      "description": "Read-only component model pinned to (atRevision, documentSnapshotId): the contexts of the document, one context's summary, its layers, or the scene layers that instance one component. Paged and byte-bounded; no expectedRevision."
+      "description": "Read-only component model pinned to (atRevision, documentSnapshotId): the contexts of the document, one context's summary, its layers, the scene layers that instance one component, or the stored duplicator descriptor of one scene layer. Paged and byte-bounded; no expectedRevision."
     },
     "ObjectComponentReadResult": {
       "oneOf": [
@@ -18905,6 +19036,153 @@
                   "$ref": "#/$defs/Revision"
                 }
               ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "layerUid",
+            "mode",
+            "rows",
+            "cols",
+            "spacingX",
+            "spacingY",
+            "count",
+            "radius",
+            "startAngle",
+            "radialOrient",
+            "pathAlignTangent",
+            "pathLayerUid",
+            "seed",
+            "sourceMode",
+            "staggerRandom",
+            "timeOffset"
+          ],
+          "properties": {
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "kind": {
+              "const": "duplicator"
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "mode": {
+              "enum": [
+                "grid",
+                "radial",
+                "path"
+              ]
+            },
+            "rows": {
+              "type": "number"
+            },
+            "cols": {
+              "type": "number"
+            },
+            "spacingX": {
+              "type": "number"
+            },
+            "spacingY": {
+              "type": "number"
+            },
+            "count": {
+              "type": "number"
+            },
+            "radius": {
+              "type": "number"
+            },
+            "startAngle": {
+              "type": "number"
+            },
+            "radialOrient": {
+              "type": "boolean"
+            },
+            "pathAlignTangent": {
+              "type": "boolean"
+            },
+            "pathLayerUid": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "sourceMode": {
+              "enum": [
+                "shape",
+                "objects"
+              ]
+            },
+            "staggerRandom": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "position",
+                "rotation",
+                "scale",
+                "opacity",
+                "hue"
+              ],
+              "properties": {
+                "position": {
+                  "type": "boolean"
+                },
+                "rotation": {
+                  "type": "boolean"
+                },
+                "scale": {
+                  "type": "boolean"
+                },
+                "opacity": {
+                  "type": "boolean"
+                },
+                "hue": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "timeOffset": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "enabled",
+                "offsetFrames",
+                "direction"
+              ],
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "offsetFrames": {
+                  "type": "number"
+                },
+                "direction": {
+                  "enum": [
+                    "forward",
+                    "backward",
+                    "centerOut",
+                    "random"
+                  ]
+                }
+              }
             }
           }
         }

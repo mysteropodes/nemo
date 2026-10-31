@@ -32,6 +32,9 @@ fn selector(value: &Value) -> bool {
             exact(value, &["kind", "contextId", "cursor", "limit"], &[])
                 .is_some_and(|o| context_id(o.get("contextId")).is_some() && page(o))
         }
+        // #2256 Q4: the stored duplicator descriptor of one scene layer.
+        Some("duplicator") => exact(value, &["kind", "layerUid"], &[])
+            .is_some_and(|o| context_id(o.get("layerUid")).is_some()),
         _ => false,
     }
 }
@@ -225,8 +228,75 @@ pub(crate) fn result(payload: &Value, value: &Value) -> bool {
                 && wanted.get("contextId").is_some_and(|id| id != SCENE)
                 && paged(o, wanted, "instanceCount", &|e, _| instance_item(e))
         }),
+        "duplicator" => exact(
+            value,
+            &with(&[
+                "layerUid",
+                "mode",
+                "rows",
+                "cols",
+                "spacingX",
+                "spacingY",
+                "count",
+                "radius",
+                "startAngle",
+                "radialOrient",
+                "pathAlignTangent",
+                "pathLayerUid",
+                "seed",
+                "sourceMode",
+                "staggerRandom",
+                "timeOffset",
+            ]),
+            &[],
+        )
+        .is_some_and(|o| {
+            pins(o) && o.get("layerUid") == wanted.get("layerUid") && duplicator_view(o)
+        }),
         _ => false,
     }
+}
+
+const DUP_MODES: [&str; 3] = ["grid", "radial", "path"];
+const DUP_DIRECTIONS: [&str; 4] = ["forward", "backward", "centerOut", "random"];
+const DUP_CHANNELS: [&str; 5] = ["position", "rotation", "scale", "opacity", "hue"];
+fn finite(value: Option<&Value>) -> bool {
+    value.and_then(Value::as_f64).is_some_and(f64::is_finite)
+}
+/// The duplicator view: the panel's fields with their baseline display defaults, closed members only.
+fn duplicator_view(o: &Map<String, Value>) -> bool {
+    let label = |key: &str, allowed: &[&str]| {
+        o.get(key)
+            .and_then(Value::as_str)
+            .is_some_and(|v| allowed.contains(&v))
+    };
+    let flags = |value: Option<&Value>, keys: &[&str]| {
+        value.is_some_and(|v| {
+            exact(v, keys, &[]).is_some_and(|m| keys.iter().all(|k| m[*k].is_boolean()))
+        })
+    };
+    let time = o.get("timeOffset").is_some_and(|v| {
+        exact(v, &["enabled", "offsetFrames", "direction"], &[]).is_some_and(|m| {
+            m["enabled"].is_boolean()
+                && finite(m.get("offsetFrames"))
+                && m["direction"]
+                    .as_str()
+                    .is_some_and(|d| DUP_DIRECTIONS.contains(&d))
+        })
+    });
+    label("mode", &DUP_MODES)
+        && label("sourceMode", &["shape", "objects"])
+        && ["rows", "cols", "spacingX", "spacingY", "count", "radius", "startAngle"]
+            .iter()
+            .all(|k| finite(o.get(*k)))
+        && o.get("seed").and_then(Value::as_u64).is_some_and(|s| s <= u64::from(u32::MAX))
+        && ["radialOrient", "pathAlignTangent"]
+            .iter()
+            .all(|k| o.get(*k).is_some_and(Value::is_boolean))
+        && o.get("pathLayerUid")
+            .is_some_and(|p| p.is_null() || context_id(Some(p)).is_some())
+        && flags(o.get("staggerRandom"), &DUP_CHANNELS)
+        && time
 }
 
 /// Owner and revision correlation of a successful envelope: same request, instance and document (a refusal may report

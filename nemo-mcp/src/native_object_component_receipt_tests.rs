@@ -132,7 +132,7 @@ fn the_catalog_declares_each_operation_once_under_two_owner_descriptors() {
         assert_eq!(descriptor["resourceBoundary"]["maxRequestBytes"], 4096);
         declared += 1;
     }
-    assert_eq!(declared, 6);
+    assert_eq!(declared, 7);
 }
 
 #[test]
@@ -163,7 +163,7 @@ fn every_descriptor_example_is_a_valid_request_with_a_correlated_valid_response(
             seen += 1;
         }
     }
-    assert_eq!(seen, 6, "one copyable example per declared operation");
+    assert_eq!(seen, 7, "one copyable example per declared operation");
 }
 
 #[test]

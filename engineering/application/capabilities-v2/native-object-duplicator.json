@@ -12,7 +12,8 @@
   "operations": [
     "command.document.object.duplicator.set",
     "command.document.object.duplicator.objects",
-    "command.document.object.duplicator.path"
+    "command.document.object.duplicator.path",
+    "command.document.object.duplicator.config"
   ],
   "input": {
     "oneOf": [
@@ -24,6 +25,9 @@
       },
       {
         "$ref": "../native-transport-v2.schema.json#/$defs/ObjectDuplicatorPathPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectDuplicatorConfigPayload"
       }
     ]
   },
@@ -37,7 +41,7 @@
     "maxReadResponseBytes": 4096,
     "policy": "Complete correlated retained receipt or typed refusal; no document or resource payload. Requests above 4096 encoded bytes are refused, never split."
   },
-  "semantics": "Enable or disable a layer duplicator (enabling writes the baseline default descriptor with the supplied seed 0..999999 and locks the layer, disabling removes it and unlocks the layer), convert a selection of layers into an object duplicator host (the pooled layers are hidden, the host is a new locked layer), and set or clear the path layer of a duplicator, as sealed transactions through the single native owner. One revision and one undo entry per applied edit; asking for the state a layer already has publishes nothing. Placement, count, modes and effectors are evaluated by the native engine, never by the caller. No JS/Paper writer or optimistic mutation.",
+  "semantics": "Enable or disable a layer duplicator (enabling writes the baseline default descriptor with the supplied seed 0..999999 and locks the layer, disabling removes it and unlocks the layer), convert a selection of layers into an object duplicator host (the pooled layers are hidden, the host is a new locked layer), set or clear the path layer of a duplicator, and edit the stored descriptor from the inspector panel (config: any of mode grid|radial|path, rows and cols clamped to 1..30, count clamped to 1..500, spacingX, spacingY, radius, startAngle, radialOrient, pathAlignTangent, seed 0..999999, staggerRandom {position, rotation, scale, opacity, hue} and timeOffset {enabled, offsetFrames, direction forward|backward|centerOut|random}; only the named members change, a value equal to the stored one publishes nothing, a layer without a duplicator is not_found), as sealed transactions through the single native owner. One revision and one undo entry per applied edit; asking for the state a layer already has publishes nothing. Placement, count, modes and effectors are evaluated by the native engine, never by the caller. No JS/Paper writer or optimistic mutation.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",
@@ -138,6 +142,40 @@
       "response": {
         "apiVersion": 2,
         "requestId": "duplicator-duplicator-path-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Shared native duplicator.config command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "duplicator-duplicator-config-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.duplicator.config",
+        "payload": {
+          "command": "object.duplicator.config",
+          "layerUid": "layer-a",
+          "mode": "radial",
+          "count": 12,
+          "radius": 240,
+          "timeOffset": {
+            "enabled": true,
+            "direction": "centerOut"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "duplicator-duplicator-config-7",
         "instanceId": "instance-A",
         "documentId": "document-A",
         "contentRevision": 8,

@@ -12,7 +12,8 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
   const OP = 'query.document.object.component.read', SCENE = 'scene-root', MAX_PAGE = 16, MAX_ID = 128;
-  const KINDS = ['contexts', 'context', 'layers', 'instances'];
+  const KINDS = ['contexts', 'context', 'layers', 'instances', 'duplicator'];
+  const DUP_MODES = ['grid', 'radial', 'path'], DUP_DIRECTIONS = ['forward', 'backward', 'centerOut', 'random'], DUP_CHANNELS = ['position', 'rotation', 'scale', 'opacity', 'hue'];
   const LAYER_KINDS = ['drawing', 'folder', 'effect', 'widget', 'null', 'instance'];
   const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
   const has = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
@@ -33,6 +34,8 @@
   function selectorOk(selector) {
     if (!selector || typeof selector !== 'object' || !KINDS.includes(selector.kind)) fail('invalid component read selector');
     if (selector.kind === 'contexts') { exact(selector, ['kind', 'cursor', 'limit'], 'component selector'); pageArgs(selector); return; }
+    // #2256 Q4: the stored duplicator descriptor of one scene layer (its layer uid is a context-style identity).
+    if (selector.kind === 'duplicator') { exact(selector, ['kind', 'layerUid'], 'component selector'); if (!idText(selector.layerUid)) fail('invalid duplicator layer uid'); return; }
     if (selector.kind === 'context') exact(selector, ['kind', 'contextId'], 'component selector');
     else { exact(selector, ['kind', 'contextId', 'cursor', 'limit'], 'component selector'); pageArgs(selector); }
     if (!idText(selector.contextId)) fail('invalid component context id');
@@ -71,6 +74,21 @@
     if (value.nextCursor === null ? end < count : !(revision(value.nextCursor) && value.nextCursor === end && end < count && items.length > 0)) fail('invalid component next cursor');
     items.forEach((item, at) => each(item, cursor === 0 && at === 0));
   }
+  // The duplicator view: the panel's fields with their baseline display defaults, closed members only.
+  function duplicatorView(value, head, selector) {
+    exact(value, head.concat(['layerUid', 'mode', 'rows', 'cols', 'spacingX', 'spacingY', 'count', 'radius', 'startAngle', 'radialOrient', 'pathAlignTangent',
+      'pathLayerUid', 'seed', 'sourceMode', 'staggerRandom', 'timeOffset']), 'component duplicator result');
+    const finite = (n) => typeof n === 'number' && Number.isFinite(n);
+    if (!idText(value.layerUid) || (selector && value.layerUid !== selector.layerUid)) fail('component read result names another layer');
+    if (!DUP_MODES.includes(value.mode) || !['shape', 'objects'].includes(value.sourceMode)) fail('invalid duplicator mode');
+    if (!['rows', 'cols', 'spacingX', 'spacingY', 'count', 'radius', 'startAngle'].every((key) => finite(value[key]))) fail('invalid duplicator number');
+    if (!uint32(value.seed) || typeof value.radialOrient !== 'boolean' || typeof value.pathAlignTangent !== 'boolean') fail('invalid duplicator flags');
+    if (!(value.pathLayerUid === null || idText(value.pathLayerUid))) fail('invalid duplicator path layer');
+    exact(value.staggerRandom, DUP_CHANNELS, 'duplicator staggerRandom');
+    if (!DUP_CHANNELS.every((key) => typeof value.staggerRandom[key] === 'boolean')) fail('invalid duplicator staggerRandom');
+    exact(value.timeOffset, ['enabled', 'offsetFrames', 'direction'], 'duplicator timeOffset');
+    if (typeof value.timeOffset.enabled !== 'boolean' || !finite(value.timeOffset.offsetFrames) || !DUP_DIRECTIONS.includes(value.timeOffset.direction)) fail('invalid duplicator timeOffset');
+  }
   function result(operation, value, request) {
     if (operation !== OP) fail('component read operation is not declared');
     if (!value || typeof value !== 'object' || !KINDS.includes(value.kind)) fail('invalid component read result');
@@ -88,6 +106,7 @@
       if (value.contextId === SCENE) fail('the scene is not instanced');
       pagedCall('instanceCount', instanceItem); return;
     }
+    if (value.kind === 'duplicator') { duplicatorView(value, head, selector); return; }
     exact(value, head.concat(['contextId', 'contextKind', 'name', 'totalFrames', 'layerCount', 'fps', 'instanceCount', 'exposedPropertyCount', 'hasCameraKeys']), 'component context result');
     sameContext();
     const scene = value.contextId === SCENE;
