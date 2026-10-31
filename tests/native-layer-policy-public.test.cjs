@@ -8,7 +8,7 @@ const descriptor=JSON.parse(fs.readFileSync(path.join(root,'engineering/applicat
 test('F06 descriptor and closed schema declare one exact revisioned flag command',()=>{
  const schema=JSON.parse(fs.readFileSync(path.join(root,'engineering/application/native-transport-v2.schema.json'),'utf8'));
  assert.deepEqual(descriptor.operations,[OP]);assert.equal(descriptor.id,'native.layer-policy');assert.equal(descriptor.authority.adapterOwnsWritableMirror,false);assert.equal(descriptor.authority.fallback,'none');
- const def=schema.$defs.ObjectLayerPolicyPayload;assert.equal(def.additionalProperties,false);assert.deepEqual(def.required,['command','layerUid','flag','value']);assert.deepEqual(def.properties.flag.enum,['locked','shy']);assert.equal(def.properties.value.type,'boolean');
+ const def=schema.$defs.ObjectLayerPolicyPayload;assert.equal(def.additionalProperties,false);assert.deepEqual(def.required,['command','layerUid','flag','value']);assert.deepEqual(def.properties.flag.enum,['locked','shy','keyLock']);assert.deepEqual(def.oneOf.map(b=>b.properties.flag.enum||b.properties.flag.const),[['locked','shy'],'keyLock']);assert.equal(def.oneOf[0].properties.value.type,'boolean');assert.deepEqual(def.properties.value.oneOf.map(v=>v.type||v.enum),['boolean','null',['in','out','layer']]);
  const branches=schema.$defs.Request.oneOf.filter(v=>v.allOf[1].properties.operation.const===OP);assert.equal(branches.length,1);assert.equal(branches[0].allOf[0].$ref,'#/$defs/RequiredRevisionRequest');assert.equal(branches[0].allOf[1].properties.payload.$ref,'#/$defs/ObjectLayerPolicyPayload');
  assert.equal(descriptor.examples[0].request.operation,OP);assert.equal(descriptor.examples[0].request.payload.flag,'locked');assert.equal(descriptor.examples[0].response.result.historyEntriesAdded,1);
 });
@@ -18,6 +18,18 @@ test('SDK explicit policy method validates both flags and changed/noop correlate
   const adapter=SDK.createNativeApplicationAdapter('policy-test',{dispatch(value){sent=value;return reply(value,applied);}});
   const response=await adapter.editLayerPolicy(q);assert.deepEqual(sent,original);assert.notEqual(sent,q);assert.deepEqual(q,original);assert.deepEqual(response,reply(q,applied));
  }
+});
+test('D37 SDK policy method carries the layer key-lock mode, null clears, and flag and value types never cross',async()=>{
+ for(const value of ['in','out','layer',null]){
+  const q=request('keyLock',value);let sent;
+  const adapter=SDK.createNativeApplicationAdapter('policy-test',{dispatch(v){sent=v;return reply(v,true);}});
+  assert.deepEqual(await adapter.editLayerPolicy(q),reply(q,true));assert.equal(sent.payload.flag,'keyLock');assert.equal(sent.payload.value,value);
+ }
+ let calls=0;const adapter=SDK.createNativeApplicationAdapter('policy-test',{dispatch(){calls++;throw Error('must not dispatch');}});
+ for(const [flag,value] of [['keyLock',true],['keyLock',false],['keyLock','both'],['keyLock',''],['keyLock',0],['keyLock',['in']],['keyLock',{in:1}],['locked',null],['locked','in'],['shy','layer']])assert.throws(()=>adapter.editLayerPolicy(request(flag,value)),TypeError,flag+':'+JSON.stringify(value));
+ assert.equal(calls,0);
+ assert.equal(descriptor.examples.some(e=>e.request.payload.flag==='keyLock'),true);
+ for(const e of descriptor.examples){assert.doesNotThrow(()=>SDK.validateRequest(e.request));assert.doesNotThrow(()=>SDK.validateResponse(e.response,e.request.requestId,OP));}
 });
 test('SDK policy request rejects open/missing/null/positional fields and unsupported flags before transport',()=>{
  let calls=0;const adapter=SDK.createNativeApplicationAdapter('policy-test',{dispatch(){calls++;throw Error('must not dispatch');}});

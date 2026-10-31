@@ -1,9 +1,9 @@
 /* Ordinary native authored-key inspector. Ports supply correlated D11 reads and
  * acknowledged D12 inner receipts; this component owns only DOM and selection. */
 (function(root,factory){
-  var api=factory(typeof module==='object'&&module.exports?require('./native-motion-property-view.js'):root.NemoNativeMotionPropertyView);
+  var node=typeof module==='object'&&module.exports,api=factory(node?require('./native-motion-property-view.js'):root.NemoNativeMotionPropertyView,node?require('./native-motion-key-lock-menu.js'):root.NemoNativeMotionKeyLockMenu);
   if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeMotionPropertyKeys=api;
-}(typeof globalThis==='object'?globalThis:this,function(View){
+}(typeof globalThis==='object'?globalThis:this,function(View,LockMenu){
   'use strict';
   function object(v){return !!v&&typeof v==='object'&&!Array.isArray(v);}
   function exact(v,required,optional){return object(v)&&required.every(function(k){return Object.prototype.hasOwnProperty.call(v,k);})&&Object.keys(v).every(function(k){return required.includes(k)||(optional||[]).includes(k);});}
@@ -82,6 +82,22 @@
     var percent=make('input','');percent.type='number';percent.step='any';percent.setAttribute('aria-label','Key influence percent');toolbar.appendChild(percent);
     function influence(side,label){var n=make('button',label);n.type='button';listen(n,'click',function(){var raw=String(percent.value),number=Number(raw);if(!raw.trim()||!Number.isFinite(number)){status.textContent='Enter a finite influence percentage.';return false;}return apply({kind:'influence',side:side,percent:number});});toolbar.appendChild(n);actionNodes.push(n);}
     influence('in','Incoming influence');influence('out','Outgoing influence');button('Subdivide',{kind:'subdivide'});
+    // D37: the baseline per-key "Lock keyframes on:" menu. Items read the selected keys' native lockTo; a pick is one track edit that
+    // is refused when the view, the read or the selection changed after the menu opened.
+    var lockButton=make('button',LockMenu?LockMenu.title({SM:{t:ports.translate}})+'…':'Lock keys…');lockButton.type='button';
+    listen(lockButton,'click',function(){var box=lockButton.getBoundingClientRect?lockButton.getBoundingClientRect():null;return openLockMenu(box?box.left:0,box?box.bottom+2:0);});
+    toolbar.appendChild(lockButton);actionNodes.push(lockButton);
+    function openLockMenu(x,y){
+      var value=accepted,ticket=serial,epoch=selectionEpoch,show=ports.showContextMenu;
+      if(busy||!value||!current(value,ticket)||!selected.size||typeof ports.editPropertyTrack!=='function'||typeof show!=='function'||!LockMenu){status.textContent='Native key lock is unavailable or stale.';return false;}
+      var frames=Array.from(selected),keys=value.items.filter(function(k){return selected.has(k.frame);});
+      if(!keys.length||keys.length!==frames.length)return refuse('Native key selection is stale.');
+      function active(mode){return keys.every(function(k){return k.lockTo===mode;});}
+      show(x,y,LockMenu.items({SM:{t:ports.translate}},active,function(next){
+        if(busy||accepted!==value||serial!==ticket||selectionEpoch!==epoch||!current(value,ticket)){status.textContent='Native key selection changed; open the lock menu again.';return false;}
+        return apply({kind:'lockTo',mode:next});
+      }));return true;
+    }
     var cancelButton=make('button','Cancel key read');cancelButton.type='button';listen(cancelButton,'click',cancel);toolbar.appendChild(cancelButton);
     function render(value,ticket){
       clearRows();
@@ -95,6 +111,7 @@
           if(check.checked)selected.add(k.frame);else selected.delete(k.frame);
           selectionEpoch++;status.textContent=selected.size+' native key(s) selected.';controls();timelineChanged('selection');
         },rowBindings);
+        listen(label,'contextmenu',function(event){if(!selected.has(k.frame)||typeof ports.showContextMenu!=='function')return;if(event.preventDefault)event.preventDefault();openLockMenu((event.clientX||0)+8,(event.clientY||0)+8);},rowBindings);
         checks.push({frame:k.frame,node:check});label.appendChild(check);label.appendChild(text);rows.appendChild(label);
       });
       status.textContent=!value.trackPresent?'No authored track.':!value.items.length?'Authored track is empty.':typeof ports.editPropertyTrack!=='function'?'Authored keys are read-only; native track editor unavailable.':value.items.length+' authored key(s). Select up to 32.';

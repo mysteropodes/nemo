@@ -410,3 +410,7 @@ mod comments_tests;
 #[cfg(test)]
 #[path = "native_import_batch_dispatch_tests.rs"]
 mod import_batch_tests;
+
+#[cfg(test)]
+#[path = "native_key_lock_dispatch_tests.rs"]
+mod key_lock_tests;

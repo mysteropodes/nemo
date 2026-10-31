@@ -157,6 +157,7 @@
     {"src":"js/domain/animation/expression-random.js"},
     {"src":"js/adapters/motion-canvas-intent.js"},
     {"src":"js/adapters/native-motion-property-view.js"},
+    {"src":"js/adapters/native-motion-key-lock-menu.js"},
     {"src":"js/adapters/native-motion-property-keys.js"},
     {"src":"js/adapters/native-motion-property-value.js"},
     {"src":"js/adapters/native-motion-property-panel.js"},

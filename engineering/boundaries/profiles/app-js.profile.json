@@ -3341,6 +3341,7 @@
         "native-motion-property-panel.js",
         "native-motion-property-binding.js",
         "native-motion-property-keys.js",
+        "native-motion-key-lock-menu.js",
         "native-motion-property-value.js",
         "native-motion-control-rows.js"
       ],

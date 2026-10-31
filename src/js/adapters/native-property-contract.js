@@ -149,6 +149,10 @@
         // Native baseline clamps finite percentages; transport must preserve the input.
       } else if (action.kind === 'subdivide') {
         exact(action, ['kind'], [], 'property key subdivision');
+      } else if (action.kind === 'lockTo') {
+        // D37: per-key standing lock; null clears. Required, never defaulted.
+        exact(action, ['kind', 'mode'], [], 'property key lock');
+        if (action.mode !== null && !['in', 'out', 'layer'].includes(action.mode)) throw new TypeError('invalid property key lock mode');
       } else {
         throw new TypeError('unsupported property track action');
       }

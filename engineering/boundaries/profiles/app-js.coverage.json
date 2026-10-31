@@ -4618,6 +4618,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-motion-key-lock-menu.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-motion-property-keys.js",
       "moduleId": "app.native.motion.properties.adapter",
       "executionClass": "document-classic",
