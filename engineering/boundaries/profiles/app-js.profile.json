@@ -2043,6 +2043,54 @@
       ]
     },
     {
+      "id": "app.keyboard.arbiter",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "keyboard-arbiter.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "keyboard-arbiter.js"
+      ]
+    },
+    {
+      "id": "app.tool.holds",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "tool-holds.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "tool-holds.js"
+      ]
+    },
+    {
+      "id": "app.shortcut.pane",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "shortcut-pane.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "shortcut-pane.js"
+      ]
+    },
+    {
+      "id": "app.tool.rail",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "tool-rail.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "tool-rail.js"
+      ]
+    },
+    {
       "id": "app.project.lifecycle",
       "layer": "application",
       "dir": "src/js/application",

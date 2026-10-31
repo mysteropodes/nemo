@@ -31,7 +31,8 @@ use crate::commands::object_fill_owner::object_frame_edit_document::{
 };
 use crate::commands::ObjectFillOwner;
 use crate::object_document::{
-    ObjectDocument, ObjectRecord, OrderElement, OrderScope, Presence, ProjectMetadata, TimingEdit,
+    FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget, OrderElement, OrderScope, Presence,
+    ProjectMetadata, RasterEntry, TextEntry, TimingEdit,
 };
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
@@ -97,7 +98,46 @@ fn elements_at<'a>(document: &'a ObjectDocument, layer: &str, frame: u32) -> Vec
         .filter(|element| element.layer_uid == layer)
         .collect()
 }
-/// The frames of `from..=to` where the layer already has authored records or ordered elements.
+/// A scene-root authored item (raster image or text block) target of `layer`, on `frame` when one is given.
+fn item_target(target: &ObjectTarget, layer: &str, frame: u32) -> bool {
+    target.context_id == CONTEXT
+        && target.frame_scope.kind == FrameScopeKind::Authored
+        && target.layer_uid == layer
+        && target.frame_scope.frame == frame
+}
+/// The layer's raster images and text blocks at `frame`, retargeted to `to`, in stored order.
+fn items_at(
+    document: &ObjectDocument,
+    layer: &str,
+    frame: u32,
+    to: u32,
+) -> (Vec<RasterEntry>, Vec<TextEntry>) {
+    let Some(items) = document.item_records() else {
+        return (Vec::new(), Vec::new());
+    };
+    let raster = items
+        .raster_entries()
+        .iter()
+        .filter(|entry| item_target(&entry.target, layer, frame))
+        .cloned()
+        .map(|mut entry| {
+            entry.target.frame_scope.frame = to;
+            entry
+        })
+        .collect();
+    let text = items
+        .text_entries()
+        .iter()
+        .filter(|entry| item_target(&entry.target, layer, frame))
+        .cloned()
+        .map(|mut entry| {
+            entry.target.frame_scope.frame = to;
+            entry
+        })
+        .collect();
+    (raster, text)
+}
+/// The frames of `from..=to` where the layer already has authored records, items or ordered elements.
 fn occupied(document: &ObjectDocument, layer: &str, from: u32, to: u32) -> BTreeSet<u32> {
     let inside = |frame: u32| frame >= from && frame <= to;
     let mut frames: BTreeSet<u32> = document
@@ -110,6 +150,17 @@ fn occupied(document: &ObjectDocument, layer: &str, from: u32, to: u32) -> BTree
         })
         .map(|record| record.target.frame_scope.frame)
         .collect();
+    if let Some(items) = document.item_records() {
+        frames.extend(
+            items
+                .targets()
+                .filter(|target| {
+                    item_target(target, layer, target.frame_scope.frame)
+                        && inside(target.frame_scope.frame)
+                })
+                .map(|target| target.frame_scope.frame),
+        );
+    }
     for scope in scene_scopes(document) {
         if inside(scope.frame_scope.frame)
             && scope
@@ -122,8 +173,8 @@ fn occupied(document: &ObjectDocument, layer: &str, from: u32, to: u32) -> BTree
     }
     frames
 }
-/// True when the layer's cell at `dst` already is exactly what the cycle writes there: a copy of the records and the
-/// ordered elements of `source`, or nothing when the source is a hold. Such a cell is left alone, so a cycle that writes
+/// True when the layer's cell at `dst` already is exactly what the cycle writes there: a copy of the records, the raster
+/// images, the text blocks and the ordered elements of `source`, or nothing when the source is a hold. Such a cell is left alone, so a cycle that writes
 /// what is already there changes no byte.
 fn cell_is_written(document: &ObjectDocument, layer: &str, source: Option<u32>, dst: u32) -> bool {
     let have = records_at(document, layer, dst);
@@ -141,6 +192,11 @@ fn cell_is_written(document: &ObjectDocument, layer: &str, source: Option<u32>, 
             moved == **present
         })
         && elements_at(document, layer, dst) == want_elements
+        && items_at(document, layer, dst, dst)
+            == match source {
+                Some(source) => items_at(document, layer, source, dst),
+                None => (Vec::new(), Vec::new()),
+            }
 }
 
 /// Baseline `symbolId` layers are the real scene-root native component instances.

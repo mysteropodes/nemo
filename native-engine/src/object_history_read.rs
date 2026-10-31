@@ -41,11 +41,12 @@ fn capitalised(word: &str) -> String {
 
 /// The label of a command family or kind. `property.edit` names its property; the vector edit names
 /// its kind (`payload.command`); every other command is named by its operation.
-fn label_for(operation: &str, payload: &Value) -> String {
+pub(crate) fn label_for(operation: &str, payload: &Value) -> String {
     let name = operation
         .strip_prefix("command.document.object.")
         .unwrap_or(operation);
     let text = |key: &str| payload.get(key).and_then(Value::as_str);
+    let property_label;
     let label = match name {
         "property.edit" | "property.track.edit" => match text("property") {
             Some(p)
@@ -54,7 +55,9 @@ fn label_for(operation: &str, payload: &Value) -> String {
                     && p.bytes()
                         .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b)) =>
             {
-                return format!("Property: {}", capitalised(p));
+                // "Property: " plus a 24-character id exceeds MAX_LABEL, so this path truncates like every other.
+                property_label = format!("Property: {}", capitalised(p));
+                property_label.as_str()
             }
             _ => "Edit Property",
         },

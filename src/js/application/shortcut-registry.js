@@ -147,6 +147,17 @@ var NemoShortcutRegistry = (function () {
     return next;
   }
 
+  var KEY_NAMES = {' ': 'Space', arrowleft: '\u2190', arrowright: '\u2192', arrowup: '\u2191', arrowdown: '\u2193', escape: 'Esc'};
+
+  // Pure: how a stored key reads in a menu or status hint (U04a #2370) — 'f5' -> 'F5', 'j' -> 'J', 'home' -> 'Home'.
+  function displayKey(key) {
+    if (!key) return '';
+    var lk = String(key).toLowerCase();
+    if (KEY_NAMES[lk]) return KEY_NAMES[lk];
+    if (lk.length === 1 || /^f\d{1,2}$/.test(lk)) return lk.toUpperCase();
+    return lk.charAt(0).toUpperCase() + lk.slice(1);
+  }
+
   function loadOverrides(storage) {
     var raw = null;
     try { raw = storage.getItem(STORAGE_KEY); } catch (e) { return {}; }
@@ -164,6 +175,7 @@ var NemoShortcutRegistry = (function () {
   function create(ports) {
     var storage = ports && ports.storage;
     var onOverrideChanged = ports && ports.onOverrideChanged;
+    var onReset = ports && ports.onReset;
     var overrides = loadOverrides(storage);
 
     function setKey(action, key) {
@@ -172,17 +184,19 @@ var NemoShortcutRegistry = (function () {
       if (typeof onOverrideChanged === 'function') onOverrideChanged(action);
     }
 
-    // Matches the original reset button handler: clears state and storage
-    // only. It never called the badge-refresh port either — the modal list
-    // re-render was the caller's own job then, and stays so now.
+    // Clears state and storage. The modal list re-render is the caller's own
+    // job; the left-rail badges are refreshed through the optional onReset
+    // port (U06 #2370: without it a reset left every rebound letter on the rail).
     function reset() {
       overrides = {};
       try { storage.removeItem(STORAGE_KEY); } catch (e) { /* ignored, same as before */ }
+      if (typeof onReset === 'function') onReset();
     }
 
     return {
       defFor: defFor,
       keyFor: function (action) { return keyFor(overrides, action); },
+      hintFor: function (action) { return displayKey(keyFor(overrides, action)); },
       clashFor: function (action, key) { return clashFor(overrides, action, key); },
       setKey: setKey,
       reset: reset,
@@ -199,6 +213,7 @@ var NemoShortcutRegistry = (function () {
     keyFor: keyFor,
     clashFor: clashFor,
     withOverride: withOverride,
+    displayKey: displayKey,
     TOOL_SHORTCUTS: TOOL_SHORTCUTS,
     COMMAND_SHORTCUTS: COMMAND_SHORTCUTS,
     READONLY_SHORTCUTS: READONLY_SHORTCUTS,

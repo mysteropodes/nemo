@@ -103,9 +103,11 @@ function installInputs(f) {
     vm.runInContext(lines[0], context);
     assert.equal(f.nodes[id].count('click'), 1);
   }
-  const keyRegistration = "document.addEventListener('keydown',onKeyDown);";
+  // U05: timeline.js mounts its keydown/keyup pair once through the arbiter; the test mounts the extracted keydown the same way.
+  const keyRegistration = 'NemoKeyboardArbiter.mount(document,{keydown:onKeyDown,keyup:onKeyUp});';
   assert.equal(timeline.split(keyRegistration).length, 2);
-  vm.runInContext(keyRegistration, context);
+  context.NemoKeyboardArbiter = require('../src/js/application/keyboard-arbiter.js');
+  vm.runInContext('NemoKeyboardArbiter.mount(document,{keydown:onKeyDown});', context);
   assert.equal(document.count('keydown'), 1);
   return {
     navigate(id, frame) {

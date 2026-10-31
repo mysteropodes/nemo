@@ -434,3 +434,28 @@ fn an_image_alone_on_a_held_frame_keys_that_frame_and_a_batch_without_the_copy_k
         "text": [["txt", before["items"]["text"][0]["block"].clone()]]}), "the source key's image is untouched");
     assert_eq!(cell(&owner, 4)["raster"][0][1]["x"], 104);
 }
+
+#[test]
+fn the_same_item_twice_in_one_batch_is_refused_by_where_it_lands_not_where_it_comes_from() {
+    let m = [1., 0., 0., 1., 4., 2.];
+    let mut owner = owner_of(&held(1));
+    let before = state(&owner);
+    // Both steps land on the item's cell at frame 4: the second swap would silently overwrite the first.
+    for (name, ops) in [
+        ("image-twice-retargeted", vec![at_frame("img", m, 4), at_frame("img", m, 4)]),
+        ("text-twice-retargeted", vec![at_frame("txt", m, 4), at_frame("txt", m, 4)]),
+        ("retargeted-then-own-cell", vec![at_frame("img", m, 0), at_frame("img", m, 0)]),
+    ] {
+        let mut payload = batch(ops);
+        payload["keyframe"] = json!("copy");
+        assert_eq!(send(&mut owner, name, payload)["ok"], false, "{name} is refused");
+    }
+    assert_eq!(state(&owner), before, "nothing was written");
+    // The same image landing in two DIFFERENT cells, and distinct items in one cell, are ordinary batches.
+    let mut payload = batch(vec![at_frame("img", m, 4), at_frame("img", m, 6), at_frame("txt", m, 4)]);
+    payload["keyframe"] = json!("copy");
+    let r = send(&mut owner, "distinct-landings", payload);
+    assert_eq!(r["ok"], true, "{r}");
+    assert_eq!(cell(&owner, 4)["raster"][0][1]["x"], 104);
+    assert_eq!(cell(&owner, 6)["raster"][0][1]["x"], 104);
+}

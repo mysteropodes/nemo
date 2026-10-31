@@ -3,10 +3,12 @@
   'use strict';
   function create(ports){
     var document=ports.document;
+    function stopCapture(){if(typeof ports.cancelShortcutCapture==='function')ports.cancelShortcutCapture();}
 function initSettingsTabs(){
   var bar=document.getElementById('settings-tabs');if(!bar)return;
   bar.querySelectorAll('.settings-tab').forEach(function(tab){
     tab.addEventListener('click',function(){
+      stopCapture();
       bar.querySelectorAll('.settings-tab').forEach(function(t){t.classList.remove('active');});
       tab.classList.add('active');
       document.querySelectorAll('#settings-modal .settings-pane').forEach(function(p){
@@ -23,8 +25,8 @@ function initSettingsModal(){
   var topBtn=document.getElementById('project-tabs-settings');
   if(topBtn)topBtn.addEventListener('click',function(){btn.click();});
   var closeBtn=document.getElementById('settings-close');
-  if(closeBtn)closeBtn.addEventListener('click',function(){modal.style.display='none';});
-  modal.addEventListener('click',function(e){if(e.target===modal)modal.style.display='none';});
+  if(closeBtn)closeBtn.addEventListener('click',function(){stopCapture();modal.style.display='none';});
+  modal.addEventListener('click',function(e){if(e.target===modal){stopCapture();modal.style.display='none';}});
   var resetBtn=document.getElementById('shortcuts-reset');
   if(resetBtn)resetBtn.addEventListener('click',function(){
     ports.resetShortcuts();

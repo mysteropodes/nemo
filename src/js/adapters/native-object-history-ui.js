@@ -54,6 +54,9 @@
     function jump(page, index) {
       const s = session(win);
       if (busy || !s) return;
+      // The step count is relative to the cursor of the page the user clicked; if the project moved on since (a commit inside the watch
+      // interval), a jump would land one entry off, so the panel is read again and nothing is sent.
+      if (pinKey(page.info) !== pinKey(s.info())) { offset = undefined; if (openPop) load(openPop); return; }
       const undo = index < page.undoDepth;
       busy = true;
       Promise.resolve().then(() => s.jumpHistory(undo ? 'undo' : 'redo', undo ? page.undoDepth - index : index - page.undoDepth + 1))
