@@ -3,7 +3,9 @@
  * the dash, click = the picker menu, right-click = clear, and the Align button next to a followed path). Every write is the
  * native edit of src/js/adapters/native-layer-parent.js (command.document.object.layer.followPath.set / timeLink.set):
  * no legacy setLayerFollowPath / setLayerTimeLink, no fallback writer. The rows hold no state of their own; refresh() re-reads the
- * pinned project rows. A layer outside the scene root shows the rows and the owner's invalid_request refusal on use. */
+ * pinned project rows. A layer outside the scene root shows the rows and the owner's invalid_request refusal on use.
+ * D37: a third row, Lock keyframes on, shows the layer's stored key-lock mode and opens the shared lock menu; a pick is the native
+ * layer-policy edit (flag keyLock) against the pin the menu was built from, so a stale menu cannot commit. */
 (function (root, factory) {
   const commonjs = typeof module === 'object' && module.exports;
   const api = factory(commonjs ? require('./native-layer-parent.js') : null);
@@ -28,6 +30,7 @@
     const node = make(host, 'div', 'native-motion-layer-link-rows');
     const refused = (kind) => { if (typeof host.showToast === 'function') host.showToast(Parent.linkRefusalText(kind, { code: 'invalid_request' })); };
     let disposed = false;
+    const toast = (message) => { if (typeof host.showToast === 'function') host.showToast(message); };
     const menu = (anchor, items) => {
       if (typeof host.showContextMenu !== 'function') return;
       const box = anchor.getBoundingClientRect();
@@ -85,10 +88,32 @@
       row.appendChild(pill);
       return row;
     }
+    function lockRow() {
+      const Menu = host.NemoNativeMotionKeyLockMenu; // a sibling module of the Motion properties adapter: reached through the host, not imported
+      if (!Menu) return null;
+      const row = make(host, 'div', 'lrow motion-prop-row'), label = make(host, 'span', '', Menu.title(host));
+      label.style.minWidth = '70px';
+      row.appendChild(label);
+      const mode = inRoot ? adapter.keyLockOf(index()) : null;
+      const pill = make(host, 'span', 'lparent' + (mode ? '' : ' none'), mode ? Menu.modeName(host, mode) : '—');
+      pill.style.marginLeft = '4px';
+      pill.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!inRoot) { toast('Key lock is only available on scene layers.'); return; }
+        // Everything the write needs is captured now: the layer, its mode and the revision the menu shows.
+        const uid = adapter.layerUid(index()), current = adapter.keyLockOf(index()), pin = adapter.pinOf();
+        menu(pill, Menu.items(host, (m) => m === current, (next) => adapter.setKeyLock(uid, next, pin).then(() => { refresh(); return true; }, () => {
+          toast('Key lock was refused or the project changed; open the menu again.');
+          return false;
+        })));
+      });
+      row.appendChild(pill);
+      return row;
+    }
     function refresh() {
       if (disposed) return false;
       if (inRoot && (index() < 0 || BARE.includes(adapter.rowKind(index())))) { node.replaceChildren(); return false; }
-      node.replaceChildren(pathRow(), timeRow());
+      node.replaceChildren(...[pathRow(), timeRow(), lockRow()].filter(Boolean));
       return true;
     }
     refresh();

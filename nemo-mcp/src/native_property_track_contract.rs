@@ -32,6 +32,10 @@ fn action(value: &Value) -> bool {
             matches!(a["side"].as_str(), Some("in" | "out")) && finite(a.get("percent"))
         }),
         Some("subdivide") => exact(value, &["kind"], &[]).is_some(),
+        // D37: per-key standing lock; mode is required, null clears.
+        Some("lockTo") => exact(value, &["kind", "mode"], &[]).is_some_and(|a| {
+            a["mode"].is_null() || matches!(a["mode"].as_str(), Some("in" | "out" | "layer"))
+        }),
         _ => false,
     }
 }

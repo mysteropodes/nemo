@@ -6,7 +6,8 @@ const ROOT=process.env.NEMO_KEYS_SOURCE_ROOT||path.join(__dirname,'..');
 const View=require(path.join(ROOT,'src/js/adapters/native-motion-property-view.js'));
 const code=fs.readFileSync(path.join(__dirname,'../src/js/adapters/native-motion-property-keys.js'),'utf8');
 const moduleValue={exports:{}},legacyEffects={reads:0};
-const sandbox={module:moduleValue,TextEncoder,setTimeout,require(name){assert.equal(name,'./native-motion-property-view.js');return View;}};
+const LockMenu=require(path.join(ROOT,'src/js/adapters/native-motion-key-lock-menu.js'));
+const sandbox={module:moduleValue,TextEncoder,setTimeout,require(name){assert.ok(['./native-motion-property-view.js','./native-motion-key-lock-menu.js'].includes(name));return name==='./native-motion-key-lock-menu.js'?LockMenu:View;}};
 for(const name of ['state','paper','SMProject','undoHistory','evaluateExpr','getVal','lerp'])Object.defineProperty(sandbox,name,{get(){legacyEffects.reads++;throw Error('Legacy authority accessed: '+name);}});
 vm.compileFunction(code,['module','require','TextEncoder','setTimeout'],{contextExtensions:[sandbox]})(moduleValue,sandbox.require,TextEncoder,setTimeout);
 const Keys=moduleValue.exports,copy=v=>JSON.parse(JSON.stringify(v));
@@ -41,9 +42,10 @@ function fixture(options={}){
  const ports={document:doc,readContext:context,readProperty(q){assert.deepEqual(Object.keys(q).sort(),['atRevision','documentId','documentSnapshotId','instanceId','view']);reads.push(copy(q));if(options.reader)return options.reader(q,response);return Promise.resolve(response(q));},
   async editPropertyTrack(payload,expected,isCurrent){writes.push({payload:copy(payload),expected:copy(expected),isCurrent});if(options.writer)return options.writer(payload,expected,isCurrent);assert.equal(isCurrent(),true);const result={applied:options.noop!==true,historyEntriesAdded:options.noop?0:1};receipts.push(result);return result;},
   async refresh(){refreshes++;if(options.refresh)await options.refresh();}};
+ const menus=[];if(options.menu!==false)ports.showContextMenu=(x,y,items)=>{menus.push({x,y,items});};
  if(options.readonly)delete ports.editPropertyTrack;
  const editor=Keys.create(container,ports);
- return {doc,container,ports,editor,reads,writes,pending,receipts,response,context,get refreshes(){return refreshes;},
+ return {doc,container,ports,editor,reads,writes,pending,receipts,response,context,menus,get refreshes(){return refreshes;},
   checks:()=>tree(editor.element).filter(n=>n.type==='checkbox'),button:label=>tree(editor.element).find(n=>n.tagName==='BUTTON'&&n.textContent===label),percent:()=>tree(editor.element).find(n=>n.attrs['aria-label']==='Key influence percent'),status:()=>tree(editor.element).find(n=>n.attrs.role==='status').textContent,
   async select(index=0,on=true){const n=this.checks()[index];n.checked=on;await n.fire('change');},open:()=>editor.open(target,'opacity'),
   frame(v){frame=v;},generation(){generation++;},replace(){pin={...pin,lifecycleGeneration:pin.lifecycleGeneration+1};},revision(){pin={...pin,contentRevision:8,documentSnapshotId:'native-object:document-keys:8'};generation++;},ready(v){ready=v;},foreign(){pin={...pin,documentId:'another-document'};}};
@@ -266,4 +268,45 @@ test('throwing or revoked aggregate selection admission never changes inspector 
  h.ports.acceptKeySelection=()=>{throw Error('Aggregate selection unavailable');};const view=h.editor.readKeyTimeline();
  assert.equal(view.canSelectFrames([]),false);assert.equal(view.selectFrames([]),false);await h.select(0);
  assert.deepEqual(h.checks().map(n=>n.checked),[false,true,false]);assert.equal(view.isCurrent(),true);assert.equal(h.writes.length,0);
+});
+
+// ---- D37 / #2522: the per-key "Lock keyframes on:" menu over the selected native keys ----
+const lockKeys=()=>[{frame:0,v:[1],lockTo:'in'},{frame:4,v:[2],lockTo:'in'},{frame:10,v:[3]}];
+test('the lock menu lists the baseline header and rows, ticking a mode only when every selected key shares it',async()=>{
+ const h=fixture({keys:lockKeys()});await h.open();
+ assert.equal(h.button('Lock keyframes on…').disabled,true,'no selection, no menu');
+ await h.select(0);await h.select(1);await h.button('Lock keyframes on…').fire('click');
+ assert.deepEqual(h.menus[0].items.map(i=>i.label),['Lock keyframes on:','   • the in point  ✓','   • the out point','   • the whole layer']);
+ assert.equal(h.menus[0].items[0].disabled,true);
+ await h.select(2);await h.button('Lock keyframes on…').fire('click');
+ assert.deepEqual(h.menus[1].items.map(i=>i.label),['Lock keyframes on:','   • the in point','   • the out point','   • the whole layer'],'a key without the lock removes the shared tick');
+ assert.equal(h.writes.length,0,'opening a menu writes nothing');
+});
+test('a lock pick is one native lockTo track edit over every selected key; the active mode clears',async()=>{
+ const h=fixture({keys:lockKeys()});await h.open();await h.select(0);await h.select(1);
+ await h.button('Lock keyframes on…').fire('click');
+ assert.equal(await h.menus[0].items[2].action(),true);
+ assert.deepEqual(h.writes[0].payload,{command:'object.property.track.edit',selections:[{target,property:'opacity',frame:0},{target,property:'opacity',frame:4}],action:{kind:'lockTo',mode:'out'}});
+ assert.equal(h.writes[0].expected.contentRevision,7);
+ const again=fixture({keys:lockKeys()});await again.open();await again.select(0);await again.select(1);await again.button('Lock keyframes on…').fire('click');
+ assert.equal(await again.menus[0].items[1].action(),true);
+ assert.deepEqual(again.writes[0].payload.action,{kind:'lockTo',mode:null},'picking the shared active mode clears it');
+});
+test('a stale selection or read cannot commit a lock pick, and a right-click on a selected key opens the same menu',async()=>{
+ const h=fixture({keys:lockKeys()});await h.open();await h.select(0);await h.button('Lock keyframes on…').fire('click');
+ const pick=h.menus[0].items[3].action;
+ await h.select(1);
+ assert.equal(await pick(),false,'the selection changed after the menu opened');
+ assert.equal(h.writes.length,0);
+ await h.button('Lock keyframes on…').fire('click');const second=h.menus[1].items[3].action;
+ h.revision();
+ assert.equal(await second(),false,'the read went stale');
+ assert.equal(h.writes.length,0);
+ const r=fixture({keys:lockKeys()});await r.open();await r.select(0);
+ const label=tree(r.editor.element).find(n=>n.tagName==='LABEL');await label.fire('contextmenu',{clientX:5,clientY:6,preventDefault(){}});
+ assert.deepEqual([r.menus[0].x,r.menus[0].y],[13,14]);assert.equal(r.menus[0].items.length,4);
+ const unselected=tree(r.editor.element).filter(n=>n.tagName==='LABEL')[1];await unselected.fire('contextmenu',{clientX:1,clientY:1,preventDefault(){}});
+ assert.equal(r.menus.length,1,'only a selected key offers the lock menu');
+ const none=fixture({keys:lockKeys(),menu:false});await none.open();await none.select(0);await none.button('Lock keyframes on…').fire('click');
+ assert.equal(none.writes.length,0);assert.match(none.status(),/unavailable or stale/);
 });

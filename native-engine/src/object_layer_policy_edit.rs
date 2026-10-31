@@ -1,6 +1,6 @@
 //! Private persisted Drawing flags; no public capability or generic Motion lock policy.
 use crate::commands::ObjectFillOwner;
-use crate::object_document::{object_deserialize, ObjectDocument, Presence};
+use crate::object_document::{object_deserialize, KeyLockMode, ObjectDocument, Presence};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
@@ -10,19 +10,21 @@ struct LayerPolicyPayload {
     command: String,
     layer_uid: String,
     flag: String,
-    value: bool,
+    // bool for locked/shy; null or an in/out/layer string for keyLock.
+    value: serde_json::Value,
 }
 object_deserialize!(LayerPolicyPayload {
     command: String,
     layer_uid: String,
     flag: String,
-    value: bool
+    value: serde_json::Value
 });
 
 #[derive(Debug)]
 enum LayerPolicyIntent {
     Locked(bool),
     Shy(bool),
+    KeyLock(Option<KeyLockMode>),
 }
 
 /// Detached, non-Clone candidate: only this child can construct its sealed origin.
@@ -31,6 +33,14 @@ pub(crate) struct PreparedLayerPolicy {
     origin: ObjectSnapshot,
     document: ObjectDocument,
     changed: bool,
+}
+
+fn set_flag(field: &mut Presence<bool>, value: bool) -> bool {
+    let changed = field.value().copied().unwrap_or(false) != value;
+    if changed {
+        *field = Presence::Present(value);
+    }
+    changed
 }
 
 impl ObjectFillOwner {
@@ -46,9 +56,17 @@ impl ObjectFillOwner {
         if payload.command != "object.layer.policy.edit" || payload.layer_uid.is_empty() {
             return Err(DispatchErrorCode::InvalidRequest);
         }
-        let intent = match payload.flag.as_str() {
-            "locked" => LayerPolicyIntent::Locked(payload.value),
-            "shy" => LayerPolicyIntent::Shy(payload.value),
+        let flag_value = payload.value.as_bool();
+        let intent = match (payload.flag.as_str(), flag_value) {
+            ("locked", Some(value)) => LayerPolicyIntent::Locked(value),
+            ("shy", Some(value)) => LayerPolicyIntent::Shy(value),
+            ("keyLock", None) => LayerPolicyIntent::KeyLock(match payload.value.as_str() {
+                None if payload.value.is_null() => None,
+                Some("in") => Some(KeyLockMode::In),
+                Some("out") => Some(KeyLockMode::Out),
+                Some("layer") => Some(KeyLockMode::Layer),
+                _ => return Err(DispatchErrorCode::InvalidRequest),
+            }),
             _ => return Err(DispatchErrorCode::InvalidRequest),
         };
         let origin = self.current_snapshot();
@@ -65,15 +83,20 @@ impl ObjectFillOwner {
             .iter_mut()
             .find(|layer| layer.layer_uid() == payload.layer_uid)
             .ok_or(DispatchErrorCode::NotFound)?;
-        let (field, value) = match intent {
-            LayerPolicyIntent::Locked(value) => (&mut layer.locked, value),
-            LayerPolicyIntent::Shy(value) => (&mut layer.shy, value),
-        };
         // Baseline absent flags read as false. A no-op must not author false.
-        let changed = field.value().copied().unwrap_or(false) != value;
-        if changed {
-            *field = Presence::Present(value);
-        }
+        let changed = match intent {
+            LayerPolicyIntent::Locked(value) => set_flag(&mut layer.locked, value),
+            LayerPolicyIntent::Shy(value) => set_flag(&mut layer.shy, value),
+            LayerPolicyIntent::KeyLock(mode) => {
+                // Missing and explicit null both read as no lock; only a real
+                // change authors the field (clearing writes the baseline null).
+                let changed = layer.key_lock.value().copied().flatten() != mode;
+                if changed {
+                    layer.key_lock = Presence::Present(mode);
+                }
+                changed
+            }
+        };
         ObjectSnapshot::validate_drawing(&document)
             .map_err(|_| DispatchErrorCode::InvalidRequest)?;
         Ok(PreparedLayerPolicy {

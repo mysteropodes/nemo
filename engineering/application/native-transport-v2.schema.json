@@ -4290,13 +4290,57 @@
         "flag": {
           "enum": [
             "locked",
-            "shy"
+            "shy",
+            "keyLock"
           ]
         },
         "value": {
-          "type": "boolean"
+          "description": "Boolean for locked and shy; null or in/out/layer for keyLock (null clears the layer key-lock mode).",
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "in",
+                "out",
+                "layer"
+              ]
+            }
+          ]
         }
-      }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "flag": {
+              "enum": [
+                "locked",
+                "shy"
+              ]
+            },
+            "value": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "properties": {
+            "flag": {
+              "const": "keyLock"
+            },
+            "value": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      ]
     },
     "ObjectComponentId": {
       "type": "string",
@@ -10679,6 +10723,28 @@
               "properties": {
                 "kind": {
                   "const": "subdivide"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "mode"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "lockTo"
+                },
+                "mode": {
+                  "description": "Per-key standing lock applied to every selected key; null clears it. Same-effective-value keys keep their authored presence.",
+                  "enum": [
+                    "in",
+                    "out",
+                    "layer",
+                    null
+                  ]
                 }
               }
             }
