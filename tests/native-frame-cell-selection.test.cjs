@@ -26,15 +26,20 @@ function selectionHarness(options={}){
     _layerSel:[0,1],_sel:{frames:[],clipboard:{retain:'clipboard'},clipOp:'copy'},
     setTimeout(f){tasks.set(++serial,f);return serial;},clearTimeout(i){tasks.delete(i);}});
   let shown={...info,owner:'native',status:'presented',frame:0},available=true,active=true;
-  const session={isActive:()=>active,info:()=>info,readPresentedObjectSession:()=>available?{...info,available:true,presentation:shown}:null};
+  let hidden=false;
+  const session={isActive:()=>active,info:()=>info,readPresentedObjectSession:(refused)=>{
+    if(hidden){if(typeof refused==='function')refused('queue-pending');return null;}
+    return available?{...info,available:true,presentation:shown}:null;}};
   const ports={currentSession:()=>session,projectionReady:()=>true,frameEditPending:()=>false};
+  if(options.wait){const slice=root.setTimeout,toasts=root.toasts=[];root.NemoNativePresentationWait=require('../src/js/adapters/native-presentation-wait.js');
+    root.showToast=t=>toasts.push(t);root.setTimeout=(f,ms)=>ms>0?(setImmediate(f),0):slice(f,ms);}
   function mount(){Selection.mount(root,caption,info,ports);return caption.children[0];}
   let strip=mount();if(options.selectionMode!==false)strip.children[4].fire('click');
   return {root,doc,header,caption,wrap,cycle,ports,session,node,info:()=>info,strip:()=>strip,
     mount(){strip=mount();return strip;},down(frame,extra={}){strip.fire('mousedown',{clientX:100+(frame+.5)*root.FC,...extra});},
     move(frame){doc.fire('mousemove',{clientX:100+(frame+.5)*root.FC});},up(frame){doc.fire('mouseup',{clientX:100+(frame+.5)*root.FC});},
     settle(){let count=0;while(tasks.size){assert.ok(count++<100);const [id,f]=tasks.entries().next().value;tasks.delete(id);f();}},
-    tasks:()=>tasks.size,changeInfo(change){info={...info,...change};},setShown(v){shown=v;},setAvailable(v){available=v;},setActive(v){active=v;}};
+    tasks:()=>tasks.size,changeInfo(change){info={...info,...change};},setShown(v){shown=v;},setAvailable(v){available=v;},setActive(v){active=v;},setHidden(v){hidden=v;}};
 }
 // END REUSABLE NATIVE CELL HEADER FIXTURE
 
@@ -201,4 +206,38 @@ test('shipped Cmd+D after native header selection reaches the wrapped frame dupl
     h.root.state.appMode='motion';h.root._layerActiveExplicit=false;
     assert.throws(()=>context.onKeyDown(key),/LAYER WRITER/);assert.equal(layerWrites,2);assert.equal(h.commands().length,1);
   }finally{Selection.retire(h.root);dispose();}
+});
+
+// #2372: the shared queue-pending wait is wired to the ruler selection's press and its document-level move / release listeners.
+const ticks=async(n=6)=>{for(let i=0;i<n;i++)await new Promise(done=>setImmediate(done));};
+test('queue-pending: a ruler press held for several ticks selects once when the presentation returns, with the drag that followed it',async()=>{
+  const h=selectionHarness({wait:true});h.setHidden(true);
+  h.down(0);h.move(1);h.up(2);await ticks();
+  assert.deepEqual(h.root._sel.frames,[],'nothing published while the presentation is hidden');
+  h.setHidden(false);await ticks();
+  assert.deepEqual(h.root._sel.frames.map(c=>c.frame),[0,1,2,0,1,2],'one replayed gesture: rows x frames 0..2');
+  assert.deepEqual(h.root.toasts,[]);
+  h.down(3);h.up(3);assert.deepEqual(h.root._sel.frames,[{layer:0,frame:3},{layer:1,frame:3}],'the next click, with the queue idle, runs straight through');
+});
+test('queue-pending: a gesture already under way survives the window and still publishes; a real change still ends it',async()=>{
+  const h=selectionHarness({wait:true});h.down(0);h.setHidden(true);h.move(1);h.up(1);
+  assert.deepEqual(h.root._sel.frames.map(c=>c.frame),[0,1,0,1],'drag and release inside the hidden window are not dropped');
+  h.setHidden(false);const prior=h.root._sel.frames;h.down(0);h.setHidden(true);h.root.state.currentFrame=1;h.up(2);
+  assert.equal(h.root._sel.frames,prior,'a frame change during the window ends the gesture');
+  h.root.state.currentFrame=0;h.setHidden(false);h.down(0);h.setHidden(true);h.changeInfo({contentRevision:1});h.up(2);
+  assert.equal(h.root._sel.frames,prior,'a pin change during the window ends the gesture');
+});
+test('queue-pending: a context change while the press waits drops it silently',async()=>{
+  for(const change of ['frame','rows','mode','pin']){
+    const h=selectionHarness({wait:true}),prior=h.root._sel.frames;h.setHidden(true);h.down(0);h.up(1);await ticks(2);
+    if(change==='frame')h.root.state.currentFrame=1;if(change==='rows')h.root._layerSel=[1];if(change==='mode')h.root.state.appMode='animation';
+    if(change==='pin')h.changeInfo({contentRevision:2});
+    h.setHidden(false);await ticks();assert.equal(h.root._sel.frames,prior,change);assert.deepEqual(h.root.toasts,[],change);
+  }
+});
+test('queue-pending: a queue that never frees gives ONE notice and no selection; any other refusal is not waited out',async()=>{
+  const h=selectionHarness({wait:true}),prior=h.root._sel.frames;h.setHidden(true);h.down(0);h.up(1);await ticks(40);
+  assert.equal(h.root._sel.frames,prior);assert.deepEqual(h.root.toasts,['The canvas is still busy - try again.']);
+  const g=selectionHarness({wait:true});g.setAvailable(false);g.down(0);g.up(1);await ticks(3);
+  assert.deepEqual(g.root._sel.frames,[]);assert.deepEqual(g.root.toasts,[],'an unavailable presentation is refused by the handler at once, not held');
 });
