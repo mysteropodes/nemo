@@ -113,14 +113,18 @@
       if (!proof && cached && queueBusy(win)) { if (hadPads) watch(); return Promise.resolve(cached.read); } // busy is not changed: keep the pads and the drag, look again next frame
       if (!proof) { if (cached) { serial++; cached = null; cancel(); } paint(); return Promise.resolve(null); }
       const key = keyOf(proof);
-      if (prior && prior.key === key && prior.proof.current()) { prior.proof = proof; paint(); return prior.promise || Promise.resolve(prior.read); }
+      // #2255: the read is keyed by revision and frame, not by the presentation object: every read re-presents the same revision, so a
+      // new presentation adopts the cached read (as the Mesh panel does) instead of reading again, which never settled and dropped the pads.
+      if (prior && prior.key === key && (prior.promise || prior.read)) { prior.proof = proof; paint(); return prior.promise || Promise.resolve(prior.read); }
       cancel(); serial++;
       const token = serial, entry = { proof, key, read: null, promise: null };
       cached = entry;
-      entry.promise = queue.catch(() => {}).then(() => (token === serial && proof.current() ? proof.session.readWidgets(proof.selector, proof.info) : null))
+      const fresh = () => { const p = proof.current() ? proof : proofNow(win); return p && keyOf(p) === key ? p : null; };
+      entry.promise = queue.catch(() => {}).then(() => { const p = token === serial ? fresh() : null; return p ? p.session.readWidgets(p.selector, p.info) : null; })
         .then((read) => {
-          if (token !== serial || cached !== entry || !read || !samePin(read.info, proof.info) || !proof.current()) return null;
-          entry.read = read; hadPads = read.items.length > 0; paint(); if (hadPads) watch(); return read;
+          const p = token === serial && cached === entry && read && samePin(read.info, proof.info) ? fresh() : null;
+          if (!p) return null;
+          entry.proof = p; entry.read = read; hadPads = read.items.length > 0; paint(); if (hadPads) watch(); return read;
         }).catch((error) => { if (token === serial && cached === entry) { entry.error = error; paint(); } return null; })
         .finally(() => { if (cached === entry) entry.promise = null; });
       queue = entry.promise.catch(() => {});
