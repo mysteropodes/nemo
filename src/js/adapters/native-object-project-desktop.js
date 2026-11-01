@@ -249,7 +249,7 @@
     if(root.SMCamera&&typeof root.SMCamera.renderNativeViewLock==='function')root.SMCamera.renderNativeViewLock();
   }
   function createPorts(root){
-    var nativeInvoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null,presentationVersion=0;
+    var nativeInvoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null,presentationVersion=0,widgetRevision=null;
     function invokeProjectObserved(command,args){
       var pin;
       if(command==='nemo_native_object_export')try{pin=JSON.parse(args.requestJson);settingsDiagnostic(root,'export-request',pin);}catch(_){}
@@ -368,6 +368,10 @@
             root.NemoNativeObjectUI.refreshTiming(root);
           if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshPolicy)root.NemoNativeObjectUI.refreshPolicy(root);
           if(root.SMImageMeshUI&&typeof root.SMImageMeshUI.refresh==='function')root.SMImageMeshUI.refresh();
+          // #2255: the widget pads are re-read once per new document revision, or a widget made elsewhere (MCP, another tab's undo) stays
+          // undrawn. Once per REVISION, not per presentation: the read itself re-presents, so a per-presentation refresh never settles.
+          var widgets=root.NemoNativeObjectWidgetUI,revision=[info.instanceId,info.lifecycleGeneration,info.documentSnapshotId].join('|');
+          if(widgets&&typeof widgets.desktop==='function'&&revision!==widgetRevision){widgetRevision=revision;widgets.desktop(root).refresh();}
           // A frame paint can precede native completion and leave Motion unavailable.
           // Refresh its existing inspector only after the current frame is presented.
           if(shown&&root.state&&root.state.appMode==='motion'&&shown.frame===root.state.currentFrame&&

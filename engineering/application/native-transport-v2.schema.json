@@ -10961,6 +10961,27 @@
                   "maximum": 1.7976931348623157e+308
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "target",
+                "property"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "expressionSource"
+                },
+                "target": {
+                  "$ref": "#/$defs/ObjectPropertyReadTarget"
+                },
+                "property": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
             }
           ]
         }
@@ -11063,7 +11084,7 @@
       }
     },
     "ObjectPropertyReadResult": {
-      "description": "Exact authored storage DTO or raw native sample. Native/shared runtime validators additionally correlate owner, revision, snapshot, target, property, frame and cursor; enforce increasing key/curve coordinates and actual native curve endpoints. Missing/null/empty curve distinctions are preserved. Provider result limit3072 and full envelope limit4096 are encoded UTF8 byte bounds, not JSON string lengths. Oversized pages refuse unavailable; no dynamic truncation.",
+      "description": "Exact authored storage DTO or raw native sample. Native/shared runtime validators additionally correlate owner, revision, snapshot, target, property, frame and cursor; enforce increasing key/curve coordinates and actual native curve endpoints. Missing/null/empty curve distinctions are preserved. Provider result limit3072 and full envelope limit4096 are encoded UTF8 byte bounds, not JSON string lengths. Oversized pages refuse unavailable; no dynamic truncation. The expressionSource view returns the exact authored code (null when no expression is authored); an oversized source refuses unavailable.",
       "oneOf": [
         {
           "type": "object",
@@ -11868,6 +11889,74 @@
               }
             }
           ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "instanceId",
+            "documentId",
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "target",
+            "property",
+            "dimension",
+            "expression"
+          ],
+          "properties": {
+            "instanceId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "documentId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "const": "expressionSource"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectPropertyReadTarget"
+            },
+            "property": {
+              "type": "string",
+              "minLength": 1
+            },
+            "dimension": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            },
+            "expression": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "enabled",
+                    "code"
+                  ],
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
+            }
+          }
         }
       ]
     },
@@ -12006,6 +12095,52 @@
               "properties": {
                 "kind": {
                   "const": "bake"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "code"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "setExpression"
+                },
+                "code": {
+                  "type": "string",
+                  "maxLength": 4096,
+                  "description": "Exact authored source. Native validators bound it to 4096 UTF-8 bytes; the empty string stays present-but-empty and only removeExpression clears an expression."
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "enabled"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "setExpressionEnabled"
+                },
+                "enabled": {
+                  "type": "boolean"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "removeExpression"
                 }
               }
             },

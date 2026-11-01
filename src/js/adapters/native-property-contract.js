@@ -86,6 +86,9 @@
       if(r.kind==='storedProperty'){if(r.items.length!==1||r.items[0].property!==p.view.property||r.nextOffset!==null)throw new TypeError('stored property mismatch');}
       else if(r.items.length>p.view.limit||r.nextOffset!==null&&(!r.items.length||r.nextOffset!==p.view.offset+r.items.length))throw new TypeError('nonadvancing/mismatched page cursor');
     }
+    function utf8Length(text) {
+      return typeof TextEncoder === 'function' ? new TextEncoder().encode(text).length : unescape(encodeURIComponent(text)).length;
+    }
     // The native holder owns dimensions, applicability and animated/static state.
     // This public subset carries intent only; curve controls use the track route.
     function editPayload(value) {
@@ -95,14 +98,22 @@
       Object.values(value.target).forEach(objectUid); objectUid(value.property);
       const action = value.action;
       if (!plain(action)) throw new TypeError('property action must be an object');
-      // D18-B: control declaration edits carry no frame; `property` is the control key.
+      // Expression authoring and D18-B control declaration edits carry no frame; for control
+      // edits `property` is the control key.
       const fields = {setValue:['values'], setKey:['values'], removeKey:[], setAnimated:['animated'], bake:[],
+        setExpression:['code'], setExpressionEnabled:['enabled'], removeExpression:[],
         addControl:['controlType', 'name'], renameControl:['name'], removeControl:[], moveControl:['direction']};
       if (typeof action.kind !== 'string' || !has(fields, action.kind)) throw new TypeError('unsupported property edit action');
-      const frameless = action.kind === 'bake' || /^(?:add|rename|remove|move)Control$/.test(action.kind);
+      const frameless = action.kind === 'bake' || /Expression/.test(action.kind) || /^(?:add|rename|remove|move)Control$/.test(action.kind);
       exact(action, ['kind', ...(frameless ? [] : ['frame']), ...fields[action.kind]], [], 'property action');
       // Native frames are finite numbers, including negative and fractional values.
       if (!frameless && !Number.isFinite(action.frame)) throw new TypeError('invalid property frame');
+      if (action.kind === 'setExpression') {
+        // Exact authored source: the empty string is present-but-empty, never a removal; null is refused.
+        if (typeof action.code !== 'string' || utf8Length(action.code) > 4096) throw new TypeError('invalid expression code');
+      } else if (action.kind === 'setExpressionEnabled' && typeof action.enabled !== 'boolean') {
+        throw new TypeError('expression enabled intent must be boolean');
+      }
       if (has(action, 'name') && (typeof action.name !== 'string' || !action.name || Array.from(action.name).length > 128)) {
         throw new TypeError('invalid control name');
       }
@@ -171,12 +182,13 @@
       exact(value, ['atRevision', 'documentSnapshotId', 'view'], [], 'property read');
       revision(value.atRevision, 'atRevision'); objectUid(value.documentSnapshotId);
       const view = value.view;
-      if (!plain(view) || !['rawSample', 'authoredKeys', 'expressionContext', 'expressionState'].includes(view.kind)) {
+      if (!plain(view) || !['rawSample', 'authoredKeys', 'expressionContext', 'expressionState', 'expressionSource'].includes(view.kind)) {
         throw new TypeError('unsupported property read view');
       }
-      const fields = view.kind !== 'authoredKeys' ? ['frame'] : ['offset', 'limit'];
+      const fields = view.kind === 'expressionSource' ? [] : view.kind !== 'authoredKeys' ? ['frame'] : ['offset', 'limit'];
       exact(view, ['kind', 'target', 'property', ...fields], [], 'property read view');
       readTarget(view.target); objectUid(view.property);
+      if (view.kind === 'expressionSource') return;
       if (view.kind !== 'authoredKeys') {
         if (!Number.isFinite(view.frame)) throw new TypeError('invalid raw sample frame');
       } else {
@@ -275,11 +287,20 @@
           diagnostic.line!==null&&(!Number.isInteger(diagnostic.line)||diagnostic.line<0||diagnostic.line>0xffffffff)) throw new TypeError('invalid expression diagnostic');
       }
     }
+    // The exact authored source of the pinned snapshot, or null when none is authored.
+    function expressionSourceResult(value) {
+      const e = value.expression;
+      if (e !== null) {
+        exact(e, ['enabled', 'code'], [], 'expression source');
+        if (typeof e.enabled !== 'boolean' || typeof e.code !== 'string') throw new TypeError('invalid expression source');
+      }
+    }
     function readResult(value) {
+      const source = value && value.kind === 'expressionSource';
       const raw = value && value.kind === 'rawSample';
       const context = value && value.kind === 'expressionContext';
       const expression = value && value.kind === 'expressionState';
-      const fields = raw ? ['frame', 'value'] : context ? ['frame','self','comp','keyCount','compUnavailable'] : expression ? ['frame','expression','evaluation'] : ['trackPresent', 'items', 'nextOffset'];
+      const fields = source ? ['expression'] : raw ? ['frame', 'value'] : context ? ['frame','self','comp','keyCount','compUnavailable'] : expression ? ['frame','expression','evaluation'] : ['trackPresent', 'items', 'nextOffset'];
       exact(value, ['instanceId', 'documentId', 'atRevision', 'documentSnapshotId',
         'kind', 'target', 'property', 'dimension', ...fields], context ? ['mesh'] : [], 'property read result');
       id(value.instanceId, 'instanceId'); id(value.documentId, 'documentId');
@@ -288,7 +309,9 @@
       if (!Number.isInteger(value.dimension) || value.dimension < 1 || value.dimension > 4) {
         throw new TypeError('invalid property read dimension');
       }
-      if (expression) {
+      if (source) {
+        expressionSourceResult(value);
+      } else if (expression) {
         expressionStateResult(value);
       } else if (context) {
         expressionContextResult(value);
@@ -320,6 +343,7 @@
           result.kind !== view.kind || result.property !== view.property ||
           ['contextId', 'layerUid', 'strokeId'].some(key => result.target[key] !== view.target[key] ||
             has(result.target, key) !== has(view.target, key))) throw new TypeError('property read selector mismatch');
+      if (view.kind === 'expressionSource') return;
       if (view.kind !== 'authoredKeys') {
         if (result.frame !== view.frame) throw new TypeError('raw sample frame mismatch');
       } else if (result.items.length > view.limit || result.nextOffset !== null &&
@@ -327,7 +351,7 @@
         throw new TypeError('authored page cursor mismatch');
       }
     }
-    const readPaths = {has: name => /^(?:payload\.documentSnapshotId|result\.(?:documentSnapshotId|property)|result\.(?:self\.property|mesh\.meshId|evaluation\.diagnostic\.message)|payload\.view\.property|(?:payload\.view\.target|result\.target)\.(?:contextId|layerUid|strokeId))$/.test(name)};
+    const readPaths = {has: name => /^(?:payload\.documentSnapshotId|result\.(?:documentSnapshotId|property)|result\.(?:self\.property|mesh\.meshId|expression\.code|evaluation\.diagnostic\.message)|payload\.view\.property|(?:payload\.view\.target|result\.target)\.(?:contextId|layerUid|strokeId))$/.test(name)};
     return Object.freeze({ rangeResult, placementResult, cellsResult, metadataPayload, metadataResult, metadataCorrelated, editPayload, trackPayload, trackResult,
       readPayload, readResult, readCorrelated, readPaths });
   }

@@ -383,7 +383,7 @@ function composedMesh(geometry = false, meshValue, beforeDispatch = async () => 
     assert.equal(ComposedUI.select(root, session.info(), 0, false, 'L0', session.readPresentedObjectSession(), uiPorts), true);
     if (settle) { await root.SMImageMeshUI.refresh(); await meshTurn(); }
   }
-  return { root, session, calls, minted, messages, open, uiPorts, holdPreview() { previewGate = meshGate(); return previewGate; },
+  return { root, session, calls, minted, messages, open, uiPorts, ports, holdPreview() { previewGate = meshGate(); return previewGate; },
     async settle() { await meshTurn(); await root.SMImageMeshUI.refresh(); await meshTurn(); },
     replaceSession() { liveSession = ComposedProject.create(ports); },
     pointer(type, x, y) { let stopped = false; captures.get(type)({ target: doc.nodes.get('drawing-canvas'), pointerId: 7,
@@ -545,6 +545,21 @@ test('a vertex commit keeps Edit points, the Mesh panel and the handles while th
   assert.equal(h.session.info().contentRevision, 1);
   assert.equal(h.root.SMImageMeshUI.isEditing(), true); assert.equal(edit.checked, true); assert.ok(handles() > 0, 'the next vertex is one drag away');
   assert.deepEqual(h.messages, []);
+});
+
+test('the widget pads are re-read once per new revision, never per presentation, so a read that re-presents cannot loop (#2255)', async () => {
+  const h = composedMesh(true, undefined, async () => {}, true); let reads = 0;
+  const drain = async () => { await meshTurn(); await new Promise(done => setTimeout(done, 0)); await meshTurn(); };
+  h.root.NemoNativeObjectWidgetUI = { desktop: win => { assert.equal(win, h.root); return { refresh() { reads++; return Promise.resolve(null); } }; } };
+  await h.open(); await drain();
+  assert.equal(reads, 1, 'the open presentation re-read the widget pads once');
+  for (let i = 0; i < 5; i++) { h.ports.presented(h.session.info()); await drain(); }
+  assert.equal(reads, 1, 'repeated presentations of the same revision (what each read causes) do not read again');
+  const pin = h.session.info();
+  await h.root.NemoNativeObjectImageMesh.desktop(h.root).setOffset('im_1', 0, 0.1, 0.1, () => true);
+  for (let i = 0; i < 40 && h.session.info().contentRevision === pin.contentRevision; i++) await new Promise(done => setTimeout(done, 5));
+  h.ports.presented(h.session.info()); await drain();
+  assert.equal(h.session.info().contentRevision, pin.contentRevision + 1); assert.equal(reads, 2, 'a new revision (a widget made through MCP) is read once');
 });
 
 test('picking the image on the canvas selects its layer row, which feeds the Mesh panel (#2372)', async () => {

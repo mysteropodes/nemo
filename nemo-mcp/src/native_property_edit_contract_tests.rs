@@ -172,6 +172,54 @@ fn property_bake_admits_only_the_intent_not_samples_or_replacement_keys() {
 }
 
 #[test]
+fn property_expression_actions_admit_exact_code_enablement_and_removal_only() {
+    let unicode = "// café 🧭\r\nconst 値 = 'é';\n";
+    let mut accepted = vec![
+        json!({"kind":"setExpression","code":""}),
+        json!({"kind":"setExpression","code":unicode}),
+        // Authored source is data, never a binary or blob resource, even when it looks like one.
+        json!({"kind":"setExpression","code":"data:x\nblob:y"}),
+        json!({"kind":"setExpression","code":"é".repeat(2048)}),
+        json!({"kind":"setExpression","code":"x".repeat(4096)}),
+        json!({"kind":"removeExpression"}),
+    ];
+    for enabled in [false, true] {
+        accepted.push(json!({"kind":"setExpressionEnabled","enabled":enabled}));
+    }
+    for action in accepted {
+        let p = payload(action);
+        assert!(request(&p), "{p}");
+        // The shape admits 4096 code bytes, but the complete request keeps its own 4096-byte
+        // ceiling, so the largest codes are refused whole by the envelope, never truncated.
+        let envelope = envelope(p);
+        let fits = serde_json::to_vec(&envelope).unwrap().len() <= 4096;
+        assert_eq!(envelope.validate().is_ok(), fits);
+    }
+    for action in [
+        json!({"kind":"setExpression"}),
+        json!({"kind":"setExpression","code":null}),
+        json!({"kind":"setExpression","code":1}),
+        json!({"kind":"setExpression","code":"x".repeat(4097)}),
+        json!({"kind":"setExpression","code":"é".repeat(2049)}),
+        json!({"kind":"setExpression","code":"x","enabled":true}),
+        json!({"kind":"setExpression","code":"x","frame":0}),
+        json!({"kind":"setExpression","expression":{"enabled":true,"code":"x"}}),
+        json!({"kind":"setExpressionEnabled"}),
+        json!({"kind":"setExpressionEnabled","enabled":null}),
+        json!({"kind":"setExpressionEnabled","enabled":1}),
+        json!({"kind":"setExpressionEnabled","enabled":true,"code":"x"}),
+        json!({"kind":"removeExpression","code":null}),
+        json!({"kind":"removeExpression","frame":0}),
+        json!(["setExpression", "x"]),
+        json!({"kind":"clearExpression"}),
+    ] {
+        let p = payload(action);
+        assert!(!request(&p), "{p}");
+        assert!(envelope(p).validate().is_err());
+    }
+}
+
+#[test]
 fn property_control_edits_admit_only_the_closed_declaration_shapes() {
     for kind in ["number", "checkbox", "angle", "point", "color"] {
         let p = payload(json!({"kind":"addControl","controlType":kind,"name":"Speed 雪"}));

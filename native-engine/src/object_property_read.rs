@@ -10,9 +10,8 @@ pub(crate) struct PropertyExpressionSource {
 }
 impl ObjectSnapshot {
     /// Exact authored code from this retained snapshot. Returning an owned value
-    /// grants neither evaluation nor a writable document mirror. Transport/editor
-    /// admission is separate; existing public reads still expose only their DTOs.
-    #[allow(dead_code)]
+    /// grants neither evaluation nor a writable document mirror; the public
+    /// `expressionSource` read view projects it under the bounded read envelope.
     pub(crate) fn property_expression_source(
         &self,
         target: &PropertyHolderTarget,
@@ -101,6 +100,10 @@ object_deserialize!(ReadSelector {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 enum ReadFields {
+    ExpressionSource {
+        target: PropertyHolderTarget,
+        property: String,
+    },
     ExpressionState {
         target: PropertyHolderTarget,
         property: String,
@@ -171,6 +174,9 @@ impl ObjectSnapshot {
             return Err(StaleRevision);
         }
         let (kind, target, property) = match &selector.view.0 {
+            ReadFields::ExpressionSource {
+                target, property, ..
+            } => ("expressionSource", target, property),
             ReadFields::ExpressionState {
                 target, property, ..
             } => ("expressionState", target, property),
@@ -203,6 +209,10 @@ impl ObjectSnapshot {
             "atRevision":self.content_revision(),"documentSnapshotId":self.snapshot_id(),
             "kind":kind,"target":target,"property":property,"dimension":dimension});
         match &selector.view.0 {
+            ReadFields::ExpressionSource { .. } => {
+                // Exact authored bytes; an oversized page is refused below, never truncated.
+                result["expression"] = json!(self.property_expression_source(target, property)?);
+            }
             ReadFields::ExpressionState { frame, .. } => {
                 if !frame.is_finite() {
                     return Err(InvalidRequest);
