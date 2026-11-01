@@ -119,3 +119,22 @@ mod tests {
 // Draw symmetry is a project setting with its own closed read/edit namespace.
 #[path = "native_symmetry_contract.rs"]
 pub(crate) mod symmetry;
+// The stored camera (keys, layerOn) is a project setting too: a closed read-only namespace.
+#[path = "native_camera_contract.rs"]
+pub(crate) mod camera;
+
+/// The symmetry and camera namespaces share the project-settings registration arm.
+pub(crate) fn route_request(op: &str, v: &Value) -> bool {
+    if op == camera::READ {
+        camera::request(op, v)
+    } else {
+        symmetry::request(op, v)
+    }
+}
+pub(crate) fn route_result(op: &str, document: &str, payload: &Value, value: &Value) -> bool {
+    if op == camera::READ {
+        camera::result(op, document, payload, value)
+    } else {
+        symmetry::result(op, document, payload, value)
+    }
+}

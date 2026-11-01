@@ -49,6 +49,16 @@ impl ObjectSnapshot {
             )
             .map(Some);
         }
+        if request.operation == "query.document.object.project.camera.read" {
+            #[cfg(all(feature = "history", feature = "project_media_codec"))]
+            return self.dispatch_camera_read(request).map(Some);
+            #[cfg(not(all(feature = "history", feature = "project_media_codec")))]
+            return failure(
+                DispatchErrorCode::Unavailable,
+                "Native camera metadata is unavailable.",
+            )
+            .map(Some);
+        }
         if request.operation == "query.document.object.project.perspective.read" {
             #[cfg(all(feature = "history", feature = "project_media_codec"))]
             return self.dispatch_perspective_read(request).map(Some);
