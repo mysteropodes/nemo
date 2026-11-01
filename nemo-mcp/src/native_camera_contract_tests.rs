@@ -85,3 +85,34 @@ fn key_pages_are_dense_ordinal_bounded_and_chain_by_next_cursor() {
     let end = json!({"kind":"cameraKeyPage","keysPresent":true,"keyCount":5,"cursor":4,"items":[key(5)],"nextCursor":null});
     assert!(wire(&last, &response(&last, end)));
 }
+
+#[test]
+fn the_shared_settings_arm_routes_camera_and_symmetry_to_their_own_validators() {
+    use crate::native_contract::settings::{route_request, route_result, symmetry};
+    let q = query(json!({"kind":"settings"}));
+    assert!(route_request(READ, &q.payload));
+    assert!(!route_request(
+        symmetry::READ,
+        &query(json!({"kind":"keyPage","cursor":0,"limit":1})).payload
+    ));
+    let body = json!({"instanceId":"i","documentId":"d","atRevision":7,"documentSnapshotId":"s7",
+        "contextId":"scene-root","result":{"keysPresent":true,"keyCount":1,"layerOn":false}});
+    assert!(route_result(READ, "d", &q.payload, &body));
+    assert!(!route_result(symmetry::READ, "d", &q.payload, &body));
+    assert!(!route_result(READ, "other", &q.payload, &body));
+    let mut moved = body.clone();
+    moved["atRevision"] = json!(8);
+    assert!(!route_result(READ, "d", &q.payload, &moved));
+    let mut wrong = body.clone();
+    wrong["contextId"] = json!("elsewhere");
+    assert!(!route_result(READ, "d", &q.payload, &wrong));
+    let page_q = query(json!({"kind":"keyPage","cursor":0,"limit":1}));
+    assert!(!route_result(READ, "d", &page_q.payload, &body));
+    assert!(!item(&json!({"ordinal":0,"frame":0,"x":0,"y":0,"w":1})));
+    assert!(!item(
+        &json!({"ordinal":1,"frame":0,"x":0,"y":0,"w":1,"hOut":[1]})
+    ));
+    assert!(item(
+        &json!({"ordinal":1,"frame":0,"x":0,"y":0,"w":1,"hOut":[1,2],"hIn":[0,0]})
+    ));
+}

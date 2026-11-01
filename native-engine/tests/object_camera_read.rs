@@ -1,8 +1,5 @@
 //! #2357 G44: the camera read query (keys, layerOn) through the real public envelope, its ownership by the
 //! snapshot dispatcher, and the AE camera kernel fed from the very same pinned snapshot.
-use crate::export_job::native_vector_export::native_ae_camera_export::{
-    build_ae_camera_script_for, AeCameraExportError, NO_ACTIVE_CAMERA,
-};
 use crate::history::NativeObjectHistory;
 use crate::request_receipts::OpacityRequest;
 use crate::revision::ObjectSnapshot;
@@ -117,22 +114,4 @@ fn stale_wrong_context_and_bad_selectors_are_typed_refusals_and_nothing_mutates(
         "invalid_request"
     );
     assert_eq!(o.content_revision(), before);
-}
-
-#[test]
-fn the_ae_camera_kernel_runs_over_the_same_pinned_snapshot() {
-    let on = pin(&owner(json!({"cameraKeys":keys(2),"cameraLayerOn":true})));
-    let out = build_ae_camera_script_for(on.project().unwrap().project()).unwrap();
-    assert_eq!(out.key_count, 2);
-    assert!(out.script.contains("setValue(320);"));
-    let off = pin(&owner(json!({"cameraKeys":keys(2),"cameraLayerOn":false})));
-    assert_eq!(
-        build_ae_camera_script_for(off.project().unwrap().project()),
-        Err(AeCameraExportError::Refused(NO_ACTIVE_CAMERA))
-    );
-    let none = pin(&owner(json!({})));
-    assert_eq!(
-        build_ae_camera_script_for(none.project().unwrap().project()),
-        Err(AeCameraExportError::Unavailable)
-    );
 }

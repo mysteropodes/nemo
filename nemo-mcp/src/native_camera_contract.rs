@@ -1,6 +1,6 @@
 //! Closed stored-camera read contract (G44, #2357). Native owns the persistent camera keys and layer flag;
 //! the read is pinned and paged, and cameraView stays session state that is never stored or returned.
-use super::{exact, revision};
+use crate::native_contract::{exact, revision};
 use crate::contract::bounded_identifier;
 use serde_json::Value;
 
@@ -29,7 +29,7 @@ fn selector(v: &Value) -> bool {
         _ => false,
     }
 }
-pub(super) fn request(op: &str, v: &Value) -> bool {
+pub(crate) fn request(op: &str, v: &Value) -> bool {
     op == READ
         && exact(
             v,
@@ -121,7 +121,7 @@ fn page(v: &Value, selector: &Value) -> bool {
         v["nextCursor"].is_null()
     }
 }
-pub(super) fn result(op: &str, document: &str, payload: &Value, value: &Value) -> bool {
+pub(crate) fn result(op: &str, document: &str, payload: &Value, value: &Value) -> bool {
     if op != READ
         || !request(op, payload)
         || exact(

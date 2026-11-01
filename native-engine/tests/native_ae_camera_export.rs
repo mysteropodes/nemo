@@ -3,14 +3,14 @@
 //! keys, fps and canvas width to both writers; the generated JSX must be byte-identical.
 use super::{
     build_ae_camera_script, build_ae_camera_script_for, js_number, AeCameraExportError,
-    NO_ACTIVE_CAMERA,
+    AeCameraKey, NO_ACTIVE_CAMERA,
 };
-use crate::object_document::ProjectCameraKey;
+use crate::history::NativeObjectHistory;
 use serde_json::{json, Value};
 
 const ORACLE: &str = include_str!("fixtures/native-ae-camera-export/oracle.json");
 
-fn keys(value: &Value) -> Vec<ProjectCameraKey> {
+fn keys(value: &Value) -> Vec<AeCameraKey> {
     serde_json::from_value(value.clone()).expect("camera keys")
 }
 
@@ -124,21 +124,40 @@ fn js_number_matches_javascript_string_conversion() {
     }
 }
 
-#[test]
-fn script_for_a_pinned_project_reads_its_stored_camera() {
-    use crate::object_document::ProjectMetadata;
-    let k = keys(&json!([{"frame":24,"x":10,"y":20,"w":30,"rot":5}]));
-    let project = ProjectMetadata::new(1920, 1080, 24.0)
+fn snapshot(extra: Value) -> crate::revision::ObjectSnapshot {
+    let mut project = json!({"canvasW":320,"canvasH":180,"fps":24});
+    project
+        .as_object_mut()
         .unwrap()
-        .with_camera(Some(k), Some(true))
-        .unwrap();
-    let out = build_ae_camera_script_for(&project).unwrap();
-    assert_eq!(out.key_count, 1);
-    assert!(out.script.contains("var times = [1];"));
-    assert!(out.script.contains("setValue(1920);"));
-    let none = ProjectMetadata::new(1920, 1080, 24.0).unwrap();
+        .extend(extra.as_object().unwrap().clone());
+    let wire = json!({
+        "format":"nemo.native-project-document","formatVersion":1,
+        "project":project,"viewportReference":null,"assets":[],
+        "drawing":{"format":"nemo.native-object-document","formatVersion":1,
+            "totalFrames":40,"layers":[{"layerUid":"L"}],"objects":[]}
+    });
+    let o =
+        NativeObjectHistory::from_project_file("ae-camera", wire.to_string().as_bytes()).unwrap();
+    o.acquire_snapshot(o.content_revision()).unwrap()
+}
+
+#[test]
+fn the_kernel_runs_over_a_pinned_snapshots_stored_camera() {
+    let on = snapshot(json!({"cameraKeys":[
+        {"frame":24,"x":10,"y":20,"w":30,"rot":5,"ease":[0.25,0.1,0.25,1]},
+        {"frame":0,"x":1,"y":2,"w":3}],"cameraLayerOn":true}));
+    let out = build_ae_camera_script_for(&on).unwrap();
+    assert_eq!(out.key_count, 2);
+    assert!(out.script.contains("var times = [0,1];"));
+    assert!(out.script.contains("setValue(320);"));
+    assert!(out.script.contains("rotZ.setValuesAtTimes(times, [0,5]);"));
+    let off = snapshot(json!({"cameraKeys":[{"frame":0,"x":1,"y":2,"w":3}],"cameraLayerOn":false}));
     assert_eq!(
-        build_ae_camera_script_for(&none),
+        build_ae_camera_script_for(&off),
+        Err(AeCameraExportError::Refused(NO_ACTIVE_CAMERA))
+    );
+    assert_eq!(
+        build_ae_camera_script_for(&snapshot(json!({}))),
         Err(AeCameraExportError::Unavailable)
     );
 }

@@ -2,10 +2,22 @@
 //! Port of baseline `src/js/ae-camera-export.js` @1065e9d8: the same keyframe times (frame / fps), the same
 //! Point of Interest / Position / Z Rotation values and the same ExtendScript text. Linear interpolation only, as in
 //! the baseline (AE re-eases natively). The job route that writes the file rides the EXPORT-A lane.
-use crate::object_document::{ProjectCameraKey, ProjectMetadata};
+use crate::revision::ObjectSnapshot;
+use serde::Deserialize;
 
 /// The baseline refusal text when the camera layer is off or there are no keys.
 pub(crate) const NO_ACTIVE_CAMERA: &str = "Aucun calque caméra actif — rien à exporter.";
+
+/// One stored camera key: only what the script writes (handles and ease are not exported).
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub(crate) struct AeCameraKey {
+    pub(crate) frame: f64,
+    pub(crate) x: f64,
+    pub(crate) y: f64,
+    pub(crate) w: f64,
+    #[serde(default)]
+    pub(crate) rot: Option<f64>,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct AeCameraScript {
@@ -60,7 +72,7 @@ fn list(items: &[String]) -> String {
 
 /// The script for the stored keys at the project's fps and canvas width (the fixed AE Zoom).
 pub(crate) fn build_ae_camera_script(
-    keys: Option<&[ProjectCameraKey]>,
+    keys: Option<&[AeCameraKey]>,
     layer_on: Option<bool>,
     fps: f64,
     canvas_w: u32,
@@ -72,7 +84,7 @@ pub(crate) fn build_ae_camera_script(
     if layer_on != Some(true) || keys.is_empty() {
         return Err(AeCameraExportError::Refused(NO_ACTIVE_CAMERA));
     }
-    let mut sorted: Vec<&ProjectCameraKey> = keys.iter().collect();
+    let mut sorted: Vec<&AeCameraKey> = keys.iter().collect();
     sorted.sort_by(|a, b| a.frame.total_cmp(&b.frame));
     let (mut times, mut poi, mut pos, mut rot) = (vec![], vec![], vec![], vec![]);
     for key in sorted {
@@ -83,7 +95,7 @@ pub(crate) fn build_ae_camera_script(
         times.push(js_number(time));
         poi.push(triple(key.x, key.y, 0.0));
         pos.push(triple(key.x, key.y, -key.w));
-        rot.push(js_number(key.rot.value().copied().unwrap_or(0.0)));
+        rot.push(js_number(key.rot.unwrap_or(0.0)));
     }
     let (times, poi, pos, rot) = (list(&times), list(&poi), list(&pos), list(&rot));
     let lines = [
@@ -124,12 +136,28 @@ pub(crate) fn build_ae_camera_script(
     })
 }
 
-/// The same script over a pinned project's stored camera, canvas width and fps.
+/// The same script over a pinned snapshot's stored camera, canvas width and fps.
 pub(crate) fn build_ae_camera_script_for(
-    project: &ProjectMetadata,
+    snapshot: &ObjectSnapshot,
 ) -> Result<AeCameraScript, AeCameraExportError> {
+    let project = snapshot
+        .project()
+        .ok_or(AeCameraExportError::Unavailable)?
+        .project();
+    let keys: Option<Vec<AeCameraKey>> = project.camera_keys().map(|stored| {
+        stored
+            .iter()
+            .map(|k| AeCameraKey {
+                frame: k.frame,
+                x: k.x,
+                y: k.y,
+                w: k.w,
+                rot: k.rot.value().copied(),
+            })
+            .collect()
+    });
     build_ae_camera_script(
-        project.camera_keys(),
+        keys.as_deref(),
         project.camera_layer_on(),
         project.fps(),
         project.canvas_dimensions().0,

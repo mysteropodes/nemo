@@ -896,6 +896,17 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "Measured on the #2255 candidate with normal cargo-llvm-cov 0.9.1 (unfiltered nemo-mcp suite); new file entry only, every prior entry, floor, exclusion and aggregate is preserved. Source measurement is not installed acceptance."
+    },
+    "nemo-mcp/src/native_camera_contract.rs": {
+      "lines": 97.97,
+      "regions": 98.51,
+      "functions": 100,
+      "note": "G44/#2357: stored-camera read contract measured with cargo-llvm-cov 0.9.1 on the clean #2357 candidate (nemo-mcp suite 512 tests, 0 failed). Only the two new entries are added; every pre-existing file/aggregate floor, exclusion, tool and recorded provenance is unchanged."
+    },
+    "nemo-mcp/src/native_camera_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "G44/#2357: stored-camera read contract measured with cargo-llvm-cov 0.9.1 on the clean #2357 candidate (nemo-mcp suite 512 tests, 0 failed). Only the two new entries are added; every pre-existing file/aggregate floor, exclusion, tool and recorded provenance is unchanged."
     }
   }
 }
