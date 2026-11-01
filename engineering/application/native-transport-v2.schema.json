@@ -9371,6 +9371,23 @@
         {
           "allOf": [
             {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.object.project.camera.read"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectCameraReadPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
               "$ref": "#/$defs/RequiredRevisionRequest"
             },
             {
@@ -10536,6 +10553,9 @@
             },
             {
               "$ref": "#/$defs/ObjectWorkspaceContextResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectCameraReadResult"
             }
           ]
         },
@@ -16284,6 +16304,243 @@
             },
             {
               "$ref": "#/$defs/ObjectProjectShadowPalettePageValue"
+            }
+          ]
+        }
+      }
+    },
+    "ObjectProjectCameraReadPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "selector"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selector": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "settings"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "cursor",
+                "limit"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "keyPage"
+                },
+                "cursor": {
+                  "$ref": "#/$defs/Revision"
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 16
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "Read-only stored camera (keys, layerOn) of the pinned project; contextId is scene-root. cameraView is session state and is never stored or returned."
+    },
+    "ObjectProjectCameraSettingsValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "keysPresent",
+        "keyCount"
+      ],
+      "properties": {
+        "keysPresent": {
+          "type": "boolean"
+        },
+        "keyCount": {
+          "$ref": "#/$defs/Revision"
+        },
+        "layerOn": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "keysPresent": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "keyCount": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectCameraKeyValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "frame",
+        "x",
+        "y",
+        "w"
+      ],
+      "properties": {
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "frame": {
+          "type": "number"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "w": {
+          "type": "number"
+        },
+        "rot": {
+          "type": "number"
+        },
+        "hOut": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        },
+        "hIn": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        },
+        "ease": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "ObjectProjectCameraKeyPageValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "keysPresent",
+        "keyCount",
+        "cursor",
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "kind": {
+          "const": "cameraKeyPage"
+        },
+        "keysPresent": {
+          "type": "boolean"
+        },
+        "keyCount": {
+          "$ref": "#/$defs/Revision"
+        },
+        "cursor": {
+          "$ref": "#/$defs/Revision"
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/ObjectProjectCameraKeyValue"
+          }
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Revision"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "ObjectProjectCameraReadResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "result"
+      ],
+      "properties": {
+        "instanceId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "documentId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "result": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectProjectCameraSettingsValue"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectCameraKeyPageValue"
             }
           ]
         }

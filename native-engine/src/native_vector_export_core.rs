@@ -14,3 +14,6 @@ pub(crate) mod native_vector_export_lottie;
 
 #[path = "native_vector_export_rive.rs"]
 pub(crate) mod native_vector_export_rive;
+
+#[path = "native_ae_camera_export.rs"]
+pub(crate) mod native_ae_camera_export;

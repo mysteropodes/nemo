@@ -130,7 +130,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
             | guide::READ
             | shadow::READ
             | perspective::READ
-            | settings::symmetry::READ
+            | settings::symmetry::READ | settings::camera::READ
             | workspace::READ
             | custom_brush::READ
             | comments::READ
@@ -206,7 +206,7 @@ fn request_check(operation: &str, payload: &Value) -> Option<bool> {
         guide::READ | guide::EDIT => guide::request(operation, payload),
         shadow::READ | shadow::EDIT => shadow::request(operation, payload),
         perspective::READ | perspective::EDIT => perspective::request(operation, payload),
-        settings::symmetry::READ | settings::symmetry::EDIT => settings::symmetry::request(operation, payload),
+        settings::symmetry::READ | settings::symmetry::EDIT | settings::camera::READ => settings::route_request(operation, payload),
         workspace::READ | workspace::EDIT => workspace::request(operation, payload),
         comments::READ | comments::EDIT => comments::request(operation, payload),
         custom_brush::READ | custom_brush::EDIT => custom_brush::request(operation, payload),
@@ -421,7 +421,7 @@ fn result_validator(operation: &str) -> Option<ResultValidator> {
         custom_brush::READ | custom_brush::EDIT => |o, d, p, r| custom_brush::result(o, d, p, r),
         workspace::READ | workspace::EDIT => |o, d, p, r| workspace::result(o, d, p, r),
         perspective::READ | perspective::EDIT => |o, d, p, r| perspective::result(o, d, p, r),
-        settings::symmetry::READ | settings::symmetry::EDIT => |o, d, p, r| settings::symmetry::result(o, d, p, r),
+        settings::symmetry::READ | settings::symmetry::EDIT | settings::camera::READ => |o, d, p, r| settings::route_result(o, d, p, r),
         shadow::READ | shadow::EDIT => |o, d, p, r| shadow::result(o, d, p, r),
         guide::READ | guide::EDIT => |o, d, p, r| guide::result(o, d, p, r),
         op if brush::owns(op) => |o, _, p, r| brush::result(o, p, r),
