@@ -44,12 +44,13 @@ function harness(options) {
   const flushFrames = () => { for (let n = 0; n < 4 && frames.length; n++) frames.splice(0).forEach((fn) => fn()); };
   const live = fx.session.info;
   const presentation = () => Object.assign(live(), { owner: 'native', status: 'presented', contextId: 'scene-root', frame: sandbox.state.currentFrame });
-  let shown = null, shownRevision = -1;
+  let shown = null, shownRevision = -1, busy = false;
   const info = () => Object.assign(live(), { canvasW: 960, canvasH: 540, layers: [{ layerUid: UID }, { layerUid: LOCKED }] });
   Object.assign(fx.session, {
     info,
     readSubscriptionGeneration: () => 1,
-    readPresentedObjectSession() {
+    readPresentedObjectSession(why) {
+      if (busy) { if (why) why('queue-pending'); return null; } // installed: any pending command (e.g. the Mesh read) hides the presentation
       if (shownRevision !== fx.state.revision || shown.presentation.frame !== sandbox.state.currentFrame) { shownRevision = fx.state.revision; shown = Object.assign(info(), { available: true, kind: 'native-object', presentation: presentation() }); }
       return shown;
     },
@@ -74,7 +75,7 @@ function harness(options) {
     for (const l of listeners.filter((entry) => entry.type === type)) { l.fn(e); if (e.stopped) break; }
     return e;
   };
-  return { represent: () => { shownRevision = -1; }, pan, created, fx, sandbox, listeners, fields, legacy, toasts, reads, fire, flushFrames, frames,
+  return { setBusy: (v) => { busy = v; }, represent: () => { shownRevision = -1; }, pan, created, fx, sandbox, listeners, fields, legacy, toasts, reads, fire, flushFrames, frames,
     // Inside the context `window` is its global object, not the sandbox object: the controller is keyed by that one.
     ui: () => sandbox.NemoNativeObjectWidgetUI.desktop(vm.runInContext('globalThis', sandbox)),
       sent: () => { assert.deepEqual(toasts.filter((t) => !/^toastWidgetLayerAdded$/.test(t)), [], 'a refused or uncorrelated command would have been toasted'); return fx.owner.log.received.map((r) => [r.operation, r.payload]); } };
@@ -191,6 +192,20 @@ test('a read that re-presents the same revision still draws its pads, and new pr
   assert.equal(h.ui().items().length, 2, 'the pads stay');
   h.fx.state.revision += 1; h.flushFrames(); await new Promise((resolve) => setImmediate(resolve)); h.flushFrames();
   assert.equal(h.reads.length, base + 1, 'a new revision is read once'); assert.equal(h.ui().items().length, 2);
+});
+
+test('a refresh that finds the queue busy reads once the queue settles, instead of never (installed: the Mesh read precedes it, #2255)', async () => {
+  const h = await started();
+  const base = h.reads.length;
+  h.setBusy(true); h.fx.state.revision += 1;
+  await h.ui().refresh(); // the presented hook's call, right after the Mesh panel queued its own read
+  assert.equal(h.reads.length, base, 'nothing is read while the queue hides the presentation');
+  setTimeout(() => h.setBusy(false), 30);
+  for (let i = 0; i < 60 && h.reads.length === base; i++) await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(h.reads.length, base + 1, 'one read once the queue settled, without another frame or presentation');
+  assert.equal(h.reads[h.reads.length - 1].pin, h.fx.state.revision);
+  h.flushFrames(); await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.ui().items().length, 2, 'the pads are drawn');
 });
 
 test('Widget settings on a native layer row edits the axis range and the size through widget.settings, with the baseline prompts', async () => {

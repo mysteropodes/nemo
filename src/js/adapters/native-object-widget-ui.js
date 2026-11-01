@@ -108,9 +108,22 @@
       });
     }
 
+    // #2255: the presented hook (and the Mesh read issued just before it) often finds the queue busy, which hides the presentation; that
+    // is "not yet", so the read waits for the queue (bounded, the shared presentation wait) instead of never happening.
+    let settling = false;
+    function settleThenRefresh() {
+      const W = win.NemoNativePresentationWait, s = session(win);
+      if (settling || !W || !s) return;
+      settling = true;
+      W.until(win, s, () => !!proofNow(win), () => active(win)).then((ok) => { settling = false; if (ok) refresh(); }, () => { settling = false; });
+    }
     function refresh() {
       const proof = proofNow(win), prior = cached;
-      if (!proof && cached && queueBusy(win)) { if (hadPads) watch(); return Promise.resolve(cached.read); } // busy is not changed: keep the pads and the drag, look again next frame
+      if (!proof && queueBusy(win)) { // busy is not changed: keep the pads and the drag, and read once the queue settles
+        settleThenRefresh();
+        if (cached) { if (hadPads) watch(); return Promise.resolve(cached.read); }
+        return Promise.resolve(null);
+      }
       if (!proof) { if (cached) { serial++; cached = null; cancel(); } paint(); return Promise.resolve(null); }
       const key = keyOf(proof);
       // #2255: the read is keyed by revision and frame, not by the presentation object: every read re-presents the same revision, so a
