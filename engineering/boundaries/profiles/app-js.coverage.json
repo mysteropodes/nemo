@@ -4355,7 +4355,7 @@
     },
     {
       "path": "src/js/adapters/native-object-widget-link.js",
-      "moduleId": "app.native.object.widget.ui.adapter",
+      "moduleId": "app.native.motion.properties.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {

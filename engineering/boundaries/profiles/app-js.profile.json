@@ -3366,7 +3366,8 @@
         "native-motion-control-rows.js",
         "native-motion-expression-snippets.js",
         "native-motion-expression-whip.js",
-        "native-motion-expression-editor.js"
+        "native-motion-expression-editor.js",
+        "native-object-widget-link.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
@@ -3488,8 +3489,7 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-widget-ui.js",
-        "native-object-widget-link.js"
+        "native-object-widget-ui.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
