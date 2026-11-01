@@ -27,10 +27,11 @@
     const toast = (m) => { if (typeof ports.showToast === 'function') ports.showToast(m); };
     const head = make('label', 'motion-expr-toggle'), cb = make('input'), whip = make('span', 'motion-expr-whip');
     const examples = make('button', 'motion-expr-glob', tr('btnExamplesEllipsis', 'Examples…'));
+    const removeBtn = make('button', 'motion-expr-glob', tr('exprRemove', 'Remove'));
     const pane = make('div', 'motion-expr-pane'), gutter = make('div', 'motion-expr-gutter'), ta = make('textarea', 'motion-expr-code');
     const err = make('div', 'motion-expr-error');
     cb.type = 'checkbox'; ta.spellcheck = false; examples.type = 'button'; removeBtn.type = 'button'; err.hidden = true;
-    head.appendChild(cb); head.appendChild(doc.createTextNode(' ' + tr('exprEnableLabel', 'Enable the expression'))); head.appendChild(whip);
+    head.appendChild(cb); head.appendChild(make('span', '', ' ' + tr('exprEnableLabel', 'Enable the expression'))); head.appendChild(whip);
     whip.title = tr('titleExprWhipHint', 'Drag onto a control row to insert its reference (Alt: clone its expression)');
     examples.title = tr('titleExamplesHint', 'Insert a common expression'); ta.title = tr('titleExprCodeHint', '');
     pane.appendChild(gutter); pane.appendChild(ta);
@@ -134,7 +135,9 @@
     on(whip, 'mousedown', (e) => {
       if (!target) return;
       Whip.start({ document: doc }, e, whip, async (pick, mods) => {
-        const ref = Whip.reference({ layerUid: target.layerUid, property }, pick);
+        // Alt clones the dropped property's own expression (any row but this one); a plain drop references an expression control.
+        const self = !!pick && !!pick.target && pick.target.layerUid === target.layerUid && pick.property === property;
+        const ref = mods.alt && !self ? { text: null } : Whip.reference({ layerUid: target.layerUid, property }, pick);
         if (ref.reject) { toast(tr('toastPropertyNotReferenceable', 'This property cannot be referenced')); return; }
         let text = ref.text;
         if (mods.alt) {
@@ -152,13 +155,14 @@
 
     function announce(reason) { try { if (typeof ports.layoutChanged === 'function') ports.layoutChanged(reason); } catch (_) { /* presentation only */ } }
     return Object.freeze({
-      mount(container) { host = container; host.replaceChildren(head, examples, removeBtn, pane, err); },
+      mount(container) { host = container; },
       open(nextTarget, nextProperty, nextDimension) {
         target = nextTarget; property = nextProperty; dimension = nextDimension; source = null; loadedPin = null; ta.value = '';
+        if (host) host.replaceChildren(head, examples, removeBtn, pane, err);
         ta.placeholder = dimension === 2 ? '[value[0] + wiggle(2, 10)[0], value[1] + wiggle(2, 10)[1]]' : 'value + wiggle(2, 10)';
         paintGutter(); announce('expression-open'); return load();
       },
-      close() { ++serial; target = null; source = null; loadedPin = null; ta.value = ''; paintError('', -1); announce('expression-close'); },
+      close() { ++serial; target = null; source = null; loadedPin = null; ta.value = ''; paintError('', -1); if (host) host.replaceChildren(); announce('expression-close'); },
       refresh() { return target ? load() : Promise.resolve(false); },
       isOpenFor(t, p) { return !!target && target.layerUid === t.layerUid && target.strokeId === t.strokeId && property === p; },
       read() { return Object.freeze({ code: ta.value, enabled: cb.checked, errorLine, error: err.textContent }); },

@@ -71,6 +71,7 @@
     })();
     function exprPlace(){if(!exprDrawer||exprDrawer.id===null)return;var slot=rowIndex.get(exprDrawer.id);if(!slot||!body.contains(slot)){exprClose();return;}if(exprDrawer.holder.parentNode!==slot)slot.appendChild(exprDrawer.holder);exprDrawer.holder.hidden=false;}
     function exprClose(){if(!exprDrawer||exprDrawer.id===null)return;exprDrawer.id=null;exprDrawer.editor.close();exprDrawer.holder.hidden=true;if(exprDrawer.holder.parentNode!==section)section.appendChild(exprDrawer.holder);}
+    function exprStow(){if(!exprDrawer)return;exprDrawer.holder.hidden=true;if(exprDrawer.holder.parentNode!==section)section.appendChild(exprDrawer.holder);}
     function exprToggle(target,property,dimension){
       if(!exprDrawer)return false;var id=rowId(target,property);if(exprDrawer.id===id){exprClose();return true;}
       exprClose();exprDrawer.id=id;exprPlace();if(exprDrawer.id===null)return false;exprDrawer.editor.open(target,property,dimension);return true;
@@ -167,7 +168,7 @@
     function savePreference(){try{if(ports.writePreference)ports.writePreference('nemo-motion-filter',mode);}catch(_){}}
     function button(label,action){var node=make('button',label);node.type='button';node.addEventListener('click',action);toolbar.appendChild(node);controls.push([node,action]);return node;}
     function clearValues(){valueEditors.forEach(function(editor){editor.dispose();});valueEditors=[];}
-    function clearBody(){linkRows.forEach(function(item){try{item.dispose();}catch(_){}});linkRows=[];releaseExpressionRows();clearValues();clearKeys();exprClose();rowBindings.forEach(function(pair){pair[0].removeEventListener(pair[2]||'click',pair[1]);});rowBindings=[];body.replaceChildren();}
+    function clearBody(){linkRows.forEach(function(item){try{item.dispose();}catch(_){}});linkRows=[];releaseExpressionRows();clearValues();clearKeys();exprStow();rowBindings.forEach(function(pair){pair[0].removeEventListener(pair[2]||'click',pair[1]);});rowBindings=[];body.replaceChildren();}
     // Interim element names: the native read model carries no element names yet (read-model gap), so derive
     // "<kind> <n>" from the stable strokeId prefix and the element's 1-based ordinal among its layer's elements.
     function elementLabel(t){
