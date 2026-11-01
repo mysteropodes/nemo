@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "e7e9ff5165974e6cde8dd74930d1f05fe8c6ca90",
+    "candidateCommit": "e86661aa8546c74623d2ae834f8f0dc86ce47f91",
     "sourceRootTree": "c96281208b2346594a4553b8402bdefc9b3e481f",
     "applicationTree": {
       "path": "src/js",
       "gitTree": "02c07c1baa81c34c7827137a15d8ff543ed4b703",
-      "lastChangedCommit": "e7e9ff5165974e6cde8dd74930d1f05fe8c6ca90"
+      "lastChangedCommit": "e86661aa8546c74623d2ae834f8f0dc86ce47f91"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -43,7 +43,7 @@
         "gitBlob": "791d5cc638581f574de7f283a6b92a9bdac7d520",
         "sha256": "11556bf2e855b11bf9d186b8de689a2a921eaa4292322f782287bf0bab1593db",
         "moduleCount": 307,
-        "basedOnCommit": "e7e9ff5165974e6cde8dd74930d1f05fe8c6ca90"
+        "basedOnCommit": "e86661aa8546c74623d2ae834f8f0dc86ce47f91"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -125,7 +125,7 @@
     "externalClassicTags": 390,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
-    "retainedClassicTags": 382,
+    "retainedClassicTags": 386,
     "retainedModuleTags": 2,
     "classicTagsUnderSrcJsIncludingVendors": 389,
     "inlineScripts": [
@@ -4354,6 +4354,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-object-widget-link.js",
+      "moduleId": "app.native.object.widget.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2676,
+          "scriptOrdinal": 325
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-history-read-contract.js",
       "moduleId": "app.native.history.read.contract",
       "executionClass": "document-classic",
@@ -4494,6 +4506,42 @@
           "path": "src/index.html",
           "line": 2688,
           "scriptOrdinal": 337
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-motion-expression-snippets.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2478,
+          "scriptOrdinal": 151
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-motion-expression-whip.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2479,
+          "scriptOrdinal": 152
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-motion-expression-editor.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2480,
+          "scriptOrdinal": 153
         }
       ]
     },
