@@ -250,7 +250,7 @@ test('the right panel edits one setting per field through widget.settings and th
   assert.equal(h.fields['p-widget-sec'].style.display, '');
   assert.deepEqual(['p-widget-w', 'p-widget-h', 'p-widget-xmin', 'p-widget-xmax', 'p-widget-xrest', 'p-widget-ymax'].map((id) => h.fields[id].value), [200, 200, -100, 100, 0, 100]);
   assert.equal(h.fields['p-widget-xlabel'].textContent, 'X');
-  assert.equal(h.fields['p-widget-xadd'].style.display, 'none', 'the property-link button has no native route');
+  assert.equal(h.fields['p-widget-xadd'].style.display, '', 'D18-C: the property-link button routes to the native link menu');
   const edits = [['p-widget-xmax', '50', { x: { max: 50 } }], ['p-widget-yrest', '-20', { y: { rest: -20 } }], ['p-widget-w', '300', { size: [300, 200] }], ['p-widget-h', '2', { size: [200, 8] }]];
   for (const [id, value, set] of edits) {
     h.fields[id].value = value;
