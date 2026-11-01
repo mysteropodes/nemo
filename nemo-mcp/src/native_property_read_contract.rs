@@ -29,6 +29,10 @@ pub(super) fn request(value: &Value) -> bool {
                         |v| target(&v["target"]) && text(v.get("property")) && finite(&v["frame"]),
                     )
                 }
+                Some("expressionSource") => {
+                    exact(&p["view"], &["kind", "target", "property"], &[])
+                        .is_some_and(|v| target(&v["target"]) && text(v.get("property")))
+                }
                 Some("authoredKeys") => exact(
                     &p["view"],
                     &["kind", "target", "property", "offset", "limit"],
@@ -92,6 +96,7 @@ pub(super) fn result(document: &str, payload: &Value, value: &Value) -> bool {
     let raw = view["kind"] == "rawSample";
     let context = view["kind"] == "expressionContext";
     let expression = view["kind"] == "expressionState";
+    let source = view["kind"] == "expressionSource";
     let mut required = vec![
         "instanceId",
         "documentId",
@@ -108,6 +113,8 @@ pub(super) fn result(document: &str, payload: &Value, value: &Value) -> bool {
         vec!["frame", "self", "comp", "keyCount", "compUnavailable"]
     } else if expression {
         vec!["frame", "expression", "evaluation"]
+    } else if source {
+        vec!["expression"]
     } else {
         vec!["trackPresent", "items", "nextOffset"]
     });
@@ -126,7 +133,9 @@ pub(super) fn result(document: &str, payload: &Value, value: &Value) -> bool {
     let Some(dimension) = value["dimension"].as_u64().filter(|d| (1..=4).contains(d)) else {
         return false;
     };
-    let valid = if expression {
+    let valid = if source {
+        expression_source(&value["expression"])
+    } else if expression {
         finite(&value["frame"])
             && value["frame"].as_f64() == view["frame"].as_f64()
             && expression_state(value)
@@ -279,6 +288,12 @@ fn mesh_context(value: &Value, target: &Value, property: &Value) -> bool {
 #[path = "native_property_read_contract_tests.rs"]
 mod tests;
 
+// Exact authored bytes: null when no expression is authored, an empty code stays present.
+fn expression_source(value: &Value) -> bool {
+    value.is_null()
+        || exact(value, &["enabled", "code"], &[])
+            .is_some_and(|e| e["enabled"].is_boolean() && e["code"].is_string())
+}
 fn expression_state(value: &Value) -> bool {
     let expression = &value["expression"];
     let evaluation = &value["evaluation"];

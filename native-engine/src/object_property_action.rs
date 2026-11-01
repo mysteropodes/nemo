@@ -21,6 +21,15 @@ pub(crate) enum PropertyAction {
     SetExpression {
         expression: Option<OrderExpression>,
     },
+    // Public expression authoring intents, resolved onto the sealed `SetExpression` by the owner.
+    #[serde(rename = "setExpression")]
+    SetExpressionCode {
+        code: String,
+    },
+    SetExpressionEnabled {
+        enabled: bool,
+    },
+    RemoveExpression {},
     SetValue {
         frame: Number,
         values: Vec<Number>,

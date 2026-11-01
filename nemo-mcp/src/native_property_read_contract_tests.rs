@@ -413,3 +413,60 @@ fn expression_state_is_closed_correlated_and_does_not_infer_missing_evaluations(
         assert!(!result("document", &p, &bad), "{pointer}");
     }
 }
+
+#[test]
+fn expression_source_is_exact_closed_frameless_and_correlated() {
+    let mut p = payload(false);
+    p["view"] = json!({"kind":"expressionSource","target":p["view"]["target"],"property":"opacity"});
+    let mut v = output(false);
+    v.as_object_mut().unwrap().remove("value");
+    v.as_object_mut().unwrap().remove("frame");
+    v["kind"] = json!("expressionSource");
+    assert!(request(&p));
+    for expression in [
+        Value::Null,
+        json!({"enabled":false,"code":""}),
+        json!({"enabled":true,"code":"data:x\r\n値 🧭"}),
+    ] {
+        v["expression"] = expression;
+        assert!(result("document", &p, &v));
+    }
+    v["expression"] = json!({"enabled":true,"code":"return 1;"});
+    for (pointer, replacement) in [
+        ("/expression", json!({"enabled":true})),
+        ("/expression", json!({"code":"x"})),
+        ("/expression", json!({"enabled":1,"code":"x"})),
+        ("/expression", json!({"enabled":true,"code":null})),
+        ("/expression", json!({"enabled":true,"code":"x","present":true})),
+        ("/expression", json!("return 1;")),
+        ("/target/layerUid", json!("foreign")),
+        ("/property", json!("foreign")),
+        ("/documentSnapshotId", json!("foreign")),
+        ("/kind", json!("expressionState")),
+    ] {
+        let mut bad = v.clone();
+        *bad.pointer_mut(pointer).unwrap() = replacement;
+        assert!(!result("document", &p, &bad), "{pointer}");
+    }
+    for (pointer, extra) in [("/frame", json!(0)), ("/evaluation", json!({"state":"unavailable","reason":"not-evaluated"})), ("/value", json!([1]))] {
+        let mut bad = v.clone();
+        bad.as_object_mut().unwrap().insert(pointer[1..].into(), extra);
+        assert!(!result("document", &p, &bad), "{pointer}");
+    }
+    let mut missing = v.clone();
+    missing.as_object_mut().unwrap().remove("expression");
+    assert!(!result("document", &p, &missing));
+    // The view carries no frame and no paging fields.
+    for key in ["frame", "offset", "limit"] {
+        let mut bad = p.clone();
+        bad["view"][key] = json!(0);
+        assert!(!request(&bad), "{key}");
+    }
+    let mut bad = p.clone();
+    bad["view"]["property"] = json!("");
+    assert!(!request(&bad));
+    // A 3072-byte provider bound refuses an oversized page rather than trimming it.
+    v["expression"] = json!({"enabled":true,"code":"y".repeat(3100)});
+    assert!(!result("document", &p, &v));
+    let _: NativeApplicationRequest = serde_json::from_value(json!({"apiVersion":2,"requestId":"source","instanceId":"instance","documentId":"document","operation":OP,"payload":p})).unwrap();
+}

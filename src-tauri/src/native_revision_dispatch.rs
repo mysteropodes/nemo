@@ -376,6 +376,8 @@ mod property_edit_tests;
 mod property_bake_tests;
 
 #[cfg(test)]
+#[path = "native_property_expression_dispatch_tests.rs"]
+mod property_expression_tests;
 #[path = "native_property_control_dispatch_tests.rs"]
 mod property_control_tests;
 

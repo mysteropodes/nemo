@@ -1,5 +1,5 @@
 //! nemo-test-harness: test-application => object_property_expression_authoring_tests
-//! #2376 private native expression authoring: exact source, one owner/history and no public capability expansion.
+//! #2376 private native expression authoring: exact source, one owner/history and the sealed producer.
 #[path = "object_vector_edit_support.rs"]
 #[allow(dead_code)]
 mod support;
@@ -8,7 +8,7 @@ use crate::history::NativeObjectHistory;
 use crate::object_codec::{decode_storage_project, encode_storage_project};
 use crate::object_document::PropertyHolderTarget;
 use crate::object_snapshot::ObjectSnapshot;
-use crate::request_receipts::{DispatchErrorCode as Code, OpacityRequest};
+use crate::request_receipts::DispatchErrorCode as Code;
 use serde_json::{json, Value};
 
 fn target() -> Value {
@@ -323,34 +323,6 @@ fn expression_authoring_bounds_code_by_utf8_bytes_and_private_envelope_without_p
     );
     bounded.push(b' ');
     assert_refused(&mut owner, &bounded, Code::InvalidRequest);
-}
-
-#[test]
-fn expression_authoring_does_not_open_generic_public_edit_or_source_read_variants() {
-    let mut owner = make_owner(2);
-    for (index, action) in [
-        json!({"kind":"setExpression","expression":expression("return 9;",true)}),
-        json!({"kind":"removeExpression"}),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        let before = state(&owner);
-        let q: OpacityRequest=serde_json::from_value(json!({"apiVersion":2,"requestId":format!("unavailable-expression-{index}"),"instanceId":owner.instance_id(),"documentId":owner.document_id(),"expectedRevision":owner.content_revision(),"operation":"command.document.object.property.edit","payload":{"command":"object.property.edit","target":target(),"property":"opacity","action":action}})).unwrap();
-        let response = owner.try_dispatch_object_command(&q).unwrap().unwrap();
-        assert!(!response.ok);
-        assert_eq!(
-            serde_json::to_value(response).unwrap()["error"]["code"],
-            "invalid_request"
-        );
-        assert_eq!(state(&owner), before);
-    }
-    let pin = snapshot(&owner);
-    let read = json!({"instanceId":pin.instance_id(),"documentId":pin.document_id(),"atRevision":pin.content_revision(),"documentSnapshotId":pin.snapshot_id(),"view":{"kind":"expressionSource","target":target(),"property":"opacity"}});
-    assert_eq!(
-        pin.query_property_read_json(&serde_json::to_vec(&read).unwrap()),
-        Err(Code::InvalidRequest)
-    );
 }
 
 #[test]

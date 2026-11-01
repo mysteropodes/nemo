@@ -40,15 +40,23 @@ test('D36 declaration keeps mutation admission separate from read-only metadata 
   assert.deepEqual(payload.properties.target.required, ['contextId', 'layerUid']);
   assert.equal(payload.properties.target.additionalProperties, false);
   assert.deepEqual(payload.properties.action.oneOf.map(v => v.properties.kind.const),
-    ['setValue', 'setKey', 'removeKey', 'setAnimated', 'bake', 'addControl', 'renameControl', 'removeControl', 'moveControl']);
+    ['setValue', 'setKey', 'removeKey', 'setAnimated', 'bake', 'setExpression', 'setExpressionEnabled', 'removeExpression', 'addControl', 'renameControl', 'removeControl', 'moveControl']);
   for (const action of payload.properties.action.oneOf) {
     assert.equal(action.additionalProperties, false);
     if (/^(?:add|rename|remove|move)Control$/.test(action.properties.kind.const)) {
       assert.equal(action.properties.frame, undefined, 'a control declaration edit carries no frame');
       assert.deepEqual(action.required, ['kind', ...Object.keys(action.properties).filter(k => k !== 'kind')]);
-    } else if (action.properties.kind.const === 'bake') {
+    } else if (['bake', 'removeExpression'].includes(action.properties.kind.const)) {
       assert.deepEqual(action.required, ['kind']);
       assert.deepEqual(Object.keys(action.properties), ['kind']);
+    } else if (action.properties.kind.const === 'setExpression') {
+      assert.deepEqual(action.required, ['kind', 'code']);
+      assert.equal(action.properties.frame, undefined);
+      assert.equal(action.properties.code.type, 'string');
+      assert.equal(action.properties.code.maxLength, 4096);
+    } else if (action.properties.kind.const === 'setExpressionEnabled') {
+      assert.deepEqual(action.required, ['kind', 'enabled']);
+      assert.equal(action.properties.enabled.type, 'boolean');
     } else {
       assert.equal(action.properties.frame.type, 'number');
       assert.equal(action.properties.frame.minimum, undefined);
@@ -214,6 +222,41 @@ test('native bake sends only the strict intent through the existing public edit 
     assert.throws(()=>SDK.validateRequest(request(action)));
   }
   assert.equal(count,1);
+});
+
+test('expression authoring sends exact code, enablement and removal through the existing edit operation (#2376)', async () => {
+  const unicode = '// café 🧭\r\nconst 値 = 1;\n';
+  const actions = [{kind:'setExpression', code:''}, {kind:'setExpression', code:unicode},
+    // Authored source is data: a leading data:/blob: spelling is exempt at exactly this field.
+    {kind:'setExpression', code:'data:x\nblob:y'}, {kind:'setExpressionEnabled', enabled:true},
+    {kind:'setExpressionEnabled', enabled:false}, {kind:'removeExpression'}];
+  let count = 0;
+  const app = adapter(async sent => { count++; return reply(sent); });
+  for (const action of actions) {
+    const q = request(action);
+    assert.doesNotThrow(() => SDK.validateRequest(q));
+    const r = await app.dispatch(q);
+    assert.equal(r.ok, true);
+  }
+  assert.equal(count, actions.length);
+  const exact = {kind:'setExpression', code:'x'.repeat(4096 - Buffer.byteLength(JSON.stringify(request({kind:'setExpression', code:''}))))};
+  assert.doesNotThrow(() => SDK.validateRequest(request(exact)));
+  // Over the code ceiling, or with a frame/curve/legacy writer shape: refused before transport.
+  for (const action of [{kind:'setExpression'}, {kind:'setExpression', code:null}, {kind:'setExpression', code:7},
+    {kind:'setExpression', code:'x'.repeat(4097)}, {kind:'setExpression', code:'é'.repeat(2049)},
+    {kind:'setExpression', code:'x', enabled:true}, {kind:'setExpression', code:'x', frame:0},
+    {kind:'setExpression', expression:{enabled:true, code:'x'}}, {kind:'setExpressionEnabled'},
+    {kind:'setExpressionEnabled', enabled:1}, {kind:'setExpressionEnabled', enabled:null},
+    {kind:'setExpressionEnabled', enabled:true, code:'x'}, {kind:'removeExpression', code:null},
+    {kind:'removeExpression', frame:0}, {kind:'clearExpression'}, ['setExpression', 'x']]) {
+    assert.throws(() => SDK.validateRequest(request(action)), undefined, JSON.stringify(action));
+  }
+  assert.equal(count, actions.length);
+  // The code string is exempt from the resource-string guard ONLY at action.code.
+  const q = request({kind:'setExpressionEnabled', enabled:true}); q.payload.property = 'data:opaque property';
+  assert.doesNotThrow(() => SDK.validateRequest(q));
+  const bad = request({kind:'setExpressionEnabled', enabled:true}); bad.payload.action.enabled = 'data:x';
+  assert.throws(() => SDK.validateRequest(bad));
 });
 
 test('D18-B control declaration edits are strict frameless intents through the one property edit operation', async () => {
