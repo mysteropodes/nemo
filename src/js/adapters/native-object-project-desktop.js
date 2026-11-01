@@ -249,7 +249,7 @@
     if(root.SMCamera&&typeof root.SMCamera.renderNativeViewLock==='function')root.SMCamera.renderNativeViewLock();
   }
   function createPorts(root){
-    var nativeInvoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null,presentationVersion=0,widgetRevision=null;
+    var nativeInvoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null,presentationVersion=0,widgetRevision=null,widgetPending=null,widgetTries=0;
     function invokeProjectObserved(command,args){
       var pin;
       if(command==='nemo_native_object_export')try{pin=JSON.parse(args.requestJson);settingsDiagnostic(root,'export-request',pin);}catch(_){}
@@ -368,10 +368,14 @@
             root.NemoNativeObjectUI.refreshTiming(root);
           if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshPolicy)root.NemoNativeObjectUI.refreshPolicy(root);
           if(root.SMImageMeshUI&&typeof root.SMImageMeshUI.refresh==='function')root.SMImageMeshUI.refresh();
-          // #2255: the widget pads are re-read once per new document revision, or a widget made elsewhere (MCP, another tab's undo) stays
-          // undrawn. Once per REVISION, not per presentation: the read itself re-presents, so a per-presentation refresh never settles.
+          // #2255: the widget pads are re-read until one read lands per document revision, or a widget made elsewhere (MCP, another tab's
+          // undo) stays undrawn. Never per presentation once landed: the read itself re-presents, so an unconditional refresh never settles.
           var widgets=root.NemoNativeObjectWidgetUI,revision=[info.instanceId,info.lifecycleGeneration,info.documentSnapshotId].join('|');
-          if(widgets&&typeof widgets.desktop==='function'&&revision!==widgetRevision){widgetRevision=revision;widgets.desktop(root).refresh();}
+          if(widgets&&typeof widgets.desktop==='function'&&revision!==widgetRevision){
+            // A read refused while the queue is busy is "not yet": retry on the next presentations (at most 5) until one lands.
+            if(revision!==widgetPending){widgetPending=revision;widgetTries=0;}
+            if(widgetTries++<5)Promise.resolve(widgets.desktop(root).refresh()).then(function(read){if(read&&read.info&&read.info.documentSnapshotId===info.documentSnapshotId&&widgetPending===revision)widgetRevision=revision;},function(){});
+          }
           // A frame paint can precede native completion and leave Motion unavailable.
           // Refresh its existing inspector only after the current frame is presented.
           if(shown&&root.state&&root.state.appMode==='motion'&&shown.frame===root.state.currentFrame&&
