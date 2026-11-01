@@ -21099,7 +21099,7 @@
             },
             "time": {
               "type": "number",
-              "minimum": 1e-08,
+              "minimum": 1e-8,
               "maximum": 0.99999999
             }
           }
