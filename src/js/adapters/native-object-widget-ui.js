@@ -306,7 +306,22 @@
       put('p-widget-xmin', item.x.min); put('p-widget-xmax', item.x.max); put('p-widget-xrest', item.x.rest);
       ['p-widget-yrange-row', 'p-widget-yrest-row'].forEach((id) => { const row = el(id), want = item.y ? '' : 'none'; if (row && row.style.display !== want) row.style.display = want; });
       if (item.y) { text('p-widget-ylabel', item.y.label || 'Y'); put('p-widget-ymin', item.y.min); put('p-widget-ymax', item.y.max); put('p-widget-yrest', item.y.rest); }
-      ['p-widget-xadd', 'p-widget-yadd'].forEach((id) => { if (el(id) && el(id).style.display !== 'none') el(id).style.display = 'none'; });
+      // D18-C: the axis "+" buttons (link a property / drive a pose); the Y one only when the pad has a second axis.
+      [['p-widget-xadd', true], ['p-widget-yadd', !!item.y]].forEach(([id, on]) => { const b = el(id), want = on ? '' : 'none'; if (b && b.style.display !== want) b.style.display = want; });
+    }
+    // D18-C: the axis "+" opens the baseline link menu over the pinned native property reads; nothing writes unless proven current.
+    function openLinkMenu(x, y, axisName) {
+      const L = win.NemoNativeObjectWidgetLink, item = activeItem(), proof = proofNow(win, 'readPropertyMetadata');
+      if (!L || !item || !item[axisName] || !proof || typeof proof.session.editProperty !== 'function') { toast(win, 'Native widget linking is unavailable.'); return false; }
+      const { session, info } = proof, pin = {};
+      PIN.forEach((k) => { pin[k] = info[k]; });
+      L.create({ contextId: 'scene-root', translate: (k) => (win.SM && win.SM.t ? win.SM.t(k) : k), showToast: (m) => toast(win, m),
+        showContextMenu: win.showContextMenu ? (x2, y2, items) => win.showContextMenu(x2, y2, items) : undefined,
+        readContext: () => ({ pin, presented: session.readPresentedObjectSession(), frame: win.state.currentFrame, viewGeneration: 0 }),
+        query: (selector) => session.readPropertyMetadata(selector), layers: () => info.layers.map((l) => ({ layerUid: l.layerUid, name: l.name === undefined ? l.layerUid : l.name })),
+        editProperty: (payload, expected, isCurrent) => session.editProperty(payload, expected, () => isCurrent() && proof.current(true)) })
+        .openMenu(x, y, { layerUid: item.layerUid, name: item[axisName].label || axisName.toUpperCase(), key: item[axisName].key });
+      return true;
     }
     // A panel edit is one `widget.settings` command. The pad size keeps the other edge at its current value.
     const SETTINGS = {
@@ -315,6 +330,10 @@
       'p-widget-ymin': (item, v) => ({ y: { min: v } }), 'p-widget-ymax': (item, v) => ({ y: { max: v } }), 'p-widget-yrest': (item, v) => ({ y: { rest: v } }),
     };
     function bindPanel() {
+      [['p-widget-xadd', 'x'], ['p-widget-yadd', 'y']].forEach(([id, axis]) => {
+        const button = el(id);
+        if (button) button.addEventListener('click', (e) => { if (active(win)) openLinkMenu(e.clientX, e.clientY, axis); });
+      });
       Object.keys(SETTINGS).forEach((id) => {
         const field = el(id);
         if (!field) return;

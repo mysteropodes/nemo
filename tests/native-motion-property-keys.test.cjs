@@ -112,7 +112,7 @@ function integratedModule(name,dependencies){
  const sourceRoot=process.env.NEMO_KEYS_INTEGRATION_ROOT||ROOT,filename=path.join(sourceRoot,'src/js/adapters/'+name+'.js'),m={exports:{}};
  vm.compileFunction(fs.readFileSync(filename,'utf8'),['module','require','TextEncoder','setTimeout'])(m,p=>{assert.ok(Object.prototype.hasOwnProperty.call(dependencies,p),p);return dependencies[p];},TextEncoder,setTimeout);return m.exports;
 }
-const Panel=integratedModule('native-motion-property-panel',{'./native-motion-property-view.js':View,'./native-motion-property-keys.js':Keys,'./native-motion-property-value.js':require(path.join(ROOT,'src/js/adapters/native-motion-property-value.js'))});
+const Panel=integratedModule('native-motion-property-panel',{'./native-motion-property-view.js':View,'./native-motion-property-keys.js':Keys,'./native-motion-property-value.js':require(path.join(ROOT,'src/js/adapters/native-motion-property-value.js')),'./native-motion-expression-editor.js':require(path.join(ROOT,'src/js/adapters/native-motion-expression-editor.js'))});
 const Binding=integratedModule('native-motion-property-binding',{'./native-motion-property-view.js':View,'./native-motion-property-panel.js':Panel});
 function ordinary(options={}){
  const h=fixture(options);h.editor.dispose();const queries=[],rawReads=[],expressionReads=[],layerTarget={contextId:target.contextId,layerUid:target.layerUid};

@@ -146,6 +146,9 @@
     var caller=Panel.createCaller({document:root.document,container:options.container,pageBudget:options.pageBudget,yieldControl:options.yieldControl,
       isMotion:function(){return !retired&&root.state.appMode==='motion';},readContext:readContext,readSelection:readSelection,readSelections:readSelections,readContextId:readContextId,
       query:query,readProperty:readProperty,keyTimelineChanged:options.keyTimelineChanged,
+      // D18-C: the pinned layer table and the toast surface, for the expression editor's Examples menu and its pickwhip messages.
+      layerNames:function(){var v=scope();return v?v.info.layers.map(function(l){return {layerUid:l.layerUid,name:l.name};}):[];},
+      showToast:function(m){if(typeof root.showToast==='function')root.showToast(m);},
       translate:function(key){return root.SM&&typeof root.SM.t==='function'?root.SM.t(key):key;},
       get showContextMenu(){return typeof root.showContextMenu==='function'?function(x,y,items){return root.showContextMenu(x,y,items);}:undefined;},
       get editPropertyTrack(){return typeof ui.editPropertyTrack==='function'?function(payload,pin,current){return editProperty(payload,pin,current,true);}:undefined;},

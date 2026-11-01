@@ -19,6 +19,22 @@
   const tr = (host, key, fallback) => { const value = host.SM && typeof host.SM.t === 'function' ? host.SM.t(key) : null; return typeof value === 'string' && value && value !== key ? value : fallback; };
   const make = (host, tag, className, text) => { const node = host.document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; };
 
+  // The declared controls of one layer, read page by page from the native property metadata (never cached across calls).
+  async function loadControls(ports, target) {
+    const consumer = View.createConsumer({ readContext: ports.readContext, query: ports.query }), found = [];
+    try {
+      let view = { kind: 'properties', target: { contextId: target.contextId, layerUid: target.layerUid }, offset: 0, limit: 8 };
+      for (let pages = 0; pages < 64; pages += 1) {
+        const page = await consumer.load(view);
+        if (!page || page.available !== true) throw new Error('native controls are unavailable');
+        page.items.forEach((item) => { if (item.controlType !== null) found.push({ key: item.property, name: item.controlName, type: item.controlType }); });
+        view = View.continuation(page);
+        if (!view) return found;
+      }
+      throw new Error('native controls exceeded the page bound');
+    } finally { consumer.dispose(); }
+  }
+
   // `ports`: readContext() -> {pin, ...}, query(selector), editProperty(payload, pin, isCurrent). `target`: {contextId, layerUid}.
   function build(host, ports, target) {
     if (!host || !host.document || !ports || typeof ports.readContext !== 'function' || typeof ports.query !== 'function' ||
@@ -31,20 +47,7 @@
     row.appendChild(button); node.appendChild(row); node.appendChild(editor);
     const toast = (message) => { if (typeof host.showToast === 'function') host.showToast(message); };
 
-    async function load() {
-      const consumer = View.createConsumer({ readContext: ports.readContext, query: ports.query }), found = [];
-      try {
-        let view = { kind: 'properties', target: { contextId: target.contextId, layerUid: target.layerUid }, offset: 0, limit: 8 };
-        for (let pages = 0; pages < 64; pages += 1) {
-          const page = await consumer.load(view);
-          if (!page || page.available !== true) throw new Error('native controls are unavailable');
-          page.items.forEach((item) => { if (item.controlType !== null) found.push({ key: item.property, name: item.controlName, type: item.controlType }); });
-          view = View.continuation(page);
-          if (!view) return found;
-        }
-        throw new Error('native controls exceeded the page bound');
-      } finally { consumer.dispose(); }
-    }
+    const load = () => loadControls({ readContext: ports.readContext, query: ports.query }, target);
     async function send(property, action) {
       if (busy) return false;
       busy = true;
@@ -132,5 +135,5 @@
       dispose() { parts.forEach((p) => { try { p.dispose(); } catch (_) { /* a disposed part must not block the others */ } }); } });
   }
 
-  return Object.freeze({ build, compose });
+  return Object.freeze({ build, compose, loadControls });
 }));

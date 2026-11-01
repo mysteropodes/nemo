@@ -66,7 +66,7 @@ function host(options={}){
   stopwatch:(i=0)=>tree(nodes['motion-props-body']).filter(n=>/\bmotion-stopwatch\b/.test(n.className||''))[i],
   fx:(on=true)=>tree(nodes['motion-props-body']).find(n=>/\bmotion-expr-btn\b/.test(n.className||'')&&(!on||/\bon\b/.test(n.className))),
   funnel:()=>tree(nodes['motion-props-body']).find(n=>/\bmotion-filter-btn\b/.test(n.className||'')),
-  async bake(node){await node.fire('click');const items=menus.pop();assert.ok(items&&items.length===1,'f(x) click offers exactly one Bake menu item');return items[0].action();},
+  async bake(node){await node.fire('contextmenu');const items=menus.pop();assert.ok(items&&items.length===1,'f(x) context menu offers exactly one Bake menu item');return items[0].action();},
   status:()=>tree(nodes['motion-props-body']).find(n=>n.attrs.role==='status')?.textContent,
   set hold(v){hold=v;},set ready(v){ready=v;},replace(){info={...info,lifecycleGeneration:info.lifecycleGeneration+1};},transport(){transportGeneration++;},release(){const item=waiting.shift();if(item)item.resolve(reply(item.request));},retire(){UI.restoreInspector(root);},set active(v){active=v;}};
 }
@@ -254,7 +254,7 @@ test('real Order inspector exposes its bake and reads without granting unavailab
   showContextMenu(x,y,items){menus.push(items);},async editProperty(p){writes.push(p);return {applied:true,historyEntriesAdded:1};},editPropertyTrack(){throw Error('Order generic track writer must remain unavailable');}});
  assert.equal(await panel.refresh(true),true);await tick();await tick();
  const numeric=tree(container).filter(n=>n.tagName==='INPUT'&&n.className==='pi scrub motion-val');assert.equal(numeric.length,1);assert.ok(numeric.every(n=>n.disabled&&n.readOnly));
- const bake=tree(container).find(n=>/\bmotion-expr-btn\b/.test(n.className||'')&&/\bon\b/.test(n.className));assert.ok(bake);await bake.fire('click');assert.equal(writes.length,0,'f(x) click only offers Bake');await menus.pop()[0].action();
+ const bake=tree(container).find(n=>/\bmotion-expr-btn\b/.test(n.className||'')&&/\bon\b/.test(n.className));assert.ok(bake);await bake.fire('contextmenu');assert.equal(writes.length,0,'f(x) context menu only offers Bake');await menus.pop()[0].action();
  assert.equal(writes.length,1);assert.equal(writes[0].property,'order');assert.deepEqual(writes[0].action,{kind:'bake'});
  await tree(container).find(n=>/\bmotion-stopwatch\b/.test(n.className||'')).fire('click',{altKey:true});await tick();
  const checks=tree(container).filter(n=>n.type==='checkbox');assert.equal(checks.length,2);assert.ok(checks.every(n=>n.disabled));
@@ -545,9 +545,42 @@ test('f(x) indicator mirrors expressionEnabled and only offers Bake through a me
   const all=tree(h.nodes['motion-props-body']).filter(n=>/\bmotion-expr-btn\b/.test(n.className||''));
   assert.ok(all.length>=2);assert.ok(all.every(n=>/^lico motion-expr-btn( on)?$/.test(n.className)));
   assert.ok(all.some(n=>/ on$/.test(n.className))&&all.some(n=>!/ on$/.test(n.className)));
-  const off=all.find(n=>!/ on$/.test(n.className));await off.fire('click');assert.equal(h.menus.length,0,'an off indicator offers nothing');
-  const on=h.fx();await on.fire('click');assert.equal(writes.length,0,'click alone never writes');assert.equal(h.menus.length,1);
+  const off=all.find(n=>!/ on$/.test(n.className));await off.fire('contextmenu');assert.equal(h.menus.length,0,'an off indicator offers nothing');
+  const on=h.fx();await on.fire('contextmenu');assert.equal(writes.length,0,'opening the menu alone never writes');assert.equal(h.menus.length,1);
   assert.deepEqual(h.menus[0].map(i=>i.label),['Bake expression']);
   await h.menus.pop()[0].action();assert.equal(writes.length,1);assert.deepEqual(writes[0].action,{kind:'bake'});assert.equal(writes[0].command,'object.property.edit');
  }finally{h.retire();}
+});
+
+// D18-C (#2376): the expression editor is a drawer in the SAME per-row slot as the keys drawer, so the grid side re-reserves its height
+// through the one layout notification (CLAUDE.md section 11); f(x) toggles it, Bake moves to the context menu.
+test('f(x) click opens one expression drawer in the row slot, announces open/close, survives a repaint, and rows carry their pick tags',async()=>{
+ const Panel=require('../src/js/adapters/native-motion-property-panel.js'),doc=document(),container=doc.createElement('div');doc.body.appendChild(container);
+ const pin={instanceId:'x-instance',documentId:'x-document',lifecycleGeneration:1,contentRevision:0,documentSnapshotId:'x-snapshot'},target={contextId:'scene-root',layerUid:'L0'};
+ const context=()=>({pin,frame:3,viewGeneration:1,presented:{...pin,available:true,presentation:{...pin,owner:'native',status:'presented',frame:3}}});
+ const row=clone(fixture.propertyPageOracle.find(r=>r.property==='opacity'));row.authored={availability:'available',keyCount:0,hasStaticOverride:false,expressionEnabled:true};
+ const categories=clone(fixture.cases.find(c=>c.expectedResult).expectedResult.unavailableCategories),layout=[],writes=[];
+ const panel=Panel.create(container,{document:doc,readContext:context,readSelection:()=>target,readSelections:()=>[target],readContextId:()=>target.contextId,
+  async query(q){return {instanceId:q.instanceId,documentId:q.documentId,atRevision:q.atRevision,documentSnapshotId:q.documentSnapshotId,kind:q.view.kind,target:q.view.kind==='targets'?null:q.view.target,items:q.view.kind==='targets'?[{kind:'context',contextId:target.contextId},{kind:'layer',target}]:[clone(row)],nextOffset:null,unavailableCategories:categories};},
+  async readProperty(q){const b={instanceId:q.instanceId,documentId:q.documentId,atRevision:q.atRevision,documentSnapshotId:q.documentSnapshotId,kind:q.view.kind,target:q.view.target,property:q.view.property,dimension:1};
+   if(q.view.kind==='expressionSource')return {...b,expression:{enabled:true,code:'value'}};
+   if(q.view.kind==='expressionState')return {...b,frame:q.view.frame,expression:{present:true,enabled:true},evaluation:{state:'evaluated',diagnostic:null}};
+   return {...b,frame:q.view.frame,value:[100]};},
+  keyTimelineChanged:r=>layout.push(r),showContextMenu(){},async editProperty(p){writes.push(p);return {applied:true,historyEntriesAdded:1};},translate:k=>k});
+ assert.equal(await panel.refresh(true),true);await tick();await tick();
+ const rowsNow=()=>tree(container).filter(n=>n.className==='lrow motion-prop-row');
+ const line=rowsNow()[0];assert.ok(line);assert.equal(line._nemoPick.property,'opacity');assert.equal(line._nemoPick.controlType,null);assert.deepEqual(line._nemoPick.target,target);
+ const fx=tree(container).find(n=>/\bmotion-expr-btn\b/.test(n.className||''));assert.ok(fx);
+ const slot=line.nextSibling;assert.equal(slot.className,'motion-keys-slot');
+ const drawers=()=>tree(container).filter(n=>/\bmotion-expr-drawer\b/.test(n.className||''));
+ await fx.fire('click');await tick();await tick();
+ const open=drawers().filter(n=>n.parentNode===slot&&!n.hidden);assert.equal(open.length,1,'one expression drawer, in the row slot');
+ assert.match(String(open[0].className),/\blrow motion-expr-editor\b/);
+ assert.equal(tree(open[0]).find(n=>/\bmotion-expr-code\b/.test(n.className||'')).value,'value');
+ assert.ok(layout.includes('expression-open'));assert.equal(writes.length,0,'opening writes nothing');
+ assert.equal(await panel.refresh(true),true);await tick();await tick();
+ const again=drawers().filter(n=>!n.hidden);assert.equal(again.length,1);assert.strictEqual(again[0].parentNode,rowsNow()[0].nextSibling,'re-seated under the same row after a repaint');
+ await tree(container).find(n=>/\bmotion-expr-btn\b/.test(n.className||'')).fire('click');await tick();
+ assert.equal(drawers().filter(n=>!n.hidden).length,0);assert.ok(layout.includes('expression-close'));assert.equal(writes.length,0);
+ panel.dispose();
 });
