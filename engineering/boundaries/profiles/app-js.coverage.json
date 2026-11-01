@@ -19,17 +19,17 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "c6bd04fbfa7eb8f4439034e30ad708f03673a2b5",
-    "sourceRootTree": "c96281208b2346594a4553b8402bdefc9b3e481f",
+    "candidateCommit": "1cead838f16dedccf16db66f767598e5f4110c89",
+    "sourceRootTree": "fd923767c3eabac8667b29297345ae58c430ce1f",
     "applicationTree": {
       "path": "src/js",
       "gitTree": "02c07c1baa81c34c7827137a15d8ff543ed4b703",
-      "lastChangedCommit": "c6bd04fbfa7eb8f4439034e30ad708f03673a2b5"
+      "lastChangedCommit": "1cead838f16dedccf16db66f767598e5f4110c89"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "94037491cec13125560b6ade5cf16e9bee3e88a5",
-      "sha256": "665ef91035856c45485c6f46f11d9058616f53caebdac5ef44fd45302e5a7cf1",
+      "gitBlob": "9b6f5b9bd8de72c433e06cbd430babee69875c4a",
+      "sha256": "250be65cba2803a2022114051792eb0ec7ae2ca14eea37b1ceeef347d4dbfd12",
       "lastChangedCommit": "f606f3b2ea60c6bf5cdb7d031b8c54b3b60d291a"
     },
     "inventoryDigest": {
@@ -43,7 +43,7 @@
         "gitBlob": "791d5cc638581f574de7f283a6b92a9bdac7d520",
         "sha256": "11556bf2e855b11bf9d186b8de689a2a921eaa4292322f782287bf0bab1593db",
         "moduleCount": 307,
-        "basedOnCommit": "c6bd04fbfa7eb8f4439034e30ad708f03673a2b5"
+        "basedOnCommit": "1cead838f16dedccf16db66f767598e5f4110c89"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -2959,8 +2959,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2475,
-          "scriptOrdinal": 148
+          "line": 2478,
+          "scriptOrdinal": 151
         }
       ]
     },
@@ -4516,8 +4516,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2478,
-          "scriptOrdinal": 151
+          "line": 2474,
+          "scriptOrdinal": 147
         }
       ]
     },
@@ -4528,8 +4528,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2479,
-          "scriptOrdinal": 152
+          "line": 2475,
+          "scriptOrdinal": 148
         }
       ]
     },
@@ -4540,8 +4540,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2480,
-          "scriptOrdinal": 153
+          "line": 2476,
+          "scriptOrdinal": 149
         }
       ]
     },
@@ -4672,8 +4672,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2474,
-          "scriptOrdinal": 147
+          "line": 2477,
+          "scriptOrdinal": 150
         }
       ]
     },
@@ -4684,8 +4684,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2476,
-          "scriptOrdinal": 149
+          "line": 2479,
+          "scriptOrdinal": 152
         }
       ]
     },
@@ -4696,8 +4696,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2477,
-          "scriptOrdinal": 150
+          "line": 2480,
+          "scriptOrdinal": 153
         }
       ]
     },
