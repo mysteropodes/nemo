@@ -55,7 +55,9 @@ function harness(options) {
     },
     async readWidgets(selector, pin) {
       reads.push({ selector, pin: pin.contentRevision });
-      return Object.freeze({ info: pin, presentation: shown.presentation, items: options.items || items });
+      const read = Object.freeze({ info: pin, presentation: shown.presentation, items: options.items || items });
+      if (options.representOnRead) shownRevision = -1; // installed: the read's completion re-presents the same revision as a new object
+      return read;
     },
   });
   sandbox.NemoNativeObjectProject = { desktop: () => fx.session, selectLayerUI: (win, index) => { sandbox.selected = index; return true; } };
@@ -72,7 +74,7 @@ function harness(options) {
     for (const l of listeners.filter((entry) => entry.type === type)) { l.fn(e); if (e.stopped) break; }
     return e;
   };
-  return { pan, created, fx, sandbox, listeners, fields, legacy, toasts, reads, fire, flushFrames, frames,
+  return { represent: () => { shownRevision = -1; }, pan, created, fx, sandbox, listeners, fields, legacy, toasts, reads, fire, flushFrames, frames,
     // Inside the context `window` is its global object, not the sandbox object: the controller is keyed by that one.
     ui: () => sandbox.NemoNativeObjectWidgetUI.desktop(vm.runInContext('globalThis', sandbox)),
       sent: () => { assert.deepEqual(toasts.filter((t) => !/^toastWidgetLayerAdded$/.test(t)), [], 'a refused or uncorrelated command would have been toasted'); return fx.owner.log.received.map((r) => [r.operation, r.payload]); } };
@@ -177,6 +179,18 @@ test('the overlay re-reads on a revision change and on a frame change by itself,
   h.flushFrames();
   assert.equal(h.reads.length, base + 2, 'nothing is read while playing');
   assert.deepEqual(h.legacy, []);
+});
+
+test('a read that re-presents the same revision still draws its pads, and new presentations never read again (installed, #2255)', async () => {
+  const h = await started({ representOnRead: true });
+  h.flushFrames(); await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.ui().items().length, 2, 'the landed read is kept and its pads are drawn on the new presentation');
+  const base = h.reads.length;
+  for (let i = 0; i < 5; i++) { h.represent(); h.flushFrames(); await new Promise((resolve) => setImmediate(resolve)); }
+  assert.equal(h.reads.length, base, 'same revision and frame, new presentation objects: no read (no loop)');
+  assert.equal(h.ui().items().length, 2, 'the pads stay');
+  h.fx.state.revision += 1; h.flushFrames(); await new Promise((resolve) => setImmediate(resolve)); h.flushFrames();
+  assert.equal(h.reads.length, base + 1, 'a new revision is read once'); assert.equal(h.ui().items().length, 2);
 });
 
 test('Widget settings on a native layer row edits the axis range and the size through widget.settings, with the baseline prompts', async () => {
