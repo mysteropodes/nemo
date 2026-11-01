@@ -4498,6 +4498,54 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-motion-expression-snippets.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-motion-expression-whip.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-motion-expression-editor.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-widget-link.js",
+      "moduleId": "app.native.object.widget.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-path-effects-ui.js",
       "moduleId": "app.native.path-effects.ui.adapter",
       "executionClass": "document-classic",

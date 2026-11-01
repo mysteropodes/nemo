@@ -5,9 +5,10 @@
 (function(root,factory){
   var api=factory(typeof module==='object'&&module.exports?require('./native-motion-property-view.js'):root.NemoNativeMotionPropertyView,
     typeof module==='object'&&module.exports?require('./native-motion-property-keys.js'):root.NemoNativeMotionPropertyKeys,
-    typeof module==='object'&&module.exports?require('./native-motion-property-value.js'):root.NemoNativeMotionPropertyValue);
+    typeof module==='object'&&module.exports?require('./native-motion-property-value.js'):root.NemoNativeMotionPropertyValue,
+    typeof module==='object'&&module.exports?require('./native-motion-expression-editor.js'):root.NemoNativeMotionExpressionEditor);
   if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeMotionPropertyPanel=api;
-}(typeof globalThis==='object'?globalThis:this,function(View,Keys,Value){
+}(typeof globalThis==='object'?globalThis:this,function(View,Keys,Value,Expr){
   'use strict';
   var shortcuts={p:'position',a:'anchor',r:'rotation',s:'scale',t:'opacity'};
   // Baseline propsFor() order (motion.js PROPS / PROPS_WITH_3D); anything else keeps its native order after these.
@@ -57,6 +58,23 @@
       keyEditors.push(entry);return entry;
     }
     var initial=makeKeyEditor(),keysAvailable=!!initial,rowIndex=new Map();if(initial)keyEditor=initial.editor;
+    // D18-C: the expression editor drawer, one at a time, seated under its row's slot exactly like a keys drawer (same slot, so the
+    // grid side re-reserves the same height through keyNotice). Absent when the editor ports are not offered: f(x) then only bakes.
+    var exprDrawer=(function(){
+      if(!Expr||typeof Expr.create!=='function'||typeof ports.readProperty!=='function'||typeof ports.editProperty!=='function')return null;
+      var holder=make('div',''),entry={id:null,holder:holder,editor:null};holder.className='lrow motion-expr-editor motion-expr-drawer';holder.hidden=true;section.appendChild(holder);
+      entry.editor=Expr.create({document:doc,readContext:ports.readContext,readProperty:ports.readProperty,get editProperty(){return ports.editProperty;},
+        get showContextMenu(){return ports.showContextMenu;},showToast:function(m){if(typeof ports.showToast==='function')ports.showToast(m);else notify(m);},translate:ports.translate,
+        otherLayerNames:function(uid){return (typeof ports.layerNames==='function'?ports.layerNames():[]).filter(function(l){return l.layerUid!==uid&&typeof l.name==='string';}).map(function(l){return l.name;});},
+        loadControls:function(target){return (typeof module==='object'&&module.exports?require('./native-motion-control-rows.js'):globalThis.NemoNativeMotionControlRows).loadControls({readContext:ports.readContext,query:ports.query},target);},layoutChanged:keyNotice});
+      if(!entry.editor)return null;entry.editor.mount(holder);return entry;
+    })();
+    function exprPlace(){if(!exprDrawer||exprDrawer.id===null)return;var slot=rowIndex.get(exprDrawer.id);if(!slot||!body.contains(slot)){exprClose();return;}if(exprDrawer.holder.parentNode!==slot)slot.appendChild(exprDrawer.holder);exprDrawer.holder.hidden=false;}
+    function exprClose(){if(!exprDrawer||exprDrawer.id===null)return;exprDrawer.id=null;exprDrawer.editor.close();exprDrawer.holder.hidden=true;if(exprDrawer.holder.parentNode!==section)section.appendChild(exprDrawer.holder);}
+    function exprToggle(target,property,dimension){
+      if(!exprDrawer)return false;var id=rowId(target,property);if(exprDrawer.id===id){exprClose();return true;}
+      exprClose();exprDrawer.id=id;exprPlace();if(exprDrawer.id===null)return false;exprDrawer.editor.open(target,property,dimension);return true;
+    }
     function stow(entry){entry.holder.hidden=true;if(entry.holder.parentNode!==section)section.appendChild(entry.holder);}
     function clearKeys(){
       suppressKeyNotice=true;
@@ -69,7 +87,7 @@
     function replaceDrawers(){
       suppressKeyNotice=true;
       try{keyEditors.forEach(function(entry){if(entry.id===null)return;if(!place(entry)){entry.editor.clear();entry.id=null;entry.property=null;entry.target=null;stow(entry);}});}
-      finally{suppressKeyNotice=false;}keyNotice('reset');
+      finally{suppressKeyNotice=false;}exprPlace();if(exprDrawer&&exprDrawer.id!==null)exprDrawer.editor.refresh();keyNotice('reset');
     }
     function openKeys(target,property){
       var id=rowId(target,property),entry=keyEditors.find(function(item){return item.id===id;});
@@ -149,7 +167,7 @@
     function savePreference(){try{if(ports.writePreference)ports.writePreference('nemo-motion-filter',mode);}catch(_){}}
     function button(label,action){var node=make('button',label);node.type='button';node.addEventListener('click',action);toolbar.appendChild(node);controls.push([node,action]);return node;}
     function clearValues(){valueEditors.forEach(function(editor){editor.dispose();});valueEditors=[];}
-    function clearBody(){linkRows.forEach(function(item){try{item.dispose();}catch(_){}});linkRows=[];releaseExpressionRows();clearValues();clearKeys();rowBindings.forEach(function(pair){pair[0].removeEventListener(pair[2]||'click',pair[1]);});rowBindings=[];body.replaceChildren();}
+    function clearBody(){linkRows.forEach(function(item){try{item.dispose();}catch(_){}});linkRows=[];releaseExpressionRows();clearValues();clearKeys();exprClose();rowBindings.forEach(function(pair){pair[0].removeEventListener(pair[2]||'click',pair[1]);});rowBindings=[];body.replaceChildren();}
     // Interim element names: the native read model carries no element names yet (read-model gap), so derive
     // "<kind> <n>" from the stable strokeId prefix and the element's 1-based ordinal among its layer's elements.
     function elementLabel(t){
@@ -299,8 +317,16 @@
               ports.showContextMenu(event&&event.clientX||0,event&&event.clientY||0,[{label:tr('exprBake','Bake expression'),action:action}]);return true;
             };
             var onFxKey=function(event){if(event&&(event.key==='Enter'||event.key===' ')){if(event.preventDefault)event.preventDefault();return offer(event);}};
-            fx.addEventListener('click',offer);fx.addEventListener('contextmenu',offer);fx.addEventListener('keydown',onFxKey);
-            nextBindings.push([fx,offer],[fx,offer,'contextmenu'],[fx,onFxKey,'keydown']);line.appendChild(fx);
+            // D18-C baseline: a click on f(x) opens/closes the expression editor; Bake moves to the context menu (and stays the click without an editor).
+            var toggle=function(event){
+              if(!exprDrawer)return offer(event);
+              if(event&&event.stopPropagation)event.stopPropagation();
+              if(!current(token,ticket,signature)||!body.contains(line))return false;
+              return exprToggle(group.target,row.property,row.dimension);
+            };
+            var onFxToggleKey=function(event){if(event&&(event.key==='Enter'||event.key===' ')){if(event.preventDefault)event.preventDefault();return toggle(event);}};
+            fx.addEventListener('click',toggle);fx.addEventListener('contextmenu',offer);fx.addEventListener('keydown',onFxToggleKey);
+            nextBindings.push([fx,toggle],[fx,offer,'contextmenu'],[fx,onFxToggleKey,'keydown']);line.appendChild(fx);
           }
           name.className='lnm motion-prop-name';name.appendChild(nameText);line.appendChild(name);
           var slot=make('div','');slot.className='native-motion-property-slot';line.appendChild(slot);
@@ -311,6 +337,7 @@
             var diagnostic=make('span','');diagnostic.className='motion-expr-error';diagnostic.setAttribute('role','status');diagnostic.hidden=true;line.appendChild(diagnostic);
             nextExpressions.push({node:diagnostic,line:line,target:group.target,property:row.property,fx:typeof fxItem==='object'?fxItem:null});
           }
+          line._nemoPick=Object.freeze({target:group.target,property:row.property,controlType:row.controlType===undefined?null:row.controlType,controlName:row.controlName===undefined?null:row.controlName});
           fragment.appendChild(line);fragment.appendChild(drawerSlot);});
       });
       // Unsupported native families do not become an empty global-U result.
@@ -366,7 +393,7 @@
         scope='inspector';propertySet=null;contentOnly=false;collapsed=false;return refresh(true);
       }catch(_){if(!retired)notify('Native selection is unavailable.');return false;}}
     function cancel(){valueEditors.forEach(function(editor){editor.cancel();});var keyCancelled=keyEditors.length>0;clearKeys();if(retired||!loading)return keyCancelled;serial++;setLoading(false);accepted=null;clearBody();notify('Property read cancelled.');return true;}
-    function dispose(){if(retired)return;retired=true;serial++;setLoading(false);client.dispose();accepted=null;clearBody();keyEditors.forEach(function(entry){entry.editor.dispose();});keyEditors=[];keyEditor=null;container.removeEventListener('keydown',onKey);controls.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});if(section.parentNode===container)container.removeChild(section);}
+    function dispose(){if(retired)return;retired=true;serial++;setLoading(false);client.dispose();accepted=null;clearBody();keyEditors.forEach(function(entry){entry.editor.dispose();});keyEditors=[];keyEditor=null;if(exprDrawer){exprDrawer.editor.dispose();exprDrawer.holder.remove&&exprDrawer.holder.remove();}container.removeEventListener('keydown',onKey);controls.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});if(section.parentNode===container)container.removeChild(section);}
     button('Cancel',cancel);
     function setSearch(value){if(retired)return false;search=String(value||'').toLowerCase();return paint();}
     container.addEventListener('keydown',onKey);readPreference();

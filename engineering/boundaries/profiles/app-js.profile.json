@@ -3363,7 +3363,10 @@
         "native-motion-property-keys.js",
         "native-motion-key-lock-menu.js",
         "native-motion-property-value.js",
-        "native-motion-control-rows.js"
+        "native-motion-control-rows.js",
+        "native-motion-expression-snippets.js",
+        "native-motion-expression-whip.js",
+        "native-motion-expression-editor.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
@@ -3485,7 +3488,8 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-widget-ui.js"
+        "native-object-widget-ui.js",
+        "native-object-widget-link.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
