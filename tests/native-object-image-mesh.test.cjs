@@ -547,19 +547,24 @@ test('a vertex commit keeps Edit points, the Mesh panel and the handles while th
   assert.deepEqual(h.messages, []);
 });
 
-test('the widget pads are re-read once per new revision, never per presentation, so a read that re-presents cannot loop (#2255)', async () => {
-  const h = composedMesh(true, undefined, async () => {}, true); let reads = 0;
+test('the widget pads are re-read until one read lands per revision (bounded), never per presentation after it (#2255)', async () => {
+  const h = composedMesh(true, undefined, async () => {}, true); let reads = 0, refuse = 0;
   const drain = async () => { await meshTurn(); await new Promise(done => setTimeout(done, 0)); await meshTurn(); };
-  h.root.NemoNativeObjectWidgetUI = { desktop: win => { assert.equal(win, h.root); return { refresh() { reads++; return Promise.resolve(null); } }; } };
+  const present = async (n) => { for (let i = 0; i < n; i++) { h.ports.presented(h.session.info()); await drain(); } };
+  // A refused read (queue busy) answers null or the previous revision's read; a landed one is pinned to the presented revision.
+  h.root.NemoNativeObjectWidgetUI = { desktop: () => ({ refresh() { reads++; return Promise.resolve(refuse-- > 0 ? null : { info: h.session.info(), items: [] }); } }) };
   await h.open(); await drain();
-  assert.equal(reads, 1, 'the open presentation re-read the widget pads once');
-  for (let i = 0; i < 5; i++) { h.ports.presented(h.session.info()); await drain(); }
-  assert.equal(reads, 1, 'repeated presentations of the same revision (what each read causes) do not read again');
-  const pin = h.session.info();
+  assert.equal(reads, 1, 'the open presentation read the pads once');
+  await present(5); assert.equal(reads, 1, 'presentations of a landed revision (what each read causes) never read again');
+  refuse = 2; const pin = h.session.info();
   await h.root.NemoNativeObjectImageMesh.desktop(h.root).setOffset('im_1', 0, 0.1, 0.1, () => true);
   for (let i = 0; i < 40 && h.session.info().contentRevision === pin.contentRevision; i++) await new Promise(done => setTimeout(done, 5));
-  h.ports.presented(h.session.info()); await drain();
-  assert.equal(h.session.info().contentRevision, pin.contentRevision + 1); assert.equal(reads, 2, 'a new revision (a widget made through MCP) is read once');
+  await present(6);
+  assert.equal(h.session.info().contentRevision, pin.contentRevision + 1);
+  assert.ok(reads >= 4 && reads <= 6, 'two refused reads are retried until the third lands: ' + reads);
+  const landed = reads; await present(4); assert.equal(reads, landed, 'then it stops');
+  refuse = 1e9; await h.root.NemoNativeObjectImageMesh.desktop(h.root).setOffset('im_1', 0, 0.2, 0.2, () => true); await drain();
+  const before = reads; await present(12); assert.ok(reads - before <= 5, 'a revision whose read never lands is retried at most 5 times: ' + (reads - before));
 });
 
 test('picking the image on the canvas selects its layer row, which feeds the Mesh panel (#2372)', async () => {
