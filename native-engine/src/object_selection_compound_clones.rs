@@ -27,9 +27,12 @@ pub(crate) fn apply_compound_clones(
     rasters: &[RasterEntry],
     tags: &[Option<String>],
     source_groups: Option<&[GroupEntry]>,
-    offset: f64,
+    offset: [f64; 2],
     ids: &mut dyn IdSource,
 ) -> Result<Clones, SelectionError> {
+    if !offset.iter().all(|v| v.is_finite()) {
+        return Err(SelectionError::NonFiniteCoordinate);
+    }
     if records.len() != tags.len() {
         return Err(SelectionError::ClipMismatch);
     }
@@ -130,7 +133,7 @@ pub(crate) fn apply_compound_clones(
             items: &sources,
             source_groups: None,
             destination_group_ids: &destination_gids,
-            offset,
+            offset: offset[0],
         },
         ids,
     )

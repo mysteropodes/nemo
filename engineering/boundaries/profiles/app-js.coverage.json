@@ -985,6 +985,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-select-alt-duplicate.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2602,
+          "scriptOrdinal": 252
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-selection-steps.js",
       "moduleId": "app.native.object.ui.adapter",
       "executionClass": "document-classic",

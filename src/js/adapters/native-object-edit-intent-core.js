@@ -30,14 +30,15 @@
     return (Array.isArray(previous) ? previous : []).filter((id) => !live.has(id));
   }
 
-  // The caller supplies exactly the declared members; `command` is added here and nothing else is forwarded.
+  // The caller supplies exactly the declared members (and, optionally, any of the contract's optional ones); `command` is added here and nothing else is forwarded.
   function build(operation, input) {
-    const keys = contract.members(operation);
+    const keys = contract.members(operation), optional = typeof contract.optionalMembers === 'function' ? contract.optionalMembers(operation) || [] : [];
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new TypeError('intent input must be a plain object');
     const own = Object.keys(input);
-    if (own.some((key) => !keys.includes(key)) || keys.some((key) => !own.includes(key))) throw new TypeError('intent input has missing or unknown fields');
+    if (own.some((key) => !keys.includes(key) && !optional.includes(key)) || keys.some((key) => !own.includes(key))) throw new TypeError('intent input has missing or unknown fields');
     const payload = { command: contract.commandOf(operation) };
     keys.forEach((key) => { payload[key] = input[key]; });
+    optional.forEach((key) => { if (own.includes(key)) payload[key] = input[key]; });
     return payload;
   }
 

@@ -6,6 +6,7 @@ const test = require('node:test'), assert = require('node:assert/strict');
 const Intent = require('../src/js/adapters/select-canvas-intent.js');
 const Overlay = require('../src/js/adapters/native-select-overlay.js');
 const Gesture = require('../src/js/adapters/native-select-gesture.js');
+const AltDuplicate = require('../src/js/adapters/native-select-alt-duplicate.js');
 const Wait = require('../src/js/adapters/native-presentation-wait.js');
 const Paper = require('./helpers/native-import-paper.cjs');
 
@@ -673,4 +674,103 @@ test('presentedSettled waits out the queue-pending window, and gives null when t
   setTimeout(() => { h.root.state.currentFrame = 2; h.busy(false); }, 40);
   assert.equal(await gone, null, 'a changed pick context refuses');
   assert.deepEqual(h.toasts, []);
+});
+
+// A-select-alt-drag-duplicate: Alt+press inside the selection drags a COPY. The gesture previews the moved copy and on release makes ONE duplicate at the
+// drag distance through the clipboard module (faked here: what it is asked to do is the contract); the originals and the batch route are never touched.
+function altHarness(items, options) {
+  const h = harness(items, options), calls = [];
+  h.root.NemoNativeSelectAltDuplicate = AltDuplicate;
+  h.root.NemoNativeSelectionClipboard = { native: () => true, duplicateAt: async (_root, offset, guard) => {
+    calls.push({ offset, guard });
+    if (guard.cancelled()) return { failed: true, status: 'cancelled' };
+    guard.release();
+    return options && options.reply ? options.reply : { status: 'applied' };
+  } };
+  h.calls = calls;
+  return h;
+}
+
+test('Alt+press inside the selection and a drag sends ONE duplicate at the drag distance, previews the copy, writes no batch and leaves the original alone', async () => {
+  const h = altHarness([BIG, FAR]), before = JSON.stringify(h.store), outlines = () => h.svg().children.filter((c) => c.tag === 'path').length;
+  await h.select(35, 35);
+  const resting = outlines();
+  h.press(60, 60, { altKey: true }); h.drag(70, 66, { altKey: true }); h.drag(90, 75, { altKey: true }); await settle();
+  const outline = h.svg().children.find((c) => c.tag === 'path');
+  assert.match(outline.attrs.d, /^M 50 35 C/, 'the live preview is the copy, moved by (30,15)');
+  assert.equal(h.calls.length, 0, 'no document write while dragging');
+  await h.release(90, 75, { altKey: true }); await settle();
+  assert.equal(h.calls.length, 1, 'exactly one duplicate request');
+  assert.deepEqual(h.calls[0].offset, [30, 15]);
+  assert.deepEqual(h.calls[0].guard.pin, h.root.NemoNativeObjectProject.desktop().info(), 'the pin read when the drag began travels with it');
+  assert.deepEqual(h.batches, [], 'the reshape batch route is not used');
+  assert.equal(JSON.stringify(h.store), before, 'the original is untouched');
+  assert.equal(outlines(), resting, 'the preview ends with the drag');
+  assert.deepEqual(h.toasts, []);
+});
+
+test('the Alt press only counts INSIDE the selection box: on an unselected shape it just moves that shape, and without Alt a drag of the selection is a plain move', async () => {
+  const h = altHarness([BIG, FAR]);
+  await h.select(35, 35);
+  h.press(170, 170, { altKey: true }); h.drag(150, 150, { altKey: true }); await settle(); await h.release(150, 150, { altKey: true }); await settle();
+  assert.equal(h.calls.length, 0, 'an unselected item under Alt is picked and moved, not copied');
+  assert.equal(h.batches.length, 1);
+  assert.deepEqual(h.batches[0].steps[0].reshape.stableTarget, FAR.stableTarget);
+  const g = altHarness([BIG, FAR]);
+  await g.select(35, 35);
+  g.press(35, 35); g.drag(60, 35); await settle(); await g.release(60, 35); await settle();
+  assert.equal(g.calls.length, 0);
+  assert.equal(g.batches.length, 1, 'the ordinary move is unchanged');
+});
+
+test('Alt+press on empty space inside the selection box still copies the selection (the box is the target, not the stroke under the pointer)', async () => {
+  const ring = quad('A', 20, 20, 120, 120, { filled: false });
+  const h = altHarness([ring]);
+  await h.select(20, 70);
+  assert.deepEqual(h.ids(), ['A']);
+  h.press(70, 70, { altKey: true }); h.drag(80, 70, { altKey: true }); h.drag(100, 90, { altKey: true }); await settle(); await h.release(100, 90, { altKey: true }); await settle();
+  assert.equal(h.calls.length, 1);
+  assert.deepEqual(h.calls[0].offset, [30, 20]);
+});
+
+test('Escape mid-drag, a click without a drag, and a drag that ends where it began send no duplicate', async () => {
+  const h = altHarness([BIG, FAR]), outlines = () => h.svg().children.filter((c) => c.tag === 'path').length;
+  await h.select(35, 35);
+  const resting = outlines();
+  h.press(60, 60, { altKey: true }); h.drag(90, 90, { altKey: true }); await settle();
+  assert.match(h.svg().children.find((c) => c.tag === 'path').attrs.d, /^M 50 50 C/, 'the copy is previewed, moved by (30,30)');
+  h.key('Escape'); await settle(); await h.release(90, 90, { altKey: true }); await settle();
+  assert.equal(h.calls.length, 0);
+  assert.equal(outlines(), resting, 'the preview is cleared');
+  h.press(60, 60, { altKey: true }); await h.release(60, 60, { altKey: true }); await settle();
+  assert.equal(h.calls.length, 0, 'a plain Alt-click copies nothing');
+  h.press(60, 60, { altKey: true }); h.drag(90, 90, { altKey: true }); h.drag(60, 60, { altKey: true }); await settle(); await h.release(60, 60, { altKey: true }); await settle();
+  assert.equal(h.calls.length, 0, 'back at the start is no move');
+  assert.deepEqual(h.batches, []);
+});
+
+test('Escape between the release and the send cancels; a document that moved on during the drag sends nothing and says so', async () => {
+  const h = altHarness([BIG, FAR]);
+  await h.select(35, 35);
+  h.press(60, 60, { altKey: true }); h.drag(90, 90, { altKey: true }); await settle();
+  h.setPin({ contentRevision: 9, documentSnapshotId: 's9' });
+  h.drag(95, 95, { altKey: true }); await settle(); await h.release(95, 95, { altKey: true }); await settle();
+  assert.equal(h.calls.length, 0);
+  assert.ok(h.toasts.some((t) => /nothing was changed/.test(t)), 'stale pin: ' + h.toasts.join('|'));
+});
+
+test('a refused or failed duplicate leaves the notice to the clipboard module and no batch; a posed record gets the distance in its own space', async () => {
+  const posed = quad('A', 20, 20, 120, 120, { matrix: [2, 0, 0, 2, 0, 0] });
+  const h = altHarness([posed]);
+  await h.select(35, 35);
+  h.press(60, 60, { altKey: true }); h.drag(80, 70, { altKey: true }); h.drag(100, 80, { altKey: true }); await settle(); await h.release(100, 80, { altKey: true }); await settle();
+  assert.equal(h.calls.length, 1);
+  assert.deepEqual(h.calls[0].offset, [20, 10], 'a world move of (40,20) is (20,10) in a record drawn at 2x');
+  assert.deepEqual(h.batches, []);
+  const mixed = altHarness([quad('A', 20, 20, 60, 60), quad('B', 70, 70, 110, 110, { matrix: [2, 0, 0, 2, 0, 0] })]);
+  mixed.press(5, 5); mixed.drag(230, 230); await settle(); await mixed.release(230, 230); await settle();
+  assert.deepEqual(mixed.ids(), ['A', 'B']);
+  mixed.press(60, 60, { altKey: true }); mixed.drag(80, 80, { altKey: true }); mixed.drag(100, 100, { altKey: true }); await settle(); await mixed.release(100, 100, { altKey: true }); await settle();
+  assert.equal(mixed.calls.length, 0, 'records that disagree on the distance are refused, not guessed');
+  assert.ok(mixed.toasts.some((t) => /differently/.test(t)), mixed.toasts.join('|'));
 });

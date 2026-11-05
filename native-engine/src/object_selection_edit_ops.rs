@@ -16,6 +16,7 @@
 //! candidate, so promotion and the selected edit publish together.
 use crate::commands::object_fill_owner::object_frame_edit_document::{clone_cell, drop_cells};
 use crate::commands::ObjectFillOwner;
+use crate::object_document::object_group_kernels::object_clipboard_remap::DUPLICATE_OFFSET_PX;
 use crate::object_document::object_group_kernels::object_selection_edit_clones::RevisionIds;
 use crate::object_document::object_group_kernels::object_selection_edit_frames::{
     HeldFramePromotion, PromotionRefusal,
@@ -36,8 +37,8 @@ pub(crate) use clipboard::PasteDestination;
 #[path = "object_selection_edit_payload.rs"]
 mod wire;
 use wire::{
-    edit_mode, labels_ok, parse, refusal_code, strokes_ok, target_ok, SelectionPayload,
-    SplitPayload,
+    edit_mode, labels_ok, parse, refusal_code, strokes_ok, target_ok, DuplicatePayload,
+    SelectionPayload, SplitPayload, MAX_DUPLICATE_OFFSET,
 };
 
 #[cfg(all(test, feature = "project_media_codec"))]
@@ -252,11 +253,17 @@ impl ObjectFillOwner {
         &self,
         bytes: &[u8],
     ) -> Result<PreparedSelectionEdit, DispatchErrorCode> {
-        let payload: SelectionPayload = parse(bytes)?;
+        let payload: DuplicatePayload = parse(bytes)?;
         let mode = edit_mode(&payload.mode)?;
+        let offset = payload
+            .offset
+            .value()
+            .copied()
+            .unwrap_or([DUPLICATE_OFFSET_PX; 2]);
         if payload.command != "object.selection.duplicate"
             || !target_ok(&payload.context_id, &payload.layer_uid)
             || !strokes_ok(&payload.stroke_ids)
+            || !offset.iter().all(|v| v.is_finite() && v.abs() <= MAX_DUPLICATE_OFFSET)
         {
             return Err(DispatchErrorCode::InvalidRequest);
         }
@@ -273,6 +280,7 @@ impl ObjectFillOwner {
             origin.document(),
             &request,
             &RealHeldFramePromotion,
+            offset,
             &mut ids,
         );
         PreparedSelectionEdit::seal(origin, SelectionEditKind::Duplicate, plan)

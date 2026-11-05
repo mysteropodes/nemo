@@ -5125,6 +5125,10 @@
           "items": {
             "$ref": "#/$defs/ObjectEditId"
           }
+        },
+        "offset": {
+          "$ref": "#/$defs/ObjectVectorPair",
+          "description": "Where the copies land, in the records' own space: the distance of an Alt-drag duplicate. Each component is finite and at most 1e6 in magnitude. Absent: the baseline 12 px nudge on both axes."
         }
       }
     },
