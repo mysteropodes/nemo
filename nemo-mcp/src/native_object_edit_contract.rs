@@ -118,7 +118,7 @@ static SPECS: [(&str, &str, &str); 21] = [
     (
         "boolean.erase",
         "object.boolean.erase",
-        "layerUid:uid contextId:uid frame:frame strokeId:uid footprint:footprint",
+        "layerUid:uid contextId:uid frame:frame strokeId:uid footprint:footprint joinHistory:flag?",
     ),
     (
         "boolean.flatten",
@@ -320,6 +320,32 @@ pub(super) fn result(operation: &str, value: &Value) -> bool {
     }
 }
 
+/// The receipt of `operation` for the request `payload` it answers: a joined eraser bite (`joinHistory`) continues the
+/// drag's undo entry, so it adds none, applied or not; every other receipt is `result`.
+pub(super) fn result_for(operation: &str, payload: &Value, value: &Value) -> bool {
+    let joined = operation.ends_with(".boolean.erase")
+        && payload.get("joinHistory").and_then(Value::as_bool) == Some(true);
+    if !joined {
+        return result(operation, value);
+    }
+    exact(value, &["applied", "historyEntriesAdded"], &[]).is_some_and(|v| {
+        v["applied"].is_boolean() && v["historyEntriesAdded"] == 0
+    })
+}
+
+/// An eraser receipt's history count follows the request: a joined bite adds no entry, any other adds one.
+fn erase_history_matches(request: &NativeApplicationRequest, value: &Value) -> bool {
+    if !request.operation.ends_with(".boolean.erase") || value["applied"] != true {
+        return true;
+    }
+    let joined = request
+        .payload
+        .get("joinHistory")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    value["historyEntriesAdded"] == u64::from(!joined)
+}
+
 /// The receipt advances the revision exactly when it applied one edit.
 pub(crate) fn revision_matches(expected: Option<u64>, revision: u64, value: &Value) -> bool {
     expected.and_then(|before| before.checked_add(u64::from(value["applied"] == true)))
@@ -338,6 +364,7 @@ pub(crate) fn response_matches(
         && response.document_id == request.document_id
         && response.result.as_ref().is_some_and(|value| {
             revision_matches(request.expected_revision, response.content_revision, value)
+                && erase_history_matches(request, value)
                 && clipboard::correlated(request, value)
         })
 }

@@ -5322,6 +5322,10 @@
               "type": "number"
             }
           }
+        },
+        "joinHistory": {
+          "type": "boolean",
+          "description": "A bite after the first of one eraser drag: the revision advances but the undo entry the drag began grows to end at it (historyEntriesAdded 0). Refused unavailable when no such entry is on top of the undo stack."
         }
       }
     },

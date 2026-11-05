@@ -412,6 +412,35 @@ fn fill_brush_wire_bounds_refuse_invalid_outlines_placements_and_mask_modes() {
 }
 
 #[test]
+fn an_eraser_bite_may_join_the_drags_history_entry_and_the_receipt_follows_the_request() {
+    let operation = format!("{P}boolean.erase");
+    for join in [json!(true), json!(false)] {
+        let payload = patched("boolean.erase", "joinHistory", join.clone());
+        assert!(request(&operation, &payload), "{join}");
+    }
+    for join in [json!("yes"), json!(1), Value::Null] {
+        assert!(!request(&operation, &patched("boolean.erase", "joinHistory", join.clone())), "{join}");
+    }
+    let plain = patched("boolean.erase", "strokeId", json!("stroke-2"));
+    let joined = patched("boolean.erase", "joinHistory", json!(true));
+    let added = json!({"applied":true,"historyEntriesAdded":1});
+    let none = json!({"applied":true,"historyEntriesAdded":0});
+    let missed = json!({"applied":false,"historyEntriesAdded":0});
+    assert!(result_for(&operation, &plain, &added) && result_for(&operation, &plain, &missed));
+    assert!(!result_for(&operation, &plain, &none), "an ordinary bite adds its entry");
+    assert!(result_for(&operation, &joined, &none) && result_for(&operation, &joined, &missed));
+    assert!(!result_for(&operation, &joined, &added), "a joined bite adds none");
+    let reply = |value: &Value| {
+        response(json!({"apiVersion":2,"requestId":"edit-1","instanceId":"instance-A","documentId":"document-A",
+            "contentRevision":8,"ok":true,"result":value}))
+    };
+    assert!(response_matches(&envelope("boolean.erase", joined.clone()), &reply(&none)));
+    assert!(!response_matches(&envelope("boolean.erase", joined), &reply(&added)));
+    assert!(response_matches(&envelope("boolean.erase", plain.clone()), &reply(&added)));
+    assert!(!response_matches(&envelope("boolean.erase", plain), &reply(&none)));
+}
+
+#[test]
 fn a_duplicate_may_carry_an_alt_drag_offset_that_is_a_bounded_finite_pair() {
     let operation = format!("{P}selection.duplicate");
     for offset in [json!([30, -7.5]), json!([0, 0]), json!([1.0e6, -1.0e6])] {

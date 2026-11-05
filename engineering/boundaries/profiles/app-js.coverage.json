@@ -4870,6 +4870,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-object-eraser-tool.js",
+      "moduleId": "app.native.object.shape.tool",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-object-shape-tool.js",
       "moduleId": "app.native.object.shape.tool",
       "executionClass": "document-classic",

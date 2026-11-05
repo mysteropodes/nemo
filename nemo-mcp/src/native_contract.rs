@@ -436,7 +436,7 @@ fn result_validator(operation: &str) -> Option<ResultValidator> {
         op if frame_edit::declares(op) => |o, _, _, r| frame_edit::result_for_operation(o, r),
         op if object_component::owns(op) => |o, _, p, r| object_component::result_for(o, p, r),
         op if object_rig::admitted(op) => |o, _, _, r| object_rig::result(o, r),
-        op if object_edit::admitted(op) => |o, _, _, r| object_edit::result(o, r),
+        op if object_edit::admitted(op) => |o, _, p, r| object_edit::result_for(o, p, r),
         op if item::owns(op) => |o, _, p, r| item::result(o, p, r),
         op if vector::owns(op) => |o, _, p, r| vector::result(o, p, r),
         placement::OP => |_, _, _, r| placement::result(r),
