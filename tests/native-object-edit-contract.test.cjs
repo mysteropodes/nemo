@@ -171,7 +171,7 @@ test('capability descriptors and the closed transport schema declare exactly the
   for (const file of files) {
     const d = JSON.parse(fs.readFileSync(file, 'utf8'));
     assert.equal(d.schemaVersion, 2); assert.equal(d.apiVersion, 2); assert.deepEqual(d.availability, { state: 'available', reason: null });
-    assert.equal(d.authority.adapterOwnsWritableMirror, false); assert.equal(d.authority.fallback, 'none'); assert.equal(d.resourceBoundary.maxRequestBytes, d.id === 'native.object.fill' ? 65536 : 4096, d.id);
+    assert.equal(d.authority.adapterOwnsWritableMirror, false); assert.equal(d.authority.fallback, 'none'); assert.equal(d.resourceBoundary.maxRequestBytes, d.id === 'native.object.fill' || d.id === 'native.object.selection-edit' ? 65536 : 4096, d.id); // the selection family carries the shape clipboard's inline clip
     assert.equal(ids.has(d.id), false); ids.add(d.id);
     assert.equal(d.input.oneOf.length, d.operations.length);
     for (const example of d.examples) {
@@ -218,7 +218,7 @@ test('copy/cut have closed clipboard receipts, copy never changes history and em
   assert.throws(() => contract.result(P + 'clipboard.cut', { applied: false, historyEntriesAdded: 0, clipboard }), /cut/);
 });
 
-test('copy/cut full responses admit authored data/blob text, reject binary/shape/owner tampering and stay4096 bytes', async () => {
+test('copy/cut full responses admit authored data/blob text, reject binary/shape/owner tampering and stay within 64 KiB', async () => {
   const record = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/examples/native-object-v1/cases.json'), 'utf8')).records[0];
   const clipboard = { contextId: 'scene-root', layerUid: 'layer-a', frame: 0, records: [{ ...record,
     target: { ...record.target, strokeId: 'data:authored-stroke' } }] };
@@ -236,7 +236,7 @@ test('copy/cut full responses admit authored data/blob text, reject binary/shape
       (r) => { r.result.clipboard.frame += 1; }, (r) => { r.result.clipboard.records[0].target.frameScope = ['authored', 0]; },
       (r) => { r.result.clipboard.records[0].geometry = new Uint8Array(4); },
       (r) => { r.result.clipboard.records[0].extra = true; },
-      (r) => { r.result.clipboard.records[0].target.strokeId = 'x'.repeat(4096); },
+      (r) => { r.result.clipboard.records[0].target.strokeId = 'x'.repeat(65536); },
       (r) => { r.requestId = 'other'; }, (r) => { r.instanceId = 'other'; }, (r) => { r.documentId = 'other'; },
       (r) => { r.contentRevision += 1; }]) await assert.rejects(send(mutate), TypeError, suffix);
     assert.equal(contract.paths(P + suffix).has('result.clipboard.records.0.target.strokeId'), true);

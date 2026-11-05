@@ -34,8 +34,17 @@ pub(crate) fn response_limit(op: &str) -> usize {
         4096
     }
 }
+/// The shape clipboard (`object.clipboard.copy` / `cut`) returns its detached clip inline: 64 KiB, the engine's clip bound.
+pub(crate) const SHAPE_CLIP_BYTES: usize = 65_536;
 pub fn native_response_byte_limit(operation: &str) -> usize {
-    response_limit(operation)
+    if matches!(
+        operation,
+        "command.document.object.clipboard.copy" | "command.document.object.clipboard.cut"
+    ) {
+        SHAPE_CLIP_BYTES
+    } else {
+        response_limit(operation)
+    }
 }
 pub(crate) fn data_admitted(cells: &Value) -> bool {
     let Some(cells) = cells.as_array() else {

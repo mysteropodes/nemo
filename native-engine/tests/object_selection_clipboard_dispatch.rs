@@ -296,21 +296,36 @@ fn held_copy_reports_playhead_but_keeps_authored_source_and_cut_obeys_edit_mode(
 
 // Independently construct the complete expected response from canonical source records, then
 // tune only the legal request-id length. This covers the envelope, not merely the clip body.
+// A record holds at most 256 segments (about 18 KiB with these identities), so the fixture copies
+// `full` complete records plus one whose segment count is tuned: each added segment grows the
+// reply by under 127 bytes, so some count lands it in the id-tuning window below.
 fn bounded_fixture(action: &str, target_bytes: usize) -> (NativeObjectHistory, Value, Value) {
     let uid = "L".repeat(128);
-    let stroke = "s".repeat(128);
-    for count in 2..=64 {
-        let mut record = shape(&uid, &stroke, 0, 0);
-        let point = record["geometry"]["segments"][0].clone();
-        record["geometry"]["segments"] = json!(vec![point; count]);
-        let source = document(1, vec![layer(&uid, "Long identity")], vec![record]);
+    let full = target_bytes / 20_000;
+    let ids: Vec<String> = (0..=full)
+        .map(|n| format!("{}{n:01}", "s".repeat(127)))
+        .collect();
+    for count in 2..=256 {
+        let records: Vec<Value> = ids
+            .iter()
+            .enumerate()
+            .map(|(n, stroke)| {
+                let mut record = shape(&uid, stroke, 0, 0);
+                let point = record["geometry"]["segments"][0].clone();
+                let segments = if n == full { count } else { 256 };
+                record["geometry"]["segments"] = json!(vec![point; segments]);
+                record
+            })
+            .collect();
+        let source = document(1, vec![layer(&uid, "Long identity")], records);
         let owner = NativeObjectHistory::new(
             "I".repeat(128),
             decode_storage_project(source.to_string().as_bytes()).unwrap(),
         )
         .unwrap();
-        let mut r = request(&owner, "r", action, &uid, 0, "motion", &[&stroke]);
-        let clip = clipboard(&owner, &uid, 0, 0, &[&stroke]);
+        let named: Vec<&str> = ids.iter().map(String::as_str).collect();
+        let mut r = request(&owner, "r", action, &uid, 0, "motion", &named);
+        let clip = clipboard(&owner, &uid, 0, 0, &named);
         let mut expected = receipt(&r, u64::from(action == "cut"), action == "cut", clip);
         let size = serde_json::to_vec(&expected).unwrap().len();
         if size <= target_bytes && target_bytes - size <= 127 {
@@ -326,16 +341,19 @@ fn bounded_fixture(action: &str, target_bytes: usize) -> (NativeObjectHistory, V
     panic!("could not construct the exact complete-envelope boundary")
 }
 
+/// The shape clipboard returns its detached clip inline: a copy or cut reply may use 64 KiB (a refusal stays a compact 4096).
+const SHAPE_CLIP_REPLY: usize = 65_536;
+
 #[test]
-fn complete4096_byte_reply_succeeds_and4097_refuses_before_cut_or_history_mutation() {
+fn complete65536_byte_reply_succeeds_and65537_refuses_before_cut_or_history_mutation() {
     for action in ["copy", "cut"] {
-        let (mut owner, r, expected) = bounded_fixture(action, 4096);
+        let (mut owner, r, expected) = bounded_fixture(action, SHAPE_CLIP_REPLY);
         let response = dispatch(&mut owner, &r);
         assert_eq!(response, expected);
-        assert_eq!(serde_json::to_vec(&response).unwrap().len(), 4096);
+        assert_eq!(serde_json::to_vec(&response).unwrap().len(), SHAPE_CLIP_REPLY);
         assert_eq!(owner.content_revision(), u64::from(action == "cut"));
-        let (mut owner, r, expected) = bounded_fixture(action, 4097);
-        assert_eq!(serde_json::to_vec(&expected).unwrap().len(), 4097);
+        let (mut owner, r, expected) = bounded_fixture(action, SHAPE_CLIP_REPLY + 1);
+        assert_eq!(serde_json::to_vec(&expected).unwrap().len(), SHAPE_CLIP_REPLY + 1);
         let before = frozen(&owner);
         let snapshot = current(&owner).snapshot_id().to_string();
         let response = dispatch(&mut owner, &r);
@@ -350,6 +368,69 @@ fn complete4096_byte_reply_succeeds_and4097_refuses_before_cut_or_history_mutati
         );
         assert_eq!(frozen(&owner), before);
     }
+}
+
+#[test]
+fn a_clip_over_the_old_4096_bytes_pastes_into_another_layer_and_frame_survives_reload_and_undo_redo() {
+    // A hand-drawn shape: 60 distinct segments is far over the old 4096-byte envelope.
+    let mut record = shape("L0", "big", 0, 0);
+    record["geometry"]["segments"] = json!((0..60)
+        .map(|n| {
+            let t = f64::from(n);
+            json!({"point":{"x":t * 1.2345678901234, "y":(t % 7.0) * 3.5432109876543},
+                "handleIn":{"x":0.5123456789012, "y":-0.2512345678901},
+                "handleOut":{"x":-0.5123456789012, "y":0.2512345678901}})
+        })
+        .collect::<Vec<_>>());
+    let source = document(
+        1,
+        vec![layer("L0", "Hero"), layer("L1", "Side")],
+        vec![record],
+    );
+    let mut owner = NativeObjectHistory::new(
+        "instance-A",
+        decode_storage_project(source.to_string().as_bytes()).unwrap(),
+    )
+    .unwrap();
+    let before = bytes(&owner);
+    let copy = request(&owner, "copy-big", "copy", "L0", 0, "animation2d", &["big"]);
+    let reply = dispatch(&mut owner, &copy);
+    let size = serde_json::to_vec(&reply).unwrap().len();
+    assert!(size > 4096 && size <= SHAPE_CLIP_REPLY, "{size}");
+    assert_eq!(reply["result"]["applied"], false);
+    assert_eq!(bytes(&owner), before);
+    assert_eq!((owner.content_revision(), owner.history_depths()), (0, (0, 0)));
+    let mut paste = request(&owner, "paste-big", "paste", "L1", 2, "animation2d", &["big"]);
+    paste["payload"] = json!({"command":"object.clipboard.paste","contextId":"scene-root",
+        "layerUid":"L1","frame":2,"mode":"animation2d","clip":reply["result"]["clipboard"]});
+    let asked = serde_json::to_vec(&paste).unwrap().len();
+    assert!(asked > 4096 && asked <= SHAPE_CLIP_REPLY, "{asked}");
+    let pasted = dispatch(&mut owner, &paste);
+    assert_eq!(pasted["ok"], true, "{pasted}");
+    assert_eq!(pasted["result"]["applied"], true);
+    assert_eq!((owner.content_revision(), owner.history_depths()), (1, (1, 0)));
+    // Another layer and frame: one fresh stroke, exactly in place (no 12 px nudge), the source untouched.
+    let landed = strokes_at(&value(&owner), "L1", 2);
+    assert_eq!(landed.len(), 1);
+    assert_ne!(landed[0], "big");
+    let original = record_at(&value(&owner), "L0", 0, "big");
+    let copied = record_at(&value(&owner), "L1", 2, &landed[0]);
+    assert_eq!(copied["geometry"]["segments"], original["geometry"]["segments"]);
+    assert_eq!(strokes_at(&value(&owner), "L0", 0), ["big"]);
+    // Save and reload: the encoded project decodes to the same bytes.
+    let after = bytes(&owner);
+    let reloaded = NativeObjectHistory::new(
+        "instance-B",
+        decode_storage_project(&after).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(bytes(&reloaded), after);
+    assert_eq!(strokes_at(&value(&reloaded), "L1", 2), landed);
+    // One undo entry, then redo.
+    owner.undo(1).unwrap();
+    assert_eq!(bytes(&owner), before);
+    owner.redo(2).unwrap();
+    assert_eq!(bytes(&owner), after);
 }
 
 #[cfg(feature = "project_media_codec")]

@@ -202,7 +202,10 @@
   function members(operation) { const entry = spec(operation); return entry ? entry[2].map((m) => m[0]) : null; }
   function kinds(operation) { const entry = spec(operation); return entry ? entry[2].map((m) => m.slice()) : null; }
   // The command runner's bound for an edit request: a Fill Brush outline (up to 256 segments) gets the vector-geometry bound,
-  // as the SDK does (native-object-vector-contract.js); every other edit stays at 4096.
-  const requestByteLimit = (op) => (op === PREFIX + 'fill.brush' ? 65536 : 4096);
-  return Object.freeze({ OPERATIONS, admitted, requiresRevision: admitted, payload, result, correlate, paths: own.paths, compose, commandOf, members, kinds, bytes, requestByteLimit });
+  // as the SDK does (native-object-vector-contract.js); a shape paste carries its clip inline and gets the same 64 KiB; every other edit
+  // stays at 4096. Copy and cut return the clip, so their complete reply gets the 64 KiB too (the engine's own clip payload bound).
+  const SHAPE_CLIP_BYTES = 65536;
+  const requestByteLimit = (op) => (op === PREFIX + 'fill.brush' || op === PREFIX + 'clipboard.paste' ? SHAPE_CLIP_BYTES : 4096);
+  const responseByteLimit = (op) => (op === PREFIX + 'clipboard.copy' || op === PREFIX + 'clipboard.cut' ? SHAPE_CLIP_BYTES : 4096);
+  return Object.freeze({ OPERATIONS, admitted, requiresRevision: admitted, payload, result, correlate, paths: own.paths, compose, commandOf, members, kinds, bytes, requestByteLimit, responseByteLimit, SHAPE_CLIP_BYTES });
 }));

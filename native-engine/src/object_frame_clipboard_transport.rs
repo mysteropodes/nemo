@@ -17,6 +17,10 @@ pub(crate) fn owns(operation: &str) -> bool {
             | "command.document.object.frames.clipboard.paste"
     )
 }
+/// The shape clipboard (`object.clipboard.*`) carries its detached clip inline: a paste request (admitted by the
+/// dispatcher's `request_limit`) and a copy or cut reply may use 64 KiB, the engine's own clip payload bound (`MAX_PAYLOAD_BYTES`). Every other
+/// operation keeps 4096.
+pub(crate) const SHAPE_CLIP_BYTES: usize = 65_536;
 pub(crate) fn request_limit(operation: &str) -> usize {
     if owns(operation) {
         MESSAGE_BYTES
@@ -31,6 +35,11 @@ pub(crate) fn response_limit(operation: &str) -> usize {
             | "command.document.object.frames.clipboard.cut"
     ) {
         MESSAGE_BYTES
+    } else if matches!(
+        operation,
+        "command.document.object.clipboard.copy" | "command.document.object.clipboard.cut"
+    ) {
+        SHAPE_CLIP_BYTES
     } else {
         4096
     }

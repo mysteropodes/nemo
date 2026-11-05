@@ -46,6 +46,7 @@ const OP_PROPERTY_TRACK_EDIT: &str = "command.document.object.property.track.edi
 const OP_OBJECT_ITEM: &str = "command.document.object.item.edit";
 const OP_OBJECT_VECTOR: &str = "command.document.object.vector.edit";
 const OP_IMAGE_MESH_EDIT: &str = "command.document.object.image.mesh.edit";
+const OP_CLIPBOARD_PASTE: &str = "command.document.object.clipboard.paste";
 const MAX_MESSAGE_BYTES: usize = families::DEFAULT_REQUEST_BYTES;
 
 /// Request-envelope bound per operation: only the vector and image-mesh edits may carry a bounded body
@@ -57,6 +58,9 @@ fn request_limit(operation: &str) -> usize {
         frame_clipboard_transport::request_limit(operation)
     } else if operation == OP_OBJECT_VECTOR || operation == OP_IMAGE_MESH_EDIT {
         MAX_VECTOR_REQUEST_BYTES
+    } else if operation == OP_CLIPBOARD_PASTE {
+        // The pasted clip rides inline (the reply limit of copy and cut is in `frame_clipboard_transport`).
+        frame_clipboard_transport::SHAPE_CLIP_BYTES
     } else {
         MAX_MESSAGE_BYTES
     }
