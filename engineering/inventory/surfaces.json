@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "2e93815251c90b3f42120a8fd2236044777ba90a",
-  "describe": "v0.7.0-alpha.4-5127-g2e9381525-dirty"
+  "head": "4b29e90e0ee6f90bc6a8b4739f495f686719e7aa",
+  "describe": "v0.7.0-alpha.4-5132-g4b29e90e0-dirty"
  },
- "inputsDigest": "fd6e3ea0e3f8b4c3b411fef3bf95be895a7dcf74ef90e73792f376774e65f7d1",
+ "inputsDigest": "06786eb306671591886f81aadc2beee8069402c8f1ab29846ce8d54cadf535c7",
  "states": [
   "inventoried",
   "characterized",
@@ -17546,7 +17546,7 @@
     "functionsVisited": 248,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-project-desktop.js:359 presented()",
+     "src/js/adapters/native-object-project-desktop.js:361 presented()",
      "src/js/app.js:536 updZoom()",
      "src/js/tools.js:7084 show()"
     ]
@@ -22209,7 +22209,7 @@
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
    "source": "src/js/labs/timeline-markers.js:82",
    "meta": {
-    "functionsVisited": 23
+    "functionsVisited": 24
    },
    "fixtures": []
   },

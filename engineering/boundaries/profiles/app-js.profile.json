@@ -3638,6 +3638,18 @@
       ]
     },
     {
+      "id": "app.native.layer-solo.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-layer-solo.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-layer-solo.js"
+      ]
+    },
+    {
       "id": "app.native.path-effects.ui.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

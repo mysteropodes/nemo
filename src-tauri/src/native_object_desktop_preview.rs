@@ -36,6 +36,9 @@ pub(crate) struct ObjectPreviewReceipt {
     /// The Shadow Brush guide lines were left out (#2373); absent when not asked for.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub(crate) hide_shadow_guides: bool,
+    /// The layers the renderer painted alone (#2371); absent when none were asked for.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) solo_layers: Vec<String>,
     /// What the renderer did with the request's onion / Ghost All settings; absent when none were asked for.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) ghosts: Option<GhostReceipt>,
@@ -102,6 +105,11 @@ pub(crate) struct ObjectPreviewRequest {
     /// never an export, never persisted).
     #[serde(default)]
     pub(crate) hide_shadow_guides: bool,
+    /// The Solo view of the layers (#2371, baseline `layerIsEffectivelyVisible`): while any listed layer belongs to the shown
+    /// context only the listed layers (and the children of a listed folder layer) are painted. A session view fact, sorted and
+    /// unique, bounded; never a command, never persisted (viewport only here, an export carries its own copy).
+    #[serde(default)]
+    pub(crate) solo_layers: Vec<String>,
     /// Onion skin / Ghost All composed under the live frame by the native renderer (viewport only, never an export).
     #[serde(default)]
     pub(crate) ghosts: Option<GhostUnderlayRequest>,
@@ -121,6 +129,11 @@ impl ObjectPreviewRequest {
             frame: self.frame,
         }
     }
+}
+/// The Solo set of a request (#2371): bounded, strictly ascending (so unique), every entry a bounded id.
+pub(crate) const MAX_SOLO_LAYERS: usize = 512;
+pub(crate) fn valid_solo(layers: &[String]) -> bool {
+    layers.len() <= MAX_SOLO_LAYERS && layers.iter().all(|id| bounded_id(id)) && layers.windows(2).all(|pair| pair[0] < pair[1])
 }
 pub(crate) fn admit_request(raw: &str, instance: &str) -> HostResult<ObjectPreviewRequest> {
     if raw.len() > MAX_BYTES || !raw.trim_start().starts_with('{') {
@@ -190,6 +203,9 @@ pub(crate) fn admit_request(raw: &str, instance: &str) -> HostResult<ObjectPrevi
             .validate()
             .map_err(|message| host_error("invalid_request", message))?;
     }
+    if !valid_solo(&request.solo_layers) {
+        return Err(host_error("invalid_request", "invalid object preview solo layers"));
+    }
     let output = request.output_spec.admit_object()?;
     request.viewport.admit_object(&output)?;
     if (request.alpha_checker || request.current_outline) && !(request.viewport.display_scale().is_finite() && request.viewport.display_scale() > 0.) {
@@ -208,6 +224,8 @@ pub(crate) struct ObjectPreviewConsumer<'a> {
     current_outline: Option<f64>,
     /// The Shadow guides switch is off (#2373).
     hide_shadow_guides: bool,
+    /// The soloed layers (#2371).
+    solo_layers: Vec<String>,
 }
 impl ObjectPreviewConsumer<'_> {
     pub(crate) fn present<P: SurfacePort>(
@@ -224,6 +242,7 @@ impl ObjectPreviewConsumer<'_> {
             self.alpha_checker,
             self.current_outline,
             self.hide_shadow_guides,
+            &self.solo_layers,
             &mut diagnostic,
         )?;
         diagnostic.finish(presented.receipt.status());
@@ -290,6 +309,7 @@ pub(crate) fn preview_with_target(
                         alpha_checker: request.alpha_checker.then(|| request.viewport.display_scale()),
                         current_outline: request.current_outline.then(|| request.viewport.display_scale()),
                         hide_shadow_guides: request.hide_shadow_guides,
+                        solo_layers: request.solo_layers.clone(),
                     }))
                 };
                 owner.with_prepared_object_preview_for_navigation(
@@ -315,6 +335,7 @@ pub(crate) fn preview_with_target(
         alpha_checker: request.alpha_checker,
         current_outline: request.current_outline,
         hide_shadow_guides: request.hide_shadow_guides,
+        solo_layers: request.solo_layers.clone(),
         ghosts: receipt.ghosts,
     })
 }

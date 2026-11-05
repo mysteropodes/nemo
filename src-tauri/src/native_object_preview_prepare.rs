@@ -8,7 +8,7 @@ use native_engine::{
     desktop_viewport::{ObjectPreviewNavigation, ObjectPreviewView},
     object_frame_packet::ObjectFrameSelector,
     object_render_scene::{
-        viewport_checker_quality_suffix, viewport_outline_quality_suffix, viewport_shadow_guides_quality_suffix, GhostReceipt, GhostUnderlayRequest, ObjectBrushAdmission,
+        viewport_checker_quality_suffix, viewport_outline_quality_suffix, viewport_shadow_guides_quality_suffix, viewport_solo_quality_suffix, GhostReceipt, GhostUnderlayRequest, ObjectBrushAdmission,
         ObjectCompositionWitness, ObjectPaintPlan,
     },
     object_snapshot::ObjectSnapshot,
@@ -30,6 +30,8 @@ pub(super) struct PreparedObjectPreview {
     pub(super) outline_scale: Option<f64>,
     /// #2373: the Shadow guides switch is off in this viewport frame; part of the quality identity.
     pub(super) hide_shadow_guides: bool,
+    /// #2371: the layers soloed in this viewport frame (sorted, unique); part of the quality identity. Empty when no layer is soloed.
+    pub(super) solo_layers: Vec<String>,
 }
 
 impl PreparedObjectPreview {
@@ -48,10 +50,15 @@ impl PreparedObjectPreview {
             Some(scale) => format!("{base}{}", viewport_outline_quality_suffix(scale)),
             None => base,
         };
-        if self.hide_shadow_guides {
+        let base = if self.hide_shadow_guides {
             format!("{base}{}", viewport_shadow_guides_quality_suffix())
         } else {
             base
+        };
+        if self.solo_layers.is_empty() {
+            base
+        } else {
+            format!("{base}{}", viewport_solo_quality_suffix(&self.solo_layers))
         }
     }
 
@@ -168,6 +175,7 @@ impl NativeObjectHost {
             checker_scale: None,
             outline_scale: None,
             hide_shadow_guides: false,
+            solo_layers: Vec::new(),
         })
     }
 }
@@ -199,6 +207,7 @@ pub(super) fn attach_view_aids(
     checker: Option<f64>,
     outline: Option<f64>,
     hide_shadow_guides: bool,
+    solo_layers: &[String],
 ) -> Result<ObjectCompositionWitness, String> {
     let composition = match checker {
         Some(scale) => composition
@@ -212,13 +221,17 @@ pub(super) fn attach_view_aids(
             .map_err(|e| format!("preview current frame outline: {e:?}"))?,
         None => composition,
     };
-    if hide_shadow_guides {
+    let composition = if hide_shadow_guides {
         composition
             .with_viewport_hidden_shadow_guides()
-            .map_err(|e| format!("preview hidden shadow guides: {e:?}"))
+            .map_err(|e| format!("preview hidden shadow guides: {e:?}"))?
     } else {
-        Ok(composition)
-    }
+        composition
+    };
+    // #2371: the Solo view of the layers, last, as the quality identity lists it.
+    composition
+        .with_viewport_solo(solo_layers)
+        .map_err(|e| format!("preview solo layers: {e:?}"))
 }
 
 impl NativeObjectHost {
