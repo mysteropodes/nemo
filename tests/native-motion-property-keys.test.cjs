@@ -203,6 +203,12 @@ test('selected-key projection exports actual qualified fractional identities and
  h.ready(false);assert.equal(h.editor.captureSelectedKeys(),null);assert.equal(captured.isCurrent(),true,'local selection proof remains readable while the queue hides presentation');
  h.editor.clear();assert.equal(captured.isCurrent(),false);h.ready(true);assert.deepEqual(h.editor.captureSelectedKeys().keys,[]);h.editor.dispose();assert.equal(h.editor.captureSelectedKeys(),null);
  for(const lockTo of [false,0,{},'other']){const bad=fixture({keys:[{frame:0,v:[1],lockTo}]});assert.equal(await bad.open(),false);}
+ for(const color of [null,7,'red','#12345','e8b64c']){const bad=fixture({keys:[{frame:0,v:[1],color}]});assert.equal(await bad.open(),false);}
+});
+
+test('the key timeline projection carries each key tint and standing lock for the grid and its menu',async()=>{
+ const h=fixture({keys:[{frame:0,v:[1],color:'#e8b64c'},{frame:4,v:[2],lockTo:'out'},{frame:9,v:[3]}]});assert.equal(await h.open(),true);
+ assert.deepEqual(copy(h.editor.readKeyTimeline().items),[{frame:0,selected:false,color:'#e8b64c'},{frame:4,selected:false,lockTo:'out'},{frame:9,selected:false}]);
 });
 
 test('key timeline is a frozen single-property native read projection with nonserialized pure UI selectors',async()=>{

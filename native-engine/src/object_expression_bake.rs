@@ -71,6 +71,7 @@ fn track(baked: &BakedTrack) -> Result<OrderTrack, DispatchErrorCode> {
                     )),
                     h_in: Presence::Present(vec![0.into(), 0.into()]),
                     h_out: Presence::Present(vec![0.into(), 0.into()]),
+                    color: Presence::Missing,
                 })
             })
             .collect::<Result<_, DispatchErrorCode>>()?,

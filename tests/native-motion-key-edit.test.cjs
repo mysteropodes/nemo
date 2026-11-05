@@ -199,3 +199,25 @@ test('a selection above 32 keys is sent as runs of consecutive selected keys per
   assert.equal(few.log.writes[0].payload.selections.length, 32);
   assert.equal(few.log.writes[0].payload.selections[0].frame, 0);
 });
+
+test('a gesture names the rows in its own order and says where each track lands (the selection box)', async () => {
+  const rowA = (uid, property, frames) => ({ target: { contextId: 'scene-root', layerUid: uid }, property, items: frames.map((f) => ({ frame: f, selected: true })).concat([{ frame: 50, selected: false }]) });
+  const h = editorHarness({ tracks: [rowA('A', 'opacity', [10]), rowA('A', 'rotation', [10]), rowA('A', 'scale', [20])] });
+  const rank = { opacity: 2, rotation: 0, scale: 1 };
+  const opts = { order: (a, b) => rank[a.property] - rank[b.property], expected: (t) => ({ opacity: [16], rotation: [13], scale: [20] }[t.property]) };
+  assert.equal(await h.editor.edit({ kind: 'warp', mode: 'top', total: 6 }, opts), true);
+  assert.deepEqual(h.log.writes[0].payload.selections.map((s) => s.property), ['rotation', 'scale', 'opacity'], 'rows are read in the order the selections first name each track');
+  assert.deepEqual(h.log.writes[0].payload.action, { kind: 'warp', mode: 'top', total: 6 });
+  assert.deepEqual(h.log.reopens.map((r) => [r.property, r.frames]), [['rotation', [13]], ['scale', [20]], ['opacity', [16]]]);
+  // Without opts the order and the landing frames are the editor's own.
+  const plain = editorHarness({ tracks: [rowA('A', 'opacity', [10]), rowA('A', 'rotation', [10])] });
+  assert.equal(await plain.editor.edit({ kind: 'color', color: '#e8b64c' }), true);
+  assert.deepEqual(plain.log.writes[0].payload.selections.map((s) => s.property), ['opacity', 'rotation']);
+  assert.deepEqual(plain.log.reopens.map((r) => r.frames), [[10], [10]], 'a tint moves nothing');
+  const refused = editorHarness({ fail: true });
+  assert.equal(await refused.editor.edit({ kind: 'warp', mode: 'left', total: 2 }), false);
+  assert.match(refused.log.notes.join('|'), /cannot move there/);
+  const tint = editorHarness({ fail: true });
+  assert.equal(await tint.editor.edit({ kind: 'color', color: null }), false);
+  assert.match(tint.log.notes.join('|'), /key edit was refused/);
+});

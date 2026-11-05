@@ -91,7 +91,7 @@
     value.tracks.map(function(track){return [trackIdentity(track),track.items.map(function(k){return k.frame;})];})]);}
   function keyAddress(track,frame){return {target:{kind:'property',target:track.target,property:track.property},frame:frame};}
   function selectedAddresses(value){var keys=[];value.tracks.forEach(function(track){track.items.forEach(function(key){if(key.selected)keys.push(keyAddress(track,key.frame));});});return keys;}
-  function clearKeys(w){(w.keyNodes||[]).forEach(function(n){if(n.parentNode)n.parentNode.removeChild(n);});w.keyNodes=[];w.keySig=null;}
+  function clearKeys(w){(w.keyNodes||[]).forEach(function(n){if(n.parentNode)n.parentNode.removeChild(n);});w.keyNodes=[];w.keySig=null;if(w.box)w.box.remove();}
   function keyRows(root,w,layout){
     if(layout.length&&(!w.ports||typeof w.ports.setKeyTimelineRows!=='function'||w.ports.setKeyTimelineRows(layout,w.info)!==true))throw Error('Native property label rows unavailable');
     if(!layout.length&&w.ports&&typeof w.ports.setKeyTimelineRows==='function')w.ports.setKeyTimelineRows([],w.info);
@@ -107,7 +107,7 @@
   // The key buttons depend on the key frames, selection, lanes and zoom, not on which frame is shown: a playback tick whose projection prints the same
   // signature keeps its buttons (#2371) and only swaps the live value their handlers read.
   function keySignature(root,w,fc,layout,positions){
-    return JSON.stringify([fc,layout,positions.map(function(p){return [p.index,w.rows[p.index].hidden,trackIdentity(p.track),p.key.frame,p.key.selected,p.left,p.top];})]);
+    return JSON.stringify([fc,layout,positions.map(function(p){return [p.index,w.rows[p.index].hidden,trackIdentity(p.track),p.key.frame,p.key.selected,p.key.color||null,p.left,p.top];})]);
   }
   function refreshKeys(root){
     var w=works.get(root);if(!w)return;
@@ -136,6 +136,7 @@
         var node=root.document.createElement('button');node.type='button';node.className='motion-key layer-inout-key native-motion-property-key';
         Object.assign(node.style,{position:'absolute',left:position.left+'px',top:position.top+'px',padding:'0',cursor:'pointer',zIndex:'7'});
         node.dataset.frame=String(key.frame);node.dataset.keyTrack=trackIdentity(track);node.dataset.selected=String(key.selected);node.classList.toggle('sel',key.selected);
+        if(key.color){node.classList.add('tinted');if(typeof node.style.setProperty==='function')node.style.setProperty('--key-color',key.color);else node.style['--key-color']=key.color;}
         node.setAttribute('aria-label',track.property+' key at frame '+String(key.frame));node.setAttribute('aria-pressed',String(key.selected));
         if(track.inert){node.disabled=true;node.style.pointerEvents='none';row.appendChild(node);w.keyNodes.push(node);return;}
         function choose(event){
@@ -148,7 +149,7 @@
             var keys=modified||key.selected?selectedAddresses(live):[],address=keyAddress(track,key.frame),id=JSON.stringify(address);
             var at=keys.findIndex(function(k){return JSON.stringify(k)===id;});if(at>=0&&(event.ctrlKey||event.metaKey))keys.splice(at,1);else if(at<0)keys.push(address);
             if(live.selectKeys(keys)!==true)throw Error('Native key selection refused');refreshKeys(root);
-            if(!modified&&event.detail!==0)dragKeys(root,w,fc,event);
+            if(!modified&&event.detail!==0)dragKeys(root,w,fc,event,node);
           }catch(_){notice(root,'Native key selection is unavailable or stale.');}
         }
         node.addEventListener('mousedown',choose);node.addEventListener('click',function(event){if(event.detail===0)choose(event);});
@@ -156,14 +157,30 @@
         row.appendChild(node);w.keyNodes.push(node);
       });
       w.keySig=signature;
+      boxUpdate(root,w);
     }catch(_){clearKeys(w);try{keyRows(root,w,[]);}catch(_){}notice(root,'Native key timeline coordinates are unavailable.');}
   }
   // #2524: dragging selected keys previews a shift and commits ONE native shift on release (baseline motion.js onDragMove/onDragUp).
-  function dragKeys(root,w,fc,event){
+  function dragKeys(root,w,fc,event,node){
     var gesture=root.NemoNativeMotionKeyGesture;if(!gesture||!w.ports||typeof w.ports.editSelectedKeys!=='function'||w.keyDrag)return;
+    // Alt + drag of a selected key skews like the bottom edge of the selection box (baseline), when the keys sit on 2+ rows.
+    if(event.altKey&&w.box&&w.box.update()){w.box.start(event,'bottom');return;}
+    var snapFirst=Number(node&&node.dataset&&node.dataset.frame);
     w.keyDrag=gesture.beginDrag({doc:root.document,startX:event.clientX,fc:fc,total:w.info.totalFrames,edit:w.ports.editSelectedKeys,
       nodes:function(){return (w.keyNodes||[]).filter(function(n){return n.dataset.selected==='true';});},
+      snap:Number.isFinite(snapFirst)?{first:snapFirst,on:function(){try{return root.localStorage.getItem('nemo-motion-snap')!=='0';}catch(_){return true;}},
+        frames:function(){try{return gesture.snapCandidates(root,keyViews(root,w),w.info.totalFrames);}catch(_){return [];}}}:null,
       tracks:function(){try{var v=keyViews(root,w);return v&&v.tracks;}catch(_){return null;}},onEnd:function(){w.keyDrag=null;}});
+  }
+  // #2377: the selection box over keys on 2+ property rows. It reads the key buttons; every gesture ends in one native warp or shift.
+  function boxUpdate(root,w){
+    if(!root.NemoNativeMotionKeyBox||!w.ports||typeof w.ports.editSelectedKeys!=='function')return;
+    if(!w.box)w.box=root.NemoNativeMotionKeyBox.attach({doc:root.document,host:root,
+      nodes:function(){return (w.keyNodes||[]).filter(function(n){return n.parentNode&&!n.parentNode.hidden;}).map(function(n){return {node:n,id:n.dataset.keyTrack,frame:Number(n.dataset.frame),selected:n.dataset.selected==='true',rect:typeof n.getBoundingClientRect==='function'?n.getBoundingClientRect():null};});},
+      view:function(){try{return keyViews(root,w);}catch(_){return null;}},fc:function(){return root.FC;},last:function(){return w.info.totalFrames-1;},
+      rank:function(track){var id=trackIdentity(track),n=(w.keyNodes||[]).find(function(k){return k.dataset.keyTrack===id;}),r=n&&typeof n.getBoundingClientRect==='function'?n.getBoundingClientRect():null;return r?r.top:0;},
+      edit:w.ports.editSelectedKeys,toast:function(m){notice(root,m);}});
+    w.box.update();
   }
   // The key menu acts on a selection read when it opened; a click after the selection changed commits nothing.
   function keyMenu(root,w,track,key,event){
@@ -175,7 +192,7 @@
       if(!key.selected){if(live.selectKeys([address])!==true)throw Error('Native key selection refused');refreshKeys(root);live=keyViews(root,w);}
       var opened=JSON.stringify(selectedAddresses(live));
       function same_(){var now=keyViews(root,w);return !!now&&JSON.stringify(selectedAddresses(now))===opened&&now.isCurrent()===true;}
-      var ctx={view:live,hold:key.hold===true,toast:function(m){notice(root,m);},refresh:function(){refreshKeys(root);},
+      var ctx={view:live,hold:key.hold===true,showMenu:function(items){root.showContextMenu(event.clientX+8,event.clientY+8,items);},toast:function(m){notice(root,m);},refresh:function(){refreshKeys(root);},
         prompt:function(m,d){return typeof root.prompt==='function'?root.prompt(m,d):null;},
         edit:function(action){if(!same_()){notice(root,'Native key selection changed; open the key menu again.');return false;}return edit(action);},
         selectOnly:function(){if(!same_()||live.selectKeys([address])!==true)return false;var now=keyViews(root,w);opened=JSON.stringify(selectedAddresses(now));return true;}};
@@ -195,8 +212,8 @@
     if(value.selectKeys(keys)!==true)throw Error('Native key marquee refused');
     m.keyView=keyViews(root,w);if(keyIdentity(m.keyView)!==m.keyIdentity)throw Error('Native key marquee changed view');refreshKeys(root);
   }
-  function cancel(root){var w=works.get(root);if(w&&w.keyDrag)w.keyDrag.cancel();if(w&&w.marquee){var m=w.marquee;w.marquee=null;if(m.rect.parentNode)m.rect.parentNode.removeChild(m.rect);}if(w&&w.capture){w.capture.valid=false;w.capture=null;}if(w)w.down=false;}
-  function retire(root){var w=works.get(root);if(!w)return;cancel(root);clearKeys(w);try{keyRows(root,w,[]);}catch(_){}w.serial++;w.rows=[];if(w.node&&w.node.parentNode)w.node.parentNode.removeChild(w.node);w.node=null;w.grid=null;}
+  function cancel(root){var w=works.get(root);if(w&&w.keyDrag)w.keyDrag.cancel();if(w&&w.box)w.box.cancel();if(w&&w.marquee){var m=w.marquee;w.marquee=null;if(m.rect.parentNode)m.rect.parentNode.removeChild(m.rect);}if(w&&w.capture){w.capture.valid=false;w.capture=null;}if(w)w.down=false;}
+  function retire(root){var w=works.get(root);if(!w)return;cancel(root);clearKeys(w);if(w.box){w.box.dispose();w.box=null;}try{keyRows(root,w,[]);}catch(_){}w.serial++;w.rows=[];if(w.node&&w.node.parentNode)w.node.parentNode.removeChild(w.node);w.node=null;w.grid=null;}
   function selection(root,w,li,part,event){
     var info=w.info,uid=info.layers[li].layerUid,values=bars(root,info)||[];
     if(event.metaKey||event.ctrlKey){var i=values.findIndex(function(v){return v.layerUid===uid;});if(i>=0)values.splice(i,1);else values.push({layerUid:uid,part:'both'});w.anchor=uid;}

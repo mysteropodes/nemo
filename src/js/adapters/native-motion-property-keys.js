@@ -13,9 +13,10 @@
   function freeze(v){if(object(v)||Array.isArray(v)){Object.values(v).forEach(freeze);Object.freeze(v);}return v;}
   function targetKey(t){return JSON.stringify([t.contextId,t.layerUid,Object.prototype.hasOwnProperty.call(t,'strokeId'),t.strokeId]);}
   function authoredKey(v,dimension){
-    if(!exact(v,['frame','v'],['hold','curvePoints','hIn','hOut','lockTo'])||!Number.isFinite(v.frame)||!vector(v.v,dimension))return false;
+    if(!exact(v,['frame','v'],['hold','curvePoints','hIn','hOut','lockTo','color'])||!Number.isFinite(v.frame)||!vector(v.v,dimension))return false;
     if('lockTo'in v&&v.lockTo!==null&&!['in','out','layer'].includes(v.lockTo))return false;
     if('hold'in v&&typeof v.hold!=='boolean')return false;
+    if('color'in v&&!(typeof v.color==='string'&&/^#(?:[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v.color)))return false;
     if(['hIn','hOut'].some(function(k){return k in v&&!vector(v[k],2);}))return false;
     if('curvePoints'in v&&v.curvePoints!==null){
       if(!Array.isArray(v.curvePoints))return false;
@@ -174,7 +175,7 @@
           }catch(_){return false;}
         }
         var projection={pin:Object.assign({},value.token.pin),frame:value.frame,viewGeneration:value.token.viewGeneration,
-          target:Object.assign({},value.target),property:value.property,items:value.items.map(function(k){var item={frame:k.frame,selected:selected.has(k.frame)};if(k.hold===true)item.hold=true;return item;})};
+          target:Object.assign({},value.target),property:value.property,items:value.items.map(function(k){var item={frame:k.frame,selected:selected.has(k.frame)};if(k.hold===true)item.hold=true;if(k.lockTo)item.lockTo=k.lockTo;if(k.color)item.color=k.color;return item;})};
         Object.defineProperties(projection,{isCurrent:{value:isCurrent},selectFrames:{value:selectFrames},canSelectFrames:{value:canSelectFrames}});
         return freeze(projection);
       }catch(_){return null;}

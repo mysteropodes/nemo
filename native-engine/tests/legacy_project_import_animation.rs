@@ -242,6 +242,21 @@ fn layer_kinds_blend_mattes_range_and_flags_keep_their_baseline_values() {
 }
 
 #[test]
+fn a_key_tint_is_carried_over_and_a_malformed_one_is_named_and_dropped() {
+    let mut doc = animation();
+    doc["layers"][0]["motion"]["position"]["keys"][2]["color"] = json!("#e8b64c");
+    doc["layers"][0]["motion"]["position"]["keys"][0]["color"] = json!("amber");
+    let converted = import(&doc.to_string());
+    let codes: Vec<_> = warnings(&converted).into_iter().map(|w| w.1).collect();
+    assert!(codes.contains(&"invalid_key_color"), "{codes:?}");
+    let d = file(&converted)["drawing"].clone();
+    let keys = property(holder(&d, "ly_shapes", None), "position")["track"]["keys"].clone();
+    let at = |frame: i64| keys.as_array().unwrap().iter().find(|k| k["frame"] == frame).unwrap().clone();
+    assert_eq!(at(4)["color"], "#e8b64c");
+    assert!(keys.as_array().unwrap().iter().filter(|k| k.get("color").is_some()).count() == 1);
+}
+
+#[test]
 fn dangling_references_degrade_like_the_baseline_and_bad_values_refuse() {
     let mut doc = animation();
     doc["layers"][1]["timeLink"] = json!({"parentUid": "ly_shapes", "inOffset": 3});

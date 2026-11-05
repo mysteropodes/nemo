@@ -238,6 +238,9 @@ fn property(
             }
             previous = Some(frame);
             vector(&key.v, meta.dimension)?;
+            if key.color.value().is_some_and(|c| !crate::object_document::valid_key_color(c)) {
+                return Err(invalid("key colour must be #rrggbb or #rrggbbaa"));
+            }
             for handle in [key.h_in.value(), key.h_out.value()].into_iter().flatten() {
                 vector(handle, 2)?;
             }

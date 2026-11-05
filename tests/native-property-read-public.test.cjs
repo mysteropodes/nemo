@@ -284,6 +284,8 @@ test('classic browser helper/SDK expose the same read with the literal finite na
 test('authored-key read accepts only actual nullable standing lock modes while preserving DTO shape',async()=>{
  for(const lockTo of [null,'in','out','layer']){const q=request('authoredKeys'),r=response(q);r.result.items[0].lockTo=lockTo;assert.deepEqual((await read(q,r)).result.items[0],r.result.items[0]);}
  for(const lockTo of [false,0,'',{},'unknown']){const q=request('authoredKeys'),r=response(q);r.result.items[0].lockTo=lockTo;await assert.rejects(read(q,r),TypeError);}
+ for(const color of ['#e8b64c','#4EA9FF','#4ea9ffcc']){const q=request('authoredKeys'),r=response(q);r.result.items[0].color=color;assert.deepEqual((await read(q,r)).result.items[0],r.result.items[0]);}
+ for(const color of [null,false,7,'red','#12345','e8b64c','#gggggg']){const q=request('authoredKeys'),r=response(q);r.result.items[0].color=color;await assert.rejects(read(q,r),TypeError);}
 });
 
 test('expressionSource returns the exact authored code, frameless and correlated, and never truncates (#2376)', async () => {
