@@ -32,12 +32,13 @@ pub(super) const TWEEN: [&str; 4] = [
 ];
 
 /// G39 (#2376): the Motion preset apply shares the table; its own shapes are pinned in the preset tests.
-pub(super) const PRESET: [&str; 5] = [
+pub(super) const PRESET: [&str; 6] = [
     "property.preset.apply",
     "layer.compositing.edit",
     "layer.parent.set",
     "layer.timeLink.set",
     "layer.followPath.set",
+    "layer.color.set",
 ];
 
 pub(super) fn corpus() -> Value {
@@ -52,8 +53,8 @@ pub(super) fn envelope(operation: &str, payload: Value) -> NativeApplicationRequ
 }
 
 #[test]
-fn the_table_declares_exactly_the_twenty_three_operations_and_nothing_else() {
-    assert_eq!(table().len(), 23, "an unparsable table admits nothing");
+fn the_table_declares_exactly_the_twenty_four_operations_and_nothing_else() {
+    assert_eq!(table().len(), 24, "an unparsable table admits nothing");
     for &suffix in OPERATIONS.iter().chain(&LABS).chain(&TWEEN).chain(&PRESET) {
         assert!(admitted(&format!("{P}{suffix}")), "{suffix}");
     }

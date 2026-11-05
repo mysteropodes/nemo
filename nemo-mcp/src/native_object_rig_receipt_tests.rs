@@ -130,7 +130,7 @@ fn the_catalog_declares_each_operation_once_under_five_owner_descriptors() {
         s if s.starts_with("tween.") => "native.object.tween",
         "property.preset.apply" => "native.object.motion-preset",
         "layer.compositing.edit" => "native.object.layer-compositing",
-        "layer.parent.set" | "layer.timeLink.set" | "layer.followPath.set" => {
+        "layer.parent.set" | "layer.timeLink.set" | "layer.followPath.set" | "layer.color.set" => {
             "native.object.layer-parent"
         }
         _ => "native.object.rig",
@@ -182,7 +182,7 @@ fn every_descriptor_example_is_a_valid_request_with_a_correlated_valid_response(
             seen += 1;
         }
     }
-    assert_eq!(seen, 15, "one copyable example per declared operation");
+    assert_eq!(seen, 16, "one copyable example per declared operation");
 }
 
 #[test]

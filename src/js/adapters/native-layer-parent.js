@@ -232,10 +232,10 @@
       if (typeof host.showContextMenu !== 'function') return;
       e.preventDefault(); e.stopPropagation();
       const x = e.clientX + 8, y = e.clientY + 8;
-      host.showContextMenu(x, y, [
+      host.showContextMenu(x, y, (host.NemoNativeLayerRowUi ? host.NemoNativeLayerRowUi.menuItems(host, li) : []).concat([
         { label: tr(host, 'ctxParentInTimeLinkTimeEllipsis', 'Parent in Time — lier le temps à…'), action: () => { host.showContextMenu(x, y, timeLinkMenuItems(host, adapter, li, onChanged)); } },
         { label: 'Chemin (Follow Path)…', action: () => { host.showContextMenu(x, y, followPathMenuItems(host, adapter, li, onChanged)); } },
-      ].concat(host.NemoNativeObjectDuplicatorUi ? host.NemoNativeObjectDuplicatorUi.contextItems(host, li) : [])); // #2256: Object-mode Duplicator…
+      ]).concat(host.NemoNativeObjectDuplicatorUi ? host.NemoNativeObjectDuplicatorUi.contextItems(host, li) : [])); // #2256: Object-mode Duplicator…
     });
   }
   // The baseline layer-row Parent cell (.lparent: pickwhip .lpick + label; 1065e9d8 buildParentCell) for a NATIVE row: the label is the
