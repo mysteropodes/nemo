@@ -4870,6 +4870,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-motion-effector.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2482,
+          "scriptOrdinal": 155
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-motion-canvas.js",
       "moduleId": "app.native.motion.properties.adapter",
       "executionClass": "document-classic",

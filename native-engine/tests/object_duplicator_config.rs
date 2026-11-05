@@ -330,3 +330,52 @@ mod placement {
         assert_eq!(view.spec.mode, Some("path"));
     }
 }
+
+fn with_effectors() -> Value {
+    let mut descriptor = full();
+    descriptor["effectors"] = json!([
+        {"pos":{"x":100,"y":200},"radius":150,"falloff":"radial","strength":0.5},
+        {"radius":80,"falloff":"linear"}
+    ]);
+    descriptor
+}
+
+fn move_to(index: u32, x: f64, y: f64) -> ConfigEdit {
+    edit_with(|e| e.effector_pos = Some(EffectorMove { index, x, y }))
+}
+
+#[test]
+fn an_effector_handle_move_changes_only_that_position() {
+    let before = world(with_effectors());
+    let plan = apply_edit(&before, &move_to(0, 340.5, -12.0));
+    assert!(plan.changed);
+    let mut expected = with_effectors();
+    expected["effectors"][0]["pos"] = json!({"x":340.5,"y":-12});
+    assert_eq!(stored(&plan.document), expected, "radius, falloff, strength and the sibling keep their bytes");
+    assert_eq!(decode(&wire(&plan.document)), plan.document, "round trip");
+    // An effector that never had a position gains one; the first one is untouched.
+    let second = apply_edit(&before, &move_to(1, 5.0, 6.0));
+    let mut expected = with_effectors();
+    expected["effectors"][1]["pos"] = json!({"x":5,"y":6});
+    assert_eq!(stored(&second.document), expected);
+}
+
+#[test]
+fn an_effector_move_to_the_stored_point_publishes_nothing() {
+    let before = world(with_effectors());
+    let plan = apply_edit(&before, &move_to(0, 100.0, 200.0));
+    assert!(!plan.changed);
+    assert_eq!(plan.document, before);
+}
+
+#[test]
+fn an_effector_move_refuses_a_missing_index_a_missing_list_and_a_non_finite_point() {
+    let before = world(with_effectors());
+    for edit in [move_to(2, 1.0, 1.0), move_to(0, f64::NAN, 1.0), move_to(0, 1.0, f64::INFINITY)] {
+        assert_eq!(plan_duplicator_config(&before, "ly_dup", &edit).unwrap_err(), SetupError::ConfigInvalid);
+    }
+    let bare = world(full());
+    assert_eq!(plan_duplicator_config(&bare, "ly_dup", &move_to(0, 1.0, 1.0)).unwrap_err(), SetupError::ConfigInvalid);
+    let plain = plan_duplicator_config(&before, "ly_plain", &move_to(0, 1.0, 1.0)).unwrap_err();
+    assert_eq!(plain, SetupError::NotADuplicator("ly_plain".into()));
+}

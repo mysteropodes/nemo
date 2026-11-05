@@ -7,15 +7,17 @@
  * (with Rotation or Scale set the edit carries `keepPose`, so Position follows in the same revision), a key diamond is grabbed only on its own frame and
  * a spatial key handle (hIn / hOut) on any frame (`setKeyHandle`). A parented layer is drawn and dragged through its ancestors' `parentAffine`; the
  * Position path is sampled once per frame through each key's easing. A component context and several selected layers draw nothing and take no
- * gesture; a layer the native read cannot box (text, effect, rig, 3D, expression) says so once in a notice instead of staying silent. The pointer listeners stay on `document` in the capture phase (CLAUDE.md section 13). This file never reads or writes a JS layer record. */
+ * gesture, except that the effector handles of a duplicator layer (a crosshair and a falloff ring each, grabbed last, even on the layer the duplicator
+ * locks) move one effector anchor through ONE `object.duplicator.config` `effectorPos` edit, a static setting and never a key; a layer the native read cannot box (text, effect, rig, 3D, expression) says so once in a notice instead of staying silent. The pointer listeners stay on `document` in the capture phase (CLAUDE.md section 13). This file never reads or writes a JS layer record. */
 (function (root, factory) {
-  const api = factory(typeof module === 'object' && module.exports ? require('./native-motion-canvas-math.js') : root.NemoNativeMotionCanvasMath);
+  const CJS = typeof module === 'object' && module.exports;
+  const api = factory(CJS ? require('./native-motion-canvas-math.js') : root.NemoNativeMotionCanvasMath, CJS ? require('./native-motion-effector.js') : root.NemoNativeMotionEffector);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else {
     root.NemoNativeMotionCanvas = api;
     if (root.document && typeof root.document.addEventListener === 'function') { try { api.desktop(root).install(); } catch (_) { /* nothing to listen on */ } }
   }
-}(typeof globalThis === 'object' ? globalThis : this, function (Math2) {
+}(typeof globalThis === 'object' ? globalThis : this, function (Math2, Eff) {
   'use strict';
   const SVG = 'http://www.w3.org/2000/svg', PIN = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
   const HANDLE = 'rgba(255,184,108,.9)', BLUE = 'rgba(74,158,255,.86)', RING = 'rgba(74,158,255,.67)', PATH = 'rgba(120,170,255,.8)', WHITE = 'rgba(255,255,255,1)', ACCENT = 'rgba(255,184,108,1)', DOT = 'rgba(230,230,230,1)', CUR = 'rgba(255,170,40,1)';
@@ -42,11 +44,27 @@
     function selector(info, view) {
       return { instanceId: info.instanceId, documentId: info.documentId, atRevision: info.contentRevision, documentSnapshotId: info.documentSnapshotId, view };
     }
+    // The effector handles of a duplicator layer, from one descriptor read pinned to the same revision as the gizmo; none when it cannot be proven.
+    async function effectorsOf(proof, layer) {
+      const C = win.NemoNativeObjectComponent, adapter = layer.hasDuplicator === true && C && typeof C.desktop === 'function' ? C.desktop(win) : null;
+      if (!adapter || typeof adapter.read !== 'function') return [];
+      const out = await adapter.read({ kind: 'duplicator', layerUid: layer.layerUid });
+      const r = out && out.ok === true ? out.result : null;
+      return r && r.layerUid === layer.layerUid && r.atRevision === proof.info.contentRevision && r.documentSnapshotId === proof.info.documentSnapshotId ? Eff.handles(r) : [];
+    }
     async function load(proof, layer) {
       const s = proof.session, frame = proof.selector.frame, target = { contextId: 'scene-root', layerUid: layer.layerUid };
       const one = (view) => s.readProperty(selector(proof.info, view));
       const raw = (property) => one({ kind: 'rawSample', target, property, frame }).then((r) => r.value);
-      const [geo, position, anchor, rotation, scale] = await Promise.all([one({ kind: 'layerBounds', target, frame }), raw('position'), raw('anchor'), raw('rotation'), raw('scale')]);
+      const effectors = effectorsOf(proof, layer).catch(() => []);
+      let geo;
+      try { geo = await one({ kind: 'layerBounds', target, frame }); } catch (error) {
+        // A duplicator host with no geometry of its own (and no parent whose map it would need) still offers its effector handles.
+        const list = error && error.code === 'unavailable' && layer.hasDuplicator === true && !layer.parentLayerUid ? await effectors : [];
+        if (!list.length) throw error;
+        return { layerUid: layer.layerUid, locked: layer.locked === true, outer: Eff.IDENTITY.slice(), bounds: null, keys: [], effectors: list };
+      }
+      const [position, anchor, rotation, scale] = await Promise.all([raw('position'), raw('anchor'), raw('rotation'), raw('scale')]);
       const keys = [];
       for (let offset = 0, n = 0; n < MAX_KEY_PAGES; n++) {
         const page = await one({ kind: 'authoredKeys', target, property: 'position', offset, limit: 8 });
@@ -54,7 +72,7 @@
         if (page.nextOffset === null || page.nextOffset === undefined) break;
         offset = page.nextOffset;
       }
-      return { layerUid: layer.layerUid, locked: layer.locked === true, outer: geo.parentAffine, bounds: geo.bounds, position, anchor, rotation: rotation[0], scale, keys };
+      return { layerUid: layer.layerUid, locked: layer.locked === true, outer: geo.parentAffine, bounds: geo.bounds, position, anchor, rotation: rotation[0], scale, keys, effectors: await effectors };
     }
     // A typed refusal of the geometry read means this layer has no box to follow: say so once per layer instead of drawing nothing.
     function unboxed(error, layer) {
@@ -92,7 +110,7 @@
     // grabbed only on the playhead's own frame, where the key IS the Position, so its preview moves the box too.
     function layoutOf(entry, map, preview) {
       const r = entry.read, g = { bounds: r.bounds, position: r.position, anchor: r.anchor, rotation: r.rotation, scale: r.scale, outer: r.outer };
-      if (preview && !preview.handle) {
+      if (preview && preview.property && !preview.handle) {
         if (preview.keepPose) g.position = Math2.follow(g, preview.values); // the box stays put while the anchor moves, as the engine's Position will
         if (preview.property === 'rotation') g.rotation = preview.values[0]; else g[preview.property] = preview.values;
       }
@@ -123,10 +141,25 @@
       if (sig === signature && sig) return;
       signature = sig;
       while (svg.firstChild) svg.removeChild(svg.firstChild);
-      const l = entry && map && layoutOf(entry, map, drag && drag.preview);
-      if (!l) return;
-      const c = client(map), scale = pxPerUnit(map), color = drag ? ACCENT : BLUE;
-      const keys = Math2.path(l, keysNow(entry, drag && drag.preview), easing());
+      const prev = drag && drag.preview && drag.preview.property ? drag.preview : null;
+      const l = entry && map && layoutOf(entry, map, prev);
+      const effs = entry && map ? Eff.preview(entry.read.effectors, drag && drag.preview && drag.preview.effector) : [];
+      if (!l && !effs.length) return;
+      const c = client(map), scale = pxPerUnit(map);
+      if (l) drawBox(svg, entry, l, c, scale, prev);
+      effs.forEach((h) => drawEffector(svg, Eff.glyph(h, entry.read.outer, c, scale)));
+    }
+    // The effector handle of motion.js@1065e9d8: a crosshair in a circle, plus a thin ring of the effector's own radius.
+    function drawEffector(svg, g) {
+      const col = 'rgba(255,120,220,1)';
+      svg.appendChild(node('line', { x1: g.c.x - g.arm, y1: g.c.y, x2: g.c.x + g.arm, y2: g.c.y, stroke: col, 'stroke-width': 1.5 }));
+      svg.appendChild(node('line', { x1: g.c.x, y1: g.c.y - g.arm, x2: g.c.x, y2: g.c.y + g.arm, stroke: col, 'stroke-width': 1.5 }));
+      svg.appendChild(node('circle', { cx: g.c.x, cy: g.c.y, r: g.dot, fill: 'none', stroke: col, 'stroke-width': 1.5 }));
+      svg.appendChild(node('circle', { cx: g.c.x, cy: g.c.y, r: g.ring, fill: 'none', stroke: 'rgba(255,120,220,.35)', 'stroke-width': 1 }));
+    }
+    function drawBox(svg, entry, l, c, scale, prev) {
+      const color = drag ? ACCENT : BLUE;
+      const keys = Math2.path(l, keysNow(entry, prev), easing());
       if (keys.dots.length) {
         if (keys.frames.length) { // one thin unbroken line through every frame sample, and a small dot per frame (capped on a very long segment)
           keys.frames.forEach((pts) => {
@@ -156,7 +189,6 @@
       svg.appendChild(node('circle', { cx: a.x, cy: a.y, r: 5, fill: 'none', stroke: color, 'stroke-width': 1.4 }));
       [[-8, 0, 8, 0], [0, -8, 0, 8]].forEach((q) => svg.appendChild(node('line', { x1: a.x + q[0], y1: a.y + q[1], x2: a.x + q[2], y2: a.y + q[3], stroke: color, 'stroke-width': 1.2 })));
     }
-
     // ---- gestures ----
     const areaOf = (e) => { const area = win.document.getElementById('canvas-area'); return area && e.target && area.contains(e.target) ? area : null; };
     const consume = (e) => { e.stopImmediatePropagation(); e.preventDefault(); };
@@ -166,11 +198,19 @@
       const st = win.state;
       if (drag || busy || !motion() || !active() || (e.button !== undefined && e.button !== 0) || st.spaceDown || st.isPanning || !areaOf(e)) return;
       const entry = usable(), map = entry && mapping(entry);
-      if (!entry || !map || entry.read.locked) return;
-      const l = layoutOf(entry, map), c = client(map), world = worldOf(e, map);
-      if (!l || !world) return;
-      const grabs = Math2.path(l, entry.read.keys);
-      const found = Math2.hit(l, { x: e.clientX, y: e.clientY }, { client: c, pxPerUnit: pxPerUnit(map), alt: !!e.altKey, body: st.tool === 'select', dots: grabs.dots, handles: grabs.handles, frame: entry.proof.selector.frame });
+      if (!entry || !map) return;
+      const c = client(map), world = worldOf(e, map), pointer = { x: e.clientX, y: e.clientY };
+      if (!world) return;
+      // The box gestures first (never on a locked layer), the effector handles last: a duplicator layer is locked by the duplicator itself.
+      const l = entry.read.bounds && !entry.read.locked ? layoutOf(entry, map) : null;
+      let found = null;
+      const probe = (body) => {
+        const grabs = Math2.path(l, entry.read.keys);
+        return Math2.hit(l, pointer, { client: c, pxPerUnit: pxPerUnit(map), alt: !!e.altKey, body, dots: grabs.dots, handles: grabs.handles, frame: entry.proof.selector.frame });
+      };
+      if (l) found = probe(false);
+      if (!found) found = Eff.hit(entry.read.effectors, entry.read.outer, c, pointer);
+      if (!found && l && st.tool === 'select') found = probe(true); // the body of the box is the last grab, as the layer move of select-bridge is
       if (!found) return;
       consume(e);
       drag = { entry, map, mode: found, layout: l, from: world, pointerId: e.pointerId, x: e.clientX, y: e.clientY, armed: false, preview: null };
@@ -183,6 +223,12 @@
       drag.armed = true;
       const to = worldOf(e, drag.map);
       if (!to) return;
+      if (drag.mode.type === 'effector') { // a static setting: the preview is the anchor the release would store, nothing when it is where it was
+        const moved = Eff.move(drag.mode.index, drag.entry.read.outer, to), was = drag.entry.read.effectors.find((h) => h.index === drag.mode.index);
+        drag.preview = moved && was && (moved.x !== was.pos.x || moved.y !== was.pos.y) ? { effector: moved } : null;
+        paint();
+        return;
+      }
       const out = Math2.drag(drag.mode, drag.layout, drag.from, to, { shift: !!e.shiftKey });
       drag.preview = out && out.values ? out : null;
       paint();
@@ -194,7 +240,25 @@
       return P.await(win, { read: (f) => { const s = W.session(win); return s ? s.readPresentedObjectSession(f) : null; }, notice: 'The canvas is still busy - try the gesture again.',
         holds: () => entry.proof.current() }).then((r) => r.ready && entry.proof.current(true));
     }
+    // ONE `object.duplicator.config` edit stores the new anchor of one inline effector: a revision and a history entry, no key, no Motion property.
+    async function writeEffector(done) {
+      const { entry, preview } = done;
+      busy = true;
+      try {
+        if (!(await proven(entry))) return false;
+        const D = win.NemoNativeObjectDuplicator, adapter = D && typeof D.desktop === 'function' ? D.desktop(win) : null;
+        if (!adapter) throw new Error('Native duplicator is unavailable.');
+        const out = await adapter.configure(entry.layer.layerUid, { effectorPos: preview.effector });
+        if (!out || out.ok !== true) throw Object.assign(new Error(out && out.message ? out.message : 'Duplicator refused.'), { code: out && out.code });
+        if (typeof win.nativeCompositingRefresh === 'function') win.nativeCompositingRefresh();
+        return true;
+      } catch (error) {
+        toast((error && error.message || 'Native duplicator edit is unavailable.') + (error && error.code ? ' (' + error.code + ')' : ''));
+        return false;
+      } finally { busy = false; signature = ''; refresh(); }
+    }
     async function write(done) {
+      if (done.preview.effector) return writeEffector(done);
       const { entry, preview } = done, proof = entry.proof, pin = {};
       PIN.forEach((k) => { pin[k] = proof.info[k]; });
       const keyed = preview.frame !== undefined, values = preview.values.map(round);

@@ -248,6 +248,7 @@ pub(crate) fn result(payload: &Value, value: &Value) -> bool {
                 "seed",
                 "sourceMode",
                 "staggerRandom",
+                "effectors",
                 "timeOffset",
             ]),
             &[],
@@ -322,6 +323,17 @@ fn duplicator_view(o: &Map<String, Value>) -> bool {
                     .is_some_and(|d| DUP_DIRECTIONS.contains(&d))
         })
     });
+    let effectors = o.get("effectors").and_then(Value::as_array).is_some_and(|list| {
+        list.len() <= 16
+            && list.iter().all(|item| {
+                exact(item, &["pos", "radius"], &[]).is_some_and(|m| {
+                    finite(m.get("radius"))
+                        && (m["pos"].is_null()
+                            || exact(&m["pos"], &["x", "y"], &[])
+                                .is_some_and(|p| finite(p.get("x")) && finite(p.get("y"))))
+                })
+            })
+    });
     label("mode", &DUP_MODES)
         && label("sourceMode", &["shape", "objects"])
         && ["rows", "cols", "spacingX", "spacingY", "count", "radius", "startAngle"]
@@ -334,6 +346,7 @@ fn duplicator_view(o: &Map<String, Value>) -> bool {
         && o.get("pathLayerUid")
             .is_some_and(|p| p.is_null() || context_id(Some(p)).is_some())
         && flags(o.get("staggerRandom"), &DUP_CHANNELS)
+        && effectors
         && time
 }
 

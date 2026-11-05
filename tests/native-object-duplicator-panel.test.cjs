@@ -31,7 +31,7 @@ function fire(section, target, type) {
   return event;
 }
 const DEFAULT = () => ({ mode: 'grid', rows: 2, cols: 3, spacingX: 150, spacingY: 150, count: 8, radius: 200, startAngle: 0, radialOrient: false, pathAlignTangent: true, pathLayerUid: null,
-  seed: 17, sourceMode: 'shape', staggerRandom: { position: false, rotation: false, scale: false, opacity: false, hue: false }, timeOffset: { enabled: false, offsetFrames: 1, direction: 'forward' } });
+  seed: 17, sourceMode: 'shape', staggerRandom: { position: false, rotation: false, scale: false, opacity: false, hue: false }, timeOffset: { enabled: false, offsetFrames: 1, direction: 'forward' }, effectors: [] });
 
 function harness(options = {}) {
   const sent = [], toasts = [], legacy = [], nodes = new Map();
