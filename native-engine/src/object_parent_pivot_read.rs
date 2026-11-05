@@ -22,7 +22,7 @@ pub(crate) fn layer_pivot_bases(
 ) -> Result<Vec<[f64; 2]>, &'static str> {
     #[cfg(feature = "evaluation")]
     {
-        bases(snapshot, context_id, layer_uids, frame).map(|all| all.iter().map(|e| e.0).collect())
+        bases(snapshot, context_id, layer_uids, frame, true).map(|all| all.iter().map(|e| e.0).collect())
     }
     #[cfg(not(feature = "evaluation"))]
     {
@@ -41,7 +41,7 @@ pub(crate) fn layer_pivot_extents(
 ) -> Result<Vec<[f64; 4]>, &'static str> {
     #[cfg(feature = "evaluation")]
     {
-        bases(snapshot, context_id, layer_uids, frame).map(|all| all.iter().map(|e| e.1).collect())
+        bases(snapshot, context_id, layer_uids, frame, true).map(|all| all.iter().map(|e| e.1).collect())
     }
     #[cfg(not(feature = "evaluation"))]
     {
@@ -71,14 +71,110 @@ pub(crate) fn layers_world_union(
     }
 }
 
+/// The layer's own bounds `[x0, y0, x1, y1]` before its Motion, for ANY layer that shows geometry at `frame`: the strict
+/// vector extents of `layer_pivot_extents`, else the extents of a mask or a duplicated source, else the display rectangles
+/// of its image and raster records. The baseline gizmo boxes every one of these (`motionBoxGeom`); text, effect, rig, 3D and
+/// widget layers stay refused with a reason the caller shows.
+#[cfg_attr(not(feature = "evaluation"), allow(unused_variables))]
+pub(crate) fn layer_gizmo_bounds(
+    snapshot: &ObjectSnapshot,
+    context_id: &str,
+    uid: &str,
+    frame: u32,
+) -> Result<[f64; 4], &'static str> {
+    #[cfg(feature = "evaluation")]
+    {
+        any_rect(snapshot, context_id, uid, frame)
+    }
+    #[cfg(not(feature = "evaluation"))]
+    {
+        Err("the evaluated parent pivot needs the evaluation layer")
+    }
+}
+
+/// The affine `[a, b, c, d, e, f]` (`x' = a x + c y + e`, `y' = b x + d y + f`) that every ancestor of `uid` applies, nearest
+/// first, to a point already moved by the layer's own Motion: the outer parent map of the baseline `outerWorldPoint`
+/// (`legacyParentChainMats`, each ancestor turning about its own bounds centre plus anchor, a Null about its `nullPos`). An
+/// ancestor without bounds contributes nothing, as in the baseline; no parent answers the identity.
+#[cfg_attr(not(feature = "evaluation"), allow(unused_variables))]
+pub(crate) fn layer_ancestor_affine(
+    snapshot: &ObjectSnapshot,
+    context_id: &str,
+    uid: &str,
+    frame: u32,
+) -> Result<[f64; 6], &'static str> {
+    #[cfg(feature = "evaluation")]
+    {
+        ancestor_affine(snapshot, context_id, uid, frame)
+    }
+    #[cfg(not(feature = "evaluation"))]
+    {
+        Err("the evaluated parent pivot needs the evaluation layer")
+    }
+}
+
+#[cfg(feature = "evaluation")]
+fn any_rect(snapshot: &ObjectSnapshot, context_id: &str, uid: &str, frame: u32) -> Result<[f64; 4], &'static str> {
+    let finite = |r: &[f64; 4]| r.iter().all(|v| v.is_finite());
+    let strict = layer_pivot_extents(snapshot, context_id, &[uid], frame);
+    if let Some(r) = strict.as_ref().ok().and_then(|all| all.first()).filter(|r| finite(r)) {
+        return Ok(*r);
+    }
+    let loose = bases(snapshot, context_id, &[uid], frame, false);
+    if let Some(r) = loose.as_ref().ok().and_then(|all| all.first()).map(|e| e.1).filter(|r| finite(r)) {
+        return Ok(r);
+    }
+    raster_rect(snapshot, context_id, uid, frame)
+        .ok_or("the layer has no geometry the canvas box can follow (text, effect, rig, 3D or an empty layer)")
+}
+
+#[cfg(feature = "evaluation")]
+fn ancestor_affine(snapshot: &ObjectSnapshot, context_id: &str, uid: &str, frame: u32) -> Result<[f64; 6], &'static str> {
+    let document = snapshot.document();
+    let canvas = snapshot.project().map(|p| p.project().canvas_dimensions());
+    let parent_of = |at: &str| {
+        document.layers().iter().find(|l| l.layer_uid() == at).and_then(|l| {
+            l.parent_layer_uid.value().and_then(Option::as_deref).filter(|p| !p.is_empty()).map(str::to_owned)
+        })
+    };
+    let mut points = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
+    let mut seen = vec![uid.to_owned()];
+    let mut current = parent_of(uid);
+    while let Some(at) = current {
+        if seen.len() > crate::evaluation::motion_parent_chain::CHAIN_NODE_LIMIT || seen.contains(&at) {
+            break;
+        }
+        seen.push(at.clone());
+        let layer = document.layers().iter().find(|l| l.layer_uid() == at).ok_or("an ancestor layer is missing")?;
+        let base = match layer.null_pivot_base(canvas) {
+            Ok(Some(point)) => Some(point),
+            _ => any_rect(snapshot, context_id, &at, frame).ok().map(|r| [(r[0] + r[2]) / 2.0, (r[1] + r[3]) / 2.0]),
+        };
+        if let Some(base) = base {
+            for point in &mut points {
+                *point = pose_point(snapshot, context_id, &at, frame, base, *point).ok_or("an ancestor pose is not finite")?;
+            }
+        }
+        current = parent_of(&at);
+    }
+    let [o, x, y] = points;
+    Ok([x[0] - o[0], x[1] - o[1], y[0] - o[0], y[1] - o[1], o[0], o[1]])
+}
+
 #[cfg(feature = "evaluation")]
 fn rest_rect(snapshot: &ObjectSnapshot, context_id: &str, uid: &str, frame: u32) -> Option<[f64; 4]> {
-    use crate::object_frame_packet::{
-        prepare_object_exposure_frame, FrameScopeKind, ObjectFrameSelector,
-    };
     if let Ok(rects) = layer_pivot_extents(snapshot, context_id, &[uid], frame) {
         return rects.first().copied().filter(|r| r.iter().all(|v| v.is_finite()));
     }
+    raster_rect(snapshot, context_id, uid, frame)
+}
+
+/// The union of the display rectangles (rotation included) of the image and raster records a layer shows at `frame`.
+#[cfg(feature = "evaluation")]
+fn raster_rect(snapshot: &ObjectSnapshot, context_id: &str, uid: &str, frame: u32) -> Option<[f64; 4]> {
+    use crate::object_frame_packet::{
+        prepare_object_exposure_frame, FrameScopeKind, ObjectFrameSelector,
+    };
     let selector = ObjectFrameSelector {
         instance_id: snapshot.instance_id(),
         document_id: snapshot.document_id(),
@@ -205,6 +301,7 @@ fn bases(
     context_id: &str,
     layer_uids: &[&str],
     frame: u32,
+    strict: bool,
 ) -> Result<Vec<([f64; 2], [f64; 4])>, &'static str> {
     use crate::evaluation::object_vector_kernels::render_vector_eval::{
         common_layer_motion_target, evaluate_record_rest_with_pose, evaluate_vector_rest,
@@ -242,10 +339,14 @@ fn bases(
             layer_uid: (*uid).to_owned(),
             stroke_id: Presence::Missing,
         };
-        if !common_layer_motion_target(snapshot.document(), &target)
-            || layer.three_d.value() == Some(&true)
-            || layer.rig().is_some()
-        {
+        // The gizmo read (`strict == false`) boxes any layer that holds geometry, so a mask or a duplicated source is boxed
+        // too; a layer with no geometry of its own (effect, widget), a 3D layer and a rig stay without a complete pivot.
+        let boxable = if strict {
+            common_layer_motion_target(snapshot.document(), &target)
+        } else {
+            !layer.is_effect_layer() && layer.widget.value().is_none()
+        };
+        if !boxable || layer.three_d.value() == Some(&true) || layer.rig().is_some() {
             return Err("the layer has no complete native pivot (text, image, mask, effect, 3D or rig content)");
         }
         if let Some(base) = layer

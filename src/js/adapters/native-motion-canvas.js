@@ -4,9 +4,10 @@
  * authored Position keys); the maths is native-motion-canvas-math.js. A drag is a local preview and ONE `object.property.edit` on release
  * (`setValue` at the playhead, `setKey` for a key diamond), so a gesture is one revision and one history entry: the click threshold, Escape,
  * a frame or document change, a locked layer and a replaced owner each commit nothing. Shift locks a move to an axis, Alt+drag moves the anchor
- * (only when it needs no Position compensation), and a key diamond is grabbed only on its own frame. A parented layer, a component context,
- * several selected layers and a layer without a complete native pivot (text, image, mask, effect, 3D, rig, expression) draw nothing and take no
- * gesture. The pointer listeners stay on `document` in the capture phase (CLAUDE.md section 13). This file never reads or writes a JS layer record. */
+ * (with Rotation or Scale set the edit carries `keepPose`, so Position follows in the same revision), a key diamond is grabbed only on its own frame and
+ * a spatial key handle (hIn / hOut) on any frame (`setKeyHandle`). A parented layer is drawn and dragged through its ancestors' `parentAffine`; the
+ * Position path is sampled once per frame through each key's easing. A component context and several selected layers draw nothing and take no
+ * gesture; a layer the native read cannot box (text, effect, rig, 3D, expression) says so once in a notice instead of staying silent. The pointer listeners stay on `document` in the capture phase (CLAUDE.md section 13). This file never reads or writes a JS layer record. */
 (function (root, factory) {
   const api = factory(typeof module === 'object' && module.exports ? require('./native-motion-canvas-math.js') : root.NemoNativeMotionCanvasMath);
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -17,12 +18,12 @@
 }(typeof globalThis === 'object' ? globalThis : this, function (Math2) {
   'use strict';
   const SVG = 'http://www.w3.org/2000/svg', PIN = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
-  const BLUE = 'rgba(74,158,255,.86)', RING = 'rgba(74,158,255,.67)', PATH = 'rgba(120,170,255,.8)', WHITE = 'rgba(255,255,255,1)', ACCENT = 'rgba(255,184,108,1)', DOT = 'rgba(230,230,230,1)', CUR = 'rgba(255,170,40,1)';
-  const THRESHOLD = 3, MAX_KEY_PAGES = 4, round = (v) => Math.round(v * 1e6) / 1e6;
-  const REFUSALS = { anchor_compensation: 'Moving the anchor while Rotation or Scale is set needs Position to follow it, which a native project cannot do from the canvas yet (anchor_compensation). Use the Anchor field.' };
+  const HANDLE = 'rgba(255,184,108,.9)', BLUE = 'rgba(74,158,255,.86)', RING = 'rgba(74,158,255,.67)', PATH = 'rgba(120,170,255,.8)', WHITE = 'rgba(255,255,255,1)', ACCENT = 'rgba(255,184,108,1)', DOT = 'rgba(230,230,230,1)', CUR = 'rgba(255,170,40,1)';
+  const THRESHOLD = 3, MAX_KEY_PAGES = 4, MAX_FRAME_DOTS = 120, round = (v) => Math.round(v * 1e6) / 1e6;
+  const UNBOXED = 'The Motion box is not available for this layer on a native project (text, effect, rig, 3D and expression-driven layers have none yet). Use the property fields.';
 
   function create(win) {
-    let cached = null, serial = 0, drag = null, busy = false, overlay = null, queued = false, watching = false, signature = '';
+    let cached = null, noticed = '', serial = 0, drag = null, busy = false, overlay = null, queued = false, watching = false, signature = '';
     const widgets = () => win.NemoNativeObjectWidgetUI;
     const toast = (m) => { try { if (win.showToast) win.showToast(m, 'warn'); } catch (_) { /* presentation only */ } };
     const motion = () => !!win.state && win.state.appMode === 'motion' && win.state.playing !== true;
@@ -53,21 +54,26 @@
         if (page.nextOffset === null || page.nextOffset === undefined) break;
         offset = page.nextOffset;
       }
-      return { layerUid: layer.layerUid, locked: layer.locked === true, parented: geo.parentLayerUid !== null, bounds: geo.bounds, position, anchor, rotation: rotation[0], scale, keys };
+      return { layerUid: layer.layerUid, locked: layer.locked === true, outer: geo.parentAffine, bounds: geo.bounds, position, anchor, rotation: rotation[0], scale, keys };
+    }
+    // A typed refusal of the geometry read means this layer has no box to follow: say so once per layer instead of drawing nothing.
+    function unboxed(error, layer) {
+      if (!error || error.code !== 'unavailable' || noticed === layer.layerUid) return;
+      noticed = layer.layerUid; toast(UNBOXED);
     }
     const keyOf = (proof, layer) => JSON.stringify([PIN.map((k) => proof.info[k]), proof.selector.frame, layer.layerUid]);
     function refresh() {
       const W = widgets(), proof = W && active() && motion() ? W.proofNow(win, 'readProperty') : null;
       if (!proof && queueBusy() && cached) return Promise.resolve(cached.read); // busy is not changed: keep the gizmo and the drag
       const layer = proof && targetOf(proof);
-      if (!layer) { if (cached) { serial++; cached = null; cancel(); } paint(); return Promise.resolve(null); }
+      if (!layer) { noticed = ''; if (cached) { serial++; cached = null; cancel(); } paint(); return Promise.resolve(null); }
       const key = keyOf(proof, layer);
       if (cached && cached.key === key) { cached.proof = proof; paint(); return cached.promise || Promise.resolve(cached.read); }
       cancel(); serial++;
       const token = serial, entry = { key, proof, layer, read: null, promise: null };
       cached = entry;
       entry.promise = load(proof, layer).then((read) => { if (token === serial && cached === entry) { entry.read = read; paint(); } return token === serial ? read : null; },
-        () => { if (token === serial && cached === entry) { entry.read = null; paint(); } return null; }).then((r) => { if (cached === entry) entry.promise = null; return r; });
+        (error) => { if (token === serial && cached === entry) { entry.read = null; unboxed(error, layer); paint(); } return null; }).then((r) => { if (cached === entry) entry.promise = null; return r; });
       return entry.promise;
     }
     function watch() {
@@ -75,7 +81,7 @@
       watching = true;
       win.requestAnimationFrame(() => { watching = false; if (!active() || !motion()) { if (cached) refresh(); return; } refresh(); if (cached) watch(); });
     }
-    const usable = () => (cached && cached.read && !cached.read.parented && cached.proof.current() ? cached : null);
+    const usable = () => (cached && cached.read && cached.proof.current() ? cached : null);
     const mapping = (entry) => { const W = widgets(); try { return W.mappingFor(win, { proof: entry.proof }); } catch (_) { return null; } };
     const client = (map) => (p) => map.api.screen({ x: p.x, y: p.y }, map);
     function pxPerUnit(map) {
@@ -85,11 +91,15 @@
     // The layout of the gizmo as it is now: the read values, with the previewed property of a drag replacing the stored one. A key diamond is
     // grabbed only on the playhead's own frame, where the key IS the Position, so its preview moves the box too.
     function layoutOf(entry, map, preview) {
-      const r = entry.read, g = { bounds: r.bounds, position: r.position, anchor: r.anchor, rotation: r.rotation, scale: r.scale };
-      if (preview) { if (preview.property === 'rotation') g.rotation = preview.values[0]; else g[preview.property] = preview.values; }
+      const r = entry.read, g = { bounds: r.bounds, position: r.position, anchor: r.anchor, rotation: r.rotation, scale: r.scale, outer: r.outer };
+      if (preview && !preview.handle) {
+        if (preview.keepPose) g.position = Math2.follow(g, preview.values); // the box stays put while the anchor moves, as the engine's Position will
+        if (preview.property === 'rotation') g.rotation = preview.values[0]; else g[preview.property] = preview.values;
+      }
       return Math2.layout(g, pxPerUnit(map));
     }
-    const keysNow = (entry, preview) => entry.read.keys.map((k) => (preview && preview.frame === k.frame ? Object.assign({}, k, { v: preview.values }) : k));
+    const keysNow = (entry, preview) => entry.read.keys.map((k) => (!preview || preview.frame !== k.frame ? k : Object.assign({}, k, preview.handle ? { [preview.handle]: preview.values } : { v: preview.values })));
+    const easing = () => (win.SMAnimationCurve && win.SMAnimationCurve.evalCurvePoints) || null;
 
     // ---- overlay (presentation only) ----
     const node = (name, attrs) => { const n = win.document.createElementNS(SVG, name); Object.keys(attrs).forEach((k) => n.setAttribute(k, attrs[k])); return n; };
@@ -116,9 +126,20 @@
       const l = entry && map && layoutOf(entry, map, drag && drag.preview);
       if (!l) return;
       const c = client(map), scale = pxPerUnit(map), color = drag ? ACCENT : BLUE;
-      const keys = Math2.path(l, keysNow(entry, drag && drag.preview));
+      const keys = Math2.path(l, keysNow(entry, drag && drag.preview), easing());
       if (keys.dots.length) {
-        if (keys.segments.length) svg.appendChild(node('path', { d: keys.segments.map((s, i) => (i ? '' : 'M' + pt(c(s.from)) + ' ') + 'C' + pt(c(s.c1)) + ' ' + pt(c(s.c2)) + ' ' + pt(c(s.to))).join(' '), fill: 'none', stroke: PATH, 'stroke-width': 1 }));
+        if (keys.frames.length) { // one thin unbroken line through every frame sample, and a small dot per frame (capped on a very long segment)
+          keys.frames.forEach((pts) => {
+            svg.appendChild(node('polyline', { points: pts.map((q) => pt(c(q))).join(' '), fill: 'none', stroke: PATH, 'stroke-width': 1 }));
+            const stride = Math.max(1, Math.ceil(pts.length / MAX_FRAME_DOTS));
+            for (let i = 0; i < pts.length; i += stride) { const q = c(pts[i]); svg.appendChild(node('circle', { cx: q.x, cy: q.y, r: 1.3, fill: PATH })); }
+          });
+        } else if (keys.segments.length) svg.appendChild(node('path', { d: keys.segments.map((s, i) => (i ? '' : 'M' + pt(c(s.from)) + ' ') + 'C' + pt(c(s.c1)) + ' ' + pt(c(s.c2)) + ' ' + pt(c(s.to))).join(' '), fill: 'none', stroke: PATH, 'stroke-width': 1 }));
+        keys.handles.filter((h) => !h.zero).forEach((h) => {
+          const a = c(h.from), b = c(h);
+          svg.appendChild(node('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: HANDLE, 'stroke-width': 1 }));
+          svg.appendChild(node('circle', { cx: b.x, cy: b.y, r: 4, fill: HANDLE, stroke: 'rgba(30,30,30,1)', 'stroke-width': 1 }));
+        });
         keys.dots.forEach((d) => {
           const p = c(d), cur = d.key.frame === entry.proof.selector.frame, r = cur ? 6 : 4.5;
           svg.appendChild(node('polygon', { points: [[p.x - r, p.y], [p.x, p.y - r], [p.x + r, p.y], [p.x, p.y + r]].map((q) => q.join(',')).join(' '), fill: cur ? CUR : DOT, stroke: 'rgba(30,30,30,1)', 'stroke-width': 1 }));
@@ -148,8 +169,8 @@
       if (!entry || !map || entry.read.locked) return;
       const l = layoutOf(entry, map), c = client(map), world = worldOf(e, map);
       if (!l || !world) return;
-      const dots = Math2.path(l, entry.read.keys).dots;
-      const found = Math2.hit(l, { x: e.clientX, y: e.clientY }, { client: c, pxPerUnit: pxPerUnit(map), alt: !!e.altKey, body: st.tool === 'select', dots, frame: entry.proof.selector.frame });
+      const grabs = Math2.path(l, entry.read.keys);
+      const found = Math2.hit(l, { x: e.clientX, y: e.clientY }, { client: c, pxPerUnit: pxPerUnit(map), alt: !!e.altKey, body: st.tool === 'select', dots: grabs.dots, handles: grabs.handles, frame: entry.proof.selector.frame });
       if (!found) return;
       consume(e);
       drag = { entry, map, mode: found, layout: l, from: world, pointerId: e.pointerId, x: e.clientX, y: e.clientY, armed: false, preview: null };
@@ -164,7 +185,6 @@
       if (!to) return;
       const out = Math2.drag(drag.mode, drag.layout, drag.from, to, { shift: !!e.shiftKey });
       drag.preview = out && out.values ? out : null;
-      drag.refuse = out && out.refuse ? out.refuse : null;
       paint();
     }
     function proven(entry) {
@@ -177,9 +197,12 @@
     async function write(done) {
       const { entry, preview } = done, proof = entry.proof, pin = {};
       PIN.forEach((k) => { pin[k] = proof.info[k]; });
-      const keyed = preview.frame !== undefined;
-      const payload = { command: 'object.property.edit', target: { contextId: 'scene-root', layerUid: entry.layer.layerUid }, property: preview.property,
-        action: { kind: keyed ? 'setKey' : 'setValue', frame: keyed ? preview.frame : proof.selector.frame, values: preview.values.map(round) } };
+      const keyed = preview.frame !== undefined, values = preview.values.map(round);
+      // A handle drag edits one handle of the key at its own frame; a key diamond is a setKey; the rest write at the playhead.
+      const action = preview.handle ? { kind: 'setKeyHandle', frame: preview.frame, handle: preview.handle, values }
+        : { kind: keyed ? 'setKey' : 'setValue', frame: keyed ? preview.frame : proof.selector.frame, values };
+      if (preview.keepPose) action.keepPose = true;
+      const payload = { command: 'object.property.edit', target: { contextId: 'scene-root', layerUid: entry.layer.layerUid }, property: preview.property, action };
       busy = true;
       try {
         if (!(await proven(entry))) return false;
@@ -196,7 +219,6 @@
       if (!drag || (e.pointerId !== undefined && drag.pointerId !== undefined && e.pointerId !== drag.pointerId)) return;
       consume(e);
       const done = drag; drag = null; signature = ''; paint();
-      if (done.refuse) { toast(REFUSALS[done.refuse] || 'This gesture is not available on a native project.'); return; }
       if (!done.armed || !done.preview || !done.entry.proof.current() || cached !== done.entry) return;
       write(done);
     }
@@ -219,5 +241,5 @@
     if (!controllers.has(win)) controllers.set(win, create(win));
     return controllers.get(win);
   }
-  return Object.freeze({ create, desktop, REFUSALS });
+  return Object.freeze({ create, desktop, UNBOXED });
 }));

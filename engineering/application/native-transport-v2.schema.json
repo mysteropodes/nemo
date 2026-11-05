@@ -12319,7 +12319,8 @@
             "target",
             "frame",
             "bounds",
-            "parentLayerUid"
+            "parentLayerUid",
+            "parentAffine"
           ],
           "properties": {
             "instanceId": {
@@ -12366,6 +12367,16 @@
                   "minLength": 1
                 }
               ]
+            },
+            "parentAffine": {
+              "type": "array",
+              "minItems": 6,
+              "maxItems": 6,
+              "items": {
+                "type": "number",
+                "minimum": -1.7976931348623157e+308,
+                "maximum": 1.7976931348623157e+308
+              }
             }
           }
         }
@@ -12430,6 +12441,41 @@
                   "type": "array",
                   "minItems": 1,
                   "maxItems": 4,
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "keepPose": {
+                  "const": true
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "frame",
+                "handle",
+                "values"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "setKeyHandle"
+                },
+                "frame": {
+                  "type": "number"
+                },
+                "handle": {
+                  "enum": [
+                    "hIn",
+                    "hOut"
+                  ]
+                },
+                "values": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
                   "items": {
                     "type": "number"
                   }

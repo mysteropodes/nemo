@@ -27,7 +27,7 @@ fn control_name(value: Option<&Value>) -> bool {
         .and_then(Value::as_str)
         .is_some_and(|s| !s.is_empty() && s.chars().count() <= 128)
 }
-fn action(value: &Value) -> bool {
+fn action(value: &Value, property: Option<&str>) -> bool {
     match value.get("kind").and_then(Value::as_str) {
         Some("setExpression") => {
             exact(value, &["kind", "code"], &[]).is_some_and(|a| code(a.get("code")))
@@ -36,8 +36,19 @@ fn action(value: &Value) -> bool {
             .is_some_and(|a| a["enabled"].is_boolean()),
         Some("removeExpression") => exact(value, &["kind"], &[]).is_some(),
         Some("bake") => exact(value, &["kind"], &[]).is_some(),
-        Some("setValue" | "setKey") => exact(value, &["kind", "frame", "values"], &[])
+        // `keepPose` (#2520) is the anchor edit that moves Position in the same revision; it is `true` or absent.
+        Some("setValue") => exact(value, &["kind", "frame", "values"], &["keepPose"]).is_some_and(|a| {
+            finite(a.get("frame"))
+                && values(&a["values"])
+                && a.get("keepPose").is_none_or(|k| k == true && property == Some("anchor"))
+        }),
+        Some("setKey") => exact(value, &["kind", "frame", "values"], &[])
             .is_some_and(|a| finite(a.get("frame")) && values(&a["values"])),
+        Some("setKeyHandle") => exact(value, &["kind", "frame", "handle", "values"], &[]).is_some_and(|a| {
+            finite(a.get("frame"))
+                && matches!(a["handle"].as_str(), Some("hIn" | "hOut"))
+                && a["values"].as_array().is_some_and(|v| v.len() == 2 && values(&a["values"]))
+        }),
         Some("removeKey") => {
             exact(value, &["kind", "frame"], &[]).is_some_and(|a| finite(a.get("frame")))
         }
@@ -66,7 +77,7 @@ pub(super) fn request(value: &Value) -> bool {
                     && nonempty(t.get("layerUid"))
                     && (!t.contains_key("strokeId") || nonempty(t.get("strokeId")))
             })
-            && action(&p["action"])
+            && action(&p["action"], p["property"].as_str())
     })
 }
 pub(super) fn result(value: &Value) -> bool {

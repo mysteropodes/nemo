@@ -144,3 +144,23 @@ fn opacity_changes_only_paint_and_reuses_the_same_retained_pixels_across_frames_
     assert_eq!(current.raster_image(0).unwrap().2, 0.25);
     assert_eq!(imported["assetId"], "asset-opacity-image");
 }
+
+// #2520/#2525: the Motion canvas boxes an image layer by its placed rectangle, and a parented image is mapped by its ancestors.
+#[test]
+fn an_image_layer_answers_its_placed_rectangle_as_the_canvas_box_bounds() {
+    let mut owner = scene_owner();
+    import(&mut owner, "bounds-image");
+    let snap = scene_snapshot(&owner);
+    let layer = snap.document().layers()[1].layer_uid().to_owned();
+    let packet = prepare_object_exposure_frame(&snap, &selector(&snap, 0)).unwrap();
+    let rect = packet.raster_records().next().unwrap().entry().item.display_rect();
+    let query = json!({"instanceId":snap.instance_id(),"documentId":snap.document_id(),"atRevision":snap.content_revision(),
+        "documentSnapshotId":snap.snapshot_id(),
+        "view":{"kind":"layerBounds","target":{"contextId":"scene-root","layerUid":layer},"frame":0}});
+    let result = snap.query_property_read_json(query.to_string().as_bytes()).unwrap();
+    let bounds: Vec<f64> = result["bounds"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+    assert!(rect.width > 0.0 && rect.height > 0.0 && rect.rotation == 0.0, "{rect:?}");
+    let want = [rect.x, rect.y, rect.x + rect.width, rect.y + rect.height];
+    assert!(bounds.iter().zip(want).all(|(a, b)| (a - b).abs() < 1e-9), "{bounds:?} != {want:?}");
+    assert_eq!(result["parentAffine"], json!([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]));
+}

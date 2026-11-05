@@ -100,12 +100,15 @@
       if (!plain(action)) throw new TypeError('property action must be an object');
       // Expression authoring and D18-B control declaration edits carry no frame; for control
       // edits `property` is the control key.
-      const fields = {setValue:['values'], setKey:['values'], removeKey:[], setAnimated:['animated'], bake:[],
+      const fields = {setValue:['values'], setKey:['values'], setKeyHandle:['handle', 'values'], removeKey:[], setAnimated:['animated'], bake:[],
         setExpression:['code'], setExpressionEnabled:['enabled'], removeExpression:[],
         addControl:['controlType', 'name'], renameControl:['name'], removeControl:[], moveControl:['direction']};
       if (typeof action.kind !== 'string' || !has(fields, action.kind)) throw new TypeError('unsupported property edit action');
       const frameless = action.kind === 'bake' || /Expression/.test(action.kind) || /^(?:add|rename|remove|move)Control$/.test(action.kind);
-      exact(action, ['kind', ...(frameless ? [] : ['frame']), ...fields[action.kind]], [], 'property action');
+      exact(action, ['kind', ...(frameless ? [] : ['frame']), ...fields[action.kind]], action.kind === 'setValue' ? ['keepPose'] : [], 'property action');
+      // `keepPose` (#2520): the anchor edit that moves Position in the same revision; `setKeyHandle` names one spatial handle of an existing 2-D key.
+      if (has(action, 'keepPose') && (action.keepPose !== true || value.property !== 'anchor')) throw new TypeError('keepPose belongs to an anchor setValue');
+      if (action.kind === 'setKeyHandle' && (!['hIn', 'hOut'].includes(action.handle) || !Array.isArray(action.values) || action.values.length !== 2)) throw new TypeError('invalid key handle');
       // Native frames are finite numbers, including negative and fractional values.
       if (!frameless && !Number.isFinite(action.frame)) throw new TypeError('invalid property frame');
       if (action.kind === 'setExpression') {
@@ -327,12 +330,13 @@
       }
     }
     function layerBoundsResult(value) {
-      exact(value, ['instanceId', 'documentId', 'atRevision', 'documentSnapshotId', 'kind', 'target', 'frame', 'bounds', 'parentLayerUid'], [], 'layer bounds result');
+      exact(value, ['instanceId', 'documentId', 'atRevision', 'documentSnapshotId', 'kind', 'target', 'frame', 'bounds', 'parentLayerUid', 'parentAffine'], [], 'layer bounds result');
       id(value.instanceId, 'instanceId'); id(value.documentId, 'documentId');
       revision(value.atRevision, 'atRevision'); objectUid(value.documentSnapshotId);
       readTarget(value.target); frame(value.frame);
       if (!Array.isArray(value.bounds) || value.bounds.length !== 4 || !value.bounds.every(Number.isFinite)) throw new TypeError('invalid layer bounds');
       if (value.parentLayerUid !== null) objectUid(value.parentLayerUid);
+      if (!Array.isArray(value.parentAffine) || value.parentAffine.length !== 6 || !value.parentAffine.every(Number.isFinite)) throw new TypeError('invalid parent affine');
     }
     function readResult(value) {
       if (value && value.kind === 'layerBounds') return layerBoundsResult(value);
