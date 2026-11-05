@@ -6,6 +6,8 @@
  * record-space matrix the engine applies (it rebuilds a ribbon from its centreline and re-syncs its linked fill, carries a texture
  * anchor's dabs and a gradient's end points, keeps a shape's box). It holds no document state and writes nothing while the pointer
  * moves: Escape (also between the release and the send), a lost capture, or a pin / frame / tool / layer / selection that no longer matches the press ends the gesture with no write (P25 / #1027). Baseline (1065e9d8 select-bridge onDown/onMove/onUp):
+ * Alt+press inside the selection (baseline select-bridge onDown ~1186-1207) drags a COPY: the same move preview, and on release ONE duplicate at the drag
+ * distance (native-select-alt-duplicate.js: one revision, the originals untouched, the clones selected); Alt on the press of an unselected item only moves it.
  * A selection may span layers (a marquee reads every visible unlocked layer, a Shift pick adds from another): its move / scale / rotate is still ONE
  * batch, each step naming its own layer. Shift on a corner scales proportionally, Alt scales from the box centre, Shift snaps a rotation to 15 degrees, Shift on the press extends
  * the selection. An image and a text block go in the same batch as a record-space matrix in their own frame (the listing's bounds and
@@ -27,10 +29,11 @@
   function samePin(a, b) { return !!a && !!b && PINS.every(function (k) { return a[k] === b[k]; }); }
   function notice(root, text) { if (typeof root.showToast === 'function') try { root.showToast(text); } catch (_) {} }
   // The selection's items that have no native transform here, as labels (null when every one can be moved, scaled and rotated).
-  function unsupported(paths) {
+  function unsupported(paths, dup) {
     var found = [];
     paths.forEach(function (p) {
-      var d = p.data || {}, label = d.nativeBrush === 'bitmap' ? 'bitmap brushes' : d.nativeBrush === 'copy' ? 'brush dabs' : MAPPED.indexOf(d.nativeRole) < 0 ? 'this item' : null;
+      // A bitmap brush is duplicated by the engine with its raster (the baked image is only moved or copied, never re-baked), so only a transform refuses it.
+      var d = p.data || {}, label = d.nativeBrush === 'bitmap' && !dup ? 'bitmap brushes' : d.nativeBrush === 'copy' ? 'brush dabs' : MAPPED.indexOf(d.nativeRole) < 0 ? 'this item' : null;
       if (label && found.indexOf(label) < 0) found.push(label);
     });
     return found.length ? found.join(', ') : null;
@@ -89,6 +92,17 @@
     var la = sx * co * co + sy * si * si, lb = (sx - sy) * co * si, ld = sx * si * si + sy * co * co;
     return [la, lb, lb, ld, ax - la * ax - lb * ay, ay - lb * ax - ld * ay];
   }
+  // True when the world point `p` is inside the oriented selection box (its four corners, in order).
+  function inBox(box, p) {
+    var c = box.corners, sign = 0;
+    for (var i = 0; i < 4; i++) {
+      var a = c[i], b = c[(i + 1) % 4], cross = (b[0] - a[0]) * (p.y - a[1]) - (b[1] - a[1]) * (p.x - a[0]);
+      if (Math.abs(cross) < 1e-9) continue;
+      if (sign && (cross > 0) !== (sign > 0)) return false;
+      sign = cross;
+    }
+    return true;
+  }
   var identity = function (m) { return Math.abs(m[0] - 1) + Math.abs(m[1]) + Math.abs(m[2]) + Math.abs(m[3] - 1) + Math.abs(m[4]) + Math.abs(m[5]) < 1e-9; };
   // The committed strokes as fresh presented paths (the old transient ones hold the geometry from before). A vector record's box angle comes
   // back from the engine's listing (the turn was stored in the same batch); an image or text block has no stored one, so it keeps the session's.
@@ -142,7 +156,7 @@
     var world = function (x, y) { return I.worldPoint(root, x, y, shown.pin, shown.presentation); };
     var Matrix = root.Matrix || root.paper.Matrix, origin = world(e.clientX, e.clientY), next = world(e.clientX + 1, e.clientY);
     var wpp = Math.hypot(next.x - origin.x, next.y - origin.y) || origin.perPixel;
-    var g = { kind: null, active: false, cancelled: false, start: origin, shift: !!e.shiftKey, last: e, pin: shown.pin, frame: shown.presentation.frame,
+    var g = { kind: null, active: false, cancelled: false, start: origin, shift: !!e.shiftKey, alt: !!e.altKey, dup: false, last: e, pin: shown.pin, frame: shown.presentation.frame,
       sel: [], box: null, angle: 0, ctx: null, matrix: [1, 0, 0, 1, 0, 0], previewed: false };
     var picked = null, pickDone = null;
     var current = (root.selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget; });
@@ -158,6 +172,9 @@
       // The box's own axes. A dynamic shape keeps the world-axis resize its engine kernel (and the baseline) applies: it refuses a skewed one.
       g.axis = current.some(function (p) { return p.data.nativeRole === 'shape'; }) ? 0 : box.angle || 0;
       g.startAngle = Math.atan2(origin.y - box.center.y, origin.x - box.center.x) * 180 / Math.PI;
+    } else if (g.alt && current.length && box && inBox(box, origin)) {
+      // Alt+press inside the selection: the drag moves a copy of it (baseline), whatever lies under the pointer.
+      g.kind = 'move'; g.dup = true; g.sel = current; g.ctx = I.pickContext(root);
     } else {
       pickDone = I.pick(root, e.clientX, e.clientY).then(function (item) { picked = { item: item }; }, function () { picked = { item: undefined }; }).then(function () {
         if (g.active && !g.kind && !g.cancelled) { classify(); if (g.kind) update(); } // the drag outran the read: it starts now
@@ -184,8 +201,9 @@
       var item = picked.item, selected = root.selectedPaths || [];
       if (item === undefined) { g.kind = 'none'; notice(root, 'Could not read the canvas just now — try again.'); return; }
       if (item === null) { I.applyPick(root, null, g.shift); g.kind = 'marquee'; g.ctx = I.pickContext(root); return; }
-      if (!selected.some(function (p) { return p && p.data && p.data.strokeId === item.data.strokeId; })) I.applyPick(root, item, g.shift);
-      g.kind = 'move'; g.sel = (root.selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget; }); g.ctx = I.pickContext(root);
+      var held = selected.some(function (p) { return p && p.data && p.data.strokeId === item.data.strokeId; });
+      if (!held) I.applyPick(root, item, g.shift);
+      g.kind = 'move'; g.dup = g.alt && held; g.sel = (root.selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget; }); g.ctx = I.pickContext(root);
     }
     // The drag's live preview: the selection's transformed copies (box, handles and ring follow) or the marquee rectangle.
     function update() {
@@ -193,7 +211,7 @@
       var at = world(g.last.clientX, g.last.clientY);
       if (g.kind === 'marquee') { g.rect = [Math.min(g.start.x, at.x), Math.min(g.start.y, at.y), Math.max(g.start.x, at.x), Math.max(g.start.y, at.y)]; O.preview(root, { marquee: g.rect }); g.previewed = true; return; }
       if (g.kind !== 'move' && g.kind !== 'scale' && g.kind !== 'rotate') return;
-      var bad = unsupported(g.sel);
+      var bad = unsupported(g.sel, g.dup);
       if (bad) { g.kind = 'none'; notice(root, 'Transforming ' + bad + ' is not available on native projects yet.'); return; }
       g.matrix = matrixOf(g, at, !!g.last.shiftKey, !!g.last.altKey);
       var cannot = unstorable(root, g.sel, g.matrix);
@@ -246,6 +264,11 @@
     }
     // The release commits through commitMatrix (shared with the inspector's Transform fields and the arrow-key nudge).
     function commit() {
+      if (g.dup) {
+        var D = root.NemoNativeSelectAltDuplicate;
+        if (!D) { notice(root, 'Duplicating is not available right now.'); return Promise.resolve('refused'); }
+        return D.commit(root, g.sel, g.matrix, { pin: g.pin, stale: stale, cancelled: function () { return g.cancelled; }, release: function () { listen(false); } });
+      }
       return commitMatrix(root, g.sel, g.matrix, { pin: g.pin, stale: stale, cancelled: function () { return g.cancelled; }, release: function () { listen(false); }, angle: g.kind === 'rotate' ? g.angle : 0 });
     }
     async function end(ev) {

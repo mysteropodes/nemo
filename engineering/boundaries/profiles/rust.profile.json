@@ -1550,6 +1550,7 @@
         "object_selection_edit_duplicate.rs",
         "object_selection_edit_split.rs",
         "object_selection_edit_split_literals.rs",
+        "object_selection_alt_drag.rs",
         "object_image_mesh_record.rs",
         "object_image_mesh_record_rows.rs",
         "object_image_mesh_record_controls.rs",

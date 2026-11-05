@@ -410,3 +410,23 @@ fn fill_brush_wire_bounds_refuse_invalid_outlines_placements_and_mask_modes() {
         assert!(request(&operation, &payload), "{payload}");
     }
 }
+
+#[test]
+fn a_duplicate_may_carry_an_alt_drag_offset_that_is_a_bounded_finite_pair() {
+    let operation = format!("{P}selection.duplicate");
+    for offset in [json!([30, -7.5]), json!([0, 0]), json!([1.0e6, -1.0e6])] {
+        let payload = patched("selection.duplicate", "offset", offset.clone());
+        assert!(request(&operation, &payload), "{offset}");
+        assert!(envelope("selection.duplicate", payload).validate_input().is_ok(), "{offset}");
+    }
+    for offset in [json!([1]), json!([1, 2, 3]), json!(["1", 2]), json!(12), Value::Null, json!([1.0e6 + 1.0, 0]), json!([0, -2.0e6])] {
+        let payload = patched("selection.duplicate", "offset", offset.clone());
+        assert!(!request(&operation, &payload), "{offset}");
+        assert!(envelope("selection.duplicate", payload).validate_input().is_err(), "{offset}");
+    }
+    // Only a duplicate has the optional member.
+    for suffix in ["selection.delete", "clipboard.copy", "clipboard.cut"] {
+        let payload = patched(suffix, "offset", json!([1, 1]));
+        assert!(!request(&format!("{P}{suffix}"), &payload), "{suffix}");
+    }
+}

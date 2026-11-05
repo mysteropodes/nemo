@@ -8,7 +8,9 @@
  * the held-frame rule (Animation 2D promotes the cell, Motion edits the key it inherits). No Paper / ld.groups writer is reached from here.
  * The detached clip lives here between a copy and a paste (the owner returns it, the owner re-validates it on paste); it is data, never
  * document state. The selection is read again at the presented revision before every request, and a refusal, a stale selection or an
- * absent owner is a notice and a resolved status, never a throw. After a duplicate or a paste the new shapes are selected (baseline). */
+ * absent owner is a notice and a resolved status, never a throw. After a duplicate or a paste the new shapes are selected (baseline).
+ * duplicateAt (A-select-alt-drag-duplicate): the same ONE duplicate request with the distance of an Alt-drag in place of the nudge; `guard`
+ * ({ pin, cancelled, release }) is the drag's own proof: a document that moved on since the press, or an Escape, sends nothing. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -77,7 +79,11 @@
     if (!layers || layers.paths.length !== want.length || !samePin(layers.pin, pin) || !samePin(livePin(s), pin)) return fail(host, 'stale', 'The selection changed — nothing was changed.');
     return { I: I, intent: intent, original: paths, layers: layers, ids: idsOf(layers.paths), context: I.heldId(host), idx: paths[0].data.nativeLayerIndex };
   }
-  function target(host, c) { return { contextId: c.context, layerUid: c.layers.layerUid, frame: c.layers.frame, mode: modeOf(host), strokeIds: c.ids }; }
+  function target(host, c, offset) {
+    var out = { contextId: c.context, layerUid: c.layers.layerUid, frame: c.layers.frame, mode: modeOf(host), strokeIds: c.ids };
+    if (offset) out.offset = [offset[0], offset[1]];
+    return out;
+  }
   async function commit(host, call, what) {
     var out;
     try { out = await call(); } catch (_) { out = { ok: false, code: 'unavailable' }; }
@@ -112,12 +118,18 @@
   }
 
   // ---- the four gestures ---------------------------------------------------------------------------------------------------------------------
-  // Cmd+D / "Dupliquer": the selection cloned in place with the baseline 12 px nudge, the clones selected.
-  async function doDuplicate(host) {
+  // Cmd+D / "Dupliquer": the selection cloned in place with the baseline 12 px nudge, the clones selected. With an `offset` ([dx, dy], record space) the
+  // copies land that far away instead (an Alt-drag); `guard` is that drag's proof, checked after the re-read and before the one request.
+  async function doDuplicate(host, offset, guard) {
     var c = await prepare(host, 'Duplicate');
     if (c.failed) return c;
+    if (guard) {
+      if (guard.pin && !samePin(c.layers.pin, guard.pin)) return fail(host, 'stale', 'The document changed during the drag \u2014 nothing was changed.');
+      if (guard.cancelled && guard.cancelled()) return { failed: true, status: 'cancelled' };
+      if (guard.release) guard.release();
+    }
     var before = listedIds(c.layers.items);
-    var out = await commit(host, function () { return c.intent.duplicateShapes(target(host, c)); }, 'Duplicate');
+    var out = await commit(host, function () { return c.intent.duplicateShapes(target(host, c, offset)); }, 'Duplicate');
     if (out.failed) return out;
     if (!out.applied) return fail(host, 'noop', 'Nothing changed.');
     select(host, c.original, await addedPaths(host, c.I, c.idx, before));
@@ -188,6 +200,7 @@
 
   return Object.freeze({
     native: native, hasClip: hasClip, forget: forget,
-    duplicate: function (host) { return run(host, doDuplicate); }, copy: function (host) { return run(host, doCopy); },
+    duplicate: function (host) { return run(host, function (h) { return doDuplicate(h); }); },
+    duplicateAt: function (host, offset, guard) { return run(host, function (h) { return doDuplicate(h, offset, guard); }); }, copy: function (host) { return run(host, doCopy); },
     cut: function (host) { return run(host, doCut); }, paste: function (host) { return run(host, doPaste); } });
 }));

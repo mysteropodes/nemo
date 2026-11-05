@@ -36,6 +36,8 @@ enum K {
     Labels,
     Clip,
     Footprint,
+    /// An Alt-drag duplicate's distance: a finite `[dx, dy]` pair, each component at most 1e6.
+    Offset,
     Fill(fill::Field),
 }
 
@@ -96,7 +98,7 @@ static SPECS: [(&str, &str, &str); 21] = [
     (
         "selection.duplicate",
         "object.selection.duplicate",
-        "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0",
+        "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0 offset:offset?",
     ),
     (
         "layer.split",
@@ -211,6 +213,12 @@ fn footprint(value: &Value) -> bool {
     })
 }
 
+fn offset(value: &Value) -> bool {
+    value.as_array().is_some_and(|pair| {
+        pair.len() == 2 && pair.iter().all(|v| finite(v) && v.as_f64().is_some_and(|n| n.abs() <= 1.0e6))
+    })
+}
+
 fn kind(token: &str) -> Option<K> {
     Some(match token {
         "uid" => K::Uid,
@@ -230,6 +238,7 @@ fn kind(token: &str) -> Option<K> {
         "labels" => K::Labels,
         "clip" => K::Clip,
         "footprint" => K::Footprint,
+        "offset" => K::Offset,
         _ => K::Fill(fill::kind(token)?),
     })
 }
@@ -264,6 +273,7 @@ fn check(kind: K, value: &Value) -> bool {
         K::Labels => labels(value),
         K::Clip => clipboard::clip(value),
         K::Footprint => footprint(value),
+        K::Offset => offset(value),
         K::Fill(field) => fill::check(field, value),
     }
 }
@@ -279,15 +289,20 @@ pub(super) fn request(operation: &str, payload: &Value) -> bool {
         .split(' ')
         .filter_map(|member| member.split_once(':'))
         .collect();
+    // A token ending in `?` names an optional member: absent is valid, present must pass its check.
+    let optional = |token: &str| token.ends_with('?');
     let mut required = vec!["command"];
-    required.extend(members.iter().map(|member| member.0));
-    exact(payload, &required, &[]).is_some_and(|object| {
+    required.extend(members.iter().filter(|member| !optional(member.1)).map(|member| member.0));
+    let allowed: Vec<&str> = members.iter().filter(|member| optional(member.1)).map(|member| member.0).collect();
+    exact(payload, &required, &allowed).is_some_and(|object| {
         object.get("command").and_then(Value::as_str) == Some(command)
             && members.iter().all(|(name, token)| {
-                matches!(
-                    (object.get(*name), kind(token)),
-                    (Some(value), Some(k)) if check(k, value)
-                )
+                let token = token.trim_end_matches('?');
+                match (object.get(*name), kind(token)) {
+                    (Some(value), Some(k)) => check(k, value),
+                    (None, Some(_)) => members.iter().any(|m| m.0 == *name && optional(m.1)),
+                    _ => false,
+                }
             })
     })
 }

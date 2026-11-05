@@ -93,11 +93,11 @@ impl IdSource for RevisionIds {
     }
 }
 
-fn shift_point(point: &mut ObjectPoint, offset: f64) -> Result<(), SelectionError> {
-    for axis in [&mut point.x, &mut point.y] {
+fn shift_point(point: &mut ObjectPoint, offset: [f64; 2]) -> Result<(), SelectionError> {
+    for (axis, delta) in [(&mut point.x, offset[0]), (&mut point.y, offset[1])] {
         let moved = axis
             .as_f64()
-            .map(|value| value + offset)
+            .map(|value| value + delta)
             .and_then(Number::from_f64)
             .ok_or(SelectionError::NonFiniteCoordinate)?;
         *axis = moved;
@@ -105,12 +105,15 @@ fn shift_point(point: &mut ObjectPoint, offset: f64) -> Result<(), SelectionErro
     Ok(())
 }
 
-/// `clone.translate(Point(offset, offset))` plus the explicit centerline shift
+/// `clone.translate(Point(dx, dy))` (the baseline nudge is `[12, 12]`; an Alt-drag duplicate passes the drag) plus the explicit centerline shift
 /// `_materializeClones` gives a vector brush. Nothing else moves, as in the
 /// baseline (a `paramShape` box and `boxAngle` stay as authored). An offset of
 /// zero leaves every number untouched.
-pub(crate) fn shift_record(record: &mut ObjectRecord, offset: f64) -> Result<(), SelectionError> {
-    if offset == 0.0 {
+pub(crate) fn shift_record(
+    record: &mut ObjectRecord,
+    offset: [f64; 2],
+) -> Result<(), SelectionError> {
+    if offset == [0.0, 0.0] {
         return Ok(());
     }
     for segment in &mut record.geometry.segments {
@@ -124,23 +127,23 @@ pub(crate) fn shift_record(record: &mut ObjectRecord, offset: f64) -> Result<(),
                 .into_iter()
                 .chain(trace.seeds.value().into_iter().flatten())
             {
-                if seed.iter().any(|n| {
+                if seed.iter().enumerate().any(|(at, n)| {
                     n.as_f64()
-                        .and_then(|v| Number::from_f64(v + offset))
+                        .and_then(|v| Number::from_f64(v + offset[at % 2]))
                         .is_none()
                 }) {
                     return Err(SelectionError::NonFiniteCoordinate);
                 }
             }
             if let Presence::Present(seed) = &mut trace.seed {
-                for n in seed {
-                    *n = Number::from_f64(n.as_f64().unwrap() + offset).unwrap();
+                for (at, n) in seed.iter_mut().enumerate() {
+                    *n = Number::from_f64(n.as_f64().unwrap() + offset[at % 2]).unwrap();
                 }
             }
             if let Presence::Present(seeds) = &mut trace.seeds {
                 for seed in seeds {
-                    for n in seed {
-                        *n = Number::from_f64(n.as_f64().unwrap() + offset).unwrap();
+                    for (at, n) in seed.iter_mut().enumerate() {
+                        *n = Number::from_f64(n.as_f64().unwrap() + offset[at % 2]).unwrap();
                     }
                 }
             }
@@ -173,9 +176,12 @@ pub(crate) fn apply_clones(
     records: &[ObjectRecord],
     tags: &[Option<String>],
     source_groups: Option<&[GroupEntry]>,
-    offset: f64,
+    offset: [f64; 2],
     ids: &mut dyn IdSource,
 ) -> Result<Clones, SelectionError> {
+    if !offset.iter().all(|v| v.is_finite()) {
+        return Err(SelectionError::NonFiniteCoordinate);
+    }
     let sources: Vec<ItemSource> = records
         .iter()
         .zip(tags)
@@ -197,7 +203,7 @@ pub(crate) fn apply_clones(
         items: &sources,
         source_groups,
         destination_group_ids: &destination_gids,
-        offset,
+        offset: offset[0],
     };
     let plan = plan_clone(&request, ids).map_err(SelectionError::Remap)?;
     let dest_uid = work.layers[dest_index].layer_uid.clone();

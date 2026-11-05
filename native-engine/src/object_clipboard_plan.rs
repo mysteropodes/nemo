@@ -263,7 +263,7 @@ pub(crate) fn plan_paste(
     let same_place = clip.layer_uid == request.layer_uid
         && clip.context_id == request.context_id
         && clip.frame == request.frame;
-    let offset = if same_place { DUPLICATE_OFFSET_PX } else { 0.0 };
+    let offset = if same_place { [DUPLICATE_OFFSET_PX; 2] } else { [0.0; 2] };
     let clones = apply_compound_clones(
         &mut work,
         index,
