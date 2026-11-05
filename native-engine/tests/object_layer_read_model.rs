@@ -519,23 +519,3 @@ fn stacks_an_edit_can_write_stay_readable_and_oversize_degrades_to_a_flag() {
     assert!(got[2].get("effects").is_none());
     assert_eq!(got[2]["pathFx"].as_array().unwrap().len(), 1);
 }
-
-#[test]
-fn only_a_layer_whose_pose_is_not_the_identity_reports_motion() {
-    let target = |uid: &str| json!({"contextId":"scene-root","layerUid":uid});
-    let uids = ["still", "default", "moved", "keyed", "scaled", "opacity"];
-    let layers: Vec<_> = uids.iter().map(|uid| fixture::layer(uid, uid, &[(0, "s")])).collect();
-    let document = fixture::decode(&fixture::document(
-        &layers,
-        json!({"propertyHolders":[
-            {"target":target("default"),"properties":[{"property":"position","static":[0,0]},
-                {"property":"scale","static":[100,100]},{"property":"rotation","static":[0]}]},
-            {"target":target("moved"),"properties":[{"property":"position","static":[120,-60]}]},
-            {"target":target("keyed"),"properties":[{"property":"rotation","static":[0],
-                "track":{"keys":[{"frame":0,"v":[0]},{"frame":10,"v":[90]}]}}]},
-            {"target":target("scaled"),"properties":[{"property":"scale","static":[100,50]}]},
-            {"target":target("opacity"),"properties":[{"property":"opacity","static":[50]}]}]}),
-    ));
-    let flagged: Vec<bool> = rows(&document).iter().map(|row| row.get("hasMotion") == Some(&json!(true))).collect();
-    assert_eq!(flagged, [false, false, true, true, true, false], "{uids:?}");
-}

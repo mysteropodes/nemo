@@ -290,7 +290,6 @@ impl NativeObjectHistory {
             undo: Vec::new(),
             redo: Vec::new(),
             labels: Default::default(),
-            erase_tail: None,
             receipts: StageReceipts::default(),
         };
         drop(incoming.take());
@@ -339,7 +338,6 @@ impl NativeObjectHistory {
         self.undo.clear();
         self.redo.clear();
         self.labels.clear();
-        self.erase_tail = None;
         self.receipts = StageReceipts::default();
         Ok(())
     }
@@ -353,7 +351,6 @@ impl NativeObjectHistory {
             undo: Vec::new(),
             redo: Vec::new(),
             labels: Default::default(),
-            erase_tail: None,
             receipts: StageReceipts::default(),
         })
     }

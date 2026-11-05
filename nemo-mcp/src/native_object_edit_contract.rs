@@ -221,24 +221,6 @@ fn offset(value: &Value) -> bool {
     })
 }
 
-fn others(value: &Value) -> bool {
-    value.as_array().is_some_and(|layers| {
-        (1..=32).contains(&layers.len())
-            && layers.iter().enumerate().all(|(at, entry)| {
-                exact(entry, &["layerUid", "strokeIds"], &[]).is_some_and(|object| {
-                    object.get("layerUid").is_some_and(uid)
-                        && object.get("strokeIds").and_then(Value::as_array).is_some_and(|ids| {
-                            (1..=MAX_ITEMS).contains(&ids.len()) && ids.iter().all(uid) && {
-                                let mut seen = HashSet::new();
-                                ids.iter().all(|id| seen.insert(id.as_str()))
-                            }
-                        })
-                        && layers[..at].iter().all(|before| before.get("layerUid") != object.get("layerUid"))
-                })
-            })
-    })
-}
-
 fn kind(token: &str) -> Option<K> {
     Some(match token {
         "uid" => K::Uid,
@@ -295,7 +277,7 @@ fn check(kind: K, value: &Value) -> bool {
         K::Clip => clipboard::clip(value),
         K::Footprint => footprint(value),
         K::Offset => offset(value),
-        K::Others => others(value),
+        K::Others => clipboard::others(value),
         K::Fill(field) => fill::check(field, value),
     }
 }

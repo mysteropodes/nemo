@@ -277,9 +277,6 @@ pub struct NativeObjectHistory {
     undo: Vec<ObjectHistoryEntry>,
     redo: Vec<ObjectHistoryEntry>,
     labels: history_read::HistoryLabels,
-    /// The revision at which the last eraser bite left its undo entry: only an entry that ends there is an open eraser gesture
-    /// a `joinHistory` bite may continue (a Draw, a delete or any other edit on top is never folded into).
-    erase_tail: Option<u64>,
     receipts: StageReceipts,
 }
 
@@ -418,7 +415,6 @@ impl NativeObjectHistory {
             undo: vec![],
             redo: vec![],
             labels: Default::default(),
-            erase_tail: None,
             receipts: StageReceipts::default(),
         })
     }
@@ -431,7 +427,6 @@ impl NativeObjectHistory {
             undo: vec![],
             redo: vec![],
             labels: Default::default(),
-            erase_tail: None,
             receipts: StageReceipts::default(),
         })
     }

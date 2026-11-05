@@ -371,3 +371,6 @@ mod key_lock_tests;
 #[cfg(test)]
 #[path = "../tests/object_layer_read_model_guide.rs"]
 mod guide_tests;
+#[cfg(test)]
+#[path = "../tests/object_layer_read_model_motion.rs"]
+mod motion_tests;

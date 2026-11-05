@@ -85,8 +85,7 @@ impl NativeObjectHistory {
     /// that was left by an eraser bite and ends at the current revision can be continued - an undo, a redo or any other edit in between breaks the chain.
     fn joinable(&self) -> bool {
         self.undo.last().is_some_and(|top| {
-            top.after_revision == self.content_revision()
-                && self.erase_tail == Some(top.after_revision)
+            top.after_revision == self.content_revision() && self.labels.is_erase(top.after_revision)
         })
     }
     fn commit_boolean_joined(
@@ -153,9 +152,6 @@ impl NativeObjectHistory {
             self.commit_boolean_edit(candidate)
         }
         .map_err(|code| (code, "Boolean edit could not commit."))?;
-        if operation == OP_BOOLEAN_ERASE && after != before {
-            self.erase_tail = Some(after);
-        }
         Ok(CompactResult::Command {
             applied: after != before,
             history_entries_added: u64::from(after != before && !join),
