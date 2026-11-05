@@ -82,7 +82,8 @@ fn matte_scene_plans_to_literal_steps_and_skips_the_consumed_source() {
             GpuStep {
                 layer: 0,
                 mattes: Vec::new(),
-                blend: 0
+                blend: 0,
+                folder: None
             },
             GpuStep {
                 layer: 1,
@@ -91,7 +92,8 @@ fn matte_scene_plans_to_literal_steps_and_skips_the_consumed_source() {
                     mode: 0,
                     invert: false
                 }],
-                blend: 0
+                blend: 0,
+                folder: None
             },
         ]
     );
@@ -110,7 +112,8 @@ fn background_blend_and_mask_scenes_plan_to_literal_steps() {
         &[GpuStep {
             layer: 1,
             mattes: Vec::new(),
-            blend: 1
+            blend: 1,
+            folder: None
         }]
     );
     let case = find("blend-hue");
@@ -167,8 +170,8 @@ fn every_unrendered_baseline_feature_is_a_typed_refusal_before_any_allocation() 
             GpuUnavailable::ElementEffects { layer: 0 },
         ),
         (
-            step(PaintSource::Folder(Vec::new()), false),
-            GpuUnavailable::FolderLayer { layer: 0 },
+            step(PaintSource::Folder(Vec::new()), true),
+            GpuUnavailable::LayerEffects { layer: 0 },
         ),
         (
             step(PaintSource::Plain, true),

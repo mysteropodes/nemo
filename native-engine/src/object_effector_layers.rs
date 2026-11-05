@@ -114,7 +114,9 @@ pub(crate) fn effector_layers_for<'a>(
             .iter()
             .find(|e| e.context_id == scope.context_id && e.layer_uid == layer.layer_uid());
         if let Some(record) = record {
-            if record.effector.target_layer_uid == target_uid && layer.visible() {
+            if record.effector.target_layer_uid == target_uid
+                && crate::object_frame_packet::solo_view::layer_visible(scope.context_id, scope.layers, layer)
+            {
                 found.push((layer, record));
             }
         }

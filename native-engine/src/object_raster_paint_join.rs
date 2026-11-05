@@ -89,8 +89,8 @@ impl ObjectPaintPlan {
         &self.scene.videos
     }
 }
-pub(crate) fn ordered_entries(plan: &ObjectPaintPlan) -> impl Iterator<Item = PaintEntry<'_>> + '_ {
-    plan.mixed.iter().map(|index| match index {
+fn entry_of<'a>(plan: &'a ObjectPaintPlan, index: &PaintIndex) -> PaintEntry<'a> {
+    match index {
         PaintIndex::Contour(index) => PaintEntry::Contour(ObjectPaintCommand {
             entry: plan.scene.entry(*index).expect("pinned contour index"),
             packet: plan.packet(),
@@ -107,7 +107,97 @@ pub(crate) fn ordered_entries(plan: &ObjectPaintPlan) -> impl Iterator<Item = Pa
             PaintEntry::Duplicator(&plan.scene.duplicators.paints[*index])
         }
         PaintIndex::Dab(index, _) => PaintEntry::Dab(&plan.dabs[*index]),
-    })
+    }
+}
+pub(crate) fn ordered_entries(plan: &ObjectPaintPlan) -> impl Iterator<Item = PaintEntry<'_>> + '_ {
+    plan.mixed.iter().map(|index| entry_of(plan, index))
+}
+impl ObjectPaintPlan {
+    /// The source layer an entry belongs to (a placed component's image or text: its host layer).
+    fn layer_of_entry(&self, index: &PaintIndex) -> usize {
+        match index {
+            PaintIndex::Contour(index) => self
+                .scene
+                .entry(*index)
+                .expect("pinned contour index")
+                .source()
+                .source_layer_index(),
+            PaintIndex::Raster(index) => self.scene.rasters[*index].layer_index,
+            #[cfg(all(feature = "application", feature = "project_media_codec"))]
+            PaintIndex::Brush(index) => self
+                .scene
+                .brushes
+                .as_ref()
+                .map_or(0, |sources| sources.paints[*index].layer_index),
+            PaintIndex::Text(index) => self.scene.texts.entries[*index].layer_index,
+            PaintIndex::Component(index) => self.scene.components.paints[*index].host_layer_index,
+            PaintIndex::Video(index) => self.scene.videos[*index].layer_index,
+            PaintIndex::Duplicator(index) => self.scene.duplicators.paints[*index].layer_index,
+            PaintIndex::Dab(_, layer) => *layer,
+        }
+    }
+}
+/// Where each visible folder's children paint: per source layer, `(stack position, child ordinal)`. A child ranks at its
+/// folder's own place, after the folder's earlier children (the baseline `paint_folder_children` order: every layer whose
+/// parent is the folder, bottom-up; a folder-shaped child is not consumed and stays where it is); every other layer ranks
+/// at its own place. `None` when no visible folder has a child, so the authored order stands. A hidden folder paints
+/// nothing and consumes nothing, exactly as in the baseline.
+pub(crate) fn folder_ranks(
+    packet: &crate::object_frame_packet::ObjectFramePacket,
+) -> Option<std::collections::BTreeMap<usize, (usize, usize)>> {
+    let placed: Vec<usize> = packet
+        .numeric_order()?
+        .layers()
+        .iter()
+        .map(|layer| layer.source_layer_index())
+        .collect();
+    let source = packet.source_layers();
+    let mut ranks = std::collections::BTreeMap::new();
+    for (position, &index) in placed.iter().enumerate() {
+        let folder = source.get(index)?;
+        if !crate::object_frame_packet::solo_view::layer_visible(packet.context_id(), source, folder) || !folder.is_folder_layer() {
+            continue;
+        }
+        let mut ordinal = 0;
+        for &child in &placed {
+            let candidate = source.get(child)?;
+            if child != index
+                && !candidate.is_folder_layer()
+                && candidate.parent_layer_uid.value().and_then(Option::as_deref)
+                    == Some(folder.layer_uid())
+            {
+                ranks.entry(child).or_insert((position, 1 + ordinal));
+                ordinal += 1;
+            }
+        }
+    }
+    if ranks.is_empty() {
+        return None;
+    }
+    for (position, &index) in placed.iter().enumerate() {
+        ranks.entry(index).or_insert((position, 0));
+    }
+    Some(ranks)
+}
+/// The plan's entries re-sequenced by a per-layer rank (`rank(source layer index)`), layers of equal rank and the
+/// entries of one layer keeping their authored order. A folder's flattened children paint at the folder's own place
+/// in the stack: a folder-only scene (every child Normal, no mask, matte or effect) is exactly the flat sequence with
+/// the children moved there, because Normal compositing is associative.
+pub(crate) fn ordered_entries_ranked<'a>(
+    plan: &'a ObjectPaintPlan,
+    rank: &dyn Fn(usize) -> (usize, usize),
+) -> Vec<PaintEntry<'a>> {
+    let mut keyed: Vec<((usize, usize), usize, &PaintIndex)> = plan
+        .mixed
+        .iter()
+        .enumerate()
+        .map(|(position, index)| (rank(plan.layer_of_entry(index)), position, index))
+        .collect();
+    keyed.sort_by_key(|(key, position, _)| (*key, *position));
+    keyed
+        .into_iter()
+        .map(|(_, _, index)| entry_of(plan, index))
+        .collect()
 }
 pub(super) fn prepare(
     scene: &ObjectRenderScene,

@@ -3,7 +3,9 @@ use crate::compositor::object_compositor::prepare_command;
 use crate::compositor::{Compositor, CompositorError};
 use crate::object_render_scene::object_scene_style_emit::PreparedItem;
 use crate::object_render_scene::viewport_checker::shadow::is_shadow_guide;
-use crate::object_render_scene::{ordered_entries, ObjectCompositionWitness, PaintEntry};
+use crate::object_render_scene::{
+    folder_ranks, ordered_entries, ordered_entries_ranked, ObjectCompositionWitness, PaintEntry,
+};
 use vello::kurbo::Affine;
 /// T12: the layered path draws solid layers only, so a video is refused, never omitted.
 pub(super) fn refuse_layered_video(
@@ -102,7 +104,15 @@ impl Compositor {
         let outline = prepared.viewport_outline();
         // #2373: the viewport-only hidden Shadow guides (an export witness hides none).
         let hide_shadow = prepared.viewport_hides_shadow_guides();
-        for entry in ordered_entries(prepared.plan()) {
+        // A folder's children paint at the folder's own place in the stack (see `folder_ranks`).
+        let ranks = folder_ranks(prepared.plan().packet());
+        let entries: Vec<PaintEntry<'_>> = match &ranks {
+            Some(ranks) => ordered_entries_ranked(prepared.plan(), &|layer| {
+                ranks.get(&layer).copied().unwrap_or((usize::MAX, 0))
+            }),
+            None => ordered_entries(prepared.plan()).collect(),
+        };
+        for entry in entries {
             if hide_shadow && is_shadow_guide(&entry) {
                 continue;
             }

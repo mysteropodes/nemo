@@ -37,30 +37,14 @@ fn layer(uid: &str) -> Value {
     json!({"layerUid":uid,"timing":{"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
         "contextId":"scene-root","keys":[{"frame":0}],"samples":[]}})
 }
-/// L0 blue (8..24, top left), L1 red (40..56, top right), L3 yellow (40..56, lower right) hidden by its eye (the baseline solo
-/// ignores the eye, so soloing it shows it). Folder F holds L2 and L4 hangs from the plain layer L0; both carry no artwork,
-/// because a native frame refuses a visible vector layer parented to a folder (its own gap), so their rule is read off the plan.
-fn owner() -> NativeObjectHistory {
-    let objects = vec![
-        square("L0", "a", [8, 8, 24, 24], [0., 0., 1.]),
-        square("L1", "b", [40, 8, 56, 24], [1., 0., 0.]),
-        square("L3", "d", [40, 40, 56, 56], [1., 1., 0.]),
-    ];
-    let mut layers = vec![
-        layer("L0"),
-        layer("L1"),
-        json!({"layerUid":"F","isFolderLayer":true}),
-        json!({"layerUid":"L2","parentLayerUid":"F"}),
-        layer("L3"),
-        json!({"layerUid":"L4","parentLayerUid":"L0"}),
-    ];
-    layers[4]["visible"] = json!(false);
+/// One document from per-layer artwork: `order` names the layers back to front, `objects` carries one square per layer that has any.
+fn owner_of(objects: Vec<Value>, layers: Vec<Value>, order: &[&str]) -> NativeObjectHistory {
     // One object per layer: the natural position is the index within the layer.
     let elements: Vec<Value> = objects
         .iter()
         .map(|o| json!({"layerUid":o["target"]["layerUid"],"strokeId":o["target"]["strokeId"],"naturalPosition":0,"order":{}}))
         .collect();
-    let order_layers: Vec<Value> = ["L0", "L1", "F", "L2", "L3", "L4"]
+    let order_layers: Vec<Value> = order
         .iter()
         .enumerate()
         .map(|(i, uid)| json!({"layerUid":uid,"naturalPosition":i,"order":{}}))
@@ -78,6 +62,26 @@ fn owner() -> NativeObjectHistory {
         .unwrap(),
     )
     .unwrap()
+}
+/// L0 blue (8..24, top left), L1 red (40..56, top right), L3 yellow (40..56, lower right) hidden by its eye (the baseline solo
+/// ignores the eye, so soloing it shows it). Folder F holds L2 and L4 hangs from the plain layer L0; both carry no artwork,
+/// their rule is read off the plan (scene_effect_scene_join_folder.rs proves the folder rule with pixels).
+fn owner() -> NativeObjectHistory {
+    let objects = vec![
+        square("L0", "a", [8, 8, 24, 24], [0., 0., 1.]),
+        square("L1", "b", [40, 8, 56, 24], [1., 0., 0.]),
+        square("L3", "d", [40, 40, 56, 56], [1., 1., 0.]),
+    ];
+    let mut layers = vec![
+        layer("L0"),
+        layer("L1"),
+        json!({"layerUid":"F","isFolderLayer":true}),
+        json!({"layerUid":"L2","parentLayerUid":"F"}),
+        layer("L3"),
+        json!({"layerUid":"L4","parentLayerUid":"L0"}),
+    ];
+    layers[4]["visible"] = json!(false);
+    owner_of(objects, layers, &["L0", "L1", "F", "L2", "L3", "L4"])
 }
 fn pins(s: &ObjectSnapshot) -> ObjectFrameSelector<'_> {
     ObjectFrameSelector {
@@ -205,4 +209,63 @@ fn gpu_an_export_paints_the_soloed_layers_and_a_viewport_solo_leaks_nothing_into
     assert_eq!(shown(&soloed), [false, true, false], "the baseline export honours layer solo");
     assert_eq!(at(&soloed, 48, 16), [255, 0, 0, 255]);
     assert_eq!(pixels(&mut gpu, &plain), before, "the plain export is unchanged afterwards");
+}
+
+/// The packet and plan built with the Solo view open: a layer the set shows is part of the frame whatever its eye says.
+fn solo_plan(s: &ObjectSnapshot, uids: &[&str]) -> crate::object_render_scene::ObjectPaintPlan {
+    let _view = crate::object_frame_packet::solo_view::enter("scene-root", &set(uids));
+    plan(s)
+}
+fn solo_viewport(s: &ObjectSnapshot, uids: &[&str]) -> ObjectCompositionWitness {
+    prepare_object_viewport_composition(&solo_plan(s, uids), &pins(s), None)
+        .unwrap()
+        .with_viewport_solo(&set(uids))
+        .unwrap()
+}
+fn solo_export(s: &ObjectSnapshot, uids: &[&str]) -> ObjectCompositionWitness {
+    prepare_object_composition(&solo_plan(s, uids), &pins(s))
+        .unwrap()
+        .with_export_solo(&set(uids))
+        .unwrap()
+}
+
+#[test]
+fn the_solo_view_is_scoped_to_its_thread_and_context_and_restores_what_was_open_before() {
+    use crate::object_frame_packet::solo_view;
+    let owner = owner();
+    let snapshot = owner.acquire_snapshot(0).unwrap();
+    let count = |plan: &crate::object_render_scene::ObjectPaintPlan| ordered_entries(plan).count();
+    assert_eq!(count(&plan(&snapshot)), 2, "no view: the hidden L3 is not in the frame");
+    {
+        let _outer = solo_view::enter("scene-root", &set(&["L3"]));
+        assert_eq!(count(&plan(&snapshot)), 1, "the soloed eye-off L3 is the frame");
+        {
+            let _inner = solo_view::enter("scene-root", &set(&["L0", "L1"]));
+            assert_eq!(count(&plan(&snapshot)), 2);
+        }
+        assert_eq!(count(&plan(&snapshot)), 1, "leaving the inner scope brings the outer one back");
+        let _elsewhere = solo_view::enter("some-component", &set(&["L3"]));
+        assert_eq!(count(&plan(&snapshot)), 2, "another context than the shown one keeps its eyes");
+    }
+    assert_eq!(count(&plan(&snapshot)), 2, "the scope ended: the eyes decide again");
+    let _empty = solo_view::enter("scene-root", &[]);
+    assert_eq!(count(&plan(&snapshot)), 2, "an empty set is an inert scope");
+}
+
+#[test]
+fn gpu_solo_shows_a_layer_whose_eye_is_off_in_the_viewport_and_in_the_export() {
+    let mut gpu = Compositor::new().expect("actual headless GPU is required; never skip");
+    let owner = owner();
+    let snapshot = owner.acquire_snapshot(0).unwrap();
+    let plain = pixels(&mut gpu, &viewport(&snapshot));
+    assert_eq!(shown(&plain), [true, true, false], "no solo: the eye-off L3 does not paint");
+    for witness in [solo_viewport(&snapshot, &["L3"]), solo_export(&snapshot, &["L3"])] {
+        let solo = pixels(&mut gpu, &witness);
+        assert_eq!(shown(&solo), [false, false, true], "soloing L3 shows it, and only it");
+        assert_eq!(at(&solo, 48, 48), [255, 255, 0, 255]);
+        assert_eq!(at(&solo, 16, 16), at(&solo, 60, 60));
+    }
+    let both = pixels(&mut gpu, &solo_viewport(&snapshot, &["L1", "L3"]));
+    assert_eq!(shown(&both), [false, true, true], "an eye-on and an eye-off soloed layer show together");
+    assert_eq!(pixels(&mut gpu, &viewport(&snapshot)), plain, "the next plain frame is the plain one");
 }

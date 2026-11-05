@@ -37,6 +37,9 @@ mod order;
 pub(crate) mod text;
 #[path = "object_frame_video.rs"]
 pub(crate) mod video;
+// #2371: the Solo view's visibility rule the packet and its joins read.
+#[path = "object_solo_view.rs"]
+pub mod solo_view;
 pub use order::{NumericElementOrder, NumericLayerOrder, NumericOrderPlan};
 #[path = "object_property_sampling.rs"]
 mod property_sampling;

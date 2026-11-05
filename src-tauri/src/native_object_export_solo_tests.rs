@@ -8,6 +8,10 @@ use std::fs;
 
 /// L0 blue square at 4..28, L1 red square at 36..60, on a 64 px canvas.
 fn host() -> NativeObjectHost {
+    host_with(true)
+}
+/// The same document with the eye of L1 as `l1_visible` says.
+fn host_with(l1_visible: bool) -> NativeObjectHost {
     let cases: Value = serde_json::from_str(include_str!(
         "../../engineering/application/examples/native-object-v1/cases.json"
     ))
@@ -23,7 +27,7 @@ fn host() -> NativeObjectHost {
     let timing = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
     let document = json!({
         "format":"nemo.native-object-document","formatVersion":2,"totalFrames":1,
-        "layers":[{"layerUid":"L0","timing":timing},{"layerUid":"L1","timing":timing}],
+        "layers":[{"layerUid":"L0","timing":timing},{"layerUid":"L1","timing":timing,"visible":l1_visible}],
         "objects":[square("L0", "a", 4, [0, 0, 1]), square("L1", "b", 36, [1, 0, 0])],
         "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,
             "documentFormatVersion":2,"contexts":[{"contextId":"scene-root",
@@ -64,4 +68,34 @@ fn the_png_export_paints_only_the_soloed_layers_and_the_next_export_is_plain_aga
     assert_eq!((left, right), (vec![0, 0, 255, 255], vec![255; 4]));
     let (left, right) = run(&mut owner, "plain-again", &[]);
     assert_eq!((left, right), (vec![0, 0, 255, 255], vec![255, 0, 0, 255]), "an export with no set is plain again");
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn the_png_export_shows_a_soloed_layer_whose_eye_is_off_and_hides_the_others() {
+    // Baseline layerIsEffectivelyVisible: a soloed layer is shown whatever its eye says (#2371 C-solo-2).
+    let mut owner = host_with(false);
+    let snapshot = owner.history.acquire_snapshot(0).unwrap();
+    let expected = selector(&snapshot);
+    let mut gpu = Compositor::new().unwrap();
+    let mut run = |owner: &mut NativeObjectHost, id: &str, solo: &[&str]| {
+        let scratch = Scratch::new();
+        let mut port = scratch.port();
+        owner.set_export_solo(solo.iter().map(|s| (*s).to_owned()).collect());
+        let outcome = owner
+            .export_pinned_object_png(&expected, id.into(), "object-output".into(), output(), 65536, &mut port, &mut gpu)
+            .unwrap();
+        assert_eq!(outcome.receipt.unwrap().status, JobStatus::Succeeded);
+        let rgba = decode_png(&fs::read(scratch.0.join("published/frame_0001.png")).unwrap());
+        let at = |x: usize, y: usize| rgba[(y * 64 + x) * 4..][..4].to_vec();
+        (at(16, 16), at(48, 16))
+    };
+    let (left, right) = run(&mut owner, "plain", &[]);
+    assert_eq!((left, right), (vec![0, 0, 255, 255], vec![255; 4]), "no solo: the eye-off L1 does not paint");
+    let (left, right) = run(&mut owner, "solo-l1", &["L1"]);
+    assert_eq!((left, right), (vec![255; 4], vec![255, 0, 0, 255]), "the soloed eye-off L1 paints alone");
+    let (left, right) = run(&mut owner, "solo-l0", &["L0"]);
+    assert_eq!((left, right), (vec![0, 0, 255, 255], vec![255; 4]), "soloing L0 leaves the eye-off L1 out");
+    let (left, right) = run(&mut owner, "plain-again", &[]);
+    assert_eq!((left, right), (vec![0, 0, 255, 255], vec![255; 4]), "the next export is plain again");
 }

@@ -93,7 +93,7 @@ fn invalid(source_object_index: usize, reason: &'static str) -> ObjectSceneError
 }
 fn ordinary_layer(packet: &ObjectFramePacket, index: usize) -> bool {
     packet.source_layers().get(index).is_some_and(|layer| {
-        layer.visible()
+        crate::object_frame_packet::solo_view::layer_visible(packet.context_id(), packet.source_layers(), layer)
             && !layer.is_folder_layer()
             && !layer.is_effect_layer()
             && layer.widget.value().is_none()

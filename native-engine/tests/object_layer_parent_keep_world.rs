@@ -232,6 +232,81 @@ fn a_rotated_null_a_grandparent_chain_and_a_chain_swap_keep_the_world_pose() {
 }
 
 #[test]
+fn a_rotated_and_scaled_folder_keeps_a_members_world_pose_in_and_out() {
+    // The Null `N` made a folder: the same pivot and pose, now grouping. The reparent used to refuse here because a
+    // folder could not give its evaluated pivot; the oracle is the real renderer, point for point.
+    let mut document = fixture(&[]);
+    let folder = document["layers"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|l| l["layerUid"] == "N")
+        .unwrap();
+    folder["isFolderLayer"] = json!(true);
+    folder["folderCollapsed"] = json!(false);
+    folder["effects"] = json!([]);
+    let mut owner = owner(&document);
+    let (before, bytes_before) = (
+        world(&owner, 0),
+        super::object_layer_lifecycle_tests::bytes(&owner),
+    );
+    let into = json!({"command":"object.layer.folder.reparent","layerUids":["C"],"folderUid":"N","frame":0});
+    let reply = send(&mut owner, "in", "folder.reparent", &into);
+    assert_eq!(
+        reply["result"],
+        json!({"applied":true,"historyEntriesAdded":1}),
+        "{reply}"
+    );
+    assert_eq!(value(&owner)["layers"][0]["parentLayerUid"], "N");
+    same(&before, &world(&owner, 0), "into the rotated and scaled folder");
+    // the folder's 45 degrees and 1.5x are undone by the member: 12 - 45 and 100 / 1.5
+    let moved = value(&owner);
+    assert!((static_of(&moved, "C", "rotation")[0] + 33.).abs() < 1e-6, "{moved}");
+    assert!((static_of(&moved, "C", "scale")[0] - 100. / 1.5).abs() < 1e-6, "{moved}");
+    let out = json!({"command":"object.layer.folder.reparent","layerUids":["C"],"folderUid":null,"frame":0});
+    send(&mut owner, "out", "folder.reparent", &out);
+    same(&before, &world(&owner, 0), "back out of the folder");
+    owner.undo(owner.content_revision()).unwrap();
+    owner.undo(owner.content_revision()).unwrap();
+    assert_eq!(
+        super::object_layer_lifecycle_tests::bytes(&owner),
+        bytes_before,
+        "both gestures undone"
+    );
+}
+
+#[test]
+fn a_member_with_no_pose_record_gets_one_when_the_folder_is_turned() {
+    // Freshly drawn layers own no property holder at all: the compensation has to create it.
+    let mut document = fixture(&[]);
+    let folder = document["layers"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|l| l["layerUid"] == "N")
+        .unwrap();
+    folder["isFolderLayer"] = json!(true);
+    folder["folderCollapsed"] = json!(false);
+    folder["effects"] = json!([]);
+    document["propertyHolders"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|h| h["target"]["layerUid"] != "C");
+    let mut owner = owner(&document);
+    let before = world(&owner, 0);
+    let into = json!({"command":"object.layer.folder.reparent","layerUids":["C"],"folderUid":"N","frame":0});
+    let reply = send(&mut owner, "in", "folder.reparent", &into);
+    assert_eq!(
+        reply["result"],
+        json!({"applied":true,"historyEntriesAdded":1}),
+        "{reply}"
+    );
+    same(&before, &world(&owner, 0), "a holder-less member under the turned folder");
+    let moved = value(&owner);
+    assert!((static_of(&moved, "C", "rotation")[0] + 45.).abs() < 1e-6, "{moved}");
+}
+
+#[test]
 fn a_keyed_parent_is_kept_at_the_edit_frame_not_at_frame_zero() {
     let keys = json!({"keys":[{"frame":0,"v":[0]},{"frame":4,"v":[80]}]});
     let mut owner = owner(&fixture(&[("P", "rotation", keys)]));

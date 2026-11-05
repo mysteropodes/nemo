@@ -91,7 +91,6 @@ pub(crate) struct GpuLayerInput<'a> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum GpuUnavailable {
     ElementEffects { layer: usize },
-    FolderLayer { layer: usize },
     LayerEffects { layer: usize },
     EffectLayerStack { layer: usize },
     MaskFeather { layer: usize },
@@ -151,12 +150,23 @@ impl GpuBlendError {
     }
 }
 
-/// One planned paint step: the layer, its resolved mattes, its blend index.
+/// One child painted inside a folder's isolated pass (`paint_folder_children`): its own paint folded onto the
+/// folder accumulator with its own blend; the first child seeds the accumulator, so its blend is moot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct GpuFolderChild {
+    pub(crate) layer: usize,
+    pub(crate) blend: u32,
+    pub(crate) seeds: bool,
+}
+
+/// One planned paint step: the layer, its resolved mattes, its blend index. A folder step carries its children:
+/// their paints are flattened in isolation and that result stands for the folder's own paint.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct GpuStep {
     pub(crate) layer: usize,
     pub(crate) mattes: Vec<MatteStep>,
     pub(crate) blend: u32,
+    pub(crate) folder: Option<Vec<GpuFolderChild>>,
 }
 
 #[derive(Clone, Debug)]
@@ -217,15 +227,40 @@ impl<'a> GpuLayerStack<'a> {
                 }
                 LayerStep::Paint(paint) => {
                     let layer = paint.index;
+                    let mut folder = None;
                     let unavailable = match &paint.source {
-                        PaintSource::Plain if paint.layer_effects => {
+                        PaintSource::Plain | PaintSource::Folder(_) if paint.layer_effects => {
                             Some(GpuUnavailable::LayerEffects { layer })
                         }
                         PaintSource::Plain => None,
                         PaintSource::ElementEffects => {
                             Some(GpuUnavailable::ElementEffects { layer })
                         }
-                        PaintSource::Folder(_) => Some(GpuUnavailable::FolderLayer { layer }),
+                        PaintSource::Folder(children) => {
+                            let mut flattened = Vec::with_capacity(children.len());
+                            let mut refused = None;
+                            for child in children {
+                                if child.index >= inputs.len() {
+                                    return Err(GpuBlendError::IndexOutOfRange {
+                                        index: child.index,
+                                    });
+                                }
+                                refused = refused.or(if child.item_effects {
+                                    Some(GpuUnavailable::ElementEffects { layer: child.index })
+                                } else if child.layer_effects {
+                                    Some(GpuUnavailable::LayerEffects { layer: child.index })
+                                } else {
+                                    None
+                                });
+                                flattened.push(GpuFolderChild {
+                                    layer: child.index,
+                                    blend: child.blend,
+                                    seeds: child.seeds_accumulator,
+                                });
+                            }
+                            folder = Some(flattened);
+                            refused
+                        }
                     };
                     if let Some(what) = unavailable {
                         return Err(GpuBlendError::Unavailable(what));
@@ -254,6 +289,7 @@ impl<'a> GpuLayerStack<'a> {
                         layer,
                         mattes: paint.mattes.clone(),
                         blend: paint.blend,
+                        folder,
                     });
                 }
             }

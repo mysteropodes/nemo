@@ -67,7 +67,7 @@ pub(super) fn prepare(
         .enumerate()
         .filter_map(|(index, layer)| {
             let descriptor = set.duplicator(packet.context_id(), layer.layer_uid())?;
-            (layer.visible()
+            (crate::object_frame_packet::solo_view::layer_visible(packet.context_id(), packet.source_layers(), layer)
                 && packet.source_frame_for_layer(index).is_some()
                 && descriptor.duplicator.effective_clone_count() > 1.)
                 .then_some((index, layer))

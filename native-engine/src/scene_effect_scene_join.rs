@@ -21,8 +21,8 @@
 //! Inputs no record carries yet (animated blend, the matte-on track and item-level effects) are not guessed and
 //! not neutralised: the input adapter refuses a layer that has them with a typed
 //! `SceneEffectJoinError::LayerCompositionPropertyUnavailable` until the raw layer-property consumer fills the
-//! same `JoinLayerInput` field. Canvas-background layers are not document layers and carry no input. Folder children come from `parent_layer_uid`, which the codec still refuses, so a native
-//! folder has none until layer parenting is admitted. The module owns no pixel, texture or scheduler state.
+//! same `JoinLayerInput` field. Canvas-background layers are not document layers and carry no input. Folder children come from `parent_layer_uid`:
+//! every layer whose parent is the folder. The module owns no pixel, texture or scheduler state.
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::{
     PinField, PinnedScene, SceneOutcome, ScenePin, UnavailableCause,
 };

@@ -9,8 +9,9 @@ impl ObjectSnapshot {
     /// Camera paint has its retained composition/export consumer. ThreeD still
     /// requires the actual layer-batch join before the frame can be admitted.
     pub(crate) fn frame_has_unjoined_3d(&self) -> bool {
-        self.document().layers().iter()
-            .any(|layer| layer.visible() && layer.three_d.value() == Some(&true)
+        let layers = self.document().layers();
+        layers.iter()
+            .any(|layer| crate::object_frame_packet::solo_view::layer_visible("scene-root", layers, layer) && layer.three_d.value() == Some(&true)
                 && !crate::evaluation::object_vector_kernels::render_vector_eval::common_layer_motion_target(self.document(), &PropertyHolderTarget {
                     context_id: "scene-root".into(), layer_uid: layer.layer_uid().to_owned(), stroke_id: crate::object_document::Presence::Missing,
                 }))

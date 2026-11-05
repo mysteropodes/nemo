@@ -287,7 +287,7 @@ pub(super) fn layer_holder_consumed(document: &ObjectDocument, holder: &Property
     let visible_vector = !layer_vectors_batchable(document, target)
         && document.layers().iter().any(|layer| {
             layer.layer_uid() == target.layer_uid()
-                && layer.visible()
+                && crate::object_frame_packet::solo_view::layer_visible("scene-root", document.layers(), layer)
                 && document.objects().iter().any(|record| {
                     record.target.context_id == target.context_id()
                         && record.target.layer_uid == target.layer_uid()
@@ -328,7 +328,7 @@ pub(crate) fn layer_vectors_batchable(document: &ObjectDocument, target: &Proper
 /// Other visible contour/vector parents still refuse without a Motion holder.
 pub(super) fn visible_vector_parents_supported(document: &ObjectDocument) -> bool {
     !document.layers().iter().any(|layer| {
-        layer.visible()
+        crate::object_frame_packet::solo_view::layer_visible("scene-root", document.layers(), layer)
             && layer.parent_layer_uid.value().is_some_and(Option::is_some)
             && !crate::evaluation::object_vector_kernels::render_vector_eval::common_layer_motion_target(document, &PropertyHolderTarget {
                 context_id: "scene-root".into(), layer_uid: layer.layer_uid().to_owned(), stroke_id: Presence::Missing,

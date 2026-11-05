@@ -37,8 +37,20 @@
       var c = root.NemoNativeCompositionController, v = c && c.read(), i = s.info();
       return v && v.composition && v.info && PIN.every(function (k) { return v.info[k] === i[k]; }) ? v.composition : null;
     };
-    return { info: function () { return s.isActive() ? s.info() : null; }, reads: reads,
-      write: { visible: entry('toggleLayerVis'), locked: entry('toggleLayerLock'), shy: entry('toggleLayerShy') },
+    // The layer rows carry `solo` (a session view fact of NemoNativeLayerSolo, never document data) so the run reads and confirms it like the other flags.
+    var solo = function () { return root.NemoNativeLayerSolo; };
+    var info = function () {
+      if (!s.isActive()) return null;
+      var i = s.info(), v = solo();
+      return i && Array.isArray(i.layers) && v && typeof v.has === 'function'
+        ? Object.assign({}, i, { layers: i.layers.map(function (l) { return Object.assign({}, l, { solo: v.has(root, i, l.layerUid) }); }) }) : i;
+    };
+    var toggleSolo = function (index) {
+      var i = info(), l = i && i.layers[index], v = solo();
+      return l && v && typeof v.toggle === 'function' ? v.toggle(root, l.layerUid) : false;
+    };
+    return { info: info, reads: reads,
+      write: { visible: entry('toggleLayerVis'), locked: entry('toggleLayerLock'), shy: entry('toggleLayerShy'), solo: toggleSolo },
       ops: root.NemoScriptNativeWrites ? root.NemoScriptNativeWrites.create(root, s) : {},
       goToFrame: function (f) { if (typeof root.goToFrame === 'function') root.goToFrame(f); },
       frame: function () { return root.state && Number.isInteger(root.state.currentFrame) ? root.state.currentFrame : 0; },

@@ -5602,6 +5602,7 @@ test('F2 scene-join family parity tests stay private test children of the compos
   for (const file of [
     'native-engine/tests/scene_effect_scene_join_families.rs',
     'native-engine/tests/scene_effect_scene_join_families_docs.rs',
+    'native-engine/tests/scene_effect_scene_join_folder.rs',
   ]) {
     const owner = profile.modules.find((entry) => entry.id === 'rust.native.engine.tests');
     assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, 'tests owner must own ' + file);

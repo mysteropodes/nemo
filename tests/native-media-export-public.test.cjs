@@ -173,6 +173,27 @@ test('the real SDK carries the six operations: revision rules, closed payloads, 
   await rejects(begin, { ...refusal, error: { code: 'frame_failed', message: 'm' } }, TypeError, 'a job code is not a dispatch error');
 });
 
+test('the Solo view of the layers rides both begin payloads: schema and contract agree on every set (#2371)', () => {
+  const svg = { documentSnapshotId: SNAPSHOT, contextId: 'scene-root', outputHandle: 'output/a', frames: [0, 5] };
+  const spec = { kind: 'frame', format: 'rgba8', width: 64, height: 36, colorInterpretation: 'srgb', alphaMode: 'straight' };
+  const media = { documentSnapshotId: SNAPSHOT, contextId: 'scene-root', outputHandle: 'output/a', output: { kind: 'sequence', frameFormat: 'png' }, range: { start: 0, end: 3 }, outputSpec: spec };
+  const many = Array.from({ length: 512 }, (_, i) => `L${String(i).padStart(4, '0')}`);
+  const tooMany = Array.from({ length: 513 }, (_, i) => `L${String(i).padStart(4, '0')}`);
+  for (const [operation, def, base] of [['job.export.svg.begin', 'ExportSvgBeginPayload', svg], ['job.export.media.begin', 'ExportMediaBeginPayload', media]]) {
+    for (const solo of [[], ['L1'], ['L1', 'L2', 'folder-9'], many]) {
+      const payload = { ...base, soloLayers: solo };
+      assert.doesNotThrow(() => contract.payload(operation, payload), `${operation} ${solo.length}`);
+      assert.ok(v.def(def)(payload), `${operation} schema ${solo.length}`);
+    }
+    for (const bad of [tooMany, ['L2', 'L1'], ['L1', 'L1'], [''], [7], 'L1', null, [{ layerUid: 'L1' }], ['has space']]) {
+      const payload = { ...base, soloLayers: bad };
+      assert.throws(() => contract.payload(operation, payload), TypeError, `${operation} ${JSON.stringify(bad).slice(0, 40)}`);
+      // The schema states the bound and the shape; "strictly ascending" (and with it uniqueness) is the contract's alone.
+      if (!(Array.isArray(bad) && bad.length === 2 && bad[0] >= bad[1])) assert.ok(!v.def(def)(payload), `${def} schema ${JSON.stringify(bad).slice(0, 40)}`);
+    }
+  }
+});
+
 test('adapters and SDK agree: every request an adapter mints is a valid union request and passes the real SDK', async () => {
   const vector = createNativeVectorExportAdapter({ route: true });
   const media = createNativeMediaExportAdapter({ route: true });

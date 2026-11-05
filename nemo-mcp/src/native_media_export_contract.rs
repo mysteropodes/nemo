@@ -16,6 +16,8 @@ const CONTROLS: [&str; 4] = [
 const MAX_JOB_FRAMES: usize = 32;
 /// One receipt lists at most this many frame names (a response is at most 4096 bytes).
 const MAX_SEQUENCE_FRAMES: u64 = 120;
+/// The Solo set bound of the desktop preview and export requests.
+const MAX_SOLO_LAYERS: usize = 512;
 /// The object export OutputSpec bound.
 const MAX_DIMENSION: u64 = 4096;
 
@@ -29,14 +31,28 @@ fn id(value: Option<&Value>) -> bool {
         .is_some_and(bounded_identifier)
 }
 
+/// The Solo view of the layers: at most 512 bounded ids, strictly ascending (so unique).
+fn solo_layers(value: Option<&Value>) -> bool {
+    value.is_none_or(|list| {
+        list.as_array().is_some_and(|ids| {
+            ids.len() <= MAX_SOLO_LAYERS
+                && ids.iter().all(|entry| id(Some(entry)))
+                && ids
+                    .windows(2)
+                    .all(|pair| pair[0].as_str() < pair[1].as_str())
+        })
+    })
+}
+
 fn scene_root(value: Option<&Value>) -> bool {
     value.and_then(Value::as_str) == Some("scene-root")
 }
 
 fn svg_begin(payload: &Value) -> bool {
     let members = ["documentSnapshotId", "contextId", "outputHandle", "frames"];
-    exact(payload, &members, &[]).is_some_and(|m| {
-        id(m.get("documentSnapshotId"))
+    exact(payload, &members, &["soloLayers"]).is_some_and(|m| {
+        solo_layers(m.get("soloLayers"))
+            && id(m.get("documentSnapshotId"))
             && scene_root(m.get("contextId"))
             && id(m.get("outputHandle"))
             && m.get("frames")
@@ -123,7 +139,7 @@ fn media_begin(payload: &Value) -> bool {
         "output",
         "range",
     ];
-    exact(payload, &required, &["outputSpec", "video"]).is_some_and(|m| {
+    exact(payload, &required, &["outputSpec", "video", "soloLayers"]).is_some_and(|m| {
         let Some(output) = exact(&payload["output"], &["kind", "frameFormat"], &[]) else {
             return false;
         };
@@ -133,7 +149,8 @@ fn media_begin(payload: &Value) -> bool {
         ) else {
             return false;
         };
-        id(m.get("documentSnapshotId"))
+        solo_layers(m.get("soloLayers"))
+            && id(m.get("documentSnapshotId"))
             && scene_root(m.get("contextId"))
             && id(m.get("outputHandle"))
             && matches!(kind, "still" | "sequence" | "video")

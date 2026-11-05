@@ -25,9 +25,11 @@ pub(crate) enum Role {
     AccumA,
     AccumB,
     Flat,
+    FolderA,
+    FolderB,
 }
 
-const ROLES: usize = 11;
+const ROLES: usize = 13;
 
 pub(crate) struct Pool {
     slots: [Option<ObjectTarget>; ROLES],

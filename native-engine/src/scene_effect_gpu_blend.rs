@@ -14,8 +14,11 @@
 //! The flat fast path is untouched: `GpuLayerStack::from_plan` refuses a flat
 //! plan, so a scene that needs none of these features is still painted by
 //! `Compositor::compose_object` pixel for pixel. Effect stacks, element
-//! effects, folders and mask feather are typed `Unavailable` refusals (see
-//! the stack module), never silently dropped.
+//! effects and mask feather are typed `Unavailable` refusals (see the stack
+//! module), never silently dropped. A folder is rendered like the baseline's
+//! `paint_folder_children`: its children are flattened in isolation (first
+//! child seeds a transparent accumulator, each later child blends in with its
+//! own blend mode) and that result is the folder's own paint.
 
 #[path = "scene_effect_gpu_blend_pipes.rs"]
 mod pipes;
@@ -29,7 +32,7 @@ pub(crate) use crate::compositor::scene_effect_gpu_blend::pipes::BlendKernels;
 #[allow(unused_imports)]
 pub(crate) use crate::compositor::scene_effect_gpu_blend::stack::{
     layer_runs_from_plan, GpuBlendError, GpuFill, GpuLayerInput, GpuLayerPaint, GpuLayerRun,
-    GpuLayerStack, GpuMask, GpuMaskMode, GpuStep, GpuUnavailable,
+    GpuFolderChild, GpuLayerStack, GpuMask, GpuMaskMode, GpuStep, GpuUnavailable,
 };
 
 use crate::compositor::object_target::{reserve_target_bytes, ObjectTarget, TargetReservation};
@@ -159,7 +162,12 @@ impl Compositor {
         for step in stack.steps() {
             let input = &stack.inputs()[step.layer];
             pool.ensure(self, Role::Layer, reserve)?;
-            self.render_paints(&[&input.paint], pool.view(Role::Layer), size)?;
+            match &step.folder {
+                Some(children) => {
+                    self.render_folder(&kernels, &mut pool, stack, children, reserve)?
+                }
+                None => self.render_paints(&[&input.paint], pool.view(Role::Layer), size)?,
+            }
             let mut source = Role::Layer;
             if !input.masks.is_empty() {
                 self.apply_masks(&kernels, &mut pool, input, reserve)?;
@@ -210,6 +218,8 @@ impl Compositor {
             Role::MatteA,
             Role::MatteB,
             Role::Background,
+            Role::FolderA,
+            Role::FolderB,
         ] {
             pool.release(role);
         }
@@ -262,6 +272,42 @@ impl Compositor {
         self.scene.reset();
         drop(swatches);
         rendered
+    }
+
+    /// Baseline `paint_folder_children`: flatten the folder's children, bottom-up, into a fresh transparent
+    /// accumulator pair and leave the result in `Role::Layer`, where an ordinary layer's own paint would be.
+    /// Each child's own masks and mattes are not honoured inside the folder (the baseline ignores them too).
+    fn render_folder(
+        &mut self,
+        kernels: &BlendKernels,
+        pool: &mut Pool,
+        stack: &GpuLayerStack<'_>,
+        children: &[GpuFolderChild],
+        reserve: &dyn Fn(usize) -> Result<TargetReservation, &'static str>,
+    ) -> Result<(), CompositorError> {
+        let size = pool.size();
+        for role in [Role::FolderA, Role::FolderB, Role::Aux] {
+            pool.ensure(self, role, reserve)?;
+        }
+        kernels.clear(pool.view(Role::FolderA), wgpu::Color::TRANSPARENT);
+        let (mut current, mut spare) = (Role::FolderA, Role::FolderB);
+        for child in children {
+            let paint = &stack.inputs()[child.layer].paint;
+            self.render_paints(&[paint], pool.view(Role::Aux), size)?;
+            if child.seeds {
+                kernels.copy(pool.texture(Role::Aux), pool.texture(current), size);
+            } else {
+                kernels.blend(
+                    pool.view(current),
+                    pool.view(Role::Aux),
+                    child.blend,
+                    pool.view(spare),
+                );
+                std::mem::swap(&mut current, &mut spare);
+            }
+        }
+        kernels.copy(pool.texture(current), pool.texture(Role::Layer), size);
+        Ok(())
     }
 
     /// Baseline mask combine: Add masks union (one Scene), none -> fully
@@ -323,6 +369,9 @@ mod cases;
 #[cfg(test)]
 #[path = "../tests/scene_effect_gpu_blend_controls.rs"]
 mod controls;
+#[cfg(test)]
+#[path = "../tests/scene_effect_gpu_blend_folder.rs"]
+mod folder;
 #[cfg(all(test, feature = "history"))]
 #[path = "../tests/scene_effect_gpu_blend_owner.rs"]
 mod owner;
