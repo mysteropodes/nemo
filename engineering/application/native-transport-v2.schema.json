@@ -1249,6 +1249,35 @@
                     "$ref": "#/$defs/ObjectContextTarget"
                   }
                 }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "op",
+                  "stableTarget",
+                  "placement"
+                ],
+                "properties": {
+                  "op": {
+                    "const": "order"
+                  },
+                  "stableTarget": {
+                    "$ref": "#/$defs/ObjectContextTarget"
+                  },
+                  "placement": {
+                    "enum": [
+                      "front",
+                      "back"
+                    ],
+                    "description": "#2372 Bring to front / Send to back: the named record or stored item goes to this end of its layer's stack in its cell, with a ribbon's linked fill and a texture anchor's dabs."
+                  },
+                  "frame": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The cell the step edits (the held cell a copy key has just made); absent: the target's own frame."
+                  }
+                }
               }
             ]
           }
@@ -1269,7 +1298,7 @@
           "description": "Optional (absent or false = atomic: any step the engine refuses refuses the whole batch with nothing written). true lets restyle steps the engine cannot do (a texture anchor the edit would unhide) be skipped while the rest apply; the receipt then reports skippedSteps. A batch whose every step is skipped is still refused."
         }
       },
-      "description": "#2361/#2362: 1..64 ordered create/replace/delete steps on the layers of ONE context, the scene root or a declared component (one or, for a Select spanning layers, several; a trimEnds batch is one layer) as one revision and one undo entry; the native owner refuses the whole batch when any step is refused."
+      "description": "#2361/#2362: 1..64 ordered create/replace/delete/order steps on the layers of ONE context, the scene root or a declared component (one or, for a Select spanning layers, several; a trimEnds batch is one layer) as one revision and one undo entry; the native owner refuses the whole batch when any step is refused."
     },
     "ObjectVectorEditPayload": {
       "oneOf": [

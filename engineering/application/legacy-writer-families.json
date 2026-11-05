@@ -203,9 +203,7 @@
           "setPointType",
           "booleanOp",
           "applyStrokeProfile",
-          "deleteSelStrokes",
-          "flipHorizontal",
-          "flipVertical"
+          "deleteSelStrokes"
         ]
       },
       "kinds": []
@@ -224,6 +222,7 @@
         "timeline-selection-dash-offset",
         "timeline-selection-fill-color",
         "timeline-selection-fill-enabled",
+        "timeline-selection-flip",
         "timeline-selection-miter-limit",
         "timeline-selection-opacity",
         "timeline-selection-paint-order",

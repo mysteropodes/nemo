@@ -106,7 +106,7 @@
         (receipt) => ({ strokeId: receipt.strokeId, strokeIds: receipt.strokeIds, unmapped: maps.map((map) => map.unmapped) }), context);
     }
     // #2361/#2362: ordered create/replace/delete steps on one layer as one native revision and one undo entry. Each step
-    // is {create: dict} | {copy: earlierStepIndex} | {replace: {strokeId, dict}} | {restyle: {stableTarget, style}} | {delete: strokeId} at `frame` (or the step's own `frame`); a create
+    // is {create: dict} | {copy: earlierStepIndex} | {replace: {strokeId, dict}} | {restyle: {stableTarget, style}} | {order: {stableTarget, mode}} | {delete: strokeId} at `frame` (or the step's own `frame`); a create
     // step's own `keyframe: 'copy'` keys its held cell with a copy when the batch's options do not.
     // The batch is atomic (any refused step refuses it whole); `options.skipUnavailable === true` lets the engine skip restyle steps it cannot do and report them (#2372).
     function batchStrokes(layerUid, frame, steps, options) {
@@ -126,6 +126,8 @@
         // {restyle: {stableTarget, style}} (#2372): only the style members named ({fill, stroke} hex8, width, opacity 0..1) change on a presented
         // record or stored item, the ribbon rebuilt and the text colour / image opacity taken by the engine; one entry for the whole selection.
         if (step.restyle !== undefined) { ops.push({ op: 'restyle', stableTarget: step.restyle.stableTarget, style: step.restyle.style, frame: at }); continue; }
+        // {order: {stableTarget, mode: 'front'|'back'}} (#2372 Bring to front / Send to back): the presented record or item goes to that end of its layer's stack in the cell `at`, with its linked fill or texture dabs.
+        if (step.order !== undefined) { ops.push({ op: 'order', stableTarget: step.order.stableTarget, placement: step.order.mode, frame: at }); continue; }
         // {copy: i, frame}: step i's stroke again on `frame`, sent once (#2362 multiframe stamps stay under the 64 KiB budget).
         if (step.copy !== undefined) { ops.push(Object.assign({ op: 'copy', fromStep: step.copy, frame: at }, step.placement ? { placement: step.placement } : {},
           step.keyframe === 'copy' ? { keyframe: 'copy' } : {})); continue; }

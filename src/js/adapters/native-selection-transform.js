@@ -8,7 +8,10 @@
  * A typed value fires many edits: they are coalesced per field and committed once when they stop (a scrub commits at its release); an edit of
  * another field, or of another selection, commits the pending one first. A nudge is one batch per key press (the baseline pushed one undo per
  * press); the auto-repeat presses that arrive while an earlier one is still being written are summed into the next batch. A refusal is a
- * notice, never a throw. Baseline stays: no Paper writer is reached from here. */
+ * notice, never a throw. Baseline stays: no Paper writer is reached from here.
+ * Flip horizontal / vertical (Shift+X / Shift+Alt+X, SM.flipHorizontal / flipVertical, baseline timeline.js): a mirror of the selection about the centre of
+ * its union bounds, sent through the same batch as the fields (scale(-1, 1) or (1, -1)); the engine mirrors a ribbon's centreline with its handles. An image
+ * or a text block has no stored mirror yet: the shared `unstorable` refusal names it, nothing is written. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -78,6 +81,18 @@
     }
     return { paths: paths, ids: ids, ctx: ctx };
   }
+  // The mirror a flip means: about the centre of the union of the items' bounds (baseline: bounds.unite over selectedPaths, scale(-1, 1) / (1, -1) about the centre).
+  function flipMatrix(paths, axis) {
+    var u = null;
+    paths.forEach(function (p) {
+      var b = p.bounds;
+      if (!b || ![b.x, b.y, b.width, b.height].every(Number.isFinite)) return;
+      u = u ? { l: Math.min(u.l, b.x), t: Math.min(u.t, b.y), r: Math.max(u.r, b.x + b.width), b: Math.max(u.b, b.y + b.height) } : { l: b.x, t: b.y, r: b.x + b.width, b: b.y + b.height };
+    });
+    if (!u) return null;
+    var cx = (u.l + u.r) / 2, cy = (u.t + u.b) / 2;
+    return { m: axis === 'v' ? scaleAbout(1, -1, cx, cy) : scaleAbout(-1, 1, cx, cy), toast: axis === 'v' ? 'Flip vertical' : 'Flip horizontal' };
+  }
   function scaleAbout(sx, sy, ax, ay) { return [sx, 0, 0, sy, ax - sx * ax, ay - sy * ay]; }
   function turnAbout(deg, cx, cy) {
     var r = deg * Math.PI / 180, cos = Math.cos(r), sin = Math.sin(r);
@@ -111,8 +126,8 @@
     // An edit made while an earlier one of ours was committing was read before that commit re-read the selection: it follows the fresh one.
     if (job.commits !== s.commits) { if (same(ids, job.ids)) job.ctx = I.pickContext(root); }
     if (!at || !paths.length || !same(ids, job.ids) || I.pickContext(root) !== job.ctx) { notice(root, 'The selection changed — nothing was transformed.'); return { status: 'stale' }; }
-    var spec = job.kind === 'nudge' ? { m: [1, 0, 0, 1, job.dx, job.dy] } : fieldMatrix(job);
-    if (!spec) return { status: 'noop' };
+    var spec = job.kind === 'nudge' ? { m: [1, 0, 0, 1, job.dx, job.dy] } : job.kind === 'flip' ? flipMatrix(paths, job.axis) : fieldMatrix(job);
+    if (!spec) { if (job.kind === 'flip') notice(root, 'The selection could not be flipped.'); return { status: job.kind === 'flip' ? 'unavailable' : 'noop' }; }
     var status = await root.NemoNativeSelectGesture.commitMatrix(root, paths, spec.m, {
       pin: at.pin, gone: 'The selection changed — nothing was transformed.', angle: spec.angle || 0,
       stale: function () { return I.pickContext(root) !== job.ctx; } });
@@ -125,6 +140,7 @@
     var angle = spec.rot !== undefined ? spec.rot : kept;
     if (root.state && root.state.selRotAccum !== angle) { root.state.selRotAccum = angle; if (typeof root.updateUI === 'function') root.updateUI(); }
     if (root.SMEngineBridge && typeof root.SMEngineBridge.renderNow === 'function') root.SMEngineBridge.renderNow();
+    if (spec.toast && typeof root.showToast === 'function') try { root.showToast(spec.toast); } catch (_) {}
     return { status: 'applied' };
   }
   function run(root, job) {
@@ -196,7 +212,25 @@
     if (!cur) return Promise.resolve({ status: 'unavailable' });
     return run(root, { kind: 'nudge', dx: dx, dy: dy, ids: cur.ids, ctx: cur.ctx, commits: s.commits });
   }
+  // Flip the selection: `axis` 'h' (Shift+X) or 'v' (Shift+Alt+X) as ONE batch. The baseline answered a missing selection (or another tool) with the
+  // 'Select strokes' toast; a refusal otherwise is a notice. Resolves with { status }; never throws.
+  function flip(root, axis) {
+    var s = state(root), st = root.state;
+    if (axis !== 'h' && axis !== 'v') return Promise.resolve({ status: 'invalid' });
+    if (!st || st.tool !== 'select' || !(root.selectedPaths || []).length) {
+      var t = root.SM && typeof root.SM.t === 'function' ? root.SM.t('toastSelectStrokes') : 'Select strokes';
+      if (typeof root.showToast === 'function') try { root.showToast(t || 'Select strokes'); } catch (_) {} // every press, as the baseline did
+      return Promise.resolve({ status: 'noop' });
+    }
+    var why = refusal(root, false);
+    if (why && why !== 'none') { notice(root, why); return Promise.resolve({ status: 'unavailable' }); }
+    if (s.pending) return flush(root).then(function () { return flip(root, axis); }); // a typed value first, then the flip
+    if (s.inflight) return s.chain.then(function () { return flip(root, axis); }); // read the selection the commit in flight re-read
+    var cur = current(root, null);
+    if (!cur) return Promise.resolve({ status: 'unavailable' });
+    return run(root, { kind: 'flip', axis: axis, ids: cur.ids, ctx: cur.ctx, commits: s.commits });
+  }
   // Tells the user why an edit cannot be made (a legacy-only path that still ends here on a native project).
   function refuse(root, text) { notice(root, text); }
-  return Object.freeze({ edit: edit, nudge: nudge, flush: flush, handles: handles, native: native, refuse: refuse });
+  return Object.freeze({ edit: edit, nudge: nudge, flip: flip, flush: flush, handles: handles, native: native, refuse: refuse });
 }));

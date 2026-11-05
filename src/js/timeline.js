@@ -2097,6 +2097,7 @@ window.SM={
     updateUI();showToast(SM.t('toastExposureExtendedPlus')+n);
   },
   flipHorizontal:function(){
+    if(nativeFlip('h'))return;if(!n20AllowLegacyWrite('timeline-selection-flip'))return false;// #2372 A-flip-selection: a native project mirrors the selection as ONE batch
     if(state.tool!=='select'||!selectedPaths.length){showToast(SM.t('toastSelectStrokes'));return;}
     pushUndo();var bounds=null;selectedPaths.forEach(function(p){if(!bounds)bounds=p.bounds.clone();else bounds=bounds.unite(p.bounds);});
     var cx=bounds.center.x;
@@ -2108,6 +2109,7 @@ window.SM={
     saveActiveLayerFrameOrPromote();updateUI();showToast('Flip horizontal');
   },
   flipVertical:function(){
+    if(nativeFlip('v'))return;if(!n20AllowLegacyWrite('timeline-selection-flip'))return false;
     if(state.tool!=='select'||!selectedPaths.length){showToast(SM.t('toastSelectStrokes'));return;}
     pushUndo();var bounds=null;selectedPaths.forEach(function(p){if(!bounds)bounds=p.bounds.clone();else bounds=bounds.unite(p.bounds);});
     var cy=bounds.center.y;
@@ -6378,6 +6380,7 @@ function routeColorToMotion(p,prop,hex){
 }
 // #2372 SEL-STYLE: on a native object project the right panel restyles the Select selection through ONE native batch (adapters/native-selection-style.js),
 // never through the legacy Paper writers the n20 gates below refuse. True when the edit was handed to it (the caller then only updates the tool defaults).
+function nativeFlip(axis){var T=window.NemoNativeSelectionTransform;if(!T||!T.native(window))return false;T.flip(window,axis);return true;}
 function nativeSelStyle(style){
   var A=window.NemoNativeSelectionStyle;
   if(!A||!A.handles(window))return false;
