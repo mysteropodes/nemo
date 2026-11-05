@@ -73,7 +73,9 @@ pub(crate) mod raster_scene;
 // T12 / T28.media: video placements drawn from decoded source frames.
 #[path = "object_media_scene_join.rs"]
 pub(crate) mod media_scene;
-pub(crate) use paint::raster::{ordered_entries, PaintEntry, PaintIndex};
+pub(crate) use paint::raster::{
+    folder_ranks, ordered_entries, ordered_entries_ranked, PaintEntry, PaintIndex,
+};
 pub(crate) use raster_scene::declared_versions as object_raster_resource_versions;
 #[path = "object_mask_inputs.rs"]
 pub(crate) mod mask_inputs;

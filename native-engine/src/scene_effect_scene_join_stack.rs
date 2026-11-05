@@ -16,7 +16,9 @@ use crate::compositor::scene_effect_gpu_blend::{
     GpuMask, GpuMaskMode,
 };
 use crate::object_render_scene::mask_inputs::ObjectMaskMode;
-use crate::object_render_scene::scene_effect_kernels::scene_effect_order::CompositionPlan;
+use crate::object_render_scene::scene_effect_kernels::scene_effect_order::{
+    CompositionPlan, LayerStep, PaintSource, SkipReason,
+};
 use crate::object_render_scene::scene_effect_kernels::scene_effect_scene_join::SceneEffectPlan;
 use crate::object_render_scene::ObjectPaintPlan;
 
@@ -46,6 +48,48 @@ pub(crate) enum PathSelectionError {
     PlanNotCovered,
 }
 
+/// True for a layered scene whose ONLY layered feature is folders holding plain Normal layers (no blend, matte, mask,
+/// effect, effect layer or canvas background). Such a scene is the flat sequence with each folder's children moved to
+/// the folder's place (Normal compositing is associative: `folder_ranks`, applied by `compose_object`), so every family
+/// the flat path paints keeps working inside a folder: Text, images, video, components, duplicators, brushes, the
+/// camera and the outline. Any other layered scene goes to the layer stack.
+pub(crate) fn folds_only(join: &SceneEffectPlan) -> bool {
+    let CompositionPlan::Layered { background: None, steps } = join.plan() else {
+        return false;
+    };
+    let mut folders = 0;
+    for step in steps {
+        match step {
+            LayerStep::Skipped {
+                reason: SkipReason::FolderChild,
+                ..
+            } => {}
+            LayerStep::Paint(paint)
+                if paint.mask_count == 0
+                    && paint.mattes.is_empty()
+                    && !paint.layer_effects
+                    && paint.blend == 0 =>
+            {
+                match &paint.source {
+                    PaintSource::Plain => {}
+                    PaintSource::Folder(children) => {
+                        folders += 1;
+                        if children
+                            .iter()
+                            .any(|c| c.item_effects || c.layer_effects || c.blend != 0)
+                        {
+                            return false;
+                        }
+                    }
+                    PaintSource::ElementEffects => return false,
+                }
+            }
+            _ => return false,
+        }
+    }
+    folders > 0
+}
+
 /// Select the compositor path for `plan`, the paint plan of the packet `join` was built from.
 pub(crate) fn select_composition_path<'a>(
     join: &SceneEffectPlan,
@@ -69,6 +113,10 @@ pub(crate) fn select_composition_path<'a>(
         {
             return Err(PathSelectionError::WrongPlan);
         }
+        return Ok(PathSelection::Flat);
+    }
+    // Folders only: the flat sequence, folded (see `folds_only`); `compose_object` applies the same ranks.
+    if plan.mask_inputs().layers().is_empty() && folds_only(join) {
         return Ok(PathSelection::Flat);
     }
     let runs = layer_runs_from_plan(plan).map_err(PathSelectionError::Stack)?;
