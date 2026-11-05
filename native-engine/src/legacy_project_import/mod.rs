@@ -4,17 +4,31 @@
 //!
 //! Slice 1 owns: version handling, the frames-only/legacyCurve/timeLinkOffsets/effectorChannels/matte migrations, canvas and
 //! project settings, drawing layers (name, visibility, lock, colour, shy, parent, `layerUid`), keyframes and plain
-//! vector strokes with their `strokeId`. Every field family a later slice owns and that holds content refuses with the
+//! vector strokes with their `strokeId`. Slice 2 adds the animation families: Motion (`motion`, `motionStatic`,
+//! `elementMotion`, `expressions`, `exprControls`, the `order` property), blend and mattes, Null, Guide, Widget and Folder
+//! layers with the folder table, the stored range with time link and markers, key lock, 3D and follow path, components
+//! (`symbols` and their instance layers), duplicators and effector layers, the StoryBoard, tween records, generated tween
+//! frames, motion arcs and the camera track. Every field family a later slice owns and that holds content refuses with the
 //! typed `legacy_unsupported_field` naming the JSON path, so nothing is ever lost silently. Editor-only preferences are
 //! listed in `ignored`; unknown members and baseline-hidden data are listed in `warnings`.
 use serde_json::{json, Map, Value};
 
 #[path = "admit.rs"]
 mod admit;
+#[path = "assemble.rs"]
+mod assemble;
 #[path = "classify.rs"]
 mod classify;
 #[path = "color.rs"]
 mod color;
+#[path = "components.rs"]
+mod components;
+#[path = "dup.rs"]
+mod dup;
+#[path = "holders.rs"]
+mod holders;
+#[path = "kinds.rs"]
+mod kinds;
 #[path = "layers.rs"]
 mod layers;
 #[path = "migrate.rs"]
@@ -25,6 +39,10 @@ mod project;
 mod stroke;
 #[path = "stroke_brush.rs"]
 mod stroke_brush;
+#[path = "storyboard.rs"]
+mod storyboard;
+#[path = "tweens.rs"]
+mod tweens;
 pub use admit::convert_admitted;
 
 pub const LEGACY_UNSUPPORTED_FIELD: &str = "legacy_unsupported_field";
@@ -172,7 +190,7 @@ pub(crate) fn convert_omitting(
         .cloned()
         .ok_or_else(|| LegacyImportError::invalid("layers", "layers must be a non-empty array"))?;
     let settings = project::read(&doc, &layer_values, &mut ctx)?;
-    let drawing = layers::build(&layer_values, settings.total, &mut ctx)?;
+    let drawing = assemble::drawing(&doc, &layer_values, settings.total, &mut ctx)?;
     classify::project_members(&doc, &mut ctx)?;
     let file = json!({"format": "nemo.native-project-document", "formatVersion": 1, "project": settings.metadata,
         "drawing": drawing, "viewportReference": null, "assets": []});
@@ -202,6 +220,12 @@ pub(crate) fn object<'a>(
         .ok_or_else(|| LegacyImportError::invalid(path, "an object is required"))
 }
 
+#[cfg(test)]
+#[path = "../../tests/legacy_project_import_animation.rs"]
+mod animation_tests;
+#[cfg(test)]
+#[path = "../../tests/legacy_project_import_families.rs"]
+mod families_tests;
 #[cfg(test)]
 #[path = "../../tests/legacy_project_import_refusals.rs"]
 mod refusal_tests;
