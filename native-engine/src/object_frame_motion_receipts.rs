@@ -237,7 +237,7 @@ pub(crate) fn remaining_holder(
         && !crate::evaluation::object_vector_kernels::render_vector_eval::motion::layer_vectors_batchable(document, target)
         && document.layers().iter().any(|l| {
             l.layer_uid() == target.layer_uid()
-                && l.visible()
+                && crate::object_frame_packet::solo_view::layer_visible("scene-root", document.layers(), l)
                 && document.objects().iter().any(|record| {
                     record.target().context_id() == target.context_id()
                         && record.target().layer_uid() == target.layer_uid()

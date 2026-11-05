@@ -20,8 +20,9 @@ pub fn viewport_solo_quality_suffix(soloed: &[String]) -> String {
 }
 
 impl ObjectCompositionWitness {
-    /// Paint only the soloed layers (and the children of a soloed folder layer) in this VIEWPORT witness. An empty set changes
-    /// nothing; a set that names no layer of the shown context leaves every item (baseline `anyLayerSoloed` reads that context
+    /// Paint only the soloed layers (and the children of a soloed folder layer) in this VIEWPORT witness. The plan must come
+    /// from a packet built with the same set open (`solo_view::enter`): this only leaves layers out, a layer whose eye is off
+    /// is in the plan only when the packet was built in the Solo view. An empty set changes nothing; a set that names no layer of the shown context leaves every item (baseline `anyLayerSoloed` reads that context
     /// only) but still belongs to the quality, since the request asked for it. An export witness refuses this form.
     pub fn with_viewport_solo(mut self, soloed: &[String]) -> Result<Self, ObjectSceneError> {
         if !self.viewport {

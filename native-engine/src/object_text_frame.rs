@@ -58,6 +58,7 @@ pub(super) fn select(
     sources: &[Option<u32>],
 ) -> Result<Vec<TextIndex>, ObjectFrameError> {
     let doc = snapshot.document();
+    let layer_visible = crate::object_frame_packet::solo_view::layer_visibility(selector.context_id, layers);
     let mut selected = Vec::new();
     if let Some(items) = doc.item_records() {
         for (entry, text) in items.text_entries().iter().enumerate() {
@@ -71,7 +72,7 @@ pub(super) fn select(
                 .iter()
                 .position(|layer| layer.layer_uid() == target.layer_uid())
                 .ok_or(ObjectFrameError::InvalidSource)?;
-            if sources[layer] == Some(target.frame()) && layers[layer].visible() {
+            if sources[layer] == Some(target.frame()) && layer_visible[layer] {
                 selected.push(TextIndex { layer, entry });
             }
         }

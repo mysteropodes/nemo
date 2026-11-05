@@ -40,8 +40,20 @@
       return value;
     }));
   }
+  // The Solo view of the layers (#2371): at most 512 bounded ids, strictly ascending (so unique); returns a frozen copy.
+  const MAX_SOLO_LAYERS = 512;
+  function copySolo(list) {
+    core.rejectRaw(list);
+    if (!Array.isArray(list) || list.length > MAX_SOLO_LAYERS) fail(`soloLayers must be a list of at most ${MAX_SOLO_LAYERS} layer ids`);
+    return core.freeze(list.map((uid, index) => {
+      core.id(uid, `soloLayers[${index}]`);
+      if (index > 0 && uid <= list[index - 1]) fail('soloLayers must be strictly ascending');
+      return uid;
+    }));
+  }
   function svgBegin(payload) {
-    core.exact(payload, ['documentSnapshotId', 'contextId', 'outputHandle', 'frames'], [], 'SVG begin');
+    core.exact(payload, ['documentSnapshotId', 'contextId', 'outputHandle', 'frames'], ['soloLayers'], 'SVG begin');
+    if (Object.prototype.hasOwnProperty.call(payload, 'soloLayers')) copySolo(payload.soloLayers);
     core.id(payload.documentSnapshotId, 'documentSnapshotId');
     if (payload.contextId !== 'scene-root') fail('contextId must be scene-root');
     core.id(payload.outputHandle, 'outputHandle');
@@ -72,7 +84,8 @@
     if (Object.prototype.hasOwnProperty.call(value, 'quality') && (typeof value.quality !== 'string' || !/^[A-Za-z0-9_-]{0,32}$/.test(value.quality))) fail('video.quality must be a short word');
   }
   function mediaBegin(payload) {
-    core.exact(payload, ['documentSnapshotId', 'contextId', 'outputHandle', 'output', 'range'], ['outputSpec', 'video'], 'media begin');
+    core.exact(payload, ['documentSnapshotId', 'contextId', 'outputHandle', 'output', 'range'], ['outputSpec', 'video', 'soloLayers'], 'media begin');
+    if (Object.prototype.hasOwnProperty.call(payload, 'soloLayers')) copySolo(payload.soloLayers);
     core.id(payload.documentSnapshotId, 'documentSnapshotId');
     if (payload.contextId !== 'scene-root') fail('contextId must be scene-root');
     core.id(payload.outputHandle, 'outputHandle');
@@ -128,7 +141,7 @@
     });
   }
   return Object.freeze(Object.assign({
-    compose, copyFrames, KINDS, FORMATS, MAX_JOB_FRAMES, MAX_SEQUENCE_FRAMES, MAX_DIMENSION, FIXED_SPEC,
+    compose, copyFrames, copySolo, KINDS, FORMATS, MAX_JOB_FRAMES, MAX_SEQUENCE_FRAMES, MAX_DIMENSION, FIXED_SPEC,
     SVG_BEGIN, SVG_STATUS, SVG_CANCEL, MEDIA_BEGIN, MEDIA_STATUS, MEDIA_CANCEL,
   }, own));
 }));

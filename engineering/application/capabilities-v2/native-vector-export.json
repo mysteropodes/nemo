@@ -55,7 +55,7 @@
       "file paths"
     ]
   },
-  "semantics": "Export up to 32 frames of the pinned snapshot as SVG through the one bounded native export job (same permit, staging, cancel, cleanup and replacement fences as the PNG job). The job publishes frame_0001.svg ... in the requested order into the host-picked destination; the receipt is the shared JobReceipt. The page never sees SVG text. Scene equivalence with the pinned PNG frame is the target (the baseline Paper exportSVG bytes are not reproducible). Unavailable until the host registers the export route; until then every caller receives typed unavailability and no legacy writer exists.",
+  "semantics": "Export up to 32 frames of the pinned snapshot as SVG through the one bounded native export job (same permit, staging, cancel, cleanup and replacement fences as the PNG job). The job publishes frame_0001.svg ... in the requested order into the host-picked destination; the receipt is the shared JobReceipt. The page never sees SVG text. Scene equivalence with the pinned PNG frame is the target (the baseline Paper exportSVG bytes are not reproducible). Unavailable until the host registers the export route; until then every caller receives typed unavailability and no legacy writer exists. An optional soloLayers member (strictly ascending layer ids, at most 512) is the Solo view of the layers: the baseline export paints only the soloed layers and the children of a soloed folder layer, whatever their eyes say; it is a session view fact and never document data.",
   "ports": [
     {
       "label": "ui",

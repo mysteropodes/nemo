@@ -271,7 +271,7 @@ pub(crate) fn produce(
         let Some(instance) = inputs.components.instance(SCENE_CONTEXT, host.layer_uid()) else {
             continue;
         };
-        if !host.visible() {
+        if !crate::object_frame_packet::solo_view::layer_visible(SCENE_CONTEXT, layers, host) {
             continue;
         }
         let outcome = evaluate_instance(packet, inputs, ports, overrides, instance, host)

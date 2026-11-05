@@ -366,3 +366,37 @@ fn the_shared_dispatcher_routes_these_operations_to_this_module() {
         &json!({})
     ));
 }
+
+/// #2371: an export of the Solo view names its layers; the set is bounded, plain ids and strictly ascending.
+#[test]
+fn the_solo_layers_member_is_optional_bounded_and_strictly_ascending() {
+    let with = |mut payload: Value, solo: Value| {
+        payload["soloLayers"] = solo;
+        payload
+    };
+    for solo in [json!([]), json!(["L1"]), json!(["L1", "L2", "folder-9"])] {
+        assert!(request(SVG_BEGIN, &with(svg(), solo.clone())), "{solo}");
+        assert!(request(MEDIA_BEGIN, &with(png_sequence(), solo.clone())), "{solo}");
+        assert!(
+            request(MEDIA_BEGIN, &with(media("sequence", "svg", json!({}), json!({})), solo.clone())),
+            "{solo}"
+        );
+    }
+    let many: Vec<String> = (0..512).map(|i| format!("L{i:04}")).collect();
+    assert!(request(SVG_BEGIN, &with(svg(), json!(many))));
+    let too_many: Vec<String> = (0..513).map(|i| format!("L{i:04}")).collect();
+    for bad in [
+        json!(too_many),
+        json!(["L2", "L1"]),
+        json!(["L1", "L1"]),
+        json!([""]),
+        json!([7]),
+        json!("L1"),
+        json!(null),
+        json!([{"layerUid":"L1"}]),
+        json!(["has space"]),
+    ] {
+        assert!(!request(SVG_BEGIN, &with(svg(), bad.clone())), "{bad}");
+        assert!(!request(MEDIA_BEGIN, &with(png_sequence(), bad.clone())), "{bad}");
+    }
+}

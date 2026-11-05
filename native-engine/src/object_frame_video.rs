@@ -59,6 +59,7 @@ pub(super) fn select(
     else {
         return Ok(Vec::new());
     };
+    let layer_visible = crate::object_frame_packet::solo_view::layer_visibility(selector.context_id, context_layers);
     let mut selected = Vec::new();
     for (placement, record) in inventory.placements().iter().enumerate() {
         let AssetTarget::Drawing {
@@ -79,7 +80,7 @@ pub(super) fn select(
             .iter()
             .position(|layer| layer.layer_uid() == layer_uid)
             .ok_or(ObjectFrameError::InvalidSource)?;
-        if source_frames[layer].is_some() && context_layers[layer].visible() {
+        if source_frames[layer].is_some() && layer_visible[layer] {
             selected.push(VideoIndex { layer, placement });
         }
     }

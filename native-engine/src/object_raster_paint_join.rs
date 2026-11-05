@@ -155,7 +155,7 @@ pub(crate) fn folder_ranks(
     let mut ranks = std::collections::BTreeMap::new();
     for (position, &index) in placed.iter().enumerate() {
         let folder = source.get(index)?;
-        if !folder.visible() || !folder.is_folder_layer() {
+        if !crate::object_frame_packet::solo_view::layer_visible(packet.context_id(), source, folder) || !folder.is_folder_layer() {
             continue;
         }
         let mut ordinal = 0;

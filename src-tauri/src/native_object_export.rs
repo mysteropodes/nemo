@@ -162,6 +162,9 @@ impl NativeObjectHost {
         {
             return Err("native object export frames are invalid".into());
         }
+        // #2371: the Solo view of this export holds while its packets, joins and media preflight are built, so a layer the
+        // Solo view shows is exported even when its eye is off, and a non-soloed effect, matte or mask layer does not apply.
+        let _solo_view = native_engine::object_frame_packet::solo_view::enter(expected.context_id, &self.preview.export_solo);
         // T12: every drawn video is preflighted (typed MissingLink) before
         // staging; its decoded frames are released once the witnesses are gone.
         let mut decoder = crate::native_dispatch::video::video_decoder();

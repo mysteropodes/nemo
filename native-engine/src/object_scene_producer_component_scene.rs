@@ -155,7 +155,10 @@ impl ComponentProduction {
             let known = packet
                 .source_layers()
                 .get(index)
-                .is_some_and(|layer| layer.visible() && layer.layer_uid() == entry.layer_uid);
+                .is_some_and(|layer| {
+                    layer.layer_uid() == entry.layer_uid
+                        && crate::object_frame_packet::solo_view::layer_visible(packet.context_id(), packet.source_layers(), layer)
+                });
             if !known {
                 return Err(ComponentJoinError::UnknownLayer {
                     source_layer_index: index,

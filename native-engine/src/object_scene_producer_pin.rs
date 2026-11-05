@@ -347,7 +347,7 @@ pub(crate) fn join_scene<T>(
         if !layers.insert(layer_index) {
             return Err(SceneJoinError::InvalidOrder);
         }
-        if !source.visible() {
+        if !crate::object_frame_packet::solo_view::layer_visible(packet.context_id(), packet.source_layers(), source) {
             continue;
         }
         for element in layer.elements() {
