@@ -7,6 +7,7 @@ use crate::object_document::{
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use action::{deserialize_action, PropertyAction};
+use pose_edit::keep_pose_position;
 use serde::Deserialize;
 use serde_json::Number;
 
@@ -22,10 +23,15 @@ mod curves;
 mod expression_edit;
 #[path = "object_property_key_batch.rs"]
 mod key_batch;
+#[path = "object_property_pose_edit.rs"]
+mod pose_edit;
 #[path = "object_property_preset_apply.rs"]
 mod preset_apply;
 #[path = "object_property_track_edit.rs"]
 mod track_edit;
+#[cfg(test)]
+#[path = "../tests/object_property_pose_edit.rs"]
+mod pose_edit_tests;
 
 #[derive(Debug)]
 struct PropertyPayload {
@@ -119,42 +125,6 @@ fn default_curve() -> Vec<OrderCurvePoint> {
 }
 fn keyed(record: &PropertyRecord) -> bool {
     record.track.value().is_some_and(|t| !t.keys.is_empty())
-}
-/// `setValue` semantics on one record: a keyed track takes a key at `frame`, a static one its static value.
-fn write_value(record: &mut PropertyRecord, frame: Number, mut values: Vec<Number>) {
-    if keyed(record) {
-        set_key(record, frame, values, None);
-    } else {
-        if let Some(before) = record.static_value.value() {
-            preserve_values(before, &mut values);
-        }
-        record.static_value = Presence::Present(values);
-    }
-}
-/// The Position that keeps every rendered point still when the anchor moves to `anchor` at `frame`:
-/// `pos + (I - R S)(anchor_old - anchor_new)`, the baseline anchor-drag compensation (`motion.js@1065e9d8` onDrag 'anchor').
-fn keep_pose_position(
-    origin: &ObjectSnapshot,
-    target: &PropertyHolderTarget,
-    frame: f64,
-    anchor: &[Number],
-) -> Result<Vec<Number>, DispatchErrorCode> {
-    let read = |property: &str, len: usize| {
-        origin
-            .sample_property_raw(target, property, frame)
-            .ok()
-            .filter(|v| v.len() == len && v.iter().all(|x| x.is_finite()))
-            .ok_or(DispatchErrorCode::Unavailable)
-    };
-    let (old, rot, scale, pos) = (read("anchor", 2)?, read("rotation", 1)?, read("scale", 2)?, read("position", 2)?);
-    let (s, c) = rot[0].to_radians().sin_cos();
-    let (sx, sy) = (scale[0] / 100.0, scale[1] / 100.0);
-    let (dx, dy) = (old[0] - finite(&anchor[0])?, old[1] - finite(&anchor[1])?);
-    let (mx, my) = (sx * c * dx - sy * s * dy, sx * s * dx + sy * c * dy);
-    [pos[0] + (dx - mx), pos[1] + (dy - my)]
-        .into_iter()
-        .map(|v| Number::from_f64(v).ok_or(DispatchErrorCode::Unavailable))
-        .collect()
 }
 fn track(record: &mut PropertyRecord) -> &mut OrderTrack {
     if record.track.missing() {
@@ -363,44 +333,24 @@ impl ObjectFillOwner {
                     finite(value)?;
                 }
                 if keep_pose {
+                    // The Position that follows an anchor edit travels in the same candidate (`follow_position` below).
                     if payload.property != "anchor" {
                         return Err(DispatchErrorCode::InvalidRequest);
                     }
                     let follow = keep_pose_position(&origin, &payload.target, at, &values)?;
                     pose_follow = Some((frame.clone(), follow));
                 }
-                write_value(&mut record, frame, values);
+                record.write_value(frame, values);
             }
             PropertyAction::SetKeyHandle {
                 frame,
                 handle,
-                mut values,
+                values,
             } => {
-                let at = finite(&frame)?;
                 if !metadata.animatable() || metadata.dimension() != 2 {
                     return Err(DispatchErrorCode::Unavailable);
                 }
-                if values.len() != 2 || !matches!(handle.as_str(), "hIn" | "hOut") {
-                    return Err(DispatchErrorCode::InvalidRequest);
-                }
-                for value in &values {
-                    finite(value)?;
-                }
-                let key = record
-                    .track
-                    .value()
-                    .and_then(|t| t.keys.iter().find(|k| k.frame.as_f64() == Some(at)))
-                    .ok_or(DispatchErrorCode::NotFound)?;
-                let slot = if handle == "hIn" { &key.h_in } else { &key.h_out };
-                if let Presence::Present(before) = slot {
-                    preserve_values(before, &mut values);
-                }
-                if let Presence::Present(t) = &mut record.track {
-                    if let Some(key) = t.keys.iter_mut().find(|k| k.frame.as_f64() == Some(at)) {
-                        *(if handle == "hIn" { &mut key.h_in } else { &mut key.h_out }) =
-                            Presence::Present(values);
-                    }
-                }
+                record.write_key_handle(finite(&frame)?, &handle, values)?;
             }
             PropertyAction::SetKey {
                 frame,
@@ -467,24 +417,7 @@ impl ObjectFillOwner {
                 holder.properties.push(record);
             }
             if let Some((frame, values)) = pose_follow {
-                holder
-                    .metadata_in_document(&document, "position")
-                    .ok_or(DispatchErrorCode::Unavailable)?;
-                let at = holder.properties.iter().position(|r| r.property == "position");
-                let mut position = at.map_or_else(
-                    || PropertyRecord {
-                        property: "position".into(),
-                        static_value: Presence::Missing,
-                        track: Presence::Missing,
-                        expression: Presence::Missing,
-                    },
-                    |i| holder.properties[i].clone(),
-                );
-                write_value(&mut position, frame, values);
-                match at {
-                    Some(i) => holder.properties[i] = position,
-                    None => holder.properties.push(position),
-                }
+                holder.follow_position(&document, frame, values)?;
             }
             if let Some(i) = index {
                 holders[i] = holder;
