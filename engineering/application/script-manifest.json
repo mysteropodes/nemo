@@ -420,6 +420,8 @@
     {"src":"js/adapters/native-layer-list-presenter.js"},
     {"src":"js/adapters/native-symmetry-desktop.js"},
     {"src":"js/adapters/native-symmetry-ui.js"},
-    {"src":"js/adapters/native-select-group.js"}
+    {"src":"js/adapters/native-select-group.js"},
+    {"src":"js/adapters/native-selection-clipboard.js"},
+    {"src":"js/adapters/native-select-menu.js"}
   ]
 }
