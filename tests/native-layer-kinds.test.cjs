@@ -86,8 +86,8 @@ test('Remove from the folder is one reparent to none, only for a member, with th
   await Kinds.leaveFolder(t.host, 0);
   assert.equal(t.s.requests.length, 0, 'a layer outside any folder is left alone');
   const items = Kinds.rowItems(t.host, 4, t.rows[4]);
-  assert.equal(items.find((i) => i.label === 'Remove from the folder').disabled, false);
-  assert.equal(Kinds.rowItems(t.host, 0, t.rows[0]).find((i) => i.label === 'Remove from the folder').disabled, true);
+  assert.equal(items.find((i) => i.label === 'Remove from the folder (parent)').disabled, false);
+  assert.equal(Kinds.rowItems(t.host, 0, t.rows[0]).find((i) => i.label === 'Remove from the folder (parent)').disabled, true);
   await Kinds.leaveFolder(t.host, 4);
   assert.deepEqual(payloads(t), [{ command: 'object.layer.folder.reparent', layerUids: ['g'], folderUid: null, frame: 3 }]);
   assert.deepEqual(t.host.toasts, ['Layer removed from the folder']);

@@ -15,7 +15,7 @@
   const WORDS = {
     layerKindFolder: 'Folder', ctxMenuInsert: 'Insert…', ctxInsertLayer: 'Insert a layer', ctxInsertLayerNull: 'Insert a Null layer',
     ctxInsertLayerFolder: 'Insert a folder', ctxInsertLayerEffect: 'Insert an effect layer', ctxInsertLayerGuide: 'Insert a Guide layer',
-    ctxInsertLayerJoystick: 'Insert a Joystick', ctxInsertLayerSlider: 'Insert a Slider', ctxRemoveFromFolderParent: 'Remove from the folder',
+    ctxInsertLayerJoystick: 'Insert a Joystick', ctxInsertLayerSlider: 'Insert a Slider', ctxRemoveFromFolderParent: 'Remove from the folder (parent)',
     ctxAddEffectorLayer: 'Add an effector layer', toastEffectorNeedsDuplicator: 'Enable the duplicator on this layer first',
     toastEffectorLayerAdded: 'Effector layer added', hsLayerRemovedFromFolder: 'Layer removed from the folder',
     toastLayerMovedToFolder: 'Layer moved into “{folder}”', toastLayersMovedToFolder: '{n} layers moved into “{folder}”',
