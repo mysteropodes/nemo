@@ -18,6 +18,7 @@ const MAPPED: &[&str] = &[
     "dashOffset",
     "paintOrder",
     "strokeId",
+    "tweenOn",
 ];
 /// Pressure-ribbon members, consumed by `stroke_brush` when `isVectorBrush` is set.
 pub(super) const BRUSH: &[&str] = &[
@@ -38,7 +39,6 @@ const LATER: &[&str] = &[
     "brushGroupId",
     "isLinkedFillCompanion",
     "linkedFillId",
-    "tweenOn",
     "boxAngle",
     "xformAnchorKey",
     "xformAnchorCustom",
