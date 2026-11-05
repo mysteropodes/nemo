@@ -200,6 +200,9 @@ mod object_selection_clipboard_dispatch;
 #[path = "../tests/object_selection_clipboard_groups.rs"]
 mod object_selection_clipboard_groups;
 #[cfg(test)]
+#[path = "../tests/object_selection_alt_drag.rs"]
+mod object_selection_alt_drag;
+#[cfg(test)]
 #[path = "../tests/object_selection_compound.rs"]
 mod object_selection_compound;
 #[cfg(test)]

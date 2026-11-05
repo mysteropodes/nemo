@@ -3762,7 +3762,7 @@ test('L02-H selection edit and clipboard transactions stay private owner/history
     ['object_selection_edit', 'object_selection_edit_tests'], ['object_selection_edit_atomic', 'object_selection_edit_atomic'],
     ['object_selection_edit_clipboard', 'object_selection_edit_clipboard'], ['object_selection_edit_controls', 'object_selection_edit_controls'],
     ['object_selection_edit_delete', 'object_selection_edit_delete'], ['object_selection_edit_duplicate', 'object_selection_edit_duplicate'],
-    ['object_selection_edit_split', 'object_selection_edit_split'], ['object_selection_edit_split_literals', 'object_selection_edit_split_literals'],
+    ['object_selection_edit_split', 'object_selection_edit_split'], ['object_selection_edit_split_literals', 'object_selection_edit_split_literals'], ['object_selection_alt_drag', 'object_selection_alt_drag'],
   ]) {
     assert.match(historyText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
   }
@@ -3791,6 +3791,7 @@ test('L02-H selection edit and clipboard transactions stay private owner/history
     ['rust.native.engine.tests', 'native-engine/tests/object_selection_edit_duplicate.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_selection_edit_split.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_selection_edit_split_literals.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_selection_alt_drag.rs'],
   ]) {
     const owner = profile.modules.find((entry) => entry.id === id);
     assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
