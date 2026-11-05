@@ -188,8 +188,14 @@
       exact(value, ['atRevision', 'documentSnapshotId', 'view'], [], 'property read');
       revision(value.atRevision, 'atRevision'); objectUid(value.documentSnapshotId);
       const view = value.view;
-      if (!plain(view) || !['rawSample', 'authoredKeys', 'expressionContext', 'expressionState', 'expressionSource'].includes(view.kind)) {
+      if (!plain(view) || !['rawSample', 'authoredKeys', 'expressionContext', 'expressionState', 'expressionSource', 'layerBounds'].includes(view.kind)) {
         throw new TypeError('unsupported property read view');
+      }
+      if (view.kind === 'layerBounds') { // #2520: the layer's own bounds before its Motion, at an integer frame; no property name
+        exact(view, ['kind', 'target', 'frame'], [], 'property read view');
+        readTarget(view.target); frame(view.frame);
+        if (has(view.target, 'strokeId')) throw new TypeError('layer bounds name a layer');
+        return;
       }
       const fields = view.kind === 'expressionSource' ? [] : view.kind !== 'authoredKeys' ? ['frame'] : ['offset', 'limit'];
       exact(view, ['kind', 'target', 'property', ...fields], [], 'property read view');
@@ -301,7 +307,16 @@
         if (typeof e.enabled !== 'boolean' || typeof e.code !== 'string') throw new TypeError('invalid expression source');
       }
     }
+    function layerBoundsResult(value) {
+      exact(value, ['instanceId', 'documentId', 'atRevision', 'documentSnapshotId', 'kind', 'target', 'frame', 'bounds', 'parentLayerUid'], [], 'layer bounds result');
+      id(value.instanceId, 'instanceId'); id(value.documentId, 'documentId');
+      revision(value.atRevision, 'atRevision'); objectUid(value.documentSnapshotId);
+      readTarget(value.target); frame(value.frame);
+      if (!Array.isArray(value.bounds) || value.bounds.length !== 4 || !value.bounds.every(Number.isFinite)) throw new TypeError('invalid layer bounds');
+      if (value.parentLayerUid !== null) objectUid(value.parentLayerUid);
+    }
     function readResult(value) {
+      if (value && value.kind === 'layerBounds') return layerBoundsResult(value);
       const source = value && value.kind === 'expressionSource';
       const raw = value && value.kind === 'rawSample';
       const context = value && value.kind === 'expressionContext';
@@ -345,6 +360,13 @@
     }
     function readCorrelated(payload, result) {
       const view = payload.view;
+      if (view.kind === 'layerBounds') {
+        if (result.atRevision !== payload.atRevision || result.documentSnapshotId !== payload.documentSnapshotId || result.kind !== view.kind ||
+            result.frame !== view.frame || ['contextId', 'layerUid'].some(key => result.target[key] !== view.target[key]) || has(result.target, 'strokeId')) {
+          throw new TypeError('layer bounds selector mismatch');
+        }
+        return;
+      }
       if (result.atRevision !== payload.atRevision || result.documentSnapshotId !== payload.documentSnapshotId ||
           result.kind !== view.kind || result.property !== view.property ||
           ['contextId', 'layerUid', 'strokeId'].some(key => result.target[key] !== view.target[key] ||
@@ -357,7 +379,7 @@
         throw new TypeError('authored page cursor mismatch');
       }
     }
-    const readPaths = {has: name => /^(?:payload\.documentSnapshotId|result\.(?:documentSnapshotId|property)|result\.(?:self\.property|mesh\.meshId|expression\.code|evaluation\.diagnostic\.message)|payload\.view\.property|(?:payload\.view\.target|result\.target)\.(?:contextId|layerUid|strokeId))$/.test(name)};
+    const readPaths = {has: name => /^(?:payload\.documentSnapshotId|result\.(?:documentSnapshotId|property|parentLayerUid)|result\.(?:self\.property|mesh\.meshId|expression\.code|evaluation\.diagnostic\.message)|payload\.view\.property|(?:payload\.view\.target|result\.target)\.(?:contextId|layerUid|strokeId))$/.test(name)};
     return Object.freeze({ rangeResult, placementResult, cellsResult, metadataPayload, metadataResult, metadataCorrelated, editPayload, trackPayload, trackResult,
       readPayload, readResult, readCorrelated, readPaths });
   }

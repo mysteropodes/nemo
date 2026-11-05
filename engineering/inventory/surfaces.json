@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "1b1a6c2a48dd7cb35274932f0158a96d3a43edbb",
-  "describe": "v0.7.0-alpha.4-5216-g1b1a6c2a4-dirty"
+  "head": "fef03e88f23a82aa47622c5d058d40f94ec19093",
+  "describe": "v0.7.0-alpha.4-5223-gfef03e88f-dirty"
  },
- "inputsDigest": "0decc2530937f2c19fd92fb90343eacb1938672f1cc7e2f957b5b97dcb3f3087",
+ "inputsDigest": "6b5d34f800a52ac40439fa5e7bf5a9f3d5c9138aae48c95f3ba6fd9a0df6fad2",
  "states": [
   "inventoried",
   "characterized",
@@ -496,7 +496,7 @@
     "container": "assets-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 82,
+    "functionsVisited": 81,
     "via": "variable btn",
     "references": [
      "src/js/assets-panel.js:16 select()",
@@ -541,7 +541,7 @@
     "container": "assets-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 82,
+    "functionsVisited": 81,
     "via": "variable btn",
     "references": [
      "src/js/assets-panel.js:16 select()",
@@ -8290,7 +8290,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 30,
+    "functionsVisited": 31,
     "via": "variable btn",
     "references": [
      "src/js/history-panel.js:151 toggleHistoryPopover()"
@@ -14116,7 +14116,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 88,
+    "functionsVisited": 87,
     "via": "variable copyBtn",
     "references": []
    },
@@ -33503,7 +33503,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 407
+    "functionsVisited": 406
    },
    "fixtures": [
     "media",

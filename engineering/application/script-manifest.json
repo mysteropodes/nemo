@@ -162,6 +162,8 @@
     {"src":"js/adapters/native-motion-key-lock-menu.js"},
     {"src":"js/adapters/native-motion-key-edit.js"},
     {"src":"js/adapters/native-motion-key-gesture.js"},
+    {"src":"js/adapters/native-motion-canvas-math.js"},
+    {"src":"js/adapters/native-motion-canvas.js"},
     {"src":"js/adapters/native-motion-property-view.js"},
     {"src":"js/adapters/native-motion-property-keys.js"},
     {"src":"js/adapters/native-motion-property-value.js"},

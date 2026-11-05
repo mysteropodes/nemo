@@ -29,6 +29,11 @@ pub(super) fn request(value: &Value) -> bool {
                         |v| target(&v["target"]) && text(v.get("property")) && finite(&v["frame"]),
                     )
                 }
+                Some("layerBounds") => exact(&p["view"], &["kind", "target", "frame"], &[]).is_some_and(|v| {
+                    target(&v["target"])
+                        && v["target"].get("strokeId").is_none()
+                        && v["frame"].as_u64().is_some_and(|n| n <= u32::MAX as u64)
+                }),
                 Some("expressionSource") => {
                     exact(&p["view"], &["kind", "target", "property"], &[])
                         .is_some_and(|v| target(&v["target"]) && text(v.get("property")))
@@ -93,6 +98,9 @@ pub(super) fn result(document: &str, payload: &Value, value: &Value) -> bool {
         return false;
     }
     let view = &payload["view"];
+    if view["kind"] == "layerBounds" {
+        return layer_bounds(document, payload, value);
+    }
     let raw = view["kind"] == "rawSample";
     let context = view["kind"] == "expressionContext";
     let expression = view["kind"] == "expressionState";
@@ -168,6 +176,35 @@ pub(super) fn result(document: &str, payload: &Value, value: &Value) -> bool {
                             .filter(|n| *n <= u32::MAX as u64))
     };
     valid && serde_json::to_vec(value).is_ok_and(|bytes| bytes.len() <= 3072)
+}
+
+/// #2520: the `layerBounds` result echoes the pinned selector, four finite bounds and the parent uid (or null).
+fn layer_bounds(document: &str, payload: &Value, value: &Value) -> bool {
+    let view = &payload["view"];
+    exact(
+        value,
+        &[
+            "instanceId",
+            "documentId",
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "target",
+            "frame",
+            "bounds",
+            "parentLayerUid",
+        ],
+        &[],
+    )
+    .is_some()
+        && value["instanceId"].as_str().is_some_and(bounded_identifier)
+        && value["documentId"].as_str() == Some(document)
+        && ["atRevision", "documentSnapshotId", "kind", "target", "frame"]
+            .iter()
+            .all(|k| value.get(*k) == payload.get(*k).or_else(|| view.get(*k)))
+        && vector(&value["bounds"], 4)
+        && (value["parentLayerUid"].is_null() || text(value.get("parentLayerUid")))
+        && serde_json::to_vec(value).is_ok_and(|bytes| bytes.len() <= 3072)
 }
 
 fn expression_context(value: &Value) -> bool {

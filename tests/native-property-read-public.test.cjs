@@ -313,3 +313,23 @@ test('expressionSource returns the exact authored code, frameless and correlated
   const noProperty = {...q, payload:{...q.payload, view:{kind:'expressionSource', target:q.payload.view.target}}};
   assert.throws(() => SDK.validateRequest(noProperty));
 });
+
+test('layerBounds returns the layer bounds before its Motion, integer-framed, propertyless and correlated (#2520)', async () => {
+  const q = request();
+  q.payload.view = {kind:'layerBounds', target:{contextId:'scene-root', layerUid:'data:layer 雪'}, frame:3};
+  const make = (fields = {}) => {
+    const r = response(q, {});
+    const result = {instanceId:q.instanceId, documentId:q.documentId, atRevision:7, documentSnapshotId:q.payload.documentSnapshotId, kind:'layerBounds',
+      target:{...q.payload.view.target}, frame:3, bounds:[20, 30, 120, 90], parentLayerUid:null, ...fields};
+    return {...r, result};
+  };
+  for (const parent of [null, 'data:parent 雪']) { const r = make({parentLayerUid:parent}); assert.deepEqual(await read(q, r), r); }
+  const bad = [r => delete r.result.bounds, r => r.result.bounds = [1, 2, 3], r => r.result.bounds = [1, 2, 3, NaN], r => r.result.frame = 4,
+    r => r.result.kind = 'rawSample', r => r.result.property = 'opacity', r => r.result.dimension = 4, r => r.result.parentLayerUid = 7,
+    r => delete r.result.parentLayerUid, r => r.result.target.layerUid = 'foreign', r => r.result.target.strokeId = 's'];
+  for (const mutate of bad) { const r = make(); mutate(r); await assert.rejects(read(q, r)); }
+  for (const view of [{...q.payload.view, frame:-1}, {...q.payload.view, frame:1.5}, {...q.payload.view, property:'opacity'}, {...q.payload.view, target:{...q.payload.view.target, strokeId:'s'}},
+    {kind:'layerBounds', target:q.payload.view.target}]) {
+    assert.throws(() => SDK.validateRequest({...q, payload:{...q.payload, view}}));
+  }
+});

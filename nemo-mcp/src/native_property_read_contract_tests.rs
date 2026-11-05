@@ -470,3 +470,24 @@ fn expression_source_is_exact_closed_frameless_and_correlated() {
     assert!(!result("document", &p, &v));
     let _: NativeApplicationRequest = serde_json::from_value(json!({"apiVersion":2,"requestId":"source","instanceId":"instance","documentId":"document","operation":OP,"payload":p})).unwrap();
 }
+
+#[test]
+fn layer_bounds_view_is_closed_and_correlated_in_the_mcp_contract() {
+    let descriptor: Value = serde_json::from_str(include_str!("../../engineering/application/capabilities-v2/native-property-read.json")).unwrap();
+    let example = descriptor["examples"].as_array().unwrap().iter().find(|e| e["request"]["payload"]["view"]["kind"] == "layerBounds").unwrap();
+    let (p, v) = (&example["request"]["payload"], &example["response"]["result"]);
+    assert!(request(p) && result("native-object-document-1", p, v));
+    for (pointer, bad) in [("/bounds", json!([1, 2, 3])), ("/frame", json!(1)), ("/kind", json!("rawSample")), ("/parentLayerUid", json!(""))] {
+        let mut wrong = v.clone();
+        *wrong.pointer_mut(pointer).unwrap() = bad;
+        assert!(!result("native-object-document-1", p, &wrong), "{pointer}");
+    }
+    let mut extra = v.clone();
+    extra["property"] = json!("opacity");
+    assert!(!result("native-object-document-1", p, &extra));
+    for (pointer, bad) in [("/view/frame", json!(-1)), ("/view/target/strokeId", json!("s")), ("/view/property", json!("opacity"))] {
+        let mut wrong = p.clone();
+        match wrong.pointer_mut(pointer) { Some(slot) => *slot = bad, None => { let (parent, key) = pointer.rsplit_once('/').unwrap(); wrong.pointer_mut(parent).unwrap()[key] = bad; } }
+        assert!(!request(&wrong), "{pointer}");
+    }
+}
