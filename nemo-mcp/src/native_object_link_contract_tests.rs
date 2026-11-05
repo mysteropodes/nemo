@@ -142,3 +142,36 @@ fn the_layer_kind_creation_and_folder_membership_writes_are_closed_shapes() {
     unframed.as_object_mut().unwrap().remove("frame");
     assert!(!ok("layer.folder.reparent", unframed));
 }
+
+/// #2371 / #2372: the in/out bar context menu is a closed shape; the engine repeats every rule on original bytes.
+#[test]
+fn the_layer_bar_menu_write_is_a_closed_shape() {
+    let ok = |payload: Value| {
+        crate::native_contract::validate_request(&format!("{P}layer.range.arrange"), &payload)
+    };
+    let arrange = |action: &str| json!({"command":"object.layer.range.arrange","contextId":"scene-root","layerUids":["L0","L1"],"action":action,"frame":3});
+    for action in ["reset", "alignLeft", "alignCenter", "alignRight", "distribute", "flip"] {
+        assert!(ok(arrange(action)), "{action}");
+    }
+    let mut stagger = arrange("stagger");
+    stagger["step"] = json!(-4);
+    assert!(ok(stagger.clone()), "a signed whole step");
+    stagger["step"] = json!(1.5);
+    assert!(!ok(stagger), "the step is a whole number of frames");
+    assert!(!ok(arrange("shuffle")));
+    let with = |key: &str, value: Value| {
+        let mut payload = arrange("flip");
+        payload[key] = value;
+        payload
+    };
+    assert!(!ok(with("layerUids", json!([]))));
+    assert!(!ok(with("layerUids", json!(["L0", ""]))));
+    assert!(!ok(with("layerUids", json!("L0"))));
+    assert!(!ok(with("frame", json!(-1))));
+    assert!(!ok(with("contextId", json!(""))));
+    assert!(!ok(with("extra", json!(1))));
+    assert!(!ok(with("command", json!("object.layer.range.drag"))));
+    let mut unframed = arrange("flip");
+    unframed.as_object_mut().unwrap().remove("frame");
+    assert!(!ok(unframed));
+}

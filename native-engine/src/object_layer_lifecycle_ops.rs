@@ -13,6 +13,7 @@
 //! comes from the kernel and the one history entry from `NativeObjectHistory`.
 //! Lock and transform-parent decisions belong to Root F06, so the owner hands
 //! the kernel the stand-in policy that answers "unavailable".
+use crate::commands::object_fill_owner::object_frame_bulk_move::plan_arrange_json;
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::{
     plan_delete, plan_duplicate, plan_rename, plan_reorder, LayerSelection, LifecycleError,
@@ -215,6 +216,7 @@ pub(crate) enum LayerLifecycleKind {
     TimeLink,
     FollowPath,
     FolderReparent,
+    RangeArrange,
 }
 
 /// A detached candidate sealed to the snapshot it was planned from. Only this
@@ -443,6 +445,33 @@ impl ObjectFillOwner {
             payload.align,
         );
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::FollowPath, plan)
+    }
+    /// #2371 / #2372: the in/out bar context menu (reset, align, distribute, flip, stagger) as one candidate document.
+    pub(crate) fn prepare_layer_range_arrange_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedLayerLifecycle, DispatchErrorCode> {
+        let origin = self.current_snapshot();
+        let arranged = plan_arrange_json(&origin, bytes)?;
+        let changed = arranged.document != *origin.document();
+        if changed {
+            ObjectSnapshot::validate_drawing(&arranged.document)
+                .map_err(|_| DispatchErrorCode::Unavailable)?;
+        }
+        let plan = LifecyclePlan {
+            document: arranged.document,
+            changed,
+            selection: None,
+            removed: Vec::new(),
+            touched: arranged.touched,
+            spared: None,
+            created: None,
+        };
+        Ok(PreparedLayerLifecycle {
+            origin,
+            plan,
+            kind: LayerLifecycleKind::RangeArrange,
+        })
     }
     pub(crate) fn commit_layer_lifecycle(
         &mut self,

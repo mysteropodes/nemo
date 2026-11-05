@@ -3615,11 +3615,13 @@
       "dir": "src/js/adapters",
       "files": [
         "native-layer-parent.js",
+        "native-layer-range-menu.js",
         "native-motion-layer-link-rows.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-layer-parent.js",
+        "native-layer-range-menu.js",
         "native-motion-layer-link-rows.js"
       ]
     },

@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "29bcc468ac3cec543b6c1ca2ae005b2f664c3d1b",
-  "describe": "v0.7.0-alpha.4-5196-g29bcc468a-dirty"
+  "head": "7c36749d4b6cd74f092b31e645da4eae1a2f178e",
+  "describe": "v0.7.0-alpha.4-5203-g7c36749d4-dirty"
  },
- "inputsDigest": "f3fae21eff08e97bf667b734b34ec6c0a71f04eb8c06c00d655d0672b47b4248",
+ "inputsDigest": "dd19120cc80fc4bde3fe70e5f6b8de9218e694b9adfbcea40e448f3b87fbe737",
  "states": [
   "inventoried",
   "characterized",
@@ -26,16 +26,16 @@
   "native"
  ],
  "counts": {
-  "total": 933,
+  "total": 943,
   "byKind": {
    "dom": 485,
    "labs": 36,
-   "menu": 286,
+   "menu": 296,
    "sdk": 76,
    "shortcut": 50
   },
   "byStatus": {
-   "inventoried": 897,
+   "inventoried": 907,
    "unmapped": 35,
    "unavailable-with-reason": 1
   },
@@ -47,16 +47,16 @@
    "animation-rigs-expressions": 157,
    "effects-masks": 10,
    "preferences-workspace": 42,
-   "unclassified": 22,
+   "unclassified": 32,
    "labs": 61,
    "storyboard": 17
   },
   "byConsumer": {
    "native": 244,
    "export": 5,
-   "animation": 385,
+   "animation": 386,
    "history": 358,
-   "selection": 388,
+   "selection": 391,
    "render": 463,
    "persist": 403
   }
@@ -453,7 +453,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 136,
+    "functionsVisited": 103,
     "via": "variable btn",
     "references": []
    },
@@ -2310,7 +2310,7 @@
     "container": "footage-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 168,
+    "functionsVisited": 156,
     "via": "chain",
     "references": [
      "src/js/images.js:758",
@@ -2489,7 +2489,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 124,
+    "functionsVisited": 91,
     "via": "variable histBtn",
     "references": [
      "src/js/timeline.js:9019 action()"
@@ -2576,7 +2576,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 234,
+    "functionsVisited": 202,
     "via": "chain",
     "references": [
      "src/js/timeline.js:9021 action()"
@@ -2659,7 +2659,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 279,
+    "functionsVisited": 256,
     "via": "chain",
     "references": [
      "src/js/images.js:705",
@@ -3046,7 +3046,7 @@
     "container": "media-statusbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 75,
+    "functionsVisited": 59,
     "via": "variable bImg",
     "references": []
    },
@@ -3089,7 +3089,7 @@
     "container": "media-statusbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 106,
+    "functionsVisited": 94,
     "via": "variable bVid",
     "references": []
    },
@@ -3430,7 +3430,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 195,
+    "functionsVisited": 166,
     "via": "chain",
     "references": []
    },
@@ -4062,7 +4062,7 @@
     "container": "ref-pop",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 60,
+    "functionsVisited": 45,
     "via": "variable btn",
     "references": []
    },
@@ -5257,7 +5257,7 @@
     "container": "media-statusbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 85,
+    "functionsVisited": 46,
     "via": "chain",
     "references": []
    },
@@ -7437,7 +7437,7 @@
     "container": "export-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 106,
+    "functionsVisited": 67,
     "via": "variable runBtn",
     "references": []
    },
@@ -9635,7 +9635,7 @@
     "container": "effects-stack-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 79,
+    "functionsVisited": 66,
     "via": "variable addBtn",
     "references": [
      "src/js/tutorial.js:1310 check()"
@@ -9818,7 +9818,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 74,
+    "functionsVisited": 30,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3236 updatePropsContext()"
@@ -9904,7 +9904,7 @@
     "container": "p-brushpreset-row",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 69,
+    "functionsVisited": 24,
     "via": "variable btn",
     "references": [
      "src/js/timeline.js:504 setTool()"
@@ -11414,7 +11414,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 74,
+    "functionsVisited": 30,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3242 updatePropsContext()",
@@ -14412,7 +14412,7 @@
     "container": "stroke-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 73,
+    "functionsVisited": 28,
     "via": "exported ColorPicker.wireColorSwatches()",
     "references": [
      "src/js/timeline.js:3776 updateFsSelPanel()",
@@ -16096,7 +16096,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 36,
+    "functionsVisited": 18,
     "via": "variable chooseBtn",
     "references": []
    },
@@ -22532,6 +22532,292 @@
    "fixtures": []
   },
   {
+   "id": "menu:adapters/native-layer-range-menu.js:items:aligner-a-droite-out",
+   "kind": "menu",
+   "surface": "dynamic menu (items)",
+   "capability": "Aligner à droite (out)",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-layer-range-menu.js:113 items()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-layer-range-menu.js:113",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 13
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-layer-range-menu.js:items:aligner-a-gauche-in",
+   "kind": "menu",
+   "surface": "dynamic menu (items)",
+   "capability": "Aligner à gauche (in)",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-layer-range-menu.js:111 items()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-layer-range-menu.js:111",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 13
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-layer-range-menu.js:items:aligner-au-centre",
+   "kind": "menu",
+   "surface": "dynamic menu (items)",
+   "capability": "Aligner au centre",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-layer-range-menu.js:112 items()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-layer-range-menu.js:112",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 13
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-layer-range-menu.js:items:distribuer-uniformement",
+   "kind": "menu",
+   "surface": "dynamic menu (items)",
+   "capability": "Distribuer uniformément",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-layer-range-menu.js:114 items()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-layer-range-menu.js:114",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 13
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-layer-range-menu.js:items:echelonner-stagger",
+   "kind": "menu",
+   "surface": "dynamic menu (items)",
+   "capability": "Échelonner (stagger)…",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-layer-range-menu.js:115 items()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-layer-range-menu.js:115",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 43
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-layer-range-menu.js:items:inverser-l-ordre-flip",
+   "kind": "menu",
+   "surface": "dynamic menu (items)",
+   "capability": "Inverser l’ordre (flip)",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-layer-range-menu.js:116 items()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-layer-range-menu.js:116",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 13
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-layer-range-menu.js:items:inverser-la-selection",
+   "kind": "menu",
+   "surface": "dynamic menu (items)",
+   "capability": "Inverser la sélection",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-layer-range-menu.js:119 items()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "selection": 2
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-layer-range-menu.js:119",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 12
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-layer-range-menu.js:items:parent-in-time-lier-le-temps-a",
+   "kind": "menu",
+   "surface": "dynamic menu (items)",
+   "capability": "Parent in Time — lier le temps à…",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-layer-range-menu.js:105 items()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-layer-range-menu.js:105",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 41
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-layer-range-menu.js:items:reinitialiser-pleine-duree",
+   "kind": "menu",
+   "surface": "dynamic menu (items)",
+   "capability": "Réinitialiser (pleine durée)",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-layer-range-menu.js:103 items()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-layer-range-menu.js:103",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 9
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-layer-range-menu.js:items:selectionner-1-sur-2",
+   "kind": "menu",
+   "surface": "dynamic menu (items)",
+   "capability": "Sélectionner 1 sur 2",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-layer-range-menu.js:117 items()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "selection": 2
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-layer-range-menu.js:117",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 19
+   },
+   "fixtures": []
+  },
+  {
    "id": "menu:adapters/native-palette-ui.js:colors:remplacer-dans-le-calque-u2026",
    "kind": "menu",
    "surface": "dynamic menu (colors)",
@@ -24281,14 +24567,16 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {},
+   "consumers": {
+    "selection": 2
+   },
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/layer-inout.js:1570",
    "meta": {
     "i18n": null,
-    "functionsVisited": 21
+    "functionsVisited": 19
    },
    "fixtures": [
     "static-props",
@@ -24776,7 +25064,7 @@
    "source": "src/js/media-library.js:543",
    "meta": {
     "i18n": "ctxRelinkReplaceFile",
-    "functionsVisited": 126
+    "functionsVisited": 111
    },
    "fixtures": [
     "mesh",
@@ -24812,7 +25100,7 @@
    "source": "src/js/media-library.js:553",
    "meta": {
     "i18n": "ctxRelinkReplaceFile",
-    "functionsVisited": 82
+    "functionsVisited": 68
    },
    "fixtures": [
     "mesh",

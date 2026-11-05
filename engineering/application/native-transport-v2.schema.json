@@ -8542,6 +8542,23 @@
             {
               "properties": {
                 "operation": {
+                  "const": "command.document.object.layer.range.arrange"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerRangeArrangePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
                   "const": "command.document.object.tween.split"
                 },
                 "payload": {
@@ -24106,6 +24123,59 @@
               "$ref": "#/$defs/ObjectLayerSelection"
             }
           }
+        }
+      }
+    },
+    "ObjectLayerRangeArrangePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUids",
+        "action",
+        "frame"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.range.arrange"
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "layerUids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "action": {
+          "enum": [
+            "reset",
+            "alignLeft",
+            "alignCenter",
+            "alignRight",
+            "distribute",
+            "flip",
+            "stagger"
+          ]
+        },
+        "step": {
+          "type": "integer",
+          "minimum": -1000000000,
+          "maximum": 1000000000
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
         }
       }
     },
