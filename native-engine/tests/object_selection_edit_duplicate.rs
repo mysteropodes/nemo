@@ -12,6 +12,9 @@ use serde_json::{json, Value};
 // The Alt-drag compound clones (ribbon + linked fill, bitmap raster) live beside these in their own file.
 #[path = "object_selection_alt_drag.rs"]
 mod object_selection_alt_drag;
+// A dragged copy of a dynamic or gradient-filled shape, and a selection that spans layers.
+#[path = "object_selection_edit_duplicate_span.rs"]
+mod object_selection_edit_duplicate_span;
 
 fn ids(values: &[&str]) -> Vec<String> {
     values.iter().map(|id| id.to_string()).collect()

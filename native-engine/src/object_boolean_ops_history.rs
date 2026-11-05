@@ -82,11 +82,11 @@ impl NativeObjectHistory {
     }
     /// An eraser bite that continues the gesture whose entry is on top of the undo stack: the revision advances, but the
     /// entry grows to end at it instead of a second one being pushed (the baseline pushes one undo per drag). Only an entry
-    /// that ends at the current revision can be continued - an undo, a redo or any other edit in between breaks the chain.
+    /// that was left by an eraser bite and ends at the current revision can be continued - an undo, a redo or any other edit in between breaks the chain.
     fn joinable(&self) -> bool {
-        self.undo
-            .last()
-            .is_some_and(|top| top.after_revision == self.content_revision())
+        self.undo.last().is_some_and(|top| {
+            top.after_revision == self.content_revision() && self.labels.is_erase(top.after_revision)
+        })
     }
     fn commit_boolean_joined(
         &mut self,

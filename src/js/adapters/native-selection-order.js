@@ -7,7 +7,8 @@
  * the order they were selected in. The engine moves a ribbon's linked fill and a texture anchor's dabs with their owner. The selection is read
  * again at the presented revision first, so the steps name what the owner shows now against the document the click found; a document that
  * moved on writes nothing. It holds no document state, has no fallback writer and resolves to a status ('applied', 'noop', 'stale', 'refused',
- * 'failed'); a refusal is a notice, never a throw. */
+ * 'failed'); a refusal is a notice, never a throw. Baseline runs both rows in any mode: in Motion the key a held frame inherits is restacked in place
+ * (Animation 2D keys the held cell with a copy first). */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -38,7 +39,6 @@
   }
   async function send(host, mode, sel) {
     var I = host.NemoSelectCanvasIntent, Labs = host.NemoNativeObjectLabs, route = Labs && typeof Labs.desktop === 'function' ? Labs.desktop(host) : null;
-    if (host.state && host.state.appMode === 'motion') { notice(host, 'Reordering the selection is not available in Motion on native projects yet.'); return 'refused'; }
     if (!route || !I) { notice(host, 'Reordering is not available right now.'); return 'refused'; }
     if (sel.length > MAX_STEPS) { notice(host, 'Too many items to reorder at once (' + MAX_STEPS + ' at most).'); return 'refused'; }
     if (host.NemoNativeSelectionStyle && typeof host.NemoNativeSelectionStyle.flush === 'function') host.NemoNativeSelectionStyle.flush(host);
@@ -48,7 +48,7 @@
     var steps = stepsOf(layers.paths, mode);
     if (JSON.stringify(steps).length > MAX_BYTES) { notice(host, 'Too much to reorder at once — select fewer items.'); return 'refused'; }
     var result;
-    try { result = await route.batchStrokes(layers.layerUid, layers.frame, steps, { select: true }); } catch (_) { result = null; }
+    try { result = await route.batchStrokes(layers.layerUid, layers.frame, steps, { select: true, inherit: !!host.state && host.state.appMode === 'motion' }); } catch (_) { result = null; } // Motion edits the key a held frame inherits
     if (!result || (result.status !== 'applied' && result.status !== 'noop')) { notice(host, 'The selection could not be reordered (locked, hidden or unsupported items are refused).'); return 'failed'; }
     if (result.status === 'applied') {
       await reselect(host, sel);

@@ -15,10 +15,11 @@ function fixture(mode){
   const reads=Reads.create({state:()=>state,settled:async()=>{},requestId:()=>`q-${++serial}`,dispatch:async q=>{
     sent.push(q);const p=q.payload;let result;const rev=state.info.contentRevision;
     if(p.view){const {limit,...view}=p.view;
-      if(mode==='bytes'){const end=Math.min(view.cursor+1,items.length);
+      if(mode==='bytes'||mode==='bytes-pose'){const end=Math.min(view.cursor+1,items.length);
         result={...view,atRevision:rev,documentSnapshotId:state.info.documentSnapshotId,total:items.length,nextCursor:end===items.length?null:end,preview:false,items:items.slice(view.cursor,end).map(i=>({...i}))};}
       else result={...view,atRevision:rev,documentSnapshotId:state.info.documentSnapshotId,total:2,nextCursor:null,preview:false,items:items.map(i=>({...i}))};
       if(mode==='unmarked')delete result.hitTest;
+      if(mode==='pose'||mode==='bytes-pose')result.layerMatrix=[1,0,0,1,7,-3];
     }else{
       const page=p.subselect,ribbon=p.stableTarget.strokeId==='ribbon',source=page.center?outline.slice(0,18):ribbon?outline:outline.slice(0,2),total=mode==='count'&&ribbon?19:source.length;
       const end=Math.min(page.cursor+page.limit,total);
@@ -73,4 +74,15 @@ test('a repeated read of an unchanged layer (a hover) lists and pages nothing ag
   const views=f.sent.filter(q=>q.payload.view).length;
   await f.read(wanted);
   assert.equal(f.sent.filter(q=>q.payload.view).length,views+1,'the new revision lists the layer again');
+});
+
+test('the layer\'s pose rides the hit-test listing to the reader, whichever page names it, and a listing without one reads null (R-lane-a-fixes)',async()=>{
+  assert.deepEqual((await fixture('pose').read(()=>false)).layerMatrix,[1,0,0,1,7,-3]);
+  const paged=fixture('bytes-pose'),read=await paged.read(()=>false);
+  assert.equal(paged.sent.filter(q=>q.payload.view).length,2,'two pages');
+  assert.deepEqual(read.layerMatrix,[1,0,0,1,7,-3]);
+  assert.equal((await fixture().read(()=>false)).layerMatrix,null);
+  const f=fixture('pose');await f.read(()=>false);const again=await f.read(()=>false);
+  assert.deepEqual(again.layerMatrix,[1,0,0,1,7,-3],'a cached listing keeps its pose');
+  assert.equal(f.sent.filter(q=>q.payload.view).length,1);
 });

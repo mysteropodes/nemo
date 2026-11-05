@@ -459,3 +459,38 @@ fn a_duplicate_may_carry_an_alt_drag_offset_that_is_a_bounded_finite_pair() {
         assert!(!request(&format!("{P}{suffix}"), &payload), "{suffix}");
     }
 }
+
+#[test]
+fn a_duplicate_may_name_the_shapes_of_other_layers_it_also_takes() {
+    let operation = format!("{P}selection.duplicate");
+    let good = [
+        json!([{"layerUid":"layer-b","strokeIds":["s1"]}]),
+        json!([{"layerUid":"layer-b","strokeIds":["s1","s2"]},{"layerUid":"layer-c","strokeIds":["s1"]}]),
+    ];
+    for others in good {
+        let payload = patched("selection.duplicate", "others", others.clone());
+        assert!(request(&operation, &payload), "{others}");
+        assert!(envelope("selection.duplicate", payload).validate_input().is_ok(), "{others}");
+    }
+    let layers = |n: usize| Value::Array((0..n).map(|i| json!({"layerUid":format!("layer-{i}"),"strokeIds":["s"]})).collect());
+    let bad = [
+        json!([]), json!({}), json!(null), json!("layer-b"), layers(33),
+        json!([{"layerUid":"layer-b","strokeIds":[]}]),
+        json!([{"layerUid":"layer-b","strokeIds":["s1","s1"]}]),
+        json!([{"layerUid":"layer-b","strokeIds":[""]}]),
+        json!([{"layerUid":"","strokeIds":["s1"]}]),
+        json!([{"layerUid":"layer-b","strokeIds":["s1"],"extra":1}]),
+        json!([{"layerUid":"layer-b"}]),
+        json!([{"layerUid":"layer-b","strokeIds":["s1"]},{"layerUid":"layer-b","strokeIds":["s2"]}]),
+    ];
+    for others in bad {
+        let payload = patched("selection.duplicate", "others", others.clone());
+        assert!(!request(&operation, &payload), "{others}");
+        assert!(envelope("selection.duplicate", payload).validate_input().is_err(), "{others}");
+    }
+    assert!(request(&operation, &patched("selection.duplicate", "others", layers(32))), "32 layers are the most");
+    for suffix in ["selection.delete", "clipboard.copy", "clipboard.cut"] {
+        let payload = patched(suffix, "others", json!([{"layerUid":"layer-b","strokeIds":["s1"]}]));
+        assert!(!request(&format!("{P}{suffix}"), &payload), "{suffix}");
+    }
+}

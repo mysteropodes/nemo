@@ -414,3 +414,29 @@ fn point_types_are_the_four_owner_kinds_and_the_read_lists_one_valid_type_per_ve
     hit["subselect"]["hitTest"] = json!(true);
     assert!(!public_read(&hit, &marked), "a hit-test page carries no point types");
 }
+
+#[test]
+fn a_hit_test_listing_may_carry_the_layers_pose_as_six_finite_non_singular_numbers() {
+    let view = json!({"kind":"subselect","contextId":"scene-root","layerUid":"layer-a","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"limit":8,"hitTest":true});
+    let q = json!({"atRevision":7,"documentSnapshotId":"native-object:document:7","view":view});
+    let r = json!({"kind":"subselect","atRevision":7,"documentSnapshotId":"native-object:document:7","contextId":"scene-root","layerUid":"layer-a","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"total":0,"nextCursor":null,"preview":false,"hitTest":true,"items":[]});
+    assert!(public_read(&q, &r), "an empty layer lists nothing");
+    for pose in [json!([1, 0, 0, 1, 7, -3]), json!([0, 1, -1, 0, 0.5, 0.25]), json!([2, 0, 0, 0.5, 0, 0])] {
+        let mut listed = r.clone();
+        listed["layerMatrix"] = pose.clone();
+        assert!(public_read(&q, &listed), "{pose}");
+    }
+    for pose in [json!([1, 0, 0, 1, 7]), json!([1, 0, 0, 1, 7, -3, 0]), json!([1, 0, 0, 1, "7", -3]), json!([0, 0, 0, 0, 0, 0]), json!([1, 2, 2, 4, 0, 0]), json!(null), json!({}), json!(1)] {
+        let mut listed = r.clone();
+        listed["layerMatrix"] = pose.clone();
+        assert!(!public_read(&q, &listed), "{pose}");
+    }
+    // The pose belongs to the hit-test listing only.
+    let plain_view = json!({"kind":"subselect","contextId":"scene-root","layerUid":"layer-a","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"limit":8});
+    let plain_q = json!({"atRevision":7,"documentSnapshotId":"native-object:document:7","view":plain_view});
+    let mut plain = r.clone();
+    plain.as_object_mut().unwrap().remove("hitTest");
+    assert!(public_read(&plain_q, &plain));
+    plain["layerMatrix"] = json!([1, 0, 0, 1, 7, -3]);
+    assert!(!public_read(&plain_q, &plain));
+}

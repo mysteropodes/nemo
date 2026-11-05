@@ -22,7 +22,7 @@ class Element{
 
 }
 function baselineFunction(text,name){const start=text.indexOf('function '+name+'(');assert.ok(start>=0,name);let at=text.indexOf('{',start),depth=1,end=at+1;while(depth){if(text[end]==='{')depth++;if(text[end]==='}')depth--;end++;}return text.slice(start,end);}
-async function fixture(tool='rect',native=true){
+async function fixture(tool='rect',native=true,facts={}){
  let installed=false,generation=0,revision=0,hold=null,refusal=null,replyChange=null,wrongOwner=false,ack=null,binding=null;
  let rect={left:40,top:50,width:640,height:360};const records=new Map(),receipts=new Map(),calls=[],events=new Map(),log=[];
  const canvas=new Element(),area=new Element(),body=new Element(),doc=new Element();canvas.getBoundingClientRect=()=>rect;
@@ -36,7 +36,7 @@ async function fixture(tool='rect',native=true){
  const info=()=>({apiVersion:2,instanceId:'instance-A',documentId:'document-'+generation,lifecycleGeneration:generation,contentRevision:revision,
   documentSnapshotId:'native-object:document-'+generation+':'+revision,documentDigest:String(revision%10).repeat(64),byteCount:1000,
   canvasW:320,canvasH:180,totalFrames:16,fps:24,undoDepth:revision,redoDepth:0,reference:null,
-  layers:[{layerUid:'L1',name:'Drawing',visible:flags.visible,locked:flags.locked,shy:false,color:'#5FA875',parentLayerUid:null}]});
+  layers:[Object.assign({layerUid:'L1',name:'Drawing',visible:flags.visible,locked:flags.locked,shy:false,color:'#5FA875',parentLayerUid:null},facts)]});
  const root={document:doc,state:{tool,appMode:'anim2d',currentFrame:0,strokeEnabled:true,fillEnabled:true,strokeColor:'#112233',fillColor:'#44556680',
   brushSize:4,opacity:50,strokeCap:'round',strokeStyle:'solid',miterLimit:10,dashOffset:0,paintOrder:'fillFirst'},userLayers:[],selectedPaths:[],devicePixelRatio:2,
   NemoNativeObjectProject:Project,NemoNativeObjectProjectFile:Files,NemoApplicationMcpTransport:Transport,NemoNativeApplicationAdapter:SDK,NemoNativeObjectVector:Vector,
@@ -95,6 +95,7 @@ async function fixture(tool='rect',native=true){
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-symmetry.js'),'utf8'),context,{filename:'native-object-draw-symmetry.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-bitmap.js'),'utf8'),context,{filename:'native-object-draw-bitmap.js'});
  if(fs.existsSync(path.join(ROOT,'src/js/adapters/native-presentation-wait.js')))vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-presentation-wait.js'),'utf8'),context,{filename:'native-presentation-wait.js'});
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-layer-motion-pose.js'),'utf8'),context,{filename:'native-layer-motion-pose.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-shape-tool.js'),'utf8'),context,{filename:'native-object-shape-tool.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/shape-bridge.js'),'utf8'),context,{filename:'shape-bridge.js'});
  if(tool==='pen'){root.SM={setTool(t){root.state.tool=t;}};vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/pen-bridge.js'),'utf8'),context,{filename:'pen-bridge.js'});}
@@ -527,14 +528,41 @@ test('Motion mode draws shapes and Pen on a layer without a Motion transform, at
  assert.equal(res.status,'applied',JSON.stringify(f.log));assert.equal(f.calls.length,1);
  // Other modes and a layer with its own Motion transform stay refused: the baseline maps the point through the layer's Motion, which native does not yet do.
  for(const mode of ['storyboard','compose']){const g=await fixture();g.root.state.appMode=mode;assert.equal(g.area.fire('pointerdown').stopped,true);g.area.fire('pointerup',{clientX:240,clientY:210});assert.equal(g.calls.length,0,mode);assert.equal(g.body.children.length,0,mode);}
- const moving=await fixture();moving.root.state.appMode='motion';moving.root.state.layers[0].motion={position:{}};moving.area.fire('pointerdown');moving.area.fire('pointerup',{clientX:240,clientY:210});assert.equal(moving.calls.length,0);
+});
+// R-lane-a-fixes: a layer that carries Motion (the row says hasMotion; the engine's hit-test listing names its pose) stores the shape in the layer's own space,
+// at the baseline's toLocalPoint (feedback #135); Animation 2D and Motion alike. The preview keeps following the cursor in world space.
+function pose(f,matrix,seen={}){f.root.NemoSelectCanvasIntent={async layerPaths(r,wanted,centres,idx){seen.idx=idx;seen.wanted=wanted({role:'shape'},[0,0,1,1]);
+ return matrix===null?null:{pin:f.session.info(),frame:f.root.state.currentFrame,layerUid:'L1',paths:[],items:[],layerMatrix:matrix};}};}
+test('a layer with Motion stores the shape where the pose maps the pointer back to, in Animation 2D and in Motion',async()=>{
+ for(const mode of ['anim2d','motion']){
+  const f=await fixture('rect',true,{hasMotion:true});f.root.state.appMode=mode;const seen={};pose(f,[1,0,0,1,10,-5],seen);
+  f.area.fire('pointerdown');f.area.fire('pointermove',{clientX:240,clientY:210});
+  assert.match(f.body.firstChild.firstChild.attributes.d,/M 20 20/,'the preview stays at the cursor');
+  f.area.fire('pointerup',{clientX:240,clientY:210});const result=await f.root.NemoNativeShapeToolController.whenSettled();
+  assert.equal(result.status,'applied',mode);assert.equal(f.calls.length,1,mode);assert.equal(seen.idx,0);assert.equal(seen.wanted,false,'no geometry is paged to read a pose');
+  const r=f.calls[0].payload.record;assert.deepEqual(r.geometry.segments.map(s=>[s.point.x,s.point.y]),[[10,25],[90,25],[90,85],[10,85]],mode);
+  assert.deepEqual(r.vectorExt.paramShape.box,{x1:10,y1:25,x2:90,y2:85},mode);
+ }
+ const turned=await fixture('line',true,{hasMotion:true});pose(turned,[0,1,-1,0,0,0]);// a quarter turn: local = inverse of world
+ assert.equal((await turned.gesture()).status,'applied');
+ assert.deepEqual(turned.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,-20],[80,-100]]);
+});
+test('a layer without Motion reads no pose, and a pose that cannot be read draws nothing',async()=>{
+ const plain=await fixture();let reads=0;plain.root.NemoSelectCanvasIntent={async layerPaths(){reads++;return null;}};
+ assert.equal((await plain.gesture()).status,'applied');assert.equal(reads,0);
+ for(const matrix of [null,[1,0,0,1,0,0,0],[0,0,0,0,0,0]]){
+  const f=await fixture('rect',true,{hasMotion:true});pose(f,matrix);const result=await f.gesture();
+  assert.equal(result.status,'unavailable',JSON.stringify(matrix));assert.equal(f.calls.length,0,'nothing is stored at the unmapped position');
+  assert.ok(f.log.some(x=>/Motion transform could not be read/.test(x)),'said out loud');
+ }
+ const gone=await fixture('rect',true,{hasMotion:true});gone.root.NemoSelectCanvasIntent=undefined;assert.equal((await gone.gesture()).status,'unavailable');assert.equal(gone.calls.length,0);
 });
 test('a frame past the entered component is not drawable even though the scene has it',async()=>{
  const f=await fixture('rect');const leave=enter(f,'comp-a',3);f.root.state.currentFrame=5;
  const down=f.area.fire('pointerdown');assert.equal(f.calls.length,0);assert.equal(f.body.children.length,0,'no gesture started: '+down.stopped);leave();
 });
-test('a hidden, locked, parented, 3D or Motion-transformed component layer is not drawable: the gate reads the owner\'s facts like the scene',async()=>{
- for(const facts of [{visible:false},{locked:true},{parentLayerUid:'other'},{threeD:true},{hasMotion:true}]){
+test('a hidden, locked, parented or 3D component layer is not drawable: the gate reads the owner\'s facts like the scene',async()=>{
+ for(const facts of [{visible:false},{locked:true},{parentLayerUid:'other'},{threeD:true}]){
   const f=await fixture('rect');const leave=enter(f,'comp-a',8,facts);await f.session.presentPreview(2);
   f.area.fire('pointerdown');assert.equal(f.calls.length,0,JSON.stringify(facts));assert.equal(f.body.children.length,0,'no gesture started: '+JSON.stringify(facts));leave();
  }

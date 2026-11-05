@@ -44,13 +44,20 @@
       // they ride the component command route on the context the workspace controller holds, with the scene's copy-on-write key (a held component frame
       // is keyed with a copy of what it showed, so the edit never lands on the source key every held frame carries).
       // Every other Labs batch (sculpt, trim, pose stamps) is unavailable there rather than silently landing on the scene.
+      // `options.inherit === true` is Motion's held-frame rule (Animation 2D keys the held cell with a copy; Motion edits the key it inherits): no copy key is sent and each step
+      // that names a presented record is addressed to the cell that record lives in (its stable target's frame), so the shared key is edited in place.
       batchStrokes: (layerUid, frame, steps, options) => {
         const Vector = vectorRoute();
         if (!Vector) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'no_vector_route' }));
         const held = heldContext(), skip = options && options.skipUnavailable === true ? { skipUnavailable: true } : {};
-        if (held === 'scene-root') return Vector.create(session).batchStrokes(layerUid, frame, steps, Object.assign({ keyframe: 'copy' }, skip));
+        const inherit = !!options && options.inherit === true, key = inherit ? {} : { keyframe: 'copy' };
+        const sent = inherit ? steps.map((step) => {
+          const named = step.order || step.reshape || step.clone || step.restyle, at = named && named.stableTarget && named.stableTarget.frameScope && named.stableTarget.frameScope.frame;
+          return Number.isInteger(at) ? Object.assign({}, step, { frame: at }) : step;
+        }) : steps;
+        if (held === 'scene-root') return Vector.create(session).batchStrokes(layerUid, frame, sent, Object.assign(key, skip));
         if (!options || options.select !== true) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'component_labs_unavailable' }));
-        return Vector.create(session, () => held).batchStrokes(layerUid, frame, steps, Object.assign({ keyframe: 'copy' }, skip));
+        return Vector.create(session, () => held).batchStrokes(layerUid, frame, sent, Object.assign(key, skip));
       },
       createStroke: (layerUid, frame, dict, opacity) => {
         const Vector = vectorRoute();

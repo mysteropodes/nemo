@@ -82,7 +82,7 @@
   const COMBINE_MODES=['none','unite','subtract','intersect','exclude'];
   const groupPath=v=>Array.isArray(v)&&v.length>=1&&v.length<=4&&v.every(g=>exact(g,['id'],['name','mode'])&&typeof g.id==='string'&&g.id.length>0&&bytes(g.id)<=128&&(!own(g,'name')||typeof g.name==='string'&&bytes(g.name)<=256)&&(!own(g,'mode')||COMBINE_MODES.includes(g.mode)));
   function viewResult(r){
-    if(!exact(r,['kind','atRevision','documentSnapshotId','contextId','layerUid','frame','workId','viewGeneration','cursor','total','nextCursor','items','preview'],['hitTest'])||own(r,'hitTest')&&r.hitTest!==true||
+    if(!exact(r,['kind','atRevision','documentSnapshotId','contextId','layerUid','frame','workId','viewGeneration','cursor','total','nextCursor','items','preview'],['hitTest','layerMatrix'])||own(r,'hitTest')&&r.hitTest!==true||own(r,'layerMatrix')&&(!own(r,'hitTest')||!Array.isArray(r.layerMatrix)||r.layerMatrix.length!==6||!r.layerMatrix.every(Number.isFinite)||Math.abs(r.layerMatrix[0]*r.layerMatrix[3]-r.layerMatrix[1]*r.layerMatrix[2])<1e-12)||
       typeof r.preview!=='boolean'||!integer(r.total,1024)||!integer(r.cursor,r.total)||!Array.isArray(r.items)||r.items.length>8||r.cursor+r.items.length>r.total)fail('Invalid subselect selection page');
     viewPayload({atRevision:r.atRevision,documentSnapshotId:r.documentSnapshotId,view:{kind:r.kind,contextId:r.contextId,layerUid:r.layerUid,frame:r.frame,workId:r.workId,viewGeneration:r.viewGeneration,cursor:r.cursor,limit:8}});
     for(const item of r.items){
