@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "322ce8d65bb1a05d75c032e53e0cead4680199de",
-  "describe": "v0.7.0-alpha.4-5115-g322ce8d65-dirty"
+  "head": "bea78e47e4e23354dc18f4c1e778e291a66411fe",
+  "describe": "v0.7.0-alpha.4-5117-gbea78e47e-dirty"
  },
- "inputsDigest": "fe79e4bb1b69d98794433daa2b1ceb15d2ce34e4ec410c79beb3a7ad30eee80b",
+ "inputsDigest": "7aef7240cbf7c2178b8a768b709b2dc723681b9be7d01e80581679e9d1d1a238",
  "states": [
   "inventoried",
   "characterized",
@@ -26,16 +26,16 @@
   "native"
  ],
  "counts": {
-  "total": 932,
+  "total": 931,
   "byKind": {
    "dom": 485,
    "labs": 36,
-   "menu": 285,
+   "menu": 284,
    "sdk": 76,
    "shortcut": 50
   },
   "byStatus": {
-   "inventoried": 896,
+   "inventoried": 895,
    "unmapped": 35,
    "unavailable-with-reason": 1
   },
@@ -47,7 +47,7 @@
    "animation-rigs-expressions": 157,
    "effects-masks": 10,
    "preferences-workspace": 42,
-   "unclassified": 21,
+   "unclassified": 20,
    "labs": 61,
    "storyboard": 17
   },
@@ -22789,13 +22789,41 @@
    ]
   },
   {
+   "id": "menu:adapters/native-select-menu.js:pasteRow:coller",
+   "kind": "menu",
+   "surface": "dynamic menu (pasteRow)",
+   "capability": "Coller",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-select-menu.js:36 pasteRow()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-select-menu.js:36",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 7
+   },
+   "fixtures": []
+  },
+  {
    "id": "menu:adapters/native-select-menu.js:rows:aplatir",
    "kind": "menu",
    "surface": "dynamic menu (rows)",
    "capability": "Aplatir",
    "area": "unclassified",
    "handler": [
-    "src/js/adapters/native-select-menu.js:56 rows()"
+    "src/js/adapters/native-select-menu.js:57 rows()"
    ],
    "events": [
     "click"
@@ -22809,63 +22837,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:56",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 7
-   },
-   "fixtures": []
-  },
-  {
-   "id": "menu:adapters/native-select-menu.js:rows:coller",
-   "kind": "menu",
-   "surface": "dynamic menu (rows)",
-   "capability": "Coller",
-   "area": "unclassified",
-   "handler": [
-    "src/js/adapters/native-select-menu.js:39 rows()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:39",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 7
-   },
-   "fixtures": []
-  },
-  {
-   "id": "menu:adapters/native-select-menu.js:rows:coller#2",
-   "kind": "menu",
-   "surface": "dynamic menu (rows)",
-   "capability": "Coller",
-   "area": "unclassified",
-   "handler": [
-    "src/js/adapters/native-select-menu.js:44 rows()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:44",
+   "source": "src/js/adapters/native-select-menu.js:57",
    "meta": {
     "i18n": null,
     "functionsVisited": 7
@@ -22879,7 +22851,7 @@
    "capability": "Combiner (Union) — non destructif",
    "area": "unclassified",
    "handler": [
-    "src/js/adapters/native-select-menu.js:53 rows()"
+    "src/js/adapters/native-select-menu.js:54 rows()"
    ],
    "events": [
     "click"
@@ -22893,7 +22865,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:53",
+   "source": "src/js/adapters/native-select-menu.js:54",
    "meta": {
     "i18n": null,
     "functionsVisited": 7
@@ -22905,34 +22877,6 @@
    "kind": "menu",
    "surface": "dynamic menu (rows)",
    "capability": "Copier",
-   "area": "unclassified",
-   "handler": [
-    "src/js/adapters/native-select-menu.js:42 rows()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:42",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 7
-   },
-   "fixtures": []
-  },
-  {
-   "id": "menu:adapters/native-select-menu.js:rows:couper",
-   "kind": "menu",
-   "surface": "dynamic menu (rows)",
-   "capability": "Couper",
    "area": "unclassified",
    "handler": [
     "src/js/adapters/native-select-menu.js:43 rows()"
@@ -22957,13 +22901,13 @@
    "fixtures": []
   },
   {
-   "id": "menu:adapters/native-select-menu.js:rows:dissocier",
+   "id": "menu:adapters/native-select-menu.js:rows:couper",
    "kind": "menu",
    "surface": "dynamic menu (rows)",
-   "capability": "Dissocier",
+   "capability": "Couper",
    "area": "unclassified",
    "handler": [
-    "src/js/adapters/native-select-menu.js:51 rows()"
+    "src/js/adapters/native-select-menu.js:44 rows()"
    ],
    "events": [
     "click"
@@ -22977,7 +22921,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:51",
+   "source": "src/js/adapters/native-select-menu.js:44",
    "meta": {
     "i18n": null,
     "functionsVisited": 7
@@ -22985,38 +22929,10 @@
    "fixtures": []
   },
   {
-   "id": "menu:adapters/native-select-menu.js:rows:dupliquer",
+   "id": "menu:adapters/native-select-menu.js:rows:dissocier",
    "kind": "menu",
    "surface": "dynamic menu (rows)",
-   "capability": "Dupliquer",
-   "area": "unclassified",
-   "handler": [
-    "src/js/adapters/native-select-menu.js:45 rows()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:45",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 25
-   },
-   "fixtures": []
-  },
-  {
-   "id": "menu:adapters/native-select-menu.js:rows:grouper",
-   "kind": "menu",
-   "surface": "dynamic menu (rows)",
-   "capability": "Grouper",
+   "capability": "Dissocier",
    "area": "unclassified",
    "handler": [
     "src/js/adapters/native-select-menu.js:52 rows()"
@@ -23041,13 +22957,13 @@
    "fixtures": []
   },
   {
-   "id": "menu:adapters/native-select-menu.js:rows:sortir-du-groupe",
+   "id": "menu:adapters/native-select-menu.js:rows:dupliquer",
    "kind": "menu",
    "surface": "dynamic menu (rows)",
-   "capability": "Sortir du groupe",
+   "capability": "Dupliquer",
    "area": "unclassified",
    "handler": [
-    "src/js/adapters/native-select-menu.js:55 rows()"
+    "src/js/adapters/native-select-menu.js:46 rows()"
    ],
    "events": [
     "click"
@@ -23061,7 +22977,63 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:55",
+   "source": "src/js/adapters/native-select-menu.js:46",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 25
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-select-menu.js:rows:grouper",
+   "kind": "menu",
+   "surface": "dynamic menu (rows)",
+   "capability": "Grouper",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-select-menu.js:53 rows()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-select-menu.js:53",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 7
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-select-menu.js:rows:sortir-du-groupe",
+   "kind": "menu",
+   "surface": "dynamic menu (rows)",
+   "capability": "Sortir du groupe",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-select-menu.js:56 rows()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-select-menu.js:56",
    "meta": {
     "i18n": null,
     "functionsVisited": 7
