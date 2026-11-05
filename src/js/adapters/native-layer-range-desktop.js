@@ -1,4 +1,4 @@
-/* Native read-only bar rows and one ordered gesture. Rust owns range/Motion/content/Arc/history. */
+/* Native bar rows, one ordered gesture and the bar menu. Rust owns range/Motion/content/Arc/history. */
 (function(root,factory){
   var api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeLayerRangeDesktop=api;
 }(typeof globalThis==='object'?globalThis:this,function(){
@@ -179,6 +179,7 @@
     return values;
   }
   function down(root,li,row,part,event){
+    if(event.button!==undefined&&event.button!==0)return true; // a right-click opens the bar menu; it starts no drag
     event.preventDefault();event.stopPropagation();
     var w=works.get(root),s=session(root),info=s&&s.info(),controller;
     try{controller=root.NemoNativeFrameEditDesktop.install(root);}catch(_){notice(root);return true;}
@@ -254,12 +255,23 @@
     bar.classList.toggle('full-range',!r.hasCustomRange);bar.classList.toggle('has-timelink',r.hasTimeLink);
     bar.setAttribute('aria-disabled','false');return true;
   }
+  // #2371/#2372: the baseline bar menu over the pinned native rows (native-layer-range-menu.js); the revision it was built from guards every write.
+  function barMenu(root,event,li,row){
+    var menu=root.NemoNativeLayerRangeMenu,w=works.get(root),s=session(root),info=s&&s.info(),selection;
+    if(!menu||!w||!w.barUiReady||w.rows[li]!==row||!ready(root,s,info)||!same(w.info,info)||w.down||w.marquee||w.capture||
+       root.state.activeSymbolId!=null||root.state.activeCompositionId!=null){notice(root,'Native range menus are unavailable.');return;}
+    try{selection=bars(root,info);}catch(_){notice(root,'Native range menus are unavailable.');return;}
+    var rows=w.rows.map(function(r,i){var v=r.nativeRange;
+      return {layerUid:info.layers[i].layerUid,hidden:!!r.hidden,rawIn:v&&same(v.pin,info)?v.range.rawInPoint:0};});
+    menu.open(root,event,{info:info,li:li,uid:info.layers[li].layerUid,selection:selection,rows:rows,setSelection:function(values){
+      w.ports.barUi.setBarSelection(values.map(function(v){return {li:info.layers.findIndex(function(l){return l.layerUid===v.layerUid;}),part:v.part};}));}});
+  }
   function buildBar(root,row,li){var w=works.get(root);if(!w||w.rows[li]!==row)return true;
     var bar=root.document.createElement('div');bar.className='layer-inout-bar';bar.setAttribute('aria-disabled','true');
     ['in','out'].forEach(function(part){var handle=root.document.createElement('div');handle.className='layer-inout-handle '+(part==='in'?'left':'right');
       handle.addEventListener('mousedown',function(event){w.ports.barUi.onDown(li,row,part,event,handle);});bar.appendChild(handle);});
     bar.addEventListener('mousedown',function(event){if(event.target===bar)w.ports.barUi.onDown(li,row,'both',event);});
-    bar.addEventListener('contextmenu',function(event){event.preventDefault();event.stopPropagation();notice(root,'Native range menus and links are unavailable.');});
+    bar.addEventListener('contextmenu',function(event){event.preventDefault();event.stopPropagation();barMenu(root,event,li,row);});
     row.appendChild(bar);row.addEventListener('mousedown',function(event){if(event.target===row){event.preventDefault();event.stopPropagation();startMarquee(root,event);}});paint(root,row,li);return true;
   }
   function owns(root,grid,noticeNode){var w=works.get(root);return !!w&&w.grid===grid&&w.node&&w.node.parentNode===grid&&grid.children.length===2&&grid.children[0]===noticeNode&&grid.children[1]===w.node;}

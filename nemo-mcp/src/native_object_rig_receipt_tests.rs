@@ -135,7 +135,8 @@ fn the_catalog_declares_each_operation_once_under_five_owner_descriptors() {
         | "layer.followPath.set"
         | "layer.color.set"
         | "layer.kind.create"
-        | "layer.folder.reparent" => "native.object.layer-parent",
+        | "layer.folder.reparent"
+        | "layer.range.arrange" => "native.object.layer-parent",
         _ => "native.object.rig",
     };
     for &suffix in OPERATIONS.iter().chain(&LABS).chain(&TWEEN).chain(&PRESET) {
@@ -185,7 +186,7 @@ fn every_descriptor_example_is_a_valid_request_with_a_correlated_valid_response(
             seen += 1;
         }
     }
-    assert_eq!(seen, 18, "one copyable example per declared operation");
+    assert_eq!(seen, 19, "one copyable example per declared operation");
 }
 
 #[test]

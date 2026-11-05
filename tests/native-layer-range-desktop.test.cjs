@@ -1,5 +1,6 @@
 'use strict';
 // Real layer-inout handlers + Range/Desktop/Intent/Project/SDK. Only native I/O and DOM are modeled.
+// BEGIN REUSABLE REAL RANGE FIXTURE (tests/native-layer-range-menu.test.cjs compiles this region)
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const Selection=require('../src/js/layer-inout-selection.js'),Range=require('../src/js/adapters/native-layer-range-desktop.js'),Desktop=require('../src/js/adapters/native-frame-edit-desktop.js');
 const Intent=require('../src/js/adapters/native-frame-edit-intent.js'),Project=require('../src/js/adapters/native-object-project.js'),SDK=require('../src/js/adapters/native-application.js');
@@ -34,6 +35,8 @@ async function harness(options={}){
  const doc=new Node('document');doc.createElement=tag=>new Node(tag);doc.body=doc.createElement('body');doc.appendChild(doc.body);const grid=doc.createElement('div');doc.body.appendChild(grid);grid.appendChild(doc.createElement('div'));
  const root={document:doc,NemoLayerInOutSelection:Selection,FC:10,state:{currentFrame:2,activeLayerIdx:0,totalFrames:12,appMode:'motion',activeSymbolId:null,activeCompositionId:null,layers:[{layerUid:'alpha'},{layerUid:'beta'}]},_layerSel:[],_sel:{frames:[]},events:new Map(),notices:[]};
  root.addEventListener=(k,f)=>root.events.set(k,f);root.showToast=m=>root.notices.push(m);
+ Object.assign(root,{menus:[],showContextMenu:(x,y,items)=>root.menus.push({x,y,items}),NemoNativeObjectRigCommand:require('../src/js/adapters/native-object-rig-command.js'),NemoNativeObjectRigContract:require('../src/js/adapters/native-object-rig-contract.js'),
+  NemoNativeLayerRangeMenu:require('../src/js/adapters/native-layer-range-menu.js'),NemoNativeLayerParent:require('../src/js/adapters/native-layer-parent.js')});
  for(const layer of root.state.layers)for(const field of ['inPoint','outPoint','frames','timeLink'])Object.defineProperty(layer,field,{get(){legacy++;throw Error('LEGACY '+field);}});
  const queuedPublic=[],calls=[],info=()=>({apiVersion:2,instanceId:'range-instance',documentId:'range-document',lifecycleGeneration:1,contentRevision:revision,documentSnapshotId:'range-snapshot-'+revision,
   documentDigest:String(revision).repeat(64),byteCount:1200,canvasW:320,canvasH:180,fps:24,totalFrames:12,layers:[{layerUid:'alpha'},{layerUid:'beta'}],reference:null,undoDepth:revision,redoDepth:0});
@@ -49,6 +52,8 @@ async function harness(options={}){
    return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,
     result:{kind:'layerRange',instanceId:q.instanceId,documentId:q.documentId,...selector,range:{...resolved}}};
   }
+  if(/^command\.document\.object\.layer\.(range\.arrange|timeLink\.set)$/.test(q.operation)){if(options.arrangeRefusal)return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:false,error:{code:options.arrangeRefusal,message:'refused'}};
+   revision++;return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1}};}
   assert.equal(q.operation,OP);if(gate)await gate.promise;revision++;
   return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1}};
  }
@@ -100,6 +105,7 @@ async function harness(options={}){
   async settle(){for(let i=0;i<30&&controller.isPending();i++)await turn();assert.equal(controller.isPending(),false);await turn();await turn();}};
 }
 
+// END REUSABLE REAL RANGE FIXTURE
 test('real layer-inout native mount and handles render only qualified raw D27 points, never legacy ranges',async()=>{
  const h=await harness();assert.equal(h.rows().length,2);assert.equal(h.bar(0).style.left,'-25px');assert.equal(h.bar(0).style.width,'175px');assert.equal(h.bar(0).attrs['aria-disabled'],'false');
  assert.equal(h.legacy(),0);assert.equal(h.commands().length,0);assert.equal(h.calls.filter(c=>c.q?.payload?.view==='range').length,2);

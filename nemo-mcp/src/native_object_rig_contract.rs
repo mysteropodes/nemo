@@ -35,10 +35,11 @@ const SPEC: &str = r####"{
 "layer.followPath.set": {"command":"object.layer.followPath.set","result":"command","node":{"t":"obj","req":{"contextId":{"t":"str","min":1,"max":256},"layerUid":{"t":"str","min":1,"max":128},"targetLayerUid":{"t":"oneOf","cases":[{"t":"str","min":1,"max":128},{"t":"null"}]}},"opt":{"align":{"t":"bool"}}}},
 "layer.color.set": {"command":"object.layer.color.set","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":128},"color":{"t":"str","min":7,"max":7}},"opt":{"selected":{"t":"arr","min":0,"max":128,"of":{"t":"str","min":1,"max":128}}}}},
 "layer.kind.create": {"command":"object.layer.kind.create","result":"created","node":{"t":"obj","req":{"kind":{"t":"enum","v":["null","effect","guide","folder","effector"]},"name":{"t":"str","min":0,"max":256},"frame":{"t":"int","min":0,"max":4294967295}},"opt":{"pos":{"t":"pair","abs":1000000000},"children":{"t":"arr","min":0,"max":128,"of":{"t":"str","min":1,"max":128}},"target":{"t":"str","min":1,"max":128}}}},
-"layer.folder.reparent": {"command":"object.layer.folder.reparent","result":"command","node":{"t":"obj","req":{"layerUids":{"t":"arr","min":1,"max":128,"of":{"t":"str","min":1,"max":128}},"folderUid":{"t":"oneOf","cases":[{"t":"str","min":1,"max":128},{"t":"null"}]},"frame":{"t":"int","min":0,"max":4294967295}},"opt":{"reorder":{"t":"obj","req":{"gap":{"t":"num","abs":1000000000},"selection":{"t":"obj","req":{"active":{"t":"str","min":1,"max":128},"selected":{"t":"arr","min":0,"max":128,"of":{"t":"str","min":1,"max":128}}},"opt":{"anchor":{"t":"oneOf","cases":[{"t":"str","min":1,"max":128},{"t":"null"}]}}}}}}}}
+"layer.folder.reparent": {"command":"object.layer.folder.reparent","result":"command","node":{"t":"obj","req":{"layerUids":{"t":"arr","min":1,"max":128,"of":{"t":"str","min":1,"max":128}},"folderUid":{"t":"oneOf","cases":[{"t":"str","min":1,"max":128},{"t":"null"}]},"frame":{"t":"int","min":0,"max":4294967295}},"opt":{"reorder":{"t":"obj","req":{"gap":{"t":"num","abs":1000000000},"selection":{"t":"obj","req":{"active":{"t":"str","min":1,"max":128},"selected":{"t":"arr","min":0,"max":128,"of":{"t":"str","min":1,"max":128}}},"opt":{"anchor":{"t":"oneOf","cases":[{"t":"str","min":1,"max":128},{"t":"null"}]}}}}}}}},
+"layer.range.arrange": {"command":"object.layer.range.arrange","result":"command","node":{"t":"obj","req":{"contextId":{"t":"str","min":1,"max":256},"layerUids":{"t":"arr","min":1,"max":128,"of":{"t":"str","min":1,"max":128}},"action":{"t":"enum","v":["reset","alignLeft","alignCenter","alignRight","distribute","flip","stagger"]},"frame":{"t":"int","min":0,"max":4294967295}},"opt":{"step":{"t":"int","min":-1000000000,"max":1000000000}}}}
 }"####;
 
-const DECLARED: [&str; 26] = [
+const DECLARED: [&str; 27] = [
     "image.mesh.edit",
     "widget.create",
     "widget.write",
@@ -65,6 +66,7 @@ const DECLARED: [&str; 26] = [
     "layer.color.set",
     "layer.kind.create",
     "layer.folder.reparent",
+    "layer.range.arrange",
 ];
 fn parse_table(source: &str) -> Map<String, Value> {
     match serde_json::from_str::<Value>(source) {
