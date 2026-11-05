@@ -2162,6 +2162,34 @@
                   "type": "number"
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "frames"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "setTotalFrames"
+                },
+                "frames": {
+                  "type": "number"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "trimToWorkArea"
+                }
+              }
             }
           ]
         }

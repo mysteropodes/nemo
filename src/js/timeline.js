@@ -933,18 +933,7 @@ window.SM={
   setOnionPrevOp:function(v){state.onionPrevOpacity=v;renderOS();},setOnionNextOp:function(v){state.onionNextOpacity=v;renderOS();},
   setOnionMode:function(v){state.onionMode=v;renderOS();},
   setWorkArea:function(inF,outF){var caller=window.NemoNativeProjectSettingsController;return caller&&typeof caller.edit==='function'?caller.edit({kind:'setWorkArea',inFrame:inF,outFrame:outF}):Promise.resolve({status:'unavailable'});},
-  setTotalFrames:function(v){v=Math.max(1,Math.min(999,v));saveAllLayerFrames();for(var i=0;i<state.layers.length;i++){while(state.layers[i].frames.length<v)state.layers[i].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});}state.totalFrames=v;window._totalF=v;if(state.waOut>=v)state.waOut=v-1;
-    // waIn had no clamp beside waOut's (2026-08-16): shrinking the timeline
-    // below a moved work-area start left waIn > waOut — not merely out of
-    // range but INVERTED, which draws #wa-bar as a strip starting past the
-    // end of the ruler (reproduced: 120->30 frames with waIn 50 put the whole
-    // work area at 550-880px on a 330px timeline). Clamped after waOut so the
-    // pair can never cross. Per-layer in/out and markers are deliberately NOT
-    // touched here — those are hidden by their own readers instead, so the
-    // user's ranges survive a shrink-and-grow round trip the way the frames
-    // array already does (see layerInPoint/layerOutPoint, app.js).
-    if(state.waIn>=state.waOut)state.waIn=Math.max(0,state.waOut-1);
-    window._waIn=state.waIn;window._waOut=state.waOut;if(state.currentFrame>=v)goToFrame(v-1);updateUI();},
+  setTotalFrames:function(v){var length=window.NemoNativeProjectLength;return length?length.setTotalFrames(window,v):Promise.resolve({status:'unavailable'});},
   addLayer:function(){var caller=window.NemoNativeDrawingAddController;return caller&&typeof caller.add==='function'?caller.add():Promise.resolve({status:'unavailable'});},
   // Null layer (2026-07, Motion) — AE's "Null Object": exists purely as a
   // parenting/pivot target for other layers (SMMotion's existing
@@ -1165,45 +1154,7 @@ window.SM={
   // work area and re-bases frame 0 on its start — layers, keyframes, markers
   // and the camera all shift together, or the trim would silently desync the
   // very things that were timed against it.
-  trimToWorkArea:function(){
-    // 2026-07-30 fix: the only structural layer op with no activeSymbolId/
-    // activeMontageViewId guard (~10 siblings in app.js all refuse with this
-    // same toast — convertLayerToComponent, mergeLayersIntoOne, splitLayer-
-    // IntoElements, etc.). Shrinking totalFrames here writes straight
-    // through to state.layers/state.markers/state.cameraKeys, which correctly
-    // alias the entered symbol's own data while inside one (see enterSymbol) —
-    // but sym.totalFrames is SHARED by every other instance/placement of
-    // that same symbol elsewhere in the project (other layers, other
-    // StoryBoard montages), so trimming it from inside one editing session
-    // silently reshapes all of them with no warning. Inside a montage view
-    // it's actively pointless instead: state.layers there is a throwaway
-    // synthetic per-segment array with no write-back on exit (unlike a
-    // symbol's), so the toast would claim success and every bit of it
-    // reverts the moment you leave.
-    if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
-    if(state.activeMontageViewId){showToast(SM.t('toastCloseMontageFirst'));return;}
-    var inF=state.waIn||0,outF=(state.waOut!=null?state.waOut:state.totalFrames-1);
-    if(outF<=inF){showToast(SM.t('hsWorkAreaTooShort'));return;}
-    if(inF===0&&outF===state.totalFrames-1){showToast(SM.t('toastWorkAreaAlreadyCoversAll'));return;}
-    saveAllLayerFrames();pushUndoLayers(true);
-    var n=outF-inF+1;
-    state.layers.forEach(function(ld,li){
-      ld.frames=ld.frames.slice(inF,outF+1);
-      while(ld.frames.length<n)ld.frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
-      if(ld.inPoint!=null)ld.inPoint=Math.max(0,ld.inPoint-inF);
-      if(ld.outPoint!=null)ld.outPoint=Math.max(0,Math.min(n-1,ld.outPoint-inF));
-      if(ld.markers)ld.markers=ld.markers.map(function(m){return{frame:m.frame-inF,name:m.name,color:m.color};}).filter(function(m){return m.frame>=0&&m.frame<n;});
-      if(window.SMMotion&&SMMotion.shiftLayerMotionKeys)SMMotion.shiftLayerMotionKeys(li,-inF);
-    });
-    if(state.markers)state.markers=state.markers.map(function(m){return{frame:m.frame-inF,name:m.name,color:m.color};}).filter(function(m){return m.frame>=0&&m.frame<n;});
-    if(state.cameraKeys)state.cameraKeys=state.cameraKeys.map(function(k){var c2=JSON.parse(JSON.stringify(k));c2.frame=k.frame-inF;return c2;}).filter(function(k){return k.frame>=0&&k.frame<n;});
-    state.totalFrames=n;window._totalF=n;
-    state.waIn=0;state.waOut=n-1;window._waIn=0;window._waOut=n-1;
-    state.currentFrame=Math.max(0,Math.min(n-1,state.currentFrame-inF));
-    loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
-    if(window.updateWaBar)updateWaBar();
-    showToast(SM.t('toastCompReducedToWorkArea')+n+' frames)');
-  },
+  trimToWorkArea:function(){var length=window.NemoNativeProjectLength;return length?length.trimToWorkArea(window):Promise.resolve({status:'unavailable'});},
   setLayerKeyLock:function(li,mode){
     var ld=state.layers[li==null?state.activeLayerIdx:li];if(!ld)return;
     pushUndo();

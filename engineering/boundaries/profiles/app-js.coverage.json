@@ -4558,6 +4558,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-project-length.js",
+      "moduleId": "app.native.project-length.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-layer-solo.js",
       "moduleId": "app.native.layer-solo.adapter",
       "executionClass": "document-classic",

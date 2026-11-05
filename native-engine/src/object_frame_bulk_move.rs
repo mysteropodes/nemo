@@ -475,4 +475,4 @@ mod tests;
 
 #[path = "object_layer_shift.rs"]
 mod object_layer_shift;
-pub(crate) use object_layer_shift::PreparedLayerShift;
+pub(crate) use object_layer_shift::{retime_root_layer_motion, PreparedLayerShift};

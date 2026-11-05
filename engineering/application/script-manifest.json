@@ -366,6 +366,7 @@
     {"src":"js/adapters/native-object-duplicator.js"},
     {"src":"js/adapters/native-object-duplicator-ui.js"},
     {"src":"js/adapters/native-layer-solo.js"},
+    {"src":"js/adapters/native-project-length.js"},
     {"src":"js/adapters/native-object-duplicator-panel.js"},
     {"src":"js/adapters/native-component-instance-panel.js"},
     {"src":"js/adapters/native-import-core.js"},
