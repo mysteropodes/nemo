@@ -140,7 +140,6 @@ fn common_layer_content_target(
     layer: &crate::object_document::ObjectLayer,
 ) -> bool {
     if layer.is_effect_layer()
-        || layer.is_folder_layer()
         || layer.widget.value().is_some()
         || document.duplicator_set().is_some_and(|set| {
             set.duplicator(target.context_id(), target.layer_uid())

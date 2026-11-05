@@ -1,6 +1,8 @@
 //! #2371 D36: folder membership (`layer.folder.reparent`) through the actual owner, history and dispatcher: in and out of a folder as
 //! single entries, the world pose kept (or a typed refusal), the drag-out drop that also reorders, and the typed refusals.
-use super::object_layer_kind_create::{created, kind, layer_of, position_of, refused, send};
+use super::object_layer_kind_create::{
+    created, drawn, kind, layer_of, position_of, refused, send,
+};
 use crate::history::object_history::object_layer_lifecycle_tests::{
     base, bytes, owner_of, selection, value,
 };
@@ -133,8 +135,8 @@ fn a_member_keeps_its_world_pose_across_a_translated_folder() {
 }
 
 #[test]
-fn a_rotated_folder_that_cannot_give_its_pivot_refuses_instead_of_jumping() {
-    let mut document = base(2);
+fn a_rotated_folder_gives_its_pivot_so_a_member_keeps_its_world_pose_instead_of_refusing() {
+    let mut document = drawn();
     document["layers"].as_array_mut().unwrap().push(
         json!({"layerUid":"F","name":"Folder","visible":true,"locked":false,"color":"#ffb020","parentLayerUid":null,
             "isNullLayer":true,"nullPos":[0,0],"isFolderLayer":true,"folderCollapsed":false,"effects":[],
@@ -153,13 +155,51 @@ fn a_rotated_folder_that_cannot_give_its_pivot_refuses_instead_of_jumping() {
             .push(json!({"layerUid":"F","naturalPosition":3,"order":{}}));
     }
     let mut owner = owner_of(&document);
-    refused(
+    let before = bytes(&owner);
+    let reply = send(
         &mut owner,
         "rotated",
         "folder.reparent",
         &reparent(&["L2"], Some("F")),
-        "unavailable",
     );
+    assert_eq!(
+        reply["result"],
+        json!({"applied":true,"historyEntriesAdded":1}),
+        "{reply}"
+    );
+    assert_eq!(layer_of(&owner, "L2")["parentLayerUid"], "F");
+    // the member undoes the folder's 45 degrees, so its own rotation is -45 (the translation absorbs the rest)
+    let holder = value(&owner)["propertyHolders"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|h| h["target"]["layerUid"] == "L2" && h["target"].get("strokeId").is_none())
+        .unwrap()
+        .clone();
+    let rotation = holder["properties"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["property"] == "rotation")
+        .unwrap()["static"][0]
+        .as_f64()
+        .unwrap();
+    assert!((rotation + 45.).abs() < 1e-9, "{holder}");
+    assert_ne!(position_of(&owner, "L2"), json!([2, 0]), "{holder}");
+    send(
+        &mut owner,
+        "out",
+        "folder.reparent",
+        &reparent(&["L2"], None),
+    );
+    let back = position_of(&owner, "L2");
+    assert!(
+        (back[0].as_f64().unwrap() - 2.).abs() < 1e-9 && back[1].as_f64().unwrap().abs() < 1e-9,
+        "back out: its own pose, {back}"
+    );
+    owner.undo(owner.content_revision()).unwrap();
+    owner.undo(owner.content_revision()).unwrap();
+    assert_eq!(bytes(&owner), before, "both gestures undone");
 }
 
 #[test]

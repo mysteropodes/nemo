@@ -116,10 +116,34 @@ fn witness_of(
     Ok((owner, witness.with_scene_effects(join).unwrap()))
 }
 
+/// The joined witness of any owner's head (frame 0), through the same funnel as the family documents.
+pub(super) fn witness_of_owner(owner: &NativeObjectHistory) -> ObjectCompositionWitness {
+    let snapshot = owner.acquire_snapshot(owner.content_revision()).unwrap();
+    let pins = ObjectFrameSelector {
+        instance_id: snapshot.instance_id(),
+        document_id: snapshot.document_id(),
+        content_revision: snapshot.content_revision(),
+        document_snapshot_id: snapshot.snapshot_id(),
+        context_id: "scene-root",
+        scope_kind: FrameScopeKind::Authored,
+        frame: 0,
+    };
+    let packet = prepare_object_frame(&snapshot, &pins).unwrap();
+    let scene = prepare_object_render_scene(&packet, &pins).unwrap();
+    let plan = prepare_object_paint_plan(&scene, &pins).unwrap();
+    let witness = prepare_object_composition(&plan, &pins).unwrap();
+    let join = join_of(plan.packet(), &[]);
+    witness.with_scene_effects(join).unwrap()
+}
+
 /// Both doors of one witness on one device, plus the export's PNG of the viewport's own result.
 fn run(gpu: &mut Compositor, family: &Family, witness: &ObjectCompositionWitness) -> Frame {
+    run_at(gpu, family.dims, witness)
+}
+
+fn run_at(gpu: &mut Compositor, dims: (u32, u32), witness: &ObjectCompositionWitness) -> Frame {
     use crate::compositor::object_compositor::ObjectOutputSpec;
-    let (w, h) = family.dims;
+    let (w, h) = dims;
     let snapshot = witness.plan().packet().snapshot().clone();
     let key = EvaluationKey::new(
         snapshot.snapshot_id(),
@@ -423,3 +447,6 @@ fn text_without_a_font_parser_never_reaches_a_door() {
         );
     }
 }
+
+#[path = "scene_effect_scene_join_folder.rs"]
+mod folder;
