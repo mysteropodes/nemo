@@ -1010,6 +1010,7 @@
         "object_brush_bitmap_route.rs",
         "object_tween_read.rs",
         "tween_bitmap_resources.rs",
+        "object_vector_rebake_bake.rs",
         "tween_png_encode.rs",
         "object_subselect_read.rs",
         "object_read_admission.rs",

@@ -470,3 +470,6 @@ pub(crate) mod tween_read;
 #[cfg(feature = "application")]
 #[path = "tween_bitmap_resources.rs"]
 pub(crate) mod tween_resources;
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+#[path = "object_vector_rebake_bake.rs"]
+pub(crate) mod vector_rebake;
