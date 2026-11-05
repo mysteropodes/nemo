@@ -360,7 +360,9 @@
           "desktop_viewport::ViewportDisplayFilter",
           "object_render_scene::GhostUnderlayRequest",
           "object_render_scene::GhostReceipt",
-          "history::legacy_project_import::convert_admitted",
+          "history::legacy_project_import::convert_admitted_with",
+          "history::legacy_project_import::MediaTranscoder",
+          "history::legacy_project_import::NoTranscoder",
           "history::legacy_project_import::looks_like_legacy_project"
         ],
         "rust.desktop.native.application.tests": [
@@ -505,7 +507,9 @@
         ],
         "rust.desktop.media": [
           "native_media_frame_export::NativeVideoDecoder",
-          "native_media_frame_export::NativeVideoInfo"
+          "native_media_frame_export::NativeVideoInfo",
+          "history::legacy_project_import::MediaTranscoder",
+          "history::legacy_project_import::convert_admitted_with"
         ]
       },
       "note": "The narrow native-engine host port is declared per exact desktop profile module, so bootstrap, focused tests, surface presentation and concrete resource/artifact/compositor ports cannot borrow each other's native-engine privileges. An omitted module is denied. The common nemo-mcp transport crate remains independent of native-engine and keeps the legacy shared allowlist form."

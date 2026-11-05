@@ -97,6 +97,24 @@ pub(super) fn convert(
             ctx,
         );
         kinds::apply(&path, map, uid, &env, &mut record, ctx)?;
+        classify::layer_pass(map, &mut record, ctx, &path);
+        if !instance {
+            let tags: Vec<(String, String)> = ctx
+                .group_tags
+                .iter()
+                .filter(|t| t.0 == uid)
+                .map(|t| (t.1.clone(), t.2.clone()))
+                .collect();
+            let known: HashSet<String> = set
+                .objects
+                .iter()
+                .filter(|o| o["target"]["layerUid"] == uid)
+                .filter_map(|o| o["target"]["strokeId"].as_str().map(str::to_owned))
+                .collect();
+            if let Some(table) = super::groups::table(&path, scope.context, map.get("groups"), &tags, &known, ctx)? {
+                record["groups"] = table;
+            }
+        }
         set.records.push(record);
         set.order_layers
             .push(json!({"layerUid": uid, "naturalPosition": index, "order": {}}));
@@ -325,8 +343,44 @@ fn frames(
             continue;
         }
         let (mut elements, mut records, mut used) = (Vec::new(), Vec::new(), HashSet::new());
+        let texts = super::text::plan(&frame_path, strokes, ctx)?;
+        let mut slot = 0usize;
         for (position, stroke_value) in strokes.iter().enumerate() {
             let stroke_path = format!("{frame_path}.strokes[{position}]");
+            if texts.skip.contains(&position) {
+                continue;
+            }
+            if let Some(block) = texts.roots.get(&position) {
+                let members = object(stroke_value, &stroke_path)?;
+                let stroke_id = members
+                    .get("strokeId")
+                    .and_then(Value::as_str)
+                    .filter(|s| !s.is_empty() && !used.contains(*s))
+                    .map_or_else(|| format!("legacy-text:{}:{}:{}", uid, number, position), str::to_owned);
+                used.insert(stroke_id.clone());
+                ctx.text.push(json!({"target": {"contextId": scope.context, "frameScope": {"kind": "authored", "frame": number},
+                    "layerUid": uid, "strokeId": stroke_id}, "block": block}));
+                ctx.stroke_paths.insert((uid.to_owned(), number, stroke_id.clone()), stroke_path.clone());
+                elements.push(json!({"layerUid": uid, "strokeId": stroke_id, "naturalPosition": slot, "order": {}}));
+                slot += 1;
+                ctx.strokes += 1;
+                continue;
+            }
+            if truthy(stroke_value.get("isRaster")) {
+                let members = object(stroke_value, &stroke_path)?;
+                let stroke_id = super::media::raster(
+                    &stroke_path,
+                    members,
+                    (uid, number, position),
+                    &mut used,
+                    ctx,
+                    scope.context,
+                )?;
+                elements.push(json!({"layerUid": uid, "strokeId": stroke_id, "naturalPosition": slot, "order": {}}));
+                slot += 1;
+                ctx.strokes += 1;
+                continue;
+            }
             let (mut record, stroke_id) = stroke::convert(
                 &stroke_path,
                 stroke_value,
@@ -335,7 +389,8 @@ fn frames(
                 ctx,
             )?;
             record["target"]["contextId"] = json!(scope.context);
-            elements.push(json!({"layerUid": uid, "strokeId": stroke_id, "naturalPosition": position, "order": {}}));
+            elements.push(json!({"layerUid": uid, "strokeId": stroke_id, "naturalPosition": slot, "order": {}}));
+            slot += 1;
             records.push(record);
             ctx.strokes += 1;
         }
