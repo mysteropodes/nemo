@@ -3616,7 +3616,7 @@
     target.addEventListener('pointercancel', function (e) { if (!nativePointerEvent('cancelEvent', e)) onUp(e); }, { capture: true });
     target.addEventListener('lostpointercapture', function (e) { nativePointerEvent('cancelEvent', e); }, { capture: true });
     window.addEventListener('blur', function () { if (nativePointerIntent) nativePointerIntent.cancel(); });
-    target.addEventListener('contextmenu', function (e) { if (!nativePointerEvent('cancelEvent', e)) onContext(e); }, { capture: true });
+    target.addEventListener('contextmenu', function (e) { if (!nativePointerEvent('cancelEvent', e)) { onContext(e); return; } if (shouldIntercept() && window.NemoNativeSelectMenu) window.NemoNativeSelectMenu.open(window, e); /* #2372: a native project's Select menu */ }, { capture: true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

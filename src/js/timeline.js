@@ -9593,7 +9593,7 @@ function onKeyDown(event){
     motionKeySelection:state.appMode==='motion'&&!!(window.SMMotion&&SMMotion.hasKeySelection&&SMMotion.hasKeySelection()),
     shapeSelection:selectedPaths.length>0,
     motionKeyClipboard:state.appMode==='motion'&&!!(window.SMMotion&&SMMotion.hasKeyClipboard&&SMMotion.hasKeyClipboard()),
-    canvasClipboard:!!(_canvasClip&&_canvasClip.snaps.length),frameClipboard:!!(_sel.clipboard&&_sel.clipboard.length),
+    canvasClipboard:!!(_canvasClip&&_canvasClip.snaps.length)||!!(window.NemoNativeSelectionClipboard&&NemoNativeSelectionClipboard.native(window)&&NemoNativeSelectionClipboard.hasClip(window)),frameClipboard:!!(_sel.clipboard&&_sel.clipboard.length),
     lastClipKind:window._lastClipKind,svgImport:!!window.SMSvgImport};});
   if(arb){
     if(arb.preventDefault)event.preventDefault();

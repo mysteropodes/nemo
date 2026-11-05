@@ -27,8 +27,10 @@
     return count;
   }
   function clipboardOperation(op) { return [PREFIX + 'frames.clipboard.copy', PREFIX + 'frames.clipboard.cut', PREFIX + 'frames.clipboard.paste'].indexOf(op) >= 0; }
-  function requestByteLimit(op) { return clipboardOperation(op) ? MESSAGE_BYTES : 4096; }
-  function responseByteLimit(op) { return packetResult(op) ? MESSAGE_BYTES : 4096; }
+  // The shape clipboard (object.clipboard.*, native-object-edit-contract.js) carries its clip inline: a paste request and a copy / cut reply get 64 KiB.
+  var SHAPE_CLIP_BYTES = 65536;
+  function requestByteLimit(op) { return clipboardOperation(op) ? MESSAGE_BYTES : op === 'command.document.object.clipboard.paste' ? SHAPE_CLIP_BYTES : 4096; }
+  function responseByteLimit(op) { return packetResult(op) ? MESSAGE_BYTES : op === 'command.document.object.clipboard.copy' || op === 'command.document.object.clipboard.cut' ? SHAPE_CLIP_BYTES : 4096; }
   var PREFIX = 'command.document.object.';
   // Operation -> native payload command. Clipboard records remain detached data; Rust alone validates/publishes them.
   var COMMANDS = Object.freeze({

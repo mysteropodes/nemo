@@ -202,7 +202,12 @@ fn the_catalog_declares_each_operation_once_under_five_owner_descriptors() {
         assert_eq!(descriptor["authority"]["adapterOwnsWritableMirror"], false);
         assert_eq!(descriptor["availability"]["state"], "available");
         // A Fill Brush outline carries up to 256 segments: the fill descriptor declares the engine payload bound.
-        let bound = if suffix.starts_with("fill.") { 65536 } else { 4096 };
+        // The selection-edit family carries the shape clipboard, whose clip rides inline (paste request, copy and cut reply).
+        let bound = if suffix.starts_with("fill.") || family(suffix) == "native.object.selection-edit" {
+            65536
+        } else {
+            4096
+        };
         assert_eq!(descriptor["resourceBoundary"]["maxRequestBytes"], bound, "{suffix}");
         declared += 1;
     }

@@ -1628,7 +1628,7 @@ function _materializeClones(snaps,layer,offset,srcGroups){
   if(srcGroups)_remapCombineGroups(clones,srcGroups,layer,sidMap);
   return clones;
 }
-function duplicateSelection(){
+function duplicateSelection(){ var nc=window.NemoNativeSelectionClipboard;if(nc&&nc.native(window)){nc.duplicate(window);return;} // #2372: a native project's owner clones in one transaction
   if(!allowLegacySelectionEdit(null,'select'))return;
   if(!selectedPaths.length)return;
   pushUndo();
@@ -1654,7 +1654,7 @@ function duplicateSelection(){
 // "different frame/layer" (paste exactly in place — there's no source
 // directly underneath to be confused with).
 var _canvasClip=null; // {snaps, layerIdx, frameIdx}
-function copySelection(){
+function copySelection(){ var nc=window.NemoNativeSelectionClipboard;if(nc&&nc.native(window)){nc.copy(window);return;} // #2372: a native project's owner copies in one transaction
   if(!selectedPaths.length)return;
   var snaps=selectedPaths.map(_snapshotForClone).filter(Boolean);
   if(!snaps.length)return;
@@ -1666,14 +1666,14 @@ function copySelection(){
   if(typeof window!=='undefined')window._lastClipKind='canvas';
   showToast(SM.t('toastCopied')+snaps.length+')');
 }
-function cutSelection(){
+function cutSelection(){ var nc=window.NemoNativeSelectionClipboard;if(nc&&nc.native(window)){nc.cut(window);return;} // #2372: a native project's owner cuts in one transaction
   if(!allowLegacySelectionEdit(null,'select'))return;
   if(!selectedPaths.length)return;
   copySelection();
   window.SM.deleteSelStrokes(); // pushes its own undo entry
   showToast(SM.t('toastCut')+_canvasClip.snaps.length+')');
 }
-function pasteSelection(){
+function pasteSelection(){ var nc=window.NemoNativeSelectionClipboard;if(nc&&nc.native(window)){nc.paste(window);return;} // #2372: a native project's owner pastes in one transaction
   if(!allowLegacySelectionEdit(null,'select'))return;
   if(!_canvasClip||!_canvasClip.snaps.length){showToast(SM.t('toastNothingToPaste'));return;}
   pushUndo();

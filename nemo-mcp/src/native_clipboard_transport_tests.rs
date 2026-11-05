@@ -278,3 +278,52 @@ async fn unrelated_stdio_bom_and_cr_still_count_against_original_outer_limit() {
     reader.read_to_string(&mut output).await.unwrap();
     assert_eq!(output, "null\n");
 }
+// The shape clipboard (object.clipboard.*) carries its detached clip inline: a paste request and a copy or cut reply get 64 KiB, every
+// other selection-edit operation keeps 4096 (X-shape-clipboard-duplicate).
+fn shape(op: &str) -> String {
+    format!("command.document.object.{op}")
+}
+#[test]
+fn shape_clip_budgets_are_64kib_for_the_paste_request_and_the_copy_cut_replies_only() {
+    use crate::wire::{
+        native_request_byte_limit as request_limit, native_response_byte_limit as reply_limit,
+    };
+    assert_eq!(request_limit(&shape("clipboard.paste")), 65_536);
+    assert_eq!(reply_limit(&shape("clipboard.paste")), 4096);
+    for op in ["clipboard.copy", "clipboard.cut"] {
+        assert_eq!(request_limit(&shape(op)), 4096, "{op}");
+        assert_eq!(reply_limit(&shape(op)), 65_536, "{op}");
+    }
+    for op in ["selection.delete", "selection.duplicate", "layer.split"] {
+        assert_eq!(request_limit(&shape(op)), 4096, "{op}");
+        assert_eq!(reply_limit(&shape(op)), 4096, "{op}");
+    }
+}
+#[test]
+fn a_shape_paste_request_between_4096_and_65536_bytes_is_admitted_and_one_over_is_not() {
+    let records = |count: usize| -> Vec<serde_json::Value> {
+        (0..count)
+            .map(|n| {
+                json!({"schemaVersion":1,"family":"closed-solid-fill-cubic-path",
+                "target":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},
+                    "layerUid":"layer-a","strokeId":format!("stroke-{n}")},
+                "geometry":{}})
+            })
+            .collect()
+    };
+    let paste = |count: usize| -> NativeApplicationRequest {
+        serde_json::from_value(json!({"apiVersion":2,"requestId":"shape-paste",
+            "instanceId":"instance-A","documentId":"document-A","expectedRevision":7,
+            "operation":shape("clipboard.paste"),"payload":{"command":"object.clipboard.paste",
+                "contextId":"scene-root","layerUid":"layer-a","frame":0,"mode":"motion",
+                "clip":{"contextId":"scene-root","layerUid":"layer-a","frame":0,"records":records(count)}}}))
+        .unwrap()
+    };
+    let size = |q: &NativeApplicationRequest| serde_json::to_vec(q).unwrap().len();
+    let (small, mid, over) = (paste(2), paste(100), paste(400));
+    assert!(size(&small) < 4096 && small.validate_input().is_ok());
+    assert!(size(&mid) > 4096 && size(&mid) <= 65_536, "{}", size(&mid));
+    assert!(mid.validate_input().is_ok());
+    assert!(size(&over) > 65_536, "{}", size(&over));
+    assert!(over.validate_input().is_err());
+}

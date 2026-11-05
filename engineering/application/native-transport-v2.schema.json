@@ -4728,7 +4728,7 @@
           "$ref": "#/$defs/ObjectClipboardSource"
         }
       },
-      "description": "Detached copied selection carried inline. Bounded structural declaration only: the native owner validates every record and remaps every reference atomically. The 4096-byte request envelope bounds the clip.",
+      "description": "Detached copied selection carried inline. Bounded structural declaration only: the native owner validates every record and remaps every reference atomically. A paste request carrying the clip may use 65536 encoded bytes (every other shape-edit request keeps 4096).",
       "dependentRequired": {
         "rasters": [
           "source"
@@ -5147,6 +5147,7 @@
     "ObjectClipboardPastePayload": {
       "type": "object",
       "additionalProperties": false,
+      "x-maxEncodedRequestBytes": 65536,
       "required": [
         "command",
         "contextId",
@@ -20226,8 +20227,8 @@
           ]
         }
       },
-      "description": "Retained shape clipboard from the pinned native snapshot; clipboard contextId, layerUid and requested frame match the request. Complete encoded correlated response is limited to4096 bytes; overflow refuses before cut publication.",
-      "x-maxEncodedResponseBytes": 4096
+      "description": "Retained shape clipboard from the pinned native snapshot; clipboard contextId, layerUid and requested frame match the request. Complete encoded correlated response is limited to65536 bytes; overflow refuses before cut publication.",
+      "x-maxEncodedResponseBytes": 65536
     },
     "ObjectClipboardCutPayload": {
       "type": "object",
@@ -20297,8 +20298,8 @@
           ]
         }
       },
-      "description": "Retained shape clipboard from the pinned native snapshot; clipboard contextId, layerUid and requested frame match the request. Complete encoded correlated response is limited to4096 bytes; overflow refuses before cut publication.",
-      "x-maxEncodedResponseBytes": 4096,
+      "description": "Retained shape clipboard from the pinned native snapshot; clipboard contextId, layerUid and requested frame match the request. Complete encoded correlated response is limited to65536 bytes; overflow refuses before cut publication.",
+      "x-maxEncodedResponseBytes": 65536,
       "allOf": [
         {
           "if": {

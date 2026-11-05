@@ -21,6 +21,8 @@ pub(super) fn request_limit(operation: &str) -> usize {
         || operation == "command.document.object.brush.bitmap.stroke"
         || operation.starts_with("command.document.object.tween.")
         || operation == "command.document.object.property.preset.apply"
+        // The shape clipboard paste carries its detached clip inline (the engine's own clip bound).
+        || operation == "command.document.object.clipboard.paste"
     {
         MAX_REQUEST_BYTES
     } else {

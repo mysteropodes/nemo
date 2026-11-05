@@ -82,9 +82,17 @@
     busy.add(root);
     return remove(root, sel).catch(function () { notice(root, 'The selection could not be deleted.'); return 'failed'; }).then(function (outcome) { busy.delete(root); return outcome; });
   }
+  // The context menu's "Supprimer": the same removal as the key, for the selection Select holds now (null when there is none).
+  function removeSelection(root) {
+    var sel = picked(root);
+    if (!sel) return Promise.resolve(null);
+    if (busy.has(root)) return Promise.resolve('busy');
+    busy.add(root);
+    return remove(root, sel).catch(function () { notice(root, 'The selection could not be deleted.'); return 'failed'; }).then(function (outcome) { busy.delete(root); return outcome; });
+  }
   function install(root) {
     var d = root.document;
     if (d && typeof d.addEventListener === 'function') d.addEventListener('keydown', function (e) { key(root, e); }, true);
   }
-  return Object.freeze({ install: install, key: key, picked: picked, stepsOf: stepsOf });
+  return Object.freeze({ install: install, key: key, picked: picked, stepsOf: stepsOf, removeSelection: removeSelection });
 }));
