@@ -143,10 +143,12 @@ fn deleting_a_transform_parent_asks_about_each_orphaned_child() {
     assert_eq!(got, want);
     let log = Log::default();
     let stale = plan_delete(&document, &only_parent, &log).expect("delete with a provider");
+    assert_eq!(layer_uids(&stale.document), ["L1", "L2"]);
     assert!(
-        !admitted(&stale.document),
-        "the codec still refuses the dangling parent"
+        admitted(&stale.document),
+        "the orphaned child is released, so no dangling parent reaches the codec"
     );
+    assert_eq!(stale.document.layers[1].parent_layer_uid, Presence::Present(None));
     assert_eq!(
         *log.0.borrow(),
         [(LayerOp::DetachFromDeletedParent, "L2".to_string())]

@@ -13,7 +13,7 @@ use crate::commands::object_fill_owner::layer_lifecycle::{
 };
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::{
-    index_of, plan_reorder, LifecycleError, LifecyclePlan, UnavailableLayerEditPolicy,
+    index_of, plan_reorder, BaselineLayerEditPolicy, LifecycleError, LifecyclePlan,
 };
 use crate::object_document::{object_deserialize, ObjectDocument, Presence, PropertyHolder};
 use crate::object_snapshot::ObjectSnapshot;
@@ -168,7 +168,7 @@ fn plan(
             &moving,
             gap,
             &selection,
-            &UnavailableLayerEditPolicy,
+            &BaselineLayerEditPolicy,
         )?;
         result.changed |= order.changed;
         result.selection = order.selection;

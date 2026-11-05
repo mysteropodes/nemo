@@ -105,3 +105,20 @@ test('markers go through the composition controller: add by frame, remove by the
   root.NemoNativeCompositionController.edit=()=>Promise.resolve({status:'unchanged',applied:false});assert.deepEqual(await ops.marker({action:'add',frame:1}),{ok:true,applied:false});
   shown=null;assert.deepEqual(await ops.marker({action:'add',frame:1}),{ok:false,code:'composition-unavailable'});
 });
+
+test('colour, work area and trim reach the layer-row writer, the settings controller and the length adapter, and only when those exist',async()=>{
+  assert.deepEqual(Object.keys(Writes.create({},{runResourceCommand(){},requestId(){}})).sort(),[]);
+  const calls=[];
+  const root={NemoNativeLayerRowWrites:{create:()=>({recolor:(uid,sel,hex)=>{calls.push(['recolor',uid,sel,hex]);return Promise.resolve({ok:true,applied:true,layerUid:uid});}})}},
+    settings={edit:(a)=>{calls.push(['edit',a]);return Promise.resolve({status:a.kind==='setWorkArea'?'applied-presented':'unchanged',applied:a.kind==='setWorkArea'});}},
+    length={trimToWorkArea:(host)=>{calls.push(['trim',host===root]);return Promise.resolve({status:'applied-presented'});}};
+  Object.assign(root,{NemoNativeProjectSettingsController:settings,NemoNativeProjectLength:length});
+  const ops=Writes.create(root,{runResourceCommand(){},requestId(){}});
+  assert.deepEqual(Object.keys(ops).sort(),['color','trim','workArea']);
+  assert.deepEqual(await ops.color('layer-a','#aabbcc'),{ok:true,applied:true,layerUid:'layer-a'});
+  assert.deepEqual(await ops.workArea({inFrame:2,outFrame:9}),{ok:true,applied:true});
+  assert.deepEqual(await ops.trim(),{ok:true,applied:true});
+  length.trimToWorkArea=()=>Promise.resolve({status:'unavailable'});
+  assert.equal((await ops.trim()).ok,false);
+  assert.deepEqual(calls.slice(0,3),[['recolor','layer-a',null,'#aabbcc'],['edit',{kind:'setWorkArea',inFrame:2,outFrame:9}],['trim',true]]);
+});

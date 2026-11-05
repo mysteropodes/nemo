@@ -133,17 +133,25 @@
     }
     function trackPayload(value) {
       exact(value, ['command', 'selections', 'action'], [], 'property track edit');
+      // An entry names one key (`frame`) or the keys of one track inside inclusive runs of frames (`ranges`): a selection of any size is
+      // then bounded by the request bytes, not by a key count. At most 32 single-key entries; at most 128 entries.
       if (value.command !== 'object.property.track.edit' || !Array.isArray(value.selections) ||
-          value.selections.length < 1 || value.selections.length > 32) {
+          value.selections.length < 1 || value.selections.length > 128 ||
+          value.selections.filter((selection) => plain(selection) && has(selection, 'frame')).length > 32) {
         throw new TypeError('invalid property track edit selection');
       }
       for (const selection of value.selections) {
-        exact(selection, ['target', 'property', 'frame'], [], 'property key selection');
+        exact(selection, ['target', 'property'], ['frame', 'ranges'], 'property key selection');
         exact(selection.target, ['contextId', 'layerUid'], ['strokeId'], 'property holder');
         Object.values(selection.target).forEach(objectUid);
         objectUid(selection.property);
-        if (!Number.isFinite(selection.frame)) throw new TypeError('invalid selected key frame');
-
+        if (has(selection, 'frame') === has(selection, 'ranges')) throw new TypeError('a key selection names a frame or ranges, not both');
+        if (has(selection, 'frame') && !Number.isFinite(selection.frame)) throw new TypeError('invalid selected key frame');
+        if (has(selection, 'ranges')) {
+          const runs = selection.ranges;
+          if (!Array.isArray(runs) || runs.length < 1 || runs.length > 512 || !runs.every((run) => Array.isArray(run) && run.length === 2 &&
+              Number.isFinite(run[0]) && Number.isFinite(run[1]) && run[0] <= run[1])) throw new TypeError('invalid selected key ranges');
+        }
       }
       const action = value.action;
       if (!plain(action)) throw new TypeError('property track action must be an object');

@@ -9,10 +9,25 @@ fn nonempty(value: Option<&Value>) -> bool {
 fn finite(value: Option<&Value>) -> bool {
     value.and_then(Value::as_f64).is_some_and(f64::is_finite)
 }
+/// One inclusive run of frames: `[from, to]`, finite and ordered.
+fn run(value: &Value) -> bool {
+    value.as_array().is_some_and(|pair| {
+        pair.len() == 2
+            && finite(pair.first())
+            && finite(pair.get(1))
+            && pair[0].as_f64() <= pair[1].as_f64()
+    })
+}
+/// An entry names one key (`frame`) or the keys of one track inside runs of frames (`ranges`), never both.
 fn selection(value: &Value) -> bool {
-    exact(value, &["target", "property", "frame"], &[]).is_some_and(|s| {
+    exact(value, &["target", "property"], &["frame", "ranges"]).is_some_and(|s| {
         nonempty(s.get("property"))
-            && finite(s.get("frame"))
+            && (s.contains_key("frame") != s.contains_key("ranges"))
+            && (!s.contains_key("frame") || finite(s.get("frame")))
+            && (!s.contains_key("ranges")
+                || s["ranges"]
+                    .as_array()
+                    .is_some_and(|r| (1..=512).contains(&r.len()) && r.iter().all(run)))
             && exact(&s["target"], &["contextId", "layerUid"], &["strokeId"]).is_some_and(|t| {
                 nonempty(t.get("contextId"))
                     && nonempty(t.get("layerUid"))
@@ -50,7 +65,9 @@ pub(super) fn request(value: &Value) -> bool {
     exact(value, &["command", "selections", "action"], &[]).is_some_and(|p| {
         p["command"].as_str() == Some("object.property.track.edit")
             && p["selections"].as_array().is_some_and(|selections| {
-                (1..=32).contains(&selections.len()) && selections.iter().all(selection)
+                (1..=128).contains(&selections.len())
+                    && selections.iter().filter(|s| s.get("frame").is_some()).count() <= 32
+                    && selections.iter().all(selection)
             })
             && action(&p["action"])
     })

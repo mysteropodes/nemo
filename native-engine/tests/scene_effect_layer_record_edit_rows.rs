@@ -479,11 +479,13 @@ fn authored_compositing_fields_survive_exact_project_save_reopen_and_old_snapsho
     assert_eq!(reopened_base.blend_mode(), Some("softLight"));
     assert_eq!(reopened_base.matte_source_uid(), Some(folder.as_str()));
     assert!(head(&reopened).document().layers()[2].folder_collapsed());
-    for _ in 0..5 {
+    // Four steps (two creations, the blend, the matte): the fold saved with the last one is no step of its own.
+    for _ in 0..4 {
         o.undo(o.content_revision()).unwrap();
     }
     assert_eq!(head(&o).document(), zero.document());
-    for _ in 0..5 {
+    assert!(o.undo(o.content_revision()).is_err(), "no fifth step: the fold added none");
+    for _ in 0..4 {
         o.redo(o.content_revision()).unwrap();
     }
     assert_eq!(

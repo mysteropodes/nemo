@@ -10809,14 +10809,36 @@
         "selections": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 32,
+          "maxItems": 128,
           "items": {
             "type": "object",
             "additionalProperties": false,
+            "description": "One key (frame) or the keys of one track inside inclusive runs of frames (ranges): exactly one of the two. At most 32 single-key entries; the request bytes bound everything else.",
+            "oneOf": [
+              {
+                "required": [
+                  "frame"
+                ],
+                "not": {
+                  "required": [
+                    "ranges"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "ranges"
+                ],
+                "not": {
+                  "required": [
+                    "frame"
+                  ]
+                }
+              }
+            ],
             "required": [
               "target",
-              "property",
-              "frame"
+              "property"
             ],
             "properties": {
               "target": {
@@ -10843,6 +10865,19 @@
               },
               "frame": {
                 "type": "number"
+              },
+              "ranges": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 512,
+                "items": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "number"
+                  }
+                }
               }
             }
           }

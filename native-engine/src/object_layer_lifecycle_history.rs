@@ -150,6 +150,9 @@ impl NativeObjectHistory {
 #[path = "../tests/object_layer_color_set.rs"]
 mod object_layer_color_set;
 #[cfg(test)]
+#[path = "../tests/object_layer_baseline_policy.rs"]
+mod object_layer_baseline_policy;
+#[cfg(test)]
 #[path = "../tests/object_layer_range_arrange.rs"]
 mod object_layer_range_arrange;
 #[cfg(test)]

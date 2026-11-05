@@ -9,7 +9,7 @@
   else root.NemoNativeMotionKeyEdit = api;
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
-  const MAX_KEYS = 32;
+  const MAX_KEYS = 32; // single-key addresses per request; a larger selection names runs of keys per track instead
   const MAX_BYTES = 4096; // the track-edit request bound
   const isMod = (e) => !!(e.metaKey || e.ctrlKey);
   const letter = (e, l) => String(e.key || '').toLowerCase() === l || e.code === 'Key' + l.toUpperCase();
@@ -46,6 +46,16 @@
       return Array.from(moving).every((f) => { const to = f + by; return to >= 0 && to <= total - 1 && !staying.has(to); });
     });
   }
+  /* One track's selected keys as inclusive runs of frames: a run never spans a key that is not selected. */
+  function rangesOf(track) {
+    const ranges = [];
+    let open = null;
+    track.items.slice().sort((a, b) => a.frame - b.frame).forEach((key) => {
+      if (!key.selected) { open = null; return; }
+      if (open) open[1] = key.frame; else { open = [key.frame, key.frame]; ranges.push(open); }
+    });
+    return { target: track.target, property: track.property, ranges };
+  }
   /* The editor over the open key tracks. Ports: readKeyTimelines() -> {pin, tracks:[{target,property,items:[{frame,selected}]}]},
    * localKeys() -> an opaque list that changes whenever the local selection does, editPropertyTrack(payload, pin, isCurrent),
    * reopen(target, property, frames) (the refresh after a write closes the drawers; this restores them and their selection),
@@ -57,17 +67,21 @@
       if (busy) return false;
       const view = ports.readKeyTimelines();
       if (!view) return null;
-      const selections = [], opened = [];
+      const selections = [], opened = [], tracks = [];
+      let count = 0;
       view.tracks.forEach((track) => {
         const frames = track.items.filter((k) => k.selected).map((k) => k.frame);
         opened.push({ target: track.target, property: track.property, frames });
         frames.forEach((frame) => selections.push({ target: track.target, property: track.property, frame }));
+        if (frames.length) tracks.push(track);
+        count += frames.length;
       });
-      if (!selections.length) return null;
-      if (selections.length > MAX_KEYS) { say('toastSelectAtMost32Keys', 'Select between 1 and 32 keys.'); return false; }
-      if ((action.kind === 'flip' || action.kind === 'distribute') && selections.length < 2) { say('toastSelectAtLeast2Keys', 'Select at least 2 keys'); return false; }
-      const payload = { command: 'object.property.track.edit', selections, action };
-      if (new TextEncoder().encode(JSON.stringify(payload)).length > MAX_BYTES) { say('toastSelectAtMost32Keys', 'Select between 1 and 32 keys.'); return false; }
+      if (!count) return null;
+      if ((action.kind === 'flip' || action.kind === 'distribute') && count < 2) { say('toastSelectAtLeast2Keys', 'Select at least 2 keys'); return false; }
+      // Up to 32 keys: one address per key. More: one entry per track naming the runs of consecutive selected keys, so the size of the
+      // selection is bounded by the request bytes alone (baseline: no key limit).
+      const payload = { command: 'object.property.track.edit', selections: count <= MAX_KEYS ? selections : tracks.map(rangesOf), action };
+      if (new TextEncoder().encode(JSON.stringify(payload)).length > MAX_BYTES) { say('toastSelectionTooLarge', 'The selection spans too many properties for one edit.'); return false; }
       const local = JSON.stringify(ports.localKeys());
       let applied = false, ok = true;
       busy = true;
@@ -119,5 +133,5 @@
     owners.set(document, api);
     return api;
   }
-  return Object.freeze({ actionForEvent, expectedFrames, canShift, createEditor, install, editable });
+  return Object.freeze({ actionForEvent, expectedFrames, canShift, rangesOf, createEditor, install, editable });
 }));

@@ -98,15 +98,26 @@ pub(crate) fn apply(
     if frames == before {
         return Ok(Some(original.clone()));
     }
-    // A moved key may neither land on a key that stays nor on another moved key.
+    // Baseline `nudgeSelectedKeys` refuses a shift onto a key that stays; `distributeKeys` and `flipKeys` just assign frames. A track holds
+    // one key per frame, so a distribute that lands on another key's frame replaces that key (among the selected keys the later one wins).
+    // Flip permutes the selected frames among themselves and a shift moves them together, so neither can share a frame among selected keys.
+    let mut dropped: Vec<usize> = Vec::new();
     for (a, &i) in chosen.iter().enumerate() {
-        let hit = frames.iter().enumerate().any(|(j, f)| {
-            j != i
-                && *f == frames[i]
-                && (chosen.binary_search(&j).is_err() || chosen[..a].contains(&j))
-        });
-        if hit {
-            return Err(DispatchErrorCode::Unavailable);
+        for (j, f) in frames.iter().enumerate() {
+            if j == i || *f != frames[i] {
+                continue;
+            }
+            let earlier_selected = chosen[..a].contains(&j);
+            let staying = chosen.binary_search(&j).is_err();
+            if action != KeyBatch::Distribute {
+                if staying || earlier_selected {
+                    return Err(DispatchErrorCode::Unavailable);
+                }
+                continue;
+            }
+            if staying || earlier_selected {
+                dropped.push(j);
+            }
         }
     }
     let mut keys = original.keys.clone();
@@ -114,7 +125,7 @@ pub(crate) fn apply(
         keys[i].frame = frame_number(frames[i])?;
     }
     // Stable by the new frame: unmoved keys keep their relative order.
-    let mut order: Vec<usize> = (0..keys.len()).collect();
+    let mut order: Vec<usize> = (0..keys.len()).filter(|i| !dropped.contains(i)).collect();
     order.sort_by(|&a, &b| frames[a].total_cmp(&frames[b]));
     Ok(Some(OrderTrack {
         keys: order.into_iter().map(|i| keys[i].clone()).collect(),

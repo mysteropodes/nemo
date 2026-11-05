@@ -40,6 +40,8 @@
   put(S, ['Layer.visible'], op(Q, O + 'layer.visibility.set', true));
   put(S, ['Layer.locked', 'Layer.shy'], op(Q, O + 'layer.policy.edit', true));
   put(S, ['Layer.name'], op(Q, O + 'layer.rename', true));
+  put(S, ['Layer.color'], op(Q, O + 'layer.color.set', true));
+  put(S, ['comp.setWorkArea', 'comp.trimToWorkArea'], op(null, O + 'project.settings.edit', true));
   put(S, ['isKeyframe'], op(Q + '.layer.timing', null, true));
   put(S, ['addLayer'], op(null, O + 'layer.create', true));
   put(S, ['Layer.remove'], op(null, O + 'layer.delete', true));
@@ -59,12 +61,12 @@
   var reasons = {
     'no-native-effects': ['Effect.enabled', 'Effect.get', 'Effect.key', 'Effect.keys', 'Effect.params', 'Effect.remove', 'Effect.set', 'Effect.type', 'Layer.addEffect', 'Layer.effects'],
     'no-native-layer-markers': ['Layer.addMarker', 'Layer.markers'], 'no-native-blend-matte': ['Layer.blendMode', 'Layer.matte'],
-    'no-native-layer-color': ['Layer.color'], 'no-native-time-remap': ['Layer.enableTimeRemap', 'Layer.disableTimeRemap'],
+    'no-native-time-remap': ['Layer.enableTimeRemap', 'Layer.disableTimeRemap'],
     'no-native-expressions': ['Layer.expression', 'Layer.setExpression'], 'no-native-layer-range': ['Layer.inFrame', 'Layer.outFrame'],
     'no-native-key-lock': ['Layer.keyLock'], 'no-native-time-link': ['Layer.linkTime', 'Layer.timeLink', 'Layer.unlinkTime'],
     'no-native-layer-merge': ['Layer.mergeWith'], 'no-native-motion-blur': ['Layer.motionBlur'], 'no-native-parenting': ['Layer.parent'],
     'no-native-stroke-profile': ['Layer.strokeProfile'], 'no-native-stroke-read': ['Layer.strokes'], 'no-native-pivot': ['addPivot'], 'no-native-camera': ['camera.keys'],
-    'no-native-work-area': ['comp.setWorkArea', 'comp.trimToWorkArea'], 'no-native-solo': ['Layer.solo'], 'script-run-grouping': ['undoGroup'],
+    'no-native-solo': ['Layer.solo'], 'script-run-grouping': ['undoGroup'],
   };
   Object.keys(reasons).forEach(function (reason) { put(S, reasons[reason], gone(reason)); });
   var ROUTES = Object.freeze(Object.keys(table).sort().map(function (row) { return Object.freeze(Object.assign({ row: row }, table[row])); }));
@@ -73,6 +75,7 @@
 
   // A bound write row still needs its native entry (ports.ops[NEEDS]) to be present when the script calls it.
   var NEEDS = { addLayer: 'add', 'Layer.remove': 'remove', 'Layer.duplicate': 'duplicate', 'Layer.splitAt': 'split', 'Layer.name': 'rename',
+    'Layer.color': 'color', 'comp.setWorkArea': 'workArea', 'comp.trimToWorkArea': 'trim',
     'Layer.set': 'property', 'Layer.key': 'property', 'Layer.clearKeys': 'property', 'Layer.hold': 'track', 'markers.add': 'marker', 'markers.removeAt': 'marker' };
   // A read row needs its port: ports.reads.property (get, keys), .cells (isKeyframe), .composition (markers, beats).
   var READS = { 'Layer.get': 'property', 'Layer.keys': 'property', isKeyframe: 'cells', 'comp.beat': 'composition', 'comp.beats': 'composition',
@@ -211,6 +214,19 @@
         if (last && last.kind === 'rename' && last.uid === uid) last.name = next; else queue.push({ kind: 'rename', uid: uid, name: next });
       },
     });
+    // The colour label (#rrggbb): read from the pinned model (or the value a queued write set), written as ONE layer.color.set at drain.
+    Object.defineProperty(Layer.prototype, 'color', {
+      get: function () { need(S + 'Layer.color'); var l = find(this.layerUid).layer; return typeof l.color === 'string' && l.color ? l.color : null; },
+      set: function (v) {
+        entry(S + 'Layer.color', 'color');
+        var uid = this.layerUid, l = find(uid).layer, next = String(v).toLowerCase();
+        if (!/^#[0-9a-f]{6}$/.test(next)) throw fail('a layer colour is #rrggbb, got ' + JSON.stringify(String(v)));
+        if (l.color === next) return;
+        l.color = next;
+        var last = queue.length && queue[queue.length - 1];
+        if (last && last.kind === 'color' && last.uid === uid) last.color = next; else queue.push({ kind: 'color', uid: uid, color: next });
+      },
+    });
     ['visible', 'locked', 'shy'].forEach(function (key) {
       Object.defineProperty(Layer.prototype, key, {
         get: function () { need(S + 'Layer.' + key); return flag(this.layerUid, key); },
@@ -333,10 +349,24 @@
       addLayer: addLayer,
       selection: guard(Object.assign(group(S + 'selection.', ['clear', 'setLayers', 'strokes']),
         { layers: function () { need(S + 'selection.layers'); return ports.selection().map(function (i) { return handle(i); }); } }), 'selection.'),
-      comp: guard(Object.assign(group(S + 'comp.', ['setWorkArea', 'trimToWorkArea']), {
+      comp: guard({
         get fps() { return start.fps; }, get frameCount() { return start.totalFrames; },
+        // Work area in frames, like the baseline: one project-settings edit at drain (the owner clamps the pair).
+        setWorkArea: function (inFrame, outFrame) {
+          entry(S + 'comp.setWorkArea', 'workArea');
+          var a = inFrame | 0, b = outFrame | 0;
+          if (a < 0 || b >= start.totalFrames || b <= a) throw fail('the work area ' + a + '..' + b + ' is outside the composition');
+          queue.push({ kind: 'workArea', inFrame: a, outFrame: b }); return nemo.comp;
+        },
+        // Keeps the work area only: what the pinned document already shows decides whether there is anything to cut.
+        trimToWorkArea: function () {
+          entry(S + 'comp.trimToWorkArea', 'trim');
+          var from = Math.max(0, Math.floor(start.waIn || 0)), to = Math.min(start.totalFrames - 1, Math.floor(start.waOut != null ? start.waOut : start.totalFrames - 1));
+          if (to > from && !(from === 0 && to === start.totalFrames - 1)) queue.push({ kind: 'trim' });
+          return nemo.comp;
+        },
         beat: function (frame) { return Reads.snap(composition(S + 'comp.beat'), start.fps, start.totalFrames, frame === undefined || frame === null ? here() : frame | 0); },
-        beats: function () { return Reads.beats(composition(S + 'comp.beats'), start.fps, start.totalFrames); } }), 'comp.'),
+        beats: function () { return Reads.beats(composition(S + 'comp.beats'), start.fps, start.totalFrames); } }, 'comp.'),
       markers: guard(Object.assign(group(S + 'markers.', []), {
         list: function () { return Reads.markers(composition(S + 'markers.list')); },
         next: function () { return adjacent(S + 'markers.next', 1); }, prev: function () { return adjacent(S + 'markers.prev', -1); },

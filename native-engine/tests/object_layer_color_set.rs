@@ -90,18 +90,20 @@ fn colour_refusals_are_typed_and_change_nothing() {
     let mut wrong = paint("L0", "#112233", None);
     wrong["command"] = json!("object.layer.rename");
     refused(&mut owner, "command", &wrong, "invalid_request");
-    // a locked layer is a typed unavailability, also when it sits in the painted selection
+    // The baseline `applyLayerColor` never checked a lock: a locked layer is relabelled, also inside a painted selection.
     let mut document = base(2);
     document["layers"][1]["locked"] = json!(true);
     let mut locked = owner_of(&document);
-    refused(&mut locked, "locked", &paint("L1", "#112233", None), "unavailable");
-    refused(&mut locked, "locked-in-selection", &paint("L0", "#112233", Some(&["L0", "L1"])), "unavailable");
-    send(&mut locked, "unlocked-ok", "color.set", &paint("L0", "#112233", None));
-    assert_eq!(colors(&locked), ["#112233", "#b49be6", "#f0a585"]);
+    send(&mut locked, "locked", "color.set", &paint("L1", "#112233", None));
+    assert_eq!(colors(&locked), ["#5fa875", "#112233", "#f0a585"]);
+    send(&mut locked, "locked-in-selection", "color.set", &paint("L0", "#445566", Some(&["L0", "L1"])));
+    assert_eq!(colors(&locked), ["#445566", "#445566", "#f0a585"]);
+    assert_eq!(locked.history_depths(), (2, 0));
+    assert_eq!(value(&locked)["layers"][1]["locked"], true, "the lock itself is untouched");
 }
 
 #[test]
-fn rename_and_colour_are_label_edits_a_parent_does_not_block_but_a_lock_does() {
+fn rename_and_colour_are_label_edits_neither_a_parent_nor_a_lock_blocks() {
     let mut document = base(2);
     document["layers"][2]["parentLayerUid"] = json!("L0");
     document["layers"][1]["locked"] = json!(true);
@@ -112,8 +114,12 @@ fn rename_and_colour_are_label_edits_a_parent_does_not_block_but_a_lock_does() {
     assert_eq!(value(&owner)["layers"][2]["parentLayerUid"], "L0", "the parent link is kept");
     send(&mut owner, "r2", "color.set", &paint("L2", "#445566", None));
     assert_eq!(colors(&owner), ["#5fa875", "#b49be6", "#445566"]);
-    let (before, depths) = (bytes(&owner), owner.history_depths());
     let reply = send(&mut owner, "r3", "rename", &rename("L1", "Locked"));
-    assert_eq!(reply["error"]["code"], "unavailable", "{reply}");
-    assert_eq!((bytes(&owner), owner.history_depths()), (before, depths));
+    assert_eq!(reply["result"], json!({"applied":true,"historyEntriesAdded":1}), "{reply}");
+    assert_eq!(value(&owner)["layers"][1]["name"], "Locked");
+    assert_eq!(value(&owner)["layers"][1]["locked"], true);
+    assert_eq!(owner.history_depths(), (3, 0));
+    let saved = bytes(&owner);
+    let reopened = NativeObjectHistory::new("reopened", decode_storage_project(&saved).unwrap()).unwrap();
+    assert_eq!(bytes(&reopened), saved, "save and reopen");
 }

@@ -38,7 +38,9 @@ test('D12 descriptor declares the exact existing native operation and closed sel
   assert.equal(shape.additionalProperties, false);
   assert.deepEqual(shape.required, ['command', 'selections', 'action']);
   assert.equal(shape.properties.selections.minItems, 1);
-  assert.equal(shape.properties.selections.maxItems, 32);
+  assert.equal(shape.properties.selections.maxItems, 128);
+  assert.deepEqual(shape.properties.selections.items.required, ['target', 'property']);
+  assert.equal(shape.properties.selections.items.properties.ranges.maxItems, 512);
   assert.equal(shape.properties.selections.items.additionalProperties, false);
   assert.equal(shape.properties.selections.items.properties.target.additionalProperties, false);
   assert.deepEqual(shape.properties.action.oneOf.map(a => a.properties.kind.const), ['preset', 'influence', 'subdivide', 'lockTo', 'shift', 'delete', 'flip', 'distribute']);
@@ -85,6 +87,13 @@ test('SDK rejects open, missing, null and positional shapes before any dispatch'
     q => q.payload.selections[0].target.contextId = 2,
     q => q.payload.selections[0].property = '', q => q.payload.selections[0].property = null,
     q => delete q.payload.selections[0].frame,
+    q => { q.payload.selections[0].ranges = [[0, 1]]; },
+    q => { delete q.payload.selections[0].frame; q.payload.selections[0].ranges = []; },
+    q => { delete q.payload.selections[0].frame; q.payload.selections[0].ranges = [[3, 2]]; },
+    q => { delete q.payload.selections[0].frame; q.payload.selections[0].ranges = [[0, '1']]; },
+    q => { delete q.payload.selections[0].frame; q.payload.selections[0].ranges = [[0, 1, 2]]; },
+    q => { delete q.payload.selections[0].frame; q.payload.selections[0].ranges = Array(513).fill([0, 1]); },
+    q => { delete q.payload.selections[0].frame; q.payload.selections[0].ranges = [[0, 1]]; q.payload.selections[0].extra = 1; },
     q => q.payload.selections[0].frame = '0', q => q.payload.selections[0].frame = NaN,
     q => q.payload.action = {kind:'preset', preset:'smooth'},
     q => q.payload.action = {kind:'preset', preset:'ease', extra:0},
@@ -300,4 +309,20 @@ test('D12 real SDK cannot dispatch with a missing helper or a helper loaded only
     assert.throws(() => vm.runInContext(browserPropertyCall, context), {name:'TypeError'});
     assert.equal(context.calls, 0, 'malordered helper must fail before authority dispatch');
   }
+});
+
+test('SDK reaches the authority with runs of frames per track, above the 32 single-key addresses', async () => {
+  const q = request({kind:'delete'});
+  const track = property => ({target:{contextId:'scene-root', layerUid:'layer'}, property, ranges:[[0, 99], [101, 250.5]]});
+  q.payload.selections = [track('position'), track('opacity'), q.payload.selections[0]];
+  const before = structuredClone(q);
+  let sent;
+  const r = await adapter(value => { sent = value; return reply(value); }).editPropertyTrack(q);
+  assert.deepEqual(sent, before);
+  assert.deepEqual(r, reply(q));
+  const wide = request({kind:'delete'});
+  wide.payload.selections = Array.from({length:12}, (_, i) => track('p' + i));
+  await assert.doesNotReject(adapter(value => reply(value)).editPropertyTrack(wide));
+  wide.payload.selections = Array.from({length:60}, (_, i) => track('p' + i));
+  await assert.rejects(async () => adapter(value => reply(value)).editPropertyTrack(wide), /4096/);
 });

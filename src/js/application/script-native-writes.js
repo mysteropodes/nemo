@@ -11,6 +11,9 @@
  *   property   session.editProperty                           command.document.object.property.edit
  *   track      session.editPropertyTrack                      command.document.object.property.track.edit
  *   marker     NemoNativeCompositionController.edit           command.document.object.project.composition.edit
+ *   color      NemoNativeLayerRowWrites.recolor               command.document.object.layer.color.set
+ *   workArea   NemoNativeProjectSettingsController.edit       command.document.object.project.settings.edit (setWorkArea)
+ *   trim       NemoNativeProjectLength.trimToWorkArea         command.document.object.project.settings.edit (trimToWorkArea)
  * The lifecycle intents submit through the session's resource command queue (dispatch, then reconcile), the route the
  * playhead cut and the composition controller already use. Nothing here reads or writes state.layers.
  * Every entry resolves { ok, applied?, layerUid? }; a refusal, a stale target or a rejected transport is ok:false.
@@ -79,6 +82,17 @@
         });
       };
     }
+    var rows = session && root.NemoNativeLayerRowWrites && typeof root.NemoNativeLayerRowWrites.create === 'function' ? root.NemoNativeLayerRowWrites.create(session, {}) : null;
+    if (rows) ops.color = function (layerUid, hex) { return guarded(function () { return rows.recolor(layerUid, null, hex); }); };
+    var settings = root.NemoNativeProjectSettingsController, length = root.NemoNativeProjectLength;
+    function settled(r) {
+      if (r && r.status === 'applied-presented') return { ok: true, applied: r.applied !== false };
+      return r && r.status === 'unchanged' ? { ok: true, applied: false } : refused({ code: r && r.status });
+    }
+    if (settings && typeof settings.edit === 'function') {
+      ops.workArea = function (spec) { return guarded(function () { return settings.edit({ kind: 'setWorkArea', inFrame: spec.inFrame, outFrame: spec.outFrame }).then(settled); }); };
+    }
+    if (length && typeof length.trimToWorkArea === 'function') ops.trim = function () { return guarded(function () { return length.trimToWorkArea(root).then(settled); }); };
     function pinned(write) {
       return session && typeof write === 'function' ? function (payload) {
         return guarded(function () {

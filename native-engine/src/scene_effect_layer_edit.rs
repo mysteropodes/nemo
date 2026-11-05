@@ -33,10 +33,17 @@ pub(crate) struct PreparedLayerCompositing {
     origin: ObjectSnapshot,
     document: ObjectDocument,
     changed: bool,
+    /// The fold chevron: a disclosure toggle, saved with the layer but never an undo step (baseline
+    /// `toggleFolderLayerCollapsed` pushed no undo snapshot).
+    disclosure: bool,
 }
 
 #[allow(dead_code)]
 impl PreparedLayerCompositing {
+    /// `true`: the edit is saved and published but adds no history entry and leaves redo alone.
+    pub(crate) fn disclosure(&self) -> bool {
+        self.disclosure
+    }
     /// `false`: nothing will be published or recorded.
     pub(crate) fn changed(&self) -> bool {
         self.changed
@@ -187,6 +194,7 @@ impl ObjectFillOwner {
             origin,
             document,
             changed,
+            disclosure: matches!(edit, Edit::FolderCollapsed(_)),
         })
     }
 

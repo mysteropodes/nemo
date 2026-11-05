@@ -69,6 +69,17 @@ pub(crate) fn plan_delete(
         .filter(|layer| !gone.contains(layer.layer_uid.as_str()))
         .cloned()
         .collect();
+    // A child of a deleted layer is released: its parent link would name a layer that no longer exists.
+    for layer in &mut candidate.layers {
+        let orphaned = layer
+            .parent_layer_uid
+            .value()
+            .and_then(|parent| parent.as_deref())
+            .is_some_and(|parent| gone.contains(parent));
+        if orphaned {
+            layer.parent_layer_uid = Presence::Present(None);
+        }
+    }
     candidate
         .objects
         .retain(|record| !gone.contains(record.target.layer_uid.as_str()));

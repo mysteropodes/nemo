@@ -85,7 +85,7 @@ test('a refused or unchanged edit still restores the drawers on the old frames',
   assert.deepEqual(del.log.reopens[0].frames, [], 'deleted keys leave nothing to select');
 });
 
-test('no selected key resolves null; flip and distribute need two; more than 32 are refused; nothing is written', async () => {
+test('no selected key resolves null; flip and distribute need two; nothing is written', async () => {
   const none = editorHarness({ tracks: [{ target: tgt, property: 'opacity', items: [{ frame: 0, selected: false }] }] });
   assert.equal(await none.editor.edit({ kind: 'delete' }), null);
   assert.equal(await editorHarness({ noView: true }).editor.edit({ kind: 'delete' }), null);
@@ -93,9 +93,7 @@ test('no selected key resolves null; flip and distribute need two; more than 32 
   assert.equal(await one.editor.edit({ kind: 'flip' }), false);
   assert.equal(await one.editor.edit({ kind: 'distribute' }), false);
   assert.deepEqual(one.log.notes, ['Select at least 2 keys', 'Select at least 2 keys']);
-  const many = editorHarness({ tracks: [{ target: tgt, property: 'opacity', items: Array.from({ length: 33 }, (_, i) => ({ frame: i, selected: true })) }] });
-  assert.equal(await many.editor.edit({ kind: 'delete' }), false);
-  for (const h of [none, one, many]) assert.equal(h.log.writes.length, 0);
+  for (const h of [none, one]) assert.equal(h.log.writes.length, 0);
   // A request over the 4096 byte bound is refused here rather than at the transport.
   const long = { contextId: 'scene-root', layerUid: 'L'.repeat(200), strokeId: 'S'.repeat(60) };
   const big = editorHarness({ tracks: [{ target: long, property: 'opacity', items: Array.from({ length: 20 }, (_, i) => ({ frame: i, selected: true })) }] });
@@ -182,4 +180,22 @@ test('an edit that finds nothing selected reports the route unavailable; a refus
   await new Promise((r) => setImmediate(r));
   assert.equal(g.flags.unavailable, 0);
   assert.throws(() => KeyEdit.install(g.doc, { ownsNativeMotion() {}, hasSelection() {}, edit() {} }), /already owned/);
+});
+
+test('a selection above 32 keys is sent as runs of consecutive selected keys per track (baseline has no key limit)', async () => {
+  const items = Array.from({ length: 200 }, (_, i) => ({ frame: i, selected: i !== 50 && i !== 120 }));
+  const h = editorHarness({ tracks: [{ target: tgt, property: 'opacity', items }, { target: tgt, property: 'position', items: items.slice(0, 40).map((k) => ({ ...k, selected: true })) }] });
+  assert.equal(await h.editor.edit({ kind: 'delete' }), true);
+  assert.equal(h.log.writes.length, 1);
+  const sent = h.log.writes[0].payload.selections;
+  assert.deepEqual(sent, [
+    { target: tgt, property: 'opacity', ranges: [[0, 49], [51, 119], [121, 199]] },
+    { target: tgt, property: 'position', ranges: [[0, 39]] },
+  ]);
+  assert.deepEqual(KeyEdit.rangesOf({ target: tgt, property: 'x', items: [{ frame: 4, selected: true }, { frame: 2, selected: true }, { frame: 3, selected: false }] }).ranges, [[2, 2], [4, 4]]);
+  // Up to 32 keys keep one address per key.
+  const few = editorHarness({ tracks: [{ target: tgt, property: 'opacity', items: Array.from({ length: 32 }, (_, i) => ({ frame: i, selected: true })) }] });
+  await few.editor.edit({ kind: 'delete' });
+  assert.equal(few.log.writes[0].payload.selections.length, 32);
+  assert.equal(few.log.writes[0].payload.selections[0].frame, 0);
 });

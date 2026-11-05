@@ -171,3 +171,38 @@ fn track_receipt_is_closed_and_exactly_correlates_one_or_zero_history_revisions(
         assert!(!result(&bad));
     }
 }
+#[test]
+fn track_selection_names_one_frame_or_runs_of_frames_never_both_or_neither() {
+    let base = |entry: Value| {
+        json!({"command":"object.property.track.edit","selections":[entry],"action":{"kind":"delete"}})
+    };
+    let target = json!({"contextId":"scene-root","layerUid":"layer"});
+    let runs = |ranges: Value| json!({"target":target,"property":"opacity","ranges":ranges});
+    for ranges in [json!([[0, 99]]), json!([[0, 4], [6, 6], [10.5, 20.25]]), json!([[-3, -1]])] {
+        let p = base(runs(ranges));
+        assert!(request(&p), "{p}");
+        assert!(envelope(p).validate().is_ok());
+    }
+    for ranges in [json!([]), json!([[5, 4]]), json!([[1]]), json!([[1, 2, 3]]), json!(["1,2"]), json!([["1", 2]]), json!({"from":1}), json!(null)] {
+        assert!(!request(&base(runs(ranges.clone()))), "{ranges}");
+    }
+    let mut both = runs(json!([[1, 2]]));
+    both["frame"] = json!(1);
+    assert!(!request(&base(both)));
+    let mut neither = runs(json!([[1, 2]]));
+    neither.as_object_mut().unwrap().remove("ranges");
+    assert!(!request(&base(neither)));
+    let too_many: Vec<Value> = (0..513).map(|i| json!([i * 2, i * 2])).collect();
+    assert!(!request(&base(runs(Value::Array(too_many)))));
+    // 128 entries (one per track), at most 32 of them single-key addresses.
+    let entries = |singles: usize, runs_n: usize| {
+        let mut all: Vec<Value> = (0..singles)
+            .map(|i| json!({"target":target,"property":format!("p{i}"),"frame":i}))
+            .collect();
+        all.extend((0..runs_n).map(|i| json!({"target":target,"property":format!("r{i}"),"ranges":[[0, 9]]})));
+        json!({"command":"object.property.track.edit","selections":all,"action":{"kind":"delete"}})
+    };
+    assert!(request(&entries(32, 96)));
+    assert!(!request(&entries(33, 0)));
+    assert!(!request(&entries(0, 129)));
+}

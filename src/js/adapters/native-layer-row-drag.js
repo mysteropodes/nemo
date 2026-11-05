@@ -20,7 +20,13 @@
     const at = rows.map((row) => info.layers.findIndex((l) => l.layerUid === row.dataset.layerUid)).filter((i) => i >= 0);
     return at.length < 2 || at[0] <= at[at.length - 1];
   }
-  function rowAt(host, x, y) {
+  // The list row under the pointer. Over the layer list the element under it names the row; over the frame grid (a gesture that began on a
+  // grid grip) the grid rows keep the list's rhythm, so the row is the one whose vertical band holds the pointer.
+  function rowAt(host, g, x, y) {
+    const list = g.list, lb = list && typeof list.getBoundingClientRect === 'function' ? list.getBoundingClientRect() : null;
+    if (lb && (x < lb.left || x > lb.right)) {
+      return g.rows.find((r) => { const b = r.getBoundingClientRect(); return y >= b.top && y < b.bottom; }) || null;
+    }
     const doc = host.document;
     let el = typeof doc.elementFromPoint === 'function' ? doc.elementFromPoint(x, y) : null;
     for (; el; el = el.parentNode) if (el.dataset && typeof el.dataset.layerUid === 'string' && el.dataset.layerUid) return el;
@@ -28,7 +34,7 @@
   }
   // The gap (an index into the layer array, 0..n) a pointer at (x, y) selects, or -1.
   function gapAt(host, g, x, y) {
-    const row = rowAt(host, x, y);
+    const row = rowAt(host, g, x, y);
     const at = row ? g.info.layers.findIndex((l) => l.layerUid === row.dataset.layerUid) : -1;
     if (at < 0 || row.hidden) return { gap: -1 };
     const box = row.getBoundingClientRect(), after = y >= box.top + box.height / 2;
@@ -52,7 +58,7 @@
     const group = sel && sel.selected.length > 1 && sel.selected.includes(env.uid);
     const moving = group ? sel.selected.slice() : [env.uid];
     const rows = Array.from(list.children).filter((r) => r.dataset && r.dataset.layerUid && !r.hidden);
-    const g = { info, moving, mark: null, folder: null, dropped: null, selection: group ? sel : { active: env.uid, selected: [env.uid] }, x0: event.clientX, y0: event.clientY, moved: false, gap: -1, ghost: null, line: null, dimmed: [], ascending: ascending(rows, info) };
+    const g = { info, moving, mark: null, folder: null, dropped: null, selection: group ? sel : { active: env.uid, selected: [env.uid] }, list, rows, x0: event.clientX, y0: event.clientY, moved: false, gap: -1, ghost: null, line: null, dimmed: [], ascending: ascending(rows, info) };
     gestures.set(host, g);
     const doc = host.document;
     function clear() { if (g.line) { g.line.remove(); g.line = null; } g.gap = -1; }
@@ -60,7 +66,7 @@
     // #2371 D36 (baseline moveLayerReorder): the MIDDLE band of another folder row drops INTO the folder instead of reordering; a dragged
     // folder never nests (no nested folders in v1), so it keeps the plain gap drop.
     function folderBand(e) {
-      const row = rowAt(host, e.clientX, e.clientY), at = row ? info.layers.findIndex((l) => l.layerUid === row.dataset.layerUid) : -1;
+      const row = rowAt(host, g, e.clientX, e.clientY), at = row ? info.layers.findIndex((l) => l.layerUid === row.dataset.layerUid) : -1;
       if (at < 0 || row.hidden || info.layers[at].kind !== 'folder' || info.layers[source].kind === 'folder' || moving.includes(info.layers[at].layerUid)) return null;
       const box = row.getBoundingClientRect(), rel = (e.clientY - box.top) / Math.max(1, box.height);
       return rel > 0.25 && rel < 0.75 ? row : null;
