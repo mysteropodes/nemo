@@ -52,6 +52,44 @@ fn a_curved_shape_is_bitten_and_the_bite_is_one_undo() {
     assert_eq!(bytes(&owner), after);
 }
 
+/// The footprint the adapter sends: a stadium of 2 x 21 points (native-object-eraser-tool.js `capsule`).
+fn stadium(a: (f64, f64), b: (f64, f64), r: f64) -> Vec<(f64, f64)> {
+    let angle = (b.1 - a.1).atan2(b.0 - a.0);
+    let arc = |c: (f64, f64), from: f64| -> Vec<(f64, f64)> {
+        (0..=20)
+            .map(|i| {
+                let t = from + std::f64::consts::PI * i as f64 / 20.0;
+                (c.0 + r * t.cos(), c.1 + r * t.sin())
+            })
+            .collect()
+    };
+    let mut out = arc(b, angle - std::f64::consts::FRAC_PI_2);
+    out.extend(arc(a, angle + std::f64::consts::FRAC_PI_2));
+    out
+}
+
+#[test]
+fn the_adapters_capsule_footprint_cuts_a_channel_through_a_curved_shape() {
+    let doc = document(2, vec![circle("c", 50.0, 50.0, 50.0)], None, None);
+    let mut owner = owner_of(&doc);
+    let before = bytes(&owner);
+    // a 14-wide channel from the middle out through the right edge splits nothing but opens the silhouette
+    let sweep = stadium((50.0, 50.0), (120.0, 50.0), 7.0);
+    assert_eq!(apply(&mut owner, "erase", &erase("L0", 0, "c", &sweep)), Ok(true));
+    let records = frame_records(&state(&owner), "L0", 0);
+    assert_eq!(ids_of(&records), ["c"]);
+    assert_ne!(bytes(&owner), before);
+    // the channel crosses the edge at x = 100: the ring is still one island and its anchors keep out of the channel
+    let ring = ring_points(&records[0]);
+    assert!(ring.iter().all(|p| !(p[0] > 72.0 && (p[1] - 50.0).abs() < 5.0)), "{ring:?}");
+    // a sweep that cuts the circle in two leaves two islands, the first keeping the identity
+    let mut owner = owner_of(&doc);
+    let across = stadium((50.0, -20.0), (50.0, 120.0), 7.0);
+    assert_eq!(apply(&mut owner, "erase", &erase("L0", 0, "c", &across)), Ok(true));
+    assert_eq!(ids_of(&frame_records(&state(&owner), "L0", 0)), ["c", "native-stroke:1:0"]);
+    assert_eq!(owner.history_depths(), (1, 0));
+}
+
 #[test]
 fn a_bite_through_the_middle_of_a_curved_shape_keeps_the_slit() {
     let doc = document(2, vec![circle("c", 50.0, 50.0, 50.0)], None, None);

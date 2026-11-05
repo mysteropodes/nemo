@@ -109,7 +109,7 @@
       var layer = row && (c && c.layerRows(root) || pin.layers).filter(function (l) { return l.layerUid === row.layerUid; })[0];
       if (!layer) fail('S\u00e9lectionne un calque de dessin.');
       var why = refusal(layer, row); if (why) fail(why);
-      return { session: s, pointer: e.pointerId, layerIdx: st.activeLayerIdx, layerUid: layer.layerUid, context: contextId(), frame: st.currentFrame, pin: null, queue: [],
+      return { session: s, pointer: e.pointerId, layerIdx: st.activeLayerIdx, layerUid: layer.layerUid, context: contextId(), frame: st.currentFrame, id: null, rev: null, queue: [],
         stab: [], last: null, joined: false, cancelled: false, running: false, ended: false };
     }
     function holds(t) {
@@ -142,8 +142,10 @@
       }
       return intents.get(s);
     }
+    // The gesture's own writes move the revision on: the presented canvas is the next one only once the session has caught up with the last bite.
     async function ready(t) {
-      var W = root.NemoNativePresentationWait, read = function (why) { try { return view(why); } catch (_) { return null; } };
+      var W = root.NemoNativePresentationWait, read = function (why) {
+        try { var v = view(why); return v && t.rev !== null && v.pin.contentRevision < t.rev ? null : v; } catch (_) { return null; } };
       if (!W) return read();
       var r = await W.await(root, { read: read, ready: function (v) { return !!v; }, holds: function () { return holds(t); }, notice: 'Le canevas est occupé — la gomme s’est arrêtée.' }, { tries: 17 });
       return r.ready ? r.value : null;
@@ -151,8 +153,9 @@
     // One bite: the capsule from the previous sample to this one, on every distinct top-most hit along the sweep.
     async function bite(t, sample) {
       var v = await ready(t);
-      if (!v || !holds(t) || t.pin && !same(v.pin, t.pin)) { t.cancelled = true; return; } // an undo, a scrub or another edit ended the gesture: no further write
-      t.pin = v.pin; last = v;
+      // An undo, a scrub or another edit ended the gesture: the document is not the one the last bite left. No further write.
+      if (!v || !holds(t) || t.id && (t.id !== v.pin.instanceId + '|' + v.pin.documentId + '|' + v.pin.lifecycleGeneration || v.pin.contentRevision !== t.rev)) { t.cancelled = true; return; }
+      t.id = v.pin.instanceId + '|' + v.pin.documentId + '|' + v.pin.lifecycleGeneration; t.rev = v.pin.contentRevision; last = v;
       var w = Mapping.point({ clientX: sample.x, clientY: sample.y }, { bounds: v.bounds, canvasW: v.pin.canvasW, canvasH: v.pin.canvasH, presentation: v.presentation });
       var p = stabilize(t, [w.x, w.y]), from = t.last, r = sample.r, tol = Math.max(8, r) / v.scale;
       var box = [Math.min(p[0], from ? from[0] : p[0]) - r - tol, Math.min(p[1], from ? from[1] : p[1]) - r - tol, Math.max(p[0], from ? from[0] : p[0]) + r + tol, Math.max(p[1], from ? from[1] : p[1]) + r + tol];
@@ -173,8 +176,16 @@
         var input = { layerUid: layers.layerUid, contextId: t.context, frame: layers.frame, strokeId: hits[k].data.strokeId, footprint: points };
         if (t.joined) input.joinHistory = true;
         var out = await made.booleanErase(input);
-        if (out.ok && out.applied) { t.joined = true; t.pin = t.session.info(); }
+        if (out.ok && out.applied) { t.joined = true; t.rev = out.revision; await caughtUp(t); }
         else if (!out.ok) outcome(t, out);
+      }
+    }
+    // The next bite is pinned to the revision the last one produced: wait (bounded) for the session to report it.
+    async function caughtUp(t) {
+      for (var i = 0; i < 40; i++) {
+        var pin = t.session.info();
+        if (pin && pin.contentRevision >= t.rev) return;
+        await new Promise(function (done) { (root.setTimeout || setTimeout)(done, 5); });
       }
     }
     // A foreign change ends the gesture; a refusal of one shape (curved beyond the owner's limits, animated, too large) is said once and the sweep goes on.
