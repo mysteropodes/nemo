@@ -39,7 +39,7 @@ test('the open notice keeps the baseline wording, says the file is untouched, an
 });
 
 test('the original file can never be the Save As destination, whatever the spelling',()=>{
-  assert.equal(LI.samePath('/Users/me/Old.json','/users/me//old.json'),true);
+  assert.equal(LI.samePath('/Users/example/Old.json','/users/example//old.json'),true);
   assert.equal(LI.samePath('C:\\a\\b.json','c:/a/b.json'),true);
   assert.equal(LI.samePath('/a/b.json','/a/b-copy.json'),false);
   assert.equal(LI.samePath(null,'/a'),false);
@@ -143,31 +143,31 @@ function ordinary(h,extra={},auto=null){
 }
 
 test('opening a baseline file through project.js makes a new unsaved document and never remembers the old path',async()=>{
-  const h=host();h.legacyFor=p=>p==='/Users/me/old-film.json';
+  const h=host();h.legacyFor=p=>p==='/Users/example/old-film.json';
   const app=ordinary(h);await turn();await turn();
-  await app.project.openPath('/Users/me/old-film.json');await turn();
+  await app.project.openPath('/Users/example/old-film.json');await turn();
   assert.equal(app.project.getCurrentLabel(),'old-film (not saved)');
   assert.equal(app.project.isDirty(),true,'unsaved until its first Save As');
   assert.ok(app.toasts.some(t=>/^Opened: old-film — imported as a new project; the original file is not modified/.test(t)),JSON.stringify(app.toasts));
   assert.equal(app.writes.some(([key])=>/recent/i.test(key)),false,'the baseline path is not added to Recents');
   assert.equal(app.mutations,0,'no legacy writer ran');
   // The first Save goes through Save As, and the original file is never an acceptable destination.
-  h.saveTo='/Users/me/OLD-FILM.json';
+  h.saveTo='/Users/example/OLD-FILM.json';
   const refused=await app.project.saveAs();
   assert.equal(h.calls.some(c=>c.command==='nemo_native_object_save_as'),false,'nothing was written over the original');
   assert.ok(app.toasts.some(t=>/never overwritten/.test(t)),JSON.stringify(app.toasts));
   assert.notEqual(refused&&refused.acknowledged,true);
-  h.saveTo='/Users/me/old-film-v2.json';
+  h.saveTo='/Users/example/old-film-v2.json';
   await app.project.saveAs();await turn();
   const save=h.calls.find(c=>c.command==='nemo_native_object_save_as');
   assert.ok(save,'a different destination saves normally');
-  assert.equal(save.r.destinationPath,'/Users/me/old-film-v2.json');
+  assert.equal(save.r.destinationPath,'/Users/example/old-film-v2.json');
 });
 
 test('an ordinary native file still opens as itself: titled, clean, remembered',async()=>{
   const h=host();
   const app=ordinary(h);await turn();await turn();
-  await app.project.openPath('/Users/me/native.json');await turn();
+  await app.project.openPath('/Users/example/native.json');await turn();
   assert.equal(app.project.getCurrentLabel().startsWith('native'),true);
   assert.equal(app.project.getCurrentLabel().includes('not saved'),false);
   assert.equal(app.writes.some(([key])=>/recent/i.test(key)),true);
@@ -186,7 +186,7 @@ test('Resume opens an old baseline autosave when the recovery store is empty',as
 test('restoring a history snapshot replaces the open document with the converted snapshot',async()=>{
   const h=host();h.legacyFor=p=>p.includes('legacy-import');h.snapshots={'/appdata/history/film/1.json':OLD};
   const app=ordinary(h);await turn();await turn();
-  await app.project.openPath('/Users/me/native.json');await turn();
+  await app.project.openPath('/Users/example/native.json');await turn();
   const before=h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length;
   assert.equal(await app.project.restoreVersion('/appdata/history/film/1.json'),true);await turn();
   const opens=h.calls.filter(c=>c.command==='nemo_native_object_bootstrap');
@@ -200,22 +200,22 @@ test('a typed refusal names the field in the toast, keeps the open document and 
   const h=host(),base=h.invoke;
   h.invoke=async(command,args)=>{
     const r=args&&JSON.parse(args.requestJson);
-    if(command==='nemo_native_object_bootstrap'&&r.sourcePath==='/Users/me/bad.json')
+    if(command==='nemo_native_object_bootstrap'&&r.sourcePath==='/Users/example/bad.json')
       throw {code:'legacy_unsupported_field',message:'legacy project field layers[0].motion: this layer content has no native owner in this release',details:{disposition:'notDispatched',retryExecution:false}};
     if(command==='nemo_native_object_inactive_project'&&r.action.kind!=='prepare')
       return {apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,contentRevision:r.expectedRevision,
         documentSnapshotId:r.documentSnapshotId,lifecycleGeneration:r.lifecycleGeneration,state:'inactive-absent',preparationToken:null,project:null,retryExecution:false};
-    if(command==='nemo_native_object_inactive_project'&&r.action.sourcePath==='/Users/me/bad.json')
+    if(command==='nemo_native_object_inactive_project'&&r.action.sourcePath==='/Users/example/bad.json')
       throw {code:'legacy_unsupported_field',message:'legacy project field layers[3].isNullLayer: this layer content has no native owner in this release',details:{disposition:'notDispatched',retryExecution:false}};
     return base(command,args);
   };
   const app=ordinary(h);await turn();await turn();
-  assert.equal(await app.project.openPath('/Users/me/bad.json'),false,'refused at the start screen');
+  assert.equal(await app.project.openPath('/Users/example/bad.json'),false,'refused at the start screen');
   assert.ok(app.toasts.some(t=>/layers\[0\]\.motion/.test(t)),JSON.stringify(app.toasts));
   assert.equal(app.mutations,0,'the legacy importer did not run');
-  await app.project.openPath('/Users/me/native.json');await turn();
+  await app.project.openPath('/Users/example/native.json');await turn();
   const label=app.project.getCurrentLabel();
-  assert.deepEqual(await app.project.openPath('/Users/me/bad.json'),{status:'refused'},'refused into a new tab while a project is open');
+  assert.deepEqual(await app.project.openPath('/Users/example/bad.json'),{status:'refused'},'refused into a new tab while a project is open');
   const bar=app.element('project-tabs-bar').children.at(-1);
   assert.match(String(bar&&bar.textContent),/layers\[3\]\.isNullLayer/,'the tab bar alert names the field');
   assert.equal(app.project.getCurrentLabel(),label,'the open document is untouched by a refusal');
@@ -235,8 +235,8 @@ test('a baseline file opened into a new tab carries no path, so a Save can never
       preparationToken:project&&project.preparationToken,project,retryExecution:false};
   };
   const app=ordinary(h);await turn();await turn();
-  await app.project.openPath('/Users/me/native.json');await turn();
-  const result=await app.project.openPath('/Users/me/old-film.json');
+  await app.project.openPath('/Users/example/native.json');await turn();
+  const result=await app.project.openPath('/Users/example/old-film.json');
   assert.equal(result.status,'prepared');
   assert.equal(result.meta.path,null);assert.equal(result.meta.name,'old-film');assert.equal(result.meta.legacy,true);
   const bar=app.element('project-tabs-bar').children.at(-1);
