@@ -3619,6 +3619,22 @@
       ]
     },
     {
+      "id": "app.native.layer-rows.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-layer-row-writes.js",
+        "native-layer-row-drag.js",
+        "native-layer-row-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-layer-row-writes.js",
+        "native-layer-row-drag.js",
+        "native-layer-row-ui.js"
+      ]
+    },
+    {
       "id": "app.native.path-effects.ui.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

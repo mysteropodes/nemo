@@ -61,10 +61,21 @@ test('blend and opacity indicators show only a non-default value and say what th
  assert.match(H.project(plain[1]).nodes[0].title,/animated/);assert.equal(H.project(plain[2]).nodes.length,0);
 });
 
-test('a folder chevron is display only and says native collapse is unavailable; children are not hidden',()=>{
- const rows=rowsFor(ROWS),arrow=rows[6].children.find(c=>/larrow/.test(c.className));
- assert.equal(arrow.textContent,'▸');assert.match(arrow.title,/native folder collapse is unavailable/);assert.equal(arrow.dataset.unavailable,'true');
- assert.equal(rows[7].hidden,false,'a collapsed folder keeps its children (the grid reserves their rows)');
+test('a folder chevron carries the baseline expand/collapse titles; the children of a collapsed folder are hidden like the baseline',()=>{
+ const rows=rowsFor(ROWS),arrow=rows[6].children.find(c=>/larrow/.test(c.className)),open=rows[1].children.find(c=>/larrow/.test(c.className));
+ assert.equal(arrow.textContent,'▸');assert.equal(arrow.title,'Déplier le dossier');assert.equal(arrow.dataset.unavailable,undefined);
+ assert.equal(open.textContent,'▾');assert.equal(open.title,'Replier le dossier');
+ assert.equal(rows[7].hidden,true,'Inner sits under the collapsed folder u6');assert.equal(rows[7].style.display,'none');
+ assert.equal(rows[2].hidden,false,'Child sits under the expanded folder u1');assert.equal(rows[6].hidden,false,'the folder row itself stays');
+ assert.equal(Presenter.hiddenByFolder({layers:ROWS},{layerUid:'x',parentLayerUid:'nope'}),false,'an unknown parent hides nothing');
+ assert.equal(Presenter.hiddenByFolder({layers:ROWS},{layerUid:'f2',kind:'folder',parentLayerUid:'u6'}),false,'a folder is never absorbed');
+});
+
+test('the caller binds the row writes through rowEdit, once per row, after the row is complete',()=>{
+ const seen=[],doc=H.fakeDocument(),info={layers:ROWS.map(r=>({...r})),layerFolders:[],layerModelUnavailable:[]};
+ Presenter.render({},{document:doc,info,selection:[],shyMode:false,policyOwner:null,onPick(){},onVisibility(){},onPolicy(){},layerKind:kindsFor({}),
+  rowEdit(layer,i,row){seen.push([layer.layerUid,i,row.children.length>=4,row.dataset.layerUid]);}});
+ assert.deepEqual(seen.map(x=>x.slice(0,2)),ROWS.map((r,i)=>[r.layerUid,i]));assert.ok(seen.every(x=>x[2]&&x[3]===x[0]));
 });
 
 test('a layer carrying none of the facts renders only its four controls; unknown, unavailable and malformed facts invent nothing',()=>{
@@ -87,7 +98,7 @@ function rootFor(){
  const doc=H.fakeDocument(),nodes=new Map(['layer-list','frame-hdr','frame-grid'].map(id=>[id,Object.assign(new H.Node('div'),{id})]));
  doc.getElementById=id=>nodes.get(id)||null;doc.addEventListener=()=>{};
  return {state:{currentFrame:1,activeLayerIdx:0,hideShy:false},userLayers:[],document:doc,_layerSel:[0],FC:10,addEventListener(){},NemoNativeObjectProjectFile:Files,
-  NemoNativeObjectUI:UI,NemoNativeLayerRangeDesktop:Range,SMLayerKind:kindsFor({}),BLEND_MODE_LABELS:{multiply:'Multiply'}};
+  NemoNativeObjectUI:UI,NemoNativeLayerRangeDesktop:Range,NemoNativeLayerListPresenter:Presenter,SMLayerKind:kindsFor({}),BLEND_MODE_LABELS:{multiply:'Multiply'}};
 }
 function info(layers,rev=3,extra={}){return {apiVersion:2,instanceId:'instance',documentId:'document',lifecycleGeneration:1,contentRevision:rev,documentSnapshotId:'document-snapshot-'+rev,
  documentDigest:'4'.repeat(64),byteCount:1000,canvasW:320,canvasH:180,fps:24,totalFrames:24,reference:null,undoDepth:0,redoDepth:0,layers:layers.map(l=>({...l})),...extra};}

@@ -24,8 +24,8 @@
     cmdTween:off('Generating tweens is unavailable in native Nemo.'),
     // flipPreview browses through the native frame navigator (native-flip-preview.js); resetView uses the native viewport navigation first.
     cmdFlipPreview:NATIVE,cmdResetView:UI,
-    // The rename field commits through the legacy SM.renameLayer, which refuses; no native rename field exists yet.
-    cmdRenameLayer:off('Renaming a layer from the keyboard is unavailable in native Nemo.')
+    // native-layer-row-ui.js shortcut() opens the in-place name field of the active layer; its Enter commits layer.rename.
+    cmdRenameLayer:NATIVE
   });
   function target(root,action){var t=Object.prototype.hasOwnProperty.call(TARGETS,action)?TARGETS[action]:null;return typeof t==='function'?t(root):t;}
   function notice(root,reason){try{if(root.showToast)root.showToast(reason);}catch(_){}}

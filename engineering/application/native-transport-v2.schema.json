@@ -8425,6 +8425,23 @@
             {
               "properties": {
                 "operation": {
+                  "const": "command.document.object.layer.color.set"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerColorSetPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
                   "const": "command.document.object.tween.split"
                 },
                 "payload": {
@@ -23840,6 +23857,38 @@
         },
         "align": {
           "type": "boolean"
+        }
+      }
+    },
+    "ObjectLayerColorSetPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "color"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.color.set"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "selected": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
         }
       }
     },

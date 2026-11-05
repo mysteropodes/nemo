@@ -10,6 +10,7 @@ use crate::transaction::CompactResult;
 const OP_LAYER_DELETE: &str = "command.document.object.layer.delete";
 const OP_LAYER_DUPLICATE: &str = "command.document.object.layer.duplicate";
 const OP_LAYER_RENAME: &str = "command.document.object.layer.rename";
+const OP_LAYER_COLOR: &str = "command.document.object.layer.color.set";
 const OP_LAYER_REORDER: &str = "command.document.object.layer.reorder";
 const OP_LAYER_PARENT: &str = "command.document.object.layer.parent.set";
 const OP_LAYER_TIME_LINK: &str = "command.document.object.layer.timeLink.set";
@@ -33,6 +34,12 @@ impl NativeObjectHistory {
         bytes: &[u8],
     ) -> Result<PreparedLayerLifecycle, DispatchErrorCode> {
         self.owner.prepare_layer_rename_json(bytes)
+    }
+    pub(crate) fn prepare_layer_color_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedLayerLifecycle, DispatchErrorCode> {
+        self.owner.prepare_layer_color_json(bytes)
     }
     pub(crate) fn prepare_layer_reorder_json(
         &self,
@@ -80,6 +87,7 @@ impl NativeObjectHistory {
             OP_LAYER_DELETE
                 | OP_LAYER_DUPLICATE
                 | OP_LAYER_RENAME
+                | OP_LAYER_COLOR
                 | OP_LAYER_REORDER
                 | OP_LAYER_PARENT
                 | OP_LAYER_TIME_LINK
@@ -104,6 +112,7 @@ impl NativeObjectHistory {
             OP_LAYER_DELETE => self.prepare_layer_delete_json(&bytes),
             OP_LAYER_DUPLICATE => self.prepare_layer_duplicate_json(&bytes),
             OP_LAYER_RENAME => self.prepare_layer_rename_json(&bytes),
+            OP_LAYER_COLOR => self.prepare_layer_color_json(&bytes),
             OP_LAYER_REORDER => self.prepare_layer_reorder_json(&bytes),
             OP_LAYER_PARENT => self.prepare_layer_parent_json(&bytes),
             OP_LAYER_TIME_LINK => self.prepare_layer_time_link_json(&bytes),

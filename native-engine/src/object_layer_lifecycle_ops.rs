@@ -33,6 +33,10 @@ use parent::plan_parent;
 #[path = "object_layer_lifecycle_link.rs"]
 mod link;
 use link::{plan_follow_path, plan_time_link, TimeLinkRequest};
+// #2371 U11: the layer colour label and the label policy rename shares with it.
+#[path = "object_layer_lifecycle_color.rs"]
+mod color;
+use color::LabelEditPolicy;
 
 const MAX_PAYLOAD_BYTES: usize = 4096;
 
@@ -200,6 +204,7 @@ pub(crate) enum LayerLifecycleKind {
     Delete,
     Duplicate,
     Rename,
+    Color,
     Reorder,
     Parent,
     TimeLink,
@@ -311,7 +316,7 @@ impl ObjectFillOwner {
             origin.document(),
             &payload.layer_uid,
             &payload.name,
-            &UnavailableLayerEditPolicy,
+            &LabelEditPolicy,
         );
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::Rename, plan)
     }

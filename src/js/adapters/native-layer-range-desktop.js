@@ -281,7 +281,7 @@
     clearKeys(w);if(w.node&&w.node.parentNode)w.node.parentNode.removeChild(w.node);
     var node=root.document.createElement('div');node.className='native-layer-range-rows';w.node=node;
     w.rows=info.layers.map(function(layer,li){var row=root.document.createElement('div');row.className='frow native-layer-range-row';row.dataset.layer=String(li);row.dataset.layerUid=layer.layerUid;
-      row.style.position='relative';row.style.height='22px';row.style.width=(info.totalFrames*root.FC)+'px';row.hidden=!!(root.state.hideShy&&layer.shy);
+      row.style.position='relative';row.style.height='22px';row.style.width=(info.totalFrames*root.FC)+'px';row.hidden=!!(root.state.hideShy&&layer.shy)||!!(root.NemoNativeLayerListPresenter&&root.NemoNativeLayerListPresenter.hiddenByFolder(info,layer));
       return row;});
     w.rows.forEach(function(row,li){node.appendChild(row);if(w.barUiReady)w.ports.barUi.buildBar(row,li);});grid.appendChild(node);refreshKeys(root);
     if(!s||typeof s.readLayerRange!=='function')return;
