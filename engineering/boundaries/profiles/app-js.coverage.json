@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "d9bbeac51c0e9a1c99f88977dfe4406a1161673d",
+    "candidateCommit": "396af5c30ae81bf94aaa6561c0276105e943cb26",
     "sourceRootTree": "3187f3a58788574e17a87abe7921b5142d23de71",
     "applicationTree": {
       "path": "src/js",
       "gitTree": "d7d63d9f2ffdcfb05ecbcd6e73747ee8c9c2f492",
-      "lastChangedCommit": "d9bbeac51c0e9a1c99f88977dfe4406a1161673d"
+      "lastChangedCommit": "396af5c30ae81bf94aaa6561c0276105e943cb26"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -43,7 +43,7 @@
         "gitBlob": "252db58f17d135337ee5a99cf6d6b36b2fadb93f",
         "sha256": "c17143d289b3433cebc01bb4b3732a90b7b9f1293461d4c762f1ef55c004e214",
         "moduleCount": 307,
-        "basedOnCommit": "d9bbeac51c0e9a1c99f88977dfe4406a1161673d"
+        "basedOnCommit": "396af5c30ae81bf94aaa6561c0276105e943cb26"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -125,7 +125,7 @@
     "externalClassicTags": 400,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
-    "retainedClassicTags": 395,
+    "retainedClassicTags": 396,
     "retainedModuleTags": 2,
     "classicTagsUnderSrcJsIncludingVendors": 399,
     "inlineScripts": [
@@ -992,7 +992,7 @@
         {
           "path": "src/index.html",
           "line": 2602,
-          "scriptOrdinal": 252
+          "scriptOrdinal": 253
         }
       ]
     },
