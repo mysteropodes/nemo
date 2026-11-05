@@ -53,6 +53,25 @@ fn the_layer_time_link_and_follow_path_writes_are_closed_shapes() {
     let mut missing = follow();
     missing.as_object_mut().unwrap().remove("targetLayerUid");
     assert!(!ok("layer.followPath.set", missing));
+    let paint = || json!({"command":"object.layer.color.set","layerUid":"L","color":"#112233"});
+    assert!(ok("layer.color.set", paint()));
+    let mut selected = paint();
+    selected["selected"] = json!(["L", "M"]);
+    assert!(ok("layer.color.set", selected), "the optional selection");
+    for bad in [json!("#123"), json!("112233"), json!(""), json!("#1122334"), json!(7)] {
+        let mut wrong = paint();
+        wrong["color"] = bad;
+        assert!(!ok("layer.color.set", wrong));
+    }
+    let mut holes = paint();
+    holes["selected"] = json!(["L", ""]);
+    assert!(!ok("layer.color.set", holes), "an empty identity is never a layer");
+    let mut stray = paint();
+    stray["frame"] = json!(0);
+    assert!(!ok("layer.color.set", stray));
+    let mut unnamed = paint();
+    unnamed.as_object_mut().unwrap().remove("layerUid");
+    assert!(!ok("layer.color.set", unnamed));
     for align in [json!(true), json!(false)] {
         let mut aligned = follow();
         aligned["align"] = align;

@@ -18,6 +18,7 @@ function keyboard({desktop=true,targets=true,nativeFrames=true}={}){
     SM:{setTool:call('setTool'),toggleOnion:call('toggleOnion'),generateTweens:call('generateTweens'),flipPreview:call('flipPreview'),
       resetView:call('resetView'),duplicateKeyframe:call('duplicateKeyframe'),extendExposure:call('extendExposure')},
     NemoNativeFrameEditDesktop:{install:()=>({shortcut:(action)=>{if(!nativeFrames||!FRAME_EDITS.includes(action))return false;calls.push('native:'+action);return true;}})},
+    NemoNativeLayerRowUi:{shortcut:(host,action)=>{if(!desktop||action!=='cmdRenameLayer')return false;calls.push('native:'+action);return true;}},
     state:{playing:false,currentFrame:3,totalFrames:24,activeLayerIdx:0,layers:[{}]},
     goToFrame:call('goToFrame'),insertFrame:call('insertFrame'),insertKeyframe:call('insertKeyframe'),insertBlankKeyframe:call('insertBlankKeyframe'),
     startLayerRename:call('startLayerRename'),prevKeyframeFrame:()=>1,nextKeyframeFrame:()=>5,stopPlay:call('stopPlay'),
@@ -46,12 +47,12 @@ test('on desktop an unavailable shortcut shows its reason and reaches nothing; n
   k.registry.setKey('cmdTween','F8');
   assert.equal(k.press('F8'),true,'a user-bound Tween key is consumed');
   assert.equal(k.press('F2'),true,'the Rename key is consumed');
-  assert.deepEqual(k.calls,[],'neither generateTweens nor the rename field runs');
-  assert.deepEqual(k.notices,['Generating tweens is unavailable in native Nemo.','Renaming a layer from the keyboard is unavailable in native Nemo.']);
+  assert.deepEqual(k.calls,['native:cmdRenameLayer'],'generateTweens never runs; F2 reaches the native name field, not the legacy startLayerRename');
+  assert.deepEqual(k.notices,['Generating tweens is unavailable in native Nemo.']);
   for(const key of ['b','o','F5','F6','F7','+',',','/'])assert.equal(k.press(key),true,key);
-  assert.deepEqual(k.calls,['setTool:draw','toggleOnion','native:cmdInsertFrame','native:cmdInsertKey','native:cmdInsertBlankKey',
+  assert.deepEqual(k.calls,['native:cmdRenameLayer','setTool:draw','toggleOnion','native:cmdInsertFrame','native:cmdInsertKey','native:cmdInsertBlankKey',
     'native:cmdExtendExposure','goToFrame:2','resetView']);
-  assert.equal(k.notices.length,2,'no further notice');
+  assert.equal(k.notices.length,1,'no further notice');
 });
 
 test('T selects the Text tool and never reaches Tween or its unavailable notice',()=>{

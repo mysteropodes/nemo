@@ -7,8 +7,10 @@
  * Fixture: tests/native-layer-list-presenter.test.cjs (pre-seam DOM characterization).
  * #2371 U11: a row also carries the baseline (1065e9d8 renderLayerList) decorations for the facts the native read model
  * stores: folder chevron, colour dot, kind icon (layer-kind.js), component/matte/blend/opacity badges and folder indent.
- * A decoration is DISPLAY ONLY (no native write route exists for it), is marked data-native-layer-decor so the caller can
- * tell it from the four controls, and a fact the row does not carry adds no node (absent differs from a default).
+ * A decoration is marked data-native-layer-decor so the caller can tell it from the four controls, and a fact the row does
+ * not carry adds no node (absent differs from a default). The presenter itself commits nothing: the writes of a row (the
+ * folder chevron, the colour dot, the name field, the drag) are bound by the caller's `rowEdit(layer, index, row)` hook.
+ * The children of a collapsed folder layer are hidden like the baseline's (hiddenByFolder; the frame grid applies the same).
  * Rows stay one per layer in read-model order: the frame grid reserves one row per layer, so no extra header row is added.
  */
 (function(root,factory){
@@ -38,17 +40,22 @@
     if(layer.kind==='folder'||typeof layer.parentLayerUid!=='string')return 0;
     var parent=table(info,'layers',layer.parentLayerUid,'layerUid');return parent&&parent.kind==='folder'?1:0;
   }
+  // A layer whose parent is a collapsed folder layer is hidden with it (baseline computeLayerRenderOrder). The frame grid reads the same fact.
+  function hiddenByFolder(info,layer){
+    if(!info||layer.kind==='folder'||typeof layer.parentLayerUid!=='string')return false;
+    var parent=table(info,'layers',layer.parentLayerUid,'layerUid');return !!parent&&parent.kind==='folder'&&parent.folderCollapsed===true;
+  }
   function percent(v){return String(Math.round(v*100)/100)+'%';}
   // Returns {before:[...nodes ahead of the name], after:[...badges after it]}; rows with no such fact get none.
   function decorate(doc,layer,context,node,slots,i){
     var info=context.info,kinds=context.layerKind,before=[],after=[],depth=depthOf(info,layer),folder=null;
     if(layer.kind==='folder'){
-      var arrow=decor(doc,'div','lico larrow',(layer.folderCollapsed?'Folder collapsed':'Folder expanded')+' — display only, native folder collapse is unavailable');
-      arrow.textContent=layer.folderCollapsed?'▸':'▾';arrow.dataset.unavailable='true';before.push(arrow);
+      var arrow=decor(doc,'div','lico larrow',layer.folderCollapsed?'Déplier le dossier':'Replier le dossier');
+      arrow.textContent=layer.folderCollapsed?'▸':'▾';arrow.style.cursor='pointer';before.push(arrow);
     }else if(slots.spacer)before.push(decor(doc,'div','lico larrow-spacer'));
     var colour=typeof layer.color==='string'&&/^#[0-9a-fA-F]{3,8}$/.test(layer.color)?layer.color:slots.dots?'#8b8b9e':null;
     if(colour){
-      var dot=decor(doc,'div','lico layer-color-dot','Layer colour');
+      var dot=decor(doc,'div','lico layer-color-dot','Layer colour');dot.style.cursor='pointer';
       if(dot.style&&typeof dot.style.setProperty==='function')dot.style.setProperty('--dot-color',colour);else dot.style['--dot-color']=colour;
       before.push(dot);
     }
@@ -81,7 +88,7 @@
     if(depth>0||typeof layer.folderId==='string')node.className+=' in-folder';
     if(typeof layer.folderId==='string'){
       folder=table(info,'layerFolders',layer.folderId,'folderId');node.dataset.folderId=layer.folderId;
-      node.title='Folder: '+((folder&&folder.name)||layer.folderId)+(folder&&folder.collapsed?' (collapsed — display only)':'');
+      node.title='Folder: '+((folder&&folder.name)||layer.folderId)+(folder&&folder.collapsed?' (collapsed)':'');
     }
     return {before:before,after:after};
   }
@@ -107,7 +114,7 @@
     });
     // #2256: a double-click opens the component an instance layer instances (the baseline row dblclick); other rows ignore it.
     if(typeof context.onOpen==='function')node.addEventListener('dblclick',function(){return context.onOpen(layer,node);});
-    node.hidden=context.shyMode&&layer.shy===true;node.style.display=node.hidden?'none':'flex';
+    node.hidden=(context.shyMode&&layer.shy===true)||hiddenByFolder(context.info,layer);node.style.display=node.hidden?'none':'flex';
     var extra=decorate(doc,layer,context,node,slots,i);
     // The four controls stay the row's first four children (every consumer addresses them by position); the decorations follow
     // in DOM order and are placed around them with flex `order` (baseline order: arrow, dot, kind, name, badges, eye, lock, shy).
@@ -117,6 +124,8 @@
       extra.after.forEach(function(n){n.style.order='1';});[eye,flags[0],flags[1]].forEach(function(n){n.style.order='2';});
     }
     node.replaceChildren.apply(node,controls.concat(extra.before,extra.after));
+    // #2371: the caller binds the row's writes (rename, drag, colour dot, folder chevron) onto the finished row.
+    if(typeof context.rowEdit==='function')context.rowEdit(layer,i,node);
     return node;
   }
   function render(list,context){
@@ -139,6 +148,6 @@
       throw new Error('Native layer-list presenter returned rows that do not match the read model');
     return rows;
   }
-  var api=Object.freeze({render:render,mountRows:mountRows});
+  var api=Object.freeze({render:render,mountRows:mountRows,hiddenByFolder:hiddenByFolder});
   return api;
 }));

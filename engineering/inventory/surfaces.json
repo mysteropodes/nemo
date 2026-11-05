@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "de98153d859e4660b750b9c5ea81e53e64bdd124",
-  "describe": "v0.7.0-alpha.4-5112-gde98153d8-dirty"
+  "head": "d814592b2a50437ef693e9317f348cee9012d6f9",
+  "describe": "v0.7.0-alpha.4-5120-gd814592b2-dirty"
  },
- "inputsDigest": "77cc719aa16e0a139d9726a7bcbc86b06b94e83be1e8a83e20ebb6f28511e48d",
+ "inputsDigest": "41121e05dd8193613ff3da3c61a4ffabeb24b7c2600ac842833095bae9e59740",
  "states": [
   "inventoried",
   "characterized",
@@ -1838,7 +1838,7 @@
     "container": "layer-ctrls",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 202,
+    "functionsVisited": 226,
     "via": "chain",
     "references": []
    },
@@ -2021,7 +2021,7 @@
     "container": "layer-ctrls",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 96,
+    "functionsVisited": 118,
     "via": "chain",
     "references": []
    },
@@ -3437,7 +3437,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 169,
+    "functionsVisited": 188,
     "via": "chain",
     "references": []
    },
@@ -3730,7 +3730,7 @@
     "container": "swatches-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 27,
+    "functionsVisited": 61,
     "via": "variable replaceBtn",
     "references": [
      "src/js/adapters/native-palette-ui.js:248 render()",
@@ -22569,7 +22569,7 @@
    "source": "src/js/adapters/native-palette-ui.js:217",
    "meta": {
     "i18n": null,
-    "functionsVisited": 14
+    "functionsVisited": 64
    },
    "fixtures": [
     "static-props",
@@ -24481,7 +24481,7 @@
    "source": "src/js/media-library.js:543",
    "meta": {
     "i18n": "ctxRelinkReplaceFile",
-    "functionsVisited": 121
+    "functionsVisited": 122
    },
    "fixtures": [
     "mesh",
@@ -28781,7 +28781,7 @@
    "source": "src/js/shapes-panel.js:738",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 68
+    "functionsVisited": 88
    },
    "fixtures": [
     "static-props",
@@ -28892,7 +28892,7 @@
    "source": "src/js/shapes-panel.js:860",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 68
+    "functionsVisited": 88
    },
    "fixtures": [
     "static-props",
@@ -29008,7 +29008,7 @@
    "source": "src/js/shapes-panel.js:869",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 306
+    "functionsVisited": 314
    },
    "fixtures": [
     "static-props",
@@ -33011,7 +33011,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 405
+    "functionsVisited": 401
    },
    "fixtures": [
     "media",
