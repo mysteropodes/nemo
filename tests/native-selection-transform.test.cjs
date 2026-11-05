@@ -50,8 +50,8 @@ function harness(items = ITEMS, { native = true } = {}) {
     requestAnimationFrame: () => {}, pushUndo() { legacy.push('pushUndo'); throw new Error('native authority denied legacy history checkpoint'); },
     NemoNativeObjectProject: { desktop: () => session, selectLayerUI: () => true },
     NemoNativeViewportUnderlay: { canvasMapping: { point: (e) => ({ x: e.clientX, y: e.clientY }), transform: () => [1, 0, 0, 1, 0, 0] } },
-    NemoNativeObjectLabs: { desktop: () => ({ batchStrokes: async (layerUid, frame, steps) => {
-      batches.push({ layerUid, frame, steps: JSON.parse(JSON.stringify(steps)) });
+    NemoNativeObjectLabs: { desktop: () => ({ batchStrokes: async (layerUid, frame, steps, options) => {
+      batches.push({ layerUid, frame, steps: JSON.parse(JSON.stringify(steps)), options: { ...options } });
       if (gate.hold) await gate.hold;
       steps.forEach((s) => {
         const it = store.find((i) => i.stableTarget.strokeId === s.reshape.stableTarget.strokeId), m = s.reshape.matrix, at = (q) => [m[0] * q[0] + m[2] * q[1] + m[4], m[1] * q[0] + m[3] * q[1] + m[5]];
@@ -321,7 +321,7 @@ test('a plain X keeps swapping stroke and fill, and SM.flipHorizontal / flipVert
   assert.deepEqual(f.guarded, [], 'a native project never reaches the legacy writer');
 });
 
-test('no selection, or another tool, says Select strokes and writes nothing (baseline); Motion and a no-native-form item are notices', async () => {
+test('no selection, or another tool, says Select strokes and writes nothing (baseline); a no-native-form item is a notice', async () => {
   const h = harness([quad('L1', 'a', 10, 10, 30, 30, { role: 'raster' }), ITEMS[1]]);
   flipper(h);
   h.chord('X', true, false); await settle();
@@ -330,10 +330,7 @@ test('no selection, or another tool, says Select strokes and writes nothing (bas
   h.root.state.tool = 'subselect';
   h.chord('X', true, false); await settle();
   assert.deepEqual(h.toasts, ['Select strokes', 'Select strokes'], 'every press says so, as the baseline did');
-  h.root.state.tool = 'select'; h.root.state.appMode = 'motion';
-  h.chord('X', true, false); await settle();
-  assert.match(h.toasts[h.toasts.length - 1], /Motion/);
-  h.root.state.appMode = 'anim2d';
+  h.root.state.tool = 'select';
   const before = h.toasts.length;
   h.chord('X', true, false); await settle();
   assert.match(h.toasts.slice(before).join('|'), /Flipping images is not available on native projects yet/, 'an image is a typed refusal, never a silent no-op');
@@ -363,4 +360,23 @@ test('on a project that is not native the flip keeps the legacy writer behind it
   assert.equal(h.root.SM.flipHorizontal(), false);
   assert.deepEqual(f.guarded, ['timeline-selection-flip']);
   assert.deepEqual(h.batches, []);
+});
+
+// R-lane-a-fixes: the baseline flips in any mode. In Motion the key a held frame inherits is mirrored in place (no copy key); the numeric fields and the
+// arrow keys stay Animation 2D's, and Animation 2D keeps keying the held cell with a copy.
+test('Flip runs in Motion on the inherited key; the arrow keys and fields still say Motion', async () => {
+  const h = harness();
+  flipper(h);
+  await h.select();
+  h.chord('X', true, false); await settle();
+  assert.equal(h.batches[0].options.inherit, false, 'Animation 2D: the held cell is keyed with a copy');
+  h.root.state.appMode = 'motion';
+  h.root.NemoNativeSelectOverlay.show(h.root); // the selection the overlay draws now belongs to the mode it is shown in
+  h.chord('X', true, false); await settle();
+  assert.equal(h.batches.length, 2);
+  assert.equal(h.batches[1].options.inherit, true, 'Motion: the inherited key is edited in place');
+  assert.deepEqual(h.toasts, ['Flip horizontal', 'Flip horizontal']);
+  h.key('ArrowRight');
+  assert.match(h.toasts[h.toasts.length - 1], /Transforming the selection is not available in Motion/);
+  assert.equal(h.batches.length, 2, 'the arrow key wrote nothing in Motion');
 });

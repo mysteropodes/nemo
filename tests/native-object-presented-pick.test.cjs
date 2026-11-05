@@ -175,3 +175,15 @@ test('a layer of many textured strokes lists their anchors only (bounds cover th
   assert.deepEqual([hit.data.strokeId, hit.data.nativeBrush, hit.data.nativeGroup], ['a3', 'anchor', 'g3'], 'world (320,10) lies on the fourth anchor line');
   assert.deepEqual(fetched.filter(([, kept]) => kept).map(([id]) => id), ['a3'], 'only the anchor whose bounds reach the click is read');
 });
+
+// R-lane-a-fixes: the engine's hit-test listing names the pose of the layer's own Motion (`layerMatrix`); the presented read hands it on, null when the listing has none.
+test('the presented layer carries the pose the listing names, and null when it names none', async () => {
+  const r = root();
+  assert.equal((await Intent.layerPaths(r, () => false, false, 0)).layerMatrix, null);
+  const session = r.NemoNativeObjectProject.desktop(), plain = session.readPresentedStrokes;
+  session.readPresentedStrokes = async (...args) => ({ ...(await plain.apply(session, args)), layerMatrix: [1, 0, 0, 1, 7, -3] });
+  const listing = await Intent.layerPaths(r, () => false, false, 0);
+  assert.deepEqual(listing.layerMatrix, [1, 0, 0, 1, 7, -3]);
+  assert.deepEqual(listing.pin, PIN);
+  assert.equal(listing.frame, 0);
+});

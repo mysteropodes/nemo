@@ -4882,6 +4882,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-layer-motion-pose.js",
+      "moduleId": "app.native.object.shape.tool",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2624,
+          "scriptOrdinal": 275
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-object-eraser-tool.js",
       "moduleId": "app.native.object.shape.tool",
       "executionClass": "document-classic",

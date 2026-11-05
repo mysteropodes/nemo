@@ -149,3 +149,12 @@ test('a hit-test listing item may carry the groupPath of its enclosing groups: o
   const {hitTest,...plain}=r;
   assert.throws(()=>C.viewResult({...plain,items:[{stableTarget:target,closed:true,count:4,matrix:[1,0,0,1,0,0],groupPath:[{id:'g'}]}]}),undefined,'an editable page has no groupPath');
 });
+test('a hit-test listing may carry the layer\'s pose as six finite non-singular numbers, and only a hit-test listing (R-lane-a-fixes)',()=>{
+  const view={kind:'subselect',contextId:'scene-root',layerUid:'layer-a',frame:0,workId:'native-work-1',viewGeneration:1,cursor:0,hitTest:true};
+  const r={...view,atRevision:7,documentSnapshotId:'native-object:document:7',total:0,nextCursor:null,preview:false,items:[]};
+  C.viewResult(r);
+  for(const pose of [[1,0,0,1,7,-3],[0,1,-1,0,0.5,0.25],[2,0,0,0.5,0,0]])C.viewResult({...r,layerMatrix:pose});
+  for(const bad of [[1,0,0,1,7],[1,0,0,1,7,-3,0],[1,0,0,1,'7',-3],[0,0,0,0,0,0],[1,2,2,4,0,0],[1,0,0,1,NaN,0],null,{},1])assert.throws(()=>C.viewResult({...r,layerMatrix:bad}),undefined,JSON.stringify(bad));
+  const {hitTest,...plain}=r;
+  assert.throws(()=>C.viewResult({...plain,layerMatrix:[1,0,0,1,7,-3]}),undefined,'an editable page has no pose');
+});

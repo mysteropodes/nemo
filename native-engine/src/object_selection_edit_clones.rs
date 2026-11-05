@@ -159,6 +159,36 @@ pub(crate) fn shift_record(
     Ok(())
 }
 
+/// What the ordinary Select move does to the rest of a dynamic or gradient-filled copy (baseline select-bridge onDown ~1186-1207
+/// clones in place and then runs the ordinary move, which carries the `paramShape.box` frame and the gradient end points with the
+/// segments): the same translation applied to those, after [`shift_record`] moved the geometry. Only an Alt-drag duplicate asks
+/// for it; the Cmd+D nudge stays the baseline `clone.translate`.
+pub(crate) fn shift_frame_and_gradient(
+    record: &mut ObjectRecord,
+    offset: [f64; 2],
+) -> Result<(), SelectionError> {
+    let Presence::Present(ext) = &mut record.vector_ext else {
+        return Ok(());
+    };
+    let moved = |n: &Number, delta: f64| -> Result<Number, SelectionError> {
+        n.as_f64()
+            .and_then(|v| Number::from_f64(v + delta))
+            .ok_or(SelectionError::NonFiniteCoordinate)
+    };
+    if let Presence::Present(shape) = &mut ext.param_shape {
+        if let Presence::Present(frame) = &mut shape.frame {
+            (frame.x1, frame.y1) = (moved(&frame.x1, offset[0])?, moved(&frame.y1, offset[1])?);
+            (frame.x2, frame.y2) = (moved(&frame.x2, offset[0])?, moved(&frame.y2, offset[1])?);
+        }
+    }
+    if let Presence::Present(gradient) = &mut ext.fill_gradient {
+        for end in [&mut gradient.from, &mut gradient.to] {
+            *end = [moved(&end[0], offset[0])?, moved(&end[1], offset[1])?];
+        }
+    }
+    Ok(())
+}
+
 /// Clones of the selected records join the top of the destination cell.
 pub(crate) struct Clones {
     pub(crate) created: Vec<String>,

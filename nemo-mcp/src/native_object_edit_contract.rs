@@ -38,6 +38,8 @@ enum K {
     Footprint,
     /// An Alt-drag duplicate's distance: a finite `[dx, dy]` pair, each component at most 1e6.
     Offset,
+    /// A multi-layer duplicate's other layers: one to 32 `{layerUid, strokeIds}` with distinct layers and one or more distinct stroke identities each.
+    Others,
     Fill(fill::Field),
 }
 
@@ -98,7 +100,7 @@ static SPECS: [(&str, &str, &str); 21] = [
     (
         "selection.duplicate",
         "object.selection.duplicate",
-        "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0 offset:offset?",
+        "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0 offset:offset? others:others?",
     ),
     (
         "layer.split",
@@ -219,6 +221,24 @@ fn offset(value: &Value) -> bool {
     })
 }
 
+fn others(value: &Value) -> bool {
+    value.as_array().is_some_and(|layers| {
+        (1..=32).contains(&layers.len())
+            && layers.iter().enumerate().all(|(at, entry)| {
+                exact(entry, &["layerUid", "strokeIds"], &[]).is_some_and(|object| {
+                    object.get("layerUid").is_some_and(uid)
+                        && object.get("strokeIds").and_then(Value::as_array).is_some_and(|ids| {
+                            (1..=MAX_ITEMS).contains(&ids.len()) && ids.iter().all(uid) && {
+                                let mut seen = HashSet::new();
+                                ids.iter().all(|id| seen.insert(id.as_str()))
+                            }
+                        })
+                        && layers[..at].iter().all(|before| before.get("layerUid") != object.get("layerUid"))
+                })
+            })
+    })
+}
+
 fn kind(token: &str) -> Option<K> {
     Some(match token {
         "uid" => K::Uid,
@@ -239,6 +259,7 @@ fn kind(token: &str) -> Option<K> {
         "clip" => K::Clip,
         "footprint" => K::Footprint,
         "offset" => K::Offset,
+        "others" => K::Others,
         _ => K::Fill(fill::kind(token)?),
     })
 }
@@ -274,6 +295,7 @@ fn check(kind: K, value: &Value) -> bool {
         K::Clip => clipboard::clip(value),
         K::Footprint => footprint(value),
         K::Offset => offset(value),
+        K::Others => others(value),
         K::Fill(field) => fill::check(field, value),
     }
 }

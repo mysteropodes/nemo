@@ -5157,6 +5157,33 @@
         "offset": {
           "$ref": "#/$defs/ObjectVectorPair",
           "description": "Where the copies land, in the records' own space: the distance of an Alt-drag duplicate. Each component is finite and at most 1e6 in magnitude. Absent: the baseline 12 px nudge on both axes."
+        },
+        "others": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "description": "Shapes of OTHER layers the copy also takes: a selection that spans layers is cloned into the destination layer (baseline duplicateSelection materialises every selected path into the active layer), in the same transaction. Each layer is named once and is not the destination; its shapes are read at the cell its playhead shows and are never written. Absent: the selection is the destination layer's alone.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "layerUid",
+              "strokeIds"
+            ],
+            "properties": {
+              "layerUid": {
+                "$ref": "#/$defs/ObjectEditId"
+              },
+              "strokeIds": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1024,
+                "items": {
+                  "$ref": "#/$defs/ObjectEditId"
+                }
+              }
+            }
+          }
         }
       }
     },

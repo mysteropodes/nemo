@@ -49,7 +49,7 @@ function harness(opts = {}) {
     NemoNativeViewportUnderlay: { canvasMapping: { point: (e) => ({ x: e.clientX, y: e.clientY }), transform: () => [1, 0, 0, 1, 0, 0] } },
     NemoNativeObjectLabs: { desktop: () => ({ batchStrokes: async (layerUid, frame, steps, options) => {
       const body = JSON.parse(JSON.stringify(steps));
-      batches.push({ layerUid, frame, steps: body, options });
+      batches.push({ layerUid, frame, steps: body, options: { ...options } });
       // the engine contract admits exactly the ops this adapter sends
       Contract.compose(null).payload(Contract.VECTOR, { command: 'object.vector.batch', ops: body.map((s) => ({ op: 'order', stableTarget: s.order.stableTarget, placement: s.order.mode, frame })) });
       if (answer !== 'applied') return { status: answer };
@@ -127,7 +127,7 @@ test('a document that moved on between the click and the read writes nothing', a
   assert.deepEqual(h.toasts, ['The document changed — nothing was reordered.']);
 });
 
-test('nothing selected resolves to null and writes nothing; a request in flight is not doubled; Motion is a notice', async () => {
+test('nothing selected resolves to null and writes nothing; a request in flight is not doubled', async () => {
   const h = harness();
   assert.equal(await Order.front(h.root), null);
   await h.marquee(2, 2, 95, 65);
@@ -135,11 +135,38 @@ test('nothing selected resolves to null and writes nothing; a request in flight 
   assert.equal(await second, 'busy');
   assert.equal(await first, 'applied');
   assert.equal(h.batches.length, 1);
-  h.root.state.appMode = 'motion';
-  assert.equal(await Order.front(h.root), 'refused');
-  assert.deepEqual(h.toasts, ['Reordering the selection is not available in Motion on native projects yet.']);
-  assert.equal(h.batches.length, 1, 'Motion writes nothing');
   assert.equal(await Order.order(h.root, 'sideways'), 'refused');
+});
+
+// R-lane-a-fixes: the baseline rows run in any mode. Motion edits the key a held frame inherits (Animation 2D keys the held cell with a copy first).
+test('Motion reorders too, asking the route for the inherited key; Animation 2D keeps the copy key', async () => {
+  const h = harness();
+  await h.marquee(2, 2, 95, 65);
+  assert.equal(await Order.front(h.root), 'applied');
+  assert.equal(h.batches[0].options.inherit, false, 'Animation 2D: the held cell is keyed with a copy');
+  h.root.state.appMode = 'motion';
+  await h.marquee(2, 2, 95, 65);
+  assert.equal(await Order.back(h.root), 'applied');
+  assert.equal(h.batches.length, 2);
+  assert.equal(h.batches[1].options.inherit, true, 'Motion: no copy key');
+  assert.equal(h.batches[1].options.select, true);
+  assert.deepEqual(h.toasts, []);
+});
+
+test('the Labs batch route in Motion sends no copy key and addresses each step to the key its record lives in', async () => {
+  const Labs = require('../src/js/adapters/native-object-labs.js');
+  const sent = [];
+  const host = { NemoNativeObjectVector: { create: () => ({ batchStrokes: async (layerUid, frame, steps, options) => { sent.push({ layerUid, frame, steps, options }); return { status: 'applied' }; } }) } };
+  const route = Labs.create({ info: () => ({ layers: [] }) }, host);
+  const target = (frame, id) => ({ contextId: 'scene-root', layerUid: 'L1', frameScope: { kind: 'authored', frame }, strokeId: id });
+  const steps = [{ order: { stableTarget: target(2, 'a'), mode: 'front' } }, { reshape: { stableTarget: target(2, 'b'), matrix: [-1, 0, 0, 1, 10, 0] } }, { delete: 'c' }];
+  await route.batchStrokes('L1', 7, steps, { select: true });
+  assert.deepEqual(sent[0].options, { keyframe: 'copy' }, 'Animation 2D: the held frame 7 is keyed with a copy');
+  assert.equal(sent[0].steps[0].frame, undefined);
+  await route.batchStrokes('L1', 7, steps, { select: true, inherit: true });
+  assert.deepEqual(sent[1].options, {}, 'Motion: no copy key');
+  assert.deepEqual(sent[1].steps.map((x) => x.frame), [2, 2, undefined], 'the steps that name a presented record go to its own key; the others keep the batch frame');
+  assert.deepEqual(steps.map((x) => x.frame), [undefined, undefined, undefined], 'the caller\'s steps are not touched');
 });
 
 test('the steps are pure: front keeps the order given, back reverses it', () => {

@@ -20,7 +20,7 @@
     function ready(){
       var s=ctx.session(),pin=s&&s.info(),shown=s&&s.readPresentedObjectSession(),state=root.state;
       if(!s||!s.isActive()||!pin||!shown||!same(pin,shown)||!shown.presentation||shown.presentation.owner!=='native'||shown.presentation.status!=='presented'||
-          !ctx.Mapping||typeof ctx.Mapping.matchesView!=='function'||!ctx.Mapping.matchesView(root,shown.presentation)||state.appMode!=='anim2d'||state.playing)
+          !ctx.Mapping||typeof ctx.Mapping.matchesView!=='function'||!ctx.Mapping.matchesView(root,shown.presentation)||(state.appMode!=='anim2d'&&state.appMode!=='motion')||state.playing)
         throw new Error(T.unavailable);
       var bounds=ctx.bounds(pin);
       return {pin:pin,presentation:shown.presentation,bounds:bounds,scale:ctx.scale({pin:pin,presentation:shown.presentation,bounds:bounds})||bounds.width/pin.canvasW};

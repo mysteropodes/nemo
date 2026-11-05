@@ -8,7 +8,7 @@
 //! Row additions (all optional except `kind`): `kind` (the `layer-kind.js` `keyOf` taxonomy, or `unknown` when the stored
 //! content contradicts itself), `folderCollapsed` (a folder layer's stored state), `folderId` (organisational membership),
 //! `componentId` (the symbol an instance layer places), `blendMode`, `matteMode`, `matteSourceLayerUid`, `mattesMore`,
-//! `isMatteSource`, `timeLinkUid` and `followPathUid` (#2372: the stored Link time source and Follow path target), `followPathAlign` (true only: the orient toggle of that path), `keyLock` (D37: the layer's standing key-lock mode `in`, `out` or `layer`; omitted when none), `hasDuplicator` (true only: the layer hosts a stored duplicator) with `dupSourceMode` (`shape` or `objects`, as that duplicator stores it), `opacity` (the static value), `opacityAnimated`, and (#2372) `effects` (the layer's stored effect stack, so the
+//! `isMatteSource`, `timeLinkUid` and `followPathUid` (#2372: the stored Link time source and Follow path target), `followPathAlign` (true only: the orient toggle of that path), `keyLock` (D37: the layer's standing key-lock mode `in`, `out` or `layer`; omitted when none), `hasDuplicator` (true only: the layer hosts a stored duplicator) with `dupSourceMode` (`shape` or `objects`, as that duplicator stores it), `opacity` (the static value), `opacityAnimated`, `hasMotion` (true only: the layer's own Position / Anchor / Rotation / Scale is not the identity pose, so a pointer must be mapped through it), and (#2372) `effects` (the layer's stored effect stack, so the
 //! effects panel can send a complete replacement) or `effectsOversize` when the stack is past the row or document bound, and the same for the path-effect stack (`pathFx`, `pathFxOversize`). Top level: `layerFolders` (the organisational folder
 //! rows) and `layerModelUnavailable`. The colour label stays the existing `color` row member.
 use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
@@ -140,6 +140,37 @@ fn carry_stack<T: serde::Serialize>(
     }
 }
 
+/// The scene layers whose own Position, Anchor, Rotation or Scale is anything but the identity pose (baseline `computeMotionMat`
+/// returns null for the identity defaults 0,0 / 0,0 / 0 / 100,100): a key, an expression, or a static value away from the default.
+fn moving_layers(document: &ObjectDocument) -> HashSet<&str> {
+    let identity = |property: &str, value: &[serde_json::Number]| {
+        let want: &[f64] = match property {
+            "scale" => &[100.0, 100.0],
+            "rotation" => &[0.0],
+            _ => &[0.0, 0.0],
+        };
+        value.len() == want.len()
+            && value.iter().zip(want).all(|(n, w)| n.as_f64() == Some(*w))
+    };
+    document
+        .property_holders()
+        .unwrap_or_default()
+        .iter()
+        .filter(|h| h.target.context_id == SCENE_CONTEXT && h.target.stroke_id.value().is_none())
+        .filter(|h| {
+            h.properties.iter().any(|p| {
+                matches!(p.property.as_str(), "position" | "anchor" | "rotation" | "scale")
+                    && (p.track.value().is_some_and(|t| !t.keys.is_empty())
+                        || p.expression.value().is_some()
+                        || p.static_value
+                            .value()
+                            .is_some_and(|v| !identity(&p.property, v)))
+            })
+        })
+        .map(|h| h.target.layer_uid.as_str())
+        .collect()
+}
+
 /// One extra-member map per layer, index-aligned with `document.layers()`.
 pub(crate) fn layer_members(document: &ObjectDocument) -> Vec<Map<String, Value>> {
     let content = content_by_layer(document);
@@ -180,6 +211,7 @@ pub(crate) fn layer_members(document: &ObjectDocument) -> Vec<Map<String, Value>
                 .map(move |p| (h.target.layer_uid.as_str(), p))
         })
         .collect();
+    let moved = moving_layers(document);
     let mut effects_budget = EFFECTS_TOTAL_BYTES;
     document
         .layers()
@@ -269,6 +301,11 @@ pub(crate) fn layer_members(document: &ObjectDocument) -> Vec<Map<String, Value>
             // #2372: the path-effect stack (baseline `ld.pathFx`) rides the same way, so the path-effects panel can resend it whole.
             if let Some(stack) = layer.path_fx().filter(|stack| !stack.is_empty()) {
                 carry_stack(&mut row, stack, "pathFx", "pathFxOversize", &mut effects_budget);
+            }
+            // #2372: the layer carries Motion (a key, an expression or a non-default static Position / Anchor / Rotation / Scale), so a
+            // pointer drawn on it is mapped through that pose before a record is stored (baseline `layerMotionPointMap`).
+            if moved.contains(uid) {
+                row.insert("hasMotion".into(), json!(true));
             }
             if let Some(record) = opacity.get(uid) {
                 if let Some([value]) = record.static_value.value().map(Vec::as_slice) {

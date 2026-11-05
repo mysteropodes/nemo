@@ -2,7 +2,8 @@
 //! a held cell - and a drag is ONE undo step (`joinHistory`). Expected values are hand-derived from the geometry.
 use crate::history::object_history::object_boolean_ops_tests::{
     apply, bytes, document, erase_payload, frame_records, ids_of, legacy, near, ngon, owner_of, rect,
-    ring_points, send, shoelace, state, vector, VectorSpec, BLUE, RED,
+    ring_points, send, shoelace, square, state, vector, VectorSpec, BLUE, RED,
+    op_payload,
 };
 use serde_json::{json, Value};
 
@@ -285,4 +286,34 @@ fn only_the_eraser_may_join_and_only_with_a_boolean() {
     assert_eq!(response["ok"], json!(false));
     assert_eq!(response["error"]["code"], json!("invalid_request"));
     assert_eq!(owner.history_depths(), (0, 0));
+}
+
+#[test]
+fn a_join_never_folds_into_an_entry_another_edit_left_on_top() {
+    // The eraser entry is NOT the top one: a boolean unite was the last edit, and its revision is the current one.
+    let mut owner = owner_of(&document(
+        2,
+        vec![
+            legacy("L0", "t", 0, &ngon(50.0, 50.0, 50.0, 64), RED),
+            legacy("L0", "s1", 0, &square(300.0, 0.0, 10.0), RED),
+            legacy("L0", "s2", 0, &square(350.0, 0.0, 10.0), BLUE),
+        ],
+        None,
+        None,
+    ));
+    send(&mut owner, "a", "erase", &erase("L0", 0, "t", &notch(-10.0)));
+    let united = send(&mut owner, "b", "apply", &op_payload("unite", "L0", 0, &["s1", "s2"]));
+    assert_eq!(united["result"]["applied"], json!(true));
+    assert_eq!(owner.history_depths(), (2, 0));
+    let (before, revision) = (bytes(&owner), owner.content_revision());
+    let refused = send(&mut owner, "c", "erase", &joined(&notch(5.0)));
+    assert_eq!(refused["ok"], json!(false));
+    assert_eq!(refused["error"]["code"], json!("unavailable"));
+    assert_eq!((bytes(&owner), owner.content_revision()), (before, revision), "nothing was erased");
+    assert_eq!(owner.history_depths(), (2, 0), "and the unite entry did not grow");
+    // an ordinary bite starts its own gesture, and the bites after it join that one
+    send(&mut owner, "d", "erase", &erase("L0", 0, "t", &notch(5.0)));
+    let again = send(&mut owner, "e", "erase", &joined(&notch(20.0)));
+    assert_eq!(again["result"], json!({"applied":true,"historyEntriesAdded":0}));
+    assert_eq!(owner.history_depths(), (3, 0));
 }

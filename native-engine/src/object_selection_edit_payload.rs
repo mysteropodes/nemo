@@ -41,8 +41,24 @@ object_deserialize!(SelectionPayload {
     stroke_ids: Vec<String>
 });
 
+/// Shapes of another layer a multi-layer duplicate copies into the destination layer.
+#[derive(Debug)]
+pub(super) struct OtherLayerPayload {
+    pub(super) layer_uid: String,
+    pub(super) stroke_ids: Vec<String>,
+}
+object_deserialize!(OtherLayerPayload {
+    layer_uid: String,
+    stroke_ids: Vec<String>
+});
+
+/// Most layers besides the destination one multi-layer duplicate may copy from.
+pub(super) const MAX_OTHER_LAYERS: usize = 32;
+
 /// duplicate: the shapes of one layer cell by stable identity, and optionally where the copies land
-/// (`offset`, the world distance of an Alt-drag; absent is the baseline 12 px nudge on both axes).
+/// (`offset`, the world distance of an Alt-drag; absent is the baseline 12 px nudge on both axes) and the shapes
+/// of OTHER layers the copy also takes (`others`): a selection that spans layers is cloned into the destination layer
+/// (baseline `duplicateSelection`: every selected path is materialised into the ACTIVE layer), all in one transaction.
 #[derive(Debug)]
 pub(super) struct DuplicatePayload {
     pub(super) command: String,
@@ -52,6 +68,7 @@ pub(super) struct DuplicatePayload {
     pub(super) mode: String,
     pub(super) stroke_ids: Vec<String>,
     pub(super) offset: Presence<[f64; 2]>,
+    pub(super) others: Presence<Vec<OtherLayerPayload>>,
 }
 object_deserialize!(DuplicatePayload {
     command: String,
@@ -60,7 +77,8 @@ object_deserialize!(DuplicatePayload {
     frame: u32,
     mode: String,
     stroke_ids: Vec<String>,
-    #[serde(default)] offset: Presence<[f64; 2]>
+    #[serde(default)] offset: Presence<[f64; 2]>,
+    #[serde(default)] others: Presence<Vec<OtherLayerPayload>>
 });
 
 /// Largest distance (world px, per axis) a duplicate may be dragged: far beyond any canvas, small enough to stay exact.

@@ -431,6 +431,26 @@ fn a_held_frame_is_keyed_with_a_copy_and_only_that_cell_is_restacked() {
     assert_eq!(r["ok"], false, "{r}");
 }
 
+/// Motion mode: the key a held frame inherits is restacked in place (the step names that key's cell, no copy key), so no key is added.
+#[test]
+fn bring_to_front_in_motion_restacks_the_inherited_key_in_place() {
+    let mut source = doc(2, &["s-a", "s-b", "s-c"]);
+    source["layers"][0]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+        "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+    let mut owner = owner_of(&source);
+    let before = state(&owner);
+    let r = send(&mut owner, "motion", batch(vec![
+        json!({"op":"order","stableTarget":target("L1", 0, "s-a"),"placement":"front","frame":0}),
+    ]));
+    assert_eq!(r["ok"], true, "{r}");
+    let after = state(&owner);
+    assert_eq!(after["layers"][0]["timing"]["keys"], json!([{"frame":0}]), "no key was added");
+    assert_eq!(stack(&after, "L1", 0), strs(&["s-b", "s-c", "s-a"]));
+    assert_eq!(owner.history_depths(), (1, 0));
+    owner.undo(1).unwrap();
+    assert_eq!(state(&owner), before);
+}
+
 #[cfg(feature = "evaluation")]
 #[test]
 fn the_evaluated_paint_order_follows_the_restack() {

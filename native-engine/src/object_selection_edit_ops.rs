@@ -38,7 +38,7 @@ pub(crate) use clipboard::PasteDestination;
 mod wire;
 use wire::{
     edit_mode, labels_ok, parse, refusal_code, strokes_ok, target_ok, DuplicatePayload,
-    SelectionPayload, SplitPayload, MAX_DUPLICATE_OFFSET,
+    SelectionPayload, SplitPayload, MAX_DUPLICATE_OFFSET, MAX_OTHER_LAYERS,
 };
 
 #[cfg(all(test, feature = "project_media_codec"))]
@@ -260,13 +260,27 @@ impl ObjectFillOwner {
             .value()
             .copied()
             .unwrap_or([DUPLICATE_OFFSET_PX; 2]);
+        let others: &[wire::OtherLayerPayload] = payload.others.value().map_or(&[], Vec::as_slice);
         if payload.command != "object.selection.duplicate"
             || !target_ok(&payload.context_id, &payload.layer_uid)
             || !strokes_ok(&payload.stroke_ids)
             || !offset.iter().all(|v| v.is_finite() && v.abs() <= MAX_DUPLICATE_OFFSET)
+            // `others` is present only to say something: one to MAX_OTHER_LAYERS layers other than the destination, each named once with its shapes.
+            || (!payload.others.missing() && (others.is_empty() || others.len() > MAX_OTHER_LAYERS))
+            || others.iter().enumerate().any(|(at, other)| {
+                !target_ok(&payload.context_id, &other.layer_uid)
+                    || other.stroke_ids.is_empty()
+                    || !strokes_ok(&other.stroke_ids)
+                    || other.layer_uid == payload.layer_uid
+                    || others[..at].iter().any(|before| before.layer_uid == other.layer_uid)
+            })
         {
             return Err(DispatchErrorCode::InvalidRequest);
         }
+        let others: Vec<(&str, &[String])> = others
+            .iter()
+            .map(|other| (other.layer_uid.as_str(), other.stroke_ids.as_slice()))
+            .collect();
         let request = SelectionRequest {
             context_id: &payload.context_id,
             layer_uid: &payload.layer_uid,
@@ -281,6 +295,8 @@ impl ObjectFillOwner {
             &request,
             &RealHeldFramePromotion,
             offset,
+            payload.offset.value().is_some(),
+            &others,
             &mut ids,
         );
         PreparedSelectionEdit::seal(origin, SelectionEditKind::Duplicate, plan)
