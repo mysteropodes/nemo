@@ -30,7 +30,7 @@ mod batch_ops;
 #[path = "object_vector_create.rs"]
 mod create_ops;
 #[path = "object_vector_edit_context.rs"]
-mod context;
+pub(crate) mod context;
 #[path = "object_vector_edit_cells.rs"]
 mod cells;
 use create_ops::{create, create_many, Placement};

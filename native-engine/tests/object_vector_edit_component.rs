@@ -391,3 +391,28 @@ fn a_locked_or_path_effect_component_layer_refuses_every_vector_write_like_the_s
     }
     }
 }
+
+/// #2361 Fill Brush inside an entered component (draw-bridge.js Fill Brush @1065e9d8 runs on the symbol layer enterSymbol swaps in):
+/// the shape lands in THAT component, one revision, one undo entry, and the scene root is untouched.
+#[test]
+fn a_fill_brush_in_a_component_places_in_that_component_as_one_entry_and_one_undo() {
+    let mut owner = owner_of(&doc());
+    let (before, bytes_before) = (state(&owner), bytes(&owner));
+    let s = |x: f64, y: f64| json!({"point":[x,y],"handleIn":[0,0],"handleOut":[0,0]});
+    let p = json!({"command":"object.fill.brush","layerUid":"inner","contextId":CTX,"frame":0,
+        "outline":[s(0.0, 0.0), s(40.0, 0.0), s(40.0, 30.0), s(0.0, 30.0)],"color":"#0000ffff","opacity":0.75,
+        "placement":"above","mask":false,"copies":[],"stamps":[]});
+    let candidate = owner.prepare_fill_brush_json(p.to_string().as_bytes()).unwrap();
+    owner.commit_boolean_edit(candidate).unwrap();
+    let after = state(&owner);
+    assert_eq!(owner.history_depths(), (1, 0), "one history entry");
+    assert_eq!(ids(&after).len(), 2, "the shape joined the component");
+    assert_eq!(component(&after)[1]["vectorExt"], json!({"isFillShape": true}));
+    assert_eq!(scene_part(&after), scene_part(&before), "the scene root is untouched");
+    undo(&mut owner);
+    assert_eq!(bytes(&owner), bytes_before, "one Undo restores the bytes");
+    // A component layer the context does not declare is refused with nothing prepared.
+    let mut stray = p.clone();
+    stray["layerUid"] = json!("L1");
+    assert!(owner.prepare_fill_brush_json(stray.to_string().as_bytes()).is_err());
+}
