@@ -414,7 +414,7 @@ fn validate_content_inner(
                 .iter()
                 .any(|record| record.target.layer_uid == layer.layer_uid)
         {
-            return Err(reject(Invalid, "a Null or Guide layer carries no objects"));
+            return Err(reject(Invalid, if layer.is_guide_layer() { "a Guide layer carries no objects" } else { "a Null layer carries no objects" }));
         }
         if let Some(table) = layer.groups.value() {
             object_group_codec::validate_group_table(

@@ -152,3 +152,6 @@ mod object_layer_kind_create;
 #[cfg(all(test, feature = "export_job"))]
 #[path = "../tests/object_layer_kind_render.rs"]
 mod object_layer_kind_render;
+#[cfg(test)]
+#[path = "../tests/object_layer_folder_membership.rs"]
+mod object_layer_folder_membership;
