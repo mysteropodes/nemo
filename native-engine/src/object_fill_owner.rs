@@ -470,7 +470,9 @@ mod tests {
 // Whole-cell Move and atomic bar Shift share this existing native owner.
 #[path = "object_frame_bulk_move.rs"]
 mod object_frame_bulk_move;
-pub(crate) use object_frame_bulk_move::{PreparedBulkFrameEdit, PreparedLayerShift};
+pub(crate) use object_frame_bulk_move::{
+    retime_root_layer_motion, PreparedBulkFrameEdit, PreparedLayerShift,
+};
 
 #[cfg(feature = "application")]
 #[path = "object_tween_owner.rs"]

@@ -3640,6 +3640,18 @@
       ]
     },
     {
+      "id": "app.native.project-length.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-project-length.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-project-length.js"
+      ]
+    },
+    {
       "id": "app.native.layer-solo.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

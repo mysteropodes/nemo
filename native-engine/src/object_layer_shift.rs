@@ -296,6 +296,16 @@ impl PreparedLayerShift {
         self.changed
     }
 }
+/// Trim to Work Area re-bases every root layer's Motion keys (baseline `shiftLayerMotionKeys`): the same retime
+/// the layer-bar gesture runs, clamped to the timeline as it was before the trim.
+#[allow(dead_code)]
+pub(crate) fn retime_root_layer_motion(
+    document: &mut ObjectDocument,
+    layer: &str,
+    dx: i64,
+) -> Result<bool, DispatchErrorCode> {
+    motion::shift_layer(document, "scene-root", layer, dx)
+}
 impl ObjectFillOwner {
     pub(crate) fn prepare_layer_shift_json(
         &self,

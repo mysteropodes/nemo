@@ -29,6 +29,10 @@ pub(super) fn request(value: &Value) -> bool {
                         .is_some_and(|a| background(a.get("color"))),
                     Some("setWorkArea") => exact(a, &["kind", "inFrame", "outFrame"], &[])
                         .is_some_and(|a| finite(a.get("inFrame")) && finite(a.get("outFrame"))),
+                    Some("setTotalFrames") => {
+                        exact(a, &["kind", "frames"], &[]).is_some_and(|a| finite(a.get("frames")))
+                    }
+                    Some("trimToWorkArea") => exact(a, &["kind"], &[]).is_some(),
                     _ => false,
                 })
     })
@@ -61,6 +65,9 @@ mod tests {
             json!({"kind":"setFps","fps":-5}),
             json!({"kind":"setFps","fps":90}),
             json!({"kind":"setWorkArea","inFrame":45.5,"outFrame":-0.25}),
+            json!({"kind":"setTotalFrames","frames":240}),
+            json!({"kind":"setTotalFrames","frames":0.5}),
+            json!({"kind":"trimToWorkArea"}),
             json!({"kind":"setCanvasBackground","color":"#aBc"}),
             json!({"kind":"setCanvasBackground","color":"AbC12380"}),
         ] {
@@ -81,6 +88,11 @@ mod tests {
             json!({"kind":"setCanvasBackground","color":"#abcd"}),
             json!({"kind":"setCanvasBackground","color":"white"}),
             json!({"kind":"setTotalFrames","totalFrames":12}),
+            json!({"kind":"setTotalFrames"}),
+            json!({"kind":"setTotalFrames","frames":"12"}),
+            json!({"kind":"setTotalFrames","frames":null}),
+            json!({"kind":"setTotalFrames","frames":12,"extra":1}),
+            json!({"kind":"trimToWorkArea","frames":12}),
             json!({"kind":"setFps","fps":24,"path":"private"}),
         ] {
             let p = payload(a);

@@ -29,8 +29,8 @@
       'addSliderLayer', 'addFolderLayer', 'deleteLayer', 'splitLayerAtPlayhead', 'duplicateLayer',
       'renameLayer', 'reorderLayer', 'reorderLayersAtGap', 'reorderLayersBatch',
       'mergeLayersIntoOne', 'setPointType', 'booleanOp', 'applyStrokeProfile', 'deleteSelStrokes',
-      'setCanvasClip', 'setSafetyZones', 'setTotalFrames', 'trimToWorkArea', 'toggleLayerMotionBlur',
-      'toggleMotionBlurComp', 'setMotionBlurSettings', 'enterMontageView', 'exitMontageView'
+      'setCanvasClip', 'setSafetyZones', 'toggleLayerMotionBlur', 'toggleMotionBlurComp',
+      'setMotionBlurSettings', 'enterMontageView', 'exitMontageView'
     ]],
     ['motion', 'motion-', [
       'toggleAnimated', 'setValue', 'setKeyAtCurrentFrame', 'setKeyAtFrame',

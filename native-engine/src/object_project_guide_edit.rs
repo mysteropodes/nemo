@@ -134,6 +134,7 @@ impl ObjectFillOwner {
             Ok(PreparedProjectSettings {
                 origin,
                 metadata,
+                document: None,
                 changed,
             })
         }

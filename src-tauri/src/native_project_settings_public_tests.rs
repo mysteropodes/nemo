@@ -154,6 +154,9 @@ fn public_settings_stale_cancel_foreign_and_invalid_input_preserve_actual_projec
         json!({"kind":"setCanvasSize","width":0,"height":100}),
         json!({"kind":"setCanvasBackground","color":null}),
         json!({"kind":"setWorkArea","inFrame":2}),
+        json!({"kind":"setTotalFrames","totalFrames":9}),
+        json!({"kind":"setTotalFrames","frames":"9"}),
+        json!({"kind":"trimToWorkArea","frames":9}),
     ] {
         let r = request(&receipt, "invalid", 0, action);
         assert!(state
@@ -380,4 +383,39 @@ async fn external_mcp_settings_requires_real_subscriber_then_reads_and_acks_exac
             },
         )
         .unwrap();
+}
+
+#[test]
+fn public_project_length_edits_reach_the_owner_as_one_revision_each() {
+    let state = ApplicationMcp::default();
+    let document = json!({"format":"nemo.native-project-document","formatVersion":1,
+      "project":{"canvasW":320,"canvasH":180,"fps":24,"waIn":2,"waOut":5},
+      "drawing":{"format":"nemo.native-object-document","formatVersion":1,"totalFrames":8,
+        "layers":[{"layerUid":"L"}],"objects":[]},"viewportReference":null,"assets":[]});
+    let receipt = serde_json::to_value(
+        bootstrap_raw(
+            &state,
+            &json!({"apiVersion":2,"requestId":"install-length","instanceId":state.instance_id(),
+              "documentJson":document.to_string()})
+            .to_string(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let grown = dispatch(&state, request(&receipt, "grow", 0, json!({"kind":"setTotalFrames","frames":10})));
+    assert_eq!(grown["result"], json!({"applied":true,"historyEntriesAdded":1}));
+    assert_eq!(grown["contentRevision"], 1);
+    assert_eq!(saved(&state, &receipt)["drawing"]["totalFrames"], 10);
+    let trimmed = dispatch(&state, request(&receipt, "trim", 1, json!({"kind":"trimToWorkArea"})));
+    assert_eq!(trimmed["result"], json!({"applied":true,"historyEntriesAdded":1}));
+    let value = saved(&state, &receipt);
+    assert_eq!(value["drawing"]["totalFrames"], 4);
+    assert_eq!((value["project"]["waIn"].clone(), value["project"]["waOut"].clone()), (json!(0.0), json!(3.0)));
+    // The work area now covers the whole timeline: a second trim adds nothing.
+    let again = dispatch(&state, request(&receipt, "trim-again", 2, json!({"kind":"trimToWorkArea"})));
+    assert_eq!(again["result"], json!({"applied":false,"historyEntriesAdded":0}));
+    assert_eq!(again["contentRevision"], 2);
+    let info = state.native_project_info(receipt["documentId"].as_str().unwrap()).unwrap();
+    assert_eq!(info["undoDepth"], 2);
+    assert_eq!(info["totalFrames"], 4);
 }

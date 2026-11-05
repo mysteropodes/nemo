@@ -3300,7 +3300,7 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
     localStorage: { getItem() { return null; } }, addEventListener(type) { events.push(['listen', type]); },
     state: { currentFrame: 10 },
     SM: { importJSON(value, silent) { imports.push([value, silent]); return true; },
-      setTotalFrames() { serializedDocument.totalFrames = 99; paperProject.itemCount = 99; } },
+      setSafetyZones() { serializedDocument.totalFrames = 99; paperProject.itemCount = 99; } },
     SMMotion: { setLayerValue() { serializedDocument.layers[0].opacity = 99; paperProject.activeLayer.opacity = 0.99; } },
     SMScript: {
       // CS8-SDK (#2354): the real runner is no longer wrapped; on desktop without a native
@@ -3411,14 +3411,14 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   assert.equal(desktop.SMPlugin.openFile(), false);
   assert.equal(desktop.SMPlugin.loadArchive({}), false);
   assert.equal(desktop.SMPlugin.loadFiles({}), false);
-  assert.equal(desktop.SM.setTotalFrames(99), false);
+  assert.equal(desktop.SM.setSafetyZones(99), false);
   assert.equal(desktop.SMMotion.setLayerValue(0, 'opacity', [99]), false);
   assert.equal(JSON.stringify(serializedDocument), documentBytes, 'serialized document bytes remain unchanged');
   assert.equal(JSON.stringify(paperProject), paperBytes, 'Paper project bytes remain unchanged');
   assert.equal(delayedScript, null); assert.equal(delayedPlugin, null); assert.equal(delayedArchive, null);
   assert.deepEqual(deniedEntries, ['script-api', 'script-openFile',
     'plugin-openFile', 'plugin-loadArchive', 'plugin-loadFiles',
-    'timeline-setTotalFrames', 'motion-setLayerValue']);
+    'timeline-setSafetyZones', 'motion-setLayerValue']);
 
   // CS4/#2343: the desktop host admits no implicit legacy write in either phase.
   // With the guard no longer blocking, script and plugin entries still refuse,
@@ -3430,7 +3430,7 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   assert.equal(desktop.SMPlugin.openFile(), false);
   assert.equal(desktop.SMPlugin.loadArchive({}), false);
   assert.equal(desktop.SMPlugin.loadFiles({}), false);
-  assert.equal(desktop.SM.setTotalFrames(99), false);
+  assert.equal(desktop.SM.setSafetyZones(99), false);
   assert.equal(desktop.SMMotion.setLayerValue(0, 'opacity', [99]), false);
   assert.equal(delayedScript, null); assert.equal(delayedPlugin, null); assert.equal(delayedArchive, null);
   assert.equal(JSON.stringify(serializedDocument), documentBytes, 'no desktop extension wrote the legacy document');

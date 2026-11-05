@@ -242,8 +242,6 @@
         "timeline": [
           "setCanvasClip",
           "setSafetyZones",
-          "setTotalFrames",
-          "trimToWorkArea",
           "toggleLayerMotionBlur",
           "toggleMotionBlurComp",
           "setMotionBlurSettings"

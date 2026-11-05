@@ -110,7 +110,7 @@ fn invalid_settings_and_duplicate_raw_members_are_atomic() {
         json!({"kind":"setCanvasBackground","color":"#ggg"}),
         json!({"kind":"setFps","fps":"24"}),
         json!({"kind":"setWorkArea","inFrame":0,"outFrame":null}),
-        json!({"kind":"setTotalFrames","frames":5}),
+        json!({"kind":"setTotalFrames","totalFrames":5}),
     ] {
         assert_eq!(
             apply(&mut o, action),

@@ -92,13 +92,23 @@
             await action.reconcile();
             return false;
           }
-          if(receipt.ok!==true||receipt.result.applied!==true)return false;
+          if(receipt.ok!==true||receipt.result.applied!==true){
+            // Baseline (timeline.js splitLayerAtPlayhead at 1065e9d8): a playhead outside the layer's range is refused with a notice.
+            task.outside=receipt.ok===true&&receipt.result.applied===false;
+            return false;
+          }
           await action.reconcile(receipt.contentRevision);
           return receipt;
         });
       }).then(function(receipt){
         // The public presented getter is intentionally fenced until the queued action settles.
-        if(!receipt||!current(task))return false;
+        if(!receipt){
+          if(task.outside===true&&pending===task&&typeof root.showToast==='function'){
+            try{root.showToast(root.SM&&typeof root.SM.t==='function'?root.SM.t('toastPlayheadInsideLayerToCut'):'toastPlayheadInsideLayerToCut');}catch(_){}
+          }
+          return false;
+        }
+        if(!current(task))return false;
         var next=session.info(),presented=session.readPresentedObjectSession();
         if(!epoch(task.pin,next)||next.contentRevision!==receipt.contentRevision||
           next.documentSnapshotId===task.pin.documentSnapshotId||selection(root,next)!==signature||

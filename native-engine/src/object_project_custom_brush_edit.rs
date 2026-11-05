@@ -68,6 +68,7 @@ impl ObjectFillOwner {
                         return Ok(PreparedProjectSettings {
                             origin,
                             metadata,
+                            document: None,
                             changed: false,
                         });
                     }
@@ -85,6 +86,7 @@ impl ObjectFillOwner {
             Ok(PreparedProjectSettings {
                 origin,
                 metadata,
+                document: None,
                 changed,
             })
         }

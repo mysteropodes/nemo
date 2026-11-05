@@ -30,7 +30,7 @@
     "maxReadResponseBytes": 4096,
     "policy": "Complete correlated retained settings receipt or typed refusal; no path, resource or raw document payload."
   },
-  "semantics": "One project metadata revision; no-op adds no history and preserves redo. Storage absence stays absent until that exact setting is edited. setFps command clamps finite values to1..60; work-area numbers are finite without range normalization. Bare drawing without project metadata reports unavailable. No totalFrames mutation or optional-setting clearing is admitted.",
+  "semantics": "One project metadata revision; no-op adds no history and preserves redo. Storage absence stays absent until that exact setting is edited. setFps command clamps finite values to1..60; work-area numbers are finite without range normalization. Bare drawing without project metadata reports unavailable. setTotalFrames clamps to 1..999 and trimToWorkArea re-bases the drawing on the work area, each as one revision with the drawing and settings together. No optional-setting clearing is admitted.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",

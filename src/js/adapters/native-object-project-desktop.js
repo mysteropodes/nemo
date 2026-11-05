@@ -23,7 +23,7 @@
       if(['p-cw','p-ch','proj-fps','p-cbg','btn-dims-lock'].includes(own('field')))row.field=own('field');
       if(['input','change'].includes(own('sourceEvent')))row.sourceEvent=own('sourceEvent');
       var kind=own('kind'),status=own('status');
-      if(['setCanvasSize','setFps','setCanvasBackground','setWorkArea','user','native-settings-intent','native-settings-publication'].includes(kind))row.kind=kind;
+      if(['setCanvasSize','setFps','setCanvasBackground','setWorkArea','setTotalFrames','trimToWorkArea','user','native-settings-intent','native-settings-publication'].includes(kind))row.kind=kind;
       if(['applied-presented','unchanged','superseded','unavailable','unconfirmed','applied-unconfirmed','succeeded','failed','cancelled'].includes(status))row.status=status;
       var log=settingsLogs.get(root);if(!log){log={startedAt:Date.now(),serial:0,events:[],writing:false,pending:null};settingsLogs.set(root,log);}
       row.sequence=++log.serial;row.at=Date.now();log.events.push(row);log.events=log.events.slice(-128);
