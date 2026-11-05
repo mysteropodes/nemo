@@ -10,7 +10,7 @@
 //! record only when its anchor is gone (the baseline resolved a dab to its anchor, which moves them together).
 //! The result is the list of records to replace, in the cell the target names.
 use crate::commands::object_fill_owner::parametric_edit;
-use crate::commands::object_fill_owner::vector_edit::batch_ops::dabs;
+use crate::commands::object_fill_owner::vector_edit::batch_ops::style::dabs;
 use crate::commands::object_fill_owner::vector_edit::batch_ops::ribbon;
 use crate::commands::object_fill_owner::vector_edit::is_vector_record;
 use crate::object_document::{CenterSegment, ObjectDocument, ObjectGeometry, ObjectPoint, ObjectRecord, ObjectTarget, Presence, VectorExt};

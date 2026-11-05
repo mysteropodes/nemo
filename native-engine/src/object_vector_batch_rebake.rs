@@ -37,6 +37,15 @@ pub(crate) fn needed(old: Option<&ObjectRecord>, new: &ObjectRecord) -> Option<R
     }
 }
 
+/// Record `needed(old, new)` in `steps` once.
+pub(crate) fn note(steps: &mut Vec<Rebake>, old: Option<&ObjectRecord>, new: &ObjectRecord) {
+    if let Some(step) = needed(old, new) {
+        if !steps.contains(&step) {
+            steps.push(step);
+        }
+    }
+}
+
 /// `drawing` (the batch's final document) with each companion re-baked or dropped, as one candidate project of `origin`.
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 pub(crate) fn apply(

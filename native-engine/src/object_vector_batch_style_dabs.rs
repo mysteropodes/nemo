@@ -8,6 +8,7 @@
 //!   `SMBitmapBrush.regenerate`).
 use crate::commands::object_fill_owner::vector_edit::batch_ops::detail;
 use crate::commands::object_fill_owner::vector_edit::batch_ops::style::num;
+use crate::commands::object_fill_owner::vector_edit::batch_ops::BatchOp;
 use crate::object_document::{ObjectDocument, ObjectRecord, ObjectTarget, Presence, SolidFill};
 use crate::request_receipts::DispatchErrorCode;
 use serde_json::Number;
@@ -25,7 +26,10 @@ fn group(record: &ObjectRecord) -> Option<(&str, bool)> {
 }
 
 /// True when the stored dab `copy` has its anchor (a record of its group that is not a dab) in the same cell.
-pub(super) fn has_anchor(source: &ObjectDocument, copy: &ObjectRecord) -> bool {
+pub(in crate::commands::object_fill_owner::vector_edit::batch_ops) fn has_anchor(
+    source: &ObjectDocument,
+    copy: &ObjectRecord,
+) -> bool {
     let Some((id, _)) = group(copy) else {
         return false;
     };
@@ -115,4 +119,26 @@ pub(super) fn bitmap_style(
         fields.bitmap_brush_spec.opacity = num(opacity)?;
     }
     Ok(())
+}
+
+/// A step of the expanded batch that names only its op and the record or target it works on.
+pub(in crate::commands::object_fill_owner::vector_edit::batch_ops) fn step(
+    op: &str,
+    record: Presence<ObjectRecord>,
+    stable_target: Presence<ObjectTarget>,
+) -> BatchOp {
+    BatchOp {
+        op: op.into(),
+        record,
+        stable_target,
+        placement: Presence::Missing,
+        keyframe: Presence::Missing,
+        from_step: Presence::Missing,
+        frame: Presence::Missing,
+        geometry: Presence::Missing,
+        offset: Presence::Missing,
+        center: Presence::Missing,
+        matrix: Presence::Missing,
+        style: Presence::Missing,
+    }
 }

@@ -19,6 +19,7 @@ use crate::object_document::object_group_kernels::object_boolean_ops::stack::Sco
 use crate::object_document::object_group_kernels::object_fill_trace_ops::regenerate::regenerate;
 use crate::object_document::{object_deserialize, CenterSegment, ObjectDocument, ObjectGeometry, ObjectRecord, ObjectTarget, Presence};
 use crate::object_snapshot::ObjectSnapshot;
+use style::dabs::step;
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 #[path = "object_vector_batch_ribbon.rs"]
@@ -35,8 +36,6 @@ mod detail;
 mod gradient;
 #[path = "object_vector_batch_order.rs"]
 mod order_step;
-#[path = "object_vector_batch_style_dabs.rs"]
-mod dabs;
 #[path = "object_vector_batch_rebake.rs"]
 pub(super) mod rebake;
 
@@ -204,9 +203,7 @@ fn expand_transforms(origin: &ObjectSnapshot, base: &ObjectDocument, ops: Vec<Ba
             restyled.push(target.clone());
             let style = spec.checked()?;
             if let Some(swap) = items::restyle(base, &target, frame, &style)? {
-                out.push(BatchOp { op: "item".into(), record: Presence::Missing, stable_target: Presence::Present(swap.target().clone()), placement: Presence::Missing,
-                    keyframe: Presence::Missing, from_step: Presence::Missing, frame: Presence::Missing, geometry: Presence::Missing,
-                    offset: Presence::Missing, center: Presence::Missing, matrix: Presence::Missing, style: Presence::Missing });
+                out.push(step("item", Presence::Missing, Presence::Present(swap.target().clone())));
                 companion.push(false);
                 swaps.push(Some(swap));
                 continue;
@@ -215,9 +212,7 @@ fn expand_transforms(origin: &ObjectSnapshot, base: &ObjectDocument, ops: Vec<Ba
             let restyled_records = match style::restyle(base, &target, &style, origin.project().and_then(|p| p.project().custom_brush_presets()), &mut deleted) {
                 Err(DispatchErrorCode::Unavailable) if skip_unavailable => {
                     skipped += 1;
-                    out.push(BatchOp { op: "noop".into(), record: Presence::Missing, stable_target: Presence::Present(target), placement: Presence::Missing,
-                        keyframe: Presence::Missing, from_step: Presence::Missing, frame: Presence::Missing, geometry: Presence::Missing,
-                        offset: Presence::Missing, center: Presence::Missing, matrix: Presence::Missing, style: Presence::Missing });
+                    out.push(step("noop", Presence::Missing, Presence::Present(target)));
                     companion.push(false);
                     swaps.push(None);
                     continue;
@@ -228,18 +223,14 @@ fn expand_transforms(origin: &ObjectSnapshot, base: &ObjectDocument, ops: Vec<Ba
                 record.target.frame_scope.frame = frame.unwrap_or(target.frame_scope.frame);
                 companion.push(at > 0);
                 swaps.push(None);
-                out.push(BatchOp { op: "replace".into(), record: Presence::Present(record), stable_target: Presence::Missing, placement: Presence::Missing,
-                    keyframe: Presence::Missing, from_step: Presence::Missing, frame: Presence::Missing, geometry: Presence::Missing,
-                    offset: Presence::Missing, center: Presence::Missing, matrix: Presence::Missing, style: Presence::Missing });
+                out.push(step("replace", Presence::Present(record), Presence::Missing));
             }
             // The stored dabs a re-stamped anchor replaces go in the same step (companions of it, not steps of their own).
             for mut gone in deleted {
                 gone.frame_scope.frame = frame.unwrap_or(target.frame_scope.frame);
                 companion.push(true);
                 swaps.push(None);
-                out.push(BatchOp { op: "delete".into(), record: Presence::Missing, stable_target: Presence::Present(gone), placement: Presence::Missing,
-                    keyframe: Presence::Missing, from_step: Presence::Missing, frame: Presence::Missing, geometry: Presence::Missing,
-                    offset: Presence::Missing, center: Presence::Missing, matrix: Presence::Missing, style: Presence::Missing });
+                out.push(step("delete", Presence::Missing, Presence::Present(gone)));
             }
             if out.len() > MAX_EXPANDED_OPS {
                 return Err(InvalidRequest);
@@ -270,9 +261,7 @@ fn expand_transforms(origin: &ObjectSnapshot, base: &ObjectDocument, ops: Vec<Ba
                 return Err(InvalidRequest);
             }
             // The step names the cell it lands in, so a copy key promotes a held frame for an item as it does for a vector.
-            out.push(BatchOp { op: "item".into(), record: Presence::Missing, stable_target: Presence::Present(swap.target().clone()), placement: Presence::Missing,
-                keyframe: Presence::Missing, from_step: Presence::Missing, frame: Presence::Missing, geometry: Presence::Missing,
-                offset: Presence::Missing, center: Presence::Missing, matrix: Presence::Missing, style: Presence::Missing });
+            out.push(step("item", Presence::Missing, Presence::Present(swap.target().clone())));
             companion.push(false);
             swaps.push(Some(swap));
             continue;
@@ -281,9 +270,7 @@ fn expand_transforms(origin: &ObjectSnapshot, base: &ObjectDocument, ops: Vec<Ba
             record.target.frame_scope.frame = frame.unwrap_or(target.frame_scope.frame);
             companion.push(at > 0);
             swaps.push(None);
-            out.push(BatchOp { op: "replace".into(), record: Presence::Present(record), stable_target: Presence::Missing, placement: Presence::Missing,
-                keyframe: Presence::Missing, from_step: Presence::Missing, frame: Presence::Missing, geometry: Presence::Missing,
-                offset: Presence::Missing, center: Presence::Missing, matrix: Presence::Missing, style: Presence::Missing });
+            out.push(step("replace", Presence::Present(record), Presence::Missing));
         }
         if out.len() > MAX_EXPANDED_OPS {
             return Err(InvalidRequest);
@@ -297,8 +284,7 @@ fn expand_transforms(origin: &ObjectSnapshot, base: &ObjectDocument, ops: Vec<Ba
 
 /// `base` is the document the steps edit: the origin's own, or a component's view of it (`object_vector_edit_context`); `context` is its context id.
 /// The edit and the bitmap companions it asks to re-bake or drop (`rebake`), which the caller applies to the project in the same revision.
-pub(super) fn batch(origin: &ObjectSnapshot, base: &ObjectDocument, context: &str, ops: Vec<BatchOp>, copy_key: bool, trim: Option<Trim>, skip_unavailable: bool)
-    -> Result<(Edit, Vec<rebake::Rebake>), DispatchErrorCode> {
+pub(super) fn batch(origin: &ObjectSnapshot, base: &ObjectDocument, context: &str, ops: Vec<BatchOp>, copy_key: bool, trim: Option<Trim>, skip_unavailable: bool) -> Result<(Edit, Vec<rebake::Rebake>), DispatchErrorCode> {
     use DispatchErrorCode::InvalidRequest;
     if !(1..=MAX_BATCH_OPS).contains(&ops.len()) {
         return Err(InvalidRequest);
@@ -474,12 +460,7 @@ pub(super) fn batch(origin: &ObjectSnapshot, base: &ObjectDocument, context: &st
             }
             ("replace", Presence::Present(record), Presence::Missing) if op.placement.missing() => {
                 // A bitmap anchor whose centreline or spec changed (or that stopped being one) leaves its baked companion stale.
-                let old = document.objects.iter().find(|r| r.target == record.target);
-                if let Some(step) = rebake::needed(old, &record) {
-                    if !rebakes.contains(&step) {
-                        rebakes.push(step);
-                    }
-                }
+                rebake::note(&mut rebakes, document.objects.iter().find(|r| r.target == record.target), &record);
                 replace_in(&document, record)?
             }
             ("delete", Presence::Missing, Presence::Present(target)) if op.placement.missing() => {
@@ -512,15 +493,6 @@ pub(super) fn batch(origin: &ObjectSnapshot, base: &ObjectDocument, context: &st
             stroke_ids.extend(edit.stroke_ids);
         }
     }
-    Ok((
-        Edit {
-            document,
-            kind: VectorEditKind::Batch,
-            stroke_id: stroke_ids.first().cloned().unwrap_or_default(),
-            stroke_ids,
-            changed,
-            skipped,
-        },
-        rebakes,
-    ))
+    let edit = Edit { document, kind: VectorEditKind::Batch, stroke_id: stroke_ids.first().cloned().unwrap_or_default(), stroke_ids, changed, skipped };
+    Ok((edit, rebakes))
 }

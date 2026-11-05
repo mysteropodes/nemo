@@ -18,7 +18,6 @@
 //! A texture anchor's opacity without a fill and a stroke switch on a brush anchor are refused (`Unavailable`): the first would bring the
 //! hidden outline back, the second has no stroke to switch.
 use crate::commands::object_fill_owner::vector_edit::batch_ops::detail::{self, Detail};
-use crate::commands::object_fill_owner::vector_edit::batch_ops::dabs;
 use crate::commands::object_fill_owner::vector_edit::batch_ops::gradient;
 use crate::commands::object_fill_owner::vector_edit::batch_ops::ribbon;
 use crate::commands::object_fill_owner::vector_edit::is_vector_record;
@@ -29,6 +28,9 @@ use crate::object_document::{
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use serde_json::Number;
+
+#[path = "object_vector_batch_style_dabs.rs"]
+pub(super) mod dabs;
 
 /// The wire members of a restyle step; each absent member leaves that style alone.
 #[derive(Debug, Default)]
