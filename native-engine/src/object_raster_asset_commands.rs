@@ -171,12 +171,25 @@ pub(crate) fn asset_code(issue: ItemAssetIssue) -> DispatchErrorCode {
     }
 }
 
+/// The layers and frame count the context of `target` owns: the scene's, or a declared component's (`None` for an undeclared context).
+fn scope_of<'a>(document: &'a ObjectDocument, target: &ObjectTarget) -> Option<(&'a [crate::object_document::ObjectLayer], u32)> {
+    if target.context_id() == "scene-root" {
+        return Some((document.layers.as_slice(), document.total_frames()));
+    }
+    document
+        .component_set()
+        .and_then(|set| set.component(target.context_id()))
+        .map(|component| (component.layers.as_slice(), component.total_frames))
+}
+
 /// Items need an authored target; reference records remain readable storage.
 pub(crate) fn check_target(
     document: &ObjectDocument,
     target: &ObjectTarget,
 ) -> Result<(), DispatchErrorCode> {
-    if !document.valid_target(target) || target.frame() >= document.total_frames() {
+    // A declared component's frames and layers are its own (#2267 T-text-context: the Text tool places and edits text inside it).
+    let total = scope_of(document, target).map_or_else(|| document.total_frames(), |(_, total)| total);
+    if !document.valid_target(target) || target.frame() >= total {
         return Err(DispatchErrorCode::InvalidRequest);
     }
     if target.frame_scope.kind == FrameScopeKind::Reference {
@@ -200,12 +213,13 @@ pub(crate) fn check_layer(
     document: &ObjectDocument,
     target: &ObjectTarget,
 ) -> Result<(), DispatchErrorCode> {
-    let layer = document
-        .layers
+    let scene = target.context_id() == "scene-root";
+    let layers = scope_of(document, target).map_or(document.layers.as_slice(), |(layers, _)| layers);
+    let layer = layers
         .iter()
         .find(|layer| layer.layer_uid() == target.layer_uid())
         .ok_or(DispatchErrorCode::NotFound)?;
-    if document.layer_is_locked(layer.layer_uid()) {
+    if if scene { document.layer_is_locked(layer.layer_uid()) } else { layer.locked() } {
         return Err(DispatchErrorCode::Unavailable);
     }
     if layer.widget.value().is_some() {

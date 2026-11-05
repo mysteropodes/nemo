@@ -300,6 +300,8 @@
     {"src":"js/adapters/native-object-draw-bitmap.js"},
     {"src":"js/adapters/native-object-draw-resize.js"},
     {"src":"js/adapters/native-layer-motion-pose.js"},
+    {"src":"js/adapters/native-object-perspective-snap.js"},
+    {"src":"js/adapters/native-object-pen-continue.js"},
     {"src":"js/adapters/native-object-shape-tool.js"},
     {"src":"js/adapters/native-object-eraser-tool.js"},
     {"src":"js/shape-bridge.js"},

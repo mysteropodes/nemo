@@ -4966,6 +4966,30 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-object-perspective-snap.js",
+      "moduleId": "app.native.object.shape.tool",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2631,
+          "scriptOrdinal": 282
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-pen-continue.js",
+      "moduleId": "app.native.object.shape.tool",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2631,
+          "scriptOrdinal": 282
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-object-eraser-tool.js",
       "moduleId": "app.native.object.shape.tool",
       "executionClass": "document-classic",

@@ -72,18 +72,18 @@ async function fixture(tool='draw',native=true,options={}){
  // desktop session explicitly, without substituting any Project/queue method.
  root.NemoNativeObjectProject={...Project,desktop:()=>session};
  // Controlled immutable native Perspective projection; never read legacy Perspective fields.
- let perspectiveMode='disabled',perspectiveOwner=session;
+ let perspectiveMode='disabled',perspectiveOwner=session,perspectiveItems=[];
  const perspectiveKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'],perspectiveProofs=new WeakMap();
  root.NemoNativePerspectiveController=Object.freeze({read(){
   const owner=perspectiveOwner,info=owner.info(),shown=owner.readPresentedObjectSession();
   if(perspectiveMode==='unavailable'||!owner.isActive()||!shown||perspectiveKeys.some(k=>shown[k]!==info[k]))return null;
   const pin=Object.fromEntries(perspectiveKeys.map(k=>[k,info[k]]));
   if(perspectiveMode==='stale')pin.documentSnapshotId='stale-perspective-snapshot';
-  const value=Object.freeze({info:Object.freeze(pin),perspective:Object.freeze({settings:Object.freeze({perspectiveEnabled:perspectiveMode==='enabled'})})});
+  const value=Object.freeze({info:Object.freeze(pin),perspective:Object.freeze({settings:Object.freeze({perspectiveEnabled:perspectiveMode==='enabled'}),items:Object.freeze(perspectiveItems.map((v,i)=>Object.freeze({ordinal:i+1,x:v[0],y:v[1],locked:false})))})});
   perspectiveProofs.set(value,typeof owner.readSubscriptionGeneration==='function'?owner.readSubscriptionGeneration():0);return value;
  },readForCommand(value){
   const owner=perspectiveOwner,info=owner.info(),ticket=typeof owner.readSubscriptionGeneration==='function'?owner.readSubscriptionGeneration():0;
-  return perspectiveMode==='disabled'&&owner.isActive()&&value&&perspectiveProofs.has(value)&&perspectiveProofs.get(value)===ticket&&perspectiveKeys.every(k=>value.info[k]===info[k])?value:null;
+  return (perspectiveMode==='disabled'||perspectiveMode==='enabled')&&owner.isActive()&&value&&perspectiveProofs.has(value)&&perspectiveProofs.get(value)===ticket&&perspectiveKeys.every(k=>value.info[k]===info[k])?value:null;
  }});
 
  root.NemoNativeObjectProjectFile={...Files,projectionReadyForUI:(_proxy,pin)=>Files.projectionReadyForUI(root,pin)};
@@ -105,10 +105,11 @@ async function fixture(tool='draw',native=true,options={}){
  root.NemoNativeDrawBitmap=require('../src/js/adapters/native-object-draw-bitmap.js');
  root.NemoNativeFillDesktop=require('../src/js/adapters/native-fill-desktop.js');
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-resize.js'),'utf8'),context,{filename:'native-object-draw-resize.js'});
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-perspective-snap.js'),'utf8'),context,{filename:'native-object-perspective-snap.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-shape-tool.js'),'utf8'),context,{filename:'native-object-shape-tool.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/draw-bridge.js'),'utf8'),context,{filename:'draw-bridge.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/shape-bridge.js'),'utf8'),context,{filename:'shape-bridge.js'});
- return {perspectiveMode:value=>perspectiveMode=value,root,context,paper,advance:(ms=16)=>clock+=ms,session,area,canvas,zoom,fit,ruler,doc,body,calls,records,log,events,info,flags,undos,setRect:r=>rect=r,refuse:code=>refusal=code,hold:g=>hold=g,mutate:fn=>replyChange=fn,
+ return {perspectiveMode:(value,items)=>{perspectiveMode=value;perspectiveItems=items||[];},root,context,paper,advance:(ms=16)=>clock+=ms,session,area,canvas,zoom,fit,ruler,doc,body,calls,records,log,events,info,flags,undos,setRect:r=>rect=r,refuse:code=>refusal=code,hold:g=>hold=g,mutate:fn=>replyChange=fn,
   async external(g){ack=g;const from=revision;revision++;return events.get('nemo-native-revision')({payload:{instanceId:'instance-A',documentId:info().documentId,lifecycleGeneration:generation,requestId:'external-'+revision,fromRevision:from,toRevision:revision}});},
   async gesture(end={clientX:240,clientY:210}){area.fire('pointerdown');area.fire('pointermove',end);area.fire('pointerup',end);return root.NemoNativeFreehandToolController.whenSettled();}};
 }
@@ -315,8 +316,8 @@ test('the brush draws on the active layer after the row selection was cleared, a
  const h=await fixture();h.root._layerSel=[];send(h,'pointerdown',20,20);send(h,'pointermove',60,40);h.root._layerSel=[0];send(h,'pointerup',100,60);
  assert.equal((await settled(h)).status,'idle');assert.equal(h.calls.length,0);assert.equal(h.root.NemoNativeFreehandToolController.isDragging(),false);
 });
-test('native drawing refuses unavailable, stale and enabled Perspective projections before a document command',async()=>{
- for(const mode of ['unavailable','stale','enabled']){
+test('native drawing refuses unavailable and stale Perspective projections before a document command',async()=>{
+ for(const mode of ['unavailable','stale']){
   const f=await fixture();f.perspectiveMode(mode);
   Object.defineProperty(f.root.state,'perspectiveEnabled',{get(){throw new Error('legacy Perspective read');},set(){throw new Error('legacy Perspective write');}});
   f.area.fire('pointerdown');f.area.fire('pointerup',{clientX:240,clientY:210});await turn();
@@ -979,4 +980,19 @@ test('Draw and Fill Brush work in Motion mode, on the playhead frame, and other 
  send(b,'pointerdown',20,20,{pointerType:'pen',pressure:.5});b.advance();send(b,'pointermove',50,30,{pointerType:'pen',pressure:.8});b.advance();send(b,'pointerup',80,45,{pointerType:'pen',pressure:0});
  await settled(b);assert.equal(b.calls.length,1,b.log.join(','));assert.equal(plain(b.calls[0]).operation,'command.document.object.fill.brush');
  const other=await fixture();other.root.state.appMode='storyboard';send(other,'pointerdown',20,20);send(other,'pointermove',45,30);send(other,'pointerup',100,80);await settled(other);assert.equal(other.calls.length,0);
+});
+
+test('B-draw-perspective-snap: with the guide on, Draw is drawn (not refused) and every sample is pulled part-way toward the VP axis, never locked onto it',async()=>{
+ // Press (20,20); VP at (1000,20). A sample at (100,36) heads atan(16/80) = 11.31 degrees off the axis: pulled by (1 - 11.31/30) * 0.55 = 0.3426 of its distance.
+ const t=(1-Math.atan(0.2)*180/Math.PI/30)*0.55,expected=Math.round((36+(20-36)*t)*1000)/1000;
+ const f=await fixture();f.perspectiveMode('enabled',[[1000,20]]);
+ send(f,'pointerdown',20,20);send(f,'pointermove',100,36);send(f,'pointerup',100,36);
+ assert.equal((await settled(f)).status,'applied');assert.equal(f.calls.length,1);
+ const pts=f.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]);
+ assert.deepEqual(pts[0],[20,20]);assert.deepEqual(pts.at(-1),[100,expected]);assert.ok(expected>20&&expected<36,'pulled toward the axis, not onto it');
+ // Aimed exactly at the VP: unchanged. The guide off: unchanged.
+ const aimed=await fixture();aimed.perspectiveMode('enabled',[[1000,20]]);send(aimed,'pointerdown',20,20);send(aimed,'pointermove',100,20);send(aimed,'pointerup',100,20);await settled(aimed);
+ assert.deepEqual(aimed.calls[0].payload.record.geometry.segments.at(-1).point,{x:100,y:20});
+ const off=await fixture();send(off,'pointerdown',20,20);send(off,'pointermove',100,36);send(off,'pointerup',100,36);await settled(off);
+ assert.deepEqual(off.calls[0].payload.record.geometry.segments.at(-1).point,{x:100,y:36});
 });
