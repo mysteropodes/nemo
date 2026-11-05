@@ -97,6 +97,10 @@ mod composition_delta_tests;
 mod composition_public_tests;
 
 #[cfg(all(test, feature = "project_media_codec"))]
+#[path = "../tests/object_project_length.rs"]
+mod project_length_tests;
+
+#[cfg(all(test, feature = "project_media_codec"))]
 #[path = "../tests/object_palette_edit.rs"]
 mod palette_delta_tests;
 

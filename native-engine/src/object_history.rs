@@ -106,9 +106,6 @@ pub(crate) mod object_shot_kernels;
 #[cfg(all(test, feature = "project_media_codec"))]
 #[path = "../tests/object_project_settings.rs"]
 mod project_settings_tests;
-#[cfg(all(test, feature = "project_media_codec"))]
-#[path = "../tests/object_project_length.rs"]
-mod project_length_tests;
 
 #[derive(Debug, Clone)]
 struct ObjectHistoryEntry {
