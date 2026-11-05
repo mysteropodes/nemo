@@ -152,7 +152,7 @@
     if (payload.command !== 'object.project.settings.edit') throw new TypeError('invalid project settings command');
     const action = payload.action;
     if (!plain(action)) throw new TypeError('project settings action must be an object');
-    const fields = {setCanvasSize:['width','height'],setFps:['fps'],setCanvasBackground:['color'],setWorkArea:['inFrame','outFrame']};
+    const fields = {setCanvasSize:['width','height'],setFps:['fps'],setCanvasBackground:['color'],setWorkArea:['inFrame','outFrame'],setTotalFrames:['frames'],trimToWorkArea:[]};
     if (!has(fields, action.kind)) throw new TypeError('unsupported project settings action');
     exact(action, ['kind', ...fields[action.kind]], [], 'project settings action');
     if (action.kind === 'setCanvasSize') {

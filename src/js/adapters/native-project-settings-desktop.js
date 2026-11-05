@@ -62,7 +62,7 @@
     function unavailable(){return {status:'unavailable'};}
     function prepare(action){
       return new Promise(function(resolve){var kind=action&&action.kind;
-        if(!['setCanvasSize','setFps','setCanvasBackground','setWorkArea'].includes(kind)){resolve(unavailable());return;}
+        if(!['setCanvasSize','setFps','setCanvasBackground','setWorkArea','setTotalFrames','trimToWorkArea'].includes(kind)){resolve(unavailable());return;}
         var item={action:Object.freeze(Object.assign({},action)),resolve:resolve},prior=preparing.items.get(kind);
         if(prior)prior.resolve({status:'superseded'});preparing.items.set(kind,item);
       });
