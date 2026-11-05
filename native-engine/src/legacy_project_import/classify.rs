@@ -50,6 +50,12 @@ pub(super) const PROJECT_MAPPED: &[&str] = &[
     "customBrushPresets",
     "cameraKeys",
     "cameraLayerOn",
+    "layerFolders",
+    "storyboard",
+    "symbols",
+    "tweenOverrides",
+    "tweenEasing",
+    "motionArcs",
 ];
 /// Editor preferences with no document meaning for a drawn project: recorded in `ignored`, never a refusal.
 const PROJECT_PREFERENCES: &[&str] = &[
@@ -66,16 +72,10 @@ const PROJECT_PREFERENCES: &[&str] = &[
 ];
 /// Families a later slice owns (folders, components, StoryBoard, motion arcs, tweens, media, expressions): content refuses.
 const PROJECT_LATER: &[&str] = &[
-    "layerFolders",
-    "storyboard",
-    "symbols",
     "customEffects",
     "audioTracks",
     "refMedia",
     "mediaLibrary",
-    "motionArcs",
-    "tweenOverrides",
-    "tweenEasing",
     "trackRoles",
     "imageMeshes",
     "exprGlobals",
@@ -121,44 +121,17 @@ pub(super) const LAYER_MAPPED: &[&str] = &[
 ];
 /// Layer members a later slice owns; any content refuses. `inPoint`/`outPoint` are handled by [`range_is_default`].
 const LAYER_LATER: &[&str] = &[
-    "symbolId",
-    "symPlayMode",
-    "symSpeed",
-    "symPlacedAt",
-    "symSingleFrame",
-    "symMatrix",
     "lfsGroup",
     "lfsIds",
     "lfsSettings",
-    "blendMode",
     "blendKeys",
-    "folderId",
     "channel",
     "linkGroupId",
-    "motion",
-    "motionStatic",
-    "elementMotion",
     "nativeVideo",
-    "matteMode",
-    "matteSourceLayerUid",
-    "mattesMore",
     "montageId",
-    "expressions",
     "isTextLayer",
-    "isNullLayer",
-    "nullPos",
-    "nullShape",
     "isEffectLayer",
-    "isFolderLayer",
-    "folderCollapsed",
-    "isGuideLayer",
-    "guidePos",
-    "guideOrientation",
-    "isWidgetLayer",
-    "widget",
     "textAnimators",
-    "isEffectorLayer",
-    "effector",
     "effects",
     "pathFx",
     "lipSync",
@@ -167,20 +140,20 @@ const LAYER_LATER: &[&str] = &[
     "parentKeys",
     "parentLayerUidB",
     "parentsMore",
-    "followPath",
-    "markers",
-    "keyLock",
-    "timeRemap",
     "motionBlur",
     "effectsFrom",
-    "timeLink",
-    "exprControls",
-    "threeD",
-    "duplicator",
     "rig",
     "groups",
     "shapeNames",
 ];
+
+/// Members another module of this reader converts (kinds, Motion, duplicators, components).
+fn converted_elsewhere(key: &str) -> bool {
+    super::kinds::MAPPED.contains(&key)
+        || super::holders::MAPPED.contains(&key)
+        || super::dup::MAPPED.contains(&key)
+        || super::components::LAYER_MAPPED.contains(&key)
+}
 
 pub(crate) fn layer_member(
     path: &str,
@@ -189,20 +162,11 @@ pub(crate) fn layer_member(
     total: u32,
     ctx: &mut Ctx,
 ) -> Result<(), LegacyImportError> {
-    if LAYER_MAPPED.contains(&key) {
+    if LAYER_MAPPED.contains(&key) || converted_elsewhere(key) {
         return Ok(());
     }
     let member = format!("{path}.{key}");
-    if key == "inPoint" || key == "outPoint" {
-        return if range_is_default(key, value, total) {
-            Ok(())
-        } else {
-            Err(LegacyImportError::unsupported(
-                member,
-                "a layer in/out range has no native owner in this release",
-            ))
-        };
-    }
+    let _ = total;
     if LAYER_LATER.contains(&key) {
         // `blendMode: "normal"` and `matteMode: "none"` are the baseline defaults.
         let neutral = matches!(
@@ -224,22 +188,6 @@ pub(crate) fn layer_member(
     Ok(())
 }
 
-/// `inPoint 0` and an `outPoint` at or past the last frame select the whole timeline, so they hide nothing.
-fn range_is_default(key: &str, value: &Value, total: u32) -> bool {
-    match value {
-        Value::Null => true,
-        Value::Number(number) => {
-            let at = number.as_f64().unwrap_or(f64::NAN);
-            if key == "inPoint" {
-                at <= 0.0
-            } else {
-                at >= f64::from(total) - 1.0
-            }
-        }
-        _ => false,
-    }
-}
-
 /// Frame members: `strokes`, `isKeyframe`, `isInterpolated` are read by the layer pass.
 pub(crate) fn frame_member(
     path: &str,
@@ -247,14 +195,17 @@ pub(crate) fn frame_member(
     value: &Value,
     ctx: &mut Ctx,
 ) -> Result<(), LegacyImportError> {
-    if ["strokes", "isKeyframe", "isInterpolated"].contains(&key) {
+    let read = [
+        "strokes",
+        "isKeyframe",
+        "isInterpolated",
+        "isManualEdit",
+        "tweenManualMode",
+        "componentFrame",
+        "blankOverride",
+    ];
+    if read.contains(&key) {
         return Ok(());
-    }
-    if key == "componentFrame" && !is_default(value) {
-        return Err(LegacyImportError::unsupported(
-            format!("{path}.{key}"),
-            "a component frame pick has no native owner in this release",
-        ));
     }
     if !is_default(value) {
         ctx.warn(

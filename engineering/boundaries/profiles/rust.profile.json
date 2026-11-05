@@ -534,7 +534,14 @@
         "legacy_project_import/migrate.rs",
         "legacy_project_import/project.rs",
         "legacy_project_import/stroke.rs",
-        "legacy_project_import/stroke_brush.rs"
+        "legacy_project_import/stroke_brush.rs",
+        "legacy_project_import/assemble.rs",
+        "legacy_project_import/components.rs",
+        "legacy_project_import/dup.rs",
+        "legacy_project_import/holders.rs",
+        "legacy_project_import/kinds.rs",
+        "legacy_project_import/storyboard.rs",
+        "legacy_project_import/tweens.rs"
       ],
       "publicApi": [
         "history.rs",
@@ -2066,7 +2073,9 @@
         "pressure_geometry.rs",
         "object_subselect_pressure.rs",
         "legacy_project_import_unit.rs",
-        "legacy_project_import_refusals.rs"
+        "legacy_project_import_refusals.rs",
+        "legacy_project_import_animation.rs",
+        "legacy_project_import_families.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

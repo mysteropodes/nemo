@@ -15,6 +15,23 @@ pub(crate) fn run(doc: &mut Map<String, Value>, ctx: &mut Ctx) -> Result<(), Leg
         .get_mut("layers")
         .and_then(Value::as_array_mut)
         .expect("validated layers");
+    layer_set(layers, ctx);
+    let uids: Vec<String> = layers
+        .iter()
+        .map(|l| l["layerUid"].as_str().unwrap_or("").to_owned())
+        .collect();
+    let mut keyed = 0;
+    for map in ["tweenOverrides", "tweenEasing"] {
+        if let Some(Value::Object(spans)) = doc.get_mut(map) {
+            keyed += tween_span_keys(spans, &uids);
+        }
+    }
+    note(ctx, "tweenSpanKeys", keyed);
+    Ok(())
+}
+
+/// The per-layer load migrations, shared by the scene layers and the layers of every component.
+pub(crate) fn layer_set(layers: &mut [Value], ctx: &mut Ctx) {
     let generated = assign_layer_uids(layers);
     note(ctx, "layerUid", generated);
     note(ctx, "legacyCurve", legacy_curves(layers));
@@ -29,18 +46,6 @@ pub(crate) fn run(doc: &mut Map<String, Value>, ctx: &mut Ctx) -> Result<(), Leg
         layers.iter_mut().map(effector_channels).sum(),
     );
     note(ctx, "matteSourceUid", matte_source_uids(layers));
-    let uids: Vec<String> = layers
-        .iter()
-        .map(|l| l["layerUid"].as_str().unwrap_or("").to_owned())
-        .collect();
-    let mut keyed = 0;
-    for map in ["tweenOverrides", "tweenEasing"] {
-        if let Some(Value::Object(spans)) = doc.get_mut(map) {
-            keyed += tween_span_keys(spans, &uids);
-        }
-    }
-    note(ctx, "tweenSpanKeys", keyed);
-    Ok(())
 }
 
 fn note(ctx: &mut Ctx, name: &str, count: usize) {

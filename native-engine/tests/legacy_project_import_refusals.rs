@@ -9,48 +9,24 @@ use serde_json::{json, Value};
 fn content_with_no_native_owner_refuses_naming_the_exact_path() {
     for (mutate, path) in [
         (
-            json!({"layers": [{"frames": [], "symbolId": "sym_1"}]}),
-            "layers[0].symbolId",
+            json!({"layers": [{"frames": [], "parentKeys": [{"frame": 0}]}]}),
+            "layers[0].parentKeys",
         ),
         (
-            json!({"layers": [{"frames": [{"strokes": [], "isInterpolated": true}]}]}),
-            "layers[0].frames[0].isInterpolated",
+            json!({"layers": [{"frames": [], "parentsMore": [{"uid": "x"}]}]}),
+            "layers[0].parentsMore",
         ),
         (
-            json!({"layers": [{"frames": [], "blendMode": "multiply"}]}),
-            "layers[0].blendMode",
-        ),
-        (
-            json!({"layers": [{"frames": [], "inPoint": 3}]}),
-            "layers[0].inPoint",
-        ),
-        (
-            json!({"layers": [{"frames": [], "isNullLayer": true}]}),
-            "layers[0].isNullLayer",
-        ),
-        (
-            json!({"layers": [{"frames": [{"strokes": [], "componentFrame": 2}]}]}),
-            "layers[0].frames[0].componentFrame",
-        ),
-        (
-            json!({"layers": [{"frames": []}], "symbols": {"s": {}}}),
-            "symbols",
-        ),
-        (
-            json!({"layers": [{"frames": []}], "storyboard": {"nodes": []}}),
-            "storyboard",
+            json!({"layers": [{"frames": [], "blendKeys": [{"frame": 0}]}]}),
+            "layers[0].blendKeys",
         ),
         (
             json!({"layers": [{"frames": []}], "audioTracks": [{"name": "a"}]}),
             "audioTracks",
         ),
         (
-            json!({"layers": [{"frames": []}], "tweenOverrides": {"ly:0-1": {}}}),
-            "tweenOverrides",
-        ),
-        (
-            json!({"layers": [{"frames": []}], "layerFolders": {"f": {}}}),
-            "layerFolders",
+            json!({"layers": [{"frames": []}], "exprGlobals": "var a = 1;"}),
+            "exprGlobals",
         ),
     ] {
         let error = refusal(mutate);
@@ -225,16 +201,7 @@ fn baseline_migrations_reproduce_the_pinned_expectations() {
     );
 }
 
-#[test]
-fn the_migration_fixture_refuses_at_its_first_unowned_family() {
-    let error = convert(MIGRATION.as_bytes()).err().expect("refused");
-    assert_eq!(
-        (error.code(), error.path()),
-        (LEGACY_UNSUPPORTED_FIELD, "layers[0].motion")
-    );
-}
-
-fn saved(owner: &NativeObjectHistory) -> Vec<u8> {
+pub(super) fn saved(owner: &NativeObjectHistory) -> Vec<u8> {
     let pin = owner.acquire_snapshot(owner.content_revision()).unwrap();
     owner
         .serialize_project_file(owner.content_revision(), pin.snapshot_id())

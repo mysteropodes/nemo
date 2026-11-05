@@ -5,7 +5,8 @@ use serde_json::{json, Value};
 use std::{fs, path::PathBuf};
 
 const ORIGINAL: &str = include_str!("../../tests/fixtures/legacy-import/original.json");
-const MOTION: &str = include_str!("../../tests/fixtures/migration/project.json");
+/// A baseline layer whose parent weights have no native owner in this release.
+const UNOWNED: &str = r#"{"version":13,"totalFrames":2,"layers":[{"name":"L","frames":[{"strokes":[],"isKeyframe":true},{"strokes":[],"isKeyframe":false}],"parentKeys":[{"frame":0}]}]}"#;
 
 struct Scratch(PathBuf);
 impl Scratch {
@@ -104,7 +105,7 @@ fn a_baseline_project_replaces_the_open_document_as_a_new_untitled_native_one() 
 fn a_refused_baseline_project_names_its_field_and_leaves_the_open_document_untouched() {
     let (state, before) = open_blank();
     let scratch = Scratch::new();
-    let path = scratch.file("with-motion.json", MOTION);
+    let path = scratch.file("with-parent-keys.json", UNOWNED);
     let request = replacing(&state, &before, &path);
     let error = replace::prepare(
         &state,
@@ -123,7 +124,7 @@ fn a_refused_baseline_project_names_its_field_and_leaves_the_open_document_untou
         (json!("notDispatched"), json!("legacy_unsupported_field"))
     );
     assert!(
-        error.message.contains("layers[0].motion"),
+        error.message.contains("layers[0].parentKeys"),
         "{}",
         error.message
     );
@@ -133,7 +134,7 @@ fn a_refused_baseline_project_names_its_field_and_leaves_the_open_document_untou
             .unwrap(),
         before
     );
-    assert_eq!(fs::read_to_string(&path).unwrap(), MOTION);
+    assert_eq!(fs::read_to_string(&path).unwrap(), UNOWNED);
 }
 
 #[test]
