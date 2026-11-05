@@ -167,3 +167,16 @@ fn the_first_open_installs_a_baseline_project_and_other_json_stays_unsupported()
         "unsupported_format"
     );
 }
+
+#[test]
+fn a_baseline_shaped_file_without_layers_is_a_typed_legacy_refusal_and_installs_nothing() {
+    let state = ApplicationMcp::default();
+    let scratch = Scratch::new();
+    let path = scratch.file("empty.json", r#"{"layers":[],"canvasW":320}"#);
+    let request = json!({"apiVersion":2,"requestId":"empty","instanceId":state.instance_id(),"sourcePath":path,"projectOnly":true});
+    let error =
+        reopen::bootstrap_request(&state, &request.to_string(), |p| p.starts_with(&scratch.0))
+            .unwrap_err();
+    assert_eq!(error.code, "legacy_invalid");
+    assert!(state.native_state().lock().unwrap().active().is_none());
+}
