@@ -140,6 +140,32 @@
     if (layer && layer.kind === 'folder') finish(host, b.writes.setFolderCollapsed(uid, layer.folderCollapsed !== true));
   }
 
+  // The environment of one reorder gesture: the pinned writes and info, the selection and the list the gap is measured on.
+  function dragEnv(host, live, info, uid) {
+    return {
+      writes: live.writes, session: live.session, info, uid, selection: selectionOf(host, info), list: listOf(host),
+      intoFolder: (uids, folder) => (host.NemoNativeLayerKindsUi ? host.NemoNativeLayerKindsUi.moveIntoFolderUids(host, uids, folder) : Promise.resolve({ status: 'unavailable' })),
+      stale: 'The layers changed - the move was cancelled.', toast: (t) => toast(host, t), refused: (r) => refusal(host, r),
+    };
+  }
+  // The sticky grip at the left of an Animation 2D frame-grid row (baseline installLayerReorderGrip) starts the same reorder as the
+  // layer list: a capture listener takes the press before the legacy grip handler, whose writer a native project has closed.
+  const gripped = new WeakSet();
+  function installGrip(host) {
+    if (gripped.has(host) || !host.document || typeof host.document.addEventListener !== 'function') return;
+    gripped.add(host);
+    const down = (e) => {
+      const grip = e.target && typeof e.target.closest === 'function' ? e.target.closest('.layer-reorder-grip') : null;
+      if (!grip || e.button !== 0) return;
+      const live = native(host), info = live && !inComponent(host) && infoOf(live), at = Number(grip.parentNode && grip.parentNode.dataset && grip.parentNode.dataset.layer);
+      const layer = info && Number.isInteger(at) ? info.layers[at] : null;
+      if (!layer) return;
+      e.preventDefault(); e.stopPropagation();
+      Drag.arm(host, dragEnv(host, live, info, layer.layerUid), e);
+    };
+    host.document.addEventListener('mousedown', down, true); host.document.addEventListener('pointerdown', down, true);
+  }
+
   // Binds the writes of one finished row: called by the presenter once per row with the row's layer and index.
   function bind(host, layer, index, row) {
     const b = native(host);
@@ -162,12 +188,9 @@
       if (e.button !== 0 || !dragStart(e.target, row)) return;
       const live = native(host), info = live && infoOf(live);
       if (!info || !info.layers.some((l) => l.layerUid === uid)) return;
-      Drag.arm(host, {
-        writes: live.writes, session: live.session, info, uid, selection: selectionOf(host, info), list: listOf(host),
-        intoFolder: (uids, folder) => (host.NemoNativeLayerKindsUi ? host.NemoNativeLayerKindsUi.moveIntoFolderUids(host, uids, folder) : Promise.resolve({ status: 'unavailable' })),
-        stale: 'The layers changed - the move was cancelled.', toast: (t) => toast(host, t), refused: (r) => refusal(host, r),
-      }, e);
+      Drag.arm(host, dragEnv(host, live, info, uid), e);
     };
+    installGrip(host);
     row.addEventListener('mousedown', begin); row.addEventListener('pointerdown', begin);
     return true;
   }

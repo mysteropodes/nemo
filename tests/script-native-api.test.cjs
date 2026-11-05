@@ -50,7 +50,9 @@ test('unbound and unavailable rows refuse with a typed error and never fall back
   typed(()=>n.undoGroup(()=>{}),'sdk:nemo-script.undoGroup','script-run-grouping');
   typed(()=>n.markers.list(),'sdk:nemo-script.markers.list','native-entry-absent');typed(()=>n.comp.beats(),'sdk:nemo-script.comp.beats','native-entry-absent');
   typed(()=>n.camera.keys(),'sdk:nemo-script.camera.keys','no-native-camera');
-  typed(()=>n.comp.setWorkArea(0,1),'sdk:nemo-script.comp.setWorkArea','no-native-work-area');
+  typed(()=>n.comp.setWorkArea(0,1),'sdk:nemo-script.comp.setWorkArea','native-entry-absent');
+  typed(()=>n.comp.trimToWorkArea(),'sdk:nemo-script.comp.trimToWorkArea','native-entry-absent');
+  typed(()=>{layer.color='#112233';},'sdk:nemo-script.Layer.color','native-entry-absent');
 });
 
 test('a replaced document, a removed layer or a refused write stops the drain (mutation-policy negative controls)',async()=>{
@@ -106,6 +108,9 @@ function owner(layers,hooks={}){
     rename:(uid,name)=>{calls.push(['rename',uid,name]);const early=done('rename',uid);if(early)return early;revise(i=>({...i,layers:i.layers.map(l=>l.layerUid===uid?{...l,name}:l)}));return Promise.resolve({ok:true,applied:true});},
     property:spec=>{calls.push(['property',spec]);const early=done('property',spec);if(early)return early;revise(i=>i);return Promise.resolve({ok:true,applied:true});},
     track:spec=>{calls.push(['track',spec]);const early=done('track',spec);if(early)return early;revise(i=>i);return Promise.resolve({ok:true,applied:true});},
+    color:(uid,hex)=>{calls.push(['color',uid,hex]);const early=done('color',uid);if(early)return early;revise(i=>({...i,layers:i.layers.map(l=>l.layerUid===uid?{...l,color:hex}:l)}));return Promise.resolve({ok:true,applied:true});},
+    workArea:spec=>{calls.push(['workArea',spec]);const early=done('workArea',spec);if(early)return early;revise(i=>({...i,waIn:spec.inFrame,waOut:spec.outFrame}));return Promise.resolve({ok:true,applied:true});},
+    trim:()=>{calls.push(['trim']);const early=done('trim');if(early)return early;revise(i=>({...i,totalFrames:i.waOut-i.waIn+1,waIn:0,waOut:i.waOut-i.waIn}));return Promise.resolve({ok:true,applied:true});},
     marker:spec=>{calls.push(['marker',spec]);const early=done('marker',spec);if(early)return early;revise(i=>i);return Promise.resolve({ok:true,applied:true});},
   };
   return {h,calls,ops,run:(extra={})=>Api.createRun({...h.ports,ops,frame:()=>4,...extra})};
@@ -222,4 +227,27 @@ test('consecutive renames of one layer collapse into one native write',async()=>
   const o=owner(L),run=o.run(),n=run.nemo,a=n.layer('A');a.name='One';a.name='Two';n.layer('B').name='B2';
   assert.deepEqual(await run.commit(),{ok:true,applied:2,pending:0});
   assert.deepEqual(o.calls,[['rename','a','Two'],['rename','b','B2']]);assert.deepEqual(o.h.info.layers.map(l=>l.name).slice(0,2),['Two','B2']);
+});
+
+test('Layer.color, comp.setWorkArea and comp.trimToWorkArea reach the native entries (one write each) and confirm in the read model',async()=>{
+  const o=owner(L),run=o.run(),n=run.nemo,a=n.layer('A');
+  assert.equal(a.color,null);a.color='#FF0000';assert.equal(a.color,'#ff0000');a.color='#00ff00';a.color='#00ff00';
+  assert.throws(()=>{a.color='red';},/#rrggbb/);
+  n.comp.setWorkArea(2,9);
+  assert.throws(()=>n.comp.setWorkArea(5,5),/outside the composition/);
+  assert.ok(['Layer.color','comp.setWorkArea','comp.trimToWorkArea'].every(r=>n.help().includes(r)));
+  assert.deepEqual(await run.commit(),{ok:true,applied:2,pending:0});
+  assert.deepEqual(o.calls,[['color','a','#00ff00'],['workArea',{inFrame:2,outFrame:9}]]);
+  assert.equal(o.h.info.layers[0].color,'#00ff00');assert.equal(o.h.info.waIn,2);assert.equal(o.h.info.waOut,9);
+  const next=o.run(),m=next.nemo;m.comp.trimToWorkArea();
+  assert.deepEqual(await next.commit(),{ok:true,applied:1,pending:0});
+  assert.deepEqual(o.calls.slice(2),[['trim']]);assert.equal(o.h.info.totalFrames,8);
+});
+
+test('trimToWorkArea with nothing to cut and a colour already worn are not writes; an unconfirmed colour stops the drain',async()=>{
+  const o=owner(L.map(l=>({...l,color:l.layerUid==='a'?'#112233':undefined}))),run=o.run(),n=run.nemo;
+  n.comp.trimToWorkArea();n.layer('A').color='#112233';
+  assert.deepEqual(await run.commit(),{ok:true,applied:0,pending:0});assert.deepEqual(o.calls,[]);
+  const p=owner(L,{color:()=>Promise.resolve({ok:true,applied:true})}),r=p.run();r.nemo.layer('B').color='#abcdef';
+  assert.equal((await r.commit()).error,'write-unconfirmed');
 });

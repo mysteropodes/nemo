@@ -5,6 +5,7 @@
   if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeMotionPropertyKeys=api;
 }(typeof globalThis==='object'?globalThis:this,function(View,LockMenu){
   'use strict';
+  var MAX_SELECTED=4096,MAX_ADDRESSES=32; // up to 32 keys are addressed one by one; a larger selection is named as runs of frames
   function object(v){return !!v&&typeof v==='object'&&!Array.isArray(v);}
   function exact(v,required,optional){return object(v)&&required.every(function(k){return Object.prototype.hasOwnProperty.call(v,k);})&&Object.keys(v).every(function(k){return required.includes(k)||(optional||[]).includes(k);});}
   function vector(v,n){return Array.isArray(v)&&v.length===n&&Array.from(v).every(Number.isFinite);}
@@ -59,14 +60,19 @@
     async function apply(action){
       var value=accepted,ticket=serial,writer=ports.editPropertyTrack;
       if(busy||!value||!current(value,ticket)||typeof writer!=='function'||!selected.size)return refuse('Native key action is unavailable or stale.');
-      var selections=value.items.filter(function(k){return selected.has(k.frame);}).map(function(k){return {target:value.target,property:value.property,frame:k.frame};});
-      if(!selections.length||selections.length>32)return refuse('Select between 1 and 32 native keys.');
+      var addresses=value.items.filter(function(k){return selected.has(k.frame);}).map(function(k){return {target:value.target,property:value.property,frame:k.frame};}),selections=addresses;
+      if(!addresses.length||addresses.length>MAX_SELECTED)return refuse('Select at least 1 native key.');
+      if(addresses.length>MAX_ADDRESSES){
+        var runs=[],open=null;
+        value.items.slice().sort(function(a,b){return a.frame-b.frame;}).forEach(function(k){if(!selected.has(k.frame)){open=null;return;}if(open)open[1]=k.frame;else{open=[k.frame,k.frame];runs.push(open);}});
+        selections=[{target:value.target,property:value.property,ranges:runs}];
+      }
       var payload=freeze({command:'object.property.track.edit',selections:selections,action:action});
       busy=true;controls();status.textContent='Waiting for native key edit…';timelineChanged('busy');
       try{
         // Queue entry suppresses presentedSession while pending. Binding guards
         // owner/frame/selection there; this predicate owns local UI lifetime.
-        var result=await writer(payload,value.token.pin,function(){return mounted()&&ticket===serial&&accepted===value&&selected.size===selections.length&&selections.every(function(k){return selected.has(k.frame);});});
+        var result=await writer(payload,value.token.pin,function(){return mounted()&&ticket===serial&&accepted===value&&selected.size===addresses.length&&addresses.every(function(k){return selected.has(k.frame);});});
         if(!receipt(result))throw Error('Malformed native key receipt.');
         if(!ownerCurrent(value,ticket)){if(ticket===serial&&!retired)return refuse('Native key view became stale; selections cleared.');return false;}
         reset(result.applied?'Native key edit accepted. Select the property again to read its keys.':'Native key edit made no change. Select the property again to read its keys.',false);
@@ -107,7 +113,7 @@
         listen(check,'change',function(){
           if(accepted!==value||!current(value,ticket)||busy||typeof ports.editPropertyTrack!=='function'){check.checked=false;return refuse('Native key selection is unavailable or stale.');}
           var proposed=Array.from(selected);if(check.checked&&!selected.has(k.frame))proposed.push(k.frame);else proposed=proposed.filter(function(frame){return frame!==k.frame;});
-          if(proposed.length>32||!acceptSelection(proposed)){check.checked=selected.has(k.frame);status.textContent='Select at most 32 current native keys across open tracks.';return;}
+          if(proposed.length>MAX_SELECTED||!acceptSelection(proposed)){check.checked=selected.has(k.frame);status.textContent='Select at most '+MAX_SELECTED+' current native keys across open tracks.';return;}
           if(check.checked)selected.add(k.frame);else selected.delete(k.frame);
           selectionEpoch++;status.textContent=selected.size+' native key(s) selected.';controls();timelineChanged('selection');
         },rowBindings);
@@ -151,7 +157,7 @@
         if(retired||busy||!value||!current(value,ticket))return null;
         function isCurrent(){return accepted===value&&selectionEpoch===epoch&&!busy&&current(value,ticket);}
         function proposedFrames(frames){
-          if(!isCurrent()||typeof ports.editPropertyTrack!=='function'||!Array.isArray(frames)||frames.length>32)return null;
+          if(!isCurrent()||typeof ports.editPropertyTrack!=='function'||!Array.isArray(frames)||frames.length>MAX_SELECTED)return null;
           var values=Array.from(frames),seen=new Set(),available=new Set(value.items.map(function(k){return k.frame;}));
           if(!values.every(function(frame){if(!Number.isFinite(frame)||!available.has(frame)||seen.has(frame))return false;seen.add(frame);return true;}))return null;
           return acceptSelection(values)&&isCurrent()?values:null;

@@ -61,13 +61,24 @@ pub(crate) trait LayerEditPolicy {
     fn permit(&self, op: LayerOp, layer: &ObjectLayer) -> Result<(), PolicyRefusal>;
 }
 
-/// The stand-in until F06 lands: every decision it is asked for is unavailable.
+/// A provider-less stand-in: every decision it is asked for is unavailable (kept for the kernel's policy tests).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct UnavailableLayerEditPolicy;
 
 impl LayerEditPolicy for UnavailableLayerEditPolicy {
     fn permit(&self, _op: LayerOp, _layer: &ObjectLayer) -> Result<(), PolicyRefusal> {
         Err(PolicyRefusal::Unavailable)
+    }
+}
+
+/// The baseline policy: `deleteLayer`, `duplicateLayer` and `reorderLayersAtGap` (1065e9d8) never gated a lock or a
+/// transform parent, so every decision is permitted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct BaselineLayerEditPolicy;
+
+impl LayerEditPolicy for BaselineLayerEditPolicy {
+    fn permit(&self, _op: LayerOp, _layer: &ObjectLayer) -> Result<(), PolicyRefusal> {
+        Ok(())
     }
 }
 

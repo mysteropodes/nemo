@@ -8,13 +8,13 @@
   else root.NemoNativeMotionKeyGesture = api;
 }(typeof globalThis === 'object' ? globalThis : this, function (KeyEdit) {
   'use strict';
-  const MAX_KEYS = 32;
+  const MAX_SELECTED = 4096; // a guard against a runaway selection; the edit names runs of keys, so the count never sizes the request
   const tr = (host, key, fallback) => { let v; try { v = host && host.SM && typeof host.SM.t === 'function' ? host.SM.t(key) : undefined; } catch (_) { v = undefined; } return typeof v === 'string' && v && v !== key ? v : fallback; };
   const address = (track, frame) => ({ target: { kind: 'property', target: track.target, property: track.property }, frame });
   const flat = (view) => view.tracks.flatMap((track) => track.items.map((key) => ({ track, key })));
   const chosen = (view) => flat(view).filter((e) => e.key.selected);
   const byFrame = (a, b) => a.key.frame - b.key.frame;
-  /* Selection-only operations over a key read; each returns whether the selection was accepted (at most 32 keys). */
+  /* Selection-only operations over a key read; each returns whether the selection was accepted (at most 4096 keys). */
   function selectEveryNth(view, n) {
     const step = Math.max(2, parseInt(n, 10) || 2);
     return view.selectKeys(chosen(view).sort(byFrame).filter((_, i) => i % step === 0).map((e) => address(e.track, e.key.frame))) === true;
@@ -28,13 +28,13 @@
   // Within the tracks currently drawn, the same universe the marquee draws over.
   function invert(view) {
     const rest = flat(view).filter((e) => !e.key.selected).map((e) => address(e.track, e.key.frame));
-    return rest.length <= MAX_KEYS && view.selectKeys(rest) === true;
+    return rest.length <= MAX_SELECTED && view.selectKeys(rest) === true;
   }
   /* The key context menu. ctx: {view, edit(action), selectOnly(), hold (bool: the right-clicked key holds), toast(msg), prompt(msg, def), refresh()}. */
   function menuItems(host, ctx) {
     const t = (key, fallback) => tr(host, key, fallback);
     const count = chosen(ctx.view).length;
-    const run = (fn) => () => { try { if (fn() === false) ctx.toast('Select between 1 and 32 keys.'); } finally { ctx.refresh(); } };
+    const run = (fn) => () => { try { if (fn() === false) ctx.toast('The key selection was not accepted.'); } finally { ctx.refresh(); } };
     const act = (action) => () => ctx.edit(action);
     const items = [
       { label: t('ctxDeleteThisKey', 'Delete this key'), action() { return ctx.selectOnly() ? ctx.edit({ kind: 'delete' }) : false; } },

@@ -11,6 +11,7 @@
   if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeMotionPropertyPanel=api;
 }(typeof globalThis==='object'?globalThis:this,function(View,Keys,Value,Expr,KeyEdit){
   'use strict';
+  var MAX_SELECTED=4096; // a guard against a runaway selection; the edit request names runs of keys, so the count never sizes it
   var shortcuts={p:'position',a:'anchor',r:'rotation',s:'scale',t:'opacity'};
   // Baseline propsFor() order (motion.js PROPS / PROPS_WITH_3D); anything else keeps its native order after these.
   var baselineOrder=['position','positionZ','anchor','rotation','rotationX','rotationY','scale','opacity','order'];
@@ -46,7 +47,7 @@
         if(base&&!sameView(base,view))return false;base=view;count+=view.items.filter(function(k){return k.selected;}).length;
       }
       var own=entry.editor.readKeyTimeline();
-      return !!own&&(!base||sameView(base,own))&&count<=32;
+      return !!own&&(!base||sameView(base,own))&&count<=MAX_SELECTED;
     }
     function makeKeyEditor(){
       if(!Keys||typeof Keys.create!=='function'||typeof ports.readProperty!=='function')return null;
@@ -114,7 +115,7 @@
       function isCurrent(){return !retired&&validAccepted()&&entries.length===keyEditors.filter(function(entry){return entry.id!==null;}).length&&entries.every(function(entry,i){return keyEditors.includes(entry)&&views[i].isCurrent();});}
       function selectKeys(keys){
         try{
-        if(!isCurrent()||!Array.isArray(keys)||keys.length>32)return false;
+        if(!isCurrent()||!Array.isArray(keys)||keys.length>MAX_SELECTED)return false;
         var proposed=new Map(entries.map(function(entry){return [entry,[]];})),seen=new Set();
         for(var address of keys){
           if(!address||typeof address!=='object'||Array.isArray(address)||Object.keys(address).length!==2||!Object.prototype.hasOwnProperty.call(address,'target')||!Object.prototype.hasOwnProperty.call(address,'frame')||!Number.isFinite(address.frame))return false;
@@ -143,7 +144,7 @@
       if(!keyEditors.some(function(entry){return entry.id!==null;}))return keyEditor?keyEditor.captureSelectedKeys():null;
       var view=readKeyTimelines();if(!view)return null;
       var keys=[];view.tracks.forEach(function(track){track.items.forEach(function(item){if(item.selected)keys.push(Object.freeze({target:Object.freeze({kind:'property',target:track.target,property:track.property}),frame:item.frame}));});});
-      if(keys.length>32)return null;Object.freeze(keys);
+      if(keys.length>MAX_SELECTED)return null;Object.freeze(keys);
       var value={pin:view.pin,frame:view.frame,viewGeneration:view.viewGeneration,keys:keys};
       var capturedAccepted=accepted,ticket=serial,entries=keyEditors.filter(function(entry){return entry.id!==null;}),ids=entries.map(function(entry){return entry.id;});
       var proofs=entries.map(function(entry){return entry.editor.captureSelectedKeys();});
