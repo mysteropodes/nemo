@@ -42,8 +42,17 @@
     if(selected.currentOutline)request.currentOutline=true;
     // "Shadow guides" switched off (#2373): the renderer leaves the shadow-tagged items out; a view flag, never a command.
     if(selected.hideShadowGuides)request.hideShadowGuides=true;
+    // Solo (#2371): the renderer paints only these layers (and the children of a soloed folder layer); a view fact, never a command.
+    if(selected.solo&&selected.solo.length)request.soloLayers=selected.solo.slice();
   }
-  function sameView(a,b){return a.mode===b.mode&&equalNav(a.navigation,b.navigation)&&a.displayFilter===b.displayFilter&&!!a.alphaChecker===!!b.alphaChecker&&!!a.currentOutline===!!b.currentOutline&&!!a.hideShadowGuides===!!b.hideShadowGuides&&ghostKey(a.ghosts)===ghostKey(b.ghosts);}
+  // The Solo set as a closed, sorted list of plain ids (the request and the receipt both carry exactly it); [] for none.
+  function soloSel(value){
+    if(value===undefined||value===null)return [];
+    if(!Array.isArray(value)||value.length>512||!value.every(function(id){return typeof id==='string'&&/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(id);}))throw new Error('Native solo selection is unavailable');
+    return Array.from(new Set(value)).sort();
+  }
+  function soloKey(value){return JSON.stringify(soloSel(value));}
+  function sameView(a,b){return a.mode===b.mode&&equalNav(a.navigation,b.navigation)&&a.displayFilter===b.displayFilter&&!!a.alphaChecker===!!b.alphaChecker&&!!a.currentOutline===!!b.currentOutline&&!!a.hideShadowGuides===!!b.hideShadowGuides&&soloKey(a.solo)===soloKey(b.solo)&&ghostKey(a.ghosts)===ghostKey(b.ghosts);}
   function projection(value,mode,navigation){
     if(!['canvas','stored-camera'].includes(mode))return null;
     var wanted;try{wanted=nav(navigation);}catch(_){return null;}
@@ -61,7 +70,7 @@
     var result={mode:mode,cameraAvailable:available,documentToComposition:forward,compositionToDocument:inverse};if(navigationValue!==undefined)result.navigation=actual;return result;
   }
   // The existing session owns desired presentation only. No geometry/camera keys live here.
-  function navigation(readMode,observe,readFilter,readGhosts,readChecker,readOutline,readHideShadow){
+  function navigation(readMode,observe,readFilter,readGhosts,readChecker,readOutline,readHideShadow,readSolo){
     var owner=null,mode=null,desired=nav(),gesture=null;
     function observedBegin(kind,code){
       var tag=kind==='pan'?'pan':kind==='zoom'?'zoom':'other';
@@ -74,9 +83,10 @@
       var checker=false;try{checker=readChecker?readChecker(info)===true:false;}catch(_){checker=false;}
       var outline=false;try{outline=readOutline?readOutline(info)===true:false;}catch(_){outline=false;}
       var hide=false;try{hide=readHideShadow?readHideShadow(info)===true:false;}catch(_){hide=false;}
-      return {mode:mode,navigation:nav(desired),displayFilter:displayFilter(readFilter?readFilter():undefined),ghosts:ghosts,alphaChecker:checker,currentOutline:outline,hideShadowGuides:hide};
+      var solo=[];try{solo=readSolo?soloSel(readSolo(info)):[];}catch(_){solo=[];}
+      return {mode:mode,navigation:nav(desired),displayFilter:displayFilter(readFilter?readFilter():undefined),ghosts:ghosts,alphaChecker:checker,currentOutline:outline,hideShadowGuides:hide,solo:solo};
     }
-    function matches(p,info){try{var value=read(info);return !!p&&!!p.view&&p.view.mode===value.mode&&equalNav(nav(p.view.navigation),value.navigation)&&displayFilter(p.displayFilter)===value.displayFilter&&(p.alphaChecker===true)===value.alphaChecker&&(p.currentOutline===true)===value.currentOutline&&(p.hideShadowGuides===true)===value.hideShadowGuides&&ghostKey(p.ghosts&&p.ghosts.selected)===ghostKey(value.ghosts);}catch(_){return false;}}
+    function matches(p,info){try{var value=read(info);return !!p&&!!p.view&&p.view.mode===value.mode&&equalNav(nav(p.view.navigation),value.navigation)&&displayFilter(p.displayFilter)===value.displayFilter&&(p.alphaChecker===true)===value.alphaChecker&&(p.currentOutline===true)===value.currentOutline&&(p.hideShadowGuides===true)===value.hideShadowGuides&&soloKey(p.soloLayers)===soloKey(value.solo)&&ghostKey(p.ghosts&&p.ghosts.selected)===ghostKey(value.ghosts);}catch(_){return false;}}
     function begin(p,info,frame,mapping,shownBounds,kind,point){
       var selected=read(info),b=mapping&&mapping.cssBounds;
       if(!p||p.frame!==frame||p.view.mode!==selected.mode||!b||!shownBounds||!['x','y','width','height'].every(function(k){return Number.isFinite(b[k])&&b[k]===shownBounds[k];})||b.width<=0||b.height<=0||!['pan','zoom'].includes(kind)){
@@ -179,7 +189,7 @@
       clearWanted: function () { wanted = null; }
     });
   }
-  function inspectReceipt(receipt,ownerMatches,allowDeferred,viewMode,navigation,filter,wantedGhosts,wantedChecker,wantedOutline,wantedHideShadow){
+  function inspectReceipt(receipt,ownerMatches,allowDeferred,viewMode,navigation,filter,wantedGhosts,wantedChecker,wantedOutline,wantedHideShadow,wantedSolo){
     if(!ownerMatches)return {failure:'owner'};
     if(!receipt)return {failure:'receipt'};
     var status=receipt.status;
@@ -198,11 +208,14 @@
     // Likewise the outline mode (#2372): echoed only when asked for, and then exactly.
     if(wantedOutline===true?receipt.currentOutline!==true:receipt.currentOutline!==undefined)return {failure:'current-outline'};
     if(wantedHideShadow===true?receipt.hideShadowGuides!==true:receipt.hideShadowGuides!==undefined)return {failure:'shadow-guides'};
+    // The Solo set (#2371) is echoed only when asked for, and then exactly the sorted set that was sent.
+    var solo;try{solo=soloSel(wantedSolo);if(solo.length?soloKey(receipt.soloLayers)!==JSON.stringify(solo):receipt.soloLayers!==undefined)return {failure:'solo-layers'};}catch(_){return {failure:'solo-layers'};}
     var done={failure:null,status:status,workId:workId,viewGeneration:viewGeneration,view:view,displayFilter:actual};
     if(ghosts)done.ghosts=ghosts;
     if(wantedChecker===true)done.alphaChecker=true;
     if(wantedOutline===true)done.currentOutline=true;
     if(wantedHideShadow===true)done.hideShadowGuides=true;
+    if(solo.length)done.soloLayers=solo;
     return done;
   }
   // What the renderer did with the onion selection: exactly the selection asked for, or nothing at all when none was asked for.
@@ -223,6 +236,7 @@
     if(receipt.alphaChecker===true)shown.alphaChecker=true;
     if(receipt.currentOutline===true)shown.currentOutline=true;
     if(receipt.hideShadowGuides===true)shown.hideShadowGuides=true;
+    if(receipt.soloLayers&&receipt.soloLayers.length)shown.soloLayers=receipt.soloLayers.slice();
     return shown;
   }
   function create(subscribe,guard){

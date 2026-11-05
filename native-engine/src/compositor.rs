@@ -497,3 +497,7 @@ mod viewport_outline_tests;
 #[cfg(all(test, feature = "history", feature = "application", feature = "project_media_codec"))]
 #[path = "../tests/object_viewport_shadow.rs"]
 mod viewport_shadow_tests;
+
+#[cfg(all(test, feature = "history", feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_viewport_solo.rs"]
+mod viewport_solo_tests;

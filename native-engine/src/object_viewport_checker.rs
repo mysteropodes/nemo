@@ -10,6 +10,9 @@ pub(crate) mod outline;
 // #2373: and the Shadow guides switch, the third.
 #[path = "object_viewport_shadow.rs"]
 pub(crate) mod shadow;
+// #2371: and the Solo view of the layers, the fourth.
+#[path = "object_viewport_solo.rs"]
+pub(crate) mod solo;
 use vello::kurbo::{Affine, Rect};
 use vello::peniko::{Color, Fill};
 

@@ -294,6 +294,8 @@
       currentOutline:function(){return !!(root.state&&root.state.currentFrameOutline===true);},
       // "Shadow guides" off (#2373): the flag is the inverse of state.showShadowGuides (shown by default, as in the baseline).
       hideShadowGuides:function(){return !!(root.state&&root.state.showShadowGuides===false);},
+      // Layer Solo (#2371): the soloed layer uids of this lifecycle, a view fact the renderer reads and the export honours (as the baseline).
+      soloLayers:function(info){var solo=root.NemoNativeLayerSolo;return solo&&typeof solo.read==='function'?solo.read(root,info):[];},
       displayFilter:function(){var labs=root.SMLabs,color=labs&&typeof labs.getViewFilter==='function'?labs.getViewFilter():'none';
         return labs&&typeof labs.isMirrored==='function'&&labs.isMirrored()?(color==='none'?'mirrored':color+'-mirrored'):color;},
       subscribeWindowOcclusion:root.__TAURI__.event&&typeof root.__TAURI__.event.listen==='function'?async function(hint,cancel){
