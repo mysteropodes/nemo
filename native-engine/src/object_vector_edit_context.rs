@@ -27,7 +27,7 @@ pub(super) fn context_of<'a>(targets: impl IntoIterator<Item = &'a ObjectTarget>
 }
 
 /// A component's view of `origin`, or `None` for the scene (the origin is the base itself).
-pub(super) fn view(
+pub(crate) fn view(
     origin: &ObjectDocument,
     context: &str,
 ) -> Result<Option<ObjectDocument>, DispatchErrorCode> {
@@ -49,7 +49,7 @@ pub(super) fn view(
 /// Write an edited view back: the component record takes the view's layers and records, every other member of the
 /// result is what the kernels left in the view (order plan, holders, items), and the scene's own layers, records and
 /// frame count are the origin's.
-pub(super) fn restore(
+pub(crate) fn restore(
     mut edited: ObjectDocument,
     origin: &ObjectDocument,
     context: &str,

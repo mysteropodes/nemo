@@ -42,7 +42,7 @@
     function style(tool,proof){
       var s=root.state,current=session(),ownerInfo=current&&current.info(),port=root.NemoNativePerspectiveController;
       var perspective=port&&(proof?typeof port.readForCommand==='function'&&port.readForCommand(proof):port.read());
-      if(s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||!perspective||!same(perspective.info,ownerInfo)||perspective.perspective.settings.perspectiveEnabled||s.activeSymbolId)fail('This drawing mode is unavailable in native shape tools.');
+      if(!(s.appMode==='anim2d'||s.appMode==='motion')||s.playing||s.spaceDown||s.isPanning||!perspective||!same(perspective.info,ownerInfo)||perspective.perspective.settings.perspectiveEnabled)fail('This drawing mode is unavailable in native shape tools.');
       if(ports.freehand)return ports.style();
       if(ports.pen)return Paint.shadowStyle(root,s,penStyle(s));
       // Shadow mode inks the shape in the swatch whatever Stroke/Fill say (applyShadowBrushTag).
@@ -158,12 +158,14 @@
       // draw-bridge.js Fill Brush: one native command places the shape (fillBrushMode) and merges same-colour fills.
       // Labs multi-frame draw stamps the path the merge hands back on the other selected frames, in the same commit.
       var fbStamps=dict.isFillShape&&root.SMLabs&&typeof root.SMLabs.multiframeTargets==='function'?root.SMLabs.multiframeTargets(t.frame):[];
-      if(dict.isFillShape)return root.NemoNativeFillDesktop.create({current:function(){return guarded;},ready:function(){return true;},
-        target:function(){return {layerUid:t.layerUid,frame:t.frame,contextId:'scene-root'};}}).brush({outline:dict.segments,color:dict.fillColor,opacity:dict.opacity,placement:root.state.fillBrushMode,mask:root.state.maskMode?root.state.maskModeType||'add':false,copies:Symmetry.matrices(root,t.pin),stamps:fbStamps})
+      var fillRoute=t.context!=='scene-root'&&guarded.runComponentCommand?Object.assign({},guarded,{runResourceCommand:guarded.runComponentCommand}):guarded; // an entered component: the resource route is scene-only (runFontResource)
+      if(dict.isFillShape)return root.NemoNativeFillDesktop.create({current:function(){return fillRoute;},ready:function(){return true;},
+        target:function(){return {layerUid:t.layerUid,frame:t.frame,contextId:t.context};}}).brush({outline:dict.segments,color:dict.fillColor,opacity:dict.opacity,placement:root.state.fillBrushMode,mask:root.state.maskMode?root.state.maskModeType||'add':false,copies:Symmetry.matrices(root,t.pin),stamps:fbStamps})
         .then(function(r){if(r&&r.applied&&fbStamps.length&&typeof root.SMLabs.multiframeStamped==='function')root.SMLabs.multiframeStamped(fbStamps.length);
           return {status:r&&r.applied?'applied':'noop'};},root.NemoNativeObjectVector.statusOf);
       // draw-bridge.js Bitmap Brush: the anchor, its baked companion and the PNG in one native command.
-      if(t.style&&t.style.bitmap)return Bitmap.commit(root,guarded,t,dict,root.NemoNativeObjectVector.statusOf);
+      if(t.style&&t.style.bitmap){if(t.context!=='scene-root'){t.refusal='Bitmap brushes are not available inside a component.';return Promise.resolve({status:'unavailable',reason:'bitmap_component_unavailable'});} // the bitmap stroke command is scene-root only
+        return Bitmap.commit(root,guarded,t,dict,root.NemoNativeObjectVector.statusOf);}
       // tools.js @1065e9d8 Draw commit: drawMode 'behind' slips the stroke under the layer's artwork.
       // G23 (symmetry-bridge.js onStrokeCommitted @1065e9d8): the stroke and its copies, each linked fill below its ribbon,
       // in one createMany (behind keeps the order at the bottom).

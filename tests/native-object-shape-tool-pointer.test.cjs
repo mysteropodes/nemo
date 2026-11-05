@@ -490,8 +490,9 @@ function enter(f,id='comp-a',total=8,facts={}){
   projectionReady:()=>true,revision:()=>Promise.resolve(true)};
  // The vector contract reads the held context from the page global (the same object the workspace controller owns).
  globalThis.NemoNativeComponentContext=f.root.NemoNativeComponentContext;
- Object.assign(f.root.state,{layers:[{layerUid:'inner',visible:true,locked:false}],activeLayerIdx:0,currentFrame:2,totalFrames:total});f.root._layerSel=[0];
- return ()=>{entered=null;delete globalThis.NemoNativeComponentContext;};
+ // The real controller (native-component-context.js projectEntered) sets state.activeSymbolId to the entered context, which the old fixture never did (#2361).
+ Object.assign(f.root.state,{layers:[{layerUid:'inner',visible:true,locked:false}],activeLayerIdx:0,currentFrame:2,totalFrames:total,activeSymbolId:id});f.root._layerSel=[0];
+ return ()=>{entered=null;f.root.state.activeSymbolId=null;delete globalThis.NemoNativeComponentContext;};
 }
 test('Draw inside an entered component creates in THAT component through the component route; the scene is not written',async()=>{
  const f=await fixture('rect');const leave=enter(f);await f.session.presentPreview(2);
@@ -500,6 +501,33 @@ test('Draw inside an entered component creates in THAT component through the com
  assert.deepEqual([r.target.contextId,r.target.layerUid,r.target.frameScope.frame,r.target.strokeId],['comp-a','inner',2,'']);
  assert.equal(f.records.size,1);
  leave();
+});
+test('every admitted shape tool (line, rect, ellipse) and Pen draw inside an entered component with state.activeSymbolId set, like the controller (#2361 B-draw-component-context)',async()=>{
+ for(const tool of ['line','rect','ellipse']){
+  const f=await fixture(tool);const leave=enter(f);await f.session.presentPreview(2);
+  assert.equal(f.root.state.activeSymbolId,'comp-a',tool);
+  const result=await f.gesture();assert.equal(result.status,'applied',tool+' '+JSON.stringify(f.log));
+  assert.equal(f.calls.length,1,tool);const r=f.calls[0].payload.record;
+  assert.deepEqual([r.target.contextId,r.target.layerUid,r.target.frameScope.frame],['comp-a','inner',2],tool);
+  assert.equal(f.records.size,1,tool);leave();
+ }
+ const f=await fixture('pen');const leave=enter(f);await f.session.presentPreview(2);
+ const res=await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
+ assert.equal(res.status,'applied',JSON.stringify(f.log));assert.equal(f.calls.length,1);
+ assert.deepEqual([f.calls[0].payload.record.target.contextId,f.calls[0].payload.record.target.layerUid,f.calls[0].payload.record.target.frameScope.frame],['comp-a','inner',2]);leave();
+});
+test('Motion mode draws shapes and Pen on a layer without a Motion transform, at the playhead frame (#2361 B-draw-motion-mode)',async()=>{
+ for(const tool of ['line','rect','ellipse']){
+  const f=await fixture(tool);f.root.state.appMode='motion';f.root.state.currentFrame=3;await f.session.presentPreview(3);
+  const result=await f.gesture();assert.equal(result.status,'applied',tool+' '+JSON.stringify(f.log));
+  assert.equal(f.calls.length,1,tool);assert.deepEqual([f.calls[0].payload.record.target.contextId,f.calls[0].payload.record.target.frameScope.frame],['scene-root',3],tool);
+ }
+ const f=await fixture('pen');f.root.state.appMode='motion';
+ const res=await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
+ assert.equal(res.status,'applied',JSON.stringify(f.log));assert.equal(f.calls.length,1);
+ // Other modes and a layer with its own Motion transform stay refused: the baseline maps the point through the layer's Motion, which native does not yet do.
+ for(const mode of ['storyboard','compose']){const g=await fixture();g.root.state.appMode=mode;assert.equal(g.area.fire('pointerdown').stopped,true);g.area.fire('pointerup',{clientX:240,clientY:210});assert.equal(g.calls.length,0,mode);assert.equal(g.body.children.length,0,mode);}
+ const moving=await fixture();moving.root.state.appMode='motion';moving.root.state.layers[0].motion={position:{}};moving.area.fire('pointerdown');moving.area.fire('pointerup',{clientX:240,clientY:210});assert.equal(moving.calls.length,0);
 });
 test('a frame past the entered component is not drawable even though the scene has it',async()=>{
  const f=await fixture('rect');const leave=enter(f,'comp-a',3);f.root.state.currentFrame=5;

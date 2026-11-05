@@ -940,3 +940,43 @@ test('every production Labs prototype with a draw hook declares its native route
  }
  assert.deepEqual(hooked.sort(),[['multiframe-draw.js',true],['predictive-stroke.js',true]],'a new draw hook needs a native route or the typed refusal above names it');
 });
+
+// #2361 B-draw-component-context / B-draw-motion-mode: Draw and Fill Brush inside an entered component (state.activeSymbolId set as
+// native-component-context.js projectEntered does) and in Motion mode, where the baseline draws too (draw-bridge.js has no appMode check).
+function enter(f,id='comp-a',total=8){
+ let entered={contextId:id,totalFrames:total,fps:24};
+ f.root.NemoNativeComponentContext={SCENE:'scene-root',presented:()=>entered,contextId:()=>entered?entered.contextId:'scene-root',
+  layerRows:()=>entered?[{layerUid:'inner',locked:false,visible:true}]:null,frameBound:(h,pin)=>entered?entered.totalFrames:pin.totalFrames,projectionReady:()=>true,revision:()=>Promise.resolve(true)};
+ globalThis.NemoNativeComponentContext=f.root.NemoNativeComponentContext;
+ Object.assign(f.root.state,{layers:[{layerUid:'inner',visible:true,locked:false,frames:[]}],activeLayerIdx:0,currentFrame:2,totalFrames:total,activeSymbolId:id});f.root._layerSel=[0];
+ return ()=>{entered=null;f.root.state.activeSymbolId=null;delete globalThis.NemoNativeComponentContext;};
+}
+test('Draw inside an entered component creates in that component through the component route (activeSymbolId set)',async()=>{
+ const f=await fixture();const leave=enter(f);await f.session.presentPreview(2);
+ send(f,'pointerdown',20,20);send(f,'pointermove',45,30);send(f,'pointerup',100,80);
+ assert.equal((await settled(f)).status,'applied',JSON.stringify(f.log));assert.equal(f.calls.length,1);
+ const r=f.calls[0].payload.record;assert.deepEqual([r.target.contextId,r.target.layerUid,r.target.frameScope.frame],['comp-a','inner',2]);leave();
+});
+test('Fill Brush inside an entered component sends the component context to the native Fill Brush command, not scene-root',async()=>{
+ const f=await fixture('fillbrush');Object.assign(f.root.state,{fillBrushMode:'above',fillBrushSize:40,strokeEnabled:false,fillEnabled:false});
+ const leave=enter(f);await f.session.presentPreview(2);
+ send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});f.advance();send(f,'pointermove',50,30,{pointerType:'pen',pressure:.8});f.advance();send(f,'pointerup',80,45,{pointerType:'pen',pressure:0});
+ await settled(f);assert.equal(f.calls.length,1,f.log.join(','));const q=plain(f.calls[0]);
+ assert.equal(q.operation,'command.document.object.fill.brush');
+ assert.deepEqual([q.payload.contextId,q.payload.layerUid,q.payload.frame],['comp-a','inner',2]);leave();
+});
+test('a bitmap brush inside a component is a typed refusal that writes nothing (the bitmap stroke command is scene-root only)',async()=>{
+ const f=await fixture();bitmapPorts(f);f.root.state.bitmapBrushOn=true;const leave=enter(f);await f.session.presentPreview(2);
+ send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});send(f,'pointermove',45,30,{pointerType:'pen',pressure:.5});send(f,'pointerup',100,80,{pointerType:'pen',pressure:0});
+ const r=await settled(f);assert.equal(r.status,'unavailable');assert.equal(f.calls.length,0);assert.ok(f.log.includes('Bitmap brushes are not available inside a component.'),JSON.stringify(f.log));leave();
+});
+test('Draw and Fill Brush work in Motion mode, on the playhead frame, and other modes stay refused',async()=>{
+ const d=await fixture();d.root.state.appMode='motion';d.root.state.currentFrame=3;await d.session.presentPreview(3);
+ send(d,'pointerdown',20,20);send(d,'pointermove',45,30);send(d,'pointerup',100,80);
+ assert.equal((await settled(d)).status,'applied',JSON.stringify(d.log));assert.equal(d.calls.length,1);
+ assert.deepEqual([d.calls[0].payload.record.target.contextId,d.calls[0].payload.record.target.frameScope.frame],['scene-root',3]);
+ const b=await fixture('fillbrush');Object.assign(b.root.state,{appMode:'motion',fillBrushMode:'merge',fillBrushSize:40});
+ send(b,'pointerdown',20,20,{pointerType:'pen',pressure:.5});b.advance();send(b,'pointermove',50,30,{pointerType:'pen',pressure:.8});b.advance();send(b,'pointerup',80,45,{pointerType:'pen',pressure:0});
+ await settled(b);assert.equal(b.calls.length,1,b.log.join(','));assert.equal(plain(b.calls[0]).operation,'command.document.object.fill.brush');
+ const other=await fixture();other.root.state.appMode='storyboard';send(other,'pointerdown',20,20);send(other,'pointermove',45,30);send(other,'pointerup',100,80);await settled(other);assert.equal(other.calls.length,0);
+});
