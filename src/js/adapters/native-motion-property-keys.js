@@ -168,7 +168,7 @@
           }catch(_){return false;}
         }
         var projection={pin:Object.assign({},value.token.pin),frame:value.frame,viewGeneration:value.token.viewGeneration,
-          target:Object.assign({},value.target),property:value.property,items:value.items.map(function(k){return {frame:k.frame,selected:selected.has(k.frame)};})};
+          target:Object.assign({},value.target),property:value.property,items:value.items.map(function(k){var item={frame:k.frame,selected:selected.has(k.frame)};if(k.hold===true)item.hold=true;return item;})};
         Object.defineProperties(projection,{isCurrent:{value:isCurrent},selectFrames:{value:selectFrames},canSelectFrames:{value:canSelectFrames}});
         return freeze(projection);
       }catch(_){return null;}
@@ -194,9 +194,11 @@
         return freeze(value);
       }catch(_){return null;}
     }
+    // #2524: a local, port-free proof of the selection a queued batch edit was built from.
+    function selectionKey(){return retired||!accepted?null:[serial,selectionEpoch,Array.from(selected).sort(function(a,b){return a-b;})];}
     function cancel(){reset('Native key read cancelled.',false);return true;}
     controls();
-    return Object.freeze({element:element,open:open,readKeyTimeline:readKeyTimeline,captureSelectedKeys:captureSelectedKeys,clear:function(){reset('',true);},cancel:cancel,dispose:function(){if(retired)return;reset('',true);retired=true;unbind(bindings);if(element.parentNode===container)container.removeChild(element);timelineChanged('dispose');}});
+    return Object.freeze({element:element,open:open,readKeyTimeline:readKeyTimeline,selectionKey:selectionKey,captureSelectedKeys:captureSelectedKeys,clear:function(){reset('',true);},cancel:cancel,dispose:function(){if(retired)return;reset('',true);retired=true;unbind(bindings);if(element.parentNode===container)container.removeChild(element);timelineChanged('dispose');}});
   }
   return Object.freeze({create:create});
 }));

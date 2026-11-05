@@ -112,8 +112,8 @@ function integratedModule(name,dependencies){
  const sourceRoot=process.env.NEMO_KEYS_INTEGRATION_ROOT||ROOT,filename=path.join(sourceRoot,'src/js/adapters/'+name+'.js'),m={exports:{}};
  vm.compileFunction(fs.readFileSync(filename,'utf8'),['module','require','TextEncoder','setTimeout'])(m,p=>{assert.ok(Object.prototype.hasOwnProperty.call(dependencies,p),p);return dependencies[p];},TextEncoder,setTimeout);return m.exports;
 }
-const Panel=integratedModule('native-motion-property-panel',{'./native-motion-property-view.js':View,'./native-motion-property-keys.js':Keys,'./native-motion-property-value.js':require(path.join(ROOT,'src/js/adapters/native-motion-property-value.js')),'./native-motion-expression-editor.js':require(path.join(ROOT,'src/js/adapters/native-motion-expression-editor.js'))});
-const Binding=integratedModule('native-motion-property-binding',{'./native-motion-property-view.js':View,'./native-motion-property-panel.js':Panel});
+const Panel=integratedModule('native-motion-property-panel',{'./native-motion-property-view.js':View,'./native-motion-property-keys.js':Keys,'./native-motion-property-value.js':require(path.join(ROOT,'src/js/adapters/native-motion-property-value.js')),'./native-motion-expression-editor.js':require(path.join(ROOT,'src/js/adapters/native-motion-expression-editor.js')),'./native-motion-key-edit.js':require(path.join(ROOT,'src/js/adapters/native-motion-key-edit.js'))});
+const Binding=integratedModule('native-motion-property-binding',{'./native-motion-property-view.js':View,'./native-motion-property-panel.js':Panel,'./native-motion-key-edit.js':require(path.join(ROOT,'src/js/adapters/native-motion-key-edit.js'))});
 function ordinary(options={}){
  const h=fixture(options);h.editor.dispose();const queries=[],rawReads=[],expressionReads=[],layerTarget={contextId:target.contextId,layerUid:target.layerUid};
  const root={document:h.doc,state:{appMode:'motion',currentFrame:10,activeLayerIdx:0,activeSymbolId:null},_layerSel:[0]};Object.defineProperty(root.state,'layers',{get(){throw Error('Legacy layer owner accessed');}});
@@ -208,13 +208,13 @@ test('key timeline is a frozen single-property native read projection with nonse
  const h=fixture();assert.equal(h.editor.readKeyTimeline(),null);await h.open();
  const projection=h.editor.readKeyTimeline(),literal=copy(projection);
  assert.deepEqual(Object.keys(literal).sort(),['frame','items','pin','property','target','viewGeneration']);
- assert.deepEqual(literal,{pin:h.context().pin,frame:10,viewGeneration:2,target,property:'opacity',items:[{frame:-0.5,selected:false},{frame:4.25,selected:false},{frame:10,selected:false}]});
+ assert.deepEqual(literal,{pin:h.context().pin,frame:10,viewGeneration:2,target,property:'opacity',items:[{frame:-0.5,selected:false},{frame:4.25,selected:false},{frame:10,selected:false,hold:true}]});
  assert.equal(Object.isFrozen(projection),true);assert.equal(Object.isFrozen(projection.items),true);assert.equal(Object.isFrozen(projection.items[0]),true);
  assert.equal(projection.isCurrent(),true);assert.equal(Object.getOwnPropertyDescriptor(projection,'selectFrames').enumerable,false);
  const reads=h.reads.length;assert.equal(projection.selectFrames([4.25,-0.5]),true);assert.equal(projection.isCurrent(),false);
  assert.deepEqual(h.checks().map(n=>n.checked),[true,true,false]);assert.match(h.status(),/^2 native key/);
  assert.deepEqual(copy(h.editor.captureSelectedKeys()).keys.map(k=>k.frame),[-0.5,4.25]);
- const next=h.editor.readKeyTimeline();assert.equal(next.isCurrent(),true);assert.deepEqual(copy(next.items),[{frame:-0.5,selected:true},{frame:4.25,selected:true},{frame:10,selected:false}]);
+ const next=h.editor.readKeyTimeline();assert.equal(next.isCurrent(),true);assert.deepEqual(copy(next.items),[{frame:-0.5,selected:true},{frame:4.25,selected:true},{frame:10,selected:false,hold:true}]);
  assert.equal(next.selectFrames([4.25,-0.5]),true);assert.equal(next.isCurrent(),true,'same selected set does not invalidate an unchanged projection');
  assert.equal(h.reads.length,reads);assert.equal(h.writes.length,0);
 });
@@ -309,4 +309,33 @@ test('a stale selection or read cannot commit a lock pick, and a right-click on 
  assert.equal(r.menus.length,1,'only a selected key offers the lock menu');
  const none=fixture({keys:lockKeys(),menu:false});await none.open();await none.select(0);await none.button('Lock keyframes on…').fire('click');
  assert.equal(none.writes.length,0);assert.match(none.status(),/unavailable or stale/);
+});
+// #2524: batch key edits reach ONE track edit over the selected keys, then the drawer and its selection come back.
+test('binding editKeys sends one batch over every selected key and restores the drawer on the shifted frames',async()=>{
+ const keys=[{frame:0,v:[1]},{frame:4,v:[2]},{frame:10,v:[3]}];
+ const o=ordinary({keys,writer:async(payload)=>{for(const s of payload.selections){keys.find(k=>k.frame===s.frame).frame+=payload.action.delta;}keys.sort((a,b)=>a.frame-b.frame);return {applied:true,historyEntriesAdded:1};}});
+ await o.binding.update(true);await o.button('Keys').fire('click');
+ for(const i of [0,2]){const c=o.checks()[i];c.checked=true;await c.fire('change');}
+ assert.equal(await o.binding.editKeys({kind:'shift',delta:2}),true);
+ assert.equal(o.h.writes.length,1);
+ assert.deepEqual(o.h.writes[0].payload,{command:'object.property.track.edit',selections:[{target:o.layerTarget,property:'opacity',frame:0},{target:o.layerTarget,property:'opacity',frame:10}],action:{kind:'shift',delta:2}});
+ assert.equal(o.checks().length,3,'the drawer is back after the refresh');
+ assert.deepEqual(o.checks().map(n=>n.checked),[true,false,true],'the selection follows the keys: 2, 4, 12');
+ assert.deepEqual(copy(o.binding.readKeyTimelines().tracks[0].items),[{frame:2,selected:true},{frame:4,selected:false},{frame:12,selected:true}]);
+ o.binding.dispose();
+});
+test('binding editKeys with no selected key writes nothing and reports it; flip needs two keys',async()=>{
+ const o=ordinary();await o.binding.update(true);await o.button('Keys').fire('click');
+ assert.equal(await o.binding.editKeys({kind:'delete'}),null);assert.equal(o.h.writes.length,0);
+ const c=o.checks()[0];c.checked=true;await c.fire('change');
+ const toasts=[];o.root.showToast=m=>toasts.push(m);
+ assert.equal(await o.binding.editKeys({kind:'flip'}),false);assert.equal(o.h.writes.length,0);
+ o.binding.dispose();
+});
+test('binding editKeys writes nothing when the frame changes while the scope is being confirmed',async()=>{
+ const o=ordinary({writer:async(p,pin,current)=>{if(!current())throw Error('queued native command cancelled');return {applied:true,historyEntriesAdded:1};}});
+ await o.binding.update(true);await o.button('Keys').fire('click');const c=o.checks()[1];c.checked=true;await c.fire('change');
+ const acting=o.binding.editKeys({kind:'delete'});o.root.state.currentFrame=11;o.h.frame(11);
+ assert.equal(await acting,null);assert.equal(o.h.writes.length,0);
+ o.binding.dispose();
 });

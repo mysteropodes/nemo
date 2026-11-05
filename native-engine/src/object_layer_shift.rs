@@ -11,8 +11,11 @@ use serde::{Deserialize, Serialize};
 
 #[path = "object_layer_shift_motion.rs"]
 mod motion;
+#[path = "object_layer_shift_arrange.rs"]
+mod arrange;
 #[path = "object_layer_shift_range.rs"]
 mod range;
+pub(crate) use arrange::plan_arrange_json;
 use motion::SelectedMotionKey;
 
 const COMMAND: &str = "object.layer.range.drag";

@@ -1,4 +1,4 @@
-/* Native read-only bar rows and one ordered gesture. Rust owns range/Motion/content/Arc/history. */
+/* Native bar rows, one ordered gesture and the bar menu. Rust owns range/Motion/content/Arc/history. */
 (function(root,factory){
   var api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeLayerRangeDesktop=api;
 }(typeof globalThis==='object'?globalThis:this,function(){
@@ -135,7 +135,7 @@
         var track=position.track,key=position.key,row=w.rows[position.index];if(row.hidden)return;
         var node=root.document.createElement('button');node.type='button';node.className='motion-key layer-inout-key native-motion-property-key';
         Object.assign(node.style,{position:'absolute',left:position.left+'px',top:position.top+'px',padding:'0',cursor:'pointer',zIndex:'7'});
-        node.dataset.frame=String(key.frame);node.dataset.keyTrack=trackIdentity(track);node.classList.toggle('sel',key.selected);
+        node.dataset.frame=String(key.frame);node.dataset.keyTrack=trackIdentity(track);node.dataset.selected=String(key.selected);node.classList.toggle('sel',key.selected);
         node.setAttribute('aria-label',track.property+' key at frame '+String(key.frame));node.setAttribute('aria-pressed',String(key.selected));
         if(track.inert){node.disabled=true;node.style.pointerEvents='none';row.appendChild(node);w.keyNodes.push(node);return;}
         function choose(event){
@@ -143,16 +143,44 @@
           try{
             var live=w.keyValue;
             if(root.state.appMode!=='motion'||node.parentNode!==row||w.rows[position.index]!==row||root.FC!==fc||w.down||w.marquee||!ready(root,session(root),w.info)||!live||live.frame!==root.state.currentFrame||!live.isCurrent())throw Error('Stale native key selection');
-            var keys=event.ctrlKey||event.metaKey||event.shiftKey?selectedAddresses(live):[],address=keyAddress(track,key.frame),id=JSON.stringify(address);
+            var modified=event.ctrlKey||event.metaKey||event.shiftKey;
+            // A plain press on an already selected key keeps the group, so it can be dragged as one (baseline onDragMove).
+            var keys=modified||key.selected?selectedAddresses(live):[],address=keyAddress(track,key.frame),id=JSON.stringify(address);
             var at=keys.findIndex(function(k){return JSON.stringify(k)===id;});if(at>=0&&(event.ctrlKey||event.metaKey))keys.splice(at,1);else if(at<0)keys.push(address);
             if(live.selectKeys(keys)!==true)throw Error('Native key selection refused');refreshKeys(root);
+            if(!modified&&event.detail!==0)dragKeys(root,w,fc,event);
           }catch(_){notice(root,'Native key selection is unavailable or stale.');}
         }
         node.addEventListener('mousedown',choose);node.addEventListener('click',function(event){if(event.detail===0)choose(event);});
+        node.addEventListener('contextmenu',function(event){keyMenu(root,w,track,key,event);});
         row.appendChild(node);w.keyNodes.push(node);
       });
       w.keySig=signature;
     }catch(_){clearKeys(w);try{keyRows(root,w,[]);}catch(_){}notice(root,'Native key timeline coordinates are unavailable.');}
+  }
+  // #2524: dragging selected keys previews a shift and commits ONE native shift on release (baseline motion.js onDragMove/onDragUp).
+  function dragKeys(root,w,fc,event){
+    var gesture=root.NemoNativeMotionKeyGesture;if(!gesture||!w.ports||typeof w.ports.editSelectedKeys!=='function'||w.keyDrag)return;
+    w.keyDrag=gesture.beginDrag({doc:root.document,startX:event.clientX,fc:fc,total:w.info.totalFrames,edit:w.ports.editSelectedKeys,
+      nodes:function(){return (w.keyNodes||[]).filter(function(n){return n.dataset.selected==='true';});},
+      tracks:function(){try{var v=keyViews(root,w);return v&&v.tracks;}catch(_){return null;}},onEnd:function(){w.keyDrag=null;}});
+  }
+  // The key menu acts on a selection read when it opened; a click after the selection changed commits nothing.
+  function keyMenu(root,w,track,key,event){
+    event.preventDefault();event.stopPropagation();
+    try{
+      var gesture=root.NemoNativeMotionKeyGesture,live=keyViews(root,w),edit=w.ports&&w.ports.editSelectedKeys;
+      if(!gesture||typeof root.showContextMenu!=='function'||typeof edit!=='function'||!live||!ready(root,session(root),w.info))throw Error('Native key menu unavailable');
+      var address=keyAddress(track,key.frame);
+      if(!key.selected){if(live.selectKeys([address])!==true)throw Error('Native key selection refused');refreshKeys(root);live=keyViews(root,w);}
+      var opened=JSON.stringify(selectedAddresses(live));
+      function same_(){var now=keyViews(root,w);return !!now&&JSON.stringify(selectedAddresses(now))===opened&&now.isCurrent()===true;}
+      var ctx={view:live,hold:key.hold===true,toast:function(m){notice(root,m);},refresh:function(){refreshKeys(root);},
+        prompt:function(m,d){return typeof root.prompt==='function'?root.prompt(m,d):null;},
+        edit:function(action){if(!same_()){notice(root,'Native key selection changed; open the key menu again.');return false;}return edit(action);},
+        selectOnly:function(){if(!same_()||live.selectKeys([address])!==true)return false;var now=keyViews(root,w);opened=JSON.stringify(selectedAddresses(now));return true;}};
+      root.showContextMenu(event.clientX,event.clientY,gesture.menuItems(root,ctx));
+    }catch(_){notice(root,'Native key menu is unavailable or stale.');}
   }
   function marqueeKeys(root,w,m,x0,y0,x1,y1){
     var value=keyViews(root,w);
@@ -167,7 +195,7 @@
     if(value.selectKeys(keys)!==true)throw Error('Native key marquee refused');
     m.keyView=keyViews(root,w);if(keyIdentity(m.keyView)!==m.keyIdentity)throw Error('Native key marquee changed view');refreshKeys(root);
   }
-  function cancel(root){var w=works.get(root);if(w&&w.marquee){var m=w.marquee;w.marquee=null;if(m.rect.parentNode)m.rect.parentNode.removeChild(m.rect);}if(w&&w.capture){w.capture.valid=false;w.capture=null;}if(w)w.down=false;}
+  function cancel(root){var w=works.get(root);if(w&&w.keyDrag)w.keyDrag.cancel();if(w&&w.marquee){var m=w.marquee;w.marquee=null;if(m.rect.parentNode)m.rect.parentNode.removeChild(m.rect);}if(w&&w.capture){w.capture.valid=false;w.capture=null;}if(w)w.down=false;}
   function retire(root){var w=works.get(root);if(!w)return;cancel(root);clearKeys(w);try{keyRows(root,w,[]);}catch(_){}w.serial++;w.rows=[];if(w.node&&w.node.parentNode)w.node.parentNode.removeChild(w.node);w.node=null;w.grid=null;}
   function selection(root,w,li,part,event){
     var info=w.info,uid=info.layers[li].layerUid,values=bars(root,info)||[];
@@ -179,6 +207,7 @@
     return values;
   }
   function down(root,li,row,part,event){
+    if(event.button!==undefined&&event.button!==0)return true; // a right-click opens the bar menu; it starts no drag
     event.preventDefault();event.stopPropagation();
     var w=works.get(root),s=session(root),info=s&&s.info(),controller;
     try{controller=root.NemoNativeFrameEditDesktop.install(root);}catch(_){notice(root);return true;}
@@ -254,12 +283,23 @@
     bar.classList.toggle('full-range',!r.hasCustomRange);bar.classList.toggle('has-timelink',r.hasTimeLink);
     bar.setAttribute('aria-disabled','false');return true;
   }
+  // #2371/#2372: the baseline bar menu over the pinned native rows (native-layer-range-menu.js); the revision it was built from guards every write.
+  function barMenu(root,event,li,row){
+    var menu=root.NemoNativeLayerRangeMenu,w=works.get(root),s=session(root),info=s&&s.info(),selection;
+    if(!menu||!w||!w.barUiReady||w.rows[li]!==row||!ready(root,s,info)||!same(w.info,info)||w.down||w.marquee||w.capture||
+       root.state.activeSymbolId!=null||root.state.activeCompositionId!=null){notice(root,'Native range menus are unavailable.');return;}
+    try{selection=bars(root,info);}catch(_){notice(root,'Native range menus are unavailable.');return;}
+    var rows=w.rows.map(function(r,i){var v=r.nativeRange;
+      return {layerUid:info.layers[i].layerUid,hidden:!!r.hidden,rawIn:v&&same(v.pin,info)?v.range.rawInPoint:0};});
+    menu.open(root,event,{info:info,li:li,uid:info.layers[li].layerUid,selection:selection,rows:rows,setSelection:function(values){
+      w.ports.barUi.setBarSelection(values.map(function(v){return {li:info.layers.findIndex(function(l){return l.layerUid===v.layerUid;}),part:v.part};}));}});
+  }
   function buildBar(root,row,li){var w=works.get(root);if(!w||w.rows[li]!==row)return true;
     var bar=root.document.createElement('div');bar.className='layer-inout-bar';bar.setAttribute('aria-disabled','true');
     ['in','out'].forEach(function(part){var handle=root.document.createElement('div');handle.className='layer-inout-handle '+(part==='in'?'left':'right');
       handle.addEventListener('mousedown',function(event){w.ports.barUi.onDown(li,row,part,event,handle);});bar.appendChild(handle);});
     bar.addEventListener('mousedown',function(event){if(event.target===bar)w.ports.barUi.onDown(li,row,'both',event);});
-    bar.addEventListener('contextmenu',function(event){event.preventDefault();event.stopPropagation();notice(root,'Native range menus and links are unavailable.');});
+    bar.addEventListener('contextmenu',function(event){event.preventDefault();event.stopPropagation();barMenu(root,event,li,row);});
     row.appendChild(bar);row.addEventListener('mousedown',function(event){if(event.target===row){event.preventDefault();event.stopPropagation();startMarquee(root,event);}});paint(root,row,li);return true;
   }
   function owns(root,grid,noticeNode){var w=works.get(root);return !!w&&w.grid===grid&&w.node&&w.node.parentNode===grid&&grid.children.length===2&&grid.children[0]===noticeNode&&grid.children[1]===w.node;}

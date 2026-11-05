@@ -160,6 +160,8 @@
     {"src":"js/adapters/native-motion-expression-whip.js"},
     {"src":"js/adapters/native-motion-expression-editor.js"},
     {"src":"js/adapters/native-motion-key-lock-menu.js"},
+    {"src":"js/adapters/native-motion-key-edit.js"},
+    {"src":"js/adapters/native-motion-key-gesture.js"},
     {"src":"js/adapters/native-motion-property-view.js"},
     {"src":"js/adapters/native-motion-property-keys.js"},
     {"src":"js/adapters/native-motion-property-value.js"},
@@ -428,6 +430,7 @@
     {"src":"js/adapters/native-select-group.js"},
     {"src":"js/adapters/native-selection-clipboard.js"},
     {"src":"js/adapters/native-selection-order.js"},
-    {"src":"js/adapters/native-select-menu.js"}
+    {"src":"js/adapters/native-select-menu.js"},
+    {"src":"js/adapters/native-layer-range-menu.js"}
   ]
 }

@@ -3367,6 +3367,8 @@
         "native-motion-property-binding.js",
         "native-motion-property-keys.js",
         "native-motion-key-lock-menu.js",
+        "native-motion-key-edit.js",
+        "native-motion-key-gesture.js",
         "native-motion-property-value.js",
         "native-motion-control-rows.js",
         "native-motion-expression-snippets.js",
@@ -3615,11 +3617,13 @@
       "dir": "src/js/adapters",
       "files": [
         "native-layer-parent.js",
+        "native-layer-range-menu.js",
         "native-motion-layer-link-rows.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-layer-parent.js",
+        "native-layer-range-menu.js",
         "native-motion-layer-link-rows.js"
       ]
     },

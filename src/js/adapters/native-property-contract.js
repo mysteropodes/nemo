@@ -164,6 +164,12 @@
         // D37: per-key standing lock; null clears. Required, never defaulted.
         exact(action, ['kind', 'mode'], [], 'property key lock');
         if (action.mode !== null && !['in', 'out', 'layer'].includes(action.mode)) throw new TypeError('invalid property key lock mode');
+      } else if (action.kind === 'shift') {
+        // #2524: whole frames, every selected key together; zero is accepted and changes nothing.
+        exact(action, ['kind', 'delta'], [], 'property key shift');
+        if (!Number.isSafeInteger(action.delta) || Math.abs(action.delta) > 1000000) throw new TypeError('invalid property key shift');
+      } else if (['delete', 'flip', 'distribute'].includes(action.kind)) {
+        exact(action, ['kind'], [], 'property key batch');
       } else {
         throw new TypeError('unsupported property track action');
       }

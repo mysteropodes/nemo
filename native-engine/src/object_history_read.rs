@@ -88,6 +88,7 @@ pub(crate) fn label_for(operation: &str, payload: &Value) -> String {
         "layer.visibility.set" => "Layer Visibility",
         "layer.create" | "layer.kind.create" => "New Layer",
         "layer.folder.reparent" => "Move Layer to Folder",
+        "layer.range.arrange" => "Arrange Layer Bars",
         "layer.delete" => "Delete Layer",
         "layer.duplicate" => "Duplicate Layer",
         "layer.rename" => "Rename Layer",
