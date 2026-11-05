@@ -409,6 +409,23 @@ fn the_time_window_travels_like_the_baseline_rows() {
 }
 
 #[test]
+fn a_null_a_folder_and_a_guide_layer_are_refused_with_the_baseline_reasons() {
+    let _ = convert_oracle();
+    let doc = decode(&document(
+        &[
+            layer("ly_null", "Null", &[]).with(json!({"isNullLayer":true,"nullPos":[0, 0]})),
+            layer("ly_folder", "Folder", &[]).with(json!({"isNullLayer":true,"nullPos":[0, 0],"isFolderLayer":true,"folderCollapsed":false,"effects":[]})),
+            layer("ly_guide", "Guide", &[]).with(json!({"isGuideLayer":true,"guidePos":[0, 0],"guideOrientation":"horizontal"})),
+        ],
+        json!({}),
+    ));
+    for (uid, refusal) in [("ly_null", SourceRefusal::Null), ("ly_folder", SourceRefusal::Null), ("ly_guide", SourceRefusal::Guide)] {
+        let want = SetupError::BadSource { layer_uid: uid.into(), refusal };
+        assert_eq!(plan_convert(&doc, 1, &uids(&[uid])).unwrap_err(), want, "{uid}");
+    }
+}
+
+#[test]
 fn an_effect_layer_is_refused_alone_and_inside_a_selection_with_the_baseline_reason() {
     let o = convert_oracle();
     let doc = decode(&document(

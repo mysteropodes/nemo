@@ -1932,7 +1932,7 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
    plain ld.folderId/.lfolder grouping above (which has no transform/effects
    of its own). Drop-target highlight while dragging a layer onto its
    middle band (moveLayerReorder, timeline.js) to reparent it. */
-.lrow.folder-drop-target,#frame-grid .frow.folder-drop-target{outline:2px solid var(--accent);outline-offset:-2px;background:color-mix(in srgb,var(--accent) 14%,transparent);}
+.lrow.folder-drop-target,.native-object-layer.folder-drop-target,#frame-grid .frow.folder-drop-target{outline:2px solid var(--accent);outline-offset:-2px;background:color-mix(in srgb,var(--accent) 14%,transparent);}
 
 /* TOOLTIP */
 #ui-tip{position:fixed;z-index:400;background:var(--panel3);border:1px solid var(--border2);color:var(--text);

@@ -15,6 +15,7 @@ const OP_LAYER_REORDER: &str = "command.document.object.layer.reorder";
 const OP_LAYER_PARENT: &str = "command.document.object.layer.parent.set";
 const OP_LAYER_TIME_LINK: &str = "command.document.object.layer.timeLink.set";
 const OP_LAYER_FOLLOW_PATH: &str = "command.document.object.layer.followPath.set";
+const OP_LAYER_FOLDER_REPARENT: &str = "command.document.object.layer.folder.reparent";
 
 impl NativeObjectHistory {
     pub(crate) fn prepare_layer_delete_json(
@@ -92,6 +93,7 @@ impl NativeObjectHistory {
                 | OP_LAYER_PARENT
                 | OP_LAYER_TIME_LINK
                 | OP_LAYER_FOLLOW_PATH
+                | OP_LAYER_FOLDER_REPARENT
         )
     }
     /// Prepare and commit one lifecycle operation for the dispatcher, which has
@@ -117,6 +119,7 @@ impl NativeObjectHistory {
             OP_LAYER_PARENT => self.prepare_layer_parent_json(&bytes),
             OP_LAYER_TIME_LINK => self.prepare_layer_time_link_json(&bytes),
             OP_LAYER_FOLLOW_PATH => self.prepare_layer_follow_path_json(&bytes),
+            OP_LAYER_FOLDER_REPARENT => self.owner.prepare_layer_folder_reparent_json(&bytes),
             _ => Err(DispatchErrorCode::InvalidRequest),
         };
         let candidate = prepared.map_err(|code| {
@@ -143,3 +146,12 @@ impl NativeObjectHistory {
 #[cfg(test)]
 #[path = "../tests/object_layer_color_set.rs"]
 mod object_layer_color_set;
+#[cfg(test)]
+#[path = "../tests/object_layer_kind_create.rs"]
+mod object_layer_kind_create;
+#[cfg(all(test, feature = "export_job"))]
+#[path = "../tests/object_layer_kind_render.rs"]
+mod object_layer_kind_render;
+#[cfg(test)]
+#[path = "../tests/object_layer_folder_membership.rs"]
+mod object_layer_folder_membership;

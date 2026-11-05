@@ -143,41 +143,12 @@
     return keys;
   }
 
+  // The creation is a native project write only (adapters/native-layer-kinds-ui.js): the layer, its record and the seeded Offset Position
+  // are one native transaction. There is no layer-list writer here; the row index names the duplicator host.
   function addEffectorLayer(targetLi) {
-    if (!window.SMMotion || typeof createUserLayer !== 'function') return -1;
-    var target = state.layers[targetLi];
-    if (!target || !target.duplicator) {
-      if (window.showToast) showToast(SM.t('toastEffectorNeedsDuplicator'));
-      return -1;
-    }
-    if (typeof saveAllLayerFrames === 'function') saveAllLayerFrames();
-    if (typeof pushUndoLayers === 'function') pushUndoLayers(true);
-    var nm = (typeof nextLayerName === 'function' ? nextLayerName() : 'Layer').replace(/^Layer/, 'Effector');
-    var idx = createUserLayer(nm);
-    var ld = state.layers[idx];
-    ld.isEffectorLayer = true;
-    ld.color = '#59d38a';
-    ld.effector = {
-      targetLayerUid: SMMotion.ensureLayerUid(target),
-      falloff: 'radial',
-      // World anchor, exactly like guidePos/nullPos/widget.pos — the layer's
-      // own Position track offsets it, so moving or keying the effector is
-      // ordinary layer animation (§13's same choice).
-      pos: [state.canvasW / 2, state.canvasH / 2],
-    };
-    // A brand-new effector with every offset at 0 would do nothing at all
-    // and look broken. Seed a visible Position offset so dropping one in
-    // shows an effect immediately, the way the duplicator's own enable
-    // toast promises something happened.
-    if (!ld.motionStatic) ld.motionStatic = {};
-    ld.motionStatic[CHANNELS[0].key] = [120, 0];
-    if (typeof activateUL === 'function') activateUL(idx);
-    if (typeof loadFrame === 'function') loadFrame(state.currentFrame);
-    if (typeof updateUI === 'function') updateUI();
-    window._sceneVersion = (window._sceneVersion || 0) + 1;
-    if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (window.showToast) showToast(SM.t('toastEffectorLayerAdded'));
-    return idx;
+    var kinds = window.NemoNativeLayerKindsUi;
+    if (kinds) kinds.addEffectorAt(window, targetLi);
+    return -1;
   }
 
   // On-canvas marker: a ring at the effector's radius plus a crosshair at

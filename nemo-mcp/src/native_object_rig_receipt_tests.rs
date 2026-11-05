@@ -11,7 +11,7 @@ fn response(value: Value) -> NativeApplicationResponse {
 fn receipts_are_the_compact_command_result_and_a_creation_names_its_minted_layer() {
     for &suffix in OPERATIONS.iter().chain(&LABS).chain(&TWEEN).chain(&PRESET) {
         let operation = format!("{P}{suffix}");
-        if suffix == "widget.create" {
+        if suffix == "widget.create" || suffix == "layer.kind.create" {
             assert!(result(
                 &operation,
                 &json!({"applied":true,"historyEntriesAdded":1,"layerUid":"native-layer:8:0"})
@@ -130,9 +130,12 @@ fn the_catalog_declares_each_operation_once_under_five_owner_descriptors() {
         s if s.starts_with("tween.") => "native.object.tween",
         "property.preset.apply" => "native.object.motion-preset",
         "layer.compositing.edit" => "native.object.layer-compositing",
-        "layer.parent.set" | "layer.timeLink.set" | "layer.followPath.set" | "layer.color.set" => {
-            "native.object.layer-parent"
-        }
+        "layer.parent.set"
+        | "layer.timeLink.set"
+        | "layer.followPath.set"
+        | "layer.color.set"
+        | "layer.kind.create"
+        | "layer.folder.reparent" => "native.object.layer-parent",
         _ => "native.object.rig",
     };
     for &suffix in OPERATIONS.iter().chain(&LABS).chain(&TWEEN).chain(&PRESET) {
@@ -182,7 +185,7 @@ fn every_descriptor_example_is_a_valid_request_with_a_correlated_valid_response(
             seen += 1;
         }
     }
-    assert_eq!(seen, 16, "one copyable example per declared operation");
+    assert_eq!(seen, 18, "one copyable example per declared operation");
 }
 
 #[test]

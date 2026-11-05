@@ -170,15 +170,6 @@
       "authority": "unavailable",
       "entries": {
         "timeline": [
-          "toggleFolderLayerCollapsed",
-          "addNullLayer",
-          "reparentLayersIntoFolder",
-          "removeLayerFromFolder",
-          "addEffectLayer",
-          "addGuideLayer",
-          "addJoystickLayer",
-          "addSliderLayer",
-          "addFolderLayer",
           "deleteLayer",
           "splitLayerAtPlayhead",
           "duplicateLayer",

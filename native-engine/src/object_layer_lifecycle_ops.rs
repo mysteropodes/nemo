@@ -37,6 +37,11 @@ use link::{plan_follow_path, plan_time_link, TimeLinkRequest};
 #[path = "object_layer_lifecycle_color.rs"]
 mod color;
 use color::LabelEditPolicy;
+// #2371 U11 / D36: Null, Effect, Guide, Folder and Effector creation, and folder membership.
+#[path = "object_layer_kind_create.rs"]
+mod kind_create;
+#[path = "object_layer_folder_reparent.rs"]
+mod folder_reparent;
 
 const MAX_PAYLOAD_BYTES: usize = 4096;
 
@@ -209,6 +214,7 @@ pub(crate) enum LayerLifecycleKind {
     Parent,
     TimeLink,
     FollowPath,
+    FolderReparent,
 }
 
 /// A detached candidate sealed to the snapshot it was planned from. Only this
