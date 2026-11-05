@@ -170,10 +170,12 @@
             var yes=!!(ports.confirmReplace&&await ports.confirmReplace(creating));
             if(yes&&recovered)recovered.confirmed=true;return yes;},
           occlude:ports.occlude,reveal:ports.reveal?async function(current){revealing=true;await ports.reveal(current);}:undefined,restore:ports.restore,
-          commit:function(current){
-            if((recovered?ports.created('Untitled',current):creating?ports.created(config.name||'Untitled',current):ports.opened(path,current))!==true)
+          commit:function(current,receipt){
+            // A baseline project arrives converted: a new unsaved document whose first Save goes through Save As.
+            var legacy=!creating&&!recovered&&ports.legacyReport?ports.legacyReport(receipt):null;
+            if((recovered?ports.created('Untitled',current):creating?ports.created(config.name||'Untitled',current):legacy?ports.legacyOpened(path,current,legacy):ports.opened(path,current))!==true)
               throw new Error('Native project UI publication failed');
-            baseline=creating||recovered?null:current.documentDigest;baselines=new Map([[current.documentId,baseline]]);initials.set(current.documentId,current.documentDigest);
+            baseline=creating||recovered||legacy?null:current.documentDigest;baselines=new Map([[current.documentId,baseline]]);initials.set(current.documentId,current.documentDigest);
             if(recovered)recoveredSlots.set(current.documentId,recovered.slotKey);ports.repaint();
           }
         });
@@ -309,7 +311,7 @@
     var session=root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);
     if(!session)return null;
     function diagnostic(event,code){try{var d=root.NemoNativeObjectProjectDesktop;if(d&&d.openDiagnostic)d.openDiagnostic(root,event,code);}catch(_){}}
-    var startWasHidden=false;
+    var startWasHidden=false,legacySources=new Map(); // document id -> the baseline file it was converted from
     function commit(path,info){
       var name=root.SMProjectDocument.baseName(path);
       // Persist recents before changing the visible file identity.
@@ -336,11 +338,20 @@
       },
       opened:function(path,info){if(commit(path,info)!==true)return false;ports.opened();ports.notice('Opened: '+ports.read().name);return true;},
       created:function(name){ports.commit(null,name);ports.opened();return true;},
+      legacyReport:function(receipt){var L=root.NemoNativeLegacyImport;return L?L.reportOf(receipt):null;},
+      legacyOpened:function(path,info,report){
+        var name=root.SMProjectDocument.baseName(path);
+        ports.commit(null,name);ports.opened();legacySources.set(info.documentId,path);
+        ports.notice(root.NemoNativeLegacyImport.notice(name,report,function(key){return root.SM.t(key);}));return true;},
       createdNotice:function(){ports.notice('New project created');},
       resumedNotice:function(){ports.notice('Session resumed');},
       recoveryRefused:function(){ports.notice(root.SM&&root.SM.t?root.SM.t('toastCannotResumeSessionCorrupt'):'Cannot resume the session: the recovery is unreadable.');},
       commit:commit,repaint:ports.repaint,discardRecovery:ports.recoveryDiscard,
-      pick:function(){return root.__TAURI__.dialog.save({title:'Save Project As',defaultPath:ports.read().name+'-copy.json',filters:[{name:'Nemo Project',extensions:['json']}]});},
+      pick:function(){
+        var current=session.info(),source=current&&legacySources.get(current.documentId);
+        return Promise.resolve(root.__TAURI__.dialog.save({title:'Save Project As',defaultPath:ports.read().name+'-copy.json',filters:[{name:'Nemo Project',extensions:['json']}]})).then(function(chosen){
+          if(chosen&&source&&root.NemoNativeLegacyImport.samePath(source,chosen)){ports.notice('The original file is never overwritten. Choose another name.');return null;}
+          return chosen;});},
       notice:function(result,written,error){
         ports.notice(result.acknowledged?'Saved: '+ports.read().name:error?'Save failed: '+(error.message||error):
           written&&written.receipt&&written.receipt.published?'File written; current saved status was not confirmed.':'Save cancelled or unavailable. Choose a new file path.');

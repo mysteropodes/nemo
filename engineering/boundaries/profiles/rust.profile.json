@@ -525,12 +525,22 @@
         "object_command_families/tween.rs",
         "object_tween_history.rs",
         "object_subselect_history.rs",
-        "object_command_families/subselect.rs"
+        "object_command_families/subselect.rs",
+        "legacy_project_import/mod.rs",
+        "legacy_project_import/admit.rs",
+        "legacy_project_import/classify.rs",
+        "legacy_project_import/color.rs",
+        "legacy_project_import/layers.rs",
+        "legacy_project_import/migrate.rs",
+        "legacy_project_import/project.rs",
+        "legacy_project_import/stroke.rs",
+        "legacy_project_import/stroke_brush.rs"
       ],
       "publicApi": [
         "history.rs",
         "transaction.rs",
-        "object_command_dispatch.rs"
+        "object_command_dispatch.rs",
+        "legacy_project_import/mod.rs"
       ],
       "sizeProfile": "Rust production module"
     },
@@ -2049,7 +2059,9 @@
         "object_subselect_projection.rs",
         "object_subselect_pixels.rs",
         "pressure_geometry.rs",
-        "object_subselect_pressure.rs"
+        "object_subselect_pressure.rs",
+        "legacy_project_import_unit.rs",
+        "legacy_project_import_refusals.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -2569,7 +2581,8 @@
         "native_subselect_read_public_tests.rs",
         "native_widget_read_public_tests.rs",
         "native_ghost_read_public_tests.rs",
-        "native_rig_read_public_tests.rs"
+        "native_rig_read_public_tests.rs",
+        "native_object_legacy_import_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

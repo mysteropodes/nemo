@@ -77,6 +77,10 @@ mod project_info_tests;
 #[path = "native_object_new_project_tests.rs"]
 mod new_project_tests;
 
+#[cfg(test)]
+#[path = "native_object_legacy_import_tests.rs"]
+mod legacy_import_tests;
+
 // This bounds the complete original wrapper, including escaped document bytes.
 const MAX_OBJECT_BOOTSTRAP_BYTES: usize = 1_048_576;
 
@@ -101,6 +105,9 @@ pub(crate) struct ObjectBootstrapReceipt {
     content_revision: u64,
     resource_count: usize,
     viewport_available: bool,
+    /// Present only when the file was a baseline project converted into this new document; carries the loss report.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    legacy_import: Option<serde_json::Value>,
 }
 
 /// A commit receipt, not a claim about a later UI, dispatch or presentation state.
@@ -200,6 +207,7 @@ fn file_bytes_checked(
         content_revision,
         resource_count,
         viewport_available: false,
+        legacy_import: None,
     })
 }
 
@@ -233,6 +241,7 @@ pub(crate) async fn nemo_native_object_bootstrap(
             request_id,
             fingerprint,
             prepared,
+            legacy,
         } = admitted
         else {
             let replace::Admission::Replay(receipt) = admitted else {
@@ -259,9 +268,14 @@ pub(crate) async fn nemo_native_object_bootstrap(
             Ok(waiter) => waiter.await.map_err(|_| ()),
             Err(_) => Err(()),
         };
-        return result.unwrap_or_else(|_| {
-            replace::reconcile_executor(&native, generation, &request_id, &fingerprint)
-        });
+        return result
+            .unwrap_or_else(|_| {
+                replace::reconcile_executor(&native, generation, &request_id, &fingerprint)
+            })
+            .map(|mut receipt| {
+                receipt.legacy_import = legacy;
+                receipt
+            });
     }
     reopen::bootstrap_request(&state, &request_json, |path| {
         window

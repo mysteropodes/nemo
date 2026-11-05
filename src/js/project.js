@@ -232,13 +232,8 @@
   var nativeRecoveryCleanup=null;
   try{if(nativeRecovery&&window.NemoNativeObjectRecoveryCleanup)nativeRecoveryCleanup=window.NemoNativeObjectRecoveryCleanup.bind(window,{scheduler:nativeRecovery});}
   catch(e){console.warn('[recovery] cleanup unavailable',e);}
-  // ---- Version history (v15) — the existing 30s autosave (timeline.js)
-  // only ever held ONE slot ('nemo-auto' in localStorage): a crash right
-  // after a bad edit overwrote the one good copy with the bad one on the
-  // very next tick. This keeps a dense rolling history of real files on
-  // disk (Tauri fs — no localStorage quota risk with base64 media embedded
-  // in every snapshot) so "I crashed 10 min ago" can recover "the version
-  // from 11 min ago", not just "whatever was last written".
+  // ---- Version history (v15): a dense rolling history of real files on disk (Tauri fs, no localStorage quota
+  // risk with embedded media), so "I crashed 10 min ago" can recover "the version from 11 min ago".
   var HISTORY_MAX=120; // 60 min of history at the existing 30s cadence
   function simpleHash(s){var h=0;for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return (h>>>0).toString(36);}
   function historyKey(){return currentPath?(window.SMProjectDocument.baseName(currentPath).replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'-'+simpleHash(currentPath)):'untitled-autosave';}
@@ -263,16 +258,20 @@
         .sort(function(a,b){return b.ts-a.ts;});
     }catch(e){return [];}
   }
+  function onVersionRestored(){ensureInitialTab();if(historyUi)historyUi.close();showToast(SM.t('toastVersionRestored'));}
   var nativeVersionRestore=window.NemoProjectNativeVersionRestore.bind(window,{
     metadata:function(){return {path:currentPath,name:currentName};},
     backupTarget:historyDir,reveal:revealOpenedProject,
     modal:function(){return document.getElementById('history-modal');},
     backup:writeVersionSnapshot,
     backupFailed:function(error){console.warn('[history] pre-restore snapshot failed',error);},
-    restored:function(){ensureInitialTab();if(historyUi)historyUi.close();showToast(SM.t('toastVersionRestored'));},
+    restored:onVersionRestored,
     unavailable:function(){showToast('Could not finish restoring this version.');}
   });
+  var legacyImport=window.NemoNativeLegacyImport?window.NemoNativeLegacyImport.bind(window,{object:nativeSavedUI.nativeObject,open:nativeSavedUI.openNative,
+    name:function(){return currentName;},notice:showToast,restored:onVersionRestored,idb:window.SMIdb,storage:{getItem:function(k){return localStorage.getItem(k);}}}):null;
   async function restoreVersion(path){
+    if(legacyImport&&legacyImport.owns())return legacyImport.restore(path);
     if(tauriOk()||'NemoNativeOpacityCutover' in window||'NemoNativeOpacityProject' in window)return nativeVersionRestore.restore(path);
     // Capture the current document before import, then record that snapshot
     // only after a successful restore. Rejected input must leave both the
@@ -709,6 +708,7 @@
   var nativeResume=window.NemoNativeObjectRecoveryResume&&nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.openRecovered?
     window.NemoNativeObjectRecoveryResume.bind(window,{openRecovered:nativeSavedUI.openRecovered,
       allowOpen:nativeSavedUI.allowOpen,notice:showToast,ownSlots:function(){return nativeRecovery?nativeRecovery.claim():[];}}):null;
+  var resumeSource=nativeResume&&legacyImport?legacyImport.combineResume(nativeResume):nativeResume;
   function initStartScreen(){
     SMProjectEntry.initializeTabs(document);
     startScreenView=SMProjectEntry.bindStartScreen(document,{
@@ -716,9 +716,9 @@
       // Media-heavy autosave can be present only in IndexedDB after quota
       // overflow. Resolve to a boolean before crossing the view boundary.
       readResumePresenceAsync:function(publish){
-        if(nativeResume){nativeResume.presence(publish);return;}
+        if(resumeSource){resumeSource.presence(publish);return;}
         if(window.SMIdb)window.SMIdb.get('nemo-auto').then(function(v){publish(!!v);}).catch(function(){});},
-      renderRecents:renderRecents,resume:nativeResume?nativeResume.resume:resumeAutosave,open:openDialog,
+      renderRecents:renderRecents,resume:resumeSource?resumeSource.resume:resumeAutosave,open:openDialog,
       createProject:function(config,current,onCreationFailure){return window.SMProject.newProject(config,current,onCreationFailure);},
       showStartScreen:showStartScreen,cancelProjectEntry:cancelNativeNew,notice:showToast
     });

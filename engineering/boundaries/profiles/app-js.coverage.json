@@ -709,6 +709,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-legacy-import.js",
+      "moduleId": "app.native.object.project-file.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2333,
+          "scriptOrdinal": 30
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-time-remap-ui.js",
       "moduleId": "app.native.time.remap.ui.adapter",
       "executionClass": "document-classic",

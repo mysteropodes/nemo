@@ -263,6 +263,7 @@ fn new_replacement_commits_once_after_cleanup_and_exact_replay_preserves_b() {
         request_id,
         fingerprint,
         prepared,
+        ..
     } = prepare(&state, &request).unwrap()
     else {
         panic!("expected execution")

@@ -2906,11 +2906,13 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-project-file.js"
+        "native-object-project-file.js",
+        "native-legacy-import.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
-        "native-object-project-file.js"
+        "native-object-project-file.js",
+        "native-legacy-import.js"
       ]
     },
     {

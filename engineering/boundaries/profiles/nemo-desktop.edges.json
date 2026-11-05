@@ -358,7 +358,9 @@
           "desktop_viewport::ObjectPresentedFrame",
           "desktop_viewport::ViewportDisplayFilter",
           "object_render_scene::GhostUnderlayRequest",
-          "object_render_scene::GhostReceipt"
+          "object_render_scene::GhostReceipt",
+          "legacy_project_import::convert_admitted",
+          "legacy_project_import::looks_like_legacy_project"
         ],
         "rust.desktop.native.application.tests": [
           "application::ExportResourceResolver",

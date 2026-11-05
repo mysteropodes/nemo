@@ -32,6 +32,7 @@
     {"src":"js/adapters/native-object-project-entry-contract.js"},
     {"src":"js/adapters/native-object-project.js"},
     {"src":"js/adapters/native-object-layer-splice.js"},
+    {"src":"js/adapters/native-legacy-import.js"},
     {"src":"js/adapters/native-object-project-file.js"},
     {"src":"js/adapters/native-object-ui.js"},
     {"src":"js/adapters/native-drawing-add.js"},
