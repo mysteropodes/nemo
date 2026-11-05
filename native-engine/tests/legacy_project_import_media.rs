@@ -78,7 +78,7 @@ fn rasters_become_items_over_deduplicated_catalog_assets() {
         ],
         "one PNG shared by the layer rasters and the reference image, one linked file, one WAV"
     );
-    assert_eq!(assets[1]["source"]["locator"], "/Users/me/art/linked.png");
+    assert_eq!(assets[1]["source"]["locator"], "/Users/example/art/linked.png");
     assert_eq!(assets[1]["name"], "linked.png");
     let rasters = wire["drawing"]["items"]["raster"].as_array().unwrap();
     assert_eq!(rasters.len(), 3);
