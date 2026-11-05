@@ -2948,6 +2948,7 @@
         "native-selection-boolean.js",
         "native-select-group.js",
         "native-selection-clipboard.js",
+        "native-selection-order.js",
         "native-select-menu.js",
         "native-selection-transform.js",
         "native-selection-align.js",

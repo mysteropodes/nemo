@@ -272,3 +272,26 @@ fn a_receipt_answers_a_request_that_names_its_steps_and_only_admitted_step_kinds
     let one = json!({"applied":true,"historyEntriesAdded":1,"operation":"batch","strokeId":"x","strokeIds":["x"]});
     assert!(!vector_result(VECTOR, &unknown, &one));
 }
+
+#[test]
+fn an_order_step_names_a_target_and_an_end_of_the_stack() {
+    let payload = json!({"command":"object.vector.batch","ops":[
+        {"op":"order","stableTarget":target("L1","s-a"),"placement":"front"},
+        {"op":"order","stableTarget":target("L2","s-b"),"placement":"back","frame":3}]});
+    assert!(vector_request(VECTOR, &payload), "Bring to front and Send to back, the second in the cell of frame 3");
+    let receipt = json!({"applied":true,"historyEntriesAdded":1,"operation":"batch","strokeId":"s-a","strokeIds":["s-a","s-b"]});
+    assert!(vector_result(VECTOR, &payload, &receipt), "an order step reports its named target");
+    let other = json!({"applied":true,"historyEntriesAdded":1,"operation":"batch","strokeId":"s-a","strokeIds":["s-a","s-c"]});
+    assert!(!vector_result(VECTOR, &payload, &other), "a receipt id that is not the named target is refused");
+    for bad in [
+        json!({"op":"order","stableTarget":target("L1","s-a")}),
+        json!({"op":"order","stableTarget":target("L1","s-a"),"placement":"behind"}),
+        json!({"op":"order","stableTarget":target("L1","s-a"),"placement":"top"}),
+        json!({"op":"order","stableTarget":target("L1","s-a"),"placement":"front","frame":-1}),
+        json!({"op":"order","stableTarget":target("L1","s-a"),"placement":"front","keyframe":"copy"}),
+        json!({"op":"order","stableTarget":target("L1","s-a"),"placement":"front","matrix":[1,0,0,1,0,0]}),
+        json!({"op":"order","placement":"front"}),
+    ] {
+        assert!(!vector_request(VECTOR, &json!({"command":"object.vector.batch","ops":[bad.clone()]})), "{bad}");
+    }
+}
