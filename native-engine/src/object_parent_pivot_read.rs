@@ -22,7 +22,26 @@ pub(crate) fn layer_pivot_bases(
 ) -> Result<Vec<[f64; 2]>, &'static str> {
     #[cfg(feature = "evaluation")]
     {
-        bases(snapshot, context_id, layer_uids, frame)
+        bases(snapshot, context_id, layer_uids, frame).map(|all| all.iter().map(|e| e.0).collect())
+    }
+    #[cfg(not(feature = "evaluation"))]
+    {
+        Err("the evaluated parent pivot needs the evaluation layer")
+    }
+}
+
+/// The tight cubic bounds `[x0, y0, x1, y1]` of each layer (a Null is its rest point), at `frame` of the root context:
+/// the rectangle whose centre `layer_pivot_bases` answers. These are the layer's own bounds before its Motion.
+#[cfg_attr(not(feature = "evaluation"), allow(unused_variables))]
+pub(crate) fn layer_pivot_extents(
+    snapshot: &ObjectSnapshot,
+    context_id: &str,
+    layer_uids: &[&str],
+    frame: u32,
+) -> Result<Vec<[f64; 4]>, &'static str> {
+    #[cfg(feature = "evaluation")]
+    {
+        bases(snapshot, context_id, layer_uids, frame).map(|all| all.iter().map(|e| e.1).collect())
     }
     #[cfg(not(feature = "evaluation"))]
     {
@@ -36,7 +55,7 @@ fn bases(
     context_id: &str,
     layer_uids: &[&str],
     frame: u32,
-) -> Result<Vec<[f64; 2]>, &'static str> {
+) -> Result<Vec<([f64; 2], [f64; 4])>, &'static str> {
     use crate::evaluation::object_vector_kernels::render_vector_eval::{
         common_layer_motion_target, evaluate_record_rest_with_pose, evaluate_vector_rest,
         is_vector_record,
@@ -83,7 +102,7 @@ fn bases(
             .null_pivot_base(canvas)
             .map_err(|_| "a Null layer needs nullPos or the retained project canvas")?
         {
-            result.push(base);
+            result.push((base, [base[0], base[1], base[0], base[1]]));
             continue;
         }
         let held = packet
@@ -119,7 +138,7 @@ fn bases(
         if !base.iter().all(|v| v.is_finite()) {
             return Err("the layer pivot is not finite");
         }
-        result.push(base);
+        result.push((base, [bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height]));
     }
     Ok(result)
 }

@@ -4570,6 +4570,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-layer-kinds-ui.js",
+      "moduleId": "app.native.layer-rows.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2719,
+          "scriptOrdinal": 368
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-project-length.js",
       "moduleId": "app.native.project-length.adapter",
       "executionClass": "document-classic",

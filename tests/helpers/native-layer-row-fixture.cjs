@@ -19,6 +19,10 @@ class El {
     for (let node = this; node && !e.stopped; node = node.parentNode) (node.listeners[type] || []).slice().forEach((f) => f(e));
     return e;
   }
+  get classList() {
+    const el = this, names = () => String(el.className).split(' ').filter(Boolean);
+    return { add: (c) => { if (!names().includes(c)) el.className = names().concat([c]).join(' '); }, remove: (c) => { el.className = names().filter((x) => x !== c).join(' '); }, contains: (c) => names().includes(c) };
+  }
   focus() { this.focused = true; } select() {}
   getBoundingClientRect() { const b = this.box || { left: 0, top: 0, width: 100, height: 22 }; return { left: b.left, top: b.top, width: b.width, height: b.height, right: b.left + b.width, bottom: b.top + b.height }; }
 }
@@ -34,7 +38,7 @@ function makeHost() {
 }
 const PIN = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
 function session(layers, options = {}) {
-  const state = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 7, documentSnapshotId: 'snap-7', totalFrames: 24, layers: layers.map((l) => ({ ...l })) };
+  const state = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 7, documentSnapshotId: 'snap-7', totalFrames: 24, canvasW: 320, canvasH: 180, layers: layers.map((l) => ({ ...l })) };
   const s = { requests: [], serial: 0, active: true, state };
   const reply = (request, fields) => Object.assign({ apiVersion: 2, requestId: request.requestId, instanceId: request.instanceId, documentId: request.documentId }, fields);
   function apply(request) {
@@ -52,6 +56,23 @@ function session(layers, options = {}) {
         rest.splice(L.slice(0, p.gap).filter((l) => !p.layerUids.includes(l.layerUid)).length, 0, ...moved); state.layers = rest; break;
       }
       case 'object.layer.split': break;
+      // #2371 D36: a created kind layer is appended and adopts its children; folder membership is the parent link (a folder opens).
+      case 'object.layer.kind.create': {
+        const uid = 'new-' + s.serial, row = { layerUid: uid, name: p.name, kind: p.kind, visible: true, parentLayerUid: null };
+        if (p.kind === 'folder') row.folderCollapsed = false;
+        L.push(row); (p.children || []).forEach((u) => { L[at(u)].parentLayerUid = uid; });
+        result = { applied: true, historyEntriesAdded: 1, layerUid: uid }; break;
+      }
+      case 'object.layer.folder.reparent': {
+        const inside = (u) => { const par = L.find((l) => l.layerUid === L[at(u)].parentLayerUid); return !!par && par.kind === 'folder'; };
+        if (p.folderUid) { p.layerUids.filter((u) => u !== p.folderUid && L[at(u)].kind !== 'folder').forEach((u) => { L[at(u)].parentLayerUid = p.folderUid; }); L[at(p.folderUid)].folderCollapsed = false; }
+        else p.layerUids.filter(inside).forEach((u) => { L[at(u)].parentLayerUid = null; });
+        if (p.reorder) {
+          const moved = L.filter((l) => p.layerUids.includes(l.layerUid)), rest = L.filter((l) => !p.layerUids.includes(l.layerUid));
+          rest.splice(L.slice(0, p.reorder.gap).filter((l) => !p.layerUids.includes(l.layerUid)).length, 0, ...moved); state.layers = rest;
+        }
+        break;
+      }
       default: return { code: 'invalid_request' };
     }
     return { result };

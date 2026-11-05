@@ -252,6 +252,13 @@ pub struct ObjectLayer {
     pub(crate) is_null_layer: Presence<Option<bool>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) null_pos: Presence<Option<[serde_json::Number; 2]>>,
+    /// Baseline `ld.isGuideLayer` / `guidePos` / `guideOrientation`: a content-free editor guide, never rendered.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) is_guide_layer: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) guide_pos: Presence<[serde_json::Number; 2]>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) guide_orientation: Presence<String>,
     /// Original ld.followPath; absent, explicit null and authored object stay distinct.
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) follow_path: Presence<Option<FollowPathRecord>>,
@@ -345,6 +352,9 @@ object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Pre
     #[serde(default)] parent_layer_uid: Presence<Option<String>>,
     #[serde(default)] is_null_layer: Presence<Option<bool>>,
     #[serde(default)] null_pos: Presence<Option<[serde_json::Number; 2]>>,
+    #[serde(default)] is_guide_layer: Presence<bool>,
+    #[serde(default)] guide_pos: Presence<[serde_json::Number; 2]>,
+    #[serde(default)] guide_orientation: Presence<String>,
     #[serde(default)] follow_path: Presence<Option<FollowPathRecord>>,
     #[serde(default)] folder_id: Presence<Option<String>>,
     #[serde(default)] shy: Presence<bool>,
@@ -404,6 +414,9 @@ impl ObjectDocument {
 impl ObjectLayer {
     pub(crate) fn is_null_layer(&self) -> bool {
         self.is_null_layer.value() == Some(&Some(true))
+    }
+    pub(crate) fn is_guide_layer(&self) -> bool {
+        self.is_guide_layer.value() == Some(&true)
     }
     /// Original Null rest pivot, never content bounds. The caller may supply
     /// only dimensions read from its retained project, not a drawing default.
@@ -468,6 +481,9 @@ impl ObjectLayer {
             parent_layer_uid: Presence::Missing,
             is_null_layer: Presence::Missing,
             null_pos: Presence::Missing,
+            is_guide_layer: Presence::Missing,
+            guide_pos: Presence::Missing,
+            guide_orientation: Presence::Missing,
             follow_path: Presence::Missing,
             folder_id: Presence::Missing,
             shy: Presence::Missing,

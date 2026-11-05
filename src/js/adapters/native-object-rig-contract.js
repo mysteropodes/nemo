@@ -36,7 +36,9 @@
     "layer.parent.set": {"command":"object.layer.parent.set","result":"command","node":{"t":"obj","req":{"contextId":{"t":"str","min":1,"max":256},"layerUid":{"t":"str","min":1,"max":128},"parentLayerUid":{"t":"oneOf","cases":[{"t":"str","min":1,"max":128},{"t":"null"}]},"frame":{"t":"int","min":0,"max":4294967295}}}},
     "layer.timeLink.set": {"command":"object.layer.timeLink.set","result":"command","node":{"t":"obj","req":{"contextId":{"t":"str","min":1,"max":256},"layerUid":{"t":"str","min":1,"max":128},"sourceLayerUid":{"t":"oneOf","cases":[{"t":"str","min":1,"max":128},{"t":"null"}]},"frame":{"t":"int","min":0,"max":4294967295}},"opt":{"mode":{"t":"enum","v":["both","in","out"]},"srcAnchor":{"t":"enum","v":["in","out"]}}}},
     "layer.followPath.set": {"command":"object.layer.followPath.set","result":"command","node":{"t":"obj","req":{"contextId":{"t":"str","min":1,"max":256},"layerUid":{"t":"str","min":1,"max":128},"targetLayerUid":{"t":"oneOf","cases":[{"t":"str","min":1,"max":128},{"t":"null"}]}},"opt":{"align":{"t":"bool"}}}},
-    "layer.color.set": {"command":"object.layer.color.set","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":128},"color":{"t":"str","min":7,"max":7}},"opt":{"selected":{"t":"arr","min":0,"max":128,"of":{"t":"str","min":1,"max":128}}}}}
+    "layer.color.set": {"command":"object.layer.color.set","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":128},"color":{"t":"str","min":7,"max":7}},"opt":{"selected":{"t":"arr","min":0,"max":128,"of":{"t":"str","min":1,"max":128}}}}},
+    "layer.kind.create": {"command":"object.layer.kind.create","result":"created","node":{"t":"obj","req":{"kind":{"t":"enum","v":["null","effect","guide","folder","effector"]},"name":{"t":"str","min":0,"max":256},"frame":{"t":"int","min":0,"max":4294967295}},"opt":{"pos":{"t":"pair","abs":1000000000},"children":{"t":"arr","min":0,"max":128,"of":{"t":"str","min":1,"max":128}},"target":{"t":"str","min":1,"max":128}}}},
+    "layer.folder.reparent": {"command":"object.layer.folder.reparent","result":"command","node":{"t":"obj","req":{"layerUids":{"t":"arr","min":1,"max":128,"of":{"t":"str","min":1,"max":128}},"folderUid":{"t":"oneOf","cases":[{"t":"str","min":1,"max":128},{"t":"null"}]},"frame":{"t":"int","min":0,"max":4294967295}},"opt":{"reorder":{"t":"obj","req":{"gap":{"t":"num","abs":1000000000},"selection":{"t":"obj","req":{"active":{"t":"str","min":1,"max":128},"selected":{"t":"arr","min":0,"max":128,"of":{"t":"str","min":1,"max":128}}},"opt":{"anchor":{"t":"oneOf","cases":[{"t":"str","min":1,"max":128},{"t":"null"}]}}}}}}}}
   };
   const has = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
   const fail = (message) => { throw new TypeError(message); };
@@ -171,5 +173,6 @@
     TWEEN_GENERATE: PREFIX + 'tween.generate', TWEEN_REGENERATE: PREFIX + 'tween.regenerate', TWEEN_SPLIT: PREFIX + 'tween.split', TWEEN_REASSIGN: PREFIX + 'tween.reassign',
     PRESET_APPLY: PREFIX + 'property.preset.apply',
     COMPOSITING_EDIT: PREFIX + 'layer.compositing.edit',
-    PARENT_SET: PREFIX + 'layer.parent.set', TIME_LINK_SET: PREFIX + 'layer.timeLink.set', FOLLOW_PATH_SET: PREFIX + 'layer.followPath.set', COLOR_SET: PREFIX + 'layer.color.set' });
+    PARENT_SET: PREFIX + 'layer.parent.set', TIME_LINK_SET: PREFIX + 'layer.timeLink.set', FOLLOW_PATH_SET: PREFIX + 'layer.followPath.set', COLOR_SET: PREFIX + 'layer.color.set',
+    KIND_CREATE: PREFIX + 'layer.kind.create', FOLDER_REPARENT: PREFIX + 'layer.folder.reparent' });
 }));

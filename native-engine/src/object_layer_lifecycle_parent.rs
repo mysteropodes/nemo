@@ -356,6 +356,18 @@ pub(crate) fn plan_parent(
     parent: Option<&str>,
     frame: u32,
 ) -> Result<LifecyclePlan, LifecycleError> {
+    plan_parent_in(snapshot, context_id, layer_uid, parent, frame, false)
+}
+
+/// `plan_parent`, optionally admitting a folder layer as the parent (a folder is a Null that groups: #2371 D36).
+pub(crate) fn plan_parent_in(
+    snapshot: &ObjectSnapshot,
+    context_id: &str,
+    layer_uid: &str,
+    parent: Option<&str>,
+    frame: u32,
+    allow_folder: bool,
+) -> Result<LifecyclePlan, LifecycleError> {
     let document = snapshot.document();
     let index = index_of(document, layer_uid)?;
     if let Some(uid) = parent {
@@ -363,7 +375,7 @@ pub(crate) fn plan_parent(
         if uid == layer_uid {
             return Err(LifecycleError::ParentSelf(layer_uid.to_owned()));
         }
-        if document.layers[target].is_folder_layer.value() == Some(&true) {
+        if !allow_folder && document.layers[target].is_folder_layer.value() == Some(&true) {
             return Err(LifecycleError::ParentRefused(uid.to_owned()));
         }
         if !in_context(document, context_id, [layer_uid, uid]) {

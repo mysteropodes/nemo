@@ -10,7 +10,8 @@
   },
   "transportSchema": "../native-transport-v2.schema.json",
   "operations": [
-    "command.document.object.layer.create"
+    "command.document.object.layer.create",
+    "command.document.object.layer.kind.create"
   ],
   "authority": {
     "document": "native-engine::object_snapshot::ObjectSnapshot",
@@ -59,6 +60,41 @@
           "layerUid": "native-layer:8:0"
         }
       }
+    },
+    {
+      "label": "#2371 create a Null layer that adopts the selected layers; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-kind-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.kind.create",
+        "payload": {
+          "command": "object.layer.kind.create",
+          "kind": "null",
+          "name": "Null 3",
+          "frame": 4,
+          "children": [
+            "layer-1",
+            "layer-2"
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-kind-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "layerUid": "native-layer:8:0"
+        }
+      }
     }
-  ]
+  ],
+  "semantics": "#2371 U11 / D36: the baseline layer kinds of the + menu (addNullLayer, addEffectLayer, addGuideLayer, addFolderLayer, src/js/timeline.js, and addEffectorLayer, src/js/effector-layer.js @1065e9d8) as ONE layer-create transaction: one revision and one history entry. kind null / effect / guide / folder / effector replaces the blank appended layer; `name` is chosen by the caller (the baseline names, Null N, Effet N, Guide N, Folder N, Effector N); `frame` is the playhead the pose of adopted layers is kept at. A Null (colour #ff2d78) and a Folder (colour #ffb020, expanded, empty effect stack) store `isNullLayer` and a `nullPos` anchor: `pos`, else the centre of the union of the bounds of `children` at `frame`, else the canvas centre. `children` (Null and Folder only) are the layers the user had selected: each is freed with its world pose kept (the Parent A rules, a keyed or expression-driven pose is refused unavailable) and parented to the new layer. A Guide (colour #00baff) stores `isGuideLayer`, `guidePos` (`pos`, else the canvas centre) and horizontal orientation, carries no content and is never rendered. An Effect layer starts with an empty effect stack. An Effector (colour #59d38a) needs `target`, a layer that hosts a duplicator (otherwise invalid_request, an unknown layer is not_found), stores the effector record with a radial falloff anchored at `pos` or the canvas centre and the seeded Offset Position (120, 0). `children` is refused for any other kind, `target` for any other kind than effector. No JS/Paper writer or fallback."
 }
