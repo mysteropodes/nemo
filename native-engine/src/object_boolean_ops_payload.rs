@@ -39,6 +39,10 @@ pub(super) struct ErasePayload {
     pub(super) frame: u32,
     pub(super) stroke_id: String,
     pub(super) footprint: Vec<[f64; 2]>,
+    /// One drag is one undo step: a bite after the first of a gesture asks to join the entry the gesture began. The history
+    /// dispatcher reads it from the wire object; admission here only keeps the member strict.
+    #[allow(dead_code)]
+    pub(super) join_history: Option<bool>,
 }
 object_deserialize!(ErasePayload {
     command: String,
@@ -46,7 +50,8 @@ object_deserialize!(ErasePayload {
     context_id: String,
     frame: u32,
     stroke_id: String,
-    footprint: Vec<[f64; 2]>
+    footprint: Vec<[f64; 2]>,
+    #[serde(default)] join_history: Option<bool>
 });
 
 #[derive(Debug)]

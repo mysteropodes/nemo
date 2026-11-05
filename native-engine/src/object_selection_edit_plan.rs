@@ -17,7 +17,7 @@ use crate::object_document::object_group_kernels::{
 use std::collections::HashSet;
 
 use crate::object_document::object_group_kernels::object_clipboard_remap::{
-    IdSource, RemapError, DUPLICATE_OFFSET_PX,
+    IdSource, RemapError,
 };
 use crate::object_document::object_group_kernels::object_group_hierarchy::GroupEntry;
 use crate::object_document::object_group_kernels::object_group_plan::{
@@ -360,12 +360,14 @@ pub(crate) fn plan_delete(
 }
 
 /// `duplicateSelection`: copies of the selected shapes land on top of the same
-/// layer cell, nudged by [`DUPLICATE_OFFSET_PX`], with fresh identities, fresh
-/// combine groups for the groups the copies belong to, and the originals untouched.
+/// layer cell, nudged by `offset` (the baseline nudge, `DUPLICATE_OFFSET_PX` on both axes, or the
+/// distance of an Alt-drag), with fresh identities, fresh combine groups for the groups the copies
+/// belong to, and the originals untouched.
 pub(crate) fn plan_duplicate(
     document: &ObjectDocument,
     request: &SelectionRequest<'_>,
     promotion: &dyn HeldFramePromotion,
+    offset: [f64; 2],
     ids: &mut dyn IdSource,
 ) -> Result<SelectionPlan, SelectionError> {
     let index = check_target(document, request.layer_uid, request.frame)?;
@@ -411,7 +413,7 @@ pub(crate) fn plan_duplicate(
         &selection.rasters,
         &tags,
         entries.as_deref(),
-        DUPLICATE_OFFSET_PX,
+        offset,
         ids,
     )?;
     Ok(SelectionPlan::changed(

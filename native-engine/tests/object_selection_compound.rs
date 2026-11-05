@@ -231,7 +231,7 @@ fn bitmap_companion_uses_same_resource_and_translates_existing_rectangle_with_an
         &selected.rasters,
         &[None],
         None,
-        12.,
+        [12., 12.],
         &mut ids,
     )
     .unwrap();
@@ -294,7 +294,7 @@ fn exhausted_identity_provider_cannot_partially_materialize_a_compound() {
         &[],
         &[None, None],
         None,
-        12.,
+        [12., 12.],
         &mut Once(true)
     )
     .is_err());

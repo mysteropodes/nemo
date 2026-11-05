@@ -51,7 +51,8 @@ function harness(items = FLAT(), opts = {}) {
       return { items: store.filter((i) => i.stableTarget.layerUid === selector.layerUid).map((item) => { const { segments, ...rest } = item; return wanted(rest) ? { ...rest, segments } : rest; }) };
     } };
   let fresh = 0;
-  const shifted = (item, by) => ({ ...item, bounds: item.bounds.map((n) => n + by), segments: item.segments.map((s) => ({ ...s, point: [s.point[0] + by, s.point[1] + by] })) });
+  const shifted = (item, by) => { const [dx, dy] = Array.isArray(by) ? by : [by, by]; // a number moves both axes, a pair is [dx, dy] (an Alt-drag duplicate)
+    return { ...item, bounds: item.bounds.map((n, at) => n + (at % 2 ? dy : dx)), segments: item.segments.map((s) => ({ ...s, point: [s.point[0] + dx, s.point[1] + dy] })) }; };
   const clone = (item, layer, by, id) => { const c = shifted(JSON.parse(JSON.stringify(item)), by); c.stableTarget = { ...c.stableTarget, layerUid: layer, strokeId: id }; return c; };
   const clipOf = (p) => ({ contextId: p.contextId, layerUid: p.layerUid, frame: p.frame, records: p.strokeIds.map((id) => {
     const item = find(id);
@@ -60,7 +61,7 @@ function harness(items = FLAT(), opts = {}) {
   }) });
   const own = (request) => {
     const p = request.payload, op = request.operation;
-    if (op.endsWith('selection.duplicate')) { p.strokeIds.forEach((id) => store.push(clone(find(id), p.layerUid, SHIFT, id + '-d' + (++fresh)))); return { applied: true, historyEntriesAdded: 1 }; }
+    if (op.endsWith('selection.duplicate')) { p.strokeIds.forEach((id) => store.push(clone(find(id), p.layerUid, p.offset || SHIFT, id + '-d' + (++fresh)))); return { applied: true, historyEntriesAdded: 1 }; }
     if (op.endsWith('clipboard.copy')) return { applied: false, historyEntriesAdded: 0, clipboard: p.strokeIds.length ? clipOf(p) : null };
     if (op.endsWith('clipboard.cut')) {
       const clip = p.strokeIds.length ? clipOf(p) : null;
@@ -125,6 +126,40 @@ test('Dupliquer / Cmd+D is ONE object.selection.duplicate request over the selec
   assert.deepEqual(h.layer('L1'), ['a', 'b', 'c', 'a-d1', 'b-d2'], 'the owner put the copies on top of the layer');
   assert.deepEqual(h.ids(), ['a-d1', 'b-d2'], 'the copies are selected, the sources are not (baseline)');
   assert.deepEqual(h.toasts, [], 'the baseline duplicate says nothing');
+});
+
+test('an Alt-drag duplicate (duplicateAt) is the same ONE request with the drag distance as `offset`; the copies land there and are selected, the originals stay', async () => {
+  const h = harness();
+  await h.pick('b', 'a');
+  const out = await Clipboard.duplicateAt(h.root, [30, -7.5], { pin: h.session.info() });
+  assert.equal(out.status, 'applied');
+  assert.equal(h.sent.length, 1, 'one revision and one history entry');
+  assert.deepEqual(h.sent[0].payload, { command: 'object.selection.duplicate', contextId: 'scene-root', layerUid: 'L1', frame: 0, mode: 'animation2d', strokeIds: ['a', 'b'], offset: [30, -7.5] });
+  assert.deepEqual(h.legacy, []);
+  assert.deepEqual(h.layer('L1'), ['a', 'b', 'c', 'a-d1', 'b-d2']);
+  assert.deepEqual(h.find('a-d1').segments[0].point, [40, 2.5], 'a (10,10) moved by (30,-7.5)');
+  assert.deepEqual(h.find('a').segments[0].point, [10, 10], 'the original is untouched');
+  assert.deepEqual(h.ids(), ['a-d1', 'b-d2']);
+  const plain = harness();
+  await plain.pick('a');
+  await Clipboard.duplicate(plain.root);
+  assert.equal('offset' in plain.sent[0].payload, false, 'Cmd+D still sends no offset (the engine keeps the 12 px nudge)');
+});
+
+test('duplicateAt with a pin the document has moved past, or an Escape, or a runaway distance sends nothing', async () => {
+  const h = harness();
+  await h.pick('a');
+  const stale = await Clipboard.duplicateAt(h.root, [5, 5], { pin: { ...h.session.info(), contentRevision: 6, documentSnapshotId: 's6' } });
+  assert.equal(stale.status, 'stale');
+  const cancelled = await Clipboard.duplicateAt(h.root, [5, 5], { pin: h.session.info(), cancelled: () => true });
+  assert.equal(cancelled.status, 'cancelled');
+  let released = 0;
+  await Clipboard.duplicateAt(h.root, [5, 5], { pin: h.session.info(), cancelled: () => false, release: () => { released++; } });
+  assert.equal(released, 1, 'the drag lets go of Escape just before the request');
+  assert.equal(h.sent.length, 1, 'only the last one was sent');
+  const far = await Clipboard.duplicateAt(h.root, [2e6, 0], { pin: h.session.info() });
+  assert.equal(far.status !== 'applied', true, 'a distance past the contract bound is refused before it leaves');
+  assert.equal(h.sent.length, 1);
 });
 
 test('Motion mode sends the owner the "motion" edit mode (the key the held frame inherits is edited, not promoted)', async () => {

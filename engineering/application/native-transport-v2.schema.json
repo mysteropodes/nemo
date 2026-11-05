@@ -5153,6 +5153,10 @@
           "items": {
             "$ref": "#/$defs/ObjectEditId"
           }
+        },
+        "offset": {
+          "$ref": "#/$defs/ObjectVectorPair",
+          "description": "Where the copies land, in the records' own space: the distance of an Alt-drag duplicate. Each component is finite and at most 1e6 in magnitude. Absent: the baseline 12 px nudge on both axes."
         }
       }
     },
@@ -5318,6 +5322,10 @@
               "type": "number"
             }
           }
+        },
+        "joinHistory": {
+          "type": "boolean",
+          "description": "A bite after the first of one eraser drag: the revision advances but the undo entry the drag began grows to end at it (historyEntriesAdded 0). Refused unavailable when no such entry is on top of the undo stack."
         }
       }
     },

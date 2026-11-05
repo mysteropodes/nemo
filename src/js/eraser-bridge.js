@@ -18,6 +18,23 @@
     if (allowed) return true; if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
     return false;
   }
+  // Native object projects (B-eraser-tool): the native adapter owns every pointer event; the Paper eraser below never runs there. Without the adapter the
+  // press is refused out loud, never in silence.
+  var nativeEraser = null;
+  function nativeEvent(kind, e) {
+    if (!nativeEraser && window.NemoNativeObjectEraserTool) {
+      nativeEraser = window.NemoNativeObjectEraserTool.create(window, { mapping: window.NemoNativeViewportUnderlay && window.NemoNativeViewportUnderlay.canvasMapping });
+      window.NemoNativeEraserToolController = nativeEraser;
+    }
+    if (nativeEraser && nativeEraser.handle(kind, e)) return true;
+    var owner = window.NemoNativeObjectProject && window.NemoNativeObjectProject.desktop(window);
+    if (!owner || !owner.blocksLegacy() || state.tool !== 'eraser') return false;
+    if (kind === 'down') { consumeStage(e); if (window.showToast) showToast('La gomme n\u2019est pas disponible sur ce projet pour le moment.'); }
+    return true;
+  }
+  function consumeStage(e) {
+    if (e.target === document.getElementById('drawing-canvas') || e.target === document.getElementById('canvas-area')) { e.stopImmediatePropagation(); e.preventDefault(); }
+  }
   var lastErasePt = null; // world Point of the previous erase sample this gesture, or null for the first — fed to eraseAtPoint so it sweeps a continuous capsule instead of a lone circle per move (see eraseAtPoint's own comment for why)
   var lastPenPressure = null; // held across a real-pen gesture — same hold-last-value fix as draw-bridge.js's pressureOf(), for the exact same reason (0/missing samples at lift-off otherwise misread as "max pressure")
   // Alt+drag resize (2026-07, "10 > pourquoi on utilise pas le même
@@ -178,6 +195,7 @@
   }
 
   function onDown(e) {
+    if (nativeEvent('down', e)) return;
     if (!shouldIntercept()) return;
     e.stopImmediatePropagation();
     e.preventDefault();
@@ -225,6 +243,7 @@
     window.SMEngineBridge.renderNow();
   }
   function onMove(e) {
+    if (nativeEvent('move', e)) return;
     if (sizing) {
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -251,6 +270,7 @@
     window.SMEngineBridge.renderNow();
   }
   function onUp(e) {
+    if (nativeEvent(e.type === 'pointercancel' ? 'cancel' : 'up', e)) return;
     if (sizing) {
       e.stopImmediatePropagation();
       e.preventDefault();

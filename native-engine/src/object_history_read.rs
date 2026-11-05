@@ -25,6 +25,12 @@ impl HistoryLabels {
     pub(crate) fn clear(&mut self) {
         self.0.clear();
     }
+    /// An entry that grew to end at a later revision keeps its label under the new key.
+    pub(crate) fn rekey(&mut self, old: u64, new: u64) {
+        if let Some(label) = self.0.remove(&old) {
+            self.0.insert(new, label);
+        }
+    }
     fn get(&self, after_revision: u64) -> &str {
         self.0
             .get(&after_revision)
