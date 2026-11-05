@@ -164,6 +164,7 @@ impl OrderTrack {
                 curve_points: Presence::Present(Some(curve.unwrap_or_else(default_curve))),
                 h_in: Presence::Present(vec![0.into(), 0.into()]),
                 h_out: Presence::Present(vec![0.into(), 0.into()]),
+                color: Presence::Missing,
             });
             keys.sort_by(|a, b| {
                 a.frame

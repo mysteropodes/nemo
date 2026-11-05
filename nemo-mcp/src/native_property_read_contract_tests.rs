@@ -367,6 +367,21 @@ fn exact_authored_key_lock_metadata_is_nullable_and_kept_separate_from_original_
 }
 
 #[test]
+fn authored_key_tint_is_a_hex_colour_and_nothing_else() {
+    let q = payload(true);
+    for tint in ["#e8b64c", "#4EA9FF", "#4ea9ffcc"] {
+        let mut value = output(true);
+        value["items"][0]["color"] = json!(tint);
+        assert!(result("document", &q, &value), "{tint}");
+    }
+    for tint in [json!("red"), json!("#12345"), json!("e8b64c"), json!(null), json!(7), json!("#ggg000")] {
+        let mut value = output(true);
+        value["items"][0]["color"] = tint;
+        assert!(!result("document", &q, &value));
+    }
+}
+
+#[test]
 fn expression_state_is_closed_correlated_and_does_not_infer_missing_evaluations() {
     let mut p = payload(false);
     p["view"]["kind"] = json!("expressionState");

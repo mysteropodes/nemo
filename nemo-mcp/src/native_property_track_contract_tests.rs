@@ -29,6 +29,13 @@ fn track_actions_preserve_native_numeric_and_opaque_string_domains() {
     for kind in ["delete", "flip", "distribute"] {
         actions.push(json!({ "kind": kind }));
     }
+    for mode in ["top", "bottom", "left", "right"] {
+        actions.push(json!({"kind":"warp","mode":mode,"total":-12.5}));
+    }
+    actions.push(json!({"kind":"warp","mode":"liquify","total":3,"grab":40.25}));
+    for color in [json!(null), json!("#e8b64c"), json!("#4EA9FFcc")] {
+        actions.push(json!({"kind":"color","color":color}));
+    }
     for side in ["in", "out"] {
         for percent in [-1000.5, 0.0, 100.0, 1000.5] {
             actions.push(json!({"kind":"influence","side":side,"percent":percent}));
@@ -52,6 +59,26 @@ fn track_actions_preserve_native_numeric_and_opaque_string_domains() {
         .unwrap();
     assert_eq!(descriptor["id"], "native.property-track-edit");
     assert_eq!(descriptor["authority"]["fallback"], "none");
+}
+#[test]
+fn warp_and_color_actions_refuse_malformed_shapes() {
+    for action in [
+        json!({"kind":"warp","mode":"diagonal","total":1}),
+        json!({"kind":"warp","mode":"top"}),
+        json!({"kind":"warp","mode":"liquify","total":1}),
+        json!({"kind":"warp","mode":"top","total":1,"grab":2}),
+        json!({"kind":"warp","mode":"top","total":1000001}),
+        json!({"kind":"warp","mode":"top","total":"1"}),
+        json!({"kind":"warp","mode":"top","total":1,"extra":1}),
+        json!({"kind":"color"}),
+        json!({"kind":"color","color":"red"}),
+        json!({"kind":"color","color":"#12345"}),
+        json!({"kind":"color","color":"#gggggg"}),
+        json!({"kind":"color","color":7}),
+        json!({"kind":"color","color":"#e8b64c","extra":true}),
+    ] {
+        assert!(!request(&payload(action.clone())), "{action}");
+    }
 }
 #[test]
 fn track_payload_selection_target_and_action_are_closed_at_every_level() {

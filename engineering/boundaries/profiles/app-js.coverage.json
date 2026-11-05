@@ -4846,6 +4846,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-motion-key-box.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2479,
+          "scriptOrdinal": 152
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-motion-canvas-math.js",
       "moduleId": "app.native.motion.properties.adapter",
       "executionClass": "document-classic",

@@ -7,7 +7,16 @@ use serde_json::{json, Map, Value};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Members of a motion key the native key record owns.
-const KEY_MEMBERS: &[&str] = &["frame", "v", "hold", "lockTo", "curvePoints", "hIn", "hOut"];
+const KEY_MEMBERS: &[&str] = &[
+    "frame",
+    "v",
+    "hold",
+    "lockTo",
+    "curvePoints",
+    "hIn",
+    "hOut",
+    "color",
+];
 /// The longest expression body the native record admits.
 const MAX_CODE_BYTES: usize = 4096;
 
@@ -162,7 +171,18 @@ fn key(path: &str, value: &Value, ctx: &mut Ctx) -> Result<(f64, Value), LegacyI
         if name == "frame" || name == "v" {
             continue;
         }
-        if KEY_MEMBERS.contains(&name.as_str()) {
+        if name == "color"
+            && !value.is_null()
+            && !value
+                .as_str()
+                .is_some_and(crate::object_document::valid_key_color)
+        {
+            ctx.warn(
+                format!("{path}.{name}"),
+                "invalid_key_color",
+                "key tint is not #rrggbb or #rrggbbaa, not carried over",
+            );
+        } else if KEY_MEMBERS.contains(&name.as_str()) {
             if !value.is_null() {
                 out.insert(name.clone(), value.clone());
             }

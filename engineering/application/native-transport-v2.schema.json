@@ -11032,6 +11032,63 @@
                   "const": "distribute"
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "mode",
+                "total"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "warp"
+                },
+                "mode": {
+                  "description": "The key selection box gesture: top/bottom skew the selected rows (the dragged edge's row moves the whole distance, the opposite row stays, rows between interpolate in the order the selections first name each track), left/right space the selection along time (the opposite edge of the selected frames stays), liquify moves keys by a Gaussian falloff around grab.",
+                  "enum": [
+                    "top",
+                    "bottom",
+                    "left",
+                    "right",
+                    "liquify"
+                  ]
+                },
+                "total": {
+                  "description": "The drag in frames, fractional allowed. Every selected key moves round(total x its share) frames from where it was; all keys land inside the composition and on no key that stays, or the whole gesture is refused.",
+                  "type": "number",
+                  "minimum": -1000000,
+                  "maximum": 1000000
+                },
+                "grab": {
+                  "description": "The frame a liquify is centred on; required for liquify and refused for every other mode.",
+                  "type": "number",
+                  "minimum": -1000000,
+                  "maximum": 1000000
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "color"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "color"
+                },
+                "color": {
+                  "description": "The timeline tint written on every selected key (#rrggbb or #rrggbbaa, stored lowercase), or null to remove it.",
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+                }
+              }
             }
           ]
         }
@@ -11367,6 +11424,11 @@
             "out",
             "layer"
           ]
+        },
+        "color": {
+          "description": "The key's timeline tint (baseline key.color): #rrggbb or #rrggbbaa. Presentation only; absent when the key is untinted.",
+          "type": "string",
+          "pattern": "^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
         }
       }
     },

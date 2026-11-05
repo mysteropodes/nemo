@@ -178,6 +178,16 @@
         if (!Number.isSafeInteger(action.delta) || Math.abs(action.delta) > 1000000) throw new TypeError('invalid property key shift');
       } else if (['delete', 'flip', 'distribute'].includes(action.kind)) {
         exact(action, ['kind'], [], 'property key batch');
+      } else if (action.kind === 'warp') {
+        // #2377: the selection box. `grab` goes with liquify and with nothing else; the drag is fractional frames.
+        exact(action, ['kind', 'mode', 'total'], ['grab'], 'property key warp');
+        const liquify = action.mode === 'liquify';
+        if (!['top', 'bottom', 'left', 'right', 'liquify'].includes(action.mode) || !Number.isFinite(action.total) || Math.abs(action.total) > 1000000 ||
+            has(action, 'grab') !== liquify || liquify && (!Number.isFinite(action.grab) || Math.abs(action.grab) > 1000000)) throw new TypeError('invalid property key warp');
+      } else if (action.kind === 'color') {
+        // #2377: the key tint; null removes it. Required, never defaulted.
+        exact(action, ['kind', 'color'], [], 'property key colour');
+        if (action.color !== null && !(typeof action.color === 'string' && /^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(action.color))) throw new TypeError('invalid property key colour');
       } else {
         throw new TypeError('unsupported property track action');
       }
@@ -224,8 +234,9 @@
       }
     }
     function readKey(value, dimension) {
-      exact(value, ['frame', 'v'], ['hold', 'curvePoints', 'hIn', 'hOut','lockTo'], 'authored property key');
+      exact(value, ['frame', 'v'], ['hold', 'curvePoints', 'hIn', 'hOut','lockTo','color'], 'authored property key');
       if (!Number.isFinite(value.frame)) throw new TypeError('invalid authored key frame');
+      if (has(value, 'color') && !(typeof value.color === 'string' && /^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value.color))) throw new TypeError('invalid authored key colour');
       readVector(value.v, dimension);
       if(has(value,'lockTo')&&value.lockTo!==null&&!['in','out','layer'].includes(value.lockTo))throw new TypeError('invalid authored lock');
       if (has(value, 'hold') && typeof value.hold !== 'boolean') throw new TypeError('invalid authored hold');
