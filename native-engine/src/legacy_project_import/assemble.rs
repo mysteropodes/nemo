@@ -139,7 +139,7 @@ pub(super) fn drawing(
             ));
         }
     }
-    let mut parts = components::convert(&symbol_map, scene, &folders, ctx)?;
+    let mut parts = components::convert(&symbol_map, scene, ctx)?;
     let mut holder_list = std::mem::take(&mut set.motion.holders);
     let mut dups = std::mem::take(&mut set.dup);
     let mut tables = Map::new();

@@ -39,7 +39,6 @@ pub(crate) fn symbol_ids(doc: &Map<String, Value>) -> HashSet<String> {
 pub(crate) fn convert(
     symbols: &Map<String, Value>,
     scene: &[Value],
-    folders: &Map<String, Value>,
     ctx: &mut Ctx,
 ) -> Result<Option<Converted>, LegacyImportError> {
     let ids = symbol_ids(&Map::from_iter([(
@@ -55,7 +54,7 @@ pub(crate) fn convert(
     for (id, symbol) in symbols {
         let path = format!("symbols.{id}");
         let members = object(symbol, &path)?;
-        components.push(component(id, &path, members, folders, &mut out, ctx)?);
+        components.push(component(id, &path, members, &mut out, ctx)?);
     }
     let mut instances = Vec::new();
     for (index, layer) in scene.iter().enumerate() {
@@ -85,7 +84,6 @@ fn component(
     id: &str,
     path: &str,
     members: &Map<String, Value>,
-    folders: &Map<String, Value>,
     out: &mut Converted,
     ctx: &mut Ctx,
 ) -> Result<Value, LegacyImportError> {
@@ -156,11 +154,13 @@ fn component(
         })?;
     let root = format!("{path}.layers");
     let no_symbols = HashSet::new();
+    // Organisational folders are a scene table; a component layer is never in one.
+    let no_folders = Map::new();
     let scope = Scope {
         context: id,
         root: &root,
         total,
-        folders,
+        folders: &no_folders,
         symbols: &no_symbols,
     };
     let set: Set = layers::convert(&layers, &scope, ctx)?;
