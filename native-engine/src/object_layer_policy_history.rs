@@ -38,3 +38,8 @@ mod duplicator_tests;
 #[cfg(test)]
 #[path = "../tests/object_key_lock_edit.rs"]
 mod key_lock_tests;
+
+// #2524: shift, delete, flip and distribute of selected keys as one atomic native history entry.
+#[cfg(test)]
+#[path = "../tests/object_key_batch_edit.rs"]
+mod key_batch_tests;

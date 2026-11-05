@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "7c36749d4b6cd74f092b31e645da4eae1a2f178e",
-  "describe": "v0.7.0-alpha.4-5203-g7c36749d4-dirty"
+  "head": "20ac67be441461b5687106a5d22ca07fd3887296",
+  "describe": "v0.7.0-alpha.4-5208-g20ac67be4-dirty"
  },
- "inputsDigest": "dd19120cc80fc4bde3fe70e5f6b8de9218e694b9adfbcea40e448f3b87fbe737",
+ "inputsDigest": "673d3242bd6ee9cab8afb8987acec1dc41b72c0a7dbaeb2a60b8277aebd37c2a",
  "states": [
   "inventoried",
   "characterized",
@@ -4956,7 +4956,7 @@
     "container": "p-textanim-add-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 84,
+    "functionsVisited": 78,
     "via": "variable animBtn",
     "references": []
    },
@@ -24833,7 +24833,7 @@
    "source": "src/js/markers.js:245",
    "meta": {
     "i18n": null,
-    "functionsVisited": 40
+    "functionsVisited": 41
    },
    "fixtures": [
     "static-props",
@@ -24987,7 +24987,7 @@
    "source": "src/js/media-library.js:560",
    "meta": {
     "i18n": "ctxDeleteTrack",
-    "functionsVisited": 21
+    "functionsVisited": 22
    },
    "fixtures": [
     "mesh",
@@ -28632,7 +28632,7 @@
    "source": "src/js/select-bridge.js:3249",
    "meta": {
     "i18n": null,
-    "functionsVisited": 84
+    "functionsVisited": 78
    },
    "fixtures": [
     "static-props",
@@ -33214,7 +33214,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:529",
    "meta": {
-    "functionsVisited": 40
+    "functionsVisited": 41
    },
    "fixtures": [
     "media",
@@ -33503,7 +33503,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 405
+    "functionsVisited": 407
    },
    "fixtures": [
     "media",

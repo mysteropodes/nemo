@@ -23,6 +23,12 @@ fn track_actions_preserve_native_numeric_and_opaque_string_domains() {
     for mode in [json!(null), json!("in"), json!("out"), json!("layer")] {
         actions.push(json!({"kind":"lockTo","mode":mode}));
     }
+    for delta in [-1_000_000, -1, 0, 7, 1_000_000] {
+        actions.push(json!({"kind":"shift","delta":delta}));
+    }
+    for kind in ["delete", "flip", "distribute"] {
+        actions.push(json!({ "kind": kind }));
+    }
     for side in ["in", "out"] {
         for percent in [-1000.5, 0.0, 100.0, 1000.5] {
             actions.push(json!({"kind":"influence","side":side,"percent":percent}));
@@ -86,6 +92,14 @@ fn track_payload_selection_target_and_action_are_closed_at_every_level() {
         ("/action", json!({"kind":"lockTo","mode":true})),
         ("/action", json!({"kind":"lockTo","mode":["in"]})),
         ("/action", json!({"kind":"lockTo","mode":"in","extra":0})),
+        ("/action", json!({"kind":"shift"})),
+        ("/action", json!({"kind":"shift","delta":1.5})),
+        ("/action", json!({"kind":"shift","delta":"2"})),
+        ("/action", json!({"kind":"shift","delta":1_000_001})),
+        ("/action", json!({"kind":"shift","delta":1,"extra":0})),
+        ("/action", json!({"kind":"delete","keep":true})),
+        ("/action", json!({"kind":"flip","times":2})),
+        ("/action", json!({"kind":"distribute","mode":"even"})),
         (
             "/action",
             json!({"kind":"influence","side":"both","percent":50}),

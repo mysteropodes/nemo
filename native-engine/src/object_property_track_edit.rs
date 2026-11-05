@@ -1,5 +1,6 @@
 //! Stable selection edits prepared against one retained native snapshot.
 use crate::commands::object_fill_owner::property_edit::curves::{self, CurvePreset, InfluenceSide};
+use crate::commands::object_fill_owner::property_edit::key_batch::{self, KeyBatch};
 use crate::commands::{ObjectFillOwner, PreparedPropertyEdit};
 use crate::object_document::{
     object_deserialize, KeyLockMode, OrderKey, OrderTrack, Presence, PropertyHolder,
@@ -34,6 +35,11 @@ enum Action {
         #[serde(deserialize_with = "Option::deserialize")]
         mode: Option<String>,
     },
+    // Batch key edits over the selection: nudge/drag retime, delete, flip, distribute.
+    Shift { delta: Number },
+    Delete {},
+    Flip {},
+    Distribute {},
 }
 #[derive(Debug)]
 struct Payload {
@@ -51,6 +57,7 @@ enum ValidAction {
     Influence(InfluenceSide, f64),
     Subdivide,
     LockTo(Option<KeyLockMode>),
+    Batch(KeyBatch),
 }
 fn invalid() -> DispatchErrorCode {
     DispatchErrorCode::InvalidRequest
@@ -85,6 +92,16 @@ impl Action {
                 Some("layer") => Some(KeyLockMode::Layer),
                 Some(_) => return Err(invalid()),
             }),
+            Self::Shift { delta } => {
+                let by = delta.as_i64().ok_or_else(invalid)?;
+                if by.abs() > key_batch::MAX_SHIFT {
+                    return Err(invalid());
+                }
+                ValidAction::Batch(KeyBatch::Shift(by))
+            }
+            Self::Delete {} => ValidAction::Batch(KeyBatch::Delete),
+            Self::Flip {} => ValidAction::Batch(KeyBatch::Flip),
+            Self::Distribute {} => ValidAction::Batch(KeyBatch::Distribute),
         })
     }
 }
@@ -177,9 +194,18 @@ impl ObjectFillOwner {
         }
         // Phase 2: prepare all tracks and ALL native samples before touching even
         // the cloned document. No earlier midpoint can alter a later sample.
-        let mut proposals = Vec::with_capacity(groups.len());
+        let mut proposals: Vec<Option<OrderTrack>> = Vec::with_capacity(groups.len());
         for group in &groups {
             let track = match action {
+                ValidAction::Batch(batch) => {
+                    proposals.push(key_batch::apply(
+                        batch,
+                        &group.original,
+                        &group.selected,
+                        source.total_frames(),
+                    )?);
+                    continue;
+                }
                 ValidAction::Preset(preset) => {
                     curves::apply_curve_preset(&group.original, &group.selected, preset)?.0
                 }
@@ -259,13 +285,32 @@ impl ObjectFillOwner {
                     proposed
                 }
             };
-            proposals.push(track);
+            proposals.push(Some(track));
         }
         // Phase 3: one proposed document, full admission, one existing sealed token.
         let mut document = source.clone();
         if let Presence::Present(proposed) = &mut document.property_holders {
             for (group, track) in groups.iter().zip(proposals) {
-                proposed[group.holder].properties[group.property].track = Presence::Present(track);
+                proposed[group.holder].properties[group.property].track = match track {
+                    Some(track) => Presence::Present(track),
+                    None => Presence::Missing,
+                };
+            }
+            // A property whose last key was deleted and that carries nothing else is dropped,
+            // highest index first so the earlier record indices stay valid.
+            let mut emptied: Vec<(usize, usize)> = groups
+                .iter()
+                .map(|g| (g.holder, g.property))
+                .filter(|&(h, r)| {
+                    let rec = &proposed[h].properties[r];
+                    rec.track.value().is_none()
+                        && rec.static_value.value().is_none()
+                        && rec.expression.value().is_none()
+                })
+                .collect();
+            emptied.sort_unstable_by(|a, b| b.cmp(a));
+            for (h, r) in emptied {
+                proposed[h].properties.remove(r);
             }
         }
         let changed = &document != source;

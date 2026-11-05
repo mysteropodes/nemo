@@ -418,3 +418,7 @@ mod import_batch_tests;
 #[cfg(test)]
 #[path = "native_key_lock_dispatch_tests.rs"]
 mod key_lock_tests;
+
+#[cfg(test)]
+#[path = "native_key_batch_dispatch_tests.rs"]
+mod key_batch_tests;
