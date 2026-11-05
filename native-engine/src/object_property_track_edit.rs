@@ -12,17 +12,24 @@ use serde::Deserialize;
 use serde_json::Number;
 type R<T> = Result<T, DispatchErrorCode>;
 const MAX_BYTES: usize = 4096; // Preserve the existing dispatch envelope bound.
-const MAX_SELECTIONS: usize = 32;
+/// Single-key addresses (`frame`) keep the original bound; a track can instead name whole runs of keys (`ranges`), so a
+/// selection of any size is limited by the request bytes alone, never by a key count.
+const MAX_FRAME_SELECTIONS: usize = 32;
+const MAX_ENTRIES: usize = 128;
+const MAX_RANGES: usize = 512;
+/// One entry names the key at `frame`, or every key of the track whose frame lies in one of the inclusive `ranges`.
 #[derive(Debug)]
 struct Selection {
     target: PropertyHolderTarget,
     property: String,
-    frame: Number,
+    frame: Option<Number>,
+    ranges: Option<Vec<[Number; 2]>>,
 }
 object_deserialize!(Selection {
     target: PropertyHolderTarget,
     property: String,
-    frame: Number
+    frame: Option<Number>,
+    ranges: Option<Vec<[Number; 2]>>
 });
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
@@ -121,7 +128,12 @@ impl ObjectFillOwner {
         let payload: Payload = serde_json::from_slice(bytes).map_err(|_| invalid())?;
         if payload.command != "object.property.track.edit"
             || payload.selections.is_empty()
-            || payload.selections.len() > MAX_SELECTIONS
+            || payload.selections.len() > MAX_ENTRIES
+            || payload.selections.iter().filter(|s| s.frame.is_some()).count() > MAX_FRAME_SELECTIONS
+            || payload.selections.iter().any(|s| {
+                s.frame.is_some() == s.ranges.is_some()
+                    || s.ranges.as_ref().is_some_and(|r| r.is_empty() || r.len() > MAX_RANGES)
+            })
         {
             return Err(invalid());
         }
@@ -137,7 +149,6 @@ impl ObjectFillOwner {
         // Phase 1: EVERY selector and property resolves in the ORIGINAL snapshot.
         // Selection order within each group is retained for preset/influence.
         for selection in &payload.selections {
-            let at = finite(&selection.frame)?;
             if matches!(selection.property.as_str(), "order" | "timeRemap") {
                 return Err(DispatchErrorCode::Unavailable);
             }
@@ -169,27 +180,52 @@ impl ObjectFillOwner {
                 .ok_or(DispatchErrorCode::NotFound)?;
             let record = &holder.properties[ri];
             let track = record.track.value().ok_or(DispatchErrorCode::NotFound)?;
-            let ki = track
-                .keys
-                .iter()
-                .position(|k| k.frame.as_f64() == Some(at))
-                .ok_or(DispatchErrorCode::NotFound)?;
-            if let Some(group) = groups
-                .iter_mut()
-                .find(|g| g.holder == hi && g.property == ri)
-            {
+            // The keys this entry names, as indices of the ORIGINAL track.
+            let mut named: Vec<usize> = Vec::new();
+            if let Some(frame) = &selection.frame {
+                let at = finite(frame)?;
+                named.push(
+                    track
+                        .keys
+                        .iter()
+                        .position(|k| k.frame.as_f64() == Some(at))
+                        .ok_or(DispatchErrorCode::NotFound)?,
+                );
+            }
+            for range in selection.ranges.iter().flatten() {
+                let (from, to) = (finite(&range[0])?, finite(&range[1])?);
+                if from > to {
+                    return Err(invalid());
+                }
+                let before = named.len();
+                for (ki, key) in track.keys.iter().enumerate() {
+                    if key.frame.as_f64().is_some_and(|f| f >= from && f <= to) {
+                        named.push(ki);
+                    }
+                }
+                if named.len() == before {
+                    return Err(DispatchErrorCode::NotFound);
+                }
+            }
+            let at_group = groups.iter().position(|g| g.holder == hi && g.property == ri);
+            let group = match at_group {
+                Some(at) => &mut groups[at],
+                None => {
+                    groups.push(Group {
+                        holder: hi,
+                        property: ri,
+                        selected: Vec::new(),
+                        original: track.clone(),
+                    });
+                    groups.last_mut().expect("just pushed")
+                }
+            };
+            for ki in named {
                 // A repeated stable key is malformed; never toggle Hold twice.
                 if group.selected.contains(&ki) {
                     return Err(invalid());
                 }
                 group.selected.push(ki);
-            } else {
-                groups.push(Group {
-                    holder: hi,
-                    property: ri,
-                    selected: vec![ki],
-                    original: track.clone(),
-                });
             }
         }
         // Phase 2: prepare all tracks and ALL native samples before touching even

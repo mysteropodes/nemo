@@ -1,8 +1,9 @@
 //! L02-F: the kernel-refusal to request-code table, and the lock / transform
-//! parent facts the stand-in policy cannot decide (Root F06 owns that decision).
+//! parent facts a provider-less policy cannot decide (the owner hands the kernel the baseline policy).
 use super::*;
 use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::{
     plan_delete, plan_duplicate, plan_rename, plan_reorder, LayerOp, LayerSelection, PolicyRefusal,
+    UnavailableLayerEditPolicy,
 };
 use serde_json::json;
 

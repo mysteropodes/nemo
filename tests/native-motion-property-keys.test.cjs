@@ -70,8 +70,9 @@ test('absent authored track differs from present empty without invented keys',as
 test('full pagination follows native cursor without a complete claim at the first page',async()=>{
  const wait=deferred(),keys=Array.from({length:18},(_,i)=>({frame:i-3.25,v:[i]}));const h=fixture({keys,reader(q,reply){return q.view.offset===8?wait.promise:Promise.resolve(reply(q));}});const loading=h.open();await tick();await new Promise(r=>setTimeout(r,5));assert.deepEqual(h.reads.map(q=>q.view.offset),[0,8]);assert.match(h.status(),/Reading/);assert.equal(h.checks().length,0);wait.resolve(h.response(h.reads[1]));assert.equal(await loading,true);assert.deepEqual(h.reads.map(q=>q.view.offset),[0,8,16]);assert.equal(h.checks().length,18);
 });
-test('at most32 stable keys may be selected across pages, without trimming the read',async()=>{
- const h=fixture({keys:Array.from({length:35},(_,i)=>({frame:i-4.5,v:[i]}))});await h.open();for(let i=0;i<33;i++)await h.select(i);assert.equal(h.checks().length,35);assert.equal(h.checks()[32].checked,false);await h.button('Hold').fire('click');assert.equal(h.writes[0].payload.selections.length,32);assert.equal(h.writes[0].payload.selections[31].frame,26.5);
+test('more than 32 stable keys may be selected across pages and are sent as runs of frames, without trimming the read',async()=>{
+ const h=fixture({keys:Array.from({length:35},(_,i)=>({frame:i-4.5,v:[i]}))});await h.open();for(let i=0;i<34;i++)await h.select(i);assert.equal(h.checks().length,35);assert.equal(h.checks()[33].checked,true);assert.equal(h.checks()[34].checked,false);await h.button('Hold').fire('click');
+ const sent=h.writes[0].payload.selections;assert.equal(sent.length,1,'one entry for the track, not one per key');assert.equal(sent[0].frame,undefined);assert.deepEqual(sent[0].ranges,[[-4.5,28.5]]);
 });
 test('foreign, malformed, duplicate and nonadvancing pages fail closed',async()=>{
  const keys=Array.from({length:9},(_,i)=>({frame:i,v:[i]}));
@@ -219,14 +220,14 @@ test('key timeline is a frozen single-property native read projection with nonse
  assert.equal(h.reads.length,reads);assert.equal(h.writes.length,0);
 });
 
-test('timeline selection validates all existing finite unique frames and the32 bound before changing the inspector Set',async()=>{
+test('timeline selection validates all existing finite unique frames and the 4096 bound before changing the inspector Set',async()=>{
  const h=fixture({keys:Array.from({length:35},(_,i)=>({frame:i-4.5,v:[i]}))});await h.open();
  let view=h.editor.readKeyTimeline();assert.equal(view.selectFrames([-4.5]),true);view=h.editor.readKeyTimeline();
  const before=h.checks().map(n=>n.checked),message=h.status();
- for(const frames of [null,{},[-4.5,-4.5],[1000],[NaN],[Infinity],['-4.5'],new Array(1),Array.from({length:33},(_,i)=>i-4.5)]){
+ for(const frames of [null,{},[-4.5,-4.5],[1000],[NaN],[Infinity],['-4.5'],new Array(1),Array.from({length:4097},(_,i)=>i-4.5)]){
   assert.equal(view.selectFrames(frames),false);assert.equal(view.isCurrent(),true);assert.deepEqual(h.checks().map(n=>n.checked),before);assert.equal(h.status(),message);
  }
- assert.equal(view.selectFrames(Array.from({length:32},(_,i)=>i-4.5)),true);assert.equal(h.checks().filter(n=>n.checked).length,32);
+ assert.equal(view.selectFrames(Array.from({length:33},(_,i)=>i-4.5)),true);assert.equal(h.checks().filter(n=>n.checked).length,33);
  assert.equal(h.writes.length,0);assert.equal(h.editor.readKeyTimeline().selectFrames([]),true);assert.equal(h.checks().filter(n=>n.checked).length,0);
 });
 

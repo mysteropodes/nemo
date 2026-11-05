@@ -145,6 +145,29 @@ test('drag: a vertical pull picks the layer up, the drop is one layer.reorder at
   assert.equal(p.s.requests[0].payload.gap, 0);
 });
 
+test('drag also starts from the sticky grip of a frame-grid row: the pointer is matched to the list row by height, the drop is the same layer.reorder', async () => {
+  const t = setup(), doc = t.host.document;
+  const grid = (index) => { const row = new F.El('div'); row.dataset.layer = String(index); const grip = new F.El('div'); grip.className = 'layer-reorder-grip'; row.appendChild(grip); grip.closest = (sel) => (sel === '.layer-reorder-grip' ? grip : null); return grip; };
+  const grip = grid(0);
+  const down = doc.fire('mousedown', { target: grip, button: 0, clientX: 600, clientY: 5 });
+  assert.equal(down.prevented, true, 'the legacy grip handler is not reached'); assert.equal(down.stopped, true);
+  t.host.fire('mousemove', { clientX: 600, clientY: 60 }); // far to the right of the list, at the height of row 2 (top 44), lower half
+  assert.equal(t.body.children.length, 2, 'ghost and drop line'); assert.equal(t.rows[0].style.opacity, '0.42');
+  assert.equal(t.body.children.find((c) => c.className === 'layer-drop-indicator').style.top, '66px');
+  t.host.fire('mouseup', { clientX: 600, clientY: 60 });
+  await settle();
+  assert.deepEqual(t.s.requests.map((q) => q.payload), [{ command: 'object.layer.reorder', layerUids: ['a'], gap: 3, selection: { active: 'a', selected: ['a'] } }]);
+  assert.equal(t.s.state.layers.map((l) => l.layerUid).join(''), 'bcafk');
+  // a press on something that is not a grip, a right button, and a grip of a layer the project does not list start nothing
+  const idle = setup(), d2 = idle.host.document;
+  d2.fire('mousedown', { target: new F.El('div'), button: 0, clientX: 600, clientY: 5 });
+  d2.fire('mousedown', { target: grid(0), button: 2, clientX: 600, clientY: 5 });
+  d2.fire('mousedown', { target: grid(9), button: 0, clientX: 600, clientY: 5 });
+  idle.host.fire('mousemove', { clientX: 600, clientY: 90 }); idle.host.fire('mouseup', {});
+  await settle();
+  assert.equal(idle.s.requests.length, 0); assert.equal(idle.body.children.length, 0);
+});
+
 test('drag of a row inside a multi-selection moves the whole block; a drop on its own place writes nothing', async () => {
   const t = setup();
   t.host._layerSel = [0, 1]; t.host.state.activeLayerIdx = 0;

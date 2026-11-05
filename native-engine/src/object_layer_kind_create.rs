@@ -16,7 +16,7 @@ use crate::object_document::object_component_record_kernels::object_duplicator_r
 };
 use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::index_of;
 use crate::object_document::{object_deserialize, ObjectDocument, ObjectLayer, Presence};
-use crate::object_snapshot::object_parent_pivot_read::layer_pivot_extents;
+use crate::object_snapshot::object_parent_pivot_read::layers_world_union;
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
@@ -73,28 +73,13 @@ fn pair(point: [f64; 2]) -> Result<[Number; 2], DispatchErrorCode> {
     Ok([number(point[0])?, number(point[1])?])
 }
 
-/// Centre of the union of the children's own bounds; a child without evaluated bounds adds nothing (the baseline's
-/// `layerWorldBoundsUnion` skips an empty layer), and no bounds at all means no centre.
+/// Centre of the union of the children's POSED world bounds (`layerWorldBoundsUnion`: own Motion and the parent chain
+/// applied, so a moved or parented layer is centred where it shows); a child without evaluated bounds adds nothing, and
+/// no bounds at all means no centre.
 fn union_centre(origin: &ObjectSnapshot, children: &[String], frame: u32) -> Option<[f64; 2]> {
-    let mut union: Option<[f64; 4]> = None;
-    for uid in children {
-        let Ok(rects) = layer_pivot_extents(origin, ROOT, &[uid.as_str()], frame) else {
-            continue;
-        };
-        let Some(rect) = rects.first().copied() else {
-            continue;
-        };
-        union = Some(match union {
-            None => rect,
-            Some(u) => [
-                u[0].min(rect[0]),
-                u[1].min(rect[1]),
-                u[2].max(rect[2]),
-                u[3].max(rect[3]),
-            ],
-        });
-    }
-    union.map(|u| [(u[0] + u[2]) / 2.0, (u[1] + u[3]) / 2.0])
+    let uids: Vec<&str> = children.iter().map(String::as_str).collect();
+    let u = layers_world_union(origin, ROOT, &uids, frame)?;
+    Some([(u[0] + u[2]) / 2.0, (u[1] + u[3]) / 2.0])
 }
 
 /// Copies the layer-level Motion holder of `uid` that the Parent A plan rewrote into the accumulating document.

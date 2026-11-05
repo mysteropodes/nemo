@@ -7,7 +7,7 @@ const tgt = { contextId: 'scene-root', layerUid: 'A' };
 function view(frames, selectedFrames, extra) {
   const tracks = [{ target: tgt, property: 'opacity', items: frames.map((f) => ({ frame: f, selected: selectedFrames.includes(f) })) }].concat(extra || []);
   const accepted = [];
-  return { tracks, accepted, selectKeys(keys) { if (keys.length > 32) return false; accepted.push(keys.map((k) => [k.target.property, k.frame])); return true; } };
+  return { tracks, accepted, selectKeys(keys) { if (keys.length > 4096) return false; accepted.push(keys.map((k) => [k.target.property, k.frame])); return true; } };
 }
 function ctxFor(v, over) {
   const log = { edits: [], toasts: [], selectOnly: 0, refresh: 0 };
@@ -61,7 +61,8 @@ test('select every Nth, keep random and invert are selection-only over the key r
   assert.equal(Gesture.invert(inv), true);
   assert.deepEqual(inv.accepted.pop(), [['opacity', 0], ['opacity', 4], ['rotation', 1]]);
   const wide = view(Array.from({ length: 40 }, (_, i) => i), []);
-  assert.equal(Gesture.invert(wide), false, 'more than 32 keys cannot be selected');
+  assert.equal(Gesture.invert(wide), true, 'baseline has no key limit: 40 keys select');
+  assert.equal(Gesture.invert(view(Array.from({ length: 5000 }, (_, i) => i), [])), false, 'only a runaway selection is refused');
 });
 
 test('the menu prompts, then selects; Cancel and refusal leave the selection untouched or say so', () => {
@@ -80,7 +81,7 @@ test('the menu prompts, then selects; Cancel and refusal leave the selection unt
   assert.deepEqual(cancelled.ctx.view.accepted, []);
   const bad = ctxFor(Object.assign(view([0, 2], [0, 2]), { selectKeys: () => false }));
   Gesture.menuItems({}, bad.ctx).find((i) => i.label === 'Select every other one').action();
-  assert.deepEqual(bad.log.toasts, ['Select between 1 and 32 keys.']);
+  assert.deepEqual(bad.log.toasts, ['The key selection was not accepted.']);
 });
 
 function dragHarness(over = {}) {

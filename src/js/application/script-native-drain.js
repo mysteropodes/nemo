@@ -86,6 +86,21 @@
           return samePin(after) && r && r.row.name === it.name ? undefined : 'write-unconfirmed';
         });
       },
+      color: function (it, now) {
+        var at = locate(now, it.uid);
+        if (!at) return 'layer-gone';
+        if (String(at.row.color || '').toLowerCase() === it.color) return SKIP;
+        return perform(function () { return ops.color(at.row.layerUid, it.color); }, function (after) {
+          var r = locate(after, it.uid);
+          return samePin(after) && r && String(r.row.color || '').toLowerCase() === it.color ? undefined : 'write-unconfirmed';
+        });
+      },
+      workArea: function (it, now) {
+        return perform(function () { return ops.workArea({ inFrame: it.inFrame, outFrame: it.outFrame }); }, revised(now));
+      },
+      trim: function (it, now) {
+        return perform(function () { return ops.trim(); }, revised(now));
+      },
       prop: function (it, now) {
         var at = locate(now, it.uid);
         if (!at) return 'layer-gone';

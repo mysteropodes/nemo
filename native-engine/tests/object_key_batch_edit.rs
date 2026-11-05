@@ -242,19 +242,23 @@ fn flip_swaps_frame_slots_and_each_key_carries_its_own_value() {
 }
 
 #[test]
-fn distribute_spaces_selected_keys_evenly_and_refuses_collisions() {
+fn distribute_spaces_selected_keys_evenly_and_a_key_landing_on_another_replaces_it() {
     let mut o = from(&fixture());
     let every = |f: &[i64]| {
         f.iter()
             .map(|f| sel("A", "opacity", *f))
             .collect::<Vec<_>>()
     };
-    // Selected 0, 4, 24 spread to 0, 12, 24 and would land on the unselected key at 12.
-    refused(
-        &mut o,
-        &batch(every(&[0, 4, 24]), json!({"kind":"distribute"})),
-        DispatchErrorCode::Unavailable,
+    // Selected 0, 4, 24 spread to 0, 12, 24: the baseline `distributeKeys` assigns the frames without a collision check, and a track
+    // holds one key per frame, so the moved key (value 80) replaces the unselected key that sat at 12 (value 10).
+    assert_eq!(
+        run(&mut o, &batch(every(&[0, 4, 24]), json!({"kind":"distribute"}))),
+        Ok(1)
     );
+    assert_eq!(frames(&o, 0, 0), vec![0, 12, 24]);
+    assert_eq!(keys(&o, 0, 0)[1], json!({"frame":12,"v":[80],"curvePoints":[]}));
+    assert_eq!(o.history_depths(), (1, 0));
+    let mut o = from(&fixture());
     assert_eq!(
         run(
             &mut o,
@@ -355,6 +359,79 @@ fn malformed_forged_and_unsupported_batches_are_typed_refusals() {
             batch(vec![sel("A", "timeRemap", 4)], json!({"kind":"delete"})),
             DispatchErrorCode::Unavailable,
         ),
+    ] {
+        refused(&mut o, &payload, code);
+    }
+}
+
+fn ranged(layer: &str, property: &str, ranges: Value) -> Value {
+    json!({"target":target(layer),"property":property,"ranges":ranges})
+}
+fn long_track(count: i64) -> Value {
+    let keys: Vec<Value> = (0..count).map(|f| json!({"frame":f,"v":[f]})).collect();
+    json!({"format":"nemo.native-object-document","formatVersion":1,"totalFrames":400,
+    "layers":[{"layerUid":"A"}],"objects":[],"propertyHolders":[{"target":target("A"),"properties":[
+    {"property":"opacity","track":{"keys":keys}},{"property":"rotation","track":{"keys":[{"frame":3,"v":[1]}]}}]}]})
+}
+
+#[test]
+fn a_selection_of_runs_is_not_limited_to_32_keys_and_deletes_in_one_undoable_entry() {
+    let mut o = from(&long_track(300));
+    let zero = bytes(&o);
+    // 298 keys in three runs (0..99, 101..199, 201..299), leaving frames 100 and 200: well above the 32 single-key addresses.
+    let payload = batch(
+        vec![ranged("A", "opacity", json!([[0, 99], [101, 199], [201, 299]]))],
+        json!({"kind":"delete"}),
+    );
+    assert!(payload.to_string().len() < 4096);
+    assert_eq!(run(&mut o, &payload), Ok(1));
+    assert_eq!(frames(&o, 0, 0), vec![100, 200]);
+    assert_eq!(o.history_depths(), (1, 0));
+    assert_eq!(frames(&o, 0, 1), vec![3], "other tracks are untouched");
+    let kept = bytes(&o);
+    let again = from(&serde_json::from_slice::<Value>(&kept).unwrap());
+    assert_eq!(bytes(&again), kept, "save and reopen");
+    assert_eq!(o.undo(1).unwrap(), 2);
+    assert_eq!(bytes(&o), zero, "undo");
+    assert_eq!(o.redo(2).unwrap(), 3);
+    assert_eq!(bytes(&o), kept, "redo");
+}
+
+#[test]
+fn runs_and_single_keys_mix_shift_follows_and_malformed_runs_are_refused() {
+    let mut o = from(&long_track(60));
+    // Runs 10..49 (40 keys) shifted by 10 would land on 50..59, which stay: refused whole.
+    refused(
+        &mut o,
+        &batch(vec![ranged("A", "opacity", json!([[10, 49]]))], shift(10)),
+        DispatchErrorCode::Unavailable,
+    );
+    // The same 40 keys shifted by one after the tail is selected too: frames 10..59 -> 11..60 (the free frame 60).
+    assert_eq!(
+        run(&mut o, &batch(vec![ranged("A", "opacity", json!([[10, 49], [50, 59]]))], shift(1))),
+        Ok(1)
+    );
+    assert_eq!(frames(&o, 0, 0)[..12].to_vec(), (0..12).map(|f| if f < 10 { f } else { f + 1 }).collect::<Vec<_>>());
+    // A single address and a run on two tracks form one batch.
+    let mut o = from(&long_track(60));
+    assert_eq!(
+        run(&mut o, &batch(vec![ranged("A", "opacity", json!([[0, 39]])), sel("A", "rotation", 3)], json!({"kind":"delete"}))),
+        Ok(1)
+    );
+    assert_eq!(frames(&o, 0, 0), (40..60).collect::<Vec<_>>());
+    let mut o = from(&long_track(60));
+    for (payload, code) in [
+        (batch(vec![ranged("A", "opacity", json!([[5, 4]]))], json!({"kind":"delete"})), DispatchErrorCode::InvalidRequest),
+        (batch(vec![ranged("A", "opacity", json!([]))], json!({"kind":"delete"})), DispatchErrorCode::InvalidRequest),
+        (batch(vec![ranged("A", "opacity", json!([[1, 3], [3, 5]]))], json!({"kind":"delete"})), DispatchErrorCode::InvalidRequest),
+        (batch(vec![ranged("A", "opacity", json!([[100, 120]]))], json!({"kind":"delete"})), DispatchErrorCode::NotFound),
+        (batch(vec![ranged("A", "opacity", json!([["1", 3]]))], json!({"kind":"delete"})), DispatchErrorCode::InvalidRequest),
+        (batch(vec![json!({"target":target("A"),"property":"opacity"})], json!({"kind":"delete"})), DispatchErrorCode::InvalidRequest),
+        (
+            batch(vec![json!({"target":target("A"),"property":"opacity","frame":1,"ranges":[[1,2]]})], json!({"kind":"delete"})),
+            DispatchErrorCode::InvalidRequest,
+        ),
+        (batch((0..33).map(|f| sel("A", "opacity", f)).collect(), json!({"kind":"delete"})), DispatchErrorCode::InvalidRequest),
     ] {
         refused(&mut o, &payload, code);
     }

@@ -49,6 +49,157 @@ pub(crate) fn layer_pivot_extents(
     }
 }
 
+/// `layerWorldBoundsUnion` (`src/js/motion.js`, 1065e9d8): the union `[x0, y0, x1, y1]` of the POSED world bounds of
+/// `layer_uids` at `frame`. Each layer contributes the four corners of its own rest bounds, moved by its own Motion about
+/// the bounds centre plus the anchor and then by every ancestor's Motion about that ancestor's pivot, nearest first. A
+/// layer with no evaluated bounds (empty, text, mask, expression-driven) adds nothing, as an empty layer does in the
+/// baseline; `None` when no layer contributes.
+#[cfg_attr(not(feature = "evaluation"), allow(unused_variables))]
+pub(crate) fn layers_world_union(
+    snapshot: &ObjectSnapshot,
+    context_id: &str,
+    layer_uids: &[&str],
+    frame: u32,
+) -> Option<[f64; 4]> {
+    #[cfg(feature = "evaluation")]
+    {
+        world_union(snapshot, context_id, layer_uids, frame)
+    }
+    #[cfg(not(feature = "evaluation"))]
+    {
+        None
+    }
+}
+
+#[cfg(feature = "evaluation")]
+fn rest_rect(snapshot: &ObjectSnapshot, context_id: &str, uid: &str, frame: u32) -> Option<[f64; 4]> {
+    use crate::object_frame_packet::{
+        prepare_object_exposure_frame, FrameScopeKind, ObjectFrameSelector,
+    };
+    if let Ok(rects) = layer_pivot_extents(snapshot, context_id, &[uid], frame) {
+        return rects.first().copied().filter(|r| r.iter().all(|v| v.is_finite()));
+    }
+    let selector = ObjectFrameSelector {
+        instance_id: snapshot.instance_id(),
+        document_id: snapshot.document_id(),
+        content_revision: snapshot.content_revision(),
+        document_snapshot_id: snapshot.snapshot_id(),
+        context_id,
+        scope_kind: FrameScopeKind::Authored,
+        frame,
+    };
+    let packet = prepare_object_exposure_frame(snapshot, &selector).ok()?;
+    let index = packet.source_layers().iter().position(|l| l.layer_uid() == uid)?;
+    let mut union: Option<[f64; 4]> = None;
+    for record in packet.raster_records().filter(|r| r.layer_index() == index) {
+        let r = record.entry().item.display_rect();
+        let (s, c) = r.rotation.to_radians().sin_cos();
+        let (hw, hh) = (r.width / 2.0, r.height / 2.0);
+        let (ex, ey) = (c.abs() * hw + s.abs() * hh, s.abs() * hw + c.abs() * hh);
+        let (cx, cy) = (r.x + hw, r.y + hh);
+        let rect = [cx - ex, cy - ey, cx + ex, cy + ey];
+        union = Some(union.map_or(rect, |u| {
+            [u[0].min(rect[0]), u[1].min(rect[1]), u[2].max(rect[2]), u[3].max(rect[3])]
+        }));
+    }
+    union.filter(|r| r.iter().all(|v| v.is_finite()))
+}
+
+/// `p -> pivot + R(rotation) S(scale) (p - pivot) + position`, the layer Motion of `motion_parent_chain.rs`.
+#[cfg(feature = "evaluation")]
+fn pose_point(
+    snapshot: &ObjectSnapshot,
+    context_id: &str,
+    uid: &str,
+    frame: u32,
+    base: [f64; 2],
+    p: [f64; 2],
+) -> Option<[f64; 2]> {
+    use crate::object_codec::PropertyHolderTarget;
+    use crate::object_document::Presence;
+    let target = PropertyHolderTarget {
+        context_id: context_id.to_owned(),
+        layer_uid: uid.to_owned(),
+        stroke_id: Presence::Missing,
+    };
+    let at = f64::from(frame);
+    let read = |key: &str| snapshot.sample_property_raw(&target, key, at).ok();
+    let (position, anchor) = (read("position")?, read("anchor")?);
+    let (rotation, scale) = (read("rotation")?, read("scale")?);
+    let (&[px, py], &[ax, ay], &[rot], &[sx, sy]) =
+        (position.as_slice(), anchor.as_slice(), rotation.as_slice(), scale.as_slice())
+    else {
+        return None;
+    };
+    let pivot = [base[0] + ax, base[1] + ay];
+    let (s, c) = rot.to_radians().sin_cos();
+    let (dx, dy) = ((p[0] - pivot[0]) * sx / 100.0, (p[1] - pivot[1]) * sy / 100.0);
+    let out = [pivot[0] + c * dx - s * dy + px, pivot[1] + s * dx + c * dy + py];
+    out.iter().all(|v| v.is_finite()).then_some(out)
+}
+
+#[cfg(feature = "evaluation")]
+fn world_union(
+    snapshot: &ObjectSnapshot,
+    context_id: &str,
+    layer_uids: &[&str],
+    frame: u32,
+) -> Option<[f64; 4]> {
+    let document = snapshot.document();
+    let canvas = snapshot.project().map(|p| p.project().canvas_dimensions());
+    let mut union: Option<[f64; 4]> = None;
+    for uid in layer_uids {
+        let Some(rect) = rest_rect(snapshot, context_id, uid, frame) else {
+            continue;
+        };
+        if rect[2] - rect[0] == 0.0 && rect[3] - rect[1] == 0.0 {
+            continue;
+        }
+        let mut corners = [
+            [rect[0], rect[1]],
+            [rect[2], rect[1]],
+            [rect[2], rect[3]],
+            [rect[0], rect[3]],
+        ];
+        let mut base = [(rect[0] + rect[2]) / 2.0, (rect[1] + rect[3]) / 2.0];
+        let mut current = Some((*uid).to_owned());
+        let mut steps = 0;
+        while let Some(at) = current {
+            steps += 1;
+            if steps > crate::evaluation::motion_parent_chain::CHAIN_NODE_LIMIT {
+                break;
+            }
+            if at != *uid {
+                let layer = document.layers().iter().find(|l| l.layer_uid() == at)?;
+                base = match layer.null_pivot_base(canvas) {
+                    Ok(Some(point)) => point,
+                    _ => match rest_rect(snapshot, context_id, &at, frame) {
+                        Some(r) => [(r[0] + r[2]) / 2.0, (r[1] + r[3]) / 2.0],
+                        None => break,
+                    },
+                };
+            }
+            for corner in &mut corners {
+                *corner = pose_point(snapshot, context_id, &at, frame, base, *corner)?;
+            }
+            current = document
+                .layers()
+                .iter()
+                .find(|l| l.layer_uid() == at)?
+                .parent_layer_uid
+                .value()
+                .and_then(Option::as_deref)
+                .map(str::to_owned);
+        }
+        for corner in corners {
+            union = Some(union.map_or([corner[0], corner[1], corner[0], corner[1]], |u| {
+                [u[0].min(corner[0]), u[1].min(corner[1]), u[2].max(corner[0]), u[3].max(corner[1])]
+            }));
+        }
+    }
+    union
+}
+
 #[cfg(feature = "evaluation")]
 fn bases(
     snapshot: &ObjectSnapshot,

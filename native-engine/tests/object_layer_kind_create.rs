@@ -159,8 +159,8 @@ fn a_null_adopts_the_selection_around_the_centre_of_its_bounds_in_one_entry() {
         "n2",
         &kind("null", "Null 4", json!({"children":["L0","L2"]})),
     );
-    // the union of x 0..10, y 0..10 and x 30..40, y 20..30 is x 0..40, y 0..30: its centre is (20, 15)
-    assert_eq!(layer["nullPos"], json!([20.0, 15.0]));
+    // L2 sits 2 px to the right (its Position): the posed union of x 0..10, y 0..10 and x 32..42, y 20..30 is x 0..42, y 0..30
+    assert_eq!(layer["nullPos"], json!([21.0, 15.0]));
     let uid = layer["layerUid"].as_str().unwrap();
     assert_eq!(layer_of(&owner, "L0")["parentLayerUid"], uid);
     assert_eq!(layer_of(&owner, "L2")["parentLayerUid"], uid);
@@ -423,4 +423,22 @@ fn kind_creation_refusals_are_typed_and_change_nothing() {
     )
     .unwrap();
     assert_eq!(reply["error"]["code"], "stale_revision", "{reply}");
+}
+
+#[test]
+fn a_null_centres_on_the_posed_bounds_of_a_moved_layer_and_of_a_parented_one() {
+    // L0 moved 100 px right: the posed union with L2 (x 32..42) is x 32..110, y 0..30, centre (71, 15).
+    let mut document = drawn();
+    document["propertyHolders"][0]["properties"][0]["static"] = json!([100, 0]);
+    let mut owner = owner_of(&document);
+    let layer = created(&mut owner, "moved", &kind("null", "Null 4", json!({"children":["L0","L2"]})));
+    assert_eq!(layer["nullPos"], json!([71.0, 15.0]));
+    // L2 parented to the moved L0: its world offset adds the parent's 100 px, x 132..142, y 20..30, centre (137, 25).
+    let mut document = drawn();
+    document["propertyHolders"][0]["properties"][0]["static"] = json!([100, 0]);
+    document["layers"][2]["parentLayerUid"] = json!("L0");
+    let mut owner = owner_of(&document);
+    let layer = created(&mut owner, "parented", &kind("folder", "Folder 4", json!({"children":["L2"]})));
+    assert_eq!(layer["nullPos"], json!([137.0, 25.0]));
+    assert_eq!(layer_of(&owner, "L2")["parentLayerUid"], layer["layerUid"]);
 }

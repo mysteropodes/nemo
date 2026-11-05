@@ -11,13 +11,15 @@
 //! `commit_layer_create`; a plan that changes nothing publishes nothing. No
 //! history, receipt or id state lives here: the revision-derived identity
 //! comes from the kernel and the one history entry from `NativeObjectHistory`.
-//! Lock and transform-parent decisions belong to Root F06, so the owner hands
-//! the kernel the stand-in policy that answers "unavailable".
+//! The baseline never gated delete, duplicate, rename, recolour or reorder on a
+//! lock or a transform parent, so the owner hands the kernel the policy that
+//! permits every decision.
 use crate::commands::object_fill_owner::object_frame_bulk_move::plan_arrange_json;
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::{
-    plan_delete, plan_duplicate, plan_rename, plan_reorder, LayerSelection, LifecycleError,
-    LifecyclePlan, SelectionOutcome, UnavailableLayerEditPolicy,
+    plan_delete, plan_duplicate, plan_rename, plan_reorder, BaselineLayerEditPolicy, LayerSelection,
+    LifecycleError,
+    LifecyclePlan, SelectionOutcome,
 };
 use crate::object_document::{object_deserialize, ObjectDocument};
 use crate::object_snapshot::ObjectSnapshot;
@@ -34,10 +36,9 @@ use parent::plan_parent;
 #[path = "object_layer_lifecycle_link.rs"]
 mod link;
 use link::{plan_follow_path, plan_time_link, TimeLinkRequest};
-// #2371 U11: the layer colour label and the label policy rename shares with it.
+// #2371 U11: the layer colour label.
 #[path = "object_layer_lifecycle_color.rs"]
 mod color;
-use color::LabelEditPolicy;
 // #2371 U11 / D36: Null, Effect, Guide, Folder and Effector creation, and folder membership.
 #[path = "object_layer_kind_create.rs"]
 mod kind_create;
@@ -286,7 +287,7 @@ impl ObjectFillOwner {
         }
         let selection = payload.selection.into_selection()?;
         let origin = self.current_snapshot();
-        let plan = plan_delete(origin.document(), &selection, &UnavailableLayerEditPolicy);
+        let plan = plan_delete(origin.document(), &selection, &BaselineLayerEditPolicy);
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::Delete, plan)
     }
     pub(crate) fn prepare_layer_duplicate_json(
@@ -307,7 +308,7 @@ impl ObjectFillOwner {
             origin.document(),
             &payload.layer_uid,
             next,
-            &UnavailableLayerEditPolicy,
+            &BaselineLayerEditPolicy,
         );
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::Duplicate, plan)
     }
@@ -324,7 +325,7 @@ impl ObjectFillOwner {
             origin.document(),
             &payload.layer_uid,
             &payload.name,
-            &LabelEditPolicy,
+            &BaselineLayerEditPolicy,
         );
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::Rename, plan)
     }
@@ -364,7 +365,7 @@ impl ObjectFillOwner {
             &moving,
             gap,
             &selection,
-            &UnavailableLayerEditPolicy,
+            &BaselineLayerEditPolicy,
         );
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::Reorder, plan)
     }

@@ -23,8 +23,9 @@ impl NativeObjectHistory {
         candidate: PreparedLayerCompositing,
     ) -> Result<u64, DispatchErrorCode> {
         let before_revision = self.content_revision();
+        let disclosure = candidate.disclosure();
         let after_revision = self.owner.commit_layer_compositing(candidate)?;
-        if after_revision != before_revision {
+        if after_revision != before_revision && !disclosure {
             self.undo.push(ObjectHistoryEntry {
                 before_revision,
                 after_revision,
@@ -69,12 +70,13 @@ impl NativeObjectHistory {
             .prepare_layer_compositing_json(&bytes)
             .map_err(|code| (code, REFUSED))?;
         let before = self.content_revision();
+        let disclosure = candidate.disclosure();
         let after = self
             .commit_layer_compositing(candidate)
             .map_err(|code| (code, "Layer compositing edit could not commit."))?;
         Ok(CompactResult::Command {
             applied: after != before,
-            history_entries_added: u64::from(after != before),
+            history_entries_added: u64::from(after != before && !disclosure),
         })
     }
 }
