@@ -1,17 +1,22 @@
 //! D16-K2 (#2072): the D16-K1 marker API over actual immutable native marker records.
 //!
-//! Mirrors where `src/js/motion.js` takes each list from: `thisComp.marker` and the
-//! alias `comp.marker` read `state.markers`, which is the root composition's list
-//! (a component keeps reading it), and a layer's `marker` reads that layer's stored
-//! `ld.markers`, natively its `range.markers`. A missing list reads empty, as
-//! `_markerApi(list || [])` does. `_exprFps` is `state.fps || 24` over the project fps.
+//! Mirrors where `src/js/motion.js` takes each list from, per expression context.
+//! `thisComp.marker` and the alias `comp.marker` read `state.markers`: the root
+//! composition's list in the scene, and `sym.markers || []` inside a component, because
+//! `enterSymbol` swaps the list (`app.js`). Native component records refuse a `markers`
+//! field, so a component context reads an empty list. A layer's `marker` reads that
+//! layer's stored `ld.markers`, natively its `range.markers`. A missing list reads
+//! empty, as `_markerApi(list || [])` does. `_exprFps` is `state.fps`, which
+//! `enterSymbol` sets to `sym.fps || state.fps`: the component fps, else the project fps.
 //!
 //! Nothing is copied into a second store: every list is rebuilt from the pinned
 //! snapshot it is asked about. A bare drawing has no composition metadata, so its
 //! composition list and fps are refused instead of inventing Motion's defaults.
 
 use super::{Fps, LookupRefusal, MarkerList, MarkerRecord};
-use crate::evaluation::object_component_kernels::object_context_resolver::ContextSource;
+use crate::evaluation::object_component_kernels::object_context_resolver::{
+    ContextSource, ResolvedContext,
+};
 use crate::object_document::ObjectLayer;
 use crate::revision::ObjectSnapshot;
 
@@ -33,23 +38,33 @@ impl From<LookupRefusal> for MarkerBindingError {
     }
 }
 
-/// `_exprFps()`: `state.fps || 24`, so a zero or NaN project fps reads 24.
-pub(crate) fn snapshot_fps(snapshot: &ObjectSnapshot) -> Result<Fps, MarkerBindingError> {
+/// `_exprFps()` in context `context_id`: the component fps when the context is a
+/// component that declares one, else the project fps. The `|| 24` fallback of Motion is
+/// unreachable here, because the project codec admits only a finite fps above zero.
+pub(crate) fn snapshot_fps(
+    snapshot: &ObjectSnapshot,
+    context_id: &str,
+) -> Result<Fps, MarkerBindingError> {
     let project = snapshot.project().ok_or(MarkerBindingError::NoProject)?;
-    let fps = project.project().fps();
-    let fps = if fps == 0.0 || fps.is_nan() {
-        24.0
-    } else {
-        fps
-    };
+    let context = resolve(snapshot, context_id)?;
+    let fps = context
+        .component()
+        .and_then(|c| c.fps.value())
+        .and_then(|fps| fps.as_f64())
+        .unwrap_or_else(|| project.project().fps());
     Ok(Fps::new(fps)?)
 }
 
-/// `_markerApi(state.markers)`: the root composition's stored markers, in stored order.
+/// `_markerApi(state.markers)` in context `context_id`: the root composition's stored
+/// markers in stored order for the scene, and an empty list inside a component.
 pub(crate) fn composition_markers(
     snapshot: &ObjectSnapshot,
+    context_id: &str,
 ) -> Result<MarkerList, MarkerBindingError> {
     let project = snapshot.project().ok_or(MarkerBindingError::NoProject)?;
+    if resolve(snapshot, context_id)?.component().is_some() {
+        return Ok(MarkerList::new(Vec::new())?);
+    }
     let records = project
         .project()
         .composition_markers()
@@ -62,6 +77,15 @@ pub(crate) fn composition_markers(
         })
         .collect();
     Ok(MarkerList::new(records)?)
+}
+
+fn resolve<'a>(
+    snapshot: &'a ObjectSnapshot,
+    context_id: &str,
+) -> Result<ResolvedContext<'a>, MarkerBindingError> {
+    ContextSource::of_document(snapshot.document())
+        .context(context_id)
+        .map_err(|_| MarkerBindingError::UnknownContext)
 }
 
 /// `_markerApi(ld.markers)` for one stored layer.
@@ -87,10 +111,7 @@ pub(crate) fn snapshot_layer_markers(
     context_id: &str,
     layer_uid: &str,
 ) -> Result<MarkerList, MarkerBindingError> {
-    let context = ContextSource::of_document(snapshot.document())
-        .context(context_id)
-        .map_err(|_| MarkerBindingError::UnknownContext)?;
-    let layer = context
+    let layer = resolve(snapshot, context_id)?
         .layers()
         .iter()
         .find(|l| l.layer_uid() == layer_uid)
@@ -143,9 +164,9 @@ mod tests {
             json!([{"layerUid":"L"}]),
         );
         let p = pin(&o);
-        let fps = snapshot_fps(&p).unwrap();
+        let fps = snapshot_fps(&p, "scene-root").unwrap();
         assert_eq!(fps, Fps::new(30.0).unwrap());
-        let list = composition_markers(&p).unwrap();
+        let list = composition_markers(&p, "scene-root").unwrap();
         assert_eq!(list.count(), 4);
         // The first marker named exactly "X"; an empty color reads null.
         assert_eq!(
@@ -188,7 +209,10 @@ mod tests {
             json!([{"layerUid":"L"}]),
         );
         let p = pin(&o);
-        let (fps, list) = (snapshot_fps(&p).unwrap(), composition_markers(&p).unwrap());
+        let (fps, list) = (
+            snapshot_fps(&p, "scene-root").unwrap(),
+            composition_markers(&p, "scene-root").unwrap(),
+        );
         let read = |selector: Value| {
             let q = json!({"command":"object.project.composition.read",
                 "instanceId":p.instance_id(),"documentId":p.document_id(),
@@ -235,7 +259,7 @@ mod tests {
             ]),
         );
         let p = pin(&o);
-        let fps = snapshot_fps(&p).unwrap();
+        let fps = snapshot_fps(&p, "scene-root").unwrap();
         let a = snapshot_layer_markers(&p, "scene-root", "a").unwrap();
         assert_eq!(a.count(), 3);
         assert_eq!(
@@ -268,14 +292,20 @@ mod tests {
     fn missing_composition_list_reads_empty_and_bounds_refuse() {
         let o = owner(12.0, None, json!([{"layerUid":"L"}]));
         let p = pin(&o);
-        let list = composition_markers(&p).unwrap();
+        let list = composition_markers(&p, "scene-root").unwrap();
         assert_eq!(list.count(), 0);
-        assert_eq!(list.at(Q::Number(1.0), snapshot_fps(&p).unwrap()), Ok(None));
+        assert_eq!(
+            list.at(Q::Number(1.0), snapshot_fps(&p, "scene-root").unwrap()),
+            Ok(None)
+        );
         // The project codec admits exactly the lookup bound and refuses one more, so
         // the binding's own TooManyMarkers refusal is unreachable from a real pin.
         let list = |n: usize| -> Value { (0..n).map(|f| json!({"frame":f})).collect() };
         let o = owner(12.0, Some(list(MAX_MARKERS)), json!([{"layerUid":"L"}]));
-        assert_eq!(composition_markers(&pin(&o)).unwrap().count(), MAX_MARKERS);
+        assert_eq!(
+            composition_markers(&pin(&o), "scene-root").unwrap().count(),
+            MAX_MARKERS
+        );
         let mut metadata = json!({"canvasW":320,"canvasH":180,"fps":12});
         metadata["markers"] = list(MAX_MARKERS + 1);
         let wire = json!({"format":"nemo.native-project-document","formatVersion":1,
@@ -284,6 +314,70 @@ mod tests {
             "viewportReference":null,"assets":[]});
         assert!(
             NativeObjectHistory::from_project_file("over", wire.to_string().as_bytes()).is_err()
+        );
+    }
+
+    #[test]
+    fn a_component_context_reads_its_own_fps_and_an_empty_composition_list() {
+        let wire = |component_fps: Option<f64>| {
+            let mut component = json!({"symbolId":"sym","totalFrames":24,
+                "layers":[{"layerUid":"in","range":{"inPoint":0,
+                    "markers":[{"frame":12,"name":"hit"}]}}],"objects":[]});
+            if let Some(fps) = component_fps {
+                component["fps"] = json!(fps);
+            }
+            json!({"format":"nemo.native-project-document","formatVersion":1,
+                "project":{"canvasW":320,"canvasH":180,"fps":24,
+                    "markers":[{"frame":12,"name":"in"}]},
+                "drawing":{"format":"nemo.native-object-document","formatVersion":2,
+                    "totalFrames":40,"layers":[{"layerUid":"L"}],"objects":[],
+                    "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,
+                        "documentFormatVersion":2,"migration":"explicit-plan-required",
+                        "referencePolicy":"unresolved","contexts":[{"contextId":"scene-root",
+                        "layers":[{"layerUid":"L","naturalPosition":0,"order":{}}],
+                        "scopes":[{"frameScope":{"kind":"authored","frame":0},"elements":[]}]}]},
+                    "componentTables":{"components":{"format":"nemo.native-component-set","formatVersion":1,"components":[component],"instances":[]}}},
+                "viewportReference":null,"assets":[]})
+        };
+        let o =
+            NativeObjectHistory::from_project_file("c", wire(Some(12.0)).to_string().as_bytes())
+                .unwrap();
+        let p = pin(&o);
+        // enterSymbol: state.fps = sym.fps || state.fps, state.markers = sym.markers || [].
+        let fps = snapshot_fps(&p, "sym").unwrap();
+        assert_eq!(fps, Fps::new(12.0).unwrap());
+        assert_eq!(
+            snapshot_fps(&p, "scene-root").unwrap(),
+            Fps::new(24.0).unwrap()
+        );
+        let comp = composition_markers(&p, "sym").unwrap();
+        assert_eq!(comp.count(), 0);
+        assert_eq!(comp.at(Q::Name("in"), fps), Ok(None));
+        assert_eq!(composition_markers(&p, "scene-root").unwrap().count(), 1);
+        // A layer marker inside the component is timed at the component fps.
+        let layer = snapshot_layer_markers(&p, "sym", "in").unwrap();
+        assert_eq!(
+            layer.at(Q::Name("hit"), fps),
+            Ok(Some(entry(12.0, 12.0, "hit", None, 1)))
+        );
+        assert_eq!(
+            layer.nearest_key_seconds(1.0, fps),
+            Some(entry(12.0, 12.0, "hit", None, 1))
+        );
+        // Without its own fps a component inherits the project fps.
+        let o =
+            NativeObjectHistory::from_project_file("d", wire(None).to_string().as_bytes()).unwrap();
+        assert_eq!(
+            snapshot_fps(&pin(&o), "sym").unwrap(),
+            Fps::new(24.0).unwrap()
+        );
+        assert_eq!(
+            snapshot_fps(&p, "no-such-context").unwrap_err(),
+            E::UnknownContext
+        );
+        assert_eq!(
+            composition_markers(&p, "no-such-context").unwrap_err(),
+            E::UnknownContext
         );
     }
 }
