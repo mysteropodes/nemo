@@ -129,13 +129,13 @@ pub(super) fn read_file(
             .map_err(|_| host_error("invalid_request", "invalid project file"))?;
         if format.format.as_deref() != Some("nemo.native-project-document") {
             // Baseline projects become a new native document; any other file keeps the typed unsupported refusal.
-            if !native_engine::legacy_project_import::looks_like_legacy_project(&bytes) {
+            if !native_engine::history::legacy_project_import::looks_like_legacy_project(&bytes) {
                 return Err(host_error(
                     "unsupported_format",
                     "file is not a native project",
                 ));
             }
-            let converted = native_engine::legacy_project_import::convert_admitted(&bytes)
+            let converted = native_engine::history::legacy_project_import::convert_admitted(&bytes)
                 .map_err(|error| host_error(error.code(), error.message()))?;
             return Ok(Loaded {
                 bytes: converted.project_file,
@@ -143,7 +143,10 @@ pub(super) fn read_file(
             });
         }
     }
-    Ok(Loaded { bytes, legacy: None })
+    Ok(Loaded {
+        bytes,
+        legacy: None,
+    })
 }
 
 /// #2269: a project file the UI names directly (a recent entry or a crash-recovery generation) was never picked in a

@@ -27,10 +27,6 @@ engine_modules! {
 #[cfg(feature = "reference_image_asset")]
 pub(crate) mod reference_image_asset;
 
-// Whole-project reader for baseline project files; converts into the one native project wire (G-legacy-import slice 1).
-#[cfg(all(feature = "history", feature = "project_media_codec"))]
-pub mod legacy_project_import;
-
 #[cfg(feature = "application")]
 pub(crate) mod object_expression_bake;
 
