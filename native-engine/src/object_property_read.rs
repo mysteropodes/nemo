@@ -100,6 +100,10 @@ object_deserialize!(ReadSelector {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 enum ReadFields {
+    LayerBounds {
+        target: PropertyHolderTarget,
+        frame: f64,
+    },
     ExpressionSource {
         target: PropertyHolderTarget,
         property: String,
@@ -173,7 +177,11 @@ impl ObjectSnapshot {
         {
             return Err(StaleRevision);
         }
+        if let ReadFields::LayerBounds { target, frame } = &selector.view.0 {
+            return self.layer_bounds_read(target, *frame);
+        }
         let (kind, target, property) = match &selector.view.0 {
+            ReadFields::LayerBounds { .. } => return Err(InvalidRequest),
             ReadFields::ExpressionSource {
                 target, property, ..
             } => ("expressionSource", target, property),
@@ -209,6 +217,7 @@ impl ObjectSnapshot {
             "atRevision":self.content_revision(),"documentSnapshotId":self.snapshot_id(),
             "kind":kind,"target":target,"property":property,"dimension":dimension});
         match &selector.view.0 {
+            ReadFields::LayerBounds { .. } => return Err(InvalidRequest),
             ReadFields::ExpressionSource { .. } => {
                 // Exact authored bytes; an oversized page is refused below, never truncated.
                 result["expression"] = json!(self.property_expression_source(target, property)?);

@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "8e927a9f10c2f8409928b479b656ff7a361067c8",
-  "describe": "v0.7.0-alpha.4-5227-g8e927a9f1-dirty"
+  "head": "fef03e88f23a82aa47622c5d058d40f94ec19093",
+  "describe": "v0.7.0-alpha.4-5223-gfef03e88f-dirty"
  },
- "inputsDigest": "77d0bdad3122c57634e7e761ae0882f7100cb37a60eca44938a9a5231882adc0",
+ "inputsDigest": "6b5d34f800a52ac40439fa5e7bf5a9f3d5c9138aae48c95f3ba6fd9a0df6fad2",
  "states": [
   "inventoried",
   "characterized",
@@ -276,7 +276,7 @@
   },
   "SMProject": {
    "file": "src/js/project.js",
-   "line": 408,
+   "line": 409,
    "members": 2
   },
   "SMAgPsdLoader": {
@@ -496,7 +496,7 @@
     "container": "assets-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 82,
+    "functionsVisited": 81,
     "via": "variable btn",
     "references": [
      "src/js/assets-panel.js:16 select()",
@@ -541,7 +541,7 @@
     "container": "assets-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 82,
+    "functionsVisited": 81,
     "via": "variable btn",
     "references": [
      "src/js/assets-panel.js:16 select()",
@@ -8290,7 +8290,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 30,
+    "functionsVisited": 31,
     "via": "variable btn",
     "references": [
      "src/js/history-panel.js:151 toggleHistoryPopover()"
@@ -14116,7 +14116,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 88,
+    "functionsVisited": 87,
     "via": "variable copyBtn",
     "references": []
    },
@@ -14761,7 +14761,7 @@
    "capability": "New project (new tab)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:660"
+    "src/js/project.js:661"
    ],
    "events": [
     "click"
@@ -14792,7 +14792,7 @@
     "via": "chain",
     "references": [
      "src/js/adapters/native-object-project-tabs-ui.js:120 render()",
-     "src/js/project.js:660",
+     "src/js/project.js:661",
      "src/js/timeline.js:9004 action()"
     ]
    },
@@ -15849,7 +15849,7 @@
     "functionsVisited": 0,
     "via": "chain",
     "references": [
-     "src/js/project.js:603 enter()"
+     "src/js/project.js:604 enter()"
     ]
    },
    "fixtures": [
@@ -33503,7 +33503,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 407
+    "functionsVisited": 406
    },
    "fixtures": [
     "media",

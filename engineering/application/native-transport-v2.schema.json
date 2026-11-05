@@ -11198,6 +11198,28 @@
                   "minLength": 1
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "target",
+                "frame"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "layerBounds"
+                },
+                "target": {
+                  "$ref": "#/$defs/ObjectPropertyReadTarget"
+                },
+                "frame": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              }
             }
           ]
         }
@@ -11300,7 +11322,7 @@
       }
     },
     "ObjectPropertyReadResult": {
-      "description": "Exact authored storage DTO or raw native sample. Native/shared runtime validators additionally correlate owner, revision, snapshot, target, property, frame and cursor; enforce increasing key/curve coordinates and actual native curve endpoints. Missing/null/empty curve distinctions are preserved. Provider result limit3072 and full envelope limit4096 are encoded UTF8 byte bounds, not JSON string lengths. Oversized pages refuse unavailable; no dynamic truncation. The expressionSource view returns the exact authored code (null when no expression is authored); an oversized source refuses unavailable.",
+      "description": "Exact authored storage DTO or raw native sample. Native/shared runtime validators additionally correlate owner, revision, snapshot, target, property, frame and cursor; enforce increasing key/curve coordinates and actual native curve endpoints. Missing/null/empty curve distinctions are preserved. Provider result limit3072 and full envelope limit4096 are encoded UTF8 byte bounds, not JSON string lengths. Oversized pages refuse unavailable; no dynamic truncation. The expressionSource view returns the exact authored code (null when no expression is authored); an oversized source refuses unavailable. The layerBounds view returns the layer's own tight bounds before its Motion (a Null is its rest point) at an integer frame, plus its parent layer uid or null.",
       "oneOf": [
         {
           "type": "object",
@@ -12169,6 +12191,68 @@
                       "type": "string"
                     }
                   }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "instanceId",
+            "documentId",
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "target",
+            "frame",
+            "bounds",
+            "parentLayerUid"
+          ],
+          "properties": {
+            "instanceId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "documentId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "const": "layerBounds"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectPropertyReadTarget"
+            },
+            "frame": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "bounds": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "items": {
+                "type": "number",
+                "minimum": -1.7976931348623157e+308,
+                "maximum": 1.7976931348623157e+308
+              }
+            },
+            "parentLayerUid": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "minLength": 1
                 }
               ]
             }

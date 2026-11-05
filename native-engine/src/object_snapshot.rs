@@ -53,6 +53,11 @@ mod property_metadata_tests;
 mod property_public_read_tests;
 #[path = "object_property_read.rs"]
 mod property_read;
+#[path = "object_property_geometry_read.rs"]
+mod property_geometry_read;
+#[cfg(all(test, feature = "evaluation"))]
+#[path = "../tests/object_property_layer_bounds.rs"]
+mod property_layer_bounds_tests;
 #[path = "object_text_read.rs"]
 mod text_read;
 #[cfg(all(
