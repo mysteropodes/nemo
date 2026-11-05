@@ -272,3 +272,95 @@ test('on a project that is not native the fields and the nudge keep the legacy w
   assert.deepEqual(h.legacy, ['selPropsApplyMove']);
   assert.deepEqual(h.toasts, []);
 });
+
+// A-flip-selection: Shift+X / Shift+Alt+X and SM.flipHorizontal / flipVertical are the real timeline.js code; the mirror is one batch.
+function flipper(h, native = true) {
+  const sm = TIMELINE.slice(TIMELINE.indexOf('  flipHorizontal:function(){'), TIMELINE.indexOf('  exportJSON:function(){'));
+  const keyBranch = TIMELINE.slice(TIMELINE.indexOf("else if(k==='x'||k==='X'){"), TIMELINE.indexOf('else window.SM.swapStrokeFill();') + 'else window.SM.swapStrokeFill();'.length + 4);
+  const calls = [], guarded = [];
+  const box = { window: h.root, state: h.root.state, Object, Point: h.root.Point, console, legacyCalls: calls, guarded, SM: null,
+    n20AllowLegacyWrite: (kind) => { guarded.push(kind); return native; } };
+  Object.defineProperty(box, 'selectedPaths', { get: () => h.root.selectedPaths });
+  vm.createContext(box);
+  vm.runInContext(extract(TIMELINE, 'nativeFlip') + '\nvar showToast=function(t){window.showToast(t);};var pushUndo=function(){legacyCalls.push("pushUndo");throw new Error("legacy checkpoint");};var saveActiveLayerFrameOrPromote=function(){legacyCalls.push("save");};var updateUI=function(){};\nSM={' + sm.replace(/,\s*$/, '') + '};', box);
+  h.root.SM = Object.assign(box.SM, { swapStrokeFill: () => calls.push('swap'), t: (k) => (k === 'toastSelectStrokes' ? 'Select strokes' : k) });
+  const press = vm.runInNewContext('(function(event,k,window){' + keyBranch.replace(/^else /, '') + '})', { Object });
+  h.chord = (k, shiftKey, altKey) => press({ shiftKey, altKey }, k, h.root);
+  return { calls, guarded, box };
+}
+
+test('Shift+X mirrors the selection about the centre of its bounds as ONE batch, Shift+Alt+X the other way, and each says so', async () => {
+  const h = harness();
+  const f = flipper(h);
+  await h.select();
+  h.chord('X', true, false); await settle();
+  assert.equal(h.batches.length, 1, 'one batch, one history entry, two layers');
+  assert.deepEqual(h.batches[0].steps.map((s) => s.reshape.stableTarget.layerUid), ['L1', 'L2']);
+  assert.deepEqual(matrices(h), [[-1, 0, 0, 1, 80, 0], [-1, 0, 0, 1, 80, 0]], 'union x 10..70: the mirror axis is x = 40');
+  assert.deepEqual(h.root.selectedPaths.map((p) => [p.bounds.x, p.bounds.width]), [[50, 20], [10, 20]], 'the two items swapped sides and the selection is read again');
+  assert.deepEqual(h.toasts, ['Flip horizontal']);
+  h.chord('x', true, true); await settle();
+  assert.deepEqual(matrices(h, 1), [[1, 0, 0, -1, 0, 40], [1, 0, 0, -1, 0, 40]], 'union y 10..30: the mirror axis is y = 20');
+  assert.deepEqual(h.toasts, ['Flip horizontal', 'Flip vertical']);
+  h.chord('X', true, false); await settle(); h.chord('X', true, false); await settle();
+  assert.deepEqual(h.toasts.slice(2), ['Flip horizontal', 'Flip horizontal'], 'a second press in a row still says so');
+  assert.deepEqual(f.calls, []); assert.deepEqual(h.legacy, []);
+  assert.equal(h.root.state.selRotAccum, 0);
+});
+
+test('a plain X keeps swapping stroke and fill, and SM.flipHorizontal / flipVertical are the same route as the chords', async () => {
+  const h = harness();
+  const f = flipper(h);
+  await h.select();
+  h.chord('X', false, false);
+  assert.deepEqual(f.calls, ['swap']); assert.equal(h.batches.length, 0);
+  h.root.SM.flipVertical(); await settle();
+  h.root.SM.flipHorizontal(); await settle();
+  assert.equal(h.batches.length, 2);
+  assert.deepEqual([matrices(h, 0)[0], matrices(h, 1)[0]], [[1, 0, 0, -1, 0, 40], [-1, 0, 0, 1, 80, 0]]);
+  assert.deepEqual(f.guarded, [], 'a native project never reaches the legacy writer');
+});
+
+test('no selection, or another tool, says Select strokes and writes nothing (baseline); Motion and a no-native-form item are notices', async () => {
+  const h = harness([quad('L1', 'a', 10, 10, 30, 30, { role: 'raster' }), ITEMS[1]]);
+  flipper(h);
+  h.chord('X', true, false); await settle();
+  assert.deepEqual(h.toasts, ['Select strokes']);
+  await h.select();
+  h.root.state.tool = 'subselect';
+  h.chord('X', true, false); await settle();
+  assert.deepEqual(h.toasts, ['Select strokes', 'Select strokes'], 'every press says so, as the baseline did');
+  h.root.state.tool = 'select'; h.root.state.appMode = 'motion';
+  h.chord('X', true, false); await settle();
+  assert.match(h.toasts[h.toasts.length - 1], /Motion/);
+  h.root.state.appMode = 'anim2d';
+  const before = h.toasts.length;
+  h.chord('X', true, false); await settle();
+  assert.match(h.toasts.slice(before).join('|'), /Flipping images is not available on native projects yet/, 'an image is a typed refusal, never a silent no-op');
+  assert.equal(h.batches.length, 0);
+  assert.deepEqual(h.legacy, []);
+});
+
+test('a flip waits for a typed value pending in a field, and a stale selection is dropped with a notice', async () => {
+  const h = harness();
+  flipper(h);
+  await h.select();
+  h.type('sp-x', '40');
+  h.chord('X', true, false); await settle();
+  assert.equal(h.batches.length, 2, 'the typed move first, then the flip');
+  assert.deepEqual(matrices(h, 0)[0], [1, 0, 0, 1, 30, 0]);
+  assert.deepEqual(matrices(h, 1)[0], [-1, 0, 0, 1, 140, 0], 'against the moved bounds 40..100: axis x = 70');
+  h.root.state.currentFrame = 4;
+  h.chord('X', true, false); await settle();
+  assert.equal(h.batches.length, 2);
+  assert.match(h.toasts.join('|'), /no longer applies/);
+});
+
+test('on a project that is not native the flip keeps the legacy writer behind its guard', async () => {
+  const h = harness(ITEMS, { native: false });
+  const f = flipper(h, false);
+  h.root.selectedPaths = [{ data: {}, bounds: { x: 0 } }];
+  assert.equal(h.root.SM.flipHorizontal(), false);
+  assert.deepEqual(f.guarded, ['timeline-selection-flip']);
+  assert.deepEqual(h.batches, []);
+});

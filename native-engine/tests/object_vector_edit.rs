@@ -25,6 +25,8 @@ mod batch_layers;
 mod batch_items;
 #[path = "object_vector_batch_box_angle.rs"]
 mod batch_box_angle;
+#[path = "object_vector_batch_flip.rs"]
+mod batch_flip;
 #[path = "object_vector_batch_style.rs"]
 mod batch_style;
 #[path = "object_vector_batch_style_detail.rs"]

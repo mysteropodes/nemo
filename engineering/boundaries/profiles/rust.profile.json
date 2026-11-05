@@ -1352,6 +1352,7 @@
         "object_vector_batch.rs",
         "object_vector_batch_items.rs",
         "object_vector_batch_box_angle.rs",
+        "object_vector_batch_flip.rs",
         "object_vector_batch_style.rs",
         "object_vector_batch_style_detail.rs",
         "object_vector_batch_style_preset.rs",
