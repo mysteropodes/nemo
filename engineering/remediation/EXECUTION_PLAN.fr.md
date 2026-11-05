@@ -10,6 +10,57 @@ Aucun de ces efforts n’a été perdu. Les corrections, les tests, les investig
 
 Ce document est le plan opérationnel unique de la remédiation en cours. Il remplace l’ordre d’exécution, les prévisions, les validations globales bloquantes, les hypothèses sur les agents distants et les exigences de compte rendu de l’ancien plan R00–R22 et des guides d’agents locaux. Les documents d’architecture et de code existants restent des références ; en cas de conflit, le présent document régit le périmètre et le fonctionnement. Les issues GitHub consignent les prises en charge et les transmissions en cours ; cette liste définit les résultats attendus. Le [journal horaire partagé de progression #1062](https://github.com/mysteropodes/nemo/issues/1062) est l’unique destination centrale des comptes rendus ; ne créez pas de registres de sprint concurrents ni de PR de compte rendu.
 
+## Amendement « table rase » — proposé le 25 octobre 2026 (requiert Ilya et Cyrill)
+
+**Statut : proposé, pas encore approuvé.** Il ne prend effet qu’une fois cet amendement normalement revu, approuvé par Ilya et par Cyrill, puis fusionné dans `codex/native-remediation`. D’ici là, chaque section ci-dessous reste la référence. Suivi : [#2339](https://github.com/mysteropodes/nemo/issues/2339) / [CS9 #2344](https://github.com/mysteropodes/nemo/issues/2344).
+
+**Objet.** Le travail restant est désormais dominé par le processus et par le brassage de fichiers partagés plutôt que par le code :
+
+- Sur les 1 897 commits hors fusion de la branche d’intégration depuis le 22 septembre, des fichiers générés ou d’enregistrement ont absorbé des centaines de modifications chacun :
+  - `surfaces.json` : 263 ;
+  - `rust.coverage.json` : 177 ;
+  - `app-js.profile.json` : 70 ;
+  - `index.html` : 66 ;
+  - le schéma de transport v2 : 56 ;
+  - la correspondance des opérations MCP et sa liste d’inclusion : environ 30 chacune.
+- Les longs fils d’issues sont surtout composés de messages de réservation et de reçus.
+
+Cet amendement change la façon de dimensionner, de prouver et de rapporter le travail. **Il n’assouplit aucun critère d’acceptation, ni l’obligation de parité de référence à 100 % pour le bureau, ni la règle d’autorité unique, la revue indépendante ou la protection de branche.**
+
+1. **Référence de départ figée.**
+   - La référence fonctionnelle de la parité est la source opérationnelle préservée lors de la séparation native, `1065e9d8d9c48e66d9b44bb4de446e8f4e887040` (§0).
+   - L’inventaire des surfaces y est régénéré une seule fois, avec des identifiants stables (et non des numéros de ligne de source), puis figé dans `engineering/inventory/baseline-surfaces.json`.
+   - Les 228 identifiants de tâches d’origine et chaque surface figée sont joints dans un fichier généré `engineering/inventory/parity-matrix.json`, doté d’un contrôle `--check`. Cette matrice, et non le nombre fixe de 50 issues, constitue le dénominateur de parité du §9.
+2. **Résultats au niveau de la chaîne (remplace le dimensionnement de 30 à 90 minutes du §3).**
+   - Un propriétaire reste responsable d’une chaîne de dépendances jusqu’à l’acceptation de ses lignes de matrice : composants et storyboard, scène et peinture, maillage et rig, texte, médias et import, frames.
+   - Les tâches élémentaires restent réservées au travail réellement indépendant.
+   - Une issue nomme les lignes de matrice qu’elle fait passer au vert, sa source d’entrée, une commande d’acceptation et les fichiers hérités qu’elle supprime.
+3. **Preuve par commande, acceptation installée regroupée par candidat.**
+   - L’acceptation au niveau source d’une ligne est la commande d’acceptation native sans interface de la famille, sur une source identifiée (fournisseurs réels, oracles indépendants, annulation/rétablissement, sauvegarde/réouverture, rendu vers pixels).
+   - L’acceptation sur bureau installé s’exécute en une seule session scriptée par candidat, couvrant chaque ligne Ready, au lieu d’une réservation par issue.
+   - Le candidat final unique du §9, ses preuves de clone propre, d’installation, de client et de ressources, ainsi que l’acceptation humaine, sont inchangés.
+   - Une réparation crée toujours un nouveau candidat.
+4. **Coût de vérification.**
+   - Lorsqu’un compilateur et des tests peuvent vérifier un changement, utiliser compilation, tests et une revue technique composée par lot d’intégration, à la place d’une revue de source distincte pour chaque tâche élémentaire.
+   - La revue de PR du §7, les demandes de modifications et la protection de fusion sont inchangées.
+5. **Comptes rendus.**
+   - Un état généré à partir de la matrice de parité remplace les messages horaires de l’orchestrateur dans #1062, qui a atteint la limite de 2 500 commentaires de GitHub.
+   - Les commentaires d’issue se limitent à la prise en charge, au blocage, à la PR et à l’acceptation, selon les gabarits courts du §3.
+   - Les commentaires ne ressassent pas l’historique conservé ; ils y renvoient par lien.
+6. **Tableau.**
+   - Un script du dépôt renseigne et relit les champs du Project #2 à partir de l’état des issues et de la matrice.
+   - Les modifications manuelles multi-champs restent permises mais ne sont plus exigées à chaque transition.
+7. **Gel des monolithes.**
+   - `src/js/motion.js`, `timeline.js`, `tools.js`, `app.js` et `tweens.js` n’acceptent que des suppressions et des redirections minimales de sites d’appel.
+   - Tout nouveau comportement d’interface est un présentateur au-dessus de modèles de lecture natifs, monté via la jonction de présentateur ([CS5 #2347](https://github.com/mysteropodes/nemo/issues/2347)).
+8. **Fichiers partagés et postes.**
+   - L’enregistrement des capacités, l’appartenance à la couverture et aux profils, l’inventaire et le chargement des adaptateurs deviennent générés, sous CS1 #2341 et CS3 #2342.
+   - Une fois qu’ils le sont, la règle d’un seul rédacteur par fichier entier (§3) ne s’applique plus qu’aux fichiers restés entretenus à la main.
+   - Les plafonds de worktrees et de rédacteurs du §2 sont alors réexaminés au regard de la contention mesurée.
+   - Un seul travail lourd de compilateur, de GPU ou d’installation par machine à la fois reste en vigueur. La réservation est un unique commentaire de prise en charge ; les récits de recensement des processus et de conservation ne sont pas exigés.
+
+Les points 1 à 8 ne sont adoptés qu’avec les outils générés auxquels ils renvoient. Tant qu’un outil n’existe pas, la règle actuelle qu’il remplace continue de s’appliquer.
+
 ## Objectif de livraison actuel — application de bureau d’abord, 7 octobre 2026
 
 **Cet amendement fixe le périmètre actuel des surfaces et de l’achèvement.**
