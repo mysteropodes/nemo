@@ -468,9 +468,7 @@
   }
 
   async function exportRive(opts){
-    // E-export-guard-rive-ae: no native Rive exporter yet; state.layers is only a projection on a native project.
-    var blocked=exportNativeUnavailable('Rive');if(blocked)return blocked;
-    var r=exportFrameRange(opts);
+    var blocked=exportNativeUnavailable('Rive');if(blocked)return blocked;var r=exportFrameRange(opts);
     var onProgress=(opts&&opts.onRiveProgress)||function(){};
     onProgress('Connexion à Rive Editor…');
     try{
