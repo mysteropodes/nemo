@@ -43,7 +43,7 @@ test('D12 descriptor declares the exact existing native operation and closed sel
   assert.equal(shape.properties.selections.items.properties.ranges.maxItems, 512);
   assert.equal(shape.properties.selections.items.additionalProperties, false);
   assert.equal(shape.properties.selections.items.properties.target.additionalProperties, false);
-  assert.deepEqual(shape.properties.action.oneOf.map(a => a.properties.kind.const), ['preset', 'influence', 'subdivide', 'lockTo', 'shift', 'delete', 'flip', 'distribute']);
+  assert.deepEqual(shape.properties.action.oneOf.map(a => a.properties.kind.const), ['preset', 'influence', 'subdivide', 'lockTo', 'shift', 'delete', 'flip', 'distribute', 'warp', 'color']);
   for (const example of descriptor.examples) {
     assert.doesNotThrow(() => SDK.validateRequest(example.request));
     assert.doesNotThrow(() => SDK.validateResponse(example.response, example.request.requestId, OP));
@@ -57,6 +57,9 @@ test('SDK reaches the authority with every preset, influence edge, subdivision a
   for (const mode of ['in', 'out', 'layer', null]) actions.push({kind:'lockTo', mode});
   for (const delta of [-1000000, -1, 0, 3, 1000000]) actions.push({kind:'shift', delta});
   for (const kind of ['delete', 'flip', 'distribute']) actions.push({kind});
+  for (const mode of ['top', 'bottom', 'left', 'right']) actions.push({kind:'warp', mode, total:-7.25});
+  actions.push({kind:'warp', mode:'liquify', total:3, grab:12.5});
+  for (const color of [null, '#e8b64c', '#4EA9FFcc']) actions.push({kind:'color', color});
   for (const action of actions) {
     const q = request(action);
     q.payload.selections[0].target.strokeId = 'blob:authored element 雪';
@@ -115,6 +118,19 @@ test('SDK rejects open, missing, null and positional shapes before any dispatch'
     q => q.payload.action = {kind:'delete', keep:true},
     q => q.payload.action = {kind:'flip', times:2},
     q => q.payload.action = {kind:'distribute', mode:'even'},
+    q => q.payload.action = {kind:'warp', mode:'top'},
+    q => q.payload.action = {kind:'warp', mode:'diagonal', total:1},
+    q => q.payload.action = {kind:'warp', mode:'liquify', total:1},
+    q => q.payload.action = {kind:'warp', mode:'top', total:1, grab:2},
+    q => q.payload.action = {kind:'warp', mode:'top', total:'1'},
+    q => q.payload.action = {kind:'warp', mode:'top', total:1000001},
+    q => q.payload.action = {kind:'warp', mode:'top', total:Infinity},
+    q => q.payload.action = {kind:'warp', mode:'top', total:1, extra:0},
+    q => q.payload.action = {kind:'color'},
+    q => q.payload.action = {kind:'color', color:'red'},
+    q => q.payload.action = {kind:'color', color:'#12345'},
+    q => q.payload.action = {kind:'color', color:7},
+    q => q.payload.action = {kind:'color', color:'#e8b64c', extra:0},
   ];
   let calls = 0;
   const port = adapter(() => { calls++; });

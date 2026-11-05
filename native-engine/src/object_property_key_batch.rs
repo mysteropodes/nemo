@@ -95,6 +95,18 @@ pub(crate) fn apply(
             }
         }
     }
+    settle(original, &chosen, &before, frames, action == KeyBatch::Distribute)
+}
+
+/// Applies the new `frames` of the `chosen` keys. A track holds one key per frame: `replaces` lets a landing key replace the one it
+/// lands on (distribute); otherwise a landing on any other key is refused.
+fn settle(
+    original: &OrderTrack,
+    chosen: &[usize],
+    before: &[f64],
+    frames: Vec<f64>,
+    replaces: bool,
+) -> R<Option<OrderTrack>> {
     if frames == before {
         return Ok(Some(original.clone()));
     }
@@ -109,7 +121,7 @@ pub(crate) fn apply(
             }
             let earlier_selected = chosen[..a].contains(&j);
             let staying = chosen.binary_search(&j).is_err();
-            if action != KeyBatch::Distribute {
+            if !replaces {
                 if staying || earlier_selected {
                     return Err(DispatchErrorCode::Unavailable);
                 }
@@ -121,7 +133,7 @@ pub(crate) fn apply(
         }
     }
     let mut keys = original.keys.clone();
-    for &i in &chosen {
+    for &i in chosen {
         keys[i].frame = frame_number(frames[i])?;
     }
     // Stable by the new frame: unmoved keys keep their relative order.
@@ -130,4 +142,89 @@ pub(crate) fn apply(
     Ok(Some(OrderTrack {
         keys: order.into_iter().map(|i| keys[i].clone()).collect(),
     }))
+}
+
+/// The box gestures of a multi-track key selection (baseline `startSkewDrag` + `onDragMove`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum WarpMode {
+    /// Top edge: the first row moves the whole distance, the last stays, rows between interpolate.
+    Top,
+    /// Bottom edge: the mirror of `Top`.
+    Bottom,
+    /// Left edge: the last frame of the selection moves the whole distance, the first stays.
+    Left,
+    /// Right edge: the mirror of `Left`.
+    Right,
+    /// Gaussian falloff centred on frame `grab`.
+    Liquify { grab: f64 },
+}
+
+/// Where the keys of one row sit in the whole selection: `row` of `rows`, over the selected frames `min..=max`.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct WarpFrame {
+    pub(crate) row: usize,
+    pub(crate) rows: usize,
+    pub(crate) min: f64,
+    pub(crate) max: f64,
+}
+
+/// The share of the drag `total` that moves a key originally at `at`: the factor of the baseline, per key.
+pub(crate) fn warp_factor(mode: WarpMode, at: f64, frame: WarpFrame) -> f64 {
+    let (n, r) = (frame.rows as f64, frame.row as f64);
+    match mode {
+        WarpMode::Top | WarpMode::Bottom if frame.rows < 2 => 1.0,
+        WarpMode::Top => (n - 1.0 - r) / (n - 1.0),
+        WarpMode::Bottom => r / (n - 1.0),
+        WarpMode::Left | WarpMode::Right => {
+            let span = frame.max - frame.min;
+            if span <= 0.0 {
+                0.0
+            } else if mode == WarpMode::Right {
+                (at - frame.min) / span
+            } else {
+                (frame.max - at) / span
+            }
+        }
+        WarpMode::Liquify { grab } => {
+            let radius = (frame.max - frame.min).max(1.0) * 0.35;
+            let dist = (at - grab) / radius.max(2.0);
+            (-dist * dist).exp()
+        }
+    }
+}
+
+/// Moves every selected key of one row by `round(total * factor)` from its ORIGINAL frame. All keys of the gesture land inside
+/// `0..total_frames` and on no key that stays, or the whole gesture is refused.
+pub(crate) fn warp(
+    mode: WarpMode,
+    total: f64,
+    original: &OrderTrack,
+    selected: &[usize],
+    frame: WarpFrame,
+    total_frames: u32,
+) -> R<Option<OrderTrack>> {
+    if !total.is_finite() || total.abs() > MAX_SHIFT as f64 {
+        return Err(DispatchErrorCode::InvalidRequest);
+    }
+    let mut frames = original
+        .keys
+        .iter()
+        .map(frame_of)
+        .collect::<R<Vec<f64>>>()?;
+    let mut chosen = selected.to_vec();
+    chosen.sort_unstable();
+    chosen.dedup();
+    if chosen.iter().any(|&i| i >= frames.len()) {
+        return Err(DispatchErrorCode::NotFound);
+    }
+    let before = frames.clone();
+    for &i in &chosen {
+        // Math.round of the baseline: halves round up.
+        let by = (total * warp_factor(mode, before[i], frame) + 0.5).floor();
+        frames[i] = before[i] + by;
+        if frames[i] < 0.0 || frames[i] > f64::from(total_frames) - 1.0 {
+            return Err(DispatchErrorCode::Unavailable);
+        }
+    }
+    settle(original, &chosen, &before, frames, false)
 }

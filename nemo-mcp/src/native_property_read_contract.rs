@@ -75,11 +75,18 @@ fn curve(value: &Value) -> bool {
                     || p[0]["x"].as_f64() == Some(0.0) && p[p.len() - 1]["x"].as_f64() == Some(1.0))
         })
 }
+/// `#rrggbb` or `#rrggbbaa`.
+pub(super) fn key_color(value: &str) -> bool {
+    value.len() > 1
+        && value.starts_with('#')
+        && matches!(value.len() - 1, 6 | 8)
+        && value[1..].bytes().all(|b| b.is_ascii_hexdigit())
+}
 pub(super) fn key(value: &Value, dimension: usize) -> bool {
     exact(
         value,
         &["frame", "v"],
-        &["hold", "curvePoints", "hIn", "hOut", "lockTo"],
+        &["hold", "curvePoints", "hIn", "hOut", "lockTo", "color"],
     )
     .is_some_and(|k| {
         finite(&k["frame"])
@@ -87,6 +94,7 @@ pub(super) fn key(value: &Value, dimension: usize) -> bool {
             && k.get("hold").is_none_or(Value::is_boolean)
             && k.get("lockTo")
                 .is_none_or(|v| v.is_null() || matches!(v.as_str(), Some("in" | "out" | "layer")))
+            && k.get("color").is_none_or(|v| v.as_str().is_some_and(key_color))
             && k.get("curvePoints").is_none_or(curve)
             && ["hIn", "hOut"]
                 .iter()

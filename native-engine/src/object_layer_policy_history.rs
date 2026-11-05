@@ -43,3 +43,8 @@ mod key_lock_tests;
 #[cfg(test)]
 #[path = "../tests/object_key_batch_edit.rs"]
 mod key_batch_tests;
+
+// #2377: the key selection box warps and the key tints as one atomic native history entry.
+#[cfg(test)]
+#[path = "../tests/object_key_warp_color_edit.rs"]
+mod key_warp_color_tests;

@@ -35,6 +35,11 @@ fn selection(value: &Value) -> bool {
             })
     })
 }
+fn in_range(value: Option<&Value>) -> bool {
+    value
+        .and_then(Value::as_f64)
+        .is_some_and(|v| v.abs() <= 1_000_000.0)
+}
 fn action(value: &Value) -> bool {
     match value.get("kind").and_then(Value::as_str) {
         Some("preset") => exact(value, &["kind", "preset"], &[]).is_some_and(|a| {
@@ -58,6 +63,23 @@ fn action(value: &Value) -> bool {
                 .is_some_and(|d| (-1_000_000..=1_000_000).contains(&d))
         }),
         Some("delete" | "flip" | "distribute") => exact(value, &["kind"], &[]).is_some(),
+        // #2377: the selection box. `grab` goes with liquify and with nothing else.
+        Some("warp") => exact(value, &["kind", "mode", "total"], &["grab"]).is_some_and(|a| {
+            let liquify = a["mode"].as_str() == Some("liquify");
+            matches!(
+                a["mode"].as_str(),
+                Some("top" | "bottom" | "left" | "right" | "liquify")
+            ) && in_range(a.get("total"))
+                && (a.contains_key("grab") == liquify)
+                && (!liquify || in_range(a.get("grab")))
+        }),
+        // #2377: the key tint; `color` is required, null removes it.
+        Some("color") => exact(value, &["kind", "color"], &[]).is_some_and(|a| {
+            a["color"].is_null()
+                || a["color"]
+                    .as_str()
+                    .is_some_and(super::property_read::key_color)
+        }),
         _ => false,
     }
 }

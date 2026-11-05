@@ -216,6 +216,16 @@ pub(crate) struct OrderKey {
     pub(crate) h_in: Presence<Vec<Number>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) h_out: Presence<Vec<Number>>,
+    /// Timeline tint of the key (baseline `key.color`, ctxColorKeys): `#rrggbb` or `#rrggbbaa`. Presentation only.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) color: Presence<String>,
+}
+/// Whether `value` is a key tint the document admits: `#` followed by six or eight hex digits.
+pub(crate) fn valid_key_color(value: &str) -> bool {
+    value.len() > 1
+        && value.starts_with('#')
+        && matches!(value.len() - 1, 6 | 8)
+        && value[1..].bytes().all(|b| b.is_ascii_hexdigit())
 }
 object_deserialize!(OrderKey {
     frame: Number, v: Vec<Number>,
@@ -223,7 +233,8 @@ object_deserialize!(OrderKey {
     #[serde(default)] lock_to: Presence<Option<KeyLockMode>>,
     #[serde(default)] curve_points: Presence<Option<Vec<OrderCurvePoint>>>,
     #[serde(default)] h_in: Presence<Vec<Number>>,
-    #[serde(default)] h_out: Presence<Vec<Number>>
+    #[serde(default)] h_out: Presence<Vec<Number>>,
+    #[serde(default)] color: Presence<String>
 });
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

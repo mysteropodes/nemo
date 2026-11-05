@@ -1,9 +1,9 @@
 //! Stable selection edits prepared against one retained native snapshot.
 use crate::commands::object_fill_owner::property_edit::curves::{self, CurvePreset, InfluenceSide};
-use crate::commands::object_fill_owner::property_edit::key_batch::{self, KeyBatch};
+use crate::commands::object_fill_owner::property_edit::key_batch::{self, KeyBatch, WarpFrame, WarpMode};
 use crate::commands::{ObjectFillOwner, PreparedPropertyEdit};
 use crate::object_document::{
-    object_deserialize, KeyLockMode, OrderKey, OrderTrack, Presence, PropertyHolder,
+    object_deserialize, valid_key_color, KeyLockMode, OrderKey, OrderTrack, Presence, PropertyHolder,
     PropertyHolderTarget,
 };
 use crate::object_snapshot::ObjectSnapshot;
@@ -47,6 +47,19 @@ enum Action {
     Delete {},
     Flip {},
     Distribute {},
+    // The key selection box (#2377): `mode` is top/bottom/left/right/liquify, `total` the drag in (fractional) frames, `grab` the
+    // frame a liquify is centred on. Rows are the selected tracks in the order the selections name them.
+    Warp {
+        mode: String,
+        total: Number,
+        #[serde(default)]
+        grab: Option<Number>,
+    },
+    // The key tint (baseline ctxColorKeys): `#rrggbb` / `#rrggbbaa`, or null to remove it. Required, never defaulted.
+    Color {
+        #[serde(deserialize_with = "Option::deserialize")]
+        color: Option<String>,
+    },
 }
 #[derive(Debug)]
 struct Payload {
@@ -58,13 +71,15 @@ object_deserialize!(Payload {
     command: String, selections: Vec<Selection>,
     #[serde(deserialize_with = "super::deserialize_action")] action: Action
 });
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum ValidAction {
     Preset(CurvePreset),
     Influence(InfluenceSide, f64),
     Subdivide,
     LockTo(Option<KeyLockMode>),
     Batch(KeyBatch),
+    Warp(WarpMode, f64),
+    Color(Option<String>),
 }
 fn invalid() -> DispatchErrorCode {
     DispatchErrorCode::InvalidRequest
@@ -109,6 +124,26 @@ impl Action {
             Self::Delete {} => ValidAction::Batch(KeyBatch::Delete),
             Self::Flip {} => ValidAction::Batch(KeyBatch::Flip),
             Self::Distribute {} => ValidAction::Batch(KeyBatch::Distribute),
+            Self::Warp { mode, total, grab } => {
+                let mode = match (mode.as_str(), grab) {
+                    ("top", None) => WarpMode::Top,
+                    ("bottom", None) => WarpMode::Bottom,
+                    ("left", None) => WarpMode::Left,
+                    ("right", None) => WarpMode::Right,
+                    ("liquify", Some(grab)) => WarpMode::Liquify { grab: finite(grab)? },
+                    _ => return Err(invalid()),
+                };
+                let total = finite(total)?;
+                if total.abs() > key_batch::MAX_SHIFT as f64 {
+                    return Err(invalid());
+                }
+                ValidAction::Warp(mode, total)
+            }
+            Self::Color { color } => ValidAction::Color(match color {
+                None => None,
+                Some(c) if valid_key_color(c) => Some(c.to_ascii_lowercase()),
+                Some(_) => return Err(invalid()),
+            }),
         })
     }
 }
@@ -231,26 +266,54 @@ impl ObjectFillOwner {
         // Phase 2: prepare all tracks and ALL native samples before touching even
         // the cloned document. No earlier midpoint can alter a later sample.
         let mut proposals: Vec<Option<OrderTrack>> = Vec::with_capacity(groups.len());
-        for group in &groups {
-            let track = match action {
+        // The extent of the whole selection, over every row, that the warp gestures measure from.
+        let extent = groups
+            .iter()
+            .flat_map(|g| g.selected.iter().filter_map(|&ki| g.original.keys[ki].frame.as_f64()))
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), f| (lo.min(f), hi.max(f)));
+        for (row, group) in groups.iter().enumerate() {
+            let track = match &action {
                 ValidAction::Batch(batch) => {
                     proposals.push(key_batch::apply(
-                        batch,
+                        *batch,
                         &group.original,
                         &group.selected,
                         source.total_frames(),
                     )?);
                     continue;
                 }
+                ValidAction::Warp(mode, total) => {
+                    let frame = WarpFrame { row, rows: groups.len(), min: extent.0, max: extent.1 };
+                    proposals.push(key_batch::warp(
+                        *mode,
+                        *total,
+                        &group.original,
+                        &group.selected,
+                        frame,
+                        source.total_frames(),
+                    )?);
+                    continue;
+                }
+                ValidAction::Color(color) => {
+                    // Only keys whose tint differs are written, so a no-op publishes nothing.
+                    let mut proposed = group.original.clone();
+                    for &ki in &group.selected {
+                        let key = &mut proposed.keys[ki];
+                        if key.color.value() != color.as_ref() {
+                            key.color = color.clone().map_or(Presence::Missing, Presence::Present);
+                        }
+                    }
+                    proposed
+                }
                 ValidAction::Preset(preset) => {
-                    curves::apply_curve_preset(&group.original, &group.selected, preset)?.0
+                    curves::apply_curve_preset(&group.original, &group.selected, *preset)?.0
                 }
                 ValidAction::Influence(side, percent) => {
                     curves::apply_selected_influence(
                         &group.original,
                         &group.selected,
-                        side,
-                        percent,
+                        *side,
+                        *percent,
                     )?
                     .0
                 }
@@ -261,8 +324,8 @@ impl ObjectFillOwner {
                     let mut proposed = group.original.clone();
                     for &ki in &group.selected {
                         let key = &mut proposed.keys[ki];
-                        if key.lock_to.value().copied().flatten() != mode {
-                            key.lock_to = Presence::Present(mode);
+                        if key.lock_to.value().copied().flatten() != *mode {
+                            key.lock_to = Presence::Present(*mode);
                         }
                     }
                     proposed
@@ -308,6 +371,7 @@ impl ObjectFillOwner {
                             curve_points: Presence::Present(Some(insertion.curve_points)),
                             h_in: Presence::Present(vec![0.into(), 0.into()]),
                             h_out: Presence::Present(vec![0.into(), 0.into()]),
+                            color: Presence::Missing,
                         });
                     }
                     let mut proposed = group.original.clone();

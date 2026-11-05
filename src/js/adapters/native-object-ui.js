@@ -51,7 +51,7 @@
     if(!paintMotionInspector(root))return false;var surface=motionSurfaces.get(root);if(!surface)return false;
     var result=surface.shortcut(key,shift);if(result===null)return false;Promise.resolve(result).catch(function(){});return true;
   }
-  function routeMotionKeyEdit(root,action){var surface=paintMotionInspector(root)?motionSurfaces.get(root):null;return Promise.resolve(surface?surface.editKeys(action):null);}
+  function routeMotionKeyEdit(root,action,opts){var surface=paintMotionInspector(root)?motionSurfaces.get(root):null;return Promise.resolve(surface?surface.editKeys(action,opts):null);}
   function readMotion(root,info,method){
     try{
       var view=views.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),surface=motionSurface(root);
@@ -296,7 +296,7 @@
       list.replaceChildren.apply(list,rows);header.replaceChildren(caption);grid.replaceChildren(unavailable);
     }
     if(root.NemoNativeLayerRangeDesktop&&typeof root.NemoNativeLayerRangeDesktop.mount==='function')
-      root.NemoNativeLayerRangeDesktop.mount(root,grid,info,Object.assign({},ports,{setKeyTimelineRows:function(layout,expected){return setKeyTimelineRows(root,layout,expected);},readMotionKeyTimelines:function(expected){return readMotionKeyTimelines(root,expected);},readMotionKeyTimeline:function(expected){return readMotionKeyTimeline(root,expected);},readSelectedMotionKeys:function(expected){return readSelectedMotionKeys(root,expected);},editSelectedKeys:function(action){return routeMotionKeyEdit(root,action);},readLegacyMotionSelection:function(){var motion=root.SMMotion;return motion&&typeof motion.getKeySelection==='function'?motion.getKeySelection():null;},barUi:root.SMLayerInOut}));
+      root.NemoNativeLayerRangeDesktop.mount(root,grid,info,Object.assign({},ports,{setKeyTimelineRows:function(layout,expected){return setKeyTimelineRows(root,layout,expected);},readMotionKeyTimelines:function(expected){return readMotionKeyTimelines(root,expected);},readMotionKeyTimeline:function(expected){return readMotionKeyTimeline(root,expected);},readSelectedMotionKeys:function(expected){return readSelectedMotionKeys(root,expected);},editSelectedKeys:function(action,opts){return routeMotionKeyEdit(root,action,opts);},readLegacyMotionSelection:function(){var motion=root.SMMotion;return motion&&typeof motion.getKeySelection==='function'?motion.getKeySelection():null;},barUi:root.SMLayerInOut}));
     caption.textContent='Frame '+(root.state.currentFrame+1)+' / '+info.totalFrames;
     if(root.NemoNativeFrameCellSelection)root.NemoNativeFrameCellSelection.mount(root,caption,info,Object.assign({},ports,{frameOnly:reuse===true,
       frameEditPending:function(){var controller=root.NemoNativeFrameEditController;return !!(controller&&controller.isPending());}}));

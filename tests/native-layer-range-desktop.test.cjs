@@ -304,6 +304,7 @@ test('a native video placement\'s Time Remap keys draw as one inert lane from it
 
 // #2524 / #2377: a plain press on a selected key keeps the group and drags it; the key menu acts on its opened selection.
 const KeyGesture = require('../src/js/adapters/native-motion-key-gesture.js');
+const KeyBox = require('../src/js/adapters/native-motion-key-box.js');
 test('dragging a selected key group previews one shift and commits it on release; a plain press keeps the group', async () => {
   const h = await harness({ propertyKeys: [2.25, 7, 10.5] });
   const edits = []; h.root.NemoNativeMotionKeyGesture = KeyGesture; h.ports.editSelectedKeys = (a) => { edits.push(a); return Promise.resolve(true); };
@@ -343,4 +344,102 @@ test('the key context menu selects an unselected key first and refuses a click a
   stale.items.find((i) => i.label === 'Linear  (Cmd+Alt+K)').action();
   assert.deepEqual(edits, []);
   assert.match(h.root.notices.join('|'), /selection changed/);
+});
+
+function placeKeys(h) {
+  // The key buttons sit at their frame in the row, 22px apart per lane, like the real grid; rectangles follow whatever is currently drawn.
+  Node.prototype.getBoundingClientRect = function () {
+    if (!/native-motion-property-key/.test(this.className || '')) return { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 };
+    const x = (Number(this.dataset.frame) + 0.5) * h.root.FC - 4.5, y = Number.parseFloat(this.style.top) || 0;
+    return { left: x, right: x + 9, top: y, bottom: y + 9, width: 9, height: 9 };
+  };
+}
+const boxes = (h) => h.doc.body.children.filter((n) => n.className === 'motion-keysel-box');
+const twoRows = () => {
+  const target = { contextId: 'scene-root', layerUid: 'alpha' };
+  return { propertyTracks: [{ target, property: 'opacity', dimension: 1, items: [{ frame: 2, v: [50], color: '#e8b64c' }, { frame: 7, v: [75] }] }, { target, property: 'position', dimension: 2, items: [{ frame: 4, v: [3, 7] }] }] };
+};
+
+test('a tinted key carries the baseline tint class and colour; the tint is part of what the grid redraws', async () => {
+  const h = await harness(twoRows());
+  const [tinted, plain] = h.keyNodes();
+  assert.equal(tinted.classes.has('tinted'), true);
+  assert.equal(plain.classes.has('tinted'), false);
+  assert.equal(tinted.style['--key-color'], '#e8b64c');
+  assert.equal(plain.style['--key-color'], undefined);
+});
+
+test('the selection box appears over keys on two rows and a skew drag commits ONE warp; Alt + dragging a selected key skews like the bottom edge', async () => {
+  const h = await harness(twoRows());
+  placeKeys(h);
+  const edits = []; h.root.NemoNativeMotionKeyGesture = KeyGesture; h.root.NemoNativeMotionKeyBox = KeyBox;
+  h.ports.editSelectedKeys = (a, o) => { edits.push([a, o]); return Promise.resolve(true); };
+  h.keyNodes()[0].fire('mousedown', { button: 0 });
+  h.doc.fire('mouseup', {});
+  assert.equal(boxes(h).length, 0, 'one key is no box');
+  h.keyNodes().find((n) => n.dataset.keyTrack.includes('position')).fire('mousedown', { button: 0, ctrlKey: true });
+  assert.equal(boxes(h).length, 1, 'keys on two property rows earn the box');
+  const box = boxes(h)[0];
+  assert.deepEqual(box.children.map((c) => c.className.replace('motion-keysel-', '')), ['fill', 'edge motion-keysel-edge-top', 'edge motion-keysel-edge-bottom', 'edge motion-keysel-edge-left', 'edge motion-keysel-edge-right']);
+  box.children[1].fire('mousedown', { clientX: 100 });
+  h.doc.fire('mousemove', { clientX: 140 });
+  assert.deepEqual(edits, [], 'nothing is written while dragging');
+  h.doc.fire('mouseup', { clientX: 140 });
+  assert.deepEqual(edits.map((e) => e[0]), [{ kind: 'warp', mode: 'top', total: 4 }]);
+  const at = { contextId: 'scene-root', layerUid: 'alpha' };
+  assert.deepEqual([{ target: at, property: 'position' }, { target: at, property: 'opacity' }].sort(edits[0][1].order).map((t) => t.property), ['opacity', 'position'], 'rows are top to bottom as drawn');
+  assert.equal(h.commands().length, 0, 'the gesture reaches the key route, never a layer range write');
+  // Alt + dragging an already selected key: the bottom edge's skew.
+  edits.length = 0;
+  h.keyNodes().find((n) => n.dataset.selected === 'true').fire('mousedown', { button: 0, altKey: true, clientX: 100 });
+  h.doc.fire('mousemove', { clientX: 120 });
+  h.doc.fire('mouseup', { clientX: 120 });
+  assert.deepEqual(edits.map((e) => e[0]), [{ kind: 'warp', mode: 'bottom', total: 2 }]);
+  // Back to one selected key: the box goes.
+  h.keyNodes()[1].fire('mousedown', { button: 0 });
+  h.doc.fire('mouseup', {});
+  assert.equal(boxes(h).length, 0);
+  delete Node.prototype.getBoundingClientRect;
+});
+
+test('dragging the grabbed key snaps to the work area with a guide line and commits the snapped shift; Cmd/Ctrl drags free', async () => {
+  const h = await harness({ propertyKeys: [3, 6] });
+  placeKeys(h);
+  const wrap = h.doc.createElement('div'); h.doc.body.appendChild(wrap);
+  h.doc.getElementById = (id) => (id === 'fg-wrap' ? wrap : wrap.children.find((c) => c.id === id) || null);
+  h.root.state.waOut = 11;
+  const edits = []; h.root.NemoNativeMotionKeyGesture = KeyGesture; h.root.NemoNativeMotionKeyBox = KeyBox;
+  h.ports.editSelectedKeys = (a) => { edits.push(a); return Promise.resolve(true); };
+  h.keyNodes()[0].fire('mousedown', { button: 0, clientX: 100 });
+  h.doc.fire('mousemove', { clientX: 170 }); // 7 frames: 3 -> 10, one frame from the work area end at 11
+  assert.equal(wrap.children[0].id, 'motion-snap-guide');
+  assert.equal(wrap.children[0].dataset.label, 'Fin zone · 12');
+  assert.equal(wrap.children[0].style.left, '115px');
+  h.doc.fire('mouseup', { clientX: 170 });
+  assert.deepEqual(edits, [{ kind: 'shift', delta: 8 }]);
+  assert.equal(wrap.children.length, 0, 'the guide is gone after the drop');
+  h.keyNodes()[0].fire('mousedown', { button: 0, clientX: 100 });
+  h.doc.fire('mousemove', { clientX: 170, metaKey: true });
+  h.doc.fire('mouseup', { clientX: 170, metaKey: true });
+  assert.deepEqual(edits.pop(), { kind: 'shift', delta: 7 }, 'Cmd disables the snap');
+  delete Node.prototype.getBoundingClientRect;
+});
+
+test('the key menu lists the colour palette and the per-key lock rows, and reaches the key route with one edit each', async () => {
+  const h = await harness({ propertyKeys: [2, 7, 10] });
+  const edits = []; h.root.NemoNativeMotionKeyGesture = KeyGesture;
+  h.ports.editSelectedKeys = (a) => { edits.push(a); return Promise.resolve(true); };
+  h.keyNodes()[0].fire('mousedown', { button: 0 }); h.keyNodes()[1].fire('mousedown', { button: 0, ctrlKey: true });
+  h.keyNodes()[1].fire('contextmenu', { clientX: 40, clientY: 50, button: 2 });
+  const menu = h.root.menus.pop();
+  assert.ok(menu.items.some((i) => i.label === 'Lock keyframes on:' && i.disabled));
+  menu.items.find((i) => i.label === '   • the out point').action();
+  assert.deepEqual(edits, [{ kind: 'lockTo', mode: 'out' }]);
+  menu.items.find((i) => i.label === 'Color the keys…').action();
+  const palette = h.root.menus.pop();
+  assert.deepEqual([palette.x, palette.y], [48, 58], 'the palette opens beside the click');
+  palette.items.find((i) => i.label === 'Pink').action();
+  assert.deepEqual(edits.pop(), { kind: 'color', color: '#ff6b8b' });
+  palette.items.find((i) => i.label === 'Remove the color').action();
+  assert.deepEqual(edits.pop(), { kind: 'color', color: null });
 });

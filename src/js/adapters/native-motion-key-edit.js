@@ -63,13 +63,17 @@
   function createEditor(ports) {
     let busy = false;
     const say = (key, fallback) => { try { ports.notify(ports.translate ? ports.translate(key, fallback) : fallback); } catch (_) { /* a notice must not break the edit */ } };
-    async function edit(action) {
+    // `opts` (optional): {order(a, b)} sorts the key tracks into the rows the gesture means (the engine reads rows in the order the
+    // selections first name each track), {expected(track, frames)} says where the selected frames of a track land.
+    async function edit(action, opts) {
       if (busy) return false;
       const view = ports.readKeyTimelines();
       if (!view) return null;
+      const order = opts && typeof opts.order === 'function' ? opts.order : null;
+      const list = order ? view.tracks.slice().sort(order) : view.tracks;
       const selections = [], opened = [], tracks = [];
       let count = 0;
-      view.tracks.forEach((track) => {
+      list.forEach((track) => {
         const frames = track.items.filter((k) => k.selected).map((k) => k.frame);
         opened.push({ target: track.target, property: track.property, frames });
         frames.forEach((frame) => selections.push({ target: track.target, property: track.property, frame }));
@@ -90,12 +94,12 @@
         applied = !!result && result.applied === true;
       } catch (_) {
         ok = false;
-        say(action.kind === 'shift' || action.kind === 'distribute' ? 'toastKeysCannotMoveThere' : 'toastKeyEditRefused',
-          action.kind === 'shift' || action.kind === 'distribute' ? 'These keys cannot move there.' : 'The key edit was refused.');
+        const moves = ['shift', 'distribute', 'warp'].includes(action.kind);
+        say(moves ? 'toastKeysCannotMoveThere' : 'toastKeyEditRefused', moves ? 'These keys cannot move there.' : 'The key edit was refused.');
       } finally {
         // The settled refresh closed the drawers whether or not the write landed; bring them back so the keys stay on the timeline.
         try {
-          for (const t of opened) await ports.reopen(t.target, t.property, applied ? expectedFrames(action, t.frames) : t.frames);
+          for (const t of opened) await ports.reopen(t.target, t.property, applied ? (opts && typeof opts.expected === 'function' ? opts.expected(t, t.frames) : expectedFrames(action, t.frames)) : t.frames);
         } catch (_) { /* the keys can be read again from the property row */ }
         busy = false;
       }

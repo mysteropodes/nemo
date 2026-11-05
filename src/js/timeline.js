@@ -5659,7 +5659,7 @@ function computeLayerRenderOrder(){
 // when they're already CONSECUTIVE in layer order (computeLayerRenderOrder
 // derives a folder's membership purely from adjacency, so a non-contiguous
 // selection would render wrong: reorder first, like Animate requires too).
-function groupSelectionIntoFolder(){
+function groupSelectionIntoFolder(){if(window.NemoNativeLayerRowUi&&window.NemoNativeLayerRowUi.group(window))return;
   if(_layerSel.length<2){showToast(SM.t('toastSelectAtLeast2LayersCap'));return;}
   var sorted=_layerSel.slice().sort(function(a,b){return a-b;});
   for(var k=1;k<sorted.length;k++)if(sorted[k]!==sorted[k-1]+1){showToast(SM.t('toastLayersMustBeConsecutive'));return;}

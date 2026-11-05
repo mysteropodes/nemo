@@ -165,7 +165,7 @@
     function dispose(){if(retired)return;retired=true;updateSerial++;resolveSerial++;pending=null;clearWait();invalidate();caller.dispose();}
     async function shortcut(k,shift){var before=baseScope();if(!before||!await update(false))return false;var after=baseScope();if(!after||before.session!==after.session||before.uiSignature!==after.uiSignature||before.context.frame!==after.context.frame)return false;return caller.shortcut(k,shift);}
     // #2524: a batch key edit on the open key tracks; same scope fence as a shortcut, the panel owns the write.
-    async function editKeys(action){var before=baseScope();if(!before||!await update(false))return null;var after=baseScope();if(!after||before.session!==after.session||before.uiSignature!==after.uiSignature||before.context.frame!==after.context.frame)return null;return caller.editKeys(action);}
+    async function editKeys(action,opts){var before=baseScope();if(!before||!await update(false))return null;var after=baseScope();if(!after||before.session!==after.session||before.uiSignature!==after.uiSignature||before.context.frame!==after.context.frame)return null;return caller.editKeys(action,opts);}
     var actionScopes=new WeakMap();
     function captureShortcutScope(){var value=baseScope();if(!value)return null;var token=Object.freeze({});actionScopes.set(token,{session:value.session,signature:value.uiSignature,identity:value.identity,frame:value.context.frame});return token;}
     function isShortcutScopeCurrent(token){var before=token&&actionScopes.get(token),after=baseScope();return !!before&&!!after&&before.session===after.session&&before.signature===after.uiSignature&&same(before.identity,after.identity)&&before.frame===after.context.frame;}
@@ -235,7 +235,7 @@
           readKeyTimeline:function(){return current()?binding.readKeyTimeline():null;},
           readKeyTimelines:function(){return current()?binding.readKeyTimelines():null;},
           captureSelectedKeys:function(){return current()?binding.captureSelectedKeys():null;},
-          editKeys:function(action){return current()?binding.editKeys(action):Promise.resolve(null);},
+          editKeys:function(action,opts){return current()?binding.editKeys(action,opts):Promise.resolve(null);},
           setKeyTimelineListener:function(fn){if(active!==entry||fn!==null&&(!current()||typeof fn!=='function'))return false;keyTimelineListener=fn;keyTimelineChanged('listener');return true;}});
         active=entry;
       }
@@ -252,7 +252,7 @@
     },render:function(container,context){
       if(!context||typeof context.isCurrent!=='function'||context.isCurrent()!==true)return null;
       return paint(context.ports,container,context.header,context.isCurrent)?active.handle:null;
-    },retire:retire,shortcut:function(key,shift){return active?active.binding.shortcut(key,shift):Promise.resolve(false);},editKeys:function(action){return active?active.binding.editKeys(action):Promise.resolve(null);},dispose:function(){if(retired)return;retire();retired=true;keyTimelineChanged('dispose');keyTimelineListener=null;}});
+    },retire:retire,shortcut:function(key,shift){return active?active.binding.shortcut(key,shift):Promise.resolve(false);},editKeys:function(action,opts){return active?active.binding.editKeys(action,opts):Promise.resolve(null);},dispose:function(){if(retired)return;retire();retired=true;keyTimelineChanged('dispose');keyTimelineListener=null;}});
   }
   // Stateful Motion surface: a provider owns DOM/read work, while this lease
   // routes actions only to its admitted handle. It owns no document state.
@@ -305,7 +305,7 @@
     }
     function call(method,args){var entry=owner;if(!entry||!current(entry)){release();return null;}var fn=entry.handle&&entry.handle[method];return typeof fn==='function'?fn.apply(entry.handle,args):null;}
     return Object.freeze({paint:paint,retire:retire,
-      shortcut:function(key,shift){return call('shortcut',[key,shift]);},editKeys:function(action){return call('editKeys',[action]);},
+      shortcut:function(key,shift){return call('shortcut',[key,shift]);},editKeys:function(action,opts){return call('editKeys',[action,opts]);},
       readKeyTimeline:function(){return call('readKeyTimeline',[]);},readKeyTimelines:function(){return call('readKeyTimelines',[]);},
       captureSelectedKeys:function(info){
         if(!disposed&&!owner&&root.state.appMode!=='motion'&&defaultProvider&&typeof defaultProvider.captureSelectedKeys==='function')return defaultProvider.captureSelectedKeys(info);

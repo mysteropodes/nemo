@@ -2,7 +2,8 @@
  * Baseline 1065e9d8 (src/js/timeline.js renderLayerList / startLayerRename / openLayerColorSwatches): double-click or F2 renames
  * in place (Enter or blur commits the trimmed name, Escape cancels), the colour dot opens the swatches (Shift+click selects every
  * layer wearing the colour), the folder chevron folds the folder, a vertical drag reorders, and the right-click menu offers
- * duplicate, delete, rename, split into layers, cut at the playhead and the colour. Every write is one native command from
+ * duplicate, delete, rename, group into a folder, split into layers, cut at the playhead, the shy mark, convert to component and the
+ * colour (Ctrl/Cmd+G is the same group). Every write is one native command from
  * native-layer-row-writes.js; this file renders nothing of its own state, reads the pinned project info at the moment of the
  * gesture, and has no fallback writer: with no native project every entry answers false so the caller keeps its own path. */
 (function (root, factory) {
@@ -19,6 +20,9 @@
     ctxDuplicateLayer: 'Duplicate the layer', ctxDeleteLayer: 'Delete the layer', elementsRename: 'Rename', hsLayerColour: 'Layer colour',
     ctxSplitIntoLayers: 'Split into layers (one shape per layer)', ctxCutAtPlayhead: 'Cut at the playhead  (⌘⇧D)', hsCannotDeleteLastLayer: 'The last layer cannot be deleted',
     toastLayerColorApplied: 'Color applied to {n} layers', toastLayersSelectedByColor: '{n} layers selected by color', autoNameShape: 'Shape', autoNameStroke: 'Stroke',
+    ctxGroupIntoFolder: 'Group into a folder', ctxConvertToComponent: 'Convert to component', ctxMarkAsShy: 'Mark as « shy »', ctxRemoveShyMark: 'Remove the « shy » mark',
+    toastSelectAtLeast2LayersCap: 'Select at least 2 layers', toastLayersMustBeConsecutive: 'Layers must be consecutive — reorder them first',
+    toastSelectedLayerAlreadyInFolder: 'A selected layer is already in a folder', toastLayerMarkedShyHint: 'Layer marked « shy » — turn on the switch to hide it',
     layerColorDotTitle: 'Layer color label — click to change it (applies to the whole selection), Shift+click to select every layer with this color',
   };
   const REFUSALS = { stale_selection: 'The layers changed - nothing was applied.', unavailable: 'This layer is locked or cannot be edited right now.', invalid_request: 'The layer change was not valid.' };
@@ -195,6 +199,35 @@
     return true;
   }
 
+  // Baseline groupSelectionIntoFolder (timeline.js @1065e9d8): two or more consecutive layers that sit in no folder are grouped under one
+  // new folder; each refusal explains itself with the baseline notice and writes nothing. The folder is the native Folder layer that adopts
+  // the selection (ONE layer.kind.create, so one revision and one history entry). Returns true when it owned the gesture.
+  function group(host) {
+    const b = native(host);
+    if (!b) return false;
+    const info = infoOf(b);
+    if (!info || inComponent(host)) { refusal(host, { ok: false, code: 'unavailable' }); return true; }
+    const L = info.layers, picked = (Array.isArray(host._layerSel) ? host._layerSel : []).filter((i, k, all) => Number.isInteger(i) && i >= 0 && i < L.length && all.indexOf(i) === k).sort((a, c) => a - c);
+    if (picked.length < 2) { toast(host, word(host, 'toastSelectAtLeast2LayersCap')); return true; }
+    if (picked.some((i, k) => k && i !== picked[k - 1] + 1)) { toast(host, word(host, 'toastLayersMustBeConsecutive')); return true; }
+    const inFolder = (l) => typeof l.folderId === 'string' || (typeof l.parentLayerUid === 'string' && L.some((o) => o.layerUid === l.parentLayerUid && o.kind === 'folder'));
+    if (picked.some((i) => inFolder(L[i]))) { toast(host, word(host, 'toastSelectedLayerAlreadyInFolder')); return true; }
+    const kinds = host.NemoNativeLayerKindsUi;
+    if (!kinds) { refusal(host, { ok: false, code: 'unavailable' }); return true; }
+    Promise.resolve(kinds.add(host, 'folder', picked)).catch(() => null);
+    return true;
+  }
+  // The shy mark (SM.toggleLayerShy is the native layer-policy edit). Marking a layer while the shy switch is off turns the switch on
+  // (the policy edit does it) and, like the baseline, says so.
+  function toggleShy(host, b, uid, index) {
+    const sm = host.SM, before = host.state && host.state.shyEnabled === true;
+    if (!sm || typeof sm.toggleLayerShy !== 'function') return;
+    Promise.resolve(sm.toggleLayerShy(index)).then(() => {
+      const now = infoOf(b), row = now && now.layers.find((l) => l.layerUid === uid);
+      if (row && row.shy === true && !before) toast(host, word(host, 'toastLayerMarkedShyHint'));
+    }).catch(() => null);
+  }
+
   // The right-click entries of a native layer row (the caller appends its Parent / Link / Duplicator entries).
   function menuItems(host, index) {
     const b = native(host), info = b && infoOf(b), layer = info && info.layers[index];
@@ -212,8 +245,11 @@
       { label: word(host, 'ctxDeleteLayer'), action: () => finish(host, b.writes.remove(menu())) },
       { sep: true },
       { label: word(host, 'elementsRename'), action: () => { startRename(host, uid); } },
+      { label: word(host, 'ctxGroupIntoFolder'), disabled: !Array.isArray(host._layerSel) || host._layerSel.length < 2, action: () => { group(host); } },
       { label: word(host, 'ctxSplitIntoLayers'), disabled: plain, action: () => finish(host, b.writes.split(uid, host.state.currentFrame)) },
       { label: word(host, 'ctxCutAtPlayhead'), action: () => { if (host.SM && typeof host.SM.splitLayerAtPlayhead === 'function') host.SM.splitLayerAtPlayhead(index); } },
+      { label: layer.shy === true ? word(host, 'ctxRemoveShyMark') : word(host, 'ctxMarkAsShy'), action: () => toggleShy(host, b, uid, index) },
+      { label: word(host, 'ctxConvertToComponent'), disabled: plain, action: () => { if (host.SM && typeof host.SM.convertActiveLayerToComponent === 'function') host.SM.convertActiveLayerToComponent(); } },
       { label: word(host, 'hsLayerColour'), action: () => { const row = rowFor(host, uid); if (row) openSwatches(host, b, uid, row); } },
     ], kinds.slice(1));
     if (layer.kind === 'folder') items.push({ label: layer.folderCollapsed ? 'Déplier le dossier' : 'Replier le dossier', action: () => toggleFolder(host, b, uid) });
@@ -239,5 +275,5 @@
     if (sel) startRename(host, sel.active);
     return true;
   }
-  return Object.freeze({ bind, menuItems, toolbar, shortcut, startRename, native });
+  return Object.freeze({ bind, menuItems, toolbar, shortcut, group, startRename, native });
 }));
