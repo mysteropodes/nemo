@@ -13,6 +13,7 @@
 //! edited" belong to Root F06.
 use crate::object_document::object_group_kernels::{
     object_selection_compound as compound, object_selection_compound_clones::apply_compound_clones,
+    object_selection_edit_clones::shift_frame_and_gradient,
 };
 use std::collections::HashSet;
 
@@ -24,8 +25,8 @@ use crate::object_document::object_group_kernels::object_group_plan::{
     plan_group_edit, GroupEdit, GroupPlanError,
 };
 use crate::object_document::object_group_kernels::object_selection_edit_frames::{
-    drop_stroke_holders, in_cell, in_layer, remove_elements, resolve_frame, EditMode,
-    HeldFramePromotion, PromotionRefusal, Resolved,
+    drop_stroke_holders, effective_frame, in_cell, in_layer, remove_elements, resolve_frame,
+    EditMode, HeldFramePromotion, PromotionRefusal, Resolved,
 };
 use crate::object_document::object_group_kernels::object_selection_edit_groups::{
     entries_of, tag_of,
@@ -363,18 +364,30 @@ pub(crate) fn plan_delete(
 /// layer cell, nudged by `offset` (the baseline nudge, `DUPLICATE_OFFSET_PX` on both axes, or the
 /// distance of an Alt-drag), with fresh identities, fresh combine groups for the groups the copies
 /// belong to, and the originals untouched.
+///
+/// `others` are shapes of OTHER layers (layer uid, stroke ids) the same gesture selected: the baseline materialises every selected path
+/// into the ACTIVE layer (`_materializeClones(snaps, userLayers[state.activeLayerIdx], ...)`), so each of them is cloned, from the cell
+/// its own layer shows at the frame, into the destination cell, in the same plan (one revision, one history entry). Their groups do not
+/// travel (the baseline passes the active layer's group table only), they are read and never written, and a locked source is fine.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn plan_duplicate(
     document: &ObjectDocument,
     request: &SelectionRequest<'_>,
     promotion: &dyn HeldFramePromotion,
     offset: [f64; 2],
+    dragged: bool,
+    others: &[(&str, &[String])],
     ids: &mut dyn IdSource,
 ) -> Result<SelectionPlan, SelectionError> {
     let index = check_target(document, request.layer_uid, request.frame)?;
-    if request.stroke_ids.is_empty() {
+    if request.stroke_ids.is_empty() && others.is_empty() {
         return Ok(SelectionPlan::unchanged(document, request.frame));
     }
     check_ids(request.stroke_ids)?;
+    for (uid, strokes) in others {
+        layer_index(document, uid)?;
+        check_ids(strokes)?;
+    }
     let (mut work, frame, promoted) = open_cell(
         document,
         index,
@@ -384,46 +397,72 @@ pub(crate) fn plan_duplicate(
         promotion,
     )?;
     let (context, layer) = (request.context_id, request.layer_uid);
-    let selection = compound::resolve(&work, context, layer, frame, request.stroke_ids)?;
-    let records = selection.records;
-    let table = work.layers[index]
-        .groups
-        .value()
-        .filter(|table| table.context_id == context)
-        .cloned();
-    let (tags, entries): (Vec<Option<String>>, Option<Vec<GroupEntry>>) = match &table {
-        Some(table) => (
-            records
-                .iter()
-                .map(|record| tag_of(table, &record.target.stroke_id))
-                .collect(),
-            Some(
-                entries_of(table)
-                    .ok_or_else(|| SelectionError::TableUnreadable(layer.to_string()))?,
+    // The shapes to copy, one source cell at a time: the destination's own selection first (with its combine groups), then each other layer's.
+    let mut sources: Vec<(String, u32, Vec<String>)> = Vec::new();
+    if !request.stroke_ids.is_empty() {
+        sources.push((layer.to_string(), frame, request.stroke_ids.to_vec()));
+    }
+    for (uid, strokes) in others {
+        let at = layer_index(&work, uid)?;
+        // The cell the playhead shows on that layer: a held frame shows its key, before every key nothing is shown.
+        let shown = effective_frame(&work.layers[at], context, request.frame)
+            .ok_or_else(|| SelectionError::UnknownStroke(strokes[0].clone()))?;
+        sources.push((uid.to_string(), shown, strokes.to_vec()));
+    }
+    let mut created: Vec<String> = Vec::new();
+    let mut created_groups: Vec<String> = Vec::new();
+    for (uid, cell, strokes) in &sources {
+        let selection = compound::resolve(&work, context, uid, *cell, strokes)?;
+        let records = selection.records;
+        let own = uid == layer;
+        let table = work.layers[index]
+            .groups
+            .value()
+            .filter(|table| own && table.context_id == context)
+            .cloned();
+        let (tags, entries): (Vec<Option<String>>, Option<Vec<GroupEntry>>) = match &table {
+            Some(table) => (
+                records
+                    .iter()
+                    .map(|record| tag_of(table, &record.target.stroke_id))
+                    .collect(),
+                Some(
+                    entries_of(table)
+                        .ok_or_else(|| SelectionError::TableUnreadable(layer.to_string()))?,
+                ),
             ),
-        ),
-        None => (vec![None; records.len()], None),
-    };
-    let clones = apply_compound_clones(
-        &mut work,
-        index,
-        context,
-        frame,
-        &records,
-        &selection.rasters,
-        &tags,
-        entries.as_deref(),
-        offset,
-        ids,
-    )?;
+            None => (vec![None; records.len()], None),
+        };
+        let clones = apply_compound_clones(
+            &mut work,
+            index,
+            context,
+            frame,
+            &records,
+            &selection.rasters,
+            &tags,
+            entries.as_deref(),
+            offset,
+            ids,
+        )?;
+        created.extend(clones.created);
+        created_groups.extend(clones.created_groups);
+    }
+    if dragged {
+        for record in &mut work.objects {
+            if created.contains(&record.target.stroke_id) {
+                shift_frame_and_gradient(record, offset)?;
+            }
+        }
+    }
     Ok(SelectionPlan::changed(
         document,
         work,
         frame,
         promoted,
         Vec::new(),
-        clones.created,
-        clones.created_groups,
+        created,
+        created_groups,
         Vec::new(),
         Vec::new(),
     ))

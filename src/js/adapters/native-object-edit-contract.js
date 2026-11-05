@@ -105,6 +105,10 @@
     stamps: (v,at)=>{if(!Array.isArray(v)||v.length>256||new Set(v).size!==v.length||v.some((f)=>!Number.isInteger(f)||f<0||f>4294967295))fail(at+' requires at most 256 distinct frames');},
     mask: (v,at)=>{if(v!==false&&!(typeof v==='string'&&v.length>0&&bytes(v)<=64&&!/[\u0000-\u001f\u007f-\u009f]/.test(v)))fail(at+' requires false or a mask mode');},
     offset: (v, at) => { if (!Array.isArray(v) || v.length !== 2 || v.some((n) => typeof n !== 'number' || !Number.isFinite(n) || Math.abs(n) > 1e6)) fail(`${at} must be a finite [dx, dy] pair within 1e6`); },
+    // A multi-layer duplicate's other layers: one to 32 {layerUid, strokeIds}, each layer once, each with one or more distinct stroke identities.
+    others: (v, at) => { list(v, at, 1, 32, (entry, i) => { exact(entry, ['layerUid', 'strokeIds'], [], i); uid(entry.layerUid, `${i}.layerUid`);
+      list(entry.strokeIds, `${i}.strokeIds`, 1, MAX_ITEMS, (id, j) => text(id, MAX_ID, j)); if (new Set(entry.strokeIds).size !== entry.strokeIds.length) fail(`${i}.strokeIds repeats a shape`); });
+      if (new Set(v.map((entry) => entry.layerUid)).size !== v.length) fail(`${at} repeats a layer`); },
     uid: uid, layerUid: layerUid, layerUids: (v, at) => { list(v, at, 1, MAX_ITEMS, opaque); if (new Set(v).size !== v.length) fail(`${at} repeats a layer`); },
     gap: (v, at) => { if (typeof v !== 'number' || !Number.isFinite(v)) fail(`${at} must be a finite number`); },
     selection: selection, name: (v, at) => { if (typeof v !== 'string') fail(`${at} must be a string`); },
@@ -128,8 +132,8 @@
     'group.rename': ['object.group.rename', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['groupId', 'groupId'], ['name', 'groupName']]],
     'group.member.remove': ['object.group.member.remove', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['strokeId', 'strokeId']]],
     'selection.delete': ['object.selection.delete', 'command', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['strokeIds', 'strokeIds0']]],
-    // offset: where the copies land (an Alt-drag duplicate, record space); absent is the baseline 12 px nudge.
-    'selection.duplicate': ['object.selection.duplicate', 'command', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['strokeIds', 'strokeIds0']], [['offset', 'offset']]],
+    // offset: where the copies land (an Alt-drag duplicate, record space); absent is the baseline 12 px nudge. others: shapes of other layers the copy also takes (a selection that spans layers).
+    'selection.duplicate': ['object.selection.duplicate', 'command', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['strokeIds', 'strokeIds0']], [['offset', 'offset'], ['others', 'others']]],
     'layer.split': ['object.layer.split', 'command', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['labels', 'labels']]],
     'clipboard.paste': ['object.clipboard.paste', 'command', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['clip', 'clip']]],
     'boolean.apply': ['object.boolean.apply', 'command', [['mode', 'booleanMode'], ['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['strokeIds', 'strokeIds2']]],

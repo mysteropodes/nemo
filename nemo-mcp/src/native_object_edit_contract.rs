@@ -38,6 +38,8 @@ enum K {
     Footprint,
     /// An Alt-drag duplicate's distance: a finite `[dx, dy]` pair, each component at most 1e6.
     Offset,
+    /// A multi-layer duplicate's other layers: one to 32 `{layerUid, strokeIds}` with distinct layers and one or more distinct stroke identities each.
+    Others,
     Fill(fill::Field),
 }
 
@@ -98,7 +100,7 @@ static SPECS: [(&str, &str, &str); 21] = [
     (
         "selection.duplicate",
         "object.selection.duplicate",
-        "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0 offset:offset?",
+        "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0 offset:offset? others:others?",
     ),
     (
         "layer.split",
@@ -239,6 +241,7 @@ fn kind(token: &str) -> Option<K> {
         "clip" => K::Clip,
         "footprint" => K::Footprint,
         "offset" => K::Offset,
+        "others" => K::Others,
         _ => K::Fill(fill::kind(token)?),
     })
 }
@@ -274,6 +277,7 @@ fn check(kind: K, value: &Value) -> bool {
         K::Clip => clipboard::clip(value),
         K::Footprint => footprint(value),
         K::Offset => offset(value),
+        K::Others => clipboard::others(value),
         K::Fill(field) => fill::check(field, value),
     }
 }

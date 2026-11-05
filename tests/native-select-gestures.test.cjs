@@ -733,7 +733,7 @@ test('Alt+press on empty space inside the selection box still copies the selecti
   assert.deepEqual(h.calls[0].offset, [30, 20]);
 });
 
-test('Escape mid-drag, a click without a drag, and a drag that ends where it began send no duplicate', async () => {
+test('Escape mid-drag sends no duplicate; an Alt+click without a drag, and a drag that ends where it began, leave the copy where the original is (baseline: the clone is made at the press)', async () => {
   const h = altHarness([BIG, FAR]), outlines = () => h.svg().children.filter((c) => c.tag === 'path').length;
   await h.select(35, 35);
   const resting = outlines();
@@ -743,10 +743,22 @@ test('Escape mid-drag, a click without a drag, and a drag that ends where it beg
   assert.equal(h.calls.length, 0);
   assert.equal(outlines(), resting, 'the preview is cleared');
   h.press(60, 60, { altKey: true }); await h.release(60, 60, { altKey: true }); await settle();
-  assert.equal(h.calls.length, 0, 'a plain Alt-click copies nothing');
+  assert.equal(h.calls.length, 1, 'a plain Alt-click leaves an in-place copy');
+  assert.deepEqual(h.calls[0].offset, [0, 0]);
+  assert.equal(outlines(), resting);
+  h.press(60, 60, { altKey: true }); h.press(61, 60, { altKey: true }); await h.release(62, 61, { altKey: true }); await settle();
+  assert.equal(h.calls.length, 2, 'a press that moves under the drag threshold is still a click');
+  assert.deepEqual(h.calls[1].offset, [0, 0], 'the copy sits exactly on the original');
   h.press(60, 60, { altKey: true }); h.drag(90, 90, { altKey: true }); h.drag(60, 60, { altKey: true }); await settle(); await h.release(60, 60, { altKey: true }); await settle();
-  assert.equal(h.calls.length, 0, 'back at the start is no move');
+  assert.equal(h.calls.length, 3, 'back at the start is a copy in place, not a move');
+  assert.deepEqual(h.calls[2].offset, [0, 0]);
   assert.deepEqual(h.batches, []);
+  // Without Alt a click is only a selection; an Alt press outside the selection box never copies.
+  const plain = altHarness([BIG, FAR]);
+  await plain.select(35, 35);
+  plain.press(60, 60); await plain.release(60, 60); await settle();
+  plain.press(170, 170, { altKey: true }); await plain.release(170, 170, { altKey: true }); await settle();
+  assert.equal(plain.calls.length, 0);
 });
 
 test('Escape between the release and the send cancels; a document that moved on during the drag sends nothing and says so', async () => {

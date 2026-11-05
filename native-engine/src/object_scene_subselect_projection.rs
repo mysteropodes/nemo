@@ -53,7 +53,15 @@ pub(crate) fn matrices_hit(
     packet: &ObjectFramePacket,
     index: usize,
 ) -> Result<BTreeMap<usize, [f64; 6]>, &'static str> {
-    layer_matrices(packet, index, None, true)
+    layer_posed(packet, index, None, true).map(|(map, _)| map)
+}
+/// [`matrices_hit`] with the affine the layer's own Motion and parent chain apply to everything it holds (identity for a layer with no
+/// Motion, no content bounds to pivot on, or no parent): what a pointer on the canvas is mapped through to reach a record's own space.
+pub(crate) fn matrices_hit_posed(
+    packet: &ObjectFramePacket,
+    index: usize,
+) -> Result<(BTreeMap<usize, [f64; 6]>, [f64; 6]), &'static str> {
+    layer_posed(packet, index, None, true)
 }
 fn layer_matrices(
     packet: &ObjectFramePacket,
@@ -61,6 +69,14 @@ fn layer_matrices(
     preview: Option<&ObjectRecord>,
     hit: bool,
 ) -> Result<BTreeMap<usize, [f64; 6]>, &'static str> {
+    layer_posed(packet, index, preview, hit).map(|(map, _)| map)
+}
+fn layer_posed(
+    packet: &ObjectFramePacket,
+    index: usize,
+    preview: Option<&ObjectRecord>,
+    hit: bool,
+) -> Result<(BTreeMap<usize, [f64; 6]>, [f64; 6]), &'static str> {
     let layer = &packet.source_layers()[index];
     // #2256: Select's hit-test listing reads an entered component like the scene; the editable (Subselect) listing stays scene-root.
     if !hit && packet.context_id() != "scene-root" {
@@ -132,7 +148,8 @@ fn layer_matrices(
     for entry in parents {
         outer = affine(&entry) * outer;
     }
-    element_matrices(packet, sources, preview, outer)
+    let pose = outer.as_coeffs();
+    element_matrices(packet, sources, preview, outer).map(|map| (map, pose))
 }
 
 /// #2372 hit-test listing of a layer that also paints Text or raster items: its vectors take the pose of the union of all
@@ -142,7 +159,15 @@ pub(crate) fn hit_matrices(
     index: usize,
     chains: &crate::object_render_scene::text_scene::parent_chain::SceneParentChains,
 ) -> Result<BTreeMap<usize, [f64; 6]>, &'static str> {
-    shared_matrices(packet, index, None, chains, true)
+    shared_posed(packet, index, None, chains, true).map(|(map, _)| map)
+}
+/// [`hit_matrices`] with the layer's shared pose (see [`matrices_hit_posed`]).
+pub(crate) fn hit_matrices_posed(
+    packet: &ObjectFramePacket,
+    index: usize,
+    chains: &crate::object_render_scene::text_scene::parent_chain::SceneParentChains,
+) -> Result<(BTreeMap<usize, [f64; 6]>, [f64; 6]), &'static str> {
+    shared_posed(packet, index, None, chains, true)
 }
 /// #2372 editable (Direct Select) listing of the VECTOR records of a layer that also paints Text or raster items. They take the
 /// same shared chain as the hit-test listing, so the listing and the geometry agree; the image and text items are no vector
@@ -154,15 +179,15 @@ pub(crate) fn mixed_matrices(
     preview: Option<&ObjectRecord>,
     chains: &crate::object_render_scene::text_scene::parent_chain::SceneParentChains,
 ) -> Result<BTreeMap<usize, [f64; 6]>, &'static str> {
-    shared_matrices(packet, index, preview, chains, false)
+    shared_posed(packet, index, preview, chains, false).map(|(map, _)| map)
 }
-fn shared_matrices(
+fn shared_posed(
     packet: &ObjectFramePacket,
     index: usize,
     preview: Option<&ObjectRecord>,
     chains: &crate::object_render_scene::text_scene::parent_chain::SceneParentChains,
     hit: bool,
-) -> Result<BTreeMap<usize, [f64; 6]>, &'static str> {
+) -> Result<(BTreeMap<usize, [f64; 6]>, [f64; 6]), &'static str> {
     let layer = &packet.source_layers()[index];
     if !hit && packet.context_id() != "scene-root" {
         return Err("Subselect editing is unavailable inside a component");
@@ -206,7 +231,8 @@ fn shared_matrices(
     }
     .map_err(|failure| failure.reason())?;
     let outer = chain.iter().fold(Affine::IDENTITY, |outer, entry| affine(entry) * outer);
-    element_matrices(packet, sources, preview, outer)
+    let pose = outer.as_coeffs();
+    element_matrices(packet, sources, preview, outer).map(|map| (map, pose))
 }
 
 /// Each record's own element Motion (pivot at its canonical cubic bounds) on top of the layer's `outer` pose.

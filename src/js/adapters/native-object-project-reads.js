@@ -332,7 +332,7 @@
         o.workId, o.viewGeneration, selector.layerUid, selector.frame].join('|');
       if (!presented.has(key)) {
         if (presented.size >= 24) presented.delete(presented.keys().next().value);
-        presented.set(key, { items: null, geometry: new Map() });
+        presented.set(key, { items: null, pose: null, geometry: new Map() });
       }
       return presented.get(key);
     }
@@ -342,14 +342,14 @@
       await settle(o);const entry=presentedEntry(o,selector);let items;
       if(entry.items)items=entry.items.map(i=>Object.assign({},i));
       else{
-        let cursor=0,total=null;items=[];
+        let cursor=0,total=null,pose=null;items=[];
         for(;;){
           const view=Object.assign({kind:'subselect',workId:o.workId,viewGeneration:o.viewGeneration,cursor:cursor,limit:8,hitTest:true},selector);
           const r=await queryBody(o,{atRevision:o.info.contentRevision,documentSnapshotId:o.info.documentSnapshotId,view:view});
           if(total!==null&&total!==r.total)throw fault('uncorrelated','Presented strokes changed between pages');
-          total=r.total;items=items.concat(r.items);if(r.nextCursor===null)break;cursor=r.nextCursor;
+          total=r.total;items=items.concat(r.items);if(r.layerMatrix)pose=r.layerMatrix.slice();if(r.nextCursor===null)break;cursor=r.nextCursor;
         }
-        requireCurrent(o);entry.items=items.map(i=>Object.assign({},i));
+        requireCurrent(o);entry.items=items.map(i=>Object.assign({},i));entry.pose=pose;
       }
       const geometryOf=async(item,center)=>{
         const k=stable(item.stableTarget)+(center?'|c':''),hit=entry.geometry.get(k);if(hit)return hit;
@@ -365,7 +365,7 @@
         if(centres&&item.role==='ribbon'){const c=await geometryOf(item,true);
           item.center=c.segments.map((a,i)=>({point:a.point,handleIn:a.handleIn,handleOut:a.handleOut,width:c.widths[i]}));}
       }
-      requireCurrent(o);return freeze({info:copyPins(o.info),presentation:o.presentation,items:items});
+      requireCurrent(o);return freeze({info:copyPins(o.info),presentation:o.presentation,items:items,layerMatrix:entry.pose?entry.pose.slice():null});
     }
     async function previewSubselect(selector,stableTarget,intent,pin){
       const o=origin(selector,pin);if(!o||!target(stableTarget)||stableTarget.contextId!==selector.contextId||stableTarget.layerUid!==selector.layerUid)throw fault('unavailable','Subselect preview origin changed');

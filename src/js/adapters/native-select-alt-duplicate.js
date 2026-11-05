@@ -5,8 +5,9 @@
  * ONE object.selection.duplicate with an `offset` through the clipboard module's duplicateAt: one revision, one history entry, the whole compound
  * (a ribbon with its linked fill and centreline, a texture anchor with its dabs, a bitmap brush with its raster, a combine group with fresh ids) cloned by
  * the same engine kernel as Cmd+D, the clones selected afterwards. Nothing is written while the pointer moves; Escape, a lost capture or a document
- * that moved on since the press end the gesture with no write (P25). Not carried over: a selection spanning layers (Duplicate is one layer; the
- * notice is Duplicate's own), and the baseline's press-time clone (a plain Alt-click without a drag changes nothing here). No document state is held. */
+ * that moved on since the press end the gesture with no write (P25). A selection spanning layers is cloned into the active layer as in the baseline (the clipboard
+ * module's duplicate names the other layers' shapes). The baseline's press-time clone is the zero distance of a plain Alt-click: the gesture hands this module the
+ * identity, and the copy stays where the original is. No document state is held. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;

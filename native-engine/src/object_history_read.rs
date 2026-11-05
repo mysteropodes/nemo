@@ -15,6 +15,8 @@ const DEFAULT_BEFORE: u64 = 20;
 /// Longest label kept (characters); a label is display text, never an identifier.
 const MAX_LABEL: usize = 32;
 const DEFAULT_LABEL: &str = "Edit";
+/// The label of an eraser bite's history entry.
+pub(crate) const ERASE_LABEL: &str = "Erase";
 
 /// Short display labels of history entries, keyed by the entry's `after_revision` (unique per entry,
 /// and stable when the entry moves between the undo and redo stacks). Entries committed outside the
@@ -30,6 +32,11 @@ impl HistoryLabels {
         if let Some(label) = self.0.remove(&old) {
             self.0.insert(new, label);
         }
+    }
+    /// True when the undo entry ending at `after_revision` was left by an eraser bite (the label every `boolean.erase` entry gets): the
+    /// only kind of entry a `joinHistory` bite may continue.
+    pub(crate) fn is_erase(&self, after_revision: u64) -> bool {
+        self.0.get(&after_revision).is_some_and(|label| label == ERASE_LABEL)
     }
     fn get(&self, after_revision: u64) -> &str {
         self.0
@@ -116,7 +123,7 @@ pub(crate) fn label_for(operation: &str, payload: &Value) -> String {
         "selection.delete" => "Delete",
         "selection.duplicate" => "Duplicate",
         "boolean.apply" => "Boolean",
-        "boolean.erase" => "Erase",
+        "boolean.erase" => ERASE_LABEL,
         "boolean.flatten" => "Flatten",
         "group.create" => "Group",
         "group.ungroup" => "Ungroup",

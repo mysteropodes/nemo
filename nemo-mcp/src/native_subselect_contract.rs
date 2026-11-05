@@ -63,12 +63,19 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
                 "items",
                 "preview",
             ],
-            &["hitTest"],
+            &["hitTest", "layerMatrix"],
         )
         .is_none()
         || r["preview"].as_bool() != Some(p["view"].get("preview").is_some())
         || r.get("hitTest").is_some() != p["view"].get("hitTest").is_some()
         || r.get("hitTest").is_some_and(|h| h != true)
+        // The layer's own pose (Motion and parent chain) rides a hit-test listing only: six finite numbers, never singular.
+        || r.get("layerMatrix").is_some_and(|m| r.get("hitTest").is_none() || !m.as_array().is_some_and(|m| {
+            m.len() == 6 && m.iter().all(|v| v.as_f64().is_some_and(f64::is_finite)) && {
+                let n: Vec<f64> = m.iter().filter_map(serde_json::Value::as_f64).collect();
+                (n[0] * n[3] - n[1] * n[2]).abs() >= 1e-12
+            }
+        }))
         || r["atRevision"] != p["atRevision"]
         || r["documentSnapshotId"] != p["documentSnapshotId"]
         || r["documentSnapshotId"].as_str()

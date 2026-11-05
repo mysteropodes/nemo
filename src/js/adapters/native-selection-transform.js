@@ -61,10 +61,11 @@
     return !!st && st.tool === 'select' && st.appMode !== 'motion' && selected(root).length > 0 && !!route(root);
   }
   // Why the selection cannot be transformed here, as a notice; 'none' when there is nothing selected (the baseline did nothing then); null when it can.
-  function refusal(root, vertex) {
+  function refusal(root, vertex, flipping) {
     var st = root.state;
     if (!(root.selectedPaths || []).length) return 'none';
-    if (st && st.appMode === 'motion') return 'Transforming the selection is not available in Motion on native projects yet.';
+    // The baseline flips in any mode (the key a held frame inherits is mirrored in place in Motion); the fields and arrow keys stay Animation 2D's.
+    if (st && st.appMode === 'motion' && !flipping) return 'Transforming the selection is not available in Motion on native projects yet.';
     if (vertex) return 'Editing the selected points from here is not available on native projects yet.';
     if (!st || st.tool !== 'select') return 'Switch to the Select tool (V) to transform the selection.';
     if (!selected(root).length) return 'Select items to transform them.';
@@ -222,7 +223,7 @@
       if (typeof root.showToast === 'function') try { root.showToast(t || 'Select strokes'); } catch (_) {} // every press, as the baseline did
       return Promise.resolve({ status: 'noop' });
     }
-    var why = refusal(root, false);
+    var why = refusal(root, false, true);
     if (why && why !== 'none') { notice(root, why); return Promise.resolve({ status: 'unavailable' }); }
     if (s.pending) return flush(root).then(function () { return flip(root, axis); }); // a typed value first, then the flip
     if (s.inflight) return s.chain.then(function () { return flip(root, axis); }); // read the selection the commit in flight re-read

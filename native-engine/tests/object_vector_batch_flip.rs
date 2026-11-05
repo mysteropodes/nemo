@@ -223,3 +223,29 @@ fn a_dynamic_shape_takes_a_mirror_through_its_scale_kernel() {
     );
     assert_eq!(owner.history_depths(), (1, 0));
 }
+
+/// Motion mode edits the key a held frame inherits (select ops: "Animation 2D promotes the cell, Motion edits the key it inherits"): the step
+/// names the key's own cell and no copy key is sent, so the shared key is mirrored in place and no new key appears.
+#[test]
+fn a_flip_in_motion_mirrors_the_inherited_key_in_place_without_keying_the_held_frame() {
+    let mut source = document(2, vec![square("s-a", Value::Null)], None);
+    source["layers"][0]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+        "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+    let mut owner = owner_of(&source);
+    let before = state(&owner);
+    let mut step = reshape("s-a", FLIP_H);
+    step["frame"] = json!(0);
+    let r = send(&mut owner, "motion", batch(vec![step]));
+    assert_eq!(r["ok"], true, "{r}");
+    let after = state(&owner);
+    assert_eq!(after["layers"][0]["timing"]["keys"], json!([{"frame":0}]), "no key was added at the held frame");
+    let xs: Vec<f64> = at(&owner, "s-a")["geometry"]["segments"].as_array().unwrap().iter().map(|s| xy(&s["point"])[0]).collect();
+    assert_eq!(xs, vec![100., 0., 0., 100.], "the key every held frame shows is mirrored");
+    assert_eq!(owner.history_depths(), (1, 0), "one gesture, one history entry");
+    owner.undo(1).unwrap();
+    assert_eq!(state(&owner), before);
+    // A held frame named without the copy key still has no records of its own: the step must name the key's cell.
+    let mut held = reshape("s-a", FLIP_H);
+    held["frame"] = json!(3);
+    assert_eq!(send(&mut owner, "held", batch(vec![held]))["ok"], false);
+}

@@ -41,12 +41,17 @@ impl ObjectCompositionWitness {
         // the editable (vertex) listing alike, so the listing and the per-item geometry agree (#2372).
         let shared = packet.raster_records().any(|r| r.layer_index() == index)
             || packet.text_records().any(|r| r.layer_index() == index);
+        let mut layer_pose = None;
         let matrices = if shared && hit_test {
-            subselect::hit_matrices(packet, index, &self.plan().native_parent_chains())?
+            let (map, pose) = subselect::hit_matrices_posed(packet, index, &self.plan().native_parent_chains())?;
+            layer_pose = Some(pose);
+            map
         } else if shared {
             subselect::mixed_matrices(packet, index, edited.as_ref(), &self.plan().native_parent_chains())?
         } else if hit_test {
-            subselect::matrices_hit(packet, index)?
+            let (map, pose) = subselect::matrices_hit_posed(packet, index)?;
+            layer_pose = Some(pose);
+            map
         } else {
             subselect::matrices_with_preview(packet, index, edited.as_ref())?
         };
@@ -193,7 +198,8 @@ impl ObjectCompositionWitness {
             items,
             preview,
         )
-        .with_hit_test(hit_test))
+        .with_hit_test(hit_test)
+        .with_layer_pose(layer_pose))
     }
 }
 

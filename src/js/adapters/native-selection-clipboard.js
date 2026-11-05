@@ -61,27 +61,43 @@
 
   // ---- reads ---------------------------------------------------------------------------------------------------------------------------------
   // The selection read again at the presented revision: fresh paths in paint order and the whole layer's listing (the "before" of a duplicate).
+  // A Duplicate may span layers (baseline duplicateSelection: every selected path is cloned into the ACTIVE layer): then the destination is the active layer,
+  // its own selected shapes are `ids`, and the shapes of every other layer travel as `others` ({ layerUid, ids }), all read at the same pin.
   async function prepare(host, what) {
     var s = session(host), I = host.NemoSelectCanvasIntent, shown = host.selectedPaths || [];
     if (!s || !I) return fail(host, 'unavailable', what + ' is not available right now.');
     if (!shown.length) return { failed: true, status: 'noop' };
     var paths = selected(host);
     if (paths.length !== shown.length) return fail(host, 'refused', 'Select shapes on the canvas first.');
-    if (paths.some(function (p) { return p.data.nativeLayerIndex !== paths[0].data.nativeLayerIndex; })) return fail(host, 'refused', 'Select shapes on one layer to ' + what.toLowerCase() + ' them.');
+    var spans = paths.some(function (p) { return p.data.nativeLayerIndex !== paths[0].data.nativeLayerIndex; });
+    if (spans && what !== 'Duplicate') return fail(host, 'refused', 'Select shapes on one layer to ' + what.toLowerCase() + ' them.');
+    var dest = spans ? host.state.activeLayerIdx : paths[0].data.nativeLayerIndex;
+    if (!Number.isInteger(dest)) return fail(host, 'refused', 'Select a layer to ' + what.toLowerCase() + ' into.');
     // An edit still waiting in the style panel's quiet window commits to the cell it was made on before this request reads the shapes.
     if (host.NemoNativeSelectionStyle && typeof host.NemoNativeSelectionStyle.flush === 'function') host.NemoNativeSelectionStyle.flush(host);
-    var intent = intentFor(host, s), pin = livePin(s), want = idsOf(paths), layers = null;
+    var intent = intentFor(host, s), pin = livePin(s), layers = null, others = [];
     if (!intent) return fail(host, 'unavailable', what + ' is not available right now.');
+    var mine = paths.filter(function (p) { return p.data.nativeLayerIndex === dest; }), want = idsOf(mine), more = [];
+    paths.forEach(function (p) {
+      var at = p.data.nativeLayerIndex, group = more.filter(function (g) { return g.idx === at; })[0];
+      if (at === dest) return;
+      if (group) group.want.push(p.data.strokeId); else more.push({ idx: at, want: [p.data.strokeId] });
+    });
     try {
       await I.presentedSettled(host);
-      layers = await I.layerPaths(host, function (item) { return want.indexOf(item.stableTarget.strokeId) >= 0; }, false, paths[0].data.nativeLayerIndex);
+      layers = await I.layerPaths(host, function (item) { return want.indexOf(item.stableTarget.strokeId) >= 0; }, false, dest);
+      for (var k = 0; k < more.length && layers; k++) {
+        var group = more[k], read = await I.layerPaths(host, function (item) { return group.want.indexOf(item.stableTarget.strokeId) >= 0; }, false, group.idx);
+        if (!read || read.paths.length !== group.want.length || !samePin(read.pin, pin)) layers = null; else others.push({ layerUid: read.layerUid, ids: idsOf(read.paths) });
+      }
     } catch (_) { layers = null; }
     if (!layers || layers.paths.length !== want.length || !samePin(layers.pin, pin) || !samePin(livePin(s), pin)) return fail(host, 'stale', 'The selection changed — nothing was changed.');
-    return { I: I, intent: intent, original: paths, layers: layers, ids: idsOf(layers.paths), context: I.heldId(host), idx: paths[0].data.nativeLayerIndex };
+    return { I: I, intent: intent, original: paths, layers: layers, ids: idsOf(layers.paths), others: others, context: I.heldId(host), idx: dest };
   }
   function target(host, c, offset) {
     var out = { contextId: c.context, layerUid: c.layers.layerUid, frame: c.layers.frame, mode: modeOf(host), strokeIds: c.ids };
     if (offset) out.offset = [offset[0], offset[1]];
+    if (c.others && c.others.length) out.others = c.others.map(function (o) { return { layerUid: o.layerUid, strokeIds: o.ids.slice() }; });
     return out;
   }
   async function commit(host, call, what) {

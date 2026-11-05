@@ -31,20 +31,20 @@ async function fixture(options = {}) {
     const applied = options.applied ? options.applied(request, log.length) : true;
     return { applied, result: { applied, historyEntriesAdded: applied ? (request.payload.joinHistory === true ? 0 : 1) : 0 } };
   } });
-  const flags = { locked: false, visible: true };
+  const flags = { locked: false, visible: true, facts: {} };
   const canvas = new El('canvas'), area = new El('div'), body = new El('body');
   canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 640, height: 360 });
   const fields = { 'p-erasersize': { value: '14' } };
   const doc = { body, documentElement: { clientWidth: 1000, clientHeight: 800, classList: { contains: () => true } },
     getElementById: (id) => ({ 'drawing-canvas': canvas, 'canvas-area': area }[id] || fields[id] || null), createElementNS: (ns, tag) => new El(tag) };
   const session = { blocksLegacy: () => true, isActive: () => true, requestId: (l) => h.ports.requestId(l),
-    info: () => ({ ...h.ports.pin(), canvasW: 640, canvasH: 360, lifecycleGeneration: 1, layers: [{ layerUid: 'layer-a', locked: flags.locked, visible: flags.visible }] }),
+    info: () => ({ ...h.ports.pin(), canvasW: 640, canvasH: 360, lifecycleGeneration: 1, layers: [{ layerUid: 'layer-a', locked: flags.locked, visible: flags.visible, ...flags.facts }] }),
     readPresentedObjectSession(why) { if (options.busy && options.busy()) { if (why) why('queue-pending'); return null; } const pin = session.info(); return { ...pin, presentation: { ...pin, owner: 'native', status: 'presented', frame: root.state.currentFrame } }; } };
   const world = options.shapes || [shape('s1', 100, 100, 300, 200)];
   const root = { document: doc, Point: Pt, state: { tool: 'eraser', appMode: 'anim2d', playing: false, currentFrame: 0, activeLayerIdx: 0, eraserSize: 14, stabilizer: 0, pressureMin: 5, pressureMax: 170,
       layers: [{ layerUid: 'layer-a' }] },
     showToast: (t) => toasts.push(t), setTimeout, Date,
-    NemoNativeObjectProject: { desktop: () => session }, NemoNativePresentationWait: Wait, NemoNativeObjectGroupIntent: Group, NemoNativeObjectEditContract: Contract,
+    NemoNativeObjectProject: { desktop: () => session }, NemoNativeObjectVectorStroke: require('../src/js/adapters/native-object-vector-stroke.js'), NemoNativePresentationWait: Wait, NemoNativeObjectGroupIntent: Group, NemoNativeObjectEditContract: Contract,
     NemoNativeObjectComponentIntent: { portsFromSession: () => ({ ...h.ports, readDeclared: () => true }) },
     NemoSelectCanvasIntent: { async layerPaths(r, wanted, centres, idx) {
       reads.push(idx); const paths = typeof world === 'function' ? world() : world;
@@ -233,4 +233,80 @@ test('eraser-bridge.js hands every native pointer event to the adapter and refus
   handlers.pointermove(event({ type: 'pointermove' })); handlers.pointerup(event({ type: 'pointerup' })); handlers.pointercancel(event({ type: 'pointercancel' }));
   handlers.pointerdown(event({ type: 'pointerdown' }));
   assert.deepEqual(calls, ['move', 'up', 'cancel', 'down']);
+});
+
+// R-lane-a-fixes: the baseline eraser-bridge has no mode check (feedback #135 maps the point through the layer's Motion), so Motion bites like Animation 2D.
+// The hit's presented matrix carries the layer's Motion (position, rotation, scale) into the record's own space, whatever the mode.
+test('Motion mode erases too: the footprint reaches the record through the hit\'s presented matrix, one revision and one undo entry per gesture', async () => {
+  // The layer is moved by (+40, -20) and turned a quarter: world = M * local, so the footprint is sent as M^-1 * world.
+  const matrix = [0, 1, -1, 0, 40, -20];
+  const f = await fixture({ shapes: [shape('s1', 100, 100, 300, 200, { nativeMatrix: matrix })] });
+  f.root.state.appMode = 'motion';
+  await f.send('down', 150, 150);
+  assert.equal(f.log.length, 1, f.toasts.join('|'));
+  assert.deepEqual([f.log[0].payload.layerUid, f.log[0].payload.frame, f.log[0].payload.strokeId], ['layer-a', 0, 's1']);
+  const b = bbox(f.log[0].payload.footprint);
+  // world (150, 150) -> local (x, y): x' = -y + 40, y' = x - 20  =>  y = 40 - 150 = -110, x = 150 + 20 = 170
+  assert.ok(Math.abs((b.x0 + b.x1) / 2 - 170) < 0.01 && Math.abs((b.y0 + b.y1) / 2 + 110) < 0.01, JSON.stringify(b));
+  await f.send('move', 160, 150);
+  assert.equal(f.log.length, 2);
+  assert.equal(f.log[1].payload.joinHistory, true, 'the rest of the drag continues the gesture entry');
+  await f.send('up', 160, 150);
+  assert.equal(f.toasts.length, 0);
+});
+
+test('Motion mode: Alt+drag resizes the eraser, the hover ring follows, and storyboard or playback stay refused', async () => {
+  const f = await fixture();
+  f.root.state.appMode = 'motion';
+  await f.send('down', 100, 100, { altKey: true });
+  await f.send('move', 160, 100, { altKey: true });
+  await f.send('up', 160, 100, { altKey: true });
+  assert.equal(f.root.state.eraserSize, 44);
+  assert.equal(f.log.length, 0);
+  await f.send('move', 200, 120);
+  assert.ok(f.tool.ringElement(), 'the ring is drawn in Motion');
+  const g = await fixture();
+  g.root.state.appMode = 'storyboard';
+  await g.send('down', 150, 150);
+  assert.equal(g.log.length, 0);
+  assert.deepEqual(g.toasts, ['La gomme n’est disponible qu’en Animation 2D et en Motion, hors lecture.']);
+});
+
+test('the refusals follow the baseline editRefusalReason: component, duplicator, path effects, locked, then video and montage, each with its wording', async () => {
+  const cases = [
+    [{ kind: 'component' }, 'Calque composant — double-clique dessus pour entrer dedans et dessiner'],
+    [{ hasDuplicator: true }, 'Calque duplicateur — « Modifier la forme source » (panneau Duplicator) pour éditer'],
+    [{ pathFx: [{ type: 'zigzag', enabled: true }] }, 'Effets de tracé actifs — désactive-les (panneau Effets) pour redessiner dessus'],
+    [{ pathFxOversize: true }, 'Effets de tracé actifs — désactive-les (panneau Effets) pour redessiner dessus'],
+    [{ kind: 'video' }, 'Calque vidéo — dessine sur un calque normal au-dessus, ou active Masque pour masquer directement cette vidéo'],
+    [{ kind: 'montage' }, 'Calque montage — son contenu s’édite dans le StoryBoard'],
+  ];
+  for (const [facts, want] of cases) {
+    const f = await fixture();
+    f.flags.facts = facts;
+    await f.send('down', 150, 150);
+    assert.deepEqual(f.toasts, [want], JSON.stringify(facts));
+    assert.equal(f.log.length, 0);
+    // a duplicator and a component force-lock their layer: said before the lock, which would be the useless half of the truth
+    const g = await fixture();
+    g.flags.facts = facts;
+    g.flags.locked = true;
+    await g.send('down', 150, 150);
+    const first = facts.kind === 'video' || facts.kind === 'montage' ? 'Calque verrouillé — déverrouille-le (cadenas) pour dessiner dessus' : want;
+    assert.deepEqual(g.toasts, [first], 'locked + ' + JSON.stringify(facts));
+  }
+  const disabled = await fixture();
+  disabled.flags.facts = { pathFx: [{ type: 'zigzag', enabled: false }] };
+  await disabled.send('down', 150, 150);
+  assert.equal(disabled.log.length, 1, 'a disabled path effect does not refuse');
+  const edit = await fixture();
+  edit.flags.facts = { hasDuplicator: true };
+  edit.root.state.layers[0]._dupEditSource = true;
+  await edit.send('down', 150, 150);
+  assert.equal(edit.log.length, 1, 'while the duplicator\'s source is being edited the eraser works');
+  const mask = await fixture();
+  mask.flags.facts = { kind: 'video' };
+  mask.root.state.maskMode = true;
+  await mask.send('down', 150, 150);
+  assert.equal(mask.log.length, 1, 'Mask mode may erase on a video layer');
 });

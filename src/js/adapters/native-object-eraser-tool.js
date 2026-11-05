@@ -17,6 +17,8 @@
   var SVG = 'http://www.w3.org/2000/svg', PINS = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
   var RING = { fill: 'rgba(255,255,255,0.122)', stroke: 'rgba(74,158,255,0.902)' }; // engine-bridge buildEraserCursorItems
   var VECTOR = { plain: 1, ribbon: 1, fill: 1, shape: 1, brush: 1, mask: 1 };
+  // eraser-bridge.js @1065e9d8 has no mode check: it bites in Animation 2D and in Motion (the hit's presented matrix carries the layer's Motion into the record's own space, feedback #135).
+  var MODES = { anim2d: 1, motion: 1 };
   function same(a, b) { return !!a && !!b && PINS.every(function (k) { return a[k] === b[k]; }); }
   function fail(message) { throw new Error(message); }
   function consume(e) { if (e && e.stopImmediatePropagation) e.stopImmediatePropagation(); if (e && e.preventDefault) e.preventDefault(); }
@@ -62,7 +64,7 @@
     function view(onRefusal) {
       var s = session(), pin = s && s.isActive() && s.info(), shown = pin && s.readPresentedObjectSession(onRefusal), st = root.state;
       if (!pin || !shown || !same(pin, shown) || !shown.presentation || shown.presentation.owner !== 'native' || shown.presentation.status !== 'presented' ||
-          !Mapping.matchesView(root, shown.presentation) || st.appMode !== 'anim2d' || st.playing) return null;
+          !Mapping.matchesView(root, shown.presentation) || !MODES[st.appMode] || st.playing) return null;
       var v = { s: s, pin: pin, presentation: shown.presentation }; v.bounds = bounds(pin); v.scale = scaleOf(v);
       if (!(v.scale > 0)) fail('Native canvas presentation is unavailable.');
       return v;
@@ -93,11 +95,17 @@
     }
     function hideRing() { if (ring) { ring.remove(); ring = null; } }
     function hover(e) { try { var v = view(); if (v) { last = v; showRing(v, e, radiusFor(e)); } else if (last) showRing(last, e, radiusFor(e)); } catch (_) { /* a missing presentation shows no ring */ } }
+    // tools.js editRefusalReason @1065e9d8, in its order (a component and a duplicator force-lock their layer, so they are said before "locked"), then the cases only native has.
     function refusal(layer, row) {
-      if (row.symbolId) return 'Calque composant — double-clique dessus pour entrer dedans et dessiner';
+      var Stroke = root.NemoNativeObjectVectorStroke, st = root.state;
+      if (row.symbolId || layer.kind === 'component') return 'Calque composant — double-clique dessus pour entrer dedans et dessiner';
+      if (layer.hasDuplicator === true && !row._dupEditSource) return 'Calque duplicateur — « Modifier la forme source » (panneau Duplicator) pour éditer';
+      if (layer.pathFxOversize === true || Stroke && typeof Stroke.hasActive === 'function' && Stroke.hasActive(layer.pathFx)) return 'Effets de tracé actifs — désactive-les (panneau Effets) pour redessiner dessus';
       if (layer.locked === true) return 'Calque verrouillé — déverrouille-le (cadenas) pour dessiner dessus';
       if (layer.visible === false) return 'Calque masqué — affiche-le pour y effacer';
       if (layer.threeD === true || row.threeD) return 'La gomme n’efface pas encore sur un calque 3D.';
+      if ((layer.kind === 'video' || row.nativeVideo) && !st.maskMode) return 'Calque vidéo — dessine sur un calque normal au-dessus, ou active Masque pour masquer directement cette vidéo';
+      if (layer.kind === 'montage' || row.montageId) return 'Calque montage — son contenu s’édite dans le StoryBoard';
       return null;
     }
     // The press needs no presentation: the first bite waits for one (`ready`), so a press right after the previous gesture's last bite is not lost.
@@ -105,7 +113,7 @@
       var s = session(), pin = s && s.isActive() && s.info(), st = root.state, row = st.layers && st.layers[st.activeLayerIdx], c = root.NemoNativeComponentContext;
       if (st.spaceDown || st.isPanning) return null;
       if (!pin) fail('La gomme est indisponible.');
-      if (st.appMode !== 'anim2d' || st.playing) fail('La gomme n\u2019est disponible qu\u2019en Animation 2D, hors lecture.');
+      if (!MODES[st.appMode] || st.playing) fail('La gomme n\u2019est disponible qu\u2019en Animation 2D et en Motion, hors lecture.');
       var layer = row && (c && c.layerRows(root) || pin.layers).filter(function (l) { return l.layerUid === row.layerUid; })[0];
       if (!layer) fail('S\u00e9lectionne un calque de dessin.');
       var why = refusal(layer, row); if (why) fail(why);

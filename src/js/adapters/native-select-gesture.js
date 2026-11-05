@@ -7,7 +7,7 @@
  * anchor's dabs and a gradient's end points, keeps a shape's box). It holds no document state and writes nothing while the pointer
  * moves: Escape (also between the release and the send), a lost capture, or a pin / frame / tool / layer / selection that no longer matches the press ends the gesture with no write (P25 / #1027). Baseline (1065e9d8 select-bridge onDown/onMove/onUp):
  * Alt+press inside the selection (baseline select-bridge onDown ~1186-1207) drags a COPY: the same move preview, and on release ONE duplicate at the drag
- * distance (native-select-alt-duplicate.js: one revision, the originals untouched, the clones selected); Alt on the press of an unselected item only moves it.
+ * distance (native-select-alt-duplicate.js: one revision, the originals untouched, the clones selected); Alt on the press of an unselected item only moves it. An Alt+click without a drag leaves the copy in place (baseline: the clone is made at the press).
  * A selection may span layers (a marquee reads every visible unlocked layer, a Shift pick adds from another): its move / scale / rotate is still ONE
  * batch, each step naming its own layer. Shift on a corner scales proportionally, Alt scales from the box centre, Shift snaps a rotation to 15 degrees, Shift on the press extends
  * the selection. An image and a text block go in the same batch as a record-space matrix in their own frame (the listing's bounds and
@@ -145,7 +145,7 @@
     if (steps && JSON.stringify(steps).length > MAX_BYTES) { notice(root, 'Too much to transform at once \u2014 select fewer items.'); return 'refused'; }
     if (o.cancelled && o.cancelled()) return 'cancelled'; // Escape between the release and the send still cancels; once sent, the write is not cancellable (undo reverts it)
     if (o.release) o.release();
-    try { result = steps ? await route.batchStrokes(layers.layerUid, layers.frame, steps, { select: true }) : null; } catch (_) { result = null; }
+    try { result = steps ? await route.batchStrokes(layers.layerUid, layers.frame, steps, { select: true, inherit: !!root.state && root.state.appMode === 'motion' }) : null; } catch (_) { result = null; } // Motion: the inherited key is edited in place
     if (!result || result.status !== 'applied') { notice(root, 'The transform could not be applied.'); return 'failed'; }
     await reselect(root, sel, o.angle);
     return 'applied';
@@ -272,14 +272,15 @@
       return commitMatrix(root, g.sel, g.matrix, { pin: g.pin, stale: stale, cancelled: function () { return g.cancelled; }, release: function () { listen(false); }, angle: g.kind === 'rotate' ? g.angle : 0 });
     }
     async function end(ev) {
-      if (g.cancelled || !g.active) return cancel();
+      // A press that never became a drag ends here, except Alt+click inside the selection: the baseline cloned it in place at the press, so the copy stays (selected).
+      if (g.cancelled || (!g.active && !(g.dup && g.kind === 'move'))) return cancel();
       g.last = ev;
       try {
         if (!g.kind && pickDone) { await pickDone; if (g.cancelled) return; classify(); }
         if (g.kind === 'marquee') { update(); await marqueeEnd(); }
         else if (g.kind === 'move' || g.kind === 'scale' || g.kind === 'rotate') {
-          update();
-          if (g.kind && !identity(g.matrix) && !g.cancelled) await commit();
+          if (g.active) update(); else g.matrix = [1, 0, 0, 1, 0, 0]; // below the drag threshold the copy sits exactly where the original is
+          if (g.kind && (g.dup || !identity(g.matrix)) && !g.cancelled) await commit(); // a copy dragged back to where it started is still a copy
         }
       } catch (_) { notice(root, 'The transform could not be applied.'); }
       finally {
@@ -290,7 +291,8 @@
         if (root.SMEngineBridge && typeof root.SMEngineBridge.renderNow === 'function') root.SMEngineBridge.renderNow();
       }
     }
-    return { move: move, end: end, cancel: cancel, owns: function () { return !!handle; } };
+    return { move: move, end: end, cancel: cancel, owns: function () { return !!handle; },
+      altClick: function (ev) { if (g.cancelled || !g.dup || g.kind !== 'move' || g.active) return false; end(ev); return true; } };
   }
   // Cmd/Ctrl+A (baseline 1065e9d8 timeline.js onKeyDown): every selectable item of the ACTIVE layer, Select and Direct Select only. A native object
   // project builds no Paper children, so the items come from the same presented listing the marquee reads (a texture dab and a linked fill companion
