@@ -26,6 +26,8 @@ pub(super) enum Admission {
         request_id: String,
         fingerprint: Vec<u8>,
         prepared: PreparedProjectReplacement,
+        /// The loss report of a converted baseline project; never part of the retained replay receipt.
+        legacy: Option<serde_json::Value>,
     },
 }
 fn refused(error: NativeApplicationError) -> NativeApplicationError {
@@ -119,7 +121,11 @@ fn prepare_source<T>(
     request: ReplacementInput<'_>,
     fingerprint: impl FnOnce() -> Result<Vec<u8>, serde_json::Error>,
     load: impl FnOnce() -> HostResult<T>,
-    build: impl FnOnce(&mut NativeObjectHost, &str, T) -> Result<PreparedProjectReplacement, String>,
+    build: impl FnOnce(
+        &mut NativeObjectHost,
+        &str,
+        T,
+    ) -> Result<(PreparedProjectReplacement, Option<serde_json::Value>), String>,
     source_failure: &str,
 ) -> HostResult<Admission> {
     require_api_instance(
@@ -175,7 +181,7 @@ fn prepare_source<T>(
         current_owner(&mut authority, request.instance_id, pins).map_err(refused)?;
     }
     let source = load().map_err(refused)?;
-    let prepared = {
+    let (prepared, legacy) = {
         let mut authority = native.lock().map_err(|_| {
             refused(host_error(
                 "unavailable",
@@ -212,6 +218,7 @@ fn prepare_source<T>(
             request_id: request.request_id.into(),
             fingerprint,
             prepared,
+            legacy,
         }),
     }
 }
@@ -233,7 +240,11 @@ pub(super) fn prepare(
         },
         || serde_json::to_vec(&request),
         || reopen::read_file(state, &request, allowed),
-        |owner, snapshot, bytes| owner.prepare_project_replacement(snapshot, &bytes),
+        |owner, snapshot, loaded| {
+            owner
+                .prepare_project_replacement(snapshot, &loaded.bytes)
+                .map(|prepared| (prepared, loaded.legacy))
+        },
         "native project replacement file refused",
     )
 }
@@ -301,13 +312,15 @@ pub(super) fn prepare_blank(state: &ApplicationMcp, request: NewRequest) -> Host
         || serde_json::to_vec(&request),
         || Ok(()),
         |owner, snapshot, ()| {
-            owner.prepare_blank_project_replacement_frames(
-                snapshot,
-                request.new_project.canvas_w,
-                request.new_project.canvas_h,
-                request.new_project.fps,
-                request.new_project.total_frames,
-            )
+            owner
+                .prepare_blank_project_replacement_frames(
+                    snapshot,
+                    request.new_project.canvas_w,
+                    request.new_project.canvas_h,
+                    request.new_project.fps,
+                    request.new_project.total_frames,
+                )
+                .map(|prepared| (prepared, None))
         },
         "native blank project intent refused",
     )
@@ -349,5 +362,6 @@ pub(super) fn bootstrap_new(
         content_revision,
         resource_count,
         viewport_available: false,
+        legacy_import: None,
     })
 }

@@ -274,7 +274,7 @@ fn project_only_file_selection_refuses_other_formats_before_owner_installation()
         "sourcePath":path,"projectOnly":true})
     .to_string();
     for bytes in [
-        json!({"layers":[],"canvasW":320}).to_string(),
+        json!({"hello":"world","canvasW":320}).to_string(),
         json!({"format":"nemo.native-object-document","formatVersion":1,"totalFrames":21,
             "layers":[{"layerUid":"drawing"}],"objects":[]})
         .to_string(),

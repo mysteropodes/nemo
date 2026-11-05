@@ -297,8 +297,8 @@ fn request_with(
         replace: None,
     };
     // File I/O holds neither the native owner nor revision lock.
-    let bytes = match read_file(state, &input, allowed) {
-        Ok(bytes) => bytes,
+    let loaded = match read_file(state, &input, allowed) {
+        Ok(loaded) => loaded,
         Err(mut failure) => {
             failure.details = Some(json!({"disposition":"notDispatched","retryExecution":false}));
             let reply = encode(Err(failure));
@@ -321,9 +321,15 @@ fn request_with(
                 &request.document_id,
                 request.expected_revision,
                 &request.document_snapshot_id,
-                &bytes,
+                &loaded.bytes,
             )
-            .map(|project| receipt(&request, "inactive-prepared", Some(project)))
+            .map(|mut project| {
+                // A converted baseline project is a new document: the tab must not carry the legacy file's path.
+                if let Some(report) = &loaded.legacy {
+                    project["legacyImport"] = report.clone();
+                }
+                receipt(&request, "inactive-prepared", Some(project))
+            })
             .map_err(|e| error(e, "notDispatched"));
         after_effect.take().unwrap()();
         let reply = encode(result);

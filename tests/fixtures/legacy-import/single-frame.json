@@ -1,0 +1,90 @@
+{
+ "version": 13,
+ "fps": 12,
+ "canvasW": 100,
+ "canvasH": 50,
+ "layers": [
+  {
+   "name": "Solo",
+   "frames": [
+    {
+     "strokes": [
+      {
+       "segments": [
+        {
+         "point": [
+          20,
+          80
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          20,
+          60
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          60
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          80
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#ffffff",
+       "hasRealStroke": false,
+       "strokeWidth": 1,
+       "strokeCap": "butt",
+       "strokeJoin": "miter",
+       "miterLimit": 10,
+       "fillColor": "#ff0000",
+       "opacity": 1,
+       "dashOffset": 0,
+       "strokeId": "st_rect"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    }
+   ]
+  }
+ ]
+}
