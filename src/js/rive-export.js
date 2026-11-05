@@ -468,7 +468,7 @@
   }
 
   async function exportRive(opts){
-    var r=exportFrameRange(opts);
+    var blocked=exportNativeUnavailable('Rive');if(blocked)return blocked;var r=exportFrameRange(opts);
     var onProgress=(opts&&opts.onRiveProgress)||function(){};
     onProgress('Connexion à Rive Editor…');
     try{
