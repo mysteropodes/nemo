@@ -218,7 +218,7 @@ test('the row menu duplicates, deletes, renames, splits and colours; a right-cli
   const items = Ui.menuItems(t.host, 2);
   assert.deepEqual(t.selections[0].slice(0, 1), [2], 'the clicked row becomes the selection');
   const labels = items.filter((i) => !i.sep).map((i) => i.label);
-  assert.deepEqual(labels, ['Duplicate the layer', 'Delete the layer', 'Rename', 'Split into layers (one shape per layer)', 'Cut at the playhead  (⌘⇧D)', 'Layer colour']);
+  assert.deepEqual(labels, ['Duplicate the layer', 'Delete the layer', 'Rename', 'Group into a folder', 'Split into layers (one shape per layer)', 'Cut at the playhead  (⌘⇧D)', 'Mark as « shy »', 'Convert to component', 'Layer colour']);
   const by = (n) => items.find((i) => i.label === n);
   by('Delete the layer').action(); await settle();
   assert.deepEqual(t.s.requests[0].payload.selection, { active: 'c', selected: ['c'] }, 'only what the click named');
@@ -250,4 +250,57 @@ test('toolbar delete and duplicate act on the selection and report refusals; the
   const locked = setup(LAYERS, { refuse: 'unavailable' });
   Ui.toolbar(locked.host, 'duplicate'); await settle();
   assert.match(locked.host.toasts[0], /locked/);
+});
+
+// ---- C-layer-rest: Group into a folder, the shy mark, Convert to component ----
+const Kinds = require('../src/js/adapters/native-layer-kinds-ui.js');
+function withKinds(layers, options) { const t = setup(layers, options); t.host.NemoNativeLayerKindsUi = Kinds; t.host.SM.t = (k) => k; return t; }
+const entry = (t, index, label) => Ui.menuItems(t.host, index).find((i) => i.label === label);
+
+test('Group into a folder (menu and Ctrl+G) wraps consecutive ungrouped layers in ONE folder.create, selected and sorted', async () => {
+  const t = withKinds(); t.host._layerSel = [2, 1]; t.host.state.activeLayerIdx = 1;
+  assert.equal(Ui.group(t.host), true); await settle();
+  assert.deepEqual(t.s.requests.map((q) => q.payload), [{ command: 'object.layer.kind.create', kind: 'folder', name: 'Folder 1', frame: 3, children: ['b', 'c'] }]);
+  assert.equal(t.s.requests.length, 1, 'one revision, one history entry');
+  const two = withKinds(); two.host._layerSel = [0, 1];
+  assert.equal(entry(two, 0, 'Group into a folder').disabled, false);
+  const one = withKinds(); one.host._layerSel = [0];
+  assert.equal(entry(one, 0, 'Group into a folder').disabled, true, 'greyed below two selected layers');
+});
+
+test('Group into a folder explains each refusal with the baseline notice and writes nothing', async () => {
+  const t = withKinds();
+  t.host._layerSel = [0]; Ui.group(t.host);
+  t.host._layerSel = [0, 2]; Ui.group(t.host);
+  assert.deepEqual(t.host.toasts, ['Select at least 2 layers', 'Layers must be consecutive — reorder them first']);
+  const inFolder = withKinds([{ layerUid: 'a', name: 'A', kind: 'draw' }, { layerUid: 'b', name: 'B', kind: 'draw', parentLayerUid: 'f' }, { layerUid: 'f', name: 'F', kind: 'folder' }]);
+  inFolder.host._layerSel = [0, 1]; Ui.group(inFolder.host);
+  assert.deepEqual(inFolder.host.toasts, ['A selected layer is already in a folder']);
+  assert.equal(t.s.requests.length + inFolder.s.requests.length, 0);
+  const plain = setup(); plain.host._layerSel = [0, 1];
+  assert.equal(Ui.group({ ...plain.host, NemoNativeObjectProject: undefined }), false, 'no native project: the legacy writer keeps the gesture');
+});
+
+test('Mark as shy goes through SM.toggleLayerShy; marking with the switch off says so, unmarking and a lit switch stay quiet', async () => {
+  const t = withKinds([{ layerUid: 'a', name: 'A', kind: 'draw' }, { layerUid: 'b', name: 'B', kind: 'draw', shy: true }]);
+  const calls = [];
+  t.host.SM.toggleLayerShy = async (i) => { calls.push(i); const row = t.s.state.layers[i]; row.shy = row.shy !== true; t.s.state.contentRevision += 1; return true; };
+  const mark = entry(t, 0, 'Mark as « shy »'); assert.ok(mark);
+  mark.action(); await settle();
+  assert.deepEqual(calls, [0]); assert.deepEqual(t.host.toasts, ['Layer marked « shy » — turn on the switch to hide it']);
+  const off = entry(t, 1, 'Remove the « shy » mark'); assert.ok(off, 'a shy layer offers the opposite entry');
+  off.action(); await settle();
+  assert.deepEqual(calls, [0, 1]); assert.equal(t.host.toasts.length, 1, 'unmarking says nothing');
+  t.host.state.shyEnabled = true; t.s.state.layers[0].shy = false;
+  entry(t, 0, 'Mark as « shy »').action(); await settle();
+  assert.equal(t.host.toasts.length, 1, 'the switch was already on');
+});
+
+test('Convert to component calls the ordinary entry on the clicked selection and is greyed on a component', () => {
+  const t = withKinds(); let converted = 0;
+  t.host.SM.convertActiveLayerToComponent = () => { converted += 1; };
+  entry(t, 1, 'Convert to component').action();
+  assert.equal(converted, 1); assert.deepEqual(t.selections.map((q) => q[0]), [1], 'the click selected the row first');
+  assert.equal(entry(t, 4, 'Convert to component').disabled, true);
+  assert.equal(entry(t, 1, 'Convert to component').disabled, false);
 });

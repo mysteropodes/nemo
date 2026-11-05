@@ -56,8 +56,8 @@
     return (kind === 'folder' ? word(host, 'layerKindFolder') : BASE_NAMES[kind]) + ' ' + n;
   }
   // The layers the user had selected, as uids (indices that no longer name a layer are dropped).
-  function selectedUids(host, info) {
-    const picked = Array.isArray(host._layerSel) ? host._layerSel : [];
+  function selectedUids(host, info, indices) {
+    const picked = Array.isArray(indices) ? indices : Array.isArray(host._layerSel) ? host._layerSel : [];
     return picked.filter((i, k, all) => Number.isInteger(i) && info.layers[i] && all.indexOf(i) === k).map((i) => info.layers[i].layerUid);
   }
   const centre = (info) => [info.canvasW / 2, info.canvasH / 2];
@@ -69,10 +69,10 @@
   });
 
   // addNullLayer / addFolderLayer / addEffectLayer / addGuideLayer: a Null or Folder over the selection adopts it.
-  function add(host, kind) {
+  function add(host, kind, indices) {
     const ctx = usable(host);
     if (!ctx) return gone;
-    const grouping = kind === 'null' || kind === 'folder', children = grouping ? selectedUids(host, ctx.info) : [], options = {};
+    const grouping = kind === 'null' || kind === 'folder', children = grouping ? selectedUids(host, ctx.info, indices) : [], options = {};
     if (children.length) options.children = children;
     else if (kind !== 'effect') options.pos = centre(ctx.info);
     return finish(host, ctx.b, ctx.b.writes.createKind(kind, nameFor(host, ctx.info, kind), options));
