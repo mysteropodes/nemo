@@ -33,6 +33,8 @@ mod style;
 mod detail;
 #[path = "object_vector_batch_style_gradient.rs"]
 mod gradient;
+#[path = "object_vector_batch_order.rs"]
+mod order_step;
 
 /// One batch is a bounded gesture, never a document rewrite; the encoded request stays under the vector budget.
 pub(crate) const MAX_BATCH_OPS: usize = 64;
@@ -162,6 +164,26 @@ fn expand_transforms(origin: &ObjectSnapshot, base: &ObjectDocument, ops: Vec<Ba
                 let from = from.and_then(|n| usize::try_from(n).ok()).filter(|&n| n < requested).ok_or(InvalidRequest)?;
                 op.from_step = Presence::Present(serde_json::Number::from(starts[from]));
             }
+        }
+        // An `order` (#2372 Bring to front / Send to back) names one record or item, the end of the stack (`placement`) and the cell it edits
+        // (`frame`, the held cell a copy key has just made); it lands on the same stroke id in that cell, like a replace.
+        if op.op == "order" {
+            let frame = op.frame.value().and_then(serde_json::Number::as_u64).and_then(|n| u32::try_from(n).ok());
+            let Presence::Present(mut target) = std::mem::take(&mut op.stable_target) else {
+                return Err(InvalidRequest);
+            };
+            if !op.record.missing() || !op.from_step.missing() || !op.keyframe.missing() || !op.geometry.missing() || !op.center.missing()
+                || !op.offset.missing() || !op.matrix.missing() || !op.style.missing() || (!op.frame.missing() && frame.is_none())
+            {
+                return Err(InvalidRequest);
+            }
+            order_step::Mode::parse(&op.placement)?;
+            target.frame_scope.frame = frame.unwrap_or(target.frame_scope.frame);
+            (op.stable_target, op.frame) = (Presence::Present(target), Presence::Missing);
+            out.push(op);
+            companion.push(false);
+            swaps.push(None);
+            continue;
         }
         // A `restyle` (#2372) becomes the replaces of the records it restyles, or the swap of a stored item, in the cell `frame` names.
         if op.op == "restyle" || !op.style.missing() {
@@ -419,6 +441,13 @@ pub(super) fn batch(origin: &ObjectSnapshot, base: &ObjectDocument, context: &st
         if let Some(swap) = swap {
             stroke_ids.push(target.stroke_id.clone());
             changed |= items::apply(&mut document, swap)?;
+            continue;
+        }
+        if op.op == "order" {
+            // Stacking changes nothing a fill trace reads, so no step regenerates; the receipt names the one target.
+            let edit = order_step::order_in(&document, &target, order_step::Mode::parse(&op.placement)?)?;
+            (document, changed) = (edit.document, changed | edit.changed);
+            stroke_ids.push(target.stroke_id.clone());
             continue;
         }
         let edit = match (op.op.as_str(), op.record, op.stable_target) {

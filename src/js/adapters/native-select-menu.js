@@ -5,9 +5,10 @@
  *   Supprimer                              -> NemoNativeSelectionDelete.removeSelection
  *   Grouper / Dissocier                    -> NemoNativeSelectGroup (the group intent)
  *   Combiner (Union), Sortir du groupe, Aplatir -> NemoNativeSelectionBoolean / NemoNativeSelectGroup
+ *   Premier plan / Arrière-plan            -> NemoNativeSelectionOrder (native-selection-order.js)
  * Right-click rule (baseline): an item that is already part of the selection keeps the whole selection; any other item replaces it, exactly as a
  * plain click does (the native pick, then applyPick); an empty spot keeps the selection and offers Coller alone when a clip is held (otherwise the
- * menu does not open). open() resolves to the rows it showed. The rows the baseline has that still lack a native route (front/back order, pivot reset, image mesh, tween opt-in,
+ * menu does not open). open() resolves to the rows it showed. The rows the baseline has that still lack a native route (pivot reset, image mesh, tween opt-in,
  * tracked roles, revision actions, stroke profiles) are added with their own routes; none is shown as a dead entry. */
 (function (root, factory) {
   var api = factory();
@@ -58,6 +59,9 @@
       }
       if (extra.length) items = items.concat([{ sep: true }], extra);
     }
+    // Premier plan / Arriere-plan (baseline order: after the group rows, before the pivot rows): one batch of order steps (native-selection-order.js).
+    var O = host.NemoNativeSelectionOrder;
+    if (O) items.push({ sep: true }, { label: 'Premier plan', action: function () { O.front(host); } }, { label: 'Arrière-plan', action: function () { O.back(host); } });
     return items;
   }
   async function build(host, x, y) {

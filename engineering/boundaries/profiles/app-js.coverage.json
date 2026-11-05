@@ -1069,6 +1069,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-selection-order.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2753,
+          "scriptOrdinal": 399
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-select-menu.js",
       "moduleId": "app.native.object.ui.adapter",
       "executionClass": "document-classic",

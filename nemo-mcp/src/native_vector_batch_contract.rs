@@ -11,7 +11,8 @@
 //! one named record. The named target may also be a stored raster image or text block (its own frame: an image's centre, size and
 //! rotation, a text block's anchor and size), so one gesture over a mixed selection is one batch. A `restyle` (#2372, `style` of
 //! optional `fill` and `stroke` hex colours, a positive `width` and an `opacity` in 0..1, at least one) restyles a named record
-//! or item; its receipt id is the named target. A batch is atomic: any step the engine refuses refuses it whole. Only a request that
+//! or item; its receipt id is the named target. An `order` (#2372, `placement` `front` or `back`, optional `frame`) moves a named record or item to
+//! that end of its layer's stack with its linked fill or texture dabs; its receipt id is the named target too. A batch is atomic: any step the engine refuses refuses it whole. Only a request that
 //! sets the boolean `skipUnavailable` restyles what it can; the receipt then adds `skippedSteps` (1 to one less than the steps) and
 //! still lists one id per step.
 use super::shapes::{anchor, geometry, gradient, record_shape};
@@ -46,6 +47,13 @@ fn step(op: &Value) -> Option<&Value> {
         "restyle" => (exact(op, &["op", "stableTarget", "style"], &["frame"]).is_some()
             && target(&op["stableTarget"], false)
             && style(&op["style"])
+            && op.get("frame").is_none_or(|f| f.as_u64().is_some_and(|f| u32::try_from(f).is_ok())))
+        .then(|| &op["stableTarget"]),
+        // An order (#2372 Bring to front / Send to back) puts one record or item at the `front` or the `back` of its layer's stack in the cell
+        // `frame` names (default: its own); a ribbon takes its linked fill and a texture anchor its dabs.
+        "order" => (exact(op, &["op", "stableTarget", "placement"], &["frame"]).is_some()
+            && target(&op["stableTarget"], false)
+            && (op["placement"] == "front" || op["placement"] == "back")
             && op.get("frame").is_none_or(|f| f.as_u64().is_some_and(|f| u32::try_from(f).is_ok())))
         .then(|| &op["stableTarget"]),
         // A clone takes new geometry (the knife's plain pieces) or, without it, copies any stroke shifted by `offset`
@@ -159,7 +167,7 @@ pub(super) fn result(payload: &Value, value: &Value) -> bool {
         && ops.iter().zip(ids).all(|(op, id)| match op["op"].as_str() {
             Some("create" | "copy" | "clone") => id.as_str().is_some_and(|s| s.starts_with("native-stroke:")),
             Some("replace") => *id == op["record"]["target"]["strokeId"],
-            Some("reshape" | "restyle") => *id == op["stableTarget"]["strokeId"],
+            Some("reshape" | "restyle" | "order") => *id == op["stableTarget"]["strokeId"],
             Some("delete") => *id == op["stableTarget"]["strokeId"],
             _ => false,
         })
