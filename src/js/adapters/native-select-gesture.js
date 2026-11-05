@@ -14,8 +14,8 @@
  * matrix): the engine moves the image's stored centre, scales its size and turns its rotation (a mesh bound to it follows) and re-anchors
  * a text block and scales its size, fixed width and spacing as the baseline resize did. An image or a text block takes a move, a scale
  * along its own axes and a turn (#2267: the text block stores a rotation about its anchor); a mirror of either and a shear of either have
- * no stored form. Not carried over: skew zones, a custom anchor, the Alt lasso, ruler snapping. Still refused with a notice: those transforms,
- * bitmap brushes (their image is baked) and a dab whose anchor could not be read. */
+ * no stored form. A bitmap brush goes in the same batch: the engine maps its anchor and bakes its companion image again. Not carried over: skew zones,
+ * a custom anchor, the Alt lasso, ruler snapping. Still refused with a notice: those transforms. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -32,8 +32,9 @@
   function unsupported(paths, dup) {
     var found = [];
     paths.forEach(function (p) {
-      // A bitmap brush is duplicated by the engine with its raster (the baked image is only moved or copied, never re-baked), so only a transform refuses it.
-      var d = p.data || {}, label = d.nativeBrush === 'bitmap' && !dup ? 'bitmap brushes' : d.nativeBrush === 'copy' ? 'brush dabs' : MAPPED.indexOf(d.nativeRole) < 0 ? 'this item' : null;
+      // A bitmap brush is moved, scaled and turned by the engine, which re-bakes its image from the transformed anchor in the same revision (baseline
+      // SMBitmapBrush.regenerate); a dab is moved with its anchor (selected for it) or, with no anchor left, as the plain record it is.
+      var d = p.data || {}, label = MAPPED.indexOf(d.nativeRole) < 0 ? 'this item' : null;
       if (label && found.indexOf(label) < 0) found.push(label);
     });
     return found.length ? found.join(', ') : null;

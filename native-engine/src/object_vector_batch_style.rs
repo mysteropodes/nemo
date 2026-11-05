@@ -9,8 +9,14 @@
 //!   (the profile's own peak is the current size) and rebuilds its outline and linked fill as the sculpt does.
 //! The panel's other style kinds (switches, cap, join, miter, dash, paint order, stroke style, brush preset, mask feather, mask mode, unmask) are the
 //! members of `object_vector_batch_style_detail.rs`.
-//! A bitmap brush, a stamped brush dab, a texture anchor's stroke colour, a texture anchor's opacity without a fill, and a width on
-//! an anchor whose copies are stored are refused (`Unavailable`): their image derives from more than the record.
+//! Brush families (A-bitmap-brush-edit, baseline `regenerateBrushTexture` / `SMBitmapBrush.regenerate`, see `object_vector_batch_style_dabs.rs`):
+//! - a bitmap brush anchor takes `width` as its dab size (`bitmapBrushSpec.size`, and the stroke width), the stroke colour as its ink
+//!   (`spec.color`) and, with no fill of its own, the opacity as the stamp opacity; the batch re-bakes its image from the new spec;
+//! - a texture anchor whose dabs are stored records re-stamps them from its preset (the stored dabs are deleted, the seeded anchor paints
+//!   natively) after a width, a stroke colour or a preset edit; a filled anchor's stroke colour is the stroke it remembers;
+//! - a stored dab whose anchor is gone is an ordinary record; one with an anchor follows its anchor and is refused (`Unavailable`) alone.
+//! A texture anchor's opacity without a fill and a stroke switch on a brush anchor are refused (`Unavailable`): the first would bring the
+//! hidden outline back, the second has no stroke to switch.
 use crate::commands::object_fill_owner::vector_edit::batch_ops::detail::{self, Detail};
 use crate::commands::object_fill_owner::vector_edit::batch_ops::gradient;
 use crate::commands::object_fill_owner::vector_edit::batch_ops::ribbon;
@@ -22,6 +28,9 @@ use crate::object_document::{
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use serde_json::Number;
+
+#[path = "object_vector_batch_style_dabs.rs"]
+pub(super) mod dabs;
 
 /// The wire members of a restyle step; each absent member leaves that style alone.
 #[derive(Debug, Default)]
@@ -213,6 +222,7 @@ pub(super) fn restyle(
     target: &ObjectTarget,
     style: &Checked,
     catalog: Option<&ProjectPresetCatalog>,
+    deleted: &mut Vec<ObjectTarget>,
 ) -> Result<Vec<ObjectRecord>, DispatchErrorCode> {
     use DispatchErrorCode::{InvalidRequest, NotFound, Unavailable};
     let existing = source
@@ -237,37 +247,25 @@ pub(super) fn restyle(
     }
     let ext = existing.vector_ext.value();
     let texture = ext.and_then(|e| e.brush_texture.value());
-    if ext.is_some_and(|e| !e.bitmap_brush.missing())
-        || texture.is_some_and(|t| t.is_brush_texture_copy.value() == Some(&true))
-    {
+    let bitmap = ext.is_some_and(|e| !e.bitmap_brush.missing());
+    let dab = texture.is_some_and(|t| t.is_brush_texture_copy.value() == Some(&true));
+    if dab && dabs::has_anchor(source, existing) {
         return Err(Unavailable);
     }
-    let group = texture.and_then(|t| t.brush_group_id.value());
-    let stored_copies = group.is_some_and(|g| {
-        source.objects.iter().any(|r| {
-            r.target.context_id == target.context_id
-                && r.target.layer_uid == target.layer_uid
-                && r.target.frame_scope == target.frame_scope
-                && r.vector_ext
-                    .value()
-                    .and_then(|e| e.brush_texture.value())
-                    .is_some_and(|t| {
-                        t.is_brush_texture_copy.value() == Some(&true)
-                            && t.brush_group_id.value() == Some(g)
-                    })
-        })
-    });
+    let anchor = texture.is_some() && !dab;
+    let stored = if anchor { dabs::copies(source, existing) } else { Vec::new() };
     if let Some(key) = style.detail.brush_preset() {
-        // Stored dabs stay behind a re-textured anchor: only native-stamped dabs follow it.
-        return if stored_copies { Err(Unavailable) } else { detail::preset(existing, key, catalog) };
+        // A re-textured anchor paints new dabs of its own: its stored ones go.
+        let out = detail::preset(existing, key, catalog)?;
+        if out.first() != Some(existing) {
+            deleted.extend(stored);
+        }
+        return Ok(out);
     }
-    // An anchor hides its own outline (an opacity of 0, or no stroke) while its dabs show: a stroke colour or an opacity that is not
-    // a fill alpha would bring the outline back, and a width has dabs of its own to follow.
-    if texture.is_some()
-        && (style.stroke.is_some()
-            || (style.opacity.is_some() && existing.solid_fill().is_none())
-            || style.detail.touches_stroke()
-            || (style.width.is_some() && stored_copies))
+    // An anchor hides its own outline (an opacity of 0, or no stroke) while its dabs show: an opacity that is not a fill alpha would bring
+    // the outline back (a bitmap anchor's is the stamp opacity), and a stroke switch has no stroke to switch.
+    if (anchor || bitmap)
+        && (style.detail.touches_stroke() || (style.opacity.is_some() && existing.solid_fill().is_none() && !bitmap))
     {
         return Err(Unavailable);
     }
@@ -317,12 +315,24 @@ pub(super) fn restyle(
     if let Some(opacity) = style.opacity {
         match record.solid_fill().cloned() {
             Some(paint) => record.fill = Presence::Present(Some(with_alpha(paint, opacity)?)),
+            // A bitmap anchor's opacity is its stamp opacity (below), never the item opacity that hides it.
+            None if bitmap => {}
             None => {
                 if let Some(body) = record.vector.value_mut() {
                     body.opacity = num(opacity)?;
                 }
             }
         }
+    }
+    let filled = record.solid_fill().is_some();
+    if bitmap {
+        dabs::bitmap_style(&mut record, style.width, stroke_colour, style.opacity.filter(|_| !filled), filled)?;
+    } else if let (true, true, Some(paint)) = (anchor, filled, stroke_colour) {
+        dabs::remember_stroke(&mut record, paint);
+    }
+    // Stored dabs keep the look they were stamped with: a new width or ink stamps them again from the anchor.
+    if anchor && !stored.is_empty() && (style.width.is_some() || stroke_colour.is_some()) && dabs::seed(&mut record) {
+        deleted.extend(stored);
     }
     let stroke_width = style
         .width

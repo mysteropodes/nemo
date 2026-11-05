@@ -13,7 +13,8 @@
 //! - `maskMode` (add, subtract, intersect) is the named mask's own mode; `unmask` (true) turns the named mask back into a normal shape:
 //!   its mask tags are dropped, its geometry and paint stay (baseline `btn-mask-unset` deletes `isMask`, `maskMode`, `maskFeather` of
 //!   the one selected path).
-//! A bitmap brush, a stamped dab, stored dabs and a stroke switch on a texture anchor are refused (`Unavailable`) by the caller.
+//! A stroke switch on a brush anchor is refused (`Unavailable`) by the caller; a bitmap anchor given a preset becomes a texture anchor (its
+//! companion image is dropped by the batch), and the stored dabs of a re-textured anchor are deleted by the caller.
 use crate::commands::object_fill_owner::vector_edit::batch_ops::gradient;
 use crate::commands::object_fill_owner::vector_edit::batch_ops::style::{
     num, parse, Checked, Style,
@@ -282,7 +283,7 @@ fn dashes(width: f64, on: f64, off: f64) -> Result<Presence<Vec<Number>>, Dispat
 }
 
 /// A 32-bit FNV-1a hash of `parts`: the seed and group of a re-textured stroke are derived, so a replay makes the same dabs.
-fn hash(parts: &[&str]) -> u32 {
+pub(super) fn hash(parts: &[&str]) -> u32 {
     let mut h: u32 = 0x811c_9dc5;
     for part in parts {
         for byte in part.bytes().chain(std::iter::once(0xff)) {
@@ -293,7 +294,7 @@ fn hash(parts: &[&str]) -> u32 {
 }
 
 /// A `#rrggbbaa` the record hides its stroke as (the baseline's `colorHex8`).
-fn hex8(paint: &SolidFill) -> Option<String> {
+pub(super) fn hex8(paint: &SolidFill) -> Option<String> {
     let byte = |n: &Number| {
         n.as_f64()
             .filter(|v| v.is_finite())
@@ -318,10 +319,25 @@ pub(super) fn preset(
     use DispatchErrorCode::InvalidRequest;
     let ext = existing.vector_ext.value();
     let body = existing.vector().ok_or(InvalidRequest)?;
-    let previous = ext.and_then(|e| e.brush_texture.value()).cloned();
-    let anchored = previous
-        .as_ref()
-        .is_some_and(|t| !t.brush_texture_preset.missing());
+    // A bitmap anchor strips like a texture anchor (baseline `stripAnyBrushTexture`): what it hid comes back, its baked image goes.
+    let bitmap = ext.and_then(|e| e.bitmap_brush.value());
+    let previous = ext
+        .and_then(|e| e.brush_texture.value())
+        .cloned()
+        .or_else(|| {
+            bitmap.map(|b| BrushTexture {
+                brush_group_id: Presence::Present(b.brush_group_id.clone()),
+                is_brush_texture_copy: Presence::Missing,
+                brush_texture_preset: Presence::Missing,
+                pre_texture_opacity: b.pre_texture_opacity.clone(),
+                pre_texture_stroke: b.pre_texture_stroke.clone(),
+                stroke_seed: Presence::Missing,
+            })
+        });
+    let anchored = bitmap.is_some()
+        || previous
+            .as_ref()
+            .is_some_and(|t| !t.brush_texture_preset.missing());
     let special =
         ext.is_some_and(|e| !e.pressure.missing() || e.is_fill_shape.value() == Some(&true));
     // Eligible (baseline): a plain stroke with a stroke or a texture already. Anything else is left exactly as it is.
@@ -356,6 +372,7 @@ pub(super) fn preset(
     }
     if let Some(e) = record.vector_ext.value_mut() {
         e.brush_texture = Presence::Missing;
+        e.bitmap_brush = Presence::Missing;
         if e.is_empty() {
             record.vector_ext = Presence::Missing;
         }

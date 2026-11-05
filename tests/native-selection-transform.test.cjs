@@ -235,12 +235,20 @@ test('a refusal is a notice and never a throw: Direct Select, Motion, picked poi
 });
 
 test('an item with no native transform is refused with the gesture notice and nothing is written', async () => {
-  const h = harness([quad('L1', 'a', 10, 10, 30, 30, { role: 'brush', brush: 'bitmap', group: 'g' }), ITEMS[1]]);
+  const h = harness([quad('L1', 'a', 10, 10, 30, 30, { role: 'unknown-family', group: 'g' }), ITEMS[1]]);
   await h.select();
   assert.ok(h.root.selectedPaths.length >= 1);
   h.key('ArrowRight'); await settle();
   assert.equal(h.batches.length, 0);
-  assert.match(h.toasts.join('|'), /bitmap brushes is not available on native projects yet/);
+  assert.match(h.toasts.join('|'), /this item is not available on native projects yet/);
+});
+
+test('a bitmap brush nudges with the rest of the selection: the engine re-bakes its image in the same batch, no notice', async () => {
+  const h = harness([quad('L1', 'a', 10, 10, 30, 30, { role: 'brush', brush: 'bitmap', group: 'g' }), ITEMS[1]]);
+  await h.select();
+  h.key('ArrowRight'); await settle();
+  assert.equal(h.batches.length, 1);
+  assert.deepEqual(h.toasts, []);
 });
 
 test('a selection that outlived a context change is dropped with a notice, never moved', async () => {

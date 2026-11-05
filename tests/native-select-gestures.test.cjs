@@ -197,12 +197,15 @@ test('after the frame changes, pressing where a handle was does not start a tran
   assert.notEqual(h.root.selectedPaths, stale, 'the stale selection was dropped (the press became a marquee, not a grab of its ring)');
 });
 
-test('bitmap brushes and an unresolved dab have no native transform here: a drag is refused with a notice naming them, and nothing is written', async () => {
-  const refused = async (extra, pattern) => { const x = harness([quad('X', 20, 20, 120, 120, extra)]); await x.select(35, 35);
+test('a bitmap brush and a dab with no anchor left are moved by the engine like any record: one batch with the record-space matrix, no refusal', async () => {
+  for (const extra of [{ role: 'brush', brush: 'bitmap', group: 'g' }, { role: 'brush', brush: 'copy', group: 'g' }]) {
+    const x = harness([quad('X', 20, 20, 120, 120, extra)]); await x.select(35, 35);
     x.press(35, 35); x.drag(60, 60); await settle(); await x.release(60, 60); await settle();
-    assert.deepEqual(x.batches, [], pattern); assert.ok(x.toasts.some((t) => pattern.test(t)), x.toasts.join('|')); };
-  await refused({ role: 'brush', brush: 'bitmap', group: 'g' }, /bitmap brushes/);
-  await refused({ role: 'brush', brush: 'copy', group: 'g' }, /brush dabs/);
+    assert.equal(x.batches.length, 1, `${extra.brush}: exactly one commit`);
+    assert.deepEqual(x.batches[0].steps.map((st) => st.reshape.stableTarget.strokeId), ['X']);
+    assert.deepEqual(x.batches[0].steps[0].reshape.matrix, [1, 0, 0, 1, 25, 25], 'the exact delta; the engine re-bakes the bitmap from the moved anchor');
+    assert.deepEqual(x.toasts, [], 'no refusal notice');
+  }
 });
 
 // #2372 SEL-F6C: an image and a text block are transformed by the same record-space matrix batch step as every other painted family
