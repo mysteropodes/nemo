@@ -31,6 +31,7 @@ mod reference;
 pub(crate) mod viewport_checker;
 pub use viewport_checker::{
     outline::viewport_outline_quality_suffix, shadow::viewport_shadow_guides_quality_suffix,
+    solo::viewport_solo_quality_suffix,
     viewport_checker_quality_suffix,
 };
 // #2358 GHOST-UNDER: onion / Ghost All frames composed under the live frame of a viewport witness.

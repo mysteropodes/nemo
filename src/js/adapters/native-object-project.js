@@ -20,7 +20,7 @@
   function create(ports){
     if(!Properties||typeof Properties.create!=='function')throw new Error('Native project property ports are unavailable');
     if(!Exposure||typeof Exposure.navigation!=='function'||typeof Exposure.previewScheduling!=='function')throw new Error('Native project view ports are unavailable');
-    var previewFailures=new WeakMap(),view=Exposure.navigation(ports.viewMode,openDiagnostic,ports.displayFilter,ports.ghosts,ports.alphaChecker,ports.currentOutline,ports.hideShadowGuides),phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,openingRequested=false;
+    var previewFailures=new WeakMap(),view=Exposure.navigation(ports.viewMode,openDiagnostic,ports.displayFilter,ports.ghosts,ports.alphaChecker,ports.currentOutline,ports.hideShadowGuides,ports.soloLayers),phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,openingRequested=false;
     var subscription=null,subscriptionTicket=0,synchronizing=false,openAttempt=null,revisionAttempt=null,presentationBounds=null,openExposure=null,openingCancelled=false;
     var observation=Desktop.attemptObserver(function(){return ports.invoke.apply(ports,arguments);},openDiagnostic,
       function(){return openAttempt;},function(){return revisionAttempt;},previewFailures),invokeTracked=observation.invoke;
@@ -232,7 +232,7 @@
       if(revisionSync)request.revisionSync=revisionSync;
       var bounds=Object.assign({},request.viewport.cssBounds);
       var receipt;
-      function inspect(value,allowDeferred){try{return Exposure.inspectReceipt(value,['opening','native'].includes(phase)&&same(info,request)&&(allowSuperseded||Exposure.sameView(selected,view.read(info))),allowDeferred,mode,selected.navigation,selected.displayFilter,selected.ghosts,selected.alphaChecker,selected.currentOutline,selected.hideShadowGuides);}
+      function inspect(value,allowDeferred){try{return Exposure.inspectReceipt(value,['opening','native'].includes(phase)&&same(info,request)&&(allowSuperseded||Exposure.sameView(selected,view.read(info))),allowDeferred,mode,selected.navigation,selected.displayFilter,selected.ghosts,selected.alphaChecker,selected.currentOutline,selected.hideShadowGuides,selected.solo);}
         catch(error){throw previewFailure('receipt-access',error);}}
       try{receipt=exposure?await exposure.run(function(){return raw('nemo_native_object_preview',request);},function(){return verifyOwner(pin);},inspect):inspect(await raw('nemo_native_object_preview',request),!!occlusion&&!revisionSync);}
       catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw error;}
@@ -403,7 +403,7 @@
       if(!Exports||typeof Exports.run!=='function')return Promise.reject(new Error('Native object export adapter is unavailable'));
       var submitted=epoch(info);return Exports.run({
         enqueue:function(action){return enqueue(function(){guardEpoch(submitted);return action(requireActive());});},
-        frameRequest:frameRequest,invoke:function(request){return raw('nemo_native_object_export',request);}
+        frameRequest:frameRequest,soloLayers:ports.soloLayers,invoke:function(request){return raw('nemo_native_object_export',request);}
       },destination,frames,onProgress,signal,format);
     }
     function exportPng(destination,frames,onProgress,signal){return exportFrames(destination,frames,onProgress,signal,'png');}

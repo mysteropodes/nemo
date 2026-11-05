@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "6dff380b74359e0cf5e86f44733cfa874af60368",
-  "describe": "v0.7.0-alpha.4-5132-g6dff380b7-dirty"
+  "head": "4b29e90e0ee6f90bc6a8b4739f495f686719e7aa",
+  "describe": "v0.7.0-alpha.4-5132-g4b29e90e0-dirty"
  },
- "inputsDigest": "13fa61276934ee10cba0406f253e9f8f26139f1d049c43312b496f2fcc493c4b",
+ "inputsDigest": "06786eb306671591886f81aadc2beee8069402c8f1ab29846ce8d54cadf535c7",
  "states": [
   "inventoried",
   "characterized",
@@ -26,16 +26,16 @@
   "native"
  ],
  "counts": {
-  "total": 933,
+  "total": 931,
   "byKind": {
    "dom": 485,
    "labs": 36,
-   "menu": 286,
+   "menu": 284,
    "sdk": 76,
    "shortcut": 50
   },
   "byStatus": {
-   "inventoried": 897,
+   "inventoried": 895,
    "unmapped": 35,
    "unavailable-with-reason": 1
   },
@@ -47,7 +47,7 @@
    "animation-rigs-expressions": 157,
    "effects-masks": 10,
    "preferences-workspace": 42,
-   "unclassified": 22,
+   "unclassified": 20,
    "labs": 61,
    "storyboard": 17
   },
@@ -17546,7 +17546,7 @@
     "functionsVisited": 248,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-project-desktop.js:359 presented()",
+     "src/js/adapters/native-object-project-desktop.js:361 presented()",
      "src/js/app.js:536 updZoom()",
      "src/js/tools.js:7084 show()"
     ]
@@ -22209,7 +22209,7 @@
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
    "source": "src/js/labs/timeline-markers.js:82",
    "meta": {
-    "functionsVisited": 23
+    "functionsVisited": 24
    },
    "fixtures": []
   },
@@ -22795,7 +22795,7 @@
    "capability": "Coller",
    "area": "unclassified",
    "handler": [
-    "src/js/adapters/native-select-menu.js:37 pasteRow()"
+    "src/js/adapters/native-select-menu.js:36 pasteRow()"
    ],
    "events": [
     "click"
@@ -22809,7 +22809,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:37",
+   "source": "src/js/adapters/native-select-menu.js:36",
    "meta": {
     "i18n": null,
     "functionsVisited": 7
@@ -22823,7 +22823,7 @@
    "capability": "Aplatir",
    "area": "unclassified",
    "handler": [
-    "src/js/adapters/native-select-menu.js:58 rows()"
+    "src/js/adapters/native-select-menu.js:57 rows()"
    ],
    "events": [
     "click"
@@ -22837,38 +22837,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:58",
+   "source": "src/js/adapters/native-select-menu.js:57",
    "meta": {
     "i18n": null,
     "functionsVisited": 7
-   },
-   "fixtures": []
-  },
-  {
-   "id": "menu:adapters/native-select-menu.js:rows:arriere-plan",
-   "kind": "menu",
-   "surface": "dynamic menu (rows)",
-   "capability": "Arrière-plan",
-   "area": "unclassified",
-   "handler": [
-    "src/js/adapters/native-select-menu.js:64 rows()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:64",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 10
    },
    "fixtures": []
   },
@@ -22877,146 +22849,6 @@
    "kind": "menu",
    "surface": "dynamic menu (rows)",
    "capability": "Combiner (Union) — non destructif",
-   "area": "unclassified",
-   "handler": [
-    "src/js/adapters/native-select-menu.js:55 rows()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:55",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 7
-   },
-   "fixtures": []
-  },
-  {
-   "id": "menu:adapters/native-select-menu.js:rows:copier",
-   "kind": "menu",
-   "surface": "dynamic menu (rows)",
-   "capability": "Copier",
-   "area": "unclassified",
-   "handler": [
-    "src/js/adapters/native-select-menu.js:44 rows()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:44",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 7
-   },
-   "fixtures": []
-  },
-  {
-   "id": "menu:adapters/native-select-menu.js:rows:couper",
-   "kind": "menu",
-   "surface": "dynamic menu (rows)",
-   "capability": "Couper",
-   "area": "unclassified",
-   "handler": [
-    "src/js/adapters/native-select-menu.js:45 rows()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:45",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 7
-   },
-   "fixtures": []
-  },
-  {
-   "id": "menu:adapters/native-select-menu.js:rows:dissocier",
-   "kind": "menu",
-   "surface": "dynamic menu (rows)",
-   "capability": "Dissocier",
-   "area": "unclassified",
-   "handler": [
-    "src/js/adapters/native-select-menu.js:53 rows()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:53",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 7
-   },
-   "fixtures": []
-  },
-  {
-   "id": "menu:adapters/native-select-menu.js:rows:dupliquer",
-   "kind": "menu",
-   "surface": "dynamic menu (rows)",
-   "capability": "Dupliquer",
-   "area": "unclassified",
-   "handler": [
-    "src/js/adapters/native-select-menu.js:47 rows()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:47",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 25
-   },
-   "fixtures": []
-  },
-  {
-   "id": "menu:adapters/native-select-menu.js:rows:grouper",
-   "kind": "menu",
-   "surface": "dynamic menu (rows)",
-   "capability": "Grouper",
    "area": "unclassified",
    "handler": [
     "src/js/adapters/native-select-menu.js:54 rows()"
@@ -23041,13 +22873,13 @@
    "fixtures": []
   },
   {
-   "id": "menu:adapters/native-select-menu.js:rows:premier-plan",
+   "id": "menu:adapters/native-select-menu.js:rows:copier",
    "kind": "menu",
    "surface": "dynamic menu (rows)",
-   "capability": "Premier plan",
+   "capability": "Copier",
    "area": "unclassified",
    "handler": [
-    "src/js/adapters/native-select-menu.js:64 rows()"
+    "src/js/adapters/native-select-menu.js:43 rows()"
    ],
    "events": [
     "click"
@@ -23061,10 +22893,122 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:64",
+   "source": "src/js/adapters/native-select-menu.js:43",
    "meta": {
     "i18n": null,
-    "functionsVisited": 10
+    "functionsVisited": 7
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-select-menu.js:rows:couper",
+   "kind": "menu",
+   "surface": "dynamic menu (rows)",
+   "capability": "Couper",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-select-menu.js:44 rows()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-select-menu.js:44",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 7
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-select-menu.js:rows:dissocier",
+   "kind": "menu",
+   "surface": "dynamic menu (rows)",
+   "capability": "Dissocier",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-select-menu.js:52 rows()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-select-menu.js:52",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 7
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-select-menu.js:rows:dupliquer",
+   "kind": "menu",
+   "surface": "dynamic menu (rows)",
+   "capability": "Dupliquer",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-select-menu.js:46 rows()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-select-menu.js:46",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 25
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-select-menu.js:rows:grouper",
+   "kind": "menu",
+   "surface": "dynamic menu (rows)",
+   "capability": "Grouper",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-select-menu.js:53 rows()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-select-menu.js:53",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 7
    },
    "fixtures": []
   },
@@ -23075,7 +23019,7 @@
    "capability": "Sortir du groupe",
    "area": "unclassified",
    "handler": [
-    "src/js/adapters/native-select-menu.js:57 rows()"
+    "src/js/adapters/native-select-menu.js:56 rows()"
    ],
    "events": [
     "click"
@@ -23089,7 +23033,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-select-menu.js:57",
+   "source": "src/js/adapters/native-select-menu.js:56",
    "meta": {
     "i18n": null,
     "functionsVisited": 7

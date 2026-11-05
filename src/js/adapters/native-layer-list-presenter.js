@@ -84,6 +84,8 @@
     if(typeof context.duplicatorCell==='function'){var dc=context.duplicatorCell(layer,i,node);if(dc){dc.style.order='1';after.push(dc);}}
     // The baseline Parent cell (.lparent) comes from the caller's hook: it owns the Parent A edit, this file commits nothing.
     if(typeof context.parentCell==='function'){var pc=context.parentCell(layer,i,node);if(pc){pc.style.order='1';after.push(pc);}}
+    // #2371: the baseline Solo cell (.lico.solo-btn "S", after eye and lock) comes from the caller's hook: the session owns the flag, this file commits nothing.
+    if(typeof context.soloCell==='function'){var sc=context.soloCell(layer,i,node);if(sc)after.push(sc);}
     if(layer.kind==='component')node.className+=' is-comp';
     if(depth>0||typeof layer.folderId==='string')node.className+=' in-folder';
     if(typeof layer.folderId==='string'){
@@ -121,7 +123,7 @@
     var controls=[pick,eye,flags[0],flags[1]],decorated=extra.before.length+extra.after.length>0;
     if(decorated){
       extra.before.forEach(function(n,k){n.style.order=String(k-extra.before.length);});pick.style.order='0';
-      extra.after.forEach(function(n){n.style.order='1';});[eye,flags[0],flags[1]].forEach(function(n){n.style.order='2';});
+      extra.after.forEach(function(n){n.style.order=n.dataset&&n.dataset.nativeLayerSolo==='true'?'2':'1';});[eye,flags[0],flags[1]].forEach(function(n){n.style.order='2';});
     }
     node.replaceChildren.apply(node,controls.concat(extra.before,extra.after));
     // #2371: the caller binds the row's writes (rename, drag, colour dot, folder chevron) onto the finished row.

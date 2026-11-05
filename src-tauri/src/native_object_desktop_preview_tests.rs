@@ -514,3 +514,6 @@ mod outline;
 
 #[path = "native_object_desktop_preview_shadow_tests.rs"]
 mod shadow;
+
+#[path = "native_object_desktop_preview_solo_tests.rs"]
+mod solo;
