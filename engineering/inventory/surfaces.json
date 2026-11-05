@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "9799c6e9ccf4a363beda6f9a96fda51063423c1b",
-  "describe": "v0.7.0-alpha.4-5266-g9799c6e9c-dirty"
+  "head": "7fd8a28b3cd1a0b8d5c26edf0214fdb6191aec08",
+  "describe": "v0.7.0-alpha.4-5276-g7fd8a28b3-dirty"
  },
- "inputsDigest": "32737c7a9b60fecdf71f20cbd7c13d8e43adc4f90f3174ca122434717963a6e7",
+ "inputsDigest": "e9dbc83708f492bce7855ad4969f677ec065c45c75840e633669190804910dae",
  "states": [
   "inventoried",
   "characterized",
@@ -2959,7 +2959,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 149,
+    "functionsVisited": 163,
     "via": "variable b",
     "references": [
      "src/js/motion.js:13214 setAppMode()",
@@ -33128,7 +33128,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:542",
    "meta": {
-    "functionsVisited": 7
+    "functionsVisited": 5
    },
    "fixtures": [
     "media",
