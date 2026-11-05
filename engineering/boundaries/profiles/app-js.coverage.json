@@ -1057,6 +1057,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-select-group.js",
+      "moduleId": "app.native.object.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-selection-boolean.js",
       "moduleId": "app.native.object.ui.adapter",
       "executionClass": "document-classic",

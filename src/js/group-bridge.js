@@ -88,7 +88,7 @@
     }
     delete ld.groups[gid];
   }
-  function groupSelection() {
+  function groupSelection() { var ng = window.NemoNativeSelectGroup; if (ng && ng.native(window)) { ng.group(window); return; } // #2372: a native project's owner groups in one transaction
     if ((state.tool !== 'select' && state.tool !== 'subselect') || !window.selectedPaths || selectedPaths.length < 2) {
       if (window.showToast) showToast(SM.t('toastSelectAtLeast2ElementsToGroup'));
       return;
@@ -191,7 +191,7 @@
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     if (window.showToast) showToast(SM.t('toastGroupCreatedSuffix') + units.length + SM.t('toastElementsCloseParen'));
   }
-  function ungroupSelection() {
+  function ungroupSelection() { var ng = window.NemoNativeSelectGroup; if (ng && ng.native(window)) { ng.ungroup(window); return; }
     // Both refusals were silent while groupSelection's own ("Sélectionnez au
     // moins 2 calques") is not — so Cmd+Shift+G read as a broken shortcut
     // rather than an inapplicable one (2026-07-25 UX audit).
@@ -373,7 +373,7 @@
   // opts.skipUndo/opts.silent let internal callers (a destructive booleanOp
   // ending a source shape's group membership before removing it) fold this
   // into their OWN undo snapshot/save cycle instead of adding a second one.
-  function removeMemberFromGroup(p, ld, layer, opts) {
+  function removeMemberFromGroup(p, ld, layer, opts) { var ng = window.NemoNativeSelectGroup; if (ng && ng.native(window)) { if (!opts) ng.removeMember(window); return; }
     opts = opts || {};
     var gid = p.data && p.data.groupId;
     if (!gid || !ld || !ld.groups || !ld.groups[gid]) return;
@@ -396,7 +396,7 @@
   // current combined outline into one real shape and discards the group,
   // reusing the existing destructive insertBooleanResult (tools.js) for its
   // styling/z-position handling, same as booleanOp() itself does.
-  function flattenGroup(gid, ld, layer) {
+  function flattenGroup(gid, ld, layer) { var ng = window.NemoNativeSelectGroup; if (ng && ng.native(window)) { ng.flatten(window); return; }
     var grp = ld && ld.groups && ld.groups[gid];
     if (!grp) return;
     var members = resolveGroupMembers(gid, ld, layer);

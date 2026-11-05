@@ -9712,7 +9712,8 @@ function onKeyDown(event){
   var _gLayerRows=!!window._layerActiveExplicit&&typeof _layerSel!=='undefined'&&_layerSel.length>=2;
   if((event.metaKey||event.ctrlKey)&&(event.key==='g'||event.key==='G')&&!event.shiftKey&&!_gLayerRows&&window.selectedPaths&&selectedPaths.length>=2){
     event.preventDefault();
-    if(window.SMGroup)SMGroup.groupSelection();
+    if(window.NemoNativeSelectGroup&&NemoNativeSelectGroup.native(window))NemoNativeSelectGroup.group(window); // #2372: native owner, one transaction
+    else if(window.SMGroup)SMGroup.groupSelection();
     return;
   }
   // Ctrl/Cmd+Shift+G "ungroup" — free shortcut (unused elsewhere), only
@@ -9720,7 +9721,8 @@ function onKeyDown(event){
   // otherwise falls through (currently nothing else claims this combo).
   if((event.metaKey||event.ctrlKey)&&(event.key==='g'||event.key==='G')&&event.shiftKey&&window.selectedPaths&&selectedPaths.length){
     event.preventDefault();
-    if(window.SMGroup)SMGroup.ungroupSelection();
+    if(window.NemoNativeSelectGroup&&NemoNativeSelectGroup.native(window))NemoNativeSelectGroup.ungroup(window);
+    else if(window.SMGroup)SMGroup.ungroupSelection();
     return;
   }
   // Ctrl/Cmd+G "group into folder" — the action already existed
@@ -11446,6 +11448,7 @@ function updateCombinePanel(){
   var existingRow=document.getElementById('combine-existing-row');
   var btns=Object.keys(COMBINE_MODE_BTN_IDS).map(function(m){return document.getElementById(COMBINE_MODE_BTN_IDS[m]);});
   if(!existingRow||btns.some(function(b){return !b;}))return;
+  if(window.NemoNativeSelectGroup&&NemoNativeSelectGroup.native(window)){NemoNativeSelectGroup.syncPanel(window);return;} // #2372: the group is read from the native listing
   var li=state.activeLayerIdx,ld=state.layers[li],layer=userLayers[li];
   var gid=null;
   if(ld&&ld.groups&&sel&&sel.length){
@@ -11502,6 +11505,7 @@ window.updateCombinePanel=updateCombinePanel;
     });
   });
   document.getElementById('btn-combine-remove').addEventListener('click',function(){
+    if(window.NemoNativeSelectGroup&&NemoNativeSelectGroup.native(window)){NemoNativeSelectGroup.removeMember(window);return;}
     var sel=window.selectedPaths;
     if(!sel||sel.length!==1||!window.SMGroup)return;
     var li=state.activeLayerIdx;
@@ -11509,6 +11513,7 @@ window.updateCombinePanel=updateCombinePanel;
     updateCombinePanel();
   });
   document.getElementById('btn-combine-flatten').addEventListener('click',function(){
+    if(window.NemoNativeSelectGroup&&NemoNativeSelectGroup.native(window)){NemoNativeSelectGroup.flatten(window);return;}
     var gid=activeCombineGid();
     if(!gid||!window.SMGroup)return;
     var li=state.activeLayerIdx;
