@@ -176,6 +176,24 @@ fn the_folder_chevron_is_saved_with_a_revision_but_adds_no_undo_entry_and_keeps_
             .len(),
         4
     );
+    // The fold rides with the last step: undo brings back the state before that step, redo the fold saved after it.
+    let mut owner2 = owner_of(&drawn());
+    let folder2 = created(&mut owner2, "f2", &kind("folder", "Folder 4", json!({"children":["L1"]})));
+    let fid2 = folder2["layerUid"].as_str().unwrap().to_string();
+    send_kind(
+        &mut owner2,
+        "fold2",
+        "compositing.edit",
+        &json!({"command":"object.layer.compositing.edit","layerUid":fid2,"edit":"folderCollapsed","collapsed":true}),
+    );
+    let folded = bytes(&owner2);
+    let at = owner2.content_revision();
+    owner2.undo(at).unwrap();
+    assert_eq!(names(&owner2), ["L0", "L1", "L2"], "the creation is undone");
+    let at = owner2.content_revision();
+    owner2.redo(at).unwrap();
+    assert_eq!(bytes(&owner2), folded, "redo restores the folder as it was folded");
+    assert_eq!(layer_of(&owner2, &fid2)["folderCollapsed"], true);
     let reply = fold(&mut owner, "unfold", false);
     assert_eq!(reply["result"]["historyEntriesAdded"], 0, "{reply}");
     assert_eq!(layer_of(&owner, &fid)["folderCollapsed"], false);

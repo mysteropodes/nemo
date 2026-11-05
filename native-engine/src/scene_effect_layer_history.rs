@@ -31,6 +31,12 @@ impl NativeObjectHistory {
                 after_revision,
             });
             self.redo.clear();
+        } else if after_revision != before_revision {
+            // A disclosure toggle is no step of its own, but the state it saved rides with the last step: redoing that step after an
+            // undo brings the fold back (the baseline redo snapshot was taken at undo time, with the fold as it then stood).
+            if let Some(last) = self.undo.last_mut().filter(|e| e.after_revision == before_revision) {
+                last.after_revision = after_revision;
+            }
         }
         Ok(after_revision)
     }

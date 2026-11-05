@@ -213,36 +213,24 @@ fn delete_flip_and_distribute_are_one_history_entry_each() {
         true,
     );
     assert_eq!(frames(&saved(&state, &id)), vec![0, 4, 6, 12]);
-    // 0, 4 and 12 would spread onto the key now at 6, which stays: nothing is published.
-    let before = saved(&state, &id);
-    let collides = state
-        .dispatch_native(batch(
-            &state,
-            &id,
-            "spread-collides",
-            2,
-            &[0, 4, 12],
-            json!({"kind":"distribute"}),
-        ))
-        .unwrap();
-    assert_eq!(collides.error.unwrap().code, "unavailable");
-    assert_eq!(saved(&state, &id), before);
+    // 0, 4 and 12 spread onto the key now at 6, which stays: the baseline assigned the frames without a collision check, so the
+    // moved key replaces it (one key per frame) and the batch is one more history entry.
     receipt(
         &state
             .dispatch_native(batch(
                 &state,
                 &id,
-                "drop",
+                "spread-replaces",
                 2,
-                &[4],
-                json!({"kind":"delete"}),
+                &[0, 4, 12],
+                json!({"kind":"distribute"}),
             ))
             .unwrap(),
         3,
         true,
     );
     assert_eq!(frames(&saved(&state, &id)), vec![0, 6, 12]);
-    assert!(undo(&state, &id, "undo-delete", 3).ok);
+    assert!(undo(&state, &id, "undo-replace", 3).ok);
     assert!(undo(&state, &id, "undo-spread", 4).ok);
     assert!(undo(&state, &id, "undo-flip", 5).ok);
     assert_eq!(saved(&state, &id), initial);
