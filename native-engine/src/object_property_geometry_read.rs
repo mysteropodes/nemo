@@ -52,8 +52,10 @@ impl ObjectSnapshot {
         if !bounds.iter().all(|v| v.is_finite()) {
             return Err(Unavailable);
         }
-        Ok(json!({"instanceId":self.instance_id(),"documentId":self.document_id(),
+        Ok(
+            json!({"instanceId":self.instance_id(),"documentId":self.document_id(),
             "atRevision":self.content_revision(),"documentSnapshotId":self.snapshot_id(),
-            "kind":"layerBounds","target":target,"frame":frame as u32,"bounds":bounds,"parentLayerUid":parent}))
+            "kind":"layerBounds","target":target,"frame":frame as u32,"bounds":bounds,"parentLayerUid":parent}),
+        )
     }
 }

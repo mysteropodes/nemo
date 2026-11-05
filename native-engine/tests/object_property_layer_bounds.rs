@@ -28,8 +28,11 @@ fn layer(uid: &str, parent: Option<&str>, null: bool) -> Value {
 }
 fn pin() -> ObjectSnapshot {
     let element = |uid: &str| json!({"layerUid":uid,"strokeId":format!("s{uid}"),"naturalPosition":0,"order":{}});
-    let order: Vec<Value> = ["A", "B", "N"].iter().enumerate()
-        .map(|(n, u)| json!({"layerUid":u,"naturalPosition":n,"order":{}})).collect();
+    let order: Vec<Value> = ["A", "B", "N"]
+        .iter()
+        .enumerate()
+        .map(|(n, u)| json!({"layerUid":u,"naturalPosition":n,"order":{}}))
+        .collect();
     let source = json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":8,
         "layers":[layer("A", None, false), layer("B", Some("A"), false), layer("N", None, true)],
         "objects":[rect("A", 20., 30., 100., 60.), rect("B", 200., 10., 50., 40.)],
@@ -39,7 +42,11 @@ fn pin() -> ObjectSnapshot {
             "migration":"explicit-plan-required","referencePolicy":"unresolved","contexts":[{"contextId":"scene-root",
                 "layers":order,
                 "scopes":[{"frameScope":{"kind":"authored","frame":0},"elements":[element("A"), element("B")]}]}]}});
-    ObjectSnapshot::new("layer-bounds", decode_storage_project(source.to_string().as_bytes()).unwrap()).unwrap()
+    ObjectSnapshot::new(
+        "layer-bounds",
+        decode_storage_project(source.to_string().as_bytes()).unwrap(),
+    )
+    .unwrap()
 }
 fn read(pin: &ObjectSnapshot, target: Value, frame: Value) -> Result<Value, DispatchErrorCode> {
     let selector = json!({"instanceId":pin.instance_id(),"documentId":pin.document_id(),"atRevision":pin.content_revision(),
@@ -55,7 +62,11 @@ fn a_drawn_layer_answers_its_bounds_before_its_motion() {
     let pin = pin();
     let result = read(&pin, layer_target("A"), json!(0)).unwrap();
     assert_eq!(result["kind"], "layerBounds");
-    assert_eq!(result["bounds"], json!([20.0, 30.0, 120.0, 90.0]), "position 50,50 and rotation 30 do not move the pre-motion bounds");
+    assert_eq!(
+        result["bounds"],
+        json!([20.0, 30.0, 120.0, 90.0]),
+        "position 50,50 and rotation 30 do not move the pre-motion bounds"
+    );
     assert_eq!(result["parentLayerUid"], Value::Null);
     assert_eq!(result["frame"], json!(0));
     assert_eq!(result["target"], layer_target("A"));
@@ -79,11 +90,27 @@ fn the_view_refuses_what_it_cannot_answer() {
     let stroke = json!({"contextId":"scene-root","layerUid":"A","strokeId":"sA"});
     for (target, frame, want) in [
         (stroke, json!(0), DispatchErrorCode::InvalidRequest),
-        (layer_target("A"), json!(1.5), DispatchErrorCode::InvalidRequest),
-        (layer_target("A"), json!(-1), DispatchErrorCode::InvalidRequest),
-        (layer_target("missing"), json!(0), DispatchErrorCode::NotFound),
+        (
+            layer_target("A"),
+            json!(1.5),
+            DispatchErrorCode::InvalidRequest,
+        ),
+        (
+            layer_target("A"),
+            json!(-1),
+            DispatchErrorCode::InvalidRequest,
+        ),
+        (
+            layer_target("missing"),
+            json!(0),
+            DispatchErrorCode::NotFound,
+        ),
     ] {
-        assert_eq!(read(&pin, target.clone(), frame.clone()).unwrap_err(), want, "{target} at {frame}");
+        assert_eq!(
+            read(&pin, target.clone(), frame.clone()).unwrap_err(),
+            want,
+            "{target} at {frame}"
+        );
     }
 }
 #[test]
@@ -91,5 +118,9 @@ fn a_stale_snapshot_is_a_stale_revision() {
     let pin = pin();
     let selector = json!({"instanceId":pin.instance_id(),"documentId":pin.document_id(),"atRevision":pin.content_revision() + 1,
         "documentSnapshotId":pin.snapshot_id(),"view":{"kind":"layerBounds","target":layer_target("A"),"frame":0}});
-    assert_eq!(pin.query_property_read_json(selector.to_string().as_bytes()).unwrap_err(), DispatchErrorCode::StaleRevision);
+    assert_eq!(
+        pin.query_property_read_json(selector.to_string().as_bytes())
+            .unwrap_err(),
+        DispatchErrorCode::StaleRevision
+    );
 }
