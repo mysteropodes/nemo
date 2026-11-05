@@ -1,14 +1,13 @@
 //! B-eraser-tool: the eraser bites what the baseline bit - a curved ribbon or shape, an open stroke, an open filled path,
 //! a held cell - and a drag is ONE undo step (`joinHistory`). Expected values are hand-derived from the geometry.
-use super::object_boolean_ops_tests::{
-    apply, bytes, document, frame_records, ids_of, legacy, near, ngon, owner_of, rect, ring_points, send,
-    shoelace, state, vector, VectorSpec, BLUE, RED,
+use crate::history::object_history::object_boolean_ops_tests::{
+    apply, bytes, document, erase_payload, frame_records, ids_of, legacy, near, ngon, owner_of, rect,
+    ring_points, send, shoelace, state, vector, VectorSpec, BLUE, RED,
 };
-use super::*;
 use serde_json::{json, Value};
 
 fn erase(layer: &str, frame: u32, id: &str, footprint: &[(f64, f64)]) -> Value {
-    super::object_boolean_ops_tests::erase_payload(layer, frame, id, footprint)
+    erase_payload(layer, frame, id, footprint)
 }
 fn circle(id: &str, cx: f64, cy: f64, r: f64) -> Value {
     let k = 0.5522847498 * r;

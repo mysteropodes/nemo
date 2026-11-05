@@ -321,29 +321,11 @@ pub(super) fn result(operation: &str, value: &Value) -> bool {
 }
 
 /// The receipt of `operation` for the request `payload` it answers: a joined eraser bite (`joinHistory`) continues the
-/// drag's undo entry, so it adds none, applied or not; every other receipt is `result`.
+/// drag's undo entry, so it adds none; every other receipt is `result`.
 pub(super) fn result_for(operation: &str, payload: &Value, value: &Value) -> bool {
-    let joined = operation.ends_with(".boolean.erase")
-        && payload.get("joinHistory").and_then(Value::as_bool) == Some(true);
-    if !joined {
-        return result(operation, value);
-    }
-    exact(value, &["applied", "historyEntriesAdded"], &[]).is_some_and(|v| {
-        v["applied"].is_boolean() && v["historyEntriesAdded"] == 0
-    })
-}
-
-/// An eraser receipt's history count follows the request: a joined bite adds no entry, any other adds one.
-fn erase_history_matches(request: &NativeApplicationRequest, value: &Value) -> bool {
-    if !request.operation.ends_with(".boolean.erase") || value["applied"] != true {
-        return true;
-    }
-    let joined = request
-        .payload
-        .get("joinHistory")
-        .and_then(Value::as_bool)
-        .unwrap_or(false);
-    value["historyEntriesAdded"] == u64::from(!joined)
+    let joined = operation.ends_with(".boolean.erase") && payload.get("joinHistory").and_then(Value::as_bool) == Some(true);
+    !joined && result(operation, value)
+        || joined && exact(value, &["applied", "historyEntriesAdded"], &[]).is_some_and(|v| v["applied"].is_boolean() && v["historyEntriesAdded"] == 0)
 }
 
 /// The receipt advances the revision exactly when it applied one edit.
@@ -364,7 +346,7 @@ pub(crate) fn response_matches(
         && response.document_id == request.document_id
         && response.result.as_ref().is_some_and(|value| {
             revision_matches(request.expected_revision, response.content_revision, value)
-                && erase_history_matches(request, value)
+                && result_for(&request.operation, &request.payload, value)
                 && clipboard::correlated(request, value)
         })
 }

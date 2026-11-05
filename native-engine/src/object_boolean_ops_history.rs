@@ -21,6 +21,9 @@ mod fill_trace_tests;
 #[cfg(test)]
 #[path = "../tests/object_fill_brush_history.rs"]
 mod fill_brush_tests;
+#[cfg(test)]
+#[path = "../tests/object_boolean_ops_erase_flat.rs"]
+mod erase_flat_tests;
 
 impl NativeObjectHistory {
     pub(crate) fn prepare_fill_trace_json(

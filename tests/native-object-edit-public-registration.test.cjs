@@ -73,7 +73,7 @@ test('the Rust contract and its clipboard and test children are members of the M
   const contract = read('nemo-mcp/src/native_contract.rs');
   assert.equal(contract.split('pub(crate) mod object_edit;').length - 1, 1);
   assert.match(contract, /op if object_edit::admitted\(op\) => object_edit::request\(op, payload\)/);
-  assert.match(contract, /op if object_edit::admitted\(op\) => \|o, _, _, r\| object_edit::result\(o, r\),/);
+  assert.match(contract, /op if object_edit::admitted\(op\) => \|o, _, p, r\| object_edit::result_for\(o, p, r\),/);
   assert.match(read('nemo-mcp/src/wire.rs'), /object_edit::response_matches\(request, response\)/);
   assert.match(read('nemo-mcp/src/native_request_input.rs'), /native object edit command requires expectedRevision/);
 });
