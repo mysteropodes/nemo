@@ -8508,6 +8508,40 @@
             {
               "properties": {
                 "operation": {
+                  "const": "command.document.object.layer.kind.create"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerKindCreatePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.folder.reparent"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerFolderReparentPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
                   "const": "command.document.object.tween.split"
                 },
                 "payload": {
@@ -23954,6 +23988,123 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128
+          }
+        }
+      }
+    },
+    "ObjectLayerKindCreatePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "kind",
+        "name",
+        "frame"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.kind.create"
+        },
+        "kind": {
+          "enum": [
+            "null",
+            "effect",
+            "guide",
+            "folder",
+            "effector"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "pos": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": -1000000000,
+            "maximum": 1000000000
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "children": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "ObjectLayerFolderReparentPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUids",
+        "folderUid",
+        "frame"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.folder.reparent"
+        },
+        "layerUids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "folderUid": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            {
+              "const": null
+            }
+          ]
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "reorder": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "gap",
+            "selection"
+          ],
+          "properties": {
+            "gap": {
+              "type": "number"
+            },
+            "selection": {
+              "$ref": "#/$defs/ObjectLayerSelection"
+            }
           }
         }
       }

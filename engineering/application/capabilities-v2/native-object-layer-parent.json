@@ -13,7 +13,9 @@
     "command.document.object.layer.parent.set",
     "command.document.object.layer.timeLink.set",
     "command.document.object.layer.followPath.set",
-    "command.document.object.layer.color.set"
+    "command.document.object.layer.color.set",
+    "command.document.object.layer.kind.create",
+    "command.document.object.layer.folder.reparent"
   ],
   "input": {
     "oneOf": [
@@ -28,6 +30,12 @@
       },
       {
         "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerColorSetPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerKindCreatePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerFolderReparentPayload"
       }
     ]
   },
@@ -41,7 +49,7 @@
     "maxReadResponseBytes": 4096,
     "policy": "Complete correlated retained receipt or typed refusal. Each request names one layer, one partner layer or null and (for time) one frame; nothing is split."
   },
-  "semantics": "#2372 U12: the baseline Parent A menu write (setLayerParent, src/js/motion.js and the Parent A items of buildParentMenuItems, src/js/timeline.js @1065e9d8) as one native transaction. parentLayerUid names an existing layer of the same context, or is null for Parent A : None (free parenting). A layer cannot parent itself, a folder is not a parent, and a parent that would close a cycle is refused invalid_request; an unknown layer or parent is not_found. The child's world pose at `frame` is kept like the baseline: the displacement between the old and the new ancestor chain is folded into the child's static Position in the same write. When every ancestor of both chains is a pure translation at `frame` that is the exact difference of the two translation sums. Under a rotated or scaled ancestor the engine reads the evaluated pivots of the chain at `frame` (the Null rest point or the centre of the tight cubic bounds of the held drawing, the renderer's own pivots) and solves the child's Position, Rotation and Scale so that every world point is unchanged (within 1e-9), still in one write. Unavailable, nothing changes, never a visible jump: an expression-driven layer in the chain or in the document, a keyed child Position, Rotation or Scale that has to change, a chain whose rotation with a non-uniform scale would skew the child or collapses it, and a chain or child layer that has no evaluated pivot (text, image, mask, effect, 3D, rig or legacy contour content, or no drawing at the frame). One successful edit is one history entry and one revision; naming the stored parent publishes nothing. Only a v2 object document stores parent links (a v1 document answers invalid_request). Parent B is not part of this operation. No JS/Paper writer or fallback. #2372 Link time (`layer.timeLink.set`): the baseline `setLayerTimeLink` and Time: None (`unlinkTimeLinkPreserveRange`, src/js/motion.js and src/js/app.js @1065e9d8) as one native transaction over `range.timeLink`. `sourceLayerUid` names another layer of the scene root, with an optional `mode` (both, in, out; default both) and, for a single driven edge, an optional `srcAnchor` (in, out) naming which edge of the source it reads; the two Motion offsets (`timeLinkInOffset`, `timeLinkOutOffset`) are seeded from the current gap at `frame`, so linking never moves the layer. `sourceLayerUid: null` unlinks: the link is removed and the edges it resolved to become the layer's hard inPoint/outPoint (rounded inward to whole frames), so the layer keeps its range and position. A layer cannot link itself, a link that closes a time-link cycle is refused invalid_request, an unknown layer or source is not_found, a context other than the scene root and a pre-v2 document are refused invalid_request, and an edge that cannot be resolved exactly (an offset driven by an expression, a layer without timing) is refused unavailable. Naming the stored link, or unlinking an unlinked layer, publishes nothing. Follow path (`layer.followPath.set`): the baseline `setLayerFollowPath` over `followPath = {targetLayerUid, align}`; `targetLayerUid: null` is Chemin : Aucun. The stored `align` survives a retarget and is dropped by a clear, like the baseline. An optional boolean `align` authors the orient toggle (the Align button of the Motion Path row, `followPath.align`): omitted keeps the stored value, true or false sets it on the same target or together with a retarget; beside `targetLayerUid: null` it is ignored, since a clear drops the follow and its align. Setting the stored target and align again publishes nothing. The project info row reports `followPathUid` and, when the orient toggle is on, `followPathAlign: true`. A layer cannot follow itself and a folder, Null or effect layer carries no path (invalid_request); unknown layers are not_found. Parent B is not part of these operations. One successful edit is one history entry and one revision. #2371 layer.color.set is the baseline applyLayerColor (src/js/timeline.js @1065e9d8): it stores a #rrggbb colour label on the named layer, or on every layer of the optional `selected` list when that list holds more than one layer and the named one; a malformed colour is invalid_request, an unknown layer not_found, a locked layer unavailable, and the stored colour again is a no-op that adds no history entry.",
+  "semantics": "#2372 U12: the baseline Parent A menu write (setLayerParent, src/js/motion.js and the Parent A items of buildParentMenuItems, src/js/timeline.js @1065e9d8) as one native transaction. parentLayerUid names an existing layer of the same context, or is null for Parent A : None (free parenting). A layer cannot parent itself, a folder is not a parent, and a parent that would close a cycle is refused invalid_request; an unknown layer or parent is not_found. The child's world pose at `frame` is kept like the baseline: the displacement between the old and the new ancestor chain is folded into the child's static Position in the same write. When every ancestor of both chains is a pure translation at `frame` that is the exact difference of the two translation sums. Under a rotated or scaled ancestor the engine reads the evaluated pivots of the chain at `frame` (the Null rest point or the centre of the tight cubic bounds of the held drawing, the renderer's own pivots) and solves the child's Position, Rotation and Scale so that every world point is unchanged (within 1e-9), still in one write. Unavailable, nothing changes, never a visible jump: an expression-driven layer in the chain or in the document, a keyed child Position, Rotation or Scale that has to change, a chain whose rotation with a non-uniform scale would skew the child or collapses it, and a chain or child layer that has no evaluated pivot (text, image, mask, effect, 3D, rig or legacy contour content, or no drawing at the frame). One successful edit is one history entry and one revision; naming the stored parent publishes nothing. Only a v2 object document stores parent links (a v1 document answers invalid_request). Parent B is not part of this operation. No JS/Paper writer or fallback. #2372 Link time (`layer.timeLink.set`): the baseline `setLayerTimeLink` and Time: None (`unlinkTimeLinkPreserveRange`, src/js/motion.js and src/js/app.js @1065e9d8) as one native transaction over `range.timeLink`. `sourceLayerUid` names another layer of the scene root, with an optional `mode` (both, in, out; default both) and, for a single driven edge, an optional `srcAnchor` (in, out) naming which edge of the source it reads; the two Motion offsets (`timeLinkInOffset`, `timeLinkOutOffset`) are seeded from the current gap at `frame`, so linking never moves the layer. `sourceLayerUid: null` unlinks: the link is removed and the edges it resolved to become the layer's hard inPoint/outPoint (rounded inward to whole frames), so the layer keeps its range and position. A layer cannot link itself, a link that closes a time-link cycle is refused invalid_request, an unknown layer or source is not_found, a context other than the scene root and a pre-v2 document are refused invalid_request, and an edge that cannot be resolved exactly (an offset driven by an expression, a layer without timing) is refused unavailable. Naming the stored link, or unlinking an unlinked layer, publishes nothing. Follow path (`layer.followPath.set`): the baseline `setLayerFollowPath` over `followPath = {targetLayerUid, align}`; `targetLayerUid: null` is Chemin : Aucun. The stored `align` survives a retarget and is dropped by a clear, like the baseline. An optional boolean `align` authors the orient toggle (the Align button of the Motion Path row, `followPath.align`): omitted keeps the stored value, true or false sets it on the same target or together with a retarget; beside `targetLayerUid: null` it is ignored, since a clear drops the follow and its align. Setting the stored target and align again publishes nothing. The project info row reports `followPathUid` and, when the orient toggle is on, `followPathAlign: true`. A layer cannot follow itself and a folder, Null or effect layer carries no path (invalid_request); unknown layers are not_found. Parent B is not part of these operations. One successful edit is one history entry and one revision. #2371 layer.color.set is the baseline applyLayerColor (src/js/timeline.js @1065e9d8): it stores a #rrggbb colour label on the named layer, or on every layer of the optional `selected` list when that list holds more than one layer and the named one; a malformed colour is invalid_request, an unknown layer not_found, a locked layer unavailable, and the stored colour again is a no-op that adds no history entry. #2371 D36 folder membership (`layer.folder.reparent`): the baseline reparentLayersIntoFolder / removeLayerFromFolder (src/js/timeline.js @1065e9d8) and the layer-row drop as one native transaction. `folderUid` names a folder layer to move `layerUids` into (each keeps its world pose through the Parent A rules; the folder itself and other folders are skipped; a cycle is refused invalid_request; the folder is expanded), or is null to take the layers whose parent is a folder out of it (a layer with another parent is left alone). The optional `reorder` {gap, selection} (only with a null folder) lands the moved block at that gap in the same candidate, so a drag-out is one revision and one history entry. An unknown layer or folder is not_found, a non-folder named as `folderUid` is invalid_request. Nothing to change publishes nothing. #2371 D36 layer kinds (`layer.kind.create`): the baseline layer kinds of the + menu (addNullLayer, addEffectLayer, addGuideLayer, addFolderLayer, src/js/timeline.js, and addEffectorLayer, src/js/effector-layer.js @1065e9d8) as ONE layer-create transaction: one revision and one history entry, the receipt naming the minted layer. kind null / effect / guide / folder / effector replaces the blank appended layer; `name` is chosen by the caller (the baseline names, Null N, Effet N, Guide N, Folder N, Effector N); `frame` is the playhead the pose of adopted layers is kept at. A Null (colour #ff2d78) and a Folder (colour #ffb020, expanded, empty effect stack) store `isNullLayer` and a `nullPos` anchor: `pos`, else the centre of the union of the bounds of `children` at `frame` (a child without evaluated bounds adds nothing), else the canvas centre. `children` (Null and Folder only) are the layers the user had selected: each is freed with its world pose kept (the Parent A rules; a keyed or expression-driven pose is refused unavailable) and parented to the new layer. A Guide (colour #00baff) stores `isGuideLayer`, `guidePos` (`pos`, else the canvas centre) and a horizontal orientation, carries no content and is never rendered. An Effect layer starts with an empty effect stack. An Effector (colour #59d38a) needs `target`, a layer that hosts a duplicator (otherwise invalid_request, an unknown layer is not_found), stores the effector record with a radial falloff anchored at `pos` or the canvas centre and the seeded Offset Position (120, 0). `children` is refused for any other kind than Null and Folder, `pos` for an Effect layer, and `target` is required for an Effector and refused for any other kind.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",
@@ -174,6 +182,72 @@
       "response": {
         "apiVersion": 2,
         "requestId": "layercolor-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "#2371 create a Null layer that adopts the selected layers; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-kind-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.kind.create",
+        "payload": {
+          "command": "object.layer.kind.create",
+          "kind": "null",
+          "name": "Null 3",
+          "frame": 4,
+          "children": [
+            "layer-1",
+            "layer-2"
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-kind-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "layerUid": "native-layer:8:0"
+        }
+      }
+    },
+    {
+      "label": "#2371 move layers into a folder; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "folder-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.folder.reparent",
+        "payload": {
+          "command": "object.layer.folder.reparent",
+          "layerUids": [
+            "layer-1",
+            "layer-2"
+          ],
+          "folderUid": "folder-1",
+          "frame": 4
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "folder-1",
         "instanceId": "instance-A",
         "documentId": "document-A",
         "contentRevision": 8,

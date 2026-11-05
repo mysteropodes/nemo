@@ -23,7 +23,8 @@
   const guarded = (fn) => Promise.resolve().then(fn).catch((e) => refused(e && typeof e.code === 'string' ? e.code : 'unavailable', { reason: e && e.reason || null, message: String(e && e.message || e) }));
 
   // session: the native project session (info, isActive, requestId, runResourceCommand). `hooks.compositing` answers the
-  // compositing adapter and `hooks.labels` the two locale words the split names its pieces with.
+  // compositing adapter, `hooks.labels` the two locale words the split names its pieces with and `hooks.frame` the playhead.
+  const KINDS = ['null', 'effect', 'guide', 'folder', 'effector'];
   function create(session, hooks) {
     hooks = hooks || {};
     const intent = Intent.createLayerLifecycleIntent({
@@ -79,6 +80,33 @@
         if (at < 0) return Promise.resolve(gone([layerUid]));
         if (!comp) return Promise.resolve(refused('unavailable'));
         return guarded(() => comp.setFolderCollapsed(at, collapsed === true).then(applied));
+      },
+      // #2371 D36: a Null, Effect, Guide, Folder or Effector layer, ONE layer.kind.create (so one revision and one history entry): `name` is
+      // chosen by the caller, `children` are the layers a Null or Folder adopts, `target` the duplicator an Effector reads, `pos` an anchor.
+      createKind(kind, name, options) {
+        const o = options || {}, children = Array.isArray(o.children) ? o.children.slice() : [], frame = hooks.frame ? hooks.frame() : 0;
+        if (!KINDS.includes(kind) || typeof name !== 'string' || !Number.isSafeInteger(frame) || frame < 0) return Promise.resolve(refused('invalid_request'));
+        if (stale(children.concat(o.target ? [o.target] : [])).length) return Promise.resolve(gone(children.concat(o.target ? [o.target] : [])));
+        const body = { command: 'object.layer.kind.create', kind, name, frame };
+        if (children.length) body.children = children;
+        if (o.target) body.target = o.target;
+        if (Array.isArray(o.pos)) body.pos = o.pos.slice();
+        return guarded(() => commands.execute(Contract.KIND_CREATE, () => body).then(applied));
+      },
+      // Folder membership: `moveIntoFolder` parents the layers to a folder; `leaveFolder` frees those that sit in one, and with a `gap`
+      // also lands the block there (a drag-out drop), all in ONE layer.folder.reparent.
+      moveIntoFolder(layerUids, folderUid) {
+        const ids = layerUids.concat([folderUid]), frame = hooks.frame ? hooks.frame() : 0;
+        if (stale(ids).length) return Promise.resolve(gone(stale(ids)));
+        const body = { command: 'object.layer.folder.reparent', layerUids: layerUids.slice(), folderUid, frame };
+        return guarded(() => commands.execute(Contract.FOLDER_REPARENT, () => body).then(applied));
+      },
+      leaveFolder(layerUids, gap, selection) {
+        const ids = layerUids.concat(selection ? [selection.active].concat(selection.selected) : []), frame = hooks.frame ? hooks.frame() : 0;
+        if (stale(ids).length) return Promise.resolve(gone(stale(ids)));
+        const body = { command: 'object.layer.folder.reparent', layerUids: layerUids.slice(), folderUid: null, frame };
+        if (selection) body.reorder = { gap, selection: sel(selection) };
+        return guarded(() => commands.execute(Contract.FOLDER_REPARENT, () => body).then(applied));
       },
       // "Split into layers": one layer per shape of the playhead frame, named with the locale's shape and stroke words.
       split(layerUid, frame) {

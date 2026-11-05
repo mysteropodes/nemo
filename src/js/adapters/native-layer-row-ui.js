@@ -38,7 +38,7 @@
     let held = bindings.get(host);
     if (!held || held.session !== session) {
       const comp = () => { const m = host.NemoNativeObjectLayerCompositing; try { return m && typeof m.desktop === 'function' ? m.desktop(host) : null; } catch (_) { return null; } };
-      held = { session, writes: Writes.create(session, { compositing: comp, labels: () => ({ shape: word(host, 'autoNameShape'), stroke: word(host, 'autoNameStroke') }) }) };
+      held = { session, writes: Writes.create(session, { compositing: comp, frame: () => (host.state ? host.state.currentFrame : 0), labels: () => ({ shape: word(host, 'autoNameShape'), stroke: word(host, 'autoNameStroke') }) }) };
       bindings.set(host, held);
     }
     return held;
@@ -164,6 +164,7 @@
       if (!info || !info.layers.some((l) => l.layerUid === uid)) return;
       Drag.arm(host, {
         writes: live.writes, session: live.session, info, uid, selection: selectionOf(host, info), list: listOf(host),
+        intoFolder: (uids, folder) => (host.NemoNativeLayerKindsUi ? host.NemoNativeLayerKindsUi.moveIntoFolderUids(host, uids, folder) : Promise.resolve({ status: 'unavailable' })),
         stale: 'The layers changed - the move was cancelled.', toast: (t) => toast(host, t), refused: (r) => refusal(host, r),
       }, e);
     };
@@ -181,7 +182,9 @@
     if (!Array.isArray(host._layerSel) || host._layerSel.indexOf(index) < 0) selectUid(host, b, uid, null);
     const menu = () => { const now = infoOf(b), sel = now && selectionOf(host, now); return sel && sel.selected.includes(uid) ? sel : { active: uid, selected: [uid] }; };
     const plain = layer.kind === 'component';
-    const items = [
+    // #2371 D36: the Insert submenu leads the menu and Remove from the folder / Add an effector layer follow it (layer-kinds module).
+    const kinds = host.NemoNativeLayerKindsUi ? host.NemoNativeLayerKindsUi.rowItems(host, index, rowFor(host, uid)) : [];
+    const items = kinds.slice(0, 1).concat([
       { label: word(host, 'ctxDuplicateLayer'), action: () => finish(host, b.writes.duplicate(uid), (r) => { if (r && r.layerUid) selectUid(host, b, r.layerUid, null); }) },
       { label: word(host, 'ctxDeleteLayer'), action: () => finish(host, b.writes.remove(menu())) },
       { sep: true },
@@ -189,7 +192,7 @@
       { label: word(host, 'ctxSplitIntoLayers'), disabled: plain, action: () => finish(host, b.writes.split(uid, host.state.currentFrame)) },
       { label: word(host, 'ctxCutAtPlayhead'), action: () => { if (host.SM && typeof host.SM.splitLayerAtPlayhead === 'function') host.SM.splitLayerAtPlayhead(index); } },
       { label: word(host, 'hsLayerColour'), action: () => { const row = rowFor(host, uid); if (row) openSwatches(host, b, uid, row); } },
-    ];
+    ], kinds.slice(1));
     if (layer.kind === 'folder') items.push({ label: layer.folderCollapsed ? 'Déplier le dossier' : 'Replier le dossier', action: () => toggleFolder(host, b, uid) });
     return items.concat([{ sep: true }]);
   }

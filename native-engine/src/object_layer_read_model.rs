@@ -198,6 +198,8 @@ pub(crate) fn layer_members(document: &ObjectDocument) -> Vec<Map<String, Value>
                 "folder"
             } else if layer.is_null_layer() {
                 "null"
+            } else if layer.is_guide_layer() {
+                "guide"
             } else if layer.widget().is_some() {
                 "widget"
             } else if effectors.contains(uid) {
@@ -329,3 +331,6 @@ mod duplicator_tests;
 #[cfg(test)]
 #[path = "../tests/object_layer_read_model_key_lock.rs"]
 mod key_lock_tests;
+#[cfg(test)]
+#[path = "../tests/object_layer_read_model_guide.rs"]
+mod guide_tests;

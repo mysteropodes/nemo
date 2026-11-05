@@ -83,3 +83,62 @@ fn the_layer_time_link_and_follow_path_writes_are_closed_shapes() {
         assert!(!ok("layer.followPath.set", aligned), "align is a boolean");
     }
 }
+
+/// #2371 D36: the layer kinds of the + menu and folder membership are closed shapes; the engine repeats every rule on original bytes.
+#[test]
+fn the_layer_kind_creation_and_folder_membership_writes_are_closed_shapes() {
+    let ok = |op: &str, payload: Value| {
+        crate::native_contract::validate_request(&format!("{P}{op}"), &payload)
+    };
+    let kind = |kind: &str| json!({"command":"object.layer.kind.create","kind":kind,"name":"Null 1","frame":3});
+    for name in ["null", "effect", "guide", "folder", "effector"] {
+        assert!(ok("layer.kind.create", kind(name)), "{name}");
+    }
+    for bad in ["widget", "", "Null"] {
+        assert!(!ok("layer.kind.create", kind(bad)), "{bad}");
+    }
+    let with = |key: &str, value: Value| {
+        let mut payload = kind("null");
+        payload[key] = value;
+        payload
+    };
+    assert!(ok("layer.kind.create", with("pos", json!([160.5, 90]))));
+    assert!(ok("layer.kind.create", with("children", json!(["L0", "L1"]))));
+    assert!(ok("layer.kind.create", with("target", json!("L0"))));
+    assert!(!ok("layer.kind.create", with("pos", json!([1, 2, 3]))));
+    assert!(!ok("layer.kind.create", with("pos", json!([1e12, 0]))));
+    assert!(!ok("layer.kind.create", with("children", json!([""]))));
+    assert!(!ok("layer.kind.create", with("children", json!("L0"))));
+    assert!(!ok("layer.kind.create", with("target", json!(""))));
+    assert!(!ok("layer.kind.create", with("frame", json!(-1))));
+    assert!(!ok("layer.kind.create", with("extra", json!(1))));
+    let mut unnamed = kind("null");
+    unnamed.as_object_mut().unwrap().remove("name");
+    assert!(!ok("layer.kind.create", unnamed));
+    let mut unframed = kind("null");
+    unframed.as_object_mut().unwrap().remove("frame");
+    assert!(!ok("layer.kind.create", unframed));
+
+    let reparent = || json!({"command":"object.layer.folder.reparent","layerUids":["L0","L1"],"folderUid":"F","frame":3});
+    assert!(ok("layer.folder.reparent", reparent()));
+    let mut out = reparent();
+    out["folderUid"] = Value::Null;
+    assert!(ok("layer.folder.reparent", out.clone()), "out of the folder");
+    out["reorder"] = json!({"gap":3,"selection":{"active":"L0","selected":["L0"],"anchor":null}});
+    assert!(ok("layer.folder.reparent", out), "a drop that also reorders");
+    let mut empty = reparent();
+    empty["layerUids"] = json!([]);
+    assert!(!ok("layer.folder.reparent", empty));
+    let mut hole = reparent();
+    hole["layerUids"] = json!(["L0", ""]);
+    assert!(!ok("layer.folder.reparent", hole));
+    let mut blank = reparent();
+    blank["folderUid"] = json!("");
+    assert!(!ok("layer.folder.reparent", blank));
+    let mut gapless = reparent();
+    gapless["reorder"] = json!({"selection":{"active":"L0","selected":[]}});
+    assert!(!ok("layer.folder.reparent", gapless));
+    let mut unframed = reparent();
+    unframed.as_object_mut().unwrap().remove("frame");
+    assert!(!ok("layer.folder.reparent", unframed));
+}

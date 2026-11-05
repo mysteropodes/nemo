@@ -227,6 +227,8 @@ pub struct ObjectDocument {
 
 #[path = "object_follow_path_record.rs"]
 mod follow_path;
+#[path = "object_layer_blank.rs"]
+mod layer_blank;
 pub(crate) use follow_path::FollowPathRecord;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -252,6 +254,13 @@ pub struct ObjectLayer {
     pub(crate) is_null_layer: Presence<Option<bool>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) null_pos: Presence<Option<[serde_json::Number; 2]>>,
+    /// Baseline `ld.isGuideLayer` / `guidePos` / `guideOrientation`: a content-free editor guide, never rendered.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) is_guide_layer: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) guide_pos: Presence<[serde_json::Number; 2]>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) guide_orientation: Presence<String>,
     /// Original ld.followPath; absent, explicit null and authored object stay distinct.
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) follow_path: Presence<Option<FollowPathRecord>>,
@@ -345,6 +354,9 @@ object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Pre
     #[serde(default)] parent_layer_uid: Presence<Option<String>>,
     #[serde(default)] is_null_layer: Presence<Option<bool>>,
     #[serde(default)] null_pos: Presence<Option<[serde_json::Number; 2]>>,
+    #[serde(default)] is_guide_layer: Presence<bool>,
+    #[serde(default)] guide_pos: Presence<[serde_json::Number; 2]>,
+    #[serde(default)] guide_orientation: Presence<String>,
     #[serde(default)] follow_path: Presence<Option<FollowPathRecord>>,
     #[serde(default)] folder_id: Presence<Option<String>>,
     #[serde(default)] shy: Presence<bool>,
@@ -405,6 +417,9 @@ impl ObjectLayer {
     pub(crate) fn is_null_layer(&self) -> bool {
         self.is_null_layer.value() == Some(&Some(true))
     }
+    pub(crate) fn is_guide_layer(&self) -> bool {
+        self.is_guide_layer.value() == Some(&true)
+    }
     /// Original Null rest pivot, never content bounds. The caller may supply
     /// only dimensions read from its retained project, not a drawing default.
     pub(crate) fn null_pivot_base(
@@ -435,59 +450,6 @@ impl ObjectLayer {
             .value()
             .and_then(Option::as_deref)
             .filter(|id| !id.is_empty())
-    }
-    /// Native New and Add share the existing desktop creation defaults. The
-    /// palette is selected by the number of layers before insertion, not revision.
-    pub(crate) fn blank_drawing(layer_uid: String, name: String, existing_layers: usize) -> Self {
-        const COLORS: [&str; 8] = [
-            "#5FA875", "#B49BE6", "#F0A585", "#E88BAE", "#E7C74C", "#EE7C58", "#7EA0FA", "#5FD1C4",
-        ];
-        Self {
-            layer_uid,
-            name: Presence::Present(name),
-            visible: Presence::Present(true),
-            locked: Presence::Present(false),
-            color: Presence::Present(COLORS[existing_layers % COLORS.len()].into()),
-            parent_layer_uid: Presence::Present(None),
-            folder_id: Presence::Missing,
-            shy: Presence::Missing,
-            timing: Presence::Present(LayerTiming::blank_drawing()),
-            ..Self::identified(String::new())
-        }
-    }
-    /// Identified, unnamed layer with earlier native-file visibility semantics.
-    pub(crate) fn identified(layer_uid: String) -> Self {
-        Self {
-            layer_uid,
-            three_d: Presence::Missing,
-            name: Presence::Missing,
-            visible: Presence::Missing,
-            locked: Presence::Missing,
-            key_lock: Presence::Missing,
-            color: Presence::Missing,
-            parent_layer_uid: Presence::Missing,
-            is_null_layer: Presence::Missing,
-            null_pos: Presence::Missing,
-            follow_path: Presence::Missing,
-            folder_id: Presence::Missing,
-            shy: Presence::Missing,
-            timing: Presence::Missing,
-            path_fx: Presence::Missing,
-            widget: Presence::Missing,
-            groups: Presence::Missing,
-            blend_mode: Presence::Missing,
-            matte_mode: Presence::Missing,
-            matte_source_layer_uid: Presence::Missing,
-            mattes_more: Presence::Missing,
-            is_effect_layer: Presence::Missing,
-            is_folder_layer: Presence::Missing,
-            folder_collapsed: Presence::Missing,
-            effects: Presence::Missing,
-            effects_from: Presence::Missing,
-            rig: Presence::Missing,
-            range: Presence::Missing,
-            text_animators: Presence::Missing,
-        }
     }
     pub fn layer_uid(&self) -> &str {
         &self.layer_uid

@@ -3630,13 +3630,15 @@
       "files": [
         "native-layer-row-writes.js",
         "native-layer-row-drag.js",
-        "native-layer-row-ui.js"
+        "native-layer-row-ui.js",
+        "native-layer-kinds-ui.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-layer-row-writes.js",
         "native-layer-row-drag.js",
-        "native-layer-row-ui.js"
+        "native-layer-row-ui.js",
+        "native-layer-kinds-ui.js"
       ]
     },
     {
