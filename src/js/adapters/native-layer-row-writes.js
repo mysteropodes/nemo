@@ -6,7 +6,8 @@
  * refusal, and a layer uid the owner no longer lists is refused as stale before anything is sent. Resolves {ok, applied, ...}. */
 (function (root, factory) {
   const commonjs = typeof module === 'object' && module.exports;
-  const Intent = commonjs ? require('./native-object-layer-lifecycle-intent.js') : root.NemoNativeObjectLayerLifecycleIntent;
+  // The lifecycle intent is a sibling adapter: it is taken from the page globals (tests install it there), never imported.
+  const Intent = root.NemoNativeObjectLayerLifecycleIntent;
   const Edit = commonjs ? require('./native-object-edit-contract.js') : root.NemoNativeObjectEditContract;
   const Command = commonjs ? require('./native-object-rig-command.js') : root.NemoNativeObjectRigCommand;
   const Contract = commonjs ? require('./native-object-rig-contract.js') : root.NemoNativeObjectRigContract;

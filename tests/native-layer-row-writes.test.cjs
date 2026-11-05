@@ -2,6 +2,7 @@
 // #2371 U11: the layer-row writes are ONE typed request each, pinned to the revision they read, and refuse stale, unknown or
 // malformed targets before anything is sent. The fake session applies the engine's small semantics so the read-back is a fact.
 const test = require('node:test'), assert = require('node:assert/strict');
+globalThis.NemoNativeObjectLayerLifecycleIntent = require('../src/js/adapters/native-object-layer-lifecycle-intent.js');
 const Writes = require('../src/js/adapters/native-layer-row-writes.js'), F = require('./helpers/native-layer-row-fixture.cjs');
 
 const LAYERS = [

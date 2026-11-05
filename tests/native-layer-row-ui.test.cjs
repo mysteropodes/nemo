@@ -3,6 +3,7 @@
 // drag reorder (cancel and stale safe), the row menu and the toolbar buttons. Listener and capture order come from the fake
 // DOM in tests/helpers/native-layer-row-fixture.cjs; every write lands in the fake session as a recorded typed request.
 const test = require('node:test'), assert = require('node:assert/strict');
+globalThis.NemoNativeObjectLayerLifecycleIntent = require('../src/js/adapters/native-object-layer-lifecycle-intent.js');
 const Presenter = require('../src/js/adapters/native-layer-list-presenter.js'), Ui = require('../src/js/adapters/native-layer-row-ui.js');
 const Writes = require('../src/js/adapters/native-layer-row-writes.js'), F = require('./helpers/native-layer-row-fixture.cjs');
 
