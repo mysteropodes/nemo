@@ -2946,6 +2946,7 @@
         "native-parametric-panel.js",
         "native-text-props-panel.js",
         "native-selection-boolean.js",
+        "native-select-group.js",
         "native-selection-transform.js",
         "native-selection-align.js",
         "native-presentation-wait.js",

@@ -418,6 +418,7 @@
     {"src":"js/application/project-lifecycle.js"},
     {"src":"js/adapters/native-layer-list-presenter.js"},
     {"src":"js/adapters/native-symmetry-desktop.js"},
-    {"src":"js/adapters/native-symmetry-ui.js"}
+    {"src":"js/adapters/native-symmetry-ui.js"},
+    {"src":"js/adapters/native-select-group.js"}
   ]
 }
