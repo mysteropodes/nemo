@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "de98153d859e4660b750b9c5ea81e53e64bdd124",
-  "describe": "v0.7.0-alpha.4-5112-gde98153d8-dirty"
+  "head": "322ce8d65bb1a05d75c032e53e0cead4680199de",
+  "describe": "v0.7.0-alpha.4-5115-g322ce8d65-dirty"
  },
- "inputsDigest": "77cc719aa16e0a139d9726a7bcbc86b06b94e83be1e8a83e20ebb6f28511e48d",
+ "inputsDigest": "fe79e4bb1b69d98794433daa2b1ceb15d2ce34e4ec410c79beb3a7ad30eee80b",
  "states": [
   "inventoried",
   "characterized",
@@ -26,16 +26,16 @@
   "native"
  ],
  "counts": {
-  "total": 922,
+  "total": 932,
   "byKind": {
    "dom": 485,
    "labs": 36,
-   "menu": 275,
+   "menu": 285,
    "sdk": 76,
    "shortcut": 50
   },
   "byStatus": {
-   "inventoried": 886,
+   "inventoried": 896,
    "unmapped": 35,
    "unavailable-with-reason": 1
   },
@@ -47,7 +47,7 @@
    "animation-rigs-expressions": 157,
    "effects-masks": 10,
    "preferences-workspace": 42,
-   "unclassified": 11,
+   "unclassified": 21,
    "labs": 61,
    "storyboard": 17
   },
@@ -22789,6 +22789,286 @@
    ]
   },
   {
+   "id": "menu:adapters/native-select-menu.js:rows:aplatir",
+   "kind": "menu",
+   "surface": "dynamic menu (rows)",
+   "capability": "Aplatir",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-select-menu.js:56 rows()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-select-menu.js:56",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 7
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-select-menu.js:rows:coller",
+   "kind": "menu",
+   "surface": "dynamic menu (rows)",
+   "capability": "Coller",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-select-menu.js:39 rows()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-select-menu.js:39",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 7
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-select-menu.js:rows:coller#2",
+   "kind": "menu",
+   "surface": "dynamic menu (rows)",
+   "capability": "Coller",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-select-menu.js:44 rows()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-select-menu.js:44",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 7
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-select-menu.js:rows:combiner-union-non-destructif",
+   "kind": "menu",
+   "surface": "dynamic menu (rows)",
+   "capability": "Combiner (Union) — non destructif",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-select-menu.js:53 rows()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-select-menu.js:53",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 7
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-select-menu.js:rows:copier",
+   "kind": "menu",
+   "surface": "dynamic menu (rows)",
+   "capability": "Copier",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-select-menu.js:42 rows()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-select-menu.js:42",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 7
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-select-menu.js:rows:couper",
+   "kind": "menu",
+   "surface": "dynamic menu (rows)",
+   "capability": "Couper",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-select-menu.js:43 rows()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-select-menu.js:43",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 7
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-select-menu.js:rows:dissocier",
+   "kind": "menu",
+   "surface": "dynamic menu (rows)",
+   "capability": "Dissocier",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-select-menu.js:51 rows()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-select-menu.js:51",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 7
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-select-menu.js:rows:dupliquer",
+   "kind": "menu",
+   "surface": "dynamic menu (rows)",
+   "capability": "Dupliquer",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-select-menu.js:45 rows()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-select-menu.js:45",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 25
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-select-menu.js:rows:grouper",
+   "kind": "menu",
+   "surface": "dynamic menu (rows)",
+   "capability": "Grouper",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-select-menu.js:52 rows()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-select-menu.js:52",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 7
+   },
+   "fixtures": []
+  },
+  {
+   "id": "menu:adapters/native-select-menu.js:rows:sortir-du-groupe",
+   "kind": "menu",
+   "surface": "dynamic menu (rows)",
+   "capability": "Sortir du groupe",
+   "area": "unclassified",
+   "handler": [
+    "src/js/adapters/native-select-menu.js:55 rows()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-select-menu.js:55",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 7
+   },
+   "fixtures": []
+  },
+  {
    "id": "menu:effects-panel.js:openCustom:new-custom-shader",
    "kind": "menu",
    "surface": "dynamic menu (openCustom)",
@@ -28221,7 +28501,7 @@
    "source": "src/js/select-bridge.js:3007",
    "meta": {
     "i18n": null,
-    "functionsVisited": 110
+    "functionsVisited": 114
    },
    "fixtures": [
     "static-props",
@@ -28260,7 +28540,7 @@
    "source": "src/js/select-bridge.js:3043",
    "meta": {
     "i18n": null,
-    "functionsVisited": 110
+    "functionsVisited": 114
    },
    "fixtures": [
     "static-props",
@@ -28374,7 +28654,7 @@
    "source": "src/js/select-bridge.js:3041",
    "meta": {
     "i18n": null,
-    "functionsVisited": 22
+    "functionsVisited": 26
    },
    "fixtures": [
     "static-props",
@@ -28412,7 +28692,7 @@
    "source": "src/js/select-bridge.js:3042",
    "meta": {
     "i18n": null,
-    "functionsVisited": 24
+    "functionsVisited": 29
    },
    "fixtures": [
     "static-props",
@@ -28484,7 +28764,7 @@
    "source": "src/js/select-bridge.js:3044",
    "meta": {
     "i18n": null,
-    "functionsVisited": 97
+    "functionsVisited": 102
    },
    "fixtures": [
     "static-props",
