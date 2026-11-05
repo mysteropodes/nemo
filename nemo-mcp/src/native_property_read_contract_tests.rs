@@ -492,7 +492,7 @@ fn layer_bounds_view_is_closed_and_correlated_in_the_mcp_contract() {
     let example = descriptor["examples"].as_array().unwrap().iter().find(|e| e["request"]["payload"]["view"]["kind"] == "layerBounds").unwrap();
     let (p, v) = (&example["request"]["payload"], &example["response"]["result"]);
     assert!(request(p) && result("native-object-document-1", p, v));
-    for (pointer, bad) in [("/bounds", json!([1, 2, 3])), ("/frame", json!(1)), ("/kind", json!("rawSample")), ("/parentLayerUid", json!(""))] {
+    for (pointer, bad) in [("/bounds", json!([1, 2, 3])), ("/frame", json!(1)), ("/kind", json!("rawSample")), ("/parentLayerUid", json!("")), ("/parentAffine", json!([1, 0, 0, 1, 0])), ("/parentAffine", json!(null))] {
         let mut wrong = v.clone();
         *wrong.pointer_mut(pointer).unwrap() = bad;
         assert!(!result("native-object-document-1", p, &wrong), "{pointer}");

@@ -326,6 +326,7 @@ fn layer_bounds_reads_through_the_real_owner_without_changing_it() {
     assert_eq!(result["kind"], "layerBounds");
     assert_eq!(result["bounds"], json!([12.0, 34.0, 12.0, 34.0]));
     assert_eq!(result["parentLayerUid"], Value::Null);
+    assert_eq!(result["parentAffine"], json!([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]));
     let drawn = invoke(&state, ask(json!({"contextId":"scene-root","layerUid":"A"}), json!(0)), true);
     assert_eq!(drawn.response.result.unwrap()["bounds"], json!([2.0, 3.0, 22.0, 13.0]));
     assert_eq!(result["frame"], 3);

@@ -23,7 +23,7 @@
     "adapterOwnsWritableMirror": false,
     "fallback": "none"
   },
-  "readPolicy": "Existing sole native owner selects the current immutable revision/snapshot. rawSample reuses native raw self sampling and deliberately ignores active expressions. authoredKeys returns admitted OrderKey DTOs with authored missing/null/empty fields unchanged; fixed-count pinned pages or unavailable, never a JS evaluator, mirror, default curve substitution, publication or ACK. expressionContext reads actual retained comp/self/key-count providers with explicit project-metadata unavailability; it grants no expression execution or writable authority. Optional mesh context binds the actual raster mesh in this context/layer, reads its rest UV/count only, and never adds rest sculpt to animated percent offsets. expressionState reads stored expression presence/enabled flags without evaluating. A real native owner may attach only its exact source/code/target/frame-matched transient diagnostic receipt; absent, stale or unvisited receipts remain explicitly not-evaluated, never inferred success. Diagnostics are not persistent document fields and code is not truncated into this bounded result. expressionSource returns the exact authored {enabled, code} of the pinned snapshot (null when none; an empty code stays present) so an editor can load the source; invalid syntax is returned as authored data, and a source that does not fit the bounded result refuses unavailable, never truncated. layerBounds returns the layer's own tight cubic bounds before its Motion (a Null is its rest point) at an integer frame of the context, with its parent layer uid or null; it is the geometry the Motion canvas box, pivot and path are drawn from, read through the evaluated pivot facade, and a layer without a complete native pivot (text, image, mask, effect, 3D, rig, or a document with an enabled expression) refuses unavailable, never a guessed box.",
+  "readPolicy": "Existing sole native owner selects the current immutable revision/snapshot. rawSample reuses native raw self sampling and deliberately ignores active expressions. authoredKeys returns admitted OrderKey DTOs with authored missing/null/empty fields unchanged; fixed-count pinned pages or unavailable, never a JS evaluator, mirror, default curve substitution, publication or ACK. expressionContext reads actual retained comp/self/key-count providers with explicit project-metadata unavailability; it grants no expression execution or writable authority. Optional mesh context binds the actual raster mesh in this context/layer, reads its rest UV/count only, and never adds rest sculpt to animated percent offsets. expressionState reads stored expression presence/enabled flags without evaluating. A real native owner may attach only its exact source/code/target/frame-matched transient diagnostic receipt; absent, stale or unvisited receipts remain explicitly not-evaluated, never inferred success. Diagnostics are not persistent document fields and code is not truncated into this bounded result. expressionSource returns the exact authored {enabled, code} of the pinned snapshot (null when none; an empty code stays present) so an editor can load the source; invalid syntax is returned as authored data, and a source that does not fit the bounded result refuses unavailable, never truncated. layerBounds returns the layer's own bounds before its Motion (a Null is its rest point; each element's own Motion is already inside, the baseline perObjectPosedUnionLocal) at an integer frame of the context, with its parent layer uid or null and parentAffine, the six numbers [a, b, c, d, e, f] (x' = a x + c y + e, y' = b x + d y + f) of the map every ancestor applies, nearest first, to a point already moved by the layer's own Motion (identity without a parent; an ancestor without bounds contributes nothing, as in the baseline). It is the geometry the Motion canvas box, pivot and path are drawn from, read through the evaluated pivot facade. Vector layers, masks, duplicated sources and image or raster layers (their placed rectangle) are answered; a layer that shows no geometry the box can follow (text, effect, rig, 3D, an empty layer, or a document with an enabled expression) refuses unavailable, never a guessed box.",
   "resourceBoundary": {
     "maxRequestBytes": 4096,
     "maxReadResponseBytes": 4096,
@@ -441,7 +441,15 @@
             120,
             90
           ],
-          "parentLayerUid": null
+          "parentLayerUid": null,
+          "parentAffine": [
+            1,
+            0,
+            0,
+            1,
+            0,
+            0
+          ]
         }
       }
     }
