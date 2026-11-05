@@ -1,0 +1,688 @@
+{
+ "version": 13,
+ "totalFrames": 24,
+ "fps": 24,
+ "canvasW": 640,
+ "canvasH": 360,
+ "canvasBg": "#ffffff",
+ "waIn": 0,
+ "waOut": 23,
+ "mediaMode": "embedded",
+ "layers": [
+  {
+   "name": "Ink",
+   "visible": true,
+   "locked": false,
+   "frames": [
+    {
+     "strokes": [
+      {
+       "segments": [
+        {
+         "point": [
+          20,
+          80
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          20,
+          60
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          60
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          80
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#ffffff",
+       "hasRealStroke": false,
+       "strokeWidth": 1,
+       "strokeCap": "butt",
+       "strokeJoin": "miter",
+       "miterLimit": 10,
+       "fillColor": "#ff0000",
+       "opacity": 1,
+       "dashOffset": 0,
+       "strokeId": "st_rect"
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          10,
+          10
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          5,
+          -3
+         ]
+        },
+        {
+         "point": [
+          50,
+          30
+         ],
+         "handleIn": [
+          -5,
+          3
+         ],
+         "handleOut": [
+          4,
+          2
+         ]
+        },
+        {
+         "point": [
+          90,
+          10
+         ],
+         "handleIn": [
+          -4,
+          -2
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": false,
+       "strokeColor": "#112233cc",
+       "hasRealStroke": true,
+       "strokeWidth": 4.5,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "miterLimit": 10,
+       "fillColor": null,
+       "opacity": 1,
+       "dashOffset": 2,
+       "strokeId": "st_line",
+       "dashArray": [
+        6,
+        3
+       ]
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "segments": [
+        {
+         "point": [
+          100,
+          100
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          140,
+          96
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          180,
+          104
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          140,
+          112
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": null,
+       "hasRealStroke": false,
+       "strokeWidth": 3,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "miterLimit": 10,
+       "fillColor": "#000000",
+       "opacity": 1,
+       "dashOffset": 0,
+       "strokeId": "st_ribbon",
+       "isVectorBrush": true,
+       "centerSegments": [
+        {
+         "point": [
+          100,
+          106
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          10,
+          -2
+         ],
+         "width": 2
+        },
+        {
+         "point": [
+          180,
+          106
+         ],
+         "handleIn": [
+          -10,
+          2
+         ],
+         "handleOut": [
+          0,
+          0
+         ],
+         "width": 6
+        }
+       ],
+       "widthProfile": [
+        {
+         "t": 0,
+         "width": 2
+        },
+        {
+         "t": 1,
+         "width": 6
+        }
+       ],
+       "strokeProfile": "taper-both",
+       "profileBase": 6
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    }
+   ],
+   "color": "#4a9eff",
+   "effects": [],
+   "layerUid": "ly_ink",
+   "parentLayerUid": null
+  },
+  {
+   "name": "Paint",
+   "visible": false,
+   "locked": true,
+   "frames": [
+    {
+     "strokes": [
+      {
+       "segments": [
+        {
+         "point": [
+          200,
+          200
+         ],
+         "handleIn": [
+          -10,
+          0
+         ],
+         "handleOut": [
+          10,
+          0
+         ]
+        },
+        {
+         "point": [
+          220,
+          220
+         ],
+         "handleIn": [
+          0,
+          -10
+         ],
+         "handleOut": [
+          0,
+          10
+         ]
+        },
+        {
+         "point": [
+          200,
+          240
+         ],
+         "handleIn": [
+          10,
+          0
+         ],
+         "handleOut": [
+          -10,
+          0
+         ]
+        },
+        {
+         "point": [
+          180,
+          220
+         ],
+         "handleIn": [
+          0,
+          10
+         ],
+         "handleOut": [
+          0,
+          -10
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#ffffff",
+       "hasRealStroke": false,
+       "strokeWidth": 1,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "miterLimit": 10,
+       "fillColor": "#33669980",
+       "opacity": 0.5,
+       "dashOffset": 0,
+       "strokeId": "st_dot"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    }
+   ],
+   "color": "#F0A585",
+   "effects": [],
+   "layerUid": "ly_paint",
+   "parentLayerUid": "ly_ink",
+   "shy": true
+  }
+ ],
+ "layerFolders": {},
+ "layerLinkGroups": {},
+ "storyboard": null,
+ "symbols": {},
+ "palettes": [
+  {
+   "id": "p0",
+   "name": "Palette 1",
+   "colors": [
+    "#000000",
+    "#ffffff",
+    "#ff0000",
+    "#ff8800",
+    "#ffee00",
+    "#00cc44",
+    "#0088ff",
+    "#8833ff"
+   ]
+  }
+ ],
+ "activePaletteIdx": 0,
+ "customBrushPresets": {},
+ "shadowPalette": [
+  {
+   "id": "sh1",
+   "color": "#ff3355"
+  },
+  {
+   "id": "sh2",
+   "color": "#ff8800"
+  }
+ ],
+ "shadowActiveId": "sh1",
+ "customEffects": [],
+ "audioTracks": [],
+ "refMedia": null,
+ "mediaLibrary": [],
+ "perspectiveEnabled": false,
+ "perspectiveMode": "2pt",
+ "perspectiveDensity": 24,
+ "perspectiveVPs": null,
+ "symmetryEnabled": false,
+ "symmetryMode": "y",
+ "symmetryAxis": null,
+ "symmetryRadialCenter": null,
+ "symmetryRadialSectors": 6,
+ "symmetryExtend": true,
+ "motionArcs": {},
+ "easingCurve": {
+  "points": [
+   {
+    "x": 0,
+    "y": 0
+   },
+   {
+    "x": 0.3,
+    "y": 0.05
+   },
+   {
+    "x": 0.7,
+    "y": 0.95
+   },
+   {
+    "x": 1,
+    "y": 1
+   }
+  ]
+ },
+ "resamplePts": 50,
+ "tweenStep": 1,
+ "tweenOverrides": {},
+ "tweenEasing": {},
+ "comments": [],
+ "cameraKeys": [],
+ "cameraLayerOn": false,
+ "markers": [],
+ "shyEnabled": false,
+ "trackRoles": {},
+ "imageMeshes": {},
+ "bpm": 120,
+ "bpmOffset": 0,
+ "bpmShow": false,
+ "motionBlurOn": false,
+ "motionBlurSamples": 6,
+ "motionBlurShutter": 0.5,
+ "guides": {
+  "h": [],
+  "v": []
+ },
+ "exprGlobals": ""
+}

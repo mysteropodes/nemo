@@ -115,6 +115,7 @@ pub(super) fn complete(
                     content_revision: owner.content_revision(),
                     resource_count: usize::from(!info["reference"].is_null()),
                     viewport_available: false,
+                    legacy_import: None,
                 })
             },
         ))

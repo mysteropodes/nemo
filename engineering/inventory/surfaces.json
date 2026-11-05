@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "fef03e88f23a82aa47622c5d058d40f94ec19093",
-  "describe": "v0.7.0-alpha.4-5223-gfef03e88f-dirty"
+  "head": "cdad3e2ab801c8733cea0106f573b17622a48b74",
+  "describe": "v0.7.0-alpha.4-5237-gcdad3e2ab-dirty"
  },
- "inputsDigest": "6b5d34f800a52ac40439fa5e7bf5a9f3d5c9138aae48c95f3ba6fd9a0df6fad2",
+ "inputsDigest": "34a22ad15b92390ae06f191892549e82924f7539bb56cb76130ed706fe2b95a9",
  "states": [
   "inventoried",
   "characterized",
@@ -276,7 +276,7 @@
   },
   "SMProject": {
    "file": "src/js/project.js",
-   "line": 409,
+   "line": 408,
    "members": 2
   },
   "SMAgPsdLoader": {
@@ -14761,7 +14761,7 @@
    "capability": "New project (new tab)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:661"
+    "src/js/project.js:660"
    ],
    "events": [
     "click"
@@ -14792,7 +14792,7 @@
     "via": "chain",
     "references": [
      "src/js/adapters/native-object-project-tabs-ui.js:120 render()",
-     "src/js/project.js:661",
+     "src/js/project.js:660",
      "src/js/timeline.js:9004 action()"
     ]
    },
@@ -15849,7 +15849,7 @@
     "functionsVisited": 0,
     "via": "chain",
     "references": [
-     "src/js/project.js:604 enter()"
+     "src/js/project.js:603 enter()"
     ]
    },
    "fixtures": [

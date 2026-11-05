@@ -157,7 +157,8 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'desktop_viewport::ObjectPreviewNavigation', 'desktop_viewport::ObjectViewProjection',
       'desktop_viewport::ObjectPresentedFrame',
       'desktop_viewport::ViewportDisplayFilter', 'object_render_scene::GhostUnderlayRequest',
-      'object_render_scene::GhostReceipt'],
+      'object_render_scene::GhostReceipt', 'history::legacy_project_import::convert_admitted',
+      'history::legacy_project_import::looks_like_legacy_project'],
     'rust.desktop.native.application.tests': [
       'application::ExportResourceResolver', 'compositor::Compositor',
       'desktop_viewport::AcquiredSurfaceFrame', 'desktop_viewport::DesktopViewportHost',
