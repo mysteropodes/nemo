@@ -23,7 +23,8 @@ function admissionRoutes(bootstrap, reopen) {
     bootstrap.indexOf('#[tauri::command]'));
   assert.match(file, /if format.format == "nemo.native-project-document"\s*\{\s*state\s*\.install_native_project_file\(bytes\)/);
   assert.match(file, /else\s*\{[\s\S]*let document = decode_storage_project\(bytes\)[\s\S]*\.install_native_object\(document\)/);
-  assert.match(reopen, /let bytes = read_file\(state, &request, allowed\)(\.map_err\(not_dispatched\))?\?;[\s\S]*?return bootstrap_file_bytes\(state, request.request_id, &bytes\);/);
+  // A baseline project is converted by read_file; the converted bytes then take the same strict native codec route.
+  assert.match(reopen, /let loaded = read_file\(state, &request, allowed\)(\.map_err\(not_dispatched\))?\?;[\s\S]*?bootstrap_file_bytes\(state, request.request_id, &loaded.bytes\)/);
   assert.match(reopen, /\}\s*bootstrap_raw\(state, raw\)/);
 }
 
@@ -43,7 +44,7 @@ test('v2 host/file controls have exact census and preserve original-byte admissi
   assert.throws(() => admissionRoutes(bootstrap.replace('.install_native_object(document)',
     '.install_native_object(unvalidated)'), reopen), assert.AssertionError);
   assert.throws(() => admissionRoutes(bootstrap, reopen.replace(
-    'bootstrap_file_bytes(state, request.request_id, &bytes)', 'bootstrap_raw(state, raw)')),
+    'bootstrap_file_bytes(state, request.request_id, &loaded.bytes)', 'bootstrap_raw(state, raw)')),
   assert.AssertionError);
   assert.match(bootstrap, /require_main\(&window\)\?/);
   assert.match(read('src-tauri/src/native_object_save.rs'), /serialize_object_file_snapshot\(&query.to_string\(\)\)/);
