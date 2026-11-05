@@ -181,3 +181,59 @@ fn a_baseline_shaped_file_without_layers_is_a_typed_legacy_refusal_and_installs_
     assert_eq!(error.code, "legacy_invalid");
     assert!(state.native_state().lock().unwrap().active().is_none());
 }
+
+const MEDIA: &str = include_str!("../../tests/fixtures/legacy-import/media.json");
+
+#[test]
+fn a_baseline_project_with_images_audio_text_and_tags_opens_with_its_media() {
+    let (state, before) = open_blank();
+    let scratch = Scratch::new();
+    let path = scratch.file("old-media.json", MEDIA);
+    let request = replacing(&state, &before, &path);
+    let admission = replace::prepare(
+        &state,
+        reopen::file_request(&request.to_string()).unwrap(),
+        |p| p.starts_with(&scratch.0),
+    )
+    .unwrap();
+    let Admission::Execute {
+        generation,
+        request_id,
+        prepared,
+        legacy,
+        ..
+    } = admission
+    else {
+        panic!("expected one execution")
+    };
+    let report = legacy.expect("a baseline project carries its report");
+    assert_eq!(report["counts"]["layers"], 3);
+    let codes: Vec<&str> = report["warnings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|w| w["code"].as_str().unwrap())
+        .collect();
+    for expected in ["raster_text_flattened", "text_outlined", "derived_listing"] {
+        assert!(codes.contains(&expected), "{expected} is reported: {codes:?}");
+    }
+    let receipt = replace::complete(
+        &state.native_state(),
+        generation,
+        &request_id,
+        prepared,
+        || Ok((vec![], "already_absent")),
+    )
+    .unwrap();
+    let receipt = serde_json::to_value(receipt).unwrap();
+    let after = state
+        .native_project_info(receipt["documentId"].as_str().unwrap())
+        .unwrap();
+    assert_eq!(
+        (after["contentRevision"].clone(), after["undoDepth"].clone()),
+        (json!(0), json!(0)),
+        "opening is no edit"
+    );
+    assert_eq!(after["layers"].as_array().unwrap().len(), 3);
+    assert_eq!(fs::read_to_string(&path).unwrap(), MEDIA, "the legacy file is never modified");
+}

@@ -3,6 +3,7 @@ use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
 
 // EXPERIMENTAL (experimental/native-video-decode) — see the module header.
+mod legacy_media_transcode;
 mod video_decode;
 // Pure text parsing of `ffmpeg -i` output, split out of video_decode (P28).
 mod application_mcp;
@@ -333,6 +334,7 @@ fn start_tablet_pressure_monitor(app: tauri::AppHandle) {
 pub fn run() {
     // T12: the native preview/export owner decodes video through the shell's sessions.
     native_dispatch::video::install_video_decoder(video_decode::boxed_decoder);
+    native_object_bootstrap::install_legacy_media_transcoder(&legacy_media_transcode::FfmpegTranscoder);
     let mut ctx = tauri::generate_context!();
     // R06 (#902): opt-in per-task isolation of every mutable native root.
     // Without NEMO_TAURI_DATA_DIR this is None and not one resolved path below

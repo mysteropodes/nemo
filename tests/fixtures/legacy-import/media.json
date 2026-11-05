@@ -1,0 +1,1272 @@
+{
+ "version": 13,
+ "totalFrames": 4,
+ "fps": 24,
+ "canvasW": 640,
+ "canvasH": 360,
+ "canvasBg": "#ffffff",
+ "waIn": 0,
+ "waOut": 3,
+ "layers": [
+  {
+   "name": "Ink",
+   "visible": true,
+   "locked": false,
+   "color": "#4a9eff",
+   "layerUid": "ly_ink",
+   "effects": [],
+   "groups": {
+    "g_pair": {
+     "name": "Pair",
+     "combineMode": "none",
+     "order": [
+      "s_a",
+      "s_b"
+     ]
+    }
+   },
+   "frames": [
+    {
+     "strokes": [
+      {
+       "segments": [
+        {
+         "point": [
+          0,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          40
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          0,
+          40
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#112233",
+       "hasRealStroke": true,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "fillColor": "#445566",
+       "opacity": 1,
+       "strokeId": "s_a",
+       "groupId": "g_pair"
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          50,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          90,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          90,
+          40
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          50,
+          40
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#112233",
+       "hasRealStroke": true,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "fillColor": "#445566",
+       "opacity": 1,
+       "strokeId": "s_b",
+       "groupId": "g_pair"
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          0,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          40
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          0,
+          40
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#112233",
+       "hasRealStroke": true,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "fillColor": "#445566",
+       "opacity": 1,
+       "strokeId": "s_mask",
+       "isMask": true,
+       "maskMode": "alpha",
+       "maskFeather": 2
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          0,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          40
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          0,
+          40
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#112233",
+       "hasRealStroke": true,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "fillColor": "#445566",
+       "opacity": 1,
+       "strokeId": "s_grad",
+       "fillGradient": {
+        "kind": "linear",
+        "from": [
+         0,
+         0
+        ],
+        "to": [
+         40,
+         0
+        ],
+        "stops": [
+         {
+          "offset": 0,
+          "color": "#ff0000"
+         },
+         {
+          "offset": 1,
+          "color": "#0000ff"
+         }
+        ]
+       },
+       "boxAngle": 0.5
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          0,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          40
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          0,
+          40
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#112233",
+       "hasRealStroke": true,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "fillColor": "#445566",
+       "opacity": 1,
+       "strokeId": "s_shape",
+       "paramShape": {
+        "kind": "rect",
+        "tl": 0,
+        "tr": 0,
+        "br": 0,
+        "bl": 0
+       }
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          0,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          40
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          0,
+          40
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#112233",
+       "hasRealStroke": true,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "fillColor": "#445566",
+       "opacity": 1,
+       "strokeId": "s_fill",
+       "fillSeed": [
+        10,
+        10
+       ],
+       "fillGapPx": 0,
+       "fillWalls": [
+        "s_a"
+       ]
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          0,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          40
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          0,
+          40
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#112233",
+       "hasRealStroke": true,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "fillColor": "#445566",
+       "opacity": 1,
+       "strokeId": "s_shadow",
+       "channelTag": "shadow",
+       "shadowSwatchId": "sw1"
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          0,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          40
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          0,
+          40
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": null,
+       "hasRealStroke": false,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "fillColor": "#445566",
+       "opacity": 1,
+       "strokeId": "s_tex",
+       "brushTexturePreset": "chalk",
+       "brushGroupId": "bg1",
+       "preTextureOpacity": 1,
+       "preTextureStroke": "#112233"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    }
+   ]
+  },
+  {
+   "name": "Media",
+   "visible": true,
+   "locked": false,
+   "color": "#b49be6",
+   "layerUid": "ly_media",
+   "effects": [],
+   "footage": {
+    "kind": "still"
+   },
+   "frames": [
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "x": 200,
+       "y": 150,
+       "width": 128,
+       "height": 96,
+       "opacity": 0.5,
+       "rotation": 15,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAYAAAChS3wfAAAAWklEQVR42u3QQQ0AMAgEMJScEvyrwMuQQbL0UQOtSd6l9JwqAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAg4L+ABVCJyXiwPYSpAAAAAElFTkSuQmCC",
+       "meshId": "im_1"
+      },
+      {
+       "isRaster": true,
+       "x": 450,
+       "y": 150,
+       "width": 64,
+       "height": 48,
+       "opacity": 1,
+       "linked": true,
+       "linkedPath": "/Users/me/art/linked.png"
+      },
+      {
+       "isRaster": true,
+       "x": 300,
+       "y": 300,
+       "width": 128,
+       "height": 96,
+       "opacity": 1,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAYAAAChS3wfAAAAWklEQVR42u3QQQ0AMAgEMJScEvyrwMuQQbL0UQOtSd6l9JwqAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAg4L+ABVCJyXiwPYSpAAAAAElFTkSuQmCC",
+       "isText": true,
+       "text": "Hi",
+       "font": "Arial",
+       "size": 24,
+       "color": "#000000",
+       "align": "left"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    }
+   ]
+  },
+  {
+   "name": "Words",
+   "visible": true,
+   "locked": false,
+   "color": "#f0a585",
+   "layerUid": "ly_words",
+   "effects": [],
+   "isTextLayer": true,
+   "frames": [
+    {
+     "strokes": [
+      {
+       "segments": [
+        {
+         "point": [
+          0,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          15,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          7,
+          18
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#112233",
+       "hasRealStroke": true,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "fillColor": "#445566",
+       "opacity": 1,
+       "strokeId": "s_w0",
+       "isVectorText": true,
+       "vectorChar": "N",
+       "isText": true,
+       "charIndex": 0,
+       "wordIndex": 0,
+       "lineIndex": 0,
+       "groupId": "tg_words",
+       "isTextRoot": true,
+       "text": "NEM",
+       "vectorFont": "vector:Roboto-Regular",
+       "textSize": 48,
+       "textColor": "#222222",
+       "textAlign": "center",
+       "textFixedWidth": 300,
+       "anchorTopLeft": {
+        "x": 100,
+        "y": 120
+       },
+       "bold": true,
+       "letterSpacing": 2,
+       "lineHeightMult": 1.5,
+       "textCase": "upper"
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          20,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          35,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          27,
+          18
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#112233",
+       "hasRealStroke": true,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "fillColor": "#445566",
+       "opacity": 1,
+       "strokeId": "s_w1",
+       "isVectorText": true,
+       "vectorChar": "E",
+       "isText": true,
+       "charIndex": 1,
+       "wordIndex": 0,
+       "lineIndex": 0,
+       "groupId": "tg_words"
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          40,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          55,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          47,
+          18
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#112233",
+       "hasRealStroke": true,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "fillColor": "#445566",
+       "opacity": 1,
+       "strokeId": "s_w2",
+       "isVectorText": true,
+       "vectorChar": "M",
+       "isText": true,
+       "charIndex": 2,
+       "wordIndex": 0,
+       "lineIndex": 0,
+       "groupId": "tg_words"
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          0,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          15,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          7,
+          18
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#112233",
+       "hasRealStroke": true,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "fillColor": "#445566",
+       "opacity": 1,
+       "strokeId": "s_g0",
+       "isVectorText": true,
+       "vectorChar": "G",
+       "isText": true,
+       "charIndex": 0,
+       "wordIndex": 0,
+       "lineIndex": 0,
+       "groupId": "tg_google",
+       "isTextRoot": true,
+       "text": "G",
+       "vectorFont": "Google:Lobster-Regular",
+       "textSize": 40,
+       "textColor": "#aa0000",
+       "textAlign": "left",
+       "anchorTopLeft": {
+        "x": 10,
+        "y": 10
+       }
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          20,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          35,
+          0
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          27,
+          18
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#112233",
+       "hasRealStroke": true,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "fillColor": "#445566",
+       "opacity": 1,
+       "strokeId": "s_g1",
+       "isVectorText": true,
+       "vectorChar": "H",
+       "isText": true,
+       "charIndex": 1,
+       "wordIndex": 0,
+       "lineIndex": 0,
+       "groupId": "tg_google"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    }
+   ]
+  }
+ ],
+ "audioTracks": [
+  {
+   "name": "score",
+   "dataB64": "data:audio/wav;base64,UklGRiwAAABXQVZFZm10IBAAAAABAAIAgLsAAADuAgAEABAAZGF0YQgAAAAAAP9/AIABAA==",
+   "offsetFrames": -3,
+   "volume": 0.8,
+   "muted": false,
+   "audioId": "au_score",
+   "trimStart": 0,
+   "trimEnd": null,
+   "motionStatic": {
+    "volume": [
+     0.5
+    ]
+   }
+  }
+ ],
+ "refMedia": {
+  "type": "image",
+  "name": "ref.png",
+  "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAYAAAChS3wfAAAAWklEQVR42u3QQQ0AMAgEMJScEvyrwMuQQbL0UQOtSd6l9JwqAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAg4L+ABVCJyXiwPYSpAAAAAElFTkSuQmCC",
+  "frames": 1,
+  "opacity": 0.4,
+  "visible": true,
+  "offsetFrames": 2
+ },
+ "mediaLibrary": [
+  {
+   "id": "ml_0",
+   "name": "embedded.png",
+   "kind": "image",
+   "layerName": "Media",
+   "layerUid": "ly_media",
+   "linked": false,
+   "naturalW": 64,
+   "naturalH": 48,
+   "sizeBytes": 147,
+   "importedAt": 0
+  }
+ ],
+ "imageMeshes": {
+  "im_1": {
+   "outline": [
+    [
+     0,
+     0
+    ],
+    [
+     0.5,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     1,
+     0.5
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     0.5,
+     1
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     0,
+     0.5
+    ]
+   ],
+   "verts": [
+    [
+     0,
+     0
+    ],
+    [
+     0.5,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     1,
+     0.5
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     0.5,
+     1
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     0,
+     0.5
+    ],
+    [
+     0.5,
+     0.5
+    ]
+   ],
+   "tris": [
+    8,
+    0,
+    1,
+    8,
+    1,
+    2,
+    8,
+    2,
+    3,
+    8,
+    3,
+    4,
+    8,
+    4,
+    5,
+    8,
+    5,
+    6,
+    8,
+    6,
+    7,
+    8,
+    7,
+    0
+   ],
+   "offsets": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0.1,
+     0
+    ]
+   ],
+   "cols": 2,
+   "rows": 2
+  }
+ }
+}

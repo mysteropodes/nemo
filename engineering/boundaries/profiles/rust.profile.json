@@ -541,7 +541,12 @@
         "legacy_project_import/holders.rs",
         "legacy_project_import/kinds.rs",
         "legacy_project_import/storyboard.rs",
-        "legacy_project_import/tweens.rs"
+        "legacy_project_import/tweens.rs",
+        "legacy_project_import/fields.rs",
+        "legacy_project_import/groups.rs",
+        "legacy_project_import/media.rs",
+        "legacy_project_import/stroke_ext.rs",
+        "legacy_project_import/text.rs"
       ],
       "publicApi": [
         "history.rs",
@@ -2073,7 +2078,9 @@
         "legacy_project_import_unit.rs",
         "legacy_project_import_refusals.rs",
         "legacy_project_import_animation.rs",
-        "legacy_project_import_families.rs"
+        "legacy_project_import_families.rs",
+        "legacy_project_import_fields.rs",
+        "legacy_project_import_media.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -2652,6 +2659,7 @@
       "dir": "src-tauri/src",
       "files": [
         "media_probe.rs",
+        "legacy_media_transcode.rs",
         "vectorize.rs",
         "video_decode.rs",
         "video_decode/decode.rs",

@@ -21,8 +21,8 @@ fn content_with_no_native_owner_refuses_naming_the_exact_path() {
             "layers[0].blendKeys",
         ),
         (
-            json!({"layers": [{"frames": []}], "audioTracks": [{"name": "a"}]}),
-            "audioTracks",
+            json!({"layers": [{"frames": []}], "trackRoles": {"r": {"name": "a"}}}),
+            "trackRoles",
         ),
         (
             json!({"layers": [{"frames": []}], "exprGlobals": "var a = 1;"}),
@@ -38,12 +38,10 @@ fn content_with_no_native_owner_refuses_naming_the_exact_path() {
         assert!(error.message().contains(path));
     }
     for (member, value) in [
-        ("isRaster", json!(true)),
-        ("fillGradient", json!({"kind": "linear"})),
-        ("isTextRoot", json!(true)),
-        ("groupId", json!("g")),
-        ("isMask", json!(true)),
-        ("boxAngle", json!(0.5)),
+        ("strokeGradientAlongPath", json!(true)),
+        ("elemHidden", json!(true)),
+        ("trackRoleId", json!("r")),
+        ("isFillCloseLine", json!(true)),
     ] {
         let mut stroke = base_stroke();
         stroke[member] = value;

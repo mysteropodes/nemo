@@ -81,6 +81,13 @@ mod new_project_tests;
 #[path = "native_object_legacy_import_tests.rs"]
 mod legacy_import_tests;
 
+/// Installed once by the shell: converts the media of a baseline project the engine cannot read directly.
+pub(crate) fn install_legacy_media_transcoder(
+    transcoder: &'static dyn native_engine::history::legacy_project_import::MediaTranscoder,
+) {
+    reopen::install_transcoder(transcoder);
+}
+
 // This bounds the complete original wrapper, including escaped document bytes.
 const MAX_OBJECT_BOOTSTRAP_BYTES: usize = 1_048_576;
 
