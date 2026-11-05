@@ -274,7 +274,7 @@ fn project_only_file_selection_refuses_other_formats_before_owner_installation()
         "sourcePath":path,"projectOnly":true})
     .to_string();
     for bytes in [
-        json!({"layers":[],"canvasW":320}).to_string(),
+        json!({"hello":"world","canvasW":320}).to_string(),
         json!({"format":"nemo.native-object-document","formatVersion":1,"totalFrames":21,
             "layers":[{"layerUid":"drawing"}],"objects":[]})
         .to_string(),
@@ -286,6 +286,13 @@ fn project_only_file_selection_refuses_other_formats_before_owner_installation()
         );
         assert!(state.native_state().lock().unwrap().active().is_none());
     }
+    // A baseline-shaped file with no layers is a typed legacy refusal, not a native or foreign format.
+    fs::write(&path, json!({"layers":[],"canvasW":320}).to_string()).unwrap();
+    assert_eq!(
+        bootstrap_request(&state, &raw, |_| true).unwrap_err().code,
+        "legacy_invalid"
+    );
+    assert!(state.native_state().lock().unwrap().active().is_none());
     // A malformed claimed project is an error, never permission to fall back.
     fs::write(
         &path,
