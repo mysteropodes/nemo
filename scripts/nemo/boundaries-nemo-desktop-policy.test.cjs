@@ -158,7 +158,8 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'desktop_viewport::ObjectPreviewNavigation', 'desktop_viewport::ObjectViewProjection',
       'desktop_viewport::ObjectPresentedFrame',
       'desktop_viewport::ViewportDisplayFilter', 'object_render_scene::GhostUnderlayRequest',
-      'object_render_scene::GhostReceipt', 'history::legacy_project_import::convert_admitted',
+      'object_render_scene::GhostReceipt', 'history::legacy_project_import::convert_admitted_with',
+      'history::legacy_project_import::MediaTranscoder', 'history::legacy_project_import::NoTranscoder',
       'history::legacy_project_import::looks_like_legacy_project'],
     'rust.desktop.native.application.tests': [
       'application::ExportResourceResolver', 'compositor::Compositor',
@@ -223,7 +224,8 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'desktop_viewport::ViewportDisplayFilter', 'object_render_scene::GhostUnderlayRequest',
       'object_render_scene::GhostReceipt', 'object_render_scene::viewport_checker_quality_suffix', 'object_render_scene::viewport_outline_quality_suffix', 'object_render_scene::viewport_shadow_guides_quality_suffix', 'object_render_scene::viewport_solo_quality_suffix', 'application::prepare_ghost_underlay', 'application::release_ghost_caches'],
     'rust.desktop.media': [
-      'native_media_frame_export::NativeVideoDecoder', 'native_media_frame_export::NativeVideoInfo'],
+      'native_media_frame_export::NativeVideoDecoder', 'native_media_frame_export::NativeVideoInfo',
+      'history::legacy_project_import::MediaTranscoder', 'history::legacy_project_import::convert_admitted_with'],
   });
   const rustProfile = read('rust.profile.json');
   for (const [moduleId, items] of Object.entries(policy.externalCratePorts.native_engine.moduleItems)) {

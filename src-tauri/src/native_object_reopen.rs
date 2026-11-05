@@ -75,6 +75,17 @@ pub(super) struct Loaded {
     pub(super) legacy: Option<serde_json::Value>,
 }
 
+/// The desktop's media converter for a baseline project (JPEG/WebP images and MP3/M4A audio become PNG and WAV), installed once
+/// by the shell; without one only PNG and WAV payloads import.
+static TRANSCODER: std::sync::OnceLock<&'static dyn native_engine::history::legacy_project_import::MediaTranscoder> =
+    std::sync::OnceLock::new();
+
+pub(super) fn install_transcoder(
+    transcoder: &'static dyn native_engine::history::legacy_project_import::MediaTranscoder,
+) {
+    let _ = TRANSCODER.set(transcoder);
+}
+
 pub(super) fn read_file(
     state: &ApplicationMcp,
     request: &FileRequest,
@@ -135,7 +146,13 @@ pub(super) fn read_file(
                     "file is not a native project",
                 ));
             }
-            let converted = native_engine::history::legacy_project_import::convert_admitted(&bytes)
+            let converted = native_engine::history::legacy_project_import::convert_admitted_with(
+                &bytes,
+                TRANSCODER
+                    .get()
+                    .copied()
+                    .unwrap_or(&native_engine::history::legacy_project_import::NoTranscoder),
+            )
                 .map_err(|error| host_error(error.code(), error.message()))?;
             return Ok(Loaded {
                 bytes: converted.project_file,

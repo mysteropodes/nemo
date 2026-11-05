@@ -56,9 +56,13 @@ pub(super) const PROJECT_MAPPED: &[&str] = &[
     "tweenOverrides",
     "tweenEasing",
     "motionArcs",
+    "audioTracks",
+    "refMedia",
+    "mediaLibrary",
+    "imageMeshes",
 ];
 /// Editor preferences with no document meaning for a drawn project: recorded in `ignored`, never a refusal.
-const PROJECT_PREFERENCES: &[&str] = &[
+pub(super) const PROJECT_PREFERENCES: &[&str] = &[
     "workspace",
     "mediaMode",
     "easingCurve",
@@ -71,13 +75,9 @@ const PROJECT_PREFERENCES: &[&str] = &[
     "layerLinkGroups",
 ];
 /// Families a later slice owns (folders, components, StoryBoard, motion arcs, tweens, media, expressions): content refuses.
-const PROJECT_LATER: &[&str] = &[
+pub(super) const PROJECT_LATER: &[&str] = &[
     "customEffects",
-    "audioTracks",
-    "refMedia",
-    "mediaLibrary",
     "trackRoles",
-    "imageMeshes",
     "exprGlobals",
 ];
 
@@ -120,7 +120,7 @@ pub(super) const LAYER_MAPPED: &[&str] = &[
     "shy",
 ];
 /// Layer members a later slice owns; any content refuses. `inPoint`/`outPoint` are handled by [`range_is_default`].
-const LAYER_LATER: &[&str] = &[
+pub(super) const LAYER_LATER: &[&str] = &[
     "lfsGroup",
     "lfsIds",
     "lfsSettings",
@@ -129,23 +129,60 @@ const LAYER_LATER: &[&str] = &[
     "linkGroupId",
     "nativeVideo",
     "montageId",
-    "isTextLayer",
-    "isEffectLayer",
-    "textAnimators",
-    "effects",
-    "pathFx",
     "lipSync",
-    "footage",
     "videoMeshId",
     "parentKeys",
     "parentLayerUidB",
     "parentsMore",
     "motionBlur",
-    "effectsFrom",
-    "rig",
-    "groups",
     "shapeNames",
 ];
+
+/// Layer members the native layer record carries under the same name; the strict codec judges their values and a refusal is
+/// attributed to the baseline member by `admit.rs`.
+pub(super) const LAYER_PASS: &[&str] = &[
+    "textAnimators",
+    "effects",
+    "effectsFrom",
+    "isEffectLayer",
+    "pathFx",
+    "rig",
+];
+
+/// Copy the pass-through layer members that hold content onto the native layer record.
+pub(crate) fn layer_pass(map: &Map<String, Value>, record: &mut Value, ctx: &mut Ctx, path: &str) {
+    for key in LAYER_PASS {
+        if let Some(value) = map.get(*key).filter(|v| !is_default(v)) {
+            record[*key] = value.clone();
+        }
+    }
+    if let Some(animators) = record.get_mut("textAnimators").and_then(Value::as_array_mut) {
+        for (index, animator) in animators.iter_mut().enumerate() {
+            // The baseline selector tests `shape` against its numeric table (square is 1) and a name falls through to square.
+            let Some(shape) = animator.pointer_mut("/selector/shape") else { continue };
+            if let Some(name) = shape.as_str() {
+                let number = match name.to_ascii_lowercase().replace(['_', '-'], "").as_str() {
+                    "rampup" => 2,
+                    "rampdown" => 3,
+                    "triangle" => 4,
+                    "round" => 5,
+                    "smooth" => 6,
+                    _ => 1,
+                };
+                *shape = Value::from(number);
+                ctx.warn(
+                    format!("{path}.textAnimators[{index}].selector.shape"),
+                    "text_selector_shape_normalised",
+                    "the selector shape was a name, which the baseline reads through its numeric table",
+                );
+            }
+        }
+    }
+    // The text layer marker is derived: a layer holding text items reads as a text layer natively.
+    if map.get("isTextLayer").is_some_and(|v| !is_default(v)) {
+        ctx.ignored.push(format!("{path}.isTextLayer"));
+    }
+}
 
 /// Members another module of this reader converts (kinds, Motion, duplicators, components).
 fn converted_elsewhere(key: &str) -> bool {
@@ -162,11 +199,26 @@ pub(crate) fn layer_member(
     total: u32,
     ctx: &mut Ctx,
 ) -> Result<(), LegacyImportError> {
-    if LAYER_MAPPED.contains(&key) || converted_elsewhere(key) {
+    if LAYER_MAPPED.contains(&key) || LAYER_PASS.contains(&key) || key == "isTextLayer" || key == "groups" || converted_elsewhere(key) {
         return Ok(());
     }
     let member = format!("{path}.{key}");
     let _ = total;
+    if key == "footage" {
+        // Still, image and sequence footage only label a layer whose pictures are ordinary raster strokes; they hold no media.
+        let kind = value.get("kind").and_then(Value::as_str);
+        return if is_default(value) || matches!(kind, Some("still" | "image" | "sequence")) {
+            if !is_default(value) {
+                ctx.ignored.push(member);
+            }
+            Ok(())
+        } else {
+            Err(LegacyImportError::unsupported(
+                member,
+                "this footage kind has no native owner in this release",
+            ))
+        };
+    }
     if LAYER_LATER.contains(&key) {
         // `blendMode: "normal"` and `matteMode: "none"` are the baseline defaults.
         let neutral = matches!(

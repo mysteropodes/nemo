@@ -8,7 +8,13 @@
 //! `elementMotion`, `expressions`, `exprControls`, the `order` property), blend and mattes, Null, Guide, Widget and Folder
 //! layers with the folder table, the stored range with time link and markers, key lock, 3D and follow path, components
 //! (`symbols` and their instance layers), duplicators and effector layers, the StoryBoard, tween records, generated tween
-//! frames, motion arcs and the camera track. Every field family a later slice owns and that holds content refuses with the
+//! frames, motion arcs and the camera track. Slice 3 adds media and the remaining stroke and layer families: raster items over
+//! PNG/linked image assets, audio tracks over WAV assets with their placement offsets, the reference image, the image-mesh
+//! store, vector text blocks (an unbundled font keeps its outlines), the per-stroke `vectorExt` tags (mask, gradient, box angle,
+//! linked fill, parametric shape, paint-bucket trace, brush texture, bitmap anchor, shadow channel), stroke and layer
+//! effects, text animators, path effects, rigs and Cmd+G groups. `fields.rs` states the disposition of every baseline member
+//! and the field-catalogue test enumerates them. Media in other formats (JPEG, MP3...) is converted by the host's
+//! `MediaTranscoder`; without one it refuses. Every field family that holds content with no native owner refuses with the
 //! typed `legacy_unsupported_field` naming the JSON path, so nothing is ever lost silently. Editor-only preferences are
 //! listed in `ignored`; unknown members and baseline-hidden data are listed in `warnings`.
 use serde_json::{json, Map, Value};
@@ -25,12 +31,18 @@ mod color;
 mod components;
 #[path = "dup.rs"]
 mod dup;
+#[path = "fields.rs"]
+mod fields;
+#[path = "groups.rs"]
+mod groups;
 #[path = "holders.rs"]
 mod holders;
 #[path = "kinds.rs"]
 mod kinds;
 #[path = "layers.rs"]
 mod layers;
+#[path = "media.rs"]
+mod media;
 #[path = "migrate.rs"]
 mod migrate;
 #[path = "project.rs"]
@@ -39,11 +51,16 @@ mod project;
 mod stroke;
 #[path = "stroke_brush.rs"]
 mod stroke_brush;
+#[path = "stroke_ext.rs"]
+mod stroke_ext;
 #[path = "storyboard.rs"]
 mod storyboard;
+#[path = "text.rs"]
+mod text;
 #[path = "tweens.rs"]
 mod tweens;
-pub use admit::convert_admitted;
+pub use admit::{convert_admitted, convert_admitted_with};
+pub use media::{MediaTranscoder, NoTranscoder};
 
 pub const LEGACY_UNSUPPORTED_FIELD: &str = "legacy_unsupported_field";
 pub const LEGACY_INVALID: &str = "legacy_invalid";
@@ -117,19 +134,33 @@ impl LegacyReport {
 pub struct Converted {
     pub project_file: Vec<u8>,
     pub report: LegacyReport,
+    pub(crate) stroke_paths: admit::StrokePaths,
 }
 
 /// Mutable state shared by the conversion passes.
 #[derive(Default)]
-pub(crate) struct Ctx {
+pub(crate) struct Ctx<'a> {
     pub(crate) warnings: Vec<LegacyWarning>,
     pub(crate) migrations: Vec<String>,
     pub(crate) ignored: Vec<String>,
     pub(crate) omit: Vec<&'static str>,
     pub(crate) keyframes: usize,
     pub(crate) strokes: usize,
+    /// Baseline JSON path of every converted scene or component stroke, keyed by (layer uid, frame, stroke id).
+    pub(crate) stroke_paths: std::collections::HashMap<(String, u32, String), String>,
+    /// Catalog assets in first-use order, with the payload keys that deduplicate them.
+    pub(crate) assets: Vec<Value>,
+    pub(crate) asset_keys: std::collections::HashMap<String, String>,
+    pub(crate) placements: Vec<Value>,
+    /// Raster item entries of every context.
+    pub(crate) raster: Vec<Value>,
+    /// Innermost group leaf tags of vector strokes: (layer uid, stroke id, group id).
+    pub(crate) group_tags: Vec<(String, String, String)>,
+    pub(crate) transcoder: Option<&'a dyn MediaTranscoder>,
+    /// Text item entries of every context.
+    pub(crate) text: Vec<Value>,
 }
-impl Ctx {
+impl Ctx<'_> {
     pub(crate) fn warn(
         &mut self,
         path: impl Into<String>,
@@ -160,12 +191,13 @@ pub fn looks_like_legacy_project(bytes: &[u8]) -> bool {
 }
 
 pub fn convert(bytes: &[u8]) -> Result<Converted, LegacyImportError> {
-    convert_omitting(bytes, &[])
+    convert_omitting(bytes, &[], &NoTranscoder)
 }
 
 pub(crate) fn convert_omitting(
     bytes: &[u8],
     omit: &[&'static str],
+    transcoder: &dyn MediaTranscoder,
 ) -> Result<Converted, LegacyImportError> {
     let value: Value = serde_json::from_slice(bytes)
         .map_err(|_| LegacyImportError::invalid("$", "not a JSON document"))?;
@@ -177,6 +209,7 @@ pub(crate) fn convert_omitting(
     };
     let mut ctx = Ctx {
         omit: omit.to_vec(),
+        transcoder: Some(transcoder),
         ..Ctx::default()
     };
     let source_version = doc.get("version").and_then(Value::as_f64);
@@ -190,12 +223,37 @@ pub(crate) fn convert_omitting(
         .cloned()
         .ok_or_else(|| LegacyImportError::invalid("layers", "layers must be a non-empty array"))?;
     let settings = project::read(&doc, &layer_values, &mut ctx)?;
-    let drawing = assemble::drawing(&doc, &layer_values, settings.total, &mut ctx)?;
+    let mut drawing = assemble::drawing(&doc, &layer_values, settings.total, &mut ctx)?;
+    if let Some(meshes) = media::image_meshes(&doc)? {
+        drawing["imageMeshes"] = meshes;
+    }
+    if let Some(tracks) = media::audio_tracks(&doc, &mut ctx)? {
+        drawing["audioTracks"] = tracks;
+    }
+    if !ctx.raster.is_empty() || !ctx.text.is_empty() {
+        let mut items = Map::new();
+        if !ctx.raster.is_empty() {
+            items.insert("raster".into(), Value::Array(std::mem::take(&mut ctx.raster)));
+        }
+        if !ctx.text.is_empty() {
+            items.insert("text".into(), Value::Array(std::mem::take(&mut ctx.text)));
+        }
+        drawing["items"] = Value::Object(items);
+    }
+    let reference = media::reference(&doc, &mut ctx)?;
+    media::library(&doc, &mut ctx);
     classify::project_members(&doc, &mut ctx)?;
-    let file = json!({"format": "nemo.native-project-document", "formatVersion": 1, "project": settings.metadata,
-        "drawing": drawing, "viewportReference": null, "assets": []});
+    let mut file = json!({"format": "nemo.native-project-document", "formatVersion": 1, "project": settings.metadata,
+        "drawing": drawing, "viewportReference": reference, "assets": []});
+    if !ctx.assets.is_empty() {
+        let ids: Vec<Value> = ctx.assets.iter().map(|a| a["id"].clone()).collect();
+        file["formatVersion"] = json!(2);
+        file["assets"] = Value::Array(std::mem::take(&mut ctx.assets));
+        file["assetInventory"] = json!({"assetIds": ids, "placements": std::mem::take(&mut ctx.placements)});
+    }
     let project_file = serde_json::to_vec(&file)
         .map_err(|_| LegacyImportError::invalid("$", "converted project cannot be encoded"))?;
+    let stroke_paths = std::mem::take(&mut ctx.stroke_paths);
     let report = LegacyReport {
         source_version,
         migrations: ctx.migrations,
@@ -208,6 +266,7 @@ pub(crate) fn convert_omitting(
     Ok(Converted {
         project_file,
         report,
+        stroke_paths,
     })
 }
 
@@ -226,6 +285,12 @@ mod animation_tests;
 #[cfg(test)]
 #[path = "../../tests/legacy_project_import_families.rs"]
 mod families_tests;
+#[cfg(test)]
+#[path = "../../tests/legacy_project_import_fields.rs"]
+mod fields_tests;
+#[cfg(test)]
+#[path = "../../tests/legacy_project_import_media.rs"]
+mod media_tests;
 #[cfg(test)]
 #[path = "../../tests/legacy_project_import_refusals.rs"]
 mod refusal_tests;

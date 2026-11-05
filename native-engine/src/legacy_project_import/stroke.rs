@@ -1,9 +1,9 @@
 //! One stored baseline stroke (`serP`) as an `editable-vector-path` object record; every other member family refuses.
-use super::{classify, color, stroke_brush, Ctx, LegacyImportError};
+use super::{classify, color, stroke_brush, stroke_ext, Ctx, LegacyImportError};
 use serde_json::{json, Map, Value};
 use std::collections::HashSet;
 
-const MAPPED: &[&str] = &[
+pub(super) const MAPPED: &[&str] = &[
     "segments",
     "closed",
     "strokeColor",
@@ -30,66 +30,25 @@ pub(super) const BRUSH: &[&str] = &[
     "isFillShape",
 ];
 /// Stroke members a later slice owns: fills, brushes, text, masks, groups, roles, review, rasters, duplicator copies.
-const LATER: &[&str] = &[
+/// Editor-only stroke state with no meaning in the drawing itself: dropped with a warning, never a refusal.
+pub(super) const WARNED: &[(&str, &str, &str)] = &[
+    ("xformAnchorKey", "editor_preference", "the transform-box pivot choice is an editor preference and is not carried over"),
+    ("xformAnchorCustom", "editor_preference", "the transform-box pivot choice is an editor preference and is not carried over"),
+    ("ownerId", "review_attribution", "team-review attribution is not carried over"),
+    ("ownerName", "review_attribution", "team-review attribution is not carried over"),
+    ("ownerColor", "review_attribution", "team-review attribution is not carried over"),
+];
+/// Stroke members that hold content with no native owner: any value refuses.
+pub(super) const LATER: &[&str] = &[
     "isFillCloseLine",
-    "fillSeed",
-    "fillSeeds",
-    "fillGapPx",
-    "fillWalls",
-    "brushGroupId",
-    "isLinkedFillCompanion",
-    "linkedFillId",
-    "boxAngle",
-    "xformAnchorKey",
-    "xformAnchorCustom",
-    "isBrushTextureCopy",
-    "brushTexturePreset",
-    "bitmapBrushSpec",
-    "bitmapPressureProfile",
-    "preTextureOpacity",
-    "preTextureStroke",
-    "channelTag",
-    "shadowSwatchId",
-    "ownerId",
-    "ownerName",
-    "ownerColor",
     "revisionParentId",
     "isRevisionGhost",
     "revisionAction",
     "preRevisionOpacity",
-    "fillGradient",
-    "groupId",
     "trackRoleId",
     "attachedToRoleId",
     "attachOffset",
     "elemHidden",
-    "paramShape",
-    "effects",
-    "isVectorText",
-    "vectorChar",
-    "charIndex",
-    "wordIndex",
-    "lineIndex",
-    "isText",
-    "isTextRoot",
-    "text",
-    "vectorFont",
-    "textSize",
-    "textColor",
-    "textAlign",
-    "textFixedWidth",
-    "anchorTopLeft",
-    "bold",
-    "italic",
-    "underline",
-    "strike",
-    "letterSpacing",
-    "wordSpacing",
-    "lineHeightMult",
-    "textCase",
-    "isMask",
-    "maskMode",
-    "maskFeather",
     "strokeGradientAlongPath",
     "isRaster",
     "src",
@@ -164,7 +123,17 @@ pub(super) fn convert(
     let brush = truthy(map.get("isVectorBrush"));
     for (key, member) in map {
         let key = key.as_str();
-        if MAPPED.contains(&key) || (brush && BRUSH.contains(&key)) {
+        if MAPPED.contains(&key) || stroke_ext::MAPPED.contains(&key) || super::text::MAPPED.contains(&key) || (brush && BRUSH.contains(&key)) {
+            continue;
+        }
+        // A text glyph's group id only ties the glyphs of one block together.
+        if key == "groupId" {
+            continue;
+        }
+        if let Some((_, code, message)) = WARNED.iter().find(|w| w.0 == key) {
+            if !classify::is_default(member) {
+                ctx.warn(format!("{path}.{key}"), code, *message);
+            }
             continue;
         }
         if LATER.contains(&key) || BRUSH.contains(&key) {
@@ -273,9 +242,27 @@ pub(super) fn convert(
         "target": {"contextId": "scene-root", "frameScope": {"kind": "authored", "frame": at.1}, "layerUid": at.0, "strokeId": stroke_id},
         "geometry": {"kind": "cubic-path", "closed": truthy(map.get("closed")), "coordinateSpace": "document-world", "handleSpace": "relative", "segments": anchors},
         "fill": fill, "vector": body});
-    if brush {
-        record["vectorExt"] = stroke_brush::pressure(path, map)?;
+    let mut ext = match brush {
+        true => match stroke_brush::pressure(path, map)? {
+            Value::Object(members) => members,
+            _ => Map::new(),
+        },
+        false => Map::new(),
+    };
+    stroke_ext::build(path, map, &mut ext, &mut record, ctx)?;
+    if !ext.is_empty() {
+        record["vectorExt"] = Value::Object(ext);
     }
+    if let Some(group) = map.get("groupId").and_then(Value::as_str).filter(|g| !g.is_empty()) {
+        // A text glyph's group id only ties the glyphs of one block together.
+        if !truthy(map.get("isVectorText")) && !truthy(map.get("isTextRoot")) {
+            ctx.group_tags.push((at.0.to_owned(), stroke_id.clone(), group.to_owned()));
+        }
+    }
+    ctx.stroke_paths.insert(
+        (at.0.to_owned(), at.1, stroke_id.clone()),
+        path.to_owned(),
+    );
     Ok((record, stroke_id))
 }
 
