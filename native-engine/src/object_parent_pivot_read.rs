@@ -115,8 +115,7 @@ fn pose_point(
     base: [f64; 2],
     p: [f64; 2],
 ) -> Option<[f64; 2]> {
-    use crate::object_codec::PropertyHolderTarget;
-    use crate::object_document::Presence;
+    use crate::object_frame_packet::{Presence, PropertyHolderTarget};
     let target = PropertyHolderTarget {
         context_id: context_id.to_owned(),
         layer_uid: uid.to_owned(),

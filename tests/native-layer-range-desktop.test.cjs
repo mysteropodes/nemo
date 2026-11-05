@@ -198,14 +198,15 @@ test('one native rectangle center-tests actual property diamonds and bar parts w
  h.down(0,'both');h.move(120);h.up(120);await h.settle();assert.deepEqual(h.commands()[0].q.payload.selectedKeys.map(k=>k.frame),[2.25,7]);
 });
 
-test('native key timeline refuses stale detached/frame/FC scopes and never trims over32 marquee selection',async()=>{
+test('native key timeline refuses stale detached/frame/FC scopes and a marquee over 33 keys selects them all (no key limit)',async()=>{
  for(const change of [h=>h.root.state.currentFrame++,h=>h.root.FC++,h=>h.keyEditor.cancel(),h=>h.keyEditor.dispose()]){
   const h=await harness({propertyKeys:[2.25,7]});const node=h.keyNodes()[0];change(h);node.fire('mousedown',{button:0});
   const captured=h.keyEditor.captureSelectedKeys();assert.ok(captured===null||captured.keys.length===0);assert.equal(h.commands().length,0);assert.equal(h.legacy(),0);
  }
  const h=await harness({propertyKeys:Array.from({length:33},(_,i)=>i)});h.keyNodes().forEach((n,i)=>{n.getBoundingClientRect=()=>({left:i*10,top:6,width:9,height:9});});
+ for(let i=0;i<2;i++){const bar=h.bar(i);if(!bar)continue;bar.getBoundingClientRect=()=>({left:900,right:950,top:100,bottom:120});bar.querySelector('.layer-inout-handle.left').getBoundingClientRect=()=>({left:900,right:904,top:100,bottom:120});bar.querySelector('.layer-inout-handle.right').getBoundingClientRect=()=>({left:946,right:950,top:100,bottom:120});}
  Range.startMarquee(h.root,{clientX:0,clientY:0});h.doc.fire('mousemove',{clientX:400,clientY:20});
- assert.deepEqual(h.keyEditor.captureSelectedKeys().keys,[]);assert.equal(h.commands().length,0);assert.ok(h.root.notices.length);
+ assert.equal(h.keyEditor.captureSelectedKeys().keys.length,33);assert.equal(h.commands().length,0);
 });
 
 
