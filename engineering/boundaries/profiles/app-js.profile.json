@@ -3369,6 +3369,8 @@
         "native-motion-key-lock-menu.js",
         "native-motion-key-edit.js",
         "native-motion-key-gesture.js",
+        "native-motion-canvas-math.js",
+        "native-motion-canvas.js",
         "native-motion-property-value.js",
         "native-motion-control-rows.js",
         "native-motion-expression-snippets.js",
