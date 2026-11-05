@@ -1,8 +1,8 @@
 //! #2371 U11: the layer colour label (`layer.color.set`) through the actual owner, history and dispatcher, on the L02-F
 //! three-layer document (stored labels L0 #5fa875, L1 #b49be6, L2 #f0a585). Expectations are hand-derived literals read back
 //! through plain `serde_json::Value` projections. Rename shares the label policy, so its parent-versus-lock split is pinned here.
-use super::object_layer_lifecycle_tests::{base, bytes, owner_of, rename, send, value};
-use super::*;
+use crate::history::object_history::object_layer_lifecycle_tests::{base, bytes, owner_of, rename, send, value};
+use crate::history::object_history::NativeObjectHistory;
 use crate::object_codec::decode_storage_project;
 use serde_json::{json, Value};
 

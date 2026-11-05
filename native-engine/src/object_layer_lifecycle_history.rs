@@ -139,3 +139,7 @@ impl NativeObjectHistory {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/object_layer_color_set.rs"]
+mod object_layer_color_set;
