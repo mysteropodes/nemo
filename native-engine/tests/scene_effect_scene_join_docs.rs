@@ -463,63 +463,27 @@ fn an_enabled_item_effect_is_a_typed_input_refusal_on_its_layer() {
 fn the_solo_view_empties_every_slot_that_is_not_soloed_effect_and_matte_layers_included() {
     use crate::object_frame_packet::solo_view;
     let mut document = base_document();
-    set_layer(
-        &mut document,
-        "L0",
-        json!({"matteMode": "alpha", "matteSourceLayerUid": "L1"}),
-    );
+    set_layer(&mut document, "L0", json!({"matteMode": "alpha", "matteSourceLayerUid": "L1"}));
     set_layer(&mut document, "L2", json!({"effectsFrom": "E0"}));
-    push_layer(
-        &mut document,
-        "E0",
-        3,
-        json!({"isEffectLayer": true, "visible": false,
-               "effects": [{"type": "blur", "enabled": true, "p1": 12}]}),
-    );
+    let effect = json!({"isEffectLayer": true, "visible": false, "effects": [{"type": "blur", "enabled": true, "p1": 12}]});
+    push_layer(&mut document, "E0", 3, effect);
     let snap = snapshot(&document, "join-solo");
     let roles = |soloed: &[&str]| {
         let soloed: Vec<String> = soloed.iter().map(|uid| (*uid).to_owned()).collect();
         let _view = solo_view::enter("scene-root", &soloed);
         let pk = packet(&snap, FRAME);
-        let scene = render_scene(&pk);
-        let joined = pinned(&pk, vec![contour_claims(&scene, "contour", &[])]);
+        let joined = pinned(&pk, vec![contour_claims(&render_scene(&pk), "contour", &[])]);
         let plan = plan_scene_effects(&pk, &joined, &options()).unwrap();
-        plan.layers()
-            .iter()
-            .map(|l| (l.layer_uid.clone(), l.role))
-            .collect::<Vec<_>>()
+        plan.layers().iter().map(|l| (l.layer_uid.clone(), l.role)).collect::<Vec<_>>()
     };
-    let role = |pairs: &[(&str, SlotRole)]| -> Vec<(String, SlotRole)> {
-        pairs.iter().map(|(u, r)| ((*u).to_owned(), *r)).collect()
+    let want = |roles: [SlotRole; 4]| -> Vec<(String, SlotRole)> {
+        ["L0", "L1", "L2", "E0"].iter().map(|u| (*u).to_owned()).zip(roles).collect()
     };
+    use SlotRole::{Effect, Empty, Plain};
     // The effect layer's own eye is off: the plain stack leaves it empty.
-    assert_eq!(
-        roles(&[]),
-        role(&[
-            ("L0", SlotRole::Plain),
-            ("L1", SlotRole::Plain),
-            ("L2", SlotRole::Plain),
-            ("E0", SlotRole::Empty)
-        ])
-    );
+    assert_eq!(roles(&[]), want([Plain, Plain, Plain, Empty]));
     // Soloing the eye-off effect layer applies it (the eye plays no part) and empties every other slot.
-    assert_eq!(
-        roles(&["E0"]),
-        role(&[
-            ("L0", SlotRole::Empty),
-            ("L1", SlotRole::Empty),
-            ("L2", SlotRole::Empty),
-            ("E0", SlotRole::Effect)
-        ])
-    );
+    assert_eq!(roles(&["E0"]), want([Empty, Empty, Empty, Effect]));
     // Soloing a plain layer leaves the effect layer and the matte pair out.
-    assert_eq!(
-        roles(&["L2"]),
-        role(&[
-            ("L0", SlotRole::Empty),
-            ("L1", SlotRole::Empty),
-            ("L2", SlotRole::Plain),
-            ("E0", SlotRole::Empty)
-        ])
-    );
+    assert_eq!(roles(&["L2"]), want([Empty, Empty, Plain, Empty]));
 }
