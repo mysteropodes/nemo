@@ -274,7 +274,7 @@
     }
     else if (key === 'stableTarget') target(payloadValue, label, false);
     else if (key === 'ops') {
-      // #2361/#2362: 1..64 ordered create/replace/delete steps on the layers of one context (#2372: a Select may span layers; a trimEnds batch is one layer), one revision and one undo entry.
+      // #2361/#2362: 1..64 ordered create/replace/delete steps (and #2372 `order` steps: Bring to front / Send to back by `placement` front or back) on the layers of one context (#2372: a Select may span layers; a trimEnds batch is one layer), one revision and one undo entry.
       if (!Array.isArray(payloadValue) || payloadValue.length < 1 || payloadValue.length > 64) fail(`${label} must hold 1 to 64 steps`);
       const targets = payloadValue.map((op, at) => {
         const where = `${label}[${at}]`;
@@ -294,9 +294,7 @@
         if (op.op === 'reshape' || op.op === 'clone') { const clone = op.op === 'clone'; exact(op, ['op', 'stableTarget'].concat(clone ? ['frame'] : []), clone ? ['geometry', 'offset', 'placement', 'keyframe'] : ['geometry', 'center', 'matrix', 'frame'], where); target(op.stableTarget, `${where}.stableTarget`, false); if (has(op, 'geometry')) geometry(op.geometry, `${where}.geometry`); if (!clone && [has(op, 'geometry'), has(op, 'center'), has(op, 'matrix')].filter(Boolean).length !== 1) fail(`${where} needs geometry, a center or a matrix`); if (has(op, 'matrix') && (!Array.isArray(op.matrix) || op.matrix.length !== 6 || !op.matrix.every(Number.isFinite))) fail(`${where}.matrix must be six finite numbers`); if (has(op, 'center')) { if (!Array.isArray(op.center) || op.center.length < 2 || op.center.length > 256) fail(`${where}.center must have 2..256 anchors`); pressure({ centerSegments: op.center }, where); } if (has(op, 'offset') && (has(op, 'geometry') || !Array.isArray(op.offset) || op.offset.length !== 2 || !op.offset.every(Number.isFinite))) fail(`${where}.offset is invalid`);
           if (has(op, 'frame') && !(Number.isSafeInteger(op.frame) && op.frame >= 0 && op.frame <= 4294967295)) fail(`${where}.frame must be a frame`); if (has(op, 'placement')) oneOf(op.placement, ['front', 'behind'], `${where}.placement`); if (has(op, 'keyframe')) oneOf(op.keyframe, ['copy'], `${where}.keyframe`); return op.stableTarget; }
         if (op.op === 'restyle') { exact(op, ['op', 'stableTarget', 'style'], ['frame'], where); target(op.stableTarget, `${where}.stableTarget`, false); restyleStyle(exact(op.style, [], Object.keys(STYLE), `${where}.style`), `${where}.style`); if (has(op, 'frame')) frame(op.frame, `${where}.frame`); return op.stableTarget; }
-        // #2372 Bring to front / Send to back: one record or item to the `front` or `back` of its layer's stack (in the cell `frame` names), with its linked fill or texture dabs.
-        if (op.op === 'order') { exact(op, ['op', 'stableTarget', 'placement'], ['frame'], where); target(op.stableTarget, `${where}.stableTarget`, false); oneOf(op.placement, ['front', 'back'], `${where}.placement`); if (has(op, 'frame')) frame(op.frame, `${where}.frame`); return op.stableTarget; }
-        if (op.op === 'delete') { exact(op, ['op', 'stableTarget'], [], where); target(op.stableTarget, `${where}.stableTarget`, false); return op.stableTarget; }
+        if (op.op === 'delete' || op.op === 'order') { const ord = op.op === 'order'; exact(op, ['op', 'stableTarget'].concat(ord ? ['placement'] : []), ord ? ['frame'] : [], where); target(op.stableTarget, `${where}.stableTarget`, false); if (ord) { oneOf(op.placement, ['front', 'back'], `${where}.placement`); if (has(op, 'frame')) frame(op.frame, `${where}.frame`); } return op.stableTarget; }
         return fail(`${where}.op must be create, copy, replace, reshape, clone, restyle, order or delete`);
       });
       targets.forEach((t, at) => { if (!t) targets[at] = targets[payloadValue[at].fromStep]; });

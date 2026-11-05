@@ -20,8 +20,7 @@ mod component;
 mod batch;
 #[path = "object_vector_batch_layers.rs"]
 mod batch_layers;
-#[path = "object_vector_batch_order.rs"]
-mod batch_order;
+#[path = "object_vector_batch_order.rs"] mod batch_order;
 #[path = "object_vector_batch_items.rs"]
 mod batch_items;
 #[path = "object_vector_batch_box_angle.rs"]
