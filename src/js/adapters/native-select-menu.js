@@ -33,15 +33,16 @@
       return { grouped: ids.some(function (id) { return (info.pathOf[id] || []).length > 0; }), active: G.activeGroup(info, ids) };
     } catch (_) { return null; }
   }
+  function pasteRow(host, enabled) { return { label: 'Coller', shortcut: '⌘V', disabled: !enabled, action: function () { host.NemoNativeSelectionClipboard.paste(host); } }; }
   // The menu rows for the selection the right-click left (empty: the selection is empty).
   async function rows(host, paths) {
     var C = host.NemoNativeSelectionClipboard, G = host.NemoNativeSelectGroup, B = host.NemoNativeSelectionBoolean, D = host.NemoNativeSelectionDelete;
-    if (!paths.length) return C.hasClip(host) ? [{ label: 'Coller', shortcut: '⌘V', action: function () { C.paste(host); } }] : [];
+    if (!paths.length) return C.hasClip(host) ? [pasteRow(host, true)] : [];
     var multi = paths.length > 1;
     var items = [
       { label: 'Copier', shortcut: '⌘C', action: function () { C.copy(host); } },
       { label: 'Couper', shortcut: '⌘X', action: function () { C.cut(host); } },
-      { label: 'Coller', shortcut: '⌘V', disabled: !C.hasClip(host), action: function () { C.paste(host); } },
+      pasteRow(host, C.hasClip(host)),
       { label: 'Dupliquer', shortcut: '⌘D', action: function () { C.duplicate(host); } }
     ];
     if (D && typeof D.removeSelection === 'function') items.push({ label: multi ? 'Supprimer la sélection' : 'Supprimer', shortcut: 'Suppr', action: function () { D.removeSelection(host); } });
