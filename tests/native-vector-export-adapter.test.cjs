@@ -24,6 +24,21 @@ test('begin mints one frozen, exact v2 request pinned to the snapshot', () => {
   assert.deepEqual(copy.payload.frames, [4, 9], 'the request never aliases the caller array');
 });
 
+test('the Solo view of the layers rides the request only when it names a layer, copied and strictly ascending (#2371)', () => {
+  const adapter = live();
+  const solo = ['L1', 'L3'];
+  const request = adapter.begin(identity(), snapshotResponse(), 'svg-solo', { outputHandle: 'output/a', frames: [0, 1], soloLayers: solo });
+  assert.deepEqual(request.payload.soloLayers, ['L1', 'L3']);
+  assert.ok(deepFrozen(request));
+  solo.push('L9'); solo[0] = 'X';
+  assert.deepEqual(request.payload.soloLayers, ['L1', 'L3'], 'the request never aliases the caller array');
+  const empty = adapter.begin(identity(), snapshotResponse(), 'svg-none', { outputHandle: 'output/a', frames: [0], soloLayers: [] });
+  assert.equal('soloLayers' in empty.payload, false, 'an empty set is no solo and stays off the wire');
+  for (const bad of [['L3', 'L1'], ['L1', 'L1'], [''], [3], 'L1', null]) {
+    assert.throws(() => adapter.begin(identity(), snapshotResponse(), 'svg-bad', { outputHandle: 'output/a', frames: [0], soloLayers: bad }), TypeError, JSON.stringify(bad));
+  }
+});
+
 test('without a registered host route every operation is typed unavailability and mints nothing', () => {
   for (const adapter of [createNativeVectorExportAdapter(), createNativeVectorExportAdapter({}), createNativeVectorExportAdapter({ route: false })]) {
     assert.deepEqual(adapter.availability(), { state: 'unavailable', reason: 'export_route_unavailable' });

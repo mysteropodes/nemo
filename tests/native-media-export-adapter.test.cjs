@@ -50,6 +50,21 @@ test('begin mints one frozen, exact v2 request for a PNG sequence, an SVG still 
   assert.deepEqual(begin(adapter, 'media-5', { kind: 'video', range: {}, video: {} }).payload.video, {});
 });
 
+test('the Solo view of the layers rides the media request only when it names a layer (#2371)', () => {
+  let n = 0;
+  const adapter = live(), id = () => `solo-${++n}`;
+  const request = begin(adapter, id(), { soloLayers: ['L1', 'L2'] });
+  assert.deepEqual(request.payload.soloLayers, ['L1', 'L2']);
+  assert.ok(deepFrozen(request));
+  for (const kind of [{ kind: 'video', frameFormat: 'png', range: {} }, { kind: 'still', frameFormat: 'svg', range: { start: 1, end: 1 }, size: undefined }]) {
+    assert.deepEqual(begin(adapter, id(), { ...kind, soloLayers: ['A'] }).payload.soloLayers, ['A']);
+  }
+  assert.equal('soloLayers' in begin(adapter, id(), { soloLayers: [] }).payload, false, 'an empty set is no solo and stays off the wire');
+  for (const bad of [['L2', 'L1'], ['L1', 'L1'], [''], [3], 'L1', null]) {
+    assert.throws(() => begin(adapter, id(), { soloLayers: bad }), TypeError, JSON.stringify(bad));
+  }
+});
+
 test('absent and zero stay distinct (baseline exportFrameRange): an explicit 0 is a value, not the work-area fallback', () => {
   const adapter = live();
   const r = (range, id) => begin(adapter, id, { range, kind: 'video' }).payload.range;

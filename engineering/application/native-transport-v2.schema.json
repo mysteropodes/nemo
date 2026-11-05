@@ -7059,8 +7059,19 @@
           "items": {
             "$ref": "#/$defs/ObjectFrame"
           }
+        },
+        "soloLayers": {
+          "$ref": "#/$defs/ExportSoloLayers"
         }
       }
+    },
+    "ExportSoloLayers": {
+      "type": "array",
+      "maxItems": 512,
+      "items": {
+        "$ref": "#/$defs/Identifier"
+      },
+      "description": "The Solo view of the layers (baseline layerIsEffectivelyVisible): while any listed layer belongs to the exported context only the listed layers, and the children of a listed folder layer, are exported, whatever their eyes say. Strictly ascending (so unique): an ordering rule the JSON Schema cannot express, repeated by the contract. A session view fact, never document data; absent or empty means no solo."
     },
     "ExportMediaRange": {
       "type": "object",
@@ -7175,6 +7186,9 @@
         },
         "video": {
           "$ref": "#/$defs/ExportMediaVideo"
+        },
+        "soloLayers": {
+          "$ref": "#/$defs/ExportSoloLayers"
         }
       },
       "description": "Three exclusive shapes: PNG still or sequence (outputSpec, no video), SVG still or sequence (neither outputSpec nor video), video of PNG frames (outputSpec, video optional). A still names its frame (start === end), range.end never precedes range.start, a sequence receipt lists at most 120 frames, absent range members mean the project work area: contract rules the JSON Schema cannot express.",

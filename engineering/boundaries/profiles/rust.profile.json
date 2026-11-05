@@ -699,6 +699,7 @@
         "object_frame_motion_values.rs",
         "object_frame_motion_receipts.rs",
         "object_frame_camera.rs",
+        "object_solo_view.rs",
         "object_boolean_motion_eval.rs",
         "object_duplicator_snapshot.rs",
         "object_duplicator_follow_path.rs",

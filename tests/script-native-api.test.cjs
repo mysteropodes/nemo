@@ -7,7 +7,7 @@ function harness(layers){
   let info={instanceId:'i',documentId:'d',lifecycleGeneration:1,contentRevision:0,fps:24,canvasW:320,canvasH:180,totalFrames:12,layers:layers.map(l=>({...l}))};
   const calls=[],frames=[],toasts=[];let refuse=null;
   const write={};
-  for(const key of ['visible','locked','shy'])write[key]=index=>{calls.push([key,index]);if(refuse===key)return Promise.resolve(false);
+  for(const key of ['visible','locked','shy','solo'])write[key]=index=>{calls.push([key,index]);if(refuse===key)return Promise.resolve(false);
     const l=info.layers[index];info={...info,contentRevision:info.contentRevision+1,layers:info.layers.map((x,i)=>i===index?{...x,[key]:key==='visible'?x.visible===false:!(x[key]===true)}:x)};
     void l;return Promise.resolve(true);};
   const ports={info:()=>info,write,goToFrame:f=>frames.push(f),selection:()=>[1],toast:m=>toasts.push(m)};
@@ -36,6 +36,21 @@ test('writes are queued with read-your-writes, cancel out, and drain in order th
   assert.deepEqual(await run.commit(),{ok:true,applied:3,pending:0});
   assert.deepEqual(h.calls,[['locked',1],['visible',1],['shy',2]]);
   assert.equal(h.info.layers[1].locked,false);assert.equal(h.info.layers[1].visible,true);assert.equal(h.info.layers[2].shy,false);
+});
+
+test('Layer.solo is a bound view-fact row: it reads the solo flag, queues one toggle and the drain confirms it (#2371)',async()=>{
+  const h=harness([{layerUid:'a',name:'A',visible:true},{layerUid:'b',name:'B',visible:false,solo:true}]),run=Api.createRun(h.ports),n=run.nemo;
+  assert.equal(n.layer('A').solo,false);assert.equal(n.layer('B').solo,true);
+  n.layer('A').solo=true;assert.equal(n.layer('A').solo,true,'read-your-writes');
+  n.layer('B').solo=true;n.layer('A').solo=false;n.layer('A').solo=true;
+  assert.deepEqual(h.calls,[],'nothing is written while the script runs');
+  assert.deepEqual(await run.commit(),{ok:true,applied:1,pending:0});
+  assert.deepEqual(h.calls,[['solo',0]],'the layer already soloed is not toggled again');
+  assert.equal(h.info.layers[0].solo,true);
+  h.refuse('solo');const again=Api.createRun(h.ports);again.nemo.layer('B').solo=false;
+  const refused=await again.commit();assert.equal(refused.ok,false);assert.equal(refused.error,'write-refused');
+  const gone=Api.createRun(harness(L).ports);
+  assert.doesNotThrow(()=>{gone.nemo.layer(0).solo=false;},'the row is bound, no unavailable refusal');
 });
 
 test('unbound and unavailable rows refuse with a typed error and never fall back',()=>{

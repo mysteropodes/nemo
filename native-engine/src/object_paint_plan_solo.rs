@@ -1,6 +1,9 @@
 //! #2371 U11: the Solo view of a paint plan. Baseline 1065e9d8 `layerIsEffectivelyVisible` (app.js): while ANY layer of the shown
 //! context is soloed only the soloed layers paint, whatever their eye says, and the children of a soloed folder layer count as
-//! soloed (one level, `_layerFolderParent`). The flag is a session view fact, never document data: this derives a plan that
+//! soloed (one level, `_layerFolderParent`). This plan filter can only LEAVE OUT layers of a plan that already holds them: a layer
+//! whose eye is off never reaches the plan unless the frame packet was built with the Solo view open
+//! (`object_frame_packet::solo_view::enter`, #2371 C-solo-2), which is also what makes a non-soloed effect, matte or mask layer
+//! stop applying. Every caller that builds a packet for a soloed frame or export opens it. The flag is a session view fact, never document data: this derives a plan that
 //! leaves the other layers' items out of `mixed` and `indices` (the two lists every painter and exporter walks) and shares the
 //! scene, masks and dabs, so no source, resource or revision is copied or changed.
 use crate::object_render_scene::{ObjectPaintPlan, PaintIndex};
@@ -29,26 +32,7 @@ impl ObjectPaintPlan {
     /// Which source layers stay visible under this Solo set; `None` when no soloed layer belongs to this plan's context
     /// (baseline `anyLayerSoloed` only reads the layers of the shown context, so the flag then changes nothing).
     pub(crate) fn solo_visibility(&self, soloed: &[String]) -> Option<Vec<bool>> {
-        let layers = self.packet().source_layers();
-        let on = |uid: &str| soloed.iter().any(|s| s == uid);
-        if !layers.iter().any(|l| on(l.layer_uid())) {
-            return None;
-        }
-        Some(
-            layers
-                .iter()
-                .map(|layer| {
-                    let folder = layer
-                        .parent_layer_uid
-                        .value()
-                        .and_then(Option::as_deref)
-                        .filter(|parent| *parent != layer.layer_uid())
-                        .and_then(|parent| layers.iter().find(|l| l.layer_uid() == parent))
-                        .filter(|parent| parent.is_folder_layer());
-                    on(layer.layer_uid()) || folder.is_some_and(|f| on(f.layer_uid()))
-                })
-                .collect(),
-        )
+        crate::object_frame_packet::solo_view::solo_visibility(self.packet().source_layers(), soloed)
     }
 
     /// This plan with only the Solo-visible layers' items; `None` when the Solo set does not apply to this context. An entry

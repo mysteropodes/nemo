@@ -265,3 +265,62 @@ fn an_image_inside_a_turned_and_scaled_folder_lands_on_hand_computed_texels() {
     }
     assert_eq!(pixel(&bytes, 100, 100), WHITE);
 }
+
+fn hide(document: &mut Value, uids: &[&str]) {
+    for layer in document["layers"].as_array_mut().unwrap() {
+        if uids.contains(&layer["layerUid"].as_str().unwrap()) {
+            layer["visible"] = json!(false);
+        }
+    }
+}
+
+/// The frame the full joined pipeline (packet, folder ranks, scene join, both doors) paints with `soloed` open.
+fn solo_frame(owner: &NativeObjectHistory, soloed: &[&str]) -> Vec<u8> {
+    let soloed: Vec<String> = soloed.iter().map(|uid| (*uid).to_owned()).collect();
+    let _view = crate::object_frame_packet::solo_view::enter("scene-root", &soloed);
+    frame_of(owner).1
+}
+
+#[test]
+fn gpu_solo_on_a_folder_isolates_its_subtree_and_ignores_the_eyes_of_the_folder_and_its_children() {
+    // L0 blue top left (plain). The folder F is hidden by its eye and holds C1 red (top right) and C2 green (lower right, its
+    // own eye off); L5 yellow (lower left) is a plain layer with its eye off. Baseline `layerIsEffectivelyVisible`.
+    const BLUE_RECT: Bounds = (10., 10., 50., 50.);
+    const C1: Bounds = (250., 10., 290., 50.);
+    const C2: Bounds = (250., 130., 290., 170.);
+    const L5: Bounds = (10., 130., 50., 170.);
+    let mut doc = document(
+        &[
+            part("L0", None, BLUE_RECT, [0., 0., 1.]),
+            part("C1", Some("F"), C1, [1., 0., 0.]),
+            part("C2", Some("F"), C2, [0., 1., 0.]),
+            part("L5", None, L5, [1., 1., 0.]),
+        ],
+        [100, 40],
+        &[],
+    );
+    hide(&mut doc, &["F", "C2", "L5"]);
+    let owner = owner(&doc);
+    let at = |bytes: &[u8], b: Bounds| pixel(bytes, ((b.0 + b.2) / 2.) as usize, ((b.1 + b.3) / 2.) as usize);
+
+    let plain = solo_frame(&owner, &[]);
+    assert_eq!(at(&plain, BLUE_RECT), BLUE);
+    assert_eq!(at(&plain, L5), WHITE, "the eye-off plain layer is hidden");
+    assert_eq!(at(&plain, C2), WHITE);
+    assert_eq!(at(&plain, C1), WHITE, "a hidden folder hides its children (baseline layerIsEffectivelyVisible)");
+
+    let folder = solo_frame(&owner, &["F"]);
+    assert_eq!(at(&folder, C1), RED, "a soloed folder shows its children although its own eye is off");
+    assert_eq!(at(&folder, C2), GREEN, "...and a child whose own eye is off");
+    assert_eq!(at(&folder, BLUE_RECT), WHITE, "everything outside the subtree is hidden");
+    assert_eq!(at(&folder, L5), WHITE);
+
+    let child = solo_frame(&owner, &["C2"]);
+    assert_eq!(at(&child, C2), GREEN, "a soloed child shows alone, under a folder whose eye is off");
+    assert_eq!(at(&child, C1), WHITE, "a child does not light its folder or its siblings");
+
+    let plain_layer = solo_frame(&owner, &["L5"]);
+    assert_eq!(at(&plain_layer, L5), [255, 255, 0, 255], "an eye-off plain layer shows when soloed");
+    assert_eq!(at(&plain_layer, C1), WHITE);
+    assert_eq!(solo_frame(&owner, &[]), plain, "the next frame without a solo is the plain one");
+}

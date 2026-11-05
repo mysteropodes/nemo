@@ -23,6 +23,8 @@ pub(crate) fn layer_inputs(
         .ok_or(SceneEffectJoinError::NoNumericOrder)?;
     let masks = mask_summary(packet).map_err(SceneEffectJoinError::MaskInputs)?;
     let source = packet.source_layers();
+    // #2371: the Solo view decides which layers count as visible, so a non-soloed effect, matte or mask layer stops applying.
+    let visible = crate::object_frame_packet::solo_view::layer_visibility(packet.context_id(), source);
     let mut seen = vec![false; source.len()];
     let mut inputs = Vec::with_capacity(source.len());
     for placed in order.layers() {
@@ -59,7 +61,7 @@ pub(crate) fn layer_inputs(
         inputs.push(JoinLayerInput {
             layer_uid: layer.layer_uid().to_owned(),
             source_layer_index: index,
-            visible: layer.visible(),
+            visible: visible[index],
             is_widget: layer.widget.value().is_some(),
             is_effect: layer.is_effect_layer(),
             is_folder: layer.is_folder_layer(),

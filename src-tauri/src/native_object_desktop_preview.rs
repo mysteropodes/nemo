@@ -301,6 +301,9 @@ pub(crate) fn preview_with_target(
             revision_sync,
             |owner| {
                 owner.require_project_output(output.dimensions())?;
+                // #2371: the Solo view holds from the packet's preparation through its presentation, so a layer the Solo
+                // view shows is built into the packet even when its eye is off (baseline `layerIsEffectivelyVisible`).
+                let _solo_view = native_engine::object_frame_packet::solo_view::enter(selector.context_id, &request.solo_layers);
                 let consume = |owner: &mut NativeObjectHost| {
                     Ok(target(ObjectPreviewConsumer {
                         owner,

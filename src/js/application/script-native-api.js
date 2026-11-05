@@ -54,6 +54,7 @@
   put(S, ['comp.beat', 'comp.beats', 'markers.list', 'markers.next', 'markers.prev'], op(Q + '.project.composition.read', null, true));
   put(S, ['markers.add', 'markers.removeAt'], op(null, O + 'project.composition.edit', true));
   put(S, ['goToFrame'], present('viewport frame presentation; no document write', true));
+  put(S, ['Layer.solo'], present('Solo view of the layer (a session view fact; the toggle asks the preview for one more frame, no document write)', true));
   put(S, ['selection.layers'], present('editor selection state', true));
   put(S, ['selection.clear', 'selection.setLayers', 'selection.strokes', 'Layer.select'], present('editor selection state'));
   put(S, ['help', 'log', 'toast'], host('script console and editor toast', true));
@@ -66,7 +67,7 @@
     'no-native-key-lock': ['Layer.keyLock'], 'no-native-time-link': ['Layer.linkTime', 'Layer.timeLink', 'Layer.unlinkTime'],
     'no-native-layer-merge': ['Layer.mergeWith'], 'no-native-motion-blur': ['Layer.motionBlur'], 'no-native-parenting': ['Layer.parent'],
     'no-native-stroke-profile': ['Layer.strokeProfile'], 'no-native-stroke-read': ['Layer.strokes'], 'no-native-pivot': ['addPivot'], 'no-native-camera': ['camera.keys'],
-    'no-native-solo': ['Layer.solo'], 'script-run-grouping': ['undoGroup'],
+    'script-run-grouping': ['undoGroup'],
   };
   Object.keys(reasons).forEach(function (reason) { put(S, reasons[reason], gone(reason)); });
   var ROUTES = Object.freeze(Object.keys(table).sort().map(function (row) { return Object.freeze(Object.assign({ row: row }, table[row])); }));
@@ -227,7 +228,7 @@
         if (last && last.kind === 'color' && last.uid === uid) last.color = next; else queue.push({ kind: 'color', uid: uid, color: next });
       },
     });
-    ['visible', 'locked', 'shy'].forEach(function (key) {
+    ['visible', 'locked', 'shy', 'solo'].forEach(function (key) {
       Object.defineProperty(Layer.prototype, key, {
         get: function () { need(S + 'Layer.' + key); return flag(this.layerUid, key); },
         set: function (v) { need(S + 'Layer.' + key); flag(this.layerUid, key, v); },
