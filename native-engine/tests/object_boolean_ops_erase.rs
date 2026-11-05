@@ -267,22 +267,9 @@ fn a_target_with_nothing_to_erase_is_left_alone() {
 
 #[test]
 fn refusals_are_typed_and_leave_state_and_history_alone() {
-    let open = VectorSpec {
-        closed: false,
-        ..VectorSpec::default()
-    };
     let doc = document(
         1,
-        vec![
-            vector(
-                "L0",
-                "open",
-                0,
-                &[(0.0, 0.0), (100.0, 0.0), (100.0, 100.0)],
-                &open,
-            ),
-            legacy("L0", "t", 0, &square(0.0, 0.0, 100.0), RED),
-        ],
+        vec![legacy("L0", "t", 0, &square(0.0, 0.0, 100.0), RED)],
         None,
         None,
     );
@@ -293,11 +280,7 @@ fn refusals_are_typed_and_leave_state_and_history_alone() {
         owner.content_revision(),
     );
     let bite = square(40.0, 40.0, 20.0);
-    // an open path needs the stroker; an unknown stroke is absent; the footprint must be a ring
-    assert_eq!(
-        apply(&mut owner, "erase", &erase("L0", 0, "open", &bite)),
-        Err(DispatchErrorCode::Unavailable)
-    );
+    // an unknown stroke is absent; the footprint must be a ring (open and curved targets are bitten since B-eraser-tool)
     assert_eq!(
         apply(&mut owner, "erase", &erase("L0", 0, "nope", &bite)),
         Err(DispatchErrorCode::NotFound)

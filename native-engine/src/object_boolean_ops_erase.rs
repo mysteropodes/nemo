@@ -5,20 +5,24 @@
 //! `object_boolean_topology`; this file feeds it and writes the records.
 use crate::object_document::object_group_kernels::object_boolean_ops::plan::number_of;
 use crate::object_document::object_group_kernels::object_boolean_ops::plan::{
-    box_angle, detach, finish, is_brush, opacity_of, outline_of, record_ring, source_data,
-    unchanged, BooleanPlan, PlanError,
+    box_angle, detach, finish, is_brush, opacity_of, outline_of, source_data, unchanged,
+    BooleanPlan, PlanError,
 };
 use crate::object_document::object_group_kernels::object_boolean_ops::stack::{
     find_record, hex8, stack_of, ResultStyle, Scope,
 };
 use crate::object_document::object_group_kernels::object_boolean_ops::{
-    erase_difference, flatten_polygons, Point,
+    erase_difference, flatten_polygons, fold_multi, guard_result, multi_area, ring_area, BoolOp,
+    MultiPolygon, Point,
 };
 use crate::object_document::object_group_kernels::object_boolean_topology::{
     erase_stroke_info, plan_erase_polygons, DataValue, EraseOutcome, EraseTarget, StrokeIdAction,
     StrokeInfo,
 };
+use crate::object_document::object_group_kernels::object_boolean_topology::Polygon;
 use crate::object_document::{ObjectDocument, SolidFill};
+#[path = "object_boolean_ops_erase_geometry.rs"]
+mod geometry;
 
 fn extent(points: &[Point]) -> [f64; 4] {
     let mut out = [
@@ -42,6 +46,23 @@ fn boxes_apart(a: &[Point], b: &[Point]) -> bool {
     a[2] < b[0] || b[2] < a[0] || a[3] < b[1] || b[3] < a[1]
 }
 
+/// The target area minus the footprint. One ring is the module's usual eraser difference; several (an open stroke united
+/// with its fill) are folded with the same plausibility guard.
+fn bite(area: &MultiPolygon, footprint: &[Point]) -> Result<MultiPolygon, PlanError> {
+    if let [only] = area.as_slice() {
+        if only.holes.is_empty() {
+            return erase_difference(&only.exterior, footprint).map_err(PlanError::Ops);
+        }
+    }
+    let eraser = vec![Polygon {
+        exterior: footprint.to_vec(),
+        holes: Vec::new(),
+    }];
+    let result = fold_multi(BoolOp::Subtract, &[area.clone(), eraser]).map_err(PlanError::Ops)?;
+    guard_result(multi_area(area), multi_area(&result), ring_area(footprint)).map_err(PlanError::Ops)?;
+    Ok(result)
+}
+
 pub(super) fn plan_erase(
     document: &ObjectDocument,
     scope: &Scope,
@@ -53,9 +74,6 @@ pub(super) fn plan_erase(
         .ok_or_else(|| PlanError::UnknownStroke(stroke.to_string()))?;
     let record = &document.objects[at];
     let brush = is_brush(record);
-    if !record.geometry.closed && !brush {
-        return Err(PlanError::OpenTarget(stroke.to_string()));
-    }
     let outline = if brush { None } else { outline_of(record) };
     let paint: Option<SolidFill> = match record.solid_fill() {
         Some(fill) => Some(fill.clone()),
@@ -65,13 +83,25 @@ pub(super) fn plan_erase(
     let Some(paint) = paint else {
         return Ok(unchanged(document));
     };
-    let ring = record_ring(record)?;
+    // A closed record (or a ribbon, always closed) is bitten as its own flattened ring; an open one as its stroke
+    // expanded to an area, united with its fill (baseline: ribbon / closed-clone machinery for an open path).
+    let area: MultiPolygon = if record.geometry.closed || brush {
+        vec![Polygon {
+            exterior: geometry::closed_ring(record)?,
+            holes: Vec::new(),
+        }]
+    } else {
+        match geometry::open_area(record, outline.as_ref(), record.solid_fill().is_some())? {
+            Some(area) => area,
+            None => return Ok(unchanged(document)),
+        }
+    };
     // A footprint whose box misses the target's box cannot change it: nothing is rewritten
     // (the baseline replaced the target with an identical copy, refit included).
-    if boxes_apart(&ring, footprint) {
+    if area.iter().all(|polygon| boxes_apart(&polygon.exterior, footprint)) {
         return Ok(unchanged(document));
     }
-    let polygons = erase_difference(&ring, footprint).map_err(PlanError::Ops)?;
+    let polygons = bite(&area, footprint)?;
     let stack = stack_of(document, scope);
     let index = stack
         .iter()

@@ -15,7 +15,8 @@
 //! pin, a typed refusal or a malformed ring publishes nothing and keeps redo.
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_boolean_ops::plan::{
-    plan_boolean, BooleanPlan, BooleanRequest, ElementMotionSource, PlanError, UnavailableMotion,
+    plan_boolean, unchanged, BooleanPlan, BooleanRequest, ElementMotionSource, PlanError,
+    UnavailableMotion,
 };
 use crate::object_document::object_group_kernels::object_boolean_ops::stack::Scope;
 use crate::object_document::object_group_kernels::object_boolean_ops::{BoolOp, OpsError};
@@ -153,14 +154,24 @@ impl PreparedBooleanEdit {
         request: &BooleanRequest,
         motion: &dyn ElementMotionSource,
     ) -> Result<Self, DispatchErrorCode> {
+        // Baseline eraser: ensureKeyframe() keys a held cell with a copy of what it shows in the same undo step as the
+        // first bite (the eraser needs the strokes it is about to cut). Promotion is part of the candidate: a bite that
+        // changes nothing publishes nothing, the held cell included.
+        let promoted = match kind {
+            BooleanEditKind::Erase => fill_trace::promoted(origin.document(), scope)?,
+            _ => None,
+        };
         let mut plan = plan_boolean(
-            origin.document(),
+            promoted.as_ref().unwrap_or_else(|| origin.document()),
             scope,
             request,
             origin.content_revision(),
             motion,
         )
         .map_err(|error| refusal_code(&error))?;
+        if promoted.is_some() && !plan.changed {
+            plan = unchanged(origin.document());
+        }
         if plan.changed {
             let touched = match request {
                 BooleanRequest::Op { strokes, .. } => strokes.clone(),

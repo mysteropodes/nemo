@@ -94,13 +94,32 @@ test('results: command receipts correlate applied and history count; a duplicate
   for (const [suffix] of VALID.filter(([s]) => !['layer.duplicate', 'clipboard.copy', 'clipboard.cut'].includes(s))) {
     contract.result(P + suffix, { applied: true, historyEntriesAdded: 1 });
     contract.result(P + suffix, { applied: false, historyEntriesAdded: 0 });
+    // A joined eraser bite applies without a new entry (its request says so: see the correlation test below).
     for (const bad of [{ applied: true, historyEntriesAdded: 0 }, { applied: false, historyEntriesAdded: 1 }, { applied: true, historyEntriesAdded: 1, layerUid: 'x' },
-      { applied: 1, historyEntriesAdded: 1 }, { applied: true }, null, []]) assert.throws(() => contract.result(P + suffix, bad), TypeError, suffix + JSON.stringify(bad));
+      { applied: 1, historyEntriesAdded: 1 }, { applied: true }, null, []].filter((b) => !(suffix === 'boolean.erase' && b && b.applied === true && b.historyEntriesAdded === 0))) assert.throws(() => contract.result(P + suffix, bad), TypeError, suffix + JSON.stringify(bad));
   }
   contract.result(P + 'layer.duplicate', { applied: true, historyEntriesAdded: 1, layerUid: 'native-layer:8:0' });
   for (const bad of [{ applied: true, historyEntriesAdded: 1 }, { applied: false, historyEntriesAdded: 0, layerUid: 'x' }, { applied: true, historyEntriesAdded: 1, layerUid: '' }]) {
     assert.throws(() => contract.result(P + 'layer.duplicate', bad), TypeError);
   }
+});
+
+test('an eraser bite may join the drag\'s history entry: joinHistory is an optional flag and the receipt follows the request', () => {
+  const op = P + 'boolean.erase', base = VALID.find(([s]) => s === 'boolean.erase')[1];
+  contract.payload(op, { ...base, joinHistory: true });
+  contract.payload(op, { ...base, joinHistory: false });
+  assert.throws(() => contract.payload(op, { ...base, joinHistory: 'yes' }), TypeError);
+  assert.throws(() => contract.payload(P + 'boolean.apply', { ...VALID.find(([s]) => s === 'boolean.apply')[1], joinHistory: true }), TypeError, 'only the eraser may join');
+  assert.deepEqual(contract.optionalMembers(op), ['joinHistory']);
+  const request = (payload) => ({ instanceId: 'instance-A', documentId: 'document-A', operation: op, expectedRevision: 7, payload });
+  const reply = (entries, applied = true) => ({ instanceId: 'instance-A', documentId: 'document-A', ok: true, contentRevision: applied ? 8 : 7, result: { applied, historyEntriesAdded: entries } });
+  contract.result(op, { applied: true, historyEntriesAdded: 0 });
+  contract.correlate(request({ ...base, joinHistory: true }), reply(0));
+  contract.correlate(request(base), reply(1));
+  contract.correlate(request({ ...base, joinHistory: true }), reply(0, false));
+  assert.throws(() => contract.correlate(request({ ...base, joinHistory: true }), reply(1)), TypeError, 'a joined bite adds none');
+  assert.throws(() => contract.correlate(request(base), reply(0)), TypeError, 'an ordinary bite adds its entry');
+  assert.throws(() => contract.correlate(request({ ...base, joinHistory: false }), reply(0)), TypeError);
 });
 
 test('the common SDK admits each operation, requires expectedRevision, accepts opaque data: identities, and refuses binary payloads', () => {

@@ -133,7 +133,8 @@
     'layer.split': ['object.layer.split', 'command', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['labels', 'labels']]],
     'clipboard.paste': ['object.clipboard.paste', 'command', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['clip', 'clip']]],
     'boolean.apply': ['object.boolean.apply', 'command', [['mode', 'booleanMode'], ['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['strokeIds', 'strokeIds2']]],
-    'boolean.erase': ['object.boolean.erase', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['strokeId', 'strokeId'], ['footprint', 'footprint']]],
+    // joinHistory: a bite after the first of one drag continues the entry the drag began (one undo per gesture, as the baseline's single pushUndo).
+    'boolean.erase': ['object.boolean.erase', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['strokeId', 'strokeId'], ['footprint', 'footprint']], [['joinHistory', 'flag']]],
     'boolean.flatten': ['object.boolean.flatten', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['groupId', 'groupId']]],
     'fill.trace':['object.fill.trace','command',[['layerUid','uid'],['contextId','contextId'],['frame','frame'],['point','point'],['color','color'],['opacity','opacity'],['remove','flag']]],
     'fill.brush':['object.fill.brush','command',[['layerUid','uid'],['contextId','contextId'],['frame','frame'],['outline','outline'],['color','color'],['opacity','opacity'],['placement','placement'],['mask','mask'],['copies','copies'],['stamps','stamps']]],
@@ -171,7 +172,9 @@
       return;
     }
     exact(value, ['applied', 'historyEntriesAdded'], [], 'object edit result');
-    if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) fail('invalid object edit disposition');
+    // A joined eraser bite applies without a new entry; whether it was joined is the request's (correlate below).
+    const joined = operation === PREFIX + 'boolean.erase' && value.applied === true && value.historyEntriesAdded === 0;
+    if (typeof value.applied !== 'boolean' || !joined && value.historyEntriesAdded !== (value.applied ? 1 : 0)) fail('invalid object edit disposition');
   }
   function correlate(request, response) {
     if (response.instanceId !== request.instanceId) fail('object edit response owner mismatch');
@@ -179,6 +182,7 @@
     if (response.documentId !== request.documentId && !replaced) fail('object edit response document mismatch');
     if (!response.ok) return;
     if (response.contentRevision !== request.expectedRevision + (response.result.applied ? 1 : 0)) fail('object edit receipt revision mismatch');
+    if (request.operation === PREFIX + 'boolean.erase' && response.result.applied && response.result.historyEntriesAdded !== (request.payload.joinHistory === true ? 0 : 1)) fail('eraser history disposition mismatch');
     if (/\.clipboard\.(?:copy|cut)$/.test(request.operation) && response.result.clipboard !== null &&
         ['contextId', 'layerUid', 'frame'].some((key) => response.result.clipboard[key] !== request.payload[key])) fail('clipboard source selector mismatch');
   }

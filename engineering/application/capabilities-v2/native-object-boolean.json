@@ -37,7 +37,7 @@
     "maxReadResponseBytes": 4096,
     "policy": "Complete correlated retained receipt or typed refusal; no document or resource payload. Requests above 4096 encoded bytes are refused, never split."
   },
-  "semantics": "Boolean the operands of one frame (unite, subtract, intersect, exclude), bite a shape with an eraser footprint, or flatten a combined group, as one sealed one-frame transaction. Straight-edged filled operands only; curved, unfilled, locked or Motion-driven operands are typed refusals, never approximations. One revision and one undo entry per applied edit. No JS/Paper/WASM writer or optimistic mutation.",
+  "semantics": "Boolean the operands of one frame (unite, subtract, intersect, exclude), bite a shape with an eraser footprint, or flatten a combined group, as one sealed one-frame transaction. Boolean operands: straight-edged filled only; curved, unfilled, locked or Motion-driven operands are typed refusals, never approximations. An eraser bite also takes curved rings (flattened at 0.25), open strokes (expanded to their outline) and open filled paths, and keys a held cell in the same entry. One revision and one undo entry per applied edit; an eraser bite with joinHistory continues the entry on top of the undo stack instead (one revision, no new entry) so one drag is one undo. No JS/Paper/WASM writer or optimistic mutation.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",

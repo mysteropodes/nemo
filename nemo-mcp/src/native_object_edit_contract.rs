@@ -118,7 +118,7 @@ static SPECS: [(&str, &str, &str); 21] = [
     (
         "boolean.erase",
         "object.boolean.erase",
-        "layerUid:uid contextId:uid frame:frame strokeId:uid footprint:footprint",
+        "layerUid:uid contextId:uid frame:frame strokeId:uid footprint:footprint joinHistory:flag?",
     ),
     (
         "boolean.flatten",
@@ -320,6 +320,14 @@ pub(super) fn result(operation: &str, value: &Value) -> bool {
     }
 }
 
+/// The receipt of `operation` for the request `payload` it answers: a joined eraser bite (`joinHistory`) continues the
+/// drag's undo entry, so it adds none; every other receipt is `result`.
+pub(super) fn result_for(operation: &str, payload: &Value, value: &Value) -> bool {
+    let joined = operation.ends_with(".boolean.erase") && payload.get("joinHistory").and_then(Value::as_bool) == Some(true);
+    !joined && result(operation, value)
+        || joined && exact(value, &["applied", "historyEntriesAdded"], &[]).is_some_and(|v| v["applied"].is_boolean() && v["historyEntriesAdded"] == 0)
+}
+
 /// The receipt advances the revision exactly when it applied one edit.
 pub(crate) fn revision_matches(expected: Option<u64>, revision: u64, value: &Value) -> bool {
     expected.and_then(|before| before.checked_add(u64::from(value["applied"] == true)))
@@ -338,6 +346,7 @@ pub(crate) fn response_matches(
         && response.document_id == request.document_id
         && response.result.as_ref().is_some_and(|value| {
             revision_matches(request.expected_revision, response.content_revision, value)
+                && result_for(&request.operation, &request.payload, value)
                 && clipboard::correlated(request, value)
         })
 }
