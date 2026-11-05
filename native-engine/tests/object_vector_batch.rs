@@ -493,8 +493,7 @@ mod select_transform {
         for (name, ops) in [
             ("singular", vec![reshape("s-a", [1., 2., 2., 4., 0., 0.])]),
             ("missing", vec![reshape("s-x", MOVE)]),
-            ("copy", vec![reshape("s-d", MOVE)]),
-            ("bitmap", vec![reshape("s-b", MOVE)]),
+            // A dab with an anchor, a bitmap anchor and its re-baked companion are covered by object_vector_batch_bitmap.rs.
             ("also-geometry", vec![json!({"op":"reshape","stableTarget":target("L1", 0, "s-a"),"matrix":MOVE,"center":[]})]),
             ("clone", vec![json!({"op":"clone","stableTarget":target("L1", 0, "s-a"),"frame":0,"matrix":MOVE})]),
             ("create", vec![json!({"op":"create","record":record_at("B", "L1", 0, ""),"matrix":MOVE})]),

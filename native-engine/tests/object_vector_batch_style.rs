@@ -369,7 +369,7 @@ fn malformed_styles_and_steps_are_refused_with_nothing_written() {
 }
 
 #[test]
-fn brush_families_the_engine_cannot_restyle_are_refused_by_type_and_a_plain_anchor_width_is_not() {
+fn a_dab_with_its_anchor_and_an_anchors_unfilled_opacity_are_refused_by_type_and_the_rest_re_stamps() {
     let anchor_ext = json!({"brushTexture":{"brushGroupId":"g","brushTexturePreset":"charcoal-pencil","preTextureOpacity":1,"strokeSeed":1}});
     let copy_ext = json!({"brushTexture":{"brushGroupId":"g","isBrushTextureCopy":true}});
     let with = |id: &str, ext: &Value| {
@@ -383,6 +383,7 @@ fn brush_families_the_engine_cannot_restyle_are_refused_by_type_and_a_plain_anch
         vec![with("anchor", &anchor_ext), with("copy", &copy_ext)],
         None,
     );
+    // A dab follows its anchor, so it is not restyled alone; an anchor's opacity with no fill would un-hide its outline.
     refused(
         &with_copy,
         vec![restyle("copy", json!({"width":3}))],
@@ -390,20 +391,18 @@ fn brush_families_the_engine_cannot_restyle_are_refused_by_type_and_a_plain_anch
     );
     refused(
         &anchor_only,
-        vec![restyle("anchor", json!({"stroke":"#ff0000"}))],
-        "unavailable",
-    );
-    refused(
-        &with_copy,
-        vec![restyle("anchor", json!({"width":3}))],
-        "unavailable",
-    );
-    refused(
-        &anchor_only,
         vec![restyle("anchor", json!({"opacity":0.5}))],
         "unavailable",
     );
+    // A stroke colour is the dabs' ink and a width their size: the seeded anchor paints them natively, the stored ones are stamped again.
     let mut owner = owner_of(&anchor_only);
+    let r = send(
+        &mut owner,
+        "ink",
+        batch(vec![restyle("anchor", json!({"stroke":"#ff0000"}))]),
+    );
+    assert_eq!(r["ok"], true, "{r}");
+    assert_eq!(at(&owner, "anchor")["vector"]["stroke"]["r"], 1);
     let r = send(
         &mut owner,
         "anchor",
@@ -414,6 +413,18 @@ fn brush_families_the_engine_cannot_restyle_are_refused_by_type_and_a_plain_anch
         "an anchor whose copies the engine paints follows its width: {r}"
     );
     assert_eq!(at(&owner, "anchor")["vector"]["strokeWidth"], 9);
+    let mut owner = owner_of(&with_copy);
+    let r = send(
+        &mut owner,
+        "restamp",
+        batch(vec![restyle("anchor", json!({"width":3}))]),
+    );
+    assert_eq!(r["ok"], true, "{r}");
+    assert_eq!(
+        objects(&state(&owner)).len(),
+        1,
+        "the stored dab is stamped again, not kept at the old size"
+    );
 }
 
 #[test]

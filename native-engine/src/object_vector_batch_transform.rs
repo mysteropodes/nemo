@@ -4,9 +4,13 @@
 //! companions: a pressure ribbon's centreline is mapped (its widths follow the mean axis scale) and the outline rebuilt
 //! from it with the stored width profile, the ribbon's linked fill is re-synced to that centreline, a texture anchor
 //! takes its stamped copies (dabs) with it, a gradient fill takes its end points, and a dynamic shape goes through the
-//! translate / scale kernels so its box and rect radii stay consistent. A bitmap brush derives its image from a baked
-//! PNG and is refused. The result is the list of records to replace, in the cell the target names.
+//! translate / scale kernels so its box and rect radii stay consistent. A bitmap brush anchor takes the affine (its centreline and
+//! its stored pressure profile) and the batch re-bakes its companion image from the mapped anchor in the same revision
+//! (`object_vector_batch_rebake.rs`; baseline `SMBitmapBrush.regenerate` after a transform). A stored dab copy is mapped as a plain
+//! record only when its anchor is gone (the baseline resolved a dab to its anchor, which moves them together).
+//! The result is the list of records to replace, in the cell the target names.
 use crate::commands::object_fill_owner::parametric_edit;
+use crate::commands::object_fill_owner::vector_edit::batch_ops::dabs;
 use crate::commands::object_fill_owner::vector_edit::batch_ops::ribbon;
 use crate::commands::object_fill_owner::vector_edit::is_vector_record;
 use crate::object_document::{CenterSegment, ObjectDocument, ObjectGeometry, ObjectPoint, ObjectRecord, ObjectTarget, Presence, VectorExt};
@@ -72,6 +76,20 @@ fn turn_box(record: &mut ObjectRecord, m: &[f64; 6]) -> Result<(), DispatchError
     record.vector_ext = if ext.is_empty() { Presence::Missing } else { Presence::Present(ext) };
     Ok(())
 }
+/// A bitmap brush's stored pressure profile is a cloud of `[x, y, pressure]` samples looked up by position: it follows the anchor so a move
+/// keeps the stroke's look (the baseline left it where it was, which re-baked a moved pressure stroke flat).
+fn map_bitmap_profile(record: &mut ObjectRecord, m: &[f64; 6]) -> Result<(), DispatchErrorCode> {
+    let Some(fields) = record.vector_ext.value_mut().and_then(|e| e.bitmap_brush.value_mut()) else {
+        return Ok(());
+    };
+    if let Some(profile) = fields.bitmap_pressure_profile.value_mut() {
+        for sample in profile {
+            let [x, y] = [sample[0].as_f64().ok_or(DispatchErrorCode::InvalidRequest)?, sample[1].as_f64().ok_or(DispatchErrorCode::InvalidRequest)?];
+            (sample[0], sample[1]) = (num(m[0] * x + m[2] * y + m[4])?, num(m[1] * x + m[3] * y + m[5])?);
+        }
+    }
+    Ok(())
+}
 fn same_cell(a: &ObjectRecord, t: &ObjectTarget) -> bool {
     a.target.context_id == t.context_id && a.target.layer_uid == t.layer_uid && a.target.frame_scope == t.frame_scope
 }
@@ -89,11 +107,9 @@ pub(super) fn transform(source: &ObjectDocument, target: &ObjectTarget, m: [f64;
         return Err(InvalidRequest);
     }
     let ext = existing.vector_ext.value();
-    if ext.is_some_and(|e| !e.bitmap_brush.missing()) {
-        return Err(DispatchErrorCode::Unavailable);
-    }
     let texture = ext.and_then(|e| e.brush_texture.value());
-    if texture.is_some_and(|t| t.is_brush_texture_copy.value() == Some(&true)) {
+    if texture.is_some_and(|t| t.is_brush_texture_copy.value() == Some(&true)) && dabs::has_anchor(source, existing) {
+        // The anchor moves its dabs; a dab named on its own would part from it.
         return Err(InvalidRequest);
     }
     let pressure = ext.and_then(|e| e.pressure.value()).filter(|p| !p.center_segments.missing());
@@ -135,13 +151,15 @@ pub(super) fn transform(source: &ObjectDocument, target: &ObjectTarget, m: [f64;
                     }
                 }
             }
+            map_bitmap_profile(&mut moved, &m)?;
             turn_box(&mut moved, &m)?;
             out.push(moved);
         }
     }
     // A fill that was not re-synced above (a ribbon without a rebuilt outline) and the stamped copies follow the same affine.
     let link = ext.and_then(|e| e.linked_fill_id.value());
-    let group = texture.and_then(|t| t.brush_group_id.value());
+    // Only an anchor brings the dabs of its group; a dab without its anchor moves alone.
+    let group = texture.filter(|t| t.is_brush_texture_copy.value() != Some(&true)).and_then(|t| t.brush_group_id.value());
     for record in source.objects.iter().filter(|r| same_cell(r, target) && r.target != *target && is_vector_record(r)) {
         let other = record.vector_ext.value();
         let fill = !fill_done && link.is_some() && other.is_some_and(|e| e.is_linked_fill_companion.value() == Some(&true) && e.linked_fill_id.value() == link);
