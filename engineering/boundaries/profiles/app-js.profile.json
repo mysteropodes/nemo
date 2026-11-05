@@ -2961,7 +2961,6 @@
         "native-layer-list-presenter.js",
         "native-object-ui.js",
         "native-layer-range-desktop.js",
-        "native-layer-range-menu.js",
         "native-layer-playhead-cut-ui.js",
         "native-component-expose-ui.js"
       ],
@@ -2969,7 +2968,6 @@
       "publicApi": [
         "native-object-ui.js",
         "native-layer-range-desktop.js",
-        "native-layer-range-menu.js",
         "native-layer-playhead-cut-ui.js",
         "native-component-expose-ui.js"
       ]
@@ -3617,11 +3615,13 @@
       "dir": "src/js/adapters",
       "files": [
         "native-layer-parent.js",
+        "native-layer-range-menu.js",
         "native-motion-layer-link-rows.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-layer-parent.js",
+        "native-layer-range-menu.js",
         "native-motion-layer-link-rows.js"
       ]
     },

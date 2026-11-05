@@ -150,6 +150,9 @@ impl NativeObjectHistory {
 #[path = "../tests/object_layer_color_set.rs"]
 mod object_layer_color_set;
 #[cfg(test)]
+#[path = "../tests/object_layer_range_arrange.rs"]
+mod object_layer_range_arrange;
+#[cfg(test)]
 #[path = "../tests/object_layer_kind_create.rs"]
 mod object_layer_kind_create;
 #[cfg(all(test, feature = "export_job"))]

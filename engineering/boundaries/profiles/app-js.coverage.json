@@ -5111,7 +5111,7 @@
     },
     {
       "path": "src/js/adapters/native-layer-range-menu.js",
-      "moduleId": "app.native.object.ui.adapter",
+      "moduleId": "app.native.layer-parent.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {

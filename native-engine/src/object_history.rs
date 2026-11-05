@@ -175,9 +175,6 @@ mod object_layer_follow_path_set;
 #[path = "../tests/object_layer_link_set.rs"]
 mod object_layer_link_set;
 #[cfg(test)]
-#[path = "../tests/object_layer_range_arrange.rs"]
-mod object_layer_range_arrange;
-#[cfg(test)]
 #[path = "../tests/object_layer_parent_set.rs"]
 mod object_layer_parent_set;
 // #2372: Parent A under a rotated or scaled ancestor, checked against the real renderer's world points.

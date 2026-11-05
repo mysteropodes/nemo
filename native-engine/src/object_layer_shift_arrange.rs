@@ -132,7 +132,10 @@ fn sorted_by_in(bars: &[Bar]) -> Vec<&Bar> {
     sorted
 }
 
-fn reset(mut document: ObjectDocument, uids: &[String]) -> Result<ObjectDocument, DispatchErrorCode> {
+fn reset(
+    mut document: ObjectDocument,
+    uids: &[String],
+) -> Result<ObjectDocument, DispatchErrorCode> {
     for uid in uids {
         let at = document
             .layers
@@ -200,7 +203,10 @@ pub(crate) fn plan_arrange_json(
     let mut next = document.clone();
     match action {
         Action::AlignLeft => {
-            let min_in = items.iter().map(|b| b.edges[0]).fold(f64::INFINITY, f64::min);
+            let min_in = items
+                .iter()
+                .map(|b| b.edges[0])
+                .fold(f64::INFINITY, f64::min);
             for bar in &items {
                 next = place(origin, next, frame, &bar.uid, |_| min_in)?;
             }
