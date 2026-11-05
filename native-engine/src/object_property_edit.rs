@@ -20,6 +20,8 @@ mod control_edit;
 mod curves;
 #[path = "object_property_expression_edit.rs"]
 mod expression_edit;
+#[path = "object_property_key_batch.rs"]
+mod key_batch;
 #[path = "object_property_preset_apply.rs"]
 mod preset_apply;
 #[path = "object_property_track_edit.rs"]

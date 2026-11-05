@@ -135,7 +135,7 @@
         var track=position.track,key=position.key,row=w.rows[position.index];if(row.hidden)return;
         var node=root.document.createElement('button');node.type='button';node.className='motion-key layer-inout-key native-motion-property-key';
         Object.assign(node.style,{position:'absolute',left:position.left+'px',top:position.top+'px',padding:'0',cursor:'pointer',zIndex:'7'});
-        node.dataset.frame=String(key.frame);node.dataset.keyTrack=trackIdentity(track);node.classList.toggle('sel',key.selected);
+        node.dataset.frame=String(key.frame);node.dataset.keyTrack=trackIdentity(track);node.dataset.selected=String(key.selected);node.classList.toggle('sel',key.selected);
         node.setAttribute('aria-label',track.property+' key at frame '+String(key.frame));node.setAttribute('aria-pressed',String(key.selected));
         if(track.inert){node.disabled=true;node.style.pointerEvents='none';row.appendChild(node);w.keyNodes.push(node);return;}
         function choose(event){
@@ -143,16 +143,44 @@
           try{
             var live=w.keyValue;
             if(root.state.appMode!=='motion'||node.parentNode!==row||w.rows[position.index]!==row||root.FC!==fc||w.down||w.marquee||!ready(root,session(root),w.info)||!live||live.frame!==root.state.currentFrame||!live.isCurrent())throw Error('Stale native key selection');
-            var keys=event.ctrlKey||event.metaKey||event.shiftKey?selectedAddresses(live):[],address=keyAddress(track,key.frame),id=JSON.stringify(address);
+            var modified=event.ctrlKey||event.metaKey||event.shiftKey;
+            // A plain press on an already selected key keeps the group, so it can be dragged as one (baseline onDragMove).
+            var keys=modified||key.selected?selectedAddresses(live):[],address=keyAddress(track,key.frame),id=JSON.stringify(address);
             var at=keys.findIndex(function(k){return JSON.stringify(k)===id;});if(at>=0&&(event.ctrlKey||event.metaKey))keys.splice(at,1);else if(at<0)keys.push(address);
             if(live.selectKeys(keys)!==true)throw Error('Native key selection refused');refreshKeys(root);
+            if(!modified&&event.detail!==0)dragKeys(root,w,fc,event);
           }catch(_){notice(root,'Native key selection is unavailable or stale.');}
         }
         node.addEventListener('mousedown',choose);node.addEventListener('click',function(event){if(event.detail===0)choose(event);});
+        node.addEventListener('contextmenu',function(event){keyMenu(root,w,track,key,event);});
         row.appendChild(node);w.keyNodes.push(node);
       });
       w.keySig=signature;
     }catch(_){clearKeys(w);try{keyRows(root,w,[]);}catch(_){}notice(root,'Native key timeline coordinates are unavailable.');}
+  }
+  // #2524: dragging selected keys previews a shift and commits ONE native shift on release (baseline motion.js onDragMove/onDragUp).
+  function dragKeys(root,w,fc,event){
+    var gesture=root.NemoNativeMotionKeyGesture;if(!gesture||!w.ports||typeof w.ports.editSelectedKeys!=='function'||w.keyDrag)return;
+    w.keyDrag=gesture.beginDrag({doc:root.document,startX:event.clientX,fc:fc,total:w.info.totalFrames,edit:w.ports.editSelectedKeys,
+      nodes:function(){return (w.keyNodes||[]).filter(function(n){return n.dataset.selected==='true';});},
+      tracks:function(){try{var v=keyViews(root,w);return v&&v.tracks;}catch(_){return null;}},onEnd:function(){w.keyDrag=null;}});
+  }
+  // The key menu acts on a selection read when it opened; a click after the selection changed commits nothing.
+  function keyMenu(root,w,track,key,event){
+    event.preventDefault();event.stopPropagation();
+    try{
+      var gesture=root.NemoNativeMotionKeyGesture,live=keyViews(root,w),edit=w.ports&&w.ports.editSelectedKeys;
+      if(!gesture||typeof root.showContextMenu!=='function'||typeof edit!=='function'||!live||!ready(root,session(root),w.info))throw Error('Native key menu unavailable');
+      var address=keyAddress(track,key.frame);
+      if(!key.selected){if(live.selectKeys([address])!==true)throw Error('Native key selection refused');refreshKeys(root);live=keyViews(root,w);}
+      var opened=JSON.stringify(selectedAddresses(live));
+      function same_(){var now=keyViews(root,w);return !!now&&JSON.stringify(selectedAddresses(now))===opened&&now.isCurrent()===true;}
+      var ctx={view:live,hold:key.hold===true,toast:function(m){notice(root,m);},refresh:function(){refreshKeys(root);},
+        prompt:function(m,d){return typeof root.prompt==='function'?root.prompt(m,d):null;},
+        edit:function(action){if(!same_()){notice(root,'Native key selection changed; open the key menu again.');return false;}return edit(action);},
+        selectOnly:function(){if(!same_()||live.selectKeys([address])!==true)return false;var now=keyViews(root,w);opened=JSON.stringify(selectedAddresses(now));return true;}};
+      root.showContextMenu(event.clientX,event.clientY,gesture.menuItems(root,ctx));
+    }catch(_){notice(root,'Native key menu is unavailable or stale.');}
   }
   function marqueeKeys(root,w,m,x0,y0,x1,y1){
     var value=keyViews(root,w);
@@ -167,7 +195,7 @@
     if(value.selectKeys(keys)!==true)throw Error('Native key marquee refused');
     m.keyView=keyViews(root,w);if(keyIdentity(m.keyView)!==m.keyIdentity)throw Error('Native key marquee changed view');refreshKeys(root);
   }
-  function cancel(root){var w=works.get(root);if(w&&w.marquee){var m=w.marquee;w.marquee=null;if(m.rect.parentNode)m.rect.parentNode.removeChild(m.rect);}if(w&&w.capture){w.capture.valid=false;w.capture=null;}if(w)w.down=false;}
+  function cancel(root){var w=works.get(root);if(w&&w.keyDrag)w.keyDrag.cancel();if(w&&w.marquee){var m=w.marquee;w.marquee=null;if(m.rect.parentNode)m.rect.parentNode.removeChild(m.rect);}if(w&&w.capture){w.capture.valid=false;w.capture=null;}if(w)w.down=false;}
   function retire(root){var w=works.get(root);if(!w)return;cancel(root);clearKeys(w);try{keyRows(root,w,[]);}catch(_){}w.serial++;w.rows=[];if(w.node&&w.node.parentNode)w.node.parentNode.removeChild(w.node);w.node=null;w.grid=null;}
   function selection(root,w,li,part,event){
     var info=w.info,uid=info.layers[li].layerUid,values=bars(root,info)||[];

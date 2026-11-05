@@ -36,6 +36,13 @@ fn action(value: &Value) -> bool {
         Some("lockTo") => exact(value, &["kind", "mode"], &[]).is_some_and(|a| {
             a["mode"].is_null() || matches!(a["mode"].as_str(), Some("in" | "out" | "layer"))
         }),
+        // #2524: whole-selection key batches; `delta` is a whole number of frames.
+        Some("shift") => exact(value, &["kind", "delta"], &[]).is_some_and(|a| {
+            a["delta"]
+                .as_i64()
+                .is_some_and(|d| (-1_000_000..=1_000_000).contains(&d))
+        }),
+        Some("delete" | "flip" | "distribute") => exact(value, &["kind"], &[]).is_some(),
         _ => false,
     }
 }

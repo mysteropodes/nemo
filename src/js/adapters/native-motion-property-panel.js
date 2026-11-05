@@ -6,9 +6,10 @@
   var api=factory(typeof module==='object'&&module.exports?require('./native-motion-property-view.js'):root.NemoNativeMotionPropertyView,
     typeof module==='object'&&module.exports?require('./native-motion-property-keys.js'):root.NemoNativeMotionPropertyKeys,
     typeof module==='object'&&module.exports?require('./native-motion-property-value.js'):root.NemoNativeMotionPropertyValue,
-    typeof module==='object'&&module.exports?require('./native-motion-expression-editor.js'):root.NemoNativeMotionExpressionEditor);
+    typeof module==='object'&&module.exports?require('./native-motion-expression-editor.js'):root.NemoNativeMotionExpressionEditor,
+    typeof module==='object'&&module.exports?require('./native-motion-key-edit.js'):root.NemoNativeMotionKeyEdit);
   if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeMotionPropertyPanel=api;
-}(typeof globalThis==='object'?globalThis:this,function(View,Keys,Value,Expr){
+}(typeof globalThis==='object'?globalThis:this,function(View,Keys,Value,Expr,KeyEdit){
   'use strict';
   var shortcuts={p:'position',a:'anchor',r:'rotation',s:'scale',t:'opacity'};
   // Baseline propsFor() order (motion.js PROPS / PROPS_WITH_3D); anything else keeps its native order after these.
@@ -95,6 +96,17 @@
       if(!entry)entry=keyEditors.find(function(item){return item.id===null;})||makeKeyEditor();
       if(!entry)return false;entry.id=id;entry.property=property;entry.target=target;keyEditor=entry.editor;place(entry);return entry.editor.open(target,property);
     }
+    // #2524: a drawer closed by the refresh after a write is reopened with its selection; the keys editor reads it back from the native owner.
+    async function reopenKeys(target,property,frames){
+      if(retired||!validAccepted()||await openKeys(target,property)!==true)return false;
+      var entry=keyEditors.find(function(item){return item.id===rowId(target,property);}),view=entry&&entry.editor.readKeyTimeline();
+      var wanted=view?frames.filter(function(frame){return view.items.some(function(k){return k.frame===frame;});}):[];
+      return !!view&&(!wanted.length||view.selectFrames(wanted));
+    }
+    var keyEdit=KeyEdit&&typeof KeyEdit.createEditor==='function'?KeyEdit.createEditor({readKeyTimelines:function(){return readKeyTimelines();},translate:tr,reopen:reopenKeys,
+      localKeys:function(){return [serial].concat(keyEditors.filter(function(entry){return entry.id!==null;}).map(function(entry){return [entry.id,entry.editor.selectionKey()];}));},
+      get editPropertyTrack(){return ports.editPropertyTrack;},notify:function(message){if(typeof ports.showToast==='function')ports.showToast(message);else notify(message);}}):null;
+    function editKeys(action){return keyEdit&&typeof ports.editPropertyTrack==='function'&&!retired&&validAccepted()?keyEdit.edit(action):Promise.resolve(false);}
     function readKeyTimelines(){
       if(retired||!validAccepted())return null;
       var entries=keyEditors.filter(function(entry){return entry.id!==null;}),views=entries.map(function(entry){return entry.editor.readKeyTimeline();});
@@ -398,11 +410,11 @@
     button('Cancel',cancel);
     function setSearch(value){if(retired)return false;search=String(value||'').toLowerCase();return paint();}
     container.addEventListener('keydown',onKey);readPreference();
-    return Object.freeze({refresh:refresh,notice:notify,setFilter:setFilter,setSearch:setSearch,select:function(target){return validAccepted()?select(target,accepted.token,serial,accepted.selection.signature,false):Promise.resolve(false);},reveal:reveal,revealContent:revealContent,refuseReveal:function(){notify('This Motion reveal is unavailable.');return false;},cancel:cancel,dispose:dispose,element:section,readKeyTimeline:function(){return !retired&&validAccepted()&&keyEditor?keyEditor.readKeyTimeline():null;},readKeyTimelines:readKeyTimelines,captureSelectedKeys:captureSelectedKeys});
+    return Object.freeze({refresh:refresh,notice:notify,setFilter:setFilter,setSearch:setSearch,select:function(target){return validAccepted()?select(target,accepted.token,serial,accepted.selection.signature,false):Promise.resolve(false);},reveal:reveal,revealContent:revealContent,refuseReveal:function(){notify('This Motion reveal is unavailable.');return false;},cancel:cancel,dispose:dispose,element:section,readKeyTimeline:function(){return !retired&&validAccepted()&&keyEditor?keyEditor.readKeyTimeline():null;},readKeyTimelines:readKeyTimelines,captureSelectedKeys:captureSelectedKeys,editKeys:editKeys});
   }
   function createCaller(ports){var panel=null,retired=false;
     async function update(force){if(retired)return false;if(!ports.isMotion()){if(panel)panel.dispose();panel=null;return false;}if(!panel)panel=create(ports.container,ports);return panel.refresh(force);}
-    return Object.freeze({update:update,notice:function(message){if(panel&&!retired)panel.notice(message);},shortcut:function(k,shift){if(retired||!ports.isMotion())return Promise.resolve(false);if(!panel)panel=create(ports.container,ports);k=String(k).toLowerCase();return shortcuts[k]?panel.reveal(shortcuts[k],!!shift):k==='u'?panel.revealContent():['e','m'].includes(k)?Promise.resolve(panel.refuseReveal()):Promise.resolve(false);},readKeyTimeline:function(){return !retired&&ports.isMotion()&&panel?panel.readKeyTimeline():null;},readKeyTimelines:function(){return !retired&&ports.isMotion()&&panel?panel.readKeyTimelines():null;},captureSelectedKeys:function(){return !retired&&panel?panel.captureSelectedKeys():null;},isMounted:function(){return !panel||panel.element.parentNode===ports.container;},setFilter:function(mode){return panel?panel.setFilter(mode):false;},setSearch:function(value){return panel?panel.setSearch(value):false;},select:function(target){return panel?panel.select(target):Promise.resolve(false);},cancel:function(){return panel?panel.cancel():false;},dispose:function(){retired=true;if(panel)panel.dispose();panel=null;}});
+    return Object.freeze({update:update,notice:function(message){if(panel&&!retired)panel.notice(message);},shortcut:function(k,shift){if(retired||!ports.isMotion())return Promise.resolve(false);if(!panel)panel=create(ports.container,ports);k=String(k).toLowerCase();return shortcuts[k]?panel.reveal(shortcuts[k],!!shift):k==='u'?panel.revealContent():['e','m'].includes(k)?Promise.resolve(panel.refuseReveal()):Promise.resolve(false);},readKeyTimeline:function(){return !retired&&ports.isMotion()&&panel?panel.readKeyTimeline():null;},readKeyTimelines:function(){return !retired&&ports.isMotion()&&panel?panel.readKeyTimelines():null;},captureSelectedKeys:function(){return !retired&&panel?panel.captureSelectedKeys():null;},editKeys:function(action){return !retired&&ports.isMotion()&&panel?panel.editKeys(action):Promise.resolve(false);},isMounted:function(){return !panel||panel.element.parentNode===ports.container;},setFilter:function(mode){return panel?panel.setFilter(mode):false;},setSearch:function(value){return panel?panel.setSearch(value):false;},select:function(target){return panel?panel.select(target):Promise.resolve(false);},cancel:function(){return panel?panel.cancel():false;},dispose:function(){retired=true;if(panel)panel.dispose();panel=null;}});
   }
   return Object.freeze({create:create,createCaller:createCaller});
 }));

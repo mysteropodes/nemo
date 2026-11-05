@@ -41,7 +41,7 @@ test('D12 descriptor declares the exact existing native operation and closed sel
   assert.equal(shape.properties.selections.maxItems, 32);
   assert.equal(shape.properties.selections.items.additionalProperties, false);
   assert.equal(shape.properties.selections.items.properties.target.additionalProperties, false);
-  assert.deepEqual(shape.properties.action.oneOf.map(a => a.properties.kind.const), ['preset', 'influence', 'subdivide', 'lockTo']);
+  assert.deepEqual(shape.properties.action.oneOf.map(a => a.properties.kind.const), ['preset', 'influence', 'subdivide', 'lockTo', 'shift', 'delete', 'flip', 'distribute']);
   for (const example of descriptor.examples) {
     assert.doesNotThrow(() => SDK.validateRequest(example.request));
     assert.doesNotThrow(() => SDK.validateResponse(example.response, example.request.requestId, OP));
@@ -53,6 +53,8 @@ test('SDK reaches the authority with every preset, influence edge, subdivision a
   for (const side of ['in', 'out']) for (const percent of [-1, 0, 50.5, 100, 101]) actions.push({kind:'influence', side, percent});
   actions.push({kind:'subdivide'});
   for (const mode of ['in', 'out', 'layer', null]) actions.push({kind:'lockTo', mode});
+  for (const delta of [-1000000, -1, 0, 3, 1000000]) actions.push({kind:'shift', delta});
+  for (const kind of ['delete', 'flip', 'distribute']) actions.push({kind});
   for (const action of actions) {
     const q = request(action);
     q.payload.selections[0].target.strokeId = 'blob:authored element 雪';
@@ -96,6 +98,14 @@ test('SDK rejects open, missing, null and positional shapes before any dispatch'
     q => q.payload.action = {kind:'lockTo', mode:''},
     q => q.payload.action = {kind:'lockTo', mode:true},
     q => q.payload.action = {kind:'lockTo', mode:'in', extra:0},
+    q => q.payload.action = {kind:'shift'},
+    q => q.payload.action = {kind:'shift', delta:1.5},
+    q => q.payload.action = {kind:'shift', delta:'2'},
+    q => q.payload.action = {kind:'shift', delta:1000001},
+    q => q.payload.action = {kind:'shift', delta:1, extra:0},
+    q => q.payload.action = {kind:'delete', keep:true},
+    q => q.payload.action = {kind:'flip', times:2},
+    q => q.payload.action = {kind:'distribute', mode:'even'},
   ];
   let calls = 0;
   const port = adapter(() => { calls++; });

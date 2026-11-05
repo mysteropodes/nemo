@@ -300,3 +300,46 @@ test('a native video placement\'s Time Remap keys draw as one inert lane from it
  h.root.SM={};Range.refreshKeys(h.root);assert.equal(h.keyNodes().length,0);
  assert.equal(h.commands().length,0);assert.equal(h.legacy(),0);
 });
+
+// #2524 / #2377: a plain press on a selected key keeps the group and drags it; the key menu acts on its opened selection.
+const KeyGesture = require('../src/js/adapters/native-motion-key-gesture.js');
+test('dragging a selected key group previews one shift and commits it on release; a plain press keeps the group', async () => {
+  const h = await harness({ propertyKeys: [2.25, 7, 10.5] });
+  const edits = []; h.root.NemoNativeMotionKeyGesture = KeyGesture; h.ports.editSelectedKeys = (a) => { edits.push(a); return Promise.resolve(true); };
+  h.keyNodes()[0].fire('mousedown', { button: 0 }); h.keyNodes()[1].fire('mousedown', { button: 0, ctrlKey: true });
+  assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map((k) => k.frame), [2.25, 7]);
+  h.keyNodes()[0].fire('mousedown', { button: 0, clientX: 100 });
+  assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map((k) => k.frame), [2.25, 7], 'the press on a selected key does not collapse the selection');
+  h.doc.fire('mousemove', { clientX: 130 });
+  const preview = h.keyNodes().filter((n) => n.classes.has('sel')).map((n) => n.style.transform);
+  assert.deepEqual(preview, ['translateX(30px)', 'translateX(30px)']);
+  assert.deepEqual(edits, [], 'nothing is written while dragging');
+  h.doc.fire('mouseup', { clientX: 130 });
+  assert.deepEqual(edits, [{ kind: 'shift', delta: 3 }]);
+  assert.ok(h.keyNodes().every((n) => !n.style.transform));
+  assert.equal(h.commands().length, 0);
+  // A plain press on an UNselected key still selects just that key.
+  h.keyNodes()[2].fire('mousedown', { button: 0, clientX: 100 }); h.doc.fire('mouseup', { clientX: 100 });
+  assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map((k) => k.frame), [10.5]);
+  assert.equal(edits.length, 1, 'a click without movement writes nothing');
+});
+
+test('the key context menu selects an unselected key first and refuses a click after the selection changed', async () => {
+  const h = await harness({ propertyKeys: [2.25, 7, 10.5] });
+  const edits = []; h.root.NemoNativeMotionKeyGesture = KeyGesture; h.ports.editSelectedKeys = (a) => { edits.push(a); return Promise.resolve(true); };
+  h.keyNodes()[1].fire('contextmenu', { clientX: 40, clientY: 50, button: 2 });
+  assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map((k) => k.frame), [7]);
+  const menu = h.root.menus.pop();
+  assert.deepEqual([menu.x, menu.y], [40, 50]);
+  assert.equal(menu.items[0].label, 'Delete this key');
+  menu.items.find((i) => i.label === 'Easy Ease  (F9)').action();
+  assert.deepEqual(edits, [{ kind: 'preset', preset: 'ease' }]);
+  // The selection moves on after the menu opened: the stale item commits nothing.
+  h.keyNodes()[1].fire('contextmenu', { clientX: 1, clientY: 2, button: 2 });
+  const stale = h.root.menus.pop();
+  h.keyNodes()[0].fire('mousedown', { button: 0, ctrlKey: true });
+  edits.length = 0; h.root.notices.length = 0;
+  stale.items.find((i) => i.label === 'Linear  (Cmd+Alt+K)').action();
+  assert.deepEqual(edits, []);
+  assert.match(h.root.notices.join('|'), /selection changed/);
+});

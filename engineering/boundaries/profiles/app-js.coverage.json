@@ -4810,6 +4810,30 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-motion-key-edit.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2477,
+          "scriptOrdinal": 150
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-motion-key-gesture.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2477,
+          "scriptOrdinal": 150
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-motion-property-keys.js",
       "moduleId": "app.native.motion.properties.adapter",
       "executionClass": "document-classic",

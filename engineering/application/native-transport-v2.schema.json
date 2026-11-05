@@ -10901,6 +10901,61 @@
                   ]
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "delta"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "shift"
+                },
+                "delta": {
+                  "description": "Whole frames to move every selected key (nudge or drag release); zero changes nothing. All selected keys move together or none does: a key may not land before frame 0, past the last frame or on a key that stays.",
+                  "type": "integer",
+                  "minimum": -1000000,
+                  "maximum": 1000000
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "delete"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "flip"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "distribute"
+                }
+              }
             }
           ]
         }
