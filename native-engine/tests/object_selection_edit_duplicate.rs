@@ -9,6 +9,10 @@ use super::object_selection_edit_tests::{
 };
 use serde_json::{json, Value};
 
+// The Alt-drag compound clones (ribbon + linked fill, bitmap raster) live beside these in their own file.
+#[path = "object_selection_alt_drag.rs"]
+mod object_selection_alt_drag;
+
 fn ids(values: &[&str]) -> Vec<String> {
     values.iter().map(|id| id.to_string()).collect()
 }

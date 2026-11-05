@@ -1,7 +1,9 @@
 //! A-select-alt-drag-duplicate: an Alt-drag duplicate (`object.selection.duplicate` with an `offset`) clones the whole compound by the drag distance on both
 //! axes, through the same L02-C kernel as Cmd+D: a pressure ribbon's centreline and its linked fill, and a bitmap brush's raster beside its anchor.
-use super::object_linked_fill_codec::linked_document;
-use super::object_selection_edit_tests::{apply, bytes, duplicate, owner_of, value};
+use crate::history::object_history::object_linked_fill_codec::linked_document;
+use crate::history::object_history::object_selection_edit_tests::{
+    apply, bytes, duplicate, owner_of, value,
+};
 use crate::object_codec::{decode_storage_project, encode_storage_project};
 use crate::object_document::object_group_kernels::{
     object_selection_compound as compound, object_selection_compound_clones::apply_compound_clones,
