@@ -126,16 +126,8 @@ impl Ctx {
     }
 }
 
-/// Optional metadata groups, in the order the host bisects them when the native codec refuses the whole file.
-pub const OPTIONAL_GROUPS: [&str; 7] = [
-    "customBrushPresets",
-    "comments",
-    "cameraKeys",
-    "markers",
-    "guides",
-    "palettes",
-    "shadowPalette",
-];
+/// Optional metadata groups, the order the host bisects them in when the native codec refuses the whole file.
+pub const OPTIONAL_GROUPS: &[&str] = project::PASS_THROUGH;
 
 /// A baseline project: a JSON object without a `format` member that holds `layers` or the oldest `frames`.
 pub fn looks_like_legacy_project(bytes: &[u8]) -> bool {

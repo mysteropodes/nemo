@@ -7,8 +7,9 @@ pub(super) struct Settings {
     pub(super) metadata: Value,
 }
 
-/// Members copied verbatim into the envelope; the strict native codec validates their shape.
-const PASS_THROUGH: &[&str] = &[
+/// Members copied verbatim into the envelope; the strict native codec validates their shape. All are editor metadata, so
+/// a member the codec refuses is dropped with a warning instead of refusing the drawing.
+pub(super) const PASS_THROUGH: &[&str] = &[
     "bpm",
     "bpmOffset",
     "bpmShow",

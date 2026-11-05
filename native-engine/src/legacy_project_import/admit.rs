@@ -15,14 +15,14 @@ pub fn convert_admitted(bytes: &[u8]) -> Result<Converted, LegacyImportError> {
         return Ok(first);
     }
     for group in OPTIONAL_GROUPS {
-        let alone = convert_omitting(bytes, &[group])?;
+        let alone = convert_omitting(bytes, &[*group])?;
         if admitted(&alone.project_file) {
             return Ok(alone);
         }
     }
     let mut dropped = Vec::new();
     for group in OPTIONAL_GROUPS {
-        dropped.push(group);
+        dropped.push(*group);
         let next = convert_omitting(bytes, &dropped)?;
         if admitted(&next.project_file) {
             return Ok(next);

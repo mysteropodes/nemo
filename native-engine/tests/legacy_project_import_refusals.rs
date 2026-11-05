@@ -303,6 +303,26 @@ fn a_rejected_group_is_dropped_with_a_warning_and_a_rejected_drawing_refuses() {
         converted.report.warnings
     );
     assert!(NativeObjectHistory::from_project_file("x", &converted.project_file).is_ok());
+    // Two refused groups at once are both dropped, each named; the drawing itself is untouched.
+    bad["perspectiveVPs"] = json!("not a list");
+    bad["comments"] = json!({"not": "a list"});
+    let both =
+        convert_admitted(bad.to_string().as_bytes()).unwrap_or_else(|e| panic!("{}", e.message()));
+    let dropped: Vec<&str> = both
+        .report
+        .warnings
+        .iter()
+        .filter(|w| w.code == "not_carried_over")
+        .map(|w| w.path.as_str())
+        .collect();
+    assert!(
+        dropped.contains(&"perspectiveVPs") && dropped.contains(&"comments"),
+        "{dropped:?}"
+    );
+    assert_eq!(
+        file(&both)["drawing"]["objects"].as_array().unwrap().len(),
+        4
+    );
 }
 
 #[test]
