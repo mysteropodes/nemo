@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "0b4aa3d83d8d6ed3edc1bc17e8afa1f977dad7a7",
-  "describe": "v0.7.0-alpha.4-5175-g0b4aa3d83-dirty"
+  "head": "77c685254fd36d6754640d33003fed208acf2997",
+  "describe": "v0.7.0-alpha.4-5178-g77c685254-dirty"
  },
- "inputsDigest": "f756ab801c09ee4a9ec4cac8e00f509e301fa33297df1cdaf0b1429fc2738374",
+ "inputsDigest": "79b2b610cfd7a694ecfa4c4787b880b4e18eaacc1b529ea13937859b527e686e",
  "states": [
   "inventoried",
   "characterized",
@@ -106,7 +106,7 @@
   },
   "SMExport": {
    "file": "src/js/rive-export.js",
-   "line": 999,
+   "line": 1001,
    "members": 0
   },
   "SMAssetTree": {
