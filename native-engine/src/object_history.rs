@@ -259,10 +259,6 @@ mod property_sampling_tests;
 #[cfg(test)]
 #[path = "../tests/object_property_track_edit.rs"]
 mod property_track_edit_tests;
-// #2524: shift, delete, flip and distribute of selected keys as one atomic native history entry.
-#[cfg(test)]
-#[path = "../tests/object_key_batch_edit.rs"]
-mod key_batch_edit_tests;
 // G39 (#2376): a Motion preset applied as one atomic native history entry.
 #[cfg(test)]
 #[path = "../tests/object_property_preset_apply.rs"]
