@@ -164,11 +164,7 @@ fn a_brush_preset_leaves_ribbons_and_unstroked_records_alone_and_refuses_what_it
         r
     };
     let stored = document(1, vec![with("anchor", &anchor), with("copy", &copy)], None);
-    refused(
-        &stored,
-        vec![restyle("anchor", json!({"brushPreset":"chalk-round"}))],
-        "unavailable",
-    );
+    // A dab follows its anchor: it is not re-textured alone. The anchor's preset stamps new dabs of its own, the stored ones go.
     refused(
         &stored,
         vec![restyle("copy", json!({"brushPreset":"chalk-round"}))],
