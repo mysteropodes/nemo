@@ -19,17 +19,17 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "85e09d7b66fd29a0bc661606b1ef3207ac232d11",
-    "sourceRootTree": "7c5dea05793f5cc06c6ef0ae3716bc66a6cfd9a9",
+    "candidateCommit": "20ac67be441461b5687106a5d22ca07fd3887296",
+    "sourceRootTree": "712cc8b14e788c37b153ea75470852fd5666d2bd",
     "applicationTree": {
       "path": "src/js",
       "gitTree": "34148a365613888c6edcdba2b85e06d6bf29c5df",
-      "lastChangedCommit": "85e09d7b66fd29a0bc661606b1ef3207ac232d11"
+      "lastChangedCommit": "20ac67be441461b5687106a5d22ca07fd3887296"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "efd24522fd0b83fed8c482f3dfbd6079d6ad65ef",
-      "sha256": "4b63e60e8a086cde1f7d97b14326c77d24141edabcc9b3aabc07b4f3a6390c8d",
+      "gitBlob": "541d71f366dc3c7bf4ab7f9819dbdc00a37ffde4",
+      "sha256": "144ef26a4fb87012e94401b42ad41a91621f6913d3f2a533c53ddc0086ad91ff",
       "lastChangedCommit": "f606f3b2ea60c6bf5cdb7d031b8c54b3b60d291a"
     },
     "inventoryDigest": {
@@ -43,7 +43,7 @@
         "gitBlob": "151211ec4699ca6f85af68b8e8735eace2149b30",
         "sha256": "c966f81c0dc2bffaf0329bdb4756a3211cdd8542dc048ea333be4fd9beae2fa0",
         "moduleCount": 307,
-        "basedOnCommit": "85e09d7b66fd29a0bc661606b1ef3207ac232d11"
+        "basedOnCommit": "20ac67be441461b5687106a5d22ca07fd3887296"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -3019,8 +3019,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2478,
-          "scriptOrdinal": 151
+          "line": 2480,
+          "scriptOrdinal": 153
         }
       ]
     },
@@ -4816,8 +4816,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2479,
-          "scriptOrdinal": 152
+          "line": 2478,
+          "scriptOrdinal": 151
         }
       ]
     },
@@ -4828,8 +4828,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2480,
-          "scriptOrdinal": 153
+          "line": 2479,
+          "scriptOrdinal": 152
         }
       ]
     },
