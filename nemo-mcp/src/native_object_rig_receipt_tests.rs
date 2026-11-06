@@ -128,7 +128,7 @@ fn the_catalog_declares_each_operation_once_under_five_owner_descriptors() {
         s if s.starts_with("widget.") => "native.object.widget",
         s if s.starts_with("labs.") => "native.object.labs",
         s if s.starts_with("tween.") => "native.object.tween",
-        "property.preset.apply" => "native.object.motion-preset",
+        "property.preset.apply" | "property.keys.paste" => "native.object.motion-preset",
         "layer.compositing.edit" => "native.object.layer-compositing",
         "layer.parent.set"
         | "layer.timeLink.set"
@@ -150,7 +150,7 @@ fn the_catalog_declares_each_operation_once_under_five_owner_descriptors() {
         assert_eq!(descriptor["availability"]["state"], "available");
         assert_eq!(
             descriptor["resourceBoundary"]["maxRequestBytes"],
-            if suffix.starts_with("tween.") || suffix == "property.preset.apply" { 65536 } else { 4096 }
+            if suffix.starts_with("tween.") || suffix == "property.preset.apply" || suffix == "property.keys.paste" { 65536 } else { 4096 }
         );
     }
 }
@@ -186,7 +186,7 @@ fn every_descriptor_example_is_a_valid_request_with_a_correlated_valid_response(
             seen += 1;
         }
     }
-    assert_eq!(seen, 19, "one copyable example per declared operation");
+    assert_eq!(seen, 20, "one copyable example per declared operation");
 }
 
 #[test]

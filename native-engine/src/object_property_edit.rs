@@ -25,6 +25,8 @@ mod expression_edit;
 mod key_batch;
 #[path = "object_property_pose_edit.rs"]
 mod pose_edit;
+#[path = "object_property_keys_paste.rs"]
+mod keys_paste;
 #[path = "object_property_preset_apply.rs"]
 mod preset_apply;
 #[path = "object_property_track_edit.rs"]
@@ -112,7 +114,7 @@ fn preserve_curve(before: &[OrderCurvePoint], after: &mut [OrderCurvePoint]) {
         }
     }
 }
-fn default_curve() -> Vec<OrderCurvePoint> {
+pub(crate) fn default_curve() -> Vec<OrderCurvePoint> {
     [(0., 0.), (0.25, 0.156), (0.5, 0.5), (0.75, 0.844), (1., 1.)]
         .into_iter()
         .map(|(x, y)| OrderCurvePoint {

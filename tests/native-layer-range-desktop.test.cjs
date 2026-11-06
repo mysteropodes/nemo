@@ -479,6 +479,29 @@ test('dragging the grabbed key snaps to the work area with a guide line and comm
   delete Node.prototype.getBoundingClientRect;
 });
 
+test('#2377 a Time Remap key is a snap candidate for a key drag, as the baseline addTrack(ld.timeRemap)', async () => {
+  const h = await harness({ propertyKeys: [3, 6] });
+  placeKeys(h);
+  const wrap = h.doc.createElement('div'); h.doc.body.appendChild(wrap);
+  h.doc.getElementById = (id) => (id === 'fg-wrap' ? wrap : wrap.children.find((c) => c.id === id) || null);
+  h.root.state.waOut = 39;
+  const edits = []; h.root.NemoNativeMotionKeyGesture = KeyGesture; h.root.NemoNativeMotionKeyBox = KeyBox;
+  h.ports.editSelectedKeys = (a) => { edits.push(a); return Promise.resolve(true); };
+  h.root.SM = { timeRemapKeyFacts: (li) => (li === 1 ? { keyCount: 1, keyAtFrame: false, value: 0, keys: [{ frame: 10, value: 0 }] } : null) };
+  Range.refreshKeys(h.root);
+  h.keyNodes()[0].fire('mousedown', { button: 0, clientX: 100 });
+  h.doc.fire('mousemove', { clientX: 160 }); // 6 frames: 3 -> 9, one frame from the remap key at 10
+  assert.equal(wrap.children[0].dataset.label, 'Clé · 11');
+  h.doc.fire('mouseup', { clientX: 160 });
+  assert.deepEqual(edits, [{ kind: 'shift', delta: 7 }]);
+  h.root.SM = {}; Range.refreshKeys(h.root);
+  h.keyNodes()[0].fire('mousedown', { button: 0, clientX: 100 });
+  h.doc.fire('mousemove', { clientX: 160 });
+  h.doc.fire('mouseup', { clientX: 160 });
+  assert.deepEqual(edits.pop(), { kind: 'shift', delta: 6 }, 'without the remap lane nothing is near');
+  delete Node.prototype.getBoundingClientRect;
+});
+
 test('the key menu lists the colour palette and the per-key lock rows, and reaches the key route with one edit each', async () => {
   const h = await harness({ propertyKeys: [2, 7, 10] });
   const edits = []; h.root.NemoNativeMotionKeyGesture = KeyGesture;

@@ -9,6 +9,8 @@
   else root.NemoNativeMotionKeyEdit = api;
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
+  // Resolved when a gesture needs it, so the script load order of the two modules does not matter.
+  const clipboardModule = () => (typeof module === 'object' && module.exports ? require('./native-motion-key-clipboard.js') : globalThis.NemoNativeMotionKeyClipboard);
   const MAX_KEYS = 32; // single-key addresses per request; a larger selection names runs of keys per track instead
   const MAX_BYTES = 4096; // the track-edit request bound
   const isMod = (e) => !!(e.metaKey || e.ctrlKey);
@@ -59,13 +61,17 @@
   /* The editor over the open key tracks. Ports: readKeyTimelines() -> {pin, tracks:[{target,property,items:[{frame,selected}]}]},
    * localKeys() -> an opaque list that changes whenever the local selection does, editPropertyTrack(payload, pin, isCurrent),
    * reopen(target, property, frames) (the refresh after a write closes the drawers; this restores them and their selection),
-   * notify(message), translate(key, fallback). `edit` resolves null when no key is selected, else true/false. */
+   * notify(message), translate(key, fallback). `edit` resolves null when no key is selected, else true/false.
+   * #2524: the actions {kind:'copy'} and {kind:'paste'} are the key clipboard (native-motion-key-clipboard.js): they take the extra ports
+   * context() and pasteKeys(payload) and write nothing but that one paste. */
   function createEditor(ports) {
     let busy = false;
+    const Clip = clipboardModule(), clipboard = Clip && typeof ports.pasteKeys === 'function' && typeof ports.context === 'function' ? Clip.create(ports) : null;
     const say = (key, fallback) => { try { ports.notify(ports.translate ? ports.translate(key, fallback) : fallback); } catch (_) { /* a notice must not break the edit */ } };
     // `opts` (optional): {order(a, b)} sorts the key tracks into the rows the gesture means (the engine reads rows in the order the
     // selections first name each track), {expected(track, frames)} says where the selected frames of a track land.
     async function edit(action, opts) {
+      if (action && (action.kind === 'copy' || action.kind === 'paste')) return clipboard ? clipboard[action.kind]() : null;
       if (busy) return false;
       const view = ports.readKeyTimelines();
       if (!view) return null;
@@ -133,9 +139,19 @@
       Promise.resolve(ports.edit(action)).then((r) => { if (r === null && !retired && ports.unavailable) ports.unavailable(); }, () => { if (!retired && ports.unavailable) ports.unavailable(); });
     }
     document.addEventListener('keydown', onKey, true);
-    const api = Object.freeze({ dispose() { if (retired) return; retired = true; document.removeEventListener('keydown', onKey, true); if (owners.get(document) === api) owners.delete(document); } });
+    // #2524: the clipboard keys (Cmd+C / Cmd+V) are decided by the keyboard arbiter, which asks this owner: whether a native key is selected,
+    // whether a key packet is held, and runs the copy or paste. `current` is null unless the native project owns Motion.
+    const api = Object.freeze({
+      dispose() { if (retired) return; retired = true; document.removeEventListener('keydown', onKey, true); if (owners.get(document) === api) owners.delete(document); },
+      owned() { try { return !retired && ports.ownsNativeMotion() === true; } catch (_) { return false; } },
+      hasSelection() { try { return !retired && ports.hasSelection() === true; } catch (_) { return false; } },
+      run(action) { return retired ? Promise.resolve(null) : Promise.resolve(ports.edit(action)); }
+    });
     owners.set(document, api);
     return api;
   }
-  return Object.freeze({ actionForEvent, expectedFrames, canShift, rangesOf, createEditor, install, editable });
+  // The installed key owner of `document` while a native project owns Motion, else null (the legacy selection is then never read).
+  function current(document) { const owner = owners.get(document); return owner && owner.owned() ? owner : null; }
+  function hasClip() { const Clip = clipboardModule(); return !!Clip && Clip.has(); }
+  return Object.freeze({ actionForEvent, expectedFrames, canShift, rangesOf, createEditor, install, editable, current, hasClip });
 }));

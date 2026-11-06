@@ -4882,6 +4882,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-motion-key-clipboard.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-motion-key-gesture.js",
       "moduleId": "app.native.motion.properties.adapter",
       "executionClass": "document-classic",
