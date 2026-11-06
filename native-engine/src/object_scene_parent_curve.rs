@@ -11,7 +11,7 @@ use crate::render_geometry::{ClosedCubicPath, CubicSegment};
 use vello::kurbo::{BezPath, Rect, Shape};
 
 /// Tight native Bezier bounds; never the control-point hull/envelope centre.
-pub(super) fn curve_path(
+pub(crate) fn curve_path(
     segments: &[([f64; 2], [f64; 2], [f64; 2])],
     closed: bool,
 ) -> Result<BezPath, ChainUnavailable> {
@@ -72,19 +72,17 @@ impl SceneParentChains {
     pub(crate) fn layer_bounds(&self, layer: usize) -> Option<Rect> {
         self.bounds.get(&layer).copied()
     }
-    /// Where an image or video of `layer` lands: a 3D layer projects the rect (baseline `project3DImageRect` of
-    /// `make3DProjector` around the layer's union bounds, replacing the 2D chain and the layer opacity), any other layer
-    /// takes its D30 chain unchanged.
-    pub(crate) fn place_image(
+    /// The baseline `make3DProjector` of a 3D layer around the union bounds of everything it draws; `None` for a layer whose
+    /// switch is off. It replaces the layer's 2D chain and its 2D Motion opacity (baseline `is3D`).
+    pub(crate) fn projector_3d(
         &self,
         layer: usize,
-        mut source: crate::object_render_scene::text_glyph_scene_kernels::object_raster_asset_scene::RasterSceneSource,
-    ) -> Result<(crate::object_render_scene::text_glyph_scene_kernels::object_raster_asset_scene::RasterSceneSource, Vec<ChainEntry>), ChainUnavailable> {
+    ) -> Result<Option<crate::evaluation::property_projection_3d::Projector3D>, ChainUnavailable> {
         let source_layer = self.packet.source_layers().get(layer).ok_or(ChainUnavailable::MissingLayer)?;
         if source_layer.three_d.value() != Some(&true) {
-            return Ok((source, self.chain(layer)?));
+            return Ok(None);
         }
-        use crate::evaluation::property_projection_3d::{make_projector, project_image_rect, Bounds, Rect as ImageIn};
+        use crate::evaluation::property_projection_3d::{make_projector, Bounds};
         let target = PropertyHolderTarget {
             context_id: self.packet.context_id().to_owned(),
             layer_uid: source_layer.layer_uid().to_owned(),
@@ -103,7 +101,20 @@ impl SceneParentChains {
             .ok_or(ChainUnavailable::MissingGeometry)?;
         let union = self.bounds.get(&layer).ok_or(ChainUnavailable::MissingGeometry)?;
         let bounds = Bounds { x: union.x0, y: union.y0, width: union.width(), height: union.height() };
-        let projector = make_projector(&pose, &bounds, f64::from(width), f64::from(height), None);
+        Ok(Some(make_projector(&pose, &bounds, f64::from(width), f64::from(height), None)))
+    }
+    /// Where an image or video of `layer` lands: a 3D layer projects the rect (baseline `project3DImageRect` of
+    /// `make3DProjector` around the layer's union bounds, replacing the 2D chain and the layer opacity), any other layer
+    /// takes its D30 chain unchanged.
+    pub(crate) fn place_image(
+        &self,
+        layer: usize,
+        mut source: crate::object_render_scene::text_glyph_scene_kernels::object_raster_asset_scene::RasterSceneSource,
+    ) -> Result<(crate::object_render_scene::text_glyph_scene_kernels::object_raster_asset_scene::RasterSceneSource, Vec<ChainEntry>), ChainUnavailable> {
+        let Some(projector) = self.projector_3d(layer)? else {
+            return Ok((source, self.chain(layer)?));
+        };
+        use crate::evaluation::property_projection_3d::{project_image_rect, Rect as ImageIn};
         let r = source.rect;
         let out = project_image_rect(
             &ImageIn { x: r.x, y: r.y, width: r.width, height: r.height, rotation: Some(r.rotation) },

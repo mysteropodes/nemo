@@ -50,3 +50,40 @@ fn a_child_of_a_3d_layer_takes_the_parents_2d_motion_like_the_flat_parent() {
     // The parent's Motion (scale 200% / 100%, Position 10) really moved it.
     assert_ne!(flat, [0., 0.]);
 }
+
+/// #2520: a mask contour of a 3D layer is projected with the layer (the baseline mask path is a child of the layer, so it takes the
+/// same vertex projector), where the scene used to refuse the mixed layer. The mask lands where the same contour lands as a
+/// plain vector of that layer; switching 3D off keeps the flat mask.
+#[test]
+fn a_mask_contour_under_3d_is_projected_with_the_layer() {
+    let build = |three_d_on: bool, mask: bool| {
+        let mut source = three_d(false);
+        source["layers"][0]["threeD"] = json!(three_d_on);
+        source["propertyHolders"][0]["properties"] = json!([
+            {"property":"positionZ","static":[2000]},{"property":"rotationX","static":[0]},{"property":"rotationY","static":[25]}]);
+        if mask {
+            source["objects"][1]["vectorExt"] = json!({"isMask":true,"maskMode":"add","maskFeather":0});
+        }
+        let o = owner(&source);
+        let s = o.acquire_snapshot(0).unwrap();
+        let p = packet(&o, &s, 0);
+        let plan = plan(&p);
+        let first = if mask {
+            let inputs = plan.mask_inputs();
+            let layer = inputs.layer(0).expect("the layer's mask inputs");
+            assert_eq!(layer.masks().len(), 1);
+            match plan.mask_path(&layer.masks()[0]).unwrap().elements()[0] {
+                vello::kurbo::PathEl::MoveTo(point) => [point.x, point.y],
+                other => panic!("{other:?}"),
+            }
+        } else {
+            starts(&plan).into_iter().find(|(id, _)| id == "second").unwrap().1
+        };
+        first
+    };
+    let as_vector = build(true, false);
+    let as_mask = build(true, true);
+    assert_eq!(as_vector, as_mask, "the mask takes the layer's projection");
+    let flat_mask = build(false, true);
+    assert_ne!(flat_mask, as_mask, "the projection really moved it");
+}

@@ -384,6 +384,23 @@ test('#2377: a connector bar joins two consecutive keys whose value changes, tin
   assert.equal(bars().find((b) => b.dataset.keyFrom === '1').classes.has('sel'), true, 'both end keys selected: the bar reads selected');
 });
 
+test('#2377: a press on a connector moves the playhead to its first key, like the baseline goToFrame(keyA.frame), and a refused move is reported', async () => {
+  const target = { contextId: 'scene-root', layerUid: 'alpha' };
+  const h = await harness({ propertyTracks: [{ target, property: 'opacity', dimension: 1, items: [
+    { frame: 1, v: [10] }, { frame: 4, v: [20] }, { frame: 8, v: [30] }] }] });
+  const jumps = []; h.root.goToFrame = (frame) => { jumps.push(frame); return Promise.resolve(); };
+  const bar = (from) => h.grid.querySelectorAll('.native-key-connect').find((b) => b.dataset.keyFrom === from);
+  await bar('4').fire('mousedown', { button: 0 });
+  assert.deepEqual(jumps, [4], 'the playhead goes to the first end key');
+  assert.equal(h.keyNodes().filter((n) => n.dataset.selected === 'true').map((n) => n.dataset.frame).join(), '4,8');
+  // A failing move is reported and never throws out of the press.
+  h.root.goToFrame = () => Promise.reject(new Error('refused'));
+  h.root.notices.length = 0;
+  await bar('1').fire('mousedown', { button: 0 });
+  await new Promise((r) => setTimeout(r, 0));
+  assert.match(h.root.notices.join('|'), /playhead could not move/);
+});
+
 test('#2377: dragging a connector moves both end keys with ONE shift; Alt+drag retimes the second key alone and selects the pair again', async () => {
   const target = { contextId: 'scene-root', layerUid: 'alpha' };
   const h = await harness({ propertyTracks: [{ target, property: 'opacity', dimension: 1, items: [

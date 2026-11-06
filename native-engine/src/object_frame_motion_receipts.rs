@@ -222,7 +222,18 @@ pub(crate) fn remaining_holder(
         crate::evaluation::object_vector_kernels::render_vector_eval::common_layer_motion_target(
             document, target,
         );
-    if !(layer || common || text_element(document, target)) {
+    let three_d_on = document
+        .layers()
+        .iter()
+        .any(|l| l.layer_uid() == target.layer_uid() && l.three_d.value() == Some(&true));
+    // The stored 3D keys of a layer whose switch is off are dormant whatever else the layer holds (mask, component, ...).
+    let dormant_layer = evaluated
+        && !three_d_on
+        && target.stroke_id().is_none()
+        && target.context_id() == "scene-root"
+        && document.layers().iter().any(|l| l.layer_uid() == target.layer_uid());
+    let base = layer || common || text_element(document, target);
+    if !(base || dormant_layer) {
         return None;
     }
     // A mixed visible contour and Text/raster layer
@@ -238,10 +249,6 @@ pub(crate) fn remaining_holder(
                         && record.target().layer_uid() == target.layer_uid()
                 })
         });
-    let three_d_on = document
-        .layers()
-        .iter()
-        .any(|l| l.layer_uid() == target.layer_uid() && l.three_d.value() == Some(&true));
     let mut remaining = holder.clone();
     remaining.properties.retain(|p| {
         let key = p.property();
@@ -249,10 +256,10 @@ pub(crate) fn remaining_holder(
         // them), so a common layer ignores them rather than refusing the frame; with it on the Pose3D consumer reads them.
         // A Text/raster layer with the switch off ignores them the same way on the owner's Motion route; the strict raw packet
         // keeps refusing any property it does not consume.
-        let dormant = layer && !three_d_on && evaluated;
+        let dormant_key = dormant_layer && ["positionZ", "rotationX", "rotationY"].contains(&key);
         let consumed = KEYS.contains(&key)
-            || ((common || dormant) && ["positionZ", "rotationX", "rotationY"].contains(&key));
-        let owned = consumed && (common || !mixed || key == "opacity");
+            || ((common || dormant_key) && ["positionZ", "rotationX", "rotationY"].contains(&key));
+        let owned = (base && consumed && (common || !mixed || key == "opacity")) || dormant_key;
         !owned || (!evaluated && p.expression.value().is_some_and(|e| e.enabled))
     });
     if remaining.properties.len() == holder.properties().len() {

@@ -376,3 +376,6 @@ fn retained_no_chain_fallback_paints_the_original_seed_once_without_persistent_c
     assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
     assert_eq!(snapshot.content_revision(), 0);
 }
+
+#[path = "object_duplicator_scene_three_d.rs"]
+mod three_d;

@@ -178,10 +178,11 @@ fn common_layer_content_target(
 ) -> bool {
     if layer.is_effect_layer()
         || layer.widget.value().is_some()
-        || document.duplicator_set().is_some_and(|set| {
+        // A 3D host's clones are projected by the duplicator scene (each with its own `dup3D` delta).
+        || (!still_images && document.duplicator_set().is_some_and(|set| {
             set.duplicator(target.context_id(), target.layer_uid())
                 .is_some_and(|d| d.duplicator.effective_clone_count() > 1.)
-        })
+        }))
         || has_unjoined_parent_blend(document, target)
     {
         return false;
@@ -199,7 +200,8 @@ fn common_layer_content_target(
                 record.family.as_str(),
                 VECTOR_FAMILY | "closed-solid-fill-cubic-path"
             )
-            || record.is_mask()
+            // A mask joins only under the layer's own 3D switch (its contour is projected with the layer).
+            || (record.is_mask() && !(still_images && record.family == VECTOR_FAMILY))
         {
             return false;
         }
@@ -210,9 +212,9 @@ fn common_layer_content_target(
     let Some(items) = document.item_records() else {
         return found;
     };
-    // A 3D layer places plain still images; text, bitmap-brush and brush-texture items stay unjoined.
+    // A 3D layer places plain still images and Text (glyph vertices through the layer projector); bitmap-brush and
+    // brush-texture items stay unjoined.
     let images = still_images
-        && items.text_entries().iter().all(|e| !on_layer(&e.target))
         && items.raster_entries().iter().filter(|e| on_layer(&e.target)).all(|e| {
             e.item.is_bitmap_brush() != Some(true)
                 && e.item.brush_group_id().is_none()
