@@ -20,6 +20,8 @@
 //! child seeds a transparent accumulator, each later child blends in with its
 //! own blend mode) and that result is the folder's own paint.
 
+#[path = "scene_effect_gpu_blend_fx.rs"]
+mod fx;
 #[path = "scene_effect_gpu_blend_pipes.rs"]
 mod pipes;
 #[path = "scene_effect_gpu_blend_pool.rs"]
@@ -35,6 +37,8 @@ pub(crate) use crate::compositor::scene_effect_gpu_blend::stack::{
     GpuFolderChild, GpuLayerStack, GpuMask, GpuMaskMode, GpuStep, GpuUnavailable,
 };
 
+use crate::compositor::object_compositor::layered::{CameraWrap, LayerContext};
+use crate::compositor::scene_effect_gpu_blend::stack::FEATHER_PASS_THRESHOLD;
 use crate::compositor::object_target::{reserve_target_bytes, ObjectTarget, TargetReservation};
 use crate::compositor::scene_effect_gpu_blend::pool::{Pool, Role};
 use crate::compositor::{Compositor, CompositorError};
@@ -142,43 +146,94 @@ impl Compositor {
         base_rgba8: [u8; 4],
         reserve: &dyn Fn(usize) -> Result<TargetReservation, &'static str>,
     ) -> Result<LayeredPixels, CompositorError> {
+        self.compose_layered_stack_in(None, stack, size, base_rgba8, reserve)
+    }
+
+    /// The layered path of a witness: `ctx` carries its paint entries (every family), stored camera and the content
+    /// beneath the artwork; without one only the stack's contour fills exist.
+    pub(super) fn compose_layered_stack_in(
+        &mut self,
+        ctx: Option<&LayerContext<'_>>,
+        stack: &GpuLayerStack<'_>,
+        size: (u32, u32),
+        base_rgba8: [u8; 4],
+        reserve: &dyn Fn(usize) -> Result<TargetReservation, &'static str>,
+    ) -> Result<LayeredPixels, CompositorError> {
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         {
             // The solid renders below replace Vello's image atlas; the next
             // reference-image composition must restore it.
             self.last_reference_image = None;
         }
+        // Every effect stack is admitted against its layer's box before any texture exists (a custom shader refuses the
+        // whole frame typed). A folder and an adjustment layer have no items of their own: the target / document box.
+        let time = ctx.map_or(0., LayerContext::time);
+        let canvas_box = (0., 0., size.0 as f32, size.1 as f32);
+        let layer_box = |wire: usize| {
+            ctx.map_or(canvas_box, |c| c.layer_bbox(stack.inputs()[wire].source_layer, size))
+        };
+        let document_box = ctx.map_or(canvas_box, |c| c.document_bbox(size));
+        for step in stack.steps().iter().filter(|step| step.effects) {
+            let plan = stack.inputs()[step.layer].effects.expect("admitted by the stack");
+            let bbox = match (step.effect_layer, step.folder.is_some()) {
+                (true, _) => document_box,
+                (_, true) => canvas_box,
+                _ => layer_box(step.layer),
+            };
+            Self::admit_layer_effects(plan, bbox, time)?;
+            for child in step.folder.iter().flatten().filter(|child| child.effects) {
+                let plan = stack.inputs()[child.layer].effects.expect("admitted by the stack");
+                Self::admit_layer_effects(plan, layer_box(child.layer), time)?;
+            }
+        }
         let kernels = self.layered_kernels();
         let mut pool = Pool::new(size.0, size.1);
         pool.ensure(self, Role::AccumA, reserve)?;
         pool.ensure(self, Role::AccumB, reserve)?;
         kernels.clear(pool.view(Role::AccumA), wgpu::Color::TRANSPARENT);
+        let under = ctx.is_some_and(LayerContext::has_under);
+        if let (true, Some(ctx)) = (under, ctx) {
+            pool.ensure(self, Role::Under, reserve)?;
+            self.render_under(ctx, pool.view(Role::Under), size)?;
+        }
         if let Some(index) = stack.background() {
             pool.ensure(self, Role::Background, reserve)?;
-            let paint = &stack.inputs()[index].paint;
-            self.render_paints(&[paint], pool.view(Role::Background), size)?;
+            self.render_wire_layer(ctx, stack, index, pool.view(Role::Background), size)?;
         }
         let (mut current, mut spare) = (Role::AccumA, Role::AccumB);
         for step in stack.steps() {
             let input = &stack.inputs()[step.layer];
+            if step.effect_layer {
+                // Adjustment layer: no paint, the stack grades everything accumulated below it.
+                let plan = input.effects.expect("admitted by the stack");
+                self.grade_backdrop(
+                    plan,
+                    (document_box, time),
+                    pool.view(current),
+                    pool.view(spare),
+                    size,
+                )?;
+                std::mem::swap(&mut current, &mut spare);
+                continue;
+            }
             pool.ensure(self, Role::Layer, reserve)?;
             match &step.folder {
                 Some(children) => {
-                    self.render_folder(&kernels, &mut pool, stack, children, reserve)?
+                    let boxes = (&layer_box as &dyn Fn(usize) -> _, time);
+                    self.render_folder(&kernels, &mut pool, (ctx, stack), boxes, children, reserve)?
                 }
-                None => self.render_paints(&[&input.paint], pool.view(Role::Layer), size)?,
+                None => self.render_wire_layer(ctx, stack, step.layer, pool.view(Role::Layer), size)?,
             }
             let mut source = Role::Layer;
             if !input.masks.is_empty() {
-                self.apply_masks(&kernels, &mut pool, input, reserve)?;
+                self.apply_masks(&kernels, &mut pool, ctx, input, reserve)?;
                 source = Role::Masked;
             }
             // Each matte narrows what the previous one left (ping-pong A/B).
             let mut into_b = false;
             for matte in &step.mattes {
                 pool.ensure(self, Role::Aux, reserve)?;
-                let paint = &stack.inputs()[matte.source].paint;
-                self.render_paints(&[paint], pool.view(Role::Aux), size)?;
+                self.render_wire_layer(ctx, stack, matte.source, pool.view(Role::Aux), size)?;
                 let destination = if into_b { Role::MatteB } else { Role::MatteA };
                 pool.ensure(self, destination, reserve)?;
                 kernels.matte(
@@ -190,9 +245,17 @@ impl Compositor {
                 source = destination;
                 into_b = !into_b;
             }
+            // The layer's own stack runs on its masked, matted alpha, so a matted edge softens too, before the blend.
+            let graded = match input.effects.filter(|_| step.effects) {
+                Some(plan) => {
+                    let bbox = if step.folder.is_some() { canvas_box } else { layer_box(step.layer) };
+                    Some(self.apply_layer_effects(plan, (bbox, time), pool.view(source), size)?)
+                }
+                None => None,
+            };
             kernels.blend(
                 pool.view(current),
-                pool.view(source),
+                graded.as_ref().map_or_else(|| pool.view(source), |g| g.view()),
                 step.blend,
                 pool.view(spare),
             );
@@ -209,6 +272,11 @@ impl Compositor {
             );
             std::mem::swap(&mut current, &mut spare);
         }
+        if under {
+            // Beneath the canvas background and every layer, exactly where the flat sequence paints it.
+            kernels.blend(pool.view(Role::Under), pool.view(current), 0, pool.view(spare));
+            std::mem::swap(&mut current, &mut spare);
+        }
         for role in [
             Role::Layer,
             Role::Aux,
@@ -220,6 +288,7 @@ impl Compositor {
             Role::Background,
             Role::FolderA,
             Role::FolderB,
+            Role::Under,
         ] {
             pool.release(role);
         }
@@ -259,13 +328,23 @@ impl Compositor {
     }
 
     /// Keep the whole isolated layer in Vello's Area-AA/f32 accumulation path.
-    fn render_paints(
+    pub(super) fn render_paints(
         &mut self,
         paints: &[&GpuLayerPaint<'_>],
+        camera: Option<CameraWrap>,
         view: &wgpu::TextureView,
         (width, height): (u32, u32),
     ) -> Result<(), CompositorError> {
-        let swatches = encode_straight_paints(&mut self.scene, paints);
+        let swatches = match camera {
+            Some(camera) => {
+                let mut artwork = vello::Scene::new();
+                let swatches = encode_straight_paints(&mut artwork, paints);
+                self.scene.reset();
+                self.append_camera(&artwork, camera);
+                swatches
+            }
+            None => encode_straight_paints(&mut self.scene, paints),
+        };
         let rendered = self.render_target(view, width, height, Color::TRANSPARENT);
         // Release our own references on both success and Vello error. The existing
         // renderer atlas can retain a swatch until pressure eviction or renderer drop.
@@ -281,7 +360,8 @@ impl Compositor {
         &mut self,
         kernels: &BlendKernels,
         pool: &mut Pool,
-        stack: &GpuLayerStack<'_>,
+        (ctx, stack): (Option<&LayerContext<'_>>, &GpuLayerStack<'_>),
+        (layer_box, time): (&dyn Fn(usize) -> (f32, f32, f32, f32), f32),
         children: &[GpuFolderChild],
         reserve: &dyn Fn(usize) -> Result<TargetReservation, &'static str>,
     ) -> Result<(), CompositorError> {
@@ -292,17 +372,26 @@ impl Compositor {
         kernels.clear(pool.view(Role::FolderA), wgpu::Color::TRANSPARENT);
         let (mut current, mut spare) = (Role::FolderA, Role::FolderB);
         for child in children {
-            let paint = &stack.inputs()[child.layer].paint;
-            self.render_paints(&[paint], pool.view(Role::Aux), size)?;
-            if child.seeds {
-                kernels.copy(pool.texture(Role::Aux), pool.texture(current), size);
-            } else {
-                kernels.blend(
-                    pool.view(current),
+            self.render_wire_layer(ctx, stack, child.layer, pool.view(Role::Aux), size)?;
+            // A child's own effect stack runs on its isolated paint before it folds into the folder (baseline
+            // `paint_folder_children`), with its own blend.
+            let graded = match stack.inputs()[child.layer].effects.filter(|_| child.effects) {
+                Some(plan) => Some(self.apply_layer_effects(
+                    plan,
+                    (layer_box(child.layer), time),
                     pool.view(Role::Aux),
-                    child.blend,
-                    pool.view(spare),
-                );
+                    size,
+                )?),
+                None => None,
+            };
+            let (view, texture) = match &graded {
+                Some(graded) => (graded.view(), graded.texture()),
+                None => (pool.view(Role::Aux), pool.texture(Role::Aux)),
+            };
+            if child.seeds {
+                kernels.copy(texture, pool.texture(current), size);
+            } else {
+                kernels.blend(pool.view(current), view, child.blend, pool.view(spare));
                 std::mem::swap(&mut current, &mut spare);
             }
         }
@@ -313,16 +402,17 @@ impl Compositor {
     /// Baseline mask combine: Add masks union (one Scene), none -> fully
     /// visible, Subtract/Intersect narrow one at a time through the alpha
     /// matte math, then the silhouette multiplies the layer into `Masked`.
-    /// Feather above the baseline threshold was refused when the stack was
-    /// built, so the silhouette never needs the blur pass here.
+    /// Feather above the baseline threshold blurs the silhouette first.
     fn apply_masks(
         &mut self,
         kernels: &BlendKernels,
         pool: &mut Pool,
+        ctx: Option<&LayerContext<'_>>,
         input: &GpuLayerInput<'_>,
         reserve: &dyn Fn(usize) -> Result<TargetReservation, &'static str>,
     ) -> Result<(), CompositorError> {
         let size = pool.size();
+        let camera = ctx.and_then(LayerContext::camera);
         for role in [Role::Aux, Role::MaskA, Role::MaskB, Role::Masked] {
             pool.ensure(self, role, reserve)?;
         }
@@ -335,7 +425,7 @@ impl Compositor {
         if adds.is_empty() {
             kernels.clear(pool.view(Role::MaskA), wgpu::Color::WHITE);
         } else {
-            self.render_paints(&adds, pool.view(Role::Aux), size)?;
+            self.render_paints(&adds, camera, pool.view(Role::Aux), size)?;
             kernels.copy(pool.texture(Role::Aux), pool.texture(Role::MaskA), size);
         }
         let (mut current, mut spare) = (Role::MaskA, Role::MaskB);
@@ -344,11 +434,24 @@ impl Compositor {
             .iter()
             .filter(|mask| mask.mode != GpuMaskMode::Add)
         {
-            self.render_paints(&[&mask.paint], pool.view(Role::Aux), size)?;
+            self.render_paints(&[&mask.paint], camera, pool.view(Role::Aux), size)?;
             kernels.matte(
                 pool.view(current),
                 pool.view(Role::Aux),
                 (0, mask.mode == GpuMaskMode::Subtract),
+                pool.view(spare),
+            );
+            std::mem::swap(&mut current, &mut spare);
+        }
+        if input.mask_feather > FEATHER_PASS_THRESHOLD {
+            // Baseline feather: the shared separable Gaussian softens the FINAL combined silhouette's edge, not the
+            // masked content (one feather for all masks of the layer).
+            let blur = self.effect_pipelines();
+            blur.blur(
+                pool.view(current),
+                input.mask_feather,
+                size,
+                pool.view(Role::Aux),
                 pool.view(spare),
             );
             std::mem::swap(&mut current, &mut spare);

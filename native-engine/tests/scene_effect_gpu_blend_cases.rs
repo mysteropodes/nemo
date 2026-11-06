@@ -83,7 +83,9 @@ fn matte_scene_plans_to_literal_steps_and_skips_the_consumed_source() {
                 layer: 0,
                 mattes: Vec::new(),
                 blend: 0,
-                folder: None
+                folder: None,
+                effects: false,
+                effect_layer: false
             },
             GpuStep {
                 layer: 1,
@@ -93,7 +95,9 @@ fn matte_scene_plans_to_literal_steps_and_skips_the_consumed_source() {
                     invert: false
                 }],
                 blend: 0,
-                folder: None
+                folder: None,
+                effects: false,
+                effect_layer: false
             },
         ]
     );
@@ -113,7 +117,9 @@ fn background_blend_and_mask_scenes_plan_to_literal_steps() {
             layer: 1,
             mattes: Vec::new(),
             blend: 1,
-            folder: None
+            folder: None,
+            effects: false,
+            effect_layer: false
         }]
     );
     let case = find("blend-hue");
@@ -203,16 +209,14 @@ fn mask_feather_above_the_baseline_threshold_is_refused_at_or_below_it_is_accept
         layer.mask_feather = feather;
         GpuLayerStack::from_plan(&plan, vec![layer])
     };
-    for accepted in [0.0, 0.01, -3.0, f32::NAN] {
+    // #2257: a feather above the baseline threshold blurs the silhouette (no refusal); only an infinite radius is refused.
+    for accepted in [0.0, 0.01, -3.0, f32::NAN, 0.011, 2.0, 30.0] {
         assert!(with_feather(accepted).is_ok(), "{accepted}");
     }
-    for refused in [0.011, 2.0, 30.0, f32::INFINITY] {
-        assert_eq!(
-            with_feather(refused).unwrap_err(),
-            GpuBlendError::Unavailable(GpuUnavailable::MaskFeather { layer: 0 }),
-            "{refused}"
-        );
-    }
+    assert_eq!(
+        with_feather(f32::INFINITY).unwrap_err(),
+        GpuBlendError::InvalidPaint { layer: 0 }
+    );
 }
 
 #[test]
