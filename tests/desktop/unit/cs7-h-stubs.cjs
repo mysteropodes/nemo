@@ -5,6 +5,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { encodeRGBA, canvas, fillRect } = require('../../fixtures/lib/png.cjs');
+const { OperatorInputError } = require('../cs7-runner.cjs');
+const { STR, SECOND, NONE, MERGE_TOAST } = require('../cs7-scenarios/settings-sync-owner.cjs');
 
 const identity = { sourceSha: 'a'.repeat(40), tree: 'b'.repeat(40), driverSha: 'c'.repeat(40),
   executableSha256: 'd'.repeat(64), sessionId: 'one-lifetime', pid: 123, dirty: false };
@@ -168,8 +170,56 @@ class SettingsApp {
   constructor(reportDirectory, faults = {}) {
     this.dir = reportDirectory; this.faults = faults;
     this.s = { project: false, menu: false, open: false, tab: 'General', name: 'Animateur 3I41', email: '', role: 'Animator', tool: 'hand', toast: '',
-      sync: '', loading: 0, keys: { insertFrame: 'F5', play: 'Enter' }, colour: [0x4a, 0x9e, 0xff], alpha: 1, originals: {}, panel: false, closed: 0 };
-    this.log = [];
+      sync: '', loading: 0, keys: { insertFrame: 'F5', play: 'Enter' }, colour: [0x4a, 0x9e, 0xff], alpha: 1, originals: {}, panel: false, closed: 0,
+      checked: false, updates: [], merged: false };
+    this.profileId = 'u_stub_1'; this.log = []; this.world = null;
+  }
+  say(text) { if (!this.faults.toastHidden) this.s.toast = text; }
+  // The legacy export shape the baseline merge reads: layers by name, frames by index, isKeyframe, strokes.
+  snapshot() {
+    const rows = this.world.state.scene['layer-1'];
+    const frames = rows.k.map((kind, i) => ({ isKeyframe: kind === 'key', strokes: kind === 'key' && rows.c[i] ? [{ strokeId: 'stroke-' + i, segments: [[0, 0], [10, 10]], strokeWidth: 4 }] : [] }));
+    return { format: 'nemo', layers: [{ name: 'Layer 1', frames }, { name: 'Layer 2', frames: [{ isKeyframe: true, strokes: [] }] }] };
+  }
+  publish() {
+    const s = this.s, f = this.faults;
+    if (!s.sync) return this.say(STR.first[0]);
+    const dir = path.join(s.sync, this.profileId);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      if (fs.existsSync(dir) && (fs.statSync(dir).mode & 0o200) === 0) throw new Error('EACCES');
+      if (f.publishNothing) return this.say(STR.published[0]);
+      fs.writeFileSync(path.join(dir, '_profile.json'), JSON.stringify({ id: f.publishWrongProfile ? 'someone-else' : this.profileId, name: s.name, color: '#4a9eff', role: s.role.toLowerCase(), email: s.email }));
+      fs.writeFileSync(path.join(dir, Date.now() + '.json'), JSON.stringify(this.snapshot()));
+      this.say(STR.published[0]);
+    } catch { if (!f.failSilent) this.say(f.failLies ? STR.published[0] : STR.failed[0]); }
+  }
+  check() {
+    const s = this.s; s.checked = true; s.merged = false; s.updates = [];
+    if (this.faults.checkEmpty) return;
+    for (const id of fs.readdirSync(s.sync)) {
+      if (id === this.profileId && !this.faults.selfListed) continue;
+      const dir = path.join(s.sync, id), files = fs.readdirSync(dir).filter(n => /^\d+\.json$/.test(n)).sort();
+      if (!files.length) continue;
+      const profile = JSON.parse(fs.readFileSync(path.join(dir, '_profile.json'), 'utf8'));
+      s.updates.push({ name: profile.name, file: path.join(dir, files.at(-1)) });
+    }
+  }
+  merge() {
+    const entry = this.s.updates[0], remote = JSON.parse(fs.readFileSync(entry.file, 'utf8')), local = this.snapshot();
+    let added = 0;
+    for (const layer of remote.layers) {
+      if (layer.name !== 'Layer 1') continue;
+      layer.frames.forEach((frame, i) => {
+        if (!local.layers[0].frames[i]?.isKeyframe) return;
+        for (const stroke of frame.strokes) if (!local.layers[0].frames[i].strokes.some(x => x.strokeId === stroke.strokeId)) {
+          added++; if (!this.faults.mergeNoop) this.world.state.scene['layer-1'].c[i] = true;
+        }
+      });
+    }
+    if (!this.faults.mergeNoop) this.world.rev++;
+    this.s.merged = true;
+    this.say(this.faults.mergeWrongToast ? 'Fusion de ' + entry.name + ' : +undefined ajout(s)' : 'Fusion de ' + entry.name + ' : +' + (this.faults.mergeNoop ? 1 : added) + ' ajout(s)');
   }
   node(id, role, extra = {}) { return { role, identifier: '', identifiers: { resolved: id }, labels: [], ...extra }; }
   nodes() {
@@ -178,7 +228,7 @@ class SettingsApp {
     const expose = !this.faults.noToolState;
     out.push(this.node('', 'AXButton', { labels: ['Hand — pan the canvas (H or Space)'], ...(expose ? { selected: s.tool === 'hand' } : {}) }));
     out.push(this.node('', 'AXButton', { labels: ['Brush (B)'], ...(expose ? { selected: s.tool === 'brush' } : {}) }));
-    if (s.toast) out.push({ role: 'AXStaticText', identifier: '', identifiers: { resolved: '' }, labels: [s.toast] });
+    if (s.toast) out.push({ role: 'AXStaticText', identifier: '', identifiers: { resolved: 'toast' }, labels: [s.toast] });
     if (!s.open) return out;
     out.push(this.node('settings-close', 'AXButton'));
     for (const tab of TABS) out.push(this.node('', 'AXButton', { labels: [tab] }));
@@ -191,6 +241,11 @@ class SettingsApp {
     } else if (s.tab === 'Collaboration') {
       out.push(this.node('sync-folder-path', 'AXTextField', { value: s.sync }));
       if (s.loading > 0) out.push({ role: 'AXStaticText', identifier: '', identifiers: { resolved: '' }, labels: ['Recherche…'] });
+      else if (s.checked && !s.updates.length) out.push({ role: 'AXStaticText', identifier: '', identifiers: { resolved: '' }, labels: [NONE] });
+      else if (s.checked && !this.faults.listHidden) for (const u of s.updates) {
+        out.push({ role: 'AXStaticText', identifier: '', identifiers: { resolved: '' }, labels: [u.name + ' — il y a 0s'] },
+          this.node('', 'AXButton', { labels: [s.merged ? STR.merged[0] : STR.merge[0]] }));
+      }
     } else if (s.tab === 'Shortcuts') {
       for (const [action, key] of Object.entries(s.keys)) out.push(this.node('', 'AXButton', { labels: [action, key] }));
     }
@@ -205,7 +260,7 @@ class SettingsApp {
   async input(command, option, value) {
     const s = this.s; this.log.push(command);
     if (s.loading > 0) s.loading--;
-    s.toast = command === 'tool.brush' ? s.toast : '';
+    if (s.sync !== '' && (command === 'sync.open-cancel' || command === 'sync.check-empty')) throw new OperatorInputError('input-refused', { command, ordinal: this.log.length });
     const ok = { status: 'ok', command };
     switch (command) {
       case 'observe': return { ...ok, nodes: this.nodes() };
@@ -221,15 +276,16 @@ class SettingsApp {
       case 'profile.name': case 'profile.email': case 'profile.role': {
         const key = command.slice(8);
         if (s.originals[key] === undefined) s.originals[key] = s[key];
-        s[key] = key === 'name' && value === '' ? 'Animateur 9Z9Z' : value; return ok;
+        s[key] = key === 'name' && value === '' ? (this.faults.fallbackSuffix ? 'Animateur 9Z9Z' : 'Animateur') : value; return ok;
       }
       case 'profile.name.restore': case 'profile.email.restore': case 'profile.role.restore': {
         const key = command.slice(8, -8); s[key] = s.originals[key]; return ok;
       }
       case 'tool.brush':
-        if (s.role === 'Producer' && !this.faults.noGuard) s.toast = 'Profil "Producteur" : lecture seule + commentaires';
+        if (s.role === 'Producer' && !this.faults.noGuard) this.say('Profil "Producteur" : lecture seule + commentaires');
         else s.tool = 'brush';
         return ok;
+      case 'tool.hand': s.tool = 'hand'; return ok;
       case 'sync.open-cancel': case 'sync.panel-observe': case 'sync.cancel-only': case 'sync.complete': return ok;
       case 'sync.check-empty': s.loading = this.faults.stuckSearch ? 99 : 1; return ok;
       default: throw new Error('unexpected helper command ' + command);
@@ -249,6 +305,22 @@ class SettingsApp {
     if (phase === 'profile-color-opaque') { s.colour = [0x33, 0x66, 0x99]; s.alpha = 1; return { observation: 'set', productFailure: false }; }
     if (phase === 'profile-color-alpha') { if (!faults.alphaIgnored) s.alpha = 0.5; return { observation: 'set', productFailure: false }; }
     if (phase === 'profile-color-restore') { if (!faults.noRestore) { s.colour = [0x4a, 0x9e, 0xff]; s.alpha = 1; } return { observation: 'restored', productFailure: false }; }
+    if (phase === 'sync-document-setup') {
+      this.world = new World(this.dir);
+      const k = Array(120).fill('held'), c = Array(120).fill(false);
+      k[0] = 'key'; k[3] = 'key'; c[0] = c[1] = c[2] = true;
+      this.world.state.scene['layer-1'] = { k, c };
+      return { observation: 'drew a stroke and a blank key', productFailure: false, layer: { uid: 'layer-1' }, reads: this.world.reads('scene') };
+    }
+    if (phase === 'sync-publish-no-folder') { this.publish(); return { observation: 'clicked Publish', productFailure: false }; }
+    if (phase === 'sync-choose-folder') {
+      if (!faults.chooseIgnored) { s.sync = request.details.sharedFolder; this.say(STR.configured[0]); }
+      return { observation: 'picked the folder', productFailure: false };
+    }
+    if (phase === 'sync-publish' || phase === 'sync-publish-unwritable') { this.publish(); return { observation: 'clicked Publish', productFailure: false }; }
+    if (phase === 'sync-check') { this.check(); return { observation: 'clicked check', productFailure: false }; }
+    if (phase === 'sync-merge') { this.merge(); return { observation: 'clicked Merge', productFailure: false }; }
+    if (phase === 'sync-merge-reads') return { observation: 'reads attached', productFailure: false, layer: { uid: 'layer-1' }, reads: this.world.reads('scene') };
     throw new Error('unknown phase ' + phase);
   }
 }

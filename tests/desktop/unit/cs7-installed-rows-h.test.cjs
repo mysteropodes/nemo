@@ -50,8 +50,17 @@ test('frame-edit-ui reaches installed-pass through the runner on a passing stub'
   assert.deepEqual(result.kindsMissing, []);
 });
 
-test('settings-profile can never reach installed-pass while sync-owner-paths stays unrun', async () => {
+test('settings-profile reaches installed-pass through the runner on a passing stub, sync-owner-paths included', async () => {
   const directory = temp(), app = new SettingsApp(directory), stub = settingsSession({ app });
+  const scenarios = { 'settings-profile': settings.createWorkflow({ reportDirectory: directory, sleep: async () => {} }) };
+  const rows = readyRows(declarations, { ...known, scenarios, only: new Set(['settings-profile']) });
+  const result = await runInstalledRows({ rows, scenarios, session: stub });
+  assert.equal(result.verdict, 'installed-pass');
+  assert.deepEqual(result.installed.rows[0].checks.map(c => c.status), Array(settings.CLAUSES.length).fill('pass'));
+});
+
+test('settings-profile cannot pass when the sync-owner clause is not provable: the receipt stays incomplete', async () => {
+  const directory = temp(), app = new SettingsApp(directory, { toastHidden: true }), stub = settingsSession({ app });
   const scenarios = { 'settings-profile': settings.createWorkflow({ reportDirectory: directory, sleep: async () => {} }) };
   const rows = readyRows(declarations, { ...known, scenarios, only: new Set(['settings-profile']) });
   const result = await runInstalledRows({ rows, scenarios, session: stub });
