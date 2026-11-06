@@ -160,3 +160,22 @@ fn the_hit_listing_names_the_pose_the_layers_motion_applies_to_a_pointer_on_the_
     still.as_object_mut().unwrap().remove("propertyHolders");
     assert_eq!(full(&still).unwrap()["layerMatrix"], json!([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]));
 }
+
+#[test]
+fn the_listing_reads_back_the_stored_select_pivot_of_a_vector_record() {
+    let mut doc = masked_content();
+    let content = doc["objects"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|r| r["target"]["layerUid"] == "L0" && r["target"]["strokeId"] == "a")
+        .unwrap();
+    content["vectorExt"] = json!({"xformAnchorKey":"br","xformAnchorCustom":[12.5, -3]});
+    let items = listing(&doc).unwrap();
+    let item = items.iter().find(|i| i["stableTarget"]["strokeId"] == "a").unwrap();
+    assert_eq!(item["xformAnchorKey"], "br");
+    assert_eq!(item["xformAnchorCustom"], json!([12.5, -3.0]));
+    let plain = listing(&masked_content()).unwrap();
+    let item = plain.iter().find(|i| i["stableTarget"]["strokeId"] == "a").unwrap();
+    assert!(item.get("xformAnchorKey").is_none() && item.get("xformAnchorCustom").is_none(), "{item}");
+}

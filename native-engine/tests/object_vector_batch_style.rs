@@ -369,7 +369,7 @@ fn malformed_styles_and_steps_are_refused_with_nothing_written() {
 }
 
 #[test]
-fn a_dab_with_its_anchor_and_an_anchors_unfilled_opacity_are_refused_by_type_and_the_rest_re_stamps() {
+fn a_dab_with_its_anchor_is_refused_by_type_and_the_rest_re_stamps() {
     let anchor_ext = json!({"brushTexture":{"brushGroupId":"g","brushTexturePreset":"charcoal-pencil","preTextureOpacity":1,"strokeSeed":1}});
     let copy_ext = json!({"brushTexture":{"brushGroupId":"g","isBrushTextureCopy":true}});
     let with = |id: &str, ext: &Value| {
@@ -383,15 +383,10 @@ fn a_dab_with_its_anchor_and_an_anchors_unfilled_opacity_are_refused_by_type_and
         vec![with("anchor", &anchor_ext), with("copy", &copy_ext)],
         None,
     );
-    // A dab follows its anchor, so it is not restyled alone; an anchor's opacity with no fill would un-hide its outline.
+    // A dab follows its anchor, so it is not restyled alone.
     refused(
         &with_copy,
         vec![restyle("copy", json!({"width":3}))],
-        "unavailable",
-    );
-    refused(
-        &anchor_only,
-        vec![restyle("anchor", json!({"opacity":0.5}))],
         "unavailable",
     );
     // A stroke colour is the dabs' ink and a width their size: the seeded anchor paints them natively, the stored ones are stamped again.

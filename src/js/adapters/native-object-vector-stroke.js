@@ -15,7 +15,7 @@
   // Members the record owns; everything else a dictionary carries is reported (UNMAPPED) or refuses the mapping (REFUSED).
   const CARRIED = ['segments', 'closed', 'strokeColor', 'hasRealStroke', 'strokeWidth', 'strokeCap', 'strokeJoin', 'miterLimit', 'fillColor',
     'opacity', 'dashArray', 'dashOffset', 'paintOrder', 'isVectorBrush', 'centerSegments', 'widthProfile', 'strokeProfile', 'profileBase',
-    'strokeId', 'boxAngle', 'paramShape', 'fillGradient', 'fillSeed', 'fillSeeds', 'fillWalls', 'fillGapPx', 'isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion',
+    'strokeId', 'boxAngle', 'xformAnchorKey', 'xformAnchorCustom', 'paramShape', 'fillGradient', 'fillSeed', 'fillSeeds', 'fillWalls', 'fillGapPx', 'isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion',
     'brushGroupId', 'isBrushTextureCopy', 'brushTexturePreset', 'preTextureOpacity', 'preTextureStroke', 'channelTag', 'shadowSwatchId'];
   // Members only the native record owns (no serP member): G16 option C's anchor stamping seed.
   const NATIVE_CARRIED = ['strokeSeed'];
@@ -116,6 +116,9 @@
     }
     if (dict.strokeId) out.strokeId = dict.strokeId;
     if (dict.boxAngle) out.boxAngle = dict.boxAngle;
+    // The Select pivot the artist last chose (serP xformAnchorKey / xformAnchorCustom).
+    if (typeof dict.xformAnchorKey === 'string' && dict.xformAnchorKey) out.xformAnchorKey = dict.xformAnchorKey;
+    if (Array.isArray(dict.xformAnchorCustom) && dict.xformAnchorCustom.length === 2) out.xformAnchorCustom = dict.xformAnchorCustom.slice();
     for (const key of ['isMask', 'maskMode', 'maskFeather']) {
       if (!has(dict, key)) continue;
       const v = dict[key];
@@ -224,6 +227,8 @@
       }
       if (n.paramShape !== undefined) ext.paramShape = shape(n.paramShape);
       if (n.boxAngle !== undefined) ext.boxAngle = n.boxAngle;
+      if (n.xformAnchorKey !== undefined) ext.xformAnchorKey = n.xformAnchorKey;
+      if (n.xformAnchorCustom !== undefined) ext.xformAnchorCustom = n.xformAnchorCustom;
       for (const key of ['isMask', 'maskMode', 'maskFeather']) if (has(n, key)) ext[key] = n[key];
       const texture = {};
       for (const key of ['brushGroupId', 'isBrushTextureCopy', 'brushTexturePreset', 'preTextureOpacity', 'preTextureStroke', 'strokeSeed']) if (has(n, key)) texture[key] = n[key];
@@ -285,6 +290,8 @@
     }
     if (record.target.strokeId) out.strokeId = record.target.strokeId;
     if (x.boxAngle) out.boxAngle = x.boxAngle;
+    if (x.xformAnchorKey) out.xformAnchorKey = x.xformAnchorKey;
+    if (x.xformAnchorCustom) out.xformAnchorCustom = x.xformAnchorCustom.slice();
     for (const key of ['isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion']) if (has(x, key)) out[key] = x[key];
     if (x.brushTexture) Object.assign(out, x.brushTexture);
     if (x.shadow) Object.assign(out, x.shadow);

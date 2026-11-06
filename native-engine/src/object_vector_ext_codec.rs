@@ -121,6 +121,21 @@ pub(crate) fn validate_vector_ext(record: &ObjectRecord) -> Result<(), ObjectCod
     {
         return Err(invalid("boxAngle must be finite"));
     }
+    // #2372: the Select pivot is one of the nine preset points, or a custom world point of two finite numbers.
+    if ext
+        .xform_anchor_key
+        .value()
+        .is_some_and(|key| !["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"].contains(&key.as_str()))
+    {
+        return Err(invalid("xformAnchorKey is one of tl tc tr ml mc mr bl bc br"));
+    }
+    if ext
+        .xform_anchor_custom
+        .value()
+        .is_some_and(|p| p.len() != 2 || p.iter().any(|n| finite(n).is_none()))
+    {
+        return Err(invalid("xformAnchorCustom is [x, y], both finite"));
+    }
     Ok(())
 }
 

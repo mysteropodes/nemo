@@ -116,7 +116,7 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
             exact(
                 i,
                 &["stableTarget", "closed", "count", "matrix"],
-                if hit { &["bounds", "role", "filled", "strokeWidth", "owner", "brush", "group", "boxAngle", "style", "paramShape", "groupPath"] } else { &["paintCount"] },
+                if hit { &["bounds", "role", "filled", "strokeWidth", "owner", "brush", "group", "boxAngle", "xformAnchorKey", "xformAnchorCustom", "style", "paramShape", "groupPath"] } else { &["paintCount"] },
             )
             .is_some()
                 && (!hit
@@ -127,6 +127,8 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
                         && i["filled"].is_boolean()
                         && i.get("strokeWidth").is_none_or(|w| w.as_f64().is_some_and(|w| w.is_finite() && w >= 0.0))
                         && i.get("boxAngle").is_none_or(|a| a.as_f64().is_some_and(f64::is_finite))
+                        && i.get("xformAnchorKey").is_none_or(|k| k.as_str().is_some_and(|k| ["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"].contains(&k)))
+                        && i.get("xformAnchorCustom").is_none_or(|p| p.as_array().is_some_and(|p| p.len() == 2 && p.iter().all(|v| v.as_f64().is_some_and(f64::is_finite))))
                         && i.get("style").is_none_or(listed_style)
                         && i.get("paramShape").is_none_or(listed_param_shape)
                         && i.get("groupPath").is_none_or(listed_group_path)

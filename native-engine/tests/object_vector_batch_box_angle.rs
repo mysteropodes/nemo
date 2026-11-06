@@ -90,3 +90,67 @@ fn a_turn_adds_to_the_stored_box_angle_and_nothing_else_changes_it() {
         "redo restores the angle"
     );
 }
+
+fn pivot(id: &str, style: Value) -> Value {
+    json!({"op":"restyle","stableTarget":target("L1", 0, id),"style":style})
+}
+
+/// The Select pivot (baseline `serP` `xformAnchorKey` / `xformAnchorCustom`) is stored by a restyle step of its own: one entry, undo and redo
+/// exact, a save and reopen keeps it, and the artist's other look (a texture anchor's dabs, the stroke) is not touched.
+#[test]
+fn the_select_pivot_is_stored_cleared_undone_and_reopened_by_a_restyle_of_its_own() {
+    let doc = document(1, vec![closed(record_at("A", "L1", 0, ""), "s-a"), closed(record_at("B", "L1", 0, ""), "s-b")], None);
+    let mut owner = owner_of(&doc);
+    let plain = state(&owner);
+    let r = send(&mut owner, "custom", batch(vec![pivot("s-a", json!({"xformAnchorCustom":[40.5, 12]}))]));
+    assert_eq!(r["ok"], true, "{r}");
+    assert_eq!(owner.history_depths(), (1, 0), "one entry");
+    assert_eq!(at(&owner, "s-a")["vectorExt"], json!({"xformAnchorCustom":[40.5, 12]}));
+    assert!(at(&owner, "s-b").get("vectorExt").is_none(), "only the named record");
+    let after = state(&owner);
+    assert_eq!(state(&owner_of(&after)), after, "save and reopen");
+    // A preset replaces the custom point (both members in one step); a null clears.
+    let r = send(&mut owner, "key", batch(vec![pivot("s-a", json!({"xformAnchorKey":"tr","xformAnchorCustom":null}))]));
+    assert_eq!(r["ok"], true, "{r}");
+    assert_eq!(at(&owner, "s-a")["vectorExt"], json!({"xformAnchorKey":"tr"}));
+    let r = send(&mut owner, "clear", batch(vec![pivot("s-a", json!({"xformAnchorKey":null}))]));
+    assert_eq!(r["ok"], true, "{r}");
+    assert!(at(&owner, "s-a").get("vectorExt").is_none(), "an empty extension is omitted");
+    assert_eq!(state(&owner), plain, "the cleared record is the plain one again");
+    for _ in 0..3 {
+        owner.undo(owner.content_revision()).unwrap();
+    }
+    assert_eq!(state(&owner), plain);
+    for _ in 0..3 {
+        owner.redo(owner.content_revision()).unwrap();
+    }
+    assert_eq!(state(&owner), plain);
+    // Two records in one step are one entry.
+    let r = send(&mut owner, "both", batch(vec![pivot("s-a", json!({"xformAnchorKey":"mc"})), pivot("s-b", json!({"xformAnchorKey":"mc"}))]));
+    assert_eq!(r["ok"], true, "{r}");
+    assert_eq!(owner.history_depths().0, 4);
+    assert_eq!(at(&owner, "s-b")["vectorExt"], json!({"xformAnchorKey":"mc"}));
+}
+
+#[test]
+fn a_pivot_with_another_style_member_or_a_malformed_value_is_refused_and_writes_nothing() {
+    let doc = document(1, vec![closed(record_at("A", "L1", 0, ""), "s-a")], None);
+    let mut owner = owner_of(&doc);
+    let before = state(&owner);
+    for (label, style) in [
+        ("with a fill", json!({"xformAnchorKey":"tl","fill":"#ff0000"})),
+        ("unknown preset", json!({"xformAnchorKey":"zz"})),
+        ("one coordinate", json!({"xformAnchorCustom":[1]})),
+        ("a string coordinate", json!({"xformAnchorCustom":[1, "2"]})),
+        ("beyond the bound", json!({"xformAnchorCustom":[1.0e9, 0]})),
+    ] {
+        // A malformed member is refused at admission (an error) or answered by a typed refusal; either way nothing is written.
+        let q = request(&owner, label, batch(vec![pivot("s-a", style)]));
+        let refused = match owner.try_dispatch_object_command(&serde_json::from_value(q).unwrap()) {
+            Err(_) | Ok(None) => true,
+            Ok(Some(reply)) => serde_json::to_value(reply).unwrap()["ok"] == false,
+        };
+        assert!(refused, "{label}");
+    }
+    assert_eq!((state(&owner), owner.history_depths()), (before, (0, 0)));
+}

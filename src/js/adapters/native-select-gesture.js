@@ -331,6 +331,14 @@
     }
     async function end(ev) {
       // A press that never became a drag ends here, except Alt+click inside the selection: the baseline cloned it in place at the press, so the copy stays (selected).
+      // The pivot gesture ends by writing the pivot onto the picked records (one restyle batch), whether it was a click or a drag.
+      if (g.kind === 'pivot' && !g.cancelled) {
+        g.cancelled = true; listen(false);
+        try { if (!stale()) await root.NemoNativeSelectPivot.persist(root, g.sel); } catch (_) { /* the pivot stays a session choice */ }
+        if (O) O.show(root);
+        if (typeof root.updateUI === 'function') root.updateUI();
+        return;
+      }
       if (g.cancelled || (!g.active && !(g.dup && g.kind === 'move'))) return cancel();
       g.last = ev;
       try {
@@ -351,7 +359,9 @@
       }
     }
     return { move: move, end: end, cancel: cancel, owns: function () { return !!handle || g.kind === 'pivot'; },
-      altClick: function (ev) { if (g.cancelled || !g.dup || g.kind !== 'move' || g.active) return false; end(ev); return true; } };
+      altClick: function (ev) {
+        if (g.kind === 'pivot' && !g.cancelled && !g.active) { end(ev); return true; } // an Alt+click that placed the pivot writes it onto the picked records
+        if (g.cancelled || !g.dup || g.kind !== 'move' || g.active) return false; end(ev); return true; } };
   }
   // Cmd/Ctrl+A (baseline 1065e9d8 timeline.js onKeyDown): every selectable item of the ACTIVE layer, Select and Direct Select only. A native object
   // project builds no Paper children, so the items come from the same presented listing the marquee reads (a texture dab and a linked fill companion

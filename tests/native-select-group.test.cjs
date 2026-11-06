@@ -387,3 +387,18 @@ test('the module stays inside the adapter size contract and writes no Paper / ld
   assert.ok(src.split('\n').filter((l) => l.trim()).length <= 500);
   assert.doesNotMatch(src.replace(/\/\*[\s\S]*?\*\//, ''), /foldBooleanOp|insertBooleanResult|pushUndo|ld\.groups|dissolveGroup|GeometryWasm/);
 });
+
+test('a combine mode picked from the group row is ONE object.group.mode.set request naming the group; the current mode is a noop', async () => {
+  const h = harness(COMBINED());
+  await h.pick('b');
+  assert.deepEqual(await NativeGroup.setMode(h.root, 'unite'), { status: 'noop' }, 'the mode it already has changes nothing');
+  assert.equal(h.sent.length, 0);
+  const out = await NativeGroup.setMode(h.root, 'subtract');
+  assert.equal(out.status, 'applied');
+  assert.equal(h.sent.length, 1);
+  assert.equal(h.sent[0].operation, 'command.document.object.group.mode.set');
+  assert.equal(h.sent[0].expectedRevision, 7);
+  assert.deepEqual(h.sent[0].payload, { command: 'object.group.mode.set', layerUid: 'L1', contextId: 'scene-root', groupId: 'G', mode: 'subtract' });
+  assert.deepEqual(h.legacy, []);
+  assert.deepEqual(await NativeGroup.setMode(h.root, 'bogus'), { status: 'noop' });
+});
