@@ -23,6 +23,19 @@ fn scratch(extension: &str) -> PathBuf {
     ))
 }
 
+/// The bytes of `path`, or `None` when it is empty or larger than `cap`. A file at the cap is read one byte past it, so a
+/// longer one is refused as a failed conversion: silently cutting it off would leave a valid-looking header over missing
+/// samples (a WAV whose RIFF length no longer matches the file), which the engine then rejects without naming the media.
+fn read_capped(path: &std::path::Path, cap: u64) -> Option<Vec<u8>> {
+    let mut out = Vec::new();
+    std::fs::File::open(path)
+        .ok()?
+        .take(cap.checked_add(1)?)
+        .read_to_end(&mut out)
+        .ok()?;
+    (!out.is_empty() && out.len() as u64 <= cap).then_some(out)
+}
+
 /// Run ffmpeg over `input` (written to a temp file, never a shell string) and return the bytes of the output file.
 fn convert(input: &[u8], in_ext: &str, out_ext: &str, args: &[&str]) -> Option<Vec<u8>> {
     let (source, target) = (scratch(in_ext), scratch(out_ext));
@@ -53,13 +66,7 @@ fn convert(input: &[u8], in_ext: &str, out_ext: &str, args: &[&str]) -> Option<V
         if !status.success() {
             return None;
         }
-        let mut out = Vec::new();
-        std::fs::File::open(&target)
-            .ok()?
-            .take(MAX_OUTPUT)
-            .read_to_end(&mut out)
-            .ok()?;
-        (!out.is_empty()).then_some(out)
+        read_capped(&target, MAX_OUTPUT)
     })();
     let _ = std::fs::remove_file(&source);
     let _ = std::fs::remove_file(&target);
@@ -118,6 +125,19 @@ mod tests {
         assert_eq!(extension("image/jpeg"), "jpg");
     }
 
+    #[test]
+    fn output_larger_than_the_cap_is_a_failed_conversion_not_a_truncated_file() {
+        let path = scratch("bin");
+        std::fs::write(&path, [7u8; 10]).unwrap();
+        assert_eq!(read_capped(&path, 10), Some(vec![7u8; 10]), "exactly at the cap is kept whole");
+        assert_eq!(read_capped(&path, 9), None, "one byte over the cap is refused");
+        assert_eq!(read_capped(&path, 1), None);
+        std::fs::write(&path, []).unwrap();
+        assert_eq!(read_capped(&path, 10), None, "an empty output is no conversion");
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(read_capped(&path, 10), None, "a missing output is no conversion");
+    }
+
     fn generated(args: &[&str], ext: &str) -> Option<Vec<u8>> {
         let target = scratch(ext);
         let ok = Command::new(crate::video_decode::sidecar_path())
@@ -173,5 +193,23 @@ mod tests {
             let file: serde_json::Value = serde_json::from_slice(&converted.project_file).unwrap();
             assert_eq!(file["assets"].as_array().unwrap().len(), 2);
         }
+    }
+
+    #[test]
+    fn audio_longer_than_the_cap_refuses_naming_the_track_instead_of_failing_the_whole_import() {
+        // 400 s of 44.1 kHz stereo 16-bit PCM is about 70 MB, over the 64 MiB cap; FLAC keeps the payload tiny.
+        let Some(flac) = generated(&["sine=frequency=440:duration=400:sample_rate=44100", "-ac", "2"], "flac") else {
+            eprintln!("skipped: no ffmpeg sidecar for this test run");
+            return;
+        };
+        assert_eq!(FfmpegTranscoder.to_wav("audio/flac", &flac), None, "a WAV over the cap is not handed back truncated");
+        use base64::Engine;
+        let std = base64::engine::general_purpose::STANDARD;
+        let project = serde_json::json!({"version": 13, "totalFrames": 2, "layers": [{"layerUid": "l", "frames": [{"isKeyframe": true, "strokes": []}]}],
+            "audioTracks": [{"name": "long", "audioId": "au", "dataB64": format!("data:audio/flac;base64,{}", std.encode(&flac))}]});
+        let error = native_engine::history::legacy_project_import::convert_admitted_with(project.to_string().as_bytes(), &FfmpegTranscoder)
+            .err()
+            .expect("refused");
+        assert_eq!(error.path(), "audioTracks[0].dataB64", "the refusal names the audio track: {}", error.message());
     }
 }

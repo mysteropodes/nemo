@@ -131,14 +131,7 @@ fn original_project_maps_settings_layers_keyframes_and_strokes_literally() {
     assert_eq!(report["warningsTotal"], 0);
     assert_eq!(
         report["ignored"],
-        json!([
-            "easingCurve",
-            "mediaMode",
-            "motionBlurSamples",
-            "motionBlurShutter",
-            "resamplePts",
-            "tweenStep"
-        ])
+        json!(["mediaMode", "motionBlurSamples", "motionBlurShutter"])
     );
 }
 

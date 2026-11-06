@@ -1399,6 +1399,7 @@
         "object_vector_batch_style_detail.rs",
         "object_vector_batch_style_preset.rs",
         "object_vector_batch_bitmap.rs",
+        "object_vector_batch_bitmap_component.rs",
         "object_vector_batch_dabs.rs",
         "object_vector_batch_skip.rs",
         "object_vector_batch_layers.rs",

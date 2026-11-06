@@ -26,6 +26,9 @@ pub(crate) struct Converted {
     pub(crate) set: Value,
     pub(crate) holders: Vec<Value>,
     pub(crate) dup: dup::Tables,
+    /// Keyframe numbers and generated-frame layers of every component layer, for the tween options.
+    pub(crate) keys: std::collections::HashMap<String, Vec<u32>>,
+    pub(crate) sampled: HashSet<String>,
 }
 
 /// The symbol ids that exist, and so may be instanced.
@@ -49,6 +52,8 @@ pub(crate) fn convert(
         set: Value::Null,
         holders: Vec::new(),
         dup: dup::Tables::default(),
+        keys: std::collections::HashMap::new(),
+        sampled: HashSet::new(),
     };
     let mut components = Vec::new();
     for (id, symbol) in symbols {
@@ -167,6 +172,8 @@ fn component(
     out.holders.extend(set.motion.holders);
     out.dup.duplicators.extend(set.dup.duplicators);
     out.dup.effector_layers.extend(set.dup.effector_layers);
+    out.keys.extend(set.keys);
+    out.sampled.extend(set.sampled);
     let mut record = json!({"symbolId": id, "totalFrames": total, "layers": set.records, "objects": set.objects});
     if let Some(Value::String(name)) = members.get("name") {
         record["name"] = json!(name);

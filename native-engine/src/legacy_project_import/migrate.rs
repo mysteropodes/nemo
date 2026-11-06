@@ -2,6 +2,7 @@
 //! offsets, effector channels, matte source uids and index-keyed tween spans (`importJSON`, motion.js, app.js, timeline.js).
 use super::{object, Ctx, LegacyImportError};
 use serde_json::{json, Map, Value};
+use std::collections::HashSet;
 
 /// JavaScript truthiness of one member.
 fn truthy(value: Option<&Value>) -> bool {
@@ -11,6 +12,19 @@ fn truthy(value: Option<&Value>) -> bool {
 pub(crate) fn run(doc: &mut Map<String, Value>, ctx: &mut Ctx) -> Result<(), LegacyImportError> {
     frames_only(doc, ctx)?;
     validate_shape(doc)?;
+    // Every explicit uid of the scene and of all components is reserved first: a uid generated for one context must not
+    // equal one named by another.
+    for layers in std::iter::once(doc.get("layers"))
+        .chain(
+            doc.get("symbols")
+                .and_then(Value::as_object)
+                .into_iter()
+                .flat_map(|symbols| symbols.values().map(|s| s.get("layers"))),
+        )
+        .filter_map(|l| l.and_then(Value::as_array))
+    {
+        reserve_uids(layers, ctx);
+    }
     let layers = doc
         .get_mut("layers")
         .and_then(Value::as_array_mut)
@@ -30,9 +44,20 @@ pub(crate) fn run(doc: &mut Map<String, Value>, ctx: &mut Ctx) -> Result<(), Leg
     Ok(())
 }
 
+/// Records the layer uids a context already names, so a generated uid never repeats one used anywhere else in the document.
+pub(crate) fn reserve_uids(layers: &[Value], ctx: &mut Ctx) {
+    ctx.layer_uids.extend(
+        layers
+            .iter()
+            .filter_map(|l| l.get("layerUid").and_then(Value::as_str))
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned),
+    );
+}
+
 /// The per-layer load migrations, shared by the scene layers and the layers of every component.
 pub(crate) fn layer_set(layers: &mut [Value], ctx: &mut Ctx) {
-    let generated = assign_layer_uids(layers);
+    let generated = assign_layer_uids(layers, &mut ctx.layer_uids);
     note(ctx, "layerUid", generated);
     note(ctx, "legacyCurve", legacy_curves(layers));
     note(
@@ -110,14 +135,10 @@ fn validate_shape(doc: &Map<String, Value>) -> Result<(), LegacyImportError> {
     Ok(())
 }
 
-/// Every layer needs a stable identity before parents, mattes and tween spans resolve against it.
-fn assign_layer_uids(layers: &mut [Value]) -> usize {
-    let mut taken: Vec<String> = layers
-        .iter()
-        .filter_map(|l| l.get("layerUid").and_then(Value::as_str))
-        .filter(|s| !s.is_empty())
-        .map(str::to_owned)
-        .collect();
+/// Every layer needs a stable identity before parents, mattes and tween spans resolve against it. Layer uids are unique in a
+/// native document (the scene and every component share one tween store and one group-tag table), so `taken` holds every
+/// uid of every context and a generated uid skips all of them.
+fn assign_layer_uids(layers: &mut [Value], taken: &mut HashSet<String>) -> usize {
     let mut generated = 0;
     for (index, layer) in layers.iter_mut().enumerate() {
         if layer
@@ -131,7 +152,7 @@ fn assign_layer_uids(layers: &mut [Value]) -> usize {
         while taken.contains(&candidate) {
             candidate.push('_');
         }
-        taken.push(candidate.clone());
+        taken.insert(candidate.clone());
         layer["layerUid"] = Value::String(candidate);
         generated += 1;
     }
