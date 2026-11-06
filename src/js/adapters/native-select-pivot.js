@@ -8,9 +8,8 @@
  * entry. Like the baseline's per-stroke `xformAnchorKey` / `xformAnchorCustom`, the choice is remembered per picked stroke, so a deselect and reselect
  * (or another item and back) brings the same pivot back; a stroke never given one reads the centre.
  * Persistence (baseline serP data.xformAnchorKey / xformAnchorCustom): once the gesture ends (Alt release, the menu's "Centrer le point d'ancrage") the
- * pivot is written onto every picked VECTOR record as the stored `xformAnchorKey` / `xformAnchorCustom` (one `restyle` batch: one revision, one undo
- * entry), the listing reads it back, so a save and reopen, an undo or a frame change brings the same pivot back. An image or a text block has no stored
- * pivot yet and keeps the session memory only. */
+ * pivot is written onto every picked record (a vector record, an image or a text block) as the stored `xformAnchorKey` / `xformAnchorCustom` (one `restyle` batch: one revision, one undo
+ * entry), the listing reads it back, so a save and reopen, an undo or a frame change brings the same pivot back. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -61,11 +60,11 @@
     else st.xformAnchorCustom = null;
     paintGrid(root);
   }
-  // The pivot as the state holds it now, written onto the picked vector records: ONE restyle batch against the document the selection was read from.
-  // Resolves to the batch status ('applied', 'noop' when no picked record can hold a pivot, 'stale' when the document moved on, 'unavailable').
+  // The pivot as the state holds it now, written onto the picked records: ONE restyle batch against the document the selection was read from.
+  // Resolves to the batch status ('applied', 'noop' when nothing needs writing, 'stale' when the document moved on, 'unavailable').
   async function persist(root, picked) {
     var I = root.NemoSelectCanvasIntent, Labs = root.NemoNativeObjectLabs, route = Labs && typeof Labs.desktop === 'function' ? Labs.desktop(root) : null, st = root.state;
-    var sel = (picked || root.selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget && Number.isInteger(p.data.nativeLayerIndex) && p.data.nativeRole !== 'raster' && p.data.nativeRole !== 'text'; });
+    var sel = (picked || root.selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget && Number.isInteger(p.data.nativeLayerIndex); });
     if (!I || !route || !st || !sel.length) return 'noop';
     var custom = Array.isArray(st.xformAnchorCustom) && st.xformAnchorCustom.length === 2 ? st.xformAnchorCustom.slice() : null;
     var style = custom ? { xformAnchorCustom: custom } : { xformAnchorKey: Object.prototype.hasOwnProperty.call(PRESETS, st.xformAnchorKey) ? st.xformAnchorKey : 'mc', xformAnchorCustom: null };

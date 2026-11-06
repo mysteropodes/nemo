@@ -65,6 +65,8 @@ fn raster(value: &Value) -> bool {
                     "flipX",
                     "flipY",
                     "skew",
+                    "xformAnchorKey",
+                    "xformAnchorCustom",
                     "isBitmapBrush",
                     "brushGroupId",
                     "isBrushTextureCopy",

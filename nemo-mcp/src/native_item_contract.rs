@@ -100,6 +100,8 @@ fn raster_item(value: &Value) -> bool {
         "flipX",
         "flipY",
         "skew",
+        "xformAnchorKey",
+        "xformAnchorCustom",
         "isBitmapBrush",
         "brushGroupId",
         "isBrushTextureCopy",
@@ -115,6 +117,7 @@ fn raster_item(value: &Value) -> bool {
                 .all(|key| members.get(*key).is_none_or(Value::is_number))
             // #2372: the stored mirror and shear of the image (degrees of x-shear, inside a quarter turn).
             && members.get("skew").is_none_or(|d| d.as_f64().is_some_and(|d| d.abs() < 90.0))
+            && pivot(members)
             && ["isBitmapBrush", "isBrushTextureCopy", "flipX", "flipY"]
                 .iter()
                 .all(|key| members.get(*key).is_none_or(Value::is_boolean))
@@ -166,6 +169,9 @@ fn text_fields(members: &Map<String, Value>) -> bool {
         // #2372: the stored mirror and shear of a block about its anchor (a patch never carries them either, see `text_patch`).
         "flipX" | "flipY" => value.is_boolean(),
         "skew" => value.as_f64().is_some_and(|d| d.abs() < 90.0),
+        // #2372: the stored Select pivot of a block (a preset, or a custom world point that wins).
+        "xformAnchorKey" => value.as_str().is_some_and(|k| PIVOT_PRESETS.contains(&k)),
+        "xformAnchorCustom" => pivot_point(value),
         "anchorTopLeft" => {
             exact(value, &["x", "y"], &[]).is_some()
                 && value["x"].is_number()
@@ -175,7 +181,21 @@ fn text_fields(members: &Map<String, Value>) -> bool {
     })
 }
 
-const TEXT_OPTIONAL: [&str; 15] = [
+/// The nine preset pivots of a selection box (an item's stored `xformAnchorKey`).
+const PIVOT_PRESETS: [&str; 9] = ["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"];
+
+/// A custom pivot: a world point of two finite numbers.
+fn pivot_point(value: &Value) -> bool {
+    value.as_array().is_some_and(|p| p.len() == 2 && p.iter().all(|n| n.as_f64().is_some_and(f64::is_finite)))
+}
+
+/// The stored Select pivot of an image (#2372): each member present is well formed.
+fn pivot(members: &Map<String, Value>) -> bool {
+    members.get("xformAnchorKey").is_none_or(|k| k.as_str().is_some_and(|k| PIVOT_PRESETS.contains(&k)))
+        && members.get("xformAnchorCustom").is_none_or(pivot_point)
+}
+
+const TEXT_OPTIONAL: [&str; 17] = [
     "fixedWidth",
     "fixedHeight",
     "bold",
@@ -191,6 +211,8 @@ const TEXT_OPTIONAL: [&str; 15] = [
     "flipX",
     "flipY",
     "skew",
+    "xformAnchorKey",
+    "xformAnchorCustom",
 ];
 
 fn text_block(value: &Value) -> bool {
@@ -202,13 +224,13 @@ fn text_block(value: &Value) -> bool {
     .is_some_and(text_fields)
 }
 
-/// A patch names members to replace; it never carries `anchorTopLeft` (an edit cannot re-anchor) or `rotation` / `flipX` / `flipY` / `skew` (a Select transform owns them).
+/// A patch names members to replace; it never carries `anchorTopLeft` (an edit cannot re-anchor) or `rotation` / `flipX` / `flipY` / `skew` / the pivot (a Select transform owns them).
 fn text_patch(value: &Value) -> bool {
     value.as_object().is_some_and(|members| {
         !members.is_empty()
             && !members.contains_key("anchorTopLeft")
             && !members.contains_key("rotation")
-            && !["flipX", "flipY", "skew"].iter().any(|key| members.contains_key(*key))
+            && !["flipX", "flipY", "skew", "xformAnchorKey", "xformAnchorCustom"].iter().any(|key| members.contains_key(*key))
             && text_fields(members)
     })
 }

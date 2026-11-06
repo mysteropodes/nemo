@@ -278,7 +278,8 @@ pub(super) fn transform(
 }
 
 /// `Ok(None)` when `target` is not a stored item. A restyle (#2372) reaches an image's opacity, and a text block's colour: a fill is its
-/// colour, an opacity is its alpha (baseline: the alpha of the fill paint). A stroke and a width have nothing to change on an item.
+/// colour, an opacity is its alpha (baseline: the alpha of the fill paint). A stroke and a width have nothing to change on an item. The
+/// Select pivot (`style.pivot`, an edit of its own) is stored as the item's `xformAnchorKey` / `xformAnchorCustom`.
 pub(super) fn restyle(
     document: &ObjectDocument,
     target: &ObjectTarget,
@@ -295,16 +296,18 @@ pub(super) fn restyle(
     }
     check_target(document, target)?;
     check_layer(document, target)?;
-    // The Select pivot is stored on vector records only (#2372): an image or a text block keeps the pivot for the session.
-    if style.pivot.is_some() {
-        return Err(DispatchErrorCode::Unavailable);
-    }
     let mut landing = target.clone();
     landing.frame_scope.frame = frame.unwrap_or(target.frame_scope.frame);
     if let Some(entry) = raster {
-        let edited = match style.opacity {
-            Some(opacity) => redecode(&entry.item, &[("opacity", style_num(opacity)?)])?,
-            None => entry.item.clone(),
+        let edited = if let Some(edit) = &style.pivot {
+            let current = serde_json::from_str::<Value>(&entry.item.encode().map_err(|_| DispatchErrorCode::Internal)?).map_err(|_| DispatchErrorCode::Internal)?;
+            let members = with_members(&current, &edit.members()?)?;
+            RasterItem::decode(&Value::Object(members).to_string()).map_err(|_| DispatchErrorCode::InvalidRequest)?
+        } else {
+            match style.opacity {
+                Some(opacity) => redecode(&entry.item, &[("opacity", style_num(opacity)?)])?,
+                None => entry.item.clone(),
+            }
         };
         return Ok(Some(ItemSwap::Raster(landing, edited)));
     }
@@ -312,6 +315,11 @@ pub(super) fn restyle(
     let Value::Object(mut members) = serde_json::to_value(block).map_err(|_| DispatchErrorCode::Internal)? else {
         return Err(DispatchErrorCode::Internal);
     };
+    if let Some(edit) = &style.pivot {
+        let members = with_members(&Value::Object(members), &edit.members()?)?;
+        let edited = TextBlockRecord::decode(&Value::Object(members).to_string()).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        return Ok(Some(ItemSwap::Text(landing, edited)));
+    }
     let base = style.fill.as_ref().map(|(_, hex)| hex.clone()).or_else(|| members.get("color").and_then(Value::as_str).map(str::to_string));
     if let Some(base) = base.filter(|_| style.fill.is_some() || style.opacity.is_some()) {
         let rgb = base.get(..7).ok_or(DispatchErrorCode::InvalidRequest)?;
