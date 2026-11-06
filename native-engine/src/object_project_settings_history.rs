@@ -70,6 +70,9 @@ impl NativeObjectHistory {
     ) -> Result<PreparedProjectSettings, DispatchErrorCode> {
         self.owner.prepare_project_settings_json(bytes)
     }
+    pub(crate) fn project_length_refusal(&self, bytes: &[u8]) -> Option<&'static str> {
+        self.owner.project_length_refusal(bytes)
+    }
     pub(crate) fn commit_project_settings(
         &mut self,
         candidate: PreparedProjectSettings,

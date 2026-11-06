@@ -20,6 +20,7 @@ function fixture(over){
     readPresentedObjectSession:()=>({...info,available:true,presentation:{...info,owner:'native',status:'presented',frame:root.state.currentFrame}}),
     async editProjectSettings(action,pin){
       assert.strictEqual(pin,info);calls.push(action);
+      if(fault&&fault.refusal)throw Object.assign(new Error('Native command refused: '+fault.refusal.code),{refusal:fault.refusal});
       const next={...info};
       if(action.kind==='setTotalFrames'){
         const wanted=Math.max(1,Math.min(999,Math.floor(action.frames)));next.totalFrames=wanted;
@@ -74,6 +75,16 @@ test('the same length is an unchanged no-op without history',async()=>{
 });
 test('a length the document did not take is never confirmed',async()=>{
   const h=fixture();h.fault('total');assert.equal((await h.sm.setTotalFrames(200)).status,'applied-unconfirmed');
+});
+test('a typed unavailable refusal shows the engine message instead of the generic notice',async()=>{
+  const reason='The timeline cannot be shortened that far: a Reference or another context still has content past the new last frame.';
+  const h=fixture();h.fault({refusal:{code:'unavailable',message:reason}});
+  const r=await h.sm.setTotalFrames(30);assert.deepEqual([r.status,r.message],['unavailable',reason]);
+  assert.deepEqual(h.toasts,[reason]);assert.equal(h.info().totalFrames,120);assert.equal(h.info().contentRevision,0);
+  // A refusal that names no cause, or another code, keeps the old unconfirmed outcome.
+  const g=fixture();g.fault({refusal:{code:'unavailable',message:''}});assert.equal((await g.sm.setTotalFrames(30)).status,'unconfirmed');
+  const s=fixture();s.fault({refusal:{code:'stale_revision',message:'old'}});assert.equal((await s.sm.setTotalFrames(30)).status,'unconfirmed');
+  assert.ok(!s.toasts.includes('old'));
 });
 test('without the native controller both entries are unavailable and touch no legacy state',async()=>{
   const h=fixture();h.controller.dispose();delete h.root.NemoNativeProjectSettingsController;

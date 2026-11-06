@@ -195,6 +195,15 @@ impl NativeObjectHistory {
                     })
                     .map_err(|code| (code, "Project settings could not commit."))
             }
+            Err(DispatchErrorCode::Unavailable) => Err((
+                DispatchErrorCode::Unavailable,
+                if request.operation == OP_PROJECT_SETTINGS {
+                    self.project_length_refusal(&payload)
+                } else {
+                    None
+                }
+                .unwrap_or("Native project settings are unavailable."),
+            )),
             Err(code) => Err((
                 code,
                 "Project settings payload is invalid or project is absent.",

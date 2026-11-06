@@ -105,6 +105,14 @@ impl ObjectFillOwner {
     ) -> Result<PreparedProjectSettings, DispatchErrorCode> {
         self.prepare_settings_json(bytes, false)
     }
+    /// Why a Frames-field or Trim request was refused as `Unavailable`, when it was the one case the field cannot
+    /// apply at all (content no edit moves would sit past the new last frame). `None` for any other outcome.
+    pub(crate) fn project_length_refusal(&self, bytes: &[u8]) -> Option<&'static str> {
+        let payload: serde_json::Value = serde_json::from_slice(bytes).ok()?;
+        let origin = self.current_snapshot();
+        let project = origin.project()?;
+        length_edit::stranded_reason(origin.document(), project.project(), payload.get("action")?)
+    }
     /// Private provider entry; the public settings dispatcher cannot select it.
     pub(crate) fn prepare_composition_metadata_json(
         &self,
