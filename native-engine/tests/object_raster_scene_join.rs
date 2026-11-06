@@ -439,6 +439,9 @@ fn a_3d_image_layer_projects_its_rect_and_keeps_the_flat_picture_at_depth_zero()
     // The image's own origin maps to the half-distance point from the canvas centre (32, 32).
     assert!((far[4] - (32. + (flat[4] - 32.) / 2.)).abs() < 1e-9, "{far:?} vs {flat:?}");
     assert!((far[5] - (32. + (flat[5] - 32.) / 2.)).abs() < 1e-9, "{far:?} vs {flat:?}");
+    // Save and reload keep the projected picture.
+    let reopened = NativeObjectHistory::from_project_file("reopened-3d", &saved_bytes(&owner)).unwrap();
+    assert_eq!(coeffs(&reopened).0, far);
     // Switching off restores the flat picture.
     three_d_layer(&mut owner, &layer, false);
     let (back, _) = coeffs(&owner);
