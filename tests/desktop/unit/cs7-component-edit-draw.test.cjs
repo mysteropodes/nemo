@@ -39,7 +39,7 @@ test('a product failure read back from the document fails its clause, stops, and
     [{ leak: 'comp-ellipse' }, 'component-draw-tools', 'component-draw-undo-redo'],     // the Scene changed
     [{ badUndo: true }, 'component-draw-undo-redo', 'component-instances-pixels'],
     [{ noInstance: true }, 'component-instances-pixels', 'component-bitmap-export'],    // the instance does not show the drawing
-    [{ noise: true }, 'component-instances-pixels', 'component-bitmap-export'],         // the artboard changed elsewhere
+    [{ noise: true }, 'component-instances-pixels', 'component-bitmap-export'],         // the canvas changed everywhere
     [{ noBitmapInk: true }, 'component-bitmap-export', 'component-break-apart'],
     [{ bakeNoKind: true }, 'component-break-apart', 'component-draw-save-reopen'],
     [{ bakeWrongFrames: true }, 'component-break-apart', 'component-draw-save-reopen'],
@@ -106,11 +106,9 @@ test('malformed or verdict-bearing evidence is an operator input error, never a 
     ({ session, workflow } = setup(t, {}, (p, op, pair) => { if (p === phase) damage(op, pair); }));
     await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed', phase);
   }
-  // an exported image whose "background" is not empty is the operator's mistake, not a verdict
-  ({ session, workflow } = setup(t));
-  const original = session.requestEvidence;
-  session.requestEvidence = async request => { const ev = await original(request); if (request.phase === 'bitmap-export') ev.rects.background = { x: 100, y: 100, w: 100, h: 20 }; return ev; };
-  await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed');
+  // an export the step did not write is the operator's mistake, not a verdict
+  ({ session, workflow } = setup(t, { noExport: 'bitmap-export' }));
+  await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed' && error.command === 'component-edit-draw.bitmap-export');
 });
 
 test('a missing or reordered declared clause is refused before any phase runs', async t => {
@@ -137,4 +135,122 @@ test('the gesture oracle encodes the baseline effect of a drawing', () => {
   assert.equal(JUDGES.drawAtPlayhead(blank, rows(['key', 'held', 'held'], [true, true, true]), 1, true), null);
   assert.ok(JUDGES.drawAtPlayhead(rows(['key', 'held'], [true, true]), blank, 1, true).pre);
   assert.equal(JUDGES.drawAtPlayhead(rows(['key', 'held'], [true, true]), rows(['key', 'held'], [true, true]), 1, false), null);
+});
+
+// ---- the findings of the installed-rows review ------------------------------------------------------------------
+const outcomeOf = directory => JSON.parse(fs.readFileSync(path.join(directory, 'component-edit-draw/outcome.json'), 'utf8'));
+const others = (s, ...ids) => Object.entries(s).filter(([id]) => !ids.includes(id)).every(([, v]) => v === 'pass');
+
+test('P2813-1: the tool that drew, the Fill Brush placement and a bitmap record are read from the app, not assumed', async t => {
+  // Before: every gesture used the same judge, so seven strokes drawn with any tool passed.
+  for (const wrongTool of ['comp-pen', 'comp-ellipse', 'comp-fillbrush']) {
+    const { session, workflow } = setup(t, { wrongTool });
+    await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed' && error.command === 'component-edit-draw.' + wrongTool, wrongTool);
+  }
+  let ctx = setup(t, { aboveOff: true });
+  await assert.rejects(ctx.workflow.run({ session: ctx.session, row: row() }), error => error.command === 'component-edit-draw.comp-fillbrush');
+  // A non-bitmap stroke at the bitmap step has no bitmap-brush record: a product failure, found by a read-only query.
+  ctx = setup(t, { notBitmap: true });
+  const failed = await ctx.workflow.run({ session: ctx.session, row: row() });
+  assert.equal(statuses(failed)['component-draw-tools'], 'fail');
+  assert.match(outcomeOf(ctx.directory).reason, /no-bitmap-brush-record-for-the-stroke/);
+  // The page's classes are not exposed: the tool cannot be read, so the clause is unrun, never passed.
+  ctx = setup(t, { noClasses: true });
+  const unread = await ctx.workflow.run({ session: ctx.session, row: row() });
+  assert.equal(statuses(unread)['component-draw-tools'], 'unrun');
+  assert.equal(statuses(unread)['component-motion-draw'], 'unrun');
+  assert.match(outcomeOf(ctx.directory).reasons['component-draw-tools'], /no tool button with DOM classes/);
+  assert.ok(others(statuses(unread), 'component-draw-tools', 'component-motion-draw'));
+  // The bitmap read route refused: unrun with the reason.
+  ctx = setup(t, { bitmapRefused: true });
+  const refused = await ctx.workflow.run({ session: ctx.session, row: row() });
+  assert.equal(statuses(refused)['component-draw-tools'], 'unrun');
+  assert.match(outcomeOf(ctx.directory).reasons['component-draw-tools'], /bitmap brush read was refused/);
+  assert.equal(statuses(refused)['component-bitmap-export'], 'unrun');
+  // The pure functions behind it.
+  const { activeTool, aboveSelected } = require('../cs7-scenarios/component-edit-draw.cjs');
+  const btn = (label, ...classes) => ({ role: 'AXButton', labels: [label], classes });
+  assert.deepEqual(activeTool([btn('Brush (B)', 'tool-btn', 'active'), btn('Pen', 'tool-btn')]), { tool: 'draw' });
+  assert.deepEqual(activeTool([btn('Pinceau de remplissage', 'tool-btn', 'active'), btn('Pinceau', 'tool-btn')]), { tool: 'fillbrush' });
+  assert.deepEqual(activeTool([btn('Pinceau', 'tool-btn', 'active')]), { tool: 'draw' });
+  assert.ok(activeTool([btn('Brush (B)', 'tool-btn')]).unread);
+  assert.deepEqual(aboveSelected([btn('Above — on top of existing fills', 'icon-btn', 'active')]), { on: true });
+});
+
+test('P2813-2: Motion mode is read from the app, and a stroke after the first must change the layer rows or the clause stays unrun', async t => {
+  // Before: motion-enter/exit asserted only "no edit", and Pen/Rectangle passed on cells that were already true.
+  let ctx = setup(t, { modeNotSwitched: true });
+  await assert.rejects(ctx.workflow.run({ session: ctx.session, row: row() }), error => error.code === 'operator-evidence-malformed' && error.command === 'component-edit-draw.motion-enter');
+  ctx = setup(t, { wrongTool: 'motion-pen' });
+  await assert.rejects(ctx.workflow.run({ session: ctx.session, row: row() }), error => error.command === 'component-edit-draw.motion-pen');
+  // Strokes routed onto the origin key: the first lands on the playhead cell, the others change no row and cannot be told from any other edit.
+  ctx = setup(t, { originKey: true });
+  const result = await ctx.workflow.run({ session: ctx.session, row: row() });
+  const s = statuses(result);
+  assert.equal(s['component-motion-draw'], 'unrun');
+  assert.match(outcomeOf(ctx.directory).reasons['component-motion-draw'], /motion-pen: the layer rows did not change/);
+  assert.ok(others(s, 'component-motion-draw'));
+  // The same stroke on a layer that already shows content: a layer edit that moves nothing is not a stroke.
+  ctx = setup(t, { noop: 'motion-pen' });
+  assert.equal(statuses(await ctx.workflow.run({ session: ctx.session, row: row() }))['component-motion-draw'], 'fail');
+});
+
+test('P2813-3: the instance pixels are judged on the canvas\'s own accessibility frame at one playhead frame, not on operator rectangles', async t => {
+  // Before: canvas, drawZone and outside were operator rects; the playhead frame and the UI around the canvas were not considered.
+  let ctx = setup(t, { chrome: true });
+  assert.equal(statuses(await ctx.workflow.run({ session: ctx.session, row: row() }))['component-instances-pixels'], 'pass');   // UI outside the canvas is ignored
+  ctx = setup(t, { exitFrame: 5 });
+  await assert.rejects(ctx.workflow.run({ session: ctx.session, row: row() }), error => error.code === 'operator-evidence-malformed' && error.command === 'component-edit-draw.component-exit');
+  ctx = setup(t, { noPlayhead: true });
+  const unread = await ctx.workflow.run({ session: ctx.session, row: row() });
+  assert.equal(statuses(unread)['component-instances-pixels'], 'unrun');
+  assert.match(outcomeOf(ctx.directory).reasons['component-instances-pixels'], /playhead frame was not readable/);
+  ctx = setup(t, { noise: true });
+  assert.equal(statuses(await ctx.workflow.run({ session: ctx.session, row: row() }))['component-instances-pixels'], 'fail');
+  assert.match(outcomeOf(ctx.directory).reason, /canvas tiles/);
+  // No operator phase asks for rectangles, and both captures are hashed by the runner.
+  ctx = setup(t);
+  const asked = []; const original = ctx.session.requestEvidence;
+  ctx.session.requestEvidence = request => { asked.push(request.phase); return original(request); };
+  await ctx.workflow.run({ session: ctx.session, row: row() });
+  assert.ok(!asked.includes('instance-before'));
+  const shot = JSON.parse(fs.readFileSync(path.join(ctx.directory, 'component-edit-draw/instance-before.json'), 'utf8'));
+  assert.equal(shot.sha256, require('node:crypto').createHash('sha256').update(fs.readFileSync(path.join(ctx.directory, 'capture-21.png'))).digest('hex'));
+  assert.deepEqual(shot.canvas, { x: 100, y: 80, w: 500, h: 300 });
+});
+
+test('P2813-4: the bitmap export is measured by the runner, pinned to frame 3, compared with a baseline export and a bitmap record', async t => {
+  // Before: the PNG was whatever the operator placed, with operator rectangles and no baseline.
+  for (const [faults, status] of [[{ noBitmapInk: true }, 'fail'], [{ inkEverywhere: true }, 'fail']]) {
+    const ctx = setup(t, faults);
+    assert.equal(statuses(await ctx.workflow.run({ session: ctx.session, row: row() }))['component-bitmap-export'], status, JSON.stringify(faults));
+  }
+  // The app records no bitmap-brush stroke at frame 3 (the export would be a plain stroke): found at the gesture, by a read-only query.
+  let ctx = setup(t, { noBitmapRecord: true });
+  assert.equal(statuses(await ctx.workflow.run({ session: ctx.session, row: row() }))['component-draw-tools'], 'fail');
+  ctx = setup(t, { wrongExportFrame: 'bitmap-export' });
+  await assert.rejects(ctx.workflow.run({ session: ctx.session, row: row() }), error => error.command === 'component-edit-draw.bitmap-export');
+  ctx = setup(t, { noExport: 'bitmap-baseline' });
+  await assert.rejects(ctx.workflow.run({ session: ctx.session, row: row() }), error => error.command === 'component-edit-draw.bitmap-baseline');
+  ctx = setup(t);
+  assert.equal(statuses(await ctx.workflow.run({ session: ctx.session, row: row() }))['component-bitmap-export'], 'pass');
+  const file = JSON.parse(fs.readFileSync(path.join(ctx.directory, 'component-edit-draw/file-bitmap-export.json'), 'utf8'));
+  assert.equal(file.playhead, 3);
+  assert.equal(file.sha256, require('node:crypto').createHash('sha256').update(fs.readFileSync(path.join(ctx.directory, 'exports/bitmap-brush.png'))).digest('hex'));
+});
+
+test('P2813-6: the saved file is compared with the verified layers and keys, and reopening must give a new document', async t => {
+  for (const [faults, reason] of [[{ savedLayersWrong: true }, /saved-layers-differ/], [{ sameDocumentOnReopen: true }, /reopen-did-not-create-a-new-document/], [{ touchFileOnOpen: true }, /changed-by-opening/]]) {
+    const ctx = setup(t, faults);
+    assert.equal(statuses(await ctx.workflow.run({ session: ctx.session, row: row() }))['component-draw-save-reopen'], 'fail', JSON.stringify(faults));
+    assert.match(outcomeOf(ctx.directory).reason, reason);
+  }
+  const ctx = setup(t, { noWrite: true });
+  await assert.rejects(ctx.workflow.run({ session: ctx.session, row: row() }), error => error.command === 'component-edit-draw.draw-save');
+});
+
+test('P2813-0: a reply that answers for another Nemo instance is refused (document state is read by the harness, bound to the candidate)', async t => {
+  const { FOREIGN } = require('./cs7-h-stubs.cjs');
+  const { session, workflow } = setup(t, {}, (phase, op, pair) => { if (phase === 'comp-pen') pair.response.instanceId = FOREIGN; });
+  await assert.rejects(workflow.run({ session, row: row() }), /reply is not from the candidate document/);
 });

@@ -39,7 +39,8 @@ test('the copied sources are the repository fixtures, and the two refusals add o
   assert.deepEqual(read('media.json'), JSON.parse(fs.readFileSync(path.join(FIXTURES, 'media.json'), 'utf8')));
   assert.equal(read('refused-expr.json').exprGlobals, 'var a = 1;');
   assert.deepEqual(read('refused-roles.json').trackRoles, { r: { name: 'a' } });
-  assert.deepEqual(expectedOf(animation), { frames: 12, names: animation.layers.map(l => l.name).sort(), comps: [6] });
+  assert.deepEqual(expectedOf(animation), { frames: 12, names: animation.layers.map(l => l.name).sort(), comps: [6],
+    kinds: { Shapes: 'drawing', Child: 'drawing', 'Matte 2': 'drawing', Null: 'null', Guide: 'drawing', Folder: 'folder', Rig: 'widget', Dup: 'drawing', Comp: 'instance' } });
 });
 
 test('a product failure fails its clause, stops, and leaves the rest unrun', async t => {
@@ -82,8 +83,8 @@ test('toast text that cannot be read leaves the clauses that need it unrun, with
   const { session, workflow, directory } = setup(t, { toastHidden: true });
   const result = await workflow.run({ session, row: row() });
   const s = statuses(result);
-  for (const id of ['open-as-new-document', 'first-save-save-as', 'media-text-open', 'refused-field-path']) assert.equal(s[id], 'unrun', id);
-  for (const id of ['original-untouched', 'edit-undo-redo', 'save-reopen']) assert.equal(s[id], 'pass', id);
+  for (const id of ['open-as-new-document', 'original-untouched', 'first-save-save-as', 'media-text-open', 'refused-field-path']) assert.equal(s[id], 'unrun', id);
+  for (const id of ['edit-undo-redo', 'save-reopen']) assert.equal(s[id], 'pass', id);
   assert.equal(result.safeToContinue, true);
   const outcome = JSON.parse(fs.readFileSync(path.join(directory, 'legacy-import/outcome.json'), 'utf8'));
   assert.match(outcome.reasons['first-save-save-as'], /refusal text for saving over the original was not read/);
@@ -127,10 +128,10 @@ test('malformed or verdict-bearing evidence is an operator input error, never a 
     await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed' || /not one complete page/.test(error.message));
   }
   // a save reply that does not name the agreed file, or a first save without the dialog fact
-  for (const damage of [ev => { ev.savedFile = 'elsewhere.json'; }, ev => { delete ev.nameDialogOpened; }]) {
+  for (const [phase, damage] of [['save-first-name', ev => { ev.savedFile = 'elsewhere.json'; }], ['save-first-press', ev => { delete ev.nameDialogOpened; }]]) {
     ({ session, workflow } = setup(t));
     const original = session.requestEvidence;
-    session.requestEvidence = async request => { const ev = await original(request); if (request.phase === 'save-first') damage(ev); return ev; };
+    session.requestEvidence = async request => { const ev = await original(request); if (request.phase === phase) damage(ev); return ev; };
     await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed');
   }
 });
@@ -152,13 +153,14 @@ test('summarizeDoc and matches read only complete, pinned component pages and co
   try {
     const world = new LegacyWorld(dir);
     const json = JSON.parse(fs.readFileSync(path.join(FIXTURES, 'animation.json'), 'utf8'));
-    world.newDocument(json);
+    world.newDocument(json, expectedOf(json).kinds);
     const good = world.reads(), summary = summarizeDoc(good);
     assert.ok(summary);
     assert.equal(matches(summary, expectedOf(json)), null);
     assert.equal(matches(summary, { ...expectedOf(json), frames: 13 }), 'scene-total-frames-differ-from-the-file');
     assert.equal(matches(summary, { ...expectedOf(json), comps: [] }), 'component-contexts-differ-from-the-file');
     assert.equal(matches(summary, { ...expectedOf(json), names: ['x'] }), 'scene-layer-count-differs-from-the-file');
+    assert.equal(matches(summary, { ...expectedOf(json), kinds: { ...expectedOf(json).kinds, Null: 'drawing' } }), 'scene-layer-kinds-differ-from-the-file');
     const why = {};
     const partial = structuredClone(good); partial.layers.response.result.nextCursor = 10;
     assert.equal(summarizeDoc(partial, why), null);
@@ -167,4 +169,78 @@ test('summarizeDoc and matches read only complete, pinned component pages and co
     assert.equal(summarizeDoc(other), null);
     assert.equal(SAVED, 'saved/legacy-animation.json');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+// ---- the findings of the installed-rows review ------------------------------------------------------------------
+const outcomeOf = directory => JSON.parse(fs.readFileSync(path.join(directory, 'legacy-import/outcome.json'), 'utf8'));
+
+test('P2813-7: original-untouched passes only when the open, the refused Save As and the refused opens were each seen', async t => {
+  // Before: `!changed().length` at the end passed an operator who replied "fine" to every step without doing anything.
+  const { session, workflow, directory } = setup(t, { silentRefusal: true });
+  const result = await workflow.run({ session, row: row() });
+  const s = statuses(result);
+  assert.equal(s['original-untouched'], 'unrun');
+  assert.equal(s['first-save-save-as'], 'unrun');
+  assert.match(outcomeOf(directory).reasons['original-untouched'], /attempt was not observed for: save-original-refused/);
+  // Nothing observed at all (no toast reaches the accessibility read): the files are unchanged and that proves nothing.
+  const blind = setup(t, { toastHidden: true });
+  await blind.workflow.run({ session: blind.session, row: row() });
+  assert.match(outcomeOf(blind.directory).reasons['original-untouched'], /open-animation, open-media, save-original-refused, refuse-expr, refuse-roles/);
+});
+
+test('P2813-8: the open needs the native notice, rejects a lossy one, and compares layer kinds', async t => {
+  // Before: any fresh text containing the base name passed, the extended "not carried over" notice passed, and kinds were not compared.
+  let ctx = setup(t, { lossyNotice: true });
+  assert.equal(statuses(await ctx.workflow.run({ session: ctx.session, row: row() }))['open-as-new-document'], 'fail');
+  assert.match(outcomeOf(ctx.directory).reason, /open-notice-reports-items-not-carried-over/);
+  ctx = setup(t, { wrongKinds: true });
+  assert.equal(statuses(await ctx.workflow.run({ session: ctx.session, row: row() }))['open-as-new-document'], 'fail');
+  assert.match(outcomeOf(ctx.directory).reason, /scene-layer-kinds-differ-from-the-file/);
+  // A title that merely contains the base name is not the notice.
+  ctx = setup(t, { toastHidden: true });
+  const original = ctx.session.input;
+  ctx.session.input = async command => { const r = await original(command); return { ...r, nodes: [{ role: 'AXStaticText', labels: ['animation.json'], value: 'animation.json' }] }; };
+  const result = await ctx.workflow.run({ session: ctx.session, row: row() });
+  assert.equal(statuses(result)['open-as-new-document'], 'unrun');
+  assert.match(outcomeOf(ctx.directory).reasons['open-as-new-document'], /open notice for animation was not read/);
+});
+
+test('P2813-9: the name dialog is looked for in the accessibility read, Save asks no name twice, and F5 is a held cell after frame 1', async t => {
+  // Before: an operator boolean decided the dialog, save-again asserted nothing about a dialog, and only totalFrames +1 judged the edit.
+  let ctx = setup(t, { dialogHidden: true });
+  let result = await ctx.workflow.run({ session: ctx.session, row: row() });
+  assert.equal(statuses(result)['first-save-save-as'], 'unrun');
+  assert.match(outcomeOf(ctx.directory).reasons['first-save-save-as'], /name dialog was reported but is not visible/);
+  assert.equal(statuses(result)['save-reopen'], 'pass');
+  ctx = setup(t, { askAgain: true });
+  assert.equal(statuses(await ctx.workflow.run({ session: ctx.session, row: row() }))['save-reopen'], 'fail');
+  assert.match(outcomeOf(ctx.directory).reason, /save-asked-for-a-name-again/);
+  ctx = setup(t, { askAgainHidden: true });                // the operator denies a dialog but the accessibility read shows one
+  assert.equal(statuses(await ctx.workflow.run({ session: ctx.session, row: row() }))['save-reopen'], 'fail');
+  ctx = setup(t, { editTotalOnly: true });                 // Total frames +1 without a held cell after frame 1
+  assert.equal(statuses(await ctx.workflow.run({ session: ctx.session, row: row() }))['edit-undo-redo'], 'fail');
+  assert.match(outcomeOf(ctx.directory).reason, /later-frames-not-shifted|inserted-cell-not-held/);
+});
+
+test('P2813-6: the saved file is compared with the document the app reports and measured by the runner', async t => {
+  // Before: any JSON whose format began with nemo.native- and whose hash differed passed.
+  for (const [faults, reason] of [[{ savedLayersWrong: true }, /saved-layers-differ-from-the-document/], [{ saveNoEdit: true }, /save-did-not-write-the-edit/]]) {
+    const ctx = setup(t, faults);
+    const s = statuses(await ctx.workflow.run({ session: ctx.session, row: row() }));
+    assert.ok(s['first-save-save-as'] === 'fail' || s['save-reopen'] === 'fail', JSON.stringify(faults));
+    assert.match(outcomeOf(ctx.directory).reason, reason);
+  }
+  const { savedAgrees } = require('../cs7-scenarios/legacy-import.cjs');
+  const summary = { contexts: [{ contextId: 'scene-root', contextKind: 'scene', totalFrames: 3, layerCount: 1 }], layers: [{ layerUid: 'l0', name: 'A', layerKind: 'drawing' }] };
+  const doc = (extra = {}) => ({ format: 'nemo.native-object-document', totalFrames: 3, layers: [{ layerUid: 'l0', name: 'A' }], ...extra });
+  assert.equal(savedAgrees(doc(), summary), null);
+  assert.match(savedAgrees(doc({ totalFrames: 4 }), summary), /total-frames/);
+  assert.match(savedAgrees(doc({ layers: [{ layerUid: 'l0', name: 'B' }] }), summary), /names/);
+  assert.match(savedAgrees({ format: 'nemo.native-x' }, summary), /no-native-object-document/);
+});
+
+test('P2813-0: a reply that answers for another Nemo instance is refused', async t => {
+  const { FOREIGN } = require('./cs7-h-stubs.cjs');
+  const { session, workflow } = setup(t, {}, (phase, op, pair) => { if (phase === 'legacy-edit') pair.response.instanceId = FOREIGN; });
+  await assert.rejects(workflow.run({ session, row: row() }), /reply is not from the candidate document|not one complete page/);
 });

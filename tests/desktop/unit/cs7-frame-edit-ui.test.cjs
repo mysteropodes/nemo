@@ -61,18 +61,88 @@ test('a failure the operator reports is taken as stated, never softened', async 
   assert.ok(result.checks.every(c => c.status === 'unrun') && result.safeToContinue === false);
 });
 
-test('the layer-row styling clause is judged from the owned-window capture pixels and accessible names', async t => {
-  for (const [styling, buttons, why] of [
-    [stylingPng({ light: true }), true, 'light button fill'],
-    [stylingPng({ wrapped: true }), true, 'name wraps to two lines'],
-    [stylingPng(), false, 'controls lost their accessible names'],
+test('finding 1: the layer-row styling clause is judged from the harness capture and the rows\' accessibility frames', async t => {
+  for (const [styling, why] of [
+    [stylingPng({ light: true }), 'light button fill'],
+    [stylingPng({ wrapped: true }), 'name wraps to two lines'],
+    [stylingPng({ tall: true }), 'rows are not compact'],
+    [stylingPng({ lost: true }), 'lock and shy lost their accessible names'],
   ]) {
-    const { session, workflow } = setup(t, {}, styling);
-    const result = await workflow.run({ session: { ...session, input: (c, o) => (c === 'observe' && !buttons ? Promise.resolve({ status: 'ok', nodes: [] }) : session.input(c, o)) }, row: row() });
+    const { session, workflow, directory } = setup(t, {}, styling);
+    const result = await workflow.run({ session, row: row() });
     const s = statuses(result);
     assert.equal(s['layer-row-styling'], 'fail', why);
     assert.equal(s['scene-f5-f6-f7'], 'unrun', why);
+    assert.equal(result.safeToContinue, false);
+    assert.match(JSON.parse(fs.readFileSync(path.join(directory, 'frame-edit-ui/outcome.json'), 'utf8')).reason, /layer-row-styling/);
   }
+  // Frames that cannot be read, or that moved while the capture was taken, leave the clause unrun and the run goes on.
+  for (const [styling, why, reason] of [
+    [stylingPng({ noFrames: true }), 'no accessibility frames', /no accessibility frames/],
+    [stylingPng({ unstable: true }), 'frames moved during the capture', /frames moved/],
+  ]) {
+    const { session, workflow, directory } = setup(t, {}, styling);
+    const s = statuses(await workflow.run({ session, row: row() }));
+    assert.equal(s['layer-row-styling'], 'unrun', why);
+    assert.equal(s['scene-f5-f6-f7'], 'pass', why);
+    assert.match(JSON.parse(fs.readFileSync(path.join(directory, 'frame-edit-ui/outcome.json'), 'utf8')).reasons['layer-row-styling'], reason);
+  }
+});
+
+test('finding 1: no rectangle comes from the operator, and the capture is hashed and read once by the runner', async t => {
+  // Before: the operator reported layerRows/longName rects and the PNG was re-read from the report directory after the operator replied.
+  const { session, workflow, directory } = setup(t);
+  const asked = [], original = session.requestEvidence, inner = session.input; let captures = 0;
+  session.requestEvidence = request => { asked.push(request.phase); return original(request); };
+  session.input = (command, ...rest) => { if (command === 'capture') captures++; return inner(command, ...rest); };
+  assert.equal(PLAN.find(s => s.id === 'layer-row-styling').how, undefined);
+  const result = await workflow.run({ session, row: row() });
+  assert.equal(statuses(result)['layer-row-styling'], 'pass');
+  assert.ok(!asked.includes('layer-row-styling') && captures === 1);
+  const private_ = JSON.parse(fs.readFileSync(path.join(directory, 'frame-edit-ui/layer-row-styling.json'), 'utf8'));
+  assert.equal(private_.facts.sha256, require('node:crypto').createHash('sha256').update(fs.readFileSync(path.join(directory, 'capture-1.png'))).digest('hex'));
+  assert.deepEqual(private_.window, { w: 810, h: 710 });
+});
+
+test('finding 6: the saved file is measured by the runner and compared with the verified layers and keys; reopening needs a new document', async t => {
+  // Before: only totalFrames was compared, the file was whatever the operator named, and reopening could be the same document.
+  for (const [faults, failed, reason] of [
+    [{ savedLayersWrong: true }, 'scene-save-reopen', /saved-layers-differ/],
+    [{ sameDocumentOnReopen: true }, 'scene-save-reopen', /reopen-did-not-create-a-new-document/],
+    [{ touchFileOnOpen: true }, 'scene-save-reopen', /saved-file-changed-by-opening/],
+  ]) {
+    const { session, workflow, directory } = setup(t, faults);
+    const s = statuses(await workflow.run({ session, row: row() }));
+    assert.equal(s[failed], 'fail', JSON.stringify(faults));
+    assert.match(JSON.parse(fs.readFileSync(path.join(directory, 'frame-edit-ui/outcome.json'), 'utf8')).reason, reason);
+  }
+  // A file the step did not write (nothing there), or one that was there before the request, is the operator's mistake.
+  let ctx = setup(t, { noWrite: true });
+  await assert.rejects(ctx.workflow.run({ session: ctx.session, row: row() }), error => error.code === 'operator-evidence-malformed' && error.command === 'frame-edit-ui.scene-save');
+  ctx = setup(t);
+  fs.mkdirSync(path.join(ctx.directory, 'saved')); fs.writeFileSync(path.join(ctx.directory, 'saved/frame-edit-scene.json'), '{}');
+  await assert.rejects(ctx.workflow.run({ session: ctx.session, row: row() }), error => error.command === 'frame-edit-ui.scene-save');
+  // The application must show the reopened file; if it is not readable the clauses stay unrun, with the reason.
+  ctx = setup(t, { noTitle: true });
+  const result = await ctx.workflow.run({ session: ctx.session, row: row() });
+  const s = statuses(result);
+  assert.equal(s['scene-save-reopen'], 'unrun');
+  assert.equal(s['component-save-reopen'], 'unrun');
+  assert.equal(s['component-edits'], 'pass');
+  assert.match(JSON.parse(fs.readFileSync(path.join(ctx.directory, 'frame-edit-ui/outcome.json'), 'utf8')).reasons['scene-save-reopen'], /file name was not shown/);
+});
+
+test('kit.compareSaved reads the stored key frames and layer set of a native document', () => {
+  const kit = require('../cs7-scenarios/installed-kit.cjs');
+  const rows = { 'layer-1': { k: ['key', 'held', 'key'], c: [true, true, false] } };
+  const doc = (keys, uid = 'layer-1', total = 3) => ({ format: 'nemo.native-object-document', totalFrames: total, layers: [{ layerUid: uid, timing: { keys: keys.map(frame => ({ frame })) } }] });
+  const ask = json => kit.compareSaved(json, { total: 3, sceneRows: rows, rows });
+  assert.deepEqual(ask(doc([0, 2])), { ok: true, compared: 1 });
+  assert.match(ask(doc([0, 1])).fail, /saved-keys-differ/);
+  assert.match(ask(doc([0, 2], 'other')).fail, /saved-layers-differ/);
+  assert.match(ask(doc([0, 2], 'layer-1', 4)).fail, /saved-total-frames-differs/);
+  assert.match(ask({ format: 'nemo' }).fail, /no native object document/);
+  assert.match(kit.compareSaved({ format: 'nemo.native-object-document', totalFrames: 3, layers: [{ layerUid: 'layer-1', name: 'x' }] }, { total: 3, sceneRows: rows, rows }).unrun, /stores no timing keys/);
 });
 
 test('malformed or verdict-bearing evidence is an operator input error, never a pass or a product failure', async t => {
