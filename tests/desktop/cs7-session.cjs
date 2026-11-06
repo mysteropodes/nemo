@@ -125,7 +125,7 @@ function createInstalledSession(config) {
   if (config.playObserver === true && config.play?.fixedClock === true) appEnvironment.NEMO_TEST_PLAY_FIXED_CLOCK = '1';
   const controller = harness.createController({ root: ROOT, app: app.bundle, env: appEnvironment });
   const tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd: ROOT, encoding: 'utf8' }).trim();
-  let instance, started = false, pinned, latestSnapshot, cleaned = false, lastIdentity;
+  let instance, started = false, pinned, latestSnapshot, cleaned = false, lastIdentity, startIdentity;
   async function currentIdentity() {
     check(instance, 'installed session not started');
     const current = identity.sourceIdentity();
@@ -140,13 +140,36 @@ function createInstalledSession(config) {
     return lastIdentity = { sourceSha: source.head, tree, driverSha: source.head, executableSha256: app.executableSha256,
       sessionId: config.taskId, pid, dirty: false };
   }
+  // Document reads are made by the harness, through the bundled nemo-mcp process of THIS package, pointed at the
+  // candidate's own isolated registry (see cs7-read.cjs for what binds a reply to the candidate).
+  const mcpBinary = path.join(app.bundle, 'Contents', 'MacOS', 'nemo-mcp');
+  const reader = require('./cs7-read.cjs').createReader({
+    currentIdentity, ownerIdentity: () => startIdentity,
+    registry: () => fs.realpathSync(path.join(latestSnapshot.runtime.roots.tauriDataDir, 'mcp')),
+    appVersion: () => latestSnapshot.app.appVersion,
+    async openClient() {
+      const stat = fs.lstatSync(mcpBinary);
+      check(stat.isFile() && !stat.isSymbolicLink() && (stat.mode & 0o111), 'packaged nemo-mcp executable required');
+      const listed = proof.artifacts?.find(a => typeof a.path === 'string' && a.path.endsWith('/Contents/MacOS/nemo-mcp'));
+      check(!listed || listed.sha256 === hash(mcpBinary), 'packaged nemo-mcp differs from the package proof');
+      const { McpClient } = require('../mcp-parity/mcp-client.cjs');
+      const client = new McpClient(mcpBinary, [], { NEMO_MCP_REGISTRY: path.join(latestSnapshot.runtime.roots.tauriDataDir, 'mcp') });
+      try {
+        const init = await client.initialize();
+        check(init.result?.protocolVersion, 'bundled nemo-mcp did not initialize');
+      } catch (error) { await client.close().catch(() => {}); throw error; }
+      return client;
+    },
+  });
   return {
     async start() {
       check(!started, 'installed session cannot restart'); started = true;
       instance = await controller.start(config.taskId, ['desktop-input', 'gpu-reference']);
-      const current = await currentIdentity(); pinned = await input.open(current.pid); return current;
+      const current = await currentIdentity(); pinned = await input.open(current.pid); startIdentity = current; return current;
     },
     identity: currentIdentity,
+    // The ONLY document-read route for scenarios: fn({ query, status }) may issue read-only `query.*` operations.
+    read: fn => reader.read(fn),
     async input(command, option, value) {
       await currentIdentity();
       return input.command(command, option, value);
@@ -176,6 +199,7 @@ function createInstalledSession(config) {
     async cleanup() {
       let failed = false;
       operator.close();
+      try { await reader.close(); } catch { failed = true; }
       try { await input.close(); } catch { failed = true; }
       try { await controller.cleanup(); } catch { failed = true; }
       check(!failed, 'installed session cleanup incomplete');

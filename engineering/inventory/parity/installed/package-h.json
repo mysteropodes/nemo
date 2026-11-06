@@ -8,11 +8,25 @@
       "status": "Ready",
       "tasks": [
         "F09",
-        "F10",
-        "F11",
-        "F12",
-        "F13"
+        "F10"
       ],
+      "partialTasks": {
+        "F11": [
+          "dom:#tl-total"
+        ],
+        "F12": [
+          "dom:#btn-cycle",
+          "menu:timeline.js:top:btncopy",
+          "menu:timeline.js:top:ctxcut",
+          "menu:timeline.js:top:ctxduplicateselection",
+          "menu:timeline.js:top:ctxpaste",
+          "shortcut:readonly:shortcutRoClipboard",
+          "shortcut:readonly:shortcutRoDuplicate"
+        ],
+        "F13": [
+          "menu:timeline.js:top:ctxconverttokeyframes"
+        ]
+      },
       "surfaces": [
         "menu:timeline.js:top:ctxinsertframe",
         "menu:timeline.js:top:ctxinsertkeyframe",
@@ -94,17 +108,30 @@
         }
       ],
       "taskEvidence": "Surfaces are limited to the timeline context-menu items and shortcuts this scenario presses. The Convert to keyframes, clipboard and Duplicate the selection menu items, dom:#tl-total and the Labs tasks are not exercised. Move, Repeat and clipboard inside a component are later work (9fc4d1dcf) and are not part of this row.",
-      "runtimePrerequisites": "Foreground operator with the real keyboard and mouse on an owned Nemo window placed at the top of display 2 (2880,-270, 1620x1420); a public Nemo MCP read route for read-only query.* calls; a disposable report directory for the saved files. The UI32 helper cannot send F5/F6/F7, right-click or free drags.",
+      "runtimePrerequisites": "Foreground operator with the real keyboard and mouse on an owned Nemo window placed at the top of display 2 (2880,-270, 1620x1420); the nemo-mcp process bundled in the package under test, reachable through the candidate's own isolated registry (the runner itself makes every read-only query.* document read and binds it to the candidate; the operator attaches no document state); a disposable report directory for the saved files. The UI32 helper cannot send F5/F6/F7, right-click or free drags.",
       "evidence": "Component frame and key edits: https://github.com/mysteropodes/nemo/pull/2786 merged at e5a7b33f50223fa7551613fe35a720f2f5c24327. Desktop frame-edit routing: https://github.com/mysteropodes/nemo/pull/2337 merged at 4c38ae23a69dbbc5e9d073464ee756bd77e0f79d. MCP half recorded at https://github.com/mysteropodes/nemo/issues/2248#issuecomment-6522968234 (integration 4d99db9d, 7/7). No installed run has happened for this row."
     },
     {
       "id": "settings-profile",
       "issue": 2172,
       "status": "Ready",
-      "tasks": [
-        "U02",
-        "D06"
-      ],
+      "tasks": [],
+      "partialTasks": {
+        "U02": [
+          "dom:#figma-token",
+          "dom:#figma-url",
+          "dom:#np-h",
+          "dom:#np-w",
+          "dom:settings-modal>a",
+          "dom:settings-modal>a:github-com-mysteropodes",
+          "dom:settings-modal>a:https-github-com-mysteropodes-nemo",
+          "dom:settings-modal>a:mysteropodes-strokemotion-feedback"
+        ],
+        "D06": [
+          "dom:settings-modal>div[data-pane=collab]",
+          "dom:settings-tabs>button[data-tab=collab]"
+        ]
+      },
       "surfaces": [
         "dom:#btn-settings",
         "dom:#project-tabs-settings",
@@ -184,20 +211,68 @@
           ]
         }
       ],
-      "taskEvidence": "Original criteria: the 2026-10-18 disposition in acceptanceReference; remaining rows reconciled at https://github.com/mysteropodes/nemo/issues/2172#issuecomment-6403867536. Surfaces are limited to what the scenario opens, types into or presses. The Figma token and URL fields, the settings-modal links, #np-w and #np-h are not exercised. sync-owner-paths is judged by the scenario from the disposable shared folder on disk (which it seeds with a second profile's published state), the accessibility read and unedited MCP document reads; it passes only when the no-folder Publish text, the chosen folder, Publish, Check, Merge (document content on the blank keyframe) and the failing Publish into a read-only folder are all observed, and it is unrun, with its reason, whenever a toast, the update list or the published snapshot shape is not readable. D06 (#2355) tracks the native migration of publish/pull/merge, so this clause may legitimately fail on the first installed run.",
-      "runtimePrerequisites": "The UI32 helper and a clean Start screen at launch; a foreground operator for File > New, drawing one stroke and a blank keyframe, the colour picker, the Shortcuts rebind/Reset all, and the sync clicks (Choose… with the native folder picker, Publish, Check, Merge); the owned window placed at the top of display 2 (2880,-270, 1620x1420); no shared sync folder configured at the start (the helper refuses a non-empty path, so every helper sync step runs before the folder is chosen); a public Nemo MCP read route for read-only query.* calls; a disposable report directory, which the scenario fills with the shared folder and briefly makes read-only. Profile name, email and role are restored by the helper, but the app keeps the profile and the chosen sync folder in local storage of the disposable run.",
+      "taskEvidence": "Original criteria: the 2026-10-18 disposition in acceptanceReference; remaining rows reconciled at https://github.com/mysteropodes/nemo/issues/2172#issuecomment-6403867536. Surfaces are limited to what the scenario opens, types into or presses. The Figma token and URL fields, the settings-modal links, #np-w and #np-h are not exercised. sync-owner-paths is judged by the scenario from the disposable shared folder on disk (which it seeds with a second profile's published state), the accessibility read and the document reads the runner makes itself; it passes only when the no-folder Publish text, the chosen folder, Publish, Check, Merge (document content on the blank keyframe) and the failing Publish into a read-only folder are all observed, and it is unrun, with its reason, whenever a toast, the update list or the published snapshot shape is not readable. D06 (#2355) tracks the native migration of publish/pull/merge, so this clause may legitimately fail on the first installed run.",
+      "runtimePrerequisites": "The UI32 helper and a clean Start screen at launch; a foreground operator for File > New, drawing one stroke and a blank keyframe, the colour picker, the Shortcuts rebind/Reset all, and the sync clicks (Choose… with the native folder picker, Publish, Check, Merge); the owned window placed at the top of display 2 (2880,-270, 1620x1420); no shared sync folder configured at the start (the helper refuses a non-empty path, so every helper sync step runs before the folder is chosen); the nemo-mcp process bundled in the package under test, reachable through the candidate's own isolated registry (the runner itself makes every read-only query.* document read and binds it to the candidate; the operator attaches no document state); a disposable report directory, which the scenario fills with the shared folder and briefly makes read-only. Profile name, email and role are restored by the helper, but the app keeps the profile and the chosen sync folder in local storage of the disposable run.",
       "evidence": "Settings and profile presentation: https://github.com/mysteropodes/nemo/pull/2178 merged at 4cf1c2ecf64c8bfe3908e2c1b20f2d52eca02214. No installed run has happened for this row."
     },
     {
       "id": "component-edit-draw",
       "issue": 2256,
       "status": "Ready",
-      "tasks": [
-        "D29",
-        "D08",
-        "G15",
-        "I18"
-      ],
+      "tasks": [],
+      "partialTasks": {
+        "D29": [
+          "menu:motion.js:renderElementsList:elementsdelete",
+          "menu:motion.js:renderElementsList:elementsrename",
+          "menu:motion.js:renderElementsList:elementsrename#2",
+          "menu:motion.js:renderElementsList:elementsselect",
+          "menu:motion.js:renderElementsList:elementsselectmembers",
+          "menu:motion.js:renderElementsList:elementsungroup",
+          "menu:motion.js:renderLayerListMotion:ctxbreakapartcomponent",
+          "menu:motion.js:renderLayerListMotion:ctxconverttocomponent",
+          "menu:motion.js:renderLayerListMotion:elementsrename",
+          "menu:timeline.js:renderShapeTreeRowsInto:elementsrename",
+          "menu:timeline.js:renderShapeTreeRowsInto:elementsrename#2",
+          "menu:timeline.js:renderShapeTreeRowsInto:elementsselect",
+          "menu:timeline.js:renderShapeTreeRowsInto:elementsselectmembers",
+          "menu:timeline.js:renderShapeTreeRowsInto:elementsungroup",
+          "menu:timeline.js:renderShapeTreeRowsInto:fxdelete"
+        ],
+        "D08": [
+          "dom:#btn-kitsu-open",
+          "dom:#comment-fb-blocking",
+          "dom:#comment-fb-email",
+          "dom:#comment-fb-name",
+          "dom:#comment-save-feedback",
+          "dom:#fb-dash-refresh",
+          "dom:#history-btn"
+        ],
+        "G15": [
+          "dom:#p-drawmode",
+          "dom:#p-erasersize",
+          "dom:#p-pinv",
+          "dom:#p-pmax",
+          "dom:#p-pmin",
+          "dom:#p-poststroke-smooth",
+          "dom:#p-smooth",
+          "dom:#p-stab",
+          "dom:#p-taper",
+          "dom:#p-vecbrush",
+          "dom:shape-tool-stack>button[data-tool=speechbubble]",
+          "dom:shape-tool-stack>button[data-tool=star]",
+          "shortcut:speechbubble",
+          "shortcut:star"
+        ],
+        "I18": [
+          "dom:#btn-comp-detach",
+          "menu:motion.js:renderLayerListMotion:ctxmergeselectedlayers",
+          "menu:motion.js:renderLayerListMotion:ctxsplitintolayers",
+          "menu:timeline.js:renderLayerList:ctxbreakapartgroup",
+          "menu:timeline.js:renderLayerList:ctxmenuorganise",
+          "menu:timeline.js:renderLayerList:ctxmergeselectedlayers",
+          "menu:timeline.js:renderLayerList:ctxsplitintolayers"
+        ]
+      },
       "surfaces": [
         "dom:tools-panel>button[data-tool=draw]",
         "dom:tools-panel>button[data-tool=pen]",
@@ -278,16 +353,19 @@
         }
       ],
       "taskEvidence": "Surfaces are limited to the tools, mode switch, Convert to component and Break apart items this scenario presses. Pointer drawing is judged only on the layer rows read back over MCP and on image pixels; stroke geometry, the Perspective guide snap, Pen continue from an open path's end point, Text, the Text Animator, the Fill tool and bitmap brush re-bake on Select are not exercised and stay with their own rows. Component camera keys and markers (PR 2803) are not exercised. A Motion-mode stroke is judged only by content landing on the playhead frame, because the baseline writes it on the origin key and the native route may key the playhead frame. Break apart is run on a component without a bitmap brush (that content is a typed refusal).",
-      "runtimePrerequisites": "Foreground operator with the real keyboard, mouse and pointer-drawing on an owned Nemo window placed at the top of display 2 (2880,-270, 1620x1420); a public Nemo MCP read route for read-only query.* calls (history, layer timing cells, component read layers); the UI32 helper for the owned-window capture; a disposable report directory for the saved file and the exported PNG. Nothing else may cover or move the window while the run is active.",
+      "runtimePrerequisites": "Foreground operator with the real keyboard, mouse and pointer-drawing on an owned Nemo window placed at the top of display 2 (2880,-270, 1620x1420); the nemo-mcp process bundled in the package under test, reachable through the candidate's own isolated registry (the runner itself makes every read-only query.* document read and binds it to the candidate; the operator attaches no document state) (history, layer timing cells, component read layers); the UI32 helper for the owned-window capture; a disposable report directory for the saved file and the exported PNG. Nothing else may cover or move the window while the run is active.",
       "evidence": "Draw, Pen, shapes and Fill Brush in an entered component and in Motion mode: https://github.com/mysteropodes/nemo/pull/2765 merged at 78493b295709a8bbd0526917d75e41e8f6bac17b. Text, Fill and bitmap brush in a component: https://github.com/mysteropodes/nemo/pull/2784 merged at 49c38b7bb94613efe47861e2fd6a29dbb8ee5882. Frame and key edits in a component: https://github.com/mysteropodes/nemo/pull/2786 merged at e5a7b33f50223fa7551613fe35a720f2f5c24327. Break apart: https://github.com/mysteropodes/nemo/pull/2800 merged at 53c66ccc55b31c24fdd16baa154a0b7e1b0b46b4. Break apart images and component camera/markers: https://github.com/mysteropodes/nemo/pull/2803 merged at 4e43eff06de4ba7a89a97136ced214c9bfc154a8. No installed run has happened for this row."
     },
     {
       "id": "legacy-import",
       "issue": 2355,
       "status": "Ready",
-      "tasks": [
-        "F03"
-      ],
+      "tasks": [],
+      "partialTasks": {
+        "F03": [
+          "dom:#file-input"
+        ]
+      },
       "surfaces": [
         "dom:#btn-open",
         "dom:#btn-saveas"
@@ -354,7 +432,7 @@
         }
       ],
       "taskEvidence": "Surfaces are limited to the Open and Save As controls the scenario uses. The row opens two repository fixtures (tests/fixtures/legacy-import/animation.json and media.json) copied into the private report directory, and two files derived from single-frame.json that add exprGlobals or trackRoles. It judges what the document contains (frame counts, layer names, component frames) and the file, history and toast facts; it does not judge that Motion keys, expression values or pictures render or play as in the old app, nor that audio plays, nor MP3 or JPEG conversion, which stay with the importer tests and the hands-on steps. The matching matrix task F03 lists owners 1049, 1584 and 1587, so this row names issue 2355 explicitly and leaves owners.json untouched.",
-      "runtimePrerequisites": "Foreground operator with the real keyboard and mouse for the native file picker (Open and Save As), Cmd+S, F5 and Cmd+Z; the owned Nemo window placed at the top of display 2 (2880,-270, 1620x1420); a Start screen with no unsaved document at launch; a public Nemo MCP read route for read-only query.* calls (history and component read); the UI32 helper only for the read-only accessibility observation of the toast; a disposable report directory, into which the scenario copies the fixtures it asks the operator to open.",
+      "runtimePrerequisites": "Foreground operator with the real keyboard and mouse for the native file picker (Open and Save As), Cmd+S, F5 and Cmd+Z; the owned Nemo window placed at the top of display 2 (2880,-270, 1620x1420); a Start screen with no unsaved document at launch; the nemo-mcp process bundled in the package under test, reachable through the candidate's own isolated registry (the runner itself makes every read-only query.* document read and binds it to the candidate; the operator attaches no document state) (history and component read); the UI32 helper only for the read-only accessibility observation of the toast; a disposable report directory, into which the scenario copies the fixtures it asks the operator to open.",
       "evidence": "Reader, host route and JS routes: https://github.com/mysteropodes/nemo/pull/2772 merged at 542bad73f8cf2874c7ad1a68eb995a480583473f. Motion, rig and component families: https://github.com/mysteropodes/nemo/pull/2774 merged at a1c7fb910571557198ae96f3e7526fbccfd468fa. Media, text and remaining fields: https://github.com/mysteropodes/nemo/pull/2777 merged at d9036dc2ab7d9bd1b9a446f60f1167629467edb9. No installed run has happened for this row."
     }
   ]
