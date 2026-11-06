@@ -3,7 +3,7 @@
 // Explicit manual entry point; never an automatic app-launching test.
 const fs = require('node:fs');
 const path = require('node:path');
-const { requireCheck: check } = require('./native-harness.cjs');
+const { requireCheck: check, isCheckRefusal } = require('./native-harness.cjs');
 const { readDeclarations, readyRows, runInstalledRows, selectRows, taskSurfaceIndex } = require('./cs7-runner.cjs');
 const { createInstalledSession } = require('./cs7-session.cjs');
 const ROOT = path.resolve(__dirname, '../..');
@@ -43,13 +43,13 @@ async function main(config, deps = {}) {
     cleanup: result.installed.cleanup }) + '\n');
   return result;
 }
-// A refusal must be diagnosable without leaking evidence. Only a plain `check` Error (no code, no
-// subclass) with a short fixed-looking message is quoted; anything else (fs errors with paths,
-// JSON syntax errors that quote the file, scenario or OS errors) yields its class and code only.
+// A refusal must be diagnosable without leaking evidence. Only an error raised by `requireCheck` (it carries a marker that
+// only requireCheck sets) with a short fixed-looking message is quoted. Every other error, including a plain `Error`
+// thrown by a scenario's prepare() or run code, fs errors with paths, JSON syntax errors that quote the file and OS
+// errors, yields its class and code only.
 function refusalReason(error) {
   const message = error?.message;
-  if (error && Object.getPrototypeOf(error) === Error.prototype && error.code === undefined &&
-    typeof message === 'string' && /^[A-Za-z][A-Za-z0-9 .,;:()-]{0,199}$/.test(message)) return message;
+  if (isCheckRefusal(error) && error.code === undefined && typeof message === 'string' && /^[A-Za-z][A-Za-z0-9 .,;:()-]{0,199}$/.test(message)) return message;
   const name = /^[A-Za-z][A-Za-z0-9]{0,40}$/.test(error?.name || '') ? error.name : 'Error';
   return /^[A-Z][A-Z0-9_]{0,40}$/.test(error?.code || '') ? name + ' ' + error.code : name;
 }

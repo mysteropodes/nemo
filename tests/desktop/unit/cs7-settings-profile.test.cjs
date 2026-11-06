@@ -50,7 +50,7 @@ test('the first operator phase asks for the window at the top of display 2', asy
   await workflow.run({ session, row: row() });
   assert.equal(asked[0].phase, 'window-placement');
   assert.match(asked[0].instruction, /position 2880,-270, size 1620x1420/);
-  assert.deepEqual(asked.map(a => a.phase), ['window-placement', 'new-project', 'shortcut-rebind', 'shortcut-reset', 'profile-color-measure',
+  assert.deepEqual(asked.map(a => a.phase), ['window-placement', 'new-project', 'shortcut-reset-first', 'shortcut-rebind', 'shortcut-reset',
     'profile-color-opaque', 'profile-color-alpha', 'profile-color-restore', ...SYNC_PHASES]);
   // Every operator phase is plain text a person can follow, and the folder phase names the exact folder.
   const choose = asked.find(a => a.phase === 'sync-choose-folder');
@@ -162,9 +162,9 @@ test('reported failures stop the row; malformed evidence is an operator input er
   ctx = setup(t, { failureAt: 'new-project' });
   result = await ctx.workflow.run({ session: ctx.session, row: row() });
   assert.ok(result.checks.every(c => c.status === 'unrun') && result.safeToContinue === false);
-  ctx = setup(t, { malformedAt: 'profile-color-measure' });
+  ctx = setup(t, { verdictAt: 'profile-color-opaque' });
   await assert.rejects(ctx.workflow.run({ session: ctx.session, row: row() }), error => error instanceof OperatorInputError &&
-    error.code === 'operator-evidence-malformed' && error.command === 'settings-profile.profile-color-measure');
+    error.code === 'operator-evidence-malformed' && error.command === 'settings-profile.profile-color-opaque');
   ctx = setup(t, { malformedAt: 'sync-document-setup' });
   await assert.rejects(ctx.workflow.run({ session: ctx.session, row: row() }), error => error.code === 'operator-evidence-malformed' &&
     error.command === 'settings-profile.sync-document-setup');
@@ -221,6 +221,91 @@ test('each sync fault fails for its own stated reason, and the folder is given b
   assert.match(await reasonOf({ mergeNoop: true }), /still has no content on frame 4/);
   assert.match(await reasonOf({ mergeWrongToast: true }), /merge toast is not/);
   assert.match(await reasonOf({ failLies: true }), /reported success although nothing could be written/);
+  assert.match(await reasonOf({ mergeNoRevision: true }), /without a new document revision/);
+});
+
+// ---- the findings of the installed-rows review ----------------------------------------------------------------
+const readOutcome = directory => JSON.parse(fs.readFileSync(path.join(directory, 'settings-profile/outcome.json'), 'utf8'));
+
+test('finding 8: a tab passes only when its own pane element is shown; another tab\'s pane fails, an unreadable pane stays unrun', async t => {
+  // Before: only "the labels differ from the previous tab's" was asserted, so a tab showing the wrong pane passed.
+  let ctx = setup(t, { wrongPane: 'Feedback' });
+  let result = await ctx.workflow.run({ session: ctx.session, row: row() });
+  assert.equal(statuses(result)['settings-entries-tabs'], 'fail');
+  assert.match(readOutcome(ctx.directory).reasons['settings-entries-tabs'], /tab Feedback showed the pane of General/);
+  ctx = setup(t, { noAnchors: true });
+  result = await ctx.workflow.run({ session: ctx.session, row: row() });
+  assert.equal(statuses(result)['settings-entries-tabs'], 'unrun');
+  assert.match(readOutcome(ctx.directory).reasons['settings-entries-tabs'], /pane element of Updates, Feedback, Figma, Labs, About was not in the accessibility read/);
+  assert.deepEqual(Object.entries(statuses(result)).filter(([id, v]) => id !== 'settings-entries-tabs' && v !== 'pass'), []);
+});
+
+test('finding 4: the empty-folder check passes only on the baseline completion text shown after the press', async t => {
+  // Before: a Check that did nothing left the folder empty and no search text, which passed.
+  let ctx = setup(t, { checkInert: true });
+  let result = await ctx.workflow.run({ session: ctx.session, row: row() });
+  assert.equal(statuses(result)['sync-empty-folder'], 'unrun');
+  assert.match(readOutcome(ctx.directory).reasons['sync-empty-folder'], /completion text of the empty-folder check was not read/);
+  assert.equal(statuses(result)['shortcuts-reset'], 'pass');           // the run goes on
+  ctx = setup(t, { stuckSearch: true });
+  assert.equal(statuses(await ctx.workflow.run({ session: ctx.session, row: row() }))['sync-empty-folder'], 'fail');
+  ctx = setup(t);
+  const seen = []; const original = ctx.session.input;
+  ctx.session.input = async (command, ...rest) => { const r = await original(command, ...rest); if (command === 'observe') seen.push(r.nodes); return r; };
+  assert.equal(statuses(await ctx.workflow.run({ session: ctx.session, row: row() }))['sync-empty-folder'], 'pass');
+});
+
+test('finding 9: the Shortcuts baseline is taken after a Reset all, so a binding left by an earlier row is not blamed on the product', async t => {
+  // Before: `defaults` was read from the live tab, so a leaked Duplicate keyframe binding made Reset all look broken.
+  const { session, workflow, app } = setup(t, { leakedBinding: true });
+  const result = await workflow.run({ session, row: row() });
+  assert.equal(statuses(result)['shortcuts-reset'], 'pass');
+  assert.equal(app.s.keys.duplicateKey, undefined);
+  // A Reset all that does nothing is still a failure.
+  const broken = setup(t, { leakedBinding: true, resetBroken: true });
+  assert.equal(statuses(await broken.workflow.run({ session: broken.session, row: row() }))['shortcuts-reset'], 'fail');
+});
+
+test('finding 1: the swatch rectangle comes from its accessibility frame; without it the clause is unrun and no colour step is asked', async t => {
+  const { session, workflow, directory } = setup(t, { noWellFrame: true });
+  const asked = []; const original = session.requestEvidence;
+  session.requestEvidence = request => { asked.push(request.phase); return original(request); };
+  const result = await workflow.run({ session, row: row() });
+  assert.equal(statuses(result)['profile-color-alpha'], 'unrun');
+  assert.match(readOutcome(directory).reasons['profile-color-alpha'], /swatch has no accessibility frame/);
+  assert.ok(!asked.some(p => p.startsWith('profile-color')));
+  // The reply of a person cannot supply rectangles any more: a verdict-bearing colour reply is refused as before.
+  assert.ok(!asked.includes('profile-color-measure'));
+});
+
+test('finding 1: each capture is hashed by the runner, and a swatch that moved between captures is not judged', async t => {
+  const { session, workflow, directory, app } = setup(t);
+  const sha = require('node:crypto');
+  const result = await workflow.run({ session, row: row() });
+  assert.equal(statuses(result)['profile-color-alpha'], 'pass');
+  const shot = JSON.parse(fs.readFileSync(path.join(directory, 'settings-profile/shot-capture-12.json'), 'utf8'));
+  assert.equal(shot.sha256, sha.createHash('sha256').update(fs.readFileSync(path.join(directory, 'capture-12.png'))).digest('hex'));
+  assert.deepEqual(shot.well, { x: 50, y: 40, w: 24, h: 24 });
+  // The swatch moves after the colour is set: the capture is not judged against the first capture's rectangle.
+  const moving = setup(t); const inner = moving.app.nodes.bind(moving.app);
+  moving.app.nodes = () => inner().map(n => (n.identifiers?.resolved === 'profile-color-well' && moving.app.s.colour[0] === 0x33 ? { ...n, frame: { ...n.frame, x: 120 } } : n));
+  const r2 = await moving.workflow.run({ session: moving.session, row: row() });
+  assert.equal(statuses(r2)['profile-color-alpha'], 'unrun');
+  assert.match(readOutcome(moving.directory).reasons['profile-color-alpha'], /swatch moved/);
+  void app;
+});
+
+test('finding 7: the merge passes only with a fresh toast, a later revision and an undisturbed history', async t => {
+  // Before: content on frame 4 plus a Merged row passed with "toast not read", and no revision or history was asserted.
+  let ctx = setup(t, { mergeNoToast: true });
+  let result = await ctx.workflow.run({ session: ctx.session, row: row() });
+  assert.equal(statuses(result)['sync-owner-paths'], 'unrun');
+  assert.match(readOutcome(ctx.directory).reasons['sync-owner-paths'], /merge toast was not read, so the content on frame 4 cannot be attributed/);
+  assert.equal(readOutcome(ctx.directory).sync.parts.merge, 'unrun');
+  ctx = setup(t, { mergeNoRevision: true });
+  result = await ctx.workflow.run({ session: ctx.session, row: row() });
+  assert.equal(statuses(result)['sync-owner-paths'], 'fail');
+  assert.match(readOutcome(ctx.directory).reasons['sync-owner-paths'], /without a new document revision/);
 });
 
 test('the second profile is derived from the snapshot the app published, in the shape the baseline merge reads', () => {

@@ -200,6 +200,8 @@ async function runSyncOwner(ctx) {
     if (parts.check === 'fail') return result();
 
     if (parts.check === 'pass') {
+      // The state the merge starts from, read by the harness right before the click (nothing has edited the document since).
+      const preMerge = await document('sync-merge-before');
       const { ev: mergeEv, before: toasts } = await gesture('sync-merge', 'Click the "Merge" button on the row of "' + SECOND.name + '" once. Reply immediately with ' +
         '{observation, productFailure}. ' + READS);
       if (mergeEv.productFailure) { settle('merge', 'fail', 'Merge reported failing'); return result(); }
@@ -210,12 +212,18 @@ async function runSyncOwner(ctx) {
       const fusion = seen.filter(t => t.includes('Fusion de ') && !toasts.includes(t));
       const after = await document('sync-merge-reads');
       if (fusion.length && !fusion.some(t => t.includes(MERGE_TOAST))) settle('merge', 'fail', 'merge toast is not "' + MERGE_TOAST + '": ' + fusion.join(' | '));
-      else if (after.documentId !== before.documentId || after.instanceId !== before.instanceId || after.total !== before.total ||
-        !same(after.rows[uid]?.k, row0.k) || !same(Object.keys(after.rows).sort(), Object.keys(before.rows).sort())) settle('merge', 'fail', 'the merge replaced the document or changed its frames');
+      else if (after.documentId !== preMerge.documentId || after.instanceId !== preMerge.instanceId || after.total !== preMerge.total ||
+        !same(after.rows[uid]?.k, row0.k) || !same(Object.keys(after.rows).sort(), Object.keys(preMerge.rows).sort())) settle('merge', 'fail', 'the merge replaced the document or changed its frames');
       else if (after.rows[uid].c.some((c, i) => i !== 3 && c !== row0.c[i])) settle('merge', 'fail', 'the merge changed frames other than the blank keyframe');
       else if (after.rows[uid].c[3] !== true) settle('merge', 'fail', 'the document still has no content on frame 4 after Merge (the toast said: ' + (fusion[0] || 'nothing read') + ')');
+      else if (after.revision <= preMerge.revision) settle('merge', 'fail', 'the content appeared without a new document revision');
+      else if (after.redo !== 0 || after.undo < preMerge.undo) settle('merge', 'fail', 'the merge disturbed the history (undo ' + preMerge.undo + ' -> ' + after.undo + ', redo ' + after.redo + ')');
       else if (!merged) settle('merge', 'fail', 'the document has the merged stroke but the row did not become "Merged"');
-      else settle('merge', 'pass', fusion.length ? null : 'the merge toast was not read; the document reads and the Merged row are the evidence');
+      // Content on frame 4 and a Merged row do not show that the content is the second profile's stroke: only the merge toast, which
+      // names that profile and counts what it added, attributes it. Without a fresh toast the clause is unrun, never passed.
+      else if (!fusion.length) settle('merge', 'unrun', 'the merge toast was not read, so the content on frame 4 cannot be attributed to the second profile\'s stroke');
+      else settle('merge', 'pass');
+      kit.privateEvidence(dir, 'sync-merge-history', { schema: 'nemo.settings-sync-owner-private/1', revision: [preMerge.revision, after.revision], undo: [preMerge.undo, after.undo], redo: [preMerge.redo, after.redo] });
       if (parts.merge === 'fail') return result();
     } else settle('merge', 'unrun', 'there was no readable Merge row');
   }

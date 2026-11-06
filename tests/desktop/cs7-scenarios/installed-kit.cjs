@@ -94,6 +94,141 @@ function readDocument(session, { record } = {}) {
   });
 }
 
+// ---- what the helper's accessibility read and owned-window capture give the harness ------------------------
+// The helper reports, per node, its window-relative `frame` {x,y,w,h} in points and its DOM `classes`, and the window's
+// own size (`windowSize`). Rectangles and control state therefore come from the application, never from a person.
+const finite = value => typeof value === 'number' && Number.isFinite(value);
+function windowOf(observed) {
+  const w = observed?.windowSize;
+  return plain(w) && finite(w.w) && finite(w.h) && w.w > 0 && w.h > 0 ? { w: w.w, h: w.h } : null;
+}
+function frameOf(node) {
+  const f = node?.frame;
+  return plain(f) && ['x', 'y', 'w', 'h'].every(key => finite(f[key])) && f.w > 0 && f.h > 0 ? { x: f.x, y: f.y, w: f.w, h: f.h } : null;
+}
+const labelsOfNode = node => (Array.isArray(node?.labels) ? node.labels.map(String) : []);
+const idOfNode = node => node?.identifiers?.resolved || node?.identifier || '';
+const hasClass = (node, name) => Array.isArray(node?.classes) && node.classes.includes(name);
+const nodeKey = node => [node.role, idOfNode(node), labelsOfNode(node).join('|')].join('\u0000');
+function stableFrames(before, after) {
+  const index = nodes => { const m = new Map(); for (const n of nodes) { const k = nodeKey(n), f = frameOf(n); if (f) m.set(k, [...(m.get(k) || []), f]); } return m; };
+  const a = index(before), b = index(after);
+  if (a.size !== b.size) return false;
+  for (const [k, list] of a) {
+    const other = b.get(k);
+    if (!other || other.length !== list.length) return false;
+    for (let i = 0; i < list.length; i++) for (const key of ['x', 'y', 'w', 'h']) if (Math.abs(list[i][key] - other[i][key]) > 1) return false;
+  }
+  return true;
+}
+// Window points -> pixels of a capture of that window; null when the capture and the window disagree in proportion.
+function toPixels(image, win, frame) {
+  const sx = image.width / win.w, sy = image.height / win.h;
+  if (!(sx > 0) || Math.abs(sx / sy - 1) > 0.02) return null;
+  const x = Math.max(0, Math.round(frame.x * sx)), y = Math.max(0, Math.round(frame.y * sy));
+  const w = Math.min(image.width - x, Math.round(frame.w * sx)), h = Math.min(image.height - y, Math.round(frame.h * sy));
+  return w > 0 && h > 0 ? { x, y, w, h } : null;
+}
+const unionOf = rects => { const x = Math.min(...rects.map(r => r.x)), y = Math.min(...rects.map(r => r.y)),
+  x2 = Math.max(...rects.map(r => r.x + r.w)), y2 = Math.max(...rects.map(r => r.y + r.h)); return { x, y, w: x2 - x, h: y2 - y }; };
+// One capture the harness takes and judges itself: capture first (the helper's first command may be this one, and its first
+// `observe` is reserved for the Start screen), read the PNG ONCE (its sha256 is recorded), then observe twice. A capture whose
+// node frames moved between the two observations is reported unstable, never judged.
+async function shot(session, reportDirectory, name) {
+  const captured = await session.input('capture', name);
+  if (!plain(captured) || captured.capture !== name) return null;
+  const bytes = readInside(reportDirectory, name), image = loadPng(bytes);
+  const first = await session.input('observe'), after = await session.input('observe');
+  if (!image || !Array.isArray(first?.nodes) || !Array.isArray(after?.nodes) || !first.nodes.every(plain) || !after.nodes.every(plain)) return null;
+  const win = windowOf(after);
+  return { name, image, sha256: sha256(bytes), bytes: bytes.length, nodes: after.nodes, window: win,
+    stable: !!win && same(windowOf(first), win) && stableFrames(first.nodes, after.nodes) };
+}
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+// ---- files the runner measures around a step ------------------------------------------------------------
+// A saved file is measured by the runner (hash, size, mtime), never by what the operator says; `since` is the time the
+// runner made the request, so a file that predates it was not written by the step.
+function measure(root, relative) {
+  try {
+    const bytes = readInside(root, relative);
+    if (!bytes) return null;
+    const stat = fs.statSync(path.join(fs.realpathSync(root), relative));
+    return { sha256: sha256(bytes), size: bytes.length, mtimeMs: stat.mtimeMs, bytes };
+  } catch { return null; }
+}
+function parseJson(bytes) { try { return bytes ? JSON.parse(bytes.toString('utf8')) : null; } catch { return null; } }
+// The native document inside a saved project file: the file itself, or the member that is the object document.
+function documentOf(json) {
+  const seen = new Set();
+  const visit = (value, depth) => {
+    if (!plain(value) || depth > 4 || seen.has(value)) return null;
+    seen.add(value);
+    if (typeof value.format === 'string' && value.format.startsWith('nemo.native-object-document') && Array.isArray(value.layers) && int(value.totalFrames)) return value;
+    for (const member of Object.values(value)) { const found = visit(member, depth + 1); if (found) return found; }
+    return null;
+  };
+  return visit(json, 0);
+}
+// Every object anywhere in the file that is a layer record of `uid` (the scene's layers and a component's layers alike).
+function layerRecords(json, uid) {
+  const out = []; let budget = 200000;
+  const visit = value => {
+    if (budget-- <= 0 || !value || typeof value !== 'object') return;
+    if (Array.isArray(value)) { for (const item of value) visit(item); return; }
+    if (value.layerUid === uid && Array.isArray(value.layers) === false && (Object.hasOwn(value, 'timing') || Object.hasOwn(value, 'name') || Object.hasOwn(value, 'visible'))) out.push(value);
+    for (const member of Object.values(value)) visit(member);
+  };
+  visit(json);
+  return out;
+}
+const keyFramesOf = row => row.k.flatMap((kind, i) => (kind === 'key' ? [i] : []));
+// The saved file against the verified rows: same layers, same total, and the stored key frames equal the keys read back.
+// `rows`: {layerUid: {k, c}} of the context(s) judged; `total`: the scene total. Returns {fail} | {unrun} | {ok, compared}.
+function compareSaved(json, { total, sceneRows, rows }) {
+  const doc = documentOf(json);
+  if (!doc) return { fail: 'the saved file holds no native object document' };
+  if (doc.totalFrames !== total) return { fail: 'saved-total-frames-differs' };
+  const sceneIds = Object.keys(sceneRows).sort(), fileIds = doc.layers.map(l => l?.layerUid).filter(text).sort();
+  if (!same(sceneIds, fileIds)) return { fail: 'saved-layers-differ-from-the-verified-scene-layers' };
+  let compared = 0;
+  for (const [uid, row] of Object.entries(rows)) {
+    const records = layerRecords(json, uid);
+    if (!records.length) return { fail: 'saved-file-lacks-layer-' + uid };
+    const keys = records.map(r => r.timing?.keys).filter(Array.isArray);
+    if (!keys.length) continue;
+    const frames = keys[0].map(k => k?.frame);
+    if (!frames.every(int)) return { fail: 'saved-timing-keys-malformed-for-' + uid };
+    if (!same(frames.slice().sort((a, b) => a - b), keyFramesOf(row))) return { fail: 'saved-keys-differ-from-the-verified-keys-of-' + uid };
+    compared++;
+  }
+  return compared ? { ok: true, compared } : { unrun: 'the saved file stores no timing keys to compare with the verified rows' };
+}
+
+// History plus the cell runs of ONE layer (a layer whose timing is unavailable gives a pair the oracle refuses, not a thrown read).
+function readLayerCells(session, { contextId, layerUid, record }) {
+  return guarded(session, record, async ({ query, status }) => {
+    const pin = await pinRevision(query, status), history = await query(HISTORY, pin);
+    return { history, cells: await query(TIMING, { ...pin, contextId, layerUid, frame: 0, view: 'cells' }) };
+  });
+}
+// The brush-bearing records (bitmap brush strokes) of one context at one frame, one entry per read, pinned to one revision.
+// A refusal (the route is unavailable in this build) is returned as `refused`, never guessed at.
+const BITMAP = 'query.document.object.brush.bitmap';
+function readBitmapScene(session, { contextId, frame, record }) {
+  return guarded(session, record, async ({ query, status }) => {
+    const pin = await pinRevision(query, status), entries = []; let total = null, refused = null;
+    for (let offset = 0; offset < 16; offset++) {
+      const { response } = await query(BITMAP, { action: 'scene', ...pin, contextId, frame, offset, limit: 1 });
+      const r = response.result;
+      if (response.ok !== true || !plain(r) || !int(r.totalEntries) || !Array.isArray(r.entries)) { refused = String(response.error?.code || response.error?.reason || 'refused').slice(0, 80); break; }
+      total = r.totalEntries; entries.push(...r.entries);
+      if (r.nextOffset === null || offset + 1 >= total) break;
+    }
+    return { pin, total, entries, refused };
+  });
+}
+
 // ---- raw pixels -------------------------------------------------------------------------
 const luma = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 function rectOk(image, rect, minWidth, minHeight) {
@@ -147,5 +282,6 @@ function loadPng(bytes) {
   try { return bytes && bytes.length > 33 ? decode(bytes) : null; } catch { return null; }
 }
 
-module.exports = { PLACEMENT, readTimeline, readDocument, plain, int, text, sha256, malformed, rawOnly, privateEvidence, readInside,
+module.exports = { PLACEMENT, readTimeline, readDocument, readLayerCells, readBitmapScene, windowOf, frameOf, labelsOfNode, idOfNode, hasClass, stableFrames, toPixels, unionOf, shot,
+  measure, parseJson, documentOf, layerRecords, keyFramesOf, compareSaved, plain, int, text, sha256, malformed, rawOnly, privateEvidence, readInside,
   luma, rectOk, pixel, meanColour, rectStats, textBands, loadPng };
