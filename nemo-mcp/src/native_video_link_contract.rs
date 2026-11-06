@@ -36,6 +36,14 @@ fn intent(value: &Value) -> bool {
     }
 }
 
+/// #2256: the optional declared component a NEW layer joins; a replace names its placement's own target and carries none.
+fn context(payload: &Value) -> bool {
+    match payload.get("contextId") {
+        None => true,
+        Some(id) => opaque(id) && payload["intent"]["kind"] == "newLayer",
+    }
+}
+
 pub(crate) fn request(payload: &Value) -> bool {
     exact(
         payload,
@@ -45,9 +53,10 @@ pub(crate) fn request(payload: &Value) -> bool {
             "source",
             "intent",
         ],
-        &[],
+        &["contextId"],
     )
     .is_some()
+        && context(payload)
         && payload["documentSnapshotId"]
             .as_str()
             .is_some_and(bounded_identifier)
@@ -96,7 +105,7 @@ pub(crate) fn result(value: &Value) -> bool {
 }
 
 /// A receipt advances exactly one revision and names the placement its intent addressed:
-/// the request's own minted id in the scene root for a new layer, the unchanged id for a
+/// the request's own minted id in the request's context (the scene root by default) for a new layer, the unchanged id for a
 /// replace (whose target is the placement's own, echoed by the owner).
 pub(crate) fn revision_matches(
     request: &NativeApplicationRequest,
@@ -114,7 +123,12 @@ pub(crate) fn revision_matches(
         && if new_layer {
             value["placementId"].as_str()
                 == Some(format!("placement-{}", request.request_id).as_str())
-                && value["target"]["contextId"] == "scene-root"
+                && value["target"]["contextId"]
+                    == request
+                        .payload
+                        .get("contextId")
+                        .cloned()
+                        .unwrap_or_else(|| Value::from("scene-root"))
         } else {
             value["placementId"] == intent["placementId"]
         }

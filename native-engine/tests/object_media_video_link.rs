@@ -459,3 +459,6 @@ fn the_advertised_path_bound_fits_the_request_budget_with_every_other_field_at_i
     assert_eq!(code(&refused), DispatchErrorCode::InvalidRequest);
     assert_eq!(owner.history_depths(), (1, 0));
 }
+
+#[path = "object_media_video_link_context.rs"]
+mod context;

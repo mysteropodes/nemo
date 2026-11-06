@@ -1941,6 +1941,7 @@
         "object_text_read.rs",
         "object_raster_image_import.rs",
         "object_media_video_link.rs",
+        "object_media_video_link_context.rs",
         "object_brush_bitmap_stroke.rs",
         "object_raster_scene_join.rs",
         "object_layer_opacity_scene.rs",

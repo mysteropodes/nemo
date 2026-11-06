@@ -35,6 +35,10 @@ pub(crate) struct VideoLink {
     pub(crate) source: VideoSource,
     #[serde(deserialize_with = "closed_map")]
     pub(crate) intent: VideoIntent,
+    /// #2256: the declared component a NEW layer joins (the editor inside an entered component); absent is the scene root.
+    /// A replace names its placement's own target, so it carries no context.
+    #[serde(default)]
+    pub(crate) context_id: Option<String>,
 }
 
 impl VideoLink {
@@ -55,6 +59,13 @@ impl VideoLink {
                     && !placement_id.contains('\0')
             }
         };
+        let context_ok = match (&parsed.context_id, &parsed.intent) {
+            (None, _) => true,
+            (Some(id), VideoIntent::NewLayer {}) => {
+                !id.trim().is_empty() && id.len() <= 255 && !id.contains('\0')
+            }
+            (Some(_), VideoIntent::Replace { .. }) => false,
+        };
         if parsed.lifecycle_generation == 0
             || parsed.lifecycle_generation > 9_007_199_254_740_991
             || parsed.document_snapshot_id.is_empty()
@@ -63,6 +74,7 @@ impl VideoLink {
             || path.len() > MAX_PATH_BYTES
             || path.contains('\0')
             || !placement_ok
+            || !context_ok
         {
             return Err(DispatchErrorCode::InvalidRequest);
         }

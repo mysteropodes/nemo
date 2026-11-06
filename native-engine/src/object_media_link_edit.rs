@@ -12,7 +12,8 @@
 //! carries the catalog. Targets resolve exactly like property holders do
 //! (`validate_property_holders`): the context is a context of the order plan
 //! (`scene-root` when there is none), the layer is a document layer and an
-//! element is an authored record of that context and layer.
+//! element is an authored record of that context and layer. A declared
+//! component is resolved against its own record (its layers and records).
 //!
 //! `Video` and `Image` assets on a drawing are admitted. An image resolves its
 //! element through `image_element_exists` (lane 6: an authored path record or
@@ -102,6 +103,33 @@ fn resolve_drawing(
     layer_uid: &str,
     stroke_id: Option<&str>,
 ) -> Result<(), PlacementRefusal> {
+    // #2256: a declared component is a context of its own: its layers and its authored records are the component record's, not the scene's.
+    if let Some(record) = document.component_set().and_then(|set| {
+        set.components
+            .iter()
+            .find(|record| record.symbol_id == context_id)
+    }) {
+        if !record
+            .layers
+            .iter()
+            .any(|layer| layer.layer_uid() == layer_uid)
+        {
+            return Err(PlacementRefusal::Layer);
+        }
+        return match stroke_id {
+            Some(stroke)
+                if !record.objects.iter().any(|item| {
+                    let target = item.target();
+                    matches!(target.scope_kind(), FrameScopeKind::Authored)
+                        && target.layer_uid() == layer_uid
+                        && target.stroke_id() == stroke
+                }) =>
+            {
+                Err(PlacementRefusal::Element)
+            }
+            _ => Ok(()),
+        };
+    }
     let context_known = match document.composition_order.value() {
         Some(plan) => plan
             .contexts

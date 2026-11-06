@@ -49,11 +49,23 @@
     }
     // The receipt's revision is in the presented chain: same owner, at or past that revision, presented at the CURRENT frame (the
     // playhead is presentation, not document state), and the target still present. Returns the presented info or null.
+    // #2256: the component the import joined, when that component is the one presented now (its rows are the component read, not the scene table).
+    const held = () => { const c = root.NemoNativeComponentContext; return c && typeof c.presented === 'function' ? c.presented(root) : null; };
+    const heldRows = (contextId) => { const c = root.NemoNativeComponentContext, here = held(); return here && here.contextId === contextId && typeof c.layers === 'function' ? c.layers(root) : null; };
     function confirmed(ctx, state, receipt) {
-      const after = ctx.session.info(), replace = ctx.intent.kind === 'replace';
-      const shown = !retired && current() === ctx.session && ctx.session.isActive() && sameOwner(after, ctx.before) &&
+      const after = ctx.session.info(), replace = ctx.intent.kind === 'replace', inside = ctx.intent.contextId !== undefined && !replace;
+      const owner = !retired && current() === ctx.session && ctx.session.isActive() && sameOwner(after, ctx.before) &&
         receipt.contentRevision === ctx.before.contentRevision + 1 && Number.isSafeInteger(after.contentRevision) && after.contentRevision >= receipt.contentRevision &&
-        root.state === state && projected(after) && ports.presented(ctx.session, after, state.currentFrame);
+        root.state === state && projected(after);
+      if (inside) {
+        // The owner acknowledged the revision chain; the layer is verified against the component read while that component is presented, and the
+        // receipt must name the component the request asked for (a scene presentation after leaving it cannot show a component layer).
+        if (!owner || receipt.target.contextId !== ctx.intent.contextId) return null;
+        const here = held(), rows = heldRows(ctx.intent.contextId);
+        if (here && here.contextId !== ctx.intent.contextId) return null;
+        return !here || (rows && rows.some((row) => row.layerUid === receipt.target.layerUid)) ? after : null;
+      }
+      const shown = owner && ports.presented(ctx.session, after, state.currentFrame);
       // A replace must name the exact target the pinned placement read presented.
       const placed = Array.isArray(after.layers) && after.layers.some((row) => row.layerUid === receipt.target.layerUid) &&
         (!replace || receipt.target.layerUid === ctx.intent.layerUid && receipt.target.contextId === ctx.intent.contextId);
@@ -69,10 +81,18 @@
       const out = { status: replace ? 'replaced' : 'imported', readback: 'confirmed', receipt, selected: false };
       // A replacement keeps its layer; a late recovery resolves the receipt without taking the user's current selection.
       if (!replace && !recovering && sameSelection(selection(), ctx.selection)) {
-        const index = after.layers.findIndex((row) => row.layerUid === receipt.target.layerUid);
-        const consumed = root.NemoNativeObjectProject.selectLayerUI(root, index, false, receipt.target.layerUid, after) === true;
-        out.selected = consumed && current() === ctx.session && samePins(ctx.session.info(), after) && state.currentFrame === frame &&
-          sameSelection(selection(), [receipt.target.layerUid]) && ports.presented(ctx.session, after, frame);
+        if (ctx.intent.contextId !== undefined) {
+          // Inside the component the new layer is selected through the context controller (its rows are the component's).
+          const rows = heldRows(ctx.intent.contextId), index = rows ? rows.findIndex((row) => row.layerUid === receipt.target.layerUid) : -1;
+          const consumed = index >= 0 && root.NemoNativeComponentContext.selectLayer(root, index) === true;
+          out.selected = consumed && current() === ctx.session && samePins(ctx.session.info(), after) && state.currentFrame === frame &&
+            sameSelection(selection(), [receipt.target.layerUid]);
+        } else {
+          const index = after.layers.findIndex((row) => row.layerUid === receipt.target.layerUid);
+          const consumed = root.NemoNativeObjectProject.selectLayerUI(root, index, false, receipt.target.layerUid, after) === true;
+          out.selected = consumed && current() === ctx.session && samePins(ctx.session.info(), after) && state.currentFrame === frame &&
+            sameSelection(selection(), [receipt.target.layerUid]) && ports.presented(ctx.session, after, frame);
+        }
       }
       return out;
     }
@@ -94,18 +114,37 @@
         return status() || { status: 'unavailable', reason: 'owner_reopened' };
       } finally { pending = false; }
     }
+    // The pinned origin of an import inside the presented component: the owner pins, the playhead and the component's own selection (no scene lease).
+    function beginInside(here) {
+      try {
+        const session = current(), before = session && session.info(), rows = heldRows(here.contextId), chosen = selection(), frame = root.state.currentFrame;
+        if (!session || !session.isActive() || !before || !rows || !Array.isArray(chosen) || !Number.isSafeInteger(frame) || frame < 0 || frame >= here.totalFrames ||
+            typeof session.runComponentCommand !== 'function' || !projected(before)) return { ok: false, status: 'unavailable', reason: 'no_presented_native_session' };
+        return { ok: true, ctx: Object.freeze({ session, before, frame, selection: chosen.slice() }) };
+      } catch (_) { return { ok: false, status: 'unavailable', reason: 'no_presented_native_session' }; }
+    }
+    // The component is still the presented one (its projection settled at the pinned revision); inside the queue the lease must show that very context at the frame.
+    function shownInside(queueScope, ctx) {
+      const here = held(), c = root.NemoNativeComponentContext;
+      if (!here || here.contextId !== ctx.intent.contextId || c.projectionReady(root, ctx.before) !== true) return false;
+      if (!queueScope) return true;
+      if (typeof queueScope.readPresentedObjectSession !== 'function') return false;
+      const shown = queueScope.readPresentedObjectSession();
+      return !!shown && !!shown.presentation && shown.presentation.contextId === ctx.intent.contextId && shown.presentation.frame === ctx.frame && samePins(shown, ctx.before);
+    }
     // One picker, one native link. `placementId` (replace only) is the placement the footage panel read at the playhead.
     async function run(placementId) {
       if (retired || !declared) return { status: 'unavailable', reason: 'native_video_route_absent' };
       if (pending) return { status: 'busy' };
       const unresolved = status();
       if (unresolved) return unresolved;
-      // The owner creates every new linked layer in the scene root, which a component editor does not present.
-      if (placementId === undefined && root.state && root.state.activeSymbolId) return { status: 'unavailable', reason: 'component_context_import_unavailable' };
-      const started = core.begin();
+      // A new linked layer is made in the scene root, or (#2256) inside the component the editor presents: the context controller's held id is sent.
+      const inside = placementId === undefined && root.state && root.state.activeSymbolId ? held() : null;
+      if (placementId === undefined && root.state && root.state.activeSymbolId && !inside) return { status: 'unavailable', reason: 'component_context_import_unavailable' };
+      const started = inside ? beginInside(inside) : core.begin();
       if (!started.ok) return { status: started.status, reason: started.reason };
       const base = started.ctx, state = root.state, symbol = state.activeSymbolId, activeLayer = state.activeLayerIdx;
-      let intent = { kind: 'newLayer' };
+      let intent = inside ? { kind: 'newLayer', contextId: inside.contextId } : { kind: 'newLayer' };
       if (placementId !== undefined) {
         const row = base.before.layers[activeLayer], read = root.SM && typeof root.SM.nativeVideoPlacement === 'function' ? root.SM.nativeVideoPlacement(activeLayer) : null;
         if (typeof placementId !== 'string' || !placementId) return { status: 'invalid', reason: 'placement_id_required' };
@@ -121,13 +160,14 @@
       const currentIntent = (queueScope) => !retired && current() === ctx.session && ctx.session.isActive() && root.state === state &&
         state.currentFrame === ctx.frame && state.activeSymbolId === symbol && state.activeLayerIdx === activeLayer &&
         ctx.session.readSubscriptionGeneration() === subscriptionGeneration && samePins(ctx.session.info(), ctx.before) && sameSelection(selection(), ctx.selection) &&
-        projected(ctx.before) && (!queueScope || typeof queueScope.readPresentedObjectSession === 'function') && ports.presented(queueScope || ctx.session, ctx.before, ctx.frame);
+        projected(ctx.before) && (inside ? shownInside(queueScope, ctx) : (!queueScope || typeof queueScope.readPresentedObjectSession === 'function') && ports.presented(queueScope || ctx.session, ctx.before, ctx.frame));
       const api = root.NemoNativeVideoAsset;
       const client = api && api.desktop(root, { videoRoute: () => !retired && declared });
       if (!client) return { status: 'unavailable', reason: 'native_video_client_absent' };
       pending = true;
       try {
         const options = { origin: ctx.before, current: currentIntent };
+        if (inside) options.contextId = inside.contextId;
         const receipt = intent.kind === 'replace' ? await client.replacePicked(placementId, options) : await client.importPicked(options);
         return receipt ? finish(ctx, state, receipt, false) : { status: 'cancelled' };
       } catch (error) {

@@ -346,6 +346,8 @@
     var st = live(host);
     if (!st) return false;
     if (Grid) Grid.paint(host, st, timingPort(host, st), frameOnly === true);
+    // The header's "Select frames" mode works on the entered component too (native-component-cell-selection.js).
+    if (host.NemoNativeComponentCellSelection && st.gridView) host.NemoNativeComponentCellSelection.mount(host, st, st.gridView.caption, frameOnly === true);
     var doc = host.document, frame = host.state.currentFrame;
     var field = doc.getElementById('tl-cf');
     if (field) { if (doc.activeElement !== field) field.value = frame + 1; field.max = st.totalFrames; }

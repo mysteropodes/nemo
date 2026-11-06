@@ -19148,8 +19148,13 @@
         "source",
         "intent"
       ],
-      "description": "T12: link one desktop video file. The host canonicalizes the path inside the request filesystem scope and probes width, height and frame count; the owner publishes one revision. Whitespace-only or NUL-bearing ids and paths are refused by the contract. The path bound (2048 bytes) fits the 4096-byte request with every other field at its maximum.",
+      "description": "T12: link one desktop video file. The host canonicalizes the path inside the request filesystem scope and probes width, height and frame count; the owner publishes one revision. Whitespace-only or NUL-bearing ids and paths are refused by the contract. The path bound (2048 bytes) fits the 4096-byte request with every other field at its maximum. The optional contextId (a newLayer only) names the declared component the new layer joins; absent is the scene root.",
       "properties": {
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
         "documentSnapshotId": {
           "$ref": "#/$defs/Identifier"
         },

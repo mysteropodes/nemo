@@ -565,3 +565,19 @@ test('the entered rows carry the owner\'s hidden / locked / parent / 3D / Motion
   assert.deepEqual(Context.layers(f.host).map((r) => [r.layerUid, r.name, r.locked, r.visible]), [['ia', 'Inner A', true, false], ['ib', 'Inner B', false, true]]);
   assert.deepEqual(f.host.state.layers.map((r) => [r.locked, r.visible, r.parentLayerUid, r.threeD]), [[true, false, 'ib', true], [false, true, null, false]]);
 });
+
+test('the entered grid mounts the header "Select frames" strip once and keeps it across a scrub tick (the real paint hook)', async () => {
+  const f = fixture(), mounts = [];
+  f.host.NemoNativeComponentCellSelection = { mount: (host, st, caption, frameOnly) => { mounts.push({ name: st.name, caption, frameOnly, text: caption.textContent, total: st.totalFrames }); return true; } };
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  const header = f.host.document.getElementById('frame-hdr');
+  const full = mounts[mounts.length - 1];
+  assert.equal(full.frameOnly, false); assert.equal(full.caption, header.children[0], 'mounted on the caption the grid painted'); assert.equal(full.name, 'Comp A'); assert.equal(full.total, 12);
+  f.host.state.currentFrame = 4;
+  assert.equal(Context.paint(f.host, true), true);
+  const tick = mounts[mounts.length - 1];
+  assert.equal(tick.frameOnly, true, 'a scrub tick asks for the in-place remount');
+  assert.equal(tick.caption, full.caption, 'the same caption node (the grid did not rebuild)');
+  assert.match(tick.text, /Frame 5 \/ 12$/, 'the caption text the strip copies is already the new frame');
+});
