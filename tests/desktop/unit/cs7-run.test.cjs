@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { main, cli, refusalReason } = require('../cs7-run.cjs');
+const { main, cli, refusalReason, EXIT_SUBSET_PASS } = require('../cs7-run.cjs');
 const { DECLARATION_SCHEMA, selectRows, readyRows } = require('../cs7-runner.cjs');
 const identity = { sourceSha: 'a'.repeat(40), tree: 'b'.repeat(40), driverSha: 'c'.repeat(40),
   executableSha256: 'd'.repeat(64), sessionId: 'one-lifetime', pid: 123, dirty: false };
@@ -55,7 +55,7 @@ test('rows runs only the selected subset, never prepares the rest, and records t
   const f = fixture(t); process.env.CS7_TEST_C_THROWS = '1'; t.after(() => { delete process.env.CS7_TEST_C_THROWS; });
   const result = await main(f.config({ rows: ['b', 'a'] }), f.deps);
   assert.deepEqual(f.events, ['prepare-a', 'prepare-b', 'session-created', 'start', 'run-a', 'run-b', 'cleanup']);
-  assert.equal(result.verdict, 'installed-pass'); // every SELECTED row passed
+  assert.equal(result.verdict, 'installed-subset-pass'); // the SELECTED rows passed; Ready row c was not run
   const selection = { scope: 'subset', selected: ['a', 'b'], omittedReady: ['c'] };
   assert.deepEqual(result.selection, selection);
   const receipt = JSON.parse(fs.readFileSync(path.join(f.report, 'installed-results.json'), 'utf8'));
@@ -69,10 +69,38 @@ test('rows runs only the selected subset, never prepares the rest, and records t
   for (const name of progress) assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.report, name), 'utf8')).selection, selection);
 });
 
-test('selecting every Ready row is labelled all-ready, with nothing omitted', async t => {
+test('selecting every Ready row is labelled all-ready, with nothing omitted, and keeps the installed-pass verdict', async t => {
   const f = fixture(t);
   const result = await main(f.config({ rows: ['a', 'b', 'c'] }), f.deps);
   assert.deepEqual(result.selection, { scope: 'all-ready', selected: ['a', 'b', 'c'], omittedReady: [] });
+  assert.equal(result.verdict, 'installed-pass');
+});
+
+test('exit status: 0 for every Ready row, 3 with a one-line explanation for a subset pass, 1 for anything that is not a pass', async t => {
+  const run = async (rows, extra = {}) => {
+    const f = fixture(t), err = [], config = path.join(f.root, 'config.json');
+    fs.writeFileSync(config, JSON.stringify(f.config({ ...(rows ? { rows } : {}), ...extra })));
+    const code = await cli(['node', 'cs7-run.cjs', config], { ...f.deps, stderr: { write: s => err.push(s) } });
+    return { code, err, f };
+  };
+  let r = await run(null);
+  assert.equal(r.code, 0); assert.deepEqual(r.err, []);
+  assert.equal(JSON.parse(r.f.out[0]).verdict, 'installed-pass');
+  r = await run(['a', 'b', 'c']);
+  assert.equal(r.code, 0); assert.deepEqual(r.err, []);
+  r = await run(['a', 'b']);
+  assert.equal(r.code, EXIT_SUBSET_PASS); assert.equal(EXIT_SUBSET_PASS, 3);
+  assert.equal(JSON.parse(r.f.out[0]).verdict, 'installed-subset-pass');
+  assert.equal(r.err.length, 1);
+  assert.match(r.err[0], /^CS7 subset run passed \(installed-subset-pass\): 2 selected row\(s\) passed, 1 Ready row\(s\) were not run; this is not the every-Ready-row outcome \(exit status 3\)\.\n$/);
+  assert.equal(r.err[0].trimEnd().split('\n').length, 1, 'one line');
+  const receipt = JSON.parse(fs.readFileSync(path.join(r.f.report, 'installed-results.json'), 'utf8'));
+  assert.equal(receipt.verdict, 'installed-subset-pass');
+  // A failing subset is a failure (1), not a subset pass.
+  const f = fixture(t), err = [], config = path.join(f.root, 'config.json');
+  fs.writeFileSync(config, JSON.stringify(f.config({ rows: ['a'] })));
+  const failing = { ...f.deps, createInstalledSession: () => ({ start: async () => identity, identity: async () => ({ ...identity }), cleanup: async () => { throw new Error('x'); } }) };
+  assert.equal(await cli(['node', 'cs7-run.cjs', config], { ...failing, stderr: { write: s => err.push(s) } }), 1);
 });
 
 test('an invalid selection refuses before any scenario is prepared, any session is created or any receipt is written', async t => {
@@ -92,7 +120,7 @@ test('an invalid selection refuses before any scenario is prepared, any session 
 
 test('selection is also checked by readyRows itself when a dependency is outside it', () => {
   const declarations = [{ schema: DECLARATION_SCHEMA, rows: [row('a'), row('b', { dependsOn: ['a'] })] }];
-  const known = { taskIds: new Set(['F03']), surfaceIds: new Set(['opacity']),
+  const known = { taskIds: new Set(['F03']), surfaceIds: new Set(['opacity']), taskSurfaces: new Map([['F03', new Set()]]),
     scenarios: { a: { run() {} }, b: { run() {} } } };
   assert.deepEqual(readyRows(declarations, { ...known, only: new Set(['a']) }).map(r => r.id), ['a']);
   assert.throws(() => readyRows(declarations, { ...known, only: new Set(['b']) }), /outside the selection/);

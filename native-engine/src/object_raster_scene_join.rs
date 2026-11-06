@@ -19,6 +19,8 @@ pub(crate) struct RasterSource {
     /// `layer_index` is unique.
     pub(crate) placed: bool,
     pub(crate) source: RasterSceneSource,
+    /// #2372: the item's stored mirror and shear (the identity for a placed component image).
+    pub(crate) form: crate::evaluation::object_item_local_form::LocalForm,
 }
 impl RasterSource {
     pub(crate) fn placed(source_index: usize, host: usize, source: RasterSceneSource) -> Self {
@@ -29,6 +31,7 @@ impl RasterSource {
             rig_offsets: None,
             placed: true,
             source,
+            form: Default::default(),
         }
     }
     /// The rig-posed offsets of this mesh-bound raster, or `None` when no linked bind poses it.
@@ -108,6 +111,7 @@ pub(super) fn sources_excluding(
                 mesh_id: item.mesh_id().map(str::to_owned),
                 rig_offsets,
                 placed: false,
+                form: item.local_form(),
                 source: RasterSceneSource {
                     asset_id: item.asset_id().as_str().to_owned(),
                     rect: crate::evaluation::motion_parent_chain::ImageRect {
@@ -276,7 +280,8 @@ mod retained {
                             source.source_index,
                             "native raster placement is unavailable",
                         )
-                    })?;
+                    })?
+                    .with_form(&source.form);
                 let mesh = source
                     .mesh_id
                     .as_deref()

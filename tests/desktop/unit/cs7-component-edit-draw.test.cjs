@@ -10,10 +10,11 @@ const { OperatorInputError } = require('../cs7-runner.cjs');
 const { DrawWorld, drawSession } = require('./cs7-i-stubs.cjs');
 
 const row = extra => ({ id: 'component-edit-draw', issue: 2256, checks: CLAUSES.map(id => ({ id })), ...extra });
-function setup(t, faults = {}) {
+function setup(t, faults = {}, tamper) {
   const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'cs7-draw-')));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const world = new DrawWorld(directory, faults);
+  if (tamper) world.tamper = (phase, pair) => tamper(phase, pair.request.operation, pair);
   return { directory, world, session: drawSession({ world }), workflow: createWorkflow({ reportDirectory: directory }) };
 }
 const statuses = result => Object.fromEntries(result.checks.map(c => [c.id, c.status]));
@@ -86,24 +87,24 @@ test('malformed or verdict-bearing evidence is an operator input error, never a 
   await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed');
   ({ session, workflow } = setup(t, { wrongFrame: 'motion-draw' }));
   await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed');
-  for (const damage of [
-    ev => { ev.reads.layers[0].response.result.cells.runs[0][0] = 1; },
-    ev => { ev.reads.layers[0].request.payload.atRevision = 1; },
-    ev => { ev.reads.history.request.operation = 'command.document.object.frames.insert'; },
-    ev => { delete ev.reads.history; },
-    ev => { delete ev.sceneLayers; },
-  ]) {
+  // Attached reads of any kind are refused: the harness reads the document, the operator never attaches it.
+  for (const key of ['reads', 'sceneLayers', 'kinds']) {
     ({ session, workflow } = setup(t));
     const original = session.requestEvidence;
-    session.requestEvidence = async request => { const ev = await original(request); if (request.phase === 'comp-pen') damage(ev); return ev; };
-    await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed');
+    session.requestEvidence = async request => { const ev = await original(request); if (request.phase === 'comp-pen') ev[key] = {}; return ev; };
+    await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed' && error.command === 'component-edit-draw.comp-pen', key);
   }
-  // kinds reads must be the pinned layers page of the scene
-  for (const damage of [ev => { delete ev.kinds; }, ev => { ev.kinds.request.payload.selector.contextId = 'native-component:1:0'; }, ev => { ev.kinds.response.result.items.pop(); }]) {
-    ({ session, workflow } = setup(t));
-    const original = session.requestEvidence;
-    session.requestEvidence = async request => { const ev = await original(request); if (request.phase === 'bake-break') damage(ev); return ev; };
-    await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed');
+  // Harness reads that do not tile, are unpinned, are not ok, or disagree between the scene and the component.
+  for (const [phase, damage] of [
+    ['comp-pen', (op, pair) => { if (op === 'query.document.object.layer.timing') pair.response.result.cells.runs[0][0] = 1; }],
+    ['comp-pen', (op, pair) => { if (op === 'query.document.object.layer.timing') pair.response.result.atRevision = 1; }],
+    ['comp-pen', (op, pair) => { if (op === 'query.document.object.history') pair.response.ok = false; }],
+    ['comp-pen', (op, pair) => { if (op === 'query.document.object.history') delete pair.response.result.undoDepth; }],
+    // the scene layers page must give every layer a kind
+    ['bake-break', (op, pair) => { if (op === 'query.document.object.component.read' && pair.request.payload.selector.contextId === 'scene-root') pair.response.result.items[0].layerKind = ''; }],
+  ]) {
+    ({ session, workflow } = setup(t, {}, (p, op, pair) => { if (p === phase) damage(op, pair); }));
+    await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed', phase);
   }
   // an exported image whose "background" is not empty is the operator's mistake, not a verdict
   ({ session, workflow } = setup(t));

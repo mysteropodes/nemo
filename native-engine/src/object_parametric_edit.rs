@@ -262,14 +262,16 @@ fn compute(
 
 /// #2372 Select on a dynamic shape (batch `reshape` with a `matrix`, record space): a move, an axis-aligned resize or a
 /// turn of one shape through the same kernels the translate and scale actions use, so the box and the rect radii stay
-/// consistent. A turn moves the baked anchors and adds to the stored `boxAngle` (the box stays the un-rotated frame);
-/// a skew or a resize of a turned shape has no meaning for a dynamic shape and is refused.
+/// consistent. A turn moves the baked anchors and adds to the stored `boxAngle` (the box stays the un-rotated frame).
+/// #2372 A-select-skew-anchor-lasso: a shear (or any other affine) of a dynamic shape bakes its anchors through the affine and
+/// drops the generator (`paramShape`, `boxAngle`), as the baseline's `p.shear` left a plain sheared path: the shape is a plain
+/// closed path from then on.
 pub(crate) fn transformed(record: &ObjectRecord, m: [f64; 6]) -> Result<ObjectRecord, DispatchErrorCode> {
     const EPS: f64 = 1e-9;
     let ext = record.vector_ext.value().ok_or(DispatchErrorCode::Unavailable)?;
     let stored = ext.param_shape.value().ok_or(DispatchErrorCode::Unavailable)?;
     let angle = member(&ext.box_angle)?.unwrap_or(0.0);
-    let (mut anchors, mut frame, mut rebuilt, mut turned) = (anchors_of(record)?, frame_of(stored)?, false, 0.0);
+    let (mut anchors, mut frame, mut rebuilt, mut turned, mut baked) = (anchors_of(record)?, frame_of(stored)?, false, 0.0, false);
     let refuse = |why: shape_kernels::ShapeRefusal| why.code();
     let [a, b, c, d, e, f] = m;
     if b.abs() < EPS && c.abs() < EPS {
@@ -287,7 +289,10 @@ pub(crate) fn transformed(record: &ObjectRecord, m: [f64; 6]) -> Result<ObjectRe
         anchors = anchors.iter().map(|k| Anchor { point: at(k.point), handle_in: lin(k.handle_in), handle_out: lin(k.handle_out) }).collect();
         turned = b.atan2(a).to_degrees();
     } else {
-        return Err(DispatchErrorCode::InvalidRequest);
+        let at = |p: [f64; 2]| [a * p[0] + c * p[1] + e, b * p[0] + d * p[1] + f];
+        let lin = |p: [f64; 2]| [a * p[0] + c * p[1], b * p[0] + d * p[1]];
+        anchors = anchors.iter().map(|k| Anchor { point: at(k.point), handle_in: lin(k.handle_in), handle_out: lin(k.handle_out) }).collect();
+        baked = true;
     }
     let mut next = record.clone();
     next.geometry.segments = segments_of(&anchors)?;
@@ -301,6 +306,10 @@ pub(crate) fn transformed(record: &ObjectRecord, m: [f64; 6]) -> Result<ObjectRe
         });
         if turned != 0.0 {
             next_ext.box_angle = Presence::Present(number((angle + turned) % 360.0)?);
+        }
+        if baked {
+            next_ext.param_shape = Presence::Missing;
+            next_ext.box_angle = Presence::Missing;
         }
     }
     Ok(next)

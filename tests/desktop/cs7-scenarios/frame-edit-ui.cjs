@@ -1,9 +1,9 @@
 'use strict';
 // #2248 installed frame-edit row, foreground. The UI32 helper cannot send F5/F6/F7, right-click or free
-// drags, so a person performs each gesture. The person never reports a verdict: after every gesture they
-// attach the unedited read-only Nemo MCP replies (history depth, per-layer cell runs) and this oracle
-// computes the effect itself (revision, history counts, total frames, cell kinds). Pixels come from the
-// helper's own owned-window capture, not from the operator.
+// drags, so a person performs each gesture. The person never reports a verdict and never attaches document
+// state: after every reply the HARNESS makes the read-only Nemo MCP reads itself (history depth, per-layer cell
+// runs; session.read, bound to the candidate) and this oracle computes the effect itself (revision, history
+// counts, total frames, cell kinds). Pixels come from the helper's own owned-window capture, not from the operator.
 const path = require('node:path');
 const { isDeepStrictEqual: same } = require('node:util');
 const kit = require('./installed-kit.cjs');
@@ -119,15 +119,11 @@ function oneEdit(p, n) {
 
 // ---- the operator script -----------------------------------------------------------------------
 const READS = 'Evidence reply (a JSON object): {observation: one plain sentence of what you saw, productFailure: true only if the app visibly ' +
-  'misbehaved (crash, missing menu item, no reaction at all), selection: {layerUid, frame, span?}, reads: {history: {request, response}, layers: ' +
-  '[{request, response}, ...]}}. Each {request, response} is the UNEDITED request and response of a READ-ONLY public Nemo MCP call, never a ' +
-  'command.* operation: history is query.document.object.history; layers holds one query.document.object.layer.timing call with payload.view ' +
-  '"cells" and payload.contextId set to the context named below for EVERY layer of that context, all pinned (atRevision, documentSnapshotId) to ' +
-  'the revision the history read reports. Make the reads right after the gesture and before any other action. Frames in `selection` are 0-based ' +
-  '(the UI shows frame N as N+1). Do not add pass/fail fields: the oracle judges the raw reads and refuses a reply that carries a verdict.';
-const SCENE_READS = READS + ' Context: "scene-root".';
-const COMP_READS = READS + ' Context: the entered component\'s id (the same value in every call). Also attach sceneLayers: the same cells ' +
-  'reads with payload.contextId "scene-root" for every scene layer, pinned to the same revision.';
+  'misbehaved (crash, missing menu item, no reaction at all), selection: {layerUid, frame, span?}}. Do NOT attach any MCP reads or document ' +
+  'state: the runner reads the document itself right after your reply, so after replying touch nothing in the app. Frames in `selection` are ' +
+  '0-based (the UI shows frame N as N+1). Do not add pass/fail fields: the oracle refuses a reply that carries a verdict or any read.';
+const SCENE_READS = READS + ' The runner reads context "scene-root".';
+const COMP_READS = READS + ' The runner reads the entered component\'s context (the context id you report) and "scene-root".';
 const gesture = (id, check, ctx, judge, how) => ({ id, check, ctx, type: 'gesture', judge, how });
 const PLAN = [
   { id: 'window-placement', type: 'placement', check: null,
@@ -138,7 +134,7 @@ const PLAN = [
       'right-click its row in the layer list (the Layer menu) and choose "Convert to component". Rename the FIRST layer to a name of about 70 ' +
       'characters, for example "A very long layer name that must stay on a single line with an ellipsis ok". Leave the layer list fully visible ' +
       'and no row hovered. Reply with {observation, productFailure, layers: {drawing: <layerUid of Layer 1>, component: <layerUid of the component ' +
-      'layer>}, reads} using the read rules. ' + SCENE_READS },
+      'layer>}}. ' + SCENE_READS },
   { id: 'layer-row-styling', type: 'styling', check: 'layer-row-styling',
     how: 'The runner has just saved an owned-window capture of the current screen. Open the PNG named in details.capturePath and measure, in ' +
       'pixels of that image, two rectangles: layerRows (the whole block of layer rows in the timeline list) and longName (the name area of the ' +
@@ -174,10 +170,10 @@ const PLAN = [
     how: 'Save the document (File > Save As) into the private report directory as saved/frame-edit-scene.json. Reply additionally with savedFile: ' +
       '"saved/frame-edit-scene.json" (path relative to the report directory). ' + SCENE_READS },
   { id: 'scene-reopen', type: 'reopen', check: 'scene-save-reopen', ctx: 'scene',
-    how: 'Open that same saved file through File > Open (it opens as the document; do not edit anything). Reply with the same savedFile and the reads. ' + SCENE_READS },
+    how: 'Open that same saved file through File > Open (it opens as the document; do not edit anything). Reply with the same savedFile. ' + SCENE_READS },
   { id: 'component-enter', type: 'enter', check: 'component-edits', ctx: 'component',
     how: 'Double-click the component layer row to enter the component (the tab bar shows the component beside Scene). Do not edit. Reply also with ' +
-      'component: {context: <component id used in the reads>, layerUid: <one component layer that has a key with content at frame 1>}. ' + COMP_READS },
+      'component: {context: <the entered component\'s context id>, layerUid: <one component layer that has a key with content at frame 1>}. ' + COMP_READS },
   gesture('component-f5', 'component-edits', 'component', 'insertFrame',
     'Inside the component click that layer\'s cell at frame 1 only and press the REAL F5 key once. ' + COMP_READS),
   gesture('component-f6', 'component-edits', 'component', 'insertKey',
@@ -200,8 +196,8 @@ const PLAN = [
     how: 'Back in the Scene tab or not, save with File > Save As as saved/frame-edit-component.json (relative to the report directory); reply with ' +
       'savedFile. Stay inside the component for the reads. ' + COMP_READS },
   { id: 'component-reopen', type: 'reopen', check: 'component-save-reopen', ctx: 'component',
-    how: 'Open the saved file again through File > Open, double-click the component layer to enter it again and do not edit. Afterwards remove the ' +
-      'Duplicate keyframe binding you set in Settings > Shortcuts. ' + COMP_READS },
+    how: 'Open the saved file again through File > Open, double-click the component layer to enter it again and do not edit. Then remove the ' +
+      'Duplicate keyframe binding you set in Settings > Shortcuts and close Settings, so the component is in view again. Reply only after that. ' + COMP_READS },
 ];
 
 // ---- the scenario --------------------------------------------------------------------------------
@@ -242,8 +238,9 @@ function createWorkflow({ reportDirectory }) {
         if (step.check) outcome[step.check] = 'fail';
         return finish(true, step.id + (step.check ? ' failure reported' : ' precondition failed'));
       }
-      const inComponent = step.ctx === 'component';
-      if (inComponent && step.type !== 'enter' && !componentContext) throw malformed(ROW, step.id);
+      const inComponent = step.ctx === 'component', entering = step.type === 'enter';
+      if (inComponent && !entering && !componentContext) throw malformed(ROW, step.id);
+      if (entering && !(plain(ev.component) && text(ev.component.context) && ev.component.context !== 'scene-root' && text(ev.component.layerUid))) throw malformed(ROW, step.id);
       if (step.type === 'styling') {
         const image = kit.loadPng(kit.readInside(reportDirectory, CAPTURE)), observed = await session.input('observe');
         if (!image || !plain(ev.rects) || !Array.isArray(observed?.nodes)) throw malformed(ROW, step.id);
@@ -262,17 +259,21 @@ function createWorkflow({ reportDirectory }) {
         }
         outcome[step.check] = 'pass'; continue;
       }
-      // The first installed run may meet MCP replies shaped differently from the contract this oracle reads. Such
-      // reads are never guessed at: the reason is kept privately, then the batch stops as operator input.
+      // The harness reads the document (never the operator). The first installed run may meet MCP replies shaped
+      // differently from the contract this oracle reads. Such reads are never guessed at: the reason is kept
+      // privately, then the batch stops.
+      const readContext = inComponent ? (entering ? ev.component.context : componentContext) : 'scene-root';
+      const seen = await kit.readTimeline(session, { contexts: inComponent ? [readContext, 'scene-root'] : ['scene-root'], record: { dir, name: step.id } });
+      const reads = { history: seen.history, layers: seen.layers[readContext] }, sceneLayers = seen.layers['scene-root'];
       const why = {};
-      const next = summarize(ev.reads, inComponent ? componentContext : 'scene-root', why);
-      const nextScene = inComponent ? summarize({ history: ev.reads?.history, layers: ev.sceneLayers }, 'scene-root', why) : next;
+      const next = summarize(reads, inComponent ? componentContext : 'scene-root', why);
+      const nextScene = inComponent ? summarize({ history: reads.history, layers: sceneLayers }, 'scene-root', why) : next;
       if ((!next || !nextScene) && step.type !== 'enter') kit.privateEvidence(dir, 'mismatch-' + step.id, { schema: 'nemo.frame-edit-ui-private/1', phase: step.id, reason: why.reason });
       if (step.type === 'enter') {
         const c = ev.component;
         if (!plain(c) || !text(c.context) || c.context === 'scene-root' || !text(c.layerUid)) throw malformed(ROW, step.id);
-        const entered = summarize(ev.reads, c.context);
-        const sceneNow = summarize({ history: ev.reads?.history, layers: ev.sceneLayers }, 'scene-root');
+        const entered = summarize(reads, c.context);
+        const sceneNow = summarize({ history: reads.history, layers: sceneLayers }, 'scene-root');
         if (!entered || !sceneNow || !Object.hasOwn(entered.rows, c.layerUid) || entered.rows[c.layerUid].k[0] !== 'key' ||
           entered.rows[c.layerUid].c[0] !== true) throw malformed(ROW, step.id);
         // Entering is a view change: no edit, no history entry, the scene untouched.

@@ -260,3 +260,23 @@ fn a_renderer_skip_is_an_item_that_draws_nothing_not_a_missing_item() {
     );
     assert_eq!(reported.resources.len(), 1);
 }
+
+/// #2372 A-image-text-flip-skew: an image bound to a mesh follows its item's stored mirror and shear: the deformed vertices go through the
+/// same world affine as the plain image's placement, the uvs (where pixels are sampled) stay.
+#[test]
+fn a_mesh_bound_image_follows_the_stored_mirror_of_its_item() {
+    use crate::object_document::object_raster_asset_kernels::object_item_local_form::LocalForm;
+    let row = mesh_rows().into_iter().find(|r| r.base.rotation == 0.0 && r.stages.is_empty()).expect("an unturned, unstaged row");
+    let image = raster_image(row.base, &row.stages, row.opacity, row.image);
+    let store = store_of(&row.mesh);
+    let source = super::MeshSceneSource { mesh_id: "im_1", view: row.view, offsets: row.override_offsets.as_deref(), pose: row.pose.as_deref() };
+    let plain = prepare_mesh_scene_item(&image, &source, Some(&store)).unwrap().unwrap();
+    let flipped_image = image.clone().with_form(&LocalForm { flip_x: true, flip_y: false, skew: 0.0 });
+    let flipped = prepare_mesh_scene_item(&flipped_image, &source, Some(&store)).unwrap().unwrap();
+    let centre = image.rect().x + image.rect().width / 2.0;
+    assert_eq!(plain.payload().verts.len(), flipped.payload().verts.len());
+    assert_eq!(plain.payload().uvs, flipped.payload().uvs, "the sampling does not move");
+    for (a, b) in plain.payload().verts.iter().zip(&flipped.payload().verts) {
+        assert!((b[0] - (2.0 * centre - a[0])).abs() < 0.011 && (b[1] - a[1]).abs() < 0.011, "{a:?} -> {b:?}");
+    }
+}

@@ -9,7 +9,7 @@
 //   * the sync-owner clause (settings-sync-owner.cjs): choosing a shared folder in the native picker, Publish,
 //     Check, a Merge row and the failing Publish. The helper reaches only the empty-folder cancel/check, so a
 //     person clicks and the oracle judges the disposable shared folder on disk (which it also seeds with a
-//     second profile's published state), the accessibility read and unedited MCP document reads.
+//     second profile's published state), the accessibility read and the document reads the harness makes itself.
 // Not covered by the helper: the backdrop press is attempted through the helper and recorded unrun if the
 // helper refuses it (the helper then ends, so it is the last helper step).
 const path = require('node:path');
@@ -250,7 +250,7 @@ function createWorkflow({ reportDirectory, sleep = ms => new Promise(resolve => 
       outcome['profile-color-alpha'] = 'pass';
 
       // 7 sync-owner-paths: the folder picker, Publish, Check, Merge and the failing Publish. A person clicks; the
-      // oracle judges the disposable shared folder, the accessibility read and the unedited MCP document reads.
+      // oracle judges the disposable shared folder, the accessibility read and the document reads the harness makes itself.
       const sync0 = await runSyncOwner({ session, ask, observe, stable, sleep, dir, profileName: name0,
         openSettings: () => reopen('gear'), closeSettings: close });
       sync = sync0;

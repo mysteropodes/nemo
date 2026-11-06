@@ -7,10 +7,37 @@ const path = require('node:path');
 const { encodeRGBA, canvas, fillRect } = require('../../fixtures/lib/png.cjs');
 const { OperatorInputError } = require('../cs7-runner.cjs');
 const { STR, SECOND, NONE, MERGE_TOAST } = require('../cs7-scenarios/settings-sync-owner.cjs');
+const { createReader } = require('../cs7-read.cjs');
 
 const identity = { sourceSha: 'a'.repeat(40), tree: 'b'.repeat(40), driverSha: 'c'.repeat(40),
   executableSha256: 'd'.repeat(64), sessionId: 'one-lifetime', pid: 123, dirty: false };
 const clone = value => JSON.parse(JSON.stringify(value));
+
+// ---- the harness read route, stubbed: the REAL reader (cs7-read.cjs) over a stub MCP client ------------
+// `target()` returns the world that answers (null/undefined: no document); `tamper(phase, pair)` may damage a reply.
+const INSTANCE = '0a1b2c3d-0000-4000-8000-000000000001', FOREIGN = '0a1b2c3d-0000-4000-8000-0000000000ff', BUILD = '0.0.0:stub';
+function stubReader({ directory, target, tamper, calls = [], listeners, current }) {
+  const registry = fs.mkdtempSync(path.join(directory, '.stub-registry-'));
+  fs.writeFileSync(path.join(registry, INSTANCE + '.json'), JSON.stringify({ instanceId: INSTANCE, port: 43210, secret: 'x'.repeat(36), buildId: BUILD }));
+  const client = {
+    async callTool(name, args) {
+      calls.push(name === 'nemo_command' ? args.operation : name);
+      const world = target();
+      if (name === 'nemo_discover') {
+        const st = world.status();
+        return { result: { structuredContent: { instances: [{ instanceId: INSTANCE, buildId: BUILD, nativeHostStatus: { instanceId: INSTANCE,
+          available: st.available, documentId: st.documentId, contentRevision: st.contentRevision, lifecycleGeneration: 1 } }] } } };
+      }
+      if (name !== 'nemo_command') throw new Error('unexpected MCP tool ' + name);
+      const pair = world.query(args.operation, args.payload);
+      if (tamper) tamper(world.phase, pair);
+      return { result: { structuredContent: pair.response } };
+    },
+    close: async () => {},
+  };
+  return createReader({ currentIdentity: current || (async () => ({ ...identity })), ownerIdentity: () => identity, registry: () => registry,
+    appVersion: () => '0.0.0', openClient: async () => client, listeners: listeners || (async () => [identity.pid]) });
+}
 
 // ---- timeline model ----------------------------------------------------------------------------
 const normalize = rows => { for (let i = 1; i < rows.k.length; i++) if (rows.k[i] === 'held') rows.c[i] = rows.c[i - 1]; };
@@ -74,8 +101,28 @@ class World {
     this.rev++;
   }
   envelope(operation, payload, result) {
-    return { request: { operation, payload }, response: { apiVersion: 2, instanceId: 'instance-A', documentId: this.documentId,
+    return { request: { operation, payload }, response: { apiVersion: 2, instanceId: INSTANCE, documentId: this.documentId,
       contentRevision: this.rev, ok: true, result } };
+  }
+  status() { return { available: true, documentId: this.documentId, contentRevision: this.rev }; }
+  // The read-only query.* operations the harness issues, answered from the model.
+  query(operation, payload) {
+    const snapshot = 'native-object:' + this.documentId + ':' + this.rev, ctxOf = id => (id === 'scene-root' ? 'scene' : 'component');
+    if (operation === 'query.document.object') return this.envelope(operation, payload, { atRevision: this.rev, documentSnapshotId: snapshot, contextId: 'scene-root', frame: 0 });
+    if (operation === 'query.document.object.history') {
+      return this.envelope(operation, payload, { atRevision: this.rev, documentSnapshotId: snapshot, undoDepth: this.undoStack.length, redoDepth: this.redoStack.length, offset: 0, entries: [] });
+    }
+    if (operation === 'query.document.object.component.read' && payload.selector?.kind === 'layers') {
+      const uids = Object.keys(this.state[ctxOf(payload.selector.contextId)] || {});
+      return this.envelope(operation, payload, { kind: 'layers', atRevision: this.rev, documentSnapshotId: snapshot, contextId: payload.selector.contextId, layerCount: uids.length, cursor: 0,
+        items: uids.map(layerUid => ({ layerUid, name: layerUid, layerKind: this.state.kinds?.[layerUid] || 'drawing' })), nextCursor: null });
+    }
+    if (operation === 'query.document.object.layer.timing') {
+      const rows = this.state[ctxOf(payload.contextId)]?.[payload.layerUid];
+      return this.envelope(operation, payload, { kind: 'layerCells', atRevision: this.rev, documentSnapshotId: snapshot, contextId: payload.contextId, layerUid: payload.layerUid, frame: 0,
+        cells: { runs: rows ? this.runs(rows) : [], nextFrame: null } });
+    }
+    throw new Error('unexpected query ' + operation);
   }
   runs(rows) {
     const out = []; let start = 0;
@@ -98,14 +145,12 @@ class World {
     };
   }
   evidence(ctx, extra = {}) {
-    const out = { observation: 'did it', productFailure: false, ...extra };
-    out.reads = this.reads(ctx);
-    if (ctx === 'component') out.sceneLayers = this.reads('scene').layers;
-    return out;
+    return { observation: 'did it', productFailure: false, ...extra };
   }
   document() { return { format: 'nemo', formatVersion: 1, totalFrames: this.state.scene['layer-1'].k.length, layers: Object.keys(this.state.scene).map(uid => ({ uid })) }; }
   async operator(request, drawingPng) {
     const phase = request.phase, faults = this.faults;
+    this.phase = phase;
     if (faults.failureAt === phase) return { observation: 'the app showed an error', productFailure: true };
     if (faults.malformedAt === phase) return { observation: 'looks right', productFailure: false };
     if (faults.verdictAt === phase) return { ...this.evidence('scene'), pass: true };
@@ -147,8 +192,9 @@ function stylingPng({ light = false, wrapped = false } = {}) {
   if (wrapped) fillRect(image, 40, 126, 90, 8, [205, 205, 205, 255]);
   return { png: encodeRGBA(image.width, image.height, image.rgba), rects: { layerRows: { x: 20, y: 100, w: 300, h: 200 }, longName: { x: 30, y: 106, w: 200, h: 34 } } };
 }
-function frameSession({ directory, world, styling = stylingPng(), buttons = true }) {
+function frameSession({ directory, world, styling = stylingPng(), buttons = true, reader = stubReader({ directory, target: () => world, tamper: world.tamper && ((p, pair) => world.tamper(p, pair)) }) }) {
   return {
+    read: fn => reader.read(fn),
     start: async () => identity, identity: async () => ({ ...identity }), cleanup: async () => {},
     runtimeContext: async () => ({ identity: { ...identity }, snapshot: {}, window: { windowId: 7 } }),
     requestEvidence: async request => world.operator(request, styling),
@@ -310,7 +356,7 @@ class SettingsApp {
       const k = Array(120).fill('held'), c = Array(120).fill(false);
       k[0] = 'key'; k[3] = 'key'; c[0] = c[1] = c[2] = true;
       this.world.state.scene['layer-1'] = { k, c };
-      return { observation: 'drew a stroke and a blank key', productFailure: false, layer: { uid: 'layer-1' }, reads: this.world.reads('scene') };
+      return { observation: 'drew a stroke and a blank key', productFailure: false, layer: { uid: 'layer-1' } };
     }
     if (phase === 'sync-publish-no-folder') { this.publish(); return { observation: 'clicked Publish', productFailure: false }; }
     if (phase === 'sync-choose-folder') {
@@ -320,12 +366,12 @@ class SettingsApp {
     if (phase === 'sync-publish' || phase === 'sync-publish-unwritable') { this.publish(); return { observation: 'clicked Publish', productFailure: false }; }
     if (phase === 'sync-check') { this.check(); return { observation: 'clicked check', productFailure: false }; }
     if (phase === 'sync-merge') { this.merge(); return { observation: 'clicked Merge', productFailure: false }; }
-    if (phase === 'sync-merge-reads') return { observation: 'reads attached', productFailure: false, layer: { uid: 'layer-1' }, reads: this.world.reads('scene') };
     throw new Error('unknown phase ' + phase);
   }
 }
-function settingsSession({ app }) {
+function settingsSession({ app, reader = stubReader({ directory: app.dir, target: () => app.world, tamper: (p, pair) => app.tamper?.(p, pair) }) }) {
   const wrapped = {
+    read: fn => reader.read(fn),
     start: async () => identity, identity: async () => ({ ...identity }), cleanup: async () => {},
     runtimeContext: async () => ({ identity: { ...identity }, snapshot: {}, window: { windowId: 7 } }),
     requestEvidence: request => app.operator(request),
@@ -337,4 +383,4 @@ function settingsSession({ app }) {
   };
   return wrapped;
 }
-module.exports = { identity, World, frameSession, stylingPng, SettingsApp, settingsSession, clone };
+module.exports = { identity, INSTANCE, FOREIGN, stubReader, World, frameSession, stylingPng, SettingsApp, settingsSession, clone };

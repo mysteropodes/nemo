@@ -95,6 +95,8 @@ pub(crate) mod object_component_kernels;
 // (#2112), where the text block record is stored; this re-export keeps every `crate::evaluation::...` consumer path valid.
 #[allow(unused_imports)]
 pub(crate) use crate::object_document::object_text_layout_kernels;
+// #2372 A-image-text-flip-skew: the stored mirror / shear math of an image and a text block, reached by the render-scene layer through here.
+pub(crate) use crate::object_document::object_raster_asset_kernels::object_item_local_form;
 // L07-A (#2141): lane-7 typed scene/style family aggregator.
 #[path = "object_scene_style_kernels.rs"]
 #[allow(dead_code)]

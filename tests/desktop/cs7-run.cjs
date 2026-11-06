@@ -4,7 +4,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { requireCheck: check } = require('./native-harness.cjs');
-const { readDeclarations, readyRows, runInstalledRows, selectRows } = require('./cs7-runner.cjs');
+const { readDeclarations, readyRows, runInstalledRows, selectRows, taskSurfaceIndex } = require('./cs7-runner.cjs');
 const { createInstalledSession } = require('./cs7-session.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 
@@ -27,7 +27,7 @@ async function main(config, deps = {}) {
     scenarios[row.scenario] = typeof module.prepare === 'function' ? await module.prepare({ config, root }) : module;
   }
   const rows = readyRows(declarations, { taskIds: new Set(matrix.tasks.map(t => t.task)),
-    surfaceIds: new Set(matrix.surfaces.map(s => s.id)), scenarios, ...(selection ? { only: selection.ids } : {}) });
+    surfaceIds: new Set(matrix.surfaces.map(s => s.id)), taskSurfaces: taskSurfaceIndex(matrix), scenarios, ...(selection ? { only: selection.ids } : {}) });
   check(typeof config.reportDirectory === 'string' && path.isAbsolute(config.reportDirectory), 'absolute report directory required');
   const resultFile = path.join(config.reportDirectory, 'installed-results.json');
   check(!fs.existsSync(resultFile), 'existing installed receipt must not be overwritten');
@@ -54,16 +54,25 @@ function refusalReason(error) {
   return /^[A-Z][A-Z0-9_]{0,40}$/.test(error?.code || '') ? name + ' ' + error.code : name;
 }
 
+// Exit status: 0 only for `installed-pass` (every Ready row on one candidate); 3 for `installed-subset-pass`
+// (the selected rows passed, other Ready rows were not run); 1 for anything else.
+const EXIT_SUBSET_PASS = 3;
 function cli(argv, deps = {}) {
   const stderr = deps.stderr || process.stderr;
   return Promise.resolve().then(() => {
     check(argv.length === 3, 'one private config file required');
     return main(JSON.parse(fs.readFileSync(argv[2], 'utf8')), deps);
-  }).then(result => (result.verdict === 'installed-pass' ? 0 : 1))
+  }).then(result => {
+    if (result.verdict === 'installed-pass') return 0;
+    if (result.verdict !== 'installed-subset-pass') return 1;
+    stderr.write('CS7 subset run passed (installed-subset-pass): ' + result.selection.selected.length + ' selected row(s) passed, ' +
+      result.selection.omittedReady.length + ' Ready row(s) were not run; this is not the every-Ready-row outcome (exit status ' + EXIT_SUBSET_PASS + ').\n');
+    return EXIT_SUBSET_PASS;
+  })
     .catch(error => {
       stderr.write('CS7 batch refused or incomplete (' + refusalReason(error) + '); inspect its private receipt. No acceptance claimed.\n');
       return 1;
     });
 }
 if (require.main === module) cli(process.argv).then(code => { process.exitCode = code; });
-module.exports = { main, cli, refusalReason };
+module.exports = { main, cli, refusalReason, EXIT_SUBSET_PASS };

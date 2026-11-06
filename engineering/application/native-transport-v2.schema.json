@@ -13481,6 +13481,20 @@
           "minimum": -360,
           "maximum": 360
         },
+        "flipX": {
+          "type": "boolean",
+          "description": "A stored mirror about the item's centre (anchor for a text block); absent reads false."
+        },
+        "flipY": {
+          "type": "boolean",
+          "description": "A stored mirror about the item's centre (anchor for a text block); absent reads false."
+        },
+        "skew": {
+          "type": "number",
+          "exclusiveMinimum": -90,
+          "exclusiveMaximum": 90,
+          "description": "A stored x-shear in degrees about the item's centre (anchor for a text block); absent reads 0."
+        },
         "fixedWidth": {
           "anyOf": [
             {
@@ -19929,6 +19943,20 @@
         },
         "rotation": {
           "type": "number"
+        },
+        "flipX": {
+          "type": "boolean",
+          "description": "A stored mirror about the item's centre (anchor for a text block); absent reads false."
+        },
+        "flipY": {
+          "type": "boolean",
+          "description": "A stored mirror about the item's centre (anchor for a text block); absent reads false."
+        },
+        "skew": {
+          "type": "number",
+          "exclusiveMinimum": -90,
+          "exclusiveMaximum": 90,
+          "description": "A stored x-shear in degrees about the item's centre (anchor for a text block); absent reads 0."
         },
         "isBitmapBrush": {
           "type": "boolean"

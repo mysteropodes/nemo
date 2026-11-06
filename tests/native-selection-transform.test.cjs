@@ -329,7 +329,7 @@ test('a plain X keeps swapping stroke and fill, and SM.flipHorizontal / flipVert
   assert.deepEqual(f.guarded, [], 'a native project never reaches the legacy writer');
 });
 
-test('no selection, or another tool, says Select strokes and writes nothing (baseline); a no-native-form item is a notice', async () => {
+test('no selection, or another tool, says Select strokes and writes nothing (baseline); an image is mirrored like any other item (A-image-text-flip-skew)', async () => {
   const h = harness([quad('L1', 'a', 10, 10, 30, 30, { role: 'raster' }), ITEMS[1]]);
   flipper(h);
   h.chord('X', true, false); await settle();
@@ -339,10 +339,10 @@ test('no selection, or another tool, says Select strokes and writes nothing (bas
   h.chord('X', true, false); await settle();
   assert.deepEqual(h.toasts, ['Select strokes', 'Select strokes'], 'every press says so, as the baseline did');
   h.root.state.tool = 'select';
-  const before = h.toasts.length;
+  const before = h.toasts.length, writes = h.batches.length;
   h.chord('X', true, false); await settle();
-  assert.match(h.toasts.slice(before).join('|'), /Flipping images is not available on native projects yet/, 'an image is a typed refusal, never a silent no-op');
-  assert.equal(h.batches.length, 0);
+  assert.doesNotMatch(h.toasts.slice(before).join('|'), /not available on native projects yet/, 'an image has a stored mirror: no refusal');
+  assert.equal(h.batches.length, writes + 1, 'the mirror of the image and the stroke is one batch');
   assert.deepEqual(h.legacy, []);
 });
 

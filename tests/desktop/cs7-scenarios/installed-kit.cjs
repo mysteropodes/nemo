@@ -22,9 +22,11 @@ const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 function malformed(row, phase) {
   return new OperatorInputError('operator-evidence-malformed', { command: row + '.' + phase });
 }
-// The operator supplies raw observations only. A reply carrying a verdict is refused outright.
+// The operator supplies raw observations only. A reply carrying a verdict is refused outright, and so is any
+// attached document read: document state is observed by the harness itself (readTimeline / readDocument below),
+// never accepted from what a person or agent pastes in.
 function rawOnly(evidence) {
-  return plain(evidence) && !['pass', 'passed', 'status', 'verdict', 'result', 'ok'].some(key => Object.hasOwn(evidence, key));
+  return plain(evidence) && !['pass', 'passed', 'status', 'verdict', 'result', 'ok', 'reads', 'sceneLayers', 'kinds'].some(key => Object.hasOwn(evidence, key));
 }
 function privateEvidence(directory, name, value) {
   fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -38,6 +40,58 @@ function readInside(root, relative, max = MAX_BYTES) {
     if (!stat.isFile() || stat.isSymbolicLink() || stat.size > max || fs.realpathSync(file) !== file) return null;
     return fs.readFileSync(file);
   } catch { return null; }
+}
+
+// ---- document reads the harness makes itself -----------------------------------------------------------
+// Every function here goes through session.read, which can only issue read-only query.* operations and binds
+// each batch to the candidate (cs7-read.cjs). The pairs returned have the {request, response} shape the
+// scenario oracles judge. A refused read is kept privately with its fixed reason, then thrown (batch stops).
+const OBJECT = 'query.document.object', HISTORY = 'query.document.object.history',
+  TIMING = 'query.document.object.layer.timing', COMPONENT = 'query.document.object.component.read';
+async function pinRevision(query, status) {
+  const { response } = await query(OBJECT, { atRevision: status.contentRevision, view: { kind: 'presentation' } });
+  const r = response.result;
+  if (response.ok !== true || !plain(r) || r.atRevision !== status.contentRevision || !text(r.documentSnapshotId)) throw new Error('presentation read refused');
+  return { atRevision: r.atRevision, documentSnapshotId: r.documentSnapshotId };
+}
+async function completePage(query, pin, selector) {
+  const pair = await query(COMPONENT, { ...pin, selector: { ...selector, cursor: 0, limit: 16 } });
+  const r = pair.response.result;
+  if (pair.response.ok !== true || !plain(r) || !Array.isArray(r.items) || r.nextCursor !== null) throw new Error('component read is not one complete page');
+  return pair;
+}
+async function guarded(session, record, fn) {
+  try {
+    const { value, observed } = await session.read(fn);
+    if (record) privateEvidence(record.dir, 'reads-' + record.name, { schema: 'nemo.cs7-harness-reads/1', observed });
+    return { ...value, observed };
+  } catch (error) {
+    if (record) try { privateEvidence(record.dir, 'read-refused-' + record.name, { schema: 'nemo.cs7-harness-reads/1', reason: String(error?.message || 'error').slice(0, 200) }); } catch { /* receipt directory unavailable */ }
+    throw error;
+  }
+}
+// History plus the cell runs of EVERY layer of each named context, all pinned to one revision/snapshot.
+// Returns { history, layers: {contextId: [pair...]}, pages: {contextId: the layers page pair}, observed }.
+function readTimeline(session, { contexts, record }) {
+  return guarded(session, record, async ({ query, status }) => {
+    const pin = await pinRevision(query, status), history = await query(HISTORY, pin), layers = {}, pages = {};
+    for (const contextId of contexts) {
+      pages[contextId] = await completePage(query, pin, { kind: 'layers', contextId });
+      layers[contextId] = [];
+      for (const item of pages[contextId].response.result.items) {
+        if (!plain(item) || !text(item.layerUid)) throw new Error('a layer item is malformed');
+        layers[contextId].push(await query(TIMING, { ...pin, contextId, layerUid: item.layerUid, frame: 0, view: 'cells' }));
+      }
+    }
+    return { history, layers, pages };
+  });
+}
+// History, the contexts page, and the layers page of the scene, pinned to one revision/snapshot.
+function readDocument(session, { record } = {}) {
+  return guarded(session, record, async ({ query, status }) => {
+    const pin = await pinRevision(query, status), history = await query(HISTORY, pin);
+    return { history, contexts: await completePage(query, pin, { kind: 'contexts' }), layers: await completePage(query, pin, { kind: 'layers', contextId: 'scene-root' }) };
+  });
 }
 
 // ---- raw pixels -------------------------------------------------------------------------
@@ -93,5 +147,5 @@ function loadPng(bytes) {
   try { return bytes && bytes.length > 33 ? decode(bytes) : null; } catch { return null; }
 }
 
-module.exports = { PLACEMENT, plain, int, text, sha256, malformed, rawOnly, privateEvidence, readInside,
+module.exports = { PLACEMENT, readTimeline, readDocument, plain, int, text, sha256, malformed, rawOnly, privateEvidence, readInside,
   luma, rectOk, pixel, meanColour, rectStats, textBands, loadPng };

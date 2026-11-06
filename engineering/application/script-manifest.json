@@ -452,6 +452,9 @@
     {"src":"js/adapters/native-component-cell-selection.js"},
     {"src":"js/adapters/native-motion-key-clipboard.js"},
     {"src":"js/adapters/native-component-state-ui.js"},
+    {"src":"js/adapters/native-select-skew.js"},
+    {"src":"js/adapters/native-select-pivot.js"},
+    {"src":"js/adapters/native-select-lasso.js"},
     {"src":"js/adapters/native-motion-element.js"}
   ]
 }

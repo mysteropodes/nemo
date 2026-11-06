@@ -28,7 +28,7 @@ use crate::evaluation::object_image_mesh_kernels::render_image_mesh_plan::{
     AffineCoeffs, MeshDrawPlan,
 };
 use crate::evaluation::object_image_mesh_kernels::render_image_mesh_scene_source::{
-    plan_draw, prepare_mesh_geometry,
+    plan_draw, prepare_mesh_geometry_posed,
 };
 pub(crate) use crate::evaluation::object_image_mesh_kernels::render_image_mesh_scene_source::{
     MeshDraw, MeshGeometry, MeshSceneError, MeshSceneSource, MeshStoreRef,
@@ -62,12 +62,13 @@ pub(crate) fn prepare_mesh_scene_item<H: Clone>(
     source: &MeshSceneSource<'_>,
     store: MeshStoreRef<'_>,
 ) -> Result<Option<MeshSceneItem<H>>, MeshSceneError> {
-    let geometry = prepare_mesh_geometry(
+    let geometry = prepare_mesh_geometry_posed(
         &image.rect(),
         image.pixel_size(),
         image.opacity_f32(),
         source,
         store,
+        image.world_form(),
     )?;
     Ok(geometry.map(|geometry| MeshSceneItem {
         image: image.clone(),

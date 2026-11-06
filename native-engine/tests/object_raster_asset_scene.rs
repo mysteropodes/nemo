@@ -178,3 +178,30 @@ fn the_l06c_record_reaches_the_scene_with_its_display_rect_and_opacity() {
     assert_eq!(image.opacity(), 0.5);
     assert_eq!(image.opacity_f32(), 0.5_f32);
 }
+
+/// #2372 A-image-text-flip-skew: the stored mirror and shear are applied about the final rect's centre, in the rect's own frame, after the
+/// placement; a plain item keeps its placement exactly.
+#[test]
+fn a_stored_mirror_and_shear_move_the_placement_about_the_final_centre() {
+    use crate::object_document::object_raster_asset_kernels::object_item_local_form::LocalForm;
+    use vello::kurbo::Point;
+    let item = RasterItem::decode(r#"{"assetId":"asset-1","x":50,"y":30,"width":40,"height":20}"#).unwrap();
+    let display = item.display_rect();
+    let source = super::RasterSceneSource {
+        asset_id: item.asset_id().as_str().to_owned(),
+        rect: ImageRect { x: display.x, y: display.y, width: display.width, height: display.height, rotation: 0.0 },
+        opacity: 1.0,
+    };
+    let port = Pixels::new((40, 20));
+    let plain = prepare_raster_scene_image(&source, &[], &port).unwrap();
+    let same = plain.clone().with_form(&LocalForm::default());
+    assert_eq!((same.placement(), same.world_form()), (plain.placement(), None));
+    // pixel (0, 0) is the top-left corner (30, 20); mirrored about x = 50 it lands on (70, 20), and the bottom-left follows.
+    let mirrored = plain.clone().with_form(&LocalForm { flip_x: true, flip_y: false, skew: 0.0 });
+    let at = |image: &RasterSceneImage<Arc<Vec<u8>>>, x: f64, y: f64| image.placement() * Point::new(x, y);
+    assert_eq!((at(&plain, 0.0, 0.0), at(&mirrored, 0.0, 0.0), at(&mirrored, 0.0, 20.0)), (Point::new(30.0, 20.0), Point::new(70.0, 20.0), Point::new(70.0, 40.0)));
+    // A 45 degree skew along x moves a point by its distance from the centre row: the top row slides left by 10, the bottom right by 10.
+    let sheared = plain.with_form(&LocalForm { flip_x: false, flip_y: false, skew: 45.0 });
+    let (top, bottom) = (at(&sheared, 0.0, 0.0), at(&sheared, 0.0, 20.0));
+    assert!((top.x - 20.0).abs() < 1e-9 && (bottom.x - 40.0).abs() < 1e-9 && top.y == 20.0 && bottom.y == 40.0, "{top:?} {bottom:?}");
+}

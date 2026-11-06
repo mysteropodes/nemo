@@ -7,13 +7,14 @@ const os = require('node:os');
 const path = require('node:path');
 const { createWorkflow, summarize, JUDGES, CLAUSES, PLAN } = require('../cs7-scenarios/frame-edit-ui.cjs');
 const { OperatorInputError } = require('../cs7-runner.cjs');
-const { World, frameSession, stylingPng } = require('./cs7-h-stubs.cjs');
+const { World, frameSession, stylingPng, FOREIGN } = require('./cs7-h-stubs.cjs');
 
 const row = extra => ({ id: 'frame-edit-ui', issue: 2248, checks: CLAUSES.map(id => ({ id })), ...extra });
-function setup(t, faults = {}, styling) {
+function setup(t, faults = {}, styling, tamper) {
   const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'cs7-frame-')));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const world = new World(directory, faults);
+  if (tamper) world.tamper = (phase, pair) => tamper(phase, pair.request.operation, pair);
   return { directory, world, session: frameSession({ directory, world, styling }),
     workflow: createWorkflow({ reportDirectory: directory }) };
 }
@@ -82,17 +83,21 @@ test('malformed or verdict-bearing evidence is an operator input error, never a 
   // A verdict field in the reply.
   ({ session, workflow } = setup(t, { verdictAt: 'scene-setup' }));
   await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed');
-  // Reads that do not tile the timeline, are unpinned, or come from a command.* call.
-  for (const damage of [
-    ev => { ev.reads.layers[0].response.result.cells.runs[0][0] = 1; },
-    ev => { ev.reads.layers[0].request.payload.atRevision = 1; },
-    ev => { ev.reads.history.request.operation = 'command.document.object.frames.insert'; },
-    ev => { delete ev.reads.history; },
-    ev => { ev.reads.layers = []; },
-  ]) {
+  // Attached reads of any kind are refused: document state is read by the harness, never accepted from the operator.
+  for (const key of ['reads', 'sceneLayers', 'kinds']) {
     ({ session, workflow } = setup(t));
     const original = session.requestEvidence;
-    session.requestEvidence = async request => { const ev = await original(request); if (request.phase === 'scene-f6') damage(ev); return ev; };
+    session.requestEvidence = async request => { const ev = await original(request); if (request.phase === 'scene-f6') ev[key] = {}; return ev; };
+    await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed' && error.command === 'frame-edit-ui.scene-f6', key);
+  }
+  // Harness reads that do not tile the timeline, are unpinned, or do not answer the history operation.
+  for (const damage of [
+    (op, pair) => { if (op === 'query.document.object.layer.timing' && pair.response.result.layerUid === 'layer-1') pair.response.result.cells.runs[0][0] = 1; },
+    (op, pair) => { if (op === 'query.document.object.layer.timing') pair.response.result.atRevision = 1; },
+    (op, pair) => { if (op === 'query.document.object.history') pair.response.ok = false; },
+    (op, pair) => { if (op === 'query.document.object.history') delete pair.response.result.undoDepth; },
+  ]) {
+    ({ session, workflow } = setup(t, { }, undefined, (phase, op, pair) => { if (phase === 'scene-f6') damage(op, pair); }));
     await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed');
   }
   // Gesture applied to the wrong cell: the precondition is the operator's mistake, not a product verdict.
@@ -140,13 +145,9 @@ test('summarize refuses reads that disagree on revision, document or total', () 
 });
 
 test('replies shaped differently from the read contract stop the batch with a private reason and the progress so far, never a guess', async t => {
-  const { session, workflow, directory } = setup(t);
-  const original = session.requestEvidence;
-  session.requestEvidence = async request => {
-    const ev = await original(request);
-    if (request.phase === 'scene-f6') ev.reads.layers[0].response.result.cells.runs[0].length = 5;
-    return ev;
-  };
+  const { session, workflow, directory } = setup(t, {}, undefined, (phase, op, pair) => {
+    if (phase === 'scene-f6' && op === 'query.document.object.layer.timing' && pair.response.result.layerUid === 'layer-1') pair.response.result.cells.runs[0].length = 5;
+  });
   await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed' && error.command === 'frame-edit-ui.scene-f6');
   const mismatch = JSON.parse(fs.readFileSync(path.join(directory, 'frame-edit-ui/mismatch-scene-f6.json'), 'utf8'));
   assert.match(mismatch.reason, /six-element array/);
@@ -154,4 +155,22 @@ test('replies shaped differently from the read contract stop the batch with a pr
   assert.equal(partial.stoppedBy, 'operator-evidence-malformed');
   assert.equal(partial.outcome['layer-row-styling'], 'pass');   // judged before the bad reply and kept
   assert.equal(partial.outcome['scene-f5-f6-f7'], 'unrun');
+});
+
+test('every document read is made by the harness: only query.* operations, bracketed by status reads, none from the operator', async t => {
+  const { session, workflow, directory } = setup(t);
+  const calls = [];
+  const inner = session.read;
+  session.read = fn => inner(async ctx => { const q = ctx.query; return fn({ ...ctx, query: (op, payload) => { calls.push(op); return q(op, payload); } }); });
+  const result = await workflow.run({ session, row: row() });
+  assert.ok(result.checks.every(c => c.status === 'pass'));
+  assert.ok(calls.length > 100 && calls.every(op => /^query\.document\.object/.test(op)), 'only read-only document queries');
+  const reads = JSON.parse(fs.readFileSync(path.join(directory, 'frame-edit-ui/reads-scene-f5.json'), 'utf8'));
+  assert.deepEqual(reads.observed.before, reads.observed.after);
+  assert.equal(reads.observed.before.pid, 123);
+});
+
+test('a reply that answers for another Nemo instance is refused and the clauses cannot pass', async t => {
+  const { session, workflow } = setup(t, {}, undefined, (phase, op, pair) => { if (phase === 'scene-f6') pair.response.instanceId = FOREIGN; });
+  await assert.rejects(workflow.run({ session, row: row() }), /reply is not from the candidate document/);
 });

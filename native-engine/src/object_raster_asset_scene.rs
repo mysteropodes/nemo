@@ -25,6 +25,7 @@
 //! other lanes' layers; the item's reserved tags are not read here.
 
 use crate::evaluation::motion_parent_chain::{transform_image_rect, ChainEntry, ImageRect};
+use crate::evaluation::object_item_local_form::LocalForm;
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::{
     ProducerOutput, ScenePin,
 };
@@ -70,9 +71,28 @@ pub(crate) struct RasterSceneImage<H> {
     rect: ImageRect,
     opacity: f64,
     placement: Affine,
+    /// #2372: the stored mirror / shear as a world affine about the final rect's centre (`None` for a plain image).
+    world_form: Option<[f64; 6]>,
 }
 
 impl<H> RasterSceneImage<H> {
+    /// #2372 A-image-text-flip-skew: the same image with its item's stored mirror and shear applied about the final rect's centre, in the rect's
+    /// own frame (`T(c) R(rho) L R(-rho) T(-c)` after the placement); the mesh bound to it follows through [`Self::world_form`]. A form that would
+    /// not be invertible leaves the image as it is.
+    pub(crate) fn with_form(mut self, form: &LocalForm) -> Self {
+        let r = self.rect;
+        if let Some(g) = form.world([r.x + r.width / 2.0, r.y + r.height / 2.0], r.rotation) {
+            let placed = Affine::new(g) * self.placement;
+            if placed.as_coeffs().iter().all(|v| v.is_finite()) && placed.determinant() != 0.0 {
+                self.placement = placed;
+                self.world_form = Some(g);
+            }
+        }
+        self
+    }
+    pub(crate) fn world_form(&self) -> Option<[f64; 6]> {
+        self.world_form
+    }
     pub(crate) fn asset_id(&self) -> &str {
         &self.asset_id
     }
@@ -226,6 +246,7 @@ pub(crate) fn prepare_raster_scene_image<P: RasterPixelPort + ?Sized>(
         rect,
         opacity,
         placement,
+        world_form: None,
     })
 }
 

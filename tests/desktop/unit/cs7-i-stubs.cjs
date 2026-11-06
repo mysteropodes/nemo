@@ -5,7 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { encodeRGBA, canvas, fillRect } = require('../../fixtures/lib/png.cjs');
-const { World, identity, clone } = require('./cs7-h-stubs.cjs');
+const { World, identity, clone, INSTANCE, stubReader } = require('./cs7-h-stubs.cjs');
 const legacy = require('../cs7-scenarios/legacy-import.cjs');
 
 const COMPONENT = 'native-component:1:0';
@@ -43,13 +43,6 @@ class DrawWorld extends World {
     }
     if (f.leak === phase) this.growScene();
   }
-  kindsRead() {
-    const snapshot = 'native-object:' + this.documentId + ':' + this.rev, uids = Object.keys(this.state.scene);
-    return this.envelope('query.document.object.component.read',
-      { atRevision: this.rev, documentSnapshotId: snapshot, selector: { kind: 'layers', contextId: 'scene-root', cursor: 0, limit: 16 } },
-      { kind: 'layers', atRevision: this.rev, documentSnapshotId: snapshot, contextId: 'scene-root', layerCount: uids.length, cursor: 0,
-        items: uids.map(layerUid => ({ layerUid, name: layerUid, layerKind: this.state.kinds[layerUid] })), nextCursor: null });
-  }
   png(name, image) { fs.mkdirSync(path.dirname(path.join(this.dir, name)), { recursive: true }); fs.writeFileSync(path.join(this.dir, name), encodeRGBA(image.width, image.height, image.rgba)); }
   capture(name) {
     const f = this.faults, image = canvas(810, 710, [200, 200, 200, 255]);
@@ -60,11 +53,12 @@ class DrawWorld extends World {
   }
   async operator(request) {
     const phase = request.phase, f = this.faults, comp = { component: { context: COMPONENT, layerUid: 'comp-layer' } };
+    this.phase = phase;
     if (f.failureAt === phase) return { observation: 'the app showed an error', productFailure: true };
     if (f.malformedAt === phase) return { observation: 'looks right', productFailure: false };
     if (f.verdictAt === phase) return { ...this.evidence('scene'), pass: true };
     if (phase === 'window-placement') return { observation: 'placed', productFailure: false };
-    if (phase === 'scene-setup') return this.evidence('scene', { layers: { anchor: 'anchor', component: 'comp-inst', plain: 'plain', bake: 'bake' }, kinds: this.kindsRead() });
+    if (phase === 'scene-setup') return this.evidence('scene', { layers: { anchor: 'anchor', component: 'comp-inst', plain: 'plain', bake: 'bake' } });
     if (phase === 'motion-enter' || phase === 'motion-exit') {
       if (f.modeEdits === phase) this.draw('scene', 'plain', 5, 'modeEdits');
       return this.evidence('scene');
@@ -94,10 +88,10 @@ class DrawWorld extends World {
       if (f.bakeNoKind !== true) this.state.kinds.bake = 'drawing';
       if (f.bakeWrongFrames) this.state.scene.bake.c[1] = true;
       this.rev++;
-      return this.evidence('scene', { kinds: this.kindsRead() });
+      return this.evidence('scene');
     }
-    if (phase === 'bake-undo') { this.step('undo'); return this.evidence('scene', { kinds: this.kindsRead() }); }
-    if (phase === 'bake-redo') { this.step('redo'); return this.evidence('scene', { kinds: this.kindsRead() }); }
+    if (phase === 'bake-undo') { this.step('undo'); return this.evidence('scene'); }
+    if (phase === 'bake-redo') { this.step('redo'); return this.evidence('scene'); }
     if (phase === 'draw-save') {
       fs.mkdirSync(path.join(this.dir, 'saved'), { recursive: true });
       this.fileBytes = JSON.stringify({ format: 'nemo.native-project-document', totalFrames: 12, layers: Object.keys(this.state.scene).map(uid => ({ uid })) });
@@ -114,8 +108,9 @@ class DrawWorld extends World {
     throw new Error('unknown phase ' + phase);
   }
 }
-function drawSession({ world }) {
+function drawSession({ world, directory = world.dir, reader = stubReader({ directory, target: () => world, tamper: world.tamper && ((p, pair) => world.tamper(p, pair)) }) }) {
   return {
+    read: fn => reader.read(fn),
     start: async () => identity, identity: async () => ({ ...identity }), cleanup: async () => {},
     runtimeContext: async () => ({ identity: { ...identity }, snapshot: {}, window: { windowId: 7 } }),
     requestEvidence: async request => world.operator(request),
@@ -150,7 +145,7 @@ class LegacyWorld {
     this.toast = this.faults.wrongNotice ? 'Opened: ' + base : 'Opened: ' + base + legacy.OPENED;
   }
   envelope(operation, payload, result) {
-    return { request: { operation, payload }, response: { apiVersion: 2, instanceId: 'instance-A', documentId: this.doc.id, contentRevision: this.rev, ok: true, result } };
+    return { request: { operation, payload }, response: { apiVersion: 2, instanceId: INSTANCE, documentId: this.doc.id, contentRevision: this.rev, ok: true, result } };
   }
   reads() {
     const snapshot = 'native-object:' + this.doc.id + ':' + this.rev, d = this.doc;
@@ -165,7 +160,15 @@ class LegacyWorld {
         { ...pin, kind: 'layers', contextId: 'scene-root', layerCount: d.names.length, cursor: 0, items: d.names.map((name, i) => ({ layerUid: 'l' + i, name, layerKind: 'drawing' })), nextCursor: null }),
     };
   }
-  evidence(extra = {}) { return { observation: 'did it', productFailure: false, ...extra, reads: this.reads() }; }
+  evidence(extra = {}) { return { observation: 'did it', productFailure: false, ...extra }; }
+  status() { return { available: !!this.doc, documentId: this.doc?.id, contentRevision: this.rev }; }
+  query(operation, payload) {
+    const all = this.reads(), snapshot = 'native-object:' + this.doc.id + ':' + this.rev;
+    if (operation === 'query.document.object') return this.envelope(operation, payload, { atRevision: this.rev, documentSnapshotId: snapshot, contextId: 'scene-root', frame: 0 });
+    if (operation === 'query.document.object.history') return all.history;
+    if (operation === 'query.document.object.component.read') return payload.selector.kind === 'contexts' ? all.contexts : all.layers;
+    throw new Error('unexpected query ' + operation);
+  }
   write(frames) {
     const file = path.join(this.dir, 'saved/legacy-animation.json');
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -174,9 +177,10 @@ class LegacyWorld {
   push() { this.undoStack.push(clone(this.doc)); this.redoStack = []; this.rev++; }
   async operator(request) {
     const phase = request.phase, f = this.faults, file = request.details.legacyFile;
+    this.phase = phase;
     if (f.failureAt === phase) return { observation: 'the app showed an error', productFailure: true };
     if (f.malformedAt === phase) return { observation: 'looks right', productFailure: false };
-    if (f.verdictAt === phase) return { observation: 'did it', productFailure: false, pass: true, reads: {} };
+    if (f.verdictAt === phase) return { observation: 'did it', productFailure: false, pass: true };
     if (phase === 'window-placement') return { observation: 'placed', productFailure: false };
     if (phase === 'open-animation' || phase === 'open-media') { this.open(file); return this.evidence(); }
     if (phase === 'save-first') {
@@ -210,8 +214,9 @@ class LegacyWorld {
   }
 }
 const REFUSED = legacy.REFUSED_OPEN;
-function legacySession({ world }) {
+function legacySession({ world, directory = world.dir, reader = stubReader({ directory, target: () => world, tamper: world.tamper && ((p, pair) => world.tamper(p, pair)) }) }) {
   return {
+    read: fn => reader.read(fn),
     start: async () => identity, identity: async () => ({ ...identity }), cleanup: async () => {},
     runtimeContext: async () => ({ identity: { ...identity }, snapshot: {}, window: { windowId: 7 } }),
     requestEvidence: async request => world.operator(request),

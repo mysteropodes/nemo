@@ -5,7 +5,8 @@
 //   * copies small baseline-format fixtures into a private source folder and records their sha256, size and mtime,
 //     so "the old file is byte-identical afterwards" is a measurement it repeats after every phase;
 //   * derives what the opened document must contain (scene frames, component frames, layer names) from the
-//     fixture file, then compares it with unedited read-only Nemo MCP replies the person attaches;
+//     fixture file, then compares it with read-only Nemo MCP replies the HARNESS reads itself (session.read,
+//     bound to the candidate); the person never attaches document state;
 //   * reads the saved files from disk and the toast text from the helper's accessibility observation (a toast that
 //     cannot be read leaves its clause unrun with the reason, it is never guessed).
 // Expected behaviour: baseline (1065e9d8) project.js shows "Opened: <name>" for an opened project; the native
@@ -124,12 +125,9 @@ const freshOf = (before, after) => (after ? after.filter(t => !(before || []).in
 
 // ---- the operator script -----------------------------------------------------------------------------------
 const READS = 'Evidence reply (a JSON object): {observation: one plain sentence of what you saw, productFailure: true only if the app visibly ' +
-  'misbehaved (crash, hang, an unexpected dialog you could not dismiss), reads: {history: {request, response}, contexts: {request, response}, layers: ' +
-  '{request, response}}}. Each {request, response} is the UNEDITED request and response of a READ-ONLY public Nemo MCP call, never a command.* ' +
-  'operation, all made right after the gesture and pinned (atRevision, documentSnapshotId) to the revision the history read reports: history is ' +
-  'query.document.object.history; contexts is query.document.object.component.read with selector {kind: "contexts", cursor: 0, limit: 16}; layers is ' +
-  'query.document.object.component.read with selector {kind: "layers", contextId: "scene-root", cursor: 0, limit: 16}. Do not add pass/fail fields: ' +
-  'the oracle judges the raw reads and refuses a reply that carries a verdict.';
+  'misbehaved (crash, hang, an unexpected dialog you could not dismiss)}. Do NOT attach any MCP reads or document state: the runner reads the ' +
+  'document itself right after your reply (history, contexts, layers), so after replying touch nothing in the app. Do not add pass/fail ' +
+  'fields: the oracle refuses a reply that carries a verdict or any read.';
 const PICK = 'In the native picker press Cmd+Shift+G, paste the path named in details.legacyFile, press Return, then Open. ';
 const PLAN = [
   { id: 'window-placement', type: 'placement', check: null, how: kit.PLACEMENT + ' Reply with {observation: "placed"}.' },
@@ -215,7 +213,7 @@ function createWorkflow({ reportDirectory, fixtureDirectory = FIXTURES }) {
         remaining[step.check]--; if (!remaining[step.check] && !held.has(step.check)) outcome[step.check] = 'pass';
         continue;
       }
-      const why = {}, next = summarizeDoc(ev.reads, why);
+      const why = {}, next = summarizeDoc(await kit.readDocument(session, { record: { dir, name: step.id } }), why);
       if (!next) {
         kit.privateEvidence(dir, 'mismatch-' + step.id, { schema: 'nemo.legacy-import-private/1', phase: step.id, reason: why.reason });
         throw malformed(ROW, step.id);
