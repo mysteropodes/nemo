@@ -73,11 +73,8 @@ impl ObjectSnapshot {
         {
             return refused(DispatchErrorCode::InvalidRequest, "Invalid subselect hit-test selector.");
         }
-        // #2256: a component's records live in its own context (Select's hit-test geometry read of an entered component); the editable and
-        // preview reads stay on the scene root.
-        if payload.stable_target.context_id != "scene-root" && !hit_test {
-            return refused(DispatchErrorCode::Unavailable, "Subselect editing is unavailable inside a component.");
-        }
+        // #2256: a component's records live in its own context: Select's hit-test read and Direct Select's editable and preview reads of an
+        // entered component resolve the record there (the baseline edited the symbol's shapes while `state.activeSymbolId` was set).
         use crate::evaluation::object_component_kernels::object_context_resolver::ContextSource;
         let Some(stored) = ContextSource::of_document(self.document())
             .context(&payload.stable_target.context_id)

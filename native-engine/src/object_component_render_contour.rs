@@ -152,8 +152,8 @@ pub(crate) fn compile(
         stroke_id: Presence::Present(target.stroke_id().to_owned()),
         ..layer_target.clone()
     };
-    let inner = raw_opacity(packet, &layer_target, inner_frame, host)?
-        * raw_opacity(packet, &element_target, inner_frame, host)?;
+    let layer_raw = raw_opacity(packet, &layer_target, inner_frame, host)?;
+    let inner = layer_raw * raw_opacity(packet, &element_target, inner_frame, host)?;
     let factor = host_factor * inner;
     // The dict `getEffectiveStrokes` returns: inner layer and element Motion opacity folded in, the
     // host's own opacity not (it applies when the scene is drawn).
@@ -229,6 +229,7 @@ pub(crate) fn compile(
     Ok(ComponentPaint {
         record,
         host_layer_index: host,
+        dab_opacity: host_factor * layer_raw,
         target: target.clone(),
         contour,
         path: validated.path,

@@ -77,23 +77,44 @@ pub(crate) fn expand(
             copy.then_some((entry.source().source_layer_index(), group))
         })
         .collect();
+    // #2361: the same rule inside a placed component (keyed by the host layer): a group stored there is never stamped twice.
+    let stored_in_components: HashSet<(usize, &str)> = scene
+        .components
+        .paints
+        .iter()
+        .filter_map(|paint| {
+            let (group, copy) = texture_group(&paint.record)?;
+            copy.then_some((paint.host_layer_index, group))
+        })
+        .collect();
     for index in mixed {
         out.push(index);
-        let PaintIndex::Contour(i) = index else {
-            continue;
+        // A scene contour, or a contour placed by a component instance (its dabs follow the placed anchor, through the same placement).
+        let (record, layer_index, source_index, path, layer_opacity) = match index {
+            PaintIndex::Contour(i) => {
+                let entry = scene.entry(i).ok_or(ObjectPaintPlanError::InvalidOrder)?;
+                let source = entry.source();
+                if texture_group(source.record()).is_some_and(|(group, _)| stored.contains(&(source.source_layer_index(), group))) {
+                    continue;
+                }
+                (source.record(), source.source_layer_index(), source.source_object_index(), entry.path(), entry.layer_opacity())
+            }
+            PaintIndex::Component(i) => {
+                let paint = scene.components.paints.get(i).ok_or(ObjectPaintPlanError::InvalidOrder)?;
+                if texture_group(&paint.record).is_some_and(|(group, _)| stored_in_components.contains(&(paint.host_layer_index, group))) {
+                    continue;
+                }
+                (&paint.record, paint.host_layer_index, paint.host_layer_index, &paint.path, paint.dab_opacity)
+            }
+            _ => continue,
         };
-        let entry = scene.entry(i).ok_or(ObjectPaintPlanError::InvalidOrder)?;
-        let source = entry.source();
-        if !is_seeded_anchor(source.record())
-            || texture_group(source.record()).is_some_and(|(group, _)| stored.contains(&(source.source_layer_index(), group)))
-        {
+        if !is_seeded_anchor(record) {
             continue;
         }
         let unavailable = |_| ObjectPaintPlanError::Unavailable;
-        let (drawn, closed) = segments_of(entry.path()).ok_or(ObjectPaintPlanError::Unavailable)?;
+        let (drawn, closed) = segments_of(path).ok_or(ObjectPaintPlanError::Unavailable)?;
         let catalog = scene.packet().custom_brush_presets();
-        let items = anchor_dab_items(source.record(), &drawn, closed, entry.layer_opacity(), catalog)
-            .map_err(unavailable)?;
+        let items = anchor_dab_items(record, &drawn, closed, layer_opacity, catalog).map_err(unavailable)?;
         for item in items {
             let segments: Vec<CubicSegment> = item
                 .path
@@ -111,16 +132,16 @@ pub(crate) fn expand(
                 let [r, g, b, a] = solid.channels();
                 Some([r.as_f64()?, g.as_f64()?, b.as_f64()?, a.as_f64()?])
             });
-            out.push(PaintIndex::Dab(dabs.len(), source.source_layer_index()));
+            out.push(PaintIndex::Dab(dabs.len(), layer_index));
             dabs.push(DabPaint {
-                layer_index: source.source_layer_index(),
-                source_index: source.source_object_index(),
+                layer_index,
+                source_index,
                 path: build_path(&segments, item.path.closed),
                 prepared,
                 svg_contour: ClosedCubicPath::new(segments).ok(),
                 svg_rgba,
                 opacity: item.opacity,
-                layer_opacity: entry.layer_opacity(),
+                layer_opacity,
                 closed: item.path.closed,
             });
         }

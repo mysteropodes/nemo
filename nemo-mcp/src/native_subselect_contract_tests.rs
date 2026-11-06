@@ -360,7 +360,7 @@ fn a_hit_test_page_may_be_shorter_than_the_limit_when_the_engine_shortened_it_to
 }
 
 #[test]
-fn a_hit_test_listing_and_geometry_may_name_the_entered_component_but_never_free_text() {
+fn a_listing_geometry_and_edit_may_name_the_entered_component_but_never_free_text() {
     let comp = |id: &str| json!({"contextId":id,"layerUid":"inner","frameScope":{"kind":"authored","frame":0},"strokeId":"c-a"});
     let listing = |id: &str| {
         let view = json!({"kind":"subselect","contextId":id,"layerUid":"inner","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"limit":8,"hitTest":true});
@@ -386,8 +386,10 @@ fn a_hit_test_listing_and_geometry_may_name_the_entered_component_but_never_free
     assert!(public_read(&geometry, &answer));
     geometry["stableTarget"]["contextId"] = json!("a b");
     assert!(!request(&geometry));
-    // The edit intent keeps the scene root.
-    let edit = json!({"command":"object.subselect.edit","stableTarget":comp("comp-a"),"intent":{"kind":"move","indices":[0],"delta":[1,2]}});
+    // The edit intent names the record's own context: the entered component, never free text.
+    let mut edit = json!({"command":"object.subselect.edit","stableTarget":comp("comp-a"),"intent":{"kind":"move","indices":[0],"delta":[1,2]}});
+    assert!(edit_request(&edit));
+    edit["stableTarget"]["contextId"] = json!("a b");
     assert!(!edit_request(&edit));
 }
 

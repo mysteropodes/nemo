@@ -24,25 +24,27 @@
     // #2356: with ONE vertex selected the state also names its type (the engine's effective type: the stored hint, else the one its handles show), so the point-type row can mark it.
     function typeOf(t){const n=t.indices.length,type=n===1&&t.item&&t.item.pointTypes&&t.item.pointTypes[t.indices[0]];return type?{count:n,pointType:type}:{count:n};}
     function notice(error){if(root.showToast)root.showToast(error&&error.message||String(error));}
+    // #2356: Direct Select works on the shapes of an ENTERED component (baseline: state.activeSymbolId set), through the context the workspace controller holds.
+    function ctx(){const c=root.NemoNativeComponentContext;try{return c&&typeof c.contextId==='function'?c.contextId(root):'scene-root';}catch(_){return 'scene-root';}}
     function layer(pin){const st=root.state,row=st.layers&&st.layers[st.activeLayerIdx],sel=root._layerSel;
       if(!row||!Array.isArray(sel)||sel.length!==1||sel[0]!==st.activeLayerIdx)throw new Error('Select one native Drawing layer.');
-      const layers=pin.layers.filter(l=>l.layerUid===row.layerUid);
+      const comp=ctx()!=='scene-root'&&root.NemoNativeComponentContext.layers(root),layers=(comp||pin.layers).filter(l=>l.layerUid===row.layerUid);
       if(layers.length!==1||layers[0].locked||layers[0].visible===false)throw new Error('The selected Drawing layer is unavailable.');return row.layerUid;}
     function bounds(pin){const d=root.document,r=d.getElementById('drawing-canvas').getBoundingClientRect(),html=d.documentElement;
       if(!html.classList.contains('nemo-native-underlay')||![r.left,r.top,r.width,r.height,pin.canvasW,pin.canvasH].every(Number.isFinite)||r.width<=0||r.height<=0||
         r.left<0||r.top<0||r.right>html.clientWidth||r.bottom>html.clientHeight||!['left','top','right','bottom'].every((k,i)=>parseFloat(html.style.getPropertyValue('--nemo-native-'+k))===[r.left,r.top,r.right,r.bottom][i]))throw new Error('Native canvas presentation changed.');
       return {left:r.left,top:r.top,width:r.width,height:r.height};}
-    function mode(){const s=root.state;return s.appMode==='anim2d'&&!s.playing&&!s.spaceDown&&!s.isPanning&&!s.shadowMode&&!s.activeSymbolId;}
+    function mode(){const s=root.state;return s.appMode==='anim2d'&&!s.playing&&!s.spaceDown&&!s.isPanning&&!s.shadowMode&&(!s.activeSymbolId||ctx()===s.activeSymbolId);}
     function capture(){const s=session(),pin=s&&s.info(),shown=s&&s.readPresentedObjectSession(),st=root.state,M=mapping();
       if(retired||!s||!s.isActive()||!pin||!shown||!same(pin,shown)||!same(pin,shown.presentation)||shown.presentation.owner!=='native'||shown.presentation.status!=='presented'||
-        !M||!M.matchesView(root,shown.presentation)||shown.presentation.frame!==st.currentFrame||shown.presentation.contextId!=='scene-root'||
+        !M||!M.matchesView(root,shown.presentation)||shown.presentation.frame!==st.currentFrame||shown.presentation.contextId!==ctx()||
         !root.NemoNativeObjectProjectFile||root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||!mode())throw new Error('Native subselect is unavailable in this mode.');
-      return {session:s,pin:pin,presentation:shown.presentation,selector:{contextId:'scene-root',layerUid:layer(pin),frame:st.currentFrame},bounds:bounds(pin)};}
+      return {session:s,pin:pin,presentation:shown.presentation,selector:{contextId:ctx(),layerUid:layer(pin),frame:st.currentFrame},bounds:bounds(pin)};}
     // #2372: the native queue hides the presentation while ANY command is pending (a hover read, the repaint of the last edit). That is "cannot prove it
     // right now", not "it changed": a gesture or selection survives it, and every write re-proves the presentation through its dispatch lease (admitted).
     function current(t,lease){try{const s=session(),pin=s&&s.info(),why=[],shown=lease?lease.readPresentedObjectSession():s&&s.readPresentedObjectSession(c=>why.push(c)),unproven=!lease&&!shown&&why[0]==='queue-pending';
       return !retired&&!t.cancelled&&s===t.session&&s.isActive()&&s.blocksLegacy()&&same(pin,t.pin)&&(shown?shown.presentation===t.presentation&&same(shown,t.pin):unproven)&&
-        root.state.tool==='subselect'&&mode()&&root.state.currentFrame===t.selector.frame&&layer(pin)===t.selector.layerUid&&
+        root.state.tool==='subselect'&&mode()&&ctx()===t.selector.contextId&&root.state.currentFrame===t.selector.frame&&layer(pin)===t.selector.layerUid&&
         (lease||unproven||mapping().matchesView(root,t.presentation))&&root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)===true&&JSON.stringify(bounds(pin))===JSON.stringify(t.bounds);
     }catch(_){return false;}}
     function point(e,t){const p=mapping().point(e,{bounds:t.bounds,canvasW:t.pin.canvasW,canvasH:t.pin.canvasH,presentation:t.presentation});return [p.x,p.y];}
@@ -131,10 +133,12 @@
         if(job.token===previewToken&&!previewNext&&drag===job.t&&current(job.t)&&r.presentation===job.t.presentation&&same(r.info,job.t.pin)){drawLatest=null;draw(job.t,r.segments,r.matrix);}
       }catch(e){if(job.token===previewToken){cancel(false);notice(e);}}}previewBusy=false;})();}
     function admitted(t,lease){if(!recovering)return current(t,lease);const s=session(),p=s&&s.info();return !retired&&s===t.session&&s.isActive()&&p&&['instanceId','documentId','lifecycleGeneration'].every(k=>p[k]===t.pin[k]);}
+    // The scene's resource route, or the component route of the entered context (one revision and one history entry either way).
+    function route(t,s){const f=t.selector.contextId==='scene-root'?s.runResourceCommand:s.runComponentCommand;if(typeof f!=='function')throw new Error('Subselect is unavailable inside this component.');return f.bind(s);}
     function commit(t,intent){if(uncertain)throw new Error('Resolve the previous subselect command before another edit.');if(pending)throw new Error('A native subselect command is still pending.');
       if(!current(t))throw new Error('Subselect target or frame changed.');
-      const s=t.session,guarded={info:s.info,isActive:s.isActive,requestId:s.requestId,runResourceCommand:action=>s.runResourceCommand(ctx=>{
-        if(!admitted(t,ctx))throw new Error('Subselect intent changed before dispatch.');return action({reconcile:ctx.reconcile,dispatch:q=>{if(!admitted(t,ctx))throw new Error('Subselect intent changed before dispatch.');return ctx.dispatch(q);}});
+      const s=t.session,guarded={info:s.info,isActive:s.isActive,requestId:s.requestId,runResourceCommand:action=>route(t,s)(lease=>{
+        if(!admitted(t,lease))throw new Error('Subselect intent changed before dispatch.');return action({reconcile:lease.reconcile,dispatch:q=>{if(!admitted(t,lease))throw new Error('Subselect intent changed before dispatch.');return lease.dispatch(q);}});
       })};
       const command=root.NemoNativeObjectVectorCommand.create(guarded,'subselect',root.NemoNativeSubselectContract);
       ++previewToken;previewNext=null;
