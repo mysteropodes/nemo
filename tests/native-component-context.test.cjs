@@ -613,3 +613,48 @@ test('Motion: a component with two layers, an Animation 2D entry, a refused spli
   f.host.SM.enterSymbol('sym_b'); await settle();
   assert.equal(calls.length, 1, 'the tab / panel entry (enterSymbol) does not split');
 });
+
+// #2256 B-comp-edit-rest: NumpadEnter in Motion on the active instance row (1065e9d8:src/js/timeline.js:9728) is the row double-click's enter-and-split path.
+function keyboard(f) {
+  const listeners = [];
+  f.host.document.addEventListener = (type, fn, capture) => { if (type === 'keydown') listeners.push({ fn, capture }); };
+  f.host.document.removeEventListener = (type, fn) => { const at = listeners.findIndex((l) => l.fn === fn); if (type === 'keydown' && at >= 0) listeners.splice(at, 1); };
+  f.composed.bindPolicyEntries();
+  const press = (code, extra) => { const event = Object.assign({ key: 'Enter', code, target: f.host.document.getElementById('layer-list'), prevented: false, stopped: false,
+    preventDefault() { this.prevented = true; }, stopPropagation() { this.stopped = true; } }, extra); listeners.forEach((l) => l.fn(event)); return event; };
+  return { listeners, press };
+}
+test('NumpadEnter in Motion enters the active component instance and splits a single-layer component, exactly as the row double-click', async () => {
+  const f = fixture(), keys = keyboard(f), calls = splitRecorder(f);
+  Object.assign(f.host.state.layers[2], { kind: 'component', componentId: 'sym_b' }); f.host.state.activeLayerIdx = 2; f.host.state.appMode = 'motion';
+  assert.ok(keys.listeners.length === 1 && keys.listeners[0].capture === true, 'one capture listener on the document');
+  const event = keys.press('NumpadEnter'); await settle();
+  assert.ok(event.prevented && event.stopped, 'the key is consumed (regular Enter would toggle play)');
+  assert.equal(Context.presented(f.host).contextId, 'sym_b', 'the instance component is presented');
+  assert.deepEqual(calls, [{ uid: 'ic', frame: 0, presented: 'sym_b' }], 'the same one split request as the double-click');
+  assert.deepEqual(f.toasts, ['toastSplitToLayersUndoHint']);
+  assert.equal(f.workspaceRequests().find((r) => r.payload.action.kind === 'enter').payload.action.fromLayerUid, 'L3', 'enters at the frame the instance shows');
+});
+test('NumpadEnter does nothing for regular Enter, a plain layer, Animation 2D, modifiers, a text field or from inside a component', async () => {
+  const f = fixture(), keys = keyboard(f), calls = splitRecorder(f);
+  Object.assign(f.host.state.layers[2], { kind: 'component', componentId: 'sym_b' }); f.host.state.activeLayerIdx = 2; f.host.state.appMode = 'motion';
+  const field = { tagName: 'INPUT', parentNode: null };
+  const idle = [keys.press('Enter'), keys.press('NumpadEnter', { altKey: true }), keys.press('NumpadEnter', { metaKey: true }), keys.press('NumpadEnter', { target: field })];
+  f.host.state.activeLayerIdx = 0; idle.push(keys.press('NumpadEnter'));
+  f.host.state.activeLayerIdx = 2; f.host.state.appMode = 'anim2d'; idle.push(keys.press('NumpadEnter'));
+  await settle();
+  assert.ok(idle.every((e) => !e.prevented), 'none of them is consumed');
+  assert.equal(f.workspaceRequests().length, 0, 'no workspace request was sent');
+  f.host.state.appMode = 'motion'; keys.press('NumpadEnter'); await settle();
+  assert.equal(Context.presented(f.host).contextId, 'sym_b');
+  const inside = keys.press('NumpadEnter'); await settle();
+  assert.ok(!inside.prevented, 'inside a component the key is left alone (nested components are refused)');
+  assert.equal(calls.length, 1);
+});
+test('a legacy document keeps the key, and disposing the entries removes the listener', async () => {
+  const f = fixture({ legacyDocument: true }), keys = keyboard(f);
+  Object.assign(f.host.state.layers[2], { kind: 'component', componentId: 'sym_b' }); f.host.state.activeLayerIdx = 2; f.host.state.appMode = 'motion';
+  assert.ok(!keys.press('NumpadEnter').prevented, 'not a native document');
+  f.composed.disposePolicyEntries();
+  assert.equal(keys.listeners.length, 0, 'the capture listener is removed on dispose');
+});

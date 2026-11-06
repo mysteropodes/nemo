@@ -584,3 +584,27 @@ test('f(x) click opens one expression drawer in the row slot, announces open/clo
  assert.equal(drawers().filter(n=>!n.hidden).length,0);assert.ok(layout.includes('expression-close'));assert.equal(writes.length,0);
  panel.dispose();
 });
+// #2256 B-comp-edit-rest: the Motion inspector of an ENTERED component (baseline enterSymbol swapped state.layers, so the Motion panel worked on the component's layers).
+// The scene's own paint is skipped while a component is entered, so Project asks paintMotionHeld for the inspector: real UI, Binding, Panel and SDK.
+test('inside an entered component the Motion inspector reads and lists the ENTERED rows with the held context id',async()=>{
+ const h=host();h.paint();await h.settle();const before=h.calls.length;
+ Object.assign(h.root,{NemoNativeComponentContext:{presented:()=>({contextId:'comp-a',totalFrames:12,fps:12}),layers:()=>[{layerUid:'in-1',name:'Inner 1'},{layerUid:'in-2',name:'Inner 2'}]}});
+ h.root.state.activeSymbolId='comp-a';h.root.state.activeLayerIdx=1;h.root._layerSel=[1];h.root.state.currentFrame=3;
+ // The owner lists the component's own targets (the fixture owner only knows the scene root's), exactly as object_property_targets.rs does for a component.
+ const read=h.ports.readPropertyMetadata;
+ h.ports.readPropertyMetadata=async selector=>{const result=await read(selector);
+  if(result.kind==='targets')result.items=[{kind:'context',contextId:'comp-a'},{kind:'layer',target:{contextId:'comp-a',layerUid:'in-1'}},{kind:'layer',target:{contextId:'comp-a',layerUid:'in-2'}}];return result;};
+ UI.paintMotionHeld(h.root,h.ports);await h.settle();
+ const views=h.calls.slice(before).map(c=>c.payload&&c.payload.view).filter(v=>v&&v.target);
+ assert.ok(views.length>0,'a property read was sent');
+ assert.ok(views.every(v=>v.target.contextId==='comp-a'&&v.target.layerUid==='in-2'),'every read names the held context and the active ENTERED row');
+ assert.ok(h.rows().length>5,'the property rows are listed');h.retire();
+});
+test('paintMotionHeld does nothing at the scene root and outside Motion',async()=>{
+ const h=host();h.paint();await h.settle();const before=h.calls.length;
+ UI.paintMotionHeld(h.root,h.ports);await h.settle();
+ assert.equal(h.calls.length,before,'no context is entered: the scene paint owns the inspector');
+ Object.assign(h.root,{NemoNativeComponentContext:{presented:()=>({contextId:'comp-a',totalFrames:12,fps:12}),layers:()=>[{layerUid:'in-1',name:'Inner 1'}]}});
+ h.root.state.appMode='anim2d';UI.paintMotionHeld(h.root,h.ports);await h.settle();
+ assert.equal(h.calls.length,before,'Animation 2D has no Motion inspector');h.retire();
+});

@@ -26,6 +26,26 @@ fn inside(doc: &ObjectDocument) -> ObjectDocument {
     if !d["tweens"].is_null() {
         out["tweens"] = d["tweens"].clone();
     }
+    // The raster / text records of the layer sit in the same context (a bitmap-brush layer keeps its baked rasters there).
+    if !d["items"].is_null() {
+        fn retag(value: &mut Value) {
+            match value {
+                Value::Object(map) => {
+                    if let Some(Value::Object(target)) = map.get_mut("target") {
+                        if target.get("contextId") == Some(&json!("scene-root")) {
+                            target.insert("contextId".into(), json!(CTX));
+                        }
+                    }
+                    map.values_mut().for_each(retag);
+                }
+                Value::Array(rows) => rows.iter_mut().for_each(retag),
+                _ => {}
+            }
+        }
+        let mut items = d["items"].clone();
+        retag(&mut items);
+        out["items"] = items;
+    }
     decode_storage_project(&serde_json::to_vec(&out).unwrap()).unwrap()
 }
 /// The component's own records, retagged to the scene root so they compare with a scene layer's.
@@ -121,4 +141,45 @@ fn a_locked_layer_an_undeclared_context_and_a_foreign_layer_refuse_with_nothing_
     let q = request(&owner, "locked", "tween.generate", tween(CTX, "L0"));
     assert!(refused(&mut owner, &q), "a locked component layer");
     assert_eq!((bytes(&owner), owner.history_depths()), (before, (0, 0)));
+}
+
+#[cfg(feature = "project_media_codec")]
+#[test]
+fn a_bitmap_brush_tween_re_bakes_inside_a_component_like_the_scene_layer() {
+    let case = fixture_cases().into_iter().find(|c| c["input"]["name"] == "bitmap-both").unwrap();
+    let scene_doc = document(&case["input"]["frames"], true);
+    let envelope = |doc: ObjectDocument| {
+        crate::object_document::ProjectEnvelope::no_media(crate::object_document::ProjectMetadata::new(320, 180, 24.).unwrap(), doc)
+            .with_asset_inventory(Some(assets::images_only()))
+    };
+    let payload = json!({"command":"object.tween.generate","layerUid":"L0","options":{"resamplePoints":12,"step":1,"skipManual":true,"easing":[]}});
+    let mut scene = NativeObjectHistory::from_admitted_project("tween-scene-bitmap", envelope(scene_doc.clone())).unwrap();
+    let q = request(&scene, "scene", "tween.generate", payload.clone());
+    assert_eq!(dispatch(&mut scene, &q)["ok"], true);
+    let mut comp = NativeObjectHistory::from_admitted_project("tween-comp-bitmap", envelope(inside(&scene_doc))).unwrap();
+    let before = comp.acquire_snapshot(0).unwrap().serialize_project_file().unwrap();
+    let mut inner = payload;
+    inner["contextId"] = json!(CTX);
+    let q = request(&comp, "inside", "tween.generate", inner.clone());
+    let reply = dispatch(&mut comp, &q);
+    assert_eq!(reply["ok"], true, "{reply}");
+    assert_eq!((comp.content_revision(), comp.history_depths()), (1, (1, 0)), "one revision, one history entry");
+    let records = |o: &NativeObjectHistory| o.acquire_snapshot(1).unwrap().project().unwrap().asset_inventory().unwrap().records().len();
+    assert_eq!(records(&comp), records(&scene), "the same baked PNG resources as the scene run");
+    let after = comp.acquire_snapshot(1).unwrap();
+    let baked = after.document().items.value().unwrap().raster_entries().iter()
+        .filter(|r| r.target.context_id == CTX && r.item.brush_group_id().is_some())
+        .count();
+    assert!(baked >= 3, "the in-between frames carry baked brush rasters in the component context ({baked})");
+    assert!(after.document().items.value().unwrap().raster_entries().iter().all(|r| r.target.context_id == CTX),
+        "no baked raster leaked into the scene root");
+    let kept = after.serialize_project_file().unwrap();
+    comp.undo(1).unwrap();
+    assert_eq!(comp.acquire_snapshot(2).unwrap().serialize_project_file().unwrap().len(), before.len());
+    comp.redo(2).unwrap();
+    assert_eq!(comp.acquire_snapshot(3).unwrap().serialize_project_file().unwrap(), kept, "redo restores the tween exactly");
+    // Regenerating is idempotent: the identical PNG resources are reused, nothing is added.
+    let q = request(&comp, "again", "tween.generate", inner);
+    assert_eq!(dispatch(&mut comp, &q)["ok"], true);
+    assert_eq!(comp.acquire_snapshot(comp.content_revision()).unwrap().project().unwrap().asset_inventory().unwrap().records().len(), records(&scene));
 }

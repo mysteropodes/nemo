@@ -319,6 +319,14 @@
     }
     return false;
   }
+  // NumpadEnter on the active instance row (1065e9d8:src/js/timeline.js:9728): the same enter-and-split path as the row double-click, for a row that
+  // already names its component (kind 'component' + componentId), so no instance scan is needed.
+  async function openInstance(host, row) {
+    if (!row || row.kind !== 'component' || typeof row.componentId !== 'string' || !row.componentId || typeof row.layerUid !== 'string' || !intent(host) || !session(host) || live(host)) return false;
+    var opened = await enter(host, row.componentId, null, row.layerUid);
+    if (opened === true) await autoSplit(host);
+    return opened;
+  }
   // Motion's double-click on an instance (1065e9d8:src/js/motion.js:6888 enterComponentLayer) silently releases a component that holds exactly ONE
   // drawing layer into one layer per shape, at the entered playhead, as ONE history entry (the layer.split of the held context: the owner applies
   // the kernel's plan, a layer of fewer than two shapes is its typed refusal and the idempotent re-entry). The Animation 2D entry never splits.
@@ -394,5 +402,5 @@
     });
     return true;
   }
-  return Object.freeze({ SCENE: SCENE, presented: presented, contextId: contextId, layerRows: layerRows, layers: layers, readScope: readScope, selectLayer: selectLayer, frameBound: frameBound, enter: enter, exit: exit, close: close, revision: revision, projectionReady: projectionReady, fault: fault, openLayer: openLayer, paint: paint, renderTabs: renderTabs });
+  return Object.freeze({ SCENE: SCENE, presented: presented, contextId: contextId, layerRows: layerRows, layers: layers, readScope: readScope, selectLayer: selectLayer, frameBound: frameBound, enter: enter, exit: exit, close: close, revision: revision, projectionReady: projectionReady, fault: fault, openLayer: openLayer, openInstance: openInstance, paint: paint, renderTabs: renderTabs });
 }));

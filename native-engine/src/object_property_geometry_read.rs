@@ -33,9 +33,17 @@ impl ObjectSnapshot {
             return Err(InvalidRequest);
         }
         let uid = target.layer_uid();
-        let parent = self
-            .document()
-            .layers()
+        // #2256: the layer is looked up in the table of ITS context (the scene's, or the entered component's own).
+        let layers = if target.context_id() == "scene-root" {
+            self.document().layers()
+        } else {
+            self.document()
+                .component_set()
+                .and_then(|set| set.component(target.context_id()))
+                .ok_or(NotFound)?
+                .layers()
+        };
+        let parent = layers
             .iter()
             .find(|l| l.layer_uid() == uid)
             .ok_or(NotFound)?

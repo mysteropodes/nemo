@@ -99,7 +99,7 @@ use held_items::*;
 #[path = "tween_bitmap_plan.rs"]
 mod bitmap_plan;
 pub(crate) use crate::object_snapshot::tween_resources::{
-    prepare_tween_resources, PreparedTweenResources,
+    prepare_tween_resources, prepare_tween_resources_in, PreparedTweenResources,
 };
 use bitmap_plan::*;
 

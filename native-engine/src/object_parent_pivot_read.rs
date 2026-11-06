@@ -362,9 +362,18 @@ fn bases(
             .source_frame_for_layer(index)
             .ok_or("the layer shows no drawing at the edit frame")?;
         let mut vectors = Vec::new();
-        for (at, record) in snapshot
-            .document()
-            .objects()
+        // #2256: a component's records live in its own table, indexed as its frame packet indexes them.
+        let objects = if context_id == "scene-root" {
+            snapshot.document().objects()
+        } else {
+            snapshot
+                .document()
+                .component_set()
+                .and_then(|set| set.component(context_id))
+                .map(|component| component.objects())
+                .ok_or("the context is not a declared component")?
+        };
+        for (at, record) in objects
             .iter()
             .enumerate()
             .filter(|(_, r)| {
@@ -379,6 +388,10 @@ fn bases(
             }
             let vector = match packet.records().find(|r| r.source_object_index() == at) {
                 Some(source) => evaluate_record_rest_with_pose(&packet, source, None),
+                // The scene index fallback reads the scene table: a component record absent from its own packet has no evaluation here.
+                None if context_id != "scene-root" => {
+                    return Err("a component record is not in its frame packet");
+                }
                 None => evaluate_vector_rest(snapshot, at, packet.frame()),
             }
             .map_err(|e| e.message())?;

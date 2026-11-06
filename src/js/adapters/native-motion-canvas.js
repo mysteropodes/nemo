@@ -6,7 +6,7 @@
  * a frame or document change, a locked layer and a replaced owner each commit nothing. Shift locks a move to an axis, Alt+drag moves the anchor
  * (with Rotation or Scale set the edit carries `keepPose`, so Position follows in the same revision), a key diamond is grabbed only on its own frame and
  * a spatial key handle (hIn / hOut) on any frame (`setKeyHandle`). A parented layer is drawn and dragged through its ancestors' `parentAffine`; the
- * Position path is sampled once per frame through each key's easing. A component context and several selected layers draw nothing and take no
+ * Position path is sampled once per frame through each key's easing. Inside an entered component the gizmo follows the component's own layer (the held context id on every read and on the edit); several selected layers draw nothing and take no
  * gesture, except that the effector handles of a duplicator layer (a crosshair and a falloff ring each, grabbed last, even on the layer the duplicator
  * locks) move one effector anchor through ONE `object.duplicator.config` `effectorPos` edit, a static setting and never a key; a layer the native read cannot box (text, effect, rig, 3D, expression) says so once in a notice instead of staying silent. The pointer listeners stay on `document` in the capture phase (CLAUDE.md section 13). This file never reads or writes a JS layer record. */
 (function (root, factory) {
@@ -35,11 +35,15 @@
       const W = widgets(), P = win.NemoNativePresentationWait;
       try { const s = W && W.session(win); return !!P && !!s && P.busy((f) => s.readPresentedObjectSession(f)); } catch (_) { return false; }
     }
-    // The layer the gizmo belongs to: exactly one selected, visible layer of the root context.
+    // #2256: the entered component the workspace controller holds ({contextId, rows}), or null at the scene root.
+    function heldNow() {
+      try { const c = win.NemoNativeComponentContext, p = c && typeof c.presented === 'function' ? c.presented(win) : null, rows = p && c.layers(win); return rows ? { contextId: p.contextId, rows } : null; } catch (_) { return null; }
+    }
+    // The layer the gizmo belongs to: exactly one selected, visible layer of the root context, or of the entered component.
     function targetOf(proof) {
-      const st = win.state, sel = win._layerSel;
-      if (!motion() || st.activeSymbolId || (Array.isArray(sel) && sel.length > 1)) return null;
-      const layer = proof.info.layers && proof.info.layers[st.activeLayerIdx];
+      const st = win.state, sel = win._layerSel, held = heldNow();
+      if (!motion() || (st.activeSymbolId && !held) || (Array.isArray(sel) && sel.length > 1)) return null;
+      const layers = held ? held.rows : proof.info.layers, layer = layers && layers[st.activeLayerIdx];
       return layer && layer.visible !== false && typeof layer.layerUid === 'string' ? layer : null;
     }
     function selector(info, view) {
@@ -54,7 +58,7 @@
       return r && r.layerUid === layer.layerUid && r.atRevision === proof.info.contentRevision && r.documentSnapshotId === proof.info.documentSnapshotId ? Eff.handles(r) : [];
     }
     async function load(proof, layer) {
-      const s = proof.session, frame = proof.selector.frame, target = { contextId: 'scene-root', layerUid: layer.layerUid };
+      const s = proof.session, frame = proof.selector.frame, target = { contextId: proof.selector.contextId, layerUid: layer.layerUid };
       const one = (view) => s.readProperty(selector(proof.info, view));
       const raw = (property) => one({ kind: 'rawSample', target, property, frame }).then((r) => r.value);
       const effectors = effectorsOf(proof, layer).catch(() => []);
@@ -86,9 +90,9 @@
       if (!error || error.code !== 'unavailable' || noticed === layer.layerUid) return;
       noticed = layer.layerUid; toast(UNBOXED);
     }
-    const keyOf = (proof, layer) => JSON.stringify([PIN.map((k) => proof.info[k]), proof.selector.frame, layer.layerUid]);
+    const keyOf = (proof, layer) => JSON.stringify([PIN.map((k) => proof.info[k]), proof.selector.contextId, proof.selector.frame, layer.layerUid]);
     function refresh() {
-      const W = widgets(), proof = W && active() && motion() ? W.proofNow(win, 'readProperty') : null;
+      const W = widgets(), held = heldNow(), proof = W && active() && motion() ? W.proofNow(win, 'readProperty', held ? held.contextId : undefined) : null;
       if (!proof && queueBusy() && cached) return Promise.resolve(cached.read); // busy is not changed: keep the gizmo and the drag
       const layer = proof && targetOf(proof);
       if (!layer) { noticed = ''; if (cached) { serial++; cached = null; cancel(); } paint(); return Promise.resolve(null); }
@@ -287,7 +291,7 @@
       const action = preview.handle ? { kind: 'setKeyHandle', frame: preview.frame, handle: preview.handle, values }
         : { kind: keyed ? 'setKey' : 'setValue', frame: keyed ? preview.frame : proof.selector.frame, values };
       if (preview.keepPose) action.keepPose = true;
-      const payload = { command: 'object.property.edit', target: { contextId: 'scene-root', layerUid: entry.layer.layerUid }, property: preview.property, action };
+      const payload = { command: 'object.property.edit', target: { contextId: proof.selector.contextId, layerUid: entry.layer.layerUid }, property: preview.property, action };
       busy = true;
       try {
         if (!(await proven(entry))) return false;

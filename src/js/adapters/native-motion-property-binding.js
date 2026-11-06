@@ -13,6 +13,8 @@
   function same(a,b){return !!a&&!!b&&pins.every(function(k){return a[k]===b[k];});}
   function clonePin(v){var p={};pins.forEach(function(k){p[k]=v[k];});return Object.freeze(p);}
   function key(t){return JSON.stringify([t.contextId,t.layerUid,t.strokeId===undefined?null:t.strokeId]);}
+  // The entered component the workspace controller holds (its id, frame count and rows), or null at the scene root.
+  function heldContext(root){try{var c=root.NemoNativeComponentContext,p=c&&typeof c.presented==='function'?c.presented(root):null,rows=p&&c.layers(root);return rows?{contextId:p.contextId,totalFrames:p.totalFrames,rows:rows}:null;}catch(_){return null;}}
   function create(root,ui,reader,options){
     options=options||{};
     if(!root||!root.state||!root.document||!ui||typeof ui.currentSession!=='function'||typeof ui.projectionReady!=='function'||typeof reader!=='function'||!options.container)throw new TypeError('Native Motion binding ports are unavailable');
@@ -23,6 +25,7 @@
       var session=ui.currentSession();if(!session||!session.isActive||!session.isActive()||!session.info||!session.readPresentedObjectSession)return invalidate();
       var info=session.info(),presented=lease&&typeof lease.readPresentedObjectSession==='function'?lease.readPresentedObjectSession():session.readPresentedObjectSession();
       if(!info||!presented||presented.kind!=='native-object'||ui.projectionReady(info)!==true||!Array.isArray(info.layers))return invalidate();
+      var held=heldContext(root);if(held&&info)info=Object.assign({},info,{layers:held.rows,totalFrames:held.totalFrames}); /* #2256: an entered component is judged by ITS rows and frame count */
       if(lease&&(!same(info,presented)||!same(info,presented.presentation)||presented.available!==true||
         presented.presentation.owner!=='native'||presented.presentation.status!=='presented'||presented.presentation.frame!==root.state.currentFrame))return invalidate();
       if(!Number.isInteger(info.totalFrames)||info.totalFrames<1||!Number.isInteger(root.state.currentFrame)||root.state.currentFrame<0||root.state.currentFrame>=info.totalFrames)return invalidate();
@@ -32,7 +35,7 @@
       var active=root.state.activeLayerIdx;if(info.layers.length&&(!Number.isInteger(active)||active<0||active>=info.layers.length))return invalidate();
       var override=null;if(options.readTargetSelection){var raw=options.readTargetSelection(identity);if(!raw||!Array.isArray(raw.selected))return invalidate();
         override={primary:raw.primary==null?null:View.normalizeTarget(raw.primary),selected:raw.selected.map(function(t){var v=View.normalizeTarget(t);if(!v)throw new Error('Invalid native UI target');return v;})};if(raw.primary!=null&&!override.primary)return invalidate();}
-      var explicit=options.readContextId?options.readContextId(info,presented):null;if(options.readContextId&&(typeof explicit!=='string'||!explicit))return invalidate();
+      var explicit=options.readContextId?options.readContextId(info,presented):held?held.contextId:null;if(options.readContextId&&(typeof explicit!=='string'||!explicit))return invalidate();
       var transport=options.readTransportGeneration?options.readTransportGeneration():null;
       var signature=JSON.stringify([pins.map(function(k){return identity[k];}),indices,active,root.state.activeSymbolId,override,explicit,transport]);
       if(lastSession!==session||lastSignature!==signature){generation++;lastSession=session;lastSignature=signature;}
