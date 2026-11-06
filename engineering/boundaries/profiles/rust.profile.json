@@ -64,6 +64,7 @@
         "object_raster_asset_kernels.rs",
         "object_raster_asset_item.rs",
         "object_raster_asset_geometry.rs",
+        "object_item_local_form.rs",
         "object_clipboard_remap.rs",
         "object_clipboard_remap_groups.rs",
         "object_clipboard_remap_layer.rs",

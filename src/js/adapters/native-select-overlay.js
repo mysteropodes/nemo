@@ -130,7 +130,8 @@
       var box = orientedBox(root, shown), r = HANDLE * c.pin.canvasW / c.bounds.width;
       if (box) {
         // The rotate ring (baseline buildTransformBoxItems): centred on the box, 36 screen px at most, 30% of the box otherwise.
-        var mid = at(c.V, box.center.x, box.center.y);
+        // #2372: the ring turns about the pivot (the box centre unless a preset or an Alt+clicked point was chosen), where the crosshair sits.
+        var pivot = root.NemoNativeSelectPivot ? root.NemoNativeSelectPivot.pointOf(root, box) : box.center, mid = at(c.V, pivot.x, pivot.y);
         svg.appendChild(node(root, 'circle', line(root, { cx: mid[0], cy: mid[1], stroke: BLUE, 'stroke-opacity': '0.63', 'stroke-width': '1',
           r: Math.min(36 * c.pin.canvasW / c.bounds.width, Math.max(box.width, box.height) * 0.3 * Math.hypot(c.V[0], c.V[1])) })));
         svg.appendChild(polygon(root, c.V, box, { stroke: BLUE, 'stroke-opacity': '0.8', 'stroke-width': '1' }));
@@ -138,11 +139,16 @@
           var p = at(c.V, h[0], h[1]);
           svg.appendChild(node(root, 'rect', line(root, { x: p[0] - r, y: p[1] - r, width: 2 * r, height: 2 * r, fill: '#ffffff', stroke: BLUE, 'stroke-width': '1.2' })));
         });
+        if (root.NemoNativeSelectSkew) root.NemoNativeSelectSkew.draw(root, svg, c, box); // the skew zones' tick marks
+        if (root.NemoNativeSelectPivot) root.NemoNativeSelectPivot.draw(root, svg, c, box); // the pivot crosshair
       }
     }
     // #2372 native-fill-gradient: the Fill row's gradient gizmo (line, end handles, stop diamonds) joins the selection's drawing.
     var gizmo = root.NemoNativeFillGradient;
     if (shown && gizmo && typeof gizmo.draw === 'function') gizmo.draw(root, svg, c, shown);
+    if (s.prev && s.prev.lasso && s.prev.lasso.length > 1) { // the Alt lasso's freehand path, closed back to its start
+      svg.appendChild(node(root, 'polygon', line(root, { points: s.prev.lasso.map(function (q) { return at(c.V, q[0], q[1]).join(','); }).join(' '), fill: 'rgba(74,158,255,0.08)', stroke: BLUE, 'stroke-opacity': '0.9', 'stroke-width': '1' })));
+    }
     if (s.prev && s.prev.marquee) {
       var m = s.prev.marquee;
       svg.appendChild(polygon(root, c.V, { corners: [[m[0], m[1]], [m[2], m[1]], [m[2], m[3]], [m[0], m[3]]] }, { fill: 'rgba(74,158,255,0.08)', stroke: BLUE, 'stroke-opacity': '0.9', 'stroke-width': '1' }));
@@ -164,6 +170,7 @@
     var s = state(root), paths = root.selectedPaths, ctx = ctxNow(root);
     s.sel = ctx !== null && Array.isArray(paths) && paths.length ? { paths: paths, count: paths.length, ctx: ctx } : null; // kept while the presentation is unreadable; refresh draws it when it is
     s.hov = null;
+    if (root.NemoNativeSelectPivot) root.NemoNativeSelectPivot.restore(root); // the picked stroke's remembered pivot comes back
     refresh(root, true);
   }
   // The pick context the drawn selection (box, handles, ring) belongs to, or null when none is drawn for the current selection (#2372).
@@ -173,7 +180,7 @@
   // and/or { marquee: [x0, y0, x1, y1] } in world space; null ends it. Nothing here writes the document.
   function preview(root, spec) {
     var s = state(root), ctx = ctxNow(root);
-    s.prev = spec && ctx !== null ? { paths: spec.paths || null, marquee: spec.marquee || null, ctx: ctx } : null;
+    s.prev = spec && ctx !== null ? { paths: spec.paths || null, marquee: spec.marquee || null, lasso: spec.lasso || null, ctx: ctx } : null;
     refresh(root, true);
   }
   // Hover box of one picked path (null clears). A path already selected shows its selection box instead.
@@ -191,6 +198,7 @@
   // and a read whose context changed before it returned is discarded.
   function hoverAt(root, e) {
     var s = state(root), I = root.NemoSelectCanvasIntent, st = root.state;
+    if (e && !e.buttons && root.NemoNativeSelectSkew && st && st.tool === 'select' && I && I.objectProject(root)) root.NemoNativeSelectSkew.hover(root, e); // handle cursors, hovered skew edge
     if (!e || e.buttons || !I || !st || st.tool !== 'select' || st.appMode === 'motion' || !I.objectProject(root)) { s.next = null; hover(root, null); return; }
     s.next = { x: e.clientX, y: e.clientY };
     if (s.busy) return;

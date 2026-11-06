@@ -69,6 +69,70 @@ fn a_turned_block_paints_every_contour_turned_about_its_stored_anchor() {
     }
 }
 
+/// The painted row of `from` under the linear map `lin` about the anchor (10, 20): the point through it, the handles through its linear part.
+fn through(row: [f64; 6], lin: [f64; 4]) -> [f64; 6] {
+    let at = |x: f64, y: f64| (lin[0] * x + lin[2] * y, lin[1] * x + lin[3] * y);
+    let p = at(row[0] - 10.0, row[1] - 20.0);
+    let (hi, ho) = (at(row[2], row[3]), at(row[4], row[5]));
+    [10.0 + p.0, 20.0 + p.1, hi.0, hi.1, ho.0, ho.1]
+}
+
+fn formed(members: Value) -> Value {
+    let mut doc = turned(0.0);
+    for (key, value) in members.as_object().unwrap() {
+        doc["items"]["text"][0]["block"][key] = value.clone();
+    }
+    doc
+}
+
+/// #2372 A-image-text-flip-skew: the stored mirror and shear map every contour about the anchor in the one scene, then the stored turn.
+#[test]
+fn a_mirrored_and_sheared_block_paints_every_contour_through_its_stored_form() {
+    use crate::object_document::object_raster_asset_kernels::object_item_local_form::{mul, turn as turn_lin, LocalForm};
+    let upright = contours_of(&turned(0.0));
+    for (members, form, degrees) in [
+        (json!({"flipX":true}), LocalForm { flip_x: true, flip_y: false, skew: 0.0 }, 0.0),
+        (json!({"flipY":true}), LocalForm { flip_x: false, flip_y: true, skew: 0.0 }, 0.0),
+        (json!({"skew":30}), LocalForm { flip_x: false, flip_y: false, skew: 30.0 }, 0.0),
+        (json!({"flipX":true,"skew":-20,"rotation":30}), LocalForm { flip_x: true, flip_y: false, skew: -20.0 }, 30.0),
+    ] {
+        let got = contours_of(&formed(members.clone()));
+        assert_eq!(got.len(), upright.len(), "{members}");
+        let lin = mul(turn_lin(degrees), form.linear());
+        for (a, b) in upright.iter().zip(&got) {
+            assert_eq!(a.len(), b.len());
+            for (from, to) in a.iter().zip(b) {
+                let want = through(*from, lin);
+                assert!(want.iter().zip(to).all(|(w, g)| (w - g).abs() < 1e-6), "{members}: {to:?} != {want:?}");
+            }
+        }
+    }
+}
+
+#[test]
+fn the_hit_listing_carries_the_stored_form_in_the_blocks_matrix_and_keeps_the_stored_bounds() {
+    let listed = |doc: &Value| {
+        let mut doc = doc.clone();
+        doc["compositionOrder"]["contexts"][0]["scopes"][0]["elements"] =
+            json!([{"layerUid":"L0","strokeId":"text","naturalPosition":0,"order":{}}]);
+        super::hit_listing::listing_of(&doc)["items"][0].clone()
+    };
+    let nums = |v: &Value| v.as_array().unwrap().iter().map(|n| n.as_f64().unwrap()).collect::<Vec<_>>();
+    let flat = listed(&turned(0.0));
+    let mirrored = listed(&formed(json!({"flipX":true})));
+    // The block's own (unmirrored) frame is the record space: the bounds stay, the map is the mirror about the anchor x = 10.
+    for (a, b) in nums(&flat["bounds"]).iter().zip(nums(&mirrored["bounds"])) {
+        assert!((a - b).abs() < 1e-6, "{flat} vs {mirrored}");
+    }
+    for (got, want) in nums(&mirrored["matrix"]).iter().zip([-1.0, 0.0, 0.0, 1.0, 20.0, 0.0]) {
+        assert!((got - want).abs() < 1e-9, "{mirrored}");
+    }
+    let sheared = nums(&listed(&formed(json!({"skew":45})))["matrix"]);
+    for (got, want) in sheared.iter().zip([1.0, 0.0, 1.0, 1.0, -20.0, 0.0]) {
+        assert!((got - want).abs() < 1e-9, "{sheared:?}");
+    }
+}
+
 #[test]
 fn the_svg_export_draws_the_turned_block() {
     let svg_of = |doc: &Value| {

@@ -7,6 +7,10 @@ const Intent = require('../src/js/adapters/select-canvas-intent.js');
 const Overlay = require('../src/js/adapters/native-select-overlay.js');
 const Gesture = require('../src/js/adapters/native-select-gesture.js');
 const AltDuplicate = require('../src/js/adapters/native-select-alt-duplicate.js');
+const Skew = require('../src/js/adapters/native-select-skew.js');
+const Pivot = require('../src/js/adapters/native-select-pivot.js');
+const Lasso = require('../src/js/adapters/native-select-lasso.js');
+const Group = require('../src/js/adapters/native-select-group.js');
 const Wait = require('../src/js/adapters/native-presentation-wait.js');
 const Paper = require('./helpers/native-import-paper.cjs');
 
@@ -51,7 +55,7 @@ function harness(items, options = {}) {
       pin = { ...pin, contentRevision: pin.contentRevision + 1, documentSnapshotId: 's' + (pin.contentRevision + 1) };
       return { status: 'applied' };
     } }) },
-    NemoSelectCanvasIntent: Intent,
+    NemoSelectCanvasIntent: Intent, NemoNativeSelectSkew: Skew, NemoNativeSelectPivot: Pivot, NemoNativeSelectLasso: Lasso, NemoNativeSelectGroup: Group,
     // busyAtShow: the pick's read has resolved but its queue entry is released a tick later, so applyPick draws inside that lag
     NemoNativeSelectOverlay: options.busyAtShow ? { ...Overlay, show: (r) => { busy = true; return Overlay.show(r); } } : Overlay };
   root.NemoNativeSelectGesture = Gesture.bind(root);
@@ -227,7 +231,7 @@ test('dragging an image is ONE batch with the exact delta as a record-space matr
   assert.deepEqual(h.toasts, []);
 });
 
-test('a text block moves and scales in one commit; a mirror of text or of an image is refused with a notice and writes nothing', async () => {
+test('a text block moves and scales in one commit; a mirror of text or of an image is ONE batch with the mirror matrix (A-image-text-flip-skew)', async () => {
   let h = harness([TXT]); await h.select(165, 40);
   await gesture(h, [165, 40], [185, 60]);
   assert.equal(h.batches.length, 1); assert.deepEqual(M(h.batches[0].steps[0]), [1, 0, 0, 1, 20, 20]); assert.deepEqual(h.toasts, []);
@@ -235,10 +239,11 @@ test('a text block moves and scales in one commit; a mirror of text or of an ima
   await gesture(h, [190, 60], [240, 100]);
   assert.equal(h.batches.length, 1, 'a corner handle scales text about the opposite corner');
   assert.deepEqual(M(h.batches[0].steps[0]), [2, 0, 0, 2, -140, -20]);
-  const none = async (items, press, to, pattern, pick = [165, 40]) => { const x = harness(items); await x.select(pick[0], pick[1]);
-    await gesture(x, press, to); assert.deepEqual(x.batches, [], String(pattern)); assert.ok(x.toasts.some((t) => pattern.test(t) && /not available/.test(t)), x.toasts.join('|')); };
-  await none([TXT], [190, 60], [110, 100], /Flipping text/);
-  await none([IMG], [120, 70], [-40, 70], /Flipping images/, [70, 70]);
+  const mirrored = async (items, press, to, pick = [165, 40]) => { const x = harness(items); await x.select(pick[0], pick[1]);
+    await gesture(x, press, to); assert.equal(x.batches.length, 1, 'one commit'); assert.equal(x.batches[0].steps.length, 1); assert.deepEqual(x.toasts, [], 'no refusal'); return M(x.batches[0].steps[0]); };
+  // The corner dragged across the opposite corner is a negative scale factor: stored by the engine as a mirror.
+  assert.deepEqual(await mirrored([TXT], [190, 60], [110, 100]), [-0.6, 0, 0, 2, 224, -20]);
+  assert.deepEqual(await mirrored([IMG], [120, 70], [-40, 70], [70, 70]), [-0.6, 0, 0, 1, 32, 0]);
 });
 
 // #2267: the text block has a stored rotation, so the ring turns it exactly as it turns an image: ONE batch, the record-space matrix.
@@ -264,14 +269,14 @@ test('a turned text block takes the box of its stored turn and scales along its 
   assert.ok(Math.abs(m[0] - 1.4) < 1e-4 && m[1] === 0 && m[2] === 0 && m[3] === 1, m.join());
 });
 
-test('a turned image scales along its own axes, not along the world axes (a shear has no stored form)', async () => {
+test('a world-axis stretch of a turned image is a shear in its own frame: ONE batch (stored as skew), no refusal', async () => {
   const c = Math.SQRT1_2, turned = quad('IMG', 20, 20, 120, 120, { role: 'raster', filled: true, matrix: [c, c, -c, c, 70 - c * 70 + c * 70, 70 - c * 70 - c * 70] });
   const h = harness([turned]); await h.select(70, 70);
   assert.deepEqual(h.ids(), ['IMG']);
   const box = h.root.selectedPaths[0].bounds;
   await gesture(h, [box.x + box.width, box.y + box.height], [box.x + box.width + 40, box.y + box.height]);
-  assert.deepEqual(h.batches, []);
-  assert.ok(h.toasts.some((t) => /Skewing images/.test(t) && /not available/.test(t)), h.toasts.join('|'));
+  assert.equal(h.batches.length, 1, 'one commit');
+  assert.deepEqual(h.toasts, [], 'no refusal');
 });
 
 test('a mixed selection of a ribbon, an image and a text block moves as ONE batch of three matrices', async () => {
@@ -288,8 +293,8 @@ test('a mixed selection of a ribbon, an image and a text block moves as ONE batc
 
 test('the image matrix is conjugated into its own frame (the listing matrix of a posed image)', async () => {
   const posed = quad('IMG', 20, 20, 60, 60, { role: 'raster', filled: true, matrix: [2, 0, 0, 2, 10, 0] });
-  const h = harness([posed]); await h.select(100, 40);
-  await gesture(h, [100, 40], [120, 50]);
+  const h = harness([posed]); await h.select(90, 80);
+  await gesture(h, [90, 80], [110, 90]);
   assert.deepEqual(M(h.batches[0].steps[0]), [1, 0, 0, 1, 10, 5], 'a world move of (20,10) is (10,5) in a frame posed at scale 2');
 });
 
@@ -392,9 +397,9 @@ test('Escape mid-drag of a ribbon writes nothing', async () => {
 test('a ribbon keeps its linked fill: the fill is selected as its ribbon and the one step names the ribbon (the engine re-syncs the fill)', async () => {
   const fill = quad('F', 20, 40, 120, 80, { role: 'fill', owner: 'R' }), ribbon = quad('R', 20, 50, 120, 70, { role: 'ribbon', center: centre });
   const h = harness([fill, ribbon]);
-  await h.select(90, 50);
+  await h.select(50, 60);
   assert.deepEqual(h.ids(), ['R'], 'a click on the fill selects its ribbon');
-  h.press(90, 50); h.drag(90, 90); await settle(); await h.release(90, 90); await settle();
+  h.press(50, 60); h.drag(50, 100); await settle(); await h.release(50, 100); await settle();
   assert.equal(h.batches.length, 1);
   assert.deepEqual(h.batches[0].steps.map((s) => s.reshape.stableTarget.strokeId), ['R']);
   assert.deepEqual(M(h.batches[0].steps[0]), [1, 0, 0, 1, 0, 40]);
@@ -712,13 +717,13 @@ test('Alt+press inside the selection and a drag sends ONE duplicate at the drag 
   assert.deepEqual(h.toasts, []);
 });
 
-test('the Alt press only counts INSIDE the selection box: on an unselected shape it just moves that shape, and without Alt a drag of the selection is a plain move', async () => {
+test('the Alt press only copies INSIDE the selection box: outside it (even on an unselected shape) it moves the pivot, and without Alt a drag of the selection is a plain move', async () => {
   const h = altHarness([BIG, FAR]);
   await h.select(35, 35);
   h.press(170, 170, { altKey: true }); h.drag(150, 150, { altKey: true }); await settle(); await h.release(150, 150, { altKey: true }); await settle();
-  assert.equal(h.calls.length, 0, 'an unselected item under Alt is picked and moved, not copied');
-  assert.equal(h.batches.length, 1);
-  assert.deepEqual(h.batches[0].steps[0].reshape.stableTarget, FAR.stableTarget);
+  assert.equal(h.calls.length, 0, 'an unselected item under Alt is not copied');
+  assert.equal(h.batches.length, 0, 'and not moved: the baseline places the pivot there (A-select-skew-anchor-lasso)');
+  assert.deepEqual(h.root.state.xformAnchorCustom, [150, 150]);
   const g = altHarness([BIG, FAR]);
   await g.select(35, 35);
   g.press(35, 35); g.drag(60, 35); await settle(); await g.release(60, 35); await settle();
@@ -731,8 +736,8 @@ test('Alt+press on empty space inside the selection box still copies the selecti
   const h = altHarness([ring]);
   await h.select(20, 70);
   assert.deepEqual(h.ids(), ['A']);
-  h.press(70, 70, { altKey: true }); h.drag(80, 70, { altKey: true }); h.drag(100, 90, { altKey: true }); await settle(); await h.release(100, 90, { altKey: true }); await settle();
-  assert.equal(h.calls.length, 1);
+  h.press(55, 55, { altKey: true }); h.drag(65, 55, { altKey: true }); h.drag(85, 75, { altKey: true }); await settle(); await h.release(85, 75, { altKey: true }); await settle();
+  assert.equal(h.calls.length, 1, 'away from the pivot crosshair (Alt over the crosshair grabs the pivot)');
   assert.deepEqual(h.calls[0].offset, [30, 20]);
 });
 
@@ -788,4 +793,159 @@ test('a refused or failed duplicate leaves the notice to the clipboard module an
   mixed.press(60, 60, { altKey: true }); mixed.drag(80, 80, { altKey: true }); mixed.drag(100, 100, { altKey: true }); await settle(); await mixed.release(100, 100, { altKey: true }); await settle();
   assert.equal(mixed.calls.length, 0, 'records that disagree on the distance are refused, not guessed');
   assert.ok(mixed.toasts.some((t) => /differently/.test(t)), mixed.toasts.join('|'));
+});
+
+// ---- A-select-skew-anchor-lasso: skew zones, the pivot and the Alt lasso ------------------------------------------------------------------------
+// BIG is the box (20,20)-(120,120): the skew zones flank each edge midpoint 9 to 20 screen px along the edge (zone centres 14.5 px from it).
+const zone = { n: [84.5, 20], s: [84.5, 120], w: [20, 84.5], e: [120, 84.5] };
+
+test('a skew zone drag shears the box about the opposite edge: ONE batch with the exact affine, previewed with its ticks, nothing written meanwhile', async () => {
+  const h = harness([BIG, FAR]); await h.select(35, 35);
+  assert.ok(h.svg().children.filter((c) => c.tag === 'line' && c.attrs.stroke === 'rgb(74,158,255)' && c.attrs['stroke-width'] === '1.6').length >= 8, 'two ticks flank each of the four edge midpoints');
+  h.press(...zone.n); h.drag(80, 20); h.drag(90, 20); await settle();
+  assert.equal(h.batches.length, 0);
+  const outline = h.svg().children.find((c) => c.tag === 'path');
+  assert.match(outline.attrs.d, /^M 40 20 C/, 'the live preview is the outline with the top edge slid right by 20');
+  await h.release(90, 20); await settle();
+  assert.equal(h.batches.length, 1, 'exactly one commit'); assert.equal(h.batches[0].steps.length, 1);
+  assert.deepEqual(M(h.batches[0].steps[0]), [1, 0, -0.2, 1, 24, 0], 'top edge: shx = -dx/height, dx from the edge midpoint (70,20), about the bottom edge midpoint (70,120)');
+  assert.deepEqual(pts(h.batches[0].steps[0]), [[40, 20], [140, 20], [120, 120], [20, 120]]);
+  assert.deepEqual(h.toasts, []);
+});
+
+test('the four edges shear along their own axis, the bottom and right ones with the opposite sign, and Ctrl lets the other axis shear too', async () => {
+  const run = async (edge, to, mods) => { const h = harness([BIG]); await h.select(35, 35); await gesture(h, zone[edge], to, mods); assert.equal(h.batches.length, 1, edge); return M(h.batches[0].steps[0]); };
+  assert.deepEqual(await run('s', [90, 120]), [1, 0, 0.2, 1, -4, 0], 'bottom edge right: shx = +dx/height about the top midpoint (70,20)');
+  assert.deepEqual(await run('w', [20, 90]), [1, -0.2, 0, 1, 0, 24], 'left edge down: shy = -dy/width about the right midpoint (120,70)');
+  assert.deepEqual(await run('e', [120, 90]), [1, 0.2, 0, 1, 0, -4]);
+  const both = await run('n', [90, 40], { ctrlKey: true });
+  assert.deepEqual(both, [1, -0.2, -0.2, 1, 24, 14], 'Ctrl: dy shears the other axis too');
+  assert.deepEqual(await run('n', [90, 40]), [1, 0, -0.2, 1, 24, 0], 'without Ctrl the other axis stays');
+});
+
+test('a resize handle wins a tie with a skew zone, a zone on an edge shorter than 48 px does not exist, and an image or a text block shears like a stroke', async () => {
+  const h = harness([BIG]); await h.select(35, 35);
+  await gesture(h, [70, 20], [70, 0]); // the n handle itself: a scale, not a skew
+  assert.equal(h.batches.length, 1); assert.deepEqual(M(h.batches[0].steps[0]).slice(0, 4), [1, 0, 0, 1.2]);
+  const tiny = harness([quad('S', 20, 20, 60, 60)]); await tiny.select(35, 35);
+  assert.equal(Skew.hit(Overlay.boxOf(tiny.root, tiny.root.selectedPaths), { x: 34.5, y: 20 }, 1), null, '40 px edge: no zone');
+  for (const [item, inside] of [[IMG, [70, 70]], [TXT, [165, 40]]]) {
+    const x = harness([item]); await x.select(inside[0], inside[1]);
+    const b = x.root.selectedPaths[0].bounds, mid = (b.left + b.right) / 2;
+    await gesture(x, [mid + 14.5, b.top], [mid + 24.5, b.top]);
+    assert.equal(x.batches.length, 1, item.stableTarget.strokeId); assert.deepEqual(x.toasts, [], 'no refusal');
+    assert.ok(Math.abs(M(x.batches[0].steps[0])[2]) > 0.05, 'a shear: the record-space matrix has a c term');
+  }
+});
+
+test('the idle pointer over a handle sets its cursor (resize, turn, skew), and a skew edge hovered turns its ticks orange; leaving restores the default', async () => {
+  const h = harness([BIG]); await h.select(35, 35);
+  const canvas = { style: {}, dataset: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 200, height: 200 }) };
+  h.root.document.getElementById = () => canvas;
+  h.root.NemoNativeSelectGesture = Gesture.bind(h.root);
+  const over = (x, y, extra) => Skew.hover(h.root, { clientX: x, clientY: y, buttons: 0, altKey: false, ...extra });
+  over(...zone.n); assert.equal(canvas.style.cursor, 'ew-resize'); assert.equal(Skew.hoveredEdge(h.root), 'n');
+  over(...zone.w); assert.equal(canvas.style.cursor, 'ns-resize'); assert.equal(Skew.hoveredEdge(h.root), 'w');
+  over(120, 120); assert.equal(canvas.style.cursor, 'nwse-resize', 'the se handle'); assert.equal(Skew.hoveredEdge(h.root), null);
+  over(120, 20); assert.equal(canvas.style.cursor, 'nesw-resize');
+  over(70, 40); assert.match(canvas.style.cursor, /^url\(/, 'the rotate ring'); // the ring is 30 px around the centre (70,70)
+  over(70, 70); assert.equal(canvas.style.cursor, 'default');
+  over(...zone.n, { altKey: true }); assert.equal(canvas.style.cursor, 'default', 'Alt shows no handle cursor');
+});
+
+test('Alt+press outside the selection box places the pivot (a click moves nothing and keeps the selection); Shift snaps to the nearest preset; no write at all', async () => {
+  const h = harness([BIG, FAR]); await h.select(35, 35);
+  h.press(140, 30, { altKey: true }); await h.release(140, 30, { altKey: true }); await settle();
+  assert.deepEqual(h.root.state.xformAnchorCustom, [140, 30]);
+  assert.deepEqual(h.ids(), ['A'], 'the click keeps the selection');
+  assert.deepEqual(h.batches, []);
+  assert.ok(h.svg().children.some((c) => c.tag === 'circle' && c.attrs.cx === '140' && c.attrs.cy === '30'), 'the crosshair is drawn at the pivot');
+  h.press(140, 10, { altKey: true, shiftKey: true }); await h.release(140, 10, { altKey: true, shiftKey: true }); await settle();
+  assert.equal(h.root.state.xformAnchorKey, 'tr'); assert.equal(h.root.state.xformAnchorCustom, null, 'the nearest preset of the box wins, the custom point goes');
+  assert.deepEqual(Pivot.pointOf(h.root, Overlay.boxOf(h.root, h.root.selectedPaths)), { x: 120, y: 20 });
+  assert.deepEqual(h.batches, []);
+});
+
+test('Alt+drag moves the pivot with the pointer, and the rotate ring then turns the selection about it', async () => {
+  const h = harness([BIG]); await h.select(35, 35);
+  h.press(140, 30, { altKey: true }); h.drag(150, 30, { altKey: true }); h.drag(160, 40, { altKey: true }); await settle();
+  await h.release(160, 40, { altKey: true }); await settle();
+  assert.deepEqual(h.root.state.xformAnchorCustom, [160, 40]); assert.deepEqual(h.batches, []);
+  // The ring is centred on the pivot now: 30 px right of it, dragged a quarter turn clockwise about (160,40).
+  await gesture(h, [190, 40], [160, 70]);
+  assert.equal(h.batches.length, 1);
+  assert.deepEqual(M(h.batches[0].steps[0]), [0, 1, -1, 0, 200, -120], 'a quarter turn about the pivot');
+});
+
+test('a preset pivot follows the box and the inspector\'s numeric rotation reads the same point; the pivot comes back for the same stroke and resets for another', async () => {
+  const h = harness([BIG, FAR]); await h.select(35, 35);
+  h.root.state.xformAnchorKey = 'br'; Pivot.remember(h.root);
+  assert.deepEqual(Pivot.pointOf(h.root, Overlay.boxOf(h.root, h.root.selectedPaths)), { x: 120, y: 120 });
+  await h.select(170, 170);
+  assert.deepEqual(h.ids(), ['B']); assert.equal(h.root.state.xformAnchorCustom, null);
+  h.root.state.xformAnchorCustom = [1, 2]; Pivot.remember(h.root);
+  await h.select(35, 35);
+  assert.deepEqual(h.ids(), ['A']); assert.equal(h.root.state.xformAnchorKey, 'br', 'A is back with its own pivot');
+  await h.select(170, 170);
+  assert.deepEqual(h.root.state.xformAnchorCustom, [1, 2], 'and so is B');
+});
+
+test('Alt+drag on empty canvas with nothing selected is a freehand lasso: bounds first, then the centre inside or the path crossed; images by their centre only', async () => {
+  const h = harness([BIG, FAR]);
+  h.press(10, 10, { altKey: true }); h.drag(130, 10, { altKey: true }); h.drag(130, 130, { altKey: true }); h.drag(10, 130, { altKey: true }); await settle();
+  const lasso = h.svg().children.filter((c) => c.tag === 'polygon').find((c) => /rgba\(74,158,255,0.08\)/.test(c.attrs.fill));
+  assert.ok(lasso, 'the freehand path is drawn while dragging'); assert.equal(lasso.attrs.points, '10,10 130,10 130,130 10,130');
+  assert.deepEqual(h.batches, []);
+  await h.release(10, 130, { altKey: true }); await settle();
+  assert.deepEqual(h.ids(), ['A'], 'A centre is inside, B is outside'); assert.deepEqual(h.batches, []);
+  assert.ok(!h.svg().children.some((c) => c.attrs && c.attrs.fill === 'rgba(74,158,255,0.08)'), 'the preview ends with the drag');
+  // Crossing without containing the centre: a small lasso over the corner of A takes the stroke, but not an image.
+  for (const [item, want] of [[BIG, ['A']], [IMG, []]]) {
+    const x = harness([item]);
+    x.press(130, 130, { altKey: true }); x.drag(130, 100, { altKey: true }); x.drag(100, 100, { altKey: true }); x.drag(100, 130, { altKey: true }); await settle();
+    await x.release(100, 130, { altKey: true }); await settle();
+    assert.deepEqual(x.ids(), want, item.stableTarget.strokeId);
+  }
+});
+
+test('a plain drag on empty canvas is still the rectangle marquee, and Alt+press with a selection never lassos', async () => {
+  const h = harness([BIG, FAR]);
+  h.press(2, 2); h.drag(60, 50); await settle();
+  assert.ok(h.svg().children.some((c) => c.tag === 'polygon' && /rgba\(74,158,255,0.08\)/.test(c.attrs.fill)));
+  await h.release(60, 50); await settle(); assert.deepEqual(h.ids(), ['A']);
+  h.press(150, 20, { altKey: true }); h.drag(170, 40, { altKey: true }); await settle(); await h.release(170, 40, { altKey: true }); await settle();
+  assert.deepEqual(h.ids(), ['A'], 'the selection is untouched: Alt moved the pivot');
+  assert.deepEqual(h.root.state.xformAnchorCustom, [170, 40]);
+});
+
+// ---- A-select-rest (3): a click on any member of a group selects the whole group ----------------------------------------------------------------
+const G1 = [{ id: 'g1' }];
+const grouped = () => [quad('A', 10, 10, 50, 50, { groupPath: G1 }), quad('B', 110, 10, 150, 50, { groupPath: G1 }), quad('C', 10, 70, 50, 110), quad('D', 110, 70, 150, 110, { groupPath: [{ id: 'outer' }, { id: 'inner' }] }), quad('E', 110, 130, 150, 170, { groupPath: [{ id: 'outer' }] })];
+
+test('a click on one member of a group selects every member of it (the outermost group), an ungrouped item alone, and Shift on a selected member takes the whole group away', async () => {
+  const h = harness(grouped());
+  await h.select(20, 20); await settle();
+  assert.deepEqual(h.ids(), ['A', 'B'], 'the siblings of the clicked member come with it');
+  await h.select(30, 90);
+  assert.deepEqual(h.ids(), ['C'], 'an ungrouped item is just itself, and replaces the group');
+  await h.select(120, 80); await settle();
+  assert.deepEqual(h.ids(), ['D', 'E'], 'a nested group widens to its outermost level (baseline rootGroupOfItem)');
+  await h.select(30, 90, true);
+  assert.deepEqual(h.ids(), ['D', 'E', 'C'], 'Shift adds the picked item');
+  await h.select(30, 90, true);
+  assert.deepEqual(h.ids(), ['D', 'E'], 'and Shift on it again removes it');
+  await h.select(120, 80, true); await settle();
+  assert.deepEqual(h.ids(), [], 'Shift on a selected member removes the whole group');
+  await h.select(120, 20, true); await settle();
+  assert.deepEqual(h.ids(), ['A', 'B'], 'Shift on an unselected member adds the whole group');
+  assert.deepEqual(h.batches, [], 'selecting writes nothing');
+});
+
+test('a press that becomes a drag on an unselected member moves the whole group in ONE batch', async () => {
+  const h = harness(grouped());
+  h.press(20, 20); h.drag(40, 30); await settle(); await h.release(40, 30); await settle();
+  assert.equal(h.batches.length, 1);
+  assert.deepEqual(h.batches[0].steps.map((st) => st.reshape.stableTarget.strokeId), ['A', 'B'], 'both members, in paint order');
+  h.batches[0].steps.forEach((st) => assert.deepEqual(M(st), [1, 0, 0, 1, 20, 10]));
+  assert.deepEqual(h.ids(), ['A', 'B']);
 });

@@ -248,7 +248,11 @@ impl ObjectCompositionWitness {
         let (sin, cos) = rect.rotation.to_radians().sin_cos();
         let (kx, ky) = (rect.width / w, rect.height / h);
         let (a, b, c, d) = (cos * kx, sin * kx, -sin * ky, cos * ky);
-        let matrix = [a, b, c, d, fx - (a * cx + c * cy), fy - (b * cx + d * cy)];
+        let mut matrix = [a, b, c, d, fx - (a * cx + c * cy), fy - (b * cx + d * cy)];
+        // #2372: a stored mirror / shear is part of the item's own frame: the world affine the scene applies about the final centre.
+        if let Some(g) = record.entry().item.local_form().world([fx, fy], rect.rotation) {
+            matrix = after(g, matrix);
+        }
         let bounds = [cx - w / 2.0, cy - h / 2.0, cx + w / 2.0, cy + h / 2.0];
         (bounds.iter().chain(&matrix).all(|v| v.is_finite()) && w > 0.0 && h > 0.0 && rect.width > 0.0 && rect.height > 0.0)
             .then(|| hit_item(target, bounds, matrix, "raster"))
@@ -269,6 +273,7 @@ impl ObjectCompositionWitness {
             .find(|r| r.source_index() == source.source_index)?;
         let target = record.entry().target.clone();
         let turn = record.entry().block.rotation();
+        let form = record.entry().block.local_form();
         // The block's painted glyph and decoration contours are already in world space; its record space is the stored anchor's
         // own frame, which the layer's parent chain carries to the world. An unposed layer keeps the identity (and the world box).
         let b = source.item.scene().contours().iter().fold(
@@ -276,10 +281,11 @@ impl ObjectCompositionWitness {
             |b, c| [b[0].min(c.envelope[0]), b[1].min(c.envelope[1]), b[2].max(c.envelope[2]), b[3].max(c.envelope[3])],
         );
         let chain = subselect::layer_chain(&self.plan().native_parent_chains(), layer).ok();
-        if turn != 0.0 {
+        if turn != 0.0 || !form.is_identity() {
             // #2267: a turned block's record space is its stored (unturned) frame about the anchor; the matrix is the turn then the layer's
             // chain, and the bounds are the contours' extent in that frame, so a client's conjugated gesture is what the batch applies.
-            return turned_text_item(target, source.item.scene().contours(), record.entry().block.anchor(), turn, chain.unwrap_or([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]));
+            // #2372: the stored mirror and shear are part of the same map about the anchor.
+            return turned_text_item(target, source.item.scene().contours(), record.entry().block.anchor(), crate::object_document::object_raster_asset_kernels::object_item_local_form::mul(crate::object_document::object_raster_asset_kernels::object_item_local_form::turn(turn), form.linear()), chain.unwrap_or([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]));
         }
         let (bounds, matrix) = match chain {
             Some(m) if m != [1.0, 0.0, 0.0, 1.0, 0.0, 0.0] => {
@@ -320,11 +326,10 @@ fn turned_text_item(
     target: crate::object_frame_packet::text::ObjectTarget,
     contours: &[crate::object_render_scene::text_glyph_scene_kernels::text_glyph_scene::SceneContour],
     anchor: [f64; 2],
-    degrees: f64,
+    lin: [f64; 4],
     layer: [f64; 6],
 ) -> Option<SubselectReadItem> {
-    let (sin, cos) = degrees.to_radians().sin_cos();
-    let turn = [cos, sin, -sin, cos, anchor[0] - cos * anchor[0] + sin * anchor[1], anchor[1] - sin * anchor[0] - cos * anchor[1]];
+    let turn = [lin[0], lin[1], lin[2], lin[3], anchor[0] - (lin[0] * anchor[0] + lin[2] * anchor[1]), anchor[1] - (lin[1] * anchor[0] + lin[3] * anchor[1])];
     let m = after(layer, turn);
     let det = m[0] * m[3] - m[1] * m[2];
     if !det.is_finite() || det.abs() < 1e-12 {

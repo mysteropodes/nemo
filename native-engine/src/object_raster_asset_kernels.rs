@@ -6,6 +6,11 @@
 #[allow(dead_code)]
 pub(crate) mod object_raster_asset_item;
 
+// #2372 A-image-text-flip-skew: the optional mirror and shear stored by a raster item and a text block.
+#[path = "object_item_local_form.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_item_local_form;
+
 // L06-D (#2154): raster/media asset admission policy.
 #[path = "object_raster_asset_admission.rs"]
 #[allow(dead_code)]

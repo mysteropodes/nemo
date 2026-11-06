@@ -62,6 +62,9 @@ fn raster(value: &Value) -> bool {
                 &[
                     "opacity",
                     "rotation",
+                    "flipX",
+                    "flipY",
+                    "skew",
                     "isBitmapBrush",
                     "brushGroupId",
                     "isBrushTextureCopy",

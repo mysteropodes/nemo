@@ -14,8 +14,8 @@
   const BOOLS=['bold','italic','underline','strike'],NUMS=['letterSpacing','wordSpacing','lineHeightMult'];
   const TEXT_OPTIONAL=['fixedWidth','fixedHeight'].concat(BOOLS,NUMS,['textCase']);
   // #2267: a created block may carry the stored turn (degrees about its anchor, within one turn either way); a patch never does.
-  const BLOCK_OPTIONAL=TEXT_OPTIONAL.concat(['rotation']);
-  const ITEM_OPTIONAL=['opacity','rotation','isBitmapBrush','brushGroupId','isBrushTextureCopy','meshId'];
+  const BLOCK_OPTIONAL=TEXT_OPTIONAL.concat(['rotation','flipX','flipY','skew']);
+  const ITEM_OPTIONAL=['opacity','rotation','flipX','flipY','skew','isBitmapBrush','brushGroupId','isBrushTextureCopy','meshId'];
   function fail(message){throw new TypeError(message);}
   function plain(v){return !!v&&typeof v==='object'&&!Array.isArray(v);}
   function exact(v,required,optional,label){
@@ -42,7 +42,7 @@
   function rasterItem(v){
     exact(v,['assetId','x','y','width','height'],ITEM_OPTIONAL,'raster item');opaque(v.assetId);['x','y','width','height'].forEach(k=>num(v[k]));
     if('opacity' in v)num(v.opacity);if('rotation' in v)num(v.rotation);
-    ['isBitmapBrush','isBrushTextureCopy'].forEach(k=>{if(k in v)bool(v[k]);});['brushGroupId','meshId'].forEach(k=>{if(k in v)opaque(v[k]);});
+    ['isBitmapBrush','isBrushTextureCopy','flipX','flipY'].forEach(k=>{if(k in v)bool(v[k]);});if('skew' in v){num(v.skew);if(Math.abs(v.skew)>=90)fail('skew invalid');}['brushGroupId','meshId'].forEach(k=>{if(k in v)opaque(v[k]);});
   }
   function font(v){
     if(plain(v)&&v.kind==='bundled'){exact(v,['kind','fontKey'],[],'font');oneOf(v.fontKey,FONTS);return;}
@@ -57,7 +57,7 @@
     ['fixedWidth','fixedHeight'].forEach(k=>{if(k in v&&v[k]!==null)num(v[k]);});
     BOOLS.forEach(k=>{if(k in v)bool(v[k]);});NUMS.forEach(k=>{if(k in v)num(v[k]);});
     if('textCase' in v)oneOf(v.textCase,CASES);
-    if(block){exact(v.anchorTopLeft,['x','y'],[],'anchorTopLeft');num(v.anchorTopLeft.x);num(v.anchorTopLeft.y);if('rotation' in v){num(v.rotation);if(Math.abs(v.rotation)>360)fail('rotation invalid');}}
+    if(block){exact(v.anchorTopLeft,['x','y'],[],'anchorTopLeft');num(v.anchorTopLeft.x);num(v.anchorTopLeft.y);if('rotation' in v){num(v.rotation);if(Math.abs(v.rotation)>360)fail('rotation invalid');}['flipX','flipY'].forEach(k=>{if(k in v)bool(v[k]);});if('skew' in v){num(v.skew);if(Math.abs(v.skew)>=90)fail('skew invalid');}}
   }
   function textBlock(v){exact(v,['text','font','size','color','align','anchorTopLeft'],BLOCK_OPTIONAL,'text block');textBody(v,true);}
   function textPatch(v){
