@@ -55,6 +55,14 @@
     else st.xformAnchorCustom = null;
     paintGrid(root);
   }
+  // The menu's "Centrer le point d'ancrage" (baseline select-bridge.js :3112): the pivot goes back to the centre of the selection, for every picked stroke.
+  function center(root) {
+    var st = root.state; st.xformAnchorCustom = null; st.xformAnchorKey = 'mc';
+    remember(root); paintGrid(root);
+    if (root.NemoNativeSelectOverlay) root.NemoNativeSelectOverlay.show(root);
+    if (typeof root.updateUI === 'function') root.updateUI();
+    if (root.SMEngineBridge && typeof root.SMEngineBridge.renderNow === 'function') root.SMEngineBridge.renderNow();
+  }
   // True when the world point `p` is on the crosshair (`wpp` world units per screen pixel).
   function grabs(root, box, p, wpp) { var c = pointOf(root, box); return Math.hypot(p.x - c.x, p.y - c.y) < GRAB_PX * wpp; }
   // The crosshair, a ringed cross at the pivot (8 screen px, 10 while hovered), into the overlay's svg.
@@ -67,5 +75,5 @@
     make('line', Object.assign({ x1: x - r, y1: y, x2: x + r, y2: y }, line));
     make('line', Object.assign({ x1: x, y1: y - r, x2: x, y2: y + r }, line));
   }
-  return Object.freeze({ pointOf: pointOf, place: place, restore: restore, remember: remember, grabs: grabs, draw: draw, nearestPreset: nearestPreset, presetPoint: presetPoint });
+  return Object.freeze({ pointOf: pointOf, place: place, center: center, restore: restore, remember: remember, grabs: grabs, draw: draw, nearestPreset: nearestPreset, presetPoint: presetPoint });
 }));

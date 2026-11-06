@@ -11,6 +11,7 @@ const Skew = require('../src/js/adapters/native-select-skew.js');
 const Pivot = require('../src/js/adapters/native-select-pivot.js');
 const Lasso = require('../src/js/adapters/native-select-lasso.js');
 const Group = require('../src/js/adapters/native-select-group.js');
+const Menu = require('../src/js/adapters/native-select-menu.js');
 const Wait = require('../src/js/adapters/native-presentation-wait.js');
 const Paper = require('./helpers/native-import-paper.cjs');
 
@@ -948,4 +949,18 @@ test('a press that becomes a drag on an unselected member moves the whole group 
   assert.deepEqual(h.batches[0].steps.map((st) => st.reshape.stableTarget.strokeId), ['A', 'B'], 'both members, in paint order');
   h.batches[0].steps.forEach((st) => assert.deepEqual(M(st), [1, 0, 0, 1, 20, 10]));
   assert.deepEqual(h.ids(), ['A', 'B']);
+});
+
+test('the Select menu ends with "Centrer le point d\'ancrage", which puts the pivot back at the centre and writes nothing', async () => {
+  const h = harness([BIG, FAR]); await h.select(35, 35);
+  h.root.NemoNativeSelectionClipboard = { native: () => true, hasClip: () => false, copy() {}, cut() {}, paste() {}, duplicate() {} };
+  h.root.state.xformAnchorCustom = [150, 30]; Pivot.remember(h.root);
+  const rows = await Menu.rows(h.root, h.root.selectedPaths);
+  assert.deepEqual(rows.slice(-2).map((r) => (r.sep ? '---' : r.label)), ['---', "Centrer le point d'ancrage"]);
+  rows[rows.length - 1].action(); await settle();
+  assert.equal(h.root.state.xformAnchorCustom, null); assert.equal(h.root.state.xformAnchorKey, 'mc');
+  assert.deepEqual(Pivot.pointOf(h.root, Overlay.boxOf(h.root, h.root.selectedPaths)), { x: 70, y: 70 });
+  await h.select(170, 170); await h.select(35, 35);
+  assert.equal(h.root.state.xformAnchorCustom, null, 'and the remembered pivot of that stroke is the centre too');
+  assert.deepEqual(h.batches, []);
 });
