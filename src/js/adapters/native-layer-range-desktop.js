@@ -103,6 +103,8 @@
   function remapTracks(root,w){var f=root.SM&&root.SM.timeRemapKeyFacts;if(typeof f!=='function')return [];
     return w.info.layers.map(function(l,i){var r=f(i),keys=r&&Array.isArray(r.keys)?r.keys:[];
       return keys.length?{target:{contextId:'scene-root',layerUid:l.layerUid},property:'timeRemap',inert:true,items:keys.map(function(k){return {frame:k.frame,selected:false};})}:null;}).filter(Boolean);}
+  // #2377: the keys a drag may snap to are every open key track and, as in the baseline snapMotionFrame (addTrack(ld.timeRemap)), each Time Remap lane.
+  function snapView(root,w){var v=keyViews(root,w),remap=remapTracks(root,w);return v||remap.length?{tracks:(v?v.tracks:[]).concat(remap)}:null;}
   function resetKeys(root,w){clearKeys(w);keyRows(root,w,[]);}
   // The key buttons depend on the key frames, selection, lanes and zoom, not on which frame is shown: a playback tick whose projection prints the same
   // signature keeps its buttons (#2371) and only swaps the live value their handlers read.
@@ -190,7 +192,7 @@
       view:function(){try{return keyViews(root,w);}catch(_){return null;}},edit:w.ports.editSelectedKeys,refresh:function(){refreshKeys(root);},
       nodes:function(frames){return (w.keyNodes||[]).filter(function(n){return n.dataset.keyTrack===id&&frames.indexOf(Number(n.dataset.frame))>=0;});},
       snap:{first:event.altKey?b.frame:a.frame,on:function(){try{return root.localStorage.getItem('nemo-motion-snap')!=='0';}catch(_){return true;}},
-        frames:function(){try{return gesture.snapCandidates(root,keyViews(root,w),w.info.totalFrames);}catch(_){return [];}}},
+        frames:function(){try{return gesture.snapCandidates(root,snapView(root,w),w.info.totalFrames);}catch(_){return [];}}},
       onEnd:function(){w.keyDrag=null;}});
   }
   // #2524: dragging selected keys previews a shift and commits ONE native shift on release (baseline motion.js onDragMove/onDragUp).
@@ -202,7 +204,7 @@
     w.keyDrag=gesture.beginDrag({doc:root.document,startX:event.clientX,fc:fc,total:w.info.totalFrames,edit:w.ports.editSelectedKeys,
       nodes:function(){return (w.keyNodes||[]).filter(function(n){return n.dataset.selected==='true';});},
       snap:Number.isFinite(snapFirst)?{first:snapFirst,on:function(){try{return root.localStorage.getItem('nemo-motion-snap')!=='0';}catch(_){return true;}},
-        frames:function(){try{return gesture.snapCandidates(root,keyViews(root,w),w.info.totalFrames);}catch(_){return [];}}}:null,
+        frames:function(){try{return gesture.snapCandidates(root,snapView(root,w),w.info.totalFrames);}catch(_){return [];}}}:null,
       tracks:function(){try{var v=keyViews(root,w);return v&&v.tracks;}catch(_){return null;}},onEnd:function(){w.keyDrag=null;}});
   }
   // #2377: the selection box over keys on 2+ property rows. It reads the key buttons; every gesture ends in one native warp or shift.

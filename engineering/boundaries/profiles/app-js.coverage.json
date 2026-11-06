@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "70f776ab24d1ca8ed8ad1be8e0ecfb858c51585b",
-    "sourceRootTree": "750bcdf980645a3c122fcdf2cb73739b00cc5896",
+    "candidateCommit": "2ce759719c02a18e2bdbd5de7bc0a149dba9e704",
+    "sourceRootTree": "01768c9a7d6e97cd07667d6ba3dc7aef1b243438",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "d1a5dfc08a4ee79f864c16fd6194d5f2f26f1443",
-      "lastChangedCommit": "70f776ab24d1ca8ed8ad1be8e0ecfb858c51585b"
+      "gitTree": "0c1975c7c15eded5eaa87e7e6a95c7828ed0814a",
+      "lastChangedCommit": "2ce759719c02a18e2bdbd5de7bc0a149dba9e704"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "27acbf505ab91ab388f501dc0f84d31b0e83e1b7",
-      "sha256": "d0d1f6ad44a56e53c08c0f7b8003f04e7c59b67830076b192e473e0a20bbe1fb",
+      "gitBlob": "20a51e9d83d5ed0feb495cdaded1e0db0f881ead",
+      "sha256": "7d8feac137e0fb1d2ee01c5be5f8fd5798ed6a4940d10e299e3bd4fd4c6d28c6",
       "lastChangedCommit": "f606f3b2ea60c6bf5cdb7d031b8c54b3b60d291a"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "3db22c8f412356752ec700bd08b89a20fe005fa71b9f832030791b0cbc42f8f8"
+      "value": "ed34d8fa58ddd4014f5744362728df575d03519655f7dec252181ee6cb127bd9"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "a9fa439653c6201ab16a3aebe4cd43978ed2b884",
-        "sha256": "62b155bcb2475dbca177be6bfad35b5a51adbf3f74e46abe39ebe282999a4d24",
+        "gitBlob": "56164dcb8e1393e2008ef6291c37f52d1d132bee",
+        "sha256": "69771ca9040597e5b71d9e8a58ecd4234eba1448ac4527f51ca8e062ccc27d63",
         "moduleCount": 307,
-        "basedOnCommit": "70f776ab24d1ca8ed8ad1be8e0ecfb858c51585b"
+        "basedOnCommit": "2ce759719c02a18e2bdbd5de7bc0a149dba9e704"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -4882,6 +4882,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-motion-key-clipboard.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2780,
+          "scriptOrdinal": 426
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-motion-key-gesture.js",
       "moduleId": "app.native.motion.properties.adapter",
       "executionClass": "document-classic",
@@ -5272,8 +5284,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2780,
-          "scriptOrdinal": 426
+          "line": 2781,
+          "scriptOrdinal": 427
         }
       ]
     },

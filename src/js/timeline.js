@@ -9390,10 +9390,10 @@ function onKeyDown(event){
   // never what anyone wants here.
   // Focus and clipboard arbitration lives in application/keyboard-arbiter.js (U05, #2370); this runs its decision.
   var inField=NemoKeyboardArbiter.inField(event.target);
-  var arb=NemoKeyboardArbiter.decide(event,function(){return {
-    motionKeySelection:state.appMode==='motion'&&!!(window.SMMotion&&SMMotion.hasKeySelection&&SMMotion.hasKeySelection()),
+  var arb=NemoKeyboardArbiter.decide(event,function(){var NK=window.NemoNativeMotionKeyEdit&&NemoNativeMotionKeyEdit.current(document);return {
+    motionKeySelection:state.appMode==='motion'&&(NK?NK.hasSelection():!!(window.SMMotion&&SMMotion.hasKeySelection&&SMMotion.hasKeySelection())),
     shapeSelection:selectedPaths.length>0,
-    motionKeyClipboard:state.appMode==='motion'&&!!(window.SMMotion&&SMMotion.hasKeyClipboard&&SMMotion.hasKeyClipboard()),
+    motionKeyClipboard:state.appMode==='motion'&&(NK?NemoNativeMotionKeyEdit.hasClip():!!(window.SMMotion&&SMMotion.hasKeyClipboard&&SMMotion.hasKeyClipboard())),
     canvasClipboard:!!(_canvasClip&&_canvasClip.snaps.length)||!!(window.NemoNativeSelectionClipboard&&NemoNativeSelectionClipboard.native(window)&&NemoNativeSelectionClipboard.hasClip(window)),frameClipboard:!!(_sel.clipboard&&_sel.clipboard.length),
     lastClipKind:window._lastClipKind,svgImport:!!window.SMSvgImport};});
   if(arb){
@@ -9405,7 +9405,7 @@ function onKeyDown(event){
       case'save':window.SMProject.save();return;
       case'saveAs':window.SMProject.saveAs();return;
       case'convertToComponent':window.SM.convertActiveLayerToComponent();return;
-      case'copyKeys':SMMotion.copySelectedKeys();return;
+      case'copyKeys':var nk=window.NemoNativeMotionKeyEdit&&NemoNativeMotionKeyEdit.current(document);if(nk){nk.run({kind:'copy'}).catch(function(){});return;}SMMotion.copySelectedKeys();return;
       case'copyShapes':copySelection();return;
       case'copyFrames':window.SM.copyFrames();return;
       case'cutShapes':cutSelection();return;
@@ -9416,7 +9416,7 @@ function onKeyDown(event){
         if(window._svgPasteFallback)clearTimeout(window._svgPasteFallback);
         window._svgPasteFallback=setTimeout(function(){window._svgPasteFallback=null;window.SM.pasteFrames();},80);
         return;
-      case'pasteKeys':SMMotion.pasteKeys();return;
+      case'pasteKeys':var nk2=window.NemoNativeMotionKeyEdit&&NemoNativeMotionKeyEdit.current(document);if(nk2){nk2.run({kind:'paste'}).catch(function(){});return;}SMMotion.pasteKeys();return;
       case'pasteShapes':pasteSelection();return;
       case'pasteFrames':window.SM.pasteFrames();return;
       default:return;

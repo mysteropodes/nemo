@@ -51,7 +51,10 @@
           !presented(session,after,Math.min(frame,after.totalFrames-1)))
           return {status:'applied-unconfirmed',applied:applied};
         return {status:applied?'applied-presented':'unchanged',applied:applied};
-      }catch(_){return applied===null?{status:'unconfirmed'}:{status:'applied-unconfirmed',applied:applied};}
+      }catch(error){var why=error&&error.refusal;
+        // A typed unavailable refusal is definite (nothing was written): its engine message names the cause.
+        if(applied===null&&why&&why.code==='unavailable'&&typeof why.message==='string'&&why.message)return {status:'unavailable',message:why.message};
+        return applied===null?{status:'unconfirmed'}:{status:'applied-unconfirmed',applied:applied};}
       finally{pending=false;}
     }
     function context(){var session=ports.currentSession(),info=session&&session.info(),selection=ports.selection();

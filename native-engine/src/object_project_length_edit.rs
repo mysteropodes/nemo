@@ -36,16 +36,11 @@ fn invalid() -> DispatchErrorCode {
     DispatchErrorCode::InvalidRequest
 }
 
-/// Drop frames `min..=max` (`0 < count < total`) from every layer; later cells move down. Layers with no timing
-/// record own no cells. A record this edit must not move (Reference scope, another context) refuses it.
-fn cut(document: &ObjectDocument, min: u32, max: u32) -> Result<ObjectDocument, DispatchErrorCode> {
-    let total = document.total_frames;
-    let count = max - min + 1;
-    let shrunk = total - count;
+/// A declared component keeps its own frame count: its records and order scopes are bounded by the component,
+/// never by the project length, so a shorter project cannot strand them. Only opaque contexts and Reference
+/// records, which no edit moves, can sit at or past `shrunk`, the length the timeline would have.
+fn stranded(document: &ObjectDocument, shrunk: u32) -> bool {
     let outside = |frame: u32| frame >= shrunk;
-    // A declared component keeps its own frame count: its records and order scopes are bounded by the
-    // component, never by the project length, so a shorter project cannot strand them. Only opaque contexts
-    // and Reference records, which no edit moves, can sit past the new end.
     let components: std::collections::HashSet<&str> = document
         .component_tables
         .value()
@@ -54,7 +49,7 @@ fn cut(document: &ObjectDocument, min: u32, max: u32) -> Result<ObjectDocument, 
         .flat_map(|set| set.components.iter())
         .map(|component| component.symbol_id())
         .collect();
-    let stuck = document.objects.iter().any(|record| {
+    document.objects.iter().any(|record| {
         (record.target.context_id != "scene-root"
             || record.target.frame_scope.kind != crate::object_document::FrameScopeKind::Authored)
             && outside(record.target.frame_scope.frame)
@@ -66,8 +61,56 @@ fn cut(document: &ObjectDocument, min: u32, max: u32) -> Result<ObjectDocument, 
             })
             .flat_map(|context| context.scopes.iter())
             .any(|scope| outside(scope.frame_scope.frame))
-    });
-    if stuck {
+    })
+}
+
+/// The reason the Frames field or Trim refuses, when content that no edit moves would end up past the new last
+/// frame (the typed `Unavailable` of `cut`). `None` for every other outcome, so a caller names only this case.
+pub(super) fn stranded_reason(
+    document: &ObjectDocument,
+    metadata: &ProjectMetadata,
+    action: &serde_json::Value,
+) -> Option<&'static str> {
+    let total = document.total_frames;
+    let kept = match action.get("kind")?.as_str()? {
+        "setTotalFrames" => {
+            let serde_json::Value::Number(frames) = action.get("frames")? else {
+                return None;
+            };
+            let wanted = wanted_total(frames)?;
+            if wanted >= total {
+                return None;
+            }
+            wanted
+        }
+        "trimToWorkArea" => {
+            let (wa_in, wa_out) = metadata.work_area();
+            let start = wa_in.unwrap_or(0.0).max(0.0).floor();
+            let end = wa_out
+                .unwrap_or(f64::from(total) - 1.0)
+                .min(f64::from(total) - 1.0)
+                .floor();
+            if end <= start || (start == 0.0 && end == f64::from(total) - 1.0) {
+                return None;
+            }
+            (end - start) as u32 + 1
+        }
+        _ => return None,
+    };
+    stranded(document, kept).then_some(STRANDED_MESSAGE)
+}
+
+/// Shown for the typed refusal: it is the one case where the field cannot be applied at all.
+pub(super) const STRANDED_MESSAGE: &str =
+    "The timeline cannot be shortened that far: a Reference or another context still has content past the new last frame.";
+
+/// Drop frames `min..=max` (`0 < count < total`) from every layer; later cells move down. Layers with no timing
+/// record own no cells. A record this edit must not move (Reference scope, another context) refuses it.
+fn cut(document: &ObjectDocument, min: u32, max: u32) -> Result<ObjectDocument, DispatchErrorCode> {
+    let total = document.total_frames;
+    let count = max - min + 1;
+    let shrunk = total - count;
+    if stranded(document, shrunk) {
         return Err(DispatchErrorCode::Unavailable);
     }
     let mut next = document.clone();
@@ -101,14 +144,19 @@ fn admitted(document: ObjectDocument) -> Result<ObjectDocument, DispatchErrorCod
     Ok(document)
 }
 
+/// The Frames field value as the baseline reads it: floored and clamped to 1..=999; non-finite input has none.
+fn wanted_total(frames: &Number) -> Option<u32> {
+    let value = frames.as_f64().filter(|v| v.is_finite())?;
+    Some(value.floor().clamp(1.0, MAX_FRAMES) as u32)
+}
+
 /// The Frames field. `frames` is the raw field value; non-finite input is invalid.
 pub(super) fn set_total_frames(
     document: &ObjectDocument,
     metadata: &ProjectMetadata,
     frames: Number,
 ) -> Result<LengthEdit, DispatchErrorCode> {
-    let value = frames.as_f64().filter(|v| v.is_finite()).ok_or_else(invalid)?;
-    let wanted = value.floor().clamp(1.0, MAX_FRAMES) as u32;
+    let wanted = wanted_total(&frames).ok_or_else(invalid)?;
     let total = document.total_frames;
     let mut tail = metadata.retained_tail().cloned();
     let next = if wanted == total {

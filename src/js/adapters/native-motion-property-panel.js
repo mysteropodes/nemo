@@ -104,7 +104,15 @@
       var wanted=view?frames.filter(function(frame){return view.items.some(function(k){return k.frame===frame;});}):[];
       return !!view&&(!wanted.length||view.selectFrames(wanted));
     }
-    var keyEdit=KeyEdit&&typeof KeyEdit.createEditor==='function'?KeyEdit.createEditor({readKeyTimelines:function(){return readKeyTimelines();},translate:tr,reopen:reopenKeys,
+        // #2524: the key clipboard's two ports - where a paste lands (playhead, layers present, the active layer) and the one paste write.
+    function pasteContext(){var c=ports.readContext(),names=typeof ports.layerNames==='function'?ports.layerNames():null,primary=accepted&&accepted.selection.primary;
+      return {frame:c.frame,layers:Array.isArray(names)?names.map(function(l){return l.layerUid;}):null,active:primary?{contextId:primary.contextId,layerUid:primary.layerUid}:null};}
+    function pasteKeys(payload){
+      var token=!retired&&validAccepted()&&typeof ports.editPropertyKeysPaste==='function'?View.captureContext(ports.readContext()):null;
+      if(!token)return Promise.reject(new Error('Native key paste is unavailable'));
+      return ports.editPropertyKeysPaste(payload,token.pin,function(){try{return !retired&&View.isCurrentContext(token,ports.readContext());}catch(_){return false;}});
+    }
+    var keyEdit=KeyEdit&&typeof KeyEdit.createEditor==='function'?KeyEdit.createEditor({readKeyTimelines:function(){return readKeyTimelines();},translate:tr,reopen:reopenKeys,context:pasteContext,pasteKeys:pasteKeys,
       localKeys:function(){return [serial].concat(keyEditors.filter(function(entry){return entry.id!==null;}).map(function(entry){return [entry.id,entry.editor.selectionKey()];}));},
       get editPropertyTrack(){return ports.editPropertyTrack;},notify:function(message){if(typeof ports.showToast==='function')ports.showToast(message);else notify(message);}}):null;
     function editKeys(action,opts){return keyEdit&&typeof ports.editPropertyTrack==='function'&&!retired&&validAccepted()?keyEdit.edit(action,opts):Promise.resolve(false);}

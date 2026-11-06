@@ -373,3 +373,61 @@ fn a_component_longer_than_the_project_does_not_stop_the_frames_field() {
     apply(&mut o, json!({"kind":"setTotalFrames","frames":6})).unwrap();
     assert_eq!(wire(&o)["drawing"], before["drawing"]);
 }
+
+#[test]
+fn frame_edits_made_while_short_shift_the_kept_cells_with_them() {
+    // Baseline splices the shared frames array, so the hidden cells ride along: insert/remove change the length
+    // by the same amount and the hidden cells still start right at the new end (timeline.js insertFrame/removeFrame).
+    let edit = |o: &mut NativeObjectHistory, op: &str, extra: Value| {
+        let mut body = json!({"command": op, "contextId": "scene-root"});
+        body.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        o.dispatch_frame_structure(&format!("command.document.{op}"), &body).unwrap();
+    };
+    let mut o = project(TEN, plain(None, None), |_| {});
+    apply(&mut o, json!({"kind":"setTotalFrames","frames":3})).unwrap();
+    edit(&mut o, "object.frames.insert", json!({"cell": 1}));
+    assert_eq!(wire(&o)["drawing"]["totalFrames"], json!(4));
+    apply(&mut o, json!({"kind":"setTotalFrames","frames":10})).unwrap();
+    assert_eq!(object_frames(&wire(&o)), vec![("a".into(), 0), ("b".into(), 4), ("c".into(), 8)]);
+    let mut o = project(TEN, plain(None, None), |_| {});
+    apply(&mut o, json!({"kind":"setTotalFrames","frames":3})).unwrap();
+    edit(&mut o, "object.frames.remove", json!({"from": 1, "to": 1}));
+    assert_eq!(wire(&o)["drawing"]["totalFrames"], json!(2));
+    apply(&mut o, json!({"kind":"setTotalFrames","frames":9})).unwrap();
+    assert_eq!(object_frames(&wire(&o)), vec![("a".into(), 0), ("b".into(), 2), ("c".into(), 6)]);
+}
+
+#[test]
+fn a_stranded_reference_or_opaque_record_gets_a_specific_refusal_message() {
+    let stuck = project(SIX, plain(Some(0.), Some(2.)), |v| {
+        let late = build::record_json("scene-root", "reference", "L0", "late", 5, 1, 10);
+        v["objects"].as_array_mut().unwrap().push(late);
+    });
+    let mut serial = 0;
+    let mut message = |o: &mut NativeObjectHistory, action: Value| {
+        serial += 1;
+        let request: crate::request_receipts::OpacityRequest = serde_json::from_value(json!({
+            "apiVersion":2,"requestId":format!("len-{serial}"),"instanceId":o.instance_id(),
+            "documentId":o.document_id(),"expectedRevision":o.content_revision(),
+            "operation":"command.document.object.project.settings.edit",
+            "payload":{"command":"object.project.settings.edit","action":action}})).unwrap();
+        serde_json::to_value(o.try_dispatch_object_command(&request).unwrap().unwrap()).unwrap()
+    };
+    let mut o = stuck;
+    let before = wire(&o);
+    let refused = message(&mut o, json!({"kind":"setTotalFrames","frames":3}));
+    assert_eq!(refused["ok"], false, "{refused}");
+    assert_eq!(refused["error"]["code"], "unavailable");
+    let text = refused["error"]["message"].as_str().unwrap();
+    assert!(text.starts_with("The timeline cannot be shortened that far"), "{text}");
+    // Trim to a work area that leaves the record outside is refused the same way.
+    let trimmed = message(&mut o, json!({"kind":"trimToWorkArea"}));
+    assert_eq!(trimmed["ok"], false, "{trimmed}");
+    assert_eq!(trimmed["error"]["message"], refused["error"]["message"]);
+    assert_eq!(wire(&o), before);
+    assert_eq!(wire(&o), before);
+    // A length that keeps the record inside, and every other field, is not blamed.
+    assert!(apply(&mut o, json!({"kind":"setTotalFrames","frames":9})).is_ok());
+    assert!(o.project_length_refusal(br#"{"action":{"kind":"setTotalFrames","frames":9}}"#).is_none());
+    assert!(o.project_length_refusal(br#"{"action":{"kind":"setFps","fps":30}}"#).is_none());
+}

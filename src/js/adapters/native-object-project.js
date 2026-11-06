@@ -287,7 +287,7 @@
       try{await inspect();await changed();}catch(unknown){throw fence(unknown);}
       if(!receipt.ok){
         try{await present(ports.frame?ports.frame():0);}catch(unpresented){if(!historyAction&&ports.notice)ports.notice(unpresented.message);}
-        throw new Error('Native command refused: '+(receipt.error&&receipt.error.code||'unavailable'));
+        throw Object.assign(new Error('Native command refused: '+(receipt.error&&receipt.error.code||'unavailable')),{refusal:receipt.error&&typeof receipt.error.message==='string'?{code:receipt.error.code,message:receipt.error.message}:undefined});
       }
       await present(ports.frame?ports.frame():0);return receipt;
     });}
@@ -411,7 +411,7 @@
     return Object.freeze({openPath:openPath,newProject:newProject,activateProject:activateProject,closeProject:function(){var C=typeof module==='object'&&module.exports?require('./native-object-project-close.js'):globalThis.NemoNativeObjectProjectClose;return C?C.run(closeHooks):Promise.reject(new Error('Native project Close is unavailable'));},cancelOpen:function(){if(!openingRequested)return false;openingCancelled=true;if(openExposure)openExposure.cancel();return true;},isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
       readSubscriptionGeneration:function(){return subscriptionTicket;},
       readPropertyMetadata:properties.readPropertyMetadata,readProperty:properties.readProperty,
-      get editPropertyTrack(){return properties.available()?properties.editPropertyTrack:undefined;},
+      get editPropertyTrack(){return properties.available()?properties.editPropertyTrack:undefined;},get editPropertyKeysPaste(){return properties.available()?properties.editPropertyKeysPaste:undefined;},
       get editProperty(){return properties.available()?properties.editProperty:undefined;},
       info:function(){return info;},requestId:requestId,runFontResource:function(action){return runFontResource(action);},runResourceCommand:function(action){return runFontResource(action);},runComponentCommand:function(action){return runFontResource(action,true);},runResourceQuery:function(action){return runFontResource(action,'query');},reference:reference,historyFromUi:function(action){return history(action);},jumpHistory:history,readHistory:function(offset){try{return reads.readHistory(requireActive(),offset);}catch(error){return Promise.reject(error);}},setLayerVisibility:setLayerVisibility,readLayerTiming:reads.readLayerTiming,readLayerRange:reads.readLayerRange,readLayerPlacement:reads.readLayerPlacement,readLayerCells:reads.readLayerCells,readImageMesh:reads.readImageMesh,readWidgets:reads.readWidgets,readGhosts:reads.readGhosts,readRig:reads.readRig,readRigWeights:reads.readRigWeights,readSubselect:reads.readSubselect,readPresentedStrokes:reads.readPresentedStrokes,previewSubselect:reads.previewSubselect,
       get editLayerPolicy(){return typeof ports.dispatchApplication==='function'&&(!ports.policyAvailable||ports.policyAvailable()===true)&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
@@ -453,7 +453,7 @@
         return session.readPropertyMetadata(selector);
       },
       readProperty:function(selector){var session=uiSession(root);if(!session)return Promise.reject(new Error('Native property session is unavailable'));return session.readProperty(selector);},
-      get editPropertyTrack(){var session=uiSession(root);return session&&session.editPropertyTrack;},
+      get editPropertyTrack(){var session=uiSession(root);return session&&session.editPropertyTrack;},get editPropertyKeysPaste(){var session=uiSession(root);return session&&session.editPropertyKeysPaste;},
       get editProperty(){var session=uiSession(root);return session&&session.editProperty;},
       selectLayer:function(index,preserve,uid,expected){return selectLayerUI(root,index,preserve,uid,expected);},
       projectSettings:function(){return root.NemoNativeProjectSettingsController||null;},

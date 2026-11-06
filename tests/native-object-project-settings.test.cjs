@@ -145,7 +145,7 @@ test('malformed/nonfinite optional settings or FPS refuse before session and pro
   assert.equal(Files.projectionReadyForUI(root,bad),false);
  }
 });
-function settingsOwnerPort(){
+function settingsOwnerPort(refuse){
   let value=info(),active=false;const writes=[];
   const invoke=async(command,args)=>{const request=args&&JSON.parse(args.requestJson);
     if(command==='nemo_native_object_client_status')return {...value,available:active};
@@ -157,6 +157,7 @@ function settingsOwnerPort(){
     mapping:()=>({cssBounds:{x:0,y:0,width:320,height:180},physicalExtent:{width:320,height:180},compositionExtent:{width:320,height:180},reportedDpr:1}),
     subscribeRevisions:async()=>({instanceId:'instance',documentId:'document',lifecycleGeneration:1,contentRevision:0,subscriptionId:'settings-subscription'}),
     dispatchApplication:async request=>{writes.push(request);assert.equal(request.operation,'command.document.object.project.settings.edit');
+      if(refuse)return {apiVersion:2,requestId:request.requestId,instanceId:'instance',documentId:'document',contentRevision:0,ok:false,error:refuse};
       assert.equal(request.expectedRevision,0);assert.deepEqual(request.payload,{command:'object.project.settings.edit',action:{kind:'setFps',fps:31}});
       value=info({fps:31},1);return {apiVersion:2,requestId:request.requestId,instanceId:'instance',documentId:'document',contentRevision:1,ok:true,result:{applied:true,historyEntriesAdded:1}};}});
   return {session,writes};
@@ -172,4 +173,10 @@ test('actual queued settings refuses a superseded expected pin before a second n
   const first=write({kind:'setFps',fps:31},before),second=write({kind:'setFps',fps:42},before);
   const refusal=assert.rejects(second,/intent is stale/);await first;await refusal;
   assert.equal(h.writes.length,1);assert.equal(s.info().fps,31);assert.equal(s.info().contentRevision,1);
+});
+test('a typed refusal keeps the engine message on the thrown error so the Frames field can show it',async()=>{
+  const error={code:'unavailable',message:'The timeline cannot be shortened that far: a Reference or another context still has content past the new last frame.'};
+  const h=settingsOwnerPort(error),s=h.session;await s.openPath('/project.json');const before=s.info();
+  await assert.rejects(s.editProjectSettings({kind:'setFps',fps:31},before),e=>/refused: unavailable/.test(e.message)&&e.refusal.code==='unavailable'&&e.refusal.message===error.message);
+  assert.equal(s.info().contentRevision,0);
 });
