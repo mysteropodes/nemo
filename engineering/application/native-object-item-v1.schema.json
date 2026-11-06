@@ -183,14 +183,26 @@
         },
         "xformAnchorKey": {
           "type": "string",
-          "enum": ["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"],
+          "enum": [
+            "tl",
+            "tc",
+            "tr",
+            "ml",
+            "mc",
+            "mr",
+            "bl",
+            "bc",
+            "br"
+          ],
           "description": "The Select rotate/scale pivot preset the artist last chose for this item; a stored xformAnchorCustom wins over it."
         },
         "xformAnchorCustom": {
           "type": "array",
           "minItems": 2,
           "maxItems": 2,
-          "items": {"type": "number"},
+          "items": {
+            "type": "number"
+          },
           "description": "The Select rotate/scale pivot as a custom world point [x, y]."
         },
         "isBitmapBrush": {
@@ -363,14 +375,26 @@
         },
         "xformAnchorKey": {
           "type": "string",
-          "enum": ["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"],
+          "enum": [
+            "tl",
+            "tc",
+            "tr",
+            "ml",
+            "mc",
+            "mr",
+            "bl",
+            "bc",
+            "br"
+          ],
           "description": "The Select rotate/scale pivot preset the artist last chose for this item; a stored xformAnchorCustom wins over it."
         },
         "xformAnchorCustom": {
           "type": "array",
           "minItems": 2,
           "maxItems": 2,
-          "items": {"type": "number"},
+          "items": {
+            "type": "number"
+          },
           "description": "The Select rotate/scale pivot as a custom world point [x, y]."
         }
       }
