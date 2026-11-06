@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "1631a6d08c7e0676e14b880a9eb9e9d970b6e127",
-  "describe": "v0.7.0-alpha.4-5446-g1631a6d08-dirty"
+  "head": "39e539bf66459311abe57ae4adf40e0187f3b6fa",
+  "describe": "v0.7.0-alpha.4-5447-g39e539bf6-dirty"
  },
- "inputsDigest": "7996d8298a1f11ed2bbcea7c3fdd99947deb16d4f0ab3bc5d8fb77b21a3ce462",
+ "inputsDigest": "bb2a99e50c60f718c1c28488317636228b394ce98a8b11d7b3aeb15561a34c65",
  "states": [
   "inventoried",
   "characterized",
@@ -2959,7 +2959,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 158,
+    "functionsVisited": 149,
     "via": "variable b",
     "references": [
      "src/js/motion.js:13219 setAppMode()",

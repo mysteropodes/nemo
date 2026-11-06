@@ -415,6 +415,7 @@
     {"src":"js/bootstrap/native-opacity-application.js"},
     {"src":"js/adapters/application-mcp.js"},
     {"src":"js/adapters/native-time-remap-ui.js"},
+    {"src":"js/adapters/native-time-remap-keys.js"},
     {"src":"js/adapters/native-reproduction.js"},
     {"src":"js/adapters/native-diagnostics-query.js"},
     {"src":"js/adapters/tutorial-native-placement.js"},

@@ -50,10 +50,10 @@ the packaged-app invocation above.
 ## CS7 installed batch driver
 
 `cs7-run.cjs` is an explicit manual entry point. Book the Local app/input slot
-in #1062 and run the entire command under `lockf -k /tmp/nemo-heavy-job.lock`.
+in #2804 and run the entire command under `lockf -k /tmp/nemo-heavy-job.lock`.
 Build the normal app and the UI32 helper from the same clean, committed candidate.
 The private JSON config names `sourceSha`, `app`, `executableSha256`, `buildProof`,
-`helper`, `helperProof`, `taskId`, `grant` (`1062/<comment-id>`), an existing empty
+`helper`, `helperProof`, `taskId`, `grant` (`2804/<comment-id>`, a booking in the current log; #1062 is full and cannot hold a new one), an existing empty
 `reportDirectory`, and an optional supported `fixtureKind`.
 
 ```sh
@@ -72,6 +72,67 @@ exist as a reviewed `cs7-scenarios/<scenario>.cjs` module exporting
 assert the original product contract from actual observations; successful input
 posting is never a passing assertion. `session.input` uses the existing closed
 UI32 semantic command protocol and fresh runtime identity checks.
+
+### Running a subset of Ready rows
+
+By default every `Ready` row is loaded, prepared and run, so the existing rows' `prepare()`
+steps (observer package, keyed fixture, private Text20 packet) are all required. An optional
+`rows` array in the private config limits the batch to the named row ids:
+
+```json
+{ "rows": ["play-resume"], "sourceSha": "...", "reportDirectory": "..." }
+```
+
+Only the listed rows are loaded, prepared and run; the other rows' scenarios are never
+`require`d. `rows` must be a non-empty list of unique ids of rows that are `Ready` in the
+declarations. A row's `dependsOn` rows must be listed too; they are never added for you.
+An empty or malformed list, an unknown or `Blocked` id, or a missing dependency refuses
+**before any session is created or the app is launched**. With no `rows` key nothing changes:
+same rows, same receipt, same stdout.
+
+`installed-pass` still means every *selected* row passed. A subset run adds a `selection`
+object right after `verdict` in `installed-results.json`, each progress file and the stdout
+line: `{ "scope": "subset", "selected": [...], "omittedReady": [...] }` (`"all-ready"` when the
+list names every Ready row). Read a subset `installed-pass` as "these rows only"; the omitted
+Ready rows were not run and the receipt is not evidence about them.
+
+### Rows in package-h (frame-edit-ui, settings-profile)
+
+Both rows are `Ready` with merged-PR evidence and run with no private packet, so
+`"rows": ["frame-edit-ui", "settings-profile"]` selects exactly them. Neither has been run installed.
+Run them in that order or separately; both capture with distinct names (`capture-1`, `capture-11`..`14`).
+
+- `frame-edit-ui` (#2248, foreground). A person presses the real F5/F6/F7, `+`, a bound Duplicate
+  keyframe key, Cmd+Z / Cmd+Shift+Z and the timeline right-click items, in the scene and inside an
+  entered component (PR #2786). After every gesture they attach the unedited **read-only** Nemo MCP
+  replies (`query.document.object.history`, one `query.document.object.layer.timing` view `cells` per
+  layer, plus the Scene layers while inside a component). The oracle computes the revision step,
+  history depth, total frames and cell runs itself, reads the saved files from disk (hash, total
+  frames) and judges the layer-row styling from the helper's own owned-window capture. A reply with a
+  verdict field, missing/unpinned/non-tiling reads, or a `command.*` call is refused as operator input.
+- `settings-profile` (#2172). `session.input` drives the Settings entries, the eight tabs, close and
+  backdrop, profile name/email/role with restore, the tool buttons and the empty sync-folder
+  open-cancel/check; `observe` supplies the raw accessibility facts. The helper **cannot** drive: File >
+  New (the `entry.*` commands need an entry mode this batch does not set), the colour swatch and its
+  alpha (judged from the helper capture of the swatch the person located), rebinding a shortcut and
+  "Reset all" (`shortcuts.reset` is denied; judged by comparing the Shortcuts tab labels before,
+  after rebind and after reset), and the real sync-owner publish/check/merge paths (declared as
+  `sync-owner-paths`, always returned `unrun` with its reason, so this row cannot reach
+  `installed-pass` until that clause is covered). Profile persistence across an app restart needs a
+  second lifetime and is not claimed.
+
+The first operator phase of both asks for the window at the top of display 2 (position 2880,-270, size
+1620x1420, raised).
+
+### Refusals
+
+A refusal before or around launch prints one line to stderr:
+`CS7 batch refused or incomplete (<reason>); inspect its private receipt. No acceptance claimed.`
+`<reason>` is the harness check's fixed message (for example `selected installed row b depends
+on a row outside the selection: a`). Any other error (file system, JSON syntax, scenario
+code) is reduced to its class and code, such as `SyntaxError` or `Error ENOENT`, so paths and
+evidence content never reach the terminal. Failures after launch are classified in the private
+receipt as before.
 
 Missing declarations or scripts refuse **before app launch**. The existing
 matrix's issue status and headless `source-pass` do not establish readiness.

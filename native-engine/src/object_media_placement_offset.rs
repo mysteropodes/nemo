@@ -5,7 +5,9 @@ use serde_json::Number;
 // T12: the stored timing of a video placement.
 #[path = "object_media_video_timing.rs"]
 mod video_timing;
-pub(crate) use video_timing::{RemapIntent, RemapRefusal, VideoTiming, MAX_INTERP_MODE};
+pub(crate) use video_timing::{
+    RemapIntent, RemapRefusal, RemapSelection, VideoTiming, MAX_INTERP_MODE,
+};
 #[cfg(feature = "evaluation")]
 pub(crate) use video_timing::sample_remap_track;
 const MAX: f64 = 9_007_199_254_740_991.;

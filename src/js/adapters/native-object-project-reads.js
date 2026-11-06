@@ -415,7 +415,10 @@
           r.cells.runs.length && r.cells.runs[0][0] === frame)) return null;
         if (view === 'range') {
           const range = r.range, fields = ['rawInPoint', 'rawOutPoint', 'inPoint', 'outPoint', 'hasCustomRange', 'hasTimeLink'];
-          if (r.kind !== 'layerRange' || !object(range) || Object.keys(range).length !== 6 || !fields.every((k) => own(range, k)) ||
+          if (r.kind !== 'layerRange' || !object(range) || !Object.keys(range).every((k) => fields.includes(k) || k === 'markers' || k === 'effectKeys' || k === 'keyFrames') || !fields.every((k) => own(range, k)) ||
+            !(!own(range, 'markers') || Array.isArray(range.markers) && range.markers.length <= 64 && range.markers.every((m) => object(m) && Number.isSafeInteger(m.frame) && m.frame >= 0 && Object.keys(m).every((k) => k === 'frame' || k === 'name') && (!own(m, 'name') || typeof m.name === 'string' && m.name.length >= 1 && m.name.length <= 32))) ||
+            !(!own(range, 'keyFrames') || Array.isArray(range.keyFrames) && range.keyFrames.length <= 512 && range.keyFrames.every((f) => Number.isSafeInteger(f) && f >= 0)) ||
+            !(!own(range, 'effectKeys') || Array.isArray(range.effectKeys) && range.effectKeys.length <= 512 && range.effectKeys.every((f) => Number.isSafeInteger(f) && f >= 0)) ||
             !fields.slice(0, 4).every((k) => finite(range[k])) || typeof range.hasCustomRange !== 'boolean' || typeof range.hasTimeLink !== 'boolean') return null;
         }
         return freeze(view ? JSON.parse(JSON.stringify(r)) : Object.assign({}, r));

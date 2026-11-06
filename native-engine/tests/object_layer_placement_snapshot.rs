@@ -55,6 +55,14 @@ fn a_video_layer_reports_its_placement_its_remap_keys_and_the_eased_source_frame
 }
 
 #[test]
+fn a_tinted_or_held_remap_key_lists_its_color_and_hold_and_a_plain_one_lists_neither() {
+    let remap = json!({"timeRemap":{"keys":[{"frame":0,"v":[0],"color":"#4ea9ff","hold":true},{"frame":24,"v":[47],"hold":false}]}});
+    let s = snapshot(&owner(remap));
+    let keys = read(&s, &query(&s, "L", 3)).unwrap()["placement"]["timeRemap"]["keys"].clone();
+    assert_eq!(keys, json!([{"frame":0,"value":0,"color":"#4ea9ff","hold":true},{"frame":24,"value":47}]));
+}
+
+#[test]
 fn a_key_list_past_the_read_budget_is_dropped_and_the_counted_facts_stay() {
     let keys: Vec<Value> = (0..300)
         .map(|i| json!({"frame":i,"v":[f64::from(i) + 0.123_456_789_012]}))

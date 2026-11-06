@@ -38,7 +38,7 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
   orchestrator and two delegates per human and two writable task worktrees plus the
   primary checkout per machine. The execution checklist's conditional four-outcome
   expansion applies only after its protected amendment and a live, capacity-verified
-  activation in #1062; a plan, model choice or idle session does not activate a slot.
+  activation in #2804; a plan, model choice or idle session does not activate a slot.
   Reuse one branch per outcome across sprints. Progress and handoffs belong in the
   existing issue, not new report PRs or additional ledgers.
 - Keep operational `main` unchanged by interim remediation. Target remediation task PRs

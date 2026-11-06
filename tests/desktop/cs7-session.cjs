@@ -75,13 +75,19 @@ function createInput({ executable, env, timeout = 10_000 }) {
   return { open, command, close };
 }
 
+// A grant names its booking comment in the current coordination log. #1062 is full, so
+// none of its comments can be a new booking.
+function validGrant(grant) {
+  return /^2804\/[0-9]+$/.test(grant || '');
+}
+
 function createInstalledSession(config) {
   const identity = require('../../scripts/nemo/lib/identity.cjs');
   const runtime = require('../../scripts/nemo/lib/native-runtime.cjs');
   const isolation = require('../../scripts/nemo/lib/isolation.cjs');
   const source = identity.sourceIdentity(), build = identity.buildIdentity();
   check(!source.dirty && source.head === config.sourceSha, 'clean frozen source required');
-  check(/^1062\/[0-9]+$/.test(config.grant || ''), 'recorded local slot required');
+  check(validGrant(config.grant), 'recorded local slot required');
   const app = harness.packagedApp(config.app, runtime);
   check(app.executableSha256 === config.executableSha256, 'packaged executable differs');
   const proof = JSON.parse(fs.readFileSync(config.buildProof, 'utf8'));
@@ -178,4 +184,4 @@ function createInstalledSession(config) {
   };
 }
 
-module.exports = { createInput, createInstalledSession };
+module.exports = { createInput, createInstalledSession, validGrant };

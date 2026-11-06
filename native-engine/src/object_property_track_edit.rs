@@ -1,16 +1,20 @@
 //! Stable selection edits prepared against one retained native snapshot.
-use crate::commands::object_fill_owner::property_edit::curves::{self, CurvePreset, InfluenceSide};
-use crate::commands::object_fill_owner::property_edit::key_batch::{self, KeyBatch, WarpFrame, WarpMode};
+use crate::commands::object_fill_owner::property_edit::curves;
+use crate::commands::object_fill_owner::property_edit::key_action::{
+    apply_to_track, finite, Action, GroupFrame, ValidAction,
+};
 use crate::commands::{ObjectFillOwner, PreparedPropertyEdit};
 use crate::object_document::{
-    object_deserialize, valid_key_color, KeyLockMode, OrderKey, OrderTrack, Presence, PropertyHolder,
-    PropertyHolderTarget,
+    object_deserialize, OrderKey, OrderTrack, Presence, PropertyHolder, PropertyHolderTarget,
 };
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use serde_json::Number;
 type R<T> = Result<T, DispatchErrorCode>;
+fn invalid() -> DispatchErrorCode {
+    DispatchErrorCode::InvalidRequest
+}
 const MAX_BYTES: usize = 4096; // Preserve the existing dispatch envelope bound.
 /// Single-key addresses (`frame`) keep the original bound; a track can instead name whole runs of keys (`ranges`), so a
 /// selection of any size is limited by the request bytes alone, never by a key count.
@@ -31,36 +35,6 @@ object_deserialize!(Selection {
     frame: Option<Number>,
     ranges: Option<Vec<[Number; 2]>>
 });
-#[derive(Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
-enum Action {
-    Preset { preset: String },
-    Influence { side: String, percent: Number },
-    Subdivide {},
-    // `mode` is required: null clears, in/out/layer sets. Never defaulted.
-    LockTo {
-        #[serde(deserialize_with = "Option::deserialize")]
-        mode: Option<String>,
-    },
-    // Batch key edits over the selection: nudge/drag retime, delete, flip, distribute.
-    Shift { delta: Number },
-    Delete {},
-    Flip {},
-    Distribute {},
-    // The key selection box (#2377): `mode` is top/bottom/left/right/liquify, `total` the drag in (fractional) frames, `grab` the
-    // frame a liquify is centred on. Rows are the selected tracks in the order the selections name them.
-    Warp {
-        mode: String,
-        total: Number,
-        #[serde(default)]
-        grab: Option<Number>,
-    },
-    // The key tint (baseline ctxColorKeys): `#rrggbb` / `#rrggbbaa`, or null to remove it. Required, never defaulted.
-    Color {
-        #[serde(deserialize_with = "Option::deserialize")]
-        color: Option<String>,
-    },
-}
 #[derive(Debug)]
 struct Payload {
     command: String,
@@ -71,82 +45,6 @@ object_deserialize!(Payload {
     command: String, selections: Vec<Selection>,
     #[serde(deserialize_with = "super::deserialize_action")] action: Action
 });
-#[derive(Clone)]
-enum ValidAction {
-    Preset(CurvePreset),
-    Influence(InfluenceSide, f64),
-    Subdivide,
-    LockTo(Option<KeyLockMode>),
-    Batch(KeyBatch),
-    Warp(WarpMode, f64),
-    Color(Option<String>),
-}
-fn invalid() -> DispatchErrorCode {
-    DispatchErrorCode::InvalidRequest
-}
-fn finite(n: &Number) -> R<f64> {
-    n.as_f64().filter(|v| v.is_finite()).ok_or_else(invalid)
-}
-impl Action {
-    fn checked(&self) -> R<ValidAction> {
-        Ok(match self {
-            Self::Preset { preset } => ValidAction::Preset(match preset.as_str() {
-                "linear" => CurvePreset::Linear,
-                "ease" => CurvePreset::Ease,
-                "easeIn" => CurvePreset::EaseIn,
-                "easeOut" => CurvePreset::EaseOut,
-                "hold" => CurvePreset::Hold,
-                _ => return Err(invalid()),
-            }),
-            Self::Influence { side, percent } => ValidAction::Influence(
-                match side.as_str() {
-                    "in" => InfluenceSide::In,
-                    "out" => InfluenceSide::Out,
-                    _ => return Err(invalid()),
-                },
-                finite(percent)?,
-            ),
-            Self::Subdivide {} => ValidAction::Subdivide,
-            Self::LockTo { mode } => ValidAction::LockTo(match mode.as_deref() {
-                None => None,
-                Some("in") => Some(KeyLockMode::In),
-                Some("out") => Some(KeyLockMode::Out),
-                Some("layer") => Some(KeyLockMode::Layer),
-                Some(_) => return Err(invalid()),
-            }),
-            Self::Shift { delta } => {
-                let by = delta.as_i64().ok_or_else(invalid)?;
-                if by.abs() > key_batch::MAX_SHIFT {
-                    return Err(invalid());
-                }
-                ValidAction::Batch(KeyBatch::Shift(by))
-            }
-            Self::Delete {} => ValidAction::Batch(KeyBatch::Delete),
-            Self::Flip {} => ValidAction::Batch(KeyBatch::Flip),
-            Self::Distribute {} => ValidAction::Batch(KeyBatch::Distribute),
-            Self::Warp { mode, total, grab } => {
-                let mode = match (mode.as_str(), grab) {
-                    ("top", None) => WarpMode::Top,
-                    ("bottom", None) => WarpMode::Bottom,
-                    ("left", None) => WarpMode::Left,
-                    ("right", None) => WarpMode::Right,
-                    ("liquify", Some(grab)) => WarpMode::Liquify { grab: finite(grab)? },
-                    _ => return Err(invalid()),
-                };
-                let total = finite(total)?;
-                if total.abs() > key_batch::MAX_SHIFT as f64 {
-                    return Err(invalid());
-                }
-                ValidAction::Warp(mode, total)
-            }
-            Self::Color { color } => ValidAction::Color(match color {
-                None => None,
-                Some(c) if valid_key_color(c) => Some(c.to_ascii_lowercase()),
-                Some(_) => return Err(invalid()),
-            }),
-        })
-    }
-}
 /// Original holder/property indices are internal only. No payload key index,
 /// supplied value, JSON path or newly created track can become authority.
 struct Group {
@@ -273,63 +171,6 @@ impl ObjectFillOwner {
             .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), f| (lo.min(f), hi.max(f)));
         for (row, group) in groups.iter().enumerate() {
             let track = match &action {
-                ValidAction::Batch(batch) => {
-                    proposals.push(key_batch::apply(
-                        *batch,
-                        &group.original,
-                        &group.selected,
-                        source.total_frames(),
-                    )?);
-                    continue;
-                }
-                ValidAction::Warp(mode, total) => {
-                    let frame = WarpFrame { row, rows: groups.len(), min: extent.0, max: extent.1 };
-                    proposals.push(key_batch::warp(
-                        *mode,
-                        *total,
-                        &group.original,
-                        &group.selected,
-                        frame,
-                        source.total_frames(),
-                    )?);
-                    continue;
-                }
-                ValidAction::Color(color) => {
-                    // Only keys whose tint differs are written, so a no-op publishes nothing.
-                    let mut proposed = group.original.clone();
-                    for &ki in &group.selected {
-                        let key = &mut proposed.keys[ki];
-                        if key.color.value() != color.as_ref() {
-                            key.color = color.clone().map_or(Presence::Missing, Presence::Present);
-                        }
-                    }
-                    proposed
-                }
-                ValidAction::Preset(preset) => {
-                    curves::apply_curve_preset(&group.original, &group.selected, *preset)?.0
-                }
-                ValidAction::Influence(side, percent) => {
-                    curves::apply_selected_influence(
-                        &group.original,
-                        &group.selected,
-                        *side,
-                        *percent,
-                    )?
-                    .0
-                }
-                ValidAction::LockTo(mode) => {
-                    // Per-key standing lock: only keys whose effective lock differs
-                    // are written, so a no-op keeps field presence and publishes
-                    // nothing. Clearing authors the baseline explicit null.
-                    let mut proposed = group.original.clone();
-                    for &ki in &group.selected {
-                        let key = &mut proposed.keys[ki];
-                        if key.lock_to.value().copied().flatten() != *mode {
-                            key.lock_to = Presence::Present(*mode);
-                        }
-                    }
-                    proposed
-                }
                 ValidAction::Subdivide => {
                     let plan = curves::subdivision_plan(&group.original, &group.selected)?;
                     let holder = &holders[group.holder];
@@ -382,10 +223,14 @@ impl ObjectFillOwner {
                             .unwrap()
                             .total_cmp(&b.frame.as_f64().unwrap())
                     });
-                    proposed
+                    Some(proposed)
+                }
+                _ => {
+                    let frame = GroupFrame { row, rows: groups.len(), extent };
+                    apply_to_track(&action, &group.original, &group.selected, frame, source.total_frames())?
                 }
             };
-            proposals.push(Some(track));
+            proposals.push(track);
         }
         // Phase 3: one proposed document, full admission, one existing sealed token.
         let mut document = source.clone();

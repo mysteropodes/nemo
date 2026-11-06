@@ -58,6 +58,9 @@ impl ObjectFillOwner {
         let inventory = project
             .asset_inventory()
             .ok_or(DispatchErrorCode::Unavailable)?;
+        // A Time Remap key edit becomes a whole-track replacement against the stored track (one revision).
+        let total = project.drawing().total_frames();
+        let edit = ObjectFillOwner::resolve_remap_keys(inventory, total, edit)?;
         let next = match apply_edit(inventory, project.drawing(), edit).map_err(code_of)? {
             PlacementOutcome::Unchanged => None,
             PlacementOutcome::Changed(next) => Some(next),

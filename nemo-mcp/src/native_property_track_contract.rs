@@ -40,7 +40,8 @@ fn in_range(value: Option<&Value>) -> bool {
         .and_then(Value::as_f64)
         .is_some_and(|v| v.abs() <= 1_000_000.0)
 }
-fn action(value: &Value) -> bool {
+/// One key action (shared with the Time Remap key edit of the placement contract).
+pub(crate) fn action(value: &Value) -> bool {
     match value.get("kind").and_then(Value::as_str) {
         Some("preset") => exact(value, &["kind", "preset"], &[]).is_some_and(|a| {
             matches!(

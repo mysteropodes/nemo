@@ -32,6 +32,19 @@ fn range_error(error: RangeError) -> DispatchErrorCode {
         _ => DispatchErrorCode::Unavailable,
     }
 }
+/// Bytes each of the three optional snap lists may take of the 4 KiB read; a longer list is cut at the last entry that fits.
+const SNAP_LIST_BYTES: usize = 1024;
+const MAX_MARKER_NAME: usize = 32;
+/// The entries of `list` that still fit `SNAP_LIST_BYTES`, in order; the first entry that does not fit ends the list.
+fn within_budget<T>(list: Vec<T>, size: impl Fn(&T) -> usize) -> Vec<T> {
+    let mut bytes = 0;
+    list.into_iter()
+        .take_while(|entry| {
+            bytes += size(entry) + 1;
+            bytes <= SNAP_LIST_BYTES
+        })
+        .collect()
+}
 impl ObjectSnapshot {
     pub(crate) fn query_layer_range_json(&self, bytes: &[u8]) -> Result<Value, DispatchErrorCode> {
         use DispatchErrorCode::{InvalidRequest, StaleRevision, Unavailable};
@@ -91,11 +104,88 @@ impl ObjectSnapshot {
         let linked = range
             .and_then(|r| r.time_link.value())
             .is_some_and(Option::is_some);
-        let value = json!({"kind":"layerRange","instanceId":self.instance_id(),"documentId":self.document_id(),
+        let mut value = json!({"kind":"layerRange","instanceId":self.instance_id(),"documentId":self.document_id(),
             "atRevision":self.content_revision(),"documentSnapshotId":self.snapshot_id(),
             "contextId":selector.context_id,"layerUid":selector.layer_uid,"frame":selector.frame,
             "range":{"rawInPoint":raw.in_point,"rawOutPoint":raw.out_point,"inPoint":bounded.in_point,
                 "outPoint":bounded.out_point,"hasCustomRange":custom,"hasTimeLink":linked}});
+        // The snap targets of the baseline `snapMotionFrame`, only when the layer has any (a plain layer keeps the six-field range):
+        // the layer's own markers ("Repère calque", frame order) and every frame carrying a key of its effect stack.
+        let total = i64::from(context.total_frames());
+        let mut markers: Vec<(i64, Option<String>)> = range
+            .and_then(|r| r.markers.value())
+            .map(|list| {
+                list.iter()
+                    .filter(|m| m.frame >= 0 && m.frame < total)
+                    .map(|m| {
+                        let name = m.name.value().filter(|n| !n.is_empty());
+                        (
+                            m.frame,
+                            name.map(|n| n.chars().take(MAX_MARKER_NAME).collect()),
+                        )
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        markers.sort_by_key(|(frame, _)| *frame);
+        let markers = within_budget(
+            markers
+                .into_iter()
+                .map(|(frame, name)| match name {
+                    Some(name) => json!({"frame":frame,"name":name}),
+                    None => json!({"frame":frame}),
+                })
+                .collect(),
+            |entry| entry.to_string().len(),
+        );
+        if !markers.is_empty() {
+            value["range"]["markers"] = Value::Array(markers);
+        }
+        let mut effect_keys: Vec<i64> = layer
+            .effects
+            .value()
+            .into_iter()
+            .flatten()
+            .filter_map(|effect| effect.keys.value().and_then(Option::as_ref))
+            .flat_map(|tracks| {
+                tracks
+                    .entries()
+                    .iter()
+                    .filter_map(|(_, track)| track.as_ref())
+            })
+            .flat_map(|track| track.keys.iter())
+            .filter_map(|key| key.frame.as_f64().filter(|f| f.fract() == 0.0))
+            .map(|f| f as i64)
+            .filter(|f| *f >= 0 && *f < total)
+            .collect();
+        effect_keys.sort_unstable();
+        effect_keys.dedup();
+        let effect_keys = within_budget(effect_keys, |frame| frame.to_string().len());
+        if !effect_keys.is_empty() {
+            value["range"]["effectKeys"] = json!(effect_keys);
+        }
+        // Every key of the layer's own property holders (the layer and its elements), one entry per key so the caller can leave out the keys it
+        // is dragging: the baseline `collectMotionSnapCandidates` over `holder.motion` and `ld.elementMotion`.
+        let mut key_frames: Vec<i64> = document
+            .property_holders()
+            .into_iter()
+            .flatten()
+            .filter(|h| {
+                h.target().context_id() == selector.context_id
+                    && h.target().layer_uid() == selector.layer_uid
+            })
+            .flat_map(|h| h.properties().iter())
+            .filter_map(|record| record.track.value())
+            .flat_map(|track| track.keys.iter())
+            .filter_map(|key| key.frame.as_f64().filter(|f| f.fract() == 0.0))
+            .map(|f| f as i64)
+            .filter(|f| *f >= 0 && *f < total)
+            .collect();
+        key_frames.sort_unstable();
+        let key_frames = within_budget(key_frames, |frame| frame.to_string().len());
+        if !key_frames.is_empty() {
+            value["range"]["keyFrames"] = json!(key_frames);
+        }
         if serde_json::to_vec(&value).map_err(|_| Unavailable)?.len() > MAX_MESSAGE_BYTES {
             return Err(Unavailable);
         }

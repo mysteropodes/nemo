@@ -17,7 +17,26 @@ class OperatorInputError extends Error {
   }
 }
 
-function readyRows(declarations, { taskIds, surfaceIds, scenarios }) {
+// Optional allow-list from the private config. Refuses before any app launch; it never
+// widens, reorders or auto-adds rows, so the unselected Ready rows stay visible as omitted.
+function selectRows(declarations, requested) {
+  check(Array.isArray(requested) && requested.length > 0 && requested.every(id => typeof id === 'string' && ID.test(id)) &&
+    new Set(requested).size === requested.length, 'installed row selection must be a non-empty list of unique row ids');
+  const known = new Map();
+  for (const declaration of declarations) for (const row of declaration?.rows || []) if (row && !known.has(row.id)) known.set(row.id, row);
+  const ids = new Set(requested);
+  for (const id of requested) {
+    const row = known.get(id);
+    check(row, 'selected installed row unknown: ' + id);
+    check(row.status === 'Ready', 'selected installed row is not Ready: ' + id);
+    check(Array.isArray(row.dependsOn), 'installed dependencies required');
+    for (const dependency of row.dependsOn) check(ids.has(dependency),
+      'selected installed row ' + id + ' depends on a row outside the selection' + (ID.test(dependency) ? ': ' + dependency : ''));
+  }
+  return { ids, omittedReady: [...known.values()].filter(row => row.status === 'Ready' && !ids.has(row.id)).map(row => row.id) };
+}
+
+function readyRows(declarations, { taskIds, surfaceIds, scenarios, only }) {
   const all = [], ids = new Set();
   for (const declaration of declarations) {
     check(declaration?.schema === DECLARATION_SCHEMA && Array.isArray(declaration.rows), 'installed declaration required');
@@ -48,7 +67,8 @@ function readyRows(declarations, { taskIds, surfaceIds, scenarios }) {
   }
   const byId = new Map(all.map(row => [row.id, row]));
   for (const row of all) for (const id of row.dependsOn) check(byId.has(id) && id !== row.id, 'installed dependency unknown or self');
-  const ready = all.filter(row => row.status === 'Ready');
+  const ready = all.filter(row => row.status === 'Ready' && (!only || only.has(row.id)));
+  check(!only || ready.length === only.size, 'selected installed row missing or not Ready');
   check(ready.length > 0, 'no explicitly Ready installed rows');
   const ordered = [], active = new Set(), done = new Set();
   function visit(row) {
@@ -56,7 +76,8 @@ function readyRows(declarations, { taskIds, surfaceIds, scenarios }) {
     check(!active.has(row.id), 'installed dependency cycle'); active.add(row.id);
     for (const id of row.dependsOn) {
       const dependency = byId.get(id);
-      check(dependency.status === 'Ready', 'Ready row has a Blocked dependency'); visit(dependency);
+      check(dependency.status === 'Ready', 'Ready row has a Blocked dependency');
+      check(!only || only.has(id), 'selected installed row depends on a row outside the selection'); visit(dependency);
     }
     check(ID.test(row.scenario) && typeof scenarios[row.scenario]?.run === 'function', 'installed scenario unavailable');
     active.delete(row.id); done.add(row.id); ordered.push(structuredClone(row));
@@ -97,8 +118,13 @@ function rowResult(row, observations, status) {
 
 // The session supplies the existing native owner handshake and real input driver.
 // A scenario asserts product behavior; this runner never equates posted input with PASS.
-async function runInstalledRows({ rows, scenarios, session, now = () => new Date().toISOString(), save = async () => {} }) {
+async function runInstalledRows({ rows, scenarios, session, now = () => new Date().toISOString(), save = async () => {}, selection }) {
   check(rows.length > 0, 'empty installed batch refused');
+  // Present only for a config `rows` subset: `installed-pass` then means every SELECTED row
+  // passed, and the receipt says which Ready rows were not asked for. Absent otherwise, so the
+  // whole-census receipt is unchanged.
+  const selected = selection ? { scope: selection.omittedReady.length ? 'subset' : 'all-ready',
+    selected: rows.map(r => r.id), omittedReady: [...selection.omittedReady] } : null;
   const results = rows.map(row => rowResult(row, [], 'unrun'));
   const finalizers = [], recorded = new Set();
   let identity, operatorInputFailures = 0, evidenceFailures = 0, cleanup = 'unrun', terminalCode = null, activeRow = null, failure = null;
@@ -141,7 +167,7 @@ async function runInstalledRows({ rows, scenarios, session, now = () => new Date
         safeToContinue = safeToContinue && item.result.safeToContinue;
       }
       check(isDeepStrictEqual(verifiedIdentity(await session.identity()), identity), 'installed candidate changed');
-      await save({ identity, rows: results, cleanup, complete: false });
+      await save({ identity, ...(selected ? { selection: selected } : {}), rows: results, cleanup, complete: false });
       if (!safeToContinue) { terminalCode = 'scenario-stopped'; break; }
     }
   } catch (error) {
@@ -187,6 +213,7 @@ async function runInstalledRows({ rows, scenarios, session, now = () => new Date
     schema: 'nemo.installed-family-result/1', format: RESULT_SCHEMA, family: 'installed-desktop',
     sourceSha: identity?.sourceSha || null, tree: identity?.tree || null, generatedAt: now(), checks,
     kindsCovered: KINDS.filter(k => covered.has(k)), kindsMissing: KINDS.filter(k => !covered.has(k)), verdict,
+    ...(selected ? { selection: selected } : {}),
     tasks: [...new Set(rows.flatMap(r => r.tasks))],
     installed: { identity: identity || null, operatorInputFailures, evidenceFailures, cleanup, terminalCode, failure, rows: results },
   };
@@ -194,4 +221,4 @@ async function runInstalledRows({ rows, scenarios, session, now = () => new Date
   return result;
 }
 
-module.exports = { DECLARATION_SCHEMA, OperatorInputError, readyRows, readDeclarations, verifiedIdentity, runInstalledRows };
+module.exports = { DECLARATION_SCHEMA, OperatorInputError, selectRows, readyRows, readDeclarations, verifiedIdentity, runInstalledRows };

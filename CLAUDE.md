@@ -649,7 +649,7 @@ les demandes de modifications et la coordination des conflits/contrats partagés
 Pour la remédiation, suivre le [plan d’exécution actuel](engineering/remediation/EXECUTION_PLAN.fr.md)
 (amendé le 2026-09-22) : une branche et une PR par résultat délimité, conservées entre les sessions ;
 worktrees limités aux rédacteurs réellement concurrents ; tâches et preuves sur le Projet #2,
-rapports partagés dans l’issue #1062. Les rappels restent en pause jusqu’au début de
+rapports partagés dans l’issue #2804. Les rappels restent en pause jusqu’au début de
 l’exécution et sont suspendus à l’arrêt de l’équipe. Les PR de remédiation ciblent la branche
 protégée commune `codex/native-remediation` ; `main` reste l’application opérationnelle
 jusqu’à une PR finale de promotion entièrement acceptée. La politique automatique
