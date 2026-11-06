@@ -1347,6 +1347,7 @@
         "object_import_remap_ids_controls.rs",
         "object_scene_producer_contour.rs",
         "object_scene_vector_batch.rs",
+        "object_scene_vector_batch_3d.rs",
         "object_scene_vector_parent.rs",
         "render_layer_transform_keys.rs",
         "object_scene_producer_contour_controls.rs",
