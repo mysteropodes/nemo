@@ -61,3 +61,13 @@ test('SDK generic dispatcher and explicit method retain literal exact replay rec
  const q=request(),r=reply(q,true);let calls=0;const adapter=SDK.createNativeApplicationAdapter('policy-test',{dispatch(){calls++;return structuredClone(r);}});
  assert.deepEqual(await adapter.dispatch(q),r);assert.deepEqual(await adapter.editLayerPolicy(q),r);assert.equal(calls,2,'both calls reach the authority; SDK must not invent its own writable receipt owner');
 });
+
+test('#2520: only the 3D switch may be saved with a revision and no history entry',async()=>{
+ const saved=q=>({...reply(q,true),result:{applied:true,historyEntriesAdded:0}});
+ const three=request('threeD',true),locked=request('locked',true);
+ const adapter=SDK.createNativeApplicationAdapter('policy-test',{dispatch(r){return saved(r);}});
+ const ok=await adapter.editLayerPolicy(three);assert.deepEqual(ok.result,{applied:true,historyEntriesAdded:0});assert.equal(ok.contentRevision,three.expectedRevision+1);
+ await assert.rejects(adapter.editLayerPolicy(locked),'a lock without a history entry is not a valid receipt');
+ const noop=SDK.createNativeApplicationAdapter('policy-test',{dispatch(r){return {...reply(r,false),result:{applied:false,historyEntriesAdded:1}};}});
+ await assert.rejects(noop.editLayerPolicy(three));
+});

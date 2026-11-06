@@ -394,7 +394,8 @@
   function retirePolicy(root){policyEpochs.set(root,(policyEpochs.get(root)||0)+1);policyTasks.delete(root);views.delete(root);}
   function policySelection(root){return JSON.stringify([root.state.appMode,root.state.activeLayerIdx,root._layerSel||[]]);}
   function setLayerPolicy(root,uid,flag,value,expected,ports){
-    function refused(){if(root.showToast)root.showToast('Native layer policy was not confirmed.');return false;}
+    // #2520: a refused 3D switch is the engine saying this layer cannot be placed in 3D yet (typed unavailable, no revision), not a lost confirmation.
+    function refused(error){var no3d=flag==='threeD'&&value===true&&/refused: unavailable/.test(String(error&&error.message||''));if(root.showToast)root.showToast(no3d?'3D is not available for this layer yet.':'Native layer policy was not confirmed.');return false;}
     try{
       if(!nativeObjectUiPortsReady(ports)||!['locked','shy','threeD'].includes(flag)||typeof value!=='boolean'||typeof ports.readTransportGeneration!=='function'||!Number.isSafeInteger(ports.readTransportGeneration())||ports.readTransportGeneration()<0||policyTasks.has(root))return Promise.resolve(false);
       var owner=policyPort(ports),session=ports.currentSession(),info=session&&session.info(),view=views.get(root),epoch=policyEpochs.get(root)||0;

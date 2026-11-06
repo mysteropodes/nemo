@@ -15,13 +15,19 @@ impl NativeObjectHistory {
         candidate: PreparedLayerPolicy,
     ) -> Result<u64, DispatchErrorCode> {
         let before_revision = self.content_revision();
+        let disclosure = candidate.disclosure();
         let after_revision = self.owner.commit_layer_policy(candidate)?;
-        if after_revision != before_revision {
+        if after_revision != before_revision && !disclosure {
             self.undo.push(ObjectHistoryEntry {
                 before_revision,
                 after_revision,
             });
             self.redo.clear();
+        } else if after_revision != before_revision {
+            // #2520: no step of its own; the state rides with the last step, as the folder fold does (redo stays).
+            if let Some(last) = self.undo.last_mut().filter(|e| e.after_revision == before_revision) {
+                last.after_revision = after_revision;
+            }
         }
         Ok(after_revision)
     }
@@ -53,3 +59,8 @@ mod key_warp_color_tests;
 #[cfg(test)]
 #[path = "../tests/object_layer_three_d.rs"]
 mod three_d_tests;
+
+// #2520/#2525: the 3D switch refuses where the frame path cannot place it and adds no undo entry.
+#[cfg(test)]
+#[path = "../tests/object_layer_three_d_guard.rs"]
+mod three_d_guard_tests;

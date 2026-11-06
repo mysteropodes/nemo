@@ -475,7 +475,7 @@ pub(crate) fn evaluate_record(
 mod pose;
 pub(crate) use pose::{
     common_layer_motion_target, evaluate_record_rest_with_pose, evaluate_record_with_pose,
-    has_unjoined_parent_blend,
+    has_unjoined_parent_blend, plain_empty_layer, three_d_joins_batch,
 };
 
 #[cfg(test)]

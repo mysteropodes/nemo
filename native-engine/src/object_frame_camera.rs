@@ -14,7 +14,9 @@ impl ObjectSnapshot {
             .any(|layer| crate::object_frame_packet::solo_view::layer_visible("scene-root", layers, layer) && layer.three_d.value() == Some(&true)
                 && !crate::evaluation::object_vector_kernels::render_vector_eval::common_layer_motion_target(self.document(), &PropertyHolderTarget {
                     context_id: "scene-root".into(), layer_uid: layer.layer_uid().to_owned(), stroke_id: crate::object_document::Presence::Missing,
-                }))
+                })
+                // #2520: a plain layer with nothing on it yet has nothing to place; its switch must not make the frame unavailable.
+                && !crate::evaluation::object_vector_kernels::render_vector_eval::plain_empty_layer(self.document(), layer.layer_uid()))
     }
     /// Camera pose independent of the viewport's session-only cameraView switch.
     /// Export and camera-locked preview select this same stored-camera provider.

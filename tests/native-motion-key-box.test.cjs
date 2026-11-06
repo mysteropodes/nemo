@@ -36,11 +36,12 @@ test('the warp factors are the baseline ones, pinned by the same values as the e
   assert.equal(Box.share('right', 5, { row: 0, rows: 2, min: 5, max: 5 }), 0, 'one frame has nothing to spread');
 });
 
-test('an unreachable gesture is null: before frame 0, past the end, onto a key that stays or onto another moved key', () => {
+test('an unreachable gesture is null: before frame 0, past the end or onto a key that stays; moved keys may pile onto one frame', () => {
   assert.equal(Box.plan(rows(), 'top', -12, 0, 59), null);
   assert.equal(Box.plan(rows(), 'top', 51, 0, 59), null);
   assert.equal(Box.plan([{ id: 'a', selected: [10], staying: [20] }, { id: 'b', selected: [10], staying: [] }], 'top', 10, 0, 59), null);
-  assert.equal(Box.plan([{ id: 'a', selected: [10, 11], staying: [] }], 'right', -1, 0, 59), null, 'two keys cannot share a frame');
+  // #2377: baseline onDragMove let dragged keys share a frame; the engine keeps one key per frame.
+  assert.deepEqual(Box.plan([{ id: 'a', selected: [10, 11], staying: [] }], 'right', -1, 0, 59), [{ id: 'a', from: [10, 11], to: [10, 10] }]);
   assert.equal(Box.plan([], 'top', 1, 0, 59), null);
 });
 

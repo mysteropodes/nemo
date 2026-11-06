@@ -125,7 +125,7 @@
     var comp = null;
     try { if (typeof reads.composition === 'function') comp = Reads.detached(reads.composition()) || null; } catch (_) { comp = null; }
     var pin = {}; PIN.forEach(function (k) { pin[k] = start[k]; });
-    var layers = detached(start.layers), overlay = Object.create(null), queue = [], log = [], ops = ports.ops || {};
+    var layers = detached(start.layers), overlay = Object.create(null), queue = [], log = [], ops = ports.ops || {}, wa = { inF: start.waIn, outF: start.waOut };
     var seen = Object.create(null), made = 0;
     layers.forEach(function (l) { if (seen[l.layerUid]) throw fail('duplicate layer id ' + l.layerUid); seen[l.layerUid] = true; });
     function find(uid) {
@@ -352,17 +352,17 @@
         { layers: function () { need(S + 'selection.layers'); return ports.selection().map(function (i) { return handle(i); }); } }), 'selection.'),
       comp: guard({
         get fps() { return start.fps; }, get frameCount() { return start.totalFrames; },
-        // Work area in frames, like the baseline: one project-settings edit at drain (the owner clamps the pair).
+        // Work area in frames, like the baseline: any pair is taken (one project-settings edit at drain, the owner stores it as given).
+        // The pair is tracked within the run, so a trimToWorkArea after a setWorkArea cuts to the area just set, as the live baseline state did.
         setWorkArea: function (inFrame, outFrame) {
           entry(S + 'comp.setWorkArea', 'workArea');
           var a = inFrame | 0, b = outFrame | 0;
-          if (a < 0 || b >= start.totalFrames || b <= a) throw fail('the work area ' + a + '..' + b + ' is outside the composition');
-          queue.push({ kind: 'workArea', inFrame: a, outFrame: b }); return nemo.comp;
+          queue.push({ kind: 'workArea', inFrame: a, outFrame: b }); wa.inF = a; wa.outF = b; return nemo.comp;
         },
         // Keeps the work area only: what the pinned document already shows decides whether there is anything to cut.
         trimToWorkArea: function () {
           entry(S + 'comp.trimToWorkArea', 'trim');
-          var from = Math.max(0, Math.floor(start.waIn || 0)), to = Math.min(start.totalFrames - 1, Math.floor(start.waOut != null ? start.waOut : start.totalFrames - 1));
+          var from = Math.max(0, Math.floor(wa.inF || 0)), to = Math.min(start.totalFrames - 1, Math.floor(wa.outF != null ? wa.outF : start.totalFrames - 1));
           if (to > from && !(from === 0 && to === start.totalFrames - 1)) queue.push({ kind: 'trim' });
           return nemo.comp;
         },

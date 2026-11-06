@@ -438,6 +438,7 @@
     {"src":"js/adapters/native-selection-clipboard.js"},
     {"src":"js/adapters/native-selection-order.js"},
     {"src":"js/adapters/native-select-menu.js"},
-    {"src":"js/adapters/native-layer-range-menu.js"}
+    {"src":"js/adapters/native-layer-range-menu.js"},
+    {"src":"js/adapters/native-motion-key-spans.js"}
   ]
 }

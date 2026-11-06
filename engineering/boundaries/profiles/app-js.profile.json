@@ -3689,6 +3689,18 @@
       ]
     },
     {
+      "id": "app.native.motion-key-spans.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-motion-key-spans.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-motion-key-spans.js"
+      ]
+    },
+    {
       "id": "app.native.path-effects.ui.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

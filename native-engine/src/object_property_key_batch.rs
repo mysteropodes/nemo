@@ -95,17 +95,28 @@ pub(crate) fn apply(
             }
         }
     }
-    settle(original, &chosen, &before, frames, action == KeyBatch::Distribute)
+    let landing = if action == KeyBatch::Distribute { Landing::Replace } else { Landing::Refuse };
+    settle(original, &chosen, &before, frames, landing)
 }
 
-/// Applies the new `frames` of the `chosen` keys. A track holds one key per frame: `replaces` lets a landing key replace the one it
-/// lands on (distribute); otherwise a landing on any other key is refused.
+/// What happens when a selected key lands on the frame of another key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Landing {
+    /// Shift and flip: any other key on the landing frame refuses the whole edit.
+    Refuse,
+    /// Distribute (baseline `distributeKeys` assigns frames): the landing key replaces the one it lands on.
+    Replace,
+    /// The box gestures (baseline `onDragMove`): selected keys may pile onto one frame, a key that stays still blocks.
+    Collapse,
+}
+
+/// Applies the new `frames` of the `chosen` keys. A track holds one key per frame, so a landing on a key's frame is settled by `landing`.
 fn settle(
     original: &OrderTrack,
     chosen: &[usize],
     before: &[f64],
     frames: Vec<f64>,
-    replaces: bool,
+    landing: Landing,
 ) -> R<Option<OrderTrack>> {
     if frames == before {
         return Ok(Some(original.clone()));
@@ -121,16 +132,16 @@ fn settle(
             }
             let earlier_selected = chosen[..a].contains(&j);
             let staying = chosen.binary_search(&j).is_err();
-            if !replaces {
-                if staying || earlier_selected {
-                    return Err(DispatchErrorCode::Unavailable);
-                }
-                continue;
-            }
-            if staying || earlier_selected {
-                dropped.push(j);
+            match landing {
+                Landing::Refuse if staying || earlier_selected => return Err(DispatchErrorCode::Unavailable),
+                Landing::Collapse if staying => return Err(DispatchErrorCode::Unavailable),
+                Landing::Replace if staying || earlier_selected => dropped.push(j),
+                _ => {}
             }
         }
+    }
+    if landing == Landing::Collapse {
+        collapse(chosen, &frames, &mut dropped);
     }
     let mut keys = original.keys.clone();
     for &i in chosen {
@@ -142,6 +153,26 @@ fn settle(
     Ok(Some(OrderTrack {
         keys: order.into_iter().map(|i| keys[i].clone()).collect(),
     }))
+}
+
+/// Keeps ONE key of each frame the selected keys piled onto: the key the baseline evaluation (`rawValueAtFrame`, over keys sorted
+/// stably by frame) answers with on that frame. A frame at or before the first key answers with the first key of the pile; every other
+/// frame, interior or at the end, answers with the last key of the pile (`segmentIndexAtFrame` steps past an equal-frame left key).
+fn collapse(chosen: &[usize], frames: &[f64], dropped: &mut Vec<usize>) {
+    let first_frame = frames.iter().copied().fold(f64::INFINITY, f64::min);
+    let mut seen: Vec<f64> = Vec::new();
+    for &i in chosen {
+        if seen.contains(&frames[i]) {
+            continue;
+        }
+        seen.push(frames[i]);
+        let pile: Vec<usize> = chosen.iter().copied().filter(|&j| frames[j] == frames[i]).collect();
+        if pile.len() < 2 {
+            continue;
+        }
+        let keep = if frames[i] == first_frame { pile[0] } else { pile[pile.len() - 1] };
+        dropped.extend(pile.into_iter().filter(|&j| j != keep));
+    }
 }
 
 /// The box gestures of a multi-track key selection (baseline `startSkewDrag` + `onDragMove`).
@@ -226,5 +257,5 @@ pub(crate) fn warp(
             return Err(DispatchErrorCode::Unavailable);
         }
     }
-    settle(original, &chosen, &before, frames, false)
+    settle(original, &chosen, &before, frames, Landing::Collapse)
 }

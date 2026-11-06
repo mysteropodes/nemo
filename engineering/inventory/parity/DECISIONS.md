@@ -21,6 +21,8 @@ Under section 7 of the execution plan, product decisions are coordinated with th
 
 - An eraser press that misses writes nothing. The baseline promoted a keyframe and added an undo entry.
 - Eraser bites are one engine revision each, but one undo step for the whole stroke.
+- Space or liquify on keys that pile onto one frame (#2377): the baseline kept every key on the shared frame; a native track holds one key per frame, so the pile collapses to the key the baseline evaluation answers with on that frame (the first key of a pile at or before the track's first key, otherwise the last). A key that stays still blocks the gesture, as in the baseline.
+- The 3D layer switch (#2520) is refused, with no revision, on a layer the frame path cannot place in 3D yet (image, text, mask, Null, folder, effect, widget and duplicator layers, layers with children, gradient fills); the baseline accepted it on any layer. It adds no undo entry, as in the baseline.
 
 ## Decisions that implement the baseline
 

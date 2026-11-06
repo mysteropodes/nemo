@@ -88,6 +88,52 @@ pub(crate) fn common_layer_motion_target(
     document: &ObjectDocument,
     target: &PropertyHolderTarget,
 ) -> bool {
+    motion_target(document, target, false)
+}
+
+/// A plain drawing layer with nothing on it yet: there is nothing for the 3D projection to place, so its switch takes and a
+/// later stroke is a vector record the common batch joins.
+pub(crate) fn plain_empty_layer(document: &ObjectDocument, layer_uid: &str) -> bool {
+    let Some(layer) = document.layers().iter().find(|l| l.layer_uid() == layer_uid) else {
+        return false;
+    };
+    !(layer.is_effect_layer()
+        || layer.is_null_layer()
+        || layer.is_guide_layer()
+        || layer.is_folder_layer.value() == Some(&true)
+        || layer.widget.value().is_some()
+        || document.component_set().is_some_and(|set| set.instance("scene-root", layer_uid).is_some())
+        || document.duplicator_set().is_some_and(|set| set.duplicator("scene-root", layer_uid).is_some())
+        || document.objects().iter().any(|r| r.target.context_id == "scene-root" && r.target.layer_uid == layer_uid)
+        || document.item_records().is_some_and(|items| {
+            items.targets().any(|t| t.context_id() == "scene-root" && t.layer_uid() == layer_uid)
+        }))
+}
+
+/// Whether the layer, with its 3D switch ON, still joins the common batch (#2520: the switch is refused where it would not,
+/// instead of leaving the whole frame unavailable). The 3D family returns right after the layer's own content check; a
+/// gradient fill under 3D is a scene-stage refusal of the batch, so it is not admitted either.
+pub(crate) fn three_d_joins_batch(document: &ObjectDocument, layer_uid: &str) -> bool {
+    // A 3D ancestor is still unjoined for the layers parented to it, which would leave the frame unavailable.
+    if document.layers().iter().any(|l| l.parent_layer_uid.value().and_then(Option::as_deref) == Some(layer_uid)) {
+        return false;
+    }
+    if plain_empty_layer(document, layer_uid) {
+        return true;
+    }
+    let target = PropertyHolderTarget {
+        context_id: "scene-root".into(),
+        layer_uid: layer_uid.to_owned(),
+        stroke_id: crate::object_document::Presence::Missing,
+    };
+    motion_target(document, &target, true)
+        && !document
+            .objects()
+            .iter()
+            .any(|r| r.target.layer_uid == layer_uid && r.fill_gradient().is_some())
+}
+
+fn motion_target(document: &ObjectDocument, target: &PropertyHolderTarget, assume_three_d: bool) -> bool {
     if document.format_version() != 2
         || target.context_id() != "scene-root"
         || target.stroke_id().is_some()
@@ -123,7 +169,7 @@ pub(crate) fn common_layer_motion_target(
             return false;
         }
         // Original3D suppresses its single-parent affine; retain that existing boundary.
-        if uid == target.layer_uid() && layer.three_d.value() == Some(&true) {
+        if uid == target.layer_uid() && (assume_three_d || layer.three_d.value() == Some(&true)) {
             return true;
         }
         if layer.three_d.value() == Some(&true) {

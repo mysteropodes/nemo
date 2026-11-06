@@ -53,27 +53,38 @@ fn edit(o: &mut NativeObjectHistory, layer: &str, property: &str, values: Value)
 }
 
 #[test]
-fn the_switch_is_one_revision_and_one_history_entry_each_way_and_a_no_op_publishes_nothing() {
+fn the_switch_is_one_saved_revision_each_way_with_no_history_entry_and_a_no_op_publishes_nothing() {
     let mut o = owner();
     let zero = bytes(&o);
-    // Off and absent read the same: switching an absent flag off authors nothing and adds no history.
+    // Off and absent read the same: switching an absent flag off authors nothing.
     assert_eq!(set(&mut o, "A", json!(false)), Ok(0));
     assert_eq!((o.history_depths(), bytes(&o)), ((0, 0), zero.clone()));
+    // #2520: the baseline `toggleLayer3D` pushed no undo snapshot, so the switch is saved but is no step of its own.
     assert_eq!(set(&mut o, "A", json!(true)), Ok(1));
-    assert_eq!(o.history_depths(), (1, 0));
+    assert_eq!(o.history_depths(), (0, 0));
     assert_eq!(wire(&o)["layers"][0]["threeD"], json!(true));
     assert!(wire(&o)["layers"][1].get("threeD").is_none(), "only the toggled layer carries the flag");
     assert_eq!(set(&mut o, "A", json!(true)), Ok(1), "the same value again is a no-op");
-    assert_eq!(o.history_depths(), (1, 0));
     assert_eq!(set(&mut o, "A", json!(false)), Ok(2));
     assert_eq!(wire(&o)["layers"][0]["threeD"], json!(false));
-    assert_eq!(o.history_depths(), (2, 0));
-    // Undo restores the exact bytes of the previous revision, redo the exact switch.
+    assert_eq!(o.history_depths(), (0, 0));
+    assert!(o.undo(2).is_err(), "nothing to undo: the switch adds no entry");
+}
+#[test]
+fn an_undo_step_taken_before_the_switch_carries_it_so_redo_brings_it_back() {
+    let mut o = owner();
+    let lock = |o: &mut NativeObjectHistory| {
+        let payload = json!({"command":"object.layer.policy.edit","layerUid":"B","flag":"locked","value":true});
+        let candidate = o.prepare_layer_policy_json(payload.to_string().as_bytes()).unwrap();
+        o.commit_layer_policy(candidate).unwrap()
+    };
+    assert_eq!(lock(&mut o), 1);
+    assert_eq!(set(&mut o, "A", json!(true)), Ok(2));
+    assert_eq!(o.history_depths(), (1, 0));
+    // Undo takes the lock and the switch back together (they rode one step); redo restores both.
     assert_eq!(o.undo(2), Ok(3));
-    assert_eq!(wire(&o)["layers"][0]["threeD"], json!(true));
-    assert_eq!(o.undo(3), Ok(4));
-    assert_eq!(bytes(&o), zero);
-    assert_eq!(o.redo(4), Ok(5));
+    assert!(wire(&o)["layers"][0].get("threeD").is_none() || wire(&o)["layers"][0]["threeD"] == json!(false));
+    assert_eq!(o.redo(3), Ok(4));
     assert_eq!(wire(&o)["layers"][0]["threeD"], json!(true));
 }
 #[test]

@@ -431,7 +431,7 @@ fn result_validator(operation: &str) -> Option<ResultValidator> {
         "query.document.object.layer.timing" => |_, d, p, r| object::timing_result(d, p, r),
         property_edit::OP => |_, _, _, r| property_edit::result(r),
         property_track::OP => |_, _, _, r| property_track::result(r),
-        layer_policy::OP => |_, _, _, r| layer_policy::result(r),
+        layer_policy::OP => |_, _, p, r| layer_policy::result_for(p, r),
         layer_cut::OP => |_, _, _, r| layer_cut::result(r),
         op if frame_edit::declares(op) => |o, _, _, r| frame_edit::result_for_operation(o, r),
         op if object_component::owns(op) => |o, _, p, r| object_component::result_for(o, p, r),

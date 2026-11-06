@@ -21,8 +21,16 @@ pub(super) fn request(value: &Value) -> bool {
 pub(super) fn result(value: &Value) -> bool {
     object::visibility_result(value)
 }
-pub(crate) fn revision_matches(expected: Option<u64>, revision: u64, value: &Value) -> bool {
+/// The 3D switch (#2520) is saved with a revision but is no undo step (baseline `toggleLayer3D` pushed none): applied with no history entry.
+fn saved_without_history(value: &Value) -> bool {
+    value["applied"] == true && value["historyEntriesAdded"] == 0
+}
+pub(super) fn result_for(payload: &Value, value: &Value) -> bool {
     result(value)
+        || payload.get("flag").and_then(Value::as_str) == Some("threeD") && exact(value, &["applied", "historyEntriesAdded"], &[]).is_some() && saved_without_history(value)
+}
+pub(crate) fn revision_matches(expected: Option<u64>, revision: u64, value: &Value) -> bool {
+    (result(value) || exact(value, &["applied", "historyEntriesAdded"], &[]).is_some() && saved_without_history(value))
         && expected.and_then(|before| before.checked_add(u64::from(value["applied"] == true)))
             == Some(revision)
 }
@@ -118,6 +126,15 @@ mod tests {
         assert!(!revision_matches(Some(7), 8, &noop));
         assert!(!revision_matches(None, 8, &changed));
         assert!(!revision_matches(Some(u64::MAX), 0, &changed));
+        // #2520: only the 3D switch may save a revision without a history entry.
+        let saved = json!({"applied":true,"historyEntriesAdded":0});
+        let three_d = json!({"command":"object.layer.policy.edit","layerUid":"layer","flag":"threeD","value":true});
+        let locked = json!({"command":"object.layer.policy.edit","layerUid":"layer","flag":"locked","value":true});
+        assert!(result_for(&three_d, &saved) && result_for(&three_d, &changed) && result_for(&three_d, &noop));
+        assert!(!result_for(&locked, &saved) && result_for(&locked, &changed));
+        assert!(!result_for(&three_d, &json!({"applied":false,"historyEntriesAdded":1})));
+        assert!(!result_for(&three_d, &json!({"applied":true,"historyEntriesAdded":0,"document":{}})));
+        assert!(revision_matches(Some(7), 8, &saved) && !revision_matches(Some(7), 7, &saved));
         for bad in [
             json!({"applied":true,"historyEntriesAdded":0}),
             json!({"applied":false,"historyEntriesAdded":1}),
