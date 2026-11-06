@@ -75,17 +75,13 @@ impl PoseSample {
         )
     }
 }
+/// #2257: blend, matte and effect properties of a layer are composition inputs the layered compositor applies to the
+/// layer's painted result (`SceneEffectPlan`); they do not move a pixel of the layer's own geometry, so they no longer
+/// make the layer's transform chain unavailable. A widget, a legacy group or a legacy folder id still do.
 fn safe_layer(layer: &ObjectLayer) -> bool {
     layer.widget.value().is_none()
         && layer.groups.value().is_none()
         && !layer.folder_id.value().is_some_and(|v| v.is_some())
-        && !layer.blend_mode().is_some_and(|v| v != "normal")
-        && !layer.matte_mode().is_some_and(|v| v != "none")
-        && layer.matte_source_layer_uid.value().is_none()
-        && !layer.mattes_more.value().is_some_and(|v| !v.is_empty())
-        && layer.is_effect_layer.value() != Some(&true)
-        && !layer.effects.value().is_some_and(|v| !v.is_empty())
-        && layer.effects_from.value().is_none()
 }
 fn sample(packet: &ObjectFramePacket, layer: usize) -> Result<PoseSample, ChainUnavailable> {
     let source = packet

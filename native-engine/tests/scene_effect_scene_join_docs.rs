@@ -344,6 +344,9 @@ fn a_witness_carries_only_a_plan_joined_from_its_own_packet_and_the_plan_is_part
         (witness, plan)
     };
     let (witness, plan) = build("join-identity");
+    // #2257: production joins on construction; the identity test starts from a witness without any plan.
+    assert!(witness.scene_effects().is_some());
+    let witness = witness.without_scene_effects();
     assert!(witness.scene_effects().is_none());
     let attached = witness.clone().with_scene_effects(plan.clone()).unwrap();
     assert!(Arc::ptr_eq(attached.scene_effects().unwrap(), &plan));

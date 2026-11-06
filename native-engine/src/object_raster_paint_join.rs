@@ -23,6 +23,7 @@ pub(crate) enum PaintIndex {
     /// A produced brush-texture dab: its paint and the layer of its anchor.
     Dab(usize, usize),
 }
+#[derive(Clone, Copy)]
 pub(crate) enum PaintEntry<'a> {
     Contour(ObjectPaintCommand<'a>),
     Raster(usize),
@@ -111,6 +112,14 @@ fn entry_of<'a>(plan: &'a ObjectPaintPlan, index: &PaintIndex) -> PaintEntry<'a>
 }
 pub(crate) fn ordered_entries(plan: &ObjectPaintPlan) -> impl Iterator<Item = PaintEntry<'_>> + '_ {
     plan.mixed.iter().map(|index| entry_of(plan, index))
+}
+/// Every entry with the source layer it belongs to, in authored order (the layered path paints one layer at a time).
+pub(crate) fn layered_entries(
+    plan: &ObjectPaintPlan,
+) -> impl Iterator<Item = (usize, PaintEntry<'_>)> + '_ {
+    plan.mixed
+        .iter()
+        .map(|index| (plan.layer_of_entry(index), entry_of(plan, index)))
 }
 impl ObjectPaintPlan {
     /// The source layer an entry belongs to (a placed component's image or text: its host layer).

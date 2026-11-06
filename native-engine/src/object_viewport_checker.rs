@@ -124,6 +124,11 @@ impl ObjectCompositionWitness {
         Ok(self)
     }
 
+    /// Whether a transparency checker sits under this witness' artwork (viewport witnesses only).
+    pub(crate) fn has_viewport_checker(&self) -> bool {
+        self.viewport_checker.is_some()
+    }
+
     /// The checker as the bottom item of `scene`, under the witness' own camera / navigation (the baseline artboard rect): behind a
     /// viewport reference and the artwork. Nothing for a witness without one, which is every export witness.
     pub(crate) fn paint_viewport_checker(&self, scene: &mut vello::Scene) {

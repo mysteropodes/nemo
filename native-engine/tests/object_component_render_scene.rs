@@ -261,7 +261,11 @@ fn missing_override_or_nonconsumed_motion_refuses_before_any_partial_scene_is_pu
                 d["componentTables"]["components"]["components"][0]["layers"][0]["blendMode"] =
                     json!("multiply")
             }
-            5 => d["layers"][2]["blendMode"] = json!("screen"),
+            // #2257: a HOST layer's blend is joined (families test); kind 5 keeps an inner-stack effect refused.
+            5 => {
+                d["componentTables"]["components"]["components"][0]["layers"][0]["effects"] =
+                    json!([{"type": "blur", "enabled": true, "p1": 4}])
+            }
             _ => {
                 d["objects"].as_array_mut().unwrap().push(record(
                     "scene-root",

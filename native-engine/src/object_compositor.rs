@@ -13,6 +13,9 @@ use vello::peniko::Color;
 
 #[path = "object_raster_compositor.rs"]
 mod raster;
+// #2257: what one wire layer of the layered path paints (every family, camera, outline, under-artwork content).
+#[path = "object_layered_content.rs"]
+pub(in crate::compositor) mod layered;
 
 const MAX_DIMENSION: u32 = 4096;
 const MAX_PIXELS: u64 = 16_777_216;
@@ -198,15 +201,14 @@ impl Compositor {
     /// budget, every paint validated, same background rule); pixels come from the GPU
     /// layer stack, which must account for every paint command of this witness' plan
     /// exactly once (`GpuLayerStack::covers_plan`: same contour address and colour bits,
-    /// compared as a multiset, so a count-preserving mis-mapping is refused). A reference image is refused: the layered path draws solid layers.
-    #[allow(dead_code)]
+    /// compared as a multiset, so a count-preserving mis-mapping is refused). Every other family, the stored camera, the
+    /// outline and hidden shadow guides, and what sits under the artwork come from the witness (`layered`).
     pub(crate) fn compose_object_layered(
         &mut self,
         prepared: &ObjectCompositionWitness,
         output: ObjectOutputSpec,
         stack: &GpuLayerStack<'_>,
     ) -> Result<ObjectCompositionResult, CompositorError> {
-        raster::check_layered_camera(prepared)?;
         let plan = prepared.plan();
         output_budget(
             output.width,
@@ -216,40 +218,13 @@ impl Compositor {
         for command in plan.commands() {
             prepare_command(command)?;
         }
-        #[cfg(all(feature = "application", feature = "project_media_codec"))]
-        if prepared.has_raster_images() {
-            return Err(CompositorError::new(
-                "native raster layered effects are unavailable",
-            ));
-        }
-        if plan.has_text() {
-            return Err(CompositorError::new(
-                "native Text layered effects are unavailable",
-            ));
-        }
-        if plan.has_components() {
-            return Err(CompositorError::new(
-                "native component layered effects are unavailable",
-            ));
-        }
-        if plan.has_duplicators() {
-            return Err(CompositorError::new(
-                "native duplicator layered effects await their shared paint join",
-            ));
-        }
-        raster::refuse_layered_video(plan)?;
         if !stack.covers_plan(plan) {
             return Err(CompositorError::new(
                 "layer stack does not cover the composition plan",
             ));
         }
-        #[cfg(all(feature = "application", feature = "project_media_codec"))]
-        if prepared.reference_image().is_some() {
-            return Err(CompositorError::new(
-                "reference image is unavailable on the layered path",
-            ));
-        }
-        // All layered/style/reference admission above must precede retiring
+        let context = layered::LayerContext::new(prepared)?;
+        // All layered/style admission above must precede retiring
         // a prior native image that could fill Vello's private atlas.
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         self.retire_object_reference_for(plan, (output.width, output.height))?;
@@ -259,8 +234,16 @@ impl Compositor {
             [255; 4]
         };
         let target = self
-            .compose_layered_stack(stack, (output.width, output.height), background)?
+            .compose_layered_stack_in(
+                Some(&context),
+                stack,
+                (output.width, output.height),
+                background,
+                &crate::compositor::object_target::reserve_target_bytes,
+            )?
             .into_target();
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        self.release_ghost_images(prepared)?;
         Ok(ObjectCompositionResult {
             instance: self.instance.clone(),
             device: self.device.clone(),

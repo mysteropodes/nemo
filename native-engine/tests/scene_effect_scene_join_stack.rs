@@ -87,7 +87,7 @@ fn a_matte_source_paints_only_through_its_matte() {
 }
 
 #[test]
-fn an_enabled_layer_effect_is_a_typed_unavailability_not_a_missing_effect() {
+fn an_enabled_layer_effect_is_selected_with_its_planned_stack_not_dropped() {
     let mut document = base_document();
     set_layer(&mut document, "L1", json!({"blendMode": "multiply"}));
     set_layer(
@@ -96,12 +96,12 @@ fn an_enabled_layer_effect_is_a_typed_unavailability_not_a_missing_effect() {
         json!({"effects": [{"type": "blur", "enabled": true, "p1": 4}]}),
     );
     let (plan, join) = plans(&document, "stack-effects", &[]);
-    assert_eq!(
-        select_composition_path(&join, &plan).unwrap_err(),
-        PathSelectionError::Stack(GpuBlendError::Unavailable(GpuUnavailable::LayerEffects {
-            layer: 2
-        }))
-    );
+    // #2257: the layer's planned stack travels with its slot (executed when the stack is composed), nothing is dropped.
+    let PathSelection::Layered(stack) = select_composition_path(&join, &plan).unwrap() else {
+        panic!("an enabled effect needs the layer stack");
+    };
+    assert!(stack.inputs()[2].effects.is_some() && stack.inputs()[1].effects.is_none());
+    assert!(stack.steps().iter().any(|step| step.layer == 2 && step.effects));
 }
 
 #[test]
@@ -224,7 +224,7 @@ fn actual_stored_masks_become_borrowed_white_gpu_inputs_without_ordinary_paint_l
 }
 
 #[test]
-fn actual_stored_mask_feather_keeps_the_original_threshold_and_typed_refusal() {
+fn actual_stored_mask_feather_keeps_the_original_threshold_and_selects_the_blur() {
     let (plan, join) = plans(&stored_mask_document(0.01), "stack-mask-threshold", &[]);
     let PathSelection::Layered(stack) = select_composition_path(&join, &plan).unwrap() else {
         panic!("baseline feather at0.01 skips blur");
@@ -234,12 +234,11 @@ fn actual_stored_mask_feather_keeps_the_original_threshold_and_typed_refusal() {
     let (plan, join) = plans(&stored_mask_document(4.), "stack-mask-feather", &[]);
     assert_eq!(plan.mask_inputs().layer(1).unwrap().feather(), 4.);
     assert_eq!(join.mask_feather(1), Some(4.));
-    assert_eq!(
-        select_composition_path(&join, &plan).unwrap_err(),
-        PathSelectionError::Stack(GpuBlendError::Unavailable(GpuUnavailable::MaskFeather {
-            layer: 0
-        }))
-    );
+    // #2257: a feather above the threshold is selected (the silhouette blur runs when the stack is composed).
+    let PathSelection::Layered(stack) = select_composition_path(&join, &plan).unwrap() else {
+        panic!("a feathered mask stays on the layer stack");
+    };
+    assert_eq!(stack.inputs()[0].mask_feather, 4.0f32);
 }
 
 #[test]

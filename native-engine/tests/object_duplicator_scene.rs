@@ -167,6 +167,83 @@ fn enabled_effects_only_on_hidden_or_shifted_sources_refuse_without_poisoning_di
 
 #[cfg(feature = "export_job")]
 #[test]
+fn real_metal_temporal_copies_of_a_multiply_host_layer_reach_both_doors_like_the_flat_frame() {
+    // #2257: a blend mode on the duplicator's host layer selects the layer stack; Multiply over an empty backdrop is the
+    // source, so the temporal copies land on the very pixels of the flat frame.
+    use crate::compositor::Compositor;
+    use crate::object_render_scene::scene_effect_kernels::scene_effect_order::CompositionPlan;
+    use crate::object_render_scene::{
+        prepare_object_composition, prepare_scheduled_object_composition_from_witness,
+    };
+    use crate::scheduler::{
+        EvaluationKey, FrameScheduler, ObjectSchedulePins, ObjectScheduleScope, OutputSpec,
+    };
+    let mut gpu = Compositor::new().expect("original pixel acceptance needs real Metal");
+    let render = |gpu: &mut Compositor, blend: Option<&str>| {
+        let mut value = fixture(1);
+        if let Some(mode) = blend {
+            value["layers"][0]["blendMode"] = json!(mode);
+        }
+        for record in value["objects"].as_array_mut().unwrap() {
+            let x = match record["target"]["frameScope"]["frame"].as_u64().unwrap() {
+                0 => 10,
+                2 => 20,
+                6 => 60,
+                _ => panic!("unexpected original drawing"),
+            };
+            record["geometry"]["segments"] = json!([[x, 30], [x + 4, 30], [x + 4, 34], [x, 34]]
+                .map(|[x, y]| json!({"point":{"x":x,"y":y},
+                    "handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}})));
+            record["fill"] = json!({"kind":"solid","r":1,"g":0,"b":0,"a":1});
+        }
+        let snapshot = snapshot(value);
+        let pin = selector(&snapshot, 2);
+        let packet = prepare_object_exposure_frame(&snapshot, &pin).unwrap();
+        let scene = prepare_object_render_scene(&packet, &pin).unwrap();
+        let plan = prepare_object_paint_plan(&scene, &pin).unwrap();
+        let witness = prepare_object_composition(&plan, &pin).unwrap();
+        let layered = matches!(
+            witness.scene_effects().unwrap().plan(),
+            CompositionPlan::Layered { .. }
+        );
+        let output = OutputSpec::new("frame", "rgba8", 100, 100, "srgb", "straight").unwrap();
+        let key =
+            EvaluationKey::new(snapshot.snapshot_id(), "scene-root", 2, "final", output, []).unwrap();
+        let pins = ObjectSchedulePins {
+            instance_id: snapshot.instance_id().into(),
+            document_id: snapshot.document_id().into(),
+            content_revision: snapshot.content_revision(),
+            document_snapshot_id: snapshot.snapshot_id().into(),
+            context_id: "scene-root".into(),
+            frame: 2,
+            scope: ObjectScheduleScope::Authored,
+        };
+        let mut scheduler = FrameScheduler::new();
+        let work = scheduler.schedule_object(snapshot.clone(), pins, key).unwrap();
+        let bytes = {
+            let live = prepare_scheduled_object_composition_from_witness(&scheduler, &work, &witness)
+                .unwrap();
+            let rendered = gpu.compose_scheduled_object(&live).unwrap();
+            gpu.readback_scheduled_object_rgba8(&rendered, &live)
+                .unwrap()
+                .bytes(&live)
+                .unwrap()
+                .to_vec()
+        };
+        scheduler.succeed(work.work_id()).unwrap();
+        (layered, bytes)
+    };
+    let (flat_layered, flat) = render(&mut gpu, None);
+    let (layered, image) = render(&mut gpu, Some("multiply"));
+    assert!(!flat_layered && layered);
+    assert_eq!(image, flat, "temporal copies: layered Multiply vs flat Normal");
+    let red = (0..100)
+        .filter(|x| image[(32 * 100 + x) * 4..(32 * 100 + x + 1) * 4] == [255, 0, 0, 255])
+        .count();
+    assert!(red >= 8, "the temporal copies are really drawn: {red} red pixels on the row");
+}
+
+#[test]
 fn real_metal_temporal_copies_reach_the_viewport_texture_and_three_decoded_pngs() {
     use crate::compositor::Compositor;
     use crate::object_render_scene::{

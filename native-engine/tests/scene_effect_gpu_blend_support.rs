@@ -211,6 +211,8 @@ pub(super) fn inputs<'a>(case: &'a Case, geometry: &'a Geometry) -> Vec<GpuLayer
         .iter()
         .enumerate()
         .map(|(i, layer)| GpuLayerInput {
+            source_layer: None,
+            effects: None,
             paint: GpuLayerPaint {
                 fills: layer
                     .fills
