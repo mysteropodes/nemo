@@ -47,6 +47,8 @@ mod property_metadata_dispatch_tests;
 mod property_metadata_read;
 #[path = "object_property_conditional_rows.rs"]
 mod property_conditional_rows;
+#[path = "object_property_shape_rows.rs"]
+mod property_shape_rows;
 #[cfg(all(test, feature = "test-commands"))]
 #[path = "../tests/object_property_metadata_read.rs"]
 mod property_metadata_tests;

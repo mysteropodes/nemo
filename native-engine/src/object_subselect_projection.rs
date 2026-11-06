@@ -122,7 +122,7 @@ impl ObjectCompositionWitness {
             // of its neighbours; its per-item geometry read stays refused.
             // The record as painted: the `vtxN` offsets of its element holder are in its bounds and matrix (and listed for the points).
             let posed = if hit_test {
-                crate::evaluation::object_vector_kernels::render_vector_eval::motion::vertex_posed(
+                crate::evaluation::object_vector_kernels::render_vector_eval::vertex::vertex_posed(
                     packet.snapshot(),
                     r,
                     packet.frame(),

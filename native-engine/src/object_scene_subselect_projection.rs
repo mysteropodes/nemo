@@ -247,7 +247,7 @@ fn element_matrices(
             stroke_id: Presence::Present(record.target.stroke_id.clone()),
         };
         // The pivot is the centre of the geometry as painted: with the `vtxN` offsets of its element holder.
-        let posed = crate::evaluation::object_vector_kernels::render_vector_eval::motion::vertex_posed(
+        let posed = crate::evaluation::object_vector_kernels::render_vector_eval::vertex::vertex_posed(
             packet.snapshot(),
             record,
             packet.frame(),
