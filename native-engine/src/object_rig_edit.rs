@@ -23,6 +23,10 @@
 //!   the remove button, the add-bone row (`{boneId, offset, w: 0.5}`), and "reset (auto)"
 //!   (`rigWeighOnePoint`, the offset model); only that one vertex's list is written;
 //! - `setIk` (`rigSetIK`): `l1`/`l2` measured on the live pose, the chain filed under `end.boneId:end.vi`;
+//! - `dragIk` (the Alt-drag of `rig-bridge.js`, #2255): the anchor `end` must be the far end of a two-bone chain
+//!   (`findIKChain`, else `invalid_request`); the chain is filed with `flip: false` and the lengths of the live pose
+//!   (`rigSetIK`), then ONE `rigDragIKEnd` solve toward `to` writes the joint, the end and the coincident near vertex
+//!   of the end bone. The whole gesture is one revision and one history entry;
 //! - `removeIk`, `removeBone`, `removeBind`: there is no removal in the baseline UI. They are the
 //!   reference-checked deletions the CRUD acceptance asks for: a bone still named by an IK chain or a
 //!   weight entry is refused, never cascaded;
@@ -45,7 +49,7 @@
 //! the auto-assign button) and `autoAssign` also refuses an active path effect (`canEditActiveLayer`); a
 //! pressure ribbon cannot be bound (`Unavailable`: the pose commit would leave its centreline at rest).
 //!
-//! Not provided: pose evaluation, IK dragging, reset/commit pose, selection, the locked-layer
+//! Not provided: pose evaluation, reset/commit pose, selection, the locked-layer
 //! gesture escape (F06), the scene/export join and the JS adapter.
 use crate::commands::object_fill_owner::path_effects_edit::layer_has_active_path_fx;
 use crate::commands::ObjectFillOwner;
@@ -177,6 +181,10 @@ pub(crate) enum RigAction {
         joint: RigRef,
         end: RigRef,
         flip: bool,
+    },
+    DragIk {
+        end: RigRef,
+        to: [f64; 2],
     },
     RemoveIk {
         end_key: String,
@@ -373,6 +381,10 @@ fn apply(
             )
             .map_err(refused)?;
             rules::set_ik(need()?, [root, joint, end], *flip, lengths)?
+        }
+        RigAction::DragIk { end, to } => {
+            let drag = plan::plan_ik_drag(document, uid, &end.kernel(), *to).map_err(refused)?;
+            rules::drag_ik(need()?, &drag)?
         }
         RigAction::RemoveIk { end_key } => rules::remove_ik(need()?, end_key)?,
         RigAction::RemoveBone { bone_id } => rules::remove_bone(need()?, bone_id)?,

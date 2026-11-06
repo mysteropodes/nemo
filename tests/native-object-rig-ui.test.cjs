@@ -92,8 +92,7 @@ test('the panel owns no canvas listener (the canvas gestures are native-object-r
   assert.deepEqual(h.sent(), []);
   assert.deepEqual(h.legacy, []);
   const rig = h.sandbox.NemoNativeObjectRig.desktop(h.win());
-  for (const name of ['dragPose', 'dragIkEnd']) {
-    const error = await rig[name]().catch((e) => e);
-    assert.deepEqual([error.code, error.reason], ['unavailable', 'rig_pose_drag_unavailable'], name);
-  }
+  assert.equal(rig.dragPose, undefined);
+  assert.equal(rig.dragIkEnd, undefined);
+  assert.equal(typeof rig.dragIk, 'function', 'the Alt-drag of a chain end is a real native command');
 });

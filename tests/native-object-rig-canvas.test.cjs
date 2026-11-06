@@ -39,7 +39,7 @@ class El {
 
 function harness(options) {
   options = options || {};
-  const fx = createFixture({}), data = rigData(), listeners = [], fields = {}, legacy = [], toasts = [], reads = [], frames = [], body = new El('body');
+  const fx = createFixture(options.fixture || {}), data = rigData(), listeners = [], fields = {}, legacy = [], toasts = [], reads = [], frames = [], body = new El('body');
   const sandbox = { console, setTimeout, clearTimeout };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   sandbox.SM = { t: (key) => key };
@@ -66,11 +66,13 @@ function harness(options) {
       if (shownKey !== key) { shownKey = key; shown = Object.assign(info(), { available: true, kind: 'native-object', presentation: presentation() }); }
       return shown;
     },
-    async readRig(selector, pin, parts) {
-      reads.push({ selector, pin: pin.contentRevision, parts: Array.from(parts) });
+    async readRig(selector, pin, parts, preview) {
+      reads.push({ selector, pin: pin.contentRevision, parts: Array.from(parts), preview });
+      if (preview && options.previewError) throw Object.assign(new Error('refused'), { code: options.previewError });
       const out = {};
-      parts.forEach((p) => { out[p] = data.parts[p]; });
-      return Object.freeze({ info: pin, presentation: shown.presentation, layerUid: selector.layerUid, unavailable: data.unavailable, parts: Object.freeze(out) });
+      parts.forEach((p) => { out[p] = (preview && data.previewParts && data.previewParts[p]) || data.parts[p]; });
+      const matrix = preview && data.previewMatrix !== undefined ? data.previewMatrix : data.matrix || null;
+      return Object.freeze({ info: pin, presentation: shown.presentation, layerUid: selector.layerUid, unavailable: data.unavailable, matrix, parts: Object.freeze(out) });
     },
     async readRigWeights(selector, pin, bind, vertex) {
       reads.push({ selector, weights: [bind, vertex] });
@@ -156,16 +158,85 @@ test('Déplacer: a handle drag mirrors the other handle unless Alt breaks the ta
   assert.equal(h.sent().length, 2);
 });
 
-test('Déplacer: Alt on an anchor is the typed rig_pose_drag_unavailable and sends nothing', async () => {
+test('Déplacer: Alt on an anchor is an IK drag, ONE dragIk on release, and the held drag is previewed by the engine without publishing', async () => {
   const h = await started({ mode: 'move' });
-  assert.equal(h.fire('pointerdown', { clientX: 100, clientY: 100, altKey: true }).stopped, true);
+  assert.equal(h.fire('pointerdown', { clientX: 200, clientY: 100, altKey: true }).stopped, true);
+  h.data.previewParts = { vertices: [vert('bone1', 0, [100, 100], [0, 0], [20, 0]), vert('bone1', 1, [160, 40], [-20, 0], [0, 0]), vert('bone2', 0, [100, 300], [0, 0], [0, 0]), vert('bone2', 1, [200, 300], [0, 0], [0, 0])],
+    posed: [[0, 0, 110, 120, 0, 0, 5, 0, 0], [0, 1, 170, 60, -5, 0, 0, 0, 0]] };
+  h.fire('pointermove', { clientX: 230, clientY: 130, altKey: true });
+  h.fire('pointermove', { clientX: 240, clientY: 150, altKey: true });
   await h.settle();
-  assert.match(h.toasts[0], /rig_pose_drag_unavailable/);
-  h.fire('pointermove', { clientX: 150, clientY: 150 });
-  h.fire('pointerup', { clientX: 150, clientY: 150 });
+  const asked = h.reads.filter((r) => r.preview);
+  assert.ok(asked.length >= 1 && asked.length <= 2, 'one request per animation frame, the pointer moves coalesced');
+  assert.deepEqual(JSON.parse(JSON.stringify(asked[asked.length - 1].preview)), { ik: { boneId: 'bone1', vi: 1, to: [240, 150] } });
+  assert.deepEqual(asked[0].parts, ['vertices', 'posed'], 'the candidate bones and the deformed outlines');
+  assert.deepEqual(h.sent(), [], 'nothing is written while the pointer is held');
+  const svg = h.body.children.find((c) => c.attrs && c.attrs['aria-hidden']);
+  const paths = (function walk(n, out) { (n.children || []).forEach((c) => { if (c.tag === 'path' || (c.attrs && c.attrs.d)) out.push(c); walk(c, out); }); return out; })(svg, []);
+  assert.ok(paths.some((p) => p.attrs.stroke === 'rgba(80,200,255,.85)'), 'the deformed outline of the bound stroke is drawn');
+  assert.equal(h.fire('pointerup', { clientX: 240, clientY: 150, altKey: true }).stopped, true);
   await h.settle();
-  assert.deepEqual(h.sent(), []);
+  assert.deepEqual(h.sent(), [edit({ kind: 'dragIk', end: { boneId: 'bone1', vi: 1 }, to: [240, 150] })]);
+  assert.deepEqual(h.toasts, []);
   assert.deepEqual(h.legacy, []);
+});
+
+test('Déplacer: Alt on an anchor that ends no two-bone chain moves the anchor (the engine refuses the IK preview), ONE moveSegment', async () => {
+  const h = await started({ mode: 'move', previewError: 'invalid_request' });
+  h.fire('pointerdown', { clientX: 100, clientY: 100, altKey: true });
+  h.fire('pointermove', { clientX: 150, clientY: 150, altKey: true });
+  await h.settle();
+  h.fire('pointermove', { clientX: 160, clientY: 160, altKey: true });
+  await h.settle();
+  h.fire('pointerup', { clientX: 160, clientY: 160, altKey: true });
+  await h.settle();
+  assert.deepEqual(h.sent(), [edit({ kind: 'moveSegment', boneId: 'bone1', vi: 0, part: 'point', to: [160, 160] })]);
+  assert.deepEqual(h.toasts, []);
+});
+
+test('Déplacer: a release before the engine answered tries the IK first and falls back to the anchor move when no chain ends there', async () => {
+  const h = await started({ mode: 'move', fixture: { refuse: (request) => (request.payload.action.kind === 'dragIk' ? { code: 'invalid_request' } : null) } });
+  await gesture(h, [['pointerdown', { clientX: 100, clientY: 100, altKey: true }], ['pointermove', { clientX: 150, clientY: 150 }], ['pointerup', { clientX: 150, clientY: 150 }]]);
+  assert.deepEqual(h.sent().map((r) => r[1].action.kind), ['dragIk', 'moveSegment'], 'a refusal publishes nothing, so the pair is still one revision');
+  assert.deepEqual(h.toasts, []);
+});
+
+test('Déplacer: a plain anchor and a handle drag are previewed as a candidate segment, and a big bind skips the deformed outline', async () => {
+  const h = harness({ mode: 'move' });
+  h.data.parts.binds = [{ index: 0, strokeId: 's1', meshId: null, points: 5000, rotate: false, state: 'posed' }];
+  h.fire('pointermove', { clientX: 1, clientY: 1 });
+  await h.settle();
+  await gesture(h, [['pointerdown', { clientX: 120, clientY: 100 }], ['pointermove', { clientX: 130, clientY: 120 }]]);
+  const last = h.reads.filter((r) => r.preview).pop();
+  assert.deepEqual(JSON.parse(JSON.stringify(last.preview)), { segment: { boneId: 'bone1', vi: 0, part: 'handleOut', to: [130, 120] } });
+  assert.deepEqual(last.parts, ['vertices'], 'five thousand bound points would cost many pages per frame: the bones alone follow the pointer');
+  await gesture(h, [['pointerup', { clientX: 130, clientY: 120 }]]);
+  assert.equal(h.sent().length, 1);
+});
+
+test('a layer with Motion: the overlay is drawn through its world map and every gesture is inverted through it', async () => {
+  const h = harness({ mode: 'move' });
+  h.data.matrix = [0, 2, -1, 0, 15, -13]; // x' = -y + 15, y' = 2x - 13 (rotated 90 degrees, doubled in x)
+  h.fire('pointermove', { clientX: 1, clientY: 1 });
+  await h.settle();
+  // bone1 vertex 1 sits at layer (200, 100): in the world (-100 + 15, 400 - 13) = (-85, 387).
+  assert.equal(h.fire('pointerdown', { clientX: -85, clientY: 387 }).stopped, true);
+  h.fire('pointermove', { clientX: -185, clientY: 287 });
+  h.fire('pointerup', { clientX: -185, clientY: 287 });
+  await h.settle();
+  // world (-185, 287) -> layer ((287 + 13) / 2, 185 + 15) = (150, 200): the inverse of the map.
+  assert.deepEqual(h.sent(), [edit({ kind: 'moveSegment', boneId: 'bone1', vi: 1, part: 'point', to: [150, 200] })]);
+  assert.deepEqual(h.toasts, []);
+});
+
+test('a layer the engine cannot map keeps the typed rig_presentation_unavailable and sends nothing', async () => {
+  const h = harness({ mode: 'move' });
+  h.data.unavailable = 'three_d';
+  h.fire('pointermove', { clientX: 1, clientY: 1 });
+  await h.settle();
+  h.fire('pointerdown', { clientX: 200, clientY: 100 });
+  assert.match(h.toasts[0], /rig_presentation_unavailable: three_d/);
+  assert.deepEqual(h.sent(), []);
 });
 
 test('Assigner: a rim drag is ONE setBoneRadius; the radius floor is 1 and the bone keeps its own radius over the panel default', async () => {

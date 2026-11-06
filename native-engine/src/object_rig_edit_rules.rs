@@ -21,7 +21,7 @@ use crate::object_document::object_rig_record::{
     RigSegment, RigWeight, BONE_ID_PREFIX,
 };
 use crate::object_document::Presence;
-use crate::object_snapshot::object_rig_edit_read::{ControlEntry, OffsetEntry};
+use crate::object_snapshot::object_rig_edit_read::{ControlEntry, IkDrag, OffsetEntry};
 use crate::request_receipts::DispatchErrorCode;
 use serde_json::Number;
 
@@ -387,6 +387,16 @@ pub(super) fn set_ik(
     }
     let mut next = rig.clone();
     next.ik_chains = replaced(&next.ik_chains, &key, chain);
+    Ok(next)
+}
+
+/// The Alt-drag of a chain end: the chain filed as `rigSetIK` does (`flip: false`), then the solved vertex writes.
+pub(super) fn drag_ik(rig: &RigRecord, drag: &IkDrag) -> Rule<RigRecord> {
+    let refs = drag.refs.clone().map(|r| RigRef { bone_id: r.bone_id, vi: r.vi });
+    let mut next = set_ik(rig, [&refs[0], &refs[1], &refs[2]], false, drag.lengths)?;
+    for (target, point) in &drag.writes {
+        next = move_segment(&next, &target.bone_id, target.vi as usize, SegmentPart::Point, *point, false)?;
+    }
     Ok(next)
 }
 

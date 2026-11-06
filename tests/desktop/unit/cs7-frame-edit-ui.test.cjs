@@ -138,3 +138,20 @@ test('summarize refuses reads that disagree on revision, document or total', () 
   const short = structuredClone(good); short.layers[1].response.result.cells.runs.pop();
   assert.equal(summarize(short, 'scene-root'), null);
 });
+
+test('replies shaped differently from the read contract stop the batch with a private reason and the progress so far, never a guess', async t => {
+  const { session, workflow, directory } = setup(t);
+  const original = session.requestEvidence;
+  session.requestEvidence = async request => {
+    const ev = await original(request);
+    if (request.phase === 'scene-f6') ev.reads.layers[0].response.result.cells.runs[0].length = 5;
+    return ev;
+  };
+  await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed' && error.command === 'frame-edit-ui.scene-f6');
+  const mismatch = JSON.parse(fs.readFileSync(path.join(directory, 'frame-edit-ui/mismatch-scene-f6.json'), 'utf8'));
+  assert.match(mismatch.reason, /six-element array/);
+  const partial = JSON.parse(fs.readFileSync(path.join(directory, 'frame-edit-ui/partial.json'), 'utf8'));
+  assert.equal(partial.stoppedBy, 'operator-evidence-malformed');
+  assert.equal(partial.outcome['layer-row-styling'], 'pass');   // judged before the bad reply and kept
+  assert.equal(partial.outcome['scene-f5-f6-f7'], 'unrun');
+});

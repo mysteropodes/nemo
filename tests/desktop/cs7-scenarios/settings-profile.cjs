@@ -6,11 +6,17 @@
 //   * File > New (the helper's entry.* commands need an entry mode the installed batch does not set),
 //   * the colour swatch and its alpha (no colour command; judged from the helper's own window capture),
 //   * rebinding a shortcut and "Reset all" (no key capture, `shortcuts.reset` is denied by the helper).
-// Not coverable here, left unrun: real sync-owner publish/check/merge (needs a configured shared folder and
-// a second profile's published state; the helper only reaches the empty-folder and cancel paths).
+//   * the sync-owner clause (settings-sync-owner.cjs): choosing a shared folder in the native picker, Publish,
+//     Check, a Merge row and the failing Publish. The helper reaches only the empty-folder cancel/check, so a
+//     person clicks and the oracle judges the disposable shared folder on disk (which it also seeds with a
+//     second profile's published state), the accessibility read and unedited MCP document reads.
+// Not covered by the helper: the backdrop press is attempted through the helper and recorded unrun if the
+// helper refuses it (the helper then ends, so it is the last helper step).
 const path = require('node:path');
 const { isDeepStrictEqual: same } = require('node:util');
 const kit = require('./installed-kit.cjs');
+const { runSyncOwner } = require('./settings-sync-owner.cjs');
+const { OperatorInputError } = require('../cs7-runner.cjs');
 const { plain, text, malformed, rawOnly } = kit;
 
 const ROW = 'settings-profile';
@@ -18,9 +24,13 @@ const CLAUSES = ['settings-entries-tabs', 'profile-persist-restore', 'profile-ro
   'shortcuts-reset', 'sync-empty-folder', 'sync-owner-paths'];
 const TABS = ['General', 'Updates', 'Collaboration', 'Feedback', 'Figma', 'Shortcuts', 'Labs', 'About'];
 const REQUESTED = { name: 'UI-validation', email: 'ui-validation@example.invalid' };
-const FALLBACK = /^(Animateur|Animator|アニメーター|Animador)/;
+// Baseline timeline.js: an emptied name is stored as the literal 'Animateur' (not localized, no suffix; the
+// suffixed 'Animateur XXXX' is only the first-install default).
+const FALLBACK = 'Animateur';
 const LOADING = /(Recherche…|Searching…|検索中|Buscando…)/;
-const GUARD_TOAST = [/(producer|producteur|productor|プロデューサー)/i, /(read.?only|lecture seule|solo lectura|読み取り|読取)/i];
+// Baseline timeline.js setTool: showToast('Profil "Producteur" : lecture seule + commentaires'), a literal.
+const GUARD_TOAST = 'Profil "Producteur" : lecture seule + commentaires';
+const BRUSH = /^(Brush|Pinceau|ブラシ|Pincel)/, HAND = /^(Hand|Main|手のひら|Mano)/;
 const CAPTURES = { baseline: 'capture-11.png', opaque: 'capture-12.png', alpha: 'capture-13.png', restored: 'capture-14.png' };
 const OPAQUE = [0x33, 0x66, 0x99];
 
@@ -38,10 +48,11 @@ function createWorkflow({ reportDirectory, sleep = ms => new Promise(resolve => 
     if (row.issue !== 2172 || !same(row.checks.map(c => c.id), CLAUSES)) throw new Error('original settings clauses changed');
     const outcome = Object.fromEntries(CLAUSES.map(id => [id, 'unrun']));
     const reasons = {};
+    let sync = null;
     const dir = path.join(reportDirectory, ROW);
     const finish = stop => {
       kit.privateEvidence(dir, 'outcome', { schema: 'nemo.settings-profile-private/1', outcome, reasons,
-        unrunReason: { 'sync-owner-paths': 'needs a configured shared folder and a second profile; the helper reaches only the empty-folder and cancel paths' } });
+        sync });
       return { checks: CLAUSES.map(id => ({ id, status: outcome[id] })), safeToContinue: !stop };
     };
     const fail = (id, why) => { outcome[id] = 'fail'; reasons[id] = why; return finish(true); };
@@ -121,7 +132,7 @@ function createWorkflow({ reportDirectory, sleep = ms => new Promise(resolve => 
       await close();
       n = await reopen('menu');
       const fallback = valueOf(n, 'profile-name');
-      if (!fallback || !FALLBACK.test(fallback)) return fail('profile-persist-restore', 'empty name did not fall back to the default name');
+      if (fallback !== FALLBACK) return fail('profile-persist-restore', 'empty name did not fall back to the baseline default "' + FALLBACK + '" (read: ' + JSON.stringify(fallback) + ')');
       await session.input('profile.name.restore');
       await session.input('profile.email.restore');
       n = await stable();
@@ -132,6 +143,20 @@ function createWorkflow({ reportDirectory, sleep = ms => new Promise(resolve => 
       const role0 = valueOf(n, 'profile-role');
       if (role0 === null) throw malformed(ROW, 'role-baseline');
       const hint = nodes => labelsOf(byId(nodes, 'profile-role-hint'));
+      const tools = nodes => {
+        const buttons = nodes.filter(x => x.role === 'AXButton' && Array.isArray(x.labels));
+        return { brush: buttons.find(x => x.labels.some(l => BRUSH.test(l))), hand: buttons.find(x => x.labels.some(l => HAND.test(l))) };
+      };
+      // Calibration with the baseline role: the tool buttons only count as evidence if pressing Brush then Hand
+      // is seen to move their accessibility `selected` state. If it is not, only the literal toast can speak.
+      await close();
+      await session.input('tool.brush');
+      const onBrush = tools(await stable());
+      await session.input('tool.hand');
+      const onHand = tools(await stable());
+      const calibrated = onBrush.brush?.selected === true && onBrush.hand?.selected !== true &&
+        onHand.hand?.selected === true && onHand.brush?.selected !== true;
+      await reopen('gear');
       await session.input('profile.role', undefined, 'Supervisor');
       n = await stable();
       const supervisorHint = hint(n);
@@ -141,22 +166,25 @@ function createWorkflow({ reportDirectory, sleep = ms => new Promise(resolve => 
       if (valueOf(n, 'profile-role') !== 'Producer') return fail('profile-role-guard', 'Producer not read back');
       if (!hint(n).length || same(hint(n), supervisorHint)) return fail('profile-role-guard', 'role hint did not change for Producer');
       await close();
+      const staleToast = labelsOf(await observe()).some(l => l.includes(GUARD_TOAST));
       await session.input('tool.brush');
-      n = await stable();
-      const tools = n.filter(x => x.role === 'AXButton' && Array.isArray(x.labels));
-      const brush = tools.find(x => x.labels.some(l => /^(Brush|Pinceau|ブラシ|Pincel)/.test(l)));
-      const hand = tools.find(x => x.labels.some(l => /^(Hand|Main|手のひら|Mano)/.test(l)));
-      const toast = labelsOf(n).some(l => GUARD_TOAST.every(re => re.test(l)));
+      const seenToast = []; let after = null;
+      for (let i = 0; i < 3; i++) { after = await observe(); seenToast.push(labelsOf(after).some(l => l.includes(GUARD_TOAST))); if (i < 2) await sleep(500); }
+      const toast = seenToast.some(Boolean), now = tools(after);
       let guard = 'unknown';
-      if (brush?.selected === true) guard = 'bypassed';
-      else if (toast || (brush?.selected === false && hand?.selected === true)) guard = 'held';
+      if (calibrated && now.brush?.selected === true) guard = 'bypassed';
+      else if (calibrated && now.brush?.selected !== true && now.hand?.selected === true) guard = 'held';
+      else if (!calibrated && toast && !staleToast) guard = 'held';
       n = await reopen('gear');
       await session.input('profile.role.restore');
       n = await stable();
       if (guard === 'bypassed') return fail('profile-role-guard', 'Producer role let the Brush tool become active');
       if (valueOf(n, 'profile-role') !== role0) return fail('profile-role-guard', 'baseline role not restored');
-      if (guard === 'held') outcome['profile-role-guard'] = 'pass';
-      else reasons['profile-role-guard'] = 'role read back, but neither the read-only toast nor tool selection state was exposed to the accessibility read';
+      if (guard === 'held') {
+        outcome['profile-role-guard'] = 'pass';
+        if (!toast) reasons['profile-role-guard'] = 'tool state held; the read-only toast text was not read';
+      } else reasons['profile-role-guard'] = 'role read back, but ' + (calibrated ? 'the tool buttons did not show Hand selected' :
+        'the tool buttons do not expose their selected state and the baseline read-only toast was ' + (staleToast ? 'already shown before the press' : 'not read'));
 
       // 6 sync-empty-folder
       await session.input('settings.tab', 'Collaboration');
@@ -221,11 +249,27 @@ function createWorkflow({ reportDirectory, sleep = ms => new Promise(resolve => 
       if (!near(centre(restored), original, 10)) return fail('profile-color-alpha', 'original colour not restored');
       outcome['profile-color-alpha'] = 'pass';
 
-      // 1 (rest): the backdrop dismisses the dialog; last, because a refusal here ends the helper
-      await session.input('settings.backdrop');
+      // 7 sync-owner-paths: the folder picker, Publish, Check, Merge and the failing Publish. A person clicks; the
+      // oracle judges the disposable shared folder, the accessibility read and the unedited MCP document reads.
+      const sync0 = await runSyncOwner({ session, ask, observe, stable, sleep, dir, profileName: name0,
+        openSettings: () => reopen('gear'), closeSettings: close });
+      sync = sync0;
+      outcome['sync-owner-paths'] = sync0.status;
+      if (sync0.reason) reasons['sync-owner-paths'] = sync0.reason;
+
+      // 1 (rest): the backdrop dismisses the dialog; last, because a refusal here ends the helper (which is why
+      // the sync-owner observations come first). A refusal is recorded as unrun, not guessed as a failure.
+      const failed = Object.values(outcome).includes('fail');
+      if (!isOpen(await stable())) { reasons['settings-entries-tabs'] = 'Settings was not open for the backdrop press'; return finish(true); }
+      try { await session.input('settings.backdrop'); }
+      catch (error) {
+        if (!(error instanceof OperatorInputError)) throw error;
+        reasons['settings-entries-tabs'] = 'the helper refused the backdrop press (' + (error.code || 'refused') + '); the other entry/tab/close observations stand';
+        return finish(true);
+      }
       if (isOpen(await stable())) return fail('settings-entries-tabs', 'backdrop did not dismiss Settings');
       outcome['settings-entries-tabs'] = 'pass';
-      return finish(false);
+      return finish(failed);
     } catch (error) {
       // Keep what was established before an input refusal or unusable evidence; the batch still stops.
       try { kit.privateEvidence(dir, 'partial', { schema: 'nemo.settings-profile-private/1', outcome, reasons, stoppedBy: error?.code || 'error' }); } catch { /* receipt directory unavailable */ }

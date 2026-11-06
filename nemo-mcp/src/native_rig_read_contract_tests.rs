@@ -20,7 +20,7 @@ fn response(
 ) -> Value {
     json!({"kind":"rig","atRevision":7,"documentSnapshotId":"native-object:document:7","contextId":"scene-root",
         "frame":5,"workId":"native-work:9","viewGeneration":3,"layerUid":"L1","part":part,"bind":bind,"vertex":vertex,
-        "cursor":0,"total":total,"nextCursor":next,"unavailable":reason,"items":items})
+        "cursor":0,"total":total,"nextCursor":next,"unavailable":reason,"preview":false,"matrix":null,"items":items})
 }
 fn good() -> Vec<(&'static str, u64, Value)> {
     vec![
@@ -56,6 +56,8 @@ fn good() -> Vec<(&'static str, u64, Value)> {
             json!({"index":1,"strokeId":null,"meshId":"im_1","points":4,"rotate":true,"state":"unavailable"}),
         ),
         ("bound", 0, json!([0, 2, 20.5, -3])),
+        ("posed", 0, json!([0, 2, 20.5, -3, 0, 0, 5.25, 1, 0])),
+        ("posed", 0, json!([1, 0, 1, 2, 0, 0, 0, 0, 1])),
         (
             "weights",
             1,
@@ -97,7 +99,7 @@ fn every_part_correlates_with_its_request() {
 #[test]
 fn an_unavailable_layer_names_its_reason_and_lists_nothing() {
     let p = payload("bones", 0, 0, 8);
-    for reason in ["expression", "sample", "parent", "motion"] {
+    for reason in ["expression", "sample", "parent", "three_d", "mixed", "contour", "empty", "frame", "pose"] {
         assert!(
             result(
                 "document",
@@ -117,7 +119,7 @@ fn an_unavailable_layer_names_its_reason_and_lists_nothing() {
         !result(
             "document",
             &p,
-            &response("bones", 0, 0, vec![item], 1, Value::Null, json!("motion"))
+            &response("bones", 0, 0, vec![item], 1, Value::Null, json!("empty"))
         ),
         "a reason with geometry"
     );
@@ -134,6 +136,8 @@ fn the_request_is_closed_and_bounded_per_part() {
         ("bound", 65, false),
         ("weights", 8, true),
         ("weights", 9, false),
+        ("posed", 24, true),
+        ("posed", 25, false),
         ("shapes", 1, false),
         ("bones", 0, false),
     ] {
@@ -281,7 +285,7 @@ fn pagination_and_item_shape_are_checked_against_the_request() {
         &response("binds", 0, 0, vec![both], 1, Value::Null, Value::Null)
     ));
     let q = payload("weights", 0, 0, 8);
-    let mut neither = good()[7].2.clone();
+    let mut neither = good()[9].2.clone();
     neither["ptIndex"] = Value::Null;
     assert!(!result(
         "document",
@@ -359,6 +363,8 @@ fn the_complete_transport_schema_admits_every_part_and_refuses_what_the_contract
         ("vertices", 17, false),
         ("bound", 64, true),
         ("weights", 9, false),
+        ("posed", 24, true),
+        ("posed", 25, false),
     ] {
         assert_eq!(
             schema.is_valid(&wrapped(payload(part, 0, 0, limit), false)),
@@ -370,7 +376,7 @@ fn the_complete_transport_schema_admits_every_part_and_refuses_what_the_contract
         !schema.is_valid(&wrapped(payload("bones", 1, 0, 8), false)),
         "a selector on a part that takes none"
     );
-    let lost = response("bones", 0, 0, vec![], 0, Value::Null, json!("motion"));
+    let lost = response("bones", 0, 0, vec![], 0, Value::Null, json!("empty"));
     assert!(schema.is_valid(&wrapped(lost, true)));
     let mut guess = response(
         "bones",
@@ -387,4 +393,88 @@ fn the_complete_transport_schema_admits_every_part_and_refuses_what_the_contract
     );
     guess["unavailable"] = json!("guess");
     assert!(!schema.is_valid(&wrapped(guess, true)));
+}
+
+#[test]
+fn a_held_pose_drag_is_one_closed_gesture_and_its_answer_says_so() {
+    let held = |preview: Value| {
+        let mut p = payload("vertices", 0, 0, 8);
+        p["view"]["preview"] = preview;
+        p
+    };
+    let segment = json!({"segment":{"boneId":"bone1","vi":1,"part":"handleOut","to":[3,4.5],"breakTangent":true}});
+    let ik = json!({"ik":{"boneId":"bone2","vi":1,"to":[10,-2]}});
+    for good in [&segment, &ik] {
+        assert!(request(&held(good.clone())), "{good}");
+    }
+    for bad in [
+        json!({}),
+        json!(null),
+        json!({"segment":segment["segment"],"ik":ik["ik"]}),
+        json!({"segment":{"boneId":"bone1","vi":1,"part":"knee","to":[1,1]}}),
+        json!({"segment":{"boneId":"","vi":1,"part":"point","to":[1,1]}}),
+        json!({"segment":{"boneId":"bone1","vi":1,"part":"point","to":[1]}}),
+        json!({"segment":{"boneId":"bone1","vi":1,"part":"point","to":[1,1],"extra":1}}),
+        json!({"segment":{"boneId":"bone1","vi":1,"part":"point","to":[1,1],"breakTangent":"yes"}}),
+        json!({"ik":{"boneId":"bone2","vi":-1,"to":[1,1]}}),
+        json!({"ik":{"boneId":"bone2","vi":1}}),
+        json!({"move":{}}),
+    ] {
+        assert!(!request(&held(bad.clone())), "{bad}");
+    }
+    let p = held(ik);
+    let mut answer = response("vertices", 0, 0, vec![good()[2].2.clone()], 1, Value::Null, Value::Null);
+    assert!(!result("document", &p, &answer), "the answer must say it came from a candidate rig");
+    answer["preview"] = json!(true);
+    assert!(result("document", &p, &answer));
+    assert!(!result("document", &payload("vertices", 0, 0, 8), &answer), "a preview nobody asked for");
+}
+
+#[test]
+fn the_world_map_is_six_numbers_on_the_first_page_of_an_available_layer() {
+    let p = payload("vertices", 0, 0, 8);
+    let item = good()[2].2.clone();
+    let mut answer = response("vertices", 0, 0, vec![item.clone()], 1, Value::Null, Value::Null);
+    answer["matrix"] = json!([0, 2, -1, 0, 15, -13.5]);
+    assert!(result("document", &p, &answer));
+    for bad in [json!([1, 0, 0, 1, 0]), json!([1, 0, 0, 1, 0, "x"]), json!("identity"), json!([1, 0, 0, 1, 0, 0, 0])] {
+        let mut wrong = answer.clone();
+        wrong["matrix"] = bad.clone();
+        assert!(!result("document", &p, &wrong), "{bad}");
+    }
+    let mut unavailable = response("vertices", 0, 0, vec![], 0, Value::Null, json!("empty"));
+    unavailable["matrix"] = json!([1, 0, 0, 1, 0, 0]);
+    assert!(!result("document", &p, &unavailable), "a reason carries no map");
+    let mut later = payload("vertices", 0, 0, 1);
+    later["view"]["cursor"] = json!(1);
+    let mut page = response("vertices", 0, 0, vec![item], 2, Value::Null, Value::Null);
+    page["cursor"] = json!(1);
+    page["matrix"] = json!([1, 0, 0, 1, 0, 0]);
+    assert!(!result("document", &later, &page), "only the first page carries the map");
+}
+
+#[test]
+fn the_transport_schema_admits_a_held_pose_drag_and_the_world_map_and_refuses_what_the_contract_refuses() {
+    let schema = transport_schema();
+    let mut p = payload("vertices", 0, 0, 8);
+    p["view"]["preview"] = json!({"ik":{"boneId":"bone2","vi":1,"to":[10,-2]}});
+    assert!(schema.is_valid(&wrapped(p.clone(), false)));
+    p["view"]["preview"] = json!({"segment":{"boneId":"bone1","vi":1,"part":"handleOut","to":[3,4.5],"breakTangent":true}});
+    assert!(schema.is_valid(&wrapped(p.clone(), false)));
+    for bad in [json!({}), json!({"ik":{"boneId":"b","vi":1}}), json!({"segment":{"boneId":"b","vi":1,"part":"knee","to":[1,1]}}),
+        json!({"ik":{"boneId":"b","vi":1,"to":[1,1]},"segment":{"boneId":"b","vi":1,"part":"point","to":[1,1]}})] {
+        p["view"]["preview"] = bad.clone();
+        assert!(!schema.is_valid(&wrapped(p.clone(), false)), "{bad}");
+    }
+    let mut r = response("vertices", 0, 0, vec![good()[2].2.clone()], 1, Value::Null, Value::Null);
+    r["matrix"] = json!([0, 2, -1, 0, 15, -13.5]);
+    r["preview"] = json!(true);
+    assert!(schema.is_valid(&wrapped(r.clone(), true)));
+    r["matrix"] = json!([1, 0, 0, 1, 0]);
+    assert!(!schema.is_valid(&wrapped(r, true)), "five numbers are no affine");
+    let mut posed = response("posed", 0, 0, vec![json!([0, 1, 2, 3, 0, 0, 0, 0, 2])], 1, Value::Null, Value::Null);
+    posed["items"] = json!([[0, 1, 2, 3, 0, 0, 0, 0, 1]]);
+    assert!(schema.is_valid(&wrapped(posed.clone(), true)));
+    posed["items"] = json!([[0, 1, 2, 3]]);
+    assert!(!schema.is_valid(&wrapped(posed, true)), "a posed vertex is nine numbers");
 }

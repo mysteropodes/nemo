@@ -2,8 +2,8 @@
  * two-bone IK chains (`command.document.object.rig.edit`, one sealed owner transaction per action) and the reversible reset
  * and commit of the pose (`command.document.object.rig.pose`). A thin client of the native project session: no rig mirror,
  * no `ld.rig` writer; the legacy rigResetPose / rigCommitFrame / rigSetIK stay behind n20AllowLegacyWrite and are never
- * called. The live pose and IK drag is evaluation (a detached deformation of an immutable snapshot), not an operation: it is
- * a typed unavailability here. Hit-testing and the pose drag preview stay in rig-bridge.js (presentation only). */
+ * called. The Alt-drag of a chain end is `dragIk` (#2255: the chain is filed and solved by the engine in ONE revision); the
+ * live pose drag preview is a held `preview` of the rig view (native-object-rig-pose.js), which publishes nothing. */
 (function (root, factory) {
   const commonjs = typeof module === 'object' && module.exports;
   const command = commonjs ? require('./native-object-rig-command.js') : root.NemoNativeObjectRigCommand;
@@ -13,9 +13,6 @@
   else root.NemoNativeObjectRig = api;
 }(typeof globalThis === 'object' ? globalThis : this, function (Command, Contract) {
   'use strict';
-  const UNAVAILABLE = Object.freeze({ dragPose: 'rig_pose_drag_unavailable', dragIkEnd: 'rig_pose_drag_unavailable' });
-  function unavailable(name) { return () => Promise.reject(Command.fault('unavailable', 'Native rig ' + name + ' is unavailable', { reason: UNAVAILABLE[name] })); }
-
   // timeline.js btn-rig-auto-assign at the baseline: the panel fields to the options of `autoAssign`. The baseline's positional
   // `radius` is the wire's `defaultRadius`; the result is passed to `autoAssign(layerUid, frame, options)` as it is.
   function autoAssignArgs(form) {
@@ -53,13 +50,13 @@
       removeWeight: (layerUid, target, vertex, entry) => edit(layerUid, kind('removeWeight', { target, vertex, entry })),
       resetWeights: (layerUid, target, vertex, options) => edit(layerUid, kind('resetWeights', Object.assign({ target, vertex }, pick(options, ['radius', 'softness'])))),
       setIk: (layerUid, root, joint, end, flip) => edit(layerUid, kind('setIk', { root, joint, end, flip: flip === undefined ? undefined : !!flip })),
+      dragIk: (layerUid, end, to) => edit(layerUid, kind('dragIk', { end: end && typeof end === 'object' ? { boneId: end.boneId, vi: end.vi } : end, to })),
       removeIk: (layerUid, endKey) => edit(layerUid, kind('removeIk', { endKey })),
       removeBone: (layerUid, boneId) => edit(layerUid, kind('removeBone', { boneId })),
       removeBind: (layerUid, target) => edit(layerUid, kind('removeBind', { target })),
       resetPose: (layerUid) => pose(layerUid, { kind: 'reset' }),
       commitPose: (layerUid, frame) => pose(layerUid, { kind: 'commit', frame }),
     };
-    Object.keys(UNAVAILABLE).forEach((name) => { api[name] = unavailable(name); });
     return Object.freeze(api);
   }
   function pick(options, names) {
@@ -75,5 +72,5 @@
     if (!bindings.has(host)) bindings.set(host, create(session));
     return bindings.get(host);
   }
-  return Object.freeze({ create, desktop, autoAssignArgs, ikKey, UNAVAILABLE });
+  return Object.freeze({ create, desktop, autoAssignArgs, ikKey });
 }));

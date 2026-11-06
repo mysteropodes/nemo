@@ -5,13 +5,15 @@
 //! module returns exactly those facts, in the six parts a request names (`bones`, `vertices`, `chains`, `binds`, `bound`,
 //! `weights`), each a flat list a page of which stays under the response byte limit. Nothing is written, cached or kept.
 //!
-//! The record is read as it is stored: the live pose `segments` (what `moveSegment` writes), never the rest pose. `bound` is the
-//! posed vertex of every bind that a pose evaluation of the same snapshot reports as posed (a bind it cannot pose, a mesh among
-//! them, lists nothing and says so in `binds`). Coordinates are document space: they are world space only while the layer and
-//! every parent carry no motion (the baseline mapped them through the layer's motion; the pivot of a drawn layer is its content
-//! bounds, which only the presented scene knows), so a layer with motion is a typed reason (`motion`) and no geometry, never a
-//! guessed map. A control expression on a transform is `expression`, an unreadable one `sample`, a missing parent `parent`.
-use crate::object_snapshot::object_rig_pose_read::{evaluate_layer_pose, PoseBind};
+//! The record is read as it is stored: the live pose `segments` (what `moveSegment` writes), never the rest pose; a `preview` (a held
+//! pose drag, `object_rig_preview.rs`) reads a CANDIDATE rig instead and writes nothing. `bound` is the posed vertex of every bind that a
+//! pose evaluation of the same snapshot reports as posed, `posed` the posed outline of each (a stroke's segments with handles, a mesh's
+//! contour). Coordinates are the layer's own space (the space the edits write); a layer with Motion or a parent carries its
+//! world map as `matrix` (`object_rig_placement.rs`), computed on the first page of a part only, and a map that cannot be had is a
+//! typed reason (`three_d`, `expression`, `sample`, `parent`, `mixed`, `contour`, `empty`) and no geometry, never a guessed map.
+use crate::object_snapshot::object_rig_pose_read::{evaluate_layer_pose_over, PoseBind, VertexWrite};
+use crate::object_snapshot::rig_placement::layer_matrix;
+use crate::object_snapshot::rig_preview::{writes, Preview};
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
 use serde_json::{json, Number, Value};
@@ -26,48 +28,69 @@ fn vector(slot: Slot) -> [f64; 2] {
 }
 
 /// The part a request names and the most items one page of it may carry.
-pub(super) const PARTS: [(&str, usize); 6] = [
+pub(super) const PARTS: [(&str, usize); 7] = [
     ("bones", 8),
     ("vertices", 16),
     ("chains", 8),
     ("binds", 8),
     ("bound", 64),
     ("weights", 8),
+    ("posed", 24),
 ];
 
 /// The answer: why the geometry is unavailable (`None` when it is not) and the whole flat list of the part.
 pub(super) struct Presented {
     pub(super) unavailable: Option<&'static str>,
+    /// The layer-to-world affine (page 0 only); `None` is the identity.
+    pub(super) matrix: Option<[f64; 6]>,
     pub(super) items: Vec<Value>,
 }
 
 impl ObjectSnapshot {
-    /// The flat list of `part` for `layer_uid`; `bind` and `vertex` select the vertex of `weights` and are zero otherwise.
+    /// The flat list of `part` for `layer_uid`; `select` is `(bind, vertex)` of `weights` and zeros otherwise. A `preview` answers from
+    /// the candidate rig it makes; `first_page` asks for the layer-to-world `matrix` (later pages carry none).
     pub(super) fn rig_presentation_items(
         &self,
         layer_uid: &str,
         part: &str,
         frame: u32,
-        bind: usize,
-        vertex: usize,
+        select: (usize, usize),
+        preview: Option<&Preview>,
+        first_page: bool,
     ) -> Result<Presented, DispatchErrorCode> {
+        let (bind, vertex) = select;
         let layer = self
             .document()
             .layers()
             .iter()
             .find(|layer| layer.layer_uid() == layer_uid)
             .ok_or(DispatchErrorCode::NotFound)?;
-        if let Err(reason) = placement_is_identity(self, layer_uid, f64::from(frame)) {
-            return Ok(Presented {
-                unavailable: Some(reason),
-                items: Vec::new(),
-            });
-        }
+        let none = |unavailable| Presented {
+            unavailable,
+            matrix: None,
+            items: Vec::new(),
+        };
+        let held: Vec<VertexWrite> = match preview {
+            Some(p) if layer.rig().is_some() => writes(self, layer_uid, p).ok_or(DispatchErrorCode::InvalidRequest)?,
+            Some(_) => return Err(DispatchErrorCode::InvalidRequest),
+            None => Vec::new(),
+        };
+        let matrix = if first_page && layer.rig().is_some() {
+            match layer_matrix(self, layer_uid, frame, &held) {
+                Ok(matrix) => matrix,
+                Err(reason) => return Ok(none(Some(reason))),
+            }
+        } else {
+            None
+        };
         let Some(rig) = layer.rig() else {
-            return Ok(Presented {
-                unavailable: None,
-                items: Vec::new(),
-            });
+            return Ok(none(None));
+        };
+        // A vertex `[anchor, handleIn, handleOut]` as the held gesture leaves it: the stored one with the writes laid over it.
+        let posed = |bone_id: &str, vi: usize, base: [[f64; 2]; 3]| {
+            held.iter().filter(|w| w.bone_id == bone_id && w.vi == vi).fold(base, |at, w| {
+                [w.point.unwrap_or(at[0]), w.handle_in.unwrap_or(at[1]), w.handle_out.unwrap_or(at[2])]
+            })
         };
         let pair = |value: &[Number; 2]| json!([value[0], value[1]]);
         let items = match part {
@@ -79,7 +102,8 @@ impl ObjectSnapshot {
                     let curves: Vec<[[f64; 2]; 3]> = bone
                         .segments
                         .iter()
-                        .map(|s| [s.point_value(), vector(s.handle_in.value()), vector(s.handle_out.value())])
+                        .enumerate()
+                        .map(|(vi, s)| posed(id, vi, [s.point_value(), vector(s.handle_in.value()), vector(s.handle_out.value())]))
                         .collect();
                     json!({"boneId":id,"closed":bone.closed,"radius":bone.radius.value(),
                         "count":bone.segments.len(),"center":bounds_center(&curves, bone.closed)})
@@ -93,8 +117,13 @@ impl ObjectSnapshot {
                     bone.segments.iter().enumerate().map(move |(vi, s)| (id, vi, s))
                 })
                 .map(|(id, vi, s)| {
-                    json!({"boneId":id,"vi":vi,"point":pair(&s.point),
-                        "handleIn":vector(s.handle_in.value()),"handleOut":vector(s.handle_out.value())})
+                    if !held.iter().any(|w| w.bone_id == *id && w.vi == vi) {
+                        return json!({"boneId":id,"vi":vi,"point":pair(&s.point),
+                            "handleIn":vector(s.handle_in.value()),"handleOut":vector(s.handle_out.value())});
+                    }
+                    let [point, handle_in, handle_out] =
+                        posed(id, vi, [s.point_value(), vector(s.handle_in.value()), vector(s.handle_out.value())]);
+                    json!({"boneId":id,"vi":vi,"point":point,"handleIn":handle_in,"handleOut":handle_out})
                 })
                 .collect(),
             "chains" => rig
@@ -111,8 +140,8 @@ impl ObjectSnapshot {
                         "l1":chain.l1,"l2":chain.l2,"flip":chain.flip})
                 })
                 .collect(),
-            "binds" | "bound" => {
-                let pose = evaluate_layer_pose(self, layer_uid, frame).ok();
+            "binds" | "bound" | "posed" => {
+                let pose = evaluate_layer_pose_over(self, layer_uid, frame, &held).ok();
                 if part == "binds" {
                     rig.binds
                         .iter()
@@ -124,12 +153,32 @@ impl ObjectSnapshot {
                         })
                         .collect()
                 } else {
+                    // `bound`: [bind, vertex, x, y] of every posed vertex (a mesh's are its posed world vertices).
+                    // `posed`: [bind, vertex, x, y, inX, inY, outX, outY, closed] of the posed outline, rounded to 0.01 (a held drag's
+                    // preview is presentation only, and the page must stay under the response byte limit).
+                    let r2 = |v: f64| (v * 100.0).round() / 100.0;
                     let mut out = Vec::new();
                     for (index, b) in rig.binds.iter().enumerate() {
-                        let posed = pose.as_ref().filter(|p| p.binds.get(index) == Some(&PoseBind::Posed));
-                        let stroke = b.stroke_id.value().and_then(|id| posed.and_then(|p| p.strokes.iter().find(|s| &s.stroke_id == id)));
+                        let Some(pose) = pose.as_ref().filter(|p| p.binds.get(index) == Some(&PoseBind::Posed)) else {
+                            continue;
+                        };
+                        let stroke = b.stroke_id.value().and_then(|id| pose.strokes.iter().find(|s| &s.stroke_id == id));
+                        let mesh = b.mesh_id.value().and_then(|id| pose.meshes.iter().find(|m| &m.mesh_id == id));
                         for (vi, v) in stroke.iter().flat_map(|s| s.vertices.iter()).enumerate() {
-                            out.push(json!([index, vi, v.point[0], v.point[1]]));
+                            out.push(if part == "bound" {
+                                json!([index, vi, v.point[0], v.point[1]])
+                            } else {
+                                json!([index, vi, r2(v.point[0]), r2(v.point[1]), r2(v.handle_in[0]), r2(v.handle_in[1]),
+                                    r2(v.handle_out[0]), r2(v.handle_out[1]), u8::from(stroke.is_some_and(|s| s.closed))])
+                            });
+                        }
+                        let limit = if part == "bound" { usize::MAX } else { mesh.map_or(0, |m| m.outline) };
+                        for (vi, w) in mesh.iter().flat_map(|m| m.world.iter()).enumerate().take(limit) {
+                            out.push(if part == "bound" {
+                                json!([index, vi, w[0], w[1]])
+                            } else {
+                                json!([index, vi, r2(w[0]), r2(w[1]), 0, 0, 0, 0, 1])
+                            });
                         }
                     }
                     out
@@ -153,6 +202,7 @@ impl ObjectSnapshot {
         };
         Ok(Presented {
             unavailable: None,
+            matrix,
             items,
         })
     }
@@ -223,38 +273,4 @@ fn bounds_center(vertices: &[[[f64; 2]; 3]], closed: bool) -> Value {
         return Value::Null;
     }
     json!([(low[0] + high[0]) / 2.0, (low[1] + high[1]) / 2.0])
-}
-
-/// The layer and every parent carry no motion matrix at `frame`, so document space is world space.
-#[cfg(feature = "evaluation")]
-fn placement_is_identity(
-    snapshot: &ObjectSnapshot,
-    layer_uid: &str,
-    frame: f64,
-) -> Result<(), &'static str> {
-    use crate::object_snapshot::widget_presentation::kernels::layer_mat;
-    let layers = snapshot.document().layers();
-    let mut seen = vec![layer_uid];
-    let mut next = Some(layer_uid);
-    while let Some(uid) = next.filter(|_| seen.len() <= 64) {
-        if layer_mat(snapshot, uid, frame)?.is_some() {
-            return Err("motion");
-        }
-        let layer = layers
-            .iter()
-            .find(|candidate| candidate.layer_uid() == uid)
-            .ok_or("parent")?;
-        next = layer.parent_layer_uid.value().and_then(Option::as_deref);
-        if let Some(parent) = next {
-            if seen.contains(&parent) {
-                break;
-            }
-            seen.push(parent);
-        }
-    }
-    Ok(())
-}
-#[cfg(not(feature = "evaluation"))]
-fn placement_is_identity(_: &ObjectSnapshot, _: &str, _: f64) -> Result<(), &'static str> {
-    Err("sample")
 }

@@ -102,7 +102,8 @@
       "issue": 2172,
       "status": "Ready",
       "tasks": [
-        "U02"
+        "U02",
+        "D06"
       ],
       "surfaces": [
         "dom:#btn-settings",
@@ -115,6 +116,8 @@
         "dom:#profile-color-well",
         "dom:#sync-folder-path",
         "dom:#sync-choose-folder",
+        "dom:#sync-publish",
+        "dom:#sync-check",
         "dom:settings-tabs>button[data-tab=general]",
         "dom:settings-tabs>button[data-tab=figma]",
         "dom:settings-tabs>button[data-tab=about]",
@@ -181,8 +184,8 @@
           ]
         }
       ],
-      "taskEvidence": "Original criteria: the 2026-10-18 disposition in acceptanceReference; remaining rows reconciled at https://github.com/mysteropodes/nemo/issues/2172#issuecomment-6403867536. Surfaces are limited to what the scenario opens, types into or presses. The Figma token and URL fields, the settings-modal links, #np-w and #np-h are not exercised. sync-owner-paths is declared so the receipt names it, and the scenario always returns it unrun: it needs a configured shared folder and a second profile, which the UI32 helper cannot reach.",
-      "runtimePrerequisites": "The UI32 helper and a clean Start screen at launch; a foreground operator for File > New, the colour picker and the Shortcuts rebind/Reset all; the owned window placed at the top of display 2 (2880,-270, 1620x1420); no shared sync folder configured (the helper refuses a non-empty path). Profile name, email and role are restored by the helper, but the app keeps the profile in local storage of the disposable run.",
+      "taskEvidence": "Original criteria: the 2026-10-18 disposition in acceptanceReference; remaining rows reconciled at https://github.com/mysteropodes/nemo/issues/2172#issuecomment-6403867536. Surfaces are limited to what the scenario opens, types into or presses. The Figma token and URL fields, the settings-modal links, #np-w and #np-h are not exercised. sync-owner-paths is judged by the scenario from the disposable shared folder on disk (which it seeds with a second profile's published state), the accessibility read and unedited MCP document reads; it passes only when the no-folder Publish text, the chosen folder, Publish, Check, Merge (document content on the blank keyframe) and the failing Publish into a read-only folder are all observed, and it is unrun, with its reason, whenever a toast, the update list or the published snapshot shape is not readable. D06 (#2355) tracks the native migration of publish/pull/merge, so this clause may legitimately fail on the first installed run.",
+      "runtimePrerequisites": "The UI32 helper and a clean Start screen at launch; a foreground operator for File > New, drawing one stroke and a blank keyframe, the colour picker, the Shortcuts rebind/Reset all, and the sync clicks (Choose… with the native folder picker, Publish, Check, Merge); the owned window placed at the top of display 2 (2880,-270, 1620x1420); no shared sync folder configured at the start (the helper refuses a non-empty path, so every helper sync step runs before the folder is chosen); a public Nemo MCP read route for read-only query.* calls; a disposable report directory, which the scenario fills with the shared folder and briefly makes read-only. Profile name, email and role are restored by the helper, but the app keeps the profile and the chosen sync folder in local storage of the disposable run.",
       "evidence": "Settings and profile presentation: https://github.com/mysteropodes/nemo/pull/2178 merged at 4cf1c2ecf64c8bfe3908e2c1b20f2d52eca02214. No installed run has happened for this row."
     }
   ]
