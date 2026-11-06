@@ -20,7 +20,7 @@ pub(crate) const LAYER_MAPPED: &[&str] = &[
     "timeRemap",
 ];
 /// Symbol members with no native owner: content refuses, annotations warn.
-const SYMBOL_REFUSED: &[&str] = &["cameraKeys", "motionArcs", "tweenOverrides", "tweenEasing"];
+const SYMBOL_REFUSED: &[&str] = &["motionArcs", "tweenOverrides", "tweenEasing"];
 
 pub(crate) struct Converted {
     pub(crate) set: Value,
@@ -108,6 +108,7 @@ fn component(
             "layers",
             "exposedProps",
             "markers",
+            "cameraKeys",
         ];
         if !known.contains(&key.as_str())
             && !SYMBOL_REFUSED.contains(&key.as_str())
@@ -119,13 +120,6 @@ fn component(
                 "unknown member, not carried over",
             );
         }
-    }
-    if members.get("markers").is_some_and(|v| !is_default(v)) {
-        ctx.warn(
-            format!("{path}.markers"),
-            "not_carried_over",
-            "component markers are annotations with no native owner, so they are not carried over",
-        );
     }
     let mut layers = members
         .get("layers")
@@ -198,6 +192,13 @@ fn component(
             list.push(Value::Object(entry));
         }
         record["exposedProps"] = Value::Array(list);
+    }
+    // `sym.cameraKeys` and `sym.markers` are the component's own camera and composition markers (stored on the record,
+    // admitted there); an empty table is what an entered symbol stores and carries nothing.
+    for key in ["cameraKeys", "markers"] {
+        if let Some(list) = members.get(key).filter(|v| !is_default(v)) {
+            record[key] = list.clone();
+        }
     }
     Ok(record)
 }

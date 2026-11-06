@@ -45,6 +45,10 @@ pub(super) fn valid() -> Vec<(&'static str, Value)> {
             json!({"command":"object.component.instance.set","layerUid":"layer-a","mode":"single","singleFrame":9,
             "placedAt":-4,"speed":2.5,"atFrame":12}),
         ),
+        (
+            "component.breakApart",
+            json!({"command":"object.component.breakApart","contextId":"scene-root","layerUid":"layer-a"}),
+        ),
     ]
 }
 
@@ -71,7 +75,7 @@ fn without(suffix: &str, key: &str) -> Value {
 }
 
 #[test]
-fn the_eight_declared_commands_are_exactly_the_admitted_operations() {
+fn the_nine_declared_commands_are_exactly_the_admitted_operations() {
     let expected = [
         "component.convert",
         "component.expose",
@@ -81,8 +85,9 @@ fn the_eight_declared_commands_are_exactly_the_admitted_operations() {
         "duplicator.path",
         "duplicator.config",
         "component.instance.set",
+        "component.breakApart",
     ];
-    assert_eq!(SPECS.len(), 8);
+    assert_eq!(SPECS.len(), 9);
     assert_eq!(
         valid().iter().map(|(s, _)| *s).collect::<Vec<_>>(),
         expected

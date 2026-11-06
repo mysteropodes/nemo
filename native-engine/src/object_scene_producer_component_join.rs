@@ -162,7 +162,7 @@ fn apply_exposed_overrides(
     }
 }
 
-fn evaluate_instance(
+pub(crate) fn evaluate_instance(
     packet: &ObjectFramePacket,
     inputs: &ComponentInputs<'_>,
     ports: &mut dyn ComponentPorts,
