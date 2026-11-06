@@ -213,6 +213,7 @@ pub(super) fn inputs<'a>(case: &'a Case, geometry: &'a Geometry) -> Vec<GpuLayer
         .map(|(i, layer)| GpuLayerInput {
             source_layer: None,
             effects: None,
+            item_effects: Default::default(),
             paint: GpuLayerPaint {
                 fills: layer
                     .fills

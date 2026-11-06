@@ -442,3 +442,5 @@ fn text_without_a_font_parser_never_reaches_a_door() {
 
 #[path = "scene_effect_scene_join_folder.rs"]
 mod folder;
+#[path = "scene_effect_scene_join_items.rs"]
+mod items;

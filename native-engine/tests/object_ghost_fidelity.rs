@@ -211,3 +211,31 @@ fn a_plain_vector_layer_still_never_evaluates_ghost_frames() {
         "a vector-only layer has no item to evaluate"
     );
 }
+
+#[test]
+fn gpu_onion_frames_sit_beneath_the_layered_accumulator_exactly_where_the_flat_sequence_paints_them() {
+    // #2257: a Multiply layer over an empty backdrop is the source itself, so the layered frame with its onion underlay
+    // equals the flat Normal frame with the same onion, and the ghost is not multiplied into the layer.
+    let mut gpu = Compositor::new().expect("ghost fidelity requires real Metal");
+    let flat_owner = super::owner_with(json!({}));
+    let layered_owner = super::owner_with(json!({"blendMode": "multiply"}));
+    let (flat, layered) = (snapshot(&flat_owner), snapshot(&layered_owner));
+    let request = request_for("L0", GhostMode::Default, 100., 3);
+    let flat_witness = viewport(&flat, 3, Some(&request));
+    let layered_witness = viewport(&layered, 3, Some(&request));
+    assert!(matches!(
+        layered_witness.scene_effects().unwrap().plan(),
+        crate::object_render_scene::scene_effect_kernels::scene_effect_order::CompositionPlan::Layered { .. }
+    ));
+    let (flat_image, layered_image) = (rgba(&mut gpu, &flat, &flat_witness), rgba(&mut gpu, &layered, &layered_witness));
+    let worst = flat_image.iter().zip(&layered_image).map(|(a, b)| a.abs_diff(*b)).max().unwrap();
+    assert!(worst <= 1, "layered vs flat with the onion underlay, worst step {worst}");
+    // The red frame-2 square (x 24..44) is ghosted under the blue frame-3 square (x 36..56): the ghost shows left of
+    // the live square and the live square covers it where they overlap.
+    let ghost = at(&layered_image, 28, 34);
+    assert!(ghost[0] > 200 && ghost[2] < 200, "the onion ghost is red-ish, got {ghost:?}");
+    assert_eq!(at(&layered_image, 48, 34), [0, 0, 255, 255], "the live frame");
+    assert_eq!(at(&layered_image, 40, 34), [0, 0, 255, 255], "the live square covers the ghost it overlaps");
+    let plain = rgba(&mut gpu, &layered, &viewport(&layered, 3, None));
+    assert_eq!(at(&plain, 28, 34), [255, 255, 255, 255], "no onion: nothing under the live square's left");
+}

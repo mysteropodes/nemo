@@ -189,7 +189,7 @@ pub fn prepare_object_composition(
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     {
         return brush_paint::attach(text_scene::attach(raster_scene::attach(witness, None)?)?)?
-            .with_joined_layers();
+            .with_joined_layers(1.);
     }
     #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
     {
@@ -199,7 +199,7 @@ pub fn prepare_object_composition(
                 "native raster resources require project media support",
             ));
         }
-        text_scene::attach(witness)?.with_joined_layers()
+        text_scene::attach(witness)?.with_joined_layers(1.)
     }
 }
 

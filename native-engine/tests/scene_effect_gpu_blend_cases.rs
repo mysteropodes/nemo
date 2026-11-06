@@ -85,7 +85,8 @@ fn matte_scene_plans_to_literal_steps_and_skips_the_consumed_source() {
                 blend: 0,
                 folder: None,
                 effects: false,
-                effect_layer: false
+                effect_layer: false,
+                elements: false
             },
             GpuStep {
                 layer: 1,
@@ -97,7 +98,8 @@ fn matte_scene_plans_to_literal_steps_and_skips_the_consumed_source() {
                 blend: 0,
                 folder: None,
                 effects: false,
-                effect_layer: false
+                effect_layer: false,
+                elements: false
             },
         ]
     );
@@ -119,7 +121,8 @@ fn background_blend_and_mask_scenes_plan_to_literal_steps() {
             blend: 1,
             folder: None,
             effects: false,
-            effect_layer: false
+            effect_layer: false,
+            elements: false
         }]
     );
     let case = find("blend-hue");
