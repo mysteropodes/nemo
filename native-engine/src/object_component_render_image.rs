@@ -83,7 +83,8 @@ pub(crate) fn raster(
     }
     layer_supported(packet, target.context_id(), layer, host)?;
     // #2361: a bitmap-brush companion is the baked stamps of the stroke -- its PNG painted at its rect, which is exactly what the baseline's Raster is.
-    // Any other brush paint (texture dabs, a half-formed companion) still needs the scene brush producer, which does not run inside a component.
+    // Any other brush tag on an image (a half-formed companion, a stored raster dab) still needs the scene brush producer. The texture dabs of a
+    // seeded vector anchor ARE painted inside a component (object_brush_dab_paint expands the placed anchor), so they never reach this image path.
     let bitmap_companion = item.is_bitmap_brush() == Some(true)
         && item.is_brush_texture_copy() == Some(true)
         && item.brush_group_id().is_some_and(|group| !group.is_empty());

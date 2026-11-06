@@ -464,3 +464,6 @@ mod bitmap;
 
 #[path = "object_tween_public_shapes.rs"]
 mod public_shapes;
+
+#[path = "object_tween_component.rs"]
+mod component;

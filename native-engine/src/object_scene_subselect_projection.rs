@@ -78,10 +78,7 @@ fn layer_posed(
     hit: bool,
 ) -> Result<(BTreeMap<usize, [f64; 6]>, [f64; 6]), &'static str> {
     let layer = &packet.source_layers()[index];
-    // #2256: Select's hit-test listing reads an entered component like the scene; the editable (Subselect) listing stays scene-root.
-    if !hit && packet.context_id() != "scene-root" {
-        return Err("Subselect editing is unavailable inside a component");
-    }
+    // #2256: an entered component is listed like the scene, for Select (hit test) and for Direct Select (editable vertices) alike.
     if layer.three_d.value() == Some(&true)
         || layer.rig().is_some()
         || packet
@@ -189,9 +186,6 @@ fn shared_posed(
     hit: bool,
 ) -> Result<(BTreeMap<usize, [f64; 6]>, [f64; 6]), &'static str> {
     let layer = &packet.source_layers()[index];
-    if !hit && packet.context_id() != "scene-root" {
-        return Err("Subselect editing is unavailable inside a component");
-    }
     if layer.three_d.value() == Some(&true)
         || layer.rig().is_some()
         || packet.duplicator_outputs().iter().any(|d| d.layer_index == index)

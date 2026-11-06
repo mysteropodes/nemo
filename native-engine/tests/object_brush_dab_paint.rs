@@ -325,3 +325,6 @@ fn a_mirrored_textured_stroke_paints_each_anchors_own_dabs_and_a_trimmed_anchor_
     let shorter = ordered_entries(&plan_of_records(vec![cut]).unwrap()).count();
     assert!(shorter < full, "{shorter} dabs on the cut anchor, {full} on the whole one");
 }
+
+#[path = "object_brush_dab_component.rs"]
+mod component;

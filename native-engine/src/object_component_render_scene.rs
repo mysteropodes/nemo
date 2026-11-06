@@ -56,6 +56,9 @@ pub(crate) struct ComponentPaint {
     pub(crate) svg_rgba: Option<[f64; 4]>,
     /// The post-override inner record as the baseline's dict holds it (untransformed geometry).
     pub(crate) record: crate::object_frame_packet::ObjectRecord,
+    /// The opacity a texture dab of this paint is painted with: the host's factor times the inner layer's raw opacity (the element's own
+    /// opacity belongs to its anchor, not to the dabs stamped from it).
+    pub(crate) dab_opacity: f64,
 }
 
 pub(crate) fn unavailable(index: usize, reason: &'static str) -> ObjectSceneError {

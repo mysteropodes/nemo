@@ -1,4 +1,5 @@
 //! Native subselect uses the existing sealed vector transaction and history publication.
+use crate::evaluation::object_component_kernels::object_context_resolver::ContextSource;
 use crate::history::object_history::{NativeObjectHistory, ObjectHistoryEntry};
 use crate::object_document::subselect::{record, Intent, Refusal};
 use crate::object_document::{object_deserialize, ObjectTarget, Presence};
@@ -39,11 +40,13 @@ impl NativeObjectHistory {
             DispatchErrorCode::Unavailable,
             "Subselect snapshot is unavailable.",
         ))?;
-        let stored = snapshot
-            .document()
-            .objects
-            .iter()
-            .find(|r| r.target == payload.stable_target)
+        // #2256: the record lives in its own context (the scene root or a declared component); a context the document does not declare
+        // is an absent target.
+        let context = payload.stable_target.context_id.clone();
+        let stored = ContextSource::of_document(snapshot.document())
+            .context(&context)
+            .ok()
+            .and_then(|c| c.objects().iter().find(|r| r.target == payload.stable_target))
             .ok_or((DispatchErrorCode::NotFound, "Subselect target is absent."))?;
         let mut promote = false;
         let mut next = record::admit(snapshot.document(), stored)
@@ -74,7 +77,11 @@ impl NativeObjectHistory {
             self.owner
                 .prepare_vector_edit_json(&unchanged)
                 .map_err(|c| (c, "Subselect drawing policy refused."))?;
-            return self.dispatch_exposure_key("command.document.object.layer.key.promote",&json!({"command":"object.layer.key.promote","layerUids":[stored.target.layer_uid],"cells":[payload.at_frame.value().unwrap()]}));
+            let mut key = json!({"command":"object.layer.key.promote","layerUids":[stored.target.layer_uid],"cells":[payload.at_frame.value().unwrap()]});
+            if context != "scene-root" {
+                key["contextId"] = json!(context);
+            }
+            return self.dispatch_exposure_key("command.document.object.layer.key.promote", &key);
         }
         let vector = serde_json::to_vec(&if promote {
             next.target.frame_scope.frame=*payload.at_frame.value().unwrap();

@@ -1,10 +1,11 @@
 //! Sealed tween edit using the existing native object revision owner.
+use crate::commands::object_fill_owner::object_context_projection::{context_of, embed, project};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::ObjectDocument;
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
 use crate::tween_kernels::{
-    plan_tween, prepare_tween_resources, PreparedTweenResources, TweenRequest,
+    plan_tween, prepare_tween_resources, PreparedTweenResources, TweenPlan, TweenRequest,
 };
 #[derive(Debug)]
 pub(crate) struct PreparedTween {
@@ -27,13 +28,26 @@ impl ObjectFillOwner {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         let origin = self.current_snapshot();
-        let planned = plan_tween(
-            origin.document(),
-            &request,
-            origin
-                .project()
-                .and_then(|p| p.project().custom_brush_presets()),
-        )?;
+        let custom = origin
+            .project()
+            .and_then(|p| p.project().custom_brush_presets());
+        // #2358: a declared component is the "scene" of the tween kernels, exactly as the baseline's enterSymbol swapped `state.layers`
+        // for the component's: project, plan, embed (the scene, the other components and the placement tables stay as they were).
+        // A tween that needs a bitmap-brush re-bake publishes a project resource, which has no component embedding: typed unavailable.
+        let context = context_of(&request.context_id)?;
+        let planned = if context == "scene-root" {
+            plan_tween(origin.document(), &request, custom)?
+        } else {
+            let view = project(origin.document(), context)?;
+            match plan_tween(&view, &request, custom)? {
+                None => None,
+                Some(plan) if !plan.bakes.is_empty() => return Err(DispatchErrorCode::Unavailable),
+                Some(plan) => Some(TweenPlan {
+                    document: embed(origin.document(), context, &view, plan.document)?,
+                    bakes: Vec::new(),
+                }),
+            }
+        };
         let (document, resources) = match planned {
             None => (None, None),
             Some(plan) => {

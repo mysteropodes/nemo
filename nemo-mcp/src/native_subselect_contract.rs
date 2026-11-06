@@ -220,7 +220,8 @@ pub(super) fn intent(v: &Value) -> bool {
 pub(crate) fn edit_request(v: &Value) -> bool {
     exact(v, &["command", "stableTarget", "intent"], &["atFrame"]).is_some()
         && v["command"] == "object.subselect.edit"
-        && super::target(&v["stableTarget"])
+        // #2356: the record's own context (the scene root, or the id of a component context the native owner declares).
+        && super::view_target(&v["stableTarget"])
         && intent(&v["intent"])
         && v.get("atFrame")
             .is_none_or(|n| n.as_u64().is_some_and(|n| n <= u64::from(u32::MAX)))

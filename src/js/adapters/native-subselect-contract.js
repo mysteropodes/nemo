@@ -25,6 +25,8 @@
   function target(v,context){return exact(v,['contextId','layerUid','frameScope','strokeId'])&&v.contextId===(context||'scene-root')&&
     ['layerUid','strokeId'].every(k=>typeof v[k]==='string'&&v[k].length>0)&&exact(v.frameScope,['kind','frame'])&&
     ['authored','reference'].includes(v.frameScope.kind)&&integer(v.frameScope.frame,4294967295);}
+  // The target of an edit or read: the scene root, or the record's own context when it is the entered component the workspace controller holds.
+  const heldTarget=v=>!!v&&typeof v==='object'&&viewContext(v.contextId)&&target(v,v.contextId);
   function intent(v){
     if(!object(v))return false;let keys,valid,optional=[];
     switch(v.kind){
@@ -40,10 +42,10 @@
     }
     return valid&&exact(v,keys,optional);
   }
-  function payload(op,v){if(op!==EDIT||!exact(v,['command','stableTarget','intent'],['atFrame'])||v.command!=='object.subselect.edit'||!target(v.stableTarget)||!intent(v.intent)||own(v,'atFrame')&&!integer(v.atFrame,4294967295))fail('Invalid native subselect intent');}
+  function payload(op,v){if(op!==EDIT||!exact(v,['command','stableTarget','intent'],['atFrame'])||v.command!=='object.subselect.edit'||!heldTarget(v.stableTarget)||!intent(v.intent)||own(v,'atFrame')&&!integer(v.atFrame,4294967295))fail('Invalid native subselect intent');}
   function result(op,v){if(op!==EDIT||!exact(v,['applied','historyEntriesAdded'])||typeof v.applied!=='boolean'||v.historyEntriesAdded!==Number(v.applied))fail('Invalid subselect receipt');}
   function correlate(q,r){result(q.operation,r.result);if(q.instanceId!==r.instanceId||q.documentId!==r.documentId||q.expectedRevision+Number(r.result.applied)!==r.contentRevision)fail('Subselect receipt origin mismatch');}
-  function readPayload(v){if(!exact(v,['atRevision','documentSnapshotId','stableTarget','subselect'])||!integer(v.atRevision)||typeof v.documentSnapshotId!=='string'||!v.documentSnapshotId||!target(v.stableTarget)||
+  function readPayload(v){if(!exact(v,['atRevision','documentSnapshotId','stableTarget','subselect'])||!integer(v.atRevision)||typeof v.documentSnapshotId!=='string'||!v.documentSnapshotId||!heldTarget(v.stableTarget)||
     !exact(v.subselect,['cursor','limit'],['preview','paint','hitTest','center'])||!integer(v.subselect.cursor,256)||!integer(v.subselect.limit,16)||!v.subselect.limit||own(v.subselect,'preview')&&!intent(v.subselect.preview)||own(v.subselect,'paint')&&v.subselect.paint!==true||
     // #2362: hit-test geometry is the painted outline of any record, never with a preview or the paint mode.
     own(v.subselect,'hitTest')&&(v.subselect.hitTest!==true||own(v.subselect,'preview')||own(v.subselect,'paint'))||own(v.subselect,'center')&&(v.subselect.center!==true||v.subselect.hitTest!==true))fail('Invalid subselect read selector');}
@@ -70,7 +72,7 @@
     if(!exact(p,['atRevision','documentSnapshotId','view'])||!integer(p.atRevision)||typeof p.documentSnapshotId!=='string'||!p.documentSnapshotId||
       !exact(v,['kind','contextId','layerUid','frame','workId','viewGeneration','cursor','limit'],['preview','hitTest'])||v.kind!=='subselect'||!viewContext(v.contextId)||own(v,'hitTest')&&(v.hitTest!==true||own(v,'preview'))||
       typeof v.layerUid!=='string'||!v.layerUid||typeof v.workId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(v.workId)||
-      !integer(v.frame,4294967295)||!integer(v.viewGeneration)||!v.viewGeneration||!integer(v.cursor,1024)||!integer(v.limit,8)||!v.limit||own(v,'preview')&&(!exact(v.preview,['stableTarget','intent'])||!target(v.preview.stableTarget)||!intent(v.preview.intent)))fail('Invalid subselect presentation selector');
+      !integer(v.frame,4294967295)||!integer(v.viewGeneration)||!v.viewGeneration||!integer(v.cursor,1024)||!integer(v.limit,8)||!v.limit||own(v,'preview')&&(!exact(v.preview,['stableTarget','intent'])||!target(v.preview.stableTarget,v.contextId)||!intent(v.preview.intent)))fail('Invalid subselect presentation selector');
   }
   // #2372: a listed dynamic shape is its kind and the finite members that kind owns (never the generator box): the body object.parametric.set takes back.
   const SHAPE_MEMBERS={rect:['tl','tr','br','bl'],ellipse:['startAngle','sweep','innerRadius'],star:['pointCount','innerRatio','cornerRadius']};
