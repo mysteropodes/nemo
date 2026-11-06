@@ -86,6 +86,7 @@
         "src/native_object_edit_receipt_tests.rs",
         "src/native_item_contract.rs",
         "src/native_item_contract_tests.rs",
+        "src/native_item_contract_component_tests.rs",
         "src/native_video_link_contract.rs",
         "src/native_video_link_contract_tests.rs",
         "src/native_vector_contract.rs",
