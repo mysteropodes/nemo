@@ -467,8 +467,7 @@ fn the_layer_compositing_edit_is_a_closed_union_by_edit() {
     assert!(ok(json!({"edit":"blendKeySet","index":12,"mode":"multiply"})));
     assert!(ok(json!({"edit":"blendKeyRemove","index":12})));
     assert!(ok(json!({"edit":"blendKeysClear"})));
-    assert!(ok(json!({"edit":"blendKeysRemove","frames":[3,4]})));
-    assert!(ok(json!({"edit":"blendKeysMove","frames":[3,4],"by":-2})));
+    assert!(ok(json!({"edit":"blendKeysRemove","frames":[3,4]})) && ok(json!({"edit":"blendKeysMove","frames":[3,4],"by":-2})));
     assert!(ok(json!({"edit":"blendKeysClear","mode":"screen"})));
     let blur = json!({"type":"blur","enabled":true,"p1":4,"p2":null,"keys":{"p1":{"keys":[]}}});
     assert!(ok(json!({"edit":"effects","effects":[blur, {"type":"vignette","enabled":false}]})));
@@ -484,13 +483,7 @@ fn the_layer_compositing_edit_is_a_closed_union_by_edit() {
     assert!(!ok(json!({"edit":"blendKeySet","index":12,"mode":"luma"})), "a matte mode is no blend mode");
     assert!(!ok(json!({"edit":"blendKeyRemove","index":12,"mode":"screen"})));
     assert!(!ok(json!({"edit":"blendKeysClear","index":1})));
-    assert!(!ok(json!({"edit":"blendKeysRemove"})), "the keys are required");
-    assert!(!ok(json!({"edit":"blendKeysRemove","frames":[]})), "at least one key");
-    assert!(!ok(json!({"edit":"blendKeysRemove","frames":[1],"by":1})));
-    assert!(!ok(json!({"edit":"blendKeysMove","frames":[1]})), "a move needs its distance");
-    assert!(!ok(json!({"edit":"blendKeysMove","by":1})), "a move needs its keys");
-    assert!(!ok(json!({"edit":"blendKeysMove","frames":[-1],"by":1})));
-    assert!(!ok(json!({"edit":"blendKeysMove","frames":[1],"by":1.5})));
+    for refused in [json!({"edit":"blendKeysRemove"}), json!({"edit":"blendKeysRemove","frames":[]}), json!({"edit":"blendKeysRemove","frames":[1],"by":1}), json!({"edit":"blendKeysMove","frames":[1]}), json!({"edit":"blendKeysMove","by":1}), json!({"edit":"blendKeysMove","frames":[-1],"by":1}), json!({"edit":"blendKeysMove","frames":[1],"by":1.5})] { assert!(!ok(refused.clone()), "{refused}"); }
     assert!(!ok(json!({"edit":"effects"})), "the stack is required");
     assert!(!ok(json!({"edit":"effects","effects":[{"type":"blur"}]})));
     assert!(!ok(json!({"edit":"effects","effects":[{"type":"blur","enabled":true,"p9":1}]})));
