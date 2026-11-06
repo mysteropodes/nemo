@@ -105,7 +105,7 @@ fn unavailable() -> DispatchErrorCode {
 }
 fn categories() -> Value {
     json!([
-        {"category":"conditionalMotionRows","state":"unavailable","reason":"holder-prerequisite-flags-not-admitted"},
+        {"category":"conditionalMotionRows","state":"unavailable","reason":"second-parent-exposed-and-shape-rows-not-admitted"},
         {"category":"pathVerticesTrimStrokeBrushMesh","state":"unavailable","reason":"required-native-property-consumer-or-kind-discriminator-not-admitted"},
         {"category":"referenceOnlyElements","state":"unavailable","reason":"no-authored-frame-independent-property-target"},
         {"category":"expressionDiagnostics","state":"unavailable","reason":"authored-read-does-not-run-pinned-evaluation"},
@@ -363,6 +363,10 @@ impl ObjectSnapshot {
                         .is_some()
                 {
                     keys.extend(DUPLICATOR_ROWS);
+                }
+                // #2520/#2525: the other conditional layer rows of the baseline `propsFor`, in its order.
+                if target.stroke_id().is_none() {
+                    keys.extend(self.conditional_layer_rows(&target));
                 }
                 // Actual admitted family has a solid fill. This describes the
                 // opt-in Fill row; null default means inherit actual source paint.

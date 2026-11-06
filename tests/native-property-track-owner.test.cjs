@@ -72,7 +72,7 @@ function fixture() {
       }
       const r = response(q, result); if (badReply) badReply(r); return r;
     }
-    if (q.operation === 'command.document.object.property.keys.paste') { assert.equal(q.expectedRevision, revision); revision++; return response(q, {applied:true, historyEntriesAdded:1}); }
+    if (q.operation === 'command.document.object.property.keys.paste' || q.operation === 'command.document.object.property.batch') { assert.equal(q.expectedRevision, revision); revision++; return response(q, {applied:true, historyEntriesAdded:1}); }
     assert.equal(q.operation, 'command.document.object.property.track.edit'); assert.equal(q.expectedRevision, revision);
     // Like the actual Tauri UI route (external=false), a local command emits no
     // self-event/ACK wait. Only the separate external() helper creates that fence.
@@ -174,6 +174,24 @@ test('#2524 a key paste is its own admitted operation through the same Project q
   await assert.rejects(run(paste, before, () => true), /stale/, 'a stale pin writes nothing');
   assert.equal(f.requests.length, 1);
   await assert.rejects(run({...paste, tracks:[]}, pin(f.session.info()), () => true), Error, 'an empty paste is refused before transport');
+  assert.equal(f.requests.length, 1);
+});
+
+test('#2520 a property batch is its own admitted operation: ONE request, one revision, copied before it is queued, stale pins write nothing', {timeout:2000}, async () => {
+  const f = fixture(); await f.open(); const before = pin(f.session.info());
+  const edit = (layer, values) => ({target:{contextId:'scene-root', layerUid:layer}, property:'position', action:{kind:'setValue', frame:4, values}});
+  const batch = {command:'object.property.batch', edits:[edit('data:layer 雪', [1, 2]), edit('other', [3, 4])]};
+  const run = f.session.editPropertyBatch; assert.equal(typeof run, 'function');
+  const submitted = JSON.parse(JSON.stringify(batch));
+  const work = run(submitted, before, () => true); submitted.edits.length = 0;
+  const result = await work;
+  assert.deepEqual(result.result, {applied:true, historyEntriesAdded:1}); assert.equal(result.contentRevision, 1);
+  assert.equal(f.requests.length, 1); assert.equal(f.requests[0].operation, 'command.document.object.property.batch');
+  assert.deepEqual(f.requests[0].payload, batch, 'the payload was copied before it was queued');
+  assert.equal(f.requests[0].expectedRevision, 0);
+  await assert.rejects(run(batch, before, () => true), /stale/, 'a stale pin writes nothing');
+  await assert.rejects(run({...batch, edits:[]}, pin(f.session.info()), () => true), Error, 'an empty batch is refused before transport');
+  await assert.rejects(run({...batch, edits:[{...edit('a', [1]), action:{kind:'removeKey', frame:4}}]}, pin(f.session.info()), () => true), Error, 'only value and key writes');
   assert.equal(f.requests.length, 1);
 });
 

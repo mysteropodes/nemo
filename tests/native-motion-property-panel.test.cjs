@@ -475,6 +475,16 @@ test('a duplicator host lists its eight per-copy offsets in the baseline order, 
  assert.deepEqual(await names(['dupOffsetRotX','dupOffsetRot','dupOffsetScale','dupOffsetOpacity']),['dupOffsetRot','dupOffsetScale','dupOffsetOpacity','dupOffsetRotX']);
  assert.deepEqual(await names(['dupOffsetRotX','order','dupOffsetPos','position']),['position','order','dupOffsetPos','dupOffsetRotX'],'the Transform rows come first');
 });
+test('the conditional layer rows keep their native order after the Transform rows and the effector rows get their baseline names',async()=>{
+ const d=directPanel({selected:[directPanel().layer],rows:['position','matteOn','effRadius','effOffPosition','pathPercent'],translations:{propEffRadius:'Rayon'}});
+ assert.equal(await d.panel.refresh(true),true);
+ const rows=d.body().filter(n=>n.className==='lrow motion-prop-row');
+ assert.deepEqual(rows.map(n=>n.dataset.property),['position','matteOn','effRadius','effOffPosition','pathPercent'],'the native order');
+ const text=r=>tree(r).map(n=>n.textContent).filter(Boolean);
+ assert.ok(text(rows[2]).includes('Rayon'), 'a translated name when the language has one');
+ assert.ok(text(rows[3]).includes('Offset Position'), 'the channel offsets are named as the baseline names them');
+ d.panel.dispose();
+});
 test('Cancel is visible only while the native read is in flight and cancelling clears the read',async()=>{
  const d=directPanel({selected:[directPanel().layer]}),release=d.hold();
  const first=d.panel.refresh(true);await tick();

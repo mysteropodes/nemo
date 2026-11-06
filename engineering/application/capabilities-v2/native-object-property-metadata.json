@@ -101,7 +101,7 @@
             {
               "category": "conditionalMotionRows",
               "state": "unavailable",
-              "reason": "holder-prerequisite-flags-not-admitted"
+              "reason": "second-parent-exposed-and-shape-rows-not-admitted"
             },
             {
               "category": "pathVerticesTrimStrokeBrushMesh",
