@@ -1,6 +1,7 @@
 //! Tween records: the per-span re-pairing overrides (`tweenOverrides`), custom easing (`tweenEasing`) and the manual
 //! mode (`tweenManualMode` with `tweenOn` strokes) become the native tween store; the project's resample, step and
-//! default easing become the options of every layer that has a span. Span keys are `layerUid:from-to`.
+//! default easing become the options of every layer that has a span or generated frames, and of every keyed layer when they
+//! differ from the native defaults. Span keys are `layerUid:from-to`.
 use super::classify::is_default;
 use super::{Ctx, LegacyImportError};
 use serde_json::{json, Map, Value};
