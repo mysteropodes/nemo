@@ -30,7 +30,10 @@
   }
   function payload(op,p){
     if(op!==LINK)fail('video operation invalid');
-    exact(p,['documentSnapshotId','lifecycleGeneration','source','intent'],'video link');
+    // #2256: the optional declared component a NEW layer joins (the editor inside an entered component); a replace names its placement's own target.
+    const inside=plain(p)&&own(p,'contextId');
+    exact(p,inside?['documentSnapshotId','lifecycleGeneration','source','intent','contextId']:['documentSnapshotId','lifecycleGeneration','source','intent'],'video link');
+    if(inside){opaque(p.contextId,'contextId');if(!plain(p.intent)||p.intent.kind!=='newLayer')fail('contextId belongs to a new layer');}
     snapshot(p.documentSnapshotId);int(p.lifecycleGeneration,1,Number.MAX_SAFE_INTEGER);
     exact(p.source,['kind','path'],'video source');if(p.source.kind!=='file')fail('video source kind invalid');filePath(p.source.path);
     intent(p.intent);
@@ -60,11 +63,13 @@
     if(res.newLayer!==(want.kind==='newLayer'))fail('video intent disposition mismatch');
     if(want.kind==='newLayer'){
       // The owner mints the placement from the request id and creates the layer at the published revision.
-      if(res.placementId!=='placement-'+q.requestId||res.target.contextId!=='scene-root'||!res.target.layerUid.startsWith('native-layer:'+next+':'))fail('video layer target mismatch');
+      // The layer is made in the request's context: the scene root unless a declared component was named.
+      const context=own(q.payload,'contextId')?q.payload.contextId:'scene-root';
+      if(res.placementId!=='placement-'+q.requestId||res.target.contextId!==context||!res.target.layerUid.startsWith('native-layer:'+next+':'))fail('video layer target mismatch');
     }else if(res.placementId!==want.placementId)fail('video replace target mismatch');
   }
   function paths(op){
-    return op===LINK?new Set(['payload.source.path','payload.intent.placementId','result.assetId','result.placementId','result.target.contextId','result.target.layerUid']):new Set();
+    return op===LINK?new Set(['payload.source.path','payload.intent.placementId','payload.contextId','result.assetId','result.placementId','result.target.contextId','result.target.layerUid']):new Set();
   }
   const api={admitted:op=>op===LINK,requiresRevision:op=>op===LINK,payload:payload,result:result,correlate:correlate,paths:paths};
   // The common SDK consumes one contract object; this joins it in front of another contract of the same interface

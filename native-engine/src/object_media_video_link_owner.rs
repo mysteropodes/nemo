@@ -1,6 +1,7 @@
 //! T12: preparation of one linked video record and its drawing placement, sealed to the
 //! existing owner. The host probes the canonical file and supplies its facts; the engine
 //! never opens a decoder, reads the file or keeps a second document owner.
+use crate::commands::object_fill_owner::object_context_projection::project;
 use crate::commands::ObjectFillOwner;
 use crate::object_document::media_timing::object_media_link_edit::{
     check_inventory, MAX_ASSET_RECORDS, MAX_PLACEMENTS,
@@ -70,6 +71,10 @@ impl PreparedVideoLink {
 fn refusal() -> DispatchErrorCode {
     DispatchErrorCode::Unavailable
 }
+/// The declared component (or the scene root) a new layer is made in: an undeclared one is `NotFound`.
+fn project_view(origin: &ObjectSnapshot, context: &str) -> Result<(), DispatchErrorCode> {
+    project(origin.document(), context).map(|_| ())
+}
 /// File basename without its extension, bounded to the record name rule.
 fn display_name(locator: &str) -> String {
     let stem = std::path::Path::new(locator)
@@ -89,6 +94,10 @@ impl ObjectFillOwner {
     pub(crate) fn video_link_preflight(&self, args: &VideoLink) -> Result<(), DispatchErrorCode> {
         let origin = self.current_snapshot();
         let project = origin.project().ok_or_else(refusal)?;
+        // #2256: a new layer inside a component needs that component declared, asked before the host touches the file.
+        if let Some(context) = &args.context_id {
+            project_view(&origin, context)?;
+        }
         if let VideoIntent::Replace { placement_id } = &args.intent {
             let inventory = project
                 .asset_inventory()
@@ -154,12 +163,15 @@ impl ObjectFillOwner {
         };
         let (drawing, placement, new_layer) = match &args.intent {
             VideoIntent::NewLayer {} => {
-                let bytes = serde_json::to_vec(&json!({"command":"object.layer.create",
-                    "name":display_name(&facts.locator)}))
-                .map_err(|_| refusal())?;
+                // Inside a declared component the new layer joins that component's own stack (the lifecycle's `contextId`).
+                let mut create = json!({"command":"object.layer.create","name":display_name(&facts.locator)});
+                if let Some(context) = &args.context_id {
+                    create["contextId"] = json!(context);
+                }
+                let bytes = serde_json::to_vec(&create).map_err(|_| refusal())?;
                 let layer = self.prepare_layer_create_json(&bytes)?;
                 let target = AssetTarget::Drawing {
-                    context_id: "scene-root".into(),
+                    context_id: args.context_id.clone().unwrap_or_else(|| "scene-root".into()),
                     layer_uid: layer.layer_uid.clone(),
                     stroke_id: None,
                 };
