@@ -363,7 +363,8 @@ fn batch_refusals_are_typed_and_change_nothing() {
     for context in ["unused-symbol", "elsewhere"] {
         let mut foreign = arrange("alignLeft", &["L0", "L1"]);
         foreign["contextId"] = json!(context);
-        refused(&mut owner, context, &foreign, "invalid_request");
+        // An undeclared context is not a component of this document (#2256: a declared one runs the batch inside it).
+        refused(&mut owner, context, &foreign, "not_found");
     }
     let mut late = arrange("alignLeft", &["L0", "L1"]);
     late["frame"] = json!(24);

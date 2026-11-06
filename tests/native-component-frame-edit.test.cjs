@@ -110,11 +110,23 @@ test('a frame outside the component is judged against its own length, not the sc
   assert.equal(h.sent.length, 0);
 });
 
-test('the layer-bar drag has no component route yet: a typed unavailable code, nothing sent', async () => {
-  const h = harness({ cells: [{ layer: 0, frame: 1 }] });
-  const result = await CompEdit.run(h.host, { kind: 'rangeDrag', gesture: {}, capture: {} });
-  assert.deepEqual([result.status, result.code], ['unavailable', CompEdit.CODES.unavailable]);
-  assert.equal(h.sent.length, 0);
+const GESTURE = { command: 'object.layer.range.drag', contextId: 'sym_a', layerUid: 'in_a', activeLayerUid: 'in_b', part: 'both', barSelection: [], samples: [1, 2],
+  plainClick: false, alt: false, frame: 1, selectedKeys: [] };
+test('the layer-bar drag runs on the component route with the held context, the component rows and the ordered samples', async () => {
+  const h = harness();
+  const result = await CompEdit.run(h.host, { kind: 'rangeDrag', gesture: GESTURE, capture: {} });
+  assert.equal(result.status, 'applied-presented');
+  assert.deepEqual([h.sent[0].operation, h.sent[0].payload], [P + 'layer.range.drag', GESTURE]);
+  assert.deepEqual([...new Set(h.routes)], ['component'], 'never the scene route');
+});
+
+test('a bar gesture naming another context, a scene layer or another frame is a typed stale refusal, nothing sent', async () => {
+  for (const change of [{ contextId: 'scene-root' }, { layerUid: 'ly_scene' }, { frame: 2 }, { activeLayerUid: 'in_c' }]) {
+    const h = harness();
+    const result = await CompEdit.run(h.host, { kind: 'rangeDrag', gesture: Object.assign({}, GESTURE, change), capture: {} });
+    assert.deepEqual([result.status, result.code], ['unavailable', Intent.CODES.stale], JSON.stringify(change));
+    assert.equal(h.sent.length, 0);
+  }
 });
 
 test('Move Key and Move Frames name the held context and the component rows; the moved cells stay selected', async () => {

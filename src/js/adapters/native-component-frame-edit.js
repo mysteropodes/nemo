@@ -6,8 +6,7 @@
  * Native: the intent planner of native-frame-edit-intent.js (the same action grammar, selection rules and payloads as the scene) is run
  * against the component's own layer rows and frame count, the held context id is stamped on the payload, and ONE closed request goes
  * through the component command route (session.runComponentCommand) to the declared native operation: one revision and one history
- * entry per gesture. No document, no Paper object, no fallback writer. The layer-bar drag has no component route yet: it answers a typed
- * unavailable code and never reaches a scene editor. The frame clipboard is the one of the cell selection (`_sel.clipboard`), so a packet
+ * entry per gesture. No document, no Paper object, no fallback writer. The layer-bar drag (rangeDrag, native-component-range-edit.js) takes the same route. The frame clipboard is the one of the cell selection (`_sel.clipboard`), so a packet
  * copied in the scene pastes into the component by relative cell, and back, as the baseline does. */
 (function (root, factory) {
   var api = factory(root);
@@ -26,7 +25,7 @@
   // The kinds that have a component route: the scene kinds whose native operation accepts a contextId.
   var ROUTED = Object.freeze(['insertFrame', 'insertKey', 'insertKeyAt', 'convertToKeyframes', 'insertBlankKey', 'duplicateKey', 'extendExposure',
     'clearKey', 'deleteFrames', 'removeTween', 'removeFrame', 'removeFrameSpan', 'moveKey', 'moveFrames', 'repeatSelection', 'duplicateSelection',
-    'copyFrames', 'cutFrames', 'pasteFrames']);
+    'copyFrames', 'cutFrames', 'pasteFrames', 'rangeDrag']);
   var CODES = Object.freeze({ unavailable: 'frame_edit_component_unavailable', session: 'frame_edit_session_unavailable', invalid: 'frame_edit_invalid_intent', stale: 'frame_edit_stale_intent' });
   var P = 'command.document.object.';
   var viewContract = null;
@@ -114,7 +113,7 @@
     var origin = s.info();
     if (!origin) return unavailable(CODES.session);
     // The planner judges a paste against the owner's identity (a packet is the document's, whichever context it was copied in).
-    var info = { layers: rows, totalFrames: here.totalFrames, instanceId: origin.instanceId, documentId: origin.documentId };
+    var info = { layers: rows, totalFrames: here.totalFrames, instanceId: origin.instanceId, documentId: origin.documentId, contextId: here.contextId };
     var clipboard = intent.kind === 'pasteFrames' ? readClipboard(host) : null, before = host._sel && host._sel.clipboard;
     var step = Intent.plan(intent, state, info, clipboard);
     if (step.code) return unavailable(step.code);

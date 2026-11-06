@@ -405,10 +405,6 @@ impl ObjectFillOwner {
             return Err(invalid());
         }
         let context = context_of(&payload.context_id)?.to_owned();
-        // The shift is the layer-bar's atomic gesture (Motion, ranges and history belong to its caller): it has no component route.
-        if payload.command != MOVE && context != CONTEXT {
-            return Err(DispatchErrorCode::Unavailable);
-        }
         let origin = self.current_snapshot();
         // Inside a component the unchanged kernel runs on the component as the scene (`through`); the layer slots of the plan are the
         // component's own, so they are named with the view's uids.

@@ -148,6 +148,15 @@ impl SelectionPlan {
             created_layers,
         }
     }
+    /// The same edit re-sealed over the real document (#2256): a plan computed on the view of a declared component is written back with
+    /// `embed`, and its exact before / after proof names the real document and the embedded result.
+    pub(crate) fn rebased(self, before: &ObjectDocument, after: ObjectDocument) -> Self {
+        Self {
+            publication: SelectionPublication::new(before, &after),
+            document: after,
+            ..self
+        }
+    }
     pub(crate) fn unchanged(document: &ObjectDocument, frame: u32) -> Self {
         Self {
             publication: SelectionPublication::new(document, document),
