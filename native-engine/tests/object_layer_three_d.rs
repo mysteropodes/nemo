@@ -230,3 +230,53 @@ fn a_duplicator_host_lists_its_eight_per_copy_offsets_after_the_transform_rows_a
     assert_eq!(wire(&o)["propertyHolders"].as_array().unwrap().iter().flat_map(|h| h["properties"].as_array().unwrap().iter())
         .find(|p| p["property"] == "dupOffsetRotY").map(|p| p["static"].clone()), None);
 }
+#[test]
+fn the_conditional_layer_rows_appear_with_their_prerequisite_in_the_baseline_order() {
+    let mut value = crate::object_frame_packet::duplicator_sources::tests::duplicated_document(1);
+    let mut other = value["layers"][0].clone();
+    other["layerUid"] = json!("L1");
+    value["layers"].as_array_mut().unwrap().push(other);
+    value["compositionOrder"]["contexts"][0]["layers"].as_array_mut().unwrap().push(json!({"layerUid":"L1","naturalPosition":1,"order":{}}));
+    value["componentTables"]["duplicators"]["effectorLayers"] = json!([
+        {"contextId":"scene-root","layerUid":"L1","effector":{"targetLayerUid":"L0","falloff":"linear"}}]);
+    let base = ["position", "anchor", "rotation", "scale", "opacity", "order"];
+    let dup = ["dupOffsetPos", "dupOffsetRot", "dupOffsetScale", "dupOffsetOpacity", "dupOffsetHue", "dupOffsetPosZ", "dupOffsetRotX", "dupOffsetRotY"];
+    let listed = |value: &Value, layer: &str| {
+        let o = NativeObjectHistory::new("rows", decode_storage_project(value.to_string().as_bytes()).unwrap()).unwrap();
+        names(&o, layer)
+    };
+    let strings = |rows: &[&str]| rows.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+    // An effector layer lists its radius, strength, the angle of a linear falloff and one offset per channel; a radial one lists no angle.
+    let channels = ["effOffPosition", "effOffRotation", "effOffScale", "effOffOpacity", "effOffPositionZ", "effOffRotationX", "effOffRotationY"];
+    let mut want = base.to_vec();
+    want.extend(["effRadius", "effStrength", "effAngle"]);
+    want.extend(channels);
+    assert_eq!(listed(&value, "L1"), strings(&want));
+    let mut radial = value.clone();
+    radial["componentTables"]["duplicators"]["effectorLayers"][0]["effector"]["falloff"] = json!("radial");
+    want.retain(|r| *r != "effAngle");
+    assert_eq!(listed(&radial, "L1"), strings(&want));
+    // A matte, a followed path (Influence only with Align) and a Parent in Time link each add their rows after the duplicator rows.
+    assert_eq!(listed(&value, "L0"), strings(&[&base[..], &dup[..]].concat()));
+    value["layers"][0]["matteMode"] = json!("alpha");
+    value["layers"][0]["matteSourceLayerUid"] = json!("L1");
+    let mut with_matte = base.to_vec();
+    with_matte.extend(dup);
+    with_matte.push("matteOn");
+    assert_eq!(listed(&value, "L0"), strings(&with_matte));
+    value["layers"][0]["followPath"] = json!({"targetLayerUid":"L1"});
+    with_matte.push("pathPercent");
+    assert_eq!(listed(&value, "L0"), strings(&with_matte));
+    value["layers"][0]["followPath"] = json!({"targetLayerUid":"L1","align":true});
+    with_matte.push("pathInfluence");
+    assert_eq!(listed(&value, "L0"), strings(&with_matte));
+    value["layers"][0]["range"] = json!({"timeLink":{"uid":"L1","mode":"in"}});
+    with_matte.push("timeLinkInOffset");
+    assert_eq!(listed(&value, "L0"), strings(&with_matte));
+    value["layers"][0]["range"] = json!({"timeLink":{"uid":"L1"}});
+    with_matte.push("timeLinkOutOffset");
+    assert_eq!(listed(&value, "L0"), strings(&with_matte));
+    value["layers"][0]["range"] = json!({"timeLink":{"uid":"L1","mode":"out"}});
+    with_matte.retain(|r| *r != "timeLinkInOffset");
+    assert_eq!(listed(&value, "L0"), strings(&with_matte));
+}
