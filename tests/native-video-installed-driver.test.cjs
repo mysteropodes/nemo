@@ -73,10 +73,10 @@ test('offset mapping mirrors the host test clamps; the reachable plan is A at of
 test('blocked steps carry source evidence that still exists at the cited lines',()=>{
   assert.deepEqual(P.BLOCKED.map(x=>x.step),['import-video','preview','replace-source','offset','time-remap']);
   const cite=/^([\w./-]+):(\d+)(?:-(\d+))?/;
-  const probes={'src/js/images.js:611':'async function importVideo','src/js/adapters/native-import-desktop.js:236':'providers: { image, video }','src/js/adapters/native-time-remap-ui.js:285':'replace.disabled=!routed',
-    'src/js/adapters/native-time-remap-ui.js:272':'c.video.replaceActive(p.placementId)','tests/desktop/video-installed-policy.cjs:189':'function witnessAction',
+  const probes={'src/js/images.js:611':'async function importVideo','src/js/adapters/native-import-desktop.js:236':'providers: { image, video }','src/js/adapters/native-time-remap-ui.js:303':'replace.disabled=!routed',
+    'src/js/adapters/native-time-remap-ui.js:290':'c.video.replaceActive(p.placementId)','tests/desktop/video-installed-policy.cjs:189':'function witnessAction',
     'src/js/layer-kind.js:110':'ld.nativeVideo','src/js/motion.js:2805':"n20AllowLegacyWrite('motion-toggle-animated')",
-    'src/js/adapters/native-time-remap-ui.js:262':'own.toggleTimeRemap(active())','src/js/adapters/native-time-remap-ui.js:168':'function timeRemapKeyIntent','src/js/adapters/native-project-placement-contract.js:39':'setTimeRemapKey',
+    'src/js/adapters/native-time-remap-ui.js:280':'own.toggleTimeRemap(active())','src/js/adapters/native-time-remap-ui.js:168':'function timeRemapKeyIntent','src/js/adapters/native-project-placement-contract.js:39':'setTimeRemapKey',
     'tests/desktop/p38-owned-window.swift:282':'let actions: Set<String>','src/js/native-video-bridge.js:1378':'async function replaceNativeVideoSource'};
   for(const [where,text] of Object.entries(probes)){const [file,line]=where.split(':');
     assert.ok(fs.readFileSync(path.join(ROOT,file),'utf8').split('\n')[Number(line)-1].includes(text),where);}

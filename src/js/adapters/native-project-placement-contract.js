@@ -25,6 +25,23 @@
   const frames=(v,names)=>{for(const n of names)if(!finite(v[n]))fail('invalid time remap frame');};
   function curvePoints(c){if(!Array.isArray(c)||!c.every(p=>{exact(p,['x','y'],['tx','ty']);return ['x','y','tx','ty'].every(k=>!has(p,k)||finite(p[k]));}))fail('invalid time remap curve');}
   function interpMode(m){if(typeof m!=='string'||!m||bytes(m)>32||m.includes('\0'))fail('invalid interpolation mode');}
+  function payload(op,v){
+    if(op!==OP)fail('placement operation is not declared');
+    if(v&&v.kind==='place'){
+      exact(v,['kind','placement']);const p=exact(v.placement,['id','assetId','target','offsetFrames']);
+      sourceId(p.id);sourceId(p.assetId);target(p.target);offset(p.offsetFrames,p.target.kind!=='audioTrack');
+    }else if(v&&['setOffset','shiftOffset'].includes(v.kind)){
+      const field=v.kind==='setOffset'?'offsetFrames':'deltaFrames';exact(v,['kind','placementId',field]);sourceId(v.placementId);offset(v[field]);
+    }else if(v&&v.kind==='remove'){exact(v,['kind','placementId']);sourceId(v.placementId);}
+    else if(v&&v.kind==='enableTimeRemap'){exact(v,['kind','placementId','inFrame','outFrame','lastSourceFrame']);sourceId(v.placementId);frames(v,['inFrame','outFrame','lastSourceFrame']);}
+    else if(v&&v.kind==='removeTimeRemapKey'){exact(v,['kind','placementId','frame']);sourceId(v.placementId);frames(v,['frame']);}
+    else if(v&&v.kind==='disableTimeRemap'){exact(v,['kind','placementId']);sourceId(v.placementId);}
+    else if(v&&v.kind==='setTimeRemapKey'){exact(v,['kind','placementId','frame','value'],['curvePoints']);sourceId(v.placementId);frames(v,['frame','value']);if(has(v,'curvePoints'))curvePoints(v.curvePoints);}
+    else if(v&&v.kind==='editTimeRemapKeys'){exact(v,['kind','placementId','selections','action']);sourceId(v.placementId);
+      if(!Array.isArray(v.selections)||v.selections.length<1||v.selections.length>128)fail('invalid time remap key selections');v.selections.forEach(selection);keyAction(v.action);}
+    else if(v&&v.kind==='setInterpMode'){exact(v,['kind','placementId','interpMode']);sourceId(v.placementId);interpMode(v.interpMode);}
+    else fail('invalid placement edit');
+  }
   // The Time Remap key edit: the selected keys (one frame, or runs of frames) under one property key action (the track-edit actions).
   const COLOR=/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
   function selection(s){
@@ -46,23 +63,6 @@
       if(!['top','bottom','left','right','liquify'].includes(a.mode)||!big(a.total)||has(a,'grab')!==liquify||liquify&&!big(a.grab))fail('invalid key warp');}
     else if(a.kind==='color'){exact(a,['kind','color']);if(a.color!==null&&!(typeof a.color==='string'&&COLOR.test(a.color)))fail('invalid key colour');}
     else fail('unsupported time remap key action');
-  }
-  function payload(op,v){
-    if(op!==OP)fail('placement operation is not declared');
-    if(v&&v.kind==='place'){
-      exact(v,['kind','placement']);const p=exact(v.placement,['id','assetId','target','offsetFrames']);
-      sourceId(p.id);sourceId(p.assetId);target(p.target);offset(p.offsetFrames,p.target.kind!=='audioTrack');
-    }else if(v&&['setOffset','shiftOffset'].includes(v.kind)){
-      const field=v.kind==='setOffset'?'offsetFrames':'deltaFrames';exact(v,['kind','placementId',field]);sourceId(v.placementId);offset(v[field]);
-    }else if(v&&v.kind==='remove'){exact(v,['kind','placementId']);sourceId(v.placementId);}
-    else if(v&&v.kind==='enableTimeRemap'){exact(v,['kind','placementId','inFrame','outFrame','lastSourceFrame']);sourceId(v.placementId);frames(v,['inFrame','outFrame','lastSourceFrame']);}
-    else if(v&&v.kind==='removeTimeRemapKey'){exact(v,['kind','placementId','frame']);sourceId(v.placementId);frames(v,['frame']);}
-    else if(v&&v.kind==='disableTimeRemap'){exact(v,['kind','placementId']);sourceId(v.placementId);}
-    else if(v&&v.kind==='setTimeRemapKey'){exact(v,['kind','placementId','frame','value'],['curvePoints']);sourceId(v.placementId);frames(v,['frame','value']);if(has(v,'curvePoints'))curvePoints(v.curvePoints);}
-    else if(v&&v.kind==='editTimeRemapKeys'){exact(v,['kind','placementId','selections','action']);sourceId(v.placementId);
-      if(!Array.isArray(v.selections)||v.selections.length<1||v.selections.length>128)fail('invalid time remap key selections');v.selections.forEach(selection);keyAction(v.action);}
-    else if(v&&v.kind==='setInterpMode'){exact(v,['kind','placementId','interpMode']);sourceId(v.placementId);interpMode(v.interpMode);}
-    else fail('invalid placement edit');
   }
   function result(op,v){
     if(op!==OP)fail('placement operation is not declared');
