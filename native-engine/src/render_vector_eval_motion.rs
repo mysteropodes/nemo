@@ -24,6 +24,16 @@ pub(crate) fn apply_element_motion(
     frame: u32,
     segments: Vec<EvalSegment>,
 ) -> Result<Vec<EvalSegment>, VectorEvalError> {
+    let segments = crate::evaluation::object_vector_kernels::render_vector_eval::vertex::apply_vertex_offsets(snapshot, record, frame, segments)?;
+    apply_element_pose(snapshot, record, frame, segments)
+}
+
+fn apply_element_pose(
+    snapshot: &ObjectSnapshot,
+    record: &ObjectRecord,
+    frame: u32,
+    segments: Vec<EvalSegment>,
+) -> Result<Vec<EvalSegment>, VectorEvalError> {
     let target = PropertyHolderTarget {
         context_id: record.target.context_id.clone(),
         layer_uid: record.target.layer_uid.clone(),

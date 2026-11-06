@@ -116,7 +116,7 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
             exact(
                 i,
                 &["stableTarget", "closed", "count", "matrix"],
-                if hit { &["bounds", "role", "filled", "strokeWidth", "owner", "brush", "group", "boxAngle", "xformAnchorKey", "xformAnchorCustom", "style", "paramShape", "groupPath"] } else { &["paintCount"] },
+                if hit { &["bounds", "role", "filled", "strokeWidth", "owner", "brush", "group", "boxAngle", "xformAnchorKey", "xformAnchorCustom", "style", "paramShape", "groupPath", "vertexOffsets"] } else { &["paintCount"] },
             )
             .is_some()
                 && (!hit
@@ -132,6 +132,12 @@ pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
                         && i.get("style").is_none_or(listed_style)
                         && i.get("paramShape").is_none_or(listed_param_shape)
                         && i.get("groupPath").is_none_or(listed_group_path)
+                        && i.get("vertexOffsets").is_none_or(|o| {
+                            o.as_array().is_some_and(|o| {
+                                Some(o.len() as u64) == i["count"].as_u64()
+                                    && o.iter().all(|p| p.as_array().is_some_and(|p| p.len() == 2 && p.iter().all(|v| v.as_f64().is_some_and(f64::is_finite))))
+                            })
+                        })
                         && i.get("bounds").is_some()
                         && i.get("owner").is_none_or(|o| i["role"] == "fill" && o.as_str().is_some_and(|s| !s.is_empty()))
                         && i.get("brush").is_none_or(|b| ["anchor", "copy", "bitmap"].contains(&b.as_str().unwrap_or("")))

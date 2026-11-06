@@ -161,6 +161,32 @@ fn the_hit_listing_names_the_pose_the_layers_motion_applies_to_a_pointer_on_the_
     assert_eq!(full(&still).unwrap()["layerMatrix"], json!([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]));
 }
 
+/// Baseline `applyPathVertexOffsets`: a record whose element holder carries `vtxN` offsets is listed as PAINTED: its bounds cover the
+/// moved points, and `vertexOffsets` hands the reader the per-anchor offsets to add to the stored anchor points.
+#[test]
+fn a_record_with_vertex_offsets_lists_its_painted_bounds_and_the_offsets() {
+    let plain = listing(&masked_content()).unwrap();
+    let stored = plain.iter().find(|i| i["stableTarget"]["strokeId"] == "a" && i["role"] != "mask").unwrap().clone();
+    assert!(stored.get("vertexOffsets").is_none(), "{stored}");
+    let mut doc = masked_content();
+    doc["propertyHolders"].as_array_mut().unwrap().push(json!({
+        "target":{"contextId":"scene-root","layerUid":"L0","strokeId":"a"},
+        "properties":[{"property":"vtx0","static":[40,30]}]}));
+    let items = listing(&doc).unwrap();
+    let posed = items.iter().find(|i| i["stableTarget"]["strokeId"] == "a" && i["role"] != "mask").unwrap();
+    let count = posed["count"].as_u64().unwrap() as usize;
+    let offsets = posed["vertexOffsets"].as_array().unwrap_or_else(|| panic!("offsets are listed: {posed}"));
+    assert_eq!(offsets.len(), count);
+    assert_eq!(offsets[0], json!([40.0, 30.0]));
+    assert!(offsets[1..].iter().all(|o| *o == json!([0.0, 0.0])));
+    // The first anchor moved by (40, 30): the box can only have grown towards it.
+    let (before, after) = (stored["bounds"].as_array().unwrap(), posed["bounds"].as_array().unwrap());
+    assert!(after[2].as_f64().unwrap() >= before[2].as_f64().unwrap() && after[3].as_f64().unwrap() >= before[3].as_f64().unwrap());
+    assert_ne!(before, after, "the bounds follow the moved vertex");
+    // A sibling without vertex Motion is listed exactly as before.
+    assert!(items.iter().filter(|i| i["role"] == "mask").all(|m| m.get("vertexOffsets").is_none()));
+}
+
 #[test]
 fn the_listing_reads_back_the_stored_select_pivot_of_a_vector_record() {
     let mut doc = masked_content();

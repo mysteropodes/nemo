@@ -123,6 +123,20 @@ impl ObjectCompositionWitness {
             // #2356: the editable listing omits a record that has no editable points (a brush, textured or pressure stroke
             // whose anchors are refused) instead of failing the whole layer, so one such record never blocks vertex editing
             // of its neighbours; its per-item geometry read stays refused.
+            // The record as painted: the `vtxN` offsets of its element holder are in its bounds and matrix (and listed for the points).
+            let posed = if hit_test {
+                crate::evaluation::object_vector_kernels::render_vector_eval::vertex::vertex_posed(
+                    packet.snapshot(),
+                    r,
+                    packet.frame(),
+                )
+            } else {
+                None
+            };
+            let (r, vertex_offsets) = match &posed {
+                Some((posed, dense)) => (posed, Some(dense.clone())),
+                None => (r, None),
+            };
             let count = if hit_test {
                 r.geometry.segments.len()
             } else {
@@ -180,6 +194,7 @@ impl ObjectCompositionWitness {
                 style: if hit_test { record::style::listed(r) } else { None },
                 param_shape: if hit_test { record::param_shape(r) } else { None },
                 group_path: None,
+                vertex_offsets,
             });
         }
         flush(&mut items, usize::MAX);
@@ -229,6 +244,7 @@ fn mask_item(r: &crate::object_frame_packet::ObjectRecord, matrix: [f64; 6], fea
         style: record::style::mask(r.mask_mode(), feather),
         param_shape: None,
         group_path: None,
+        vertex_offsets: None,
     }
 }
 
@@ -380,6 +396,7 @@ fn hit_item(
         style: None,
         param_shape: None,
         group_path: None,
+        vertex_offsets: None,
     }
 }
 

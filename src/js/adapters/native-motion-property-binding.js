@@ -162,6 +162,7 @@
         // D18-B: the "Expression controls…" entry shares the layer's one row slot; it edits only through this binding's pinned owner port.
         var controls=ctl&&typeof ctl.build==='function'?ctl.build(root,{readContext:readContext,query:query,editProperty:editProperty},target):null;
         return ctl&&typeof ctl.compose==='function'?ctl.compose(root,link,controls):link;},
+      pathOpened:function(t){var V=root.NemoNativeMotionVertices;if(V&&typeof V.open==='function')V.open(root,t);},
       selectTarget:selectTarget,labelTarget:labelTarget,labelProperty:options.labelProperty,dimLabels:options.dimLabels,readPreference:options.readPreference,writePreference:options.writePreference});
     async function update(force){var ticket=++updateSerial,base=baseScope();if(base&&!base.explicit&&!cacheMatches(base)&&uniqueContextAllowed())showWait('Loading properties…',true);
       if(base)await resolveContext(base,!!force);if(retired||ticket!==updateSerial||options.isCurrent&&options.isCurrent()!==true)return false;clearWait();return caller.update(force);}

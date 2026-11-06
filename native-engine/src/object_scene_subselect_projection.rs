@@ -106,7 +106,7 @@ fn layer_posed(
     }
     let mut rest = Vec::new();
     for source in &sources {
-        record::admit_layer(packet.snapshot().document(), source.record(), layer)
+        record::admit_layer_for(packet.snapshot().document(), source.record(), layer, hit)
             .map_err(|_| "Subselect geometry consumer is unavailable")?;
         if !hit && (source.record().is_mask() || record_layer_has_active_path_fx(packet, source.record())) {
             return Err("Subselect mask or path effect is unavailable");
@@ -246,6 +246,13 @@ fn element_matrices(
             layer_uid: record.target.layer_uid.clone(),
             stroke_id: Presence::Present(record.target.stroke_id.clone()),
         };
+        // The pivot is the centre of the geometry as painted: with the `vtxN` offsets of its element holder.
+        let posed = crate::evaluation::object_vector_kernels::render_vector_eval::vertex::vertex_posed(
+            packet.snapshot(),
+            record,
+            packet.frame(),
+        );
+        let record = posed.as_ref().map_or(record, |(posed, _)| posed);
         let mut matrix = outer;
         if let Some(mat) = packet
             .snapshot()

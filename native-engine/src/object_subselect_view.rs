@@ -62,6 +62,11 @@ pub(crate) struct SubselectReadItem {
     /// the name absent for a group never renamed. Absent for a loose record. The Elements panel builds its group tree from it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) group_path: Option<Vec<serde_json::Value>>,
+    /// Hit-test listing only: a record whose anchors carry `vtxN` Motion offsets at the presented frame lists them, one `[dx, dy]` per
+    /// anchor in record space. `bounds`, `matrix` and the pose already account for them; the stored anchors a geometry page returns do
+    /// not, so a reader adds them to the anchor POINTS (never the handles) to get the geometry as painted. Absent when there are none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) vertex_offsets: Option<Vec<[f64; 2]>>,
 }
 #[derive(Debug, Clone)]
 pub struct SubselectReadProjection {

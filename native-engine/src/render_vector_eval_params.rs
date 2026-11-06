@@ -305,7 +305,9 @@ fn holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
                 || matches!(
                     property.property(),
                     "position" | "anchor" | "rotation" | "scale"
-                ))
+                )
+                // `vtxN` offsets are added to the anchor points by the element Motion join.
+                || PropertyHolder::vertex_index(property.property()).is_some())
                 && !property.expression.value().is_some_and(|code| code.enabled)
         });
         if !consumed {

@@ -408,6 +408,7 @@ fn worst_case_items(count: usize, id_len: usize) -> Vec<crate::object_snapshot::
                 style: None,
                 param_shape: None,
                 group_path: None,
+                vertex_offsets: None,
             }
         })
         .collect()

@@ -455,6 +455,9 @@
     {"src":"js/adapters/native-select-skew.js"},
     {"src":"js/adapters/native-select-pivot.js"},
     {"src":"js/adapters/native-select-lasso.js"},
-    {"src":"js/adapters/native-motion-element.js"}
+    {"src":"js/adapters/native-motion-element.js"},
+    {"src":"js/adapters/native-motion-vertices.js"},
+    {"src":"js/adapters/native-motion-text-bounds.js"},
+    {"src":"js/adapters/native-motion-unified.js"}
   ]
 }

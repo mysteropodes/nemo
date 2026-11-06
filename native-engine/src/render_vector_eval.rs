@@ -37,6 +37,8 @@ use serde_json::Number;
 
 #[path = "render_vector_eval_motion.rs"]
 pub(crate) mod motion;
+#[path = "render_vector_eval_vertex.rs"]
+pub(crate) mod vertex;
 
 #[path = "render_vector_eval_params.rs"]
 pub(crate) mod params;
