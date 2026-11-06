@@ -382,3 +382,6 @@ pub(crate) fn prepare(
         sequence,
     })
 }
+#[cfg(all(test, feature = "history", feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_component_break_apart_render.rs"]
+mod break_apart_render_tests;
