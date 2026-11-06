@@ -107,3 +107,15 @@ fn a_layer_without_a_duplicator_or_an_unknown_layer_is_not_found_and_a_stale_pin
         );
     }
 }
+
+#[test]
+fn the_effector_handles_are_listed_with_their_anchor_and_radius() {
+    let result = ask(&snapshot(json!({"effectors":[
+        {"pos":{"x":100,"y":-20.5},"radius":150,"falloff":"radial"},{"falloff":"linear"}]})), "ly_dup").result.unwrap();
+    assert_eq!(result["effectors"], json!([{"pos":{"x":100,"y":-20.5},"radius":150},{"pos":null,"radius":0}]));
+    let none = ask(&snapshot(json!({})), "ly_dup").result.unwrap();
+    assert_eq!(none["effectors"], json!([]));
+    let many: Vec<Value> = (0..20).map(|i| json!({"pos":{"x":i,"y":i},"radius":i + 1,"falloff":"radial"})).collect();
+    let capped = ask(&snapshot(json!({"effectors":many})), "ly_dup").result.unwrap();
+    assert_eq!(capped["effectors"].as_array().unwrap().len(), 16, "the view lists at most 16 handles");
+}

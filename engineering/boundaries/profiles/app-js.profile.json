@@ -3373,6 +3373,7 @@
         "native-motion-key-gesture.js",
         "native-motion-key-box.js",
         "native-motion-canvas-math.js",
+        "native-motion-effector.js",
         "native-motion-canvas.js",
         "native-motion-property-value.js",
         "native-motion-control-rows.js",

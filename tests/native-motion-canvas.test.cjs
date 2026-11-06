@@ -5,7 +5,7 @@
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 
 const ROOT = path.join(__dirname, '..', 'src', 'js', 'adapters');
-const SOURCES = ['native-object-widget-ui.js', 'native-motion-canvas-math.js', 'native-motion-canvas.js'];
+const SOURCES = ['native-object-widget-ui.js', 'native-motion-canvas-math.js', 'native-motion-effector.js', 'native-motion-canvas.js'];
 const CURVE = path.join(__dirname, '..', 'src', 'js', 'animation', 'curve.js');
 const LAYER = 'native-layer:1:0', PIN = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
 const BASE = { bounds: [100, 100, 300, 200], position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100] };

@@ -4704,6 +4704,28 @@
               ]
             }
           }
+        },
+        "effectorPos": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "index",
+            "x",
+            "y"
+          ],
+          "properties": {
+            "index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            }
+          }
         }
       }
     },
@@ -20179,6 +20201,7 @@
             "seed",
             "sourceMode",
             "staggerRandom",
+            "effectors",
             "timeOffset"
           ],
           "properties": {
@@ -20274,6 +20297,46 @@
                 },
                 "hue": {
                   "type": "boolean"
+                }
+              }
+            },
+            "effectors": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "pos",
+                  "radius"
+                ],
+                "properties": {
+                  "pos": {
+                    "oneOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "x",
+                          "y"
+                        ],
+                        "properties": {
+                          "x": {
+                            "type": "number"
+                          },
+                          "y": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "radius": {
+                    "type": "number"
+                  }
                 }
               }
             },

@@ -80,7 +80,7 @@
   // The duplicator view: the panel's fields with their baseline display defaults, closed members only.
   function duplicatorView(value, head, selector) {
     exact(value, head.concat(['layerUid', 'mode', 'rows', 'cols', 'spacingX', 'spacingY', 'count', 'radius', 'startAngle', 'radialOrient', 'pathAlignTangent',
-      'pathLayerUid', 'seed', 'sourceMode', 'staggerRandom', 'timeOffset']), 'component duplicator result');
+      'pathLayerUid', 'seed', 'sourceMode', 'staggerRandom', 'effectors', 'timeOffset']), 'component duplicator result');
     const finite = (n) => typeof n === 'number' && Number.isFinite(n);
     if (!idText(value.layerUid) || (selector && value.layerUid !== selector.layerUid)) fail('component read result names another layer');
     if (!DUP_MODES.includes(value.mode) || !['shape', 'objects'].includes(value.sourceMode)) fail('invalid duplicator mode');
@@ -89,6 +89,13 @@
     if (!(value.pathLayerUid === null || idText(value.pathLayerUid))) fail('invalid duplicator path layer');
     exact(value.staggerRandom, DUP_CHANNELS, 'duplicator staggerRandom');
     if (!DUP_CHANNELS.every((key) => typeof value.staggerRandom[key] === 'boolean')) fail('invalid duplicator staggerRandom');
+    // The Motion canvas effector handles: at most 16, each an optional world anchor and a finite radius.
+    if (!Array.isArray(value.effectors) || value.effectors.length > 16) fail('invalid duplicator effectors');
+    value.effectors.forEach((item) => {
+      exact(item, ['pos', 'radius'], [], 'duplicator effector');
+      if (!finite(item.radius)) fail('invalid duplicator effector radius');
+      if (item.pos !== null) { exact(item.pos, ['x', 'y'], [], 'duplicator effector pos'); if (!finite(item.pos.x) || !finite(item.pos.y)) fail('invalid duplicator effector pos'); }
+    });
     exact(value.timeOffset, ['enabled', 'offsetFrames', 'direction'], 'duplicator timeOffset');
     if (typeof value.timeOffset.enabled !== 'boolean' || !finite(value.timeOffset.offsetFrames) || !DUP_DIRECTIONS.includes(value.timeOffset.direction)) fail('invalid duplicator timeOffset');
   }
