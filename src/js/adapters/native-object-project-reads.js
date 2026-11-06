@@ -365,7 +365,8 @@
         if(typeof wanted==='function'&&!wanted(item))continue;
         const geometry=await geometryOf(item,false);
         if(geometry.closed!==item.closed||geometry.segments.length!==item.count)throw fault('uncorrelated','Presented geometry differs from its listing');
-        item.segments=geometry.segments;
+        // The record as PAINTED: its `vtxN` Motion offsets (listed by the engine) move the anchor points, never the handles.
+        item.segments=Array.isArray(item.vertexOffsets)&&item.vertexOffsets.length===geometry.segments.length?geometry.segments.map((a,i)=>({point:[a.point[0]+item.vertexOffsets[i][0],a.point[1]+item.vertexOffsets[i][1]],handleIn:a.handleIn,handleOut:a.handleOut})):geometry.segments;
         if(centres&&item.role==='ribbon'){const c=await geometryOf(item,true);
           item.center=c.segments.map((a,i)=>({point:a.point,handleIn:a.handleIn,handleOut:a.handleOut,width:c.widths[i]}));}
       }

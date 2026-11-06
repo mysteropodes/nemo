@@ -311,3 +311,86 @@ fn top_level_v2_parent_storage_is_preserved_but_visible_vector_parenting_never_p
     .is_err());
     assert_eq!(encode_storage_project(s.document()).unwrap(), stored);
 }
+
+/// Baseline `applyPathVertexOffsets`: a `vtxN` offset moves anchor N's point only, before the layer Position, and the
+/// document stays drawable (the holder is consumed by the join, not left to the packet gate).
+#[test]
+fn vertex_offsets_move_anchor_points_only_before_the_layer_pose_and_stay_drawable() {
+    let mut v = terminal();
+    v["propertyHolders"].as_array_mut().unwrap().push(json!({
+        "target": {"contextId":"scene-root","layerUid":"r08_curve_layer","strokeId":"r08_curve_rect"},
+        "properties": [
+            {"property":"vtx0","static":[5,7]},
+            {"property":"vtx2","track":{"keys":[
+                {"frame":0,"v":[0,0],"curvePoints":[]},
+                {"frame":10,"v":[10,-10],"curvePoints":[]}]}}
+        ]
+    }));
+    let s = snap(&v);
+    let before = encode_storage_project(s.document()).unwrap();
+    // Layer Position is 0 at frame 0 and 64 at frame 10 (see the first test).
+    for (frame, v2) in [(0, [0., 0.]), (10, [10., -10.]), (5, [5., -5.])] {
+        let got = evaluate_vector(&s, 0, frame).expect("production evaluator");
+        // The layer Position (eased between its keys) is read off the one anchor that has no vertex offset.
+        let dx = got.segments[1].point[0] - 20.;
+        let want = [
+            [25. + dx, 87.],
+            [20. + dx, 60.],
+            [40. + dx + v2[0], 60. + v2[1]],
+            [40. + dx, 80.],
+        ];
+        assert_eq!(got.segments.len(), 4);
+        for (segment, want) in got.segments.iter().zip(want) {
+            close(segment.point[0], want[0]);
+            close(segment.point[1], want[1]);
+            assert_eq!(segment.handle_in, [0., 0.]);
+            assert_eq!(segment.handle_out, [0., 0.]);
+        }
+    }
+    // The packet gate admits the document: paint reaches a plan for the posed shape.
+    let _ = plan(&s, 10);
+    assert_eq!(encode_storage_project(s.document()).unwrap(), before);
+    // An enabled expression on a vertex stays unavailable instead of being silently ignored.
+    let mut v = v;
+    v["propertyHolders"][1]["properties"][0]["expression"] = json!({"enabled":true,"code":"[1,1]"});
+    let s = snap(&v);
+    assert!(evaluate_vector(&s, 0, 0).is_err());
+}
+
+/// Baseline `propsFor`: a dynamic shape's element lists its own rows after the Transform rows, by kind; the engine renders them from the
+/// keyed tracks (`run_param_shape`), so a keyed corner radius moves the painted anchors.
+#[test]
+fn a_dynamic_shapes_element_lists_its_parametric_rows_and_the_keyed_corner_reshapes_the_paint() {
+    let names = |v: &Value, element: bool| {
+        let s = snap(v);
+        let mut target = json!({"contextId":"scene-root","layerUid":"r08_curve_layer"});
+        if element {
+            target["strokeId"] = json!("r08_curve_rect");
+        }
+        let (mut out, mut offset) = (vec![], 0u64);
+        loop {
+            let selector = json!({"instanceId":s.instance_id(),"documentId":s.document_id(),"atRevision":s.content_revision(),
+                "documentSnapshotId":s.snapshot_id(),"view":{"kind":"properties","target":target,"offset":offset,"limit":8}});
+            let page = s.query_property_metadata_json(selector.to_string().as_bytes()).unwrap();
+            out.extend(page["items"].as_array().unwrap().iter().map(|i| i["property"].as_str().unwrap().to_owned()));
+            match page["nextOffset"].as_u64() {
+                Some(next) => offset = next,
+                None => return out,
+            }
+        }
+    };
+    let mut v = terminal();
+    assert!(names(&v, true).iter().all(|n| !n.starts_with("corner")), "a plain path has no shape rows");
+    for (kind, shape, rows) in [
+        ("rect", json!({"kind":"rect","tl":0,"tr":0,"br":0,"bl":0}), vec!["cornerTL", "cornerTR", "cornerBR", "cornerBL"]),
+        ("ellipse", json!({"kind":"ellipse","startAngle":0,"sweep":360,"innerRadius":0}), vec!["arcStart", "arcSweep", "arcInner"]),
+        ("star", json!({"kind":"star","pointCount":5,"innerRatio":0.5,"cornerRadius":0}), vec!["starInner", "starCorner"]),
+    ] {
+        v["objects"][0]["vectorExt"] = json!({"paramShape":shape});
+        let listed = names(&v, true);
+        let at = listed.iter().position(|n| n == rows[0]).unwrap_or_else(|| panic!("{kind}: {listed:?}"));
+        assert_eq!(&listed[at..at + rows.len()], rows.as_slice(), "{kind}: the rows come in the baseline order");
+        assert!(listed.iter().position(|n| n == "scale").unwrap() < at, "{kind}: after the Transform rows");
+        assert!(names(&v, false).iter().all(|n| !rows.contains(&n.as_str())), "{kind}: the layer lists none of them");
+    }
+}

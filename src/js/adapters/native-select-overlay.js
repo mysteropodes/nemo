@@ -147,6 +147,10 @@
     // #2372 native-fill-gradient: the Fill row's gradient gizmo (line, end handles, stop diamonds) joins the selection's drawing.
     var gizmo = root.NemoNativeFillGradient;
     if (shown && gizmo && typeof gizmo.draw === 'function') gizmo.draw(root, svg, c, shown);
+    var vertices = root.NemoNativeMotionVertices; // Motion: the dots of an element's open Path group
+    if (shown && vertices && typeof vertices.draw === 'function') vertices.draw(root, svg, c, shown);
+    var unified = root.NemoNativeMotionUnified; // Motion: the violet path of a multi-element selection
+    if (shown && unified && typeof unified.draw === 'function') unified.draw(root, svg, c, shown);
     if (s.prev && s.prev.lasso && s.prev.lasso.length > 1) { // the Alt lasso's freehand path, closed back to its start
       svg.appendChild(node(root, 'polygon', line(root, { points: s.prev.lasso.map(function (q) { return at(c.V, q[0], q[1]).join(','); }).join(' '), fill: 'rgba(74,158,255,0.08)', stroke: BLUE, 'stroke-opacity': '0.9', 'stroke-width': '1' })));
     }

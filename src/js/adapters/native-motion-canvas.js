@@ -64,11 +64,17 @@
       const one = (view) => s.readProperty(selector(proof.info, view));
       const raw = (property) => one({ kind: 'rawSample', target, property, frame }).then((r) => r.value);
       const effectors = effectorsOf(proof, layer).catch(() => []);
-      let geo;
+      let geo, refusal;
       try { geo = await one({ kind: 'layerBounds', target, frame }); } catch (error) {
+        refusal = error;
+        // A text layer: the native read refuses it, the glyph-run bounds come from the hit-test listing (native-motion-text-bounds.js).
+        const T = win.NemoNativeMotionTextBounds, text = error && error.code === 'unavailable' && T ? await T.read(win, proof, layer).catch(() => null) : null;
+        if (text) geo = { bounds: text.bounds, parentAffine: text.parentAffine };
+      }
+      if (!geo) {
         // A duplicator host with no geometry of its own (and no parent whose map it would need) still offers its effector handles.
-        const list = error && error.code === 'unavailable' && layer.hasDuplicator === true && !layer.parentLayerUid ? await effectors : [];
-        if (!list.length) throw error;
+        const list = refusal && refusal.code === 'unavailable' && layer.hasDuplicator === true && !layer.parentLayerUid ? await effectors : [];
+        if (!list.length) throw refusal;
         return { layerUid: layer.layerUid, locked: layer.locked === true, outer: Eff.IDENTITY.slice(), bounds: null, keys: [], effectors: list };
       }
       const [position, anchor, rotation, scale] = await Promise.all([raw('position'), raw('anchor'), raw('rotation'), raw('scale')]);

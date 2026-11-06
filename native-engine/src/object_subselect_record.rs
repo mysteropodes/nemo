@@ -102,6 +102,17 @@ pub(crate) fn admit_layer(
     record: &ObjectRecord,
     layer: &crate::object_document::ObjectLayer,
 ) -> Result<(), Refusal> {
+    admit_layer_for(document, record, layer, false)
+}
+/// `hit` is the Select hit-test listing (read only: bounds and matrix of the geometry as PAINTED). It lists a record whose
+/// anchors carry `vtxN` Motion offsets, because the evaluation join applies them; the editable (Direct Select) paths keep
+/// refusing it, as their edits address the stored anchors.
+pub(crate) fn admit_layer_for(
+    document: &ObjectDocument,
+    record: &ObjectRecord,
+    layer: &crate::object_document::ObjectLayer,
+    hit: bool,
+) -> Result<(), Refusal> {
     if layer.three_d.value() == Some(&true) || layer.rig().is_some() {
         return Err(Refusal::Unsupported);
     }
@@ -111,7 +122,7 @@ pub(crate) fn admit_layer(
                 && h.target.layer_uid == record.target.layer_uid
                 && h.target.stroke_id.value() == Some(&record.target.stroke_id)
                 && h.properties.iter().any(|p| {
-                    p.property.starts_with("vtx")
+                    (!hit && p.property.starts_with("vtx"))
                         || (record
                             .vector_ext
                             .value()

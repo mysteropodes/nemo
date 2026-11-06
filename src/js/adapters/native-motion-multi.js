@@ -98,7 +98,11 @@
       const s = proof.session, frame = proof.selector.frame, target = { contextId: proof.selector.contextId, layerUid: row.layerUid };
       const one = (view) => s.readProperty(selector(proof.info, view)), raw = (property) => one({ kind: 'rawSample', target, property, frame }).then((r) => r.value);
       try {
-        const geo = await one({ kind: 'layerBounds', target, frame });
+        let geo; try { geo = await one({ kind: 'layerBounds', target, frame }); } catch (error) { // a text layer: glyph-run bounds from the hit-test listing
+          const T = win.NemoNativeMotionTextBounds, text = error && error.code === 'unavailable' && T ? await T.read(win, proof, row).catch(() => null) : null;
+          if (!text) throw error;
+          geo = { bounds: text.bounds, parentAffine: text.parentAffine };
+        }
         const [position, anchor, rotation, scale] = await Promise.all([raw('position'), raw('anchor'), raw('rotation'), raw('scale')]);
         return { layerUid: row.layerUid, g: { bounds: geo.bounds, position, anchor, rotation: rotation[0], scale, outer: geo.parentAffine } };
       } catch (_) { return null; } // a layer the native read cannot box takes no part, as the baseline skips a layer without bounds

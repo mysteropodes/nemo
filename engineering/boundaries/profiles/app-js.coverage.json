@@ -5038,6 +5038,42 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-motion-vertices.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2788,
+          "scriptOrdinal": 434
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-motion-text-bounds.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2789,
+          "scriptOrdinal": 435
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-motion-unified.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2790,
+          "scriptOrdinal": 436
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-motion-property-keys.js",
       "moduleId": "app.native.motion.properties.adapter",
       "executionClass": "document-classic",

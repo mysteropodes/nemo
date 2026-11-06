@@ -5,7 +5,7 @@
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 
 const ROOT = path.join(__dirname, '..', 'src', 'js', 'adapters');
-const SOURCES = ['native-object-widget-ui.js', 'native-motion-canvas-math.js', 'native-motion-effector.js', 'native-motion-canvas.js'];
+const SOURCES = ['native-object-widget-ui.js', 'native-motion-canvas-math.js', 'native-motion-effector.js', 'native-motion-text-bounds.js', 'native-motion-canvas.js'];
 const CURVE = path.join(__dirname, '..', 'src', 'js', 'animation', 'curve.js');
 const LAYER = 'native-layer:1:0', PIN = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
 const BASE = { bounds: [100, 100, 300, 200], position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100] };
@@ -46,6 +46,8 @@ function harness(options) {
       return { ok: true, result: { applied: true, historyEntriesAdded: 1 } };
     },
   };
+  // A text layer (C-motion-canvas-4): the hit-test listing of the layer, which the text-bounds fallback reads after the typed refusal.
+  if (o.textItems) sandbox.NemoSelectCanvasIntent = { layerList: (w, pin) => pin.layers, presented: async () => ({ pin: info(), frame: sandbox.state.currentFrame, items: o.textItems, layerMatrix: o.textPose || [1, 0, 0, 1, 0, 0] }) };
   if (o.component) sandbox.NemoNativeComponentContext = { presented: () => ({ contextId: 'comp-a', totalFrames: 12, fps: 12 }), layers: () => [Object.assign({ layerUid: 'in-1', visible: true, locked: false }, o.row)] };
   sandbox.NemoNativeObjectProject = { desktop: () => session };
   sandbox.NemoNativeViewportUnderlay = { canvasMapping: Object.freeze({ bounds: () => ({ left: 0, top: 0, width: 960, height: 540 }), matchesView: () => true,
@@ -261,6 +263,23 @@ test('a layer the native read cannot box says so once instead of staying silent 
   assert.equal(h.edits.length, 0);
   const transient = harness({ boundsError: 'stale_revision' }); await transient.ready();
   assert.deepEqual(transient.toasts, [], 'only a typed unavailable is a notice');
+});
+
+test('a text layer is boxed on its glyph-run bounds from the hit-test listing, and a parented, turned or mixed layer keeps the notice (C-motion-canvas-4)', async () => {
+  const item = (extra) => Object.assign({ role: 'text', stableTarget: { contextId: 'scene-root', layerUid: LAYER, strokeId: 't' }, matrix: [1, 0, 0, 1, 0, 0], bounds: [40, 50, 240, 90] }, extra);
+  const h = harness({ boundsError: 'unavailable', textItems: [item(), item({ bounds: [60, 100, 200, 140] })] });
+  await h.ready();
+  assert.deepEqual(h.toasts, [], 'no notice: the box exists');
+  assert.deepEqual(Array.from(h.ctl.data().bounds), [40, 50, 240, 140], 'the union of the glyph runs, before the layer Motion');
+  assert.deepEqual(Array.from(h.ctl.data().outer), [1, 0, 0, 1, 0, 0]);
+  const moved = harness({ boundsError: 'unavailable', textPose: [1, 0, 0, 1, 7, -3], textItems: [item({ matrix: [1, 0, 0, 1, 7, -3] })] });
+  await moved.ready();
+  assert.deepEqual(Array.from(moved.ctl.data().bounds), [40, 50, 240, 90], 'a posed layer lists its bounds before the pose');
+  for (const bad of [{ textItems: [item({ matrix: [0, 1, -1, 0, 0, 0] })] }, { textItems: [item(), { role: 'plain', stableTarget: { layerUid: LAYER }, bounds: [0, 0, 1, 1], matrix: [1, 0, 0, 1, 0, 0] }] }, { textItems: [item()], layer: { parentLayerUid: 'P' } }]) {
+    const refused = harness({ boundsError: 'unavailable', ...bad }); await refused.ready();
+    assert.equal(refused.ctl.data(), null, JSON.stringify(Object.keys(bad)));
+    assert.match(refused.toasts[0], /Motion box is not available/, 'a turned block, a mixed layer and a parented layer stay refused');
+  }
 });
 
 // #2256 B-comp-edit-rest: the whole-layer gizmo on the active layer of an ENTERED component (baseline enterSymbol swapped state.layers, so the Motion
