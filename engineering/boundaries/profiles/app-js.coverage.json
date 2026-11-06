@@ -5242,6 +5242,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-component-range-edit.js",
+      "moduleId": "app.native.component.context.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-component-layer-edit.js",
       "moduleId": "app.native.component.context.adapter",
       "executionClass": "document-classic",

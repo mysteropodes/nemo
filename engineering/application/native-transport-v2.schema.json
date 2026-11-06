@@ -20229,6 +20229,9 @@
                   },
                   "hasMotion": {
                     "type": "boolean"
+                  },
+                  "shy": {
+                    "type": "boolean"
                   }
                 }
               }

@@ -1,6 +1,6 @@
 /* #2256: the timeline of an ENTERED native component (baseline timeline.js renderTimeline after enterSymbol, 1065e9d8): one .lrow in #layer-list and
  * one .frow in #frame-grid per component layer, in the same 34px (Motion 22px) rhythm so the two panels stay row-for-row aligned (CLAUDE.md section 11),
- * with the component's OWN frames drawn as the baseline .fc cells (key dot, held span, tween, span end) and its layer range as the read-only in/out bar.
+ * with the component's OWN frames drawn as the baseline .fc cells (key dot, held span, tween, span end) and its layer range as the in/out bar (editable through native-component-range-edit.js).
  * It owns no state and writes nothing: the cells and the range come from the pinned timing reads of the declared component context (the same
  * owner reads the scene grid uses, asked with the entered context), each answer is applied only while the entered context, its revision and the
  * playhead frame are still the ones asked, and a row whose read was refused stays blank (never a guess). Clicking a row activates the layer through
@@ -45,6 +45,8 @@
     var fc = Number.isFinite(host.FC) && host.FC > 0 ? host.FC : 14;
     bar.setAttribute('aria-disabled', 'true'); bar.style.left = (range.rawInPoint * fc) + 'px'; bar.style.width = Math.max(fc, (range.rawOutPoint - range.rawInPoint + 1) * fc) + 'px';
     bar.classList.toggle('full-range', !range.hasCustomRange); bar.classList.toggle('has-timelink', range.hasTimeLink === true);
+    // The bar is editable inside a component too (native-component-range-edit.js): edge handles, drag, selection and the bar menu.
+    if (host.NemoNativeComponentRangeEdit) host.NemoNativeComponentRangeEdit.bind(host, bar, row.dataset.layerUid, range);
   }
   function caption(st, frame) { return st.name + ' — Frame ' + (frame + 1) + ' / ' + st.totalFrames; }
   // CLAUDE.md section 5bis (b): the only frame-dependent outputs of the grid are the .cur cell and the caption, so a scrub or a playback tick
@@ -79,7 +81,12 @@
       var ico = node(host, 'span', 'lico', ''); ico.style.background = layer.color || '#5FA875';
       var name = node(host, 'span', 'lnm', layer.name); name.title = layer.name + ' — ' + layer.layerKind;
       row.appendChild(ico); row.appendChild(name);
-      row.addEventListener('click', function () { if (ports.current()) ports.select(i); });
+      // The shy switch hides the marked rows on both panels alike (CLAUDE.md section 11: the two lists stay row-for-row aligned).
+      if (s.shyEnabled === true && layer.shy === true) { row.hidden = true; row.style.display = 'none'; }
+      row.addEventListener('click', function () {
+        if (host._layerDragJustEnded) { host._layerDragJustEnded = false; return; } // the trailing click of a reorder drag must not select
+        if (ports.current()) ports.select(i);
+      });
       // The eye, the padlock and the row menu: layer-level edits of the component (native-component-layer-edit.js), one native request each.
       if (host.NemoNativeComponentLayerEdit) host.NemoNativeComponentLayerEdit.decorate(host, row, layer, i);
       return row;
@@ -89,6 +96,7 @@
     var frows = st.rows.map(function (layer, i) {
       var row = node(host, 'div', 'frow native-component-row' + (i === active ? ' act' : '')), cells = [];
       row.dataset.layer = String(i); row.dataset.layerUid = layer.layerUid; row.style.position = 'relative'; row.style.width = (st.totalFrames * fc) + 'px';
+      if (s.shyEnabled === true && layer.shy === true) { row.hidden = true; row.style.display = 'none'; }
       if (layer.color) { row.style.setProperty('--dot-color', layer.color); }
       for (var fi = 0; fi < st.totalFrames; fi += 1) {
         var cell = node(host, 'div', 'fc' + (fi === frame ? ' cur' : '') + (fi < s.waIn || fi > s.waOut ? ' outside-wa' : '') + (picked.has(i + ':' + fi) ? ' sel' : '')); cell.dataset.frame = String(fi); cell.dataset.layer = String(i);

@@ -3,7 +3,8 @@
  * and, with two or more bars selected, align left / centre / right, distribute, stagger, flip and "Sélectionner 1 sur 2", then
  * "Inverser la sélection". Every write is ONE command.document.object.layer.range.arrange over the listed layers: the engine computes
  * the targets from its own range evaluator and writes them atomically as one revision and one history entry. The selection items only
- * change the bar selection of the timeline UI. The adapter holds no document state and has no fallback writer. */
+ * change the bar selection of the timeline UI. The adapter holds no document state and has no fallback writer. A view that carries its own
+ * `send(action, uids, step)` (the entered component's bars) is written through it with the held contextId, and offers no Parent in Time. */
 (function (root, factory) {
   const commonjs = typeof module === 'object' && module.exports;
   const command = commonjs ? require('./native-object-rig-command.js') : root.NemoNativeObjectRigCommand;
@@ -39,6 +40,8 @@
   }
   // One native edit over `uids` (listed order); `view.info` is the revision the menu was built from, so a stale menu writes nothing.
   function send(host, view, action, uids, step) {
+    // A bar menu opened inside an entered component sends through the component route (native-component-range-edit.js).
+    if (typeof view.send === 'function') return view.send(action, uids, step);
     const route = bound(host);
     if (!route || !Contract) { toast(host, 'Native layer range editing is unavailable.'); return Promise.resolve(false); }
     if (!same(route.session.info(), view.info)) { toast(host, 'Native layer range editing is unavailable or stale.'); return Promise.resolve(false); }
@@ -101,7 +104,7 @@
       return send(host, view, action, uids, step);
     };
     const menu = [{ label: 'Réinitialiser (pleine durée)', action: () => { send(host, view, 'reset', [view.uid]); } }];
-    if (adapter) {
+    if (adapter && typeof view.send !== 'function') {
       menu.push({ label: 'Parent in Time — lier le temps à…', action: () => {
         host.showContextMenu(x + 8, y + 8, parent.timeLinkMenuItems(host, adapter, view.li, () => refresh(host)));
       } });

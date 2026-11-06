@@ -10,6 +10,7 @@
 use crate::commands::object_fill_owner::object_frame_bulk_move::object_layer_shift::range::{
     edge_at, points,
 };
+use crate::commands::object_fill_owner::object_context_projection::{embed, project};
 use crate::object_document::{object_deserialize, LayerRange, ObjectDocument, Presence};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
@@ -22,7 +23,7 @@ const MAX_BYTES: usize = 4096;
 const MAX_LAYERS: usize = 128;
 const MAX_STEP: i64 = 1_000_000_000;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Arrange {
     command: String,
     context_id: String,
@@ -157,7 +158,8 @@ fn reset(
     Ok(document)
 }
 
-/// Plans one batch bar edit from its JSON payload over the pinned origin; a refusal changes nothing.
+/// Plans one batch bar edit from its JSON payload over the pinned origin; a refusal changes nothing. A declared component is the
+/// scene of the unchanged planner (`project`) and the result is written back into the real document (`embed`).
 pub(crate) fn plan_arrange_json(
     origin: &ObjectSnapshot,
     bytes: &[u8],
@@ -166,8 +168,34 @@ pub(crate) fn plan_arrange_json(
         return Err(invalid());
     }
     let payload: Arrange = serde_json::from_slice(bytes).map_err(|_| invalid())?;
+    if payload.context_id.is_empty() {
+        return Err(invalid());
+    }
+    if payload.context_id == ROOT {
+        return plan_in(origin, origin.document(), &payload);
+    }
+    let real = origin.document();
+    let view = project(real, &payload.context_id)?;
+    let mut inner = payload.clone();
+    inner.context_id = ROOT.to_owned();
+    let planned = plan_in(origin, &view, &inner)?;
+    let document = if planned.document == view {
+        real.clone()
+    } else {
+        embed(real, &payload.context_id, &view, planned.document)?
+    };
+    Ok(Arranged {
+        document,
+        touched: planned.touched,
+    })
+}
+
+fn plan_in(
+    origin: &ObjectSnapshot,
+    document: &ObjectDocument,
+    payload: &Arrange,
+) -> Result<Arranged, DispatchErrorCode> {
     let action = action_of(&payload.action)?;
-    let document = origin.document();
     let unique: BTreeSet<&str> = payload.layer_uids.iter().map(String::as_str).collect();
     if payload.command != COMMAND
         || payload.context_id != ROOT

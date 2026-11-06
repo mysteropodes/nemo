@@ -67,8 +67,9 @@ fn wrong_owner_missing_revision_closed_payload_and_context_refusals_are_atomic()
                 "invalid_request"
             }
             "context" => {
+                // Undeclared: a declared component runs the gesture inside it (#2256).
                 q["payload"]["contextId"] = json!("nested");
-                "unavailable"
+                "not_found"
             }
             "active" => {
                 q["payload"]["activeLayerUid"] = json!("missing");

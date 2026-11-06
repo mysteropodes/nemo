@@ -1530,6 +1530,7 @@
         "object_frame_edit_structure_controls.rs",
         "object_frame_edit_context_history.rs",
         "object_frame_edit_context_moves_history.rs",
+        "object_frame_edit_context_range_history.rs",
         "object_context_projection.rs",
         "object_frame_edit_structure_items.rs",
         "object_frame_edit_structure_exposure.rs",

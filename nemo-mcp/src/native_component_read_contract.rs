@@ -99,7 +99,7 @@ fn layer_item(value: &Value) -> bool {
     exact(
         value,
         &["layerUid", "name", "layerKind"],
-        &["visible", "locked", "parentLayerUid", "threeD", "hasMotion"],
+        &["visible", "locked", "parentLayerUid", "threeD", "hasMotion", "shy"],
     )
     .is_some_and(|o| {
         uid(o.get("layerUid"))
@@ -107,7 +107,7 @@ fn layer_item(value: &Value) -> bool {
             && o["layerKind"]
                 .as_str()
                 .is_some_and(|k| LAYER_KINDS.contains(&k))
-            && ["visible", "locked", "threeD", "hasMotion"]
+            && ["visible", "locked", "threeD", "hasMotion", "shy"]
                 .iter()
                 .all(|k| o.get(*k).map_or(true, Value::is_boolean))
             && o.get("parentLayerUid").map_or(true, |p| p.is_null() || uid(Some(p)))

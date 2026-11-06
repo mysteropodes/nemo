@@ -3,6 +3,7 @@
 use crate::commands::object_fill_owner::object_frame_bulk_move::{
     prepare as prepare_content, Payload as ContentPayload, SHIFT,
 };
+use crate::commands::object_fill_owner::object_context_projection::{embed, project};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::{object_deserialize, KeyLockMode, ObjectDocument, Presence};
 use crate::object_snapshot::ObjectSnapshot;
@@ -19,6 +20,7 @@ pub(crate) use arrange::plan_arrange_json;
 use motion::SelectedMotionKey;
 
 const COMMAND: &str = "object.layer.range.drag";
+const ROOT: &str = "scene-root";
 const MAX_SAFE: i64 = 9_007_199_254_740_991;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -37,7 +39,7 @@ impl<'de> Deserialize<'de> for Part {
         }
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct BarSelection {
     layer_uid: String,
     part: Part,
@@ -46,7 +48,7 @@ object_deserialize!(BarSelection {
     layer_uid: String,
     part: Part
 });
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Gesture {
     command: String,
     context_id: String,
@@ -216,8 +218,34 @@ fn drop_content(
     }
     Ok(document)
 }
+/// The gesture on `origin`. A declared component is the scene of the unchanged kernel (`project`): the component's own layers,
+/// records and holders carry the context `scene-root`, the gesture's captured keys are retagged the same way, and the result is
+/// written back into the real document (`embed`). In the baseline `enterSymbol` swaps `state.layers`, so the bar works unchanged.
 fn apply(origin: &ObjectSnapshot, gesture: &Gesture) -> Result<ObjectDocument, DispatchErrorCode> {
-    let document = origin.document();
+    let real = origin.document();
+    if gesture.context_id.is_empty() {
+        return Err(invalid());
+    }
+    if gesture.context_id == ROOT {
+        return apply_in(origin, real, gesture);
+    }
+    let view = project(real, &gesture.context_id)?;
+    let mut inner = gesture.clone();
+    let context = std::mem::replace(&mut inner.context_id, ROOT.to_owned());
+    for key in &mut inner.selected_keys {
+        key.retag(&context, ROOT)?;
+    }
+    let edited = apply_in(origin, &view, &inner)?;
+    if edited == view {
+        return Ok(real.clone());
+    }
+    embed(real, &context, &view, edited)
+}
+fn apply_in(
+    origin: &ObjectSnapshot,
+    document: &ObjectDocument,
+    gesture: &Gesture,
+) -> Result<ObjectDocument, DispatchErrorCode> {
     if gesture.command != COMMAND
         || gesture.context_id.is_empty()
         || gesture.layer_uid.is_empty()
@@ -232,10 +260,6 @@ fn apply(origin: &ObjectSnapshot, gesture: &Gesture) -> Result<ObjectDocument, D
         || gesture.selected_keys.len() > 4096
     {
         return Err(invalid());
-    }
-    // Nonroot content/Arc representation remains the named #2225/#2233 provider join.
-    if gesture.context_id != "scene-root" {
-        return Err(DispatchErrorCode::Unavailable);
     }
     if !document
         .layers

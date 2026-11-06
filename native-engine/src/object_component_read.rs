@@ -338,7 +338,7 @@ impl ObjectSnapshot {
                             json!({"layerUid":layer.layer_uid(),"name":layer.name(),"layerKind":kind,
                                 "visible":layer.visible.value() != Some(&false),"locked":if scene { self.document().layer_is_locked(layer.layer_uid()) } else { layer.locked() },
                                 "parentLayerUid":layer.parent_layer_uid.value().cloned().flatten(),
-                                "threeD":layer.three_d.value() == Some(&true),"hasMotion":motion})
+                                "threeD":layer.three_d.value() == Some(&true),"hasMotion":motion,"shy":layer.shy.value() == Some(&true)})
                         })
                         .collect();
                     let mut head = self.component_head("layers");

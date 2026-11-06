@@ -115,6 +115,61 @@ test('a decorated row has an eye, a padlock and a menu bound to the component la
   await flush(); await flush();
   assert.deepEqual(h.sent[0].payload, { command: 'object.layer.visibility.set', layerUid: 'in_b', visible: true, contextId: 'sym_a' });
   row.listeners.contextmenu({ preventDefault() {}, clientX: 4, clientY: 5 });
-  assert.deepEqual(h.menus[0].filter((m) => !m.sep).length, 3, 'duplicate, delete, cut at the playhead');
+  assert.deepEqual(h.menus[0].filter((m) => !m.sep).map((m) => m.label), ['Duplicate the layer', 'Delete the layer', 'Split into layers', 'Cut at the playhead  (⌘⇧D)', 'Mark as « shy »'],
+    'duplicate, delete, split, cut at the playhead and the shy mark');
   assert.deepEqual(h.selected, [1], 'a right-click outside the selection selects the row');
+});
+
+test('the shy mark sends the policy flag, turns the shy switch on and says so; unmarking sends false', async () => {
+  const h = harness();
+  h.host.state.shyEnabled = false;
+  h.host.document.getElementById = () => ({ classList: { add(c) { h.btn = c; } } });
+  assert.equal((await Edit.shy(h.host, 'in_a')).ok, true);
+  assert.deepEqual(h.sent[0].payload, { command: 'object.layer.policy.edit', layerUid: 'in_a', flag: 'shy', value: true, contextId: 'sym_a' });
+  assert.deepEqual([h.host.state.shyEnabled, h.btn, h.notices.length], [true, 'active', 1]);
+  h.host.NemoNativeComponentContext.layers = () => [{ layerUid: 'in_a', name: 'L', locked: false, visible: true, shy: true }];
+  await Edit.shy(h.host, 'in_a');
+  assert.equal(h.sent[1].payload.value, false);
+  assert.equal(h.notices.length, 1, 'no hint when unmarking');
+  assert.equal((await Edit.shy(h.host, 'gone')).code, Edit.CODES.stale);
+});
+
+test('Split into layers sends the layer.split for the playhead frame with the locale labels, and keeps the layer selected', async () => {
+  const h = harness();
+  const r = await Edit.split(h.host, 'in_b');
+  assert.equal(r.ok, true);
+  assert.deepEqual([h.sent[0].operation, h.sent[0].payload], [P + 'layer.split', { command: 'object.layer.split', contextId: 'sym_a', layerUid: 'in_b', frame: 3, labels: { shape: 'Shape', stroke: 'Stroke' } }]);
+  assert.deepEqual(h.selected, [1]);
+  assert.equal((await Edit.split(h.host, 'gone')).code, Edit.CODES.invalid);
+});
+
+test('a reorder drop sends ONE layer.reorder with the gap and the selection after, on the component route', async () => {
+  const h = harness();
+  const r = await Edit.reorder(h.host, ['in_a'], 2, { active: 'in_a', selected: ['in_a'] });
+  assert.equal(r.ok, true);
+  assert.deepEqual([h.sent[0].operation, h.sent[0].payload], [P + 'layer.reorder', { command: 'object.layer.reorder', layerUids: ['in_a'], gap: 2, selection: { active: 'in_a', selected: ['in_a'] }, contextId: 'sym_a' }]);
+  assert.deepEqual([...new Set(h.routes)], ['component']);
+  for (const bad of [[['in_a'], 3], [['gone'], 1], [['in_a'], -1]]) {
+    const g = harness();
+    assert.equal((await Edit.reorder(g.host, bad[0], bad[1], { active: 'in_a', selected: ['in_a'] })).code, Edit.CODES.invalid);
+    assert.equal(g.sent.length, 0);
+  }
+});
+
+test('a press on an entered row arms the shared layer drag with the component rows, its pin and the reorder write', async () => {
+  const h = harness();
+  const armed = [];
+  h.host.NemoNativeLayerRowDrag = { arm: (host, env, event) => { armed.push([env, event]); return true; } };
+  h.host.document.getElementById = (id) => (id === 'layer-list' ? { children: [] } : null);
+  const row = h.host.document.createElement('div');
+  Edit.decorate(h.host, row, { layerUid: 'in_b', visible: false, locked: true }, 1);
+  row.listeners.mousedown({ button: 0, target: {}, clientX: 1, clientY: 2 });
+  assert.equal(armed.length, 1);
+  const env = armed[0][0];
+  assert.deepEqual([env.uid, env.info.layers.map((l) => l.layerUid), env.info.contentRevision], ['in_b', ['in_a', 'in_b'], 5]);
+  assert.deepEqual(env.session.info().layers.map((l) => l.layerUid), ['in_a', 'in_b'], 'the drop is judged against the component rows');
+  await env.writes.reorder(['in_b'], 0, { active: 'in_b', selected: ['in_b'] });
+  assert.equal(h.sent[0].payload.gap, 0);
+  row.listeners.mousedown({ button: 2, target: {} });
+  assert.equal(armed.length, 1, 'only the primary button arms a drag');
 });
