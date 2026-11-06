@@ -238,3 +238,138 @@ fn trim_to_a_leading_work_area_needs_no_rebase_and_keeps_the_start() {
     assert_eq!(key_frame(&after), json!(5));
     assert_eq!((after["project"]["waIn"].clone(), after["project"]["waOut"].clone()), (json!(0.), json!(4.)));
 }
+
+fn all_cells_inside(v: &Value) {
+    let total = v["drawing"]["totalFrames"].as_u64().unwrap();
+    assert!(object_frames(v).iter().all(|(_, frame)| *frame < total));
+    for layer in v["drawing"]["layers"].as_array().unwrap() {
+        for list in ["keys", "samples"] {
+            for entry in layer["timing"][list].as_array().unwrap() {
+                assert!(entry["frame"].as_u64().unwrap() < total);
+            }
+        }
+    }
+    for scope in v["drawing"]["compositionOrder"]["contexts"][0]["scopes"].as_array().unwrap() {
+        assert!(scope["frameScope"]["frame"].as_u64().unwrap() < total);
+    }
+}
+
+#[test]
+fn shrinking_then_growing_restores_every_cell_through_undo_redo_and_reopen() {
+    let mut o = project(TEN, plain(None, None), |_| {});
+    let full = wire(&o);
+    assert!(full["project"].get("retainedTail").is_none());
+    assert_eq!(apply(&mut o, json!({"kind":"setTotalFrames","frames":3})).unwrap(), 1);
+    let small = wire(&o);
+    // Nothing past the new end stays in the drawing, so nothing past it can render, export or play ...
+    all_cells_inside(&small);
+    assert_eq!(object_frames(&small), vec![("a".to_string(), 0)]);
+    // ... the cut cells wait in the project, and they survive save and reopen while the timeline is short.
+    assert!(small["project"].get("retainedTail").is_some());
+    let reopened = NativeObjectHistory::from_project_file("short", small.to_string().as_bytes()).unwrap();
+    assert_eq!(wire(&reopened), small);
+    let mut reopened = reopened;
+    apply(&mut reopened, json!({"kind":"setTotalFrames","frames":10})).unwrap();
+    assert_eq!(wire(&reopened)["drawing"], full["drawing"]);
+    // Growing brings back every cell: the whole drawing is the one it was before the shrink.
+    assert_eq!(apply(&mut o, json!({"kind":"setTotalFrames","frames":10})).unwrap(), 2);
+    let again = wire(&o);
+    assert_eq!(again["drawing"], full["drawing"]);
+    assert_eq!(object_frames(&again), vec![("a".into(), 0), ("b".into(), 3), ("c".into(), 7)]);
+    assert_eq!(frames_of(&again, 0), vec![0, 3, 7]);
+    assert!(again["project"].get("retainedTail").is_none());
+    // Undo and redo move the length and the kept cells together.
+    assert_eq!(o.undo(2).unwrap(), 3);
+    assert_eq!(wire(&o), small);
+    assert_eq!(o.undo(3).unwrap(), 4);
+    assert_eq!(wire(&o), full);
+    assert_eq!(o.redo(4).unwrap(), 5);
+    assert_eq!(wire(&o), small);
+    assert_eq!(o.redo(5).unwrap(), 6);
+    assert_eq!(wire(&o), again);
+    assert_eq!(o.history_depths(), (2, 0));
+}
+
+#[test]
+fn a_partial_grow_returns_the_nearest_cells_and_a_second_shrink_keeps_the_older_ones() {
+    let mut o = project(TEN, plain(None, None), |_| {});
+    let full = wire(&o);
+    apply(&mut o, json!({"kind":"setTotalFrames","frames":3})).unwrap();
+    apply(&mut o, json!({"kind":"setTotalFrames","frames":5})).unwrap();
+    let five = wire(&o);
+    // Frames 3 and 4 return (cell b at 3); frame 7 is still kept, 2 frames past the new end.
+    assert_eq!(object_frames(&five), vec![("a".into(), 0), ("b".into(), 3)]);
+    all_cells_inside(&five);
+    assert!(five["project"].get("retainedTail").is_some());
+    // Shrinking again keeps the new cut in front of the older one: 5 -> 4 sets b aside, c stays behind it.
+    apply(&mut o, json!({"kind":"setTotalFrames","frames":3})).unwrap();
+    apply(&mut o, json!({"kind":"setTotalFrames","frames":10})).unwrap();
+    assert_eq!(wire(&o)["drawing"], full["drawing"]);
+    // 10 -> 6 -> 2 -> 10 passes through two cuts and returns the same drawing.
+    apply(&mut o, json!({"kind":"setTotalFrames","frames":6})).unwrap();
+    apply(&mut o, json!({"kind":"setTotalFrames","frames":2})).unwrap();
+    all_cells_inside(&wire(&o));
+    apply(&mut o, json!({"kind":"setTotalFrames","frames":10})).unwrap();
+    assert_eq!(wire(&o)["drawing"], full["drawing"]);
+}
+
+#[test]
+fn trim_to_the_work_area_really_cuts_and_forgets_the_kept_cells() {
+    let mut o = project(TEN, plain(Some(2.), Some(6.)), |_| {});
+    apply(&mut o, json!({"kind":"setTotalFrames","frames":7})).unwrap();
+    assert!(wire(&o)["project"].get("retainedTail").is_some());
+    apply(&mut o, json!({"kind":"trimToWorkArea"})).unwrap();
+    let trimmed = wire(&o);
+    assert_eq!(trimmed["drawing"]["totalFrames"], json!(5));
+    assert!(trimmed["project"].get("retainedTail").is_none());
+    apply(&mut o, json!({"kind":"setTotalFrames","frames":10})).unwrap();
+    assert_eq!(object_frames(&wire(&o)), vec![("b".to_string(), 1)]);
+}
+
+#[test]
+fn a_malformed_kept_tail_is_refused_when_the_project_is_read() {
+    let mut o = project(TEN, plain(None, None), |_| {});
+    apply(&mut o, json!({"kind":"setTotalFrames","frames":3})).unwrap();
+    let good = wire(&o);
+    let reopen = |tail: Value| {
+        let mut v = good.clone();
+        v["project"]["retainedTail"] = tail;
+        NativeObjectHistory::from_project_file("bad", v.to_string().as_bytes())
+    };
+    let mut doubled = good["project"]["retainedTail"].clone();
+    let layers = doubled["layers"].as_array().unwrap().clone();
+    doubled["layers"] = json!([layers[0].clone(), layers[0].clone()]);
+    assert!(reopen(doubled).is_err());
+    assert!(reopen(json!({"layers":[{"layerUid":"L0","timing":{"keys":[{"frame":5},{"frame":2}],"samples":[]}}]})).is_err());
+    assert!(reopen(json!({"layers":[{"layerUid":"L0","timing":{"keys":[{"frame":4000}],"samples":[]}}]})).is_err());
+    assert!(reopen(json!({"unknown":[]})).is_err());
+}
+
+#[test]
+fn a_component_longer_than_the_project_does_not_stop_the_frames_field() {
+    let long = project(SIX, plain(None, None), |v| {
+        let inner = build::record_json("symbol", "authored", "inside", "inner", 20, 3, 30);
+        v["componentTables"] = json!({"components":{
+            "format":"nemo.native-component-set","formatVersion":1,
+            "components":[{"symbolId":"symbol","name":"long","totalFrames":30,
+                "layers":[{"layerUid":"inside"}],"objects":[inner]}],
+            "instances":[{"contextId":"scene-root","layerUid":"L1","symbolId":"symbol",
+                "symSpeed":1,"symPlacedAt":0,"symMatrix":[1,0,0,1,0,0],
+                "frameKeys":[{"frame":0,"componentFrame":0}]}]
+        }});
+        // The component's own explicit order plan reaches frame 20, far past the project's last frame.
+        v["compositionOrder"]["contexts"].as_array_mut().unwrap().push(json!({"contextId":"symbol",
+            "layers":[{"layerUid":"inside","naturalPosition":0,"order":{}}],
+            "scopes":[{"frameScope":{"kind":"authored","frame":20},
+                "elements":[{"layerUid":"inside","strokeId":"inner","naturalPosition":0,"order":{}}]}]}));
+    });
+    let mut o = long;
+    let before = wire(&o);
+    assert_eq!(apply(&mut o, json!({"kind":"setTotalFrames","frames":3})).unwrap(), 1);
+    let short = wire(&o);
+    assert_eq!(short["drawing"]["totalFrames"], json!(3));
+    // The component keeps its own 30 frames and the record at frame 20.
+    assert_eq!(short["drawing"]["componentTables"], before["drawing"]["componentTables"]);
+    apply(&mut o, json!({"kind":"setTotalFrames","frames":6})).unwrap();
+    assert_eq!(wire(&o)["drawing"], before["drawing"]);
+}
