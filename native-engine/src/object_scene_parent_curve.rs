@@ -4,6 +4,7 @@ use crate::evaluation::object_vector_kernels::render_vector_eval::{
     evaluate_vector_rest, is_vector_record, motion::apply_element_motion, record_layer_has_active_path_fx, EvalSegment,
 };
 use crate::object_frame_packet::subselect_record::paint_anchors;
+use crate::object_frame_packet::text::{Presence, PropertyHolderTarget};
 use crate::object_frame_packet::ObjectRecord;
 use crate::object_render_scene::text_scene::parent_chain::{ChainUnavailable, SceneParentChains};
 use crate::render_geometry::{ClosedCubicPath, CubicSegment};
@@ -66,6 +67,56 @@ impl SceneParentChains {
     }
     pub(crate) fn chain(&self, layer: usize) -> Result<Vec<ChainEntry>, ChainUnavailable> {
         self.chain_with(layer, None)
+    }
+    /// The union of everything the layer draws (vectors, images, Text, video) at this frame, for a 3D pivot.
+    pub(crate) fn layer_bounds(&self, layer: usize) -> Option<Rect> {
+        self.bounds.get(&layer).copied()
+    }
+    /// Where an image or video of `layer` lands: a 3D layer projects the rect (baseline `project3DImageRect` of
+    /// `make3DProjector` around the layer's union bounds, replacing the 2D chain and the layer opacity), any other layer
+    /// takes its D30 chain unchanged.
+    pub(crate) fn place_image(
+        &self,
+        layer: usize,
+        mut source: crate::object_render_scene::text_glyph_scene_kernels::object_raster_asset_scene::RasterSceneSource,
+    ) -> Result<(crate::object_render_scene::text_glyph_scene_kernels::object_raster_asset_scene::RasterSceneSource, Vec<ChainEntry>), ChainUnavailable> {
+        let source_layer = self.packet.source_layers().get(layer).ok_or(ChainUnavailable::MissingLayer)?;
+        if source_layer.three_d.value() != Some(&true) {
+            return Ok((source, self.chain(layer)?));
+        }
+        use crate::evaluation::property_projection_3d::{make_projector, project_image_rect, Bounds, Rect as ImageIn};
+        let target = PropertyHolderTarget {
+            context_id: self.packet.context_id().to_owned(),
+            layer_uid: source_layer.layer_uid().to_owned(),
+            stroke_id: Presence::Missing,
+        };
+        let pose = self
+            .packet
+            .sampled_pose_3d(&target)
+            .map_err(|_| ChainUnavailable::Sample)?
+            .ok_or(ChainUnavailable::Sample)?;
+        let (width, height) = self
+            .packet
+            .snapshot()
+            .project()
+            .map(|p| p.project().canvas_dimensions())
+            .ok_or(ChainUnavailable::MissingGeometry)?;
+        let union = self.bounds.get(&layer).ok_or(ChainUnavailable::MissingGeometry)?;
+        let bounds = Bounds { x: union.x0, y: union.y0, width: union.width(), height: union.height() };
+        let projector = make_projector(&pose, &bounds, f64::from(width), f64::from(height), None);
+        let r = source.rect;
+        let out = project_image_rect(
+            &ImageIn { x: r.x, y: r.y, width: r.width, height: r.height, rotation: Some(r.rotation) },
+            &projector,
+        );
+        source.rect = crate::evaluation::motion_parent_chain::ImageRect {
+            x: out.x,
+            y: out.y,
+            width: out.width,
+            height: out.height,
+            rotation: out.rotation,
+        };
+        Ok((source, Vec::new()))
     }
     /// #2372 a Direct Select preview on a layer that also paints Text or images: its own pivot is the layer's vector rest
     /// bounds with `edited` in place of its stored record, joined with the layer's Text/raster/video bounds, which is what the

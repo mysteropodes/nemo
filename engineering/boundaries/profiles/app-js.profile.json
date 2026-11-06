@@ -3702,6 +3702,18 @@
       ]
     },
     {
+      "id": "app.native.motion-connector-drag.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-motion-connector-drag.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-motion-connector-drag.js"
+      ]
+    },
+    {
       "id": "app.native.path-effects.ui.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

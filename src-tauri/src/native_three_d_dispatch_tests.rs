@@ -10,10 +10,13 @@ fn install(state: &ApplicationMcp) -> String {
     install_layers(state, json!([{"layerUid":"L0"},{"layerUid":"L1"}]))
 }
 fn install_layers(state: &ApplicationMcp, layers: Value) -> String {
+    install_with(state, layers, json!([]))
+}
+fn install_with(state: &ApplicationMcp, layers: Value, objects: Value) -> String {
     let document = json!({"format":"nemo.native-project-document","formatVersion":1,
         "project":{"canvasW":64,"canvasH":48,"fps":24},"viewportReference":null,"assets":[],
         "drawing":{"format":"nemo.native-object-document","formatVersion":1,"totalFrames":16,
-        "layers":layers,"objects":[],"propertyHolders":[]}});
+        "layers":layers,"objects":objects,"propertyHolders":[]}});
     let receipt = bootstrap_raw(
         state,
         &json!({"apiVersion":2,"requestId":"three-d-install","instanceId":state.instance_id(),"documentJson":document.to_string()}).to_string(),
@@ -73,11 +76,22 @@ fn the_3d_switch_is_written_projected_in_the_layer_row_saved_and_undone() {
     assert_eq!(state.native_project_info(&id).unwrap()["contentRevision"], json!(2));
 }
 #[test]
-fn a_layer_the_frame_path_cannot_place_refuses_the_switch_with_no_revision_and_no_history() {
+fn a_null_folder_or_empty_layer_takes_the_switch_like_the_baseline() {
     let state = ApplicationMcp::default();
     let id = install_layers(&state, json!([{"layerUid":"L0","isNullLayer":true},{"layerUid":"L1"}]));
+    receipt(&state.dispatch_native(switch(&state, &id, "three-d-null", 0, json!(true))).unwrap(), 1, true);
+    assert_eq!(row(&state, &id, 0)["threeD"], json!(true));
+}
+#[test]
+fn a_layer_the_frame_path_cannot_place_refuses_the_switch_with_no_revision_and_no_history() {
+    // A format-1 document has no composition order for the 3D batch to join, so a layer that draws is refused.
+    let cases: Value = serde_json::from_str(include_str!("../../engineering/application/examples/native-object-v1/cases.json")).unwrap();
+    let mut record = cases["records"][0].clone();
+    record["target"] = json!({"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},"layerUid":"L0","strokeId":"s0"});
+    let state = ApplicationMcp::default();
+    let id = install_with(&state, json!([{"layerUid":"L0"},{"layerUid":"L1"}]), json!([record]));
     let before = saved(&state, &id);
-    let reply = state.dispatch_native(switch(&state, &id, "three-d-null", 0, json!(true))).unwrap();
+    let reply = state.dispatch_native(switch(&state, &id, "three-d-drawn", 0, json!(true))).unwrap();
     assert!(!reply.ok, "{reply:?}");
     assert_eq!(reply.error.as_ref().map(|e| e.code.as_str()), Some("unavailable"));
     assert_eq!(reply.content_revision, 0);

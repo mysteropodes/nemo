@@ -496,3 +496,6 @@ fn switching_a_layer_to_3d_through_the_policy_leaves_the_contours_in_place_until
     assert_eq!(switch(&mut o, false), 5);
     assert!(near(&at(&o), &flat), "positionZ is stored but inactive while the switch is off");
 }
+
+#[path = "object_scene_vector_batch_3d.rs"]
+mod three_d_scene_tests;

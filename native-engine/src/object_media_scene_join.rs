@@ -107,9 +107,14 @@ pub(crate) fn slots(packet: &ObjectFramePacket) -> Result<Vec<VideoSlot>, Object
                 "a video layer with drawn records or path effects is unavailable",
             ));
         }
-        let opacity = packet
-            .layer_opacity(layer_index)
-            .map_err(|_| unavailable(layer_index, "raw layer opacity is unavailable"))?;
+        // A 3D layer suppresses its 2D Motion opacity (baseline `motionMat = null`).
+        let opacity = if layers[layer_index].three_d.value() == Some(&true) {
+            1.0
+        } else {
+            packet
+                .layer_opacity(layer_index)
+                .map_err(|_| unavailable(layer_index, "raw layer opacity is unavailable"))?
+        };
         slots.push(VideoSlot {
             layer_index,
             placement_id: video.placement_id().to_owned(),
@@ -230,15 +235,17 @@ impl MediaDraws {
                 }
             };
             let (width, height, id) = (first.width, first.height, id.as_str());
-            let chain = plan
+            let (source, chain) = plan
                 .native_parent_chains()
-                .chain(slot.layer_index)
+                .place_image(
+                    slot.layer_index,
+                    RasterSceneSource {
+                        asset_id: id.to_owned(),
+                        rect: contain_rect(canvas, width, height),
+                        opacity: slot.opacity,
+                    },
+                )
                 .map_err(|error| unavailable(slot.layer_index, error.reason()))?;
-            let source = RasterSceneSource {
-                asset_id: id.to_owned(),
-                rect: contain_rect(canvas, width, height),
-                opacity: slot.opacity,
-            };
             let placed = prepare_raster_scene_image(&source, &chain, &Pixels(width, height, id))
                 .map_err(|_| unavailable(slot.layer_index, "video placement is unavailable"))?;
             draws.push(MediaDraw {

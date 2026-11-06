@@ -243,7 +243,7 @@ pub(crate) fn style_of_record_posed(
         };
         return vector_style(record, factor, placement);
     }
-    if pose.moves_gradient() {
+    if pose.moves_gradient() || pose.is_pinned() {
         let placement = Placement {
             offset: [0.0, 0.0],
             chain,

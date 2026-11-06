@@ -7,7 +7,7 @@ use crate::evaluation::object_vector_kernels::render_vector_eval::{
 };
 use crate::evaluation::object_scene_style_kernels::object_scene_paint_pose::PaintPose;
 use crate::object_frame_packet::projection::{
-    apply_layer_entry, layer_chain_entry, project_layer_3d,
+    apply_layer_entry, layer_chain_entry, project_layer_3d_bounded,
 };
 use crate::object_render_scene::text_scene::parent_chain::SceneParentChains;
 use crate::object_frame_packet::{MotionValues, ObjectFramePacket, ObjectFrameRecord};
@@ -187,7 +187,14 @@ fn prepare_layer(
     if !active && !expanded && parents.is_empty() && !common_position {
         return Ok(None);
     }
-    let mixed = (record_mixed || item_consumers) && item_chain.is_none();
+    // A 3D layer that also holds still images pivots around the union of its drawn geometry and its images (baseline
+    // `userLayers[i].bounds`); Text and masks keep the layer unjoined.
+    let union_bounds = if three_d && item_consumers && !record_mixed && !packet.text_records().any(|s| s.layer_index() == index) {
+        chains.and_then(|c| c.layer_bounds(index))
+    } else {
+        None
+    };
+    let mixed = (record_mixed || item_consumers) && item_chain.is_none() && union_bounds.is_none();
     // The original per-record producers already consume raw Position, including
     // mask curves. A union-bounds transform is unnecessary for translation; keep
     // that admitted route unless an expanded holder or parent needs this batch.
@@ -204,24 +211,25 @@ fn prepare_layer(
     for source in sources.iter().copied().filter(|s| !s.record().is_mask()) {
         let record = source.record();
         // The paint style carries the layer pose (`PaintPose`): stroke width and gradient endpoints follow the same chain
-        // as the path. What stays unjoined is a gradient under 3D, a gradient whose Position is an expression (the raw
+        // as the path. What stays unjoined is a gradient whose Position is an expression (the raw
         // translation port ignores it) and a dash pattern under a scaled stroke (the baseline inline route leaves the
         // dash unscaled while its retained route scales it with the pen).
+        // A gradient under 3D keeps its raw endpoints: the baseline projects the geometry only and leaves the paint alone.
         let refusal = if record.fill_gradient().is_some()
-            && (three_d
-                || packet
-                    .snapshot()
-                    .document()
-                    .property_holders()
-                    .is_some_and(|holders| {
-                        holders.iter().any(|h| {
-                            h.target() == &target
-                                && h.properties().iter().any(|p| {
-                                    p.property() == "position"
-                                        && p.expression.value().is_some_and(|e| e.enabled)
-                                })
-                        })
-                    })) {
+            && !three_d
+            && packet
+                .snapshot()
+                .document()
+                .property_holders()
+                .is_some_and(|holders| {
+                    holders.iter().any(|h| {
+                        h.target() == &target
+                            && h.properties().iter().any(|p| {
+                                p.property() == "position"
+                                    && p.expression.value().is_some_and(|e| e.enabled)
+                            })
+                    })
+                }) {
             Some("transformed vector gradient awaits the same evaluated paint consumer")
         } else {
             None
@@ -274,15 +282,21 @@ fn prepare_layer(
             .project()
             .canvas_dimensions();
         let extras = vec![None; vectors.len()];
-        let vectors = project_layer_3d(
+        let vectors = project_layer_3d_bounded(
             &vectors,
             &pose,
             [f64::from(width), f64::from(height)],
             &extras,
+            union_bounds.map(|r| crate::evaluation::property_projection_3d::Bounds {
+                x: r.x0,
+                y: r.y0,
+                width: r.width(),
+                height: r.height(),
+            }),
         )
         .map_err(|_| "ordinary vector 3D batch projection refused its numeric inputs")?;
         // Original3D suppresses layer2D Motion, parent opacity and strokeScale.
-        (vectors, 1., PaintPose::default())
+        (vectors, 1., PaintPose::pinned())
     } else {
         let motion = motion
             .as_ref()

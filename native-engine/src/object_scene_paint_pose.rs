@@ -18,6 +18,8 @@ pub(crate) struct PaintPose {
     layer: Option<ChainEntry>,
     /// Its ancestors, immediate parent first; identity entries are absent.
     parents: Vec<ChainEntry>,
+    /// A 3D layer: the baseline projects the geometry only, so paint coordinates (gradient endpoints) stay raw.
+    pinned: bool,
 }
 
 impl Default for PaintPose {
@@ -27,6 +29,7 @@ impl Default for PaintPose {
             stroke_scale: 1.0,
             layer: None,
             parents: Vec::new(),
+            pinned: false,
         }
     }
 }
@@ -46,7 +49,24 @@ impl PaintPose {
             stroke_scale,
             layer,
             parents: parents.to_vec(),
+            pinned: false,
         }
+    }
+
+    /// The pose of a 3D layer: carried, no stroke scaling and no paint movement at all (baseline `is3D`: `motionMat = null`,
+    /// `parentChain = []`, and the gradient endpoints go through neither).
+    pub(crate) fn pinned() -> Self {
+        Self {
+            carried: true,
+            stroke_scale: 1.0,
+            layer: None,
+            parents: Vec::new(),
+            pinned: true,
+        }
+    }
+
+    pub(crate) fn is_pinned(&self) -> bool {
+        self.pinned
     }
 
     pub(crate) fn carried(&self) -> bool {

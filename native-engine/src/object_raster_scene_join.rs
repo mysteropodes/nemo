@@ -86,10 +86,15 @@ pub(super) fn sources_excluding(
                     "raster path effects are unavailable",
                 ));
             }
-            let opacity = item.opacity()
-                * packet.layer_opacity(record.layer_index()).map_err(|_| {
+            // A 3D layer suppresses its 2D Motion opacity (baseline `motionMat = null`); its image keeps its own.
+            let layer_opacity = if layer.three_d.value() == Some(&true) {
+                1.0
+            } else {
+                packet.layer_opacity(record.layer_index()).map_err(|_| {
                     unavailable(record.source_index(), "raw layer opacity is unavailable")
-                })?;
+                })?
+            };
+            let opacity = item.opacity() * layer_opacity;
             if !(opacity as f32).is_finite() {
                 return Err(unavailable(
                     record.source_index(),
@@ -258,14 +263,14 @@ mod retained {
                         },
                     );
                 }
-                let chain = if source.placed {
-                    Vec::new()
+                let (placed_source, chain) = if source.placed {
+                    (source.source.clone(), Vec::new())
                 } else {
                     plan.native_parent_chains()
-                        .chain(source.layer_index)
+                        .place_image(source.layer_index, source.source.clone())
                         .map_err(|error| unavailable(source.source_index, error.reason()))?
                 };
-                let image = prepare_raster_scene_image(&source.source, &chain, &Pixels(&assets))
+                let image = prepare_raster_scene_image(&placed_source, &chain, &Pixels(&assets))
                     .map_err(|_| {
                         unavailable(
                             source.source_index,
