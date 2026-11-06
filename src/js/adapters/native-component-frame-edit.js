@@ -8,19 +8,23 @@
  * entry per gesture. No document, no Paper object, no fallback writer. Actions with no component route yet (move, repeat, clipboard,
  * layer-bar drag) answer a typed unavailable code and never reach a scene editor. */
 (function (root, factory) {
-  var commonjs = typeof module === 'object' && module.exports;
-  var api = factory(commonjs ? require('./native-frame-edit-intent.js') : root.NemoNativeFrameEditIntent,
-    commonjs ? require('./native-frame-edit-contract.js') : root.NemoNativeFrameEditContract,
-    commonjs ? require('./native-object-vector-command.js') : root.NemoNativeObjectVectorCommand);
-  if (commonjs) module.exports = api;
+  var api = factory(root);
+  if (typeof module === 'object' && module.exports) module.exports = api;
   else root.NemoNativeComponentFrameEdit = api;
-}(typeof globalThis === 'object' ? globalThis : this, function (Intent, Contract, Command) {
+}(typeof globalThis === 'object' ? globalThis : this, function (root) {
   'use strict';
+  // The planner, the contract and the command round trip are read from the page at call time (adapter modules do not import each other).
+  var Intent = { get CODES() { return root.NemoNativeFrameEditIntent.CODES; }, action: function (v) { return root.NemoNativeFrameEditIntent.action(v); },
+    readState: function (p, i) { return root.NemoNativeFrameEditIntent.readState(p, i); }, plan: function (a, b, c, d) { return root.NemoNativeFrameEditIntent.plan(a, b, c, d); } };
+  var Contract = { payload: function (o, v) { return root.NemoNativeFrameEditContract.payload(o, v); }, valid: function (o, v) { return root.NemoNativeFrameEditContract.valid(o, v); },
+    result: function (o, v) { return root.NemoNativeFrameEditContract.result(o, v); }, correlate: function (a, b) { return root.NemoNativeFrameEditContract.correlate(a, b); },
+    requestByteLimit: function (o) { return root.NemoNativeFrameEditContract.requestByteLimit(o); } };
+  var Command = { create: function (s, l, c) { return root.NemoNativeObjectVectorCommand.create(s, l, c); }, fault: function (a, b, c) { return root.NemoNativeObjectVectorCommand.fault(a, b, c); } };
   var LABEL = 'component-frame';
   // The kinds that have a component route: the scene kinds whose native operation accepts a contextId.
   var ROUTED = Object.freeze(['insertFrame', 'insertKey', 'insertKeyAt', 'convertToKeyframes', 'insertBlankKey', 'duplicateKey', 'extendExposure',
     'clearKey', 'deleteFrames', 'removeTween', 'removeFrame', 'removeFrameSpan']);
-  var CODES = Object.freeze({ unavailable: 'frame_edit_component_unavailable', session: Intent.CODES.session, invalid: Intent.CODES.invalid, stale: Intent.CODES.stale });
+  var CODES = Object.freeze({ unavailable: 'frame_edit_component_unavailable', session: 'frame_edit_session_unavailable', invalid: 'frame_edit_invalid_intent', stale: 'frame_edit_stale_intent' });
   var P = 'command.document.object.';
   var viewContract = null;
 
@@ -48,7 +52,7 @@
     var code = error && error.code, reason = (error && (error.reason || error.message)) || null;
     if (typeof code !== 'string') return unavailable(CODES.session, reason);
     if (code === 'stale_origin') return unavailable(CODES.stale, reason);
-    if (code === 'invalid_request') return unavailable(Intent.CODES.request, reason);
+    if (code === 'invalid_request') return unavailable('frame_edit_request_invalid', reason);
     if (code === 'unavailable' || code === 'request_too_large') return unavailable(CODES.session, reason);
     if (code === 'uncorrelated' || code.endsWith('_command_indeterminate')) return Object.freeze({ status: 'unconfirmed', requestId: error.requestId });
     return Object.freeze({ status: 'refused', code: code, reason: error.reason || null });
@@ -77,7 +81,7 @@
     var step = Intent.plan(intent, state, { layers: rows, totalFrames: here.totalFrames }, null);
     if (step.code) return unavailable(step.code);
     var payload = Object.assign({}, step.payload, { contextId: here.contextId });
-    if (!Contract.valid(step.op, payload)) return unavailable(Intent.CODES.request);
+    if (!Contract.valid(step.op, payload)) return unavailable('frame_edit_request_invalid');
     var origin = s.info(), frame = state.frame;
     if (!origin) return unavailable(CODES.session);
     try {

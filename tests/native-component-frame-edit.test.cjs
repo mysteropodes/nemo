@@ -2,9 +2,13 @@
 // #2256 A-comp-edit-timeline (JS): the dense editor's frame and key actions inside an entered component reach the declared native
 // operations through the component command route only, stamped with the held context, against the component's own rows and length.
 const test = require('node:test'), assert = require('node:assert/strict');
+const Intent = require('../src/js/adapters/native-frame-edit-intent.js');
+// The adapter reads its collaborators from the page at call time (adapter modules do not import each other).
+globalThis.NemoNativeFrameEditIntent = Intent;
+globalThis.NemoNativeFrameEditContract = require('../src/js/adapters/native-frame-edit-contract.js');
+globalThis.NemoNativeObjectVectorCommand = require('../src/js/adapters/native-object-vector-command.js');
 const CompEdit = require('../src/js/adapters/native-component-frame-edit.js');
 const Desktop = require('../src/js/adapters/native-frame-edit-desktop.js');
-const Intent = require('../src/js/adapters/native-frame-edit-intent.js');
 const P = 'command.document.object.';
 const ROWS = [{ layerUid: 'in_a', name: 'A', locked: false }, { layerUid: 'in_b', name: 'B', locked: false }, { layerUid: 'in_c', name: 'C', locked: false }];
 
