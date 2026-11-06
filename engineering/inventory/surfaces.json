@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "e021db91cc9e76abaeff6d6b8d49d28f9b54f966",
-  "describe": "v0.7.0-alpha.4-5291-ge021db91c-dirty"
+  "head": "693de7f5cab44fad2e11325b49e08815fa3f3fd2",
+  "describe": "v0.7.0-alpha.4-5294-g693de7f5c-dirty"
  },
- "inputsDigest": "510106f8dfa2cccabb6c68e9b520a9b385bd08b54daae0ee03eea014cb4f6cb0",
+ "inputsDigest": "3017c607e5d01bfbd5c919c700fd6b76297af8d5465c595e5709e260e366103a",
  "states": [
   "inventoried",
   "characterized",
@@ -4956,7 +4956,7 @@
     "container": "p-textanim-add-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 78,
+    "functionsVisited": 76,
     "via": "variable animBtn",
     "references": []
    },
@@ -28632,7 +28632,7 @@
    "source": "src/js/select-bridge.js:3249",
    "meta": {
     "i18n": null,
-    "functionsVisited": 78
+    "functionsVisited": 76
    },
    "fixtures": [
     "static-props",

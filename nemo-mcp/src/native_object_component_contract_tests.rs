@@ -37,7 +37,8 @@ pub(super) fn valid() -> Vec<(&'static str, Value)> {
             json!({"command":"object.duplicator.config","layerUid":"layer-a","mode":"radial","rows":3,"cols":4,
             "spacingX":150.5,"spacingY":-20,"count":12,"radius":240,"startAngle":45,"radialOrient":true,
             "pathAlignTangent":false,"seed":482913,"staggerRandom":{"position":true,"hue":false},
-            "timeOffset":{"enabled":true,"offsetFrames":2.5,"direction":"centerOut"}}),
+            "timeOffset":{"enabled":true,"offsetFrames":2.5,"direction":"centerOut"},
+            "effectorPos":{"index":1,"x":120.5,"y":-40}}),
         ),
         (
             "component.instance.set",

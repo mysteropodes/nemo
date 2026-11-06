@@ -61,6 +61,7 @@ fn duplicator_result() -> Value {
         json!({"layerUid":"ly_dup","mode":"radial","rows":2,"cols":3,"spacingX":150.5,"spacingY":-20,"count":8,"radius":200,
             "startAngle":0,"radialOrient":true,"pathAlignTangent":false,"pathLayerUid":null,"seed":4242,"sourceMode":"shape",
             "staggerRandom":{"position":true,"rotation":false,"scale":false,"opacity":false,"hue":true},
+            "effectors":[{"pos":{"x":100,"y":-20.5},"radius":150},{"pos":null,"radius":0}],
             "timeOffset":{"enabled":true,"offsetFrames":2.5,"direction":"centerOut"}}),
     )
 }
