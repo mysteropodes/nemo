@@ -238,13 +238,19 @@ pub(crate) fn remaining_holder(
                         && record.target().layer_uid() == target.layer_uid()
                 })
         });
+    let three_d_on = document
+        .layers()
+        .iter()
+        .any(|l| l.layer_uid() == target.layer_uid() && l.three_d.value() == Some(&true));
     let mut remaining = holder.clone();
     remaining.properties.retain(|p| {
         let key = p.property();
         // #2520/#2525: with the 3D switch off the three 3D keys are stored but dormant (the baseline `toggleLayer3D` keeps
         // them), so a common layer ignores them rather than refusing the frame; with it on the Pose3D consumer reads them.
+        // A Text/raster layer with the switch off ignores them the same way.
+        let dormant = layer && !three_d_on;
         let consumed = KEYS.contains(&key)
-            || (common && ["positionZ", "rotationX", "rotationY"].contains(&key));
+            || ((common || dormant) && ["positionZ", "rotationX", "rotationY"].contains(&key));
         let owned = consumed && (common || !mixed || key == "opacity");
         !owned || (!evaluated && p.expression.value().is_some_and(|e| e.enabled))
     });

@@ -4654,6 +4654,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-motion-connector-drag.js",
+      "moduleId": "app.native.motion-connector-drag.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2774,
+          "scriptOrdinal": 420
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-motion-layer-link-rows.js",
       "moduleId": "app.native.layer-parent.adapter",
       "executionClass": "document-classic",

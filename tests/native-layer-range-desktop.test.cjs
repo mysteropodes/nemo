@@ -384,6 +384,28 @@ test('#2377: a connector bar joins two consecutive keys whose value changes, tin
   assert.equal(bars().find((b) => b.dataset.keyFrom === '1').classes.has('sel'), true, 'both end keys selected: the bar reads selected');
 });
 
+test('#2377: dragging a connector moves both end keys with ONE shift; Alt+drag retimes the second key alone and selects the pair again', async () => {
+  const target = { contextId: 'scene-root', layerUid: 'alpha' };
+  const h = await harness({ propertyTracks: [{ target, property: 'opacity', dimension: 1, items: [
+    { frame: 1, v: [10] }, { frame: 4, v: [20] }, { frame: 8, v: [30] }] }] });
+  const edits = []; h.root.NemoNativeMotionKeyGesture = KeyGesture; h.root.NemoNativeMotionConnectorDrag = require('../src/js/adapters/native-motion-connector-drag.js');
+  h.ports.editSelectedKeys = (a) => { edits.push([a, h.keyNodes().filter((n) => n.dataset.selected === 'true').map((n) => Number(n.dataset.frame))]); return Promise.resolve(true); };
+  const bar = () => h.grid.querySelectorAll('.native-key-connect').find((b) => b.dataset.keyFrom === '1');
+  await bar().fire('mousedown', { button: 0, clientX: 100 });
+  h.doc.fire('mousemove', { clientX: 120, metaKey: true });
+  assert.deepEqual(h.keyNodes().filter((n) => n.dataset.selected === 'true').map((n) => n.style.transform), ['translateX(20px)', 'translateX(20px)']);
+  h.doc.fire('mouseup', { clientX: 120 });
+  assert.deepEqual(edits, [[{ kind: 'shift', delta: 2 }, [1, 4]]], 'both end keys moved by one shift');
+  edits.length = 0;
+  await bar().fire('mousedown', { button: 0, clientX: 100, altKey: true });
+  h.doc.fire('mousemove', { clientX: 120, metaKey: true });
+  assert.deepEqual(h.keyNodes().map((n) => n.style.transform || ''), ['', '', ''].map((_, i) => (i === 1 ? 'translateX(20px)' : '')));
+  h.doc.fire('mouseup', { clientX: 120 });
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(edits, [[{ kind: 'shift', delta: 2 }, [4]]], 'only the second key moved');
+  assert.equal(h.commands().length, 0);
+});
+
 test('the selection box appears over keys on two rows and a skew drag commits ONE warp; Alt + dragging a selected key skews like the bottom edge', async () => {
   const h = await harness(twoRows());
   placeKeys(h);
@@ -407,7 +429,7 @@ test('the selection box appears over keys on two rows and a skew drag commits ON
   // Alt + dragging an already selected key: the bottom edge's skew.
   edits.length = 0;
   h.keyNodes().find((n) => n.dataset.selected === 'true').fire('mousedown', { button: 0, altKey: true, clientX: 100 });
-  h.doc.fire('mousemove', { clientX: 120 });
+  h.doc.fire('mousemove', { clientX: 120, metaKey: true });
   h.doc.fire('mouseup', { clientX: 120 });
   assert.deepEqual(edits.map((e) => e[0]), [{ kind: 'warp', mode: 'bottom', total: 2 }]);
   // Back to one selected key: the box goes.

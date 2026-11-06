@@ -74,62 +74,88 @@ fn prepares(o: &NativeObjectHistory) -> bool {
     prepare_object_exposure_frame(&s, &selector).is_ok()
 }
 
+/// The Motion-capable frame preparation (the plain one refuses any authored property holder).
+fn prepares_with_motion(o: &NativeObjectHistory) -> bool {
+    let s = head(o);
+    let selector = ObjectFrameSelector {
+        instance_id: s.instance_id(),
+        document_id: s.document_id(),
+        content_revision: s.content_revision(),
+        document_snapshot_id: s.snapshot_id(),
+        context_id: "scene-root",
+        scope_kind: FrameScopeKind::Authored,
+        frame: 0,
+    };
+    let mut effects = None;
+    crate::object_expression_runtime::prepare_object_motion_exposure_frame_for_owner(o, &s, &selector, &mut effects).is_ok()
+}
+fn key(o: &mut NativeObjectHistory, layer: &str, property: &str, values: Value) {
+    let payload = json!({"command":"object.property.edit","target":{"contextId":"scene-root","layerUid":layer},
+        "property":property,"action":{"kind":"setValue","frame":0,"values":values}});
+    let candidate = o.prepare_property_edit_json(payload.to_string().as_bytes()).unwrap();
+    o.commit_property_edit(candidate).unwrap();
+}
+
 #[test]
-fn a_layer_the_frame_path_cannot_place_refuses_the_switch_with_no_revision_and_the_document_keeps_preparing(
-) {
+fn the_three_d_keys_of_every_kind_leave_the_frame_available_with_the_switch_on_or_off() {
+    let mut o = owner(&mixed());
+    assert!(prepares_with_motion(&o));
+    let kinds = ["ly_v", "ly_empty", "ly_null", "ly_folder", "ly_fx", "ly_widget", "ly_img", "ly_txt"];
+    // Dormant keys (switch off) first, on every kind including Text, then the same keys with the switch on.
+    for layer in kinds {
+        key(&mut o, layer, "positionZ", json!([300]));
+        key(&mut o, layer, "rotationY", json!([20]));
+        assert!(prepares_with_motion(&o), "{layer}: dormant 3D keys");
+    }
+    for layer in kinds.iter().filter(|l| **l != "ly_txt") {
+        assert!(set(&mut o, layer, true).is_ok(), "{layer}");
+        assert!(prepares_with_motion(&o), "{layer}: active 3D keys");
+    }
+}
+
+#[test]
+fn text_is_the_one_kind_the_frame_path_cannot_place_yet_and_refuses_the_switch_with_no_revision() {
     let mut o = owner(&mixed());
     let zero = bytes(&o);
     assert!(prepares(&o), "the fixture prepares before any switch");
-    for layer in ["ly_img", "ly_txt", "ly_folder", "ly_fx", "ly_widget"] {
-        assert_eq!(
-            set(&mut o, layer, true),
-            Err(DispatchErrorCode::Unavailable),
-            "{layer}"
-        );
-        assert_eq!(
-            (o.content_revision(), o.history_depths(), bytes(&o)),
-            (0, (0, 0), zero.clone()),
-            "{layer}: no revision, no history"
-        );
-        assert!(prepares(&o), "{layer}: the document still prepares");
-    }
+    assert_eq!(
+        set(&mut o, "ly_txt", true),
+        Err(DispatchErrorCode::Unavailable)
+    );
+    assert_eq!(
+        (o.content_revision(), o.history_depths(), bytes(&o)),
+        (0, (0, 0), zero),
+        "no revision, no history"
+    );
+    assert!(prepares(&o), "the document still prepares");
 }
 
 #[test]
-fn a_vector_layer_a_null_and_an_empty_layer_take_the_switch_and_every_frame_still_prepares() {
+fn every_other_kind_takes_the_switch_and_every_frame_still_prepares() {
     let mut o = owner(&mixed());
-    for (revision, layer) in [(1, "ly_v"), (2, "ly_empty")] {
-        assert_eq!(set(&mut o, layer, true), Ok(revision), "{layer}");
-        assert!(
-            prepares(&o),
-            "{layer}: the document prepares with the switch on"
-        );
+    let kinds = ["ly_v", "ly_empty", "ly_null", "ly_folder", "ly_fx", "ly_widget", "ly_img"];
+    for (i, layer) in kinds.iter().enumerate() {
+        assert_eq!(set(&mut o, layer, true), Ok(i as u64 + 1), "{layer}");
+        assert!(prepares(&o), "{layer}: the document prepares with the switch on");
         assert!(!head(&o).frame_has_unjoined_3d(), "{layer}");
     }
-    // A Null is either taken with the frame still preparing, or refused with no revision: never a silent unavailable document.
-    let before = o.content_revision();
-    match set(&mut o, "ly_null", true) {
-        Ok(_) => assert!(prepares(&o) && !head(&o).frame_has_unjoined_3d()),
-        Err(code) => assert_eq!(
-            (code, o.content_revision()),
-            (DispatchErrorCode::Unavailable, before)
-        ),
-    }
     // Off again always works, on every kind (a stored 3D flag can be cleared).
-    assert!(set(&mut o, "ly_v", false).is_ok() && prepares(&o));
+    for layer in kinds {
+        assert!(set(&mut o, layer, false).is_ok() && prepares(&o), "{layer}");
+    }
 }
 
 #[test]
-fn a_stored_3d_flag_on_a_non_placeable_layer_can_still_be_switched_off() {
+fn a_stored_3d_flag_on_a_text_layer_can_still_be_switched_off() {
     let mut doc = mixed();
-    doc["layers"][6]["threeD"] = json!(true);
+    doc["layers"][7]["threeD"] = json!(true);
     let mut o = owner(&doc);
     assert!(
         !prepares(&o),
-        "an imported 3D image layer is the unavailable state the switch must never create"
+        "an imported 3D text layer is the unavailable state the switch must never create"
     );
     assert_eq!(
-        set(&mut o, "ly_img", false),
+        set(&mut o, "ly_txt", false),
         Ok(1),
         "switching off is never refused"
     );
@@ -137,7 +163,7 @@ fn a_stored_3d_flag_on_a_non_placeable_layer_can_still_be_switched_off() {
 }
 
 #[test]
-fn a_gradient_fill_under_3d_is_refused_instead_of_failing_the_scene() {
+fn a_gradient_fill_takes_the_switch_and_the_frame_still_prepares() {
     let mut doc = mixed();
     let corner = |x: f64, y: f64| json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}});
     doc["objects"][0] = json!({"schemaVersion":1,"family":"editable-vector-path","target":target("ly_v", "sv"),
@@ -148,12 +174,8 @@ fn a_gradient_fill_under_3d_is_refused_instead_of_failing_the_scene() {
         "vectorExt":{"fillGradient":{"kind":"linear","from":[0,0],"to":[100,60],"stops":[
             {"offset":0,"color":"#000000"},{"offset":1,"color":"#ffffff"}]}}});
     let mut o = owner(&doc);
-    let zero = bytes(&o);
-    assert_eq!(
-        set(&mut o, "ly_v", true),
-        Err(DispatchErrorCode::Unavailable)
-    );
-    assert_eq!(bytes(&o), zero);
+    assert_eq!(set(&mut o, "ly_v", true), Ok(1));
+    assert!(prepares(&o));
 }
 
 #[test]
@@ -194,7 +216,7 @@ fn the_switch_is_saved_with_a_revision_but_adds_no_undo_entry_and_leaves_redo_al
 }
 
 #[test]
-fn a_layer_with_children_refuses_the_switch_and_a_child_under_a_flat_parent_takes_it() {
+fn a_3d_layer_with_children_and_a_child_under_a_3d_parent_both_keep_the_frame_preparing() {
     let mut doc = mixed();
     doc["layers"][1]["parentLayerUid"] = json!("ly_v");
     doc["objects"]
@@ -207,15 +229,10 @@ fn a_layer_with_children_refuses_the_switch_and_a_child_under_a_flat_parent_take
         .push(element("ly_empty", "se", 0));
     let mut o = owner(&doc);
     assert!(prepares(&o));
-    let zero = bytes(&o);
-    // The ancestor stays unjoined for its children, so the switch is refused on the parent and the document keeps preparing.
-    assert_eq!(
-        set(&mut o, "ly_v", true),
-        Err(DispatchErrorCode::Unavailable)
-    );
-    assert_eq!((o.content_revision(), bytes(&o)), (0, zero));
-    assert!(prepares(&o));
-    // The child itself, under a flat parent, takes the switch.
-    assert_eq!(set(&mut o, "ly_empty", true), Ok(1));
+    // The parent takes the switch: its children keep the chain of its 2D Motion, as the baseline `computeMotionMat` did.
+    assert_eq!(set(&mut o, "ly_v", true), Ok(1));
+    assert!(prepares(&o) && !head(&o).frame_has_unjoined_3d());
+    // The child under that 3D parent takes it too.
+    assert_eq!(set(&mut o, "ly_empty", true), Ok(2));
     assert!(prepares(&o));
 }

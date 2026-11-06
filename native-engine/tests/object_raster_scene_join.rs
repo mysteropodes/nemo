@@ -384,3 +384,117 @@ fn a_raster_whose_asset_pixels_are_unavailable_refuses_the_frame_and_publishes_n
     assert_eq!(saved_bytes(&reopened), before);
     assert_eq!(reopened.history_depths(), (0, 0));
 }
+
+fn three_d_layer(owner: &mut NativeObjectHistory, layer: &str, on: bool) {
+    let payload = json!({"command":"object.layer.policy.edit","layerUid":layer,"flag":"threeD","value":on});
+    let candidate = owner.prepare_layer_policy_json(payload.to_string().as_bytes()).unwrap();
+    owner.commit_layer_policy(candidate).unwrap();
+}
+fn set_property(owner: &mut NativeObjectHistory, layer: &str, property: &str, values: Value) {
+    let payload = json!({"command":"object.property.edit","target":{"contextId":"scene-root","layerUid":layer},
+        "property":property,"action":{"kind":"setValue","frame":0,"values":values}});
+    let candidate = owner.prepare_property_edit_json(payload.to_string().as_bytes()).unwrap();
+    owner.commit_property_edit(candidate).unwrap();
+}
+/// The Motion-capable frame (the plain exposure packet refuses any authored property holder).
+fn coeffs(owner: &NativeObjectHistory) -> ([f64; 6], f32) {
+    let snapshot = scene_snapshot(owner);
+    let pins = selector(&snapshot, 0);
+    let mut effects = None;
+    let packet = crate::object_expression_runtime::prepare_object_motion_exposure_frame_for_owner(
+        owner, &snapshot, &pins, &mut effects,
+    )
+    .unwrap();
+    let scene = prepare_object_render_scene(&packet, &pins).unwrap();
+    let plan = prepare_object_paint_plan(&scene, &pins).unwrap();
+    let witness = prepare_object_viewport_composition(&plan, &pins, None).unwrap();
+    let (_, place, opacity) = witness.raster_image(0).unwrap();
+    (place.as_coeffs(), opacity)
+}
+
+/// #2520/#2525: an image takes the baseline `project3DImageRect` of `make3DProjector`, around the canvas centre of the
+/// 64x64 canvas, and ignores the layer's 2D Motion opacity.
+#[test]
+fn a_3d_image_layer_projects_its_rect_and_keeps_the_flat_picture_at_depth_zero() {
+    let mut owner = scene_owner();
+    let result = import(&mut owner, "three-d");
+    let layer = result["target"]["layerUid"].as_str().unwrap().to_owned();
+    let (flat, flat_opacity) = coeffs(&owner);
+    three_d_layer(&mut owner, &layer, true);
+    // Depth zero: the 3D picture is the 2D picture.
+    for key in ["positionZ", "rotationX", "rotationY"] {
+        set_property(&mut owner, &layer, key, json!([0]));
+    }
+    let (at_zero, opacity) = coeffs(&owner);
+    for (a, b) in at_zero.iter().zip(flat) {
+        assert!((a - b).abs() < 1e-9, "{at_zero:?} vs {flat:?}");
+    }
+    assert_eq!(opacity, flat_opacity);
+    // Pushed 2000 back: every point of the plane halves its distance to the canvas centre (depth 2).
+    set_property(&mut owner, &layer, "positionZ", json!([2000]));
+    let (far, _) = coeffs(&owner);
+    assert!((far[0] - flat[0] / 2.).abs() < 1e-9 && (far[3] - flat[3] / 2.).abs() < 1e-9, "{far:?}");
+    let centre = |c: [f64; 6]| [c[0] * 1. + c[4], c[3] * 1. + c[5]];
+    let _ = centre;
+    // The image's own origin maps to the half-distance point from the canvas centre (32, 32).
+    assert!((far[4] - (32. + (flat[4] - 32.) / 2.)).abs() < 1e-9, "{far:?} vs {flat:?}");
+    assert!((far[5] - (32. + (flat[5] - 32.) / 2.)).abs() < 1e-9, "{far:?} vs {flat:?}");
+    // Switching off restores the flat picture.
+    three_d_layer(&mut owner, &layer, false);
+    let (back, _) = coeffs(&owner);
+    for (a, b) in back.iter().zip(flat) {
+        assert!((a - b).abs() < 1e-9);
+    }
+}
+
+/// A 3D layer that draws a vector AND an image pivots around the union of both (baseline `userLayers[i].bounds`): the vector
+/// batch and the image placement agree on one projector, so the scene builds instead of refusing the mixed layer.
+#[test]
+fn a_3d_layer_with_a_vector_and_an_image_projects_both_around_the_union() {
+    let mut owner = scene_owner();
+    let result = import(&mut owner, "mixed-3d");
+    let image_layer = result["target"]["layerUid"].as_str().unwrap().to_owned();
+    let saved: Value = serde_json::from_slice(&saved_bytes(&owner)).unwrap();
+    let mut project = saved.clone();
+    let drawing = &mut project["drawing"];
+    // Move the image onto the vector layer.
+    drawing["items"]["raster"][0]["target"]["layerUid"] = json!("drawing");
+    drawing["layers"].as_array_mut().unwrap().retain(|l| l["layerUid"] != json!(image_layer));
+    let context = &mut drawing["compositionOrder"]["contexts"][0];
+    context["layers"].as_array_mut().unwrap().retain(|l| l["layerUid"] != json!(image_layer));
+    for scope in context["scopes"].as_array_mut().unwrap() {
+        for element in scope["elements"].as_array_mut().unwrap() {
+            if element["layerUid"] == json!(image_layer) {
+                element["layerUid"] = json!("drawing");
+                element["naturalPosition"] = json!(1);
+            }
+        }
+    }
+    let mut mixed = NativeObjectHistory::from_project_file("mixed", &serde_json::to_vec(&project).unwrap()).unwrap();
+    let (flat, _) = coeffs(&mixed);
+    three_d_layer(&mut mixed, "drawing", true);
+    for key in ["positionZ", "rotationX", "rotationY"] {
+        set_property(&mut mixed, "drawing", key, json!([0]));
+    }
+    let (at_zero, _) = coeffs(&mixed);
+    for (a, b) in at_zero.iter().zip(flat) {
+        assert!((a - b).abs() < 1e-9, "{at_zero:?} vs {flat:?}");
+    }
+    set_property(&mut mixed, "drawing", "positionZ", json!([2000]));
+    let (far, _) = coeffs(&mixed);
+    assert!((far[0] - flat[0] / 2.).abs() < 1e-9, "{far:?}");
+    // The vector moved with the image: same halving around the canvas centre.
+    let snapshot = scene_snapshot(&mixed);
+    let pins = selector(&snapshot, 0);
+    let mut effects = None;
+    let packet = crate::object_expression_runtime::prepare_object_motion_exposure_frame_for_owner(
+        &mixed, &snapshot, &pins, &mut effects,
+    )
+    .unwrap();
+    let scene = prepare_object_render_scene(&packet, &pins).unwrap();
+    let plan = prepare_object_paint_plan(&scene, &pins).unwrap();
+    let start = plan.commands().next().unwrap().contour().segments()[0].point;
+    // The vector's first corner (24, 24) with the union pivot unchanged at depth 0 and halved toward (32, 32) at depth 2.
+    assert!((start[0] - (32. + (24. - 32.) / 2.)).abs() < 1e-9, "{start:?}");
+    assert!((start[1] - (32. + (24. - 32.) / 2.)).abs() < 1e-9, "{start:?}");
+}
