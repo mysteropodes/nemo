@@ -222,6 +222,8 @@ pub struct ObjectFramePacket {
     source_frames: Vec<Option<u32>>,
     numeric_order: Option<NumericOrderPlan>,
     motion_receipts: Vec<motion_receipts::MotionReceipt>,
+    /// `(layer uid, evaluated matteOn)` of the layers whose switch is expressed (see `capture_matte_on`).
+    matte_on_receipts: Vec<(String, f64)>,
     selector_receipts: Vec<text_selectors::SelectorReceipt>,
 }
 

@@ -226,8 +226,22 @@ fn component(blend: Option<&str>, overlay: Option<&str>) -> NativeObjectHistory 
 }
 
 fn brush(blend: Option<&str>, overlay: Option<&str>) -> NativeObjectHistory {
+    brush_with_effects(blend, overlay, None)
+}
+
+/// The brush document with `effects` (an item-level stack) authored on every one of its stroke records.
+pub(super) fn brush_with_effects(
+    blend: Option<&str>,
+    overlay: Option<&str>,
+    effects: Option<Value>,
+) -> NativeObjectHistory {
     let mut doc = BitmapBrushFields::test_drawing();
     with_blend(&mut doc["layers"][0], blend);
+    for record in doc["objects"].as_array_mut().into_iter().flatten() {
+        if let Some(effects) = &effects {
+            record["effects"] = effects.clone();
+        }
+    }
     overlaid(&mut doc, overlay);
     let mut bytes = Vec::new();
     {
@@ -250,7 +264,7 @@ fn brush(blend: Option<&str>, overlay: Option<&str>) -> NativeObjectHistory {
         .unwrap()
 }
 
-fn brush_scene(
+pub(super) fn brush_scene(
     packet: &crate::object_frame_packet::ObjectFramePacket,
     pins: &crate::object_frame_packet::ObjectFrameSelector<'_>,
 ) -> Result<

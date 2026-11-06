@@ -16,7 +16,7 @@ use crate::compositor::scene_effect_gpu_blend::{
     layer_runs_from_plan, GpuBlendError, GpuFill, GpuLayerInput, GpuLayerPaint, GpuLayerStack,
     GpuMask, GpuMaskMode, GpuUnavailable,
 };
-use crate::compositor::object_compositor::layered::item_object;
+use crate::compositor::object_compositor::layered::claimed_object;
 use crate::object_render_scene::layered_entries;
 use crate::object_render_scene::mask_inputs::ObjectMaskMode;
 use crate::object_render_scene::scene_effect_kernels::scene_effect_order::{
@@ -135,11 +135,11 @@ pub(crate) fn select_composition_path<'a>(
             .map(|(object, stack)| (*object, stack))
             .collect();
     }
-    // Every item stack is drawn by exactly the entry that owns its record; a stack no supported entry claims (a
-    // brush ink, a duplicator copy, a placed component, a video slot) is refused typed, never dropped.
+    // Every item stack is drawn by exactly the entry that owns its record; a stack no entry claims (a record
+    // nothing draws, a video slot) is refused typed, never dropped.
     if join.layers().iter().any(|layer| !layer.item_stacks.is_empty()) {
         let claimed: std::collections::BTreeSet<usize> = layered_entries(plan)
-            .filter_map(|(_, entry)| item_object(plan, &entry))
+            .filter_map(|(_, entry)| claimed_object(plan, &entry))
             .collect();
         for (slot, layer) in join.layers().iter().enumerate() {
             if layer.item_stacks.iter().any(|(object, _)| !claimed.contains(object)) {

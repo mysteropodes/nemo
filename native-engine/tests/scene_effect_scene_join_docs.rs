@@ -433,20 +433,20 @@ fn a_keyed_matte_on_track_is_sampled_at_the_frame_and_an_expressed_one_is_refuse
 }
 
 #[test]
-fn a_blend_track_or_blend_keys_cannot_be_authored_so_no_neutral_blend_can_stand_in() {
+fn a_blend_property_track_cannot_be_authored_but_the_layers_own_blend_keys_are_a_record() {
     use crate::object_codec::decode_storage_project;
     let mut document = base_document();
     set_layer(&mut document, "L1", json!({"blendMode": "multiply"}));
     key_layer_property(&mut document, "L1", "blend");
     assert!(decode_storage_project(&serde_json::to_vec(&document).unwrap()).is_err());
-    // `blendKeys` on the layer record is likewise not admitted: animated blend belongs to the property provider.
+    // The baseline's hold-only `blendKeys` are the layer's own record (sampled by `blend_mode_at`), not a property track.
     let mut document = base_document();
     set_layer(
         &mut document,
         "L1",
         json!({"blendKeys": [{"frame": 0, "mode": "multiply"}]}),
     );
-    assert!(decode_storage_project(&serde_json::to_vec(&document).unwrap()).is_err());
+    assert!(decode_storage_project(&serde_json::to_vec(&document).unwrap()).is_ok());
 }
 
 #[test]

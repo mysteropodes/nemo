@@ -803,8 +803,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   function discreteRowVisible(ld, kind) {
     if (isPropFiltered(kind)) return false;
     if (!_hideUnanimated) return true;
-    var keys = kind === 'parent' ? ld.parentKeys : ld.blendKeys;
-    return !!(keys && keys.length);
+    var nbk = kind === 'blend' && window.nativeCompositing && nativeCompositing(); // #2257: native keys live in the engine
+    var keys = kind === 'parent' ? ld.parentKeys : nbk ? nbk.blendKeysOf(state.layers.indexOf(ld)) : ld.blendKeys; return !!(keys && keys.length);
   }
   function handleRevealAnimatedShortcut() {
     if (state.appMode !== 'motion') return false;
@@ -7757,14 +7757,17 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     // still what most other consumers of ld.blendMode read, see
     // layerBlendModeAt's own comment), ON seeds a single key at the
     // playhead with whatever mode was showing.
-    var keyed = !!(ld.blendKeys && ld.blendKeys.length);
-    var hasKeyHere = keyed && ld.blendKeys.some(function (k) { return k.frame === state.currentFrame; });
+    var nb = window.nativeCompositing && nativeCompositing(); // #2257: a native project keeps the keys in the engine
+    var keyed = nb ? nb.blendKeysOf(li).length > 0 : !!(ld.blendKeys && ld.blendKeys.length);
+    var hasKeyHere = keyed && (nb ? nb.blendKeysOf(li) : ld.blendKeys).some(function (k) { return k.frame === state.currentFrame; });
     var sw = document.createElement('div');
     sw.className = 'lico motion-stopwatch' + (keyed ? ' on' : '');
     sw.title = stopwatchTitle('motionAnimateProp', keyed, hasKeyHere);
     sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (hasKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
     sw.addEventListener('click', function (e) {
-      e.stopPropagation(); pushUndo();
+      e.stopPropagation();
+      if (nb) { nb.toggleBlendStopwatch(li, state.currentFrame).then(nativeCompositingRefresh, nativeCompositingRefused); return; }
+      pushUndo();
       if (!keyed) {
         ld.blendKeys = [{ frame: state.currentFrame, mode: ld.blendMode || 'normal' }];
       } else if (hasKeyHere) {
@@ -7791,7 +7794,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     label.textContent = SM.t('fieldBlend'); label.style.minWidth = '70px';
     row.appendChild(label);
     var pill = document.createElement('div');
-    var mode = layerBlendModeAt(li, state.currentFrame) || 'normal';
+    var mode = (nb ? nb.blendOf(li, state.currentFrame) : layerBlendModeAt(li, state.currentFrame)) || 'normal';
     pill.className = 'lparent motion-parent-pill' + (mode === 'normal' ? ' none' : '');
     var lab = document.createElement('span'); lab.className = 'mp-label';
     lab.textContent = (typeof BLEND_MODE_LABELS !== 'undefined' && BLEND_MODE_LABELS[mode]) || mode;
@@ -11161,7 +11164,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
       // alignment invariant.
       // Same gate as the panel half (discreteRowVisible) — §11.
       if (discreteRowVisible(ld, 'parent')) renderDiscreteKeyGridRow(grid, ld, 'parentKeys', SM.t('fieldParent') || 'Parent', ld.parentKeys || [], function (frame) { SMMotion.removeParentKeyAt(ld, frame); });
-      if (discreteRowVisible(ld, 'blend')) renderDiscreteKeyGridRow(grid, ld, 'blendKeys', SM.t('fieldBlend'), ld.blendKeys || [], function (frame) { SMMotion.removeBlendKeyAt(ld, frame); });
+      var nbk = window.nativeCompositing && nativeCompositing(); // #2257: the native keys, removed natively
+      if (discreteRowVisible(ld, 'blend')) renderDiscreteKeyGridRow(grid, ld, 'blendKeys', SM.t('fieldBlend'), nbk ? nbk.blendKeysOf(li) : ld.blendKeys || [], function (frame) { if (nbk) nbk.removeBlendKey(li, frame).then(nativeCompositingRefresh, nativeCompositingRefused); else SMMotion.removeBlendKeyAt(ld, frame); });
       if (showsGroupHeader()) {
         // 'motion-group-row' too, not just 'frow' (2026-07-30 fix, Cyril:
         // "encore des problème de calage d'ui"): .motion-group-row carries

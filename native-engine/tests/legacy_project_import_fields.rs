@@ -334,7 +334,7 @@ fn refused_members_refuse_with_their_exact_path_and_the_typed_code() {
             "{scope:?}.{key}"
         );
     }
-    assert_eq!(refused, 30, "the refused set is pinned");
+    assert_eq!(refused, 29, "the refused set is pinned (blendKeys left it in #2257)");
 }
 
 #[test]

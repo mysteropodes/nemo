@@ -402,11 +402,11 @@ fn rejects_unknown_versions_and_unsupported_feature_families() {
             "frames",
             json!([{"strokes": [{"strokeId": "r08_curve_rect"}]}]),
         ),
-        // L08-J (#2114) admits `effects` deliberately; animated blend keys stay with the property provider.
+        // L08-J (#2114) admits `effects` deliberately; #2257 admits the hold-only `blendKeys` record, but only its own shape.
         (
             "blendKeys",
             "blendKeys",
-            json!([{"frame": 0, "mode": "multiply"}]),
+            json!([{"frame": 0, "mode": "multiply", "ease": 1}]),
         ),
         (
             "expressions",

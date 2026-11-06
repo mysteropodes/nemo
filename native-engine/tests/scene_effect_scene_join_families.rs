@@ -444,3 +444,8 @@ fn text_without_a_font_parser_never_reaches_a_door() {
 mod folder;
 #[path = "scene_effect_scene_join_items.rs"]
 mod items;
+#[path = "scene_effect_scene_join_item_families.rs"]
+mod item_families;
+#[path = "scene_effect_scene_join_expressed_matte.rs"]
+mod expressed_matte;
+

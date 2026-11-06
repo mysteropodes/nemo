@@ -362,18 +362,19 @@ fn placed_effect_outcome(enabled: bool, selected: bool)
 }
 #[cfg(feature = "test-application")]
 #[test]
-fn placed_component_selected_enabled_element_effect_returns_typed_unavailable_without_partial_plain_shapes(
-) {
+fn placed_component_selected_enabled_element_effect_keeps_every_shape_and_its_stack() {
     use crate::evaluation::object_scene_style_kernels::object_scene_producer_component_scene::ComponentOutcome;
-    use crate::evaluation::object_scene_style_kernels::object_scene_producer_component_select::ComponentUnavailable;
-    // The effect record follows a valid plain record. Refuse the whole instance, not just the effect shape.
+    // #2257: the inner record's item effects ride on the evaluated shape's source record (the layered compositor
+    // grades that shape on its own box); the instance is no longer refused.
+    let ComponentOutcome::Shapes(placed) = placed_effect_outcome(true, true) else {
+        panic!("an enabled element effect no longer refuses the instance");
+    };
     assert_eq!(
-        placed_effect_outcome(true, true),
-        ComponentOutcome::Unavailable(ComponentUnavailable::InnerFeature {
-            layer_uid: "inside".into(),
-            feature: "per-element effects"
-        })
+        placed.shapes.iter().map(|s| s.target.stroke_id()).collect::<Vec<_>>(),
+        ["plain", "fx"]
     );
+    let effected: Vec<bool> = placed.shapes.iter().map(|s| s.source.has_enabled_effects()).collect();
+    assert_eq!(effected, [false, true]);
 }
 #[cfg(feature = "test-application")]
 #[test]

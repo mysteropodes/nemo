@@ -17,8 +17,8 @@ fn content_with_no_native_owner_refuses_naming_the_exact_path() {
             "layers[0].parentsMore",
         ),
         (
-            json!({"layers": [{"frames": [], "blendKeys": [{"frame": 0}]}]}),
-            "layers[0].blendKeys",
+            json!({"layers": [{"frames": [], "channel": "x"}]}),
+            "layers[0].channel",
         ),
         (
             json!({"layers": [{"frames": []}], "trackRoles": {"r": {"name": "a"}}}),

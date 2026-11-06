@@ -174,6 +174,7 @@ pub(crate) fn null_layer_motion_target(
         // join applies to the flattened group; the baseline ignores a folder's blend and matte, so they are inert.
         && (layer.is_folder_layer()
             || (!layer.blend_mode().is_some_and(|v| v != "normal")
+                && layer.blend_keys.value().is_none()
                 && !layer.matte_mode().is_some_and(|v| v != "none")
                 && layer.matte_source_layer_uid.value().is_none()
                 && !layer.mattes_more.value().is_some_and(|v| !v.is_empty())

@@ -1,6 +1,6 @@
 //! L08-J (G11): the stored layer compositing fields of the baseline layer (`ld`), as optional members of
 //! `ObjectLayer`: `blendMode`, the first matte (`matteMode`, `matteSourceLayerUid`) with its additional mattes
-//! (`mattesMore`), the layer kind flags `isEffectLayer`, `isFolderLayer`, `folderCollapsed`, the ordered
+//! (`mattesMore`), the hold-only `blendKeys` of an animated blend mode, the layer kind flags `isEffectLayer`, `isFolderLayer`, `folderCollapsed`, the ordered
 //! `effects` stack and the borrowed stack `effectsFrom`. Names, member order (the `exportJSON` layer map of
 //! `src/js/timeline.js` at fbe4b8a3) and value shapes are the baseline's; the record only stores and admits.
 //! Blend, matte and effect EVALUATION stays in `scene_effect_order`, `scene_effect_blend_ref` and
@@ -18,7 +18,7 @@
 //! Deliberate differences, each pinned by a test: an empty `mattesMore` and an empty UID reference are refused
 //! (the baseline import silently drops the former and treats the latter as the legacy marker), an effect
 //! entry retains `{type, enabled, p1..p8, keys}` with typed ordered scalar tracks; keyed evaluation is a
-//! separately admitted reader and cannot fall back to static parameters, `blendKeys` is not admitted (animated blend belongs to the property provider),
+//! separately admitted reader and cannot fall back to static parameters, an empty or unordered `blendKeys` is refused,
 //! `folderCollapsed` needs a folder layer, a layer is not both an effect layer and a folder, and an effect or
 //! folder layer owns no drawing objects (the baseline never renders their content: `getEffectiveStrokes`
 //! returns `[]` for an effect layer and the folder wire entry carries no items).
@@ -71,6 +71,19 @@ pub(crate) struct MatteRef {
 }
 object_deserialize!(MatteRef {
     uid: String,
+    mode: String
+});
+
+/// One key of an animated blend mode (`blendKeys[i]`, baseline `{frame, mode}`): the mode HOLDS from its frame until the
+/// next key. Nothing is interpolated (there is no halfway point between Multiply and Screen).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub(crate) struct BlendKey {
+    pub(crate) frame: u32,
+    pub(crate) mode: String,
+}
+object_deserialize!(BlendKey {
+    frame: u32,
     mode: String
 });
 
@@ -156,6 +169,8 @@ impl LayerEffect {
 pub(crate) enum LayerCompositingError {
     EmptyReference,
     EmptyMatteStack,
+    EmptyBlendKeys,
+    UnorderedBlendKeys,
     EffectAndFolder,
     CollapsedWithoutFolder,
     KindLayerHasObjects,
@@ -166,6 +181,10 @@ impl LayerCompositingError {
         match self {
             LayerCompositingError::EmptyReference => "a layer uid reference must not be empty",
             LayerCompositingError::EmptyMatteStack => "an empty mattesMore must be omitted",
+            LayerCompositingError::EmptyBlendKeys => "an empty blendKeys must be omitted",
+            LayerCompositingError::UnorderedBlendKeys => {
+                "blendKeys need a non-empty mode each, in strictly increasing frame order"
+            }
             LayerCompositingError::EffectAndFolder => {
                 "a layer is not both an effect layer and a folder layer"
             }
@@ -209,6 +228,16 @@ pub(crate) fn validate_layer_compositing(
                 return Err(LayerCompositingError::EmptyReference);
             }
         }
+        if let Some(keys) = layer.blend_keys.value() {
+            if keys.is_empty() {
+                return Err(LayerCompositingError::EmptyBlendKeys);
+            }
+            if keys.iter().any(|key| key.mode.is_empty())
+                || keys.windows(2).any(|pair| pair[0].frame >= pair[1].frame)
+            {
+                return Err(LayerCompositingError::UnorderedBlendKeys);
+            }
+        }
         if layer.is_effect_layer() && layer.is_folder_layer() {
             return Err(LayerCompositingError::EffectAndFolder);
         }
@@ -235,6 +264,21 @@ impl ObjectLayer {
     /// The effective blend name; absent and stored null return `None`, explicit Normal stays named.
     pub(crate) fn blend_mode(&self) -> Option<&str> {
         self.blend_mode.value().and_then(Option::as_deref)
+    }
+    /// The stored blend keys in frame order (empty when the member is absent).
+    pub(crate) fn blend_keys(&self) -> &[BlendKey] {
+        self.blend_keys.value().map(Vec::as_slice).unwrap_or(&[])
+    }
+    /// Baseline `layerBlendModeAt(li, frame)`: with keys, the mode of the last key at or before `frame` (the first key's mode
+    /// before the first key); without, the stored `blendMode`. Hold-only, so there is never a blend between two modes.
+    pub(crate) fn blend_mode_at(&self, frame: u32) -> Option<&str> {
+        match self.blend_keys() {
+            [] => self.blend_mode(),
+            keys => {
+                let held = keys.iter().rev().find(|key| key.frame <= frame);
+                Some(held.unwrap_or(&keys[0]).mode.as_str())
+            }
+        }
     }
     /// The effective first-matte name; absent and stored null return `None`, explicit None stays named.
     pub(crate) fn matte_mode(&self) -> Option<&str> {
