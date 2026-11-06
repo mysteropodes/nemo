@@ -192,6 +192,16 @@ test('nothing is edited while a component is presented: every write path refuses
   assert.deepEqual(Object.keys(writers(f.session)).filter((k) => typeof writers(f.session)[k] === 'function'), reachable, 'the same editors are offered again on the scene');
 });
 
+test('selecting a layer by index inside a component activates the component layer (the cell click and the canvas pick), never a scene row', async () => {
+  const f = fixture(); await f.open();
+  await Context.enter(f.root, 'sym_a', null);
+  assert.equal(f.root.state.activeLayerIdx, 0);
+  assert.equal(Project.selectLayerUI(f.root, 1), true);
+  assert.deepEqual([f.root.state.activeLayerIdx, f.root._layerSel], [1, [1]], 'the second component layer is the active one');
+  assert.equal(f.root.state.layers[1].layerUid, 'ib');
+  await Context.exit(f.root);
+});
+
 test('Undo and Redo stay available inside a component, and the document-wide history is the only write', async () => {
   const f = fixture(); await f.open();
   await Context.enter(f.root, 'sym_a', null);

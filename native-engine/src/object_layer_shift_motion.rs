@@ -77,6 +77,22 @@ fn delta(dx: i64) -> Result<(), DispatchErrorCode> {
     }
     Ok(())
 }
+impl SelectedMotionKey {
+    /// The key as the view of a component sees it: `from` becomes `to`; a key of any other context is not part of this gesture.
+    pub(super) fn retag(&mut self, from: &str, to: &str) -> Result<(), DispatchErrorCode> {
+        let slot = match &mut self.target {
+            ShiftTrackTarget::Property { target, .. } => &mut target.context_id,
+            ShiftTrackTarget::LayerOrder { context_id, .. }
+            | ShiftTrackTarget::ElementOrder { context_id, .. }
+            | ShiftTrackTarget::TimeRemap { context_id, .. } => context_id,
+        };
+        if slot != from {
+            return Err(invalid());
+        }
+        *slot = to.to_owned();
+        Ok(())
+    }
+}
 impl ShiftTrackTarget {
     fn scope(&self) -> (&str, &str) {
         match self {

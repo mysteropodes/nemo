@@ -59,9 +59,9 @@
   }
   function layerItem(item) {
     // The drawing-gate facts (visible, locked, parented, 3D, Motion-transformed) are optional on the wire; the owner always sends them (#2256).
-    exact(item, ['layerUid', 'name', 'layerKind'], 'component layer', ['visible', 'locked', 'parentLayerUid', 'threeD', 'hasMotion']);
+    exact(item, ['layerUid', 'name', 'layerKind'], 'component layer', ['visible', 'locked', 'parentLayerUid', 'threeD', 'hasMotion', 'shy']);
     if (!idText(item.layerUid) || !nameOk(item.name) || !LAYER_KINDS.includes(item.layerKind)) fail('invalid component layer');
-    if (['visible', 'locked', 'threeD', 'hasMotion'].some((key) => has(item, key) && typeof item[key] !== 'boolean') ||
+    if (['visible', 'locked', 'threeD', 'hasMotion', 'shy'].some((key) => has(item, key) && typeof item[key] !== 'boolean') ||
       has(item, 'parentLayerUid') && item.parentLayerUid !== null && !idText(item.parentLayerUid)) fail('invalid component layer facts');
   }
   function instanceItem(item) {

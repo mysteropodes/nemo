@@ -6,16 +6,18 @@
 //!
 //! Cut keeps locked layers in the packet but never blanks them; duplicate is copy plus paste with its first frame at
 //! `maxF + 1` of the SELECTION BOUNDS and its first layer on the ACTIVE layer, and never grows the timeline.
+use crate::commands::object_fill_owner::object_context_projection::through;
 use crate::commands::object_fill_owner::object_frame_clipboard_packet::{
-    copy_frame_cells, FrameClipboardPacket, PacketLimits, PacketPins, SelectedCell,
+    copy_frame_cells_of, FrameClipboardPacket, PacketLimits, PacketPins, SelectedCell,
 };
 use crate::commands::object_fill_owner::object_frame_clipboard_paste::{
     edit_refusal, layer_position, packet_refusal, paste_cells, CellRef, FrameClipboardOperation,
     CellItems, PasteCell, PasteRequest,
 };
-use crate::commands::object_fill_owner::object_frame_clipboard_paste_wire::parse_clipboard_payload;
+use crate::commands::object_fill_owner::object_frame_clipboard_paste_wire::parse_clipboard_payload_in;
 use crate::commands::object_fill_owner::object_frame_edit_document::{clear_cells, DocumentEdit};
 use crate::commands::ObjectFillOwner;
+use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
 use crate::object_document::{item_asset_issue, ObjectDocument, Presence};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
@@ -49,6 +51,7 @@ pub(crate) fn packet_paste_cells(packet: &FrameClipboardPacket) -> Vec<PasteCell
 
 fn copy_selection(
     snapshot: &ObjectSnapshot,
+    document: &ObjectDocument,
     selection: &[CellRef],
 ) -> Result<FrameClipboardPacket, DispatchErrorCode> {
     let pins = PacketPins {
@@ -64,11 +67,12 @@ fn copy_selection(
             frame: cell.frame,
         })
         .collect();
-    copy_frame_cells(snapshot, &pins, &cells, &PacketLimits::DEFAULT).map_err(packet_refusal)
+    copy_frame_cells_of(snapshot, document, &pins, &cells, &PacketLimits::DEFAULT).map_err(packet_refusal)
 }
 
 fn paste(
     snapshot: &ObjectSnapshot,
+    document: &ObjectDocument,
     request: &PasteRequest,
 ) -> Result<DocumentEdit, DispatchErrorCode> {
     if request.instance_id != snapshot.instance_id() {
@@ -77,7 +81,6 @@ fn paste(
     if request.document_id != snapshot.document_id() {
         return Err(DispatchErrorCode::WrongDocument);
     }
-    let document = snapshot.document();
     let anchor =
         layer_position(document, &request.anchor_layer).ok_or(DispatchErrorCode::NotFound)?;
     if request.anchor_frame >= document.total_frames {
@@ -121,13 +124,13 @@ fn check_pasted_items(
 /// a plain hold (L05-B `clear_cells`). A cut that blanks nothing still returns its packet and publishes nothing.
 fn cut(
     snapshot: &ObjectSnapshot,
+    document: &ObjectDocument,
     selection: &[CellRef],
 ) -> Result<(Option<FrameClipboardPacket>, DocumentEdit), DispatchErrorCode> {
     if selection.is_empty() {
         return Ok((None, DocumentEdit::NoChange));
     }
-    let packet = copy_selection(snapshot, selection)?;
-    let document = snapshot.document();
+    let packet = copy_selection(snapshot, document, selection)?;
     let mut layers: Vec<&str> = Vec::new();
     for cell in selection {
         if !layers.contains(&cell.layer_uid.as_str()) {
@@ -165,15 +168,15 @@ fn cut(
 /// bounds and its first layer on the active layer. The timeline never grows, so cells past the end are dropped.
 fn duplicate(
     snapshot: &ObjectSnapshot,
+    document: &ObjectDocument,
     selection: &[CellRef],
     anchor_layer: &str,
 ) -> Result<DocumentEdit, DispatchErrorCode> {
-    let document = snapshot.document();
     let anchor = layer_position(document, anchor_layer).ok_or(DispatchErrorCode::NotFound)?;
     if selection.is_empty() {
         return Ok(DocumentEdit::NoChange);
     }
-    let packet = copy_selection(snapshot, selection)?;
+    let packet = copy_selection(snapshot, document, selection)?;
     let (_, min_frame) = packet.origin();
     let (_, span) = packet.extent();
     let base = min_frame
@@ -218,30 +221,45 @@ impl ObjectFillOwner {
         &self,
         operation: &FrameClipboardOperation,
     ) -> Result<PreparedFrameClipboard, DispatchErrorCode> {
+        self.prepare_frame_clipboard_in(operation, SCENE_CONTEXT)
+    }
+
+    /// #2256: the operation inside `context`; a declared component is the scene of the unchanged planners. The packet and the
+    /// identity pins are always the snapshot's, so a clipboard copied in the scene pastes into a component by relative cell (the
+    /// baseline pastes by relative layer index into whatever context is open) and back.
+    pub(crate) fn prepare_frame_clipboard_in(
+        &self,
+        operation: &FrameClipboardOperation,
+        context: &str,
+    ) -> Result<PreparedFrameClipboard, DispatchErrorCode> {
         let origin = self.current_snapshot();
-        let (edit, packet, command) = match operation {
-            FrameClipboardOperation::Paste(request) => (
-                paste(&origin, request)?,
-                None,
-                "object.frames.clipboard.paste",
-            ),
-            FrameClipboardOperation::Cut { selection } => {
-                let (packet, edit) = cut(&origin, selection)?;
-                (edit, packet, "object.frames.clipboard.cut")
-            }
-            FrameClipboardOperation::Duplicate {
-                selection,
-                anchor_layer,
-            } => (
-                duplicate(&origin, selection, anchor_layer)?,
-                None,
-                "object.frames.clipboard.duplicate",
-            ),
-        };
-        let document = match edit {
-            DocumentEdit::Changed(next) => Some(next),
-            DocumentEdit::NoChange => None,
-        };
+        let mut packet = None;
+        let mut command = "";
+        let document = through(origin.document(), context, |view| {
+            let edit = match operation {
+                FrameClipboardOperation::Paste(request) => {
+                    command = "object.frames.clipboard.paste";
+                    paste(&origin, view, request)?
+                }
+                FrameClipboardOperation::Cut { selection } => {
+                    command = "object.frames.clipboard.cut";
+                    let (cut_packet, edit) = cut(&origin, view, selection)?;
+                    packet = cut_packet;
+                    edit
+                }
+                FrameClipboardOperation::Duplicate {
+                    selection,
+                    anchor_layer,
+                } => {
+                    command = "object.frames.clipboard.duplicate";
+                    duplicate(&origin, view, selection, anchor_layer)?
+                }
+            };
+            Ok(match edit {
+                DocumentEdit::Changed(next) => Some(next),
+                DocumentEdit::NoChange => None,
+            })
+        })?;
         Ok(PreparedFrameClipboard {
             origin,
             document,
@@ -255,14 +273,30 @@ impl ObjectFillOwner {
         &self,
         selection: &[CellRef],
     ) -> Result<FrameClipboardPacket, DispatchErrorCode> {
-        copy_selection(&self.current_snapshot(), selection)
+        self.copy_frame_clipboard_in(selection, SCENE_CONTEXT)
+    }
+
+    /// #2256: the same read inside a declared component.
+    pub(crate) fn copy_frame_clipboard_in(
+        &self,
+        selection: &[CellRef],
+        context: &str,
+    ) -> Result<FrameClipboardPacket, DispatchErrorCode> {
+        let snapshot = self.current_snapshot();
+        let mut packet = None;
+        through(snapshot.document(), context, |view| {
+            packet = Some(copy_selection(&snapshot, view, selection)?);
+            Ok(None)
+        })?;
+        packet.ok_or(DispatchErrorCode::Internal)
     }
 
     pub(crate) fn prepare_frame_clipboard_json(
         &self,
         bytes: &[u8],
     ) -> Result<PreparedFrameClipboard, DispatchErrorCode> {
-        self.prepare_frame_clipboard(&parse_clipboard_payload(bytes)?)
+        let (operation, context) = parse_clipboard_payload_in(bytes)?;
+        self.prepare_frame_clipboard_in(&operation, &context)
     }
 
     pub(crate) fn commit_frame_clipboard(

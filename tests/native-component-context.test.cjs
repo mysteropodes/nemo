@@ -290,6 +290,10 @@ test('an entered component paints its own timeline: baseline rows, no scene pain
   assert.equal(f.host.state.activeLayerIdx, 1, 'a row click activates the component layer');
   assert.deepEqual(f.host._layerSel, [1]);
   assert.ok(f.host.document.getElementById('layer-list').children[1].className.split(' ').includes('act'));
+  // #2256: the selected cells stay painted across a repaint (a click on a cell activates its layer, which repaints the grid).
+  f.host._sel = { frames: [{ layer: 1, frame: 3 }] }; f.host.updateUI();
+  const cells = f.host.document.getElementById('frame-grid').children;
+  assert.deepEqual([cells[1].children[3].className.split(' ').includes('sel'), cells[0].children[3].className.split(' ').includes('sel'), cells[1].children[2].className.split(' ').includes('sel')], [true, false, false]);
 });
 
 test('the entered grid shows the component\'s OWN frames and range from the pinned timing reads, never the scene\'s, and drops a stale answer', async () => {
@@ -535,14 +539,29 @@ test('a repaint of changed content rebuilds the grid but asks no read for an ans
   f.m.revision = 8; Context.revision(f.host, f.session.info()); await settle();
   assert.ok(f.calls.length > asked, 'a new revision reads again');
 });
+test('the shy switch hides the marked entered rows on BOTH panels alike, and the range edit binds each painted bar', async () => {
+  const f = fixture();
+  f.m.comps.sym_a.layers = [['ia', 'Inner A', 'drawing', { shy: true }], ['ib', 'Inner B', 'drawing', { shy: false }]];
+  f.session.readLayerCells = async () => null;
+  f.session.readLayerRange = async () => ({ kind: 'layerRange', range: { rawInPoint: 2, rawOutPoint: 9, inPoint: 2, outPoint: 9, hasCustomRange: true, hasTimeLink: false } });
+  const bound = [];
+  f.host.NemoNativeComponentRangeEdit = { bind: (host, bar, uid, range) => { bound.push([uid, range.rawInPoint]); return true; } };
+  f.host.state.shyEnabled = true;
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  const doc = f.host.document, list = doc.getElementById('layer-list'), grid = doc.getElementById('frame-grid');
+  assert.deepEqual(list.children.map((r) => r.hidden === true), [true, false]);
+  assert.deepEqual(grid.children.map((r) => r.hidden === true), [true, false], 'the two lists keep the same rows hidden (CLAUDE.md section 11)');
+  assert.deepEqual(bound.sort(), [['ia', 2], ['ib', 2]], 'each bar is bound to the range edit with its owner range');
+});
 test('the entered rows carry the owner\'s hidden / locked / parent / 3D / Motion facts that the drawing gates read', async () => {
   const f = fixture();
-  f.m.comps.sym_a.layers = [['ia', 'Inner A', 'drawing', { visible: false, locked: true, parentLayerUid: 'ib', threeD: true, hasMotion: true }], ['ib', 'Inner B', 'drawing', { visible: true, locked: false, parentLayerUid: null, threeD: false, hasMotion: false }]];
+  f.m.comps.sym_a.layers = [['ia', 'Inner A', 'drawing', { visible: false, locked: true, parentLayerUid: 'ib', threeD: true, hasMotion: true, shy: true }], ['ib', 'Inner B', 'drawing', { visible: true, locked: false, parentLayerUid: null, threeD: false, hasMotion: false }]];
   f.composed.bindPolicyEntries();
   f.row(1).fire('dblclick'); await settle();
   const rows = Context.layerRows(f.host);
-  assert.deepEqual(rows[0], { layerUid: 'ia', locked: true, visible: false, parentLayerUid: 'ib', threeD: true, hasMotion: true });
-  assert.deepEqual(rows[1], { layerUid: 'ib', locked: false, visible: true, parentLayerUid: null, threeD: false, hasMotion: false });
+  assert.deepEqual(rows[0], { layerUid: 'ia', locked: true, visible: false, parentLayerUid: 'ib', threeD: true, hasMotion: true, shy: true });
+  assert.deepEqual(rows[1], { layerUid: 'ib', locked: false, visible: true, parentLayerUid: null, threeD: false, hasMotion: false, shy: false });
   assert.deepEqual(Context.layers(f.host).map((r) => [r.layerUid, r.name, r.locked, r.visible]), [['ia', 'Inner A', true, false], ['ib', 'Inner B', false, true]]);
   assert.deepEqual(f.host.state.layers.map((r) => [r.locked, r.visible, r.parentLayerUid, r.threeD]), [[true, false, 'ib', true], [false, true, null, false]]);
 });

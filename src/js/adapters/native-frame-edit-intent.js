@@ -106,7 +106,7 @@
     }
     switch (intent.kind) {
       case 'rangeDrag':
-        if(!intent.gesture||intent.gesture.frame!==state.frame||intent.gesture.activeLayerUid!==uid(state.active)||intent.gesture.contextId!=='scene-root'||
+        if(!intent.gesture||intent.gesture.frame!==state.frame||intent.gesture.activeLayerUid!==uid(state.active)||intent.gesture.contextId!==(typeof info.contextId==='string'?info.contextId:'scene-root')||
            info.layers.every(function(l){return l.layerUid!==intent.gesture.layerUid;}))return {code:CODES.stale};
         return {op:P+'layer.range.drag',payload:intent.gesture};
       case 'insertBlankKey': return { op: P + 'layer.key.blank', payload: { command: 'object.layer.key.blank', layerUid: uid(state.active), cell: state.frame } };

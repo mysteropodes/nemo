@@ -172,8 +172,12 @@ pub(super) fn timing_result(document_id: &str, payload: &Value, result: &Value) 
 }
 
 pub(super) fn visibility_request(value: &Value) -> bool {
-    exact(value, &["command", "layerUid", "visible"], &[]).is_some_and(|value| {
+    exact(value, &["command", "layerUid", "visible"], &["contextId"]).is_some_and(|value| {
         value.get("command").and_then(Value::as_str) == Some("object.layer.visibility.set")
+            // #2256: the declared component the toggle works inside; absent is the scene root.
+            && value
+                .get("contextId")
+                .is_none_or(|id| id.as_str().is_some_and(|id| !id.is_empty()))
             && value
                 .get("layerUid")
                 .and_then(Value::as_str)
@@ -217,8 +221,12 @@ pub(super) fn history_result(value: &Value) -> bool {
 }
 
 pub(super) fn create_request(value: &Value) -> bool {
-    exact(value, &["command", "name"], &[]).is_some_and(|value| {
+    exact(value, &["command", "name"], &["contextId"]).is_some_and(|value| {
         value.get("command").and_then(Value::as_str) == Some("object.layer.create")
+            // #2256: the declared component the new layer joins; absent is the scene root.
+            && value
+                .get("contextId")
+                .is_none_or(|id| id.as_str().is_some_and(|id| !id.is_empty()))
             && value.get("name").is_some_and(Value::is_string)
     })
 }

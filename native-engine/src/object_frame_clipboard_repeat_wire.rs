@@ -7,7 +7,8 @@
 //! One field set; duplicate, unknown, missing, null, wrongly typed, fractional, negative-frame, > u32 and
 //! over-4096-byte inputs are `InvalidRequest`. The existing 4096-byte object message bound is unchanged.
 use crate::commands::object_fill_owner::object_frame_clipboard_repeat::RepeatRequest;
-use crate::object_document::object_deserialize;
+use crate::commands::object_fill_owner::object_context_projection::context_of;
+use crate::object_document::{object_deserialize, Presence};
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -23,6 +24,8 @@ struct RepeatPayload {
     from_frame: u32,
     to_frame: u32,
     times: i64,
+    /// #2256: the declared component the cycle works inside; absent is the scene root.
+    context_id: Presence<String>,
 }
 object_deserialize!(RepeatPayload {
     command: String,
@@ -30,11 +33,19 @@ object_deserialize!(RepeatPayload {
     to_layer_uid: String,
     from_frame: u32,
     to_frame: u32,
-    times: i64
+    times: i64,
+    #[serde(default)] context_id: Presence<String>
 });
 
 /// Parse one repeat payload into its typed request.
 pub(crate) fn parse_repeat_payload(bytes: &[u8]) -> Result<RepeatRequest, DispatchErrorCode> {
+    parse_repeat_payload_in(bytes).map(|(request, _)| request)
+}
+
+/// The typed request and the context it works inside (the scene root when the payload names none).
+pub(crate) fn parse_repeat_payload_in(
+    bytes: &[u8],
+) -> Result<(RepeatRequest, String), DispatchErrorCode> {
     if bytes.len() > MAX_PAYLOAD_BYTES {
         return Err(DispatchErrorCode::InvalidRequest);
     }
@@ -46,13 +57,17 @@ pub(crate) fn parse_repeat_payload(bytes: &[u8]) -> Result<RepeatRequest, Dispat
     {
         return Err(DispatchErrorCode::InvalidRequest);
     }
-    Ok(RepeatRequest {
-        from_layer: payload.from_layer_uid,
-        to_layer: payload.to_layer_uid,
-        from_frame: payload.from_frame,
-        to_frame: payload.to_frame,
-        times: payload.times,
-    })
+    let context = context_of(&payload.context_id)?.to_owned();
+    Ok((
+        RepeatRequest {
+            from_layer: payload.from_layer_uid,
+            to_layer: payload.to_layer_uid,
+            from_frame: payload.from_frame,
+            to_frame: payload.to_frame,
+            times: payload.times,
+        },
+        context,
+    ))
 }
 
 /// The payload that carries `request`: the one definition of the wire form.

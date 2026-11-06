@@ -15,6 +15,7 @@
 //! hold promotion uses the existing L05 frame kernel inside the same detached
 //! candidate, so promotion and the selected edit publish together.
 use crate::commands::object_fill_owner::object_frame_edit_document::{clone_cell, drop_cells};
+use crate::commands::object_fill_owner::object_context_projection::{embed, project};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_clipboard_remap::DUPLICATE_OFFSET_PX;
 use crate::object_document::object_group_kernels::object_selection_edit_clones::RevisionIds;
@@ -324,7 +325,31 @@ impl ObjectFillOwner {
             },
             revision: next_revision(&origin)?,
         };
-        let plan = plan_split(origin.document(), &request);
+        // A declared component is the scene of the unchanged split kernel (`project`); the result is written back with `embed`.
+        let real = origin.document();
+        let plan = if payload.context_id == "scene-root" {
+            plan_split(real, &request)
+        } else {
+            let view = project(real, &payload.context_id)?;
+            let inner = SplitRequest {
+                context_id: "scene-root",
+                layer_uid: &payload.layer_uid,
+                frame: payload.frame,
+                labels: SplitLabels {
+                    shape: &payload.labels.shape,
+                    stroke: &payload.labels.stroke,
+                },
+                revision: request.revision,
+            };
+            match plan_split(&view, &inner) {
+                Ok(planned) if planned.changed => {
+                    let after = embed(real, &payload.context_id, &view, planned.document.clone())?;
+                    Ok(planned.rebased(real, after))
+                }
+                Ok(_) => Ok(SelectionPlan::unchanged(real, payload.frame)),
+                Err(error) => Err(error),
+            }
+        };
         PreparedSelectionEdit::seal(origin, SelectionEditKind::Split, plan)
     }
 

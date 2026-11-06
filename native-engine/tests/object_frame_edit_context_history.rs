@@ -73,29 +73,29 @@ fn world(explicit: bool) -> Value {
                     square("sym_a","ly_in_b",0,"s_b0"),square("sym_a","ly_in_lock",0,"s_l0")]}],
             "instances":[{"contextId":"scene-root","layerUid":"ly_inst","symbolId":"sym_a","symPlayMode":"loop","symSpeed":1,"symPlacedAt":0,"symSingleFrame":0}]}}})
 }
-fn open_as(explicit: bool) -> NativeObjectHistory {
+pub(super) fn open_as(explicit: bool) -> NativeObjectHistory {
     owner(
         decode_storage_project(world(explicit).to_string().as_bytes())
             .expect("the authored world is admitted"),
     )
 }
-fn open() -> NativeObjectHistory {
+pub(super) fn open() -> NativeObjectHistory {
     open_as(false)
 }
-fn bytes(o: &NativeObjectHistory) -> Vec<u8> {
+pub(super) fn bytes(o: &NativeObjectHistory) -> Vec<u8> {
     encode_storage_project(head(o).document()).unwrap()
 }
-fn value(o: &NativeObjectHistory) -> Value {
+pub(super) fn value(o: &NativeObjectHistory) -> Value {
     serde_json::from_slice(&bytes(o)).unwrap()
 }
-fn run(o: &mut NativeObjectHistory, operation: &str, payload: Value) -> Value {
+pub(super) fn run(o: &mut NativeObjectHistory, operation: &str, payload: Value) -> Value {
     let submitted = request(o, "ctx", operation, payload);
     dispatch(o, &submitted)
 }
-fn component(doc: &Value) -> &Value {
+pub(super) fn component(doc: &Value) -> &Value {
     &doc["componentTables"]["components"]["components"][0]
 }
-fn keys(doc: &Value, uid: &str) -> Vec<u64> {
+pub(super) fn keys(doc: &Value, uid: &str) -> Vec<u64> {
     component(doc)["layers"]
         .as_array()
         .unwrap()
@@ -108,7 +108,7 @@ fn keys(doc: &Value, uid: &str) -> Vec<u64> {
         .map(|k| k["frame"].as_u64().unwrap())
         .collect()
 }
-fn frames_of(doc: &Value, uid: &str) -> Vec<u64> {
+pub(super) fn frames_of(doc: &Value, uid: &str) -> Vec<u64> {
     let mut out: Vec<u64> = component(doc)["objects"]
         .as_array()
         .unwrap()
@@ -120,7 +120,7 @@ fn frames_of(doc: &Value, uid: &str) -> Vec<u64> {
     out
 }
 /// Everything the edit must not touch: the scene layers/objects/length, the scene order context and the placement table.
-fn outside(doc: &Value) -> Value {
+pub(super) fn outside(doc: &Value) -> Value {
     json!([
         doc["totalFrames"],
         doc["layers"],
@@ -129,7 +129,7 @@ fn outside(doc: &Value) -> Value {
         doc["componentTables"]["components"]["instances"]
     ])
 }
-fn scope_frames(doc: &Value) -> Vec<u64> {
+pub(super) fn scope_frames(doc: &Value) -> Vec<u64> {
     doc["compositionOrder"]["contexts"][1]["scopes"]
         .as_array()
         .unwrap()
@@ -141,7 +141,7 @@ fn scope_frames(doc: &Value) -> Vec<u64> {
 fn edit_cycle(operation: &str, payload: Value) -> Value {
     edit_cycle_in(open(), operation, payload)
 }
-fn edit_cycle_in(mut o: NativeObjectHistory, operation: &str, payload: Value) -> Value {
+pub(super) fn edit_cycle_in(mut o: NativeObjectHistory, operation: &str, payload: Value) -> Value {
     let (before_bytes, before) = (bytes(&o), value(&o));
     let reply = run(&mut o, operation, payload);
     assert_eq!(reply["ok"], true, "{reply}");

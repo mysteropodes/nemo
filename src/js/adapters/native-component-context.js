@@ -51,7 +51,7 @@
   function contextId(host) { var st = live(host); return st ? st.contextId : SCENE; }
   function layerRows(host) {
     var st = live(host);
-    return st ? st.rows.map(function (row) { return { layerUid: row.layerUid, locked: row.locked === true, visible: row.visible !== false, parentLayerUid: row.parentLayerUid || null, threeD: row.threeD === true, hasMotion: row.hasMotion === true }; }) : null;
+    return st ? st.rows.map(function (row) { return { layerUid: row.layerUid, locked: row.locked === true, visible: row.visible !== false, parentLayerUid: row.parentLayerUid || null, threeD: row.threeD === true, hasMotion: row.hasMotion === true, shy: row.shy === true }; }) : null;
   }
   function frameBound(host, pin) { var st = live(host); return st ? st.totalFrames : pin.totalFrames; }
   // #2256: what a pinned timing read of the held context is judged by: the component's own id, frame count and layer uids (null at the scene root).
@@ -94,7 +94,7 @@
       // The facts the scene's drawing gates read come from the owner's layer read (absent only from an older owner: then the permissive default).
       rows.push({ layerUid: layer.layerUid, name: layer.name === null ? 'Layer ' + (rows.length + 1) : layer.name, layerKind: layer.layerKind,
         visible: layer.visible !== false, locked: layer.locked === true, color: '#5FA875', parentLayerUid: layer.parentLayerUid || null,
-        threeD: layer.threeD === true, hasMotion: layer.hasMotion === true, frames: [], motion: {} });
+        threeD: layer.threeD === true, hasMotion: layer.hasMotion === true, shy: layer.shy === true, frames: [], motion: {} });
     });
     return rows;
   }

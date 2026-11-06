@@ -16,9 +16,11 @@ const P = 'command.document.object.';
 const OPS = Contract.OPERATIONS;
 const request = (operation, payload, extra) => Object.assign({ apiVersion: 2, requestId: 'frame-edit-7', instanceId: 'instance-A', documentId: 'document-A', expectedRevision: 7, operation, payload }, extra);
 const reply = (q, applied) => ({ apiVersion: 2, requestId: q.requestId, instanceId: q.instanceId, documentId: q.documentId, contentRevision: q.expectedRevision + (applied ? 1 : 0), ok: true, result: Object.assign({ applied, historyEntriesAdded: applied ? 1 : 0 }, q.operation === P + 'frames.move' ? { selection: applied ? [] : null } : q.operation === P + 'frames.repeat' ? { cycledLayers: 1, skippedComponentLayers: 0 } : /frames\.clipboard\.(copy|cut)$/.test(q.operation) ? { clipboard: {instanceId:q.instanceId,documentId:q.documentId,cells:[]} } : {}) });
-// #2256: contextId (the entered component) is optional on the nine timing edits that have a component route.
+// #2256: contextId (the entered component) is optional on the timing, move, repeat and clipboard edits that have a component route.
 const CONTEXT = ['contextId'];
-const OPTIONAL = { 'object.frames.insert': ['layerUids', 'contextId'], 'object.layer.key.promote': ['layerUids', 'contextId'], 'object.layer.key.move': ['activeLayerUid'],
+const OPTIONAL = { 'object.frames.insert': ['layerUids', 'contextId'], 'object.layer.key.promote': ['layerUids', 'contextId'], 'object.layer.key.move': ['activeLayerUid', 'contextId'],
+  'object.frames.move': CONTEXT, 'object.frames.repeat': CONTEXT, 'object.frames.clipboard.copy': CONTEXT, 'object.frames.clipboard.cut': CONTEXT,
+  'object.frames.clipboard.paste': CONTEXT, 'object.frames.clipboard.duplicate': CONTEXT,
   'object.frames.extend': CONTEXT, 'object.frames.duplicate': CONTEXT, 'object.frames.remove': CONTEXT, 'object.layer.key.blank': CONTEXT,
   'object.layer.key.clear': CONTEXT, 'object.layer.key.clear_cells': CONTEXT, 'object.layer.tween.remove': CONTEXT };
 

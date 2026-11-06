@@ -259,6 +259,7 @@
   function toolbar(host, kind) {
     const b = native(host);
     if (!b) return false;
+    if (host.NemoNativeComponentLayerEdit && host.NemoNativeComponentLayerEdit.held(host)) return host.NemoNativeComponentLayerEdit.toolbar(host, kind); // #2256: the entered component's own layers
     const info = infoOf(b), sel = info && !inComponent(host) && selectionOf(host, info);
     if (!sel) { refusal(host, { ok: false, code: 'unavailable' }); return true; }
     if (kind === 'delete') finish(host, b.writes.remove(sel));

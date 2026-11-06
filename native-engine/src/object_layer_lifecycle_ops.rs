@@ -14,6 +14,7 @@
 //! The baseline never gated delete, duplicate, rename, recolour or reorder on a
 //! lock or a transform parent, so the owner hands the kernel the policy that
 //! permits every decision.
+use crate::commands::object_fill_owner::object_context_projection::{context_of, project};
 use crate::commands::object_fill_owner::object_frame_bulk_move::plan_arrange_json;
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::{
@@ -21,7 +22,7 @@ use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::{
     LifecycleError,
     LifecyclePlan, SelectionOutcome,
 };
-use crate::object_document::{object_deserialize, ObjectDocument};
+use crate::object_document::{object_deserialize, ObjectDocument, Presence};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
@@ -39,6 +40,10 @@ use link::{plan_follow_path, plan_time_link, TimeLinkRequest};
 // #2371 U11: the layer colour label.
 #[path = "object_layer_lifecycle_color.rs"]
 mod color;
+// #2256: a lifecycle kernel inside a declared component.
+#[path = "object_layer_lifecycle_context.rs"]
+mod context_plan;
+use context_plan::plan_in;
 // #2371 U11 / D36: Null, Effect, Guide, Folder and Effector creation, and folder membership.
 #[path = "object_layer_kind_create.rs"]
 mod kind_create;
@@ -63,20 +68,25 @@ object_deserialize!(SelectionPayload {
 struct DeletePayload {
     command: String,
     selection: SelectionPayload,
+    /// #2256: the declared component the edit works inside; absent is the scene root.
+    context_id: Presence<String>,
 }
 object_deserialize!(DeletePayload {
     command: String,
-    selection: SelectionPayload
+    selection: SelectionPayload,
+    #[serde(default)] context_id: Presence<String>
 });
 
 #[derive(Debug)]
 struct DuplicatePayload {
     command: String,
     layer_uid: String,
+    context_id: Presence<String>,
 }
 object_deserialize!(DuplicatePayload {
     command: String,
-    layer_uid: String
+    layer_uid: String,
+    #[serde(default)] context_id: Presence<String>
 });
 
 #[derive(Debug)]
@@ -97,12 +107,14 @@ struct ReorderPayload {
     layer_uids: Vec<String>,
     gap: Number,
     selection: SelectionPayload,
+    context_id: Presence<String>,
 }
 object_deserialize!(ReorderPayload {
     command: String,
     layer_uids: Vec<String>,
     gap: Number,
-    selection: SelectionPayload
+    selection: SelectionPayload,
+    #[serde(default)] context_id: Presence<String>
 });
 
 #[derive(Debug)]
@@ -285,9 +297,12 @@ impl ObjectFillOwner {
         if payload.command != "object.layer.delete" {
             return Err(DispatchErrorCode::InvalidRequest);
         }
+        let context = context_of(&payload.context_id)?.to_owned();
         let selection = payload.selection.into_selection()?;
         let origin = self.current_snapshot();
-        let plan = plan_delete(origin.document(), &selection, &BaselineLayerEditPolicy);
+        let plan = plan_in(&origin, &context, |view| {
+            plan_delete(view, &selection, &BaselineLayerEditPolicy)
+        })?;
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::Delete, plan)
     }
     pub(crate) fn prepare_layer_duplicate_json(
@@ -298,18 +313,16 @@ impl ObjectFillOwner {
         if payload.command != "object.layer.duplicate" || payload.layer_uid.is_empty() {
             return Err(DispatchErrorCode::InvalidRequest);
         }
+        let context = context_of(&payload.context_id)?.to_owned();
         let origin = self.current_snapshot();
         // The kernel bounds the embedded revision (2^53 - 1) like layer-create.
         let next = origin
             .content_revision()
             .checked_add(1)
             .ok_or(DispatchErrorCode::Unavailable)?;
-        let plan = plan_duplicate(
-            origin.document(),
-            &payload.layer_uid,
-            next,
-            &BaselineLayerEditPolicy,
-        );
+        let plan = plan_in(&origin, &context, |view| {
+            plan_duplicate(view, &payload.layer_uid, next, &BaselineLayerEditPolicy)
+        })?;
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::Duplicate, plan)
     }
     pub(crate) fn prepare_layer_rename_json(
@@ -342,31 +355,31 @@ impl ObjectFillOwner {
             .as_f64()
             .filter(|gap| gap.is_finite())
             .ok_or(DispatchErrorCode::InvalidRequest)?;
+        let context = context_of(&payload.context_id)?.to_owned();
         let selection = payload.selection.into_selection()?;
         let origin = self.current_snapshot();
         // Targets are identities; a repeated one is a malformed set, not a
         // silently merged one.
         let mut seen: HashSet<&str> = HashSet::new();
-        let mut moving: Vec<i64> = Vec::with_capacity(payload.layer_uids.len());
         for uid in &payload.layer_uids {
             if uid.is_empty() || !seen.insert(uid.as_str()) {
                 return Err(DispatchErrorCode::InvalidRequest);
             }
-            let slot = origin
-                .document()
+        }
+        // The slots are those of the context's own layer stack.
+        let stack = project(origin.document(), &context)?;
+        let mut moving: Vec<i64> = Vec::with_capacity(payload.layer_uids.len());
+        for uid in &payload.layer_uids {
+            let slot = stack
                 .layers
                 .iter()
                 .position(|layer| layer.layer_uid == *uid)
                 .ok_or(DispatchErrorCode::NotFound)?;
             moving.push(i64::try_from(slot).map_err(|_| DispatchErrorCode::InvalidRequest)?);
         }
-        let plan = plan_reorder(
-            origin.document(),
-            &moving,
-            gap,
-            &selection,
-            &BaselineLayerEditPolicy,
-        );
+        let plan = plan_in(&origin, &context, |view| {
+            plan_reorder(view, &moving, gap, &selection, &BaselineLayerEditPolicy)
+        })?;
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::Reorder, plan)
     }
     /// #2372 U12: Parent A set or clear (`parentLayerUid: null`) that keeps the child's world pose at `frame`.
