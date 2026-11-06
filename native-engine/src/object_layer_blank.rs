@@ -46,6 +46,7 @@ impl ObjectLayer {
             widget: Presence::Missing,
             groups: Presence::Missing,
             blend_mode: Presence::Missing,
+            blend_keys: Presence::Missing,
             matte_mode: Presence::Missing,
             matte_source_layer_uid: Presence::Missing,
             mattes_more: Presence::Missing,

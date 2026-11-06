@@ -324,9 +324,13 @@ fn entry_bounds(witness: &ObjectCompositionWitness, entry: &PaintEntry<'_>) -> V
     }
 }
 
-/// The source object whose record owns an entry's item-level effect stack: the baseline `item.effects` of that one
-/// item. Contours, text and (unplaced) images draw their own record; a brush ink, a duplicator copy, a placed
-/// component and a video slot are not the record's own item, so they never carry its stack.
+/// The key an entry's item-level effect stack is filed under: the baseline `item.effects` of the ONE item the entry
+/// draws. A contour, an (unplaced) text or image, and every copy of a duplicator draw their source record, so the key is
+/// that record's object index (a copy carries its source's stack, like the baseline's cloned stroke). A placed
+/// component's inner record lives in the symbol's own context, so it takes a key past the packet's objects (see
+/// [`ObjectPaintPlan::component_item_key`]). A brush dab or bitmap ink and a video slot never carry a stack of their
+/// own: the baseline's dabs are separate items without `effects`, and the stack of a textured stroke belongs to its
+/// (camouflaged) anchor contour, which is drawn by its own entry.
 pub(in crate::compositor) fn item_object(
     plan: &ObjectPaintPlan,
     entry: &PaintEntry<'_>,
@@ -339,6 +343,25 @@ pub(in crate::compositor) fn item_object(
             .get(*index)
             .filter(|source| !source.placed)
             .map(|source| source.source_index),
+        PaintEntry::Duplicator(copy) => Some(copy.source_index),
+        PaintEntry::Component(paint) => plan.component_item_key(paint),
         _ => None,
+    }
+}
+
+/// The record an entry draws, for the claim check of a join stack: the keys of [`item_object`] plus the anchor record of
+/// a brush ink (its dabs and bitmap draw plain; the record's stack is its anchor contour's, see [`item_object`]).
+pub(in crate::compositor) fn claimed_object(
+    plan: &ObjectPaintPlan,
+    entry: &PaintEntry<'_>,
+) -> Option<usize> {
+    match entry {
+        PaintEntry::Dab(dab) => Some(dab.source_index),
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        PaintEntry::Brush(index) => plan
+            .brush_sources()
+            .and_then(|sources| sources.paints.get(*index))
+            .map(|paint| paint.source_index),
+        _ => item_object(plan, entry),
     }
 }

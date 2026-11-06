@@ -99,6 +99,7 @@ where
     let mut packet = ObjectFramePacket {
         duplicators: Vec::new(),
         motion_receipts: Vec::new(),
+        matte_on_receipts: Vec::new(),
         selector_receipts: Vec::new(),
         text_records,
         video_records: video::select(snapshot, selector, context_layers, &source_frames)?,
@@ -117,6 +118,8 @@ where
             crate::object_frame_packet::motion_receipts::capture(&packet, motion)?;
         packet.selector_receipts =
             crate::object_frame_packet::text_selectors::capture(&packet, motion)?;
+        packet.matte_on_receipts =
+            crate::object_frame_packet::motion_receipts::capture_matte_on(&packet, motion);
     }
     packet.duplicators = duplicators::prepare(&packet, exposure, motion)?;
     Ok(packet)

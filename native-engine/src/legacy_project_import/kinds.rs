@@ -15,6 +15,7 @@ pub(crate) struct Env<'a> {
 /// The layer members this module converts (they leave the slice-1 refusal list).
 pub(crate) const MAPPED: &[&str] = &[
     "blendMode",
+    "blendKeys",
     "matteMode",
     "matteSourceLayerUid",
     "mattesMore",
@@ -75,6 +76,44 @@ pub(crate) fn apply(
     range(path, map, uid, env, record, ctx)
 }
 
+/// Baseline `importJSON`: `blendKeys` keeps the entries that are `{frame: number, mode: string}`. Native stores them
+/// strictly increasing: a repeated frame keeps the LAST entry (what the baseline's linear scan would hold) and the order
+/// is restored by frame; an entry the baseline would drop, or one that is not a whole non-negative frame, is dropped
+/// with a warning.
+fn blend_keys(path: &str, map: &Map<String, Value>, record: &mut Value, ctx: &mut Ctx) {
+    let Some(Value::Array(entries)) = map.get("blendKeys") else {
+        return;
+    };
+    let mut kept: Vec<(u32, String)> = Vec::new();
+    for (position, entry) in entries.iter().enumerate() {
+        let frame = entry
+            .get("frame")
+            .and_then(Value::as_f64)
+            .filter(|frame| frame.fract() == 0. && (0. ..=f64::from(u32::MAX)).contains(frame))
+            .map(|frame| frame as u32);
+        let mode = entry.get("mode").and_then(Value::as_str).filter(|mode| !mode.is_empty());
+        match (frame, mode) {
+            (Some(frame), Some(mode)) => match kept.iter_mut().find(|(at, _)| *at == frame) {
+                Some(slot) => slot.1 = mode.to_owned(),
+                None => kept.push((frame, mode.to_owned())),
+            },
+            _ => ctx.warn(
+                format!("{path}.blendKeys[{position}]"),
+                "dropped_blend_key",
+                "a blend key needs a whole frame and a mode name, so it is not carried over",
+            ),
+        }
+    }
+    kept.sort_by_key(|(frame, _)| *frame);
+    if !kept.is_empty() {
+        record["blendKeys"] = Value::Array(
+            kept.into_iter()
+                .map(|(frame, mode)| json!({"frame": frame, "mode": mode}))
+                .collect(),
+        );
+    }
+}
+
 fn compositing(
     path: &str,
     map: &Map<String, Value>,
@@ -96,6 +135,7 @@ fn compositing(
         }
         None => {}
     }
+    blend_keys(path, map, record, ctx);
     let mode = match map.get("matteMode") {
         Some(Value::String(name)) if !name.is_empty() && name != "none" => Some(name.as_str()),
         Some(v) if is_default(v) || v == "none" => None,

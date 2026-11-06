@@ -353,6 +353,11 @@ test('the closed schema and the contract accept and refuse the same compositing 
     [{ edit: 'effects', effects: [{ type: 'blur' }] }, false], [{ edit: 'effects', effects: [{ type: 'blur', enabled: true, p9: 1 }] }, false],
     [{ edit: 'effectsFromSet', source: 'S' }, true], [{ edit: 'effectsFromClear' }, true], [{ edit: 'folderCollapsed', collapsed: true }, true],
     [{ edit: 'folderCollapsed', collapsed: 1 }, false], [{ edit: 'unknown' }, false],
+    [{ edit: 'blendKeySet', index: 12, mode: 'multiply' }, true], [{ edit: 'blendKeySet', index: 12 }, false], [{ edit: 'blendKeySet', mode: 'multiply' }, false],
+    [{ edit: 'blendKeySet', index: 12, mode: 'luma' }, false], [{ edit: 'blendKeySet', index: 12, mode: 'multiply', source: 'S' }, false],
+    [{ edit: 'blendKeyRemove', index: 3 }, true], [{ edit: 'blendKeyRemove' }, false], [{ edit: 'blendKeyRemove', index: 3, mode: 'screen' }, false],
+    [{ edit: 'blendKeysClear' }, true], [{ edit: 'blendKeysClear', mode: 'screen' }, true], [{ edit: 'blendKeysClear', mode: 'alpha' }, false],
+    [{ edit: 'blendKeysClear', index: 1 }, false],
   ];
   for (const [extra, expected] of cases) {
     const payload = Object.assign({}, base, extra);
@@ -386,4 +391,88 @@ test('panel hooks: parameter edits send one stack edit, keyed parameters and key
   assert.equal(none.remove(0), false);
   assert.equal(none.keyed(), false);
   assert.equal(none.param(0, 'p1', 1, keyed), false);
+});
+
+// #2257: the hold-only blend keys (the Blend stopwatch of the baseline Motion row) are three more edits of the same
+// operation. The rows carry `blendKeys`; the adapter decides which edit a gesture is from the pinned row.
+const KEYED = [
+  { layerUid: 'K-two', name: 'Two', visible: true, blendKeys: [{ frame: 4, mode: 'multiply' }, { frame: 10, mode: 'screen' }] },
+  { layerUid: 'K-one', name: 'One', visible: true, blendKeys: [{ frame: 6, mode: 'overlay' }] },
+  { layerUid: 'K-none', name: 'None', visible: true, blendMode: 'darken' },
+];
+const COMPOSITING = 'object.layer.compositing.edit';
+
+test('the contract admits the three blend key edits and refuses malformed ones locally', () => {
+  const ok = (extra) => { try { Contract.payload(OP, Object.assign({ command: COMPOSITING, layerUid: 'L' }, extra)); return true; } catch (_) { return false; } };
+  assert.equal(ok({ edit: 'blendKeySet', index: 12, mode: 'multiply' }), true);
+  assert.equal(ok({ edit: 'blendKeyRemove', index: 12 }), true);
+  assert.equal(ok({ edit: 'blendKeysClear' }), true);
+  assert.equal(ok({ edit: 'blendKeysClear', mode: 'screen' }), true);
+  assert.equal(ok({ edit: 'blendKeySet', mode: 'multiply' }), false, 'a key needs its frame');
+  assert.equal(ok({ edit: 'blendKeySet', index: 1 }), false, 'a key needs its mode');
+  assert.equal(ok({ edit: 'blendKeySet', index: 1, mode: 'luma' }), false, 'a matte mode is not a blend mode');
+  assert.equal(ok({ edit: 'blendKeySet', index: -1, mode: 'screen' }), false);
+  assert.equal(ok({ edit: 'blendKeyRemove', index: 1, mode: 'screen' }), false);
+  assert.equal(ok({ edit: 'blendKeysClear', index: 3 }), false);
+});
+
+test('blendOf holds the key mode at the frame and a pick on a keyed layer snaps a key there', async () => {
+  const h = harness({ layers: KEYED });
+  assert.equal(h.adapter.blendOf(0, 0), 'multiply', 'before the first key the first key holds');
+  assert.equal(h.adapter.blendOf(0, 4), 'multiply');
+  assert.equal(h.adapter.blendOf(0, 9), 'multiply', 'held until the next key');
+  assert.equal(h.adapter.blendOf(0, 10), 'screen');
+  assert.equal(h.adapter.blendOf(0, 99), 'screen');
+  assert.equal(h.adapter.blendOf(2, 7), 'darken', 'no keys: the stored blend');
+  assert.deepEqual(plain(h.adapter.blendKeysOf(1)), [{ frame: 6, mode: 'overlay' }]);
+  await h.adapter.setBlend(0, 'hue', 7);
+  assert.deepEqual(plain(h.sent[0].payload), { command: COMPOSITING, layerUid: 'K-two', edit: 'blendKeySet', index: 7, mode: 'hue' });
+  await h.adapter.setBlend(2, 'hue', 7);
+  assert.deepEqual(plain(h.sent[1].payload), { command: COMPOSITING, layerUid: 'K-none', edit: 'blend', mode: 'hue' }, 'no keys: the static blend');
+});
+
+test('the stopwatch is one native edit per click, decided from the pinned row', async () => {
+  const h = harness({ layers: KEYED });
+  await h.adapter.toggleBlendStopwatch(2, 5);
+  assert.deepEqual(plain(h.sent[0].payload), { command: COMPOSITING, layerUid: 'K-none', edit: 'blendKeySet', index: 5, mode: 'darken' }, 'on: seeds a key with the mode showing');
+  await h.adapter.toggleBlendStopwatch(0, 7);
+  assert.deepEqual(plain(h.sent[1].payload), { command: COMPOSITING, layerUid: 'K-two', edit: 'blendKeySet', index: 7, mode: 'multiply' }, 'keyed, no key here: a key holding the mode in force');
+  await h.adapter.toggleBlendStopwatch(0, 10);
+  assert.deepEqual(plain(h.sent[2].payload), { command: COMPOSITING, layerUid: 'K-two', edit: 'blendKeyRemove', index: 10 }, 'a key here: it goes');
+  await h.adapter.toggleBlendStopwatch(1, 6);
+  assert.deepEqual(plain(h.sent[3].payload), { command: COMPOSITING, layerUid: 'K-one', edit: 'blendKeysClear', mode: 'overlay' }, 'the only key: back to the static blend, keeping its mode');
+  await h.adapter.removeBlendKey(0, 4);
+  assert.equal(h.sent[4].payload.edit, 'blendKeyRemove');
+  await assert.rejects(h.adapter.toggleBlendStopwatch(0, -1), (error) => error.code === 'invalid_request');
+  await assert.rejects(h.adapter.toggleBlendStopwatch(9, 1), (error) => error.code === 'not_found');
+  await assert.rejects(h.adapter.setBlendKey(0, 1.5, 'screen'), (error) => error.code === 'invalid_request');
+  assert.equal(h.sent.length, 5, 'refused-locally calls never reach the owner');
+});
+
+test('the Motion Blend row on a native project shows the engine keys and the stopwatch is one native edit, no legacy write', async () => {
+  const motion = source('motion.js');
+  const a = motion.indexOf('  function renderBlendRow(body, ld, li) {'), b = motion.indexOf('  // One menu: pick the SOURCE layer, then the MODE.', a);
+  assert.ok(a > 0 && b > a);
+  const h = harness({ layers: KEYED });
+  const node = () => ({ className: '', style: {}, children: [], title: '', textContent: '', innerHTML: '', handlers: {},
+    appendChild(child) { this.children.push(child); return child; }, addEventListener(type, fn) { this.handlers[type] = fn; } });
+  const refreshed = [];
+  const guard = (name) => () => { throw new Error('legacy path: ' + name); };
+  const legacyRow = new Proxy({}, { set() { throw new Error('legacy write'); } });
+  const context = vm.createContext({
+    window: { nativeCompositing: () => h.adapter, openBlendDropdownAt() {} }, document: { createElement: node }, state: { currentFrame: 7 },
+    SM: { t: (key) => key }, stopwatchTitle: () => 'title', BLEND_MODE_LABELS: { multiply: 'Multiply', screen: 'Screen' },
+    nativeCompositing: () => h.adapter, nativeCompositingRefresh: () => refreshed.push('ok'), nativeCompositingRefused: () => refreshed.push('refused'),
+    layerBlendModeAt: guard('layerBlendModeAt'), pushUndo: guard('pushUndo'), renderLayerList: guard('renderLayerList'),
+  });
+  vm.runInContext(motion.slice(a, b), context);
+  const body = node();
+  vm.runInContext('renderBlendRow', context)(body, legacyRow, 0);
+  const row = body.children[0], [stopwatch, , pill] = row.children;
+  assert.match(stopwatch.className, /\bon\b/, 'keyed: the stopwatch is on');
+  assert.equal(pill.children[0].textContent, 'Multiply', 'the mode held at frame 7 by the keys at 4 and 10');
+  stopwatch.handlers.click({ stopPropagation() {} });
+  await settle();
+  assert.deepEqual(plain(h.sent.map((r) => r.payload)), [{ command: COMPOSITING, layerUid: 'K-two', edit: 'blendKeySet', index: 7, mode: 'multiply' }]);
+  assert.deepEqual(refreshed, ['ok']);
 });

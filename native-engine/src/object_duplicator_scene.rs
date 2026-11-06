@@ -120,11 +120,11 @@ pub(crate) fn prepare(packet: &ObjectFramePacket) -> Result<DuplicatorScene, Obj
                 .objects()
                 .get(layer.source_indices[copy_index])
                 .ok_or_else(|| invalid("duplicator original source is unavailable"))?;
-            if !copy.record.is_mask()
-                && (source.has_enabled_effects() || copy.record.has_enabled_effects())
-            {
+            // #2257: a copy carries its source's item effects (baseline `cloneStrokeForTransform` keeps `effects`);
+            // the layered compositor grades each copy on its own box with the source record's stack.
+            if !copy.record.is_mask() && source.effects() != copy.record.effects() {
                 return Err(invalid(
-                    "per-element effect evaluation awaits its native scene consumer",
+                    "a duplicator copy does not carry its source's item effects",
                 ));
             }
             let placement = layer

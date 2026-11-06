@@ -464,6 +464,10 @@ fn the_layer_compositing_edit_is_a_closed_union_by_edit() {
     assert!(ok(json!({"edit":"matteMoreAdd","source":"S"})));
     assert!(ok(json!({"edit":"matteMoreSet","index":0,"mode":"alpha"})));
     assert!(ok(json!({"edit":"folderCollapsed","collapsed":true})));
+    assert!(ok(json!({"edit":"blendKeySet","index":12,"mode":"multiply"})));
+    assert!(ok(json!({"edit":"blendKeyRemove","index":12})));
+    assert!(ok(json!({"edit":"blendKeysClear"})));
+    assert!(ok(json!({"edit":"blendKeysClear","mode":"screen"})));
     let blur = json!({"type":"blur","enabled":true,"p1":4,"p2":null,"keys":{"p1":{"keys":[]}}});
     assert!(ok(json!({"edit":"effects","effects":[blur, {"type":"vignette","enabled":false}]})));
     assert!(ok(json!({"edit":"effects","effects":[]})));
@@ -473,6 +477,11 @@ fn the_layer_compositing_edit_is_a_closed_union_by_edit() {
     assert!(!ok(json!({"edit":"blend","mode":"screen","source":"S"})), "closed members");
     assert!(!ok(json!({"edit":"matteClear","mode":"alpha"})));
     assert!(!ok(json!({"edit":"matteMoreRemove","index":-1})));
+    assert!(!ok(json!({"edit":"blendKeySet","index":12})), "a key needs its mode");
+    assert!(!ok(json!({"edit":"blendKeySet","mode":"screen"})), "a key needs its frame");
+    assert!(!ok(json!({"edit":"blendKeySet","index":12,"mode":"luma"})), "a matte mode is no blend mode");
+    assert!(!ok(json!({"edit":"blendKeyRemove","index":12,"mode":"screen"})));
+    assert!(!ok(json!({"edit":"blendKeysClear","index":1})));
     assert!(!ok(json!({"edit":"effects"})), "the stack is required");
     assert!(!ok(json!({"edit":"effects","effects":[{"type":"blur"}]})));
     assert!(!ok(json!({"edit":"effects","effects":[{"type":"blur","enabled":true,"p9":1}]})));

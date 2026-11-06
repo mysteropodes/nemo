@@ -257,6 +257,35 @@ fn a_key_tint_is_carried_over_and_a_malformed_one_is_named_and_dropped() {
 }
 
 #[test]
+fn hold_only_blend_keys_convert_in_frame_order_and_a_malformed_entry_is_named_and_dropped() {
+    let mut doc = animation();
+    // The baseline loader keeps `{frame: number, mode: string}`; its scan holds the LAST of two keys at one frame.
+    doc["layers"][0]["blendKeys"] = json!([
+        {"frame": 6, "mode": "screen"},
+        {"frame": 2, "mode": "multiply"},
+        {"frame": 2, "mode": "hue"},
+        {"frame": 1.5, "mode": "screen"},
+        {"frame": 3},
+        {"frame": 4, "mode": ""}
+    ]);
+    let converted = import(&doc.to_string());
+    let dropped = warnings(&converted).into_iter().filter(|w| w.1 == "dropped_blend_key").count();
+    assert_eq!(dropped, 3, "the fractional frame, the missing mode and the empty mode");
+    let d = file(&converted)["drawing"].clone();
+    assert_eq!(
+        d["layers"][0]["blendKeys"],
+        json!([{"frame": 2, "mode": "hue"}, {"frame": 6, "mode": "screen"}])
+    );
+    // Reopened through the real codec and owner, the keys are the stored record.
+    let mut doc = animation();
+    doc["layers"][0]["blendKeys"] = json!([{"frame": 0, "mode": "multiply"}]);
+    assert_eq!(
+        drawing(&doc.to_string())["layers"][0]["blendKeys"],
+        json!([{"frame": 0, "mode": "multiply"}])
+    );
+}
+
+#[test]
 fn dangling_references_degrade_like_the_baseline_and_bad_values_refuse() {
     let mut doc = animation();
     doc["layers"][1]["timeLink"] = json!({"parentUid": "ly_shapes", "inOffset": 3});

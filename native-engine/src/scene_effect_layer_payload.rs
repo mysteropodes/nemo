@@ -68,6 +68,14 @@ pub(super) enum Edit {
         mode: Option<String>,
     },
     MatteMoreRemove(usize),
+    /// Hold-only blend key: the mode from `frame` on (an existing key at the frame is replaced).
+    BlendKeySet {
+        frame: u32,
+        mode: String,
+    },
+    BlendKeyRemove(u32),
+    /// The stopwatch off: drop every key; with a mode, that mode becomes the static blend in the same write.
+    BlendKeysClear(Option<String>),
     Effects(Vec<LayerEffect>),
     EffectsFromSet(String),
     EffectsFromClear,
@@ -101,7 +109,7 @@ fn allowed(present: bool, rule: u8) -> bool {
     }
 }
 
-/// Which of `mode, source, index, collapsed, effects` an edit takes.
+/// Which of `mode, source, index, collapsed, effects` an edit takes. A blend key's frame travels as `index`.
 fn rules(edit: &str) -> Option<[u8; 5]> {
     Some(match edit {
         "blend" => [REQUIRED, FORBIDDEN, FORBIDDEN, FORBIDDEN, FORBIDDEN],
@@ -111,6 +119,9 @@ fn rules(edit: &str) -> Option<[u8; 5]> {
         "matteMoreAdd" => [OPTIONAL, REQUIRED, FORBIDDEN, FORBIDDEN, FORBIDDEN],
         "matteMoreSet" => [OPTIONAL, OPTIONAL, REQUIRED, FORBIDDEN, FORBIDDEN],
         "matteMoreRemove" => [FORBIDDEN, FORBIDDEN, REQUIRED, FORBIDDEN, FORBIDDEN],
+        "blendKeySet" => [REQUIRED, FORBIDDEN, REQUIRED, FORBIDDEN, FORBIDDEN],
+        "blendKeyRemove" => [FORBIDDEN, FORBIDDEN, REQUIRED, FORBIDDEN, FORBIDDEN],
+        "blendKeysClear" => [OPTIONAL, FORBIDDEN, FORBIDDEN, FORBIDDEN, FORBIDDEN],
         "effects" => [FORBIDDEN, FORBIDDEN, FORBIDDEN, FORBIDDEN, REQUIRED],
         "folderCollapsed" => [FORBIDDEN, FORBIDDEN, FORBIDDEN, REQUIRED, FORBIDDEN],
         _ => return None,
@@ -190,6 +201,17 @@ pub(super) fn edit_of(payload: &EditPayload) -> Result<Edit, DispatchErrorCode> 
             }
         }
         "matteMoreRemove" => Edit::MatteMoreRemove(index.ok_or(DispatchErrorCode::InvalidRequest)?),
+        "blendKeySet" => match (mode, payload.index.value()) {
+            (Some(mode), Some(frame)) if BLEND_MODE_NAMES.contains(&mode.as_str()) => {
+                Edit::BlendKeySet { frame: *frame, mode }
+            }
+            _ => return bad(),
+        },
+        "blendKeyRemove" => Edit::BlendKeyRemove(*payload.index.value().ok_or(DispatchErrorCode::InvalidRequest)?),
+        "blendKeysClear" => match mode {
+            Some(mode) if !BLEND_MODE_NAMES.contains(&mode.as_str()) => return bad(),
+            mode => Edit::BlendKeysClear(mode),
+        },
         "effects" => Edit::Effects(payload.effects.value().cloned().unwrap_or_default()),
         "effectsFromSet" => Edit::EffectsFromSet(source.ok_or(DispatchErrorCode::InvalidRequest)?),
         "effectsFromClear" => Edit::EffectsFromClear,

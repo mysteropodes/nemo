@@ -54,6 +54,34 @@ impl ObjectPaintPlan {
     pub(crate) fn has_components(&self) -> bool {
         !self.scene.components.paints.is_empty()
     }
+    /// Every duplicator copy paint, in scene order (the entries' `PaintIndex::Duplicator` index).
+    pub(crate) fn duplicator_paints(
+        &self,
+    ) -> &[crate::object_render_scene::duplicator_scene::DuplicatorPaint] {
+        &self.scene.duplicators.paints
+    }
+    /// Every placed-component inner paint, in scene order (the entries' `PaintIndex::Component` index).
+    pub(crate) fn component_paints(
+        &self,
+    ) -> &[crate::object_render_scene::component_scene::ComponentPaint] {
+        &self.scene.components.paints
+    }
+    /// The item-effect key of one placed-component paint of THIS plan: the packet's object count plus the paint's index,
+    /// so it never collides with a source object index. A placed component's inner record lives in the symbol's own
+    /// context, which the join's packet-wide object table does not hold. `None` for a paint of another plan.
+    pub(crate) fn component_item_key(
+        &self,
+        paint: &crate::object_render_scene::component_scene::ComponentPaint,
+    ) -> Option<usize> {
+        let paints = self.component_paints();
+        let range = paints.as_ptr_range();
+        let at = std::ptr::from_ref(paint);
+        if !range.contains(&at) {
+            return None;
+        }
+        let offset = (at as usize - range.start as usize) / std::mem::size_of_val(paint);
+        Some(self.packet().source_objects().len() + offset)
+    }
     pub(crate) fn has_text(&self) -> bool {
         !self.scene.texts.entries.is_empty()
     }

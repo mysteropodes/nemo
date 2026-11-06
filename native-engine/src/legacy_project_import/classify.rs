@@ -124,7 +124,6 @@ pub(super) const LAYER_LATER: &[&str] = &[
     "lfsGroup",
     "lfsIds",
     "lfsSettings",
-    "blendKeys",
     "channel",
     "linkGroupId",
     "nativeVideo",
