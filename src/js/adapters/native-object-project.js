@@ -287,7 +287,7 @@
       try{await inspect();await changed();}catch(unknown){throw fence(unknown);}
       if(!receipt.ok){
         try{await present(ports.frame?ports.frame():0);}catch(unpresented){if(!historyAction&&ports.notice)ports.notice(unpresented.message);}
-        throw new Error('Native command refused: '+(receipt.error&&receipt.error.code||'unavailable'));
+        throw Object.assign(new Error('Native command refused: '+(receipt.error&&receipt.error.code||'unavailable')),{refusal:receipt.error&&typeof receipt.error.message==='string'?{code:receipt.error.code,message:receipt.error.message}:undefined});
       }
       await present(ports.frame?ports.frame():0);return receipt;
     });}
