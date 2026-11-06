@@ -74,7 +74,8 @@ pub(crate) fn layers_world_union(
 /// The layer's own bounds `[x0, y0, x1, y1]` before its Motion, for ANY layer that shows geometry at `frame`: the strict
 /// vector extents of `layer_pivot_extents`, else the extents of a mask or a duplicated source, else the display rectangles
 /// of its image and raster records. The baseline gizmo boxes every one of these (`motionBoxGeom`), and a 3D layer's own gizmo
-/// pivots about the same bounds; text, effect, rig and widget layers stay refused with a reason the caller shows.
+/// pivots about the same bounds. A rigged layer is boxed on its POSED strokes, an effect layer at the zero bounds of an empty layer, and an expression-driven
+/// document on its rest geometry; text and widget layers stay refused with a reason the caller shows.
 #[cfg_attr(not(feature = "evaluation"), allow(unused_variables))]
 pub(crate) fn layer_gizmo_bounds(
     snapshot: &ObjectSnapshot,
